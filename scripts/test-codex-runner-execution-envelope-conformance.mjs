@@ -71,6 +71,29 @@ Decision:
 `;
 }
 
+function findingMarkdown({
+  findingId = "F-COMPLETE",
+  severity = "major",
+  mergeBlocker = "false",
+  practicalImpact = "callers receive an incorrect review decision",
+  triggerOrFailureTrace = "managed review -> finding inventory",
+  evidenceLocation = "scripts/ask-sensors.mjs",
+  requiredPostFixCondition = "the closed finding inventory is accepted",
+  category = "correctness",
+} = {}) {
+  return `- Finding ID: ${findingId}
+  Severity: ${severity}
+  Merge blocker: ${mergeBlocker}
+  Practical impact: ${practicalImpact}
+  Trigger or failure trace: ${triggerOrFailureTrace}
+  Evidence location: ${evidenceLocation}
+  Required post-fix condition: ${requiredPostFixCondition}${category === null ? "" : `\n  Category: ${category}`}`;
+}
+
+function withoutFindingField(markdown, field) {
+  return markdown.split("\n").filter((line) => !line.match(new RegExp(`^\\s*(?:-\\s+)?${field}:`, "u"))).join("\n");
+}
+
 const modeCases = [
   {
     prompt: "skill-implement.md",
@@ -241,6 +264,64 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     assert.equal(JSON.parse(readFileSync(persistedRecordPath, "utf8")).record_id, report.execution_envelope_record.record_id, `${fixture.mode} persisted record identity`);
   }
 
+  const validNonBlockingFinding = findingMarkdown();
+  const validBlockingFinding = findingMarkdown({
+    findingId: "F-MERGE-BLOCKER",
+    severity: "blocker",
+    mergeBlocker: "true",
+    practicalImpact: "the candidate cannot be merged safely",
+    requiredPostFixCondition: "the merge-blocking defect is resolved",
+  });
+  const completeFindingFields = [
+    "Finding ID",
+    "Severity",
+    "Merge blocker",
+    "Practical impact",
+    "Trigger or failure trace",
+    "Evidence location",
+    "Required post-fix condition",
+  ];
+  const malformedFindingCases = [
+    ...completeFindingFields.map((field) => ({ label: `missing ${field}`, findings: withoutFindingField(validNonBlockingFinding, field) })),
+    { label: "unknown severity", findings: findingMarkdown({ severity: "critical" }) },
+    { label: "unknown merge blocker", findings: findingMarkdown({ mergeBlocker: "unknown" }) },
+    { label: "string merge blocker", findings: findingMarkdown({ mergeBlocker: '"true"' }) },
+    { label: "duplicate finding ID", findings: `${findingMarkdown({ findingId: "F-DUPLICATE", mergeBlocker: "true" })}\n${findingMarkdown({ findingId: "F-DUPLICATE" })}` },
+    { label: "duplicate field", findings: `${validNonBlockingFinding}\n  Severity: major` },
+    { label: "unknown field", findings: `${validNonBlockingFinding}\n  Recommendation: reject this extension` },
+    { label: "unindented unknown field", findings: `${validNonBlockingFinding}\nRecommendation: reject this extension` },
+    { label: "unindented unknown field after none", findings: "- none\nUnknown field: silently accepted" },
+    { label: "empty practical impact", findings: findingMarkdown({ practicalImpact: "" }) },
+    { label: "empty trigger or failure trace", findings: findingMarkdown({ triggerOrFailureTrace: "" }) },
+    { label: "empty evidence location", findings: findingMarkdown({ evidenceLocation: "" }) },
+    { label: "empty required post-fix condition", findings: findingMarkdown({ requiredPostFixCondition: "" }) },
+    { label: "empty category", findings: findingMarkdown({ category: "" }) },
+    { label: "invalid finding ID", findings: findingMarkdown({ findingId: "finding-lowercase" }) },
+    {
+      label: "invalid merge-blocker impact order",
+      findings: `${findingMarkdown({ findingId: "F-NONBLOCKING" })}\n${findingMarkdown({ findingId: "F-BLOCKING", severity: "blocker", mergeBlocker: "true" })}`,
+    },
+    {
+      label: "invalid severity impact order",
+      findings: `${findingMarkdown({ findingId: "F-MINOR", severity: "minor" })}\n${findingMarkdown({ findingId: "F-MAJOR", severity: "major" })}`,
+    },
+    {
+      label: "invalid finding ID impact order",
+      findings: `${findingMarkdown({ findingId: "F-ZULU" })}\n${findingMarkdown({ findingId: "F-ALPHA" })}`,
+    },
+  ];
+  const malformedDecisionCoverage = [
+    { label: "request changes malformed inventory", baselineStatus: "fail", decision: "request changes" },
+    { label: "block malformed inventory", baselineStatus: "fail", decision: "block" },
+    {
+      label: "insufficient evidence malformed inventory",
+      baselineStatus: "insufficient_evidence",
+      missingEvidence: "- review-ai-quality: exact target unavailable; inspect it",
+      decision: "insufficient evidence",
+    },
+    { label: "approve malformed inventory", decision: "approve" },
+    { label: "approve with comments malformed inventory", decision: "approve with comments" },
+  ];
   const installedDecisionCases = [
     { label: "baseline fail plus approve", response: reviewResponse({ baselineStatus: "fail", decision: "approve" }), expectedPass: false },
     { label: "baseline insufficient evidence plus approve", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", decision: "approve" }), expectedPass: false },
@@ -277,15 +358,55 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     },
     {
       label: "all required gates pass plus approve",
-      response: reviewResponse({ additionalGates: "- review-output-quality: status=pass; evidence=exact rendered output; signals=docs_output_change", decision: "approve" }),
+      response: reviewResponse({ additionalGates: "- review-output-quality: status=pass; evidence=exact rendered output; signals=docs_output_change", findings: validNonBlockingFinding, decision: "approve" }),
       observedSignal: "docs_output_change",
       expectedPass: true,
     },
-    { label: "approve with comments remains valid", response: reviewResponse({ decision: "approve with comments" }), expectedPass: true },
+    { label: "approve with comments remains valid", response: reviewResponse({ findings: validNonBlockingFinding, decision: "approve with comments" }), expectedPass: true },
+    {
+      label: "approve preserves quoted and fenced legacy prose after an empty inventory",
+      response: reviewResponse({
+        findings: `- none
+
+The quoted legacy label is "Layer summary:" and is not a Finding field.
+
+\`\`\`text
+Layer summary:
+- legacy example inside a code fence
+\`\`\``,
+        decision: "approve",
+      }),
+      expectedPass: true,
+    },
     { label: "approve with comments rejects a failing baseline", response: reviewResponse({ baselineStatus: "fail", decision: "approve with comments" }), expectedPass: false },
-    { label: "request changes remains valid", response: reviewResponse({ baselineStatus: "fail", decision: "request changes" }), expectedPass: true },
-    { label: "block remains valid", response: reviewResponse({ baselineStatus: "fail", decision: "block" }), expectedPass: true },
-    { label: "insufficient evidence remains valid", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", decision: "insufficient evidence" }), expectedPass: true },
+    { label: "request changes accepts a complete merge blocker", response: reviewResponse({ baselineStatus: "fail", findings: validBlockingFinding, decision: "request changes" }), expectedPass: true },
+    { label: "block accepts a complete merge blocker", response: reviewResponse({ baselineStatus: "fail", findings: validBlockingFinding, decision: "block" }), expectedPass: true },
+    { label: "insufficient evidence accepts a complete merge blocker", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", findings: validBlockingFinding, decision: "insufficient evidence" }), expectedPass: true },
+    { label: "request changes accepts an omitted optional category", response: reviewResponse({ baselineStatus: "fail", findings: findingMarkdown({ mergeBlocker: "true", category: null }), decision: "request changes" }), expectedPass: true },
+    {
+      label: "request changes keeps none findings for a failing additional gate",
+      response: reviewResponse({ additionalGates: "- review-output-quality: status=fail; evidence=output regression; signals=docs_output_change", decision: "request changes" }),
+      observedSignal: "docs_output_change",
+      expectedPass: true,
+    },
+    { label: "request changes keeps none finding inventory", response: reviewResponse({ baselineStatus: "fail", decision: "request changes" }), expectedPass: true },
+    { label: "block keeps none finding inventory", response: reviewResponse({ baselineStatus: "fail", decision: "block" }), expectedPass: true },
+    { label: "insufficient evidence keeps none finding inventory", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", decision: "insufficient evidence" }), expectedPass: true },
+    ...malformedFindingCases.map(({ label, findings }) => ({
+      label: `approve rejects ${label}`,
+      response: reviewResponse({ findings, decision: "approve" }),
+      expectedPass: false,
+    })),
+    ...malformedDecisionCoverage.map(({ label, baselineStatus = "pass", missingEvidence = "- none", decision }) => ({
+      label,
+      response: reviewResponse({
+        baselineStatus,
+        missingEvidence,
+        findings: withoutFindingField(validNonBlockingFinding, "Evidence location"),
+        decision,
+      }),
+      expectedPass: false,
+    })),
   ];
   for (const [index, fixture] of installedDecisionCases.entries()) {
     const resultPath = resolve(target, `.fixture-review-decision-${index}.json`);

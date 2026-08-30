@@ -14,6 +14,7 @@ import {
   inspectExecutionEnvelopeRecordEmission,
   isMarkdownFenceClosing,
   markdownFenceOpening,
+  validateJsonSchema,
 } from "./execution-envelope.mjs";
 
 const KNOWN_OUTPUT_SECTIONS = [
@@ -276,9 +277,11 @@ function reviewLayerSummarySensor(text, contract, requiredGates = [], observedSi
   if (baselineResult.issue) {
     return sensor("review_layer_summary", "fail", baselineResult.issue, "Emit exactly one review-ai-quality result with a normalized status and non-empty evidence.");
   }
+  let registry;
   let route;
   try {
-    route = deriveReviewSignalGateRoute(readReviewSignalGateMap(target), observedSignals);
+    registry = readReviewSignalGateMap(target);
+    route = deriveReviewSignalGateRoute(registry, observedSignals);
   } catch (error) {
     return sensor("review_layer_summary", "fail", `Canonical review route is unavailable: ${error.message}.`, "Restore the canonical signal registry before evaluating review output.");
   }
@@ -302,6 +305,14 @@ function reviewLayerSummarySensor(text, contract, requiredGates = [], observedSi
   if (additionalResult.issue) {
     return sensor("review_layer_summary", "fail", additionalResult.issue, "Emit one closed result record for every derived additional gate and no untriggered gate record.");
   }
+  const findingResult = inspectFindingInventory(
+    sections.get("Findings:")?.[0] ?? [],
+    registry.finding_contract,
+    resolve(target, "schemas/review-finding.schema.json"),
+  );
+  if (findingResult.issue) {
+    return sensor("review_layer_summary", "fail", findingResult.issue, "Emit one complete impact-ordered Findings inventory that conforms to ask.review-finding@1.0.0.");
+  }
   if (finalGateRequired) {
     const decisionResult = inspectReviewDecision(sections.get("Decision:")?.[0] ?? []);
     if (decisionResult.issue) {
@@ -313,7 +324,7 @@ function reviewLayerSummarySensor(text, contract, requiredGates = [], observedSi
         baselineStatus: baselineResult.status,
         additionalStatuses: additionalResult.statuses,
         missingEvidenceLines: sections.get("Missing evidence:")?.[0] ?? [],
-        findingLines: sections.get("Findings:")?.[0] ?? [],
+        findings: findingResult.findings,
       });
       if (consistencyIssue) {
         return sensor("review_layer_summary", "fail", consistencyIssue, "Use request changes, block, or insufficient evidence until every approval precondition is satisfied.");
@@ -392,7 +403,7 @@ function inspectReviewDecision(lines) {
   return { issue: null, decision };
 }
 
-function inspectApprovalConsistency({ decision, baselineStatus, additionalStatuses, missingEvidenceLines, findingLines }) {
+function inspectApprovalConsistency({ decision, baselineStatus, additionalStatuses, missingEvidenceLines, findings }) {
   const issues = [];
   if (baselineStatus !== "pass") issues.push(`baseline review status is ${baselineStatus ?? "missing"}`);
   const nonPassingGates = additionalStatuses.filter(({ status }) => status !== "pass");
@@ -402,9 +413,7 @@ function inspectApprovalConsistency({ decision, baselineStatus, additionalStatus
   if (missingEvidence.issue) issues.push(missingEvidence.issue);
   else if (!missingEvidence.empty) issues.push("Missing evidence is not empty");
 
-  const findings = inspectBlockingFindingInventory(findingLines);
-  if (findings.issue) issues.push(findings.issue);
-  else if (findings.blocking) issues.push("Findings contains an unresolved merge blocker");
+  if (findings.some((finding) => finding.merge_blocker)) issues.push("Findings contains an unresolved merge blocker");
 
   return issues.length > 0 ? `Decision ${decision} is inconsistent with review authority: ${issues.join("; ")}.` : null;
 }
@@ -418,18 +427,106 @@ function inspectEmptyInventory(lines, label) {
   return { issue: null, empty: false };
 }
 
-function inspectBlockingFindingInventory(lines) {
-  const empty = inspectEmptyInventory(lines, "Findings");
-  if (empty.empty) return { issue: null, blocking: false };
-  if (empty.issue) return { issue: empty.issue, blocking: false };
-  const records = contentLines(lines);
-  const findingCount = records.filter((line) => /^\s*-\s+Finding ID:\s*\S/u.test(line)).length;
-  const blockerFields = records.filter((line) => /^\s+Merge blocker:/u.test(line));
-  const normalizedBlockers = blockerFields.map((line) => line.match(/^\s+Merge blocker:\s*(true|false)\s*$/u)?.[1] ?? null);
-  if (findingCount === 0 || blockerFields.length !== findingCount || normalizedBlockers.some((value) => value === null)) {
-    return { issue: "Findings inventory has an uninterpretable merge-blocker state", blocking: false };
+const REVIEW_FINDING_MARKDOWN_FIELDS = new Map([
+  ["Finding ID", "finding_id"],
+  ["Severity", "severity"],
+  ["Merge blocker", "merge_blocker"],
+  ["Practical impact", "practical_impact"],
+  ["Trigger or failure trace", "trigger_or_failure_trace"],
+  ["Evidence location", "evidence_location"],
+  ["Required post-fix condition", "required_post_fix_condition"],
+  ["Category", "category"],
+]);
+
+function inspectFindingInventory(lines, contract, schemaPath) {
+  const records = reviewFindingRecordLines(lines);
+  const empty = inspectEmptyInventory(records, "Findings");
+  if (empty.empty) return { issue: null, findings: [] };
+  if (empty.issue) return { issue: empty.issue, findings: [] };
+  const findings = [];
+  let finding = null;
+  let fields = null;
+
+  for (const line of records) {
+    const recordMatch = line.match(/^\s*-\s+([^:]+):\s*(.*?)\s*$/u);
+    const fieldMatch = recordMatch ?? line.match(/^\s+([^:]+):\s*(.*?)\s*$/u);
+    if (!fieldMatch) return { issue: `Findings inventory contains an unsupported record line: ${line.trim()}.`, findings: [] };
+    const [, markdownField, rawValue] = fieldMatch;
+    const field = REVIEW_FINDING_MARKDOWN_FIELDS.get(markdownField);
+    if (!field) return { issue: `Findings inventory contains an unknown field: ${markdownField}.`, findings: [] };
+    if (recordMatch) {
+      if (field !== "finding_id") return { issue: `Findings inventory record must start with Finding ID, received ${markdownField}.`, findings: [] };
+      finding = {};
+      fields = new Set();
+      findings.push(finding);
+    } else if (!finding) {
+      return { issue: `Findings inventory contains ${markdownField} before a Finding ID.`, findings: [] };
+    }
+    if (fields.has(field)) {
+      const id = finding.finding_id || "unknown";
+      return { issue: `Finding ${id} repeats ${markdownField}.`, findings: [] };
+    }
+    fields.add(field);
+    finding[field] = field === "merge_blocker"
+      ? rawValue === "true" ? true : rawValue === "false" ? false : rawValue
+      : rawValue;
   }
-  return { issue: null, blocking: normalizedBlockers.includes("true") };
+
+  const requiredFields = contract?.required_fields ?? [];
+  const optionalFields = contract?.optional_fields ?? [];
+  const canonicalFields = new Set([...requiredFields, ...optionalFields]);
+  if (canonicalFields.size !== REVIEW_FINDING_MARKDOWN_FIELDS.size
+    || [...REVIEW_FINDING_MARKDOWN_FIELDS.values()].some((field) => !canonicalFields.has(field))) {
+    return { issue: "Canonical review Finding field projection is inconsistent with the review signal registry.", findings: [] };
+  }
+
+  const schemaIssues = validateJsonSchema(findings, { schemaPath });
+  const duplicateIds = [];
+  const seenIds = new Set();
+  for (const findingRecord of findings) {
+    if (seenIds.has(findingRecord.finding_id)) duplicateIds.push(findingRecord.finding_id);
+    seenIds.add(findingRecord.finding_id);
+  }
+  const issues = schemaIssues.map((issue) => `schema ${issue}`);
+  for (const id of duplicateIds) issues.push(`duplicate Finding ID ${id}`);
+
+  if (issues.length === 0) {
+    const severityIndex = new Map((contract?.severity_order ?? []).map((severity, index) => [severity, index]));
+    const expected = [...findings].sort((left, right) => {
+      if (left.merge_blocker !== right.merge_blocker) return left.merge_blocker ? -1 : 1;
+      const severity = severityIndex.get(left.severity) - severityIndex.get(right.severity);
+      if (severity !== 0) return severity;
+      return left.finding_id < right.finding_id ? -1 : left.finding_id > right.finding_id ? 1 : 0;
+    });
+    if (expected.some((expectedFinding, index) => expectedFinding !== findings[index])) issues.push("impact order is invalid");
+  }
+
+  return issues.length > 0
+    ? { issue: `Findings inventory violates ask.review-finding@1.0.0: ${issues.join("; ")}.`, findings: [] }
+    : { issue: null, findings };
+}
+
+function reviewFindingRecordLines(lines) {
+  const records = [];
+  let activeFence = null;
+  for (const line of lines) {
+    if (activeFence) {
+      if (isMarkdownFenceClosing(line, activeFence)) activeFence = null;
+      continue;
+    }
+    const opening = markdownFenceOpening(line);
+    if (opening) {
+      activeFence = opening;
+      continue;
+    }
+    if (!line.trim() || /^\s*>/u.test(line)) continue;
+    if (/^\s*-\s+/u.test(line)
+      || /^\s+\S/u.test(line)
+      || /^[\p{L}\p{N}_-][\p{L}\p{N} _/-]*:\s*/u.test(line)) {
+      records.push(line);
+    }
+  }
+  return records;
 }
 
 function contentLines(lines) {
