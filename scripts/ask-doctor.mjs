@@ -10,6 +10,7 @@ import {
   hashText,
   inspectCodexDiscoverySkillAssets,
   inspectCodexProjectionCanonicalInputs,
+  inspectCodexPromptContractBindings,
   parseCodexCompactProfileHeader,
   readJsonIfExists,
 } from "./ask-shared.mjs";
@@ -710,6 +711,9 @@ function checkCodexRuntimeState(target, state, probe) {
   for (const prompt of state.selected_prompts ?? []) {
     const promptPath = resolve(target, ".agents/prompts", prompt);
     const record = state.managed_files?.[`.agents/prompts/${prompt}`];
+    for (const finding of inspectCodexPromptContractBindings(target, state, prompt, record)) {
+      probe.failures.push(`Codex selected prompt contract ${finding.status}: ${finding.path}`);
+    }
     if (!existsSync(promptPath) || !record?.compact_profile) {
       probe.failures.push(`Codex compact runtime profile is missing: .agents/prompts/${prompt}`);
       continue;

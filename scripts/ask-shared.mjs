@@ -243,6 +243,40 @@ export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {
   return findings;
 }
 
+export function inspectCodexPromptContractBindings(target, state = {}, prompt, promptRecord = null) {
+  const findings = [];
+  const registryPath = "schemas/fixed-entry-profile-registry.json";
+  const registry = readJsonIfExists(resolve(target, registryPath));
+  const expectedContracts = registry.ok ? registry.value?.entries?.[prompt]?.requested_contracts : null;
+  if (!Array.isArray(expectedContracts) || expectedContracts.length === 0 || new Set(expectedContracts).size !== expectedContracts.length) {
+    findings.push({ path: registryPath, status: registry.ok ? "invalid_prompt_contract_registry" : "prompt_contract_registry_unavailable" });
+    return findings;
+  }
+  const requiredSkills = promptRecord?.required_skills;
+  if (!Array.isArray(requiredSkills) || requiredSkills.length === 0 || new Set(requiredSkills).size !== requiredSkills.length) {
+    findings.push({ path: prompt, status: "invalid_required_skill_inventory" });
+    return findings;
+  }
+  const requestedContracts = promptRecord?.compact_profile?.requested_contracts;
+  if (JSON.stringify(requestedContracts) !== JSON.stringify(expectedContracts)) {
+    findings.push({ path: prompt, status: "compact_requested_contracts_mismatch" });
+  }
+  const selectedSkillSet = new Set(Array.isArray(state.selected_skills) ? state.selected_skills : []);
+  const projectedSkillSet = new Set((state.projection_plan?.projected_managed_assets ?? []).flatMap((asset) => {
+    if (asset?.asset_kind !== "skills" || typeof asset.path !== "string") return [];
+    const match = asset.path.match(/^\.agents\/skills\/([a-z0-9][a-z0-9-]*)\/SKILL\.md$/u);
+    return match ? [match[1]] : [];
+  }));
+  for (const contract of expectedContracts) {
+    if (!requiredSkills.includes(contract)) findings.push({ path: contract, status: "canonical_required_skill_missing" });
+  }
+  for (const skill of requiredSkills) {
+    if (!selectedSkillSet.has(skill)) findings.push({ path: skill, status: "required_skill_not_selected" });
+    if (!projectedSkillSet.has(skill)) findings.push({ path: skill, status: "required_skill_not_projected" });
+  }
+  return findings;
+}
+
 function inspectCodexDiscoveryPathSegments(target, path) {
   let current = resolve(target);
   let leafStatus = null;

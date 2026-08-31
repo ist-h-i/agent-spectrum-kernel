@@ -4,7 +4,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSyn
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, deriveReviewSignalGateRoute, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, parseCodexCompactProfileHeader, readReviewSignalGateMap } from "./ask-shared.mjs";
+import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, deriveReviewSignalGateRoute, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, inspectCodexPromptContractBindings, parseCodexCompactProfileHeader, readReviewSignalGateMap } from "./ask-shared.mjs";
 import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
 import { buildExecutionEnvelopeRecord, hasExecutionEnvelopeMarker, inspectExecutionEnvelopeRecordEmission, renderExecutionEnvelopeProjection, selectExecutionEnvelopeEmission, validateExecutionEnvelope, validateExecutionEnvelopeRecord, validateJsonSchema } from "./execution-envelope.mjs";
 import { resolveGitDirectory, resolveObservabilityPath } from "./observability-paths.mjs";
@@ -207,6 +207,9 @@ function preflight(args) {
     failures.push(`selected prompt has no managed Codex prompt record: ${args.prompt}`);
   } else if (promptPath && existsSync(promptPath) && hashText(readFileSync(promptPath, "utf8")) !== promptRecord.sha256) {
     failures.push(`prompt hash does not match Codex install state: ${args.prompt}`);
+  }
+  for (const finding of inspectCodexPromptContractBindings(args.target, state, args.prompt, promptRecord)) {
+    failures.push(`selected prompt contract ${finding.status}: ${finding.path}`);
   }
   const promptContent = promptPath && existsSync(promptPath) ? readFileSync(promptPath, "utf8") : "";
   const compactHeader = parseCodexCompactProfileHeader(promptContent);

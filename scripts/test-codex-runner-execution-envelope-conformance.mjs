@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -28,6 +29,20 @@ function runGit(args, { cwd = target } = {}) {
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
   });
+}
+
+function hashText(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function stableCanonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableCanonicalJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableCanonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+function canonicalValueDigest(value) {
+  return `sha256:${hashText(stableCanonicalJson(value ?? null))}`;
 }
 
 function assertPass(label, result) {
@@ -873,6 +888,44 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
   const mismatchedSelectedSkillInventory = runNode([dailyRunner, "--target", dailyTarget, "--prompt", "skill-implement.md", "--mode", "implementation", "--dry-run", "--json"], { cwd: dailyTarget });
   assert.notEqual(mismatchedSelectedSkillInventory.status, 0, "selected Skill state must remain bound to the projected inventory");
   assert.match(mismatchedSelectedSkillInventory.stdout, /compact-profile canonical source selected_skill_inventory_mismatch: selected_skills/u);
+  writeFileSync(dailyStatePath, `${JSON.stringify(dailyState, null, 2)}\n`);
+
+  const coordinatedState = JSON.parse(JSON.stringify(dailyState));
+  coordinatedState.selected_skills = coordinatedState.selected_skills.filter((skill) => skill !== "controlled-implementation");
+  coordinatedState.projection_plan.projected_managed_assets = coordinatedState.projection_plan.projected_managed_assets
+    .filter((asset) => asset.path !== ".agents/skills/controlled-implementation/SKILL.md");
+  const projection = coordinatedState.projection_plan;
+  const coordinatedFingerprint = canonicalValueDigest({
+    canonical_source_digest: projection.canonical_source_digest,
+    renderer_id: projection.renderer_id,
+    renderer_version: projection.renderer_version,
+    renderer_profile: projection.renderer_profile,
+    plan_shaping_options: projection.plan_shaping_options,
+    renderer_inputs_digest: canonicalValueDigest(projection.renderer_inputs),
+    managed_inventory_digest: canonicalValueDigest(projection.projected_managed_assets),
+  });
+  projection.fingerprint = coordinatedFingerprint;
+  const dailyPromptPath = resolve(dailyTarget, ".agents/prompts/skill-implement.md");
+  const dailyPromptContent = readFileSync(dailyPromptPath, "utf8");
+  const coordinatedPromptContent = dailyPromptContent.replace(/^<!-- ASK_CODEX_COMPACT_PROFILE (\{[^\n]+\}) -->/u, (_line, metadata) => {
+    const parsed = JSON.parse(metadata);
+    parsed.p = coordinatedFingerprint.replace(/^sha256:/u, "");
+    return `<!-- ASK_CODEX_COMPACT_PROFILE ${JSON.stringify(parsed)} -->`;
+  });
+  const promptRecord = coordinatedState.managed_files[".agents/prompts/skill-implement.md"];
+  promptRecord.content = coordinatedPromptContent;
+  promptRecord.sha256 = hashText(coordinatedPromptContent);
+  promptRecord.compact_profile.profile_fingerprint = coordinatedFingerprint;
+  promptRecord.compact_profile.rendered_sha256 = `sha256:${hashText(coordinatedPromptContent)}`;
+  const selectedCompactProfile = coordinatedState.compact_runtime_profiles.find((profile) => profile.profile_id === promptRecord.compact_profile.profile_id);
+  selectedCompactProfile.profile_fingerprint = coordinatedFingerprint;
+  selectedCompactProfile.rendered_sha256 = promptRecord.compact_profile.rendered_sha256;
+  writeFileSync(dailyPromptPath, coordinatedPromptContent);
+  writeFileSync(dailyStatePath, `${JSON.stringify(coordinatedState, null, 2)}\n`);
+  const missingMandatoryPromptContract = runNode([dailyRunner, "--target", dailyTarget, "--prompt", "skill-implement.md", "--mode", "implementation", "--dry-run", "--json"], { cwd: dailyTarget });
+  assert.notEqual(missingMandatoryPromptContract.status, 0, "mandatory prompt contracts must remain selected and projected");
+  assert.match(missingMandatoryPromptContract.stdout, /selected prompt contract required_skill_not_selected: controlled-implementation/u);
+  writeFileSync(dailyPromptPath, dailyPromptContent);
   writeFileSync(dailyStatePath, `${JSON.stringify(dailyState, null, 2)}\n`);
 
   console.log("Codex runner Execution Envelope conformance tests passed");
