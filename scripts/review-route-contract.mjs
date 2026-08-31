@@ -68,6 +68,7 @@ function findingIssues(registry, findings) {
     seen.add(id);
     if (!contract?.severity_order?.includes(finding?.severity)) issues.push(`finding:${id}:invalid_severity`);
     if (typeof finding?.merge_blocker !== "boolean") issues.push(`finding:${id}:invalid_merge_blocker`);
+    if (finding?.severity === "blocker" && finding?.merge_blocker === false) issues.push(`finding:${id}:blocker_requires_merge_blocker`);
   }
   const severityIndex = new Map((contract?.severity_order ?? []).map((severity, index) => [severity, index]));
   const expected = [...findings].sort((left, right) => {

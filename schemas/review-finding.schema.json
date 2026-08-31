@@ -21,6 +21,27 @@
         "evidence_location",
         "required_post_fix_condition"
       ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "severity": {
+                "const": "blocker"
+              }
+            },
+            "required": [
+              "severity"
+            ]
+          },
+          "then": {
+            "properties": {
+              "merge_blocker": {
+                "const": true
+              }
+            }
+          }
+        }
+      ],
       "properties": {
         "finding_id": {
           "type": "string",

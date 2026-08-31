@@ -233,7 +233,7 @@ function preflight(args) {
     for (const gate of args.requiredGates) if (!(state?.selected_skills ?? []).includes(gate)) capabilityMissing.push(gate);
     const selectedProfile = (state?.compact_runtime_profiles ?? []).find((profile) => profile.profile_id === compactProfile.profile_id);
     if (!selectedProfile || selectedProfile.rendered_sha256 !== compactProfile.rendered_sha256) failures.push(`compact profile is not selected in Codex install state: ${compactProfile.profile_id}`);
-    for (const finding of inspectCodexProjectionCanonicalInputs(args.target, state?.projection_plan)) {
+    for (const finding of inspectCodexProjectionCanonicalInputs(args.target, state?.projection_plan, { selectedSkills: state?.selected_skills })) {
       failures.push(`compact-profile canonical source ${finding.status}: ${finding.path}`);
     }
   }

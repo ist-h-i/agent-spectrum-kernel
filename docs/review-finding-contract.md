@@ -23,6 +23,8 @@ Every blocker or actionable finding has:
 
 Category is optional metadata. Empty category sections are not an output.
 
+Severity `blocker` always requires `merge_blocker: true`. This is a Finding-level semantic invariant, independent of whether a final Decision was requested. Other severities retain their explicitly authored merge consequence; they are not promoted to merge blockers by severity alone.
+
 ## Impact order
 
 Order the complete inventory deterministically:

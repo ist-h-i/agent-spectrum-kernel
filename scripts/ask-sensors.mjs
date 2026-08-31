@@ -539,8 +539,8 @@ function extractTopLevelSections(text) {
   let activeSection = null;
   for (const line of text.split(/\r?\n/)) {
     if (activeFence) {
+      if (activeSection) activeSection.push(line);
       if (isMarkdownFenceClosing(line, activeFence)) activeFence = null;
-      else if (activeSection) activeSection.push(line);
       continue;
     }
     const opening = markdownFenceOpening(line);

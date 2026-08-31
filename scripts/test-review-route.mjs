@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deriveReviewSignalGateRoute, readReviewSignalGateMap } from "./ask-shared.mjs";
+import { validateJsonSchema } from "./execution-envelope.mjs";
 import { BASELINE_GATE, FINAL_GATE, inspectReviewPolicyRegistry, inspectReviewRouteCase } from "./review-route-contract.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -24,6 +25,7 @@ const expectedScenarioIds = [
   "duplicate_baseline",
   "final_gate_overactivation",
   "final_gate_missing",
+  "blocker_without_merge_consequence",
   "impact_ordered_findings",
   "missing_finding_field",
   "duplicate_finding_id",
@@ -39,6 +41,28 @@ if (fixture.schema_version !== "1.0.0" || fixture.baseline_gate !== BASELINE_GAT
 if (JSON.stringify(fixture.required_finding_fields) !== JSON.stringify(registry.finding_contract.required_fields)) throw new Error("fixture finding fields differ from canonical registry");
 if (JSON.stringify(fixture.severity_order) !== JSON.stringify(registry.finding_contract.severity_order)) throw new Error("fixture severity order differs from canonical registry");
 if (JSON.stringify(fixture.scenarios.map((scenario) => scenario.id)) !== JSON.stringify(expectedScenarioIds)) throw new Error("review route scenario inventory drifted");
+
+const findingSchemaPath = resolve(root, "schemas/review-finding.schema.json");
+const findingBase = {
+  finding_id: "F-SCHEMA-SEMANTIC",
+  practical_impact: "The schema must preserve merge consequence semantics.",
+  trigger_or_failure_trace: "A producer emits a Finding inventory.",
+  evidence_location: "scripts/test-review-route.mjs",
+  required_post_fix_condition: "The canonical semantic pair is validated.",
+};
+if (validateJsonSchema([{ ...findingBase, severity: "blocker", merge_blocker: false }], { schemaPath: findingSchemaPath }).length === 0) {
+  throw new Error("review Finding schema must reject blocker severity without merge consequence");
+}
+for (const finding of [
+  { ...findingBase, severity: "blocker", merge_blocker: true },
+  { ...findingBase, severity: "major", merge_blocker: false },
+  { ...findingBase, severity: "major", merge_blocker: true },
+  { ...findingBase, severity: "minor", merge_blocker: false },
+  { ...findingBase, severity: "nit", merge_blocker: false },
+]) {
+  const issues = validateJsonSchema([finding], { schemaPath: findingSchemaPath });
+  if (issues.length > 0) throw new Error(`review Finding schema rejected a valid severity/consequence pair: ${issues.join("; ")}`);
+}
 
 for (const scenario of fixture.scenarios) {
   const actual = inspectReviewRouteCase(registry, scenario);

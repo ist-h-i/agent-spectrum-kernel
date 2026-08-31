@@ -181,8 +181,9 @@ export function deriveReviewSignalGateRoute(registry, observedSignals = []) {
   return { observed_signals: normalizedSignals, additional_gates: additionalGates, signals_by_gate: signalsByGate, issues };
 }
 
-export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {}) {
+export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {}, { selectedSkills = [] } = {}) {
   const findings = [];
+  const selectedSkillSet = new Set(Array.isArray(selectedSkills) ? selectedSkills : []);
   for (const input of projectionPlan.renderer_inputs?.canonical ?? []) {
     if (typeof input?.path !== "string" || input.path.startsWith("/") || input.path.split(/[\\/]/).includes("..") || !/^sha256:[a-f0-9]{64}$/.test(input.digest ?? "")) {
       findings.push({ path: String(input?.path), status: "invalid_projection_input" });
@@ -198,6 +199,8 @@ export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {
       if (!managedBlock || hashText(managedBlock) !== blockRecord?.sha256) findings.push({ path: input.path, status: "managed_block_drift" });
       continue;
     }
+    const skillMatch = input.path.match(/^skills\/([a-z0-9][a-z0-9-]*)\/SKILL\.md$/u);
+    if (skillMatch && !selectedSkillSet.has(skillMatch[1])) continue;
     const sourcePath = resolve(target, input.path);
     if (!existsSync(sourcePath)) {
       if (input.path.startsWith("skills/")) findings.push({ path: input.path, status: "missing" });

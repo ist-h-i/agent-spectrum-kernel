@@ -11,6 +11,7 @@ const fixtureRoot = mkdtempSync(resolve(tmpdir(), "codex-envelope-conformance-")
 const target = resolve(fixtureRoot, "adopting-project");
 const coreInstaller = resolve(repoRoot, "scripts/install-kernel.mjs");
 const codexInstaller = resolve(repoRoot, "scripts/install-codex-adapter.mjs");
+const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
 
 function runNode(args, { cwd = repoRoot, env = {} } = {}) {
   return spawnSync(process.execPath, args, {
@@ -65,9 +66,9 @@ ${missingEvidence}
 
 Findings:
 ${findings}
-
+${decision === undefined ? "" : `
 Decision:
-- ${decision}
+- ${decision}`}
 `;
 }
 
@@ -92,6 +93,16 @@ function findingMarkdown({
 
 function withoutFindingField(markdown, field) {
   return markdown.split("\n").filter((line) => !line.match(new RegExp(`^\\s*(?:-\\s+)?${field}:`, "u"))).join("\n");
+}
+
+function fencedFindingExample({ opening = "```", closing = opening, body }) {
+  return `${opening}markdown
+${body}
+${closing}`;
+}
+
+function quotedFindingExample(body) {
+  return body.split("\n").map((line) => `> ${line}`).join("\n");
 }
 
 const modeCases = [
@@ -272,6 +283,14 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     practicalImpact: "the candidate cannot be merged safely",
     requiredPostFixCondition: "the merge-blocking defect is resolved",
   });
+  const exampleFinding = findingMarkdown({
+    findingId: "F-EXAMPLE-ONLY",
+    severity: "blocker",
+    mergeBlocker: "true",
+    practicalImpact: "example content must not become an actual finding",
+    evidenceLocation: "fixture:fenced-example",
+    requiredPostFixCondition: "the example remains ignored",
+  });
   const completeFindingFields = [
     "Finding ID",
     "Severity",
@@ -321,6 +340,99 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     },
     { label: "approve malformed inventory", decision: "approve" },
     { label: "approve with comments malformed inventory", decision: "approve with comments" },
+  ];
+  const blockerWithoutMergeConsequenceCases = [
+    { label: "approve rejects blocker without merge consequence", decision: "approve" },
+    { label: "approve with comments rejects blocker without merge consequence", decision: "approve with comments" },
+    { label: "request changes rejects blocker without merge consequence", baselineStatus: "fail", decision: "request changes" },
+    { label: "block rejects blocker without merge consequence", baselineStatus: "fail", decision: "block" },
+    {
+      label: "insufficient evidence rejects blocker without merge consequence",
+      baselineStatus: "insufficient_evidence",
+      missingEvidence: "- review-ai-quality: exact target unavailable; inspect it",
+      decision: "insufficient evidence",
+    },
+    { label: "review without final decision rejects blocker without merge consequence", baselineStatus: "fail", finalDecision: false },
+  ];
+  const postFenceCases = [
+    {
+      label: "approve validates a real finding after a backtick example",
+      findings: `${fencedFindingExample({ body: exampleFinding })}\n${validNonBlockingFinding}`,
+      decision: "approve",
+      expectedPass: true,
+    },
+    {
+      label: "approve validates a real finding after a tilde example",
+      findings: `${fencedFindingExample({ opening: "~~~", body: exampleFinding })}\n${validNonBlockingFinding}`,
+      decision: "approve",
+      expectedPass: true,
+    },
+    {
+      label: "approve validates a real finding after a longer closing fence",
+      findings: `${fencedFindingExample({ opening: "`````", closing: "```````", body: exampleFinding })}\n${validNonBlockingFinding}`,
+      decision: "approve",
+      expectedPass: true,
+    },
+    {
+      label: "approve validates a real finding after multiple examples",
+      findings: `${fencedFindingExample({ body: exampleFinding })}\n${fencedFindingExample({ opening: "~~~~", body: exampleFinding })}\n${validNonBlockingFinding}`,
+      decision: "approve",
+      expectedPass: true,
+    },
+    {
+      label: "approve validates a real finding after a quoted example",
+      findings: `${quotedFindingExample(exampleFinding)}\n${validNonBlockingFinding}`,
+      decision: "approve",
+      expectedPass: true,
+    },
+    {
+      label: "request changes rejects post-fence blocker in invalid impact order",
+      baselineStatus: "fail",
+      findings: `${validNonBlockingFinding}\n${fencedFindingExample({ body: exampleFinding })}\n${validBlockingFinding}`,
+      decision: "request changes",
+      expectedPass: false,
+    },
+    {
+      label: "block rejects none mixed with a real post-fence finding",
+      baselineStatus: "fail",
+      findings: `- none\n${fencedFindingExample({ opening: "~~~", body: exampleFinding })}\n${validNonBlockingFinding}`,
+      decision: "block",
+      expectedPass: false,
+    },
+    {
+      label: "approve rejects a required field missing after a fence",
+      findings: `${validNonBlockingFinding}\n${fencedFindingExample({ opening: "````", body: exampleFinding })}\n${withoutFindingField(findingMarkdown({ findingId: "F-POST-FENCE-MISSING" }), "Evidence location")}`,
+      decision: "approve",
+      expectedPass: false,
+    },
+    {
+      label: "approve with comments rejects an unknown post-fence field",
+      findings: `${validNonBlockingFinding}\n${fencedFindingExample({ opening: "~~~~", body: exampleFinding })}\n${findingMarkdown({ findingId: "F-POST-FENCE-UNKNOWN" })}\n  Owner: adapter-local`,
+      decision: "approve with comments",
+      expectedPass: false,
+    },
+    {
+      label: "request changes rejects a duplicate post-fence finding ID",
+      baselineStatus: "fail",
+      findings: `${findingMarkdown({ findingId: "F-POST-FENCE-DUPLICATE" })}\n${fencedFindingExample({ body: exampleFinding })}\n${findingMarkdown({ findingId: "F-POST-FENCE-DUPLICATE" })}`,
+      decision: "request changes",
+      expectedPass: false,
+    },
+    {
+      label: "insufficient evidence rejects malformed finding after multiple fences",
+      baselineStatus: "insufficient_evidence",
+      missingEvidence: "- review-ai-quality: exact target unavailable; inspect it",
+      findings: `${validNonBlockingFinding}\n${fencedFindingExample({ body: exampleFinding })}\n${fencedFindingExample({ opening: "~~~", body: exampleFinding })}\n${withoutFindingField(findingMarkdown({ findingId: "F-POST-FENCE-INSUFFICIENT" }), "Practical impact")}`,
+      decision: "insufficient evidence",
+      expectedPass: false,
+    },
+    {
+      label: "review without final decision rejects malformed post-fence finding",
+      baselineStatus: "fail",
+      findings: `${validNonBlockingFinding}\n${fencedFindingExample({ opening: "``````", body: exampleFinding })}\n${withoutFindingField(findingMarkdown({ findingId: "F-POST-FENCE-NO-DECISION" }), "Required post-fix condition")}`,
+      finalDecision: false,
+      expectedPass: false,
+    },
   ];
   const installedDecisionCases = [
     { label: "baseline fail plus approve", response: reviewResponse({ baselineStatus: "fail", decision: "approve" }), expectedPass: false },
@@ -382,6 +494,7 @@ Layer summary:
     { label: "request changes accepts a complete merge blocker", response: reviewResponse({ baselineStatus: "fail", findings: validBlockingFinding, decision: "request changes" }), expectedPass: true },
     { label: "block accepts a complete merge blocker", response: reviewResponse({ baselineStatus: "fail", findings: validBlockingFinding, decision: "block" }), expectedPass: true },
     { label: "insufficient evidence accepts a complete merge blocker", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", findings: validBlockingFinding, decision: "insufficient evidence" }), expectedPass: true },
+    { label: "request changes accepts an explicit non-blocker merge consequence", response: reviewResponse({ baselineStatus: "fail", findings: findingMarkdown({ findingId: "F-MAJOR-MERGE", mergeBlocker: "true" }), decision: "request changes" }), expectedPass: true },
     { label: "request changes accepts an omitted optional category", response: reviewResponse({ baselineStatus: "fail", findings: findingMarkdown({ mergeBlocker: "true", category: null }), decision: "request changes" }), expectedPass: true },
     {
       label: "request changes keeps none findings for a failing additional gate",
@@ -407,6 +520,23 @@ Layer summary:
       }),
       expectedPass: false,
     })),
+    ...blockerWithoutMergeConsequenceCases.map(({ label, baselineStatus = "pass", missingEvidence = "- none", decision, finalDecision = true }) => ({
+      label,
+      response: reviewResponse({
+        baselineStatus,
+        missingEvidence,
+        findings: findingMarkdown({ findingId: "F-BLOCKER-FALSE", severity: "blocker", mergeBlocker: "false" }),
+        decision,
+      }),
+      finalDecision,
+      expectedPass: false,
+    })),
+    ...postFenceCases.map(({ label, baselineStatus = "pass", missingEvidence = "- none", findings, decision, finalDecision = true, expectedPass }) => ({
+      label,
+      response: reviewResponse({ baselineStatus, missingEvidence, findings, decision }),
+      finalDecision,
+      expectedPass,
+    })),
   ];
   for (const [index, fixture] of installedDecisionCases.entries()) {
     const resultPath = resolve(target, `.fixture-review-decision-${index}.json`);
@@ -417,11 +547,11 @@ Layer summary:
       "--target", target,
       "--prompt", "skill-review.md",
       "--mode", "review",
-      "--final-decision",
       "--codex-bin", fakeCodex,
       "--output", outputRelative,
       "--json",
     ];
+    if (fixture.finalDecision !== false) runnerArgs.push("--final-decision");
     if (fixture.observedSignal) runnerArgs.push("--observed-signal", fixture.observedSignal);
     else runnerArgs.push("--gates-observed");
     const result = runNode(runnerArgs, { cwd: target, env: { ASK_FAKE_RESULT_PATH: resultPath } });
@@ -643,6 +773,97 @@ Findings:
     assert.match(report.failures.join("\n"), /duplicates the runner-owned Execution Envelope/u, `${shape} rejection reason`);
     assert.deepEqual(readdirSync(recordDirectory).sort(), recordNamesBeforeMixed, `${shape} must not persist a record`);
   }
+
+  const dailyTarget = resolve(fixtureRoot, "daily-subset-project");
+  const dailySkills = manifest.projection_packs.daily_delivery.skills.join(",");
+  assertPass("daily subset core install", runNode([coreInstaller, "--target", dailyTarget, "--skills", dailySkills]));
+  assert.equal(existsSync(resolve(dailyTarget, "skills/domain-rule-ledger/SKILL.md")), false, "daily core must not install the unselected conditional knowledge Skill");
+  assertPass("daily Codex adapter install", runNode([codexInstaller, "--target", dailyTarget, "--profile", "daily"]));
+  const dailyRunner = resolve(dailyTarget, "scripts/codex-exec-runner.mjs");
+  const dailyDryRun = runNode([
+    dailyRunner,
+    "--target", dailyTarget,
+    "--prompt", "skill-implement.md",
+    "--mode", "implementation",
+    "--dry-run",
+    "--json",
+  ], { cwd: dailyTarget });
+  assert.equal(dailyDryRun.status, 2, `daily installed runner dry run must use the runner's non-executing exit contract\nstdout:\n${dailyDryRun.stdout}\nstderr:\n${dailyDryRun.stderr}`);
+  const dailyDryRunReport = JSON.parse(dailyDryRun.stdout);
+  assert.equal(dailyDryRunReport.status, "ready_to_execute");
+  assert.deepEqual(dailyDryRunReport.failures, []);
+  assert.match(dailyDryRunReport.command, /^codex exec /u);
+
+  const dailyFakeCodex = resolve(dailyTarget, "fake-codex");
+  const dailyInvocationPath = resolve(dailyTarget, ".fixture-codex-invocations");
+  const dailyResultPath = resolve(dailyTarget, ".fixture-daily-implementation.json");
+  const dailyOutputRelative = ".agents/runs/daily-implementation.md";
+  writeFileSync(
+    dailyFakeCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+if [ -n "$ASK_FAKE_INVOCATION_PATH" ]; then printf '%s\n' "invoked" >> "$ASK_FAKE_INVOCATION_PATH"; fi
+if [ -z "$ASK_FAKE_RESULT_PATH" ]; then exit 3; fi
+cp "$ASK_FAKE_RESULT_PATH" "$output"
+`,
+  );
+  chmodSync(dailyFakeCodex, 0o755);
+  writeFileSync(dailyResultPath, `${JSON.stringify(structuredResult(modeCases[0].response), null, 2)}\n`);
+  const dailyExecution = runNode([
+    dailyRunner,
+    "--target", dailyTarget,
+    "--prompt", "skill-implement.md",
+    "--mode", "implementation",
+    "--codex-bin", dailyFakeCodex,
+    "--output", dailyOutputRelative,
+    "--json",
+  ], { cwd: dailyTarget, env: { ASK_FAKE_RESULT_PATH: dailyResultPath, ASK_FAKE_INVOCATION_PATH: dailyInvocationPath } });
+  assertPass("daily installed runner fake Codex execution", dailyExecution);
+  const dailyExecutionReport = JSON.parse(dailyExecution.stdout);
+  assert.equal(dailyExecutionReport.status, "executed");
+  assert.equal(dailyExecutionReport.execution_envelope_record?.persisted, true);
+  assert.equal(existsSync(resolve(dailyTarget, dailyOutputRelative)), true);
+
+  const dailyState = JSON.parse(readFileSync(resolve(dailyTarget, ".agent-spectrum-kernel/codex-install-state.json"), "utf8"));
+  const knowledgeFixture = dailyState.skill_closure?.routing_fixtures?.find((fixture) => fixture.id === "explicit_knowledge_promotion");
+  assert.equal(knowledgeFixture?.outcome, "capability_missing", "daily conditional knowledge route must remain unavailable");
+  assert.equal(dailyState.selected_skills.includes("domain-rule-ledger"), false);
+  const invocationsBeforeCapabilityStop = readFileSync(dailyInvocationPath, "utf8");
+  const capabilityMissing = runNode([
+    dailyRunner,
+    "--target", dailyTarget,
+    "--prompt", "skill-implement.md",
+    "--mode", "implementation",
+    "--required-gate", "domain-rule-ledger",
+    "--codex-bin", dailyFakeCodex,
+    "--output", ".agents/runs/daily-knowledge-promotion.md",
+    "--json",
+  ], { cwd: dailyTarget, env: { ASK_FAKE_RESULT_PATH: dailyResultPath, ASK_FAKE_INVOCATION_PATH: dailyInvocationPath } });
+  assert.notEqual(capabilityMissing.status, 0, "daily unavailable conditional Skill must stop");
+  const capabilityMissingReport = JSON.parse(capabilityMissing.stdout);
+  assert.equal(capabilityMissingReport.status, "insufficient_evidence");
+  assert.equal(capabilityMissingReport.execution_envelope_record?.envelope?.stop_reason?.status, "capability_missing");
+  assert.equal(capabilityMissingReport.normalized_adapter_event?.stop?.status, "capability_missing");
+  assert.equal(readFileSync(dailyInvocationPath, "utf8"), invocationsBeforeCapabilityStop, "capability_missing must stop before Codex invocation");
+
+  const selectedProjectionPath = resolve(dailyTarget, ".agents/skills/controlled-implementation/SKILL.md");
+  const selectedProjectionContent = readFileSync(selectedProjectionPath, "utf8");
+  rmSync(selectedProjectionPath);
+  const missingSelectedSkill = runNode([dailyRunner, "--target", dailyTarget, "--prompt", "skill-implement.md", "--mode", "implementation", "--dry-run", "--json"], { cwd: dailyTarget });
+  assert.notEqual(missingSelectedSkill.status, 0, "missing selected Skill projection must fail preflight");
+  assert.match(missingSelectedSkill.stdout, /Codex discovery skill missing/u);
+  writeFileSync(selectedProjectionPath, selectedProjectionContent);
+
+  const selectedCanonicalPath = resolve(dailyTarget, "skills/controlled-implementation/SKILL.md");
+  const selectedCanonicalContent = readFileSync(selectedCanonicalPath, "utf8");
+  writeFileSync(selectedCanonicalPath, `${selectedCanonicalContent}\nlocal drift\n`);
+  const driftedSelectedSkill = runNode([dailyRunner, "--target", dailyTarget, "--prompt", "skill-implement.md", "--mode", "implementation", "--dry-run", "--json"], { cwd: dailyTarget });
+  assert.notEqual(driftedSelectedSkill.status, 0, "drifted selected canonical Skill must fail preflight");
+  assert.match(driftedSelectedSkill.stdout, /compact-profile canonical source drift: skills\/controlled-implementation\/SKILL\.md/u);
+  writeFileSync(selectedCanonicalPath, selectedCanonicalContent);
 
   console.log("Codex runner Execution Envelope conformance tests passed");
 } finally {

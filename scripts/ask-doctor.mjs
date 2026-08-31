@@ -734,7 +734,7 @@ function checkCodexRuntimeState(target, state, probe) {
       probe.failures.push(`Codex compact runtime profile does not derive from shared projection state: ${compact.profile_id}`);
       continue;
     }
-    const canonicalFindings = inspectCodexProjectionCanonicalInputs(target, state.projection_plan);
+    const canonicalFindings = inspectCodexProjectionCanonicalInputs(target, state.projection_plan, { selectedSkills: state.selected_skills });
     if (canonicalFindings.length > 0) {
       for (const finding of canonicalFindings) {
         probe.failures.push(`Codex compact-profile canonical source ${finding.status}: ${finding.path}`);

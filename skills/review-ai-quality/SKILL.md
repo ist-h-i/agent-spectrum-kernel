@@ -72,6 +72,7 @@ Be specific and evidence-backed. Passing tests prove only their observed behavio
 
 5. Produce one finding inventory.
    - Every blocker or actionable finding has a unique Finding ID, severity, merge-blocker boolean, practical impact, trigger or failure trace, evidence location, and required post-fix condition.
+   - A finding with blocker severity always sets `Merge blocker: true`; other severities keep their explicitly judged merge consequence.
    - Category is optional metadata, not a section.
    - Sort merge blockers first, then blocker/major/minor/nit, then Finding ID in code-unit order.
    - Keep non-actionable suggestions outside the finding inventory.

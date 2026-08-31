@@ -490,6 +490,45 @@
       }
     },
     {
+      "id": "blocker_without_merge_consequence",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality"
+      ],
+      "baseline_result_status": "fail",
+      "baseline_result_count": 1,
+      "findings": [
+        {
+          "finding_id": "F-BLOCKER-FALSE",
+          "severity": "blocker",
+          "merge_blocker": false,
+          "practical_impact": "A blocker can be published without its required merge consequence.",
+          "trigger_or_failure_trace": "The producer emits blocker severity with a false merge consequence.",
+          "evidence_location": "fixture:blocker_without_merge_consequence",
+          "required_post_fix_condition": "Every blocker explicitly prevents merge."
+        }
+      ],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "fail",
+        "issues": [
+          "finding:F-BLOCKER-FALSE:blocker_requires_merge_blocker"
+        ]
+      }
+    },
+    {
       "id": "impact_ordered_findings",
       "target_present": true,
       "final_decision_requested": false,
