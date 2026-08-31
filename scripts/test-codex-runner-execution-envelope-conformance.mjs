@@ -865,6 +865,16 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
   assert.match(driftedSelectedSkill.stdout, /compact-profile canonical source drift: skills\/controlled-implementation\/SKILL\.md/u);
   writeFileSync(selectedCanonicalPath, selectedCanonicalContent);
 
+  const dailyStatePath = resolve(dailyTarget, ".agent-spectrum-kernel/codex-install-state.json");
+  writeFileSync(dailyStatePath, `${JSON.stringify({
+    ...dailyState,
+    selected_skills: dailyState.selected_skills.filter((skill) => skill !== "controlled-implementation"),
+  }, null, 2)}\n`);
+  const mismatchedSelectedSkillInventory = runNode([dailyRunner, "--target", dailyTarget, "--prompt", "skill-implement.md", "--mode", "implementation", "--dry-run", "--json"], { cwd: dailyTarget });
+  assert.notEqual(mismatchedSelectedSkillInventory.status, 0, "selected Skill state must remain bound to the projected inventory");
+  assert.match(mismatchedSelectedSkillInventory.stdout, /compact-profile canonical source selected_skill_inventory_mismatch: selected_skills/u);
+  writeFileSync(dailyStatePath, `${JSON.stringify(dailyState, null, 2)}\n`);
+
   console.log("Codex runner Execution Envelope conformance tests passed");
 } finally {
   rmSync(fixtureRoot, { recursive: true, force: true });

@@ -183,7 +183,36 @@ export function deriveReviewSignalGateRoute(registry, observedSignals = []) {
 
 export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {}, { selectedSkills = [] } = {}) {
   const findings = [];
-  const selectedSkillSet = new Set(Array.isArray(selectedSkills) ? selectedSkills : []);
+  const projectedSkillIds = [];
+  for (const asset of projectionPlan.projected_managed_assets ?? []) {
+    if (asset?.asset_kind !== "skills") continue;
+    const match = typeof asset.path === "string" ? asset.path.match(/^\.agents\/skills\/([a-z0-9][a-z0-9-]*)\/SKILL\.md$/u) : null;
+    if (!match) {
+      findings.push({ path: String(asset?.path), status: "invalid_projected_skill_asset" });
+      continue;
+    }
+    projectedSkillIds.push(match[1]);
+  }
+  const selectedSkillInventory = Array.isArray(selectedSkills) ? [...new Set(selectedSkills)].sort() : [];
+  const projectedSkillInventory = [...new Set(projectedSkillIds)].sort();
+  if (JSON.stringify(selectedSkillInventory) !== JSON.stringify(projectedSkillInventory)
+    || selectedSkillInventory.length !== (Array.isArray(selectedSkills) ? selectedSkills.length : 0)
+    || projectedSkillInventory.length !== projectedSkillIds.length) {
+    findings.push({ path: "selected_skills", status: "selected_skill_inventory_mismatch" });
+  }
+  const selectedSkillSet = new Set(projectedSkillInventory);
+  const rendererInputsDigest = canonicalValueDigest(projectionPlan.renderer_inputs);
+  const managedInventoryDigest = canonicalValueDigest(projectionPlan.projected_managed_assets);
+  const expectedFingerprint = canonicalValueDigest({
+    canonical_source_digest: projectionPlan.canonical_source_digest,
+    renderer_id: projectionPlan.renderer_id,
+    renderer_version: projectionPlan.renderer_version,
+    renderer_profile: projectionPlan.renderer_profile,
+    plan_shaping_options: projectionPlan.plan_shaping_options,
+    renderer_inputs_digest: rendererInputsDigest,
+    managed_inventory_digest: managedInventoryDigest,
+  });
+  if (projectionPlan.fingerprint !== expectedFingerprint) findings.push({ path: "projection_plan", status: "fingerprint_mismatch" });
   for (const input of projectionPlan.renderer_inputs?.canonical ?? []) {
     if (typeof input?.path !== "string" || input.path.startsWith("/") || input.path.split(/[\\/]/).includes("..") || !/^sha256:[a-f0-9]{64}$/.test(input.digest ?? "")) {
       findings.push({ path: String(input?.path), status: "invalid_projection_input" });
@@ -291,6 +320,16 @@ export function parseCodexCompactProfileHeader(content) {
 
 export function hashText(text) {
   return createHash("sha256").update(text).digest("hex");
+}
+
+function stableCanonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableCanonicalJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableCanonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+function canonicalValueDigest(value) {
+  return `sha256:${hashText(stableCanonicalJson(value ?? null))}`;
 }
 
 export function hashFile(path) {
