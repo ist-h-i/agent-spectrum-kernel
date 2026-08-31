@@ -369,6 +369,21 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     },
     { label: "review without final decision rejects blocker without merge consequence", baselineStatus: "fail", finalDecision: false },
   ];
+  const cleanNonApprovalCases = [
+    { label: "clean review rejects request changes", decision: "request changes" },
+    { label: "clean review rejects block", decision: "block" },
+    { label: "clean review rejects insufficient evidence", decision: "insufficient evidence" },
+    { label: "all-pass additional gate rejects request changes", decision: "request changes", additionalGate: true },
+    { label: "all-pass additional gate rejects block", decision: "block", additionalGate: true },
+    { label: "all-pass additional gate rejects insufficient evidence", decision: "insufficient evidence", additionalGate: true },
+  ];
+  const mixedMissingEvidenceCases = [
+    { label: "approve rejects mixed missing evidence", decision: "approve" },
+    { label: "approve with comments rejects mixed missing evidence", decision: "approve with comments", findings: validNonBlockingFinding },
+    { label: "request changes rejects mixed missing evidence", decision: "request changes", baselineStatus: "fail" },
+    { label: "block rejects mixed missing evidence", decision: "block", baselineStatus: "fail" },
+    { label: "insufficient evidence rejects mixed missing evidence", decision: "insufficient evidence", baselineStatus: "insufficient_evidence" },
+  ];
   const postFenceCases = [
     {
       label: "approve validates a real finding after a backtick example",
@@ -450,6 +465,8 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     },
   ];
   const installedDecisionCases = [
+    { label: "clean approve remains valid", response: reviewResponse({ decision: "approve" }), expectedPass: true },
+    { label: "review without final decision remains valid", response: reviewResponse({}), finalDecision: false, expectedPass: true },
     { label: "baseline fail plus approve", response: reviewResponse({ baselineStatus: "fail", decision: "approve" }), expectedPass: false },
     { label: "baseline insufficient evidence plus approve", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", decision: "approve" }), expectedPass: false },
     {
@@ -520,6 +537,25 @@ Layer summary:
     { label: "request changes keeps none finding inventory", response: reviewResponse({ baselineStatus: "fail", decision: "request changes" }), expectedPass: true },
     { label: "block keeps none finding inventory", response: reviewResponse({ baselineStatus: "fail", decision: "block" }), expectedPass: true },
     { label: "insufficient evidence keeps none finding inventory", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", decision: "insufficient evidence" }), expectedPass: true },
+    ...cleanNonApprovalCases.map(({ label, decision, additionalGate = false }) => ({
+      label,
+      response: reviewResponse({
+        additionalGates: additionalGate ? "- review-output-quality: status=pass; evidence=exact rendered output; signals=docs_output_change" : "- none",
+        decision,
+      }),
+      observedSignal: additionalGate ? "docs_output_change" : undefined,
+      expectedPass: false,
+    })),
+    ...mixedMissingEvidenceCases.map(({ label, decision, baselineStatus = "pass", findings = "- none" }) => ({
+      label,
+      response: reviewResponse({
+        baselineStatus,
+        missingEvidence: "- none\n- final CI: unavailable; run final CI",
+        findings,
+        decision,
+      }),
+      expectedPass: false,
+    })),
     ...malformedFindingCases.map(({ label, findings }) => ({
       label: `approve rejects ${label}`,
       response: reviewResponse({ findings, decision: "approve" }),

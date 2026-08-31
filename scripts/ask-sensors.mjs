@@ -305,6 +305,10 @@ function reviewLayerSummarySensor(text, contract, requiredGates = [], observedSi
   if (additionalResult.issue) {
     return sensor("review_layer_summary", "fail", additionalResult.issue, "Emit one closed result record for every derived additional gate and no untriggered gate record.");
   }
+  const missingEvidenceResult = inspectEmptyInventory(sections.get("Missing evidence:")?.[0] ?? [], "Missing evidence");
+  if (missingEvidenceResult.issue) {
+    return sensor("review_layer_summary", "fail", missingEvidenceResult.issue, "Use exactly '- none' or one or more evidence records, never both.");
+  }
   const findingResult = inspectFindingInventory(
     sections.get("Findings:")?.[0] ?? [],
     registry.finding_contract,
@@ -318,17 +322,15 @@ function reviewLayerSummarySensor(text, contract, requiredGates = [], observedSi
     if (decisionResult.issue) {
       return sensor("review_layer_summary", "fail", decisionResult.issue, "Emit exactly one normalized decision from the existing final-gate vocabulary.");
     }
-    if (["approve", "approve_with_comments"].includes(decisionResult.decision)) {
-      const consistencyIssue = inspectApprovalConsistency({
-        decision: decisionResult.decision,
-        baselineStatus: baselineResult.status,
-        additionalStatuses: additionalResult.statuses,
-        missingEvidenceLines: sections.get("Missing evidence:")?.[0] ?? [],
-        findings: findingResult.findings,
-      });
-      if (consistencyIssue) {
-        return sensor("review_layer_summary", "fail", consistencyIssue, "Use request changes, block, or insufficient evidence until every approval precondition is satisfied.");
-      }
+    const consistencyIssue = inspectDecisionConsistency({
+      decision: decisionResult.decision,
+      baselineStatus: baselineResult.status,
+      additionalStatuses: additionalResult.statuses,
+      missingEvidenceEmpty: missingEvidenceResult.empty,
+      findings: findingResult.findings,
+    });
+    if (consistencyIssue) {
+      return sensor("review_layer_summary", "fail", consistencyIssue, "Emit a Decision supported by current gate results, Missing evidence, and Findings without synthesizing evidence.");
     }
   }
   if (!diagnostic) {
@@ -403,17 +405,21 @@ function inspectReviewDecision(lines) {
   return { issue: null, decision };
 }
 
-function inspectApprovalConsistency({ decision, baselineStatus, additionalStatuses, missingEvidenceLines, findings }) {
-  const issues = [];
-  if (baselineStatus !== "pass") issues.push(`baseline review status is ${baselineStatus ?? "missing"}`);
+function inspectDecisionConsistency({ decision, baselineStatus, additionalStatuses, missingEvidenceEmpty, findings }) {
   const nonPassingGates = additionalStatuses.filter(({ status }) => status !== "pass");
-  if (nonPassingGates.length > 0) issues.push(`additional required gates are not pass: ${nonPassingGates.map(({ gate, status }) => `${gate}=${status}`).join(", ")}`);
-
-  const missingEvidence = inspectEmptyInventory(missingEvidenceLines, "Missing evidence");
-  if (missingEvidence.issue) issues.push(missingEvidence.issue);
-  else if (!missingEvidence.empty) issues.push("Missing evidence is not empty");
-
-  if (findings.some((finding) => finding.merge_blocker)) issues.push("Findings contains an unresolved merge blocker");
+  const issues = [];
+  if (["approve", "approve_with_comments"].includes(decision)) {
+    if (baselineStatus !== "pass") issues.push(`baseline review status is ${baselineStatus ?? "missing"}`);
+    if (nonPassingGates.length > 0) issues.push(`additional required gates are not pass: ${nonPassingGates.map(({ gate, status }) => `${gate}=${status}`).join(", ")}`);
+    if (!missingEvidenceEmpty) issues.push("Missing evidence is not empty");
+    if (findings.some((finding) => finding.merge_blocker)) issues.push("Findings contains an unresolved merge blocker");
+  } else {
+    const hasNonApprovalRationale = baselineStatus !== "pass"
+      || nonPassingGates.length > 0
+      || !missingEvidenceEmpty
+      || findings.length > 0;
+    if (!hasNonApprovalRationale) issues.push("non-approval Decision has no failing gate, missing evidence, or Finding");
+  }
 
   return issues.length > 0 ? `Decision ${decision} is inconsistent with review authority: ${issues.join("; ")}.` : null;
 }
