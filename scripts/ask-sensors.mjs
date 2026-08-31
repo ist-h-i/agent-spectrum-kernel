@@ -407,15 +407,20 @@ function inspectReviewDecision(lines) {
 
 function inspectDecisionConsistency({ decision, baselineStatus, additionalStatuses, missingEvidenceEmpty, findings }) {
   const nonPassingGates = additionalStatuses.filter(({ status }) => status !== "pass");
+  const failingGates = additionalStatuses.filter(({ status }) => status === "fail");
+  const insufficientGates = additionalStatuses.filter(({ status }) => status === "insufficient_evidence");
+  const hasInsufficientGate = baselineStatus === "insufficient_evidence" || insufficientGates.length > 0;
   const issues = [];
+  if (hasInsufficientGate && missingEvidenceEmpty) issues.push("a gate reports insufficient_evidence but Missing evidence is empty");
+  if (!hasInsufficientGate && !missingEvidenceEmpty) issues.push("Missing evidence is not reflected by an insufficient_evidence gate status");
   if (["approve", "approve_with_comments"].includes(decision)) {
     if (baselineStatus !== "pass") issues.push(`baseline review status is ${baselineStatus ?? "missing"}`);
     if (nonPassingGates.length > 0) issues.push(`additional required gates are not pass: ${nonPassingGates.map(({ gate, status }) => `${gate}=${status}`).join(", ")}`);
     if (!missingEvidenceEmpty) issues.push("Missing evidence is not empty");
     if (findings.some((finding) => finding.merge_blocker)) issues.push("Findings contains an unresolved merge blocker");
   } else {
-    const hasNonApprovalRationale = baselineStatus !== "pass"
-      || nonPassingGates.length > 0
+    const hasNonApprovalRationale = baselineStatus === "fail"
+      || failingGates.length > 0
       || !missingEvidenceEmpty
       || findings.length > 0;
     if (!hasNonApprovalRationale) issues.push("non-approval Decision has no failing gate, missing evidence, or Finding");

@@ -376,6 +376,12 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     { label: "all-pass additional gate rejects request changes", decision: "request changes", additionalGate: true },
     { label: "all-pass additional gate rejects block", decision: "block", additionalGate: true },
     { label: "all-pass additional gate rejects insufficient evidence", decision: "insufficient evidence", additionalGate: true },
+    { label: "comment-only baseline rejects request changes", baselineStatus: "pass_with_comments", decision: "request changes" },
+    { label: "comment-only baseline rejects block", baselineStatus: "pass_with_comments", decision: "block" },
+    { label: "comment-only baseline rejects insufficient evidence", baselineStatus: "pass_with_comments", decision: "insufficient evidence" },
+    { label: "comment-only additional gate rejects block", decision: "block", additionalGate: true, additionalStatus: "pass_with_comments" },
+    { label: "unexplained insufficient baseline rejects insufficient evidence", baselineStatus: "insufficient_evidence", decision: "insufficient evidence" },
+    { label: "unexplained insufficient additional gate rejects insufficient evidence", decision: "insufficient evidence", additionalGate: true, additionalStatus: "insufficient_evidence" },
   ];
   const mixedMissingEvidenceCases = [
     { label: "approve rejects mixed missing evidence", decision: "approve" },
@@ -537,10 +543,11 @@ Layer summary:
     { label: "request changes keeps none finding inventory", response: reviewResponse({ baselineStatus: "fail", decision: "request changes" }), expectedPass: true },
     { label: "block keeps none finding inventory", response: reviewResponse({ baselineStatus: "fail", decision: "block" }), expectedPass: true },
     { label: "insufficient evidence keeps none finding inventory", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", decision: "insufficient evidence" }), expectedPass: true },
-    ...cleanNonApprovalCases.map(({ label, decision, additionalGate = false }) => ({
+    ...cleanNonApprovalCases.map(({ label, decision, baselineStatus = "pass", additionalGate = false, additionalStatus = "pass" }) => ({
       label,
       response: reviewResponse({
-        additionalGates: additionalGate ? "- review-output-quality: status=pass; evidence=exact rendered output; signals=docs_output_change" : "- none",
+        baselineStatus,
+        additionalGates: additionalGate ? `- review-output-quality: status=${additionalStatus}; evidence=exact rendered output; signals=docs_output_change` : "- none",
         decision,
       }),
       observedSignal: additionalGate ? "docs_output_change" : undefined,
