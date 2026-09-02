@@ -23,10 +23,10 @@
   "output_contract_type": "findings_producing",
   "requirement_record_id": "requirement-record-mp-frontend-state-review",
   "output_contract_id": "output-contract-mp-frontend-state-review",
-  "evaluator_bundle_id": "evaluator-44fb8e1dcd1907302c7fbb14140b5ce1fe8d78f263fb13618539d356138e2a5a",
-  "evaluator_bundle_digest": "sha256:11092729674491fa45877a0ce1c5147d539821373c60507842f017cb01e4adad",
-  "evaluator_byte_count": 141181,
+  "evaluator_bundle_id": "evaluator-ad168c9f0292181990b9f33e4e7d2d53a4d8ff70c77faaa5cc02d702764e1dd5",
+  "evaluator_bundle_digest": "sha256:1c27f5024aa8e519aa535d80db23eacd8033307d92c20dd4129ecbb49b992f31",
+  "evaluator_byte_count": 162942,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:aafa02ef89032e3db93dbdc93de516182d48bee139040346a1a8ed5a95c9d906"
+  "metadata_digest": "sha256:5d2d92bfdd5daf90f63fe214f5908b7bae52ec6238dbca021628ded401daffa9"
 }

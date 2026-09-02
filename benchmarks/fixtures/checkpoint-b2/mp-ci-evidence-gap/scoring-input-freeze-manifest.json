@@ -21,24 +21,24 @@
   },
   "admission_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/final-admission-record.json",
-    "raw_byte_digest": "sha256:a122b87f665b922f7971ca9aec5665d8a13008cd3b69cd66e1018ea10238bd33",
-    "semantic_digest": "sha256:cc9297898671d982d2e967d5fce0415ee25b99111db3e4bd89ecc484d6b07a8d"
+    "raw_byte_digest": "sha256:52e01090fd8cf8424e9cd13749871276cfedab550a89110ecf81e617b44f1ffa",
+    "semantic_digest": "sha256:272a5e118c4ec34fd2e3ed9e0167c1cf610c6e7efd6cffd0e680aa9055b82c1d"
   },
   "requirement_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/requirement-record.json",
-    "raw_byte_digest": "sha256:fe77b99caa897b55f20f0befb3d7b6664ddbb91821b07645c0bf46c3a8c61dc2",
-    "record_digest": "sha256:dd034d636ff375b93a22678e2aa74c11624fa9c010b684d8d47ace3f6649d555",
+    "raw_byte_digest": "sha256:e74da07034e06f12822170684bbe1b65f8aba1a61bffa5807a58a3a6a7a4b48d",
+    "record_digest": "sha256:89cb2dc49789a2ee4fb68f8c7fefec3fe2723ec8a0e79f66bcf827fd69e726bd",
     "set_digest": "sha256:af2b2bceca81e1c97d09a479e1c959fa14512b14b480d408911eed9aa68e4412"
   },
   "output_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/output-contract.json",
-    "raw_byte_digest": "sha256:b2e4ea9e0e27828941f1a9e029cedc6ec252234716e694d7f9e98e464d14e311",
-    "semantic_digest": "sha256:11a5faf65401c2d91ca971f335d418b9da04293d3aded86ff4427ed34b0a1dd3"
+    "raw_byte_digest": "sha256:fdf2f738ee21779d5a678a89918482fca4d099f08abe3f530a18de85ea274061",
+    "semantic_digest": "sha256:1608aa8274099674d369248953ba15fa29d92a19b19e566051b394f91dff3e85"
   },
   "evaluator_public_reference": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/evaluator-reference.json",
-    "raw_byte_digest": "sha256:5becab3f16b455addabf13c2dc055b873d0f4a2d3bfae5181670e745d9159c9f",
-    "semantic_digest": "sha256:febdec3c4de3be8fba6d82212a6d36651ec5282ca5c752710260a939c3322511"
+    "raw_byte_digest": "sha256:d1022015cab634afe5eb051b09a2844db8053df5d84517b21f00699713124126",
+    "semantic_digest": "sha256:1b98d1c3084193fd07b3e253cba7eb7985bbe861dab6281f5a1899814eab1f96"
   },
   "verification_command_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/verification-command-contract.json",
@@ -52,13 +52,13 @@
   },
   "evaluator_authority_manifest": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/evaluator-authority-manifest.json",
-    "raw_byte_digest": "sha256:82a3715695337ce555f0691dd719deda2acfd6512a023fe906130e2e50dc4e8a",
-    "semantic_digest": "sha256:9006a6ef50f85fccca9645c12af9f6ec42ffd1cfbc41bf2f3aebefe62d568a23"
+    "raw_byte_digest": "sha256:b5cec84a723a26dd1ebee32b8db7706d61c503f45232f3efa3d220c713a97736",
+    "semantic_digest": "sha256:4fd2aa088fa7dc3f77bd7a5caaf2ad3a7a6a2376e9dde84265e7980ebba456b7"
   },
   "result_profile": {
     "name": "binary_scope_verification_v1",
     "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
   },
   "freeze_revision": "issue-206-mp-ci-evidence-gap-r1",
-  "manifest_digest": "sha256:62d6af6e13c298399ce889dc7f25ca464ccd8cc461e1cfe5e10a0497a98fa6b4"
+  "manifest_digest": "sha256:90c2d0d9be74d21637ab8a0a51932a4241b2ce8b89026360824a17de9bfb43a4"
 }
