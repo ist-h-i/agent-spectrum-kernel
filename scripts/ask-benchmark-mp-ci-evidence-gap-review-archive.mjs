@@ -6,10 +6,20 @@ import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertPrivateRootOutsideRepository } from "./ask-benchmark-mn-build-option-update.mjs";
 import { validateMpCiEvidenceGapProductionAuthority } from "./ask-benchmark-mp-ci-evidence-gap-authority.mjs";
+import {
+  establishReviewArchiveIdentity,
+  evaluatorSourceReviewEntries,
+  resolveReviewArchiveOutput,
+  reviewArchiveCommitEntry,
+  reviewArchiveCommitTreeEntries,
+  validateReviewArchiveCases,
+  validateReviewArchivePrivateBundle,
+} from "./ask-benchmark-review-archive-identity.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE_ID = "mp-ci-evidence-gap";
 const FIXTURE_PATH = `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`;
+const GENERATOR_PATH = "scripts/ask-benchmark-mp-ci-evidence-gap-review-archive.mjs";
 const FORMAT_REVISION = "issue-206-node-store-zip.v1";
 const DOS_TIME = 0;
 const DOS_DATE = 0x0021;
@@ -21,7 +31,7 @@ const SOURCE_PATHS = Object.freeze([
   "benchmarks/portfolio-design-admission-records/mp-ci-evidence-gap.json",
   "scripts/ask-benchmark-mp-ci-evidence-gap.mjs",
   "scripts/ask-benchmark-mp-ci-evidence-gap-authority.mjs",
-  "scripts/ask-benchmark-mp-ci-evidence-gap-review-archive.mjs",
+  GENERATOR_PATH,
   "scripts/test-ask-benchmark-mp-ci-evidence-gap.mjs",
 ]);
 
@@ -137,22 +147,31 @@ function zip(entries) {
   return Buffer.concat([...local, centralBytes, end]);
 }
 
-export function generateMpCiEvidenceGapReviewArchive({ root = ROOT, privateRoot, caseRoot, outputPath, reviewedHead }) {
-  if (!privateRoot || !caseRoot || !outputPath || !reviewedHead) throw new Error("review archive requires privateRoot, caseRoot, outputPath, and reviewedHead");
+export function generateMpCiEvidenceGapReviewArchive({ root = ROOT, privateRoot, caseRoot, outputPath, reviewedHead, sourceRevision }) {
+  if (!privateRoot || !caseRoot || !outputPath) throw new Error("review archive requires privateRoot, caseRoot, outputPath, reviewedHead, and sourceRevision");
   const repositoryRoot = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
   const caseDirectory = realpathSync(caseRoot);
   assertPrivateRootOutsideRepository(repositoryRoot, privateDirectory);
   assertPrivateRootOutsideRepository(repositoryRoot, caseDirectory);
+  if (privateDirectory === caseDirectory || privateDirectory.startsWith(`${caseDirectory}${sep}`) || caseDirectory.startsWith(`${privateDirectory}${sep}`)) throw new Error("review archive private and case roots must be disjoint");
+  const archiveTarget = resolveReviewArchiveOutput({ repositoryRoot, privateRoot: privateDirectory, caseRoot: caseDirectory, outputPath });
   if (git(repositoryRoot, ["rev-parse", "HEAD"], "reviewed HEAD lookup") !== reviewedHead) throw new Error("review archive reviewed HEAD does not match repository HEAD");
   const authority = validateMpCiEvidenceGapProductionAuthority({ root: repositoryRoot });
+  const identity = establishReviewArchiveIdentity({ root: repositoryRoot, runtimeRoot: ROOT, reviewedHead, sourceRevision, evaluatorRevision: authority.evaluatorRevision, generatorPath: GENERATOR_PATH });
   const bundle = readJson(resolve(privateDirectory, "private-evaluator-bundle.json"), "private evaluator bundle");
   if (bundle.evaluator_bundle_id !== authority.evaluatorBundleId || bundle.evaluator_bundle_digest !== authority.evaluatorBundleDigest) throw new Error("review archive private bundle differs from public reference");
+  const privateEntries = walk(privateDirectory, "private-evaluator");
+  const caseEntries = walk(caseDirectory, "private-cases");
+  const privateSummary = validateReviewArchivePrivateBundle({ fixtureId: FIXTURE_ID, bundle, authority, privateEntries, privatePrefix: "private-evaluator" });
+  const caseSummary = validateReviewArchiveCases({ fixtureId: FIXTURE_ID, caseEntries, casePrefix: "private-cases", closedCaseFileName: "review.json", additionalCasePaths: ["concept-family-matrix.json", "paraphrase-matrix.json"] });
   const entries = [
-    ...walk(resolve(repositoryRoot, FIXTURE_PATH), `repository/${FIXTURE_PATH}`),
-    ...SOURCE_PATHS.map((path) => sourceEntry(repositoryRoot, path)),
-    ...walk(privateDirectory, "private-evaluator"),
-    ...walk(caseDirectory, "private-cases"),
+    ...reviewArchiveCommitTreeEntries({ root: repositoryRoot, revision: reviewedHead, path: FIXTURE_PATH, prefix: "repository" }),
+    ...SOURCE_PATHS.map((path) => reviewArchiveCommitEntry(repositoryRoot, reviewedHead, path, "repository")),
+    ...evaluatorSourceReviewEntries({ root: repositoryRoot, sourceRevision, sourceIdentity: bundle.evaluator_source_identity }),
+    ...identity.generatorEntries,
+    ...privateEntries,
+    ...caseEntries,
   ];
   const unique = new Map();
   for (const entry of entries) {
@@ -165,21 +184,30 @@ export function generateMpCiEvidenceGapReviewArchive({ root = ROOT, privateRoot,
     program: "mp_ci_evidence_gap_private_review_archive",
     fixture_id: FIXTURE_ID,
     reviewed_repository_head: reviewedHead,
-    evaluator_source_revision: authority.evaluatorRevision,
+    evaluator_source_revision: sourceRevision,
     evaluator_bundle_id: authority.evaluatorBundleId,
     evaluator_bundle_digest: authority.evaluatorBundleDigest,
     evaluator_source_tree_digest: bundle.evaluator_source_identity.source_tree_digest,
     evaluator_dependency_graph_digest: bundle.dependency_graph.graph_digest,
+    archive_generator_source_identity: identity.generatorSourceIdentity,
+    private_asset_bytes: privateSummary.privateAssetBytes,
+    private_asset_count: privateSummary.privateAssetCount,
+    private_case_count: caseSummary.caseCount,
+    private_case_paths: caseSummary.casePaths,
     candidate_digest: candidate.candidate_digest,
     input_digest: authority.inputDigest,
     independent_review_status: "pending",
-    archive_format: { revision: FORMAT_REVISION, compression_method: "store", fixed_timestamp: "1980-01-01T00:00:00", generator_source_digest: sha256(readFileSync(resolve(repositoryRoot, "scripts/ask-benchmark-mp-ci-evidence-gap-review-archive.mjs"))) },
+    admission_status: "admission_pending",
+    scoring_ready: false,
+    measured_execution: false,
+    scoring_published: false,
+    archive_format: { revision: FORMAT_REVISION, compression_method: "store", fixed_timestamp: "1980-01-01T00:00:00", generator_source_digest: sha256(readFileSync(resolve(repositoryRoot, GENERATOR_PATH))), generator_source_inventory: identity.generatorSourceIdentity.node_inventory },
     entries: [...unique.values()].sort((left, right) => left.path.localeCompare(right.path)).map(({ path, bytes, mode }) => ({ path, bytes: bytes.length, sha256: sha256(bytes), mode })),
   };
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
   const archiveBytes = zip([...unique.values(), { path: "REVIEW-MANIFEST.json", bytes: manifestBytes, mode: 0o644 }]);
-  writeFileSync(resolve(outputPath), archiveBytes, { flag: "wx" });
-  return { fixtureId: FIXTURE_ID, reviewedHead, evaluatorSourceRevision: authority.evaluatorRevision, bundleId: authority.evaluatorBundleId, bundleDigest: authority.evaluatorBundleDigest, candidateDigest: candidate.candidate_digest, inputDigest: authority.inputDigest, archivePath: resolve(outputPath), archiveSha256: sha256(archiveBytes), archiveBytes: archiveBytes.length, entryCount: unique.size + 1 };
+  writeFileSync(archiveTarget, archiveBytes, { flag: "wx" });
+  return { fixtureId: FIXTURE_ID, reviewedHead, evaluatorSourceRevision: sourceRevision, bundleId: authority.evaluatorBundleId, bundleDigest: authority.evaluatorBundleDigest, privateAssetBytes: privateSummary.privateAssetBytes, candidateDigest: candidate.candidate_digest, inputDigest: authority.inputDigest, archivePath: archiveTarget, archiveSha256: sha256(archiveBytes), archiveBytes: archiveBytes.length, entryCount: unique.size + 1, privateCaseCount: caseSummary.caseCount };
 }
 
 function parseArgs(argv) {
@@ -191,6 +219,7 @@ function parseArgs(argv) {
     else if (name === "--case-root") args.caseRoot = resolve(argv[++index]);
     else if (name === "--output") args.outputPath = resolve(argv[++index]);
     else if (name === "--reviewed-head") args.reviewedHead = argv[++index];
+    else if (name === "--source-revision") args.sourceRevision = argv[++index];
     else throw new Error(`unknown argument: ${name}`);
   }
   return args;

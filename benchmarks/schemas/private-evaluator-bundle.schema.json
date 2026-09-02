@@ -7,6 +7,7 @@
     "schema_version",
     "schema_path",
     "program",
+    "execution_budget_ms",
     "evaluator_bundle_id",
     "evaluator_bundle_digest",
     "fixture_identity",
@@ -24,6 +25,7 @@
     "schema_version": { "const": "1.0.0" },
     "schema_path": { "const": "benchmarks/schemas/private-evaluator-bundle.schema.json" },
     "program": { "const": "adaptive_ask_private_evaluator_bundle" },
+    "execution_budget_ms": { "type": "integer", "minimum": 1, "maximum": 900000 },
     "evaluator_bundle_id": { "$ref": "#/$defs/bundleId" },
     "evaluator_bundle_digest": { "$ref": "#/$defs/digest" },
     "fixture_identity": {

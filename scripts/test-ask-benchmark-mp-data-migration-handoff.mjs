@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -18,10 +18,68 @@ import { computeResultProfileDigest, deriveBinaryScopeVerificationClassification
 import { validateEquivalenceAuthority, validateMatchedEquivalenceIds, validateMutationAuthority } from "./ask-benchmark-mn-build-option-update.mjs";
 import { validateMpDataMigrationHandoffInputClosure } from "./ask-benchmark-mp-data-migration-handoff.mjs";
 import { buildMpDataMigrationHandoffAuthority, validateMpDataMigrationHandoffProductionAuthority } from "./ask-benchmark-mp-data-migration-handoff-authority.mjs";
+import {
+  assertFlatRegularAuthorityDirectory,
+  prepareAuthorityPublication,
+  publishPreparedAuthority,
+  writeAuthorityJsonNoFollow,
+} from "./ask-benchmark-authority-publication.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE_ID = "mp-data-migration-handoff";
-const FIXTURE_ROOT = resolve(ROOT, `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`);
+const FIXTURE_REPOSITORY_ROOT = `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`;
+const FIXTURE_ROOT = resolve(ROOT, FIXTURE_REPOSITORY_ROOT);
+const REQUIREMENT_IDS = Object.freeze([
+  "current-state-consistency",
+  "safe-next-action",
+  "resume-gate-truthfulness",
+  "rollback-truthfulness",
+  "continuation-readiness",
+]);
+const CASE_COVERAGE_CLASSES = Object.freeze([
+  "positive",
+  "evidence_removal",
+  "scope",
+  "approval",
+  "rollback",
+  "resume",
+  "equivalence",
+  "malformed",
+]);
+const REQUIRED_CASE_COVERAGE_CLASSES = Object.freeze(["evidence_removal", "scope", "approval", "rollback", "resume", "equivalence", "malformed"]);
+const CASE_FIELDS = Object.freeze([
+  "case_id",
+  "coverage_class",
+  "mutations",
+  "expected_points",
+  "expected_classification",
+  "control",
+  "omit_output",
+  "extra_candidate_path",
+  "omit_command_evidence",
+  "expected_findings",
+  "expected_outcomes",
+  "expected_equivalence_ids",
+  "expected_evaluation_status",
+  "expected_verification_correctness",
+  "expected_evidence_correctness",
+  "expected_under_processing",
+  "expected_over_processing",
+  "expected_scope_deviations",
+  "expected_manual_requirement_ids",
+  "expected_verification_evidence_state",
+  "scope_deviation_applies_to_requirements",
+]);
+const HISTORICAL_ADMITTED_AUTHORITY = Object.freeze({
+  decisionRawSha256: "sha256:6038ffd91f7bdf63183c358839b30dc015d1d592d60dff9ae6062e50d2b586b5",
+  decisionId: "admission-decision-14b9e8a9ee0709fe66cc74a2a63d1169",
+  decisionDigest: "sha256:7cb994b239fd238083017987f74ad9b6c8df36045df44dc2d95ae7e9759e6a0b",
+  reviewedHeadRevision: "918cf001e2d6fc0fb06e63a2fcc6b2a4ff04038a",
+  evaluatorRevision: "740418f1d014b2181f1d372460def1dbcdb91a41",
+  evaluatorBundleId: "evaluator-4137390f2e1b27dec07545a1b07cfd309c7a2d0c56ad00305351ca0638dd1078",
+  evaluatorBundleDigest: "sha256:d61095a16bef1c07dfc5cbbe24220e085f7a275b0da33408cf3056ac06359bc7",
+  evaluatorPublicReferenceDigest: "sha256:e43bee5687ef5561a15ec873519404797511938c118d21c2ddfd589dd1c0a8a6",
+});
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -29,6 +87,188 @@ function readJson(path) {
 
 function clone(value) {
   return structuredClone(value);
+}
+
+function validateAuthorityPublicationGuards() {
+  const work = mkdtempSync(resolve(tmpdir(), "ask-authority-publication-test-"));
+  try {
+    const privateRoot = resolve(work, "private");
+    mkdirSync(privateRoot);
+    const externalTarget = resolve(work, "external-target.json");
+    const externalBytes = Buffer.from("external authority bytes\n");
+    writeFileSync(externalTarget, externalBytes);
+    const linkedGeneratedPath = resolve(privateRoot, "dependency-graph.json");
+    symlinkSync(externalTarget, linkedGeneratedPath);
+    assert.throws(() => assertFlatRegularAuthorityDirectory(privateRoot, "test private root"), /symlink|non-regular/u, "generated-path symlink must fail the complete pre-write inventory");
+    assert.throws(() => writeAuthorityJsonNoFollow(linkedGeneratedPath, { replaced: true }, "test generated authority"), /symlink|ELOOP/u, "no-follow JSON publication must reject the generated-path symlink");
+    assert.deepEqual(readFileSync(externalTarget), externalBytes, "generated-path symlink rejection must leave its external target byte-identical");
+    rmSync(linkedGeneratedPath);
+
+    const transactionDirectory = resolve(work, "transaction");
+    const pairs = ["one", "two"].map((name) => {
+      const source = resolve(work, `${name}.source`);
+      const target = resolve(work, `${name}.target`);
+      writeFileSync(source, `${name} new\n`);
+      writeFileSync(target, `${name} old\n`);
+      return { source, target, transactionDirectory, label: name };
+    });
+    const original = pairs.map(({ target }) => readFileSync(target));
+
+    let renameCount = 0;
+    const renameFailure = prepareAuthorityPublication(pairs);
+    assert.throws(() => publishPreparedAuthority(renameFailure, () => true, {
+      publishEntry(source, target) {
+        if (renameCount++ === 1) throw new Error("injected rename failure");
+        renameSync(source, target);
+      },
+    }), /injected rename failure/u, "rename failure must roll back every published target");
+    assert.deepEqual(pairs.map(({ target }) => readFileSync(target)), original, "rename failure rollback must restore original target bytes");
+
+    const validationFailure = prepareAuthorityPublication(pairs);
+    assert.throws(() => publishPreparedAuthority(validationFailure, () => { throw new Error("injected validation failure"); }), /injected validation failure/u, "validation failure must roll back every target");
+    assert.deepEqual(pairs.map(({ target }) => readFileSync(target)), original, "validation failure rollback must restore original target bytes");
+
+    const cleanupFailure = prepareAuthorityPublication(pairs);
+    let cleanupCount = 0;
+    assert.throws(() => publishPreparedAuthority(cleanupFailure, () => "validated", {
+      removeBackup(path) {
+        if (cleanupCount++ === 0) return rmSync(path, { force: true });
+        throw new Error("injected cleanup failure");
+      },
+    }), /injected cleanup failure/u, "post-validation cleanup failure must be reported");
+    assert.deepEqual(pairs.map(({ target }) => readFileSync(target, "utf8")), ["one new\n", "two new\n"], "post-validation cleanup failure must not roll back or delete committed targets");
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+function sha256(bytes) {
+  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function assertClosedObject(value, fields, required, label) {
+  assert.ok(value && typeof value === "object" && !Array.isArray(value), `${label} must be an object`);
+  const keys = Object.keys(value);
+  assert.deepEqual(keys.filter((key) => !fields.includes(key)), [], `${label} unknown fields`);
+  assert.deepEqual(required.filter((key) => !keys.includes(key)), [], `${label} missing fields`);
+}
+
+function assertFindingExpectation(value, label) {
+  assertClosedObject(value, ["finding_id", "category", "severity"], ["finding_id", "category", "severity"], label);
+  assert.match(value.finding_id, /^[a-z0-9][a-z0-9_-]*$/u, `${label} finding_id`);
+  assert.match(value.category, /^[a-z0-9][a-z0-9_-]*$/u, `${label} category`);
+  assert.ok(["critical", "high", "medium", "low", "informational"].includes(value.severity), `${label} severity`);
+}
+
+function validatePrivateCaseContract(cases) {
+  assertClosedObject(cases, ["fixture_id", "base_handoff", "cases"], ["fixture_id", "base_handoff", "cases"], "private cases authority");
+  assert.equal(cases.fixture_id, FIXTURE_ID, "private cases fixture identity");
+  assert.ok(cases.base_handoff && typeof cases.base_handoff === "object" && !Array.isArray(cases.base_handoff), "private cases base_handoff must be an object");
+  assert.ok(Array.isArray(cases.cases) && cases.cases.length > 0, "private cases inventory must be non-empty");
+  const caseIds = [];
+  const observedCoverage = new Set();
+  const requirementFailureCoverage = new Set();
+  for (const [index, entry] of cases.cases.entries()) {
+    const label = `private case ${index}`;
+    assertClosedObject(entry, CASE_FIELDS, ["case_id", "coverage_class", "mutations", "expected_points", "expected_classification"], label);
+    assert.match(entry.case_id, /^[a-z0-9][a-z0-9_-]*$/u, `${label} case_id`);
+    caseIds.push(entry.case_id);
+    assert.ok(CASE_COVERAGE_CLASSES.includes(entry.coverage_class), `${entry.case_id} coverage_class is invalid`);
+    observedCoverage.add(entry.coverage_class);
+    assert.ok(Array.isArray(entry.mutations), `${entry.case_id} mutations must be an array`);
+    for (const [mutationIndex, mutation] of entry.mutations.entries()) {
+      const mutationLabel = `${entry.case_id} mutation ${mutationIndex}`;
+      assert.ok(mutation?.operation === "set" || mutation?.operation === "delete", `${mutationLabel} operation must be set or delete`);
+      assertClosedObject(mutation, mutation.operation === "set" ? ["operation", "path", "value"] : ["operation", "path"], mutation.operation === "set" ? ["operation", "path", "value"] : ["operation", "path"], mutationLabel);
+      assert.ok(Array.isArray(mutation.path) && mutation.path.length > 0 && mutation.path.every((segment) => typeof segment === "string" && segment.length > 0), `${mutationLabel} path must contain non-empty string segments`);
+    }
+    assert.ok(Array.isArray(entry.expected_points), `${entry.case_id} expected_points must be an array`);
+    assert.equal(entry.expected_points.length, REQUIREMENT_IDS.length, `${entry.case_id} expected_points must be a five-requirement vector`);
+    for (const [requirementIndex, points] of entry.expected_points.entries()) {
+      assert.ok(points === 0 || points === 2 || points === null, `${entry.case_id} expected_points contains a non-binary value`);
+      if (points !== 2) requirementFailureCoverage.add(REQUIREMENT_IDS[requirementIndex]);
+    }
+    assert.ok(entry.expected_classification === null || ["correct_narrow_execution", "under_processing", "over_processing", "invalid_evidence"].includes(entry.expected_classification), `${entry.case_id} expected_classification is invalid`);
+    if (entry.expected_outcomes) {
+      assert.ok(Array.isArray(entry.expected_outcomes), `${entry.case_id} expected_outcomes must be an array`);
+      assert.equal(entry.expected_outcomes.length, REQUIREMENT_IDS.length, `${entry.case_id} expected_outcomes must be a five-requirement vector`);
+      assert.ok(entry.expected_outcomes.every((outcome) => ["pass", "fail", "partial", "not_evaluated", "manual_review_required", "unavailable"].includes(outcome)), `${entry.case_id} expected_outcomes contains an invalid outcome`);
+    }
+    if (entry.expected_equivalence_ids) {
+      assert.ok(Array.isArray(entry.expected_equivalence_ids), `${entry.case_id} expected_equivalence_ids must be an array`);
+      assert.equal(entry.expected_equivalence_ids.length, REQUIREMENT_IDS.length, `${entry.case_id} expected_equivalence_ids must be a five-requirement vector`);
+      for (const ids of entry.expected_equivalence_ids) assert.ok(Array.isArray(ids) && new Set(ids).size === ids.length && ids.every((id) => typeof id === "string" && id.length > 0), `${entry.case_id} expected_equivalence_ids is invalid`);
+    }
+    for (const field of ["expected_findings", "expected_scope_deviations"]) if (entry[field]) {
+      assert.ok(Array.isArray(entry[field]), `${entry.case_id} ${field} must be an array`);
+      entry[field].forEach((finding, findingIndex) => assertFindingExpectation(finding, `${entry.case_id} ${field} ${findingIndex}`));
+    }
+    if (entry.expected_manual_requirement_ids) assert.ok(Array.isArray(entry.expected_manual_requirement_ids) && new Set(entry.expected_manual_requirement_ids).size === entry.expected_manual_requirement_ids.length && entry.expected_manual_requirement_ids.every((id) => REQUIREMENT_IDS.includes(id)), `${entry.case_id} manual requirement inventory is invalid`);
+    for (const field of ["omit_output", "omit_command_evidence", "scope_deviation_applies_to_requirements"]) if (Object.hasOwn(entry, field)) assert.equal(typeof entry[field], "boolean", `${entry.case_id} ${field} must be boolean`);
+    if (Object.hasOwn(entry, "extra_candidate_path")) assert.match(entry.extra_candidate_path, /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[a-zA-Z0-9._/-]+$/u, `${entry.case_id} extra_candidate_path is invalid`);
+  }
+  assert.equal(new Set(caseIds).size, caseIds.length, "private case IDs must be unique");
+  for (const coverage of REQUIRED_CASE_COVERAGE_CLASSES) assert.ok(observedCoverage.has(coverage), `private cases are missing ${coverage} coverage`);
+  assert.deepEqual([...requirementFailureCoverage].sort(), [...REQUIREMENT_IDS].sort(), "private cases must exercise a non-pass result for every weighted requirement");
+}
+
+function readGitBytes(revision, path) {
+  return execFileSync("git", ["-C", ROOT, "show", `${revision}:${path}`], { encoding: "buffer", maxBuffer: 4 * 1024 * 1024 });
+}
+
+function validateHistoricalAdmittedAuthority() {
+  const decisionPath = "benchmarks/fixtures/admission-decision/mp-data-migration-handoff-admission-decision.json";
+  const decisionBytes = readGitBytes("HEAD", decisionPath);
+  const decision = JSON.parse(decisionBytes.toString("utf8"));
+  assert.equal(sha256(decisionBytes), HISTORICAL_ADMITTED_AUTHORITY.decisionRawSha256, "historical admission decision raw bytes");
+  assert.equal(decision.decision_id, HISTORICAL_ADMITTED_AUTHORITY.decisionId);
+  assert.equal(decision.decision_digest, HISTORICAL_ADMITTED_AUTHORITY.decisionDigest);
+  assert.equal(decision.reviewed_head_revision, HISTORICAL_ADMITTED_AUTHORITY.reviewedHeadRevision);
+  assert.deepEqual(decision.evaluator, {
+    evaluator_revision: HISTORICAL_ADMITTED_AUTHORITY.evaluatorRevision,
+    evaluator_bundle_id: HISTORICAL_ADMITTED_AUTHORITY.evaluatorBundleId,
+    evaluator_bundle_digest: HISTORICAL_ADMITTED_AUTHORITY.evaluatorBundleDigest,
+    evaluator_bundle_bytes: 135361,
+  });
+  assert.equal(decision.evaluator_public_reference_digest, HISTORICAL_ADMITTED_AUTHORITY.evaluatorPublicReferenceDigest);
+  for (const authority of [decision.frozen_admission_authority, decision.frozen_requirement_record, decision.frozen_scoring_input_manifest]) {
+    const bytes = readGitBytes(decision.reviewed_head_revision, authority.path);
+    assert.equal(sha256(bytes), authority.raw_byte_digest, `${authority.path} historical raw bytes`);
+  }
+  const admissionBytes = readGitBytes(decision.reviewed_head_revision, decision.frozen_admission_authority.path);
+  const requirementBytes = readGitBytes(decision.reviewed_head_revision, decision.frozen_requirement_record.path);
+  const referencePath = `${FIXTURE_REPOSITORY_ROOT}/evaluator-reference.json`;
+  const referenceBytes = readGitBytes(decision.reviewed_head_revision, referencePath);
+  const admission = JSON.parse(admissionBytes);
+  const requirement = JSON.parse(requirementBytes);
+  const freeze = JSON.parse(readGitBytes(decision.reviewed_head_revision, decision.frozen_scoring_input_manifest.path));
+  const reference = JSON.parse(referenceBytes);
+  assert.equal(admission.admission_digest, decision.frozen_admission_authority.semantic_digest);
+  assert.equal(admission.requirement_authority_digest, decision.frozen_admission_authority.requirement_authority_digest);
+  assert.equal(requirement.requirement_record_digest, decision.frozen_requirement_record.record_digest);
+  assert.equal(requirement.requirement_set_digest, decision.frozen_requirement_record.set_digest);
+  assert.equal(freeze.manifest_digest, decision.frozen_scoring_input_manifest.semantic_digest);
+  assert.equal(reference.public_metadata_digest, decision.evaluator_public_reference_digest);
+  assert.equal(reference.evaluator_revision, decision.evaluator.evaluator_revision);
+  assert.equal(reference.evaluator_bundle_id, decision.evaluator.evaluator_bundle_id);
+  assert.equal(reference.evaluator_bundle_digest, decision.evaluator.evaluator_bundle_digest);
+  assert.equal(reference.evaluator_source_identity.base_git_revision, decision.evaluator.evaluator_revision);
+  assert.equal(reference.evaluator_source_identity.source_tree_digest, canonicalDigest(reference.evaluator_source_identity.source_files));
+  assert.deepEqual(freeze.admission_record, { path: decision.frozen_admission_authority.path, raw_byte_digest: sha256(admissionBytes), semantic_digest: admission.admission_digest });
+  assert.deepEqual(freeze.requirement_record, { path: decision.frozen_requirement_record.path, raw_byte_digest: sha256(requirementBytes), record_digest: requirement.requirement_record_digest, set_digest: requirement.requirement_set_digest });
+  assert.deepEqual(freeze.evaluator_public_reference, { path: referencePath, raw_byte_digest: sha256(referenceBytes), semantic_digest: reference.public_metadata_digest });
+  const manifestBytes = readGitBytes(decision.reviewed_head_revision, reference.evaluator_authority_manifest_path);
+  const manifest = JSON.parse(manifestBytes);
+  assert.equal(sha256(manifestBytes), reference.evaluator_authority_manifest_raw_sha256);
+  assert.equal(sha256(manifestBytes), admission.evaluator_authority_manifest_raw_sha256);
+  assert.equal(manifest.manifest_digest, reference.evaluator_authority_manifest_digest);
+  assert.equal(manifest.manifest_digest, admission.evaluator_authority_manifest_digest);
+  assert.deepEqual(freeze.evaluator_authority_manifest, { path: reference.evaluator_authority_manifest_path, raw_byte_digest: sha256(manifestBytes), semantic_digest: manifest.manifest_digest });
+  for (const source of reference.evaluator_source_identity.source_files) {
+    const bytes = readGitBytes(reference.evaluator_revision, source.path);
+    assert.equal(bytes.length, source.bytes, `${source.path} historical evaluator source bytes`);
+    assert.equal(sha256(bytes), source.sha256, `${source.path} historical evaluator source digest`);
+  }
 }
 
 function evaluatorSemanticProjection(result) {
@@ -312,8 +552,14 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
   assert.equal(production.admissionState, "admission_pending");
   const evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${production.evaluatorBundleDigest}`);
   const cases = readJson(resolve(caseRoot, "cases.json"));
+  validatePrivateCaseContract(cases);
   const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
   const bundle = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
+  const independence = readJson(resolve(privateRoot, "independence.json"));
+  assert.ok(independence.source_classification.includes("current_canonical_public_contracts"), "private provenance must identify current canonical public contracts as its specification source");
+  for (const excluded of ["historical_private_case_review_bytes_unavailable", "historical_private_case_review_bytes_not_reconstructed", "measured_agent_output", "measured_scoring_result"]) assert.ok(independence.excluded_source_classification.includes(excluded), `private provenance must exclude ${excluded}`);
+  assert.equal(independence.measured_output_used, false);
+  assert.equal(independence.measured_result_used, false);
   const hiddenAsset = bundle.asset_inventory.find(({ role }) => role === "hidden_tests");
   assert.ok(hiddenAsset, "private bundle requires a hidden evaluator asset");
   const freezePath = resolve(FIXTURE_ROOT, "scoring-input-freeze-manifest.json");
@@ -431,6 +677,8 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
 }
 
 validateFrozenDesign();
+validateAuthorityPublicationGuards();
+validateHistoricalAdmittedAuthority();
 validateMpDataMigrationHandoffInputClosure({ root: ROOT });
 validateVisibleScenario();
 validateSafeNextActionMutationCoverage();
@@ -438,8 +686,9 @@ validateWorkspaceValidatorParity();
 validatePublicNegativeCoverage();
 
 const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
+const publicContractOnly = process.argv.slice(2).includes("--public-contract-only");
 let effectiveAdmissionStatus = "admission_pending";
-if (productionExists) {
+if (productionExists && !publicContractOnly) {
   const production = validateMpDataMigrationHandoffProductionAuthority({ root: ROOT });
   assert.equal(production.scoringReady, false);
   validateProductionNegativeCoverage();
@@ -460,4 +709,4 @@ if (productionExists) {
 
 const requested = privateArgs(process.argv.slice(2));
 const privateSummary = requested ? await validatePrivateCases(requested) : null;
-console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));
+console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", historical_admitted_authority: "pass", production_validation: publicContractOnly ? "not_requested" : productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));

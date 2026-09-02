@@ -2,17 +2,23 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { dirname, relative, resolve, sep } from "node:path";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { computeEvaluatorBundleDigest, computeEvaluatorBundleId } from "./ask-benchmark-evaluator-boundary.mjs";
 import { assertPrivateRootOutsideRepository } from "./ask-benchmark-mn-build-option-update.mjs";
 import { validateMnFocusedRegressionTestProductionAuthority } from "./ask-benchmark-mn-focused-regression-test-authority.mjs";
+import {
+  establishReviewArchiveIdentity,
+  evaluatorSourceReviewEntries,
+  validateReviewArchiveCases,
+  validateReviewArchivePrivateBundle,
+} from "./ask-benchmark-review-archive-identity.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE_ID = "mn-focused-regression-test";
 const FIXTURE_PATH = `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`;
 const GENERATOR_PATH = "scripts/ask-benchmark-mn-focused-regression-test-review-archive.mjs";
-const FORMAT_REVISION = "issue-207-node-store-zip.v1";
+const FORMAT_REVISION = "issue-282-fresh-successor-store-zip.v1";
 const DOS_TIME = 0;
 const DOS_DATE = 0x0021;
 const UTF8_FLAG = 0x0800;
@@ -21,6 +27,11 @@ const VERSION = 20;
 const VERSION_MADE_BY_UNIX = (3 << 8) | VERSION;
 const SOURCE_PATHS = Object.freeze([
   "benchmarks/portfolio-design-admission-records/mn-focused-regression-test.json",
+  "benchmarks/schemas/private-evaluator-bundle.schema.json",
+  "benchmarks/schemas/private-evaluator-fragment.schema.json",
+  "benchmarks/schemas/private-evaluator-independence-statement.schema.json",
+  "scripts/ask-benchmark-evaluator-boundary.mjs",
+  "scripts/ask-benchmark-private-evaluator-runner.mjs",
   "scripts/ask-benchmark-mn-focused-regression-test.mjs",
   "scripts/ask-benchmark-mn-focused-regression-test-authority.mjs",
   GENERATOR_PATH,
@@ -174,27 +185,35 @@ function zip(entries) {
   return Buffer.concat([...local, centralBytes, end]);
 }
 
-export function generateMnFocusedRegressionTestReviewArchive({ root = ROOT, privateRoot, caseRoot, outputPath, reviewedHead } = {}) {
-  if (!privateRoot || !caseRoot || !outputPath || !/^[a-f0-9]{40}$/u.test(reviewedHead ?? "")) throw new Error("mn-focused review archive requires privateRoot, caseRoot, outputPath, and reviewedHead");
+export function generateMnFocusedRegressionTestReviewArchive({ root = ROOT, privateRoot, caseRoot, outputPath, reviewedHead, sourceRevision } = {}) {
+  if (!privateRoot || !caseRoot || !outputPath) throw new Error("mn-focused review archive requires privateRoot, caseRoot, outputPath, reviewedHead, and sourceRevision");
   const repositoryRoot = realpathSync(root);
   const privateDirectory = externalDirectory(privateRoot, "mn-focused review archive private root");
   const caseDirectory = externalDirectory(caseRoot, "mn-focused review archive case root");
   assertPrivateRootOutsideRepository(repositoryRoot, privateDirectory);
   assertPrivateRootOutsideRepository(repositoryRoot, caseDirectory);
+  const requestedTarget = resolve(outputPath);
+  const archiveTarget = resolve(realpathSync(dirname(requestedTarget)), basename(requestedTarget));
+  if ([repositoryRoot, privateDirectory, caseDirectory].some((directory) => archiveTarget === directory || archiveTarget.startsWith(`${directory}${sep}`))) throw new Error("mn-focused review archive output must stay outside repository and authority source roots");
   const head = git(repositoryRoot, ["rev-parse", "HEAD"], "review archive reviewed HEAD lookup").trim();
   if (head !== reviewedHead) throw new Error("mn-focused review archive reviewed HEAD differs from repository HEAD");
   const trackedDiff = spawnSync("git", ["-C", repositoryRoot, "diff", "--quiet", reviewedHead, "--"]);
   if (trackedDiff.status !== 0) throw new Error("mn-focused review archive repository tracked bytes differ from the reviewed HEAD");
   const authority = validateMnFocusedRegressionTestProductionAuthority({ root: repositoryRoot });
+  const identity = establishReviewArchiveIdentity({ root: repositoryRoot, runtimeRoot: ROOT, reviewedHead, sourceRevision, evaluatorRevision: authority.evaluatorRevision, generatorPath: GENERATOR_PATH });
   const bundle = readJson(resolve(privateDirectory, "private-evaluator-bundle.json"), "mn-focused private evaluator bundle");
   const privateEntries = walk(privateDirectory, "private-evaluator");
   validatePrivateBundle(privateDirectory, bundle, authority, privateEntries);
+  const privateSummary = validateReviewArchivePrivateBundle({ fixtureId: FIXTURE_ID, bundle, authority, privateEntries, privatePrefix: "private-evaluator" });
   const cases = readJson(resolve(caseDirectory, "cases.json"), "mn-focused private cases");
   if (cases.fixture_id !== FIXTURE_ID || !Array.isArray(cases.cases) || cases.cases.length === 0 || new Set(cases.cases.map(({ case_id }) => case_id)).size !== cases.cases.length) throw new Error("mn-focused review archive private case identity is invalid");
   const caseEntries = walk(caseDirectory, "private-cases");
+  const caseSummary = validateReviewArchiveCases({ fixtureId: FIXTURE_ID, caseEntries, casePrefix: "private-cases", singleton: true });
   const entries = [
     ...repositoryTreeEntries(repositoryRoot, reviewedHead, FIXTURE_PATH),
     ...SOURCE_PATHS.map((path) => repositoryEntry(repositoryRoot, reviewedHead, path)),
+    ...evaluatorSourceReviewEntries({ root: repositoryRoot, sourceRevision, sourceIdentity: bundle.evaluator_source_identity }),
+    ...identity.generatorEntries,
     ...privateEntries,
     ...caseEntries,
   ];
@@ -213,11 +232,16 @@ export function generateMnFocusedRegressionTestReviewArchive({ root = ROOT, priv
     program: "mn_focused_regression_test_private_review_archive",
     fixture_id: FIXTURE_ID,
     reviewed_repository_head: reviewedHead,
-    evaluator_source_revision: authority.evaluatorRevision,
+    evaluator_source_revision: sourceRevision,
     evaluator_bundle_id: authority.evaluatorBundleId,
     evaluator_bundle_digest: authority.evaluatorBundleDigest,
     evaluator_source_tree_digest: bundle.evaluator_source_identity.source_tree_digest,
     evaluator_dependency_graph_digest: bundle.dependency_graph.graph_digest,
+    archive_generator_source_identity: identity.generatorSourceIdentity,
+    private_asset_bytes: privateSummary.privateAssetBytes,
+    private_asset_count: privateSummary.privateAssetCount,
+    private_case_count: caseSummary.caseCount,
+    private_case_paths: caseSummary.casePaths,
     evaluator_authority_digest: authority.evaluatorAuthorityDigest,
     requirement_record_digest: authority.requirementRecordDigest,
     requirement_set_digest: authority.requirementSetDigest,
@@ -229,13 +253,14 @@ export function generateMnFocusedRegressionTestReviewArchive({ root = ROOT, priv
     admission_status: "admission_pending",
     scoring_ready: false,
     measured_execution: false,
-    archive_format: { revision: FORMAT_REVISION, compression_method: "store", fixed_timestamp: "1980-01-01T00:00:00", generator_source_digest: sha256(generatorEntry.bytes) },
+    scoring_published: false,
+    archive_format: { revision: FORMAT_REVISION, compression_method: "store", fixed_timestamp: "1980-01-01T00:00:00", generator_source_digest: sha256(generatorEntry.bytes), generator_source_inventory: identity.generatorSourceIdentity.node_inventory },
     entries: [...unique.values()].sort((left, right) => left.path.localeCompare(right.path)).map(({ path, bytes, mode }) => ({ path, bytes: bytes.length, sha256: sha256(bytes), mode })),
   };
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
   const archiveBytes = zip([...unique.values(), { path: "REVIEW-MANIFEST.json", bytes: manifestBytes, mode: 0o644 }]);
-  writeFileSync(resolve(outputPath), archiveBytes, { flag: "wx", mode: 0o644 });
-  return Object.freeze({ fixtureId: FIXTURE_ID, reviewedHead, evaluatorSourceRevision: authority.evaluatorRevision, bundleId: authority.evaluatorBundleId, bundleDigest: authority.evaluatorBundleDigest, candidateDigest: authority.candidateDigest, inputDigest: authority.inputDigest, archivePath: resolve(outputPath), archiveSha256: sha256(archiveBytes), archiveBytes: archiveBytes.length, entryCount: unique.size + 1 });
+  writeFileSync(archiveTarget, archiveBytes, { flag: "wx", mode: 0o644 });
+  return Object.freeze({ fixtureId: FIXTURE_ID, reviewedHead, evaluatorSourceRevision: sourceRevision, bundleId: authority.evaluatorBundleId, bundleDigest: authority.evaluatorBundleDigest, privateAssetBytes: privateSummary.privateAssetBytes, candidateDigest: authority.candidateDigest, inputDigest: authority.inputDigest, archivePath: archiveTarget, archiveSha256: sha256(archiveBytes), archiveBytes: archiveBytes.length, entryCount: unique.size + 1, privateCaseCount: caseSummary.caseCount });
 }
 
 function parseArgs(argv) {
@@ -247,6 +272,7 @@ function parseArgs(argv) {
     else if (name === "--case-root") args.caseRoot = resolve(argv[++index]);
     else if (name === "--output") args.outputPath = resolve(argv[++index]);
     else if (name === "--reviewed-head") args.reviewedHead = argv[++index];
+    else if (name === "--source-revision") args.sourceRevision = argv[++index];
     else throw new Error(`unknown argument: ${name}`);
   }
   return args;

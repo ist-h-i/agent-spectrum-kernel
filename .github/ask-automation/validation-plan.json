@@ -122,6 +122,30 @@
       "argv": ["node", "scripts/test-ask-benchmark-evaluator-boundary.mjs"]
     },
     {
+      "id": "mp_ci_evidence_gap_review_archive",
+      "argv": ["node", "scripts/test-ask-benchmark-mp-ci-evidence-gap-review-archive.mjs"]
+    },
+    {
+      "id": "mp_accessibility_interaction_review_archive",
+      "argv": ["node", "scripts/test-ask-benchmark-mp-accessibility-interaction-review-review-archive.mjs"]
+    },
+    {
+      "id": "mp_data_migration_handoff_review_archive",
+      "argv": ["node", "scripts/test-ask-benchmark-mp-data-migration-handoff-review-archive.mjs"]
+    },
+    {
+      "id": "mp_frontend_state_review_archive",
+      "argv": ["node", "scripts/test-ask-benchmark-mp-frontend-state-review-archive.mjs"]
+    },
+    {
+      "id": "mp_iac_rollback_design_review_archive",
+      "argv": ["node", "scripts/test-ask-benchmark-mp-iac-rollback-design-review-archive.mjs"]
+    },
+    {
+      "id": "mp_performance_investigation_review_archive",
+      "argv": ["node", "scripts/test-ask-benchmark-mp-performance-investigation-review-archive.mjs"]
+    },
+    {
       "id": "portfolio_score",
       "argv": ["node", "scripts/test-ask-benchmark-portfolio-score.mjs"]
     },

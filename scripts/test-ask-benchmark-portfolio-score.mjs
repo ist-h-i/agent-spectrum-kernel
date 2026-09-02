@@ -373,6 +373,7 @@ function createPrivateBundle(path, normalized) {
     schema_version: "1.0.0",
     schema_path: "benchmarks/schemas/private-evaluator-bundle.schema.json",
     program: "adaptive_ask_private_evaluator_bundle",
+    execution_budget_ms: 120_000,
     evaluator_bundle_id: `evaluator-${"0".repeat(64)}`,
     evaluator_bundle_digest: digest("placeholder"),
     fixture_identity: { fixture_id: FIXTURE_ID, task_class: normalized.lineage.task_class, suite: normalized.lineage.suite },

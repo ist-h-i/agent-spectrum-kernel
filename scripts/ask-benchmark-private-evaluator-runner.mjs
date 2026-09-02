@@ -155,10 +155,11 @@ function virtualNode(authority, value) {
 
 function virtualStats(authority, absolute, node) {
   const file = node.file_type === "file";
+  const observableMode = node.original_mode ?? node.mode;
   return {
     dev: 1,
     ino: authority.inodeByPath.get(absolute),
-    mode: (file ? 0o100000 : 0o040000) | node.mode,
+    mode: (file ? 0o100000 : 0o040000) | observableMode,
     nlink: 1,
     size: file ? node.bytes : 0,
     mtimeMs: 0,
@@ -171,6 +172,49 @@ function virtualStats(authority, absolute, node) {
     isBlockDevice: () => false,
     isCharacterDevice: () => false,
   };
+}
+
+function installOriginalWorkspaceModes(authority) {
+  const originalRoot = authority.roots.get("original_workspace_authority")?.virtual;
+  if (!originalRoot) fail("original workspace authority root is missing");
+  const authorityNode = authority.nodes.get(path.resolve(originalRoot, "original-workspace-authority.json"));
+  const diffNode = authority.nodes.get(path.resolve(originalRoot, "repository-diff-artifact.json"));
+  if (!authorityNode?.content || !diffNode?.content) fail("original workspace authority artifacts are missing");
+  let originalWorkspaceAuthority;
+  let repositoryDiffArtifact;
+  try {
+    originalWorkspaceAuthority = JSON.parse(authorityNode.content.toString("utf8"));
+    repositoryDiffArtifact = JSON.parse(diffNode.content.toString("utf8"));
+  } catch { fail("original workspace authority payload is invalid JSON"); }
+
+  const { authority_digest: authorityDigest, authority_bytes: authorityBytes, ...authorityClosure } = originalWorkspaceAuthority;
+  if (authorityDigest !== canonicalDigest(authorityClosure) || authorityBytes !== (Buffer.byteLength(stableCanonicalJson(authorityClosure)) || 1)) fail("original workspace authority identity is invalid");
+  if (repositoryDiffArtifact.artifact_digest !== canonicalDigest(repositoryDiffArtifact.diff_entries)
+    || repositoryDiffArtifact.artifact_bytes !== (Buffer.byteLength(stableCanonicalJson(repositoryDiffArtifact.diff_entries)) || 1)
+    || stableCanonicalJson(repositoryDiffArtifact.diff_entries) !== stableCanonicalJson(originalWorkspaceAuthority.diff_entries)
+    || originalWorkspaceAuthority.repository_diff_artifact?.digest !== repositoryDiffArtifact.artifact_digest
+    || originalWorkspaceAuthority.repository_diff_artifact?.bytes !== repositoryDiffArtifact.artifact_bytes) fail("repository diff artifact identity is invalid");
+
+  for (const [kind, inventoryField, digestField] of [
+    ["frozen", "frozen_inventory", "frozen_workspace_portable_digest"],
+    ["candidate", "candidate_inventory", "candidate_workspace_portable_digest"],
+  ]) {
+    const root = authority.roots.get(kind)?.virtual;
+    const inventory = originalWorkspaceAuthority[inventoryField];
+    if (!root || !Array.isArray(inventory) || originalWorkspaceAuthority[digestField] !== canonicalDigest(inventory)) fail(`${kind} original workspace inventory identity is invalid`);
+    const sourceNodes = [...authority.nodes.values()].filter((node) => node.kind === kind && node.relativePath !== "");
+    if (sourceNodes.length !== inventory.length) fail(`${kind} original workspace inventory is not closed`);
+    const seen = new Set();
+    for (const entry of inventory) {
+      const relativePath = portablePath(entry.path, `${kind} original workspace path`);
+      if (seen.has(relativePath) || !Number.isInteger(entry.mode) || entry.mode < 0 || entry.mode > 0o777) fail(`${kind} original workspace mode authority is invalid`);
+      seen.add(relativePath);
+      const node = authority.nodes.get(path.resolve(root, relativePath));
+      if (!node || node.kind !== kind || node.relativePath !== relativePath || node.file_type !== entry.file_type || node.bytes !== entry.bytes || node.sha256 !== entry.sha256) fail(`${kind} original workspace inventory is detached at ${relativePath}`);
+      node.original_mode = entry.mode;
+    }
+  }
+  return { originalWorkspaceAuthority, repositoryDiffArtifact };
 }
 
 function readEncoding(options) {
@@ -332,24 +376,55 @@ async function execute(payload, authority) {
   const repositoryRoot = authority.roots.get("repository")?.virtual;
   const privateRoot = authority.roots.get("private_bundle")?.virtual;
   if (!repositoryRoot || !privateRoot) fail("in-memory evaluator roots are incomplete");
+  const { originalWorkspaceAuthority, repositoryDiffArtifact } = installOriginalWorkspaceModes(authority);
+  const privateManifestNode = authority.nodes.get(path.resolve(privateRoot, "private-evaluator-bundle.json"));
+  if (!privateManifestNode || privateManifestNode.file_type !== "file") fail("private evaluator bundle manifest is missing from the verified authority");
+  let privateManifest;
+  try { privateManifest = JSON.parse(privateManifestNode.content.toString("utf8")); }
+  catch { fail("private evaluator bundle manifest is invalid JSON"); }
+  const hiddenAsset = (privateManifest.asset_inventory ?? []).find(({ role }) => role === "hidden_tests");
+  if (!hiddenAsset || hiddenAsset.path !== payload.hidden_evaluator_path) fail("hidden evaluator path is detached from the private bundle manifest");
+  const expectedPrivateModules = (privateManifest.asset_inventory ?? [])
+    .filter(({ media_type: mediaType }) => mediaType === "text/javascript")
+    .map((asset) => {
+      const privateBundlePath = portablePath(asset.path, "private evaluator module asset path");
+      const modulePath = privateBundlePath === payload.hidden_evaluator_path ? PRIVATE_MODULE_PATH : `private/${privateBundlePath}`;
+      portablePath(modulePath, "private evaluator virtual module path");
+      return { modulePath, privateBundlePath, asset };
+    })
+    .sort((left, right) => left.modulePath.localeCompare(right.modulePath));
+  if (!expectedPrivateModules.some(({ modulePath }) => modulePath === PRIVATE_MODULE_PATH)) fail("hidden evaluator is absent from the private module inventory");
+  if (new Set(expectedPrivateModules.map(({ modulePath }) => modulePath)).size !== expectedPrivateModules.length) fail("private evaluator module paths collide");
+  const expectedPrivateModuleByPath = new Map(expectedPrivateModules.map((entry) => [entry.modulePath, entry]));
+  const privateModuleAuthorityByPath = new Map();
+  const privateModulePathByAuthority = new Map();
   const moduleSources = new Map();
   for (const entry of payload.modules ?? []) {
+    portablePath(entry.path, "in-memory module path");
     if (moduleSources.has(entry.path)) fail(`duplicate in-memory module path: ${entry.path}`);
     const bytes = Buffer.from(entry.source_base64 ?? "", "base64");
     if (bytes.toString("base64") !== entry.source_base64 || bytes.length !== entry.bytes || sha256(bytes) !== entry.sha256) fail(`in-memory module bytes are invalid: ${entry.path}`);
-    if (entry.path !== PRIVATE_MODULE_PATH) {
+    if (entry.private_bundle_path !== undefined) {
+      const privateBundlePath = portablePath(entry.private_bundle_path, "in-memory private module authority path");
+      const expected = expectedPrivateModuleByPath.get(entry.path);
+      if (!expected || expected.privateBundlePath !== privateBundlePath || expected.asset.bytes !== entry.bytes || expected.asset.sha256 !== entry.sha256) fail(`in-memory private module is outside the verified bundle manifest: ${entry.path}`);
+      const privateNode = authority.nodes.get(path.resolve(privateRoot, privateBundlePath));
+      if (!privateNode || privateNode.file_type !== "file" || privateNode.bytes !== entry.bytes || privateNode.sha256 !== entry.sha256 || Buffer.compare(privateNode.content, bytes) !== 0) fail(`in-memory private module is detached from private byte authority: ${entry.path}`);
+      privateModuleAuthorityByPath.set(entry.path, privateBundlePath);
+      privateModulePathByAuthority.set(privateBundlePath, entry.path);
+    } else {
       const node = graphNodes.get(entry.path);
       if (!node || node.file_type !== "module" || node.bytes !== entry.bytes || node.sha256 !== entry.sha256) fail(`in-memory module is outside the verified source graph: ${entry.path}`);
       const repositoryNode = authority.nodes.get(path.resolve(repositoryRoot, entry.path));
       if (!repositoryNode || repositoryNode.file_type !== "file" || repositoryNode.bytes !== entry.bytes || repositoryNode.sha256 !== entry.sha256 || Buffer.compare(repositoryNode.content, bytes) !== 0) fail(`in-memory module is detached from repository authority: ${entry.path}`);
-    } else {
-      const hiddenNode = authority.nodes.get(path.resolve(privateRoot, payload.hidden_evaluator_path));
-      if (!hiddenNode || hiddenNode.file_type !== "file" || hiddenNode.bytes !== entry.bytes || hiddenNode.sha256 !== entry.sha256 || Buffer.compare(hiddenNode.content, bytes) !== 0) fail("hidden evaluator module is detached from private byte authority");
     }
     moduleSources.set(entry.path, bytes.toString("utf8"));
   }
-  const expectedModulePaths = [...graphNodes.values()].filter(({ file_type }) => file_type === "module").map(({ path: modulePath }) => modulePath).sort();
-  if (stableCanonicalJson([...moduleSources.keys()].filter((modulePath) => modulePath !== PRIVATE_MODULE_PATH).sort()) !== stableCanonicalJson(expectedModulePaths) || !moduleSources.has(PRIVATE_MODULE_PATH)) fail("in-memory module inventory is not closed");
+  const expectedRepositoryModulePaths = [...graphNodes.values()].filter(({ file_type }) => file_type === "module").map(({ path: modulePath }) => modulePath).sort();
+  const actualRepositoryModulePaths = [...moduleSources.keys()].filter((modulePath) => !privateModuleAuthorityByPath.has(modulePath)).sort();
+  const actualPrivateModulePaths = [...privateModuleAuthorityByPath.keys()].sort();
+  if (stableCanonicalJson(actualRepositoryModulePaths) !== stableCanonicalJson(expectedRepositoryModulePaths)
+    || stableCanonicalJson(actualPrivateModulePaths) !== stableCanonicalJson(expectedPrivateModules.map(({ modulePath }) => modulePath))) fail("in-memory module inventory is not closed");
 
   const context = vm.createContext({
     AbortController,
@@ -381,21 +456,34 @@ async function execute(payload, authority) {
   builtinNamespaces.set("node:child_process", childNamespace);
   const moduleCache = new Map();
   const builtinCache = new Map();
-  const identifierForPath = (modulePath) => modulePath === PRIVATE_MODULE_PATH
-    ? url.pathToFileURL(path.resolve(privateRoot, payload.hidden_evaluator_path)).href
+  const identifierForPath = (modulePath) => privateModuleAuthorityByPath.has(modulePath)
+    ? url.pathToFileURL(path.resolve(privateRoot, privateModuleAuthorityByPath.get(modulePath))).href
     : url.pathToFileURL(path.resolve(repositoryRoot, modulePath)).href;
   const pathForIdentifier = (identifier) => {
     const absolute = url.fileURLToPath(identifier);
-    if (absolute === path.resolve(privateRoot, payload.hidden_evaluator_path)) return PRIVATE_MODULE_PATH;
+    if (absolute.startsWith(`${privateRoot}${path.sep}`)) {
+      const privateBundlePath = path.relative(privateRoot, absolute).split(path.sep).join("/");
+      const modulePath = privateModulePathByAuthority.get(privateBundlePath);
+      if (modulePath) return modulePath;
+      fail(`module identifier escapes verified private module authority: ${identifier}`);
+    }
     if (absolute.startsWith(`${repositoryRoot}${path.sep}`)) return path.relative(repositoryRoot, absolute).split(path.sep).join("/");
     fail(`module identifier escapes verified authority: ${identifier}`);
   };
-  const edgeAllowed = (from, to, specifier, dynamic) => edges.some((edge) => {
-    if (edge.from !== from || edge.to !== to) return false;
-    if (from === PRIVATE_MODULE_PATH) return dynamic && edge.kind === "private_entry_import";
-    if (dynamic) return edge.kind === "dynamic_import";
-    return ["static_import", "export_from"].includes(edge.kind) && edge.specifier === specifier;
-  });
+  const edgeAllowed = (from, to, specifier, dynamic) => {
+    const fromPrivate = privateModuleAuthorityByPath.has(from);
+    const toPrivate = privateModuleAuthorityByPath.has(to);
+    if (fromPrivate || toPrivate) {
+      if (fromPrivate && toPrivate) return specifier.startsWith("./") || specifier.startsWith("../");
+      if (from === PRIVATE_MODULE_PATH && !toPrivate) return dynamic && edges.some((edge) => edge.from === from && edge.to === to && edge.kind === "private_entry_import");
+      return false;
+    }
+    return edges.some((edge) => {
+      if (edge.from !== from || edge.to !== to) return false;
+      if (dynamic) return edge.kind === "dynamic_import";
+      return ["static_import", "export_from"].includes(edge.kind) && edge.specifier === specifier;
+    });
+  };
   const syntheticBuiltin = (specifier) => {
     if (builtinCache.has(specifier)) return builtinCache.get(specifier);
     const namespace = builtinNamespaces.get(specifier);
@@ -409,8 +497,9 @@ async function execute(payload, authority) {
     if (moduleCache.has(modulePath)) return moduleCache.get(modulePath);
     const source = moduleSources.get(modulePath);
     if (source === undefined) fail(`module is outside the verified byte map: ${modulePath}`);
-    const kind = modulePath === PRIVATE_MODULE_PATH ? "private_bundle" : "repository";
-    const relativePath = modulePath === PRIVATE_MODULE_PATH ? payload.hidden_evaluator_path : modulePath;
+    const privateBundlePath = privateModuleAuthorityByPath.get(modulePath);
+    const kind = privateBundlePath ? "private_bundle" : "repository";
+    const relativePath = privateBundlePath ?? modulePath;
     const module = withBarrier(payload.barrier, "before_module_link", kind, relativePath, () => new vm.SourceTextModule(source, {
       context,
       identifier: identifierForPath(modulePath),
@@ -443,14 +532,13 @@ async function execute(payload, authority) {
   let normalized;
   try { normalized = JSON.parse(normalizedBytes.toString("utf8")); }
   catch { fail("normalized result verified bytes are invalid JSON"); }
-  const originalAuthorityRoot = authority.roots.get("original_workspace_authority")?.virtual;
-  if (!originalAuthorityRoot) fail("original workspace authority root is missing");
-  let originalWorkspaceAuthority;
-  let repositoryDiffArtifact;
-  try {
-    originalWorkspaceAuthority = JSON.parse(fsNamespace.readFileSync(path.resolve(originalAuthorityRoot, "original-workspace-authority.json"), "utf8"));
-    repositoryDiffArtifact = JSON.parse(fsNamespace.readFileSync(path.resolve(originalAuthorityRoot, "repository-diff-artifact.json"), "utf8"));
-  } catch { fail("original workspace authority payload is invalid JSON"); }
+  const normalizedLineage = normalized?.lineage;
+  if (repositoryDiffArtifact.run_instance_id !== normalizedLineage?.run_instance_id
+    || repositoryDiffArtifact.case_id !== normalizedLineage?.case_id
+    || repositoryDiffArtifact.attempt !== normalizedLineage?.attempt) fail("repository diff artifact lineage is detached from the normalized result");
+  if (repositoryDiffArtifact.frozen_workspace_tree_digest !== originalWorkspaceAuthority.frozen_workspace_portable_digest
+    || repositoryDiffArtifact.candidate_workspace_tree_digest !== originalWorkspaceAuthority.candidate_workspace_portable_digest
+    || stableCanonicalJson(repositoryDiffArtifact.candidate_authority) !== stableCanonicalJson(originalWorkspaceAuthority.candidate_authority)) fail("repository diff artifact workspace authority is detached from the original workspace authority");
   const fragment = await hidden.namespace.evaluateCandidateSafe({
     repositoryRoot,
     frozenWorkspace: authority.roots.get("frozen")?.virtual,

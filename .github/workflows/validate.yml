@@ -132,6 +132,24 @@ jobs:
       - name: Run performance investigation fixture source-freeze tests
         run: node scripts/test-ask-benchmark-mp-performance-investigation.mjs
 
+      - name: Run CI-evidence review archive contract tests
+        run: node scripts/test-ask-benchmark-mp-ci-evidence-gap-review-archive.mjs
+
+      - name: Run accessibility interaction review archive contract tests
+        run: node scripts/test-ask-benchmark-mp-accessibility-interaction-review-review-archive.mjs
+
+      - name: Run data migration handoff review archive contract tests
+        run: node scripts/test-ask-benchmark-mp-data-migration-handoff-review-archive.mjs
+
+      - name: Run frontend state review archive contract tests
+        run: node scripts/test-ask-benchmark-mp-frontend-state-review-archive.mjs
+
+      - name: Run IaC rollback design review archive contract tests
+        run: node scripts/test-ask-benchmark-mp-iac-rollback-design-review-archive.mjs
+
+      - name: Run performance investigation review archive contract tests
+        run: node scripts/test-ask-benchmark-mp-performance-investigation-review-archive.mjs
+
       - name: Run evaluator-authority integration contract tests
         run: node scripts/test-ask-benchmark-portfolio-evaluator-result.mjs
 
