@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "mp-ci-evidence-gap",
   "candidate_input_digest": "sha256:13e5d0c70feffed4db0bdf68b2b89b9b15005c53525a8e5b10d9198775d7ac25",
-  "candidate_evaluator_digest": "sha256:5a539e33ca12428d5787df3eca09bac5b5d6ed119e5759d7ea5dc9707a4de392",
+  "candidate_evaluator_digest": "sha256:87c759ab11cd866ee878efef58f9be364513a7354a86e20051bc9bd7663f9d5a",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -121,5 +121,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:db6a33a2827b40baac52c39cd94c3c41bd472113f8d6162774b35ef38654c4a4"
+  "review_package_digest": "sha256:228414b9949c25630384eb1257e8825a3d2c374a82e16fef36a0ebb1e59a425c"
 }

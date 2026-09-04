@@ -2,17 +2,17 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-68c74acf0009a6365373bb409996a3e33245c64586c423aca5c9cc0013124b05",
-  "evaluator_bundle_digest": "sha256:4a22dafa8e2b94b42165f453b88b228fa1f876794c56e9977ef0f74e6c21bc5e",
+  "evaluator_bundle_id": "evaluator-63f3ab14a12398475059540b3789f80f91737e7162d7ecab3e13f9629718e777",
+  "evaluator_bundle_digest": "sha256:713941f54790de3c0e75e440260587743dac483e5544085be4e8ed02a1802c10",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mn-doc-config-correction",
   "fixture_input_digest": "sha256:de997ed8e15305fc82f5b3ad7e876a7891d69bc7d5978a5b8d6e9ee5a7cec906",
   "task_class": "documentation",
   "suite": "mechanism_negative",
-  "evaluator_revision": "4084c3d02d3ad7b396d5a785db0bf04eecac7868",
+  "evaluator_revision": "deced835dca27b922e0347ff21363e219e3d33f7",
   "evaluator_source_identity": {
-    "base_git_revision": "4084c3d02d3ad7b396d5a785db0bf04eecac7868",
-    "source_tree_digest": "sha256:9eb970403ee379dd0030c77b4756186f8a349e622c845c7024bebad7719632a3",
+    "base_git_revision": "deced835dca27b922e0347ff21363e219e3d33f7",
+    "source_tree_digest": "sha256:b3fdb175c431300b752d5473e79f472c6a5295ce8269e324d02898e305c90b3d",
     "generator_source_digest": "sha256:7c45a2f1b516282fe00d31d2fc0d8530159e1cbbb785d186c13e3e1e09dd2810",
     "source_files": [
       {
@@ -117,8 +117,8 @@
       },
       {
         "path": "scripts/adapter-runtime-inventory.mjs",
-        "bytes": 5054,
-        "sha256": "sha256:cb2fe36cebaec0acf45ebd94c39b630d033bc8ac5b4e2bc532d0b84ed5320f76"
+        "bytes": 6262,
+        "sha256": "sha256:5578bc07e60acac8c22eed988627adbfe2ff72389155f963a61c2dfacae5ae3a"
       },
       {
         "path": "scripts/ask-benchmark-admission-decision.mjs",
@@ -242,8 +242,8 @@
       },
       {
         "path": "scripts/execution-envelope.mjs",
-        "bytes": 13377,
-        "sha256": "sha256:d1ef64cc75db819bbbe9aee227ede05c0ddd84467ebbff2c2a37bfd42c8d6395"
+        "bytes": 15237,
+        "sha256": "sha256:6bcbe5eb552f71dcacd1f8426e612001deb22e0ae534cdfc127b6bc3e3fefbdf"
       },
       {
         "path": "scripts/fixed-entry-profile.mjs",
@@ -262,13 +262,13 @@
       },
       {
         "path": "scripts/installer-lifecycle.mjs",
-        "bytes": 26544,
-        "sha256": "sha256:21c33a7937a68871c173f5191ba2858d75121cd1c34a38add82d0979581f8c68"
+        "bytes": 26724,
+        "sha256": "sha256:2364e0337e5c511d1532cb8da5defffc3de311cd5cbf246634e86ae2dde8f477"
       },
       {
         "path": "scripts/json-schema-validation.mjs",
-        "bytes": 6809,
-        "sha256": "sha256:cb1daadb03c213c7c4682e6fc1caf532de2f71f0d908675a59ce9c545b1bc256"
+        "bytes": 24199,
+        "sha256": "sha256:fdf3af983ecee0d4dbcecbf5c991cdffd23ef91178442a35cad361f3d1eaecd3"
       },
       {
         "path": "scripts/verification-proof-policy.mjs",
@@ -447,11 +447,11 @@
         },
         {
           "path": "scripts/adapter-runtime-inventory.mjs",
-          "bytes": 5054,
-          "sha256": "sha256:cb2fe36cebaec0acf45ebd94c39b630d033bc8ac5b4e2bc532d0b84ed5320f76",
+          "bytes": 6262,
+          "sha256": "sha256:5578bc07e60acac8c22eed988627adbfe2ff72389155f963a61c2dfacae5ae3a",
           "file_type": "module",
-          "base_git_revision_bytes": 5054,
-          "base_git_revision_sha256": "sha256:cb2fe36cebaec0acf45ebd94c39b630d033bc8ac5b4e2bc532d0b84ed5320f76"
+          "base_git_revision_bytes": 6262,
+          "base_git_revision_sha256": "sha256:5578bc07e60acac8c22eed988627adbfe2ff72389155f963a61c2dfacae5ae3a"
         },
         {
           "path": "scripts/ask-benchmark-admission-decision.mjs",
@@ -647,11 +647,11 @@
         },
         {
           "path": "scripts/execution-envelope.mjs",
-          "bytes": 13377,
-          "sha256": "sha256:d1ef64cc75db819bbbe9aee227ede05c0ddd84467ebbff2c2a37bfd42c8d6395",
+          "bytes": 15237,
+          "sha256": "sha256:6bcbe5eb552f71dcacd1f8426e612001deb22e0ae534cdfc127b6bc3e3fefbdf",
           "file_type": "module",
-          "base_git_revision_bytes": 13377,
-          "base_git_revision_sha256": "sha256:d1ef64cc75db819bbbe9aee227ede05c0ddd84467ebbff2c2a37bfd42c8d6395"
+          "base_git_revision_bytes": 15237,
+          "base_git_revision_sha256": "sha256:6bcbe5eb552f71dcacd1f8426e612001deb22e0ae534cdfc127b6bc3e3fefbdf"
         },
         {
           "path": "scripts/fixed-entry-profile.mjs",
@@ -679,19 +679,19 @@
         },
         {
           "path": "scripts/installer-lifecycle.mjs",
-          "bytes": 26544,
-          "sha256": "sha256:21c33a7937a68871c173f5191ba2858d75121cd1c34a38add82d0979581f8c68",
+          "bytes": 26724,
+          "sha256": "sha256:2364e0337e5c511d1532cb8da5defffc3de311cd5cbf246634e86ae2dde8f477",
           "file_type": "module",
-          "base_git_revision_bytes": 26544,
-          "base_git_revision_sha256": "sha256:21c33a7937a68871c173f5191ba2858d75121cd1c34a38add82d0979581f8c68"
+          "base_git_revision_bytes": 26724,
+          "base_git_revision_sha256": "sha256:2364e0337e5c511d1532cb8da5defffc3de311cd5cbf246634e86ae2dde8f477"
         },
         {
           "path": "scripts/json-schema-validation.mjs",
-          "bytes": 6809,
-          "sha256": "sha256:cb1daadb03c213c7c4682e6fc1caf532de2f71f0d908675a59ce9c545b1bc256",
+          "bytes": 24199,
+          "sha256": "sha256:fdf3af983ecee0d4dbcecbf5c991cdffd23ef91178442a35cad361f3d1eaecd3",
           "file_type": "module",
-          "base_git_revision_bytes": 6809,
-          "base_git_revision_sha256": "sha256:cb1daadb03c213c7c4682e6fc1caf532de2f71f0d908675a59ce9c545b1bc256"
+          "base_git_revision_bytes": 24199,
+          "base_git_revision_sha256": "sha256:fdf3af983ecee0d4dbcecbf5c991cdffd23ef91178442a35cad361f3d1eaecd3"
         },
         {
           "path": "scripts/verification-proof-policy.mjs",
@@ -1751,15 +1751,15 @@
           "edge_digest": "sha256:fe5afccacce85f1af999e1d2a5a4b9235274603aa8c27fffde8b16ca4ec9df74"
         }
       ],
-      "graph_digest": "sha256:0e35db4eb2db808b3282c458d434c8b3d0c49c6fe5074a9ff76f850f99a698ef"
+      "graph_digest": "sha256:7230d580c6176ed711f351e62f1dbf050b2be3b3982df178cecb7ee83ffcd084"
     }
   },
   "generator_identity": "sha256:af6b7f0f953179c940104263f3a4888496daa7c916a87c9feda06d20d04bc891",
-  "independence_statement_digest": "sha256:d875405957d22d0b0fcd93e7c184cafc95ced9461b97da44d60073e553d8013e",
-  "review_record_digest": "sha256:9bdb332c313bb5e093032de61f296ef07be0eb05ca3512b770163bf67499a875",
+  "independence_statement_digest": "sha256:743df9120a7ee2c37fb1719c50ff4e5649b2bc4d912a9f9d9d5bb4c257211c19",
+  "review_record_digest": "sha256:fe7b02464c986fab610134e0ffccdce357a9ea4aceeb87752204e44c54ef9454",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-doc-config-correction/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:ea15909b0880522e4dc56327aee877ea049dd3a49c6bf0ab6b3e1e13014df679",
-  "evaluator_authority_manifest_digest": "sha256:adaebc8f84c4df72c87f37938d9da27f1043da1f2632570a7aa7f05a88de208d",
+  "evaluator_authority_manifest_raw_sha256": "sha256:961474181085a14588a8f1dc0c241590fa13f92d033151513f22431784d9965b",
+  "evaluator_authority_manifest_digest": "sha256:d96eddc5df081cab7158fd4c8c6fc3963326b34c646972067ea25a9459c4a321",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:f87678a971615f7f1223d19ec82d89be81348bdbdd4b6d8d6d4920c58e280728"
+  "public_metadata_digest": "sha256:694aacf344f14b830b988f7425f98c81fecf92593ae4a5f27a3de0e68794f45b"
 }
