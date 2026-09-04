@@ -11,6 +11,8 @@ This document is the human-readable source of truth. The control payload is mirr
 - The runner validates one canonical payload, binds it to the exact adapter entry/profile/revision/fingerprint and response digest, then persists one immutable content-addressed record under runtime-owned storage.
 - Inline JSON is a visibility projection of that same validated record, not a second mutable source of truth.
 - The envelope is control metadata. Requirement Contracts, Specs, Verification Contracts, Implementation Summaries, Review Findings, and Handoffs remain skill-specific artifacts.
+- For a non-review risk-gated action, the runner owns `risk_approval`. `requested` and `rejected` always pair with `not_executed` and a `risk_gate` stop. `approved` records the caller-trusted external approval digest; it becomes `executed` only when the runner actually spawns Codex and binds the final prompt bytes.
+- A final review decision accepted by the review sensors is preserved under `review_decision`; `approve_with_comments` must not be collapsed to `approve`.
 - `Metrics event candidate` is optional and must be omitted unless adoption metrics are explicitly enabled or requested and the boundary reached a meaningful durable state. It is never required for skill completion.
 
 ## Emission classes
@@ -67,6 +69,12 @@ When `docs/lifecycle-traceability-contract.md` applies, `evidence_status.checked
 
 `next action` is a concrete work action, not only a skill name. Examples include `run the focused validation`, `implement the scoped change`, `request domain clarification`, or `prepare the final merge decision`.
 
+### Exact Codex risk approval
+
+The risk action descriptor and approval are closed JSON documents. The action names the normalized credential-free `remote.origin.url` repository ID, exact operation, target scope, permitted/prohibited effects, and expected authority id, authority revision, and authority-evidence digest. The runner independently derives that logical repository ID, requires it to match the action, and also binds the checkout/Git-directory identity, HEAD/tree, installed prompt/profile provenance and fingerprints, composed base prompt, mode/sandbox, required gates, Codex executable argument plus canonical path/raw digest/size, output path, and canonical action/invocation/request digests. The executable identity is stable-read again immediately before spawning that exact canonical path. The authority fields in the embedded request prevent a different authority assertion from matching; the caller-supplied raw SHA256 of the approval file is the separate trust root for the external approval bytes.
+
+The first invocation emits that deterministic request and stops before Codex. An approved rerun accepts only a regular non-symlink approval file outside the target repository whose raw bytes match the caller-supplied digest, whose embedded request self-digest is valid, and whose request is exactly equal to the current recomputed request. Plain booleans or prose, partial or superset documents, target-contained files, changed logical origin/check-out identity/head/tree/scope/prompt/profile/mode/sandbox/gates/executor/output/effects, or a modified request with a recomputed digest are rejected. The runner stable-reads both documents again immediately before spawn, adds the exact approved request to the Codex prompt, and records that final prompt digest. A missing capability still stops without execution. A managed read-only review that evaluates a risk surface is not the risk action and requires no approval.
+
 ## Skill-specific artifact boundary
 
 The following belong in the skill artifact and should not be repeated in the envelope unless they directly change the control state:
@@ -85,7 +93,7 @@ These artifacts may contain evidence, blockers, or next-step detail required by 
 
 ## Compatibility
 
-- Managed Codex runner paths use the runner-owned record policy. The runner passes `codex exec` a closed structured-result schema and does not parse the domain prose for control state.
+- Managed Codex runner paths use the runner-owned record policy. The runner passes `codex exec` a closed structured-result schema and does not reconstruct general control state from domain prose. The one narrow exception is a requested final review decision: the runner copies the exact closed-vocabulary value into the Envelope, and publishes it only after the review sensors accept the complete decision matrix.
 - Direct/copied Codex prompts and current Claude project, plugin, and GitHub Action paths remain explicit inline compatibility because the repository has not verified an equivalent independent structured channel for them.
 - Legacy inline payloads remain readable and schema-valid. They are not silently upgraded to sidecar records, and historical measured prompt fixtures remain unchanged.
 - Adapters may keep entry-specific artifacts only when they do not duplicate lifecycle or control fields. Codex implementation and verification profiles use their canonical Contract plus Evidence record; investigation does not add `Verified`, `Unknown / not verified`, or `Next`; handoff does not add a separate `Stop condition`. `next_action` and `stop_reason.stop_if` remain owned by the Envelope.

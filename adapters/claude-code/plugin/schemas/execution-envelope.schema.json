@@ -61,6 +61,38 @@
       }
     },
     "next_action": { "type": "string", "minLength": 1 },
+    "risk_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "execution_status", "request", "approval_file_sha256", "rendered_invocation_sha256", "rejection_reasons"],
+      "properties": {
+        "status": { "type": "string", "enum": ["requested", "approved", "rejected"] },
+        "execution_status": { "type": "string", "enum": ["not_executed", "executed"] },
+        "request": { "$ref": "codex-risk-approval-request.schema.json" },
+        "approval_file_sha256": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+          ]
+        },
+        "rendered_invocation_sha256": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+          ]
+        },
+        "rejection_reasons": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+        }
+      }
+    },
+    "review_decision": {
+      "type": "string",
+      "enum": ["approve", "approve_with_comments", "request_changes", "block", "insufficient_evidence"]
+    },
     "metrics_event_candidate": {
       "$ref": "metrics-event.schema.json",
       "description": "Optional bounded summary governed by docs/metrics-event-contract.md. Omit unless metrics are explicitly enabled or requested."

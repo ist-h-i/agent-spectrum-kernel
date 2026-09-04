@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { delimiter, dirname, isAbsolute, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, deriveReviewSignalGateRoute, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, inspectCodexPromptContractBindings, parseCodexCompactProfileHeader, readReviewSignalGateMap } from "./ask-shared.mjs";
 import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
-import { buildExecutionEnvelopeRecord, hasExecutionEnvelopeMarker, inspectExecutionEnvelopeRecordEmission, renderExecutionEnvelopeProjection, selectExecutionEnvelopeEmission, validateExecutionEnvelope, validateExecutionEnvelopeRecord, validateJsonSchema } from "./execution-envelope.mjs";
+import { canonicalRiskDigest, createRiskApprovalRequest, readRiskAction, readStableExecutableFile, verifyRiskApproval } from "./codex-risk-approval.mjs";
+import { buildExecutionEnvelopeRecord, hasExecutionEnvelopeMarker, inspectExecutionEnvelopeRecordEmission, isMarkdownFenceClosing, markdownFenceOpening, renderExecutionEnvelopeProjection, selectExecutionEnvelopeEmission, validateExecutionEnvelope, validateExecutionEnvelopeRecord, validateJsonSchema } from "./execution-envelope.mjs";
 import { resolveGitDirectory, resolveObservabilityPath } from "./observability-paths.mjs";
 
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
@@ -19,12 +20,16 @@ const MANAGED_CODEX_RUNTIME_FILES = [
   "ask-shared.mjs",
   "execution-envelope.mjs",
   "adapter-runtime-event.mjs",
+  "codex-risk-approval.mjs",
   "observability-paths.mjs",
   "execution-envelope.schema.json",
   "execution-envelope-record.schema.json",
   "codex-runner-result.schema.json",
   "metrics-event.schema.json",
   "adapter-runtime-event.schema.json",
+  "codex-risk-action.schema.json",
+  "codex-risk-approval-request.schema.json",
+  "codex-risk-approval.schema.json",
 ];
 
 function hashText(value) { return createHash("sha256").update(value).digest("hex"); }
@@ -59,6 +64,9 @@ function parseArgs(argv) {
     finalDecision: false,
     dryRun: false,
     diagnosticEnvelope: false,
+    riskAction: null,
+    riskApproval: null,
+    riskApprovalSha256: null,
     json: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -89,6 +97,12 @@ function parseArgs(argv) {
       args.dryRun = true;
     } else if (arg === "--diagnostic-envelope") {
       args.diagnosticEnvelope = true;
+    } else if (arg === "--risk-action") {
+      args.riskAction = resolve(argv[++index]);
+    } else if (arg === "--risk-approval") {
+      args.riskApproval = resolve(argv[++index]);
+    } else if (arg === "--risk-approval-sha256") {
+      args.riskApprovalSha256 = argv[++index];
     } else if (arg === "--json") {
       args.json = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -132,6 +146,11 @@ function parseArgs(argv) {
         ? "projected"
         : "none";
   }
+  const readOnlyReviewRiskEvaluation = args.mode === "review" && args.sandbox === "read-only";
+  const riskActionRequired = args.requiredGates.includes("risk-gate") && !readOnlyReviewRiskEvaluation;
+  if (riskActionRequired && !args.riskAction) throw new Error("non-review risk-gate requires --risk-action with a closed descriptor");
+  if (!riskActionRequired && (args.riskAction || args.riskApproval || args.riskApprovalSha256)) throw new Error("risk approval arguments require a non-review risk-gated action");
+  if (Boolean(args.riskApproval) !== Boolean(args.riskApprovalSha256)) throw new Error("--risk-approval and --risk-approval-sha256 must be provided together");
   return args;
 }
 
@@ -152,6 +171,9 @@ Options:
   --final-decision      Review only: request review-final-merge-gate after baseline and additional gates.
   --dry-run             Run preflight and print the codex command without invoking Codex.
   --diagnostic-envelope Explicitly serialize the validated record for route/debug diagnosis.
+  --risk-action <path> Closed exact action descriptor required for a non-review risk-gate.
+  --risk-approval <path> Approval JSON outside target for the exact generated request.
+  --risk-approval-sha256 <hex> Caller-trusted lowercase SHA256 of the raw approval file.
   --json                Print machine-readable result JSON.
 
 The runner is bounded: it runs preflight, assembles an installed prompt with
@@ -278,7 +300,150 @@ function preflight(args) {
   }
   args.structuredResultSchemaPath = resolve(args.target, "scripts/codex-runner-result.schema.json");
   args.envelopeRecordSchemaPath = resolve(args.target, "scripts/execution-envelope-record.schema.json");
+  args.riskActionSchemaPath = resolve(args.target, "scripts/codex-risk-action.schema.json");
+  args.riskApprovalSchemaPath = resolve(args.target, "scripts/codex-risk-approval.schema.json");
   return { failures, warnings, capabilityMissing, state, promptPath, compactProfile };
+}
+
+function gitRevision(target, revision) {
+  const result = spawnSync("git", ["rev-parse", "--verify", revision], { cwd: target, encoding: "utf8" });
+  if (result.error || result.status !== 0 || !result.stdout.trim()) throw new Error(`cannot bind git ${revision}: ${result.stderr || result.error?.message || "unknown failure"}`);
+  return result.stdout.trim();
+}
+
+function normalizedRepositoryId(target) {
+  const result = spawnSync("git", ["config", "--get", "remote.origin.url"], { cwd: target, encoding: "utf8" });
+  if (result.error || result.status !== 0 || !result.stdout.trim()) {
+    throw new Error(`cannot bind logical repository identity from remote.origin.url: ${result.stderr || result.error?.message || "origin is missing"}`);
+  }
+  const raw = result.stdout.trim();
+  let host;
+  let repositoryPath;
+  const scp = raw.includes("://") ? null : raw.match(/^(?:[^@/\s]+@)?([^:/\s]+):([^?#]+)$/u);
+  if (scp) {
+    [, host, repositoryPath] = scp;
+  } else {
+    let parsed;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      throw new Error("cannot bind logical repository identity: remote.origin.url must be an absolute network URL or SCP-style Git URL");
+    }
+    if (!parsed.hostname || parsed.password || parsed.search || parsed.hash || !["https:", "http:", "ssh:", "git:"].includes(parsed.protocol)) {
+      throw new Error("cannot bind logical repository identity: remote.origin.url is unsupported or contains credentials/query/fragment data");
+    }
+    if ((parsed.protocol === "https:" || parsed.protocol === "http:") && parsed.username) {
+      throw new Error("cannot bind logical repository identity: HTTP(S) origin must not contain credentials");
+    }
+    host = parsed.hostname;
+    repositoryPath = parsed.pathname;
+  }
+  repositoryPath = repositoryPath.replace(/^\/+|\/+$/gu, "").replace(/\.git$/u, "");
+  if (!/^[A-Za-z0-9._/-]+$/u.test(repositoryPath) || repositoryPath.includes("//") || repositoryPath.split("/").includes("..")) {
+    throw new Error("cannot bind logical repository identity: remote repository path is not canonical");
+  }
+  return `${host.toLowerCase()}/${repositoryPath}`;
+}
+
+function repositoryIdentity(target) {
+  const gitDirectoryResult = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-dir"], { cwd: target, encoding: "utf8" });
+  if (gitDirectoryResult.error || gitDirectoryResult.status !== 0) throw new Error(`cannot bind repository identity: ${gitDirectoryResult.stderr || gitDirectoryResult.error?.message || "unknown failure"}`);
+  const canonicalTarget = realpathSync(target);
+  const canonicalGitDirectory = realpathSync(gitDirectoryResult.stdout.trim());
+  return {
+    repository_id: normalizedRepositoryId(target),
+    repository_identity_sha256: canonicalRiskDigest({ canonical_target: canonicalTarget, canonical_git_directory: canonicalGitDirectory }),
+    head_sha: gitRevision(target, "HEAD^{commit}"),
+    tree_sha: gitRevision(target, "HEAD^{tree}"),
+  };
+}
+
+function resolveCodexExecutable(codexBin, target) {
+  if (!codexBin || codexBin.includes("\0") || /[\r\n]/u.test(codexBin)) throw new Error("Codex executable argument is invalid");
+  const candidates = codexBin.includes("/")
+    ? [isAbsolute(codexBin) ? codexBin : resolve(target, codexBin)]
+    : (process.env.PATH ?? "").split(delimiter).map((entry) => resolve(entry || target, codexBin));
+  for (const candidate of candidates) {
+    if (!existsSync(candidate)) continue;
+    const canonicalPath = realpathSync(candidate);
+    const evidence = readStableExecutableFile(canonicalPath);
+    return {
+      codex_bin: codexBin,
+      canonical_path: evidence.path,
+      raw_sha256: evidence.file_sha256,
+      size_bytes: evidence.bytes.length,
+    };
+  }
+  throw new Error(`Codex executable cannot be resolved: ${codexBin}`);
+}
+
+function riskInvocation(args, state, compactProfile, prompt, action) {
+  return {
+    repository: repositoryIdentity(args.target),
+    target_scope: action.target_scope,
+    prompt: {
+      entry_id: args.prompt,
+      rendered_sha256: compactProfile.rendered_sha256,
+      invocation_sha256: `sha256:${hashText(prompt)}`,
+    },
+    profile: {
+      installed_profile: state.selected_profile,
+      profile_id: compactProfile.profile_id,
+      profile_schema_version: compactProfile.schema_version,
+      canonical_revision: compactProfile.canonical_revision,
+      canonical_source_digest: compactProfile.canonical_source_digest,
+      profile_fingerprint: compactProfile.profile_fingerprint,
+    },
+    executor: {
+      ...resolveCodexExecutable(args.codexBin, args.target),
+      output_path: args.output,
+    },
+    mode: args.mode,
+    sandbox: args.sandbox,
+    required_gates: args.requiredGates,
+    risk_gate: action.risk_gate,
+    operation: action.operation,
+    permitted_effects: action.permitted_effects,
+    prohibited_effects: action.prohibited_effects,
+  };
+}
+
+function evaluateRiskApproval(args, state, compactProfile, prompt) {
+  const actionEvidence = readRiskAction(args.riskAction, { schemaPath: args.riskActionSchemaPath });
+  const request = createRiskApprovalRequest({ actionEvidence, invocation: riskInvocation(args, state, compactProfile, prompt, actionEvidence.value) });
+  if (!args.riskApproval) return { status: "requested", execution_status: "not_executed", request, approval_file_sha256: null, rendered_invocation_sha256: null, rejection_reasons: [] };
+  const verified = verifyRiskApproval({
+    approvalPath: args.riskApproval,
+    approvalSha256: args.riskApprovalSha256,
+    expectedRequest: request,
+    target: args.target,
+    schemaPath: args.riskApprovalSchemaPath,
+  });
+  return {
+    status: verified.status,
+    execution_status: "not_executed",
+    request,
+    approval_file_sha256: verified.status === "approved" ? verified.evidence.file_sha256 : null,
+    rendered_invocation_sha256: null,
+    rejection_reasons: verified.reasons,
+  };
+}
+
+function renderApprovedRiskPrompt(prompt, request) {
+  const context = [
+    "Runner-authorized exact risk action:",
+    `- Approval request digest: ${request.request_sha256}`,
+    `- Operation: ${request.action.operation}`,
+    `- Target scope: ${request.action.target_scope.join(", ")}`,
+    `- Permitted effects: ${request.action.permitted_effects.join(", ")}`,
+    `- Prohibited effects: ${request.action.prohibited_effects.join(", ")}`,
+    "- Execute only this exact approved action. Stop if any bound field no longer matches.",
+    "Exact approval request:",
+    "```json",
+    JSON.stringify(request, null, 2),
+    "```",
+  ].join("\n");
+  return `${prompt.trimEnd()}\n\n${context}\n`;
 }
 
 function resolveDiffRange(target, value) {
@@ -345,13 +510,13 @@ function buildPrompt(args, state, promptPath, compactProfile) {
   return [prompt.trimEnd(), "", context.join("\n"), diff ? `\n${diff}` : ""].join("\n");
 }
 
-function runCodex(args, prompt) {
+function runCodex(args, prompt, codexBin = args.codexBin) {
   mkdirSync(dirname(args.outputPath), { recursive: true });
   const temporaryOutput = `.agents/runs/codex-run-${process.pid}-${Date.now()}.json`;
   const temporaryOutputPath = resolveWithinTarget(args.target, temporaryOutput, "temporary output");
   mkdirSync(dirname(temporaryOutputPath), { recursive: true });
   const commandArgs = ["exec", "--sandbox", args.sandbox, "--output-schema", "scripts/codex-runner-result.schema.json", "--output-last-message", temporaryOutput];
-  const result = spawnSync(args.codexBin, commandArgs, {
+  const result = spawnSync(codexBin, commandArgs, {
     cwd: args.target,
     encoding: "utf8",
     input: prompt,
@@ -362,7 +527,7 @@ function runCodex(args, prompt) {
   const acceptedOutput = !result.error && result.status === 0 && outputExists && finalOutput.trim().length > 0;
   if (!acceptedOutput && outputExists) unlinkSync(temporaryOutputPath);
   return {
-    command: [args.codexBin, ...commandArgs, "<stdin-prompt>"].join(" "),
+    command: [codexBin, ...commandArgs, "<stdin-prompt>"].join(" "),
     exitCode: result.status,
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
@@ -386,13 +551,40 @@ function runnerBinding(args, compactProfile) {
   };
 }
 
-function envelopeForControl(args, compactProfile, control) {
+function reviewDecision(args, responseMarkdown) {
+  if (args.mode !== "review" || !args.finalDecision) return null;
+  const lines = responseMarkdown.split(/\r?\n/u);
+  const matches = [];
+  let activeFence = null;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (activeFence) {
+      if (isMarkdownFenceClosing(line, activeFence)) activeFence = null;
+      continue;
+    }
+    const opening = markdownFenceOpening(line);
+    if (opening) {
+      activeFence = opening;
+      continue;
+    }
+    if (!/^ {0,3}Decision:[ \t]*$/u.test(line)) continue;
+    let decisionLine = index + 1;
+    while (decisionLine < lines.length && lines[decisionLine].trim() === "") decisionLine += 1;
+    const match = lines[decisionLine]?.match(/^ {0,3}-[ \t]*(approve(?: with comments)?|request changes|block|insufficient evidence)[ \t]*$/iu);
+    if (match) matches.push(match[1]);
+  }
+  return matches.length === 1 ? matches[0].toLowerCase().replace(/\s+/gu, "_") : null;
+}
+
+function envelopeForControl(args, compactProfile, control, { riskApproval = null, responseMarkdown = "" } = {}) {
   const contract = CODEX_PROMPT_CONTRACTS[args.prompt];
   const secondary = (compactProfile.requested_contracts ?? []).filter((item) => item !== compactProfile.primary_contract);
   const internal = {
     primary: compactProfile.primary_contract,
     ...(secondary.length > 0 ? { secondary } : {}),
   };
+  const parsedReviewDecision = reviewDecision(args, responseMarkdown);
+  if (args.mode === "review" && args.finalDecision && !parsedReviewDecision) throw new Error("final review output must contain exactly one closed Decision value");
   return {
     schema_version: "1.0.0",
     route: {
@@ -404,11 +596,13 @@ function envelopeForControl(args, compactProfile, control) {
     evidence_status: control.evidence_status,
     stop_reason: control.stop_reason,
     next_action: control.next_action,
+    ...(riskApproval ? { risk_approval: riskApproval } : {}),
+    ...(parsedReviewDecision ? { review_decision: parsedReviewDecision } : {}),
   };
 }
 
-function recordForControl(args, compactProfile, responseMarkdown, control, { dynamicFieldsSource, controlInputSha256 = null } = {}) {
-  const envelope = envelopeForControl(args, compactProfile, control);
+function recordForControl(args, compactProfile, responseMarkdown, control, { dynamicFieldsSource, controlInputSha256 = null, riskApproval = null } = {}) {
+  const envelope = envelopeForControl(args, compactProfile, control, { riskApproval, responseMarkdown });
   const envelopeErrors = validateExecutionEnvelope(envelope);
   if (envelopeErrors.length > 0) throw new Error(`structured control cannot produce a canonical Execution Envelope: ${envelopeErrors.join("; ")}`);
   const emissionClass = selectExecutionEnvelopeEmission({
@@ -433,7 +627,7 @@ function recordForControl(args, compactProfile, responseMarkdown, control, { dyn
   return record;
 }
 
-function parseStructuredResult(args, compactProfile, rawOutput) {
+function parseStructuredResult(args, compactProfile, rawOutput, { riskApproval = null } = {}) {
   let value;
   try {
     value = JSON.parse(rawOutput);
@@ -447,11 +641,12 @@ function parseStructuredResult(args, compactProfile, rawOutput) {
   const record = recordForControl(args, compactProfile, value.response_markdown, value.control, {
     dynamicFieldsSource: "structured_runtime_result",
     controlInputSha256,
+    riskApproval,
   });
   return { value, record };
 }
 
-function runnerObservedStop(args, compactProfile, { status, details, missing, nextAction, responseMarkdown }) {
+function runnerObservedStop(args, compactProfile, { status, details, missing, nextAction, responseMarkdown, riskApproval = null }) {
   return {
     responseMarkdown,
     record: recordForControl(args, compactProfile, responseMarkdown, {
@@ -466,7 +661,7 @@ function runnerObservedStop(args, compactProfile, { status, details, missing, ne
         stop_if: details,
       },
       next_action: nextAction,
-    }, { dynamicFieldsSource: "runner_observation" }),
+    }, { dynamicFieldsSource: "runner_observation", riskApproval }),
   };
 }
 
@@ -630,19 +825,30 @@ try {
   let publication = null;
   let structuredError = null;
   const readOnlyReviewRiskEvaluation = args.mode === "review" && args.sandbox === "read-only";
-  const approvalBlocked = args.requiredGates.includes("risk-gate") && !readOnlyReviewRiskEvaluation;
+  const riskActionRequired = args.requiredGates.includes("risk-gate") && !readOnlyReviewRiskEvaluation;
+  let riskApproval = null;
+  let approvedCodexBin = null;
+  let approvalBlocked = riskActionRequired;
   const capabilityBlocked = preflightResult.capabilityMissing.length > 0;
   if (preflightResult.failures.length === 0) {
     const prompt = buildPrompt(args, preflightResult.state, preflightResult.promptPath, preflightResult.compactProfile);
+    if (riskActionRequired) {
+      riskApproval = evaluateRiskApproval(args, preflightResult.state, preflightResult.compactProfile, prompt);
+      approvalBlocked = riskApproval.status !== "approved";
+    }
     command = `${args.codexBin} exec --sandbox ${args.sandbox} --output-schema scripts/codex-runner-result.schema.json --output-last-message <temporary-json> <stdin-prompt>`;
     if (!args.dryRun) {
       if (approvalBlocked) {
+        const rejected = riskApproval?.status === "rejected";
         const stop = runnerObservedStop(args, preflightResult.compactProfile, {
           status: "risk_gate",
-          details: ["risk-gate requires specific-action approval before execution"],
+          details: rejected ? riskApproval.rejection_reasons : ["risk-gate requires exact specific-action approval before execution"],
           missing: ["specific_action_approval"],
-          nextAction: "obtain approval for the exact risk-gated action",
-          responseMarkdown: "Codex runner stopped before execution because the selected action requires specific approval.\n",
+          nextAction: rejected ? "replace the rejected approval with an exact authority approval for this request" : "obtain approval for the exact risk-gated request emitted in this Envelope",
+          responseMarkdown: rejected
+            ? "Codex runner rejected the supplied approval and stopped before execution.\n"
+            : "Codex runner emitted an exact approval request and stopped before execution.\n",
+          riskApproval,
         });
         envelopeRecord = stop.record;
         publication = publishOutput(args, stop.responseMarkdown, stop.record, { inspectDomainOutput: false });
@@ -654,14 +860,74 @@ try {
           missing,
           nextAction: `install or explicitly select a profile containing ${preflightResult.capabilityMissing.join(", ")}`,
           responseMarkdown: "Codex runner stopped before execution because a required capability is unavailable.\n",
+          riskApproval,
         });
         envelopeRecord = stop.record;
         publication = publishOutput(args, stop.responseMarkdown, stop.record, { inspectDomainOutput: false });
       } else {
-        codexResult = runCodex(args, prompt);
+        let spawnPrompt = prompt;
+        if (riskActionRequired) {
+          spawnPrompt = buildPrompt(args, preflightResult.state, preflightResult.promptPath, preflightResult.compactProfile);
+          const rereadApproval = evaluateRiskApproval(args, preflightResult.state, preflightResult.compactProfile, spawnPrompt);
+          if (rereadApproval.status !== "approved" || canonicalRiskDigest(rereadApproval.request) !== canonicalRiskDigest(riskApproval.request)) {
+            riskApproval = {
+              ...rereadApproval,
+              status: "rejected",
+              execution_status: "not_executed",
+              approval_file_sha256: null,
+              rendered_invocation_sha256: null,
+              rejection_reasons: rereadApproval.status === "approved"
+                ? ["risk action, repository, prompt, or approval changed immediately before execution"]
+                : rereadApproval.rejection_reasons,
+            };
+            approvalBlocked = true;
+            const stop = runnerObservedStop(args, preflightResult.compactProfile, {
+              status: "risk_gate",
+              details: riskApproval.rejection_reasons,
+              missing: ["specific_action_approval"],
+              nextAction: "issue a new exact approval for the current request",
+              responseMarkdown: "Codex runner detected approval-context drift and stopped before execution.\n",
+              riskApproval,
+            });
+            envelopeRecord = stop.record;
+            publication = publishOutput(args, stop.responseMarkdown, stop.record, { inspectDomainOutput: false });
+          } else {
+            const finalExecutor = { ...resolveCodexExecutable(args.codexBin, args.target), output_path: args.output };
+            if (canonicalRiskDigest(finalExecutor) !== canonicalRiskDigest(rereadApproval.request.invocation.executor)) {
+              riskApproval = {
+                ...rereadApproval,
+                status: "rejected",
+                execution_status: "not_executed",
+                approval_file_sha256: null,
+                rendered_invocation_sha256: null,
+                rejection_reasons: ["Codex executable identity changed immediately before execution"],
+              };
+              approvalBlocked = true;
+              const stop = runnerObservedStop(args, preflightResult.compactProfile, {
+                status: "risk_gate",
+                details: riskApproval.rejection_reasons,
+                missing: ["specific_action_approval"],
+                nextAction: "issue a new exact approval for the current executable identity",
+                responseMarkdown: "Codex runner detected executable drift and stopped before execution.\n",
+                riskApproval,
+              });
+              envelopeRecord = stop.record;
+              publication = publishOutput(args, stop.responseMarkdown, stop.record, { inspectDomainOutput: false });
+            } else {
+              approvedCodexBin = finalExecutor.canonical_path;
+              spawnPrompt = renderApprovedRiskPrompt(spawnPrompt, rereadApproval.request);
+              riskApproval = {
+                ...rereadApproval,
+                execution_status: "executed",
+                rendered_invocation_sha256: `sha256:${hashText(spawnPrompt)}`,
+              };
+            }
+          }
+        }
+        if (!approvalBlocked) codexResult = runCodex(args, spawnPrompt, approvedCodexBin ?? args.codexBin);
         try {
-          if (codexResult.exitCode === 0 && codexResult.finalOutput.trim()) {
-            const parsed = parseStructuredResult(args, preflightResult.compactProfile, codexResult.finalOutput);
+          if (codexResult?.exitCode === 0 && codexResult.finalOutput.trim()) {
+            const parsed = parseStructuredResult(args, preflightResult.compactProfile, codexResult.finalOutput, { riskApproval });
             envelopeRecord = parsed.record;
             publication = publishOutput(args, parsed.value.response_markdown, parsed.record);
             sensorResult = publication.sensorResult;
@@ -669,7 +935,7 @@ try {
         } catch (error) {
           structuredError = error.message;
         } finally {
-          if (codexResult.temporaryOutputPath && existsSync(codexResult.temporaryOutputPath)) unlinkSync(codexResult.temporaryOutputPath);
+          if (codexResult?.temporaryOutputPath && existsSync(codexResult.temporaryOutputPath)) unlinkSync(codexResult.temporaryOutputPath);
         }
       }
     }
@@ -745,9 +1011,11 @@ try {
         detail: "Output inspection does not expose whether Codex applied the requested workflow contract.",
       },
       risk_approval_contract_application: {
-        evidence_level: "none",
-        missing_evidence: ["risk_approval_contract_application"],
-        detail: "Output inspection does not expose whether Codex applied the risk and approval contract.",
+        evidence_level: riskApproval ? (riskApproval.execution_status === "executed" ? "executed" : "runtime_detected") : "none",
+        missing_evidence: riskApproval ? [] : ["risk_approval_contract_application"],
+        detail: riskApproval
+          ? `Runner-owned exact approval state=${riskApproval.status}, execution=${riskApproval.execution_status}.`
+          : "No runner-owned risk action was selected for exact approval evaluation.",
       },
       verification_contract_application: {
         evidence_level: "none",

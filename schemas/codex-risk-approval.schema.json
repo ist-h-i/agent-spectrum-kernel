@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/codex-risk-approval.schema.json",
+  "title": "Codex Exact Risk Approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "decision", "request", "request_sha256"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "kind": { "type": "string", "const": "codex_risk_approval" },
+    "decision": { "type": "string", "enum": ["approved", "rejected"] },
+    "request": { "$ref": "codex-risk-approval-request.schema.json" },
+    "request_sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

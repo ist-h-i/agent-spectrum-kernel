@@ -314,6 +314,22 @@ experiment, recommendation, proposal, decision, action, and rollback anchor.
 The root base heads must equal the approved proposal heads, and every successor
 base must equal its fully verified predecessor result heads.
 
+Only a `pending`, `in_progress`, or `stopped` receipt with a non-null valid
+`next_step` is resumable. The successor starts with that exact named step and
+retains its `step_id`, operation, input digest, planned output digest, and
+authority-context digest. The closed step-status transition matrix is:
+
+| predecessor next-step status | allowed successor continued-step status |
+|---|---|
+| `pending` | `pending`, `completed`, or `failed` |
+
+`skipped` is not a continuation. A pending continuation reads the current
+verified result head for its resource. A completed continuation may advance the
+head only through the normal completed-step verifier. A failed continuation
+also reads the current result head, but its planned output never advances that
+head. Completed and failed receipts, receipts with `next_step: null`, and any
+terminal receipt hidden deeper in a predecessor chain cannot be resume points.
+
 CAS publication may leave unreferenced objects after interruption, but they do
 not become Registry or Portfolio commit markers. Exact retries are idempotent.
 A stored target manifest does not become current. A stale predecessor or a

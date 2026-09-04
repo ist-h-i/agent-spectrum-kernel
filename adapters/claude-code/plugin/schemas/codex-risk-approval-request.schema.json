@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/codex-risk-approval-request.schema.json",
+  "title": "Codex Exact Risk Approval Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "approval_authority", "action", "action_sha256", "action_file_sha256", "invocation", "invocation_sha256", "request_sha256"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "kind": { "type": "string", "const": "codex_risk_approval_request" },
+    "approval_authority": { "$ref": "codex-risk-action.schema.json#/properties/approval_authority" },
+    "action": { "$ref": "codex-risk-action.schema.json" },
+    "action_sha256": { "$ref": "#/$defs/digest" },
+    "action_file_sha256": { "$ref": "#/$defs/digest" },
+    "invocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "target_scope", "prompt", "profile", "executor", "mode", "sandbox", "required_gates", "risk_gate", "operation", "permitted_effects", "prohibited_effects"],
+      "properties": {
+        "repository": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository_id", "repository_identity_sha256", "head_sha", "tree_sha"],
+          "properties": {
+            "repository_id": { "$ref": "codex-risk-action.schema.json#/$defs/repository_id" },
+            "repository_identity_sha256": { "$ref": "#/$defs/digest" },
+            "head_sha": { "$ref": "#/$defs/git_sha" },
+            "tree_sha": { "$ref": "#/$defs/git_sha" }
+          }
+        },
+        "target_scope": { "$ref": "codex-risk-action.schema.json#/properties/target_scope" },
+        "prompt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["entry_id", "rendered_sha256", "invocation_sha256"],
+          "properties": {
+            "entry_id": { "type": "string", "enum": ["skill-implement.md", "skill-investigate.md", "skill-review.md", "skill-verify.md", "skill-handoff.md"] },
+            "rendered_sha256": { "$ref": "#/$defs/digest" },
+            "invocation_sha256": { "$ref": "#/$defs/digest" }
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["installed_profile", "profile_id", "profile_schema_version", "canonical_revision", "canonical_source_digest", "profile_fingerprint"],
+          "properties": {
+            "installed_profile": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "profile_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "profile_schema_version": { "type": "string", "minLength": 1, "maxLength": 50 },
+            "canonical_revision": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "canonical_source_digest": { "$ref": "#/$defs/digest" },
+            "profile_fingerprint": { "$ref": "#/$defs/digest" }
+          }
+        },
+        "executor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["codex_bin", "canonical_path", "raw_sha256", "size_bytes", "output_path"],
+          "properties": {
+            "codex_bin": { "type": "string", "minLength": 1, "maxLength": 1000 },
+            "canonical_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+            "raw_sha256": { "$ref": "#/$defs/digest" },
+            "size_bytes": { "type": "integer", "minimum": 1, "maximum": 536870912 },
+            "output_path": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          }
+        },
+        "mode": { "type": "string", "enum": ["implementation", "investigation", "review", "verification", "handoff"] },
+        "sandbox": { "type": "string", "enum": ["read-only", "workspace-write"] },
+        "required_gates": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "codex-risk-action.schema.json#/$defs/identifier" }
+        },
+        "risk_gate": { "type": "string", "const": "risk-gate" },
+        "operation": { "$ref": "codex-risk-action.schema.json#/$defs/identifier" },
+        "permitted_effects": { "$ref": "codex-risk-action.schema.json#/$defs/identifiers" },
+        "prohibited_effects": { "$ref": "codex-risk-action.schema.json#/$defs/identifiers" }
+      }
+    },
+    "invocation_sha256": { "$ref": "#/$defs/digest" },
+    "request_sha256": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "git_sha": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" }
+  }
+}

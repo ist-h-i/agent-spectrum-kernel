@@ -30,6 +30,15 @@ jobs:
       - name: Run installed Codex runner Execution Envelope conformance tests
         run: node scripts/test-codex-runner-execution-envelope-conformance.mjs
 
+      - name: Run managed JSON Schema validation tests
+        run: node scripts/test-json-schema-validation.mjs
+
+      - name: Run exact Codex risk approval tests
+        run: node scripts/test-codex-risk-approval.mjs
+
+      - name: Run review decision matrix tests
+        run: node scripts/test-review-decision-matrix.mjs
+
       - name: Run claim evidence status contract tests
         run: node scripts/test-claim-evidence-status.mjs
 

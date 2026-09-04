@@ -914,6 +914,20 @@ function receiptStepsForHead(receipt, headField, { completedOnly = false } = {})
   ));
 }
 
+function receiptHeadFieldForStep(step) {
+  for (const [headField, operations] of Object.entries(RECEIPT_HEAD_OPERATIONS)) {
+    if (operations.has(step.operation)) return headField;
+  }
+  throw new Error(`Evolution receipt step ${step.step_id} has no resource-head binding`);
+}
+
+function assertStepInputBindsCurrentHead(receipt, step, label) {
+  const headField = receiptHeadFieldForStep(step);
+  if (step.input_digest !== receipt.result_heads[headField]) {
+    throw new Error(`${label} input must equal the current ${headField} result head`);
+  }
+}
+
 function validateReceiptStepSequence(receipt) {
   const stepIds = new Set();
   for (const step of receipt.steps) {
@@ -964,6 +978,13 @@ function validateReceiptStepSequence(receipt) {
         throw new Error("failed Evolution receipt step sequence must be completed prefix, one failed step, then skipped steps");
       }
     }
+  }
+
+  if (["pending", "in_progress", "stopped"].includes(receipt.state)) {
+    assertStepInputBindsCurrentHead(receipt, firstPending, `${receipt.state} Evolution receipt next step`);
+  } else if (receipt.state === "failed") {
+    const failedStep = receipt.steps.find(({ status }) => status === "failed");
+    if (failedStep) assertStepInputBindsCurrentHead(receipt, failedStep, "failed Evolution receipt step");
   }
 }
 
@@ -1018,6 +1039,43 @@ export function buildEvolutionApplicationReceipt(draft) {
 export function publishEvolutionApplicationReceipt({ storeRoot, receipt }) {
   validateEvolutionApplicationReceipt(receipt);
   return publishArtifact({ storeRoot, artifact: receipt, semanticField: "receipt_digest" });
+}
+
+const RESUMABLE_RECEIPT_STATES = new Set(["pending", "in_progress", "stopped"]);
+const RESUME_STEP_STATUS_TRANSITIONS = Object.freeze({
+  pending: new Set(["pending", "completed", "failed"]),
+});
+const RESUME_STEP_IDENTITY_FIELDS = Object.freeze([
+  "step_id",
+  "operation",
+  "input_digest",
+  "output_digest",
+  "authority_context_digest",
+]);
+
+function assertReceiptContinuation(predecessor, successor) {
+  if (!RESUMABLE_RECEIPT_STATES.has(predecessor.state)) {
+    throw new Error(`${predecessor.state} Evolution predecessor cannot be resumed`);
+  }
+  if (predecessor.next_step === null) {
+    throw new Error("Evolution predecessor requires a non-null next_step before resume");
+  }
+  const predecessorStep = predecessor.steps.find(({ step_id }) => step_id === predecessor.next_step);
+  if (!predecessorStep || predecessorStep.status !== "pending") {
+    throw new Error("Evolution predecessor next_step is not an exact pending resume point");
+  }
+  const continuedStep = successor.steps[0];
+  if (!continuedStep) {
+    throw new Error("Evolution successor must continue the predecessor next_step as its first step");
+  }
+  for (const field of RESUME_STEP_IDENTITY_FIELDS) {
+    if (continuedStep[field] !== predecessorStep[field]) {
+      throw new Error(`Evolution resume continued step ${field} transplant rejected`);
+    }
+  }
+  if (!RESUME_STEP_STATUS_TRANSITIONS[predecessorStep.status]?.has(continuedStep.status)) {
+    throw new Error(`Evolution resume step status transition ${predecessorStep.status}->${continuedStep.status} is not allowed`);
+  }
 }
 
 export function verifyEvolutionActionProposal({
@@ -1408,6 +1466,7 @@ export function verifyEvolutionApplicationReceipt({
     if (!compareCanonical(predecessor.result_heads, successor.base_heads)) {
       throw new Error("Evolution receipt predecessor head drift rejected");
     }
+    assertReceiptContinuation(predecessor, successor);
     predecessorChain.push(predecessor);
     successor = predecessor;
   }

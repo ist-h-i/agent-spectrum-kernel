@@ -129,7 +129,17 @@ export function mapCodexRunnerResult(report, { eventId = null, taskId = null, oc
     && selectedContracts.includes("review-router");
   const approvalRequired = (requiredGates.includes("risk-gate") && !readOnlyReviewRiskEvaluation)
     || envelope?.stop_reason?.status === "risk_gate";
-  const approvalMissing = approvalRequired && missingEvidence.includes("specific_action_approval");
+  const riskApproval = envelope?.risk_approval ?? null;
+  const approvalMissing = approvalRequired && (riskApproval?.status === "requested" || missingEvidence.includes("specific_action_approval"));
+  const approvalStatus = !approvalRequired
+    ? "not_required"
+    : riskApproval?.status === "approved"
+      ? "approved"
+      : riskApproval?.status === "rejected"
+        ? "rejected"
+        : approvalMissing
+          ? "missing"
+          : "unknown";
   const envelopeStop = envelope?.stop_reason?.status === "human_decision" ? "blocked" : envelope?.stop_reason?.status;
   const stopStatus = approvalMissing
     ? "risk_gate"
@@ -158,7 +168,7 @@ export function mapCodexRunnerResult(report, { eventId = null, taskId = null, oc
     gates: { required: requiredGates, executed: [] },
     approval: {
       required: approvalRequired,
-      status: approvalRequired ? approvalMissing ? "missing" : "unknown" : "not_required",
+      status: approvalStatus,
       action_categories: approvalRequired ? ["risk_gated_action"] : [],
     },
     evidence: {

@@ -419,6 +419,9 @@
     "schemas/execution-envelope.schema.json",
     "schemas/execution-envelope-record.schema.json",
     "schemas/codex-runner-result.schema.json",
+    "schemas/codex-risk-action.schema.json",
+    "schemas/codex-risk-approval-request.schema.json",
+    "schemas/codex-risk-approval.schema.json",
     "schemas/adapter-runtime-profile.schema.json",
     "schemas/adapter-runtime-evidence.schema.json",
     "schemas/adapter-runtime-event.schema.json",
@@ -533,7 +536,9 @@
     "scripts/test-verification-proof-policy.mjs",
     "scripts/test-adapter-runtime-migration.mjs",
     "scripts/test-adapter-runtime-event.mjs",
-    "scripts/codex-exec-runner.mjs"
+    "scripts/codex-exec-runner.mjs",
+    "scripts/codex-risk-approval.mjs",
+    "scripts/test-codex-risk-approval.mjs"
   ],
   "routing": {
     "schema_version": 1,

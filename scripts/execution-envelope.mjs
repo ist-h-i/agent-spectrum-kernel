@@ -158,10 +158,19 @@ export function validateExecutionEnvelope(value, { schemaPath = ENVELOPE_SCHEMA_
   const details = value?.stop_reason?.details ?? [];
   const humanDecision = value?.stop_reason?.human_decision_required ?? [];
   const stopIf = value?.stop_reason?.stop_if ?? [];
+  const riskApproval = value?.risk_approval;
   if (["none", "completed"].includes(status) && (details.length > 0 || humanDecision.length > 0)) errors.push(`$.stop_reason: status ${status} cannot include blocking details`);
   if (["human_decision", "insufficient_evidence", "capability_missing", "risk_gate", "blocked"].includes(status) && stopIf.length === 0) errors.push("$.stop_reason.stop_if: required for a stopping status");
   if (status === "human_decision" && humanDecision.length === 0) errors.push("$.stop_reason.human_decision_required: required for human_decision status");
   if (["insufficient_evidence", "capability_missing", "risk_gate", "blocked"].includes(status) && details.length === 0) errors.push("$.stop_reason.details: required for the stopping status");
+  if (riskApproval?.status === "requested" && (riskApproval.execution_status !== "not_executed" || status !== "risk_gate")) errors.push("$.risk_approval: requested approval requires risk_gate and not_executed");
+  if (riskApproval?.status === "rejected" && (riskApproval.execution_status !== "not_executed" || status !== "risk_gate" || riskApproval.rejection_reasons.length === 0)) errors.push("$.risk_approval: rejected approval requires risk_gate, not_executed, and rejection reasons");
+  if (riskApproval?.status === "approved" && riskApproval.rejection_reasons.length > 0) errors.push("$.risk_approval.rejection_reasons: approved state cannot include rejection reasons");
+  if (riskApproval && riskApproval.status !== "approved" && riskApproval.approval_file_sha256 !== null) errors.push("$.risk_approval.approval_file_sha256: only approved state may bind an approval file");
+  if (riskApproval?.status === "approved" && riskApproval.approval_file_sha256 === null) errors.push("$.risk_approval.approval_file_sha256: approved state requires the trusted approval file digest");
+  if (riskApproval?.execution_status === "executed" && riskApproval.status !== "approved") errors.push("$.risk_approval.execution_status: only approved state may be executed");
+  if (riskApproval?.execution_status === "executed" && riskApproval.rendered_invocation_sha256 === null) errors.push("$.risk_approval.rendered_invocation_sha256: executed state requires the exact spawned prompt digest");
+  if (riskApproval?.execution_status === "not_executed" && riskApproval.rendered_invocation_sha256 !== null) errors.push("$.risk_approval.rendered_invocation_sha256: not_executed state cannot claim a spawned prompt digest");
   return errors;
 }
 
@@ -191,7 +200,10 @@ export function buildExecutionEnvelopeRecord({ emissionClass, authority, binding
 
 export function validateExecutionEnvelopeRecord(value, { schemaPath = ENVELOPE_RECORD_SCHEMA_PATH, responseMarkdown = null } = {}) {
   const errors = validateJsonSchema(value, { schemaPath });
-  errors.push(...validateExecutionEnvelope(value?.envelope).map((error) => `$.envelope${error.slice(1)}`));
+  errors.push(...validateExecutionEnvelope(value?.envelope).map((error) => error
+    .replace(/^instance \$/u, "instance $.envelope")
+    .replace(/^\$/u, "$.envelope")
+    .replace(/; \$(?=[:.[])/gu, "; $.envelope")));
   if (value?.envelope_sha256 !== sha256(stableCanonicalJson(value?.envelope))) errors.push("$.envelope_sha256: does not bind the canonical Envelope payload");
   const expectedRecordId = `execution-envelope-record-${sha256(stableCanonicalJson(recordIdentityInput(value ?? {}))).slice("sha256:".length)}`;
   if (value?.record_id !== expectedRecordId) errors.push("$.record_id: does not bind the immutable record content");

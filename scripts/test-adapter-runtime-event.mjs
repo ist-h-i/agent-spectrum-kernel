@@ -118,6 +118,53 @@ const codexWriteRiskNormalized = mapCodexRunnerResult(codexWriteRiskResult, {
 });
 assert.equal(codexWriteRiskNormalized.approval.required, true, "non-review risk-gated action must still require approval");
 
+const codexRequestedRiskResult = structuredClone(codexWriteRiskResult);
+codexRequestedRiskResult.execution_envelope_record = {
+  envelope: {
+    stop_reason: { status: "risk_gate" },
+    evidence_status: { checked: [], missing: ["specific_action_approval"] },
+  },
+};
+codexRequestedRiskResult.execution_envelope_record.envelope.risk_approval = {
+  status: "requested",
+  execution_status: "not_executed",
+  request: {
+    schema_version: "1.0.0",
+    kind: "codex_risk_approval_request",
+    approval_authority: { authority_id: "fixture-owner", authority_revision: "rev-1", evidence_sha256: `sha256:${"a".repeat(64)}` },
+  },
+  approval_file_sha256: null,
+  rendered_invocation_sha256: null,
+  rejection_reasons: [],
+};
+const codexRequestedRiskNormalized = mapCodexRunnerResult(codexRequestedRiskResult);
+assert.equal(codexRequestedRiskNormalized.approval.status, "missing", "requested exact approval maps to missing approval");
+
+const codexApprovedRiskResult = structuredClone(codexWriteRiskResult);
+codexApprovedRiskResult.execution_envelope_record = structuredClone(codexRequestedRiskResult.execution_envelope_record);
+codexApprovedRiskResult.execution_envelope_record.envelope.stop_reason.status = "completed";
+codexApprovedRiskResult.execution_envelope_record.envelope.evidence_status.missing = [];
+codexApprovedRiskResult.execution_envelope_record.envelope.risk_approval = {
+  ...codexRequestedRiskResult.execution_envelope_record.envelope.risk_approval,
+  status: "approved",
+  execution_status: "executed",
+  approval_file_sha256: `sha256:${"b".repeat(64)}`,
+  rendered_invocation_sha256: `sha256:${"c".repeat(64)}`,
+};
+codexApprovedRiskResult.execution_evidence.required_gates.missing_evidence = [];
+const codexApprovedRiskNormalized = mapCodexRunnerResult(codexApprovedRiskResult);
+assert.equal(codexApprovedRiskNormalized.approval.status, "approved", "executed exact approval maps to approved");
+
+const codexRejectedRiskResult = structuredClone(codexWriteRiskResult);
+codexRejectedRiskResult.execution_envelope_record = structuredClone(codexRequestedRiskResult.execution_envelope_record);
+codexRejectedRiskResult.execution_envelope_record.envelope.risk_approval = {
+  ...codexRequestedRiskResult.execution_envelope_record.envelope.risk_approval,
+  status: "rejected",
+  rejection_reasons: ["exact request mismatch"],
+};
+const codexRejectedRiskNormalized = mapCodexRunnerResult(codexRejectedRiskResult);
+assert.equal(codexRejectedRiskNormalized.approval.status, "rejected", "rejected exact approval maps to rejected");
+
 const missingStop = structuredClone(codexNormalized);
 delete missingStop.stop;
 assert.ok(validateAdapterRuntimeEvent(missingStop).some((error) => error.includes("$.stop: is required")));

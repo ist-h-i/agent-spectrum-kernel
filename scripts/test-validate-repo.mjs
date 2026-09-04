@@ -32,6 +32,9 @@ const adapterMigrationTestScript = resolve(repoRoot, "scripts/test-adapter-runti
 const adapterRuntimeEventTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-event.mjs");
 const verificationProofPolicyTestScript = resolve(repoRoot, "scripts/test-verification-proof-policy.mjs");
 const skillEffectivenessOutcomeTestScript = resolve(repoRoot, "scripts/test-skill-effectiveness-outcome.mjs");
+const reviewDecisionMatrixTestScript = resolve(repoRoot, "scripts/test-review-decision-matrix.mjs");
+const jsonSchemaValidationTestScript = resolve(repoRoot, "scripts/test-json-schema-validation.mjs");
+const codexRiskApprovalTestScript = resolve(repoRoot, "scripts/test-codex-risk-approval.mjs");
 const fixtureRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "validate-repo-")));
 const promptV2PreregistrationDocs = [
   "docs/adr/0011-prompt-v2-result-blind-canary-authority.md",
@@ -71,6 +74,9 @@ for (const [label, script] of [
   ["Dual-runtime migration", adapterMigrationTestScript],
   ["Verification proof policy", verificationProofPolicyTestScript],
   ["One-task Skill effectiveness outcome", skillEffectivenessOutcomeTestScript],
+  ["Review decision matrix", reviewDecisionMatrixTestScript],
+  ["Managed JSON Schema validation", jsonSchemaValidationTestScript],
+  ["Codex exact risk approval", codexRiskApprovalTestScript],
 ]) {
   const result = spawnSync(process.execPath, [script], { cwd: repoRoot, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`${label} tests failed\n${result.stdout}\n${result.stderr}`);
@@ -524,6 +530,9 @@ function writeAdapterFixture(root) {
     "schemas/execution-envelope.schema.json",
     "schemas/execution-envelope-record.schema.json",
     "schemas/codex-runner-result.schema.json",
+    "schemas/codex-risk-action.schema.json",
+    "schemas/codex-risk-approval-request.schema.json",
+    "schemas/codex-risk-approval.schema.json",
     "schemas/adapter-runtime-profile.schema.json",
     "schemas/adapter-runtime-evidence.schema.json",
     "schemas/adapter-runtime-event.schema.json",
@@ -668,6 +677,8 @@ console.log(path, code, privacy);
     "adapters/claude-code/plugin/contracts/execution-envelope-contract.md",
     "adapters/claude-code/plugin/contracts/review-signal-gate-map.json",
     "adapters/claude-code/plugin/schemas/claim-evidence-status.schema.json",
+    "adapters/claude-code/plugin/schemas/codex-risk-action.schema.json",
+    "adapters/claude-code/plugin/schemas/codex-risk-approval-request.schema.json",
     "adapters/claude-code/plugin/schemas/execution-envelope.schema.json",
     "adapters/claude-code/plugin/schemas/metrics-event.schema.json",
     "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs",
@@ -3467,6 +3478,12 @@ function assertSkillEffectivenessRuntimeProjection({ installer, freshTarget }) {
 function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
   const schemaPath = "schemas/execution-envelope.schema.json";
   const recordSchemaPath = "schemas/execution-envelope-record.schema.json";
+  const envelopeDependencySchemaPaths = [
+    "schemas/metrics-event.schema.json",
+    "schemas/codex-risk-action.schema.json",
+    "schemas/codex-risk-approval-request.schema.json",
+    "schemas/codex-risk-approval.schema.json",
+  ];
   const statePath = ".agent-spectrum-kernel/install-state.json";
   const canonicalBytes = readFileSync(resolve(repoRoot, schemaPath), "utf8");
   const canonicalDigest = hashText(canonicalBytes);
@@ -3504,6 +3521,12 @@ function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
   });
   if (canonicalExample.status !== "parsed") {
     throw new Error(`projected Execution Envelope schema must validate the canonical contract example\n${canonicalExample.errors.join("\n")}`);
+  }
+  for (const dependencyPath of envelopeDependencySchemaPaths) {
+    const dependencyRecord = freshState.managed_files?.[dependencyPath];
+    if (!existsSync(resolve(freshTarget, dependencyPath)) || dependencyRecord?.kind !== "immutable_contract") {
+      throw new Error(`fresh core installation must project the Execution Envelope Schema dependency ${dependencyPath}`);
+    }
   }
   assertRuntimePass("kernel installer Execution Envelope schema check", runRepoScript([installer, "--target", freshTarget, "--check"]));
 
@@ -3618,6 +3641,12 @@ function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
     const runtimePath = resolve(adapterTarget, "scripts/execution-envelope.schema.json");
     if (readFileSync(canonicalPath, "utf8") !== readFileSync(runtimePath, "utf8")) {
       throw new Error(`${label} runtime Execution Envelope schema must be byte-identical to the core canonical projection`);
+    }
+    const runtimeExample = inspectExecutionEnvelope(readFileSync(resolve(adapterTarget, "docs/execution-envelope-contract.md"), "utf8"), {
+      schemaPath: runtimePath,
+    });
+    if (runtimeExample.status !== "parsed") {
+      throw new Error(`${label} runtime Execution Envelope schema must resolve every shared dependency\n${runtimeExample.errors.join("\n")}`);
     }
     const runtimeRecordPath = resolve(adapterTarget, "scripts/execution-envelope-record.schema.json");
     const runtimeResultPath = resolve(adapterTarget, "scripts/codex-runner-result.schema.json");
@@ -4820,6 +4849,30 @@ EOF
   }
 
   const riskInvocationMarker = `${fakeCodex}.invocations`;
+  const riskActionPath = resolve(fixtureRoot, "codex-runner-risk-action.json");
+  writeFileSync(riskActionPath, `${JSON.stringify({
+    schema_version: "1.0.0",
+    action_id: "validate-repo-risk-output",
+    repository_id: "github.com/example/codex-runner-target",
+    risk_gate: "risk-gate",
+    operation: "write_risk_output",
+    target_scope: ["codex-risk-output.md"],
+    permitted_effects: ["write_risk_output"],
+    prohibited_effects: ["publish_production", "write_outside_target_scope"],
+    approval_authority: {
+      authority_id: "fixture-owner",
+      authority_revision: "rev-1",
+      evidence_sha256: `sha256:${"a".repeat(64)}`,
+    },
+  }, null, 2)}\n`);
+  for (const [label, gitArgs] of [
+    ["init", ["init", "-b", "main"]],
+    ["origin", ["remote", "add", "origin", "https://github.com/example/codex-runner-target.git"]],
+    ["add", ["add", "."]],
+    ["commit", ["-c", "user.name=ASK Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "fixture"]],
+  ]) {
+    assertRuntimePass(`codex risk runner git ${label}`, spawnSync("git", gitArgs, { cwd: target, encoding: "utf8" }));
+  }
   const invocationsBeforeRisk = existsSync(riskInvocationMarker) ? readFileSync(riskInvocationMarker, "utf8") : "";
   const riskResult = runRepoScript([
     targetRunnerScript,
@@ -4829,6 +4882,8 @@ EOF
     "skill-implement.md",
     "--required-gate",
     "risk-gate",
+    "--risk-action",
+    riskActionPath,
     "--codex-bin",
     fakeCodex,
     "--output",
@@ -4836,6 +4891,7 @@ EOF
     "--json",
   ]);
   if (riskResult.status === 0) throw new Error(`codex risk runner must stop without specific-action approval\n${riskResult.stdout}`);
+  if (!riskResult.stdout.trim()) throw new Error(`codex risk runner must emit a JSON approval request before stopping\nstderr:\n${riskResult.stderr}`);
   const riskReport = JSON.parse(riskResult.stdout);
   const invocationsAfterRisk = existsSync(riskInvocationMarker) ? readFileSync(riskInvocationMarker, "utf8") : "";
   if (
@@ -4850,6 +4906,7 @@ EOF
   ) {
     throw new Error(`codex risk runner must emit approval-required state and stop before execution\n${riskResult.stdout}`);
   }
+  rmSync(resolve(target, ".git"), { recursive: true, force: true });
 
   const invocationsBeforeCapability = existsSync(riskInvocationMarker) ? readFileSync(riskInvocationMarker, "utf8") : "";
   const capabilityResult = runRepoScript([
@@ -5222,6 +5279,7 @@ EOF
   const originalAdapterEventRuntime = readFileSync(resolve(target, "scripts/adapter-runtime-event.mjs"), "utf8");
   const originalEnvelopeRuntime = readFileSync(resolve(target, "scripts/execution-envelope.mjs"), "utf8");
   const originalJsonSchemaRuntime = readFileSync(resolve(target, "scripts/json-schema-validation.mjs"), "utf8");
+  const originalRiskApprovalRuntime = readFileSync(resolve(target, "scripts/codex-risk-approval.mjs"), "utf8");
   const originalObservabilityRuntime = readFileSync(resolve(target, "scripts/observability-paths.mjs"), "utf8");
   const outsideRuntimeDir = resolve(fixtureRoot, "outside-codex-runtime", "scripts");
   mkdirSync(outsideRuntimeDir, { recursive: true });
@@ -5231,6 +5289,7 @@ EOF
   writeFileSync(resolve(outsideRuntimeDir, "adapter-runtime-event.mjs"), originalAdapterEventRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "execution-envelope.mjs"), originalEnvelopeRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "json-schema-validation.mjs"), originalJsonSchemaRuntime);
+  writeFileSync(resolve(outsideRuntimeDir, "codex-risk-approval.mjs"), originalRiskApprovalRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "observability-paths.mjs"), originalObservabilityRuntime);
   rmSync(targetRunnerScript);
   symlinkSync(outsideRunnerPath, targetRunnerScript);
@@ -5639,7 +5698,7 @@ Layer summary:
   Trigger or failure trace: docs_output_change -> review-output-quality
   Evidence location: fixture/output-contract
   Required post-fix condition: complete the output contract`,
-      decision: "request changes",
+      decision: "block",
     }),
   );
   const separatedReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", separatedReviewOutput, "--required-gate", "review-output-quality", "--required-gate", "review-final-merge-gate", "--observed-signal", "docs_output_change"]);
@@ -5701,9 +5760,9 @@ Layer summary:
       expectedStatus: "pass",
     },
     {
-      label: "approve with comments remains valid",
+      label: "clean approve with comments alias is rejected",
       output: reviewFixture({ decision: "approve with comments" }),
-      expectedStatus: "pass",
+      expectedStatus: "fail",
     },
     {
       label: "approve with comments rejects a failing baseline",
@@ -5716,9 +5775,9 @@ Layer summary:
       expectedStatus: "pass",
     },
     {
-      label: "block remains valid",
+      label: "block without a blocking Finding is rejected",
       output: reviewFixture({ baselineStatus: "fail", decision: "block" }),
-      expectedStatus: "pass",
+      expectedStatus: "fail",
     },
     {
       label: "insufficient evidence decision remains valid",
@@ -5794,7 +5853,7 @@ Layer summary:
     }
   }
   const claudeReviewFixture = reviewFixture({
-    additionalGates: "- review-automated-gate: status=pass; evidence=focused validation; signals=automated_evidence_required",
+    additionalGates: "- review-automated-gate: status=pass_with_comments; evidence=focused validation with non-blocking comments; signals=automated_evidence_required",
     decision: "approve with comments",
   });
   const claudeOutput = resolve(target, "claude-review-output.txt");
@@ -5852,6 +5911,8 @@ Layer summary:
     "contracts/execution-envelope-contract.md",
     "contracts/review-signal-gate-map.json",
     "schemas/claim-evidence-status.schema.json",
+    "schemas/codex-risk-action.schema.json",
+    "schemas/codex-risk-approval-request.schema.json",
     "schemas/execution-envelope.schema.json",
     "schemas/metrics-event.schema.json",
     "scripts/claim-evidence-status.mjs",

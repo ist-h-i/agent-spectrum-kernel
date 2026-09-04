@@ -1681,6 +1681,164 @@ try {
     );
   });
 
+  closes("resume retains the predecessor next-step identity", () => {
+    const predecessor = publishReceiptVariant({
+      state: "stopped",
+      steps: [application.artifact.steps[0], portfolioMarker()],
+      stop: { code: "portfolio_activation_authority_required", detail: "Resume the exact commit-marker step." },
+      next_step: "portfolio_commit_marker",
+    });
+    const publishResumed = (step) => publishReceiptVariant({
+      predecessor_receipt_digest: predecessor.object_digest,
+      state: "pending",
+      base_heads: structuredClone(predecessor.artifact.result_heads),
+      result_heads: structuredClone(predecessor.artifact.result_heads),
+      steps: [step],
+      stop: null,
+      next_step: step.step_id,
+    });
+    const expectTransplant = (step) => {
+      const resumed = publishResumed(step);
+      assert.throws(
+        () => verifyReceiptObject(resumed.object_digest),
+        /continued step|next.step.*identity|resume.*transplant/iu,
+      );
+    };
+
+    expectTransplant({ ...portfolioMarker(), step_id: "transplanted_step" });
+    expectTransplant({
+      ...portfolioMarker(),
+      operation: "verify_asset_commit_marker",
+      input_digest: predecessor.artifact.result_heads.registry_snapshot_digest,
+      output_digest: predecessor.artifact.result_heads.registry_snapshot_digest,
+    });
+    expectTransplant({ ...portfolioMarker(), output_digest: digest("transplanted-planned-output") });
+    expectTransplant({ ...portfolioMarker(), authority_context_digest: digest("transplanted-authority-context") });
+  });
+
+  closes("only resumable predecessors with a non-null next step may continue", () => {
+    const successorFrom = (predecessorObjectDigest, predecessorHeads) => publishReceiptVariant({
+      predecessor_receipt_digest: predecessorObjectDigest,
+      state: "pending",
+      base_heads: structuredClone(predecessorHeads),
+      result_heads: structuredClone(predecessorHeads),
+      steps: [portfolioMarker()],
+      stop: null,
+      next_step: "portfolio_commit_marker",
+    });
+
+    const fromCompleted = successorFrom(application.object_digest, application.artifact.result_heads);
+    assert.throws(() => verifyReceiptObject(fromCompleted.object_digest), /completed.*cannot.*resume|predecessor.*resumable/iu);
+
+    const failed = publishReceiptVariant({
+      state: "failed",
+      steps: [application.artifact.steps[0], portfolioMarker("failed")],
+      stop: { code: "application_failed", detail: "Terminal commit-marker failure." },
+      next_step: null,
+    });
+    const fromFailed = successorFrom(failed.object_digest, failed.artifact.result_heads);
+    assert.throws(() => verifyReceiptObject(fromFailed.object_digest), /failed.*cannot.*resume|predecessor.*resumable/iu);
+
+    const forgedNullNext = structuredClone(failed.artifact);
+    forgedNullNext.state = "stopped";
+    forgedNullNext.steps[1].status = "pending";
+    forgedNullNext.stop = { code: "stale_head", detail: "A malformed checkpoint omitted its next step." };
+    delete forgedNullNext.receipt_digest;
+    forgedNullNext.receipt_digest = computeEvolutionApplicationReceiptDigest(forgedNullNext);
+    const storedNullNext = putContentAddressedJson({ storeRoot, artifact: forgedNullNext });
+    const fromNullNext = successorFrom(storedNullNext.digest, forgedNullNext.result_heads);
+    assert.throws(() => verifyReceiptObject(fromNullNext.object_digest), /next step|next_step|schema/iu);
+  });
+
+  closes("stopped receipts continue through pending and in-progress checkpoints", () => {
+    const stopped = publishReceiptVariant({
+      state: "stopped",
+      steps: [application.artifact.steps[0], portfolioMarker()],
+      stop: { code: "portfolio_activation_authority_required", detail: "Resume the exact commit-marker step." },
+      next_step: "portfolio_commit_marker",
+    });
+    const pending = publishReceiptVariant({
+      predecessor_receipt_digest: stopped.object_digest,
+      state: "pending",
+      base_heads: structuredClone(stopped.artifact.result_heads),
+      result_heads: structuredClone(stopped.artifact.result_heads),
+      steps: [portfolioMarker()],
+      stop: null,
+      next_step: "portfolio_commit_marker",
+    });
+    assert.equal(verifyReceiptObject(pending.object_digest).receipt.state, "pending");
+
+    const postMarker = { ...portfolioMarker(), step_id: "portfolio_post_commit_marker" };
+    const inProgress = publishReceiptVariant({
+      predecessor_receipt_digest: stopped.object_digest,
+      state: "in_progress",
+      base_heads: structuredClone(stopped.artifact.result_heads),
+      result_heads: structuredClone(stopped.artifact.result_heads),
+      steps: [portfolioMarker("completed"), postMarker],
+      stop: null,
+      next_step: "portfolio_post_commit_marker",
+    });
+    assert.equal(verifyReceiptObject(inProgress.object_digest).receipt.state, "in_progress");
+
+    const continued = publishReceiptVariant({
+      predecessor_receipt_digest: inProgress.object_digest,
+      state: "pending",
+      base_heads: structuredClone(inProgress.artifact.result_heads),
+      result_heads: structuredClone(inProgress.artifact.result_heads),
+      steps: [postMarker],
+      stop: null,
+      next_step: "portfolio_post_commit_marker",
+    });
+    assert.equal(verifyReceiptObject(continued.object_digest).receipt.predecessor_receipt_digest, inProgress.object_digest);
+
+    const failed = publishReceiptVariant({
+      predecessor_receipt_digest: stopped.object_digest,
+      state: "failed",
+      base_heads: structuredClone(stopped.artifact.result_heads),
+      result_heads: structuredClone(stopped.artifact.result_heads),
+      steps: [portfolioMarker("failed")],
+      stop: { code: "application_failed", detail: "The exact resumed step failed without advancing the head." },
+      next_step: null,
+    });
+    assert.equal(verifyReceiptObject(failed.object_digest).receipt.state, "failed");
+
+    const skipped = publishReceiptVariant({
+      predecessor_receipt_digest: stopped.object_digest,
+      state: "stopped",
+      base_heads: structuredClone(stopped.artifact.result_heads),
+      result_heads: structuredClone(stopped.artifact.result_heads),
+      steps: [
+        { ...portfolioMarker(), status: "skipped" },
+        { ...portfolioMarker(), step_id: "portfolio_post_commit_marker" },
+      ],
+      stop: { code: "stale_head", detail: "Skipping the named continuation is prohibited." },
+      next_step: "portfolio_post_commit_marker",
+    });
+    assert.throws(() => verifyReceiptObject(skipped.object_digest), /status transition pending->skipped.*not allowed/iu);
+  });
+
+  closes("a terminal predecessor hidden deeper in the receipt chain is rejected", () => {
+    const intermediate = publishReceiptVariant({
+      predecessor_receipt_digest: application.object_digest,
+      state: "stopped",
+      base_heads: structuredClone(application.artifact.result_heads),
+      result_heads: structuredClone(application.artifact.result_heads),
+      steps: [portfolioMarker()],
+      stop: { code: "portfolio_activation_authority_required", detail: "This apparent resume point hides a terminal predecessor." },
+      next_step: "portfolio_commit_marker",
+    });
+    const successor = publishReceiptVariant({
+      predecessor_receipt_digest: intermediate.object_digest,
+      state: "pending",
+      base_heads: structuredClone(intermediate.artifact.result_heads),
+      result_heads: structuredClone(intermediate.artifact.result_heads),
+      steps: [portfolioMarker()],
+      stop: null,
+      next_step: "portfolio_commit_marker",
+    });
+    assert.throws(() => verifyReceiptObject(successor.object_digest), /completed.*cannot.*resume|predecessor.*resumable/iu);
+  });
+
   closes("digest-resealed semantically invalid stored receipt still fails closed", () => {
     const forged = structuredClone(application.artifact);
     forged.state = "stopped";

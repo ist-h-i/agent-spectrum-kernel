@@ -892,7 +892,11 @@ closes("receipt state matrix rejects contradictory stop, resume, and step topolo
       ...structuredClone(base.steps[0]),
       input_digest: base.base_heads.portfolio_lock_digest,
       output_digest: base.base_heads.portfolio_lock_digest,
-    }, markerStep],
+    }, {
+      ...markerStep,
+      input_digest: base.base_heads.portfolio_lock_digest,
+      output_digest: base.base_heads.portfolio_lock_digest,
+    }],
     next_step: "portfolio_commit_marker",
   }, /apply step.*successor head|must produce/iu);
   expectInvalid({ state: "in_progress", result_heads: structuredClone(base.base_heads), steps: [pendingStep], next_step: "portfolio_activation" }, /in.progress.*completed|prefix|schema/iu);
@@ -973,6 +977,47 @@ closes("receipt state matrix rejects contradictory stop, resume, and step topolo
     steps: [base.steps[0], { ...markerStep, step_id: base.steps[0].step_id }],
     next_step: base.steps[0].step_id,
   }, /duplicate.*step|step ID/iu);
+});
+
+closes("non-terminal and failed steps bind the current resource head", () => {
+  const base = applicationReceiptDraft();
+  const pendingApply = { ...structuredClone(base.steps[0]), status: "pending" };
+  const markerStep = {
+    step_id: "portfolio_commit_marker",
+    operation: "verify_portfolio_commit_marker",
+    input_digest: base.result_heads.portfolio_lock_digest,
+    authority_context_digest: D[2],
+    output_digest: base.result_heads.portfolio_lock_digest,
+    status: "pending",
+  };
+  const expectInvalid = (overrides) => assert.throws(
+    () => buildEvolutionApplicationReceipt(applicationReceiptDraft(overrides)),
+    /current.*result head|step input.*result head|input.*current head/iu,
+  );
+
+  expectInvalid({
+    state: "pending",
+    result_heads: structuredClone(base.base_heads),
+    steps: [{ ...pendingApply, input_digest: D[3] }],
+    next_step: "portfolio_activation",
+  });
+  expectInvalid({
+    state: "in_progress",
+    steps: [base.steps[0], { ...markerStep, input_digest: D[3] }],
+    next_step: "portfolio_commit_marker",
+  });
+  expectInvalid({
+    state: "stopped",
+    steps: [base.steps[0], { ...markerStep, input_digest: D[3] }],
+    stop: { code: "stale_head", detail: "The next step no longer binds the current head." },
+    next_step: "portfolio_commit_marker",
+  });
+  expectInvalid({
+    state: "failed",
+    steps: [base.steps[0], { ...markerStep, input_digest: D[3], status: "failed" }],
+    stop: { code: "application_failed", detail: "The failed step used a stale head." },
+    next_step: null,
+  });
 });
 
 process.stdout.write(`Evolution loop contract tests passed: ${closures} closures\n`);

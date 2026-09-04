@@ -50,13 +50,19 @@ Produce the final merge decision from current baseline, specialized-gate, findin
 
 5. Decide.
 
+Apply one closed decision matrix with this precedence:
+
+`block > insufficient evidence > request changes > approve with comments > approve`
+
 | Decision | Use when |
 |---|---|
-| approve | Baseline and every required additional gate pass with sufficient evidence and no unresolved merge blocker. |
-| approve with comments | Required gates pass and only non-blocking findings or bounded residual risk remain. |
-| request changes | Actionable repair or missing evidence is bounded and direction remains viable. |
-| block | Critical correctness, security, domain, build, approval, or risk failure exists. |
-| insufficient evidence | The target cannot be judged without current target, gate, verification, context, or approval evidence. |
+| approve | Baseline and every required additional gate are `pass`, Findings and Missing evidence are empty, and no higher-precedence condition exists. |
+| approve with comments | Every gate is `pass` or `pass_with_comments`, at least one gate is `pass_with_comments` or one complete non-blocking `Minor`/`Nit` Finding exists, Findings contain no `Blocker`/`Major` or merge blocker, Missing evidence is empty, and no higher-precedence condition exists. |
+| request changes | At least one gate is `fail` or one complete non-blocking `Major` Finding exists, and no blocking or insufficient-evidence condition takes precedence. Every `Major` requires changes; `Minor`/`Nit` alone never does. |
+| block | A complete `Blocker` Finding or any complete Finding with `Merge blocker: true` exists. A failing gate alone does not justify `block`. |
+| insufficient evidence | At least one gate is `insufficient_evidence`, Missing evidence names the gap, and no blocking Finding takes precedence. Missing evidence without an insufficient gate does not justify this decision. |
+
+Reject a lower-precedence decision when a higher-precedence condition exists. Also reject `approve with comments` as an empty alias for a clean `approve`, and reject `request changes`, `block`, or `insufficient evidence` when their defining condition is absent.
 
 ## Output
 

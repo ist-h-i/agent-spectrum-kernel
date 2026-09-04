@@ -38,6 +38,18 @@
       "argv": ["node", "scripts/test-codex-runner-execution-envelope-conformance.mjs"]
     },
     {
+      "id": "managed_json_schema_validation",
+      "argv": ["node", "scripts/test-json-schema-validation.mjs"]
+    },
+    {
+      "id": "codex_exact_risk_approval",
+      "argv": ["node", "scripts/test-codex-risk-approval.mjs"]
+    },
+    {
+      "id": "review_decision_matrix",
+      "argv": ["node", "scripts/test-review-decision-matrix.mjs"]
+    },
+    {
       "id": "claim_evidence_status_contract",
       "argv": ["node", "scripts/test-claim-evidence-status.mjs"]
     },

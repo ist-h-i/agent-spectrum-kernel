@@ -13,6 +13,7 @@ import {
   selectExecutionEnvelopeEmission,
   validateExecutionEnvelopeRecord,
 } from "./execution-envelope.mjs";
+import { createRiskApprovalRequest } from "./codex-risk-approval.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const schemaPath = resolve(root, "schemas/execution-envelope-record.schema.json");
@@ -186,7 +187,15 @@ assert.match(inspectExecutionEnvelopeRecordEmission(disagreement, inline, { sche
 
 const invalidRecord = structuredClone(sidecar);
 invalidRecord.envelope.next_action = "";
-assert.match(validateExecutionEnvelopeRecord(invalidRecord, { schemaPath }).join("\n"), /next_action|record_id/u);
+const invalidRecordErrors = validateExecutionEnvelopeRecord(invalidRecord, { schemaPath }).join("\n");
+assert.match(invalidRecordErrors, /instance \$\.envelope\.next_action: keyword minLength/u);
+assert.doesNotMatch(invalidRecordErrors, /envelopenstance/u, "nested Envelope diagnostics must preserve the structured instance prefix");
+
+const invalidEnvelopeSemantics = structuredClone(sidecar);
+invalidEnvelopeSemantics.envelope.stop_reason.details = ["must not be present for a completed status"];
+const invalidEnvelopeSemanticErrors = validateExecutionEnvelopeRecord(invalidEnvelopeSemantics, { schemaPath }).join("\n");
+assert.match(invalidEnvelopeSemanticErrors, /\$\.envelope\.stop_reason: status completed cannot include blocking details/u);
+assert.doesNotMatch(invalidEnvelopeSemanticErrors, /envelopenstance/u);
 
 const mismatchedEntryMode = buildExecutionEnvelopeRecord({
   emissionClass: "sidecar",
@@ -220,5 +229,102 @@ const hiddenHumanDecision = buildExecutionEnvelopeRecord({
   controlInputSha256: digest("d"),
 });
 assert.match(validateExecutionEnvelopeRecord(hiddenHumanDecision, { schemaPath }).join("\n"), /blocking details/u);
+
+const riskAction = {
+  schema_version: "1.0.0",
+  action_id: "envelope-fixture",
+  repository_id: "github.com/example/envelope-fixture",
+  risk_gate: "risk-gate",
+  operation: "write_release_candidate",
+  target_scope: ["dist/release.json"],
+  permitted_effects: ["write_release_candidate"],
+  prohibited_effects: ["publish_production"],
+  approval_authority: { authority_id: "fixture-owner", authority_revision: "rev-1", evidence_sha256: digest("1") },
+};
+const riskRequest = createRiskApprovalRequest({
+  actionEvidence: { value: riskAction, file_sha256: digest("2") },
+  invocation: {
+    repository: { repository_id: riskAction.repository_id, repository_identity_sha256: digest("3"), head_sha: "4".repeat(40), tree_sha: "5".repeat(40) },
+    target_scope: riskAction.target_scope,
+    prompt: { entry_id: "skill-implement.md", rendered_sha256: digest("6"), invocation_sha256: digest("7") },
+    profile: {
+      installed_profile: "implementation",
+      profile_id: binding.profile_id,
+      profile_schema_version: binding.profile_schema_version,
+      canonical_revision: binding.canonical_revision,
+      canonical_source_digest: binding.canonical_source_digest,
+      profile_fingerprint: binding.profile_fingerprint,
+    },
+    executor: {
+      codex_bin: "codex",
+      canonical_path: "/usr/local/bin/codex",
+      raw_sha256: digest("5"),
+      size_bytes: 12345,
+      output_path: ".agents/runs/release.md",
+    },
+    mode: "implementation",
+    sandbox: "workspace-write",
+    required_gates: ["risk-gate"],
+    risk_gate: "risk-gate",
+    operation: riskAction.operation,
+    permitted_effects: riskAction.permitted_effects,
+    prohibited_effects: riskAction.prohibited_effects,
+  },
+});
+const requestedRiskEnvelope = {
+  ...envelope,
+  evidence_status: { checked: ["exact risk request"], missing: ["specific_action_approval"] },
+  stop_reason: {
+    status: "risk_gate",
+    details: ["exact approval is required"],
+    human_decision_required: ["specific approval for the risk-gated action"],
+    stop_if: ["exact approval remains unavailable"],
+  },
+  risk_approval: {
+    status: "requested",
+    execution_status: "not_executed",
+    request: riskRequest,
+    approval_file_sha256: null,
+    rendered_invocation_sha256: null,
+    rejection_reasons: [],
+  },
+};
+const requestedRiskRecord = buildExecutionEnvelopeRecord({
+  emissionClass: "inline_required",
+  authority: inline.authority,
+  binding,
+  envelope: requestedRiskEnvelope,
+  responseMarkdown,
+  controlInputSha256: null,
+});
+assert.deepEqual(validateExecutionEnvelopeRecord(requestedRiskRecord, { schemaPath }), [], "requested approval must be a valid non-executed risk stop");
+
+const invalidRequestedExecution = structuredClone(requestedRiskRecord);
+invalidRequestedExecution.envelope.risk_approval.execution_status = "executed";
+assert.match(validateExecutionEnvelopeRecord(invalidRequestedExecution, { schemaPath }).join("\n"), /requested approval requires|only approved state|record_id/u);
+
+const approvedExecutionEnvelope = {
+  ...envelope,
+  risk_approval: {
+    ...requestedRiskEnvelope.risk_approval,
+    status: "approved",
+    execution_status: "executed",
+    approval_file_sha256: digest("8"),
+    rendered_invocation_sha256: digest("9"),
+  },
+};
+const approvedExecutionRecord = buildExecutionEnvelopeRecord({
+  emissionClass: "sidecar",
+  authority: sidecar.authority,
+  binding,
+  envelope: approvedExecutionEnvelope,
+  responseMarkdown,
+  controlInputSha256: digest("a"),
+});
+assert.deepEqual(validateExecutionEnvelopeRecord(approvedExecutionRecord, { schemaPath }), [], "approved executed state must bind approval and spawned prompt bytes");
+
+const invalidApprovedWithoutPrompt = structuredClone(approvedExecutionRecord);
+invalidApprovedWithoutPrompt.envelope.risk_approval.rendered_invocation_sha256 = null;
+assert.match(validateExecutionEnvelopeRecord(invalidApprovedWithoutPrompt, { schemaPath }).join("\n"), /spawned prompt digest|record_id/u);
 
 console.log("Execution Envelope record tests passed");

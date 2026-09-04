@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const fixtureRoot = mkdtempSync(resolve(tmpdir(), "codex-envelope-conformance-"));
+const fixtureRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "codex-envelope-conformance-")));
 const target = resolve(fixtureRoot, "adopting-project");
 const coreInstaller = resolve(repoRoot, "scripts/install-kernel.mjs");
 const codexInstaller = resolve(repoRoot, "scripts/install-codex-adapter.mjs");
@@ -89,7 +89,7 @@ Decision:
 
 function findingMarkdown({
   findingId = "F-COMPLETE",
-  severity = "major",
+  severity = "minor",
   mergeBlocker = "false",
   practicalImpact = "callers receive an incorrect review decision",
   triggerOrFailureTrace = "managed review -> finding inventory",
@@ -243,6 +243,12 @@ ${JSON.stringify({
 try {
   assertPass("core install", runNode([coreInstaller, "--target", target]));
   assertPass("full Codex adapter install", runNode([codexInstaller, "--target", target, "--profile", "full"]));
+  for (const runtime of [
+    "codex-risk-approval.mjs",
+    "codex-risk-action.schema.json",
+    "codex-risk-approval-request.schema.json",
+    "codex-risk-approval.schema.json",
+  ]) assert.equal(existsSync(resolve(target, "scripts", runtime)), true, `installed projection must include ${runtime}`);
 
   const runner = resolve(target, "scripts/codex-exec-runner.mjs");
   const fakeCodex = resolve(target, "fake-codex");
@@ -254,6 +260,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 if [ -n "$ASK_FAKE_INVOCATION_PATH" ]; then printf '%s\n' "invoked" >> "$ASK_FAKE_INVOCATION_PATH"; fi
+if [ -n "$ASK_FAKE_STDIN_PATH" ]; then cat > "$ASK_FAKE_STDIN_PATH"; fi
 if [ -z "$ASK_FAKE_RESULT_PATH" ]; then exit 3; fi
 cp "$ASK_FAKE_RESULT_PATH" "$output"
 `,
@@ -394,31 +401,31 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     {
       label: "approve validates a real finding after a backtick example",
       findings: `${fencedFindingExample({ body: exampleFinding })}\n${validNonBlockingFinding}`,
-      decision: "approve",
+      decision: "approve with comments",
       expectedPass: true,
     },
     {
       label: "approve validates a real finding after a tilde example",
       findings: `${fencedFindingExample({ opening: "~~~", body: exampleFinding })}\n${validNonBlockingFinding}`,
-      decision: "approve",
+      decision: "approve with comments",
       expectedPass: true,
     },
     {
       label: "approve validates a real finding after a longer closing fence",
       findings: `${fencedFindingExample({ opening: "`````", closing: "```````", body: exampleFinding })}\n${validNonBlockingFinding}`,
-      decision: "approve",
+      decision: "approve with comments",
       expectedPass: true,
     },
     {
       label: "approve validates a real finding after multiple examples",
       findings: `${fencedFindingExample({ body: exampleFinding })}\n${fencedFindingExample({ opening: "~~~~", body: exampleFinding })}\n${validNonBlockingFinding}`,
-      decision: "approve",
+      decision: "approve with comments",
       expectedPass: true,
     },
     {
       label: "approve validates a real finding after a quoted example",
       findings: `${quotedFindingExample(exampleFinding)}\n${validNonBlockingFinding}`,
-      decision: "approve",
+      decision: "approve with comments",
       expectedPass: true,
     },
     {
@@ -508,11 +515,24 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     },
     {
       label: "all required gates pass plus approve",
-      response: reviewResponse({ additionalGates: "- review-output-quality: status=pass; evidence=exact rendered output; signals=docs_output_change", findings: validNonBlockingFinding, decision: "approve" }),
+      response: reviewResponse({ additionalGates: "- review-output-quality: status=pass; evidence=exact rendered output; signals=docs_output_change", decision: "approve" }),
       observedSignal: "docs_output_change",
       expectedPass: true,
     },
     { label: "approve with comments remains valid", response: reviewResponse({ findings: validNonBlockingFinding, decision: "approve with comments" }), expectedPass: true },
+    {
+      label: "approve with comments ignores a fenced decision example",
+      response: reviewResponse({
+        findings: `${validNonBlockingFinding}\n\n\`\`\`text\nDecision:\n- approve\n\`\`\``,
+        decision: "approve with comments",
+      }),
+      expectedPass: true,
+    },
+    {
+      label: "approve with comments survives blank space after the Decision heading",
+      response: reviewResponse({ findings: validNonBlockingFinding, decision: "approve with comments" }).replace("Decision:\n- approve with comments", "Decision:\n\n- approve with comments"),
+      expectedPass: true,
+    },
     {
       label: "approve preserves quoted and fenced legacy prose after an empty inventory",
       response: reviewResponse({
@@ -529,11 +549,11 @@ Layer summary:
       expectedPass: true,
     },
     { label: "approve with comments rejects a failing baseline", response: reviewResponse({ baselineStatus: "fail", decision: "approve with comments" }), expectedPass: false },
-    { label: "request changes accepts a complete merge blocker", response: reviewResponse({ baselineStatus: "fail", findings: validBlockingFinding, decision: "request changes" }), expectedPass: true },
+    { label: "request changes rejects a complete merge blocker", response: reviewResponse({ baselineStatus: "fail", findings: validBlockingFinding, decision: "request changes" }), expectedPass: false },
     { label: "block accepts a complete merge blocker", response: reviewResponse({ baselineStatus: "fail", findings: validBlockingFinding, decision: "block" }), expectedPass: true },
-    { label: "insufficient evidence accepts a complete merge blocker", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", findings: validBlockingFinding, decision: "insufficient evidence" }), expectedPass: true },
-    { label: "request changes accepts an explicit non-blocker merge consequence", response: reviewResponse({ baselineStatus: "fail", findings: findingMarkdown({ findingId: "F-MAJOR-MERGE", mergeBlocker: "true" }), decision: "request changes" }), expectedPass: true },
-    { label: "request changes accepts an omitted optional category", response: reviewResponse({ baselineStatus: "fail", findings: findingMarkdown({ mergeBlocker: "true", category: null }), decision: "request changes" }), expectedPass: true },
+    { label: "insufficient evidence rejects a complete merge blocker", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", findings: validBlockingFinding, decision: "insufficient evidence" }), expectedPass: false },
+    { label: "request changes accepts an explicit non-blocking Major", response: reviewResponse({ baselineStatus: "fail", findings: findingMarkdown({ findingId: "F-MAJOR", severity: "major", mergeBlocker: "false" }), decision: "request changes" }), expectedPass: true },
+    { label: "request changes accepts an omitted optional category", response: reviewResponse({ baselineStatus: "fail", findings: findingMarkdown({ severity: "major", mergeBlocker: "false", category: null }), decision: "request changes" }), expectedPass: true },
     {
       label: "request changes keeps none findings for a failing additional gate",
       response: reviewResponse({ additionalGates: "- review-output-quality: status=fail; evidence=output regression; signals=docs_output_change", decision: "request changes" }),
@@ -541,7 +561,7 @@ Layer summary:
       expectedPass: true,
     },
     { label: "request changes keeps none finding inventory", response: reviewResponse({ baselineStatus: "fail", decision: "request changes" }), expectedPass: true },
-    { label: "block keeps none finding inventory", response: reviewResponse({ baselineStatus: "fail", decision: "block" }), expectedPass: true },
+    { label: "block rejects none finding inventory", response: reviewResponse({ baselineStatus: "fail", decision: "block" }), expectedPass: false },
     { label: "insufficient evidence keeps none finding inventory", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", decision: "insufficient evidence" }), expectedPass: true },
     ...cleanNonApprovalCases.map(({ label, decision, baselineStatus = "pass", additionalGate = false, additionalStatus = "pass" }) => ({
       label,
@@ -620,6 +640,10 @@ Layer summary:
       assert.equal(report.sensor_status, "pass", `${fixture.label} sensor status`);
       assert.equal(report.execution_envelope_record?.persisted, true, `${fixture.label} record persistence`);
       assert.equal(existsSync(resolve(target, outputRelative)), true, `${fixture.label} output publication`);
+      if (fixture.label.startsWith("approve with comments")) {
+        assert.equal(report.execution_envelope_record?.envelope?.review_decision, "approve_with_comments", "accepted approve_with_comments must remain exact in the published Envelope");
+        assert.notEqual(report.execution_envelope_record?.envelope?.review_decision, "approve", "approve_with_comments must not degrade to plain approve");
+      }
     } else {
       assert.notEqual(result.status, 0, `${fixture.label} must fail closed`);
       assert.equal(report.status, "insufficient_evidence", `${fixture.label} runner status`);
@@ -638,12 +662,12 @@ Layer summary:
   assert.match(generatedReviewCommand, /(?:^|\s)--gates-observed(?:\s|$)/u, "generated review command must record completed gate classification by default");
   assert.match(generatedCommands, /remove `--gates-observed` and replace it with repeated exact `--observed-signal <id>` arguments/u, "generated review guidance must explain how to replace the default observation form");
   assert.match(generatedCommands, /Never combine `--gates-observed` with `--observed-signal`/u, "generated review guidance must preserve observation-form mutual exclusion");
-
   const generatedReviewTokens = generatedReviewCommand.trim().split(/\s+/u);
   assert.equal(generatedReviewTokens.filter((token) => token === "--gates-observed").length, 1, "generated review command must contain exactly one default observation form");
   assert.equal(generatedReviewTokens.includes("--observed-signal"), false, "generated review command must not combine default and exact-signal observation forms");
   assert.deepEqual(generatedReviewTokens.slice(0, 2), ["node", "scripts/codex-exec-runner.mjs"]);
   assertPass("generated review fixture git init", runGit(["init", "-b", "main"]));
+  assertPass("generated review fixture origin", runGit(["remote", "add", "origin", "https://github.com/example/conformance-target.git"]));
   assertPass("generated review fixture git add", runGit(["add", "."]));
   assertPass("generated review fixture git commit", runGit([
     "-c", "user.name=ASK Fixture",
@@ -766,17 +790,35 @@ Findings:
   assert.match(writeReviewResult.stderr, /prompt\/sandbox mismatch/u);
   assert.equal(readFileSync(fakeInvocationPath, "utf8"), invocationsBeforeWriteReview, "rejected workspace-write review must not invoke Codex");
 
+  const riskActionPath = resolve(fixtureRoot, "risk-action.json");
+  writeFileSync(riskActionPath, `${JSON.stringify({
+    schema_version: "1.0.0",
+    action_id: "conformance-release",
+    repository_id: "github.com/example/conformance-target",
+    risk_gate: "risk-gate",
+    operation: "write_release_candidate",
+    target_scope: ["dist/release-candidate.json"],
+    permitted_effects: ["write_release_candidate"],
+    prohibited_effects: ["publish_production", "write_outside_target_scope"],
+    approval_authority: {
+      authority_id: "fixture-owner",
+      authority_revision: "rev-1",
+      evidence_sha256: `sha256:${"a".repeat(64)}`,
+    },
+  }, null, 2)}\n`);
   const invocationsBeforeRiskAction = readFileSync(fakeInvocationPath, "utf8");
-  const riskActionResult = runNode([
+  const riskArgs = [
     runner,
     "--target", target,
     "--prompt", "skill-implement.md",
     "--mode", "implementation",
     "--required-gate", "risk-gate",
+    "--risk-action", riskActionPath,
     "--codex-bin", fakeCodex,
     "--output", ".agents/runs/conformance-risk-action.md",
     "--json",
-  ], {
+  ];
+  const riskActionResult = runNode(riskArgs, {
     cwd: target,
     env: {
       ASK_FAKE_RESULT_PATH: generatedReviewResultPath,
@@ -784,11 +826,162 @@ Findings:
     },
   });
   assert.notEqual(riskActionResult.status, 0, "non-review risk-gated action must stop without approval");
+  assert.ok(riskActionResult.stdout.trim(), `risk action must emit a JSON report\nstderr:\n${riskActionResult.stderr}`);
   const riskActionReport = JSON.parse(riskActionResult.stdout);
   assert.equal(riskActionReport.normalized_adapter_event?.approval?.required, true);
   assert.equal(riskActionReport.normalized_adapter_event?.approval?.status, "missing");
   assert.equal(riskActionReport.normalized_adapter_event?.stop?.status, "risk_gate");
+  assert.equal(riskActionReport.execution_envelope_record?.envelope?.risk_approval?.status, "requested");
+  assert.equal(riskActionReport.execution_envelope_record?.envelope?.risk_approval?.execution_status, "not_executed");
+  assert.equal(riskActionReport.execution_envelope_record?.envelope?.risk_approval?.request?.invocation?.executor?.canonical_path, realpathSync(fakeCodex));
+  assert.equal(riskActionReport.execution_envelope_record?.envelope?.risk_approval?.request?.invocation?.executor?.raw_sha256, `sha256:${hashText(readFileSync(fakeCodex))}`);
   assert.equal(readFileSync(fakeInvocationPath, "utf8"), invocationsBeforeRiskAction, "non-review risk-gated action must not invoke Codex");
+
+  const repeatedRiskActionResult = runNode(riskArgs, {
+    cwd: target,
+    env: {
+      ASK_FAKE_RESULT_PATH: resolve(target, ".fixture-implementation.json"),
+      ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
+    },
+  });
+  assert.notEqual(repeatedRiskActionResult.status, 0, "repeated first risk invocation must still stop");
+  const repeatedRiskActionReport = JSON.parse(repeatedRiskActionResult.stdout);
+  assert.deepEqual(repeatedRiskActionReport.execution_envelope_record?.envelope?.risk_approval?.request, riskActionReport.execution_envelope_record?.envelope?.risk_approval?.request, "two first invocations must emit one deterministic request identity");
+  assert.equal(readFileSync(fakeInvocationPath, "utf8"), invocationsBeforeRiskAction, "repeated unapproved action must not invoke Codex");
+
+  const approvalPath = resolve(fixtureRoot, "risk-approval.json");
+  const approvedPromptPath = resolve(fixtureRoot, "approved-risk-prompt.txt");
+  const request = riskActionReport.execution_envelope_record.envelope.risk_approval.request;
+  const approvalBytes = `${JSON.stringify({
+    schema_version: "1.0.0",
+    kind: "codex_risk_approval",
+    decision: "approved",
+    request,
+    request_sha256: request.request_sha256,
+  }, null, 2)}\n`;
+  writeFileSync(approvalPath, approvalBytes);
+  const approvedRiskResult = runNode([
+    ...riskArgs,
+    "--risk-approval", approvalPath,
+    "--risk-approval-sha256", hashText(approvalBytes),
+  ], {
+    cwd: target,
+    env: {
+      ASK_FAKE_RESULT_PATH: resolve(target, ".fixture-implementation.json"),
+      ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
+      ASK_FAKE_STDIN_PATH: approvedPromptPath,
+    },
+  });
+  assertPass("exact risk approval executes once", approvedRiskResult);
+  const approvedRiskReport = JSON.parse(approvedRiskResult.stdout);
+  assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.status, "approved");
+  assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.execution_status, "executed");
+  assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.rendered_invocation_sha256, `sha256:${hashText(readFileSync(approvedPromptPath))}`);
+  assert.equal(readFileSync(approvedPromptPath, "utf8").includes(request.request_sha256), true, "spawn prompt must contain the exact approved request digest");
+  assert.match(readFileSync(approvedPromptPath, "utf8"), /Operation: write_release_candidate/u, "spawn prompt must contain the exact approved operation");
+  assert.match(readFileSync(approvedPromptPath, "utf8"), /Target scope: dist\/release-candidate\.json/u, "spawn prompt must contain the exact approved target scope");
+  assert.match(readFileSync(approvedPromptPath, "utf8"), /Permitted effects: write_release_candidate/u, "spawn prompt must contain exact permitted effects");
+  assert.match(readFileSync(approvedPromptPath, "utf8"), /Prohibited effects: publish_production, write_outside_target_scope/u, "spawn prompt must contain exact prohibited effects");
+  assert.equal(approvedRiskReport.normalized_adapter_event?.approval?.status, "approved");
+  assert.equal(readFileSync(fakeInvocationPath, "utf8").trim().split("\n").length, 3, "exact approval must add exactly one Codex invocation");
+
+  const invocationsBeforeRejectedApprovals = readFileSync(fakeInvocationPath, "utf8");
+  const resealApproval = (mutate) => {
+    const changed = JSON.parse(approvalBytes);
+    mutate(changed.request);
+    const requestWithoutDigest = { ...changed.request };
+    delete requestWithoutDigest.request_sha256;
+    changed.request.request_sha256 = canonicalValueDigest(requestWithoutDigest);
+    changed.request_sha256 = changed.request.request_sha256;
+    return `${JSON.stringify(changed, null, 2)}\n`;
+  };
+  const assertInstalledApprovalRejected = (label, bytes, sha = hashText(bytes)) => {
+    const rejectedPath = resolve(fixtureRoot, `rejected-${label}.json`);
+    writeFileSync(rejectedPath, bytes);
+    const result = runNode([
+      ...riskArgs,
+      "--risk-approval", rejectedPath,
+      "--risk-approval-sha256", sha,
+    ], {
+      cwd: target,
+      env: {
+        ASK_FAKE_RESULT_PATH: resolve(target, ".fixture-implementation.json"),
+        ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
+      },
+    });
+    assert.notEqual(result.status, 0, `${label} approval must stop before Codex`);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.execution_envelope_record?.persisted, true, `${label} rejection Envelope must persist`);
+    assert.equal(report.execution_envelope_record?.envelope?.risk_approval?.status, "rejected", `${label} rejection status`);
+    assert.equal(report.execution_envelope_record?.envelope?.risk_approval?.execution_status, "not_executed", `${label} execution status`);
+    assert.equal(report.normalized_adapter_event?.approval?.status, "rejected", `${label} normalized approval status`);
+    assert.equal(readFileSync(fakeInvocationPath, "utf8"), invocationsBeforeRejectedApprovals, `${label} rejection must not invoke Codex`);
+  };
+
+  const approvedExecutableBytes = readFileSync(fakeCodex);
+  writeFileSync(fakeCodex, Buffer.concat([approvedExecutableBytes, Buffer.from("\n# executable identity drift\n", "utf8")]));
+  chmodSync(fakeCodex, 0o755);
+  assertInstalledApprovalRejected("executable-digest", approvalBytes);
+  writeFileSync(fakeCodex, approvedExecutableBytes);
+  chmodSync(fakeCodex, 0o755);
+
+  assertInstalledApprovalRejected("stale-head", resealApproval((value) => { value.invocation.repository.head_sha = "0".repeat(40); }));
+  assertInstalledApprovalRejected("broader-effects", resealApproval((value) => {
+    value.action.permitted_effects = ["publish_production", "write_release_candidate"];
+    value.invocation.permitted_effects = ["publish_production", "write_release_candidate"];
+    value.action_sha256 = canonicalValueDigest(value.action);
+    value.invocation_sha256 = canonicalValueDigest(value.invocation);
+  }));
+  assertInstalledApprovalRejected("raw-digest", approvalBytes, "0".repeat(64));
+
+  assertPass("switch fixture to unrelated origin", runGit(["remote", "set-url", "origin", "https://github.com/example/unrelated-target.git"]));
+  const unrelatedAction = JSON.parse(readFileSync(riskActionPath, "utf8"));
+  unrelatedAction.repository_id = "github.com/example/unrelated-target";
+  writeFileSync(riskActionPath, `${JSON.stringify(unrelatedAction, null, 2)}\n`);
+  assertInstalledApprovalRejected("unrelated-repository", approvalBytes);
+  assertPass("restore fixture origin", runGit(["remote", "set-url", "origin", "https://github.com/example/conformance-target.git"]));
+  unrelatedAction.repository_id = "github.com/example/conformance-target";
+  writeFileSync(riskActionPath, `${JSON.stringify(unrelatedAction, null, 2)}\n`);
+
+  const missingCapabilityRiskArgs = [
+    ...riskArgs,
+    "--required-gate", "missing-capability",
+  ];
+  const missingCapabilityRequestResult = runNode(missingCapabilityRiskArgs, {
+    cwd: target,
+    env: {
+      ASK_FAKE_RESULT_PATH: resolve(target, ".fixture-implementation.json"),
+      ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
+    },
+  });
+  assert.notEqual(missingCapabilityRequestResult.status, 0, "missing-capability risk action must first request approval");
+  const missingCapabilityRequest = JSON.parse(missingCapabilityRequestResult.stdout).execution_envelope_record.envelope.risk_approval.request;
+  const missingCapabilityApprovalPath = resolve(fixtureRoot, "missing-capability-risk-approval.json");
+  const missingCapabilityApprovalBytes = `${JSON.stringify({
+    schema_version: "1.0.0",
+    kind: "codex_risk_approval",
+    decision: "approved",
+    request: missingCapabilityRequest,
+    request_sha256: missingCapabilityRequest.request_sha256,
+  }, null, 2)}\n`;
+  writeFileSync(missingCapabilityApprovalPath, missingCapabilityApprovalBytes);
+  const capabilityBlockedRiskResult = runNode([
+    ...missingCapabilityRiskArgs,
+    "--risk-approval", missingCapabilityApprovalPath,
+    "--risk-approval-sha256", hashText(missingCapabilityApprovalBytes),
+  ], {
+    cwd: target,
+    env: {
+      ASK_FAKE_RESULT_PATH: resolve(target, ".fixture-implementation.json"),
+      ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
+    },
+  });
+  assert.notEqual(capabilityBlockedRiskResult.status, 0, "exact approval cannot bypass a missing capability");
+  const capabilityBlockedRiskReport = JSON.parse(capabilityBlockedRiskResult.stdout);
+  assert.equal(capabilityBlockedRiskReport.execution_envelope_record?.envelope?.risk_approval?.status, "approved");
+  assert.equal(capabilityBlockedRiskReport.execution_envelope_record?.envelope?.risk_approval?.execution_status, "not_executed");
+  assert.equal(capabilityBlockedRiskReport.execution_envelope_record?.envelope?.stop_reason?.status, "capability_missing");
+  assert.equal(readFileSync(fakeInvocationPath, "utf8").trim().split("\n").length, 3, "exact approval with a missing capability must not invoke Codex");
 
   const recordDirectory = resolve(target, ".agent-spectrum-kernel/runtime/execution-envelopes");
   const fencedExampleResultPath = resolve(target, ".fixture-fenced-example.json");
