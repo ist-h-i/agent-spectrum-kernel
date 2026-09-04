@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-spectrum-kernel.local/benchmarks/schemas/prompt-v2-comparison-report.schema.json",
+  "title": "Prompt v2 adapter-separated comparison report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "schema_path", "artifact_type", "program", "preregistration_id",
+    "preregistration_digest", "authority_binding_digest", "plan_id", "plan_digest", "materialization_id",
+    "materialization_digest", "run_instance_id", "resume_state_digest", "thresholds_digest",
+    "adapter_reports", "repository_outcome", "pool_adapter_results", "boundaries", "report_id", "report_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/prompt-v2-comparison-report.schema.json" },
+    "artifact_type": { "const": "prompt_v2_comparison_report" },
+    "program": { "const": "ask_prompt_v2_result_blind_canary" },
+    "preregistration_id": { "type": "string", "minLength": 1 }, "preregistration_digest": { "$ref": "#/$defs/digest" },
+    "authority_binding_digest": { "$ref": "#/$defs/digest" }, "plan_id": { "type": "string", "minLength": 1 }, "plan_digest": { "$ref": "#/$defs/digest" },
+    "materialization_id": { "type": "string", "minLength": 1 }, "materialization_digest": { "$ref": "#/$defs/digest" },
+    "run_instance_id": { "type": "string", "format": "uuid" }, "resume_state_digest": { "$ref": "#/$defs/digest" }, "thresholds_digest": { "$ref": "#/$defs/digest" },
+    "adapter_reports": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/adapterReport" } },
+    "repository_outcome": { "$ref": "#/$defs/outcome" }, "pool_adapter_results": { "const": false },
+    "boundaries": {
+      "type": "object", "additionalProperties": false,
+      "required": ["raw_score_recomputed", "raw_prompt_serialized", "raw_output_serialized", "private_evaluator_serialized", "authoritative_recommendation", "decision_or_activation_implied"],
+      "properties": {
+        "raw_score_recomputed": { "const": false }, "raw_prompt_serialized": { "const": false }, "raw_output_serialized": { "const": false },
+        "private_evaluator_serialized": { "const": false }, "authoritative_recommendation": { "const": false }, "decision_or_activation_implied": { "const": false }
+      }
+    },
+    "report_id": { "type": "string", "pattern": "^prompt-v2-report-[a-f0-9]{32}$" }, "report_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "outcome": { "enum": ["insufficient_evidence", "revise_and_repeat", "retain_current", "adopt_prompt_v2"] },
+    "stat": {
+      "type": "object", "additionalProperties": false, "required": ["status", "value"],
+      "properties": { "status": { "enum": ["known", "unknown", "unavailable", "not_applicable"] }, "value": { "type": ["number", "null"] } }
+    },
+    "resultRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["case_id", "normalized_result_id", "normalized_result_digest", "status"],
+      "properties": {
+        "case_id": { "type": "string", "minLength": 1 }, "normalized_result_id": { "type": "string", "minLength": 1 },
+        "normalized_result_digest": { "$ref": "#/$defs/digest" }, "status": { "enum": ["scoring_ready", "not_scoring_ready", "unavailable"] }
+      }
+    },
+    "fixtureQuality": {
+      "type": "object", "additionalProperties": false,
+      "required": ["fixture_id", "expected_pairs", "eligible_pairs", "median_delta", "nonnegative_count", "required_nonnegative_count", "pass"],
+      "properties": {
+        "fixture_id": { "type": "string", "minLength": 1 }, "expected_pairs": { "type": "integer", "minimum": 1 }, "eligible_pairs": { "type": "integer", "minimum": 0 },
+        "median_delta": { "$ref": "#/$defs/stat" }, "nonnegative_count": { "type": ["integer", "null"], "minimum": 0 }, "required_nonnegative_count": { "type": "integer", "minimum": 1 },
+        "pass": { "type": ["boolean", "null"] }
+      }
+    },
+    "tokenStats": {
+      "type": "object", "additionalProperties": false,
+      "required": ["eligible_pairs", "current_median_total_tokens", "prompt_v2_median_total_tokens", "current_median_cached_tokens", "prompt_v2_median_cached_tokens", "median_reduction_ratio", "pairs_meeting_threshold", "required_pairs_meeting_threshold", "current_normalized_mad", "prompt_v2_normalized_mad", "variability_floor", "pass"],
+      "properties": {
+        "eligible_pairs": { "type": "integer", "minimum": 0 }, "median_reduction_ratio": { "$ref": "#/$defs/stat" },
+        "current_median_total_tokens": { "$ref": "#/$defs/stat" }, "prompt_v2_median_total_tokens": { "$ref": "#/$defs/stat" },
+        "current_median_cached_tokens": { "$ref": "#/$defs/stat" }, "prompt_v2_median_cached_tokens": { "$ref": "#/$defs/stat" },
+        "pairs_meeting_threshold": { "type": ["integer", "null"], "minimum": 0 }, "required_pairs_meeting_threshold": { "type": "integer", "minimum": 1 },
+        "current_normalized_mad": { "$ref": "#/$defs/stat" }, "prompt_v2_normalized_mad": { "$ref": "#/$defs/stat" }, "variability_floor": { "$ref": "#/$defs/stat" },
+        "pass": { "type": ["boolean", "null"] }
+      }
+    },
+    "durationStats": {
+      "type": "object", "additionalProperties": false,
+      "required": ["eligible_pairs", "current_median_duration_ms", "prompt_v2_median_duration_ms", "median_increase_ratio", "median_quality_gain", "current_quality_mad", "prompt_v2_quality_mad", "variability_floor", "conditional_path_used", "pass"],
+      "properties": {
+        "eligible_pairs": { "type": "integer", "minimum": 0 }, "median_increase_ratio": { "$ref": "#/$defs/stat" }, "median_quality_gain": { "$ref": "#/$defs/stat" },
+        "current_median_duration_ms": { "$ref": "#/$defs/stat" }, "prompt_v2_median_duration_ms": { "$ref": "#/$defs/stat" },
+        "current_quality_mad": { "$ref": "#/$defs/stat" }, "prompt_v2_quality_mad": { "$ref": "#/$defs/stat" }, "variability_floor": { "$ref": "#/$defs/stat" },
+        "conditional_path_used": { "type": ["boolean", "null"] }, "pass": { "type": ["boolean", "null"] }
+      }
+    },
+    "adapterReport": {
+      "type": "object", "additionalProperties": false,
+      "required": ["adapter_track", "expected_cases", "terminal_cases", "scoring_ready_cases", "unavailable_cases", "not_scoring_ready_cases", "inventory_complete", "scoring_complete", "fixture_quality", "quality_regression", "guardrail_regression_fields", "route_gate_regression_fields", "tokens", "duration", "stability_complete", "result_refs", "prompt_outcome"],
+      "properties": {
+        "adapter_track": { "enum": ["codex", "claude"] }, "expected_cases": { "const": 28 }, "terminal_cases": { "type": "integer", "minimum": 0, "maximum": 28 },
+        "scoring_ready_cases": { "type": "integer", "minimum": 0, "maximum": 28 }, "unavailable_cases": { "type": "integer", "minimum": 0, "maximum": 28 },
+        "not_scoring_ready_cases": { "type": "integer", "minimum": 0, "maximum": 28 }, "inventory_complete": { "type": "boolean" }, "scoring_complete": { "type": "boolean" },
+        "fixture_quality": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "$ref": "#/$defs/fixtureQuality" } }, "quality_regression": { "type": ["boolean", "null"] },
+        "guardrail_regression_fields": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }, "route_gate_regression_fields": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "tokens": { "$ref": "#/$defs/tokenStats" }, "duration": { "$ref": "#/$defs/durationStats" }, "stability_complete": { "type": "boolean" },
+        "result_refs": { "type": "array", "maxItems": 28, "items": { "$ref": "#/$defs/resultRef" } }, "prompt_outcome": { "$ref": "#/$defs/outcome" }
+      }
+    }
+  }
+}

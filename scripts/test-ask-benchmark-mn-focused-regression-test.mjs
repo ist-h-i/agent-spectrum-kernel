@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -41,6 +41,10 @@ const FINDING_SEEDS = [
   ["focused-change-scope-not-met", "incorrect_decision", "medium"],
   ["missing-or-inaccurate-verification-evidence", "insufficient_evidence", "medium"],
 ];
+const FRESH_COVERAGE_CLASSES = new Set(["positive", "regression", "production", "scope", "verification", "evidence_removal", "equivalence", "malformed"]);
+const REQUIRED_FRESH_COVERAGE = ["regression", "production", "scope", "verification", "evidence_removal", "equivalence", "malformed"];
+const HISTORICAL_REVIEWED_HEAD = "c0804424e5c31ff7c27f38fe39d2380627dcd07d";
+const FRESH_CASE_PAYLOAD_DIGEST = "sha256:0c260a43bd3f5c87ef877b5c209e2a7c974985a7da233b2a10ffb9b04c0c5f0f";
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -52,6 +56,53 @@ function clone(value) {
 
 function digestBytes(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function gitBytes(revision, path) {
+  return execFileSync("git", ["-C", ROOT, "show", `${revision}:${path}`]);
+}
+
+function validateHistoricalPublicInputInvariance() {
+  const paths = [
+    `${FIXTURE_ROOT_RELATIVE}/task.md`,
+    `${FIXTURE_ROOT_RELATIVE}/input-manifest.json`,
+    `${FIXTURE_ROOT_RELATIVE}/verification-command-contract.json`,
+    ...readJson(resolve(FIXTURE_ROOT, "input-manifest.json")).fixtures[FIXTURE_ID].files.map(({ path }) => `${FIXTURE_ROOT_RELATIVE}/${path}`),
+  ];
+  for (const path of paths) assert.deepEqual(readFileSync(resolve(ROOT, path)), gitBytes(HISTORICAL_REVIEWED_HEAD, path), `${path} must remain byte-identical to the historical reviewed public input`);
+}
+
+function validateFreshPrivateSourceContract({ privateRoot, caseRoot }, { sourceOnly }) {
+  const sourceNames = ["authenticated-generic-loader.mjs", "hidden-evaluator.mjs", "human-instructions.md", "oracle.json", "rubric.md", "scope-boundaries.json"];
+  const generatedNames = ["dependency-graph.json", "equivalent-solutions.json", "evidence-removal-mutations.json", "independence.json", "private-evaluator-bundle.json"];
+  assert.deepEqual(readdirSync(privateRoot).sort(), [...sourceNames, ...(sourceOnly ? [] : generatedNames)].sort(), "fresh mn private root inventory must be closed for its generation phase");
+  for (const name of sourceNames) assert.ok(lstatSync(resolve(privateRoot, name)).isFile() && !lstatSync(resolve(privateRoot, name)).isSymbolicLink(), `${name} must be a regular source file`);
+  assert.deepEqual(readdirSync(caseRoot).sort(), ["cases.json"], "fresh mn case root must be closed");
+  const cases = readJson(resolve(caseRoot, "cases.json"));
+  assert.equal(canonicalDigest(cases), FRESH_CASE_PAYLOAD_DIGEST, "fresh mn behavior-bearing case payload must remain independently frozen");
+  const duplicatedPayload = clone(cases);
+  duplicatedPayload.cases[1].test_source = duplicatedPayload.cases[0].test_source;
+  assert.notEqual(canonicalDigest(duplicatedPayload), FRESH_CASE_PAYLOAD_DIGEST, "fresh mn payload duplication must invalidate the independent case digest");
+  assert.deepEqual(Object.keys(cases).sort(), ["cases", "fixture_id"], "fresh mn cases top-level fields must be closed");
+  assert.equal(cases.fixture_id, FIXTURE_ID);
+  assert.ok(Array.isArray(cases.cases) && cases.cases.length > 0);
+  assert.equal(new Set(cases.cases.map(({ case_id }) => case_id)).size, cases.cases.length, "fresh mn case IDs must be unique");
+  const allowed = new Set(["case_id", "coverage_class", "test_source", "expected_passes", "expected_evidence_correctness", "expected_classification", "expected_scope_deviation", "verification_state", "append_files", "new_files", "replacements", "rename_paths", "delete_paths", "directory_paths", "mode_changes", "control"]);
+  for (const entry of cases.cases) {
+    assert.match(entry.case_id ?? "", /^[a-z0-9][a-z0-9-]*$/u);
+    assert.ok(FRESH_COVERAGE_CLASSES.has(entry.coverage_class), `${entry.case_id} coverage class`);
+    assert.ok(Object.keys(entry).every((key) => allowed.has(key)), `${entry.case_id} contains an unknown field`);
+    assert.ok(Array.isArray(entry.expected_passes) && entry.expected_passes.length === REQUIREMENT_IDS.length && entry.expected_passes.every((value) => typeof value === "boolean"), `${entry.case_id} pass vector`);
+    assert.ok(["pass", "fail"].includes(entry.expected_evidence_correctness), `${entry.case_id} evidence correctness`);
+    assert.ok(["correct_narrow_execution", "under_processing", "over_processing", "invalid_evidence"].includes(entry.expected_classification), `${entry.case_id} classification`);
+  }
+  for (const coverageClass of REQUIRED_FRESH_COVERAGE) assert.ok(cases.cases.some((entry) => entry.coverage_class === coverageClass), `fresh mn cases require ${coverageClass} coverage`);
+  for (let index = 0; index < REQUIREMENT_IDS.length; index += 1) assert.ok(cases.cases.some((entry) => entry.expected_passes[index] === false), `${REQUIREMENT_IDS[index]} requires a non-pass case`);
+  assert.ok(cases.cases.some((entry) => typeof entry.test_source === "string" && entry.test_source.length > 0), "fresh mn cases require an executable reference test source");
+  const source = readFileSync(resolve(ROOT, "scripts/ask-benchmark-mn-focused-regression-test-authority.mjs"), "utf8");
+  assert.match(source, /current_canonical_public_contracts/u);
+  assert.match(source, /historical_private_case_review_bytes_not_reconstructed/u);
+  return { cases: cases.cases.length, source_files: sourceNames.length };
 }
 
 function privateArgs(argv) {
@@ -99,7 +150,11 @@ function portableStates(root, current = root) {
   return states;
 }
 
-function repositoryDiffArtifact(frozen, candidate) {
+function repositoryDiffArtifactForEntries(diffEntries, lineage) {
+  return { run_instance_id: lineage.run_instance_id, case_id: lineage.case_id, attempt: lineage.attempt, artifact_digest: canonicalDigest(diffEntries), artifact_bytes: Buffer.byteLength(stableCanonicalJson(diffEntries)) || 1, diff_entries: diffEntries };
+}
+
+function repositoryDiffArtifact(frozen, candidate, lineage) {
   const before = portableStates(frozen);
   const after = portableStates(candidate);
   const diffEntries = [...new Set([...before.keys(), ...after.keys()])].sort().flatMap((path) => {
@@ -108,7 +163,7 @@ function repositoryDiffArtifact(frozen, candidate) {
     if (stableCanonicalJson(frozenState) === stableCanonicalJson(candidateState)) return [];
     return [{ path, change_type: frozenState === null ? "addition" : candidateState === null ? "deletion" : "modification", before: frozenState, after: candidateState }];
   });
-  return { artifact_digest: canonicalDigest(diffEntries), artifact_bytes: Buffer.byteLength(stableCanonicalJson(diffEntries)) || 1, diff_entries: diffEntries };
+  return repositoryDiffArtifactForEntries(diffEntries, lineage);
 }
 
 function commandEvidence(caseEntry) {
@@ -333,7 +388,7 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   const work = mkdtempSync(resolve(tmpdir(), "mn-focused-regression-private-"));
   const cases = readJson(resolve(caseRoot, "cases.json"));
   assert.equal(cases.fixture_id, FIXTURE_ID);
-  assert.equal(cases.cases.length, 46, "private regression inventory must remain closed");
+  assert.ok(cases.cases.length > 0, "private regression inventory must not be empty");
   assert.equal(new Set(cases.cases.map(({ case_id }) => case_id)).size, cases.cases.length);
   let production = null;
   let externalAuthorityAnchor = null;
@@ -430,7 +485,7 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
     cpSync(frozen, candidate, { recursive: true });
     applyCase(candidate, entry);
     const normalized = normalizedResult(entry, index);
-    let diffArtifact = repositoryDiffArtifact(frozen, candidate);
+    let diffArtifact = repositoryDiffArtifact(frozen, candidate, normalized.lineage);
     let sealedExecution = null;
     if (productionExists) {
       sealedExecution = createSealedEvaluatorExecutionForTest({
@@ -518,9 +573,28 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       assert.equal(first.requirement_results[0].outcome, "fail", "candidate-originated fd4 data must not establish authenticated behavior coverage");
     }
     if (index === 0) {
-      const invalidDiff = clone(diffArtifact);
-      invalidDiff.artifact_digest = `sha256:${"0".repeat(64)}`;
-      await assert.rejects(evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult: normalized, repositoryDiffArtifact: invalidDiff }), /repository diff byte authority/u, "repository diff transplant must fail closed");
+      for (const [label, mutate] of [
+        ["digest", (artifact) => { artifact.artifact_digest = `sha256:${"0".repeat(64)}`; }],
+        ["bytes", (artifact) => { artifact.artifact_bytes += 1; }],
+      ]) {
+        const invalidDiff = clone(diffArtifact);
+        mutate(invalidDiff);
+        await assert.rejects(evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult: normalized, repositoryDiffArtifact: invalidDiff }), /repository diff byte authority/u, `repository diff ${label} transplant must fail closed`);
+      }
+      for (const field of ["run_instance_id", "case_id", "attempt"]) {
+        const wrongLineage = clone(diffArtifact);
+        wrongLineage[field] = `${wrongLineage[field]}-transplanted`;
+        await assert.rejects(evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult: normalized, repositoryDiffArtifact: wrongLineage }), /repository diff lineage authority/u, `repository diff ${field} transplant must fail closed`);
+      }
+      for (const [label, diffEntries] of [
+        ["deletion", [{ path: "test/session-key.test.mjs", change_type: "deletion", before: { file_type: "file" }, after: null }]],
+        ["addition", [{ path: "test/session-key.test.mjs", change_type: "addition", before: null, after: { file_type: "file" } }]],
+        ["symlink", [{ path: "test/session-key.test.mjs", change_type: "modification", before: { file_type: "file" }, after: { file_type: "symlink" } }]],
+      ]) {
+        const invalidScope = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult: normalized, repositoryDiffArtifact: repositoryDiffArtifactForEntries(diffEntries, normalized.lineage) });
+        assert.equal(invalidScope.classification, "over_processing", `repository diff ${label} must fail the exact focused-test scope`);
+        assert.deepEqual(invalidScope.scope_deviations.map(({ finding_id }) => finding_id), ["unauthorized-candidate-change"], `repository diff ${label} must emit the scope finding`);
+      }
     }
     if (sealedExecution) {
       const sealed = executeSealedEvaluatorForTest({ execution: sealedExecution, externalAuthorityAnchor, repositoryRoot: ROOT, normalized, label: `mn-focused-regression sealed ${entry.case_id} evaluator` });
@@ -528,19 +602,6 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       assert.deepEqual(sealed.firstFragment, first, `${entry.case_id} direct/production-safe evaluator agreement`);
     }
   }
-  assert.ok(cases.cases.some(({ case_id }) => case_id === "focused-test-replaced-by-directory"), "directory type replacement must remain in the private case inventory");
-  assert.ok(cases.cases.some(({ case_id }) => case_id === "patched-trim-masks-real-source-mutation"), "real source mutation masking must remain in the private case inventory");
-  assert.ok(cases.cases.some(({ case_id }) => case_id === "lowercase-mechanism-observation-without-output"), "mechanism-observation negative must remain in the private case inventory");
-  assert.ok(cases.cases.some(({ case_id }) => case_id === "mixed-case-only-replaces-existing-suite"), "existing observable coverage retention must remain in the private case inventory");
-  for (const caseId of [
-    "generic-loader-source-answer-neutral",
-    "stdin-trial-authority-is-closed",
-    "forged-fd4-observation-record",
-    "exec-argv-does-not-disclose-variant",
-    "inherited-environment-authority-unavailable",
-    "network-entry-denied-before-connect",
-    "control-mutant-order-state-isolated",
-  ]) assert.ok(cases.cases.some(({ case_id }) => case_id === caseId), `${caseId} must remain in the private case inventory`);
   const symlinkControls = [
     { caseId: "focused-test-replaced-by-symlink", path: "test/session-key.test.mjs", target: "../src/session-key.mjs" },
     { caseId: "protected-source-replaced-by-symlink", path: "src/session-key.mjs", target: "../spec/session-key.md" },
@@ -555,7 +616,7 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
     symlinkSync(control.target, target);
     const entry = { case_id: control.caseId };
     const normalized = normalizedResult(entry, cases.cases.length + controlIndex);
-    const diffArtifact = repositoryDiffArtifact(frozen, candidate);
+    const diffArtifact = repositoryDiffArtifact(frozen, candidate, normalized.lineage);
     const changed = diffArtifact.diff_entries.find(({ path }) => path === control.path);
     assert.equal(changed?.before?.file_type, "file", `${control.caseId} frozen path must remain a regular file`);
     assert.equal(changed?.after?.file_type, "symlink", `${control.caseId} repository diff must retain the symlink type`);
@@ -649,10 +710,13 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
 function validateReviewArchive({ privateRoot, caseRoot }) {
   const work = mkdtempSync(resolve(tmpdir(), "mn-focused-regression-review-archive-"));
   const reviewedHead = spawnSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).stdout.trim();
+  const sourceRevision = process.env.SOURCE_REVISION;
+  assert.match(sourceRevision ?? "", /^[a-f0-9]{40}$/u, "SOURCE_REVISION is required for review archive validation");
+  assert.equal(process.env.REVIEW_CANDIDATE_HEAD, reviewedHead, "REVIEW_CANDIDATE_HEAD must equal the exact repository HEAD");
   const firstPath = resolve(work, "first.zip");
   const secondPath = resolve(work, "second.zip");
-  const first = generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath: firstPath, reviewedHead });
-  const second = generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath: secondPath, reviewedHead });
+  const first = generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath: firstPath, reviewedHead, sourceRevision });
+  const second = generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath: secondPath, reviewedHead, sourceRevision });
   assert.deepEqual({ ...first, archivePath: null }, { ...second, archivePath: null }, "review archive identity must be deterministic");
   assert.deepEqual(readFileSync(firstPath), readFileSync(secondPath), "review archive bytes must be deterministic");
   const integrity = spawnSync("unzip", ["-tqq", firstPath], { encoding: "utf8" });
@@ -660,6 +724,7 @@ function validateReviewArchive({ privateRoot, caseRoot }) {
   const names = spawnSync("unzip", ["-Z1", firstPath], { encoding: "utf8" }).stdout.trim().split("\n");
   const manifest = JSON.parse(spawnSync("unzip", ["-p", firstPath, "REVIEW-MANIFEST.json"], { encoding: "utf8" }).stdout);
   assert.equal(manifest.reviewed_repository_head, reviewedHead);
+  assert.equal(manifest.evaluator_source_revision, sourceRevision);
   assert.equal(manifest.evaluator_bundle_id, readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).evaluator_bundle_id);
   assert.equal(manifest.evaluator_bundle_digest, readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).evaluator_bundle_digest);
   assert.equal(manifest.independent_review_status, "pending");
@@ -679,41 +744,65 @@ function validateReviewArchive({ privateRoot, caseRoot }) {
     "private-cases/cases.json",
   ]) assert.ok(names.includes(path), `review archive must include ${path}`);
 
-  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath: resolve(work, "wrong-head.zip"), reviewedHead: "0".repeat(40) }), /reviewed HEAD/u, "review archive wrong HEAD");
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath: resolve(work, "wrong-head.zip"), reviewedHead: "0".repeat(40), sourceRevision }), /reviewed HEAD/u, "review archive wrong HEAD");
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath: resolve(work, "collapsed-revisions.zip"), reviewedHead, sourceRevision: reviewedHead }), /must be distinct/u, "review archive collapsed source/review revisions");
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath: resolve(work, "stale-source.zip"), reviewedHead, sourceRevision: "0".repeat(40) }), /source revision|SOURCE_REVISION|evaluator/u, "review archive stale source revision");
   const trackedDrift = validationCopy("review-archive-tracked-drift");
+  spawnSync("git", ["-C", trackedDrift, "remote", "set-url", "origin", "https://github.com/ist-h-i/agent-spectrum-kernel.git"]);
   writeFileSync(resolve(trackedDrift, FIXTURE_ROOT_RELATIVE, "task.md"), `${readFileSync(resolve(trackedDrift, FIXTURE_ROOT_RELATIVE, "task.md"), "utf8")}\nDrift.\n`);
-  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: trackedDrift, privateRoot, caseRoot, outputPath: resolve(work, "tracked-drift.zip"), reviewedHead }), /tracked bytes differ/u, "review archive tracked-byte drift");
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: trackedDrift, privateRoot, caseRoot, outputPath: resolve(work, "tracked-drift.zip"), reviewedHead, sourceRevision }), /tracked bytes differ/u, "review archive tracked-byte drift");
   const driftedPrivate = resolve(work, "drifted-private");
   cpSync(privateRoot, driftedPrivate, { recursive: true });
   const driftedBundlePath = resolve(driftedPrivate, "private-evaluator-bundle.json");
   const driftedBundle = readJson(driftedBundlePath);
   driftedBundle.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`;
   writeFileSync(driftedBundlePath, `${JSON.stringify(driftedBundle, null, 2)}\n`);
-  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot: driftedPrivate, caseRoot, outputPath: resolve(work, "drifted-private.zip"), reviewedHead }), /private bundle differs/u, "review archive private/public transplant");
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot: driftedPrivate, caseRoot, outputPath: resolve(work, "drifted-private.zip"), reviewedHead, sourceRevision }), /private bundle differs/u, "review archive private/public transplant");
   const driftedAsset = resolve(work, "drifted-asset");
   cpSync(privateRoot, driftedAsset, { recursive: true });
   writeFileSync(resolve(driftedAsset, "hidden-evaluator.mjs"), `${readFileSync(resolve(driftedAsset, "hidden-evaluator.mjs"), "utf8")}\n// drift\n`);
-  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot: driftedAsset, caseRoot, outputPath: resolve(work, "drifted-asset.zip"), reviewedHead }), /private asset bytes/u, "review archive private asset drift");
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot: driftedAsset, caseRoot, outputPath: resolve(work, "drifted-asset.zip"), reviewedHead, sourceRevision }), /private asset bytes/u, "review archive private asset drift");
   const transplantedCases = resolve(work, "transplanted-cases");
   cpSync(caseRoot, transplantedCases, { recursive: true });
   const transplantedCasesPath = resolve(transplantedCases, "cases.json");
   const transplantedCaseAuthority = readJson(transplantedCasesPath);
   transplantedCaseAuthority.fixture_id = "foreign-fixture";
   writeFileSync(transplantedCasesPath, `${JSON.stringify(transplantedCaseAuthority, null, 2)}\n`);
-  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot: transplantedCases, outputPath: resolve(work, "transplanted-cases.zip"), reviewedHead }), /case identity/u, "review archive private case transplant");
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot: transplantedCases, outputPath: resolve(work, "transplanted-cases.zip"), reviewedHead, sourceRevision }), /case identity/u, "review archive private case transplant");
   const symlinkedPrivate = resolve(work, "symlinked-private");
   cpSync(privateRoot, symlinkedPrivate, { recursive: true });
   symlinkSync("oracle.json", resolve(symlinkedPrivate, "oracle-link.json"));
-  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot: symlinkedPrivate, caseRoot, outputPath: resolve(work, "symlinked-private.zip"), reviewedHead }), /symlink/u, "review archive private symlink");
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot: symlinkedPrivate, caseRoot, outputPath: resolve(work, "symlinked-private.zip"), reviewedHead, sourceRevision }), /symlink/u, "review archive private symlink");
   return { rawSha256: first.archiveSha256, rawBytes: first.archiveBytes, entryCount: first.entryCount };
+}
+
+function validateReviewArchiveOutputBoundary() {
+  const work = mkdtempSync(resolve(tmpdir(), "mn-focused-review-output-boundary-"));
+  try {
+    const privateRoot = resolve(work, "private");
+    const caseRoot = resolve(work, "cases");
+    mkdirSync(privateRoot);
+    mkdirSync(caseRoot);
+    const reviewedHead = spawnSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).stdout.trim();
+    for (const [outputPath, label] of [
+      [resolve(ROOT, "forbidden-review.zip"), "repository"],
+      [resolve(privateRoot, "forbidden-review.zip"), "private root"],
+      [resolve(caseRoot, "forbidden-review.zip"), "case root"],
+    ]) expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath, reviewedHead }), /output must stay outside/u, `review archive output inside ${label}`);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 }
 
 validateFrozenDesign();
 validateMnFocusedRegressionTestInputClosure({ root: ROOT });
+validateHistoricalPublicInputInvariance();
 validateVisibleScenario();
 validatePublicNegativeCoverage();
+validateReviewArchiveOutputBoundary();
 
-const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
+const publicContractOnly = process.argv.includes("--public-contract-only");
+const productionExists = !publicContractOnly && readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
 let effectiveAdmissionStatus = "admission_pending";
 if (productionExists) {
   const production = validateMnFocusedRegressionTestProductionAuthority({ root: ROOT });
@@ -735,6 +824,7 @@ if (productionExists) {
 }
 
 const requested = privateArgs(process.argv.slice(2));
+const sourceSummary = requested ? validateFreshPrivateSourceContract(requested, { sourceOnly: publicContractOnly }) : null;
 const privateSummary = requested ? await validatePrivateCases({ ...requested, productionExists }) : null;
-const reviewArchiveSummary = requested ? validateReviewArchive(requested) : null;
-console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), ...(reviewArchiveSummary ? { review_archive_validation: reviewArchiveSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));
+const reviewArchiveSummary = requested && productionExists ? validateReviewArchive(requested) : null;
+console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", historical_public_input_invariance: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? publicContractOnly ? "source_behavior_pass" : "pass" : "not_supplied", ...(sourceSummary ? { fresh_source_summary: sourceSummary } : {}), ...(privateSummary ? { private_summary: privateSummary } : {}), ...(reviewArchiveSummary ? { review_archive_validation: reviewArchiveSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));

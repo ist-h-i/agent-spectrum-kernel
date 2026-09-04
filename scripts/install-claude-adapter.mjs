@@ -4,12 +4,14 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
 import { ADAPTER_RENDERER_METADATA, CLAUDE_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
+import { renderClaudeFixedEntryProfile, measureClaudeFixedEntryProfiles } from "./claude-fixed-entry-profile.mjs";
+import { FIXED_ENTRY_NAMES, fixedEntryCanonicalPaths, fixedEntryDirectTriggers } from "./fixed-entry-profile.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const STATE_PATH = ".agent-spectrum-kernel/claude-install-state.json";
 const CANONICAL_REGISTRY_PATH = "schemas/review-signal-gate-map.json";
-const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_IMMUTABLE_CONTRACT_ASSETS;
+const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_OWNED_IMMUTABLE_ASSETS;
 const CORE_PRESERVE_PATHS = [CANONICAL_REGISTRY_PATH, ...CORE_OWNED_IMMUTABLE_ASSETS];
 const DEFAULT_PROFILE = "full";
 const HOOK_MARKER = "agent-spectrum-kernel:claude-adapter-hook";
@@ -72,29 +74,30 @@ const COMMAND_TEMPLATES = [
   "skill-report.md",
   "skill-ledger-refresh.md",
 ];
+const FIXED_ENTRY_COMMANDS = new Set(FIXED_ENTRY_NAMES);
 const RUNTIME_DIRECTORIES = [
   "docs/ai/metrics",
   "docs/ai/reports",
 ];
 const COMMAND_METADATA = {
   "skill-review.md": {
-    requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
-    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-traceability-contract.md"],
+    requiredSkills: ["review-router", "review-ai-quality", "review-final-merge-gate", "risk-gate"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-traceability-contract.md", "docs/review-finding-contract.md", "schemas/review-finding.schema.json"],
   },
   "skill-implement.md": {
-    requiredSkills: ["skill-router", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
+    requiredSkills: ["controlled-implementation", "test-first-verification", "risk-gate"],
     requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-investigate.md": {
-    requiredSkills: ["skill-router", "doubt-driven-development", "test-first-verification", "evidence-ledger", "risk-gate"],
+    requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation", "risk-gate"],
     requiredAssets: ["docs/execution-envelope-contract.md"],
   },
   "skill-verify.md": {
-    requiredSkills: ["test-first-verification", "evidence-ledger"],
+    requiredSkills: ["test-first-verification", "risk-gate"],
     requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-handoff.md": {
-    requiredSkills: ["handoff-generation", "evidence-ledger"],
+    requiredSkills: ["handoff-generation", "risk-gate"],
     requiredAssets: ["docs/agent-session-state-contract.md", "docs/execution-envelope-contract.md"],
     initialProjectStateAssets: [],
     runtimeDirectories: [],
@@ -118,7 +121,7 @@ const COMMAND_METADATA = {
     ],
   },
   "skill-ledger-refresh.md": {
-    requiredSkills: ["operating-mode-router", "domain-rule-ledger", "improvement-ledger", "evidence-ledger"],
+    requiredSkills: ["operating-mode-router", "domain-rule-ledger", "improvement-ledger"],
     requiredAssets: [
       "docs/debt-lifecycle-contract.md",
       "docs/metrics-event-contract.md",
@@ -141,23 +144,17 @@ const SKILL_RELATIONSHIPS = {
   "spec-driven-development": {
     requires: ["work-package-compiler", "test-first-verification", "controlled-implementation"],
   },
+  "review-router": {
+    requires: ["review-ai-quality"],
+  },
   "review-final-merge-gate": {
-    requires: ["review-router"],
+    requires: ["review-router", "review-ai-quality"],
   },
   "release-readiness-gate": {
     requires: ["risk-gate", "evidence-ledger"],
   },
   "project-adoption-pack-generation": {
     requires: ["repository-orientation"],
-  },
-  "skill-adoption-metrics": {
-    requires: ["evidence-ledger"],
-  },
-  "skill-effectiveness-evaluation": {
-    requires: ["evidence-ledger"],
-  },
-  "engineering-capability-evaluation": {
-    requires: ["evidence-ledger"],
   },
 };
 const CLAUDE_PROFILES = {
@@ -302,7 +299,7 @@ const PROFILE_ROUTING_FIXTURES = {
       id: "bug_investigation",
       router: "skill-router",
       selectedRoute: "doubt-driven-development",
-      requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger"],
+      requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation"],
     },
     {
       id: "unfamiliar_repository",
@@ -340,7 +337,6 @@ const PROFILE_ROUTING_FIXTURES = {
         "review-output-quality",
         "review-adversarial-risk",
         "review-final-merge-gate",
-        "evidence-ledger",
         "risk-gate",
         "adr-review",
         "improvement-ledger",
@@ -352,19 +348,19 @@ const PROFILE_ROUTING_FIXTURES = {
       id: "skill_effectiveness",
       router: "operating-mode-router",
       selectedRoute: "skill-effectiveness-evaluation",
-      requiredSkills: ["skill-effectiveness-evaluation", "evidence-ledger"],
+      requiredSkills: ["skill-effectiveness-evaluation"],
     },
     {
       id: "adoption_metrics",
       router: "operating-mode-router",
       selectedRoute: "skill-adoption-metrics",
-      requiredSkills: ["skill-adoption-metrics", "evidence-ledger"],
+      requiredSkills: ["skill-adoption-metrics"],
     },
     {
       id: "capability_evaluation",
       router: "operating-mode-router",
       selectedRoute: "engineering-capability-evaluation",
-      requiredSkills: ["engineering-capability-evaluation", "evidence-ledger"],
+      requiredSkills: ["engineering-capability-evaluation"],
     },
   ],
   full: [],
@@ -621,9 +617,15 @@ function installSkills(args, writes) {
 
 function installCommands(args, writes) {
   for (const command of args.selectedCommands) {
-    const source = resolve(REPO_ROOT, "adapters/claude-code/project/.claude/commands", command);
     const destination = resolve(args.target, ".claude", "commands", command);
-    copyFilePlanned(source, destination, args, writes, { kind: "claude_command", command });
+    const fixedEntry = args.projectionPlan.compactProfileArtifacts?.find((artifact) => artifact.metadata.prompt_name === command);
+    if (FIXED_ENTRY_COMMANDS.has(command)) {
+      if (!fixedEntry) throw new Error(`Claude fixed-entry artifact is missing: ${command}`);
+      writeFilePlanned(destination, fixedEntry.content, args, writes, { kind: "claude_command", command, compact_profile: fixedEntry.metadata });
+    } else {
+      const source = resolve(REPO_ROOT, "adapters/claude-code/project/.claude/commands", command);
+      copyFilePlanned(source, destination, args, writes, { kind: "claude_command", command });
+    }
   }
 }
 
@@ -824,9 +826,33 @@ function requiredAssetsForSkills(skills) {
   return [...assets].sort();
 }
 
-function routingFixturesForProfile(profileName, seedSkills, selectedCommands) {
+function routingFixturesForProfile(profileName, seedSkills, selectedCommands, { customSelection = false } = {}) {
   const selectedRouters = new Set([...seedSkills, ...requiredSkillsForCommands(selectedCommands)]);
-  return (PROFILE_ROUTING_FIXTURES[profileName] ?? []).filter((fixture) => selectedRouters.has(fixture.router));
+  const profileFixtures = PROFILE_ROUTING_FIXTURES[profileName] ?? [];
+  const routedCandidates = profileFixtures
+    .filter((fixture) => selectedRouters.has(fixture.router));
+  const routed = ["implementation", "investigation"].includes(profileName) ? [] : routedCandidates;
+  const availableCapabilities = new Set(selectedRouters);
+  for (const fixture of customSelection ? [] : profileFixtures) {
+    if (fixture.outcome === "capability_missing") continue;
+    if (fixture.selectedRoute) availableCapabilities.add(fixture.selectedRoute);
+    for (const skill of fixture.requiredSkills ?? []) availableCapabilities.add(skill);
+  }
+  const direct = selectedCommands
+    .filter((command) => FIXED_ENTRY_COMMANDS.has(command))
+    .flatMap((command) => fixedEntryDirectTriggers(command).map((trigger) => {
+      const available = availableCapabilities.has(trigger.contract);
+      return {
+        id: trigger.id,
+        signal: trigger.signal,
+        router: "compact-profile-direct-trigger",
+        selectedRoute: trigger.contract,
+        outcome: available ? "available" : "capability_missing",
+        recommendedProfile: available ? null : "organizational",
+        requiredSkills: available ? [trigger.contract] : [],
+      };
+    }));
+  return [...new Map([...routed, ...direct].map((fixture) => [fixture.id, fixture])).values()];
 }
 
 function skillsForRoutingFixtures(routingFixtures) {
@@ -882,8 +908,10 @@ function validateCoreInstalled(args) {
     const sourceContent = readFileSync(resolve(REPO_ROOT, asset), "utf8");
     const record = state?.managed_files?.[asset];
     const targetPath = resolve(args.target, asset);
-    if (record?.kind !== "immutable_contract" || record.sha256 !== lifecycle.hashText(sourceContent) || !existsSync(targetPath) || lifecycle.hashText(readFileSync(targetPath, "utf8")) !== record.sha256) {
-      throw new Error(`ASK core immutable contract is missing or stale: ${asset}. Re-run scripts/install-kernel.mjs before installing the Claude adapter.`);
+    const kind = lifecycle.coreImmutableAssetKind(asset);
+    const label = kind === "immutable_runtime" ? "runtime" : "contract";
+    if (record?.kind !== kind || record.sha256 !== lifecycle.hashText(sourceContent) || !existsSync(targetPath) || lifecycle.hashText(readFileSync(targetPath, "utf8")) !== record.sha256) {
+      throw new Error(`ASK core immutable ${label} is missing or stale: ${asset}. Re-run scripts/install-kernel.mjs before installing the Claude adapter.`);
     }
   }
 }
@@ -911,7 +939,7 @@ function resolveSelection(args) {
   }
   const selectedCommands = args.skipCommands ? [] : [...profile.commands];
   const skillSeed = args.skills ?? profileSkills;
-  const routingFixtures = routingFixturesForProfile(args.profile, skillSeed, selectedCommands);
+  const routingFixtures = routingFixturesForProfile(args.profile, skillSeed, selectedCommands, { customSelection: args.skills !== null });
   const requiredSkills = computeRequiredClosure(skillSeed, selectedCommands, routingFixtures);
   const selectedSkills = [...new Set(args.skills ?? requiredSkills)].sort();
   const unknownSkills = selectedSkills.filter((skill) => !manifestSkillSet.has(skill));
@@ -929,6 +957,7 @@ function resolveSelection(args) {
     throw new Error(`Selected Claude commands are not closed over installed skills: ${missingRequiredSkills.join(", ")}`);
   }
   const requiredAssets = [...new Set([
+    "scripts/json-schema-validation.mjs",
     "schemas/execution-envelope.schema.json",
     ...selectedCommands.flatMap((command) => COMMAND_METADATA[command].requiredAssets),
     ...requiredAssetsForSkills(selectedSkills),
@@ -936,6 +965,7 @@ function resolveSelection(args) {
   const initialProjectStateAssets = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].initialProjectStateAssets ?? []))].sort();
   const runtimeDirectories = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].runtimeDirectories ?? []))].sort();
   args.selectedSkills = selectedSkills;
+  args.manifest = manifest;
   args.selectedCommands = selectedCommands;
   args.requiredAssets = requiredAssets;
   args.initialProjectStateAssets = initialProjectStateAssets;
@@ -946,6 +976,7 @@ function resolveSelection(args) {
 }
 
 function claudeRendererInputsForSelection(args, { skipHooks, skipRuntime }) {
+  const fixedCommands = args.selectedCommands.filter((command) => FIXED_ENTRY_COMMANDS.has(command));
   const canonical = [
     { path: "AGENTS.md", role: "kernel" },
     { path: "manifest.json", role: "manifest" },
@@ -955,18 +986,21 @@ function claudeRendererInputsForSelection(args, { skipHooks, skipRuntime }) {
     { path: "schemas/adapter-runtime-event.schema.json", role: "schema" },
     { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
     { path: "schemas/metrics-event.schema.json", role: "schema" },
+    ...fixedCommands.flatMap((command) => fixedEntryCanonicalPaths(command).map((path) => ({ path, role: path.startsWith("skills/") ? "skill" : path.startsWith("schemas/") ? "schema" : path.endsWith(".mjs") ? "runtime_source" : "contract" }))),
     ...args.selectedSkills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
-    ...args.requiredAssets.filter((path) => path.startsWith("schemas/") || path.endsWith("-contract.md")).map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : "contract" })),
+    ...args.requiredAssets.filter((path) => CORE_OWNED_IMMUTABLE_ASSETS.includes(path) || path.startsWith("schemas/") || path.endsWith("-contract.md")).map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : path.endsWith(".mjs") ? "runtime_source" : "contract" })),
   ];
   const adapterOwned = [
     { path: "scripts/install-claude-adapter.mjs", role: "renderer" },
+    ...(fixedCommands.length > 0 ? [{ path: "scripts/fixed-entry-profile.mjs", role: "renderer" }] : []),
+    ...(fixedCommands.length > 0 ? [{ path: "scripts/claude-fixed-entry-profile.mjs", role: "renderer" }] : []),
     { path: "scripts/installer-lifecycle.mjs", role: "runtime_source" },
     { path: "scripts/adapter-runtime-inventory.mjs", role: "inventory" },
     ...(!skipHooks && !skipRuntime ? [{ path: "adapters/claude-code/project/.claude/hooks/hooks.json", role: "hook_template" }] : []),
     ...args.selectedCommands.map((command) => ({ path: `adapters/claude-code/project/.claude/commands/${command}`, role: "command_template" })),
     ...(!skipRuntime ? CLAUDE_RUNTIME_FILES.map((file) => ({ path: file.source, role: file.assetKind === "schemas" ? "runtime_schema" : "runtime_source" })) : []),
     ...(!skipRuntime ? [{ path: "docs/ai/observability-config.yml", role: "config_source" }] : []),
-    ...args.requiredAssets.filter((path) => !path.startsWith("schemas/") && !path.endsWith("-contract.md")).map((path) => ({ path, role: "config_source" })),
+    ...args.requiredAssets.filter((path) => !CORE_OWNED_IMMUTABLE_ASSETS.includes(path) && !path.startsWith("schemas/") && !path.endsWith("-contract.md")).map((path) => ({ path, role: "config_source" })),
     ...args.initialProjectStateAssets.map((path) => ({ path, role: "config_source" })),
   ];
   const dedupe = (items) => [...new Map(items.map((item) => [item.path, item])).values()].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
@@ -1022,7 +1056,20 @@ export function buildClaudeProjectionPlan({ profileName, skills = null, skipHook
     rendererInputs,
     projectedManagedAssets,
   });
-  return { ...args, ...provenance, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };
+  const canonicalContract = {
+    revision: `ask-${args.manifest.version}`,
+    source_digest: provenance.canonical_source_digest,
+    source_paths: provenance.renderer_inputs.canonical.map((input) => input.path),
+  };
+  const compactProfileArtifacts = args.selectedCommands
+    .filter((command) => FIXED_ENTRY_COMMANDS.has(command))
+    .map((command) => renderClaudeFixedEntryProfile(command, {
+      canonicalContract,
+      profileFingerprint: provenance.fingerprint,
+    }));
+  const compactProfiles = compactProfileArtifacts.map((artifact) => artifact.metadata);
+  const compactProfileMeasurements = measureClaudeFixedEntryProfiles(compactProfiles);
+  return { ...args, ...provenance, compactProfiles, compactProfileArtifacts, compactProfileMeasurements, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };
 }
 
 export function resolveClaudeSkillClosure(skills) {
@@ -1237,6 +1284,8 @@ function buildState(args, manifest) {
       initial_project_state_assets: args.initialProjectStateAssets,
       runtime_directories: args.projectionPlan.actualInstalledInventory.filter((asset) => asset.ownership_mode === "runtime_directory").map((asset) => asset.path),
       selected_runtime_scripts: selectedRuntimeScripts,
+      compact_runtime_profiles: args.projectionPlan.compactProfiles,
+      compact_profile_measurements: args.projectionPlan.compactProfileMeasurements,
       managed_subset_fingerprint: managedSubsetFingerprint,
       applied_provenance: appliedProvenance,
       last_applied_provenance: appliedProvenance,
@@ -1250,6 +1299,7 @@ function buildState(args, manifest) {
         canonical_source_digest: args.projectionPlan.canonical_source_digest,
         renderer_inputs: args.projectionPlan.renderer_inputs,
         projected_managed_assets: args.projectionPlan.projectedManagedAssets,
+        compact_profiles: args.projectionPlan.compactProfiles,
       },
       actual_installed_inventory: args.projectionPlan.actualInstalledInventory,
       skill_closure: {

@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/portfolio-selection-context.schema.json",
+  "title": "Agent Spectrum Kernel closed pre-result Portfolio selector context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_kind",
+    "selection_phase",
+    "portfolio_lock_digest",
+    "repository_id",
+    "project_id",
+    "source_revision",
+    "tree_digest",
+    "task_class",
+    "model",
+    "adapter",
+    "stack",
+    "domain",
+    "risk_class",
+    "capabilities",
+    "operation_scopes",
+    "available_budget",
+    "current_state_refs",
+    "context_digest"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "object_kind": { "type": "string", "const": "portfolio_selection_context" },
+    "selection_phase": { "type": "string", "const": "pre_result" },
+    "portfolio_lock_digest": { "$ref": "#/$defs/digest" },
+    "repository_id": { "$ref": "#/$defs/repositoryId" },
+    "project_id": { "$ref": "#/$defs/repositoryId" },
+    "source_revision": { "$ref": "#/$defs/token" },
+    "tree_digest": { "$ref": "#/$defs/digest" },
+    "task_class": { "$ref": "#/$defs/token" },
+    "model": { "$ref": "#/$defs/token" },
+    "adapter": { "$ref": "#/$defs/token" },
+    "stack": { "$ref": "#/$defs/token" },
+    "domain": { "$ref": "#/$defs/token" },
+    "risk_class": { "$ref": "#/$defs/token" },
+    "capabilities": { "$ref": "#/$defs/stringSet" },
+    "operation_scopes": { "$ref": "#/$defs/stringSet" },
+    "available_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token_count", "duration_ms", "cost_microunits"],
+      "properties": {
+        "token_count": { "$ref": "#/$defs/quantity" },
+        "duration_ms": { "$ref": "#/$defs/quantity" },
+        "cost_microunits": { "$ref": "#/$defs/quantity" }
+      }
+    },
+    "current_state_refs": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["state_id", "state_digest"],
+        "properties": {
+          "state_id": { "$ref": "#/$defs/token" },
+          "state_digest": { "$ref": "#/$defs/digest" }
+        }
+      }
+    },
+    "context_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@/+~-]*$"
+    },
+    "repositoryId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/@+-]*$"
+    },
+    "stringSet": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "value"],
+      "properties": {
+        "status": { "type": "string", "enum": ["known", "unknown"] },
+        "value": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    }
+  }
+}

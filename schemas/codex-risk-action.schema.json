@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/codex-risk-action.schema.json",
+  "title": "Codex Exact Risk Action Descriptor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "action_id", "repository_id", "risk_gate", "operation", "target_scope", "permitted_effects", "prohibited_effects", "approval_authority"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "action_id": { "$ref": "#/$defs/identifier" },
+    "repository_id": { "$ref": "#/$defs/repository_id" },
+    "risk_gate": { "type": "string", "const": "risk-gate" },
+    "operation": { "$ref": "#/$defs/identifier" },
+    "target_scope": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+    },
+    "permitted_effects": { "$ref": "#/$defs/identifiers" },
+    "prohibited_effects": { "$ref": "#/$defs/identifiers" },
+    "approval_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority_id", "authority_revision", "evidence_sha256"],
+      "properties": {
+        "authority_id": { "$ref": "#/$defs/identifier" },
+        "authority_revision": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "evidence_sha256": { "$ref": "#/$defs/digest" }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]*$", "maxLength": 200 },
+    "repository_id": { "type": "string", "pattern": "^[a-z0-9.-]+/[A-Za-z0-9._/-]+$", "maxLength": 500 },
+    "identifiers": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

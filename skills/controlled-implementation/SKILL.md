@@ -37,7 +37,7 @@ If implementation context is missing or `template` but the task is small and loc
 When `docs/ai/engineering-pattern-ledger.md` exists, consult it only when the task has a repeated implementation shape, project-specific pattern, or review finding that materially affects the implementation choice:
 
 - `template`: treat as no project-specific pattern evidence.
-- `active`: use matching `Verified` or `Human-confirmed` entries as constraints, `Supported` entries as cautions requiring current repo checks, and `Hypothesis` entries as questions only.
+- `active`: use matching `Verified` entries as constraints, `Supported` entries as cautions requiring current repo checks, and `Hypothesis` entries as questions only. Human authority metadata identifies who owns a statement; it does not prove implementation behavior.
 - `archived`: cite for history only; do not use as current implementation guidance.
 
 If the implementation decision depends on a prior architecture or boundary decision, consult `docs/ai/architecture-decision-memory.md` with the same evidence-status discipline and route to `application-boundary-architecture` or `adr-review` when mechanics or durable ADR action are unresolved.
@@ -92,7 +92,7 @@ Rules:
 
 4. Add or update verification.
 
-Use `test-first-verification` when behavior needs proof or a bug/regression is involved. Reference its Verification Contract before changing behavior.
+Use `test-first-verification` when behavior needs proof or a bug/regression is involved. Before implementation claims, reference the selected `compact_proof` or `formal_verification_contract` from `ask.verification-proof-policy@1.0.0`. Do not copy unchanged proof fields into the Implementation Contract. Upgrade compact to formal if a trigger emerges; never downgrade formal after failure or resume.
 
 5. Run focused checks.
 

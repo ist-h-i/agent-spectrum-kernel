@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -22,6 +22,11 @@ import { buildMpFrontendStateAuthority, validateMpFrontendStateReviewProductionA
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE_ID = "mp-frontend-state-review";
 const FIXTURE_ROOT = resolve(ROOT, `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`);
+const FIXTURE_ROOT_RELATIVE = `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`;
+const REQUIREMENT_IDS = ["state-consistency-finding", "decision-correctness", "verification-conclusion", "suspicious-control-restraint", "evidence-and-review-precision"];
+const HISTORICAL_REVIEWED_HEAD = "3fb6506de538189e93b12006d908ced49c051de2";
+const FRESH_COVERAGE_CLASSES = new Set(["positive", "state_finding", "decision", "verification", "restraint", "evidence", "scope", "equivalence", "malformed", "evidence_removal"]);
+const FRESH_CASE_PAYLOAD_DIGEST = "sha256:003229697a3a1b2346b095bcfa6298cc961c66af4e3d79be779d9a27232f1bf9";
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -29,6 +34,68 @@ function readJson(path) {
 
 function clone(value) {
   return structuredClone(value);
+}
+
+function stableCanonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableCanonicalJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableCanonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+function repositoryDiffArtifactForEntries(diffEntries, lineage) {
+  return { run_instance_id: lineage.run_instance_id, case_id: lineage.case_id, attempt: lineage.attempt, artifact_digest: canonicalDigest(diffEntries), artifact_bytes: Buffer.byteLength(stableCanonicalJson(diffEntries)) || 1, diff_entries: diffEntries };
+}
+
+function directRepositoryDiffArtifact(entry, lineage) {
+  const diffEntries = [{ path: "review.json", change_type: "addition", before: null, after: { file_type: "file" } }];
+  if (entry.extra_candidate_path) diffEntries.push({ path: entry.extra_candidate_path, change_type: "addition", before: null, after: { file_type: "file" } });
+  return repositoryDiffArtifactForEntries(diffEntries, lineage);
+}
+
+function gitBytes(revision, path) {
+  return execFileSync("git", ["-C", ROOT, "show", `${revision}:${path}`]);
+}
+
+function validateHistoricalPublicInputInvariance() {
+  const manifest = readJson(resolve(FIXTURE_ROOT, "input-manifest.json"));
+  const paths = [`${FIXTURE_ROOT_RELATIVE}/task.md`, `${FIXTURE_ROOT_RELATIVE}/input-manifest.json`, `${FIXTURE_ROOT_RELATIVE}/verification-command-contract.json`, ...manifest.fixtures[FIXTURE_ID].files.map(({ path }) => `${FIXTURE_ROOT_RELATIVE}/${path}`)];
+  for (const path of paths) assert.deepEqual(readFileSync(resolve(ROOT, path)), gitBytes(HISTORICAL_REVIEWED_HEAD, path), `${path} must remain byte-identical to the historical reviewed public input`);
+}
+
+function validateFreshPrivateSourceContract({ privateRoot, caseRoot }, { sourceOnly }) {
+  const sourceNames = ["false-positive-boundaries.json", "hidden-evaluator.mjs", "human-instructions.md", "oracle.json", "rubric.md", "scope-boundaries.json"];
+  const generatedNames = ["dependency-graph.json", "equivalent-solutions.json", "evidence-removal-mutations.json", "independence.json", "private-evaluator-bundle.json"];
+  assert.deepEqual(readdirSync(privateRoot).sort(), [...sourceNames, ...(sourceOnly ? [] : generatedNames)].sort(), "fresh frontend private root inventory must be closed for its generation phase");
+  for (const name of sourceNames) assert.ok(lstatSync(resolve(privateRoot, name)).isFile() && !lstatSync(resolve(privateRoot, name)).isSymbolicLink(), `${name} must be a regular source file`);
+  const entries = readdirSync(caseRoot).sort();
+  assert.ok(entries.includes("cases.json") && entries.includes("reference-review"), "fresh frontend cases require manifest and reference review");
+  const cases = readJson(resolve(caseRoot, "cases.json"));
+  const reviewIds = [...new Set([...cases.cases.map(({ case_id }) => case_id), "reference-review"])].sort();
+  const payloadProjection = { manifest: cases, reviews: reviewIds.map((case_id) => ({ case_id, review_bytes: readFileSync(resolve(caseRoot, case_id, "review.json"), "utf8") })) };
+  assert.equal(canonicalDigest(payloadProjection), FRESH_CASE_PAYLOAD_DIGEST, "fresh frontend behavior-bearing case payloads must remain independently frozen");
+  const duplicatedPayload = clone(payloadProjection);
+  duplicatedPayload.reviews[1].review_bytes = duplicatedPayload.reviews[0].review_bytes;
+  assert.notEqual(canonicalDigest(duplicatedPayload), FRESH_CASE_PAYLOAD_DIGEST, "fresh frontend payload duplication must invalidate the independent case digest");
+  assert.deepEqual(Object.keys(cases).sort(), ["cases", "fixture_id"], "fresh frontend cases top-level fields must be closed");
+  assert.equal(cases.fixture_id, FIXTURE_ID);
+  assert.ok(Array.isArray(cases.cases) && cases.cases.length > 0);
+  assert.equal(new Set(cases.cases.map(({ case_id }) => case_id)).size, cases.cases.length, "fresh frontend case IDs must be unique");
+  const allowed = new Set(["case_id", "coverage_class", "expected_passes", "expected_findings", "expected_evaluation_status", "expected_verification_correctness", "expected_evidence_correctness", "expected_under_processing", "expected_over_processing", "expected_classification", "expected_scope_deviations", "expected_manual_requirement_ids", "extra_candidate_path", "control"]);
+  for (const entry of cases.cases) {
+    assert.match(entry.case_id ?? "", /^[a-z0-9][a-z0-9-]*$/u);
+    assert.ok(FRESH_COVERAGE_CLASSES.has(entry.coverage_class), `${entry.case_id} coverage class`);
+    assert.ok(Object.keys(entry).every((key) => allowed.has(key)), `${entry.case_id} contains an unknown field`);
+    assert.ok(Array.isArray(entry.expected_passes) && entry.expected_passes.length === REQUIREMENT_IDS.length && entry.expected_passes.every((value) => typeof value === "boolean"), `${entry.case_id} pass vector`);
+    const reviewPath = resolve(caseRoot, entry.case_id, "review.json");
+    assert.ok(existsSync(reviewPath) && lstatSync(reviewPath).isFile() && !lstatSync(reviewPath).isSymbolicLink(), `${entry.case_id} review must be regular`);
+  }
+  assert.deepEqual(entries, ["cases.json", "reference-review", ...cases.cases.map(({ case_id }) => case_id)].sort(), "fresh frontend case directory inventory must be closed");
+  for (const coverageClass of ["state_finding", "decision", "verification", "restraint", "evidence", "scope", "equivalence", "malformed", "evidence_removal"]) assert.ok(cases.cases.some((entry) => entry.coverage_class === coverageClass), `fresh frontend cases require ${coverageClass} coverage`);
+  for (let index = 0; index < REQUIREMENT_IDS.length; index += 1) assert.ok(cases.cases.some((entry) => entry.expected_passes[index] === false), `${REQUIREMENT_IDS[index]} requires a non-pass case`);
+  const source = readFileSync(resolve(ROOT, "scripts/ask-benchmark-mp-frontend-state-review-authority.mjs"), "utf8");
+  assert.match(source, /current_canonical_public_contracts/u);
+  assert.match(source, /historical_private_case_review_bytes_not_reconstructed/u);
+  return { cases: cases.cases.length, source_files: sourceNames.length };
 }
 
 function evaluatorSemanticProjection(result) {
@@ -75,6 +142,7 @@ function expectedSemanticProjection(entry, { normalizedResult, repositoryDiffArt
     "equivalent-evidence-bounded-review",
   ];
   const findingIds = entry.expected_findings.map(({ finding_id }) => finding_id);
+  const findingIdsByRequirement = ["missing-state-consistency-finding", "incorrect-review-decision", "incorrect-verification-conclusion", "false-positive-expanded-history", "imprecise-review-evidence"];
   const expectedScopeDeviations = entry.expected_scope_deviations ?? [];
   const scopeDeviationIds = expectedScopeDeviations.map(({ finding_id }) => finding_id);
   const manual = entry.expected_evaluation_status === "manual_review_required";
@@ -96,7 +164,7 @@ function expectedSemanticProjection(entry, { normalizedResult, repositoryDiffArt
       outcome: entry.expected_passes[index] ? "pass" : "fail",
       earned_points: entry.expected_passes[index] ? maxPoints[index] : 0,
       matched_equivalence_class_ids: entry.expected_passes[index] ? [equivalenceIds[index]] : [],
-      finding_ids: manual ? manualRequirementIds.has(requirement_id) ? findingIds : [] : findingIds,
+      finding_ids: manual ? manualRequirementIds.has(requirement_id) ? findingIds : [] : entry.expected_passes[index] ? [] : [findingIdsByRequirement[index]],
       evidence_references: manualRequirementIds.has(requirement_id) ? [finalOutputReference] : standardReferences,
       scope_deviation_references: scopeDeviationIds,
       verification_evidence_references: manualRequirementIds.has(requirement_id) ? [] : [verificationReference],
@@ -286,31 +354,35 @@ function validateProductionNegativeCoverage() {
   }
 }
 
-async function validatePrivateCases({ privateRoot, caseRoot }) {
+async function validatePrivateCases({ privateRoot, caseRoot, productionExists }) {
   const work = mkdtempSync(resolve(tmpdir(), "mp-frontend-state-private-test-"));
-  const boundaryRoots = createBoundaryRoots(work);
-  const production = validateMpFrontendStateReviewProductionAuthority({ root: ROOT, privateRoot, boundaryRoots });
-  assert.equal(production.scoringReady, false);
-  assert.equal(production.admissionState, "admission_pending");
-  const evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${production.evaluatorBundleDigest}`);
+  const boundaryRoots = productionExists ? createBoundaryRoots(work) : null;
+  const production = productionExists ? validateMpFrontendStateReviewProductionAuthority({ root: ROOT, privateRoot, boundaryRoots }) : null;
+  if (production) {
+    assert.equal(production.scoringReady, false);
+    assert.equal(production.admissionState, "admission_pending");
+  }
+  const evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${createHash("sha256").update(readFileSync(resolve(privateRoot, "hidden-evaluator.mjs"))).digest("hex")}`);
   const cases = readJson(resolve(caseRoot, "cases.json"));
   const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
-  const bundle = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
-  const hiddenAsset = bundle.asset_inventory.find(({ role }) => role === "hidden_tests");
-  assert.ok(hiddenAsset, "private bundle requires a hidden evaluator asset");
+  const bundle = production ? readJson(resolve(privateRoot, "private-evaluator-bundle.json")) : null;
+  const hiddenAsset = bundle?.asset_inventory.find(({ role }) => role === "hidden_tests") ?? null;
+  if (production) assert.ok(hiddenAsset, "private bundle requires a hidden evaluator asset");
   const freezePath = resolve(FIXTURE_ROOT, "scoring-input-freeze-manifest.json");
-  const externalAuthorityAnchor = readEvaluatorAuthorityAnchorFromFreeze({
+  const externalAuthorityAnchor = production ? readEvaluatorAuthorityAnchorFromFreeze({
     root: ROOT,
     freezeManifestPath: freezePath,
     freezeManifestSourceDigest: `sha256:${createHash("sha256").update(readFileSync(freezePath)).digest("hex")}`,
     referencePath: resolve(FIXTURE_ROOT, "evaluator-reference.json"),
     label: "mp-frontend-state private regression authority",
-  });
-  const privateEvaluationRoot = resolve(work, "sealed-authority");
-  const evaluationInputRoot = resolve(work, "sealed-input");
-  mkdirSync(privateEvaluationRoot);
-  mkdirSync(evaluationInputRoot);
-  writeFileSync(resolve(evaluationInputRoot, "private-regression-authority.json"), "{\"measured_execution\":false,\"scoring_ready\":false}\n");
+  }) : null;
+  const privateEvaluationRoot = production ? resolve(work, "sealed-authority") : null;
+  const evaluationInputRoot = production ? resolve(work, "sealed-input") : null;
+  if (production) {
+    mkdirSync(privateEvaluationRoot);
+    mkdirSync(evaluationInputRoot);
+    writeFileSync(resolve(evaluationInputRoot, "private-regression-authority.json"), "{\"measured_execution\":false,\"scoring_ready\":false}\n");
+  }
   for (const [index, entry] of cases.cases.entries()) {
     const frozen = resolve(work, `${entry.case_id}-frozen`);
     const candidate = resolve(work, `${entry.case_id}-candidate`);
@@ -339,7 +411,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
         cwd_unverified_command_count: 0,
       },
     };
-    const sealedExecution = createSealedEvaluatorExecutionForTest({
+    const sealedExecution = production ? createSealedEvaluatorExecutionForTest({
       root: ROOT,
       privateEvaluationRoot,
       privateRoot,
@@ -352,14 +424,41 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       externalAuthorityAnchor,
       executionDirectoryName: `sealed-${entry.case_id}`,
       label: `mp-frontend-state sealed ${entry.case_id} evaluator`,
-    });
-    const repositoryDiffArtifact = readJson(resolve(sealedExecution.originalWorkspaceAuthority.path, sealedExecution.originalWorkspaceAuthority.repositoryDiffPath));
+    }) : null;
+    const repositoryDiffArtifact = sealedExecution ? readJson(resolve(sealedExecution.originalWorkspaceAuthority.path, sealedExecution.originalWorkspaceAuthority.repositoryDiffPath)) : directRepositoryDiffArtifact(entry, lineage);
     const first = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
     const second = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
     assert.deepEqual(first, second, `${entry.case_id} evaluator determinism`);
     assertBenchmarkSchemaInstance(first, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} private fragment` });
     const expected = expectedSemanticProjection(entry, { normalizedResult, repositoryDiffArtifact });
     assert.deepEqual(evaluatorSemanticProjection(first), expected, `${entry.case_id} complete private evaluator projection`);
+    if (index === 0) {
+      const transplanted = clone(normalizedResult);
+      transplanted.lineage.final_output_digest = `sha256:${"0".repeat(64)}`;
+      await assert.rejects(evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult: transplanted, repositoryDiffArtifact }), /final output authority/u, "frontend final-output authority transplant must fail closed");
+      for (const field of ["run_instance_id", "case_id", "attempt"]) {
+        const wrongLineage = clone(repositoryDiffArtifact);
+        wrongLineage[field] = `${wrongLineage[field]}-transplanted`;
+        await assert.rejects(evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact: wrongLineage }), /repository diff lineage authority/u, `frontend repository diff ${field} transplant must fail closed`);
+      }
+      for (const [label, mutate] of [
+        ["digest", (artifact) => { artifact.artifact_digest = `sha256:${"0".repeat(64)}`; }],
+        ["bytes", (artifact) => { artifact.artifact_bytes += 1; }],
+      ]) {
+        const invalid = clone(repositoryDiffArtifact);
+        mutate(invalid);
+        await assert.rejects(evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact: invalid }), /repository diff byte authority/u, `frontend repository diff ${label} transplant must fail closed`);
+      }
+      for (const [label, diffEntries] of [
+        ["deletion", [{ path: "review.json", change_type: "deletion", before: { file_type: "file" }, after: null }]],
+        ["modification", [{ path: "review.json", change_type: "modification", before: { file_type: "file" }, after: { file_type: "file" } }]],
+        ["symlink", [{ path: "review.json", change_type: "addition", before: null, after: { file_type: "symlink" } }]],
+      ]) {
+        const invalidScope = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact: repositoryDiffArtifactForEntries(diffEntries, lineage) });
+        assert.equal(invalidScope.classification, "over_processing", `frontend repository diff ${label} must fail the closed scope`);
+        assert.deepEqual(invalidScope.scope_deviations.map(({ finding_id }) => finding_id), ["candidate-scope-violation"], `frontend repository diff ${label} must emit the scope finding`);
+      }
+    }
     if (entry.expected_evaluation_status === "manual_review_required") {
       assert.equal(Object.hasOwn(first, "classification"), false, `${entry.case_id} manual fragment must omit classification`);
       assert.equal(deriveBinaryScopeVerificationClassification({ evaluatorResult: first, requirementRecord: requirement }), null, `${entry.case_id} manual fragment must not derive a normal classification`);
@@ -373,17 +472,15 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       );
     }
 
-    const sealed = executeSealedEvaluatorForTest({
-      execution: sealedExecution,
-      externalAuthorityAnchor,
-      repositoryRoot: ROOT,
-      normalized: normalizedResult,
-      label: `mp-frontend-state sealed ${entry.case_id} evaluator`,
-    });
-    assertBenchmarkSchemaInstance(sealed.firstFragment, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} production-safe private fragment` });
-    assert.deepEqual(evaluatorSemanticProjection(sealed.firstFragment), expected, `${entry.case_id} complete production-safe evaluator projection`);
-    assert.deepEqual(evaluatorSemanticProjection(sealed.firstFragment), evaluatorSemanticProjection(first), `${entry.case_id} direct/production-safe evaluator agreement`);
+    if (sealedExecution) {
+      const sealed = executeSealedEvaluatorForTest({ execution: sealedExecution, externalAuthorityAnchor, repositoryRoot: ROOT, normalized: normalizedResult, label: `mp-frontend-state sealed ${entry.case_id} evaluator` });
+      assertBenchmarkSchemaInstance(sealed.firstFragment, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} production-safe private fragment` });
+      assert.deepEqual(evaluatorSemanticProjection(sealed.firstFragment), expected, `${entry.case_id} complete production-safe evaluator projection`);
+      assert.deepEqual(evaluatorSemanticProjection(sealed.firstFragment), evaluatorSemanticProjection(first), `${entry.case_id} direct/production-safe evaluator agreement`);
+    }
   }
+
+  if (!production) return { cases: cases.cases.length, directPass: cases.cases.length, productionSafePass: 0, mutationBehaviorPass: 0, validatorParityPass: 0, falsePositiveControls: cases.cases.filter(({ control }) => control === "suspicious_but_correct").length };
 
   const admission = readJson(resolve(FIXTURE_ROOT, "final-admission-record.json"));
   const evidenceMap = readJson(resolve(FIXTURE_ROOT, "evidence-map.json"));
@@ -422,7 +519,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
         references: [{ command_id: "review-contract-validation", match_state: "matched", outcome: "succeeded", exit_code: 0, digest: canonicalDigest({ mutation_id: mutation.mutation_id }), bytes: 1 }],
       },
     };
-    const repositoryDiffArtifact = { artifact_digest: canonicalDigest({ mutation_id: mutation.mutation_id, kind: "repository_diff" }), artifact_bytes: 1 };
+    const repositoryDiffArtifact = directRepositoryDiffArtifact({}, lineage);
     const result = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
     const target = result.requirement_results.find(({ requirement_id }) => requirement_id === mutation.requirement_id);
     assert.equal(target?.outcome, "fail", `${mutation.mutation_id} must make ${mutation.requirement_id} unrecoverable`);
@@ -457,7 +554,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
         references: [{ command_id: "review-contract-validation", match_state: "matched", outcome: "succeeded", exit_code: 0, digest: canonicalDigest({ private_validator_case: name }), bytes: 1 }],
       },
     };
-    const repositoryDiffArtifact = { artifact_digest: canonicalDigest({ private_validator_case: name, kind: "repository_diff" }), artifact_bytes: 1 };
+    const repositoryDiffArtifact = directRepositoryDiffArtifact({}, lineage);
     const result = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
     assert.ok(result.requirement_results.every(({ outcome }) => outcome === "fail"), `${name} private evaluator rejection`);
     assert.equal(result.classification, "under_processing", `${name} private evaluator classification`);
@@ -480,12 +577,14 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
 
 validateFrozenDesign();
 validateMpFrontendStateReviewInputClosure({ root: ROOT });
+validateHistoricalPublicInputInvariance();
 validateVisibleScenario();
 validatePullRequestDiff();
 validateWorkspaceValidatorParity();
 validatePublicNegativeCoverage();
 
-const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
+const publicContractOnly = process.argv.includes("--public-contract-only");
+const productionExists = !publicContractOnly && readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
 let effectiveAdmissionStatus = "admission_pending";
 if (productionExists) {
   const production = validateMpFrontendStateReviewProductionAuthority({ root: ROOT });
@@ -507,5 +606,6 @@ if (productionExists) {
 }
 
 const requested = privateArgs(process.argv.slice(2));
-const privateSummary = requested ? await validatePrivateCases(requested) : null;
-console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));
+const sourceSummary = requested ? validateFreshPrivateSourceContract(requested, { sourceOnly: publicContractOnly }) : null;
+const privateSummary = requested ? await validatePrivateCases({ ...requested, productionExists }) : null;
+console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", historical_public_input_invariance: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? publicContractOnly ? "source_behavior_pass" : "pass" : "not_supplied", ...(sourceSummary ? { fresh_source_summary: sourceSummary } : {}), ...(privateSummary ? { private_summary: privateSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));

@@ -1,0 +1,551 @@
+{
+  "schema_version": "1.0.0",
+  "program": "ask_evolution_loop_samples",
+  "source_revision": "58b21338c0378a2f8ea8e955979eaa5041ac098e",
+  "tree_digest": "sha256:cba765f764e2ccfef249d00bb85771f0282ab2c873c2fa63a86e3f351cc1b087",
+  "fixture_scope": "local_deterministic_contract_test_only",
+  "source_files": {
+    "parent": {
+      "path": "adapters/codex/prompts/skill-verify.md",
+      "raw_digest": "sha256:0fb394cd590cfd00215e581d3d159a31967437f039156f5e5e3d6b4f1b157b82",
+      "byte_length": 936
+    },
+    "candidate": {
+      "path": "docs/evolution-loop-sample-prompt-candidate.md",
+      "raw_digest": "sha256:244ee3bde52c3c9f5da51d66f9c91d08c7a9ac47b651d585f083362fa3c61a41",
+      "byte_length": 761
+    }
+  },
+  "foundation": {
+    "copied_portfolio_object_count": 27,
+    "portfolio_reference": {
+      "schema_version": "1.0.0",
+      "program": "ask_portfolio_manager_samples",
+      "source_revision": "9586ea62888c896e6bda7e5647972218fe96ea0d",
+      "registry_snapshot_digest": "sha256:34a511af596bc1317941241135f053153d9862ff7552a243c0231fc079c4edba",
+      "kernel_only": {
+        "schema_version": "1.0.0",
+        "program": "ask_portfolio_reference",
+        "portfolio_id": "ask.portfolio.reference",
+        "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+        "scope_id": "agent-spectrum-kernel",
+        "lock_revision": 2,
+        "lock_digest": "sha256:646f7738d9eed0b744e1096c74ad4ee7ce2449c2c98fd193cba4aabccd0bd704",
+        "required_portfolio_authority_context_digests": [
+          "sha256:0e499748e1957449343805b97886ade136a1754b899ac7c8425f905ed31877e0"
+        ],
+        "required_high_impact_approval_grant_digests": [],
+        "current_manifest": {
+          "revision": "reference-kernel-only-v1",
+          "manifest_digest": "sha256:ad70988ddb668b2feb9c2bf2ff55df5b83007158f9e5b291408a54d0956cdb47",
+          "asset_set_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "selections": [
+          {
+            "selection_object_digest": "sha256:d01137c27fa79d0828b8735feeb834f85001178d3e3881480444c33b29723f33",
+            "selection_digest": "sha256:1d44860afcffce4d823a4bedaf53bed23272cea430b15f06a73cce0575c7250f",
+            "context_object_digest": "sha256:b3d6e32039faf9c46ed92263b673c441acfd0ff88a73873be8286bc475dd1136",
+            "context_digest": "sha256:1d6348f6e74fabf3dd364b14c89f5063080900bc7eae892b8f0d3ca4b5562637",
+            "decision": "selected"
+          }
+        ],
+        "mutable_latest_pointer_used": false,
+        "runtime_activation_implied": false,
+        "execution_implied": false,
+        "effectiveness_implied": false
+      },
+      "adaptive_ask": {
+        "schema_version": "1.0.0",
+        "program": "ask_portfolio_reference",
+        "portfolio_id": "ask.portfolio.reference",
+        "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+        "scope_id": "agent-spectrum-kernel",
+        "lock_revision": 3,
+        "lock_digest": "sha256:c12f13a5762d3a0c1e6868fca76e43197c541f2ac61965cf6fdc58714079f633",
+        "required_portfolio_authority_context_digests": [
+          "sha256:04b954d103ac3ab1c4b51e8f930d9a314b501c6c88911a375179820353939aa8",
+          "sha256:0e499748e1957449343805b97886ade136a1754b899ac7c8425f905ed31877e0"
+        ],
+        "required_high_impact_approval_grant_digests": [],
+        "current_manifest": {
+          "revision": "reference-adaptive-ask-v1",
+          "manifest_digest": "sha256:8b643e508304b4b23dea1e833c5ea78715dcbba5ebadd08947f7cedf744828e9",
+          "asset_set_digest": "sha256:bf7aa0a97dbdd6fa46453e661ce05482e3619062f9fc949d916e2fdc6c11a329"
+        },
+        "selections": [
+          {
+            "selection_object_digest": "sha256:3cd937a361e7087a4c88a98bc3326cc2f930f4ef88d0cc86dc466cf7f4c7dbb5",
+            "selection_digest": "sha256:4b2492cf9f5777bf66287e8f0b69949e8c02bf760c5ac04288b69ce452926aee",
+            "context_object_digest": "sha256:5a5f82acd97693aee049f4fb2f6060a444f7b9ecb0d205e48d012039b580aba1",
+            "context_digest": "sha256:7d0b8ddb780dafa2f077cbedbafcda611318dc1938f9b9a9486596f6a11db123",
+            "decision": "downgrade"
+          }
+        ],
+        "mutable_latest_pointer_used": false,
+        "runtime_activation_implied": false,
+        "execution_implied": false,
+        "effectiveness_implied": false
+      },
+      "frozen_benchmark_results_mutated": false
+    },
+    "portfolio_authority_contexts": [
+      {
+        "authority": {
+          "authority_evidence_digest": "sha256:3d2124696b13b8c6d5b2a85b88d5d97c6ba33c4ebc8209ff3c5a544a144a049b",
+          "authority_id": "ask.portfolio.sample-authority",
+          "authority_revision": "adaptive-ask-v1",
+          "kind": "external_portfolio_activation_authority"
+        },
+        "context_digest": "sha256:081409acc29618fe56b3be9b206668bdbfb57683476494d6cc2182c2724992e1",
+        "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "grants": [],
+        "object_kind": "portfolio_authority_context",
+        "portfolio_id": "ask.portfolio.reference",
+        "predecessor_lock_digest": "sha256:646f7738d9eed0b744e1096c74ad4ee7ce2449c2c98fd193cba4aabccd0bd704",
+        "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+        "rollback_target": null,
+        "schema_version": "1.0.0",
+        "scope_id": "agent-spectrum-kernel",
+        "transition_basis_digest": "sha256:2f12894c018c02acf0245e80fee89f9b4269fd9c96d22621b05e4698f21d435d",
+        "transitions": [
+          {
+            "from_state": null,
+            "manifest": {
+              "asset_set_digest": "sha256:bf7aa0a97dbdd6fa46453e661ce05482e3619062f9fc949d916e2fdc6c11a329",
+              "manifest_digest": "sha256:8b643e508304b4b23dea1e833c5ea78715dcbba5ebadd08947f7cedf744828e9",
+              "portfolio_id": "ask.portfolio.reference",
+              "revision": "reference-adaptive-ask-v1"
+            },
+            "to_state": "current"
+          },
+          {
+            "from_state": "current",
+            "manifest": {
+              "asset_set_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+              "manifest_digest": "sha256:ad70988ddb668b2feb9c2bf2ff55df5b83007158f9e5b291408a54d0956cdb47",
+              "portfolio_id": "ask.portfolio.reference",
+              "revision": "reference-kernel-only-v1"
+            },
+            "to_state": "superseded"
+          }
+        ]
+      },
+      {
+        "authority": {
+          "authority_evidence_digest": "sha256:0fd87596f6e807135c26e8257749475fe812b90ee7ce7c8e6072226ac67794c5",
+          "authority_id": "ask.portfolio.sample-authority",
+          "authority_revision": "kernel-only-v1",
+          "kind": "external_portfolio_activation_authority"
+        },
+        "context_digest": "sha256:6937a6a20fa70a5df39e43440a862c576849a39ebfac3052a77d3abad89acd62",
+        "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "grants": [],
+        "object_kind": "portfolio_authority_context",
+        "portfolio_id": "ask.portfolio.reference",
+        "predecessor_lock_digest": "sha256:eaaa0fffdde78c9f8dee3ef38168ee948b1d79111b86d6815144285e77a21821",
+        "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+        "rollback_target": null,
+        "schema_version": "1.0.0",
+        "scope_id": "agent-spectrum-kernel",
+        "transition_basis_digest": "sha256:726b3ce5699e13e29bf1d8aee8fc4998d193acccd85e4bff6291e14da6246faf",
+        "transitions": [
+          {
+            "from_state": null,
+            "manifest": {
+              "asset_set_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+              "manifest_digest": "sha256:ad70988ddb668b2feb9c2bf2ff55df5b83007158f9e5b291408a54d0956cdb47",
+              "portfolio_id": "ask.portfolio.reference",
+              "revision": "reference-kernel-only-v1"
+            },
+            "to_state": "current"
+          }
+        ]
+      }
+    ]
+  },
+  "asset_lineage": {
+    "original_parent": {
+      "asset_type": "prompt",
+      "stable_id": "ask.prompt-template.codex.skill-verify",
+      "version": "git:656edf1ac611890a3ae5a93a90e9076f50ee2488",
+      "record_digest": "sha256:5cc2ab9ca47824d2d13438f7f4460b71db1a6f939cfce1b0f84291e3e5935be5",
+      "content_digest": "sha256:c619c6c426da2f6fac9185c2426908ea83ff1598e5e9af7add61f509678a5853"
+    },
+    "sample_baseline": {
+      "asset_type": "prompt",
+      "stable_id": "ask.prompt-template.issue278.evolution-sample",
+      "version": "278.0.0-baseline",
+      "record_digest": "sha256:0f2b5008f5f83d51ab93e5c93c2902731d0fdecead3e4ae6fa9bf61ae972f80f",
+      "content_digest": "sha256:c619c6c426da2f6fac9185c2426908ea83ff1598e5e9af7add61f509678a5853"
+    },
+    "sample_candidate": {
+      "asset_type": "prompt",
+      "stable_id": "ask.prompt-template.issue278.evolution-sample",
+      "version": "278.0.0-candidate",
+      "record_digest": "sha256:9c93cb116df6bf61e855fc8d24fd26116acedbceaabae9a8b8d7fb5185ab6d78",
+      "content_digest": "sha256:d89ac64c6b863068939aef479e324542c9b9c0150d3d37373467d81d6d7bcc84"
+    },
+    "registry_snapshot_digest": "sha256:679ecc1a1507a3663a97d45fb8152acef0ec547fe39b37a12a6345227533dca7",
+    "original_parent_bytes_preserved": true,
+    "sample_baseline_content_changed": false,
+    "candidate_is_only_content_changing_child": true,
+    "eligibility_metadata_authority": {
+      "kind": "deterministic_local_fixture_metadata_authority",
+      "authority_id": "issue-278-sample-eligibility-metadata",
+      "authority_revision": "58b21338c0378a2f8ea8e955979eaa5041ac098e",
+      "scope": "fixture_selection_eligibility_only",
+      "authority_evidence_digest": "sha256:f2182a740db2d08cf1be4bdc14862e3c731000a67d62203e4375c493a2ccf03d",
+      "scoring_evidence_implied": false,
+      "quality_evidence_implied": false,
+      "effectiveness_implied": false,
+      "production_eligibility_implied": false
+    },
+    "asset_lifecycle_authority_contexts": []
+  },
+  "pre_result_roles": {
+    "baseline": {
+      "role": "baseline",
+      "portfolio": {
+        "portfolio_id": "ask.portfolio.issue278.sample-runtime",
+        "revision": "sample-baseline-v1",
+        "manifest_digest": "sha256:01b90828482e22833c6e246872c05b7a20349a0357eef8f9be9d587add0b893f",
+        "asset_set_digest": "sha256:06ef54d6a0516d07d2b058a08b8a291d37f8e884bdb2ba6a924661776e8fb460",
+        "lock_digest": "sha256:4e771bfb45ba55e473bbef342fb0139171a2d30a14088e285bfb582c3097f800"
+      },
+      "registry_snapshot_digest": "sha256:679ecc1a1507a3663a97d45fb8152acef0ec547fe39b37a12a6345227533dca7",
+      "selection_object_digest": "sha256:783c1a33e10a46e73d5365ba1e7ee6907456f85d9d2cf516ae108a6f3d2c3f33",
+      "selection_digest": "sha256:c37bd82a4a67e80f90cbe3f9bc3c329a828b83e4c5ff839b96cd06054b93aaa2",
+      "selected_asset": {
+        "asset_type": "prompt",
+        "stable_id": "ask.prompt-template.issue278.evolution-sample",
+        "version": "278.0.0-baseline",
+        "record_digest": "sha256:0f2b5008f5f83d51ab93e5c93c2902731d0fdecead3e4ae6fa9bf61ae972f80f",
+        "content_digest": "sha256:c619c6c426da2f6fac9185c2426908ea83ff1598e5e9af7add61f509678a5853"
+      }
+    },
+    "challenger": {
+      "role": "challenger",
+      "portfolio": {
+        "portfolio_id": "ask.portfolio.issue278.sample-evaluation",
+        "revision": "sample-challenger-v1",
+        "manifest_digest": "sha256:2b9550fef6878114702bf2b318f9e6b02460694e8b295b148dc77a054a5aff6d",
+        "asset_set_digest": "sha256:2e39061606b95f53b482e4aedf368f555d5e5be3f4a63eddc19e81e87006f963",
+        "lock_digest": "sha256:e9b0c0320e2181568b838261a37946a6861ba96b414e4304cac4b643be3f297a"
+      },
+      "registry_snapshot_digest": "sha256:679ecc1a1507a3663a97d45fb8152acef0ec547fe39b37a12a6345227533dca7",
+      "selection_object_digest": "sha256:fef4aa45d53d205dd71362892313dee6209580ff72437c40776ef9771c8f627f",
+      "selection_digest": "sha256:d7dbe4e669c848d6e9f653094ebed57fabd8e394cd695c3d124bf2ec574a9244",
+      "selected_asset": {
+        "asset_type": "prompt",
+        "stable_id": "ask.prompt-template.issue278.evolution-sample",
+        "version": "278.0.0-candidate",
+        "record_digest": "sha256:9c93cb116df6bf61e855fc8d24fd26116acedbceaabae9a8b8d7fb5185ab6d78",
+        "content_digest": "sha256:d89ac64c6b863068939aef479e324542c9b9c0150d3d37373467d81d6d7bcc84"
+      }
+    }
+  },
+  "artifacts": {
+    "candidate": {
+      "object_digest": "sha256:0a70562fc0b0b5c4c5a615ccce307c6f49eccf5db817cf8a68f77eb91f7c615c",
+      "semantic_digest": "sha256:e458c82cfc4eadb9e0c7655d426f1a3262b0bea1f79846b28547ec9e74a9d41d"
+    },
+    "experiment": {
+      "object_digest": "sha256:86b9deb8716742c76e040e750b3e1f645b19fb08ad1579f5b2344f1cf97c2d88",
+      "semantic_digest": "sha256:bb41ef0d0dae67e31b9ca22e1d027ebb679ef4b69aa31bc9d756cda2abc1d544"
+    },
+    "recommendation": {
+      "object_digest": "sha256:21566d99eef552e79f3776c86fb68b7a75cd52ccff601391982a893e435f55b1",
+      "semantic_digest": "sha256:abf4b4484db1d982705806775a49600e72b6abf2bf64cea9d9a2b7d0598527a2"
+    },
+    "action_proposal": {
+      "object_digest": "sha256:2bb874e33d7ac4ca72b43e5a59ed4ae0e968a9c0880312908f37f77fe125f379",
+      "semantic_digest": "sha256:30aaf940a6c461ac4c753dac87b05eae43632ea69cdf38d067ee5e9cd73aa086"
+    },
+    "human_decision": {
+      "object_digest": "sha256:eec65127c27339503729cec191f4be095016393e3395d6271c4b20fb09218f9f",
+      "semantic_digest": "sha256:01e8f2714afb17c6b80da8ec710278e5eefa2e68817caf4efabee43b9ea497ba"
+    },
+    "application_receipt": {
+      "object_digest": "sha256:1dfd22044f50990abaca1cc04894b87a628395d8d9b5691537b90bfb1a0463e4",
+      "semantic_digest": "sha256:8e2b1a733bece0eef0df9b31706e3f62eaae96ddb6c0314cafec091e81703070"
+    }
+  },
+  "application": {
+    "gate_evidence_object_digest": "sha256:5416a6960ec4ed19a03fc0dd6a2039f14beb5a0d7db8a1ad8a7f030fe6a3aa12",
+    "base_portfolio_lock_digest": "sha256:4e771bfb45ba55e473bbef342fb0139171a2d30a14088e285bfb582c3097f800",
+    "result_portfolio_lock_digest": "sha256:7643df91cd2ef164e21105e1814a688487578a35f2c35e3387c6f2e1a673c3ff",
+    "rollback_anchor": {
+      "portfolio_id": "ask.portfolio.issue278.sample-runtime",
+      "revision": "sample-baseline-v1",
+      "manifest_digest": "sha256:01b90828482e22833c6e246872c05b7a20349a0357eef8f9be9d587add0b893f",
+      "asset_set_digest": "sha256:06ef54d6a0516d07d2b058a08b8a291d37f8e884bdb2ba6a924661776e8fb460"
+    }
+  },
+  "trusted_contexts": {
+    "experiment": [
+      {
+        "kind": "external_evolution_experiment_authority",
+        "authority_id": "issue-278-sample-experiment-authority",
+        "authority_revision": 1,
+        "authority_evidence_digest": "sha256:ced951a2b755f7e4de3bbdd831b98399764db76a5d59ae7f0f7382f1876966c0"
+      }
+    ],
+    "evaluation": [
+      {
+        "authority": {
+          "kind": "external_evolution_evaluation_authority",
+          "authority_id": "issue-278-synthetic-contract-verifier",
+          "authority_revision": 1,
+          "authority_evidence_digest": "sha256:c4eab53f278e1254e0444b49bf60c8abc3163355ea94f854ba5fcb3979645a23",
+          "experiment_digest": "sha256:bb41ef0d0dae67e31b9ca22e1d027ebb679ef4b69aa31bc9d756cda2abc1d544",
+          "verification_mode": "full_verifier",
+          "artifact_inventory_digest": "sha256:9f5b862133519d3b7c995e55fc1be03564b0a8be191a0cf75ddb89b1f6c70ce9"
+        },
+        "dimensions": {
+          "quality": {
+            "status": "complete",
+            "conclusion": "improved",
+            "source_kind": "portfolio_aggregate_result",
+            "artifact_id": "fixture-only-quality-issue-278",
+            "artifact_digest": "sha256:0dfebd0de3d6c767c45de811ea6438e8d37a6cc9031462d2f82ccc6dac8858cc",
+            "causal_credit_applied": true,
+            "factor_ids": [
+              "prompt_instruction_content"
+            ]
+          },
+          "safety": {
+            "status": "complete",
+            "conclusion": "retained",
+            "source_kind": "paired_comparison_report",
+            "artifact_id": "fixture-only-safety-issue-278",
+            "artifact_digest": "sha256:9e5625a8043f23470e03784f1c0e69aa079c435097e04bd6841a655060831ecd",
+            "causal_credit_applied": false,
+            "factor_ids": []
+          },
+          "cost": {
+            "status": "complete",
+            "conclusion": "retained",
+            "source_kind": "paired_comparison_report",
+            "artifact_id": "fixture-only-cost-issue-278",
+            "artifact_digest": "sha256:7c76383d6ccaaf408236ee0b3984889d06d9e8fae6def650c7f298945eb95fd7",
+            "causal_credit_applied": false,
+            "factor_ids": []
+          },
+          "variance": {
+            "status": "complete",
+            "conclusion": "retained",
+            "source_kind": "repetition_report",
+            "artifact_id": "fixture-only-variance-issue-278",
+            "artifact_digest": "sha256:4ef30099e018e332c989d47cbfbf5a12a1f3ef120a915d9b9044f3401f0885e7",
+            "causal_credit_applied": false,
+            "factor_ids": []
+          },
+          "mechanism": {
+            "status": "complete",
+            "conclusion": "observed",
+            "source_kind": "mechanism_scorecard",
+            "artifact_id": "fixture-only-mechanism-issue-278",
+            "artifact_digest": "sha256:5805726a59d58781975b171623834874fa259fbeac653f543ff5f121e08b75ac",
+            "causal_credit_applied": false,
+            "factor_ids": []
+          },
+          "external_outcome": {
+            "status": "insufficient_evidence",
+            "conclusion": "unknown",
+            "source_kind": "external_outcome_report",
+            "artifact_id": "fixture-only-external-outcome-issue-278",
+            "artifact_digest": "sha256:d0e59aac4ab6356d7b913a9380c231df1b36c03e42b54aeb82b088ad62d11d06",
+            "causal_credit_applied": false,
+            "factor_ids": []
+          }
+        },
+        "causal_attribution": {
+          "status": "supported",
+          "factor_ids": [
+            "prompt_instruction_content"
+          ],
+          "evidence_digests": [
+            "sha256:0dfebd0de3d6c767c45de811ea6438e8d37a6cc9031462d2f82ccc6dac8858cc"
+          ]
+        },
+        "reason_codes": [
+          "fixture_only_contract_mechanics"
+        ]
+      }
+    ],
+    "human_decision": [
+      {
+        "schema_version": "1.0.0",
+        "object_kind": "evolution_human_decision",
+        "proposal_digest": "sha256:30aaf940a6c461ac4c753dac87b05eae43632ea69cdf38d067ee5e9cd73aa086",
+        "action": "adopt_candidate",
+        "disposition": "approved",
+        "reason_codes": [
+          "fixture_only_human_approved_canary_mechanics"
+        ],
+        "authority": {
+          "kind": "external_evolution_human_decision_authority",
+          "authority_id": "issue-278-sample-human-maintainer",
+          "authority_revision": 1,
+          "authority_evidence_digest": "sha256:201a8fbe4edfabea55f79934bad4709cf5704a2c69f34ddf9856c3537bb9285f"
+        },
+        "authority_implied": false,
+        "decision_digest": "sha256:01e8f2714afb17c6b80da8ec710278e5eefa2e68817caf4efabee43b9ea497ba"
+      }
+    ],
+    "asset_lifecycle": [],
+    "portfolio_lifecycle": [
+      {
+        "schema_version": "1.0.0",
+        "object_kind": "portfolio_authority_context",
+        "portfolio_id": "ask.portfolio.issue278.sample-runtime",
+        "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+        "scope_id": "agent-spectrum-kernel",
+        "predecessor_lock_digest": "sha256:f1d01ddd3e54aa6816d096c2333a8abf517246b2f65a7a8185ce907b9877a4bb",
+        "transitions": [
+          {
+            "manifest": {
+              "portfolio_id": "ask.portfolio.issue278.sample-runtime",
+              "revision": "sample-baseline-v1",
+              "manifest_digest": "sha256:01b90828482e22833c6e246872c05b7a20349a0357eef8f9be9d587add0b893f",
+              "asset_set_digest": "sha256:06ef54d6a0516d07d2b058a08b8a291d37f8e884bdb2ba6a924661776e8fb460"
+            },
+            "from_state": null,
+            "to_state": "current"
+          }
+        ],
+        "transition_basis_digest": "sha256:a5c7179eb80f47c5854a0f4c98dcd3ea278f721ad948c92f9350d14cd5501f93",
+        "grants": [],
+        "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "rollback_target": null,
+        "authority": {
+          "kind": "external_portfolio_activation_authority",
+          "authority_id": "issue-278-sample-bootstrap-authority",
+          "authority_revision": "1",
+          "authority_evidence_digest": "sha256:05095d596e79c23a49159147d3130f7aa4e3133bd0353b485b71b1c50c62e3a9"
+        },
+        "context_digest": "sha256:ab1e39162bc96447f53ca5392cd1f6756dd66b8ffd03707a4d2a977bbd906e14"
+      },
+      {
+        "schema_version": "1.0.0",
+        "object_kind": "portfolio_authority_context",
+        "portfolio_id": "ask.portfolio.issue278.sample-evaluation",
+        "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+        "scope_id": "agent-spectrum-kernel",
+        "predecessor_lock_digest": "sha256:c4f0c14e08cda87699af094883c46123fff5bd6a9488febc13b1a66c709e4089",
+        "transitions": [
+          {
+            "manifest": {
+              "portfolio_id": "ask.portfolio.issue278.sample-evaluation",
+              "revision": "sample-challenger-v1",
+              "manifest_digest": "sha256:2b9550fef6878114702bf2b318f9e6b02460694e8b295b148dc77a054a5aff6d",
+              "asset_set_digest": "sha256:2e39061606b95f53b482e4aedf368f555d5e5be3f4a63eddc19e81e87006f963"
+            },
+            "from_state": null,
+            "to_state": "current"
+          }
+        ],
+        "transition_basis_digest": "sha256:108a7ff34f636590726ab0830ead0181e4ee85670f81930838d08d8d0cf0c75e",
+        "grants": [],
+        "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "rollback_target": null,
+        "authority": {
+          "kind": "external_portfolio_activation_authority",
+          "authority_id": "issue-278-sample-evaluation-portfolio-authority",
+          "authority_revision": "1",
+          "authority_evidence_digest": "sha256:37bd9c3c21bfb3a3d508199dcfa67c018198d5c1f6a09653d38a40a48c2430e0"
+        },
+        "context_digest": "sha256:b5228d0841a806317ba0421436276f616e14ca097cc89169bb60da4e3a950952"
+      },
+      {
+        "schema_version": "1.0.0",
+        "object_kind": "portfolio_authority_context",
+        "portfolio_id": "ask.portfolio.issue278.sample-runtime",
+        "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+        "scope_id": "agent-spectrum-kernel",
+        "predecessor_lock_digest": "sha256:4e771bfb45ba55e473bbef342fb0139171a2d30a14088e285bfb582c3097f800",
+        "transitions": [
+          {
+            "manifest": {
+              "portfolio_id": "ask.portfolio.issue278.sample-runtime",
+              "revision": "sample-baseline-v1",
+              "manifest_digest": "sha256:01b90828482e22833c6e246872c05b7a20349a0357eef8f9be9d587add0b893f",
+              "asset_set_digest": "sha256:06ef54d6a0516d07d2b058a08b8a291d37f8e884bdb2ba6a924661776e8fb460"
+            },
+            "from_state": "current",
+            "to_state": "superseded"
+          },
+          {
+            "manifest": {
+              "portfolio_id": "ask.portfolio.issue278.sample-runtime",
+              "revision": "sample-candidate-canary-v2",
+              "manifest_digest": "sha256:c9ab3115073d7d50b2b099ee1ca8b08a15f5f962a71e3c9fe56e8e5bc90f584b",
+              "asset_set_digest": "sha256:21e68b89466702a19cbaf4213f8927ba52498ab14ca21e67aec17d9c60ba7eab"
+            },
+            "from_state": null,
+            "to_state": "current"
+          }
+        ],
+        "transition_basis_digest": "sha256:e8582f621d38c5884f36cccfa29a530a6ed38f9c9792340bf1ffac110f6139d5",
+        "grants": [],
+        "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "rollback_target": null,
+        "authority": {
+          "kind": "external_portfolio_activation_authority",
+          "authority_id": "issue-278-sample-human-maintainer",
+          "authority_revision": "3",
+          "authority_evidence_digest": "sha256:eec65127c27339503729cec191f4be095016393e3395d6271c4b20fb09218f9f"
+        },
+        "context_digest": "sha256:39008a7221366262524a3d3e5f6c89fbfcc5589bc9f4d2e01b40233ba2f4ac0f"
+      }
+    ],
+    "high_impact_approval_grants": []
+  },
+  "contract_closure_meanings": [
+    "six_artifact_full_closure_reconstructable",
+    "untrusted_evaluation_authority_rejected",
+    "untrusted_human_decision_authority_rejected",
+    "decision_bound_portfolio_authority_preserves_rollback",
+    "completed_receipt_binds_exact_successor_heads",
+    "all_six_evolution_publications_are_idempotent",
+    "semantic_digest_and_unknown_field_tamper_rejected",
+    "missing_human_decision_rejected_before_mutation",
+    "wrong_decision_evidence_digest_rejected",
+    "stale_portfolio_predecessor_rejected",
+    "untrusted_portfolio_activation_authority_rejected",
+    "rollback_anchor_drift_rejected",
+    "semantic_and_object_digests_remain_distinct",
+    "insufficient_evidence_verified_exact_head_noop_without_implicit_retention",
+    "evaluation_authority_experiment_transplant_rejected",
+    "forged_completed_receipt_reconstruction_rejected",
+    "target_portfolio_transplant_rejected",
+    "candidate_reserved_experiment_authority_and_scope_closure",
+    "evaluation_authority_role_collapse_rejected",
+    "unreserved_human_decision_authority_rejected",
+    "incomplete_evidence_affirmative_or_retention_mapping_rejected",
+    "causal_and_dimension_source_semantics_closed"
+  ],
+  "synthetic_evidence_provenance": {
+    "fixture_only": true,
+    "contract_test_scenario": "expand_to_adopt_candidate_mechanics",
+    "executed_benchmark_result": false,
+    "real_scoring_result": false,
+    "production_recommendation": false,
+    "generalization_allowed": false,
+    "external_outcome_evidence_present": false
+  },
+  "prompt_vertical": {
+    "sample_is_prompt_v2": false,
+    "status": "typed_stop",
+    "stop_code": "prompt_v2_materialization_unavailable",
+    "generic_issue_197_projection_available": false
+  },
+  "boundaries": {
+    "prompt_v2_vertical_completed": false,
+    "product_evidence_implied": false,
+    "external_outcome_claimed": false,
+    "autonomous_mutation": false,
+    "mutable_latest_pointer_used": false,
+    "frozen_benchmark_results_mutated": false
+  }
+}

@@ -36,8 +36,10 @@ This skill evaluates capability growth. It does not replace task-level verificat
    - Review gate outcomes and final decisions.
    - Verification results and missing evidence.
    - Adoption metrics, skill effectiveness evaluations, stakeholder readiness reports, and explicit human confirmations.
+   - Apply `ask.claim-evidence-status@1.0.0` inline and keep human authority plus assessment lifecycle separate. Select formal `evidence-ledger` only for a closed audit trigger.
 
 3. Score level using evidence-backed criteria.
+   - Treat a one-task `ask.skill-effectiveness-outcome@1.0.0` result only as scoped source evidence. Its dimension classifications and recommendation are not capability levels and do not move maturity by themselves.
    - `0 Unknown`: no usable evidence.
    - `1 One-off assisted`: one task outcome with limited reuse evidence.
    - `2 Repeatable with human supervision`: repeated use with human decisions still central.
@@ -63,6 +65,8 @@ Engineering capability evaluation:
 - Current level:
 - Evidence source:
 - Evidence status:
+- Authority status:
+- Assessment state:
 - Observed strengths:
 - Observed failures:
 - Human dependency:

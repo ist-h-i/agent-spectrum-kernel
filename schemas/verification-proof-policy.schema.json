@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/verification-proof-policy.schema.json",
+  "title": "ASK verification proof policy",
+  "description": "Closed records for selecting Compact Proof or the existing Formal Verification Contract without creating an evidence store.",
+  "oneOf": [
+    { "$ref": "#/$defs/selection" },
+    { "$ref": "#/$defs/compactProof" },
+    { "$ref": "#/$defs/transition" }
+  ],
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "referenceList": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonEmptyString" }
+    },
+    "eligibilityFact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fact_id", "evidence_refs"],
+      "properties": {
+        "fact_id": {
+          "type": "string",
+          "enum": [
+            "localized_scope",
+            "reversible_change",
+            "single_observable_behavior",
+            "single_focused_check",
+            "single_session_no_handoff",
+            "no_cross_boundary_change",
+            "consistent_local_upstream_proof",
+            "localized_completion_claim_only"
+          ]
+        },
+        "evidence_refs": { "$ref": "#/$defs/referenceList" }
+      }
+    },
+    "formalTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trigger_id", "evidence_refs"],
+      "properties": {
+        "trigger_id": {
+          "type": "string",
+          "enum": [
+            "bug_reproduction_or_regression",
+            "public_api_schema_or_compatibility",
+            "state_concurrency_persistence_lifecycle_or_cross_module",
+            "security_auth_permission_privacy_financial_or_email",
+            "infrastructure_migration_production_or_external_effect",
+            "dependency_or_hard_to_reverse_boundary",
+            "performance_or_reliability",
+            "multi_session_multi_agent_or_handoff",
+            "merge_release_or_stable_trace",
+            "multiple_specialized_checks",
+            "missing_or_conflicting_upstream_proof",
+            "explicit_formal_request",
+            "compact_eligibility_incomplete"
+          ]
+        },
+        "evidence_refs": { "$ref": "#/$defs/referenceList" }
+      }
+    },
+    "upstreamProofFact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_ref", "field", "value"],
+      "properties": {
+        "source_ref": { "$ref": "#/$defs/nonEmptyString" },
+        "field": { "$ref": "#/$defs/nonEmptyString" },
+        "value": {}
+      }
+    },
+    "compactSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selection_id", "policy_ref", "selected_path", "behavior_ref", "eligibility_facts", "formal_triggers"],
+      "properties": {
+        "selection_id": { "$ref": "#/$defs/nonEmptyString" },
+        "policy_ref": { "const": "ask.verification-proof-policy@1.0.0" },
+        "selected_path": { "const": "compact_proof" },
+        "behavior_ref": { "$ref": "#/$defs/nonEmptyString" },
+        "eligibility_facts": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/eligibilityFact" },
+          "allOf": [
+            {
+              "contains": { "type": "object", "required": ["fact_id"], "properties": { "fact_id": { "const": "localized_scope" } } },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": { "type": "object", "required": ["fact_id"], "properties": { "fact_id": { "const": "reversible_change" } } },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": { "type": "object", "required": ["fact_id"], "properties": { "fact_id": { "const": "single_observable_behavior" } } },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": { "type": "object", "required": ["fact_id"], "properties": { "fact_id": { "const": "single_focused_check" } } },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": { "type": "object", "required": ["fact_id"], "properties": { "fact_id": { "const": "single_session_no_handoff" } } },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": { "type": "object", "required": ["fact_id"], "properties": { "fact_id": { "const": "no_cross_boundary_change" } } },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": { "type": "object", "required": ["fact_id"], "properties": { "fact_id": { "const": "consistent_local_upstream_proof" } } },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": { "type": "object", "required": ["fact_id"], "properties": { "fact_id": { "const": "localized_completion_claim_only" } } },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ]
+        },
+        "formal_triggers": {
+          "type": "array",
+          "maxItems": 0
+        },
+        "upstream_proof_facts": {
+          "type": "array",
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/upstreamProofFact" }
+        }
+      }
+    },
+    "formalSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selection_id", "policy_ref", "selected_path", "behavior_ref", "eligibility_facts", "formal_triggers", "formal_verification_contract_ref"],
+      "properties": {
+        "selection_id": { "$ref": "#/$defs/nonEmptyString" },
+        "policy_ref": { "const": "ask.verification-proof-policy@1.0.0" },
+        "selected_path": { "const": "formal_verification_contract" },
+        "behavior_ref": { "$ref": "#/$defs/nonEmptyString" },
+        "eligibility_facts": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/eligibilityFact" }
+        },
+        "formal_triggers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 13,
+          "items": { "$ref": "#/$defs/formalTrigger" }
+        },
+        "formal_verification_contract_ref": { "$ref": "#/$defs/nonEmptyString" },
+        "upstream_proof_facts": {
+          "type": "array",
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/upstreamProofFact" }
+        }
+      }
+    },
+    "selection": {
+      "oneOf": [
+        { "$ref": "#/$defs/compactSelection" },
+        { "$ref": "#/$defs/formalSelection" }
+      ]
+    },
+    "focusedCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "command"],
+      "properties": {
+        "check_id": { "$ref": "#/$defs/nonEmptyString" },
+        "command": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "observedResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "check_id", "command", "exit_code", "exact_result", "execution_evidence_refs"],
+      "properties": {
+        "status": { "type": "string", "enum": ["passed", "failed"] },
+        "check_id": { "$ref": "#/$defs/nonEmptyString" },
+        "command": { "$ref": "#/$defs/nonEmptyString" },
+        "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "exact_result": { "$ref": "#/$defs/nonEmptyString" },
+        "execution_evidence_refs": { "$ref": "#/$defs/referenceList" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "passed" } }, "required": ["status"] },
+          "then": { "properties": { "exit_code": { "const": 0 } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
+          "then": { "properties": { "exit_code": { "type": "integer", "minimum": 1, "maximum": 255 } } }
+        }
+      ]
+    },
+    "missingResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "check_id", "command", "missing_evidence", "next_check"],
+      "properties": {
+        "status": { "const": "missing" },
+        "check_id": { "$ref": "#/$defs/nonEmptyString" },
+        "command": { "$ref": "#/$defs/nonEmptyString" },
+        "missing_evidence": { "$ref": "#/$defs/nonEmptyString" },
+        "next_check": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "compactProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "artifact_type", "policy_ref", "selection_ref", "behavior_ref", "behavior", "focused_check", "result", "broader_check_required_when"],
+      "properties": {
+        "artifact_id": { "$ref": "#/$defs/nonEmptyString" },
+        "artifact_type": { "const": "compact_proof" },
+        "policy_ref": { "const": "ask.verification-proof-policy@1.0.0" },
+        "selection_ref": { "$ref": "#/$defs/nonEmptyString" },
+        "behavior_ref": { "$ref": "#/$defs/nonEmptyString" },
+        "behavior": { "$ref": "#/$defs/nonEmptyString" },
+        "focused_check": { "$ref": "#/$defs/focusedCheck" },
+        "result": {
+          "oneOf": [
+            { "$ref": "#/$defs/observedResult" },
+            { "$ref": "#/$defs/missingResult" }
+          ]
+        },
+        "broader_check_required_when": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_ref", "selection_id", "from_path", "to_path", "formal_triggers", "executed_compact_evidence_refs", "retained_evidence_refs", "formal_verification_contract_ref"],
+      "properties": {
+        "policy_ref": { "const": "ask.verification-proof-policy@1.0.0" },
+        "selection_id": { "$ref": "#/$defs/nonEmptyString" },
+        "from_path": { "const": "compact_proof" },
+        "to_path": { "const": "formal_verification_contract" },
+        "formal_triggers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 13,
+          "items": { "$ref": "#/$defs/formalTrigger" }
+        },
+        "executed_compact_evidence_refs": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "retained_evidence_refs": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "formal_verification_contract_ref": { "$ref": "#/$defs/nonEmptyString" },
+        "prior_result_status": { "type": "string", "enum": ["passed", "failed", "missing"] },
+        "resumed": { "type": "boolean" }
+      }
+    }
+  },
+  "x-ask-contract": {
+    "id": "ask.verification-proof-policy",
+    "revision": "1.0.0",
+    "ref": "ask.verification-proof-policy@1.0.0",
+    "paths": ["compact_proof", "formal_verification_contract"],
+    "compact_eligibility_fact_ids": [
+      "localized_scope",
+      "reversible_change",
+      "single_observable_behavior",
+      "single_focused_check",
+      "single_session_no_handoff",
+      "no_cross_boundary_change",
+      "consistent_local_upstream_proof",
+      "localized_completion_claim_only"
+    ],
+    "formal_trigger_ids": [
+      "bug_reproduction_or_regression",
+      "public_api_schema_or_compatibility",
+      "state_concurrency_persistence_lifecycle_or_cross_module",
+      "security_auth_permission_privacy_financial_or_email",
+      "infrastructure_migration_production_or_external_effect",
+      "dependency_or_hard_to_reverse_boundary",
+      "performance_or_reliability",
+      "multi_session_multi_agent_or_handoff",
+      "merge_release_or_stable_trace",
+      "multiple_specialized_checks",
+      "missing_or_conflicting_upstream_proof",
+      "explicit_formal_request",
+      "compact_eligibility_incomplete"
+    ],
+    "protected_compact_claim_types": [
+      "merge",
+      "release",
+      "performance",
+      "security",
+      "reliability",
+      "production",
+      "external_readiness",
+      "no_regression",
+      "broad_no_regression"
+    ],
+    "compact_rendered_shape": "Proof:\n- Behavior:\n- Focused check:\n- Result or missing evidence:\n- Broader check required when:\n",
+    "formal_path_absorbing": true,
+    "execution_evidence_owner_ref": "docs/verification-evidence-contract.md"
+  }
+}

@@ -4,8 +4,9 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildAgentsBlock,
-  CORE_IMMUTABLE_CONTRACT_ASSETS,
+  CORE_OWNED_IMMUTABLE_ASSETS,
   buildLifecycleState,
+  coreImmutableAssetKind,
   createManagedBlockRecord,
   createManagedFileRecord,
   createRollbackSnapshot,
@@ -120,28 +121,30 @@ function readPreviousState(target) {
   return readJson(statePath);
 }
 
-function validateImmutableContractProjection(target, state) {
+function validateImmutableProjection(target, state) {
   if (!state) {
     throw new Error(`core install state is missing: ${STATE_PATH}`);
   }
   if (state.install_status !== "installed") {
     throw new Error(`core install state is not active: ${STATE_PATH}`);
   }
-  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
+  for (const asset of CORE_OWNED_IMMUTABLE_ASSETS) {
+    const kind = coreImmutableAssetKind(asset);
+    const label = kind === "immutable_runtime" ? "runtime" : "contract";
     const record = state.managed_files?.[asset];
-    if (record?.kind !== "immutable_contract" || record.asset !== asset) {
-      throw new Error(`core immutable contract ownership mismatch: ${asset}`);
+    if (record?.kind !== kind || record.asset !== asset) {
+      throw new Error(`core immutable ${label} ownership mismatch: ${asset}`);
     }
     const sourceDigest = hashText(readText(resolve(REPO_ROOT, asset)));
     if (record.sha256 !== sourceDigest || record.canonical_sha256 !== sourceDigest) {
-      throw new Error(`core immutable contract state digest mismatch: ${asset}`);
+      throw new Error(`core immutable ${label} state digest mismatch: ${asset}`);
     }
     const targetPath = resolve(target, asset);
     if (!existsSync(targetPath)) {
-      throw new Error(`core immutable contract is missing: ${asset}`);
+      throw new Error(`core immutable ${label} is missing: ${asset}`);
     }
     if (hashText(readText(targetPath)) !== record.sha256) {
-      throw new Error(`core immutable contract bytes do not match install state: ${asset}`);
+      throw new Error(`core immutable ${label} bytes do not match install state: ${asset}`);
     }
   }
 }
@@ -275,16 +278,17 @@ function buildPlan(args) {
     rollback,
   });
 
-  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
+  for (const asset of CORE_OWNED_IMMUTABLE_ASSETS) {
+    const kind = coreImmutableAssetKind(asset);
     const source = resolve(REPO_ROOT, asset);
     ensureSource(source, asset);
     const content = readText(source);
-    managedFiles[asset] = createManagedFileRecord({ kind: "immutable_contract", asset, content });
+    managedFiles[asset] = createManagedFileRecord({ kind, asset, content });
     planWriteManaged(operations, {
       target: args.target,
       relativePath: asset,
       content,
-      reason: `immutable_contract:${asset}`,
+      reason: `${kind}:${asset}`,
       previousState,
       force: args.force,
       rollback,
@@ -359,7 +363,7 @@ function main() {
     return;
   }
   if (args.check) {
-    validateImmutableContractProjection(args.target, readPreviousState(args.target));
+    validateImmutableProjection(args.target, readPreviousState(args.target));
   }
   const plan = buildPlan(args);
   applyLifecyclePlan({ target: args.target, statePath: STATE_PATH, operations: plan.operations, state: plan.state, dryRun: args.dryRun || args.check });

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/asset-content.schema.json",
+  "title": "Agent Spectrum Kernel Asset content package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "object_kind", "asset_type", "package_format", "files", "type_extension"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "object_kind": { "type": "string", "const": "asset_content_package" },
+    "asset_type": { "type": "string", "enum": ["skill", "prompt", "evaluator_reference"] },
+    "package_format": { "type": "string", "const": "canonical_json_base64_files" },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/file" }
+    },
+    "type_extension": { "$ref": "#/$defs/typeExtension" }
+  },
+  "$defs": {
+    "portablePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!(?:.*\\/)?\\.{1,2}(?:\\/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+    },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "media_type", "encoding", "byte_length", "raw_digest", "bytes_base64"],
+      "properties": {
+        "path": { "$ref": "#/$defs/portablePath" },
+        "media_type": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+(?:; charset=utf-8)?$" },
+        "encoding": { "type": "string", "const": "base64" },
+        "byte_length": { "type": "integer", "minimum": 1, "maximum": 1048576 },
+        "raw_digest": { "$ref": "#/$defs/digest" },
+        "bytes_base64": { "type": "string", "minLength": 4, "maxLength": 1398104, "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$" }
+      }
+    },
+    "typeExtension": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "entrypoint"],
+          "properties": {
+            "kind": { "type": "string", "const": "skill" },
+            "entrypoint": { "$ref": "#/$defs/portablePath" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "adapter", "entrypoint", "rendered_runtime_content"],
+          "properties": {
+            "kind": { "type": "string", "const": "prompt_template" },
+            "adapter": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+            "entrypoint": { "$ref": "#/$defs/portablePath" },
+            "rendered_runtime_content": { "type": "boolean", "const": false }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "adapter", "entrypoints", "renderer", "runtime_application_implied"],
+          "properties": {
+            "kind": { "type": "string", "const": "rendered_prompt_bundle" },
+            "adapter": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+            "entrypoints": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/portablePath" }
+            },
+            "renderer": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "version", "input_digest", "projection_digest"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+                "version": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$" },
+                "input_digest": { "$ref": "#/$defs/digest" },
+                "projection_digest": { "$ref": "#/$defs/digest" }
+              }
+            },
+            "runtime_application_implied": { "type": "boolean", "const": false }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "fixture_id", "entrypoint", "private_evaluator_content_included"],
+          "properties": {
+            "kind": { "type": "string", "const": "public_evaluator_reference" },
+            "fixture_id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+            "entrypoint": { "$ref": "#/$defs/portablePath" },
+            "private_evaluator_content_included": { "type": "boolean", "const": false }
+          }
+        }
+      ]
+    }
+  }
+}

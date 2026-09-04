@@ -70,8 +70,10 @@ Use these statuses for important claims:
 | `Verified` | Directly observed in repo files, docs, tests, runtime output, command output, or user input. |
 | `Supported` | Backed by indirect evidence but not fully proven. |
 | `Hypothesis` | Plausible inference that needs confirmation before being used as fact. |
-| `Human-confirmed` | Confirmed by a human owner in the current or prior documented review context. |
 | `Unknown` | Not inspected, unavailable, ambiguous, or outside current evidence. |
+| `Falsified` | Direct evidence contradicts the claim and requires correction. |
+
+Use `ask.claim-evidence-status@1.0.0`; record human confirmation in source/owner metadata, not as another status.
 
 ## Process
 
@@ -142,7 +144,7 @@ Review context generation:
 - Path:
 - Created or updated:
 - Facts found from repo:
-- Human-confirmed items:
+- Items with explicit human authority metadata:
 - Hypotheses needing confirmation:
 - Unknowns:
 - Review consumers:

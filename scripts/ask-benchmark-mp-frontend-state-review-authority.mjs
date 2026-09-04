@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { constants, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import {
@@ -52,13 +52,18 @@ import {
 } from "./ask-benchmark-mn-build-option-update.mjs";
 import { validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
 import {
+  assertFlatRegularAuthorityDirectory,
+  prepareAuthorityPublication,
+  publishPreparedAuthority,
+  writeAuthorityJsonNoFollow as writeJson,
+} from "./ask-benchmark-authority-publication.mjs";
+import {
   MP_FRONTEND_STATE_FIXTURE_ID,
   MP_FRONTEND_STATE_FIXTURE_ROOT,
   agentVisibleFiles,
   readJson,
   sha256,
   validateMpFrontendStateReviewInputClosure,
-  writeJson,
 } from "./ask-benchmark-mp-frontend-state-review.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -226,8 +231,8 @@ function writePrivateAuthority({ root, privateRoot, evaluatorRevision, generatio
     generation_revision: evaluatorRevision,
     evaluator_source_identity: sourceIdentity,
     frozen_candidate_input: { public_source_path: `${MP_FRONTEND_STATE_FIXTURE_ROOT}/input-manifest.json`, raw_byte_digest: inputDigest, digest: canonicalDigest(readJson(resolve(root, MP_FRONTEND_STATE_FIXTURE_ROOT, "input-manifest.json"), "mp-frontend-state input manifest")) },
-    source_classification: ["issue_206_and_264_authority_requirements", "frozen_agent_visible_fixture", "repository_production_contracts", "independently_created_engineering_scenario"],
-    excluded_source_classification: ["measured_agent_output", "measured_scoring_result", "prohibited_legacy_fixture_sources"],
+    source_classification: ["current_canonical_public_contracts", "frozen_agent_visible_fixture", "repository_production_contracts", "independently_created_engineering_scenario"],
+    excluded_source_classification: ["historical_private_case_review_bytes_unavailable", "historical_private_case_review_bytes_not_reconstructed", "measured_agent_output", "measured_scoring_result", "prohibited_legacy_fixture_sources"],
     measured_output_used: false,
     measured_result_used: false,
     author_scratch: { used: true, scope: "private evaluator construction only", contamination_assessment: { state: "not_used", evidence_basis: "No measured output, score, or prohibited legacy answer was available to the generator." } },
@@ -242,6 +247,7 @@ function writePrivateAuthority({ root, privateRoot, evaluatorRevision, generatio
     schema_version: "1.0.0",
     schema_path: "benchmarks/schemas/private-evaluator-bundle.schema.json",
     program: "adaptive_ask_private_evaluator_bundle",
+    execution_budget_ms: 120_000,
     fixture_identity: { fixture_id: MP_FRONTEND_STATE_FIXTURE_ID, task_class: "pr_review", suite: "mechanism_positive" },
     input_identity: { fixture_input_digest: inputDigest },
     evaluator_revision: evaluatorRevision,
@@ -348,7 +354,7 @@ function generateInPlace({ root, privateRoot, evaluatorRevision, generationDate 
     catalog: rawArtifact(root, "benchmarks/portfolio-catalog.json", catalog.catalog_digest), policy_manifest: rawArtifact(root, "benchmarks/portfolio-policy-manifest.json", policyManifest.manifest_digest), scoring_policy: rawArtifact(root, "benchmarks/portfolio-scoring-policy.json", scoringPolicy.policy_digest),
     admission_record: rawArtifact(root, admissionPath, admission.admission_digest), requirement_record: { path: requirementPath, raw_byte_digest: sha256(readFileSync(resolve(root, requirementPath))), record_digest: requirement.requirement_record_digest, set_digest: requirement.requirement_set_digest },
     output_contract: rawArtifact(root, outputPath, output.output_contract_digest), evaluator_public_reference: rawArtifact(root, referencePath, reference.public_metadata_digest), verification_command_contract: rawArtifact(root, verificationPath, verification.contract_digest), evidence_map: rawArtifact(root, evidencePath, canonicalDigest(authority.evidenceMap)), evaluator_authority_manifest: rawArtifact(root, layout.manifestPath, authorityManifest.manifest_digest),
-    result_profile: output.result_profile, freeze_revision: "issue-264-mp-frontend-state-review-r1",
+    result_profile: output.result_profile, freeze_revision: "issue-282-mp-frontend-state-review-successor-r1",
   };
   const freeze = { ...freezeBase, manifest_digest: computeScoringInputFreezeManifestDigest(freezeBase) };
   writeJson(resolve(fixtureRoot, "scoring-input-freeze-manifest.json"), freeze);
@@ -380,52 +386,6 @@ function runGit(root, args, label) {
   return result.stdout.trim();
 }
 
-function preparePublication(pairs) {
-  const transactionDirectories = new Set();
-  const prepared = [];
-  try {
-    for (const { source, target, transactionDirectory, label } of pairs) {
-      if (!existsSync(source) || !lstatSync(source).isFile() || lstatSync(source).isSymbolicLink()) throw new Error(`${label} staged source is invalid`);
-      if (existsSync(target) && (!lstatSync(target).isFile() || lstatSync(target).isSymbolicLink())) throw new Error(`${label} target is invalid`);
-      if (existsSync(target) && readFileSync(source).equals(readFileSync(target))) continue;
-      if (!existsSync(transactionDirectory)) mkdirSync(transactionDirectory, { recursive: false });
-      transactionDirectories.add(transactionDirectory);
-      const suffix = randomUUID();
-      const staged = resolve(transactionDirectory, `${basename(target)}.${suffix}.staging`);
-      const backup = resolve(transactionDirectory, `${basename(target)}.${suffix}.backup`);
-      copyFileSync(source, staged, constants.COPYFILE_EXCL);
-      const hadTarget = existsSync(target);
-      if (hadTarget) copyFileSync(target, backup, constants.COPYFILE_EXCL);
-      prepared.push({ target, staged, backup, label, published: false, hadTarget });
-    }
-    return { prepared, transactionDirectories: [...transactionDirectories] };
-  } catch (error) {
-    for (const record of prepared) { rmSync(record.staged, { force: true }); rmSync(record.backup, { force: true }); }
-    for (const directory of transactionDirectories) rmSync(directory, { recursive: true, force: true });
-    throw error;
-  }
-}
-
-function publishPrepared(preparedState, validatePublished) {
-  try {
-    for (const record of preparedState.prepared) { renameSync(record.staged, record.target); record.published = true; }
-    const result = validatePublished();
-    for (const record of preparedState.prepared) rmSync(record.backup, { force: true });
-    for (const directory of preparedState.transactionDirectories) rmSync(directory, { recursive: true, force: true });
-    return result;
-  } catch (error) {
-    for (const record of [...preparedState.prepared].reverse()) {
-      if (record.published) {
-        if (record.hadTarget && existsSync(record.backup)) renameSync(record.backup, record.target);
-        else rmSync(record.target, { force: true });
-      }
-      rmSync(record.staged, { force: true }); rmSync(record.backup, { force: true });
-    }
-    for (const directory of preparedState.transactionDirectories) rmSync(directory, { recursive: true, force: true });
-    throw error;
-  }
-}
-
 export function writeMpFrontendStateReviewProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots }) {
   if (!privateRoot || !existsSync(privateRoot) || !lstatSync(privateRoot).isDirectory() || lstatSync(privateRoot).isSymbolicLink()) throw new Error("mp-frontend-state writer requires an existing non-symlink private root");
   assertPrivateRootOutsideRepository(root, privateRoot);
@@ -436,6 +396,7 @@ export function writeMpFrontendStateReviewProductionAuthority({ root = ROOT, pri
   if (!boundaryRoots || requiredBoundaries.some((key) => !boundaryRoots[key] || !existsSync(boundaryRoots[key]) || !lstatSync(boundaryRoots[key]).isDirectory())) throw new Error("mp-frontend-state writer requires complete boundary roots");
   const repositoryRoot = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
+  assertFlatRegularAuthorityDirectory(privateDirectory, "mp-frontend-state private root");
   const frozenBefore = agentVisibleFiles(resolve(repositoryRoot, MP_FRONTEND_STATE_FIXTURE_ROOT));
   const inputBefore = readFileSync(resolve(repositoryRoot, MP_FRONTEND_STATE_FIXTURE_ROOT, "input-manifest.json"));
   const verificationBefore = readFileSync(resolve(repositoryRoot, MP_FRONTEND_STATE_FIXTURE_ROOT, "verification-command-contract.json"));
@@ -448,6 +409,7 @@ export function writeMpFrontendStateReviewProductionAuthority({ root = ROOT, pri
     runGit(repositoryRoot, ["worktree", "add", "--detach", stagedRepository, evaluatorRevision], "mp-frontend-state staging worktree creation");
     worktreeAdded = true;
     cpSync(privateDirectory, stagedPrivate, { recursive: true, force: false, errorOnExist: true });
+    assertFlatRegularAuthorityDirectory(stagedPrivate, "mp-frontend-state staged private root");
     generateInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate });
     validateMpFrontendStateReviewProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots });
     if (!inputBefore.equals(readFileSync(resolve(stagedRepository, MP_FRONTEND_STATE_FIXTURE_ROOT, "input-manifest.json"))) || !verificationBefore.equals(readFileSync(resolve(stagedRepository, MP_FRONTEND_STATE_FIXTURE_ROOT, "verification-command-contract.json"))) || stableCanonicalJson(frozenBefore) !== stableCanonicalJson(agentVisibleFiles(resolve(stagedRepository, MP_FRONTEND_STATE_FIXTURE_ROOT)))) throw new Error("mp-frontend-state production generation changed frozen agent-visible inputs");
@@ -456,7 +418,7 @@ export function writeMpFrontendStateReviewProductionAuthority({ root = ROOT, pri
     const privateTransaction = resolve(dirname(privateDirectory), `.mp-frontend-state-authority-${transaction}`);
     const publicPairs = GENERATED_PUBLIC.map((name) => ({ source: resolve(stagedRepository, MP_FRONTEND_STATE_FIXTURE_ROOT, name), target: resolve(repositoryRoot, MP_FRONTEND_STATE_FIXTURE_ROOT, name), transactionDirectory: publicTransaction, label: `mp-frontend-state public ${name}` }));
     const privatePairs = GENERATED_PRIVATE.map((name) => ({ source: resolve(stagedPrivate, name), target: resolve(privateDirectory, name), transactionDirectory: privateTransaction, label: `mp-frontend-state private ${name}` }));
-    return publishPrepared(preparePublication([...publicPairs, ...privatePairs]), () => validateMpFrontendStateReviewProductionAuthority({ root: repositoryRoot, privateRoot: privateDirectory, boundaryRoots }));
+    return publishPreparedAuthority(prepareAuthorityPublication([...publicPairs, ...privatePairs]), () => validateMpFrontendStateReviewProductionAuthority({ root: repositoryRoot, privateRoot: privateDirectory, boundaryRoots }));
   } finally {
     if (worktreeAdded) {
       const removal = spawnSync("git", ["-C", repositoryRoot, "worktree", "remove", "--force", stagedRepository], { encoding: "utf8" });

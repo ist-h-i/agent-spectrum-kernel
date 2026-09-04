@@ -1,45 +1,43 @@
 ---
-description: Run the Agent Spectrum Kernel review flow for the current PR or diff.
+description: Review a target through the fixed-entry Agent Spectrum Kernel profile.
 ---
 
-Use the installed project skills from this repository projection.
+Fixed review entry. Primary contract: `review-router`. Read `schemas/review-signal-gate-map.json`.
 
-Use `/evidence-ledger` for every correctness, readiness, or merge claim.
+Produce one `review-ai-quality` baseline. Add gates only for exact signals; run `review-final-merge-gate` last only when `$ARGUMENTS` requests a final decision. Keep one impact-ordered Findings list.
 
-Start with `/review-router` to extract observed change signals and map them to required gates. Run only the required gates. End with `/review-final-merge-gate` style output:
+{{ASK_COMPACT_CONTROLS}}
 
-- require approval for the specific action and stop without that approval before any risk-gated action
-- when required evidence is missing, report `insufficient_evidence` and stop; do not infer the missing result
-- do not start or delegate agents unless the request explicitly requires agent activity; report started, completed, and failed counts
+{{ASK_COMPACT_DIRECT_TRIGGERS}}
 
-Before extracting signals, read `schemas/review-signal-gate-map.json`. Emit only its exact signal IDs and use its signal-to-gate mapping; do not invent free-form trigger IDs.
+[agent_activity] opt-in; report started/completed/failed.
 
-- decision: `approve`, `approve with comments`, `request changes`, `block`, or `insufficient evidence`
-- blocking evidence
-- passed required gates
-- insufficient evidence
-- non-blocking follow-ups
-- residual risk
-- one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`
+Baseline review:
+- Gate: review-ai-quality
+- Status: pass | pass_with_comments | fail | insufficient_evidence
+- Evidence: target/evidence
 
-When the merge claim depends on lifecycle evidence, use stable refs from `docs/lifecycle-traceability-contract.md`; do not copy acceptance, evidence, blocker, or accepted-risk content into another lifecycle section.
-
-Keep current-PR blockers separate from non-blocking improvement-ledger candidates and suggestions. Do not publish metrics externally.
-
-Normal review route:
-
-Change signals:
-- signal: observed evidence
-
-Required gates:
-- gate: reason; triggered by signal(s)
-
-Skipped heavy gates:
-- gate/layer: observed reason
+Additional required gates:
+- <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<text>; signals=<exact IDs>
 
 Missing evidence:
-- input: why it is required and what remains unknown
+- input/gate: affected judgment; next check
 
-Do not emit a fixed layer-by-layer applicability table unless validation or debugging explicitly requests the diagnostic artifact.
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: optional
+
+Only for a requested final decision:
+
+Decision:
+- approve | approve with comments | request changes | block | insufficient evidence
+
+Use `- none` for empty sections. Emit one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`.
 
 $ARGUMENTS

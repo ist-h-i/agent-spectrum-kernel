@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "measurement": "sequential canonical workflow stages; adapter entry and conditional branches are excluded",
+  "profiles": [
+    {
+      "prompt_name": "skill-implement.md",
+      "pre_fixed_sha256": "sha256:055f1a16519a2b7934f444ce5dcf2a7b81504adc9f80279e1259bbb92b40b246",
+      "pre_fixed_stages": ["skill-router", "controlled-implementation"],
+      "fixed_stages": ["controlled-implementation"]
+    },
+    {
+      "prompt_name": "skill-investigate.md",
+      "pre_fixed_sha256": "sha256:c5b1a73abe92045bc4423bf275961a7f3e6008207a45977ca9ceb3afb75cc4b1",
+      "pre_fixed_stages": ["skill-router", "doubt-driven-development"],
+      "fixed_stages": ["doubt-driven-development"]
+    },
+    {
+      "prompt_name": "skill-review.md",
+      "pre_fixed_sha256": "sha256:e55bbe6c937e220abd5db22187caa3ed31ef1df4780734d81f8112da8853f881",
+      "pre_fixed_stages": ["review-router"],
+      "fixed_stages": ["review-router"]
+    },
+    {
+      "prompt_name": "skill-verify.md",
+      "pre_fixed_sha256": "sha256:a6e15f2467599a73d4fc047582d48b3dc18ff0874ebda90be3879dd63fee818f",
+      "pre_fixed_stages": ["test-first-verification"],
+      "fixed_stages": ["test-first-verification"]
+    },
+    {
+      "prompt_name": "skill-handoff.md",
+      "pre_fixed_sha256": "sha256:81d1b167a4151ffe4e9f9efc01811b511e727c6ae53095ccd415801fee4f3254",
+      "pre_fixed_stages": ["handoff-generation"],
+      "fixed_stages": ["handoff-generation"]
+    }
+  ]
+}

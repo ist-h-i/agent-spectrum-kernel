@@ -44,6 +44,8 @@ Domain rule entry:
 - State / condition:
 - Source:
 - Evidence status:
+- Authority status:
+- Record state:
 - Applies to:
 - Used by:
 - Last checked:
@@ -52,22 +54,19 @@ Domain rule entry:
 ```
 
 3. Apply evidence status semantics.
-   - `Verified`: directly supported by repo/docs/tests/runtime/production behavior.
-   - `Human-confirmed`: confirmed by a responsible human or domain owner.
-   - `Supported`: backed by indirect evidence but not fully proven.
-   - `Hypothesis`: usable for question generation only, not for blocking review.
-   - `Deprecated`: retained for history and migration context.
-   - `Contradicted`: retained as a visible conflict requiring a human/domain-owner decision.
+   - Use `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`.
+   - Record human confirmation as `Authority status=human_confirmed`; it does not promote evidence by itself.
+   - Record lifecycle/conflict as `Record state=active|deprecated|contradicted`.
 
 4. Enforce promotion gates.
    - `Hypothesis` -> `Supported` requires cited supporting evidence.
    - `Supported` -> `Verified` requires direct repo/docs/tests/runtime/production evidence.
-   - Any status -> `Human-confirmed` requires explicit human/domain-owner confirmation.
-   - Contradictions are not overwritten silently; keep the contradicted entry visible and add the conflict source.
+   - Human confirmation requires an explicit human/domain-owner source and changes authority metadata only.
+   - Contradictions use `Falsified` plus `Record state=contradicted`; keep the entry visible and add the conflict source.
 
 5. Handle stale rules.
    - Mark stale review when `Last checked` is old relative to `Staleness trigger`.
-   - If current evidence no longer supports a rule, move it to `Contradicted` or `Deprecated` instead of deleting it.
+   - If current evidence no longer supports a rule, set `Record state` to `contradicted` or `deprecated` instead of deleting it.
    - Do not use stale or contradicted rules as blocking constraints without human review.
 
 6. Keep consumers explicit.
@@ -84,7 +83,7 @@ Domain rule ledger update:
 - Entries updated:
 - Entries marked stale:
 - Contradictions:
-- Deprecated rules:
+- Rules with `Record state=deprecated`:
 - Promotion decisions:
 - Human confirmation required:
 - Consumers to refresh:
@@ -95,7 +94,7 @@ Domain rule ledger update:
 ## Exit criteria
 
 - Each durable rule has a source and evidence status.
-- AI-created candidates remain `Hypothesis` or `Supported` unless stronger evidence or human confirmation exists.
+- AI-created candidates remain `Hypothesis` or `Supported` unless stronger direct evidence exists; human confirmation stays separate.
 - Stale and contradicted rules remain visible.
 - Human decision boundaries are explicit.
 - Technical debt is not hidden inside domain rules.
@@ -105,6 +104,6 @@ Domain rule ledger update:
 | Failure | Correction |
 |---|---|
 | Auto-promoting inferred business rules | Keep them as `Hypothesis` or `Supported` and ask for confirmation. |
-| Deleting contradicted rules | Mark `Contradicted` and cite the conflict. |
+| Deleting contradicted rules | Use `Falsified`, set `Record state=contradicted`, and cite the conflict. |
 | Storing task progress as a domain rule | Move progress to handoff or planning artifacts. |
 | Using `Hypothesis` rules to block review | Use them only for questions or warnings. |

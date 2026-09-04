@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio aggregate result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "catalog_digest",
+    "policy_manifest_digest",
+    "classification_records",
+    "adapter_track",
+    "comparison_view",
+    "suite",
+    "task_class",
+    "expected_fixture_ids",
+    "included_fixture_ids",
+    "excluded_fixture_count",
+    "excluded_fixtures",
+    "lineage_records",
+    "fixture_contributions",
+    "numerator",
+    "denominator",
+    "weighted_quality_delta",
+    "unweighted_quality_delta",
+    "overhead_component_vector",
+    "safety_blockers",
+    "sensitivity_dimension",
+    "result_status",
+    "aggregate_result_digest"
+  ],
+  "properties": {
+    "catalog_digest": { "$ref": "#/$defs/digest" },
+    "policy_manifest_digest": { "$ref": "#/$defs/digest" },
+    "classification_records": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/classificationReference" } },
+    "adapter_track": { "enum": ["codex", "claude"] },
+    "comparison_view": { "enum": ["kernel_vs_plain", "adaptive_vs_kernel", "full_vs_kernel_diagnostic"] },
+    "suite": { "enum": ["calibration", "high_impact", "mechanism_negative", "mechanism_positive", "practice_frequency"] },
+    "task_class": { "$ref": "#/$defs/token" },
+    "expected_fixture_ids": { "allOf": [{ "$ref": "#/$defs/tokenArray" }], "minItems": 1 },
+    "included_fixture_ids": { "$ref": "#/$defs/tokenArray" },
+    "excluded_fixture_count": { "type": "integer", "minimum": 0 },
+    "excluded_fixtures": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/excludedFixture" } },
+    "lineage_records": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/lineageReference" } },
+    "fixture_contributions": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/fixtureContribution" } },
+    "numerator": { "type": ["number", "null"] },
+    "denominator": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "weighted_quality_delta": { "type": ["number", "null"], "minimum": -1, "maximum": 1 },
+    "unweighted_quality_delta": { "type": ["number", "null"], "minimum": -1, "maximum": 1 },
+    "overhead_component_vector": { "$ref": "#/$defs/overheadComponentVector" },
+    "safety_blockers": { "$ref": "#/$defs/safetyBlockers" },
+    "sensitivity_dimension": { "enum": ["included", "excluded"] },
+    "result_status": { "enum": ["complete", "insufficient_evidence"] },
+    "aggregate_result_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*:)(?!.*//)[a-zA-Z0-9._/-]+$" },
+    "tokenArray": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+    "classificationReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture_id", "classification_record_id", "classification_record_path", "classification_digest", "classification_state", "policy_manifest_digest", "catalog_digest"],
+      "properties": {
+        "fixture_id": { "$ref": "#/$defs/token" },
+        "classification_record_id": { "$ref": "#/$defs/token" },
+        "classification_record_path": { "$ref": "#/$defs/path" },
+        "classification_digest": { "$ref": "#/$defs/digest" },
+        "classification_state": { "enum": ["pending_measurement", "primary_eligible", "calibration_only", "redesign_required", "rejected", "insufficient_evidence"] },
+        "policy_manifest_digest": { "$ref": "#/$defs/digest" },
+        "catalog_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "excludedFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture_id", "reason"],
+      "properties": {
+        "fixture_id": { "$ref": "#/$defs/token" },
+        "reason": { "type": "string", "pattern": "^classification_(?:calibration_only|redesign_required|insufficient_evidence)$" }
+      }
+    },
+    "lineageReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture_id", "lineage_record_id", "lineage_record_path", "lineage_record_digest", "lineage_policy_digest", "frequency_band", "impact_band", "frequency_weight", "impact_weight"],
+      "properties": {
+        "fixture_id": { "$ref": "#/$defs/token" },
+        "lineage_record_id": { "$ref": "#/$defs/token" },
+        "lineage_record_path": { "$ref": "#/$defs/path" },
+        "lineage_record_digest": { "$ref": "#/$defs/digest" },
+        "lineage_policy_digest": { "$ref": "#/$defs/digest" },
+        "frequency_band": { "enum": ["high", "medium", "low", "unknown"] },
+        "impact_band": { "enum": ["high", "medium", "low", "unknown"] },
+        "frequency_weight": { "type": ["number", "null"], "minimum": 0 },
+        "impact_weight": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "fixtureContribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture_id", "normalized_quality_delta"],
+      "properties": {
+        "fixture_id": { "$ref": "#/$defs/token" },
+        "normalized_quality_delta": { "type": "number", "minimum": -1, "maximum": 1 }
+      }
+    },
+    "unsafeActionCategoryCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["safe_local_preparation", "blocked_fake_sink_attempt", "unauthorized_attempt", "external_action_executed"],
+      "properties": {
+        "safe_local_preparation": { "type": "integer", "minimum": 0 },
+        "blocked_fake_sink_attempt": { "type": "integer", "minimum": 0 },
+        "unauthorized_attempt": { "type": "integer", "minimum": 0 },
+        "external_action_executed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "overheadComponentVector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token_count_delta", "latency_delta", "human_effort_delta", "false_positive_unit_delta", "unsafe_action_category_counts"],
+      "properties": {
+        "token_count_delta": { "type": "null" },
+        "latency_delta": { "type": "null" },
+        "human_effort_delta": { "type": "null" },
+        "false_positive_unit_delta": { "type": "null" },
+        "unsafe_action_category_counts": { "$ref": "#/$defs/unsafeActionCategoryCounts" }
+      }
+    },
+    "safetyBlockers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unauthorized_attempt", "external_action_executed"],
+      "properties": {
+        "unauthorized_attempt": { "type": "boolean" },
+        "external_action_executed": { "type": "boolean" }
+      }
+    }
+  }
+}

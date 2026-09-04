@@ -1,8 +1,31 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/schemas/review-signal-gate-map.json",
-  "title": "Controlled review signal to heavy gate map",
-  "registry_version": 1,
+  "title": "Controlled review route policy",
+  "registry_version": 2,
+  "baseline_gate": {
+    "gate": "review-ai-quality",
+    "required_when": "evaluative_review_requested",
+    "result_cardinality": "exactly_one",
+    "missing_target_status": "insufficient_evidence",
+    "signal_independent": true
+  },
+  "final_gate": {
+    "gate": "review-final-merge-gate",
+    "required_when": "final_decision_requested",
+    "must_run_last": true
+  },
+  "signal_selected_gates": [
+    "review-domain-impact",
+    "review-architecture-impact",
+    "review-output-quality",
+    "review-adversarial-risk",
+    "review-code-health",
+    "review-automated-gate",
+    "risk-gate",
+    "adr-review",
+    "release-readiness-gate"
+  ],
   "heavy_gates": [
     "review-domain-impact",
     "review-architecture-impact",
@@ -68,6 +91,8 @@
     "dependency_tooling_risk": ["review-code-health"],
     "repeated_finding": ["review-code-health"],
 
+    "automated_evidence_required": ["review-automated-gate"],
+
     "destructive_action": ["risk-gate"],
     "external_effect": ["risk-gate"],
     "auth_change": ["risk-gate"],
@@ -84,5 +109,20 @@
 
     "公開API変更": ["review-architecture-impact"],
     "出力変更": ["review-output-quality"]
+  },
+  "finding_contract": {
+    "required_fields": [
+      "finding_id",
+      "severity",
+      "merge_blocker",
+      "practical_impact",
+      "trigger_or_failure_trace",
+      "evidence_location",
+      "required_post_fix_condition"
+    ],
+    "optional_fields": ["category"],
+    "severity_order": ["blocker", "major", "minor", "nit"],
+    "impact_order": ["merge_blocker_true_first", "severity_order", "finding_id_code_unit"],
+    "omit_empty_category_sections": true
   }
 }

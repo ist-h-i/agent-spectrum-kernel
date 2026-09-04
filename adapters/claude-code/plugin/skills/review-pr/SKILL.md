@@ -1,49 +1,54 @@
 ---
-description: Run the Agent Spectrum Kernel PR review flow through review-router and final merge gate.
+name: review-pr
+description: Review a target through the fixed-entry Agent Spectrum Kernel profile.
 ---
+<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"review","k":"p","r":"ask-fixed-entry-assets-v1","p":"13fc729130ef3c1ace6ca5ec5ff922a84e947f5aa5a56b2f475dfed9497417a9","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
 
 # Review PR
 
-Use the core Agent Spectrum Kernel review model.
+Entry mode is fixed to review. Primary contract: `review-router`. Apply the review semantics directly; do not add an upper routing stage. Read `${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json`.
 
-Before reviewing, read the bundled canonical contracts at `${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md` and `${CLAUDE_PLUGIN_ROOT}/contracts/lifecycle-traceability-contract.md`, the bundled signal registry at `${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json`, and the bundled schemas at `${CLAUDE_PLUGIN_ROOT}/schemas/`. The plugin package is self-contained; do not substitute a host repository document. Emit only registry signal IDs and use its signal-to-gate mapping.
+Produce exactly one `review-ai-quality` baseline result. Select additional gates only for exact observed signal IDs. Run `review-final-merge-gate` last only when `$ARGUMENTS` explicitly requests a final merge decision.
 
-Process:
+- [scope] repo/code/tests/docs/API; missing=>stop|insufficient; minimal diff; cleanup separate
+- [verification] ask.verification-proof-policy@1.0.0: compact_proof|formal_verification_contract before claim; focused->risk-based; exact; trigger=>formal.
+- [risk_approval] exact action/risk/impact/reversibility/visibility/alternative/preconditions; unapproved=>stop; approved-only.
+- [evidence] Verified|Supported|Hypothesis|Unknown|Falsified@ask.claim-evidence-status@1.0.0; inline; closed formal=>evidence-ledger; unsupported=>downgrade.
+- [missing_evidence] unavailable|insufficient; no inference; required=>stop
+- [output] managed: ordinary=>sidecar, stop/handoff=>inline, diagnostic explicit; unmanaged=>one inline; next_action only.
 
-1. Start with `review-router` to extract observed change signals and map them to required gates.
-2. Run only required gates.
-3. Include code-health review only when maintainability, debt, repeated finding, validation-check, or refactor-candidate risk is applicable.
-4. Keep current-PR blockers in Blocking evidence; use Required fixes only for detailed fix entries.
-5. Put non-blocking follow-up under Non-blocking follow-ups and separate improvement-ledger candidates when applicable.
-6. End with `review-final-merge-gate` style output.
-7. When the merge claim depends on lifecycle evidence, use stable refs from the bundled traceability contract and report stale or missing refs as `insufficient evidence`.
+Conditional (each missing=>`capability_missing`): `formal_claim_audit_required`=>`evidence-ledger`.
 
-Normal routing artifact:
+[agent_activity] opt-in; report started, completed, and failed counts.
 
-Change signals:
-- signal: observed evidence
+Read `${CLAUDE_PLUGIN_ROOT}/contracts/claim-evidence-status-contract.md` and `${CLAUDE_PLUGIN_ROOT}/schemas/claim-evidence-status.schema.json`. Apply `ask.claim-evidence-status@1.0.0` inline. A requested final merge decision selects `high_stakes_readiness` and `formal_ledger`; apply `/ai-skills:evidence-ledger`. Installation alone is not activation.
 
-Required gates:
-- gate: reason; triggered by signal(s)
+Baseline review:
+- Gate: review-ai-quality
+- Status: pass | pass_with_comments | fail | insufficient_evidence
+- Evidence: target/evidence
 
-Skipped heavy gates:
-- gate/layer: observed reason
+Additional required gates:
+- <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<text>; signals=<exact IDs>
 
 Missing evidence:
-- input: why it is required and what remains unknown
+- input/gate: affected judgment; next check
 
-Do not emit a fixed layer-by-layer applicability table unless validation or debugging explicitly requests the diagnostic artifact.
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: optional
 
-Output contract:
+Only when final merge judgment was requested, append:
 
-- Decision: approve | approve with comments | request changes | block | insufficient evidence
-- Blocking evidence
-- Passed required gates
-- Insufficient evidence
-- Non-blocking follow-ups
-- Residual risk
-- exactly one fenced JSON `Execution Envelope` using `${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md`; the serialized output must contain the literal `Execution Envelope:` heading immediately before the JSON fence
+Decision:
+- approve | approve with comments | request changes | block | insufficient evidence
 
-Do not merge, deploy, publish, or mutate production configuration.
+Use `- none` for empty sections. Emit exactly one fenced JSON `Execution Envelope` using `${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md`.
 
 $ARGUMENTS

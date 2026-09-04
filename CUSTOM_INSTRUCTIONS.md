@@ -12,11 +12,11 @@ Core rules:
 2. Inspect relevant repository context before changing code.
 3. Keep the change boundary narrow. Do not opportunistically refactor, reformat, rename public APIs, alter dependencies, or fix adjacent issues.
 4. Prefer the smallest valid change that preserves existing behavior.
-5. Separate evidence status: Verified, Supported, Hypothesis, Unknown, Falsified.
+5. Apply `ask.claim-evidence-status@1.0.0` inline: Verified, Supported, Hypothesis, Unknown, Falsified.
 6. Do not claim correctness, performance, security, reliability, readiness, or business value without evidence.
 7. Ask only the focused question that materially changes the implementation. Otherwise make a reversible assumption and mark it.
 8. Do not perform destructive, irreversible, credential-sensitive, production-facing, or externally visible actions without explicit approval.
-9. Verify before completion using tests, typecheck, lint, build, runtime/manual checks, reproduction, measurement, or security-specific checks as appropriate.
+9. Verify before completion using tests, typecheck, lint, build, runtime/manual checks, reproduction, measurement, or security-specific checks as appropriate. When verification applies, use `ask.verification-proof-policy@1.0.0`: Compact Proof requires every closed localized eligibility fact and no formal trigger; otherwise keep the Formal Verification Contract. Compact may upgrade to formal with evidence retained; formal never downgrades.
 10. If verification cannot be run, state exactly why, what was checked instead, and the next verification step.
 11. Use `docs/agent-session-state-contract.md` only for non-trivial continuation, handoff, interrupted work, or risk-gated work. Do not require session state for trivial or fully captured simple local tasks.
 
@@ -35,11 +35,11 @@ Core rules:
 - Design / “grill me”: `grill-design`.
 - Docs/domain/ADR fit: `grill-with-docs`.
 - Application boundary decision needed before implementation, including dependency direction, state ownership, external I/O boundary, DTO/error trust boundary, async lifetime, feature public API, usecase/repository/port/adapter/mapper necessity, ID boundary, or architecture guard rollout: `application-boundary-architecture`, then return to `spec-driven-development` or `controlled-implementation`.
-- New feature: `spec-driven-development` -> `test-first-verification` for Verification Contract -> `controlled-implementation` -> `test-first-verification` for evidence.
-- Bug/unknown root cause: `doubt-driven-development` -> `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof.
-- Scope creep/refactor risk: `scope-control`; then `controlled-implementation` if proceeding to code. In review, use `review-router` -> required gates; scope findings generally route to `review-ai-quality`.
+- New feature: `spec-driven-development` -> `test-first-verification` selects Compact Proof or Formal Verification Contract -> `controlled-implementation` references it -> `test-first-verification` for evidence.
+- Bug/unknown root cause: `doubt-driven-development` -> `test-first-verification` selects the Formal Verification Contract for reproduction/regression -> `controlled-implementation` -> `test-first-verification` for regression proof.
+- Scope creep/refactor risk: `scope-control`; then `controlled-implementation` if proceeding to code. In review, use `review-router` -> one mandatory `review-ai-quality` baseline -> exact-signal additional gates.
 - Hard-to-reverse architecture decision or ADR need: `adr-review`.
-- Diff/PR/generated code review: `review-router` -> observed change signals -> required gates, including `review-architecture-impact` for structural or boundary impact, `review-output-quality` for consumer-facing or machine-consumed output, and `review-adversarial-risk` for severe failure paths -> `review-final-merge-gate`.
+- Diff/PR/generated code review: `review-router` -> exactly one signal-independent `review-ai-quality` baseline -> exact-signal additional gates, including `review-architecture-impact` for structural or boundary impact, `review-output-quality` for consumer-facing or machine-consumed output, and `review-adversarial-risk` for severe failure paths -> `review-final-merge-gate` last only when a final decision is requested.
 - Repeated implementation context: `implementation-context-generation` creates or updates `docs/ai/implementation-context.md` for stack inventory, commands, implementation/test patterns, boundaries, overlay hooks, stop conditions, and update triggers.
 - Repeated review context: `review-context-generation` creates or updates `docs/ai/review-context.md` for personas, output contracts, critical workflows, accepted risks, known issues, and noise-control rules.
 - MR/PR README, PR explanation, or durable change-context documentation: `mr-readme-generation`.
@@ -51,23 +51,22 @@ Stack implementation overlay: after generic workflow selection, consider stack-s
 
 Risk overlay: if any task involves destructive, external, production, auth, secret, dependency, migration, billing, email, or infra impact, run `risk-gate` before the selected workflow proceeds to action.
 
-Evidence overlay: use `evidence-ledger` whenever the response makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
+Evidence overlay: apply the five statuses inline for ordinary work. Use `evidence-ledger` only when the shared contract selects `formal_ledger` for an explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs.
 
 ## Completion format
 
+For implementation, use the canonical implementation artifact. The managed runner owns ordinary Execution Envelope state as a sidecar; direct/unmanaged use follows the explicit inline compatibility in `docs/execution-envelope-contract.md`.
+
 ```text
-Changed:
-- ...
+Implementation Contract:
+- Artifact ID:
+- Upstream refs:
+- Actual change boundary:
+- Verification attempted:
+- Evidence references:
+- Selected Compact Proof or Formal Verification Contract ref:
+- Handoff state:
 
-Verified:
-- ...
-
-Not verified:
-- ...
-
-Risks / assumptions:
-- ...
-
-Next:
-- ...
+Evidence:
+- claim, command or observation, and exact result
 ```

@@ -32,6 +32,8 @@ Do not over-process trivial tasks. For non-trivial tasks, select the smallest re
 
 ## 1. Truth model
 
+The machine-readable source is `ask.claim-evidence-status@1.0.0` (`schemas/claim-evidence-status.schema.json`). Apply it inline by default.
+
 Separate every important statement by evidence status.
 
 - `Verified`: directly observed in code, docs, tests, logs, runtime output, command output, or user-provided input.
@@ -124,6 +126,14 @@ Do not ask broad question dumps. Ask the next decision that materially changes t
 
 Completion means verified behavior, not edited files.
 
+When verification applies, use `ask.verification-proof-policy@1.0.0` from
+`docs/verification-proof-policy-contract.md` before implementation claims.
+Select Compact Proof only when every closed localized/reversible eligibility
+fact is evidenced and no formal trigger is present; otherwise retain the
+existing Formal Verification Contract. Upgrade compact to formal when a trigger
+appears, preserve executed evidence refs, and never downgrade formal after a
+failed check, resume, or handoff.
+
 Use the strongest affordable evidence:
 - focused unit/integration/e2e tests,
 - typecheck, lint, build,
@@ -191,48 +201,55 @@ Every non-trivial change needs evidence proportional to risk.
 ## 10. Output contracts
 
 Evidence overlay:
-Use `evidence-ledger` whenever the response makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
+Apply the five claim statuses inline for ordinary work. Use `evidence-ledger` only when `ask.claim-evidence-status@1.0.0` selects `formal_ledger` for an explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs.
 
 For implementation tasks, end with:
 
 ```text
-Changed:
-- ...
+Implementation Contract:
+- Artifact ID:
+- Upstream refs:
+- Actual change boundary:
+- Verification attempted:
+- Evidence references:
+- Selected Compact Proof or Formal Verification Contract ref:
+- Handoff state:
 
-Verified:
-- ...
-
-Not verified:
-- ...
-
-Risks / assumptions:
-- ...
-
-Next:
-- ...
+Evidence:
+- claim, command or observation, and exact result
 ```
+
+Execution Envelope transport follows `docs/execution-envelope-contract.md`: the managed runner persists ordinary control state as a sidecar, protected and handoff boundaries serialize it once, and direct/unmanaged adapters use explicit inline compatibility. Do not copy route, checked/missing evidence, stop conditions, or next action into renamed summary fields.
 
 For review tasks, end with:
 
 ```text
+Baseline review:
+- Gate: review-ai-quality
+- Status: pass | pass_with_comments | fail | insufficient_evidence
+- Evidence: non-empty checked target/evidence
+
+Additional required gates:
+- <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<non-empty text>; signals=<comma-separated exact signal IDs>
+
+Missing evidence:
+- gate/input — affected judgment and the next check
+
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: optional
+
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
-
-Blocking evidence:
-- [severity] gate/file:line — evidence, impact, and required fix or decision
-
-Passed required gates:
-- gate — evidence checked
-
-Insufficient evidence:
-- gate/input — what remains unknown and the next check
-
-Non-blocking follow-ups:
-- improvement-ledger candidate, rule feedback, or suggestion
-
-Residual risk:
-- ...
 ```
+
+Omit `Decision` when no final decision was requested. Use one impact-ordered finding inventory; do not emit empty category sections or skipped-heavy-gate boilerplate in ordinary output.
 
 For handoff tasks, produce a precise next task, not a generic recommendation.
 
@@ -243,5 +260,5 @@ Allowed scope:
 Forbidden scope:
 Expected output:
 Verification:
-Stop condition:
+Unverified evidence:
 ```

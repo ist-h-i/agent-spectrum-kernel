@@ -1,0 +1,549 @@
+{
+  "schema_version": "1.0.0",
+  "contract_ref": "ask.skill-effectiveness-outcome@1.0.0",
+  "base_input": {
+    "outcome_id": "fixture-outcome",
+    "task_id": "fixture-task",
+    "skill_id": "skill-effectiveness-evaluation",
+    "observations": [
+      {
+        "observation_id": "obs-outcome-quality",
+        "dimension": "outcome_quality",
+        "metric_id": "valid_findings",
+        "unit": "finding",
+        "measurement_status": "observed",
+        "value": 3,
+        "metric_definition": "Count of task-relevant findings accepted in the completed artifact.",
+        "source_ref": "fixture://completed-task/review",
+        "evidence_refs": ["fixture-evidence:review"],
+        "evidence_status": "Verified",
+        "effect": {
+          "status": "established",
+          "reference_value": 3,
+          "materiality_threshold": 1,
+          "rule_ref": "fixture://completed-task/materiality/valid-findings",
+          "evidence_refs": ["fixture-evidence:review"],
+          "evidence_status": "Verified",
+          "limitation": null
+        },
+        "limitation": null
+      },
+      {
+        "observation_id": "obs-false-positive-control",
+        "dimension": "false_positive_control",
+        "metric_id": "false_positive_findings",
+        "unit": "finding",
+        "measurement_status": "observed",
+        "value": 0,
+        "metric_definition": "Count of reported findings rejected as false positives during task review.",
+        "source_ref": "fixture://completed-task/review",
+        "evidence_refs": ["fixture-evidence:review"],
+        "evidence_status": "Verified",
+        "effect": {
+          "status": "established",
+          "reference_value": 0,
+          "materiality_threshold": 1,
+          "rule_ref": "fixture://completed-task/materiality/false-positive-findings",
+          "evidence_refs": ["fixture-evidence:review"],
+          "evidence_status": "Verified",
+          "limitation": null
+        },
+        "limitation": null
+      },
+      {
+        "observation_id": "obs-safety",
+        "dimension": "safety",
+        "metric_id": "guardrail_violations",
+        "unit": "violation",
+        "measurement_status": "observed",
+        "value": 0,
+        "metric_definition": "Count of task guardrail violations established by the recorded review evidence.",
+        "source_ref": "fixture://completed-task/safety-review",
+        "evidence_refs": ["fixture-evidence:safety-review"],
+        "evidence_status": "Verified",
+        "effect": {
+          "status": "established",
+          "evidence_refs": ["fixture-evidence:safety-review"],
+          "evidence_status": "Verified",
+          "limitation": null
+        },
+        "limitation": null
+      },
+      {
+        "observation_id": "obs-routing-quality",
+        "dimension": "routing_quality",
+        "metric_id": "route_mismatches",
+        "unit": "route_decision",
+        "measurement_status": "observed",
+        "value": 0,
+        "metric_definition": "Count of selected routes contradicted by the completed task evidence.",
+        "source_ref": "fixture://completed-task/route-review",
+        "evidence_refs": ["fixture-evidence:route-review"],
+        "evidence_status": "Verified",
+        "effect": {
+          "status": "established",
+          "reference_value": 0,
+          "materiality_threshold": 1,
+          "rule_ref": "fixture://completed-task/materiality/route-mismatches",
+          "evidence_refs": ["fixture-evidence:route-review"],
+          "evidence_status": "Verified",
+          "limitation": null
+        },
+        "limitation": null
+      },
+      {
+        "observation_id": "obs-evidence-quality",
+        "dimension": "evidence_quality",
+        "metric_id": "unsupported_overclaims",
+        "unit": "claim",
+        "measurement_status": "observed",
+        "value": 0,
+        "metric_definition": "Count of material task claims that exceeded their recorded evidence.",
+        "source_ref": "fixture://completed-task/claim-audit",
+        "evidence_refs": ["fixture-evidence:claim-audit"],
+        "evidence_status": "Verified",
+        "effect": {
+          "status": "established",
+          "reference_value": 0,
+          "materiality_threshold": 1,
+          "rule_ref": "fixture://completed-task/materiality/unsupported-overclaims",
+          "evidence_refs": ["fixture-evidence:claim-audit"],
+          "evidence_status": "Verified",
+          "limitation": null
+        },
+        "limitation": null
+      },
+      {
+        "observation_id": "obs-overhead",
+        "dimension": "overhead",
+        "metric_id": "task_tokens",
+        "unit": "token",
+        "measurement_status": "observed",
+        "value": 4200,
+        "metric_definition": "Total recorded model tokens used for the completed task.",
+        "source_ref": "fixture://completed-task/runtime",
+        "evidence_refs": ["fixture-evidence:runtime"],
+        "evidence_status": "Verified",
+        "effect": {
+          "status": "established",
+          "reference_value": 4200,
+          "materiality_threshold": 1000,
+          "rule_ref": "fixture://completed-task/materiality/task-tokens",
+          "evidence_refs": ["fixture-evidence:runtime"],
+          "evidence_status": "Verified",
+          "limitation": null
+        },
+        "limitation": null
+      },
+      {
+        "observation_id": "obs-reuse-value",
+        "dimension": "reuse_value",
+        "metric_id": "reusable_artifacts",
+        "unit": "artifact",
+        "measurement_status": "observed",
+        "value": 0,
+        "metric_definition": "Count of task artifacts accepted for reuse in a later workflow.",
+        "source_ref": "fixture://completed-task/artifact-review",
+        "evidence_refs": ["fixture-evidence:artifact-review"],
+        "evidence_status": "Verified",
+        "effect": {
+          "status": "established",
+          "reference_value": 0,
+          "materiality_threshold": 1,
+          "rule_ref": "fixture://completed-task/materiality/reusable-artifacts",
+          "evidence_refs": ["fixture-evidence:artifact-review"],
+          "evidence_status": "Verified",
+          "limitation": null
+        },
+        "limitation": null
+      }
+    ],
+    "limitations": []
+  },
+  "positive_cases": [
+    {
+      "case_id": "effective-expand",
+      "observation_overrides": [
+        { "observation_id": "obs-outcome-quality", "value": 4 }
+      ],
+      "expected_dimension": "outcome_quality",
+      "expected_classification": "effective",
+      "expected_recommendation": "expand"
+    },
+    {
+      "case_id": "neutral-retain",
+      "observation_overrides": [],
+      "expected_dimension": "outcome_quality",
+      "expected_classification": "neutral",
+      "expected_recommendation": "retain"
+    },
+    {
+      "case_id": "excessive-simplify",
+      "observation_overrides": [
+        { "observation_id": "obs-overhead", "value": 14200 }
+      ],
+      "expected_dimension": "overhead",
+      "expected_classification": "excessive",
+      "expected_recommendation": "simplify"
+    },
+    {
+      "case_id": "harmful-stop",
+      "observation_overrides": [
+        { "observation_id": "obs-outcome-quality", "value": 4 },
+        { "observation_id": "obs-safety", "value": 1 }
+      ],
+      "expected_dimension": "safety",
+      "expected_classification": "harmful",
+      "expected_recommendation": "stop"
+    },
+    {
+      "case_id": "insufficient-evidence",
+      "observation_overrides": [
+        {
+          "observation_id": "obs-evidence-quality",
+          "measurement_status": "unknown",
+          "value": null,
+          "evidence_refs": [],
+          "evidence_status": "Unknown",
+          "effect": {
+            "status": "unknown",
+            "reference_value": null,
+            "materiality_threshold": null,
+            "rule_ref": null,
+            "evidence_refs": [],
+            "evidence_status": "Unknown",
+            "limitation": "No artifact-level effect evidence was recorded for this task."
+          },
+          "limitation": "No artifact-level overclaim audit was recorded for this task."
+        }
+      ],
+      "expected_dimension": "evidence_quality",
+      "expected_classification": "insufficient_evidence",
+      "expected_recommendation": "insufficient_evidence"
+    },
+    {
+      "case_id": "routing-only-retain",
+      "observation_overrides": [
+        { "observation_id": "obs-routing-quality", "effect": { "reference_value": 1 } }
+      ],
+      "expected_dimension": "routing_quality",
+      "expected_classification": "effective",
+      "expected_recommendation": "retain"
+    },
+    {
+      "case_id": "observed-overhead-unknown-effect",
+      "observation_overrides": [
+        {
+          "observation_id": "obs-overhead",
+          "effect": {
+            "status": "unknown",
+            "reference_value": null,
+            "materiality_threshold": null,
+            "rule_ref": null,
+            "evidence_refs": [],
+            "evidence_status": "Unknown",
+            "limitation": "Token use was observed, but no comparable baseline or materiality rule was recorded."
+          }
+        }
+      ],
+      "expected_dimension": "overhead",
+      "expected_classification": "insufficient_evidence",
+      "expected_recommendation": "insufficient_evidence"
+    }
+  ],
+  "negative_cases": [
+    {
+      "case_id": "reject-observation-score-metric",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "observation",
+        "observation_id": "obs-outcome-quality",
+        "field": "metric_id",
+        "value": "overall_effectiveness_score"
+      },
+      "expected_issue_codes": ["METRIC_UNKNOWN"]
+    },
+    {
+      "case_id": "reject-observation-personnel-metric",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "observation",
+        "observation_id": "obs-outcome-quality",
+        "field": "metric_id",
+        "value": "personnel_performance_score"
+      },
+      "expected_issue_codes": ["METRIC_UNKNOWN"]
+    },
+    {
+      "case_id": "reject-unregistered-metric-alias",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "observation",
+        "observation_id": "obs-outcome-quality",
+        "field": "metric_id",
+        "value": "workflow_efficiency_index"
+      },
+      "expected_issue_codes": ["METRIC_UNKNOWN"]
+    },
+    {
+      "case_id": "reject-observation-score-unit",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "observation",
+        "observation_id": "obs-outcome-quality",
+        "field": "unit",
+        "value": "score_0_100"
+      },
+      "expected_issue_codes": ["METRIC_UNIT_MISMATCH"]
+    },
+    {
+      "case_id": "reject-observation-personnel-definition",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "observation",
+        "observation_id": "obs-outcome-quality",
+        "field": "metric_definition",
+        "value": "Personnel performance rating for the individual completing the task."
+      },
+      "expected_issue_codes": ["METRIC_DEFINITION_MISMATCH"]
+    },
+    {
+      "case_id": "reject-metric-dimension-drift",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "observation",
+        "observation_id": "obs-outcome-quality",
+        "field": "dimension",
+        "value": "overhead"
+      },
+      "expected_issue_codes": ["METRIC_DIMENSION_MISMATCH"]
+    },
+    {
+      "case_id": "reject-metric-value-type-drift",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "observation",
+        "observation_id": "obs-outcome-quality",
+        "field": "value",
+        "value": 4.5
+      },
+      "expected_issue_codes": ["METRIC_VALUE_INVALID"]
+    },
+    {
+      "case_id": "reject-effect-reference-missing",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "effect",
+        "observation_id": "obs-outcome-quality",
+        "field": "reference_value",
+        "value": null
+      },
+      "expected_issue_codes": ["EFFECT_REFERENCE_REQUIRED"]
+    },
+    {
+      "case_id": "reject-effect-delta-drift",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "effect",
+        "observation_id": "obs-outcome-quality",
+        "field": "delta",
+        "value": 99
+      },
+      "expected_issue_codes": ["EFFECT_DELTA_MISMATCH"]
+    },
+    {
+      "case_id": "reject-effect-threshold-missing",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "effect",
+        "observation_id": "obs-outcome-quality",
+        "field": "materiality_threshold",
+        "value": null
+      },
+      "expected_issue_codes": ["EFFECT_THRESHOLD_REQUIRED"]
+    },
+    {
+      "case_id": "reject-effect-rule-missing",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "effect",
+        "observation_id": "obs-outcome-quality",
+        "field": "rule_ref",
+        "value": null
+      },
+      "expected_issue_codes": ["EFFECT_RULE_REF_REQUIRED"]
+    },
+    {
+      "case_id": "reject-effect-evidence-missing",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "effect",
+        "observation_id": "obs-outcome-quality",
+        "field": "evidence_refs",
+        "value": []
+      },
+      "expected_issue_codes": ["EFFECT_EVIDENCE_REF_REQUIRED"]
+    },
+    {
+      "case_id": "reject-effect-impact-drift",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "effect",
+        "observation_id": "obs-outcome-quality",
+        "field": "impact",
+        "value": "neutral"
+      },
+      "expected_issue_codes": ["EFFECT_IMPACT_MISMATCH"]
+    },
+    {
+      "case_id": "reject-direct-effect-rule-drift",
+      "from_case_id": "harmful-stop",
+      "mutation": {
+        "target": "effect",
+        "observation_id": "obs-safety",
+        "field": "rule_ref",
+        "value": "fixture://self-declared/safety-rule"
+      },
+      "expected_issue_codes": ["EFFECT_RULE_REF_MISMATCH"]
+    },
+    {
+      "case_id": "reject-observed-direct-unknown-effect",
+      "from_case_id": "harmful-stop",
+      "mutation": {
+        "target": "observation",
+        "observation_id": "obs-safety",
+        "field": "effect",
+        "value": {
+          "status": "unknown",
+          "basis": "evidence_gap",
+          "reference_value": null,
+          "delta": null,
+          "materiality_threshold": null,
+          "rule_ref": null,
+          "evidence_refs": [],
+          "evidence_status": "Unknown",
+          "impact": "unknown",
+          "limitation": "The caller attempted to suppress an observed direct safety effect."
+        }
+      },
+      "expected_issue_codes": ["SCHEMA_INVALID", "DIRECT_EFFECT_STATUS_REQUIRED"]
+    },
+    {
+      "case_id": "reject-direct-nonzero-neutral-impact",
+      "from_case_id": "harmful-stop",
+      "mutation": {
+        "target": "effect",
+        "observation_id": "obs-safety",
+        "field": "impact",
+        "value": "neutral"
+      },
+      "expected_issue_codes": ["SCHEMA_INVALID", "EFFECT_IMPACT_MISMATCH"]
+    },
+    {
+      "case_id": "reject-direct-zero-harmful-impact",
+      "from_case_id": "neutral-retain",
+      "mutation": {
+        "target": "effect",
+        "observation_id": "obs-safety",
+        "field": "impact",
+        "value": "harmful"
+      },
+      "expected_issue_codes": ["SCHEMA_INVALID", "EFFECT_IMPACT_MISMATCH"]
+    },
+    {
+      "case_id": "reject-direct-effect-evidence-ref-drift",
+      "from_case_id": "neutral-retain",
+      "mutation": {
+        "target": "effect",
+        "observation_id": "obs-safety",
+        "field": "evidence_refs",
+        "value": ["fixture-evidence:unrelated-effect-source"]
+      },
+      "expected_issue_codes": ["DIRECT_EFFECT_EVIDENCE_REFS_MISMATCH"]
+    },
+    {
+      "case_id": "reject-direct-effect-evidence-status-drift",
+      "from_case_id": "neutral-retain",
+      "mutation": {
+        "target": "effect",
+        "observation_id": "obs-safety",
+        "field": "evidence_status",
+        "value": "Supported"
+      },
+      "expected_issue_codes": ["DIRECT_EFFECT_EVIDENCE_STATUS_MISMATCH"]
+    },
+    {
+      "case_id": "reject-unknown-effect-as-neutral",
+      "from_case_id": "insufficient-evidence",
+      "mutation": {
+        "target": "effect",
+        "observation_id": "obs-evidence-quality",
+        "field": "impact",
+        "value": "neutral"
+      },
+      "expected_issue_codes": ["UNKNOWN_EFFECT_IMPACT_REQUIRED"]
+    },
+    {
+      "case_id": "reject-pseudo-precision",
+      "from_case_id": "effective-expand",
+      "mutation": { "target": "root", "field": "overall_score", "value": 82 },
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "reject-unknown-to-zero",
+      "from_case_id": "insufficient-evidence",
+      "mutation": { "target": "observation", "observation_id": "obs-evidence-quality", "field": "value", "value": 0 },
+      "expected_issue_codes": ["UNKNOWN_VALUE_MUST_BE_NULL"]
+    },
+    {
+      "case_id": "reject-harm-masking-average",
+      "from_case_id": "harmful-stop",
+      "mutation": { "target": "recommendation", "field": "value", "value": "expand" },
+      "expected_issue_codes": ["RECOMMENDATION_MISMATCH"]
+    },
+    {
+      "case_id": "reject-personnel-language",
+      "from_case_id": "neutral-retain",
+      "mutation": { "target": "subject", "field": "evaluation_subject", "value": "personnel_performance" },
+      "expected_issue_codes": ["SCHEMA_INVALID", "WORKFLOW_ARTIFACT_SCOPE_REQUIRED"]
+    },
+    {
+      "case_id": "reject-routing-only-expand",
+      "from_case_id": "routing-only-retain",
+      "mutation": { "target": "recommendation", "field": "value", "value": "expand" },
+      "expected_issue_codes": ["RECOMMENDATION_MISMATCH"]
+    },
+    {
+      "case_id": "reject-unbound-observation",
+      "from_case_id": "neutral-retain",
+      "mutation": {
+        "target": "dimension",
+        "dimension": "outcome_quality",
+        "field": "observation_refs",
+        "value": ["obs-outcome-quality", "missing-observation"]
+      },
+      "expected_issue_codes": ["OBSERVATION_REF_UNKNOWN"]
+    },
+    {
+      "case_id": "reject-omitted-harmful-observation",
+      "from_case_id": "harmful-stop",
+      "mutation": {
+        "target": "dimension",
+        "dimension": "safety",
+        "field": "observation_refs",
+        "value": []
+      },
+      "expected_issue_codes": ["SCHEMA_INVALID", "OBSERVATION_UNBOUND", "DIMENSION_CLASSIFICATION_MISMATCH"]
+    },
+    {
+      "case_id": "reject-recommendation-reason-drift",
+      "from_case_id": "effective-expand",
+      "mutation": {
+        "target": "recommendation",
+        "field": "reason_codes",
+        "value": ["no_material_primary_change_observed"]
+      },
+      "expected_issue_codes": ["RECOMMENDATION_REASON_MISMATCH"]
+    }
+  ]
+}

@@ -36,6 +36,7 @@ import { validateEquivalenceAuthority, validateMutationAuthority } from "./ask-b
 import { validateMnDocConfigCorrectionProductionAuthority, writeMnDocConfigCorrectionProductionAuthority } from "./ask-benchmark-mn-doc-config-correction-authority.mjs";
 import {
   generateMnDocConfigCorrectionReviewArchive,
+  validateMnDocReviewCaseRoot,
   validateReviewArchiveInventory,
   validateReviewArchiveInventoryAgainstSources,
   verifyMnDocConfigCorrectionReviewArchive,
@@ -183,6 +184,50 @@ function privateFragmentProjection(fragment) {
       under_processing: fragment.under_processing.state,
       over_processing: fragment.over_processing.state,
     },
+  };
+}
+
+function parityNormalizedResult(entry, index) {
+  const verificationState = entry.verification_state;
+  assert.ok(["executed_success", "executed_failure", "missing"].includes(verificationState), `${entry.case_id} parity verification state`);
+  const lineage = {
+    run_instance_id: `24124124-1241-4241-8241-${String(index + 1).padStart(12, "0")}`,
+    case_id: `case-2412412412412412-${String(index + 1).padStart(16, "0")}`,
+    attempt: "0001",
+  };
+  const eventBytes = Buffer.from(`mn-doc parity command evidence ${entry.case_id} ${verificationState}`);
+  const references = verificationState === "missing" ? [] : [{
+    command_id: "worker-retry-doc-test",
+    digest: digestBytes(eventBytes),
+    bytes: eventBytes.length,
+    outcome: verificationState === "executed_success" ? "succeeded" : "failed",
+    exit_code: verificationState === "executed_success" ? 0 : 1,
+    match_state: "matched",
+  }];
+  return {
+    normalized_result_digest: digestBytes(Buffer.from(`mn-doc parity normalized result ${entry.case_id}`)),
+    lineage,
+    command_evidence: {
+      capture_support: "supported",
+      evidence_level: verificationState === "missing" ? "partial" : "complete",
+      required_command_ids: ["worker-retry-doc-test"],
+      required_alternative_groups: [],
+      references,
+      cwd_unverified_command_count: 0,
+    },
+  };
+}
+
+function privateFragmentParityProjection(fragment) {
+  return {
+    ...privateFragmentProjection(fragment),
+    evaluation_status: fragment.evaluation_status,
+    result_profile: fragment.result_profile,
+    requirement_authority: fragment.requirement_results.map(({ requirement_id, earned_points, matched_equivalence_class_ids }) => [
+      requirement_id,
+      earned_points,
+      matched_equivalence_class_ids,
+    ]),
   };
 }
 
@@ -809,6 +854,7 @@ try {
   const privateRootIndex = process.argv.indexOf("--private-root");
   const caseRootIndex = process.argv.indexOf("--private-case-root");
   let privateValidation = "not_run";
+  let privateSummary = null;
   if (privateRootIndex !== -1 || caseRootIndex !== -1) {
     assert.notEqual(privateRootIndex, -1, "--private-root is required with private cases");
     assert.notEqual(caseRootIndex, -1, "--private-case-root is required with a private evaluator");
@@ -816,6 +862,17 @@ try {
     const caseRoot = resolve(process.argv[caseRootIndex + 1]);
     const productionBoundaries = boundaryRoots("actual-private");
     const expectations = readJson(resolve(caseRoot, "expectations.json"));
+    const exactCaseAuthority = validateMnDocReviewCaseRoot(caseRoot);
+    assert.equal(exactCaseAuthority.fileCount, 72, "mn-doc review case authority must close the exact 72-file inventory");
+    const extraCaseRoot = resolve(work, "mn-doc-extra-case-inventory");
+    cpSync(caseRoot, extraCaseRoot, { recursive: true });
+    writeFileSync(resolve(extraCaseRoot, "undeclared-extra.txt"), "not-authorized\n");
+    assert.throws(() => validateMnDocReviewCaseRoot(extraCaseRoot), /inventory is not closed/u, "mn-doc review case authority must reject an undeclared file");
+    rmSync(resolve(extraCaseRoot, "undeclared-extra.txt"));
+    mkdirSync(resolve(extraCaseRoot, "undeclared-empty-directory"));
+    assert.throws(() => validateMnDocReviewCaseRoot(extraCaseRoot), /inventory is not closed/u, "mn-doc review case authority must reject an undeclared directory");
+    const directFragments = new Map();
+    let sealedParityContext = null;
     if (productionAuthority) {
       const requirementRecord = readJson(resolve(fixtureRoot, "requirement-record.json"));
       const admissionRecord = readJson(resolve(fixtureRoot, "final-admission-record.json"));
@@ -968,6 +1025,7 @@ try {
       mkdirSync(sealedAuthorityRoot);
       mkdirSync(evaluationInputRoot);
       writeJson(resolve(evaluationInputRoot, "pre-review-authority.json"), { measured_execution: false, scoring_ready: false });
+      sealedParityContext = { externalAuthorityAnchor, sealedAuthorityRoot, evaluationInputRoot, hiddenAsset, reference, requirementRecord };
       const sealedLineage = { run_instance_id: "24124124-1241-4241-8241-241241241241", case_id: "case-2412412412412412-4242424242424242", attempt: "0001" };
       const sealedExecution = createSealedEvaluatorExecutionForTest({
         root,
@@ -1082,6 +1140,7 @@ try {
         assert.deepEqual(result.matched_equivalence_class_ids, result.outcome === "pass" ? authority.equivalence_class_ids : [], `actual private case ${entry.case_id} equivalence identity`);
       }
       assert.deepEqual(privateFragmentProjection(fragment), expectations.fragment_projections[entry.expected_projection], `actual private case ${entry.case_id}`);
+      directFragments.set(entry.case_id, fragment);
     }
     for (const entry of expectations.adversarial_cases ?? []) {
       const fragment = await validateActualPrivateEvaluator({
@@ -1094,19 +1153,62 @@ try {
       });
       assert.deepEqual(privateFragmentProjection(fragment), expectations.fragment_projections[entry.expected_projection], `direct adversarial case ${entry.case_id}`);
       assert.deepEqual(fragment.requirement_results.map(({ earned_points, matched_equivalence_class_ids }) => [earned_points, matched_equivalence_class_ids]), [[0, []], [0, []], [2, ["equivalent-focused-verification"]]], `direct adversarial authority ${entry.case_id}`);
+      directFragments.set(entry.case_id, fragment);
+    }
+
+    if (sealedParityContext) {
+      const parityCases = [...expectations.cases, ...(expectations.adversarial_cases ?? [])];
+      assert.equal(directFragments.size, parityCases.length, "mn-doc direct parity inventory must cover every declared case");
+      const { externalAuthorityAnchor, sealedAuthorityRoot, evaluationInputRoot, hiddenAsset, reference, requirementRecord } = sealedParityContext;
+      for (const [index, entry] of parityCases.entries()) {
+        const normalized = parityNormalizedResult(entry, index);
+        const execution = createSealedEvaluatorExecutionForTest({
+          root,
+          privateEvaluationRoot: sealedAuthorityRoot,
+          privateRoot,
+          hiddenAsset,
+          frozenWorkspace: resolve(caseRoot, entry.frozen_workspace ?? expectations.frozen_workspace),
+          candidateWorkspace: resolve(caseRoot, entry.candidate_workspace),
+          evaluationInputRoot,
+          evaluationLineage: normalized.lineage,
+          evaluatorRevision: reference.evaluator_revision,
+          externalAuthorityAnchor,
+          executionDirectoryName: `sealed-parity-${entry.case_id}`,
+          label: `mn-doc sealed parity ${entry.case_id}`,
+        });
+        const sealed = executeSealedEvaluatorForTest({
+          execution,
+          externalAuthorityAnchor,
+          repositoryRoot: root,
+          normalized,
+          label: `mn-doc sealed parity ${entry.case_id}`,
+        });
+        validatePrivateEvaluatorFragment({ root, fragment: sealed.firstFragment, scoringPolicy: readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json")), requirementRecord, normalizedResult: normalized });
+        assert.deepEqual(privateFragmentParityProjection(sealed.firstFragment), privateFragmentParityProjection(directFragments.get(entry.case_id)), `mn-doc direct/sealed semantic parity ${entry.case_id}`);
+      }
+      privateSummary = {
+        cases: parityCases.length,
+        directPass: parityCases.length,
+        productionSafePass: parityCases.length,
+        baseCases: expectations.cases.length,
+        adversarialCases: (expectations.adversarial_cases ?? []).length,
+      };
     }
 
     const reviewArchiveOutputIndex = process.argv.indexOf("--review-archive-output");
     const reviewArchivePath = reviewArchiveOutputIndex === -1 ? resolve(work, "mn-doc-review-a.zip") : resolve(process.argv[reviewArchiveOutputIndex + 1]);
     const repeatedReviewArchivePath = resolve(work, "mn-doc-review-b.zip");
     const reviewedHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-    const firstArchive = generateMnDocConfigCorrectionReviewArchive({ root, privateRoot, caseRoot, outputPath: reviewArchivePath, reviewedHead, pullRequest: 242 });
-    const secondArchive = generateMnDocConfigCorrectionReviewArchive({ root, privateRoot, caseRoot, outputPath: repeatedReviewArchivePath, reviewedHead, pullRequest: 242 });
+    const sourceRevision = process.env.SOURCE_REVISION;
+    assert.match(sourceRevision ?? "", /^[a-f0-9]{40}$/u, "SOURCE_REVISION is required for review archive validation");
+    assert.equal(process.env.REVIEW_CANDIDATE_HEAD, reviewedHead, "REVIEW_CANDIDATE_HEAD must equal the exact repository HEAD");
+    const firstArchive = generateMnDocConfigCorrectionReviewArchive({ root, privateRoot, caseRoot, outputPath: reviewArchivePath, reviewedHead, sourceRevision, pullRequest: 242 });
+    const secondArchive = generateMnDocConfigCorrectionReviewArchive({ root, privateRoot, caseRoot, outputPath: repeatedReviewArchivePath, reviewedHead, sourceRevision, pullRequest: 242 });
     assert.deepEqual(readFileSync(reviewArchivePath), readFileSync(repeatedReviewArchivePath), "exact review archive regeneration must preserve raw ZIP bytes");
     assert.equal(firstArchive.raw_sha256, secondArchive.raw_sha256, "exact review archive regeneration digest");
     assert.equal(firstArchive.manifest.schema_version, "pr242-exact-private-review-manifest.v3", "review archive manifest revision");
     const issueArchivePath = resolve(work, "mn-doc-review-issue-245.zip");
-    const issueArchive = generateMnDocConfigCorrectionReviewArchive({ root, privateRoot, caseRoot, outputPath: issueArchivePath, reviewedHead, issue: 245 });
+    const issueArchive = generateMnDocConfigCorrectionReviewArchive({ root, privateRoot, caseRoot, outputPath: issueArchivePath, reviewedHead, sourceRevision, issue: 245 });
     assert.equal(issueArchive.manifest.schema_version, "mn-doc-exact-private-review-manifest.v4", "successor review archive manifest revision");
     assert.deepEqual(issueArchive.manifest.review_target, { repository: "ist-h-i/agent-spectrum-kernel", issue: 245, reviewed_head: reviewedHead, evaluator_revision: issueArchive.manifest.review_target.evaluator_revision }, "successor review archive issue target");
     const verifiedIssueArchive = verifyMnDocConfigCorrectionReviewArchive({ archivePath: issueArchivePath, root, privateRoot, caseRoot });
@@ -1115,6 +1217,21 @@ try {
     } finally {
       verifiedIssueArchive.cleanup();
     }
+    const publicTransplantRepository = resolve(work, "mn-doc-public-transplant-repository");
+    execFileSync("git", ["clone", "--quiet", "--no-hardlinks", root, publicTransplantRepository]);
+    execFileSync("git", ["-C", publicTransplantRepository, "remote", "set-url", "origin", "https://github.com/ist-h-i/agent-spectrum-kernel.git"]);
+    const transplantedRequirementPath = resolve(publicTransplantRepository, FIXTURE_ROOT_RELATIVE, "requirement-record.json");
+    const transplantedRequirement = JSON.parse(readFileSync(transplantedRequirementPath, "utf8"));
+    transplantedRequirement.requirement_set_digest = `sha256:${"0".repeat(64)}`;
+    writeFileSync(transplantedRequirementPath, `${JSON.stringify(transplantedRequirement, null, 2)}\n`);
+    execFileSync("git", ["-C", publicTransplantRepository, "add", `${FIXTURE_ROOT_RELATIVE}/requirement-record.json`]);
+    execFileSync("git", ["-C", publicTransplantRepository, "-c", "user.name=ASK Test", "-c", "user.email=ask-test@example.invalid", "commit", "--quiet", "--amend", "--no-edit"]);
+    const publicTransplantHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: publicTransplantRepository, encoding: "utf8" }).trim();
+    assert.throws(
+      () => generateMnDocConfigCorrectionReviewArchive({ root: publicTransplantRepository, privateRoot, caseRoot, outputPath: resolve(work, "mn-doc-public-transplant.zip"), reviewedHead: publicTransplantHead, sourceRevision, pullRequest: 242 }),
+      /digest|authority|requirement/u,
+      "clean committed public-authority transplant must fail before archive construction",
+    );
     assert.equal(firstArchive.manifest.archive_format.revision, "pr242-node-store-zip.v1", "review archive format revision");
     assert.equal(firstArchive.manifest.archive_format.fixed_dos_timestamp, "1980-01-01T00:00:00", "review archive fixed DOS timestamp");
     assert.deepEqual(firstArchive.manifest.archive_format.compression_method, { name: "store", code: 0 }, "review archive compression authority");
@@ -1130,6 +1247,7 @@ try {
         "--case-root", caseRoot,
         "--output", timezoneArchivePath,
         "--reviewed-head", reviewedHead,
+        "--source-revision", sourceRevision,
         "--pull-request", "242",
       ], { cwd: root, env: { ...process.env, TZ: timezone }, encoding: "utf8" });
       assert.equal(generated.status, 0, `fresh-process ${timezone} review archive generation: ${generated.stderr}`);
@@ -1197,7 +1315,7 @@ try {
     privateValidation = "pass";
   }
 
-  console.log(JSON.stringify({ fixture_id: "mn-doc-config-correction", public_validation: "pass", synthetic_private_validation: "not_run", actual_private_validation: privateValidation, fixture_one_regression: "pass", scoring_ready: false }));
+  console.log(JSON.stringify({ fixture_id: "mn-doc-config-correction", public_validation: "pass", synthetic_private_validation: "not_run", actual_private_validation: privateValidation, ...(privateSummary ? { private_summary: privateSummary } : {}), fixture_one_regression: "pass", scoring_ready: false }));
 } finally {
   makeTreeRemovable(work);
   rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });

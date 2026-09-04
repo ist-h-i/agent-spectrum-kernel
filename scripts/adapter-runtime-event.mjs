@@ -110,24 +110,41 @@ function codexMissingEvidence(report) {
 }
 
 export function mapCodexRunnerResult(report, { eventId = null, taskId = null, occurredAt = null, schemaPath = DEFAULT_SCHEMA_PATH } = {}) {
+  const envelope = report.execution_envelope_record?.envelope ?? null;
   const selectedContracts = unique(report.execution_evidence?.requested_contracts?.contracts ?? []);
   const requiredGateEvidence = report.execution_evidence?.required_gates;
   const requiredGates = unique(requiredGateEvidence?.gates ?? []);
   const gateObservationMissing = evidenceLevel(requiredGateEvidence?.evidence_level) === "none";
   const missingEvidence = unique([
     ...codexMissingEvidence(report),
+    ...(envelope?.evidence_status?.missing ?? []),
     ...(gateObservationMissing ? ["required_gate_observation"] : []),
   ]);
   const appliedLevel = evidenceLevel(report.execution_evidence?.workflow_contract_application?.evidence_level);
   const appliedContracts = appliedLevel === "none" ? [] : selectedContracts;
-  const verificationAttempted = report.sensor_status === null || report.sensor_status === undefined ? 0 : 1;
-  const verificationPassed = report.sensor_status === "pass" ? 1 : 0;
-  const verificationFailed = verificationAttempted - verificationPassed;
   const applicationEvidenceMissing = missingEvidence.some((item) => /(?:contract_load|contract_application)$/u.test(item));
-  const approvalRequired = requiredGates.includes("risk-gate");
-  const approvalMissing = approvalRequired && missingEvidence.includes("specific_action_approval");
+  const readOnlyReviewRiskEvaluation = report.mode === "review"
+    && report.sandbox === "read-only"
+    && requiredGates.includes("review-ai-quality")
+    && selectedContracts.includes("review-router");
+  const approvalRequired = (requiredGates.includes("risk-gate") && !readOnlyReviewRiskEvaluation)
+    || envelope?.stop_reason?.status === "risk_gate";
+  const riskApproval = envelope?.risk_approval ?? null;
+  const approvalMissing = approvalRequired && (riskApproval?.status === "requested" || missingEvidence.includes("specific_action_approval"));
+  const approvalStatus = !approvalRequired
+    ? "not_required"
+    : riskApproval?.status === "approved"
+      ? "approved"
+      : riskApproval?.status === "rejected"
+        ? "rejected"
+        : approvalMissing
+          ? "missing"
+          : "unknown";
+  const envelopeStop = envelope?.stop_reason?.status === "human_decision" ? "blocked" : envelope?.stop_reason?.status;
   const stopStatus = approvalMissing
     ? "risk_gate"
+    : envelopeStop && !["none", "completed"].includes(envelopeStop)
+      ? envelopeStop
     : report.status === "executed"
     ? applicationEvidenceMissing || appliedContracts.length === 0 ? "insufficient_evidence" : "completed"
     : report.status === "insufficient_evidence"
@@ -151,15 +168,18 @@ export function mapCodexRunnerResult(report, { eventId = null, taskId = null, oc
     gates: { required: requiredGates, executed: [] },
     approval: {
       required: approvalRequired,
-      status: approvalRequired ? approvalMissing ? "missing" : "unknown" : "not_required",
+      status: approvalStatus,
       action_categories: approvalRequired ? ["risk_gated_action"] : [],
     },
     evidence: {
-      checked: unique(Object.entries(report.execution_evidence ?? {}).filter(([, record]) => evidenceLevel(record?.evidence_level) !== "none").map(([name]) => name)),
+      checked: unique([
+        ...Object.entries(report.execution_evidence ?? {}).filter(([, record]) => evidenceLevel(record?.evidence_level) !== "none").map(([name]) => name),
+        ...(envelope?.evidence_status?.checked ?? []),
+      ]),
       missing: missingEvidence,
     },
     agent_activity: { started: 0, completed: 0, failed: 0 },
-    verification: verificationCounts({ obligationRequired: selectedContracts.includes("test-first-verification"), attempted: verificationAttempted, passed: verificationPassed, failed: verificationFailed }),
+    verification: verificationCounts({ obligationRequired: selectedContracts.includes("test-first-verification"), unavailable: selectedContracts.includes("test-first-verification") ? 1 : 0 }),
     review: { final_gate_required: requiredGates.includes("review-final-merge-gate") },
     handoff: { executable_state_required: selectedContracts.includes("handoff-generation") },
     stop: { status: stopStatus },
@@ -180,7 +200,12 @@ export function validateAdapterRuntimeEvent(event, { schemaPath = DEFAULT_SCHEMA
   const selectedContracts = new Set(event?.contracts?.selected ?? []);
   const appliedContracts = event?.contracts?.applied ?? [];
   const applicationEvidenceLevel = event?.contracts?.application_evidence_level;
-  if (requiredGates.has("risk-gate") && event?.approval?.required !== true) errors.push("$.approval.required: risk-gate requires approval.required");
+  const reviewRiskEvaluation = event?.adapter_id === "codex"
+    && requiredGates.has("risk-gate")
+    && requiredGates.has("review-ai-quality")
+    && selectedContracts.has("review-router");
+  if (requiredGates.has("risk-gate") && !reviewRiskEvaluation && event?.approval?.required !== true) errors.push("$.approval.required: risk-gate requires approval.required");
+  if (reviewRiskEvaluation && event?.approval?.required === true) errors.push("$.approval.required: review risk-gate must not require action approval");
   if (event?.approval?.required === true && event?.approval?.status !== "approved" && (event?.stop?.status === "completed" || event?.outcome?.classification === "completed" || event?.outcome?.claim_effect === "support_within_scope")) errors.push("$.approval.status: incomplete approval cannot produce completed or support claim");
   if (event?.outcome?.claim_effect === "support_within_scope" && (event?.contracts?.applied?.length ?? 0) === 0) errors.push("$.outcome.claim_effect: support claim requires an applied contract");
   if (applicationEvidenceLevel === "none" && appliedContracts.length > 0) errors.push("$.contracts.applied: application evidence none cannot have applied contracts");

@@ -24,10 +24,10 @@
   "output_contract_type": "design_or_operation_plan_producing",
   "requirement_record_id": "requirement-record-mp-iac-rollback-design",
   "output_contract_id": "output-contract-mp-iac-rollback-design",
-  "evaluator_bundle_id": "evaluator-8c523ae7d70c588cb50cd4de6092a3ee48fff361beb5ec45f55b3ebf3ed27b32",
-  "evaluator_bundle_digest": "sha256:40d563d5adcfe2affe5231f7b8a7cdce31bd5317ebfa85ec2e52e3991b0c12e4",
-  "evaluator_byte_count": 156623,
+  "evaluator_bundle_id": "evaluator-0d1be23683ded3bdd597aa5d19fb4a8a657e5b5b05a36df80d6a1686b2aba763",
+  "evaluator_bundle_digest": "sha256:e266de2ef90f6615887846cf13a8e661fc2b205dfe0e7df70674de042912383b",
+  "evaluator_byte_count": 159449,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:bc7961314b98e32cb4a3b164c459a4dee90633ecbef07214e622c3c0bd044db3"
+  "metadata_digest": "sha256:101801af8a2d8ec774865da58ed6db9debf58c23d354152e6faa91b901b63af5"
 }

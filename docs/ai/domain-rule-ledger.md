@@ -49,21 +49,19 @@ Rules:
 
 ## Evidence Status Key
 
-| Status | Meaning |
-|---|---|
-| `Verified` | Directly supported by repo files, docs, tests, runtime output, production behavior, or other direct evidence. |
-| `Human-confirmed` | Confirmed by a responsible human or domain owner. |
-| `Supported` | Plausible and indirectly supported, but not fully proven. |
-| `Hypothesis` | Usable for question generation only, not for blocking review or implementation scope. |
-| `Deprecated` | Retained for history, migration context, or old workflow explanation. |
-| `Contradicted` | Retained as a visible conflict requiring human/domain-owner decision. |
+Use `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`.
+
+Human authority and record lifecycle are separate:
+
+- `Authority status`: `not_asserted` or `human_confirmed`.
+- `Record state`: `active`, `deprecated`, or `contradicted`.
 
 Promotion rules:
 
 - `Hypothesis` -> `Supported` requires cited supporting evidence.
 - `Supported` -> `Verified` requires direct repo/docs/tests/runtime/production evidence.
-- Any status -> `Human-confirmed` requires explicit human/domain-owner confirmation.
-- Contradictions must remain visible. Do not overwrite a contradicted rule silently.
+- Human confirmation changes `Authority status`; it does not promote evidence by itself.
+- Contradictions use `Falsified` plus `Record state=contradicted` and remain visible. Do not overwrite them silently.
 
 ## Entry Fields
 
@@ -77,6 +75,8 @@ Promotion rules:
 | State / condition | yes | State, trigger, precondition, exception, or timing condition. |
 | Source | yes | Requirement, issue, doc, test, review comment, incident, production behavior, or human/domain-owner confirmation. |
 | Evidence status | yes | One of the evidence statuses above. |
+| Authority status | yes | `not_asserted` or `human_confirmed`; separate from evidence strength. |
+| Record state | yes | `active`, `deprecated`, or `contradicted`; separate from evidence strength. |
 | Applies to | yes | Product area, module, API, UI, report, automation, review gate, or repo scope. |
 | Used by | yes | `requirement-grill`, `work-package-compiler`, `review-domain-impact`, or another explicit consumer. |
 | Last checked | yes | ISO date (`YYYY-MM-DD`) or `null` for template rows only. |
@@ -85,12 +85,12 @@ Promotion rules:
 
 ## Domain Rule Entries
 
-| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Applies to | Used by | Last checked | Staleness trigger | Owner |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Authority status | Record state | Applies to | Used by | Last checked | Staleness trigger | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 <!--
 Example active row:
-| DR-0001 | A refund over the configured threshold requires manager approval before payout. | Refund | Support agent; manager | Refund approval | Refund amount exceeds threshold | Human-confirmed: domain owner comment on ISSUE-123 | Human-confirmed | Refund workflow; payout service | requirement-grill; review-domain-impact | 2026-07-06 | Approval policy, threshold, or payout workflow changes | support-ops |
+| DR-0001 | A refund over the configured threshold requires manager approval before payout. | Refund | Support agent; manager | Refund approval | Refund amount exceeds threshold | Domain owner comment on ISSUE-123 | Supported | human_confirmed | active | Refund workflow; payout service | requirement-grill; review-domain-impact | 2026-07-06 | Approval policy, threshold, or payout workflow changes | support-ops |
 -->
 
 ## Stale Rule Review

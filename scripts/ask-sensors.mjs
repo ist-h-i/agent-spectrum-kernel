@@ -4,13 +4,22 @@ import { resolve } from "node:path";
 import {
   CODEX_PROMPT_MODES,
   codexPromptContractForMode,
+  deriveReviewSignalGateRoute,
   detectApprovalRequiredSurfaces,
   findUnsupportedCapabilityClaims,
+  readReviewSignalGateMap,
 } from "./ask-shared.mjs";
-import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
+import {
+  inspectExecutionEnvelope,
+  inspectExecutionEnvelopeRecordEmission,
+  isMarkdownFenceClosing,
+  markdownFenceOpening,
+  validateJsonSchema,
+} from "./execution-envelope.mjs";
 
 const KNOWN_OUTPUT_SECTIONS = [
   "Implementation Contract:",
+  "Proof:",
   "Verification Contract:",
   "Changed:",
   "Verified:",
@@ -18,6 +27,9 @@ const KNOWN_OUTPUT_SECTIONS = [
   "Risks / assumptions:",
   "Next:",
   "Decision:",
+  "Baseline review:",
+  "Additional required gates:",
+  "Findings:",
   "Change signals:",
   "Required gates:",
   "Skipped heavy gates:",
@@ -70,7 +82,11 @@ function parseArgs(argv) {
     target: process.cwd(),
     mode: "implementation",
     input: null,
+    envelopeRecord: null,
     changedFiles: [],
+    requiredGates: [],
+    observedSignals: [],
+    diagnostic: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -80,8 +96,16 @@ function parseArgs(argv) {
       args.mode = argv[++index];
     } else if (arg === "--input") {
       args.input = resolve(argv[++index]);
+    } else if (arg === "--envelope-record") {
+      args.envelopeRecord = resolve(argv[++index]);
     } else if (arg === "--changed-files") {
       args.changedFiles = argv[++index].split(",").map((path) => path.trim()).filter(Boolean);
+    } else if (arg === "--required-gate") {
+      args.requiredGates.push(argv[++index]);
+    } else if (arg === "--observed-signal") {
+      args.observedSignals.push(argv[++index]);
+    } else if (arg === "--diagnostic") {
+      args.diagnostic = true;
     } else if (arg === "--help" || arg === "-h") {
       printHelp();
       process.exit(0);
@@ -92,6 +116,9 @@ function parseArgs(argv) {
   if (!CODEX_PROMPT_MODES.has(args.mode)) {
     throw new Error(`--mode must be one of ${[...CODEX_PROMPT_MODES].join(", ")}`);
   }
+  if (args.mode !== "review" && args.observedSignals.length > 0) throw new Error("--observed-signal requires review mode");
+  if (args.requiredGates.some((gate) => typeof gate !== "string" || !/^[a-z0-9][a-z0-9-]*$/u.test(gate))) throw new Error("--required-gate must be a controlled identifier");
+  args.requiredGates = [...new Set(args.requiredGates)];
   return args;
 }
 
@@ -102,7 +129,11 @@ Options:
   --target <path>           Repository root to scan for capability claims. Defaults to cwd.
   --mode <mode>             Managed Codex prompt contract mode. Defaults to implementation.
   --input <path>            Output text to inspect. If omitted, stdin is used when piped.
+  --envelope-record <path>  Managed runner record to validate against the output.
   --changed-files <csv>     Optional comma-separated changed file paths for risk-surface checks.
+  --required-gate <id>      Gate required by the managed runner. Repeat for multiple gates.
+  --observed-signal <id>    Review signal observed by the managed runner. Repeat as observed.
+  --diagnostic              Permit explicit review diagnostic sections.
 
 Initial rollout is report-only: warn, fail, and hard_stop findings do not change
 the exit code. They restrict unsupported completion/readiness/safety claims.
@@ -119,20 +150,22 @@ function readInput(args) {
   return "";
 }
 
-function runSensors({ target, mode, text, changedFiles }) {
+function runSensors({ target, mode, text, changedFiles, envelopeRecord, requiredGates, observedSignals, diagnostic }) {
   const sensors = [];
   const contract = codexPromptContractForMode(mode);
   if (contract) {
-    sensors.push(completionContractSensor(text, mode, contract.requiredSections));
+    sensors.push(completionContractSensor(text, mode, contract, requiredGates));
   }
-  sensors.push(executionEnvelopeSensor(text));
+  sensors.push(executionEnvelopeSensor(text, envelopeRecord));
   if (["implementation", "investigation"].includes(mode)) {
     sensors.push(evidenceQualitySensor(text));
   }
   if (mode === "review") {
-    sensors.push(reviewLayerSummarySensor(text));
+    sensors.push(reviewLayerSummarySensor(text, contract, requiredGates, observedSignals, target, diagnostic));
   }
-  sensors.push(riskSurfaceSensor(text, changedFiles));
+  sensors.push(riskSurfaceSensor(text, changedFiles, {
+    evaluationOnly: mode === "review" && requiredGates.includes("risk-gate"),
+  }));
   sensors.push(unsupportedCapabilitySensor(target));
   sensors.push(evidencePhraseSensor(text));
 
@@ -140,7 +173,25 @@ function runSensors({ target, mode, text, changedFiles }) {
   return { status, sensors };
 }
 
-function executionEnvelopeSensor(text) {
+function executionEnvelopeSensor(text, envelopeRecord) {
+  if (envelopeRecord) {
+    let record;
+    try {
+      record = JSON.parse(readFileSync(envelopeRecord, "utf8"));
+    } catch (error) {
+      return sensor("execution_envelope", "fail", `Runner-owned Execution Envelope record is unreadable: ${error.message}.`);
+    }
+    const result = inspectExecutionEnvelopeRecordEmission(text, record);
+    if (result.status === "valid") {
+      return sensor("execution_envelope", "pass", `Runner-owned ${record.emission_class} Execution Envelope record and output agree.`);
+    }
+    return sensor(
+      "execution_envelope",
+      "fail",
+      `Runner-owned Execution Envelope record is invalid: ${result.errors.join(" ")}.`,
+      "Do not infer or repair control state from prose; regenerate one valid bound record.",
+    );
+  }
   const result = inspectExecutionEnvelope(text);
   if (result.status === "parsed") {
     return sensor("execution_envelope", "pass", "Execution Envelope is valid JSON and conforms to the shared schema.");
@@ -153,11 +204,13 @@ function executionEnvelopeSensor(text) {
   );
 }
 
-function completionContractSensor(text, mode, requiredSections) {
+function completionContractSensor(text, mode, contract, requiredGates = []) {
   if (!text.trim()) {
     return sensor("completion_contract", "warn", "No implementation output text was provided.");
   }
-  const missing = requiredSections.filter((section) => !text.includes(section));
+  const conditionalSections = requiredGates.flatMap((gate) => contract.conditionalSections?.[gate] ?? []);
+  const requiredSections = [...new Set([...contract.requiredSections, ...conditionalSections])];
+  const missing = requiredSections.filter((section) => !hasTopLevelSection(text, section));
   if (missing.length > 0) {
     return sensor(
       "completion_contract",
@@ -166,10 +219,20 @@ function completionContractSensor(text, mode, requiredSections) {
       `Do not claim ${mode} completion/readiness until the managed completion contract is present.`,
     );
   }
+  const alternatives = contract.exactlyOneOfSections ?? [];
+  const presentAlternatives = alternatives.filter((section) => hasTopLevelSection(text, section));
+  if (alternatives.length > 0 && presentAlternatives.length !== 1) {
+    return sensor(
+      "completion_contract",
+      "fail",
+      `${mode} output must contain exactly one selected proof section: ${alternatives.join(" or ")}.`,
+      `Do not claim ${mode} completion until one proof path is selected and recorded.`,
+    );
+  }
   return sensor("completion_contract", "pass", `${mode} completion contract sections are present.`);
 }
 
-function reviewLayerSummarySensor(text) {
+function reviewLayerSummarySensor(text, contract, requiredGates = [], observedSignals = [], target, diagnostic = false) {
   if (!text.trim()) {
     return sensor("review_layer_summary", "warn", "No review output text was provided.");
   }
@@ -178,29 +241,356 @@ function reviewLayerSummarySensor(text) {
       "review_layer_summary",
       "fail",
       "Review output uses the removed fixed layer summary contract.",
-      "Use Decision, Blocking evidence, Passed required gates, Insufficient evidence, Non-blocking follow-ups, and Residual risk. Use Diagnostic applicability only when a debug matrix is explicitly requested.",
+      "Use Baseline review, Additional required gates, Missing evidence, and one Findings inventory. Add Decision only when requested.",
     );
   }
-  const missing = codexPromptContractForMode("review").requiredSections.filter((section) => !hasTopLevelSection(text, section));
+  const sections = extractTopLevelSections(text);
+  const conditionalSections = requiredGates.flatMap((gate) => contract.conditionalSections?.[gate] ?? []);
+  const missing = [...new Set([...contract.requiredSections, ...conditionalSections])].filter((section) => (sections.get(section)?.length ?? 0) === 0);
   if (missing.length > 0) {
     return sensor(
       "review_layer_summary",
       "fail",
       `Review output is missing required sections: ${missing.join(", ")}.`,
-      "Do not claim merge approval/readiness until the signal-first routing and final decision sections are present.",
+      "Do not claim review or merge readiness until the mandatory baseline and required current sections are present.",
     );
   }
-  return sensor("review_layer_summary", "pass", "Signal-first routing and review decision sections are present.");
+  const duplicateRequiredSections = [...new Set([...contract.requiredSections, ...conditionalSections])]
+    .filter((section) => (sections.get(section)?.length ?? 0) > 1);
+  if (duplicateRequiredSections.length > 0) {
+    return sensor(
+      "review_layer_summary",
+      "fail",
+      `Review output repeats cardinality-one sections: ${duplicateRequiredSections.join(", ")}.`,
+      "Emit exactly one baseline, additional-gate inventory, missing-evidence inventory, findings inventory, and requested final decision.",
+    );
+  }
+  const finalGateRequired = requiredGates.includes("review-final-merge-gate");
+  const decisionCount = sections.get("Decision:")?.length ?? 0;
+  if (!finalGateRequired && decisionCount > 0) {
+    return sensor("review_layer_summary", "fail", "Review output contains a final Decision without a final-decision request.", "Do not make a merge decision from the router or baseline gate.");
+  }
+  if (finalGateRequired && decisionCount !== 1) {
+    return sensor("review_layer_summary", "fail", `Review output must contain exactly one Decision for the requested final gate; received ${decisionCount}.`, "Emit one final decision after all required gate results.");
+  }
+  const baselineResult = inspectBaselineReview(sections.get("Baseline review:")?.[0] ?? []);
+  if (baselineResult.issue) {
+    return sensor("review_layer_summary", "fail", baselineResult.issue, "Emit exactly one review-ai-quality result with a normalized status and non-empty evidence.");
+  }
+  let registry;
+  let route;
+  try {
+    registry = readReviewSignalGateMap(target);
+    route = deriveReviewSignalGateRoute(registry, observedSignals);
+  } catch (error) {
+    return sensor("review_layer_summary", "fail", `Canonical review route is unavailable: ${error.message}.`, "Restore the canonical signal registry before evaluating review output.");
+  }
+  if (route.issues.length > 0) {
+    return sensor("review_layer_summary", "fail", `Observed review signals are invalid: ${route.issues.join(", ")}.`, "Use each exact controlled signal at most once.");
+  }
+  const runnerAdditionalGates = requiredGates.filter((gate) => !["review-ai-quality", "review-final-merge-gate"].includes(gate));
+  if (JSON.stringify(runnerAdditionalGates) !== JSON.stringify(route.additional_gates)) {
+    return sensor(
+      "review_layer_summary",
+      "fail",
+      `Runner-required additional gates do not match the canonical observed-signal route: required=${runnerAdditionalGates.join(",") || "none"}; derived=${route.additional_gates.join(",") || "none"}.`,
+      "Derive additional gates only from exact observed signals in schemas/review-signal-gate-map.json.",
+    );
+  }
+  const additionalResult = inspectAdditionalGateResults(
+    sections.get("Additional required gates:")?.[0] ?? [],
+    route,
+    sections.get("Missing evidence:")?.[0] ?? [],
+  );
+  if (additionalResult.issue) {
+    return sensor("review_layer_summary", "fail", additionalResult.issue, "Emit one closed result record for every derived additional gate and no untriggered gate record.");
+  }
+  const missingEvidenceResult = inspectEmptyInventory(sections.get("Missing evidence:")?.[0] ?? [], "Missing evidence");
+  if (missingEvidenceResult.issue) {
+    return sensor("review_layer_summary", "fail", missingEvidenceResult.issue, "Use exactly '- none' or one or more evidence records, never both.");
+  }
+  const findingResult = inspectFindingInventory(
+    sections.get("Findings:")?.[0] ?? [],
+    registry.finding_contract,
+    resolve(target, "schemas/review-finding.schema.json"),
+  );
+  if (findingResult.issue) {
+    return sensor("review_layer_summary", "fail", findingResult.issue, "Emit one complete impact-ordered Findings inventory that conforms to ask.review-finding@1.0.0.");
+  }
+  if (finalGateRequired) {
+    const decisionResult = inspectReviewDecision(sections.get("Decision:")?.[0] ?? []);
+    if (decisionResult.issue) {
+      return sensor("review_layer_summary", "fail", decisionResult.issue, "Emit exactly one normalized decision from the existing final-gate vocabulary.");
+    }
+    const consistencyIssue = inspectDecisionConsistency({
+      decision: decisionResult.decision,
+      baselineStatus: baselineResult.status,
+      additionalStatuses: additionalResult.statuses,
+      missingEvidenceEmpty: missingEvidenceResult.empty,
+      findings: findingResult.findings,
+    });
+    if (consistencyIssue) {
+      return sensor("review_layer_summary", "fail", consistencyIssue, "Emit a Decision supported by current gate results, Missing evidence, and Findings without synthesizing evidence.");
+    }
+  }
+  if (!diagnostic) {
+    const forbidden = (contract.forbiddenOrdinarySections ?? []).filter((section) => hasTopLevelSection(text, section));
+    if (forbidden.length > 0) {
+      return sensor("review_layer_summary", "fail", `Ordinary review output contains debug or empty-category boilerplate: ${forbidden.join(", ")}.`, "Remove skipped-layer and empty-category sections unless diagnostic output was explicitly requested.");
+    }
+  }
+  return sensor("review_layer_summary", "pass", "Mandatory baseline, additional-gate, missing-evidence, finding, and conditional-decision sections are valid.");
+}
+
+const REVIEW_GATE_STATUSES = new Set(["pass", "pass_with_comments", "fail", "insufficient_evidence"]);
+const REVIEW_DECISIONS = new Set(["approve", "approve_with_comments", "request_changes", "block", "insufficient_evidence"]);
+
+function inspectBaselineReview(lines) {
+  const fields = new Map();
+  for (const line of contentLines(lines)) {
+    const match = line.match(/^\s*-\s+(Gate|Status|Evidence):\s*(.*?)\s*$/u);
+    if (!match) return { issue: `Baseline review contains an unsupported record line: ${line.trim()}.`, status: null };
+    const [, field, value] = match;
+    if (fields.has(field)) return { issue: `Baseline review repeats ${field}.`, status: null };
+    fields.set(field, value);
+  }
+  if (fields.size !== 3 || fields.get("Gate") !== "review-ai-quality") return { issue: "Baseline review must contain exactly Gate, Status, and Evidence for review-ai-quality.", status: null };
+  if (!REVIEW_GATE_STATUSES.has(fields.get("Status"))) return { issue: `Baseline review has an invalid normalized status: ${fields.get("Status") || "missing"}.`, status: null };
+  if (!fields.get("Evidence")?.trim()) return { issue: "Baseline review evidence is empty.", status: null };
+  return { issue: null, status: fields.get("Status") };
+}
+
+function inspectAdditionalGateResults(lines, route, missingEvidenceLines) {
+  const records = contentLines(lines);
+  if (route.additional_gates.length === 0) {
+    return records.length === 1 && records[0].trim() === "- none"
+      ? { issue: null, statuses: [] }
+      : { issue: "Additional required gates must contain exactly '- none' when no observed signal derives a gate.", statuses: [] };
+  }
+  if (records.some((line) => line.trim() === "- none")) return { issue: `Additional required gates reports none but ${route.additional_gates.join(", ")} is required.`, statuses: [] };
+  if (records.length !== route.additional_gates.length) return { issue: `Additional required gate result cardinality is invalid: expected ${route.additional_gates.length}, received ${records.length}.`, statuses: [] };
+  const seen = new Set();
+  const statuses = [];
+  for (let index = 0; index < records.length; index += 1) {
+    const line = records[index].trim();
+    const match = line.match(/^-\s+([a-z0-9][a-z0-9-]*):\s+status=(pass|pass_with_comments|fail|insufficient_evidence);\s+evidence=([^;\r\n]+);\s+signals=([^;\r\n]+)$/u);
+    if (!match) return { issue: `Additional required gate result has an invalid closed record: ${line}.`, statuses: [] };
+    const [, gate, status, evidence, signalsText] = match;
+    if (seen.has(gate)) return { issue: `Additional required gate result is duplicated: ${gate}.`, statuses: [] };
+    seen.add(gate);
+    const expectedGate = route.additional_gates[index];
+    if (gate !== expectedGate) return { issue: `Additional required gate result order or selection is invalid: expected ${expectedGate}, received ${gate}.`, statuses: [] };
+    if (!REVIEW_GATE_STATUSES.has(status)) return { issue: `Additional required gate ${gate} has an invalid normalized status: ${status}.`, statuses: [] };
+    if (!evidence.trim()) return { issue: `Additional required gate ${gate} has empty evidence.`, statuses: [] };
+    const signals = signalsText.split(",").map((signal) => signal.trim()).filter(Boolean);
+    if (new Set(signals).size !== signals.length) return { issue: `Additional required gate ${gate} repeats a trigger signal.`, statuses: [] };
+    if (JSON.stringify([...signals].sort()) !== JSON.stringify(route.signals_by_gate[gate])) {
+      return { issue: `Additional required gate ${gate} has mismatched trigger signals: expected ${(route.signals_by_gate[gate] ?? []).join(",")}, received ${signals.join(",") || "none"}.`, statuses: [] };
+    }
+    if (status === "insufficient_evidence" && !contentLines(missingEvidenceLines).some((missingLine) => missingLine.includes(gate))) {
+      return { issue: `Additional required gate ${gate} is insufficient_evidence but Missing evidence does not name that gate.`, statuses: [] };
+    }
+    statuses.push({ gate, status });
+  }
+  return { issue: null, statuses };
+}
+
+function inspectReviewDecision(lines) {
+  const records = contentLines(lines);
+  if (records.length !== 1) return { issue: `Decision must contain exactly one value; received ${records.length}.`, decision: null };
+  const match = records[0].match(/^\s*-\s+(.+?)\s*$/u);
+  if (!match) return { issue: `Decision contains an invalid record: ${records[0].trim()}.`, decision: null };
+  const decision = match[1].trim().toLowerCase().replace(/\s+/gu, "_");
+  if (!REVIEW_DECISIONS.has(decision)) return { issue: `Decision has an invalid normalized value: ${decision || "missing"}.`, decision: null };
+  return { issue: null, decision };
+}
+
+function inspectDecisionConsistency({ decision, baselineStatus, additionalStatuses, missingEvidenceEmpty, findings }) {
+  const gateStatuses = [baselineStatus, ...additionalStatuses.map(({ status }) => status)];
+  const hasFailingGate = gateStatuses.includes("fail");
+  const insufficientGates = additionalStatuses.filter(({ status }) => status === "insufficient_evidence");
+  const hasInsufficientGate = baselineStatus === "insufficient_evidence" || insufficientGates.length > 0;
+  const issues = [];
+  if (hasInsufficientGate && missingEvidenceEmpty) issues.push("a gate reports insufficient_evidence but Missing evidence is empty");
+  if (!hasInsufficientGate && !missingEvidenceEmpty) issues.push("Missing evidence is not reflected by an insufficient_evidence gate status");
+  const hasBlockingFinding = findings.some((finding) => finding.severity === "blocker" || finding.merge_blocker);
+  const hasMajorFinding = findings.some((finding) => finding.severity === "major");
+  const hasComment = gateStatuses.includes("pass_with_comments")
+    || findings.some((finding) => ["minor", "nit"].includes(finding.severity) && !finding.merge_blocker);
+  const expectedDecision = hasBlockingFinding
+    ? "block"
+    : hasInsufficientGate
+      ? "insufficient_evidence"
+      : hasFailingGate || hasMajorFinding
+        ? "request_changes"
+        : hasComment
+          ? "approve_with_comments"
+          : "approve";
+  if (decision !== expectedDecision) {
+    issues.push(`closed decision matrix requires ${expectedDecision}`);
+  }
+
+  return issues.length > 0 ? `Decision ${decision} is inconsistent with review authority: ${issues.join("; ")}.` : null;
+}
+
+function inspectEmptyInventory(lines, label) {
+  const records = contentLines(lines);
+  if (records.length === 0) return { issue: `${label} inventory is empty or uninterpretable`, empty: false };
+  const noneCount = records.filter((line) => line.trim() === "- none").length;
+  if (noneCount === 1 && records.length === 1) return { issue: null, empty: true };
+  if (noneCount > 0) return { issue: `${label} inventory mixes '- none' with evidence records`, empty: false };
+  return { issue: null, empty: false };
+}
+
+const REVIEW_FINDING_MARKDOWN_FIELDS = new Map([
+  ["Finding ID", "finding_id"],
+  ["Severity", "severity"],
+  ["Merge blocker", "merge_blocker"],
+  ["Practical impact", "practical_impact"],
+  ["Trigger or failure trace", "trigger_or_failure_trace"],
+  ["Evidence location", "evidence_location"],
+  ["Required post-fix condition", "required_post_fix_condition"],
+  ["Category", "category"],
+]);
+
+function inspectFindingInventory(lines, contract, schemaPath) {
+  const records = reviewFindingRecordLines(lines);
+  const empty = inspectEmptyInventory(records, "Findings");
+  if (empty.empty) return { issue: null, findings: [] };
+  if (empty.issue) return { issue: empty.issue, findings: [] };
+  const findings = [];
+  let finding = null;
+  let fields = null;
+
+  for (const line of records) {
+    const recordMatch = line.match(/^\s*-\s+([^:]+):\s*(.*?)\s*$/u);
+    const fieldMatch = recordMatch ?? line.match(/^\s+([^:]+):\s*(.*?)\s*$/u);
+    if (!fieldMatch) return { issue: `Findings inventory contains an unsupported record line: ${line.trim()}.`, findings: [] };
+    const [, markdownField, rawValue] = fieldMatch;
+    const field = REVIEW_FINDING_MARKDOWN_FIELDS.get(markdownField);
+    if (!field) return { issue: `Findings inventory contains an unknown field: ${markdownField}.`, findings: [] };
+    if (recordMatch) {
+      if (field !== "finding_id") return { issue: `Findings inventory record must start with Finding ID, received ${markdownField}.`, findings: [] };
+      finding = {};
+      fields = new Set();
+      findings.push(finding);
+    } else if (!finding) {
+      return { issue: `Findings inventory contains ${markdownField} before a Finding ID.`, findings: [] };
+    }
+    if (fields.has(field)) {
+      const id = finding.finding_id || "unknown";
+      return { issue: `Finding ${id} repeats ${markdownField}.`, findings: [] };
+    }
+    fields.add(field);
+    finding[field] = field === "merge_blocker"
+      ? rawValue === "true" ? true : rawValue === "false" ? false : rawValue
+      : rawValue;
+  }
+
+  const requiredFields = contract?.required_fields ?? [];
+  const optionalFields = contract?.optional_fields ?? [];
+  const canonicalFields = new Set([...requiredFields, ...optionalFields]);
+  if (canonicalFields.size !== REVIEW_FINDING_MARKDOWN_FIELDS.size
+    || [...REVIEW_FINDING_MARKDOWN_FIELDS.values()].some((field) => !canonicalFields.has(field))) {
+    return { issue: "Canonical review Finding field projection is inconsistent with the review signal registry.", findings: [] };
+  }
+
+  const schemaIssues = validateJsonSchema(findings, { schemaPath });
+  const duplicateIds = [];
+  const seenIds = new Set();
+  for (const findingRecord of findings) {
+    if (seenIds.has(findingRecord.finding_id)) duplicateIds.push(findingRecord.finding_id);
+    seenIds.add(findingRecord.finding_id);
+  }
+  const issues = schemaIssues.map((issue) => `schema ${issue}`);
+  for (const id of duplicateIds) issues.push(`duplicate Finding ID ${id}`);
+
+  if (issues.length === 0) {
+    const severityIndex = new Map((contract?.severity_order ?? []).map((severity, index) => [severity, index]));
+    const expected = [...findings].sort((left, right) => {
+      if (left.merge_blocker !== right.merge_blocker) return left.merge_blocker ? -1 : 1;
+      const severity = severityIndex.get(left.severity) - severityIndex.get(right.severity);
+      if (severity !== 0) return severity;
+      return left.finding_id < right.finding_id ? -1 : left.finding_id > right.finding_id ? 1 : 0;
+    });
+    if (expected.some((expectedFinding, index) => expectedFinding !== findings[index])) issues.push("impact order is invalid");
+  }
+
+  return issues.length > 0
+    ? { issue: `Findings inventory violates ask.review-finding@1.0.0: ${issues.join("; ")}.`, findings: [] }
+    : { issue: null, findings };
+}
+
+function reviewFindingRecordLines(lines) {
+  const records = [];
+  let activeFence = null;
+  for (const line of lines) {
+    if (activeFence) {
+      if (isMarkdownFenceClosing(line, activeFence)) activeFence = null;
+      continue;
+    }
+    const opening = markdownFenceOpening(line);
+    if (opening) {
+      activeFence = opening;
+      continue;
+    }
+    if (!line.trim() || /^\s*>/u.test(line)) continue;
+    if (/^\s*-\s+/u.test(line)
+      || /^\s+\S/u.test(line)
+      || /^[\p{L}\p{N}_-][\p{L}\p{N} _/-]*:\s*/u.test(line)) {
+      records.push(line);
+    }
+  }
+  return records;
+}
+
+function contentLines(lines) {
+  return lines.filter((line) => line.trim().length > 0);
+}
+
+function extractTopLevelSections(text) {
+  const sections = new Map();
+  let activeFence = null;
+  let activeSection = null;
+  for (const line of text.split(/\r?\n/)) {
+    if (activeFence) {
+      if (activeSection) activeSection.push(line);
+      if (isMarkdownFenceClosing(line, activeFence)) activeFence = null;
+      continue;
+    }
+    const opening = markdownFenceOpening(line);
+    if (opening) {
+      activeFence = opening;
+      if (activeSection) activeSection.push(line);
+      continue;
+    }
+    const isNestedOrQuoted = /^\s*(?:>|[-*+]\s)/u.test(line);
+    const section = isNestedOrQuoted ? null : KNOWN_OUTPUT_SECTIONS.find((candidate) => line === candidate) ?? null;
+    if (section) {
+      activeSection = [];
+      const occurrences = sections.get(section) ?? [];
+      occurrences.push(activeSection);
+      sections.set(section, occurrences);
+      continue;
+    }
+    if (activeSection) activeSection.push(line);
+  }
+  return sections;
 }
 
 function hasTopLevelSection(text, section) {
-  let inFence = false;
+  let activeFence = null;
   for (const line of text.split(/\r?\n/)) {
-    if (/^\s*```/.test(line)) {
-      inFence = !inFence;
+    if (activeFence) {
+      if (isMarkdownFenceClosing(line, activeFence)) activeFence = null;
       continue;
     }
-    if (inFence || /^\s*(?:>|[-*+]\s)/.test(line)) {
+    const opening = markdownFenceOpening(line);
+    if (opening) {
+      activeFence = opening;
+      continue;
+    }
+    if (/^\s*(?:>|[-*+]\s)/.test(line)) {
       continue;
     }
     if (line === section) {
@@ -210,10 +600,17 @@ function hasTopLevelSection(text, section) {
   return false;
 }
 
-function riskSurfaceSensor(text, changedFiles) {
+function riskSurfaceSensor(text, changedFiles, { evaluationOnly = false } = {}) {
   const surfaces = detectApprovalRequiredSurfaces({ text, paths: changedFiles });
   if (surfaces.length === 0) {
     return sensor("risk_surface", "pass", "No AGENTS approval-required risk surface detected.");
+  }
+  if (evaluationOnly) {
+    return sensor(
+      "risk_surface",
+      "pass",
+      `Approval-required risk surface evaluated by a managed read-only review: ${surfaces.map((surface) => surface.id).join(", ")}. No risky action was authorized or performed.`,
+    );
   }
   if (hasExplicitApprovalEvidence(text)) {
     return sensor(
@@ -490,7 +887,7 @@ function printReport({ mode, target, changedFiles, report }) {
 try {
   const args = parseArgs(process.argv.slice(2));
   const text = readInput(args);
-  const report = runSensors({ target: args.target, mode: args.mode, text, changedFiles: args.changedFiles });
+  const report = runSensors({ target: args.target, mode: args.mode, text, changedFiles: args.changedFiles, envelopeRecord: args.envelopeRecord, requiredGates: args.requiredGates, observedSignals: args.observedSignals, diagnostic: args.diagnostic });
   printReport({ mode: args.mode, target: args.target, changedFiles: args.changedFiles, report });
   process.exit(0);
 } catch (error) {

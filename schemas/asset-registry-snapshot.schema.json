@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/asset-registry-snapshot.schema.json",
+  "title": "Agent Spectrum Kernel immutable Asset registry snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "object_kind", "registry_id", "repository_id", "scope_id",
+    "snapshot_revision", "predecessor", "entries", "lifecycle_authority_context_digest"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "object_kind": { "type": "string", "const": "asset_registry_snapshot" },
+    "registry_id": { "$ref": "#/$defs/stableId" },
+    "repository_id": { "$ref": "#/$defs/repositoryId" },
+    "scope_id": { "$ref": "#/$defs/stableId" },
+    "snapshot_revision": { "type": "integer", "minimum": 1 },
+    "predecessor": { "$ref": "#/$defs/nullablePredecessor" },
+    "entries": {
+      "type": "array",
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/entry" }
+    },
+    "lifecycle_authority_context_digest": { "$ref": "#/$defs/nullableDigest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "nullableDigest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+    "stableId": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+    "repositoryId": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$" },
+    "assetType": { "type": "string", "enum": ["skill", "prompt", "evaluator_reference"] },
+    "state": { "type": "string", "enum": ["candidate", "admitted", "current", "historical", "superseded", "retired"] },
+    "predecessor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshot_revision", "snapshot_digest"],
+      "properties": {
+        "snapshot_revision": { "type": "integer", "minimum": 1 },
+        "snapshot_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "nullablePredecessor": { "oneOf": [{ "$ref": "#/$defs/predecessor" }, { "type": "null" }] },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_type", "stable_id", "version", "record_digest", "content_digest", "state", "scope_id"],
+      "properties": {
+        "asset_type": { "$ref": "#/$defs/assetType" },
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$" },
+        "record_digest": { "$ref": "#/$defs/digest" },
+        "content_digest": { "$ref": "#/$defs/digest" },
+        "state": { "$ref": "#/$defs/state" },
+        "scope_id": { "$ref": "#/$defs/stableId" }
+      }
+    }
+  }
+}

@@ -23,10 +23,10 @@
   "output_contract_type": "findings_producing",
   "requirement_record_id": "requirement-record-mp-performance-investigation",
   "output_contract_id": "output-contract-mp-performance-investigation",
-  "evaluator_bundle_id": "evaluator-3afa640c4024bb057555efb49f225a5bc9e10a08a9da869b1ddcc41736fb5370",
-  "evaluator_bundle_digest": "sha256:994a6493cc799b44f9a32d472d4545ef2c45cbc9a2b58d4157edc4091c25226f",
-  "evaluator_byte_count": 153198,
+  "evaluator_bundle_id": "evaluator-ae52ef14117f211dd76b23abae14a4babeee1f4207fe7e9df437014e9097cc51",
+  "evaluator_bundle_digest": "sha256:ee57776831377a44310e1f4ea24678ae2da0986113e68c968c2ae46240667411",
+  "evaluator_byte_count": 163163,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:6d4f9c4ae88cf323bc8d16c3e2ccebbf305868e1e328bfda65b30d91a5bb2521"
+  "metadata_digest": "sha256:084c8680716cef9637c405a23abb447f0f21b9928d7d4fe39b40c9b734811784"
 }

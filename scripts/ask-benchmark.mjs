@@ -33,6 +33,7 @@ import { reportEngineeringResultRepetitions, verifyEngineeringRepetitionReport }
 import { reportEngineeringPairedComparisons, verifyEngineeringPairedComparisonReport } from "./ask-benchmark-portfolio-paired-comparison-report.mjs";
 import { reportEngineeringDirectionalOutcomes, verifyEngineeringDirectionalOutcomeReport } from "./ask-benchmark-portfolio-directional-outcome-report.mjs";
 import { reportEngineeringMechanismScorecards, verifyEngineeringMechanismScorecard } from "./ask-benchmark-portfolio-mechanism-scorecard.mjs";
+import { reportPortfolioAggregateResult, verifyPortfolioAggregateResult } from "./ask-benchmark-portfolio-aggregate-result.mjs";
 import { migrateLegacyCalibrationResult, verifyLegacyCalibrationMigration } from "./ask-benchmark-portfolio-legacy-calibration-migration.mjs";
 import {
   DEFAULT_PORTFOLIO_CATALOG_PATH,
@@ -81,7 +82,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, source: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, pairedComparisonReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, privateEvaluationRoot: null, privateEvaluationRecordPath: null, privateFragmentPath: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, admissionDecision: null, admissionReviewAuthority: null, admissionReviewAuthoritySourceDigest: null, admissionReviewArchive: null, executionAdmissionFixture: null, executionAdmissionEvidence: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, source: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, pairedComparisonReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, privateEvaluationRoot: null, privateEvaluationRecordPath: null, privateFragmentPath: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, admissionDecision: null, admissionReviewAuthority: null, admissionReviewAuthoritySourceDigest: null, admissionReviewArchive: null, executionAdmissionFixture: null, executionAdmissionEvidence: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, aggregateAuthorityRoot: null, classificationRecordPaths: [], classificationRecordSourceDigests: [], lineageRecordPaths: [], lineageRecordSourceDigests: [], comparisonView: null, suite: null, taskClass: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -131,6 +132,14 @@ function parseArgs(argv) {
     else if (flag === "--engineering-result-source-manifest") args.engineeringResultSourceManifest = resolve(argv.shift());
     else if (flag === "--engineering-result-source-manifest-source-digest") args.engineeringResultSourceManifestSourceDigest = argv.shift();
     else if (flag === "--public-artifact-root") args.publicArtifactRoot = resolve(argv.shift());
+    else if (flag === "--aggregate-authority-root") args.aggregateAuthorityRoot = resolve(argv.shift());
+    else if (flag === "--classification-record") args.classificationRecordPaths.push(argv.shift());
+    else if (flag === "--classification-record-source-digest") args.classificationRecordSourceDigests.push(argv.shift());
+    else if (flag === "--lineage-record") args.lineageRecordPaths.push(argv.shift());
+    else if (flag === "--lineage-record-source-digest") args.lineageRecordSourceDigests.push(argv.shift());
+    else if (flag === "--comparison-view") args.comparisonView = argv.shift();
+    else if (flag === "--suite") args.suite = argv.shift();
+    else if (flag === "--task-class") args.taskClass = argv.shift();
     else if (flag === "--catalog") args.catalogPath = resolve(argv.shift());
     else if (flag === "--similarity") args.similarityPath = resolve(argv.shift());
     else if (flag === "--policy-manifest") args.policyManifestPath = resolve(argv.shift());
@@ -182,6 +191,8 @@ Commands:
   verify-engineering-directional-outcome-report --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --paired-comparison-report <paired-comparison-report.json> --input <directional-outcome-report.json>
   report-engineering-mechanism-scorecards --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --output <mechanism-scorecard.json>
   verify-engineering-mechanism-scorecard --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --input <mechanism-scorecard.json>
+  report-engineering-aggregate-result --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --paired-comparison-report <paired-comparison-report.json> --aggregate-authority-root <directory> --classification-record <relative-path> --classification-record-source-digest <sha256:digest> [--classification-record <relative-path> --classification-record-source-digest <sha256:digest> ...] [--lineage-record <relative-path> --lineage-record-source-digest <sha256:digest> ...] --comparison-view <view> --suite <suite> --task-class <task-class> --output <aggregate-result.json>
+  verify-engineering-aggregate-result --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --paired-comparison-report <paired-comparison-report.json> --aggregate-authority-root <directory> --classification-record <relative-path> --classification-record-source-digest <sha256:digest> [--classification-record <relative-path> --classification-record-source-digest <sha256:digest> ...] [--lineage-record <relative-path> --lineage-record-source-digest <sha256:digest> ...] --comparison-view <view> --suite <suite> --task-class <task-class> --input <aggregate-result.json>
   recover-case --run-dir <run-directory> --case-id <case-id> --claim-id <claim-id> --reason <reason>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
@@ -730,6 +741,50 @@ function verifyEngineeringMechanismScorecardCommand(args) {
   console.log(`Verified mechanism observation scorecard ${result.artifact.mechanism_scorecard_id}`);
 }
 
+function aggregateAuthorityOptions(args) {
+  if (!args.resultSet || !args.repetitionReport || !args.pairedComparisonReport || !args.aggregateAuthorityRoot || !args.comparisonView || !args.suite || !args.taskClass) {
+    throw new Error("engineering aggregate commands require --result-set, --repetition-report, --paired-comparison-report, --aggregate-authority-root, --comparison-view, --suite, and --task-class");
+  }
+  if (args.classificationRecordPaths.length === 0 || args.classificationRecordPaths.length !== args.classificationRecordSourceDigests.length) {
+    throw new Error("engineering aggregate commands require one --classification-record-source-digest for every --classification-record");
+  }
+  if (args.lineageRecordPaths.length !== args.lineageRecordSourceDigests.length) {
+    throw new Error("engineering aggregate commands require one --lineage-record-source-digest for every --lineage-record");
+  }
+  const paths = [...args.classificationRecordPaths, ...args.lineageRecordPaths];
+  if (paths.some((path) => typeof path !== "string" || path.trim() === "")) throw new Error("engineering aggregate record paths must be non-empty relative paths");
+  if (new Set(paths).size !== paths.length) throw new Error("engineering aggregate record paths must be unique");
+  const immutableArtifactDigests = Object.fromEntries([
+    ...args.classificationRecordPaths.map((path, index) => [path, args.classificationRecordSourceDigests[index]]),
+    ...args.lineageRecordPaths.map((path, index) => [path, args.lineageRecordSourceDigests[index]]),
+  ]);
+  return {
+    ...engineeringResultSetOptions(args),
+    resultSetPath: args.resultSet,
+    repetitionReportPath: args.repetitionReport,
+    comparisonReportPath: args.pairedComparisonReport,
+    aggregateAuthorityRoot: args.aggregateAuthorityRoot,
+    classificationRecordPaths: args.classificationRecordPaths,
+    lineageRecordPaths: args.lineageRecordPaths,
+    immutableArtifactDigests,
+    comparisonView: args.comparisonView,
+    suite: args.suite,
+    taskClass: args.taskClass,
+  };
+}
+
+function reportEngineeringAggregateResultCommand(args) {
+  if (!args.output) throw new Error("report-engineering-aggregate-result requires --output");
+  const result = reportPortfolioAggregateResult({ ...aggregateAuthorityOptions(args), outputPath: args.output });
+  console.log(`Published aggregate result ${result.artifact.aggregate_result_digest} with status ${result.artifact.result_status}`);
+}
+
+function verifyEngineeringAggregateResultCommand(args) {
+  if (!args.input) throw new Error("verify-engineering-aggregate-result requires --input");
+  const result = verifyPortfolioAggregateResult({ ...aggregateAuthorityOptions(args), aggregateResultPath: args.input });
+  console.log(`Verified aggregate result ${result.artifact.aggregate_result_digest} with status ${result.artifact.result_status}`);
+}
+
 function recoverCase(args) {
   if (!args.runDir) throw new Error("recover-case requires --run-dir");
   const result = recoverPortfolioCase({ root: ROOT, runDir: args.runDir, caseId: args.caseId, claimId: args.claimId, reason: args.reason });
@@ -1225,6 +1280,8 @@ try {
   else if (args.command === "verify-engineering-directional-outcome-report") verifyEngineeringDirectionalOutcomeReportCommand(args);
   else if (args.command === "report-engineering-mechanism-scorecards") reportEngineeringMechanismScorecardsCommand(args);
   else if (args.command === "verify-engineering-mechanism-scorecard") verifyEngineeringMechanismScorecardCommand(args);
+  else if (args.command === "report-engineering-aggregate-result") reportEngineeringAggregateResultCommand(args);
+  else if (args.command === "verify-engineering-aggregate-result") verifyEngineeringAggregateResultCommand(args);
   else if (args.command === "recover-case") recoverCase(args);
   else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);

@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/review-finding.schema.json",
+  "title": "ASK impact-ordered review finding inventory",
+  "description": "Closed actionable finding fields. Array ordering is validated by the review route contract: merge blockers first, then severity order, then code-unit Finding ID.",
+  "type": "array",
+  "maxItems": 1000,
+  "items": {
+    "$ref": "#/$defs/finding"
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "finding_id",
+        "severity",
+        "merge_blocker",
+        "practical_impact",
+        "trigger_or_failure_trace",
+        "evidence_location",
+        "required_post_fix_condition"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "severity": {
+                "const": "blocker"
+              }
+            },
+            "required": [
+              "severity"
+            ]
+          },
+          "then": {
+            "properties": {
+              "merge_blocker": {
+                "const": true
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "finding_id": {
+          "type": "string",
+          "pattern": "^F-[A-Z0-9][A-Z0-9-]*$",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "blocker",
+            "major",
+            "minor",
+            "nit"
+          ]
+        },
+        "merge_blocker": {
+          "type": "boolean"
+        },
+        "practical_impact": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "trigger_or_failure_trace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "evidence_location": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "required_post_fix_condition": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        }
+      }
+    }
+  },
+  "x-ask-contract": {
+    "id": "ask.review-finding",
+    "revision": "1.0.0",
+    "ref": "ask.review-finding@1.0.0",
+    "severity_order": [
+      "blocker",
+      "major",
+      "minor",
+      "nit"
+    ],
+    "impact_order": [
+      "merge_blocker_true_first",
+      "severity_order",
+      "finding_id_code_unit"
+    ],
+    "category_role": "optional_metadata",
+    "omit_empty_category_sections": true
+  }
+}

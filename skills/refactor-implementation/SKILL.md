@@ -53,6 +53,7 @@ This skill is for safe refactor execution after a candidate exists. It does not 
    - Proceed only when the boundary decision is `No boundary change` or `Approved boundary movement`.
 
 5. Define regression proof with `test-first-verification`.
+   - Apply `ask.verification-proof-policy@1.0.0`: a localized, reversible, single-check refactor may use `compact_proof` only with every eligibility fact; public/cross-module changes, broad no-regression claims, multiple checks, handoff, or missing/conflicting obligations require `formal_verification_contract`.
    - Identify existing tests or checks that cover the affected behavior.
    - Add or update focused tests only when needed to prove preservation.
    - Include static checks, typecheck, build, or runtime/manual checks proportional to the refactor risk.
@@ -90,8 +91,8 @@ Forbidden scope:
 Boundary decision:
 - No boundary change | Use application-boundary-architecture first | Approved boundary movement
 
-Verification contract:
-- Tests / typecheck / build / runtime checks needed
+Selected proof ref:
+- Compact Proof | Formal Verification Contract
 
 Implementation summary:
 - ...
@@ -130,7 +131,7 @@ Record refactor candidate implemented, behavior-preservation verification, valid
 | Failure | Correction |
 |---|---|
 | Refactoring without an approved candidate | Route to `review-code-health` or ask for the concrete objective. |
-| Stopping despite a concrete approved candidate | Proceed after behavior-preservation, scope, boundary, and verification contracts are defined. |
+| Stopping despite a concrete approved candidate | Proceed after behavior-preservation, scope, boundary, and selected verification proof are defined. |
 | Ambiguous candidate scope | Propose the smallest safe target and stop before editing unless authorized. |
 | Hiding behavior change inside cleanup | Stop and treat the behavior change as a new feature or bug fix. |
 | Broad architecture rewrite | Route boundary movement to `application-boundary-architecture` and split the work. |

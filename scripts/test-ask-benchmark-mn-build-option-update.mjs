@@ -489,12 +489,13 @@ function currentEvaluatorSourceIdentity(repositoryRoot, generatorSourceDigest) {
   };
 }
 
-function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluatorRoot, fragment, hiddenEvaluatorSource = null }) {
+function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluatorRoot, fragment, hiddenEvaluatorSource = null, privateModuleAsset = null }) {
   const syntheticFixtureRoot = resolve(repositoryRoot, FIXTURE_ROOT_RELATIVE);
   const hiddenBytes = hiddenEvaluatorSource ?? Buffer.from(`export async function evaluateCandidateSafe() { return ${JSON.stringify(fragment)}; }\n`);
   writeFileSync(resolve(privateEvaluatorRoot, "hidden-evaluator.mjs"), hiddenBytes);
   const scopeBoundaryBytes = Buffer.from(`${JSON.stringify({ test_only_synthetic_scope_boundary: true }, null, 2)}\n`);
   writeFileSync(resolve(privateEvaluatorRoot, "scope-boundaries.json"), scopeBoundaryBytes);
+  if (privateModuleAsset) writeFileSync(resolve(privateEvaluatorRoot, privateModuleAsset.path), privateModuleAsset.bytes);
   const generatorSourceDigest = sha256(Buffer.from("deterministic-synthetic-current-authority-v1"));
   const sourceIdentity = currentEvaluatorSourceIdentity(repositoryRoot, generatorSourceDigest);
   const referenceSeed = readJson(resolve(syntheticFixtureRoot, "evaluator-reference.json"));
@@ -502,6 +503,7 @@ function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluator
     schema_version: "1.0.0",
     schema_path: "benchmarks/schemas/private-evaluator-bundle.schema.json",
     program: "adaptive_ask_private_evaluator_bundle",
+    execution_budget_ms: 180_000,
     fixture_identity: { fixture_id: "mn-build-option-update", task_class: "configuration", suite: "mechanism_negative" },
     input_identity: { fixture_input_digest: referenceSeed.fixture_input_digest },
     evaluator_revision: sourceIdentity.base_git_revision,
@@ -511,6 +513,7 @@ function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluator
     review: { record_digest: canonicalDigest({ authority: "synthetic-test-only", status: "not_independently_reviewed" }), status: "pending", reviewer_count: 1 },
     asset_inventory: [
       { role: "hidden_tests", path: "hidden-evaluator.mjs", bytes: hiddenBytes.length, sha256: sha256(hiddenBytes), media_type: "text/javascript", required: true },
+      ...(privateModuleAsset ? [{ role: "matchers", path: privateModuleAsset.path, bytes: privateModuleAsset.bytes.length, sha256: sha256(privateModuleAsset.bytes), media_type: privateModuleAsset.mediaType, required: true }] : []),
       { role: "scope_boundaries", path: "scope-boundaries.json", bytes: scopeBoundaryBytes.length, sha256: sha256(scopeBoundaryBytes), media_type: "application/json", required: true },
     ],
     capabilities: { automated_evaluation: true, manual_evaluation: false },
@@ -587,7 +590,7 @@ function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluator
   return { bundleManifest, reference, sourceIdentity };
 }
 
-function createSyntheticCurrentAuthorityEnvironment(state, { hiddenEvaluatorSource = null, evaluationStatus = state === "invalid" ? "invalid_input" : "completed", semanticText = null } = {}) {
+function createSyntheticCurrentAuthorityEnvironment(state, { hiddenEvaluatorSource = null, hiddenEvaluatorSourceFactory = null, privateModuleAsset = null, evaluationStatus = state === "invalid" ? "invalid_input" : "completed", semanticText = null } = {}) {
   const parent = createPortableAuthorityRoot("ask-current-synthetic-authority-");
   const repositoryRoot = resolve(parent, "repository");
   const clone = spawnSync("git", ["clone", "--quiet", "--no-local", historicalRoot, repositoryRoot], { encoding: "utf8" });
@@ -598,14 +601,14 @@ function createSyntheticCurrentAuthorityEnvironment(state, { hiddenEvaluatorSour
   mkdirSync(previewRoot);
   const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot: previewRoot, state });
   const fragment = syntheticPrivateFragment({ normalized: normalizedAuthority.normalized, requirementRecord: readJson(resolve(fixtureRoot, "requirement-record.json")), state, evaluationStatus });
-  const explicitHiddenEvaluatorSource = hiddenEvaluatorSource ?? (semanticText === null ? null : Buffer.from(
+  const explicitHiddenEvaluatorSource = hiddenEvaluatorSourceFactory?.(fragment) ?? hiddenEvaluatorSource ?? (semanticText === null ? null : Buffer.from(
     `const syntheticFindingText = ${JSON.stringify(semanticText)};\nexport async function evaluateCandidateSafe() { void syntheticFindingText; return ${JSON.stringify(fragment)}; }\n`,
   ));
   const privateEvaluatorRoot = resolve(parent, "private-evaluator");
   mkdirSync(privateEvaluatorRoot);
-  materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluatorRoot, fragment, hiddenEvaluatorSource: explicitHiddenEvaluatorSource });
+  materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluatorRoot, fragment, hiddenEvaluatorSource: explicitHiddenEvaluatorSource, privateModuleAsset });
   removeTree(previewRoot);
-  return { parent, repositoryRoot, privateEvaluatorRoot };
+  return { parent, repositoryRoot, privateEvaluatorRoot, fragment };
 }
 
 function restoreHistoricalEnvironment(environment) {
@@ -2701,6 +2704,7 @@ async function runSealedAuthorityAndRaceChecks(privateRoot) {
       ...productionOverrides,
       label: "R16 external authority baseline",
     });
+    assert.throws(() => executeSealedEvaluatorForTest({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, timeout: 1, label: "R17 intentional execution-budget overrun" }), /child execution failed.*ETIMEDOUT/u, "execution-budget overruns must remain fatal");
     for (const [property, calls] of Object.entries(productionOverrideCalls)) assert.equal(calls, 0, `production execution must not invoke caller-supplied ${property}`);
     const require = createRequire(import.meta.url);
     const mutableChildProcess = require("node:child_process");
@@ -2781,6 +2785,12 @@ async function runSealedAuthorityAndRaceChecks(privateRoot) {
       changed.asset_inventory.find(({ role }) => role === "hidden_tests").sha256 = `sha256:${"0".repeat(64)}`;
       overwriteSealedFile(bundlePath, Buffer.from(`${JSON.stringify(changed, null, 2)}\n`));
     }, /private bundle asset bytes|bundle identity|recorded sealed authority/u);
+    expectPrivateBundlePreflightFailure("private bundle execution budget replacement", (tamperedExecution) => {
+      const bundlePath = resolve(tamperedExecution.privateBundle.path, "private-evaluator-bundle.json");
+      const changed = readJson(bundlePath);
+      changed.execution_budget_ms += 1;
+      overwriteSealedFile(bundlePath, Buffer.from(`${JSON.stringify(changed, null, 2)}\n`));
+    }, /bundle identity|recorded sealed authority/u);
     expectPrivateBundlePreflightFailure("consistent private bundle and hidden evaluator reseal", (tamperedExecution) => {
       const bundlePath = resolve(tamperedExecution.privateBundle.path, "private-evaluator-bundle.json");
       const changedHidden = Buffer.from("export async function evaluateCandidateSafe() { return { forged: true }; }\n");
@@ -2923,6 +2933,73 @@ function runCurrentClosedModuleLinkerRegression() {
     removeTree(authorityRoot);
     restoreHistoricalEnvironment(environment);
   }
+}
+
+function runCurrentPrivateSiblingModuleRegression() {
+  const helperPath = "synthetic-private-helper.mjs";
+  const identityHelper = Buffer.from("export function identity(value) { return value; }\n");
+  const runScenario = ({ label, helperBytes, mediaType, hiddenEvaluatorSourceFactory, expectedError = null }) => {
+    const environment = createSyntheticCurrentAuthorityEnvironment("executed_success", {
+      hiddenEvaluatorSourceFactory,
+      privateModuleAsset: { path: helperPath, bytes: helperBytes, mediaType },
+    });
+    const externalAuthorityAnchor = currentExternalAuthorityAnchor();
+    const authorityRoot = mkdtempSync(resolve(tmpdir(), `ask-mn-private-sibling-${label}-`));
+    const manifest = readJson(resolve(environment.privateEvaluatorRoot, "private-evaluator-bundle.json"));
+    const hiddenAsset = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
+    const workspace = resolve(fixtureRoot, "workspace");
+    const evidence = resolve(authorityRoot, "evidence");
+    mkdirSync(evidence);
+    writeJson(resolve(evidence, "seed.json"), { authority: label });
+    const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot, state: "executed_success" });
+    try {
+      const execution = createSealedEvaluatorExecutionForTest({
+        root,
+        privateEvaluationRoot: authorityRoot,
+        privateRoot: environment.privateEvaluatorRoot,
+        hiddenAsset,
+        frozenWorkspace: workspace,
+        candidateWorkspace: workspace,
+        evaluationInputRoot: evidence,
+        evaluationLineage: normalizedAuthority.normalized.lineage,
+        evaluatorRevision: manifest.evaluator_revision,
+        externalAuthorityAnchor,
+        executionDirectoryName: `private-sibling-${label}`,
+        label: `current private-sibling ${label}`,
+      });
+      const execute = () => executeSealedEvaluatorForTest({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized: normalizedAuthority.normalized, label: `current private-sibling ${label}` });
+      if (expectedError) assert.throws(execute, expectedError, `${label} must fail closed`);
+      else {
+        const result = execute();
+        assert.deepEqual(result.firstFragment, environment.fragment, "declared private sibling must execute from verified bytes");
+        assert.deepEqual(result.secondFragment, environment.fragment, "declared private sibling must remain deterministic");
+      }
+    } finally {
+      removeTree(authorityRoot);
+      restoreHistoricalEnvironment(environment);
+    }
+  };
+
+  runScenario({
+    label: "declared",
+    helperBytes: identityHelper,
+    mediaType: "text/javascript",
+    hiddenEvaluatorSourceFactory: (fragment) => Buffer.from(`import { identity } from "./${helperPath}";\nexport async function evaluateCandidateSafe() { return identity(${JSON.stringify(fragment)}); }\n`),
+  });
+  runScenario({
+    label: "non-javascript",
+    helperBytes: identityHelper,
+    mediaType: "text/plain",
+    hiddenEvaluatorSourceFactory: (fragment) => Buffer.from(`import { identity } from "./${helperPath}";\nexport async function evaluateCandidateSafe() { return identity(${JSON.stringify(fragment)}); }\n`),
+    expectedError: /module identifier escapes verified private module authority/u,
+  });
+  runScenario({
+    label: "helper-repository-escape",
+    helperBytes: Buffer.from("export async function load(repositoryRoot) { return import(`${repositoryRoot}/scripts/ask-benchmark-materialize.mjs`); }\n"),
+    mediaType: "text/javascript",
+    hiddenEvaluatorSourceFactory: (fragment) => Buffer.from(`import { load } from "./${helperPath}";\nexport async function evaluateCandidateSafe({ repositoryRoot }) { await load(repositoryRoot); return ${JSON.stringify(fragment)}; }\n`),
+    expectedError: /module resolution is outside the verified dependency edge/u,
+  });
 }
 
 async function runPrivateCandidateChecks(privateRoot) {
@@ -3461,6 +3538,7 @@ try {
   const historicalR21EvaluatorRevision = runHistoricalR21AuthorityResolutionRegressions();
   runHistoricalR21SourceMismatchRegression(historicalR21EvaluatorRevision);
   runCurrentClosedModuleLinkerRegression();
+  runCurrentPrivateSiblingModuleRegression();
 
   expectFailure(() => assertAnswerNeutralPublicValue({ hidden_answer: "x" }), /answer-bearing field/u, "public answer-bearing fields must fail closed");
   expectFailure(() => assertPrivateRootOutsideRepository(root, fixtureRoot), /outside the repository/u, "repository-local private bundles must be rejected");

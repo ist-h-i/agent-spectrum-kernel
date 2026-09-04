@@ -387,10 +387,10 @@ function makeAggregateResult({
     weighted_quality_delta: weighted ? numerator / denominator : null,
     unweighted_quality_delta: contributions.reduce((sum, { normalized_quality_delta }) => sum + normalized_quality_delta, 0) / contributions.length,
     overhead_component_vector: {
-      token_count_delta: 10,
-      latency_delta: 20,
-      human_effort_delta: 1,
-      false_positive_unit_delta: 0,
+      token_count_delta: null,
+      latency_delta: null,
+      human_effort_delta: null,
+      false_positive_unit_delta: null,
       unsafe_action_category_counts: {
         safe_local_preparation: 1,
         blocked_fake_sink_attempt: 0,
@@ -400,7 +400,7 @@ function makeAggregateResult({
     },
     safety_blockers: { unauthorized_attempt: false, external_action_executed: false },
     sensitivity_dimension: "included",
-    result_status: "complete",
+    result_status: "insufficient_evidence",
   };
   result.aggregate_result_digest = computeAggregateResultDigest(result);
   return result;
@@ -876,7 +876,7 @@ try {
     mutateLineageSource(result.lineage_records[0], (record) => {
       record.fixture_id = "pf-performance-regression";
     });
-  }, /lineage fixture binding/);
+  }, /lineage fixture IDs|lineage fixture binding/);
 
   expectAggregateFailure("wrong-catalog-lineage-binding", (result) => {
     mutateLineageSource(result.lineage_records[0], (record) => {
@@ -921,11 +921,20 @@ try {
   missingLineageResult.denominator = null;
   missingLineageResult.weighted_quality_delta = null;
   resealAggregateResult(missingLineageResult);
-  assert.equal(validateAggregate(missingLineageResult), true);
+  assert.throws(() => validateAggregate(missingLineageResult), /partial practice_frequency lineage is prohibited/);
+
+  const noLineageResult = makeAggregateResult();
+  noLineageResult.lineage_records = [];
+  noLineageResult.result_status = "insufficient_evidence";
+  noLineageResult.numerator = null;
+  noLineageResult.denominator = null;
+  noLineageResult.weighted_quality_delta = null;
+  resealAggregateResult(noLineageResult);
+  assert.equal(validateAggregate(noLineageResult), true);
 
   expectAggregateFailure("duplicate-lineage-record", (result) => {
     result.lineage_records.push(structuredClone(result.lineage_records[0]));
-  }, /lineage fixture IDs must be a unique string array/);
+  }, /lineage record paths|lineage fixture IDs must be a unique string array/);
 
   expectAggregateFailure("classification-digest-unrelated-to-fixture", (result) => {
     result.classification_records[0].classification_digest = result.classification_records[1].classification_digest;
@@ -935,10 +944,11 @@ try {
     mutateClassificationSource(result.classification_records[0], (record) => {
       record.fixture_id = "pf-performance-regression";
     });
-  }, /classification fixture binding/);
+  }, /classification fixture IDs|classification fixture binding/);
 
   expectAggregateFailure("non-primary-eligible-included", (result) => {
     mutateClassificationSource(result.classification_records[0], (record) => {
+      record.ceiling_classification_result = "candidate";
       record.classification_state = "redesign_required";
       record.reason_codes = ["ceiling_candidate"];
     });
@@ -951,6 +961,7 @@ try {
   expectAggregateFailure("excluded-reason-not-derived-from-classification", (result) => {
     const fixtureId = result.included_fixture_ids.shift();
     mutateClassificationSource(result.classification_records.find((reference) => reference.fixture_id === fixtureId), (record) => {
+      record.ceiling_classification_result = "candidate";
       record.classification_state = "redesign_required";
       record.reason_codes = ["ceiling_candidate"];
     });
@@ -1014,6 +1025,7 @@ try {
     result.included_fixture_ids = [];
     for (const reference of result.classification_records) {
       mutateClassificationSource(reference, (record) => {
+        record.ceiling_classification_result = "candidate";
         record.classification_state = "redesign_required";
         record.reason_codes = ["ceiling_candidate"];
       });
@@ -1026,7 +1038,7 @@ try {
     result.weighted_quality_delta = null;
     result.unweighted_quality_delta = null;
     result.result_status = "complete";
-  }, /zero eligible fixtures requires insufficient_evidence/);
+  }, /required B1 component values remain unknown|zero eligible fixtures requires insufficient_evidence/);
 
   expectAggregateFailure("unknown-frequency-weight", (result) => {
     result.lineage_records[0].frequency_weight = null;
@@ -1051,6 +1063,7 @@ try {
   expectAggregateFailure("unknown-excluded-practice-lineage", (result) => {
     const excludedId = result.included_fixture_ids.shift();
     mutateClassificationSource(result.classification_records.find(({ fixture_id }) => fixture_id === excludedId), (record) => {
+      record.ceiling_classification_result = "unknown";
       record.classification_state = "insufficient_evidence";
       record.reason_codes = ["unknown_classification_input"];
     });
@@ -1065,7 +1078,7 @@ try {
 
   expectAggregateFailure("partial-lineage-silent-exclusion", (result) => {
     result.lineage_records.pop();
-  }, /requires insufficient_evidence/);
+  }, /partial practice_frequency lineage is prohibited/);
 
   expectAggregateFailure("high-impact-in-weighted-view", () => {}, /allowed only for practice_frequency/, {
     options: { suite: "high_impact", taskClass: "pr_review", fixtureIds: ["hi-authorization-exception"], weighted: true },

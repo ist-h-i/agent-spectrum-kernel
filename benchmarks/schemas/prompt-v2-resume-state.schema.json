@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-spectrum-kernel.local/benchmarks/schemas/prompt-v2-resume-state.schema.json",
+  "title": "Prompt v2 immutable partial-resume state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "schema_path", "artifact_type", "program", "run_instance_id",
+    "plan_id", "plan_digest", "materialization_id", "materialization_digest", "cases",
+    "completeness", "boundaries", "state_id", "state_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/prompt-v2-resume-state.schema.json" },
+    "artifact_type": { "const": "prompt_v2_resume_state" },
+    "program": { "const": "ask_prompt_v2_result_blind_canary" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
+    "plan_id": { "type": "string", "minLength": 1 }, "plan_digest": { "$ref": "#/$defs/digest" },
+    "materialization_id": { "type": "string", "minLength": 1 }, "materialization_digest": { "$ref": "#/$defs/digest" },
+    "cases": { "type": "array", "minItems": 56, "maxItems": 56, "items": { "$ref": "#/$defs/case" } },
+    "completeness": {
+      "type": "object", "additionalProperties": false, "required": ["expected_cases", "terminal_cases", "pending_cases", "partial"],
+      "properties": {
+        "expected_cases": { "const": 56 }, "terminal_cases": { "type": "integer", "minimum": 0, "maximum": 56 },
+        "pending_cases": { "type": "integer", "minimum": 0, "maximum": 56 }, "partial": { "type": "boolean" }
+      }
+    },
+    "boundaries": {
+      "type": "object", "additionalProperties": false,
+      "required": ["completed_refs_immutable", "pending_only_scheduled", "retry_substitution_allowed", "cross_run_transplant_allowed", "cherry_pick_allowed"],
+      "properties": {
+        "completed_refs_immutable": { "const": true }, "pending_only_scheduled": { "const": true }, "retry_substitution_allowed": { "const": false },
+        "cross_run_transplant_allowed": { "const": false }, "cherry_pick_allowed": { "const": false }
+      }
+    },
+    "state_id": { "type": "string", "pattern": "^prompt-v2-resume-[a-f0-9]{32}$" },
+    "state_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "resultRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["normalized_result_id", "normalized_result_digest", "status"],
+      "properties": {
+        "normalized_result_id": { "type": "string", "minLength": 1 }, "normalized_result_digest": { "$ref": "#/$defs/digest" },
+        "status": { "enum": ["scoring_ready", "not_scoring_ready", "unavailable"] }
+      }
+    },
+    "case": {
+      "type": "object", "additionalProperties": false,
+      "required": ["position", "case_id", "case_identity_digest", "attempt", "status", "result_ref"],
+      "properties": {
+        "position": { "type": "integer", "minimum": 1, "maximum": 56 }, "case_id": { "type": "string", "minLength": 1 },
+        "case_identity_digest": { "$ref": "#/$defs/digest" }, "attempt": { "const": 1 },
+        "status": { "enum": ["pending", "scoring_ready", "not_scoring_ready", "unavailable"] },
+        "result_ref": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/resultRef" }] }
+      }
+    }
+  }
+}

@@ -1,0 +1,368 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/evolution-experiment.schema.json",
+  "title": "Agent Spectrum Kernel sealed pre-result Evolution experiment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_kind",
+    "experiment_id",
+    "phase",
+    "results_accessed",
+    "candidate_digest",
+    "candidate_object_digest",
+    "roles",
+    "projection",
+    "protocol",
+    "causal_design",
+    "recommendation_policy",
+    "action_mapping",
+    "prompt_outcome_mapping",
+    "authority",
+    "experiment_digest"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "object_kind": { "type": "string", "const": "evolution_experiment" },
+    "experiment_id": { "$ref": "#/$defs/stableId" },
+    "phase": { "type": "string", "const": "pre_result" },
+    "results_accessed": { "type": "boolean", "const": false },
+    "candidate_digest": { "$ref": "#/$defs/digest" },
+    "candidate_object_digest": { "$ref": "#/$defs/digest" },
+    "roles": { "$ref": "#/$defs/roles" },
+    "projection": { "$ref": "#/$defs/projection" },
+    "protocol": { "$ref": "#/$defs/protocol" },
+    "causal_design": { "$ref": "#/$defs/causalDesign" },
+    "recommendation_policy": { "$ref": "#/$defs/recommendationPolicy" },
+    "action_mapping": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/actionMapping" }
+    },
+    "prompt_outcome_mapping": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/promptOutcomeMapping" }
+    },
+    "authority": { "$ref": "#/$defs/experimentAuthority" },
+    "experiment_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@/+~-]*$"
+    },
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "nonBlankText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": ".*\\S.*"
+    },
+    "tokenSet": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "textSet": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlankText" }
+    },
+    "exactAssetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_type", "stable_id", "version", "record_digest", "content_digest"],
+      "properties": {
+        "asset_type": {
+          "type": "string",
+          "enum": ["skill", "prompt", "prompt_template", "evaluator_reference"]
+        },
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "version": { "$ref": "#/$defs/token" },
+        "record_digest": { "$ref": "#/$defs/digest" },
+        "content_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "lockedPortfolioRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["portfolio_id", "revision", "manifest_digest", "asset_set_digest", "lock_digest"],
+      "properties": {
+        "portfolio_id": { "$ref": "#/$defs/stableId" },
+        "revision": { "$ref": "#/$defs/token" },
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "asset_set_digest": { "$ref": "#/$defs/digest" },
+        "lock_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "portfolio",
+        "registry_snapshot_digest",
+        "selection_object_digest",
+        "selection_digest",
+        "selected_asset"
+      ],
+      "properties": {
+        "role": { "type": "string", "enum": ["baseline", "challenger"] },
+        "portfolio": { "$ref": "#/$defs/lockedPortfolioRef" },
+        "registry_snapshot_digest": { "$ref": "#/$defs/digest" },
+        "selection_object_digest": { "$ref": "#/$defs/digest" },
+        "selection_digest": { "$ref": "#/$defs/digest" },
+        "selected_asset": { "$ref": "#/$defs/exactAssetRef" }
+      }
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline", "challenger"],
+      "properties": {
+        "baseline": { "$ref": "#/$defs/role" },
+        "challenger": { "$ref": "#/$defs/role" }
+      }
+    },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "baseline_condition",
+        "challenger_condition",
+        "mapping_digest",
+        "projection_evidence_digest"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["fixed_b1_exact", "prompt_v2_exact"]
+        },
+        "baseline_condition": { "$ref": "#/$defs/stableId" },
+        "challenger_condition": { "$ref": "#/$defs/stableId" },
+        "mapping_digest": { "$ref": "#/$defs/digest" },
+        "projection_evidence_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "runtimeIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "identity_digest"],
+      "properties": {
+        "name": { "$ref": "#/$defs/stableId" },
+        "version": { "$ref": "#/$defs/token" },
+        "identity_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_revision",
+        "tree_digest",
+        "model",
+        "cli",
+        "adapter",
+        "fixture_ids",
+        "task_classes",
+        "exclusions",
+        "candidate_evaluation_scope_digest",
+        "repetitions",
+        "evaluator",
+        "evaluator_contract_digest",
+        "scoring_policy_digest",
+        "thresholds_digest",
+        "weights_digest",
+        "stop_conditions_digest",
+        "privacy_boundary_digest"
+      ],
+      "properties": {
+        "source_revision": { "$ref": "#/$defs/token" },
+        "tree_digest": { "$ref": "#/$defs/digest" },
+        "model": { "$ref": "#/$defs/token" },
+        "cli": { "$ref": "#/$defs/runtimeIdentity" },
+        "adapter": { "$ref": "#/$defs/runtimeIdentity" },
+        "fixture_ids": { "$ref": "#/$defs/tokenSet" },
+        "task_classes": { "$ref": "#/$defs/tokenSet" },
+        "exclusions": { "$ref": "#/$defs/textSet" },
+        "candidate_evaluation_scope_digest": { "$ref": "#/$defs/digest" },
+        "repetitions": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "evaluator": { "$ref": "#/$defs/evaluatorRef" },
+        "evaluator_contract_digest": { "$ref": "#/$defs/digest" },
+        "scoring_policy_digest": { "$ref": "#/$defs/digest" },
+        "thresholds_digest": { "$ref": "#/$defs/digest" },
+        "weights_digest": { "$ref": "#/$defs/digest" },
+        "stop_conditions_digest": { "$ref": "#/$defs/digest" },
+        "privacy_boundary_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "evaluatorRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable_id", "version", "record_digest", "content_digest"],
+      "properties": {
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "version": { "$ref": "#/$defs/token" },
+        "record_digest": { "$ref": "#/$defs/digest" },
+        "content_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "causalDesign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "candidate_factors_digest", "changed_factor_ids", "ablation_evidence_digests"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["one_factor", "factorial_or_ablation_required"]
+        },
+        "candidate_factors_digest": { "$ref": "#/$defs/digest" },
+        "changed_factor_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/stableId" }
+        },
+        "ablation_evidence_digests": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/digest" }
+        }
+      }
+    },
+    "dimensionConclusion": {
+      "type": "string",
+      "enum": [
+        "improved",
+        "retained",
+        "regressed",
+        "unsafe",
+        "observed",
+        "not_observed",
+        "contradicted",
+        "unknown",
+        "unavailable",
+        "not_applicable"
+      ]
+    },
+    "recommendation": {
+      "$ref": "effectiveness-decision-vocabulary.schema.json#/$defs/overallRecommendation"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "adopt_candidate",
+        "retain_current",
+        "revise_candidate",
+        "reject_candidate",
+        "retire_current",
+        "insufficient_evidence"
+      ]
+    },
+    "dimensionMatch": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/dimensionConclusion" }
+    },
+    "ruleMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quality", "safety", "cost", "variance", "mechanism", "external_outcome"],
+      "properties": {
+        "quality": { "$ref": "#/$defs/dimensionMatch" },
+        "safety": { "$ref": "#/$defs/dimensionMatch" },
+        "cost": { "$ref": "#/$defs/dimensionMatch" },
+        "variance": { "$ref": "#/$defs/dimensionMatch" },
+        "mechanism": { "$ref": "#/$defs/dimensionMatch" },
+        "external_outcome": { "$ref": "#/$defs/dimensionMatch" }
+      }
+    },
+    "recommendationRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_id", "match", "recommendation", "decision_scope"],
+      "properties": {
+        "rule_id": { "$ref": "#/$defs/stableId" },
+        "match": { "$ref": "#/$defs/ruleMatch" },
+        "recommendation": { "$ref": "#/$defs/recommendation" },
+        "decision_scope": { "$ref": "#/$defs/token" }
+      }
+    },
+    "recommendationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rules", "no_match"],
+      "properties": {
+        "rules": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/recommendationRule" }
+        },
+        "no_match": { "type": "string", "const": "insufficient_evidence" }
+      }
+    },
+    "actionMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recommendation", "actions"],
+      "properties": {
+        "recommendation": { "$ref": "#/$defs/recommendation" },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/action" }
+        }
+      }
+    },
+    "promptOutcomeMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt_outcome", "action"],
+      "properties": {
+        "prompt_outcome": {
+          "type": "string",
+          "enum": ["adopt_prompt_v2", "retain_current", "revise_and_repeat", "insufficient_evidence"]
+        },
+        "action": { "$ref": "#/$defs/action" }
+      }
+    },
+    "experimentAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "authority_id", "authority_revision", "authority_evidence_digest"],
+      "properties": {
+        "kind": { "type": "string", "const": "external_evolution_experiment_authority" },
+        "authority_id": { "$ref": "#/$defs/stableId" },
+        "authority_revision": { "type": "integer", "minimum": 1 },
+        "authority_evidence_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

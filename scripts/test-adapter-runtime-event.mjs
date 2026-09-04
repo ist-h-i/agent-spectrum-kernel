@@ -36,6 +36,20 @@ const claudeExecutedGate = mapClaudeMetricsEvent(claudeExecutedGateEvent, { even
 assert.notEqual(claudeExecutedGate.approval.status, "approved", "gate execution is not explicit human approval evidence");
 assert.equal(claudeExecutedGate.stop.status, "risk_gate");
 
+const claudeReviewRiskEvent = structuredClone(claudeMetricsEvent);
+claudeReviewRiskEvent.skills_used = ["review-router", "review-ai-quality", "review-architecture-impact", "risk-gate"];
+claudeReviewRiskEvent.routing_result.required_gates = ["review-ai-quality", "review-architecture-impact", "risk-gate"];
+claudeReviewRiskEvent.gate_decisions = [
+  { gate: "review-ai-quality", status: "executed", missing_inputs: [] },
+  { gate: "review-architecture-impact", status: "executed", missing_inputs: [] },
+  { gate: "risk-gate", status: "required", missing_inputs: ["specific_action_approval"] },
+];
+const claudeReviewRiskNormalized = mapClaudeMetricsEvent(claudeReviewRiskEvent, { eventKind: "task_stop", hookEvent: "Stop" });
+assert.deepEqual(validateAdapterRuntimeEvent(claudeReviewRiskNormalized), []);
+assert.equal(claudeReviewRiskNormalized.approval.required, true, "Claude events do not carry Codex read-only sandbox evidence");
+assert.equal(claudeReviewRiskNormalized.approval.status, "missing");
+assert.equal(claudeReviewRiskNormalized.stop.status, "risk_gate");
+
 const codexRunnerResult = {
   status: "executed",
   evidence_level: "executed",
@@ -60,11 +74,96 @@ const codexNormalized = mapCodexRunnerResult(codexRunnerResult, {
 });
 assert.deepEqual(validateAdapterRuntimeEvent(codexNormalized), []);
 assert.equal(codexNormalized.adapter_id, "codex");
-assert.deepEqual(codexNormalized.verification, { obligation_required: false, attempted: 1, passed: 1, failed: 0, unavailable: 0 });
+assert.deepEqual(codexNormalized.verification, { obligation_required: false, attempted: 0, passed: 0, failed: 0, unavailable: 0 });
 assert.equal(codexNormalized.stop.status, "insufficient_evidence");
 assert.equal(codexNormalized.outcome.classification, "insufficient_evidence");
 assert.notEqual(codexNormalized.outcome.claim_effect, "support_within_scope");
 assert.ok(codexNormalized.evidence.missing.includes("required_gate_observation"));
+
+const codexVerificationResult = structuredClone(codexRunnerResult);
+codexVerificationResult.execution_evidence.requested_contracts.contracts.push("test-first-verification");
+const codexVerificationNormalized = mapCodexRunnerResult(codexVerificationResult, {
+  eventId: "evt:codex-verification-fixture",
+  taskId: "task:codex-verification-fixture",
+  occurredAt: "2026-07-14T00:00:01Z",
+});
+assert.deepEqual(codexVerificationNormalized.verification, { obligation_required: true, attempted: 0, passed: 0, failed: 0, unavailable: 1 }, "sensor pass must not become command or verification evidence");
+
+const codexReviewRiskResult = structuredClone(codexRunnerResult);
+codexReviewRiskResult.mode = "review";
+codexReviewRiskResult.sandbox = "read-only";
+codexReviewRiskResult.execution_evidence.requested_contracts.contracts = ["review-router", "risk-gate"];
+codexReviewRiskResult.execution_evidence.required_gates = {
+  evidence_level: "runtime_detected",
+  gates: ["review-ai-quality", "review-architecture-impact", "risk-gate"],
+  missing_evidence: [],
+};
+const codexReviewRiskNormalized = mapCodexRunnerResult(codexReviewRiskResult, {
+  eventId: "evt:codex-review-risk-fixture",
+  taskId: "task:codex-review-risk-fixture",
+  occurredAt: "2026-07-14T00:00:02Z",
+});
+assert.deepEqual(validateAdapterRuntimeEvent(codexReviewRiskNormalized), []);
+assert.equal(codexReviewRiskNormalized.approval.required, false, "read-only review risk-gate is an evaluation gate, not action approval");
+assert.equal(codexReviewRiskNormalized.approval.status, "not_required");
+
+const codexWriteRiskResult = structuredClone(codexReviewRiskResult);
+codexWriteRiskResult.mode = "implementation";
+codexWriteRiskResult.sandbox = "workspace-write";
+codexWriteRiskResult.execution_evidence.requested_contracts.contracts = ["controlled-implementation", "risk-gate"];
+const codexWriteRiskNormalized = mapCodexRunnerResult(codexWriteRiskResult, {
+  eventId: "evt:codex-write-risk-fixture",
+  taskId: "task:codex-write-risk-fixture",
+  occurredAt: "2026-07-14T00:00:03Z",
+});
+assert.equal(codexWriteRiskNormalized.approval.required, true, "non-review risk-gated action must still require approval");
+
+const codexRequestedRiskResult = structuredClone(codexWriteRiskResult);
+codexRequestedRiskResult.execution_envelope_record = {
+  envelope: {
+    stop_reason: { status: "risk_gate" },
+    evidence_status: { checked: [], missing: ["specific_action_approval"] },
+  },
+};
+codexRequestedRiskResult.execution_envelope_record.envelope.risk_approval = {
+  status: "requested",
+  execution_status: "not_executed",
+  request: {
+    schema_version: "1.0.0",
+    kind: "codex_risk_approval_request",
+    approval_authority: { authority_id: "fixture-owner", authority_revision: "rev-1", evidence_sha256: `sha256:${"a".repeat(64)}` },
+  },
+  approval_file_sha256: null,
+  rendered_invocation_sha256: null,
+  rejection_reasons: [],
+};
+const codexRequestedRiskNormalized = mapCodexRunnerResult(codexRequestedRiskResult);
+assert.equal(codexRequestedRiskNormalized.approval.status, "missing", "requested exact approval maps to missing approval");
+
+const codexApprovedRiskResult = structuredClone(codexWriteRiskResult);
+codexApprovedRiskResult.execution_envelope_record = structuredClone(codexRequestedRiskResult.execution_envelope_record);
+codexApprovedRiskResult.execution_envelope_record.envelope.stop_reason.status = "completed";
+codexApprovedRiskResult.execution_envelope_record.envelope.evidence_status.missing = [];
+codexApprovedRiskResult.execution_envelope_record.envelope.risk_approval = {
+  ...codexRequestedRiskResult.execution_envelope_record.envelope.risk_approval,
+  status: "approved",
+  execution_status: "executed",
+  approval_file_sha256: `sha256:${"b".repeat(64)}`,
+  rendered_invocation_sha256: `sha256:${"c".repeat(64)}`,
+};
+codexApprovedRiskResult.execution_evidence.required_gates.missing_evidence = [];
+const codexApprovedRiskNormalized = mapCodexRunnerResult(codexApprovedRiskResult);
+assert.equal(codexApprovedRiskNormalized.approval.status, "approved", "executed exact approval maps to approved");
+
+const codexRejectedRiskResult = structuredClone(codexWriteRiskResult);
+codexRejectedRiskResult.execution_envelope_record = structuredClone(codexRequestedRiskResult.execution_envelope_record);
+codexRejectedRiskResult.execution_envelope_record.envelope.risk_approval = {
+  ...codexRequestedRiskResult.execution_envelope_record.envelope.risk_approval,
+  status: "rejected",
+  rejection_reasons: ["exact request mismatch"],
+};
+const codexRejectedRiskNormalized = mapCodexRunnerResult(codexRejectedRiskResult);
+assert.equal(codexRejectedRiskNormalized.approval.status, "rejected", "rejected exact approval maps to rejected");
 
 const missingStop = structuredClone(codexNormalized);
 delete missingStop.stop;
@@ -97,6 +196,24 @@ const riskGateWithoutApproval = structuredClone(semanticBase);
 riskGateWithoutApproval.gates.required = ["risk-gate"];
 riskGateWithoutApproval.approval = { required: false, status: "not_required", action_categories: [] };
 assert.ok(validateAdapterRuntimeEvent(riskGateWithoutApproval).some((error) => error.includes("risk-gate requires approval.required")));
+
+const reviewRiskGateWithoutApproval = structuredClone(semanticBase);
+reviewRiskGateWithoutApproval.contracts.selected = ["review-router", "risk-gate"];
+reviewRiskGateWithoutApproval.gates.required = ["review-ai-quality", "review-architecture-impact", "risk-gate"];
+reviewRiskGateWithoutApproval.approval = { required: false, status: "not_required", action_categories: [] };
+assert.deepEqual(validateAdapterRuntimeEvent(reviewRiskGateWithoutApproval), [], "review risk-gate must not imply action approval");
+
+const reviewRiskGateWithApproval = structuredClone(reviewRiskGateWithoutApproval);
+reviewRiskGateWithApproval.approval = { required: true, status: "unknown", action_categories: ["risk_gated_action"] };
+assert.ok(validateAdapterRuntimeEvent(reviewRiskGateWithApproval).some((error) => error.includes("review risk-gate must not require action approval")));
+
+const claudeReviewRiskGateWithoutApproval = structuredClone(reviewRiskGateWithoutApproval);
+claudeReviewRiskGateWithoutApproval.adapter_id = "claude_code";
+assert.ok(validateAdapterRuntimeEvent(claudeReviewRiskGateWithoutApproval).some((error) => error.includes("risk-gate requires approval.required")), "Codex-only review evidence must not weaken Claude approval semantics");
+
+const nonReviewRiskGateWithReviewBaseline = structuredClone(reviewRiskGateWithoutApproval);
+nonReviewRiskGateWithReviewBaseline.contracts.selected = ["controlled-implementation", "risk-gate"];
+assert.ok(validateAdapterRuntimeEvent(nonReviewRiskGateWithReviewBaseline).some((error) => error.includes("risk-gate requires approval.required")), "a review gate id alone must not bypass non-review approval");
 
 const supportWithoutAppliedContract = structuredClone(semanticBase);
 supportWithoutAppliedContract.contracts.applied = [];

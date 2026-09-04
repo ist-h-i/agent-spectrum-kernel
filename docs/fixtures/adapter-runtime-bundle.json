@@ -2,27 +2,44 @@
   "schema_version": "1.0.0",
   "canonical_contract": {
     "revision": "ask-3.0.0",
-    "source_digest": "sha256:bd61cbe9194e48bb7ab67437ebc25ad54c5f55ffe0f30486faf3d9afc3b7df86",
+    "source_digest": "sha256:03e79b923276c63b8b10bb73e500fee04a1984bcf299619c3f4c3e426b1b1fd6",
     "source_paths": [
       "AGENTS.md",
       "docs/adapter-runtime-boundary-contract.md",
       "docs/agent-session-state-contract.md",
+      "docs/claim-evidence-status-contract.md",
       "docs/debt-lifecycle-contract.md",
       "docs/execution-envelope-contract.md",
       "docs/lifecycle-artifact-contract.md",
       "docs/lifecycle-traceability-contract.md",
       "docs/metrics-event-contract.md",
       "docs/observability-runtime-contract.md",
+      "docs/review-finding-contract.md",
+      "docs/skill-effectiveness-evaluation-contract.md",
       "docs/stack-implementation-overlay-contract.md",
+      "docs/verification-proof-policy-contract.md",
       "manifest.json",
       "schemas/adapter-runtime-event.schema.json",
       "schemas/adapter-runtime-evidence.schema.json",
       "schemas/adapter-runtime-profile.schema.json",
+      "schemas/claim-evidence-status.schema.json",
+      "schemas/codex-risk-action.schema.json",
+      "schemas/codex-risk-approval-request.schema.json",
+      "schemas/codex-risk-approval.schema.json",
+      "schemas/codex-runner-result.schema.json",
       "schemas/compact-profile-control-map.json",
+      "schemas/effectiveness-decision-vocabulary.schema.json",
+      "schemas/execution-envelope-record.schema.json",
       "schemas/execution-envelope.schema.json",
+      "schemas/fixed-entry-profile-registry.json",
       "schemas/metrics-event.schema.json",
       "schemas/normalized-event-schema-registry.json",
+      "schemas/review-finding.schema.json",
       "schemas/review-signal-gate-map.json",
+      "schemas/skill-effectiveness-outcome.schema.json",
+      "schemas/verification-proof-policy.schema.json",
+      "scripts/json-schema-validation.mjs",
+      "scripts/skill-effectiveness-outcome.mjs",
       "skills/adr-review/SKILL.md",
       "skills/angular-implementation-architecture/SKILL.md",
       "skills/application-boundary-architecture/SKILL.md",
@@ -82,20 +99,20 @@
         {
           "adapter_id": "claude_code",
           "renderer_id": "install-claude-adapter",
-          "renderer_version": "4",
+          "renderer_version": "5",
           "renderer_profile": "daily",
-          "profile_fingerprint": "sha256:cd11916022f0d5fd9180f7e19212a61b2ed1524f9b7e349319fbc1b79dd2647b",
-          "canonical_subset_digest": "sha256:b65c33344fa92dbf5c12246477d40223d41216b9f2a4d307e2e5bb6b2c19f993",
-          "canonical_source_count": 47,
-          "projected_asset_count": 49,
-          "projected_asset_digest": "sha256:00e958290d2cb494677b4599326a613e8ced018e6a0ccadff1592197005936ce",
+          "profile_fingerprint": "sha256:64d7dc430289d13a2402dffcc8c2ad7d3867602084b9c65ed85aa0b8ca617885",
+          "canonical_subset_digest": "sha256:ed3961f06c5591295d021beadd38f32fdc02082afcb6628b5f252ff1e925e8f3",
+          "canonical_source_count": 58,
+          "projected_asset_count": 53,
+          "projected_asset_digest": "sha256:0cb73b9cb04e2c5c661a3931aebc679b82a822cfa834fb525d012685c4434c0a",
           "projected_asset_counts": {
             "commands": 5,
             "configuration": 1,
             "hooks": 1,
-            "runner": 6,
+            "runner": 7,
             "runtime_data": 2,
-            "schemas": 3,
+            "schemas": 6,
             "skills": 31
           },
           "lifecycle_operations": [
@@ -108,18 +125,18 @@
         {
           "adapter_id": "codex",
           "renderer_id": "install-codex-adapter",
-          "renderer_version": "4",
+          "renderer_version": "9",
           "renderer_profile": "daily",
-          "profile_fingerprint": "sha256:4a58dd471d2b4d242bcd5c51b6fb49bca2a359959f5adb60dc5227d8cccfc2af",
-          "canonical_subset_digest": "sha256:dec622176fff606453fc32cd17158d0ea79a938932fe07c45bbe0ad6fb7c5484",
-          "canonical_source_count": 49,
-          "projected_asset_count": 45,
-          "projected_asset_digest": "sha256:5679248d5c961b1d40f87d9703b808fdcb83c6c615c1ee99ba5fc99a2cdb60c6",
+          "profile_fingerprint": "sha256:70fcb1dce62e5025dc45fa5c7d525e92fb54f043397193fd325eb99e974462c8",
+          "canonical_subset_digest": "sha256:978e54e8859ac1317feb141700acf9a8099fe6d295220eea330424bdc2df8a89",
+          "canonical_source_count": 63,
+          "projected_asset_count": 53,
+          "projected_asset_digest": "sha256:c0776fde8fba71c7a5a522a4ca9e35fd617a62eea4da4c86079d4238d0289a75",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 5,
-            "runner": 5,
-            "schemas": 3,
+            "runner": 8,
+            "schemas": 8,
             "skills": 31
           },
           "lifecycle_operations": [
@@ -137,20 +154,20 @@
         {
           "adapter_id": "claude_code",
           "renderer_id": "install-claude-adapter",
-          "renderer_version": "4",
+          "renderer_version": "5",
           "renderer_profile": "organizational",
-          "profile_fingerprint": "sha256:64dbdb9137835a862557d758f2ffb9bcdabd76f93b380e20c4aac97deb165288",
-          "canonical_subset_digest": "sha256:d311ae9429e6ea8be3cfc03b963c1c556e32531d5826e44a994054969ff2d006",
-          "canonical_source_count": 63,
-          "projected_asset_count": 69,
-          "projected_asset_digest": "sha256:6dafde3fdf4f76fc479ae68b01d65fd217796a9a42f317dd287a6767fcd5e67a",
+          "profile_fingerprint": "sha256:bbf00dad75e588b51b2d7dbca2c3596b8835beb9545e63aa8d3df4cdda86d9d5",
+          "canonical_subset_digest": "sha256:a11cff73148c5e7a0373ccaf5cf5fcae1fb059bd3b33762290cb325a0c53cdf4",
+          "canonical_source_count": 77,
+          "projected_asset_count": 73,
+          "projected_asset_digest": "sha256:7ad1e67653954633bc17b77574001eccedef442e2c3048d89434c989a4998f16",
           "projected_asset_counts": {
             "commands": 7,
             "configuration": 4,
             "hooks": 1,
-            "runner": 6,
+            "runner": 7,
             "runtime_data": 2,
-            "schemas": 3,
+            "schemas": 6,
             "skills": 46
           },
           "lifecycle_operations": [
@@ -163,18 +180,18 @@
         {
           "adapter_id": "codex",
           "renderer_id": "install-codex-adapter",
-          "renderer_version": "4",
+          "renderer_version": "9",
           "renderer_profile": "organizational",
-          "profile_fingerprint": "sha256:47cfee7c8543fd332a3ac818ab9bc21e21e5e4284cf7cc6393cd6d8a0352eac4",
-          "canonical_subset_digest": "sha256:bd61cbe9194e48bb7ab67437ebc25ad54c5f55ffe0f30486faf3d9afc3b7df86",
-          "canonical_source_count": 65,
-          "projected_asset_count": 60,
-          "projected_asset_digest": "sha256:c23fde39066da6c695a708ea6aa96d6bb04704eaf1f38454136d2100cdeed73f",
+          "profile_fingerprint": "sha256:81517e48bd10b6ad3ba160ca215c9c525156ab4c1a8f27e198e8e685736624ae",
+          "canonical_subset_digest": "sha256:03e79b923276c63b8b10bb73e500fee04a1984bcf299619c3f4c3e426b1b1fd6",
+          "canonical_source_count": 82,
+          "projected_asset_count": 68,
+          "projected_asset_digest": "sha256:985e8c2a6f5767b75b20143677e5292214270b93589f6f9cffbeb479f96df8c0",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 5,
-            "runner": 5,
-            "schemas": 3,
+            "runner": 8,
+            "schemas": 8,
             "skills": 46
           },
           "lifecycle_operations": [
@@ -192,20 +209,20 @@
         {
           "adapter_id": "claude_code",
           "renderer_id": "install-claude-adapter",
-          "renderer_version": "4",
+          "renderer_version": "5",
           "renderer_profile": "implementation",
-          "profile_fingerprint": "sha256:55ea522cb2dc482b196691f5b45568ab32130f9cb96aa25cbe1d9a8f0b756985",
-          "canonical_subset_digest": "sha256:4cb3674d733babd419eb0d3dfa3a421292c3f109b2c1a52b9bb40d0385a15d7b",
-          "canonical_source_count": 31,
-          "projected_asset_count": 32,
-          "projected_asset_digest": "sha256:0ceef0aefe8dde955c6239febb1ed6808d7f0ff35e9609d04aa2571c571a3be4",
+          "profile_fingerprint": "sha256:7fe606cbefb49f981cbbf2aaa657d0a6f76d8fda66bec08abdb1538285a0fd5e",
+          "canonical_subset_digest": "sha256:a34dd8b1f6a1b1aa9cb66bd9ff7c78f92690998dec653ce5ae5beb0c69c00dae",
+          "canonical_source_count": 39,
+          "projected_asset_count": 36,
+          "projected_asset_digest": "sha256:a9b3f192d0c9a805ab90825d14ddc294415e0f409f02fe34ee9e2893b9c20d3a",
           "projected_asset_counts": {
             "commands": 3,
             "configuration": 1,
             "hooks": 1,
-            "runner": 6,
+            "runner": 7,
             "runtime_data": 2,
-            "schemas": 3,
+            "schemas": 6,
             "skills": 16
           },
           "lifecycle_operations": [
@@ -218,18 +235,18 @@
         {
           "adapter_id": "codex",
           "renderer_id": "install-codex-adapter",
-          "renderer_version": "4",
+          "renderer_version": "9",
           "renderer_profile": "implementation",
-          "profile_fingerprint": "sha256:73e2e616248b3e0f3731e3adca3d986b2a39fbc84c826d4c759df123959c879a",
-          "canonical_subset_digest": "sha256:78ce473bfa6ee09d6a44b600ea416cab81862797a0457df74228e8d45b45d1e8",
-          "canonical_source_count": 26,
-          "projected_asset_count": 23,
-          "projected_asset_digest": "sha256:5425480d90565704bb4b0969fb0e1c0abcb1c5b5d608bd588edc7c97972b54d9",
+          "profile_fingerprint": "sha256:c5f9d60b5ad63230788e16623a375cf6accda10d692999ac99681113111fbb79",
+          "canonical_subset_digest": "sha256:d4fad9a7e01e255b4fc6fc521b1b8c4ca6ae7ab75661fb41ba4675043c0fae03",
+          "canonical_source_count": 38,
+          "projected_asset_count": 31,
+          "projected_asset_digest": "sha256:edf9c914fcb3684f2e33d2c834466940afd77932c11a7ce0d508ecca570c689b",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 3,
-            "runner": 5,
-            "schemas": 3,
+            "runner": 8,
+            "schemas": 8,
             "skills": 11
           },
           "lifecycle_operations": [
@@ -247,20 +264,20 @@
         {
           "adapter_id": "claude_code",
           "renderer_id": "install-claude-adapter",
-          "renderer_version": "4",
+          "renderer_version": "5",
           "renderer_profile": "investigation",
-          "profile_fingerprint": "sha256:a481c4bf98de20bd404745fa4afd146332910e01c3bbb8ce38a933576fb71101",
-          "canonical_subset_digest": "sha256:ba3b411f0f0bbef7aa15c713a284e00c5bed1407c92bd5499786e6fa93d1ac27",
-          "canonical_source_count": 26,
-          "projected_asset_count": 27,
-          "projected_asset_digest": "sha256:860b0c25561d8ff2a1869f404439cdf49c23b322ea52e9205e05b2601e193c50",
+          "profile_fingerprint": "sha256:75ed568ddf347df10ad9860b64d196ee06f035c736a26543f4c906e88db302d8",
+          "canonical_subset_digest": "sha256:9e6fb5cc85d999a1797ccc5a797a360834668562718b4d949f0da9dce48c14b4",
+          "canonical_source_count": 33,
+          "projected_asset_count": 31,
+          "projected_asset_digest": "sha256:e2d64a79ed4adfb9c959b06910799803bb1ed2c5c02d130d21af230e19ad5df1",
           "projected_asset_counts": {
             "commands": 3,
             "configuration": 1,
             "hooks": 1,
-            "runner": 6,
+            "runner": 7,
             "runtime_data": 2,
-            "schemas": 3,
+            "schemas": 6,
             "skills": 11
           },
           "lifecycle_operations": [
@@ -273,18 +290,18 @@
         {
           "adapter_id": "codex",
           "renderer_id": "install-codex-adapter",
-          "renderer_version": "4",
+          "renderer_version": "9",
           "renderer_profile": "investigation",
-          "profile_fingerprint": "sha256:3287c06183a4f343a528e31fce82216a59cf922841f34e38d5058ce45e9bb268",
-          "canonical_subset_digest": "sha256:8a3fad6dab4e4fb100975d8989fa7e5bc360516c401a38d4e6839debf8017f7c",
-          "canonical_source_count": 24,
-          "projected_asset_count": 21,
-          "projected_asset_digest": "sha256:ed50082a2f9853bcd2d77f5566331d8d324d09d4fec4f86ca06df1694c271d22",
+          "profile_fingerprint": "sha256:0f7ebafab33f6ca2a31f5b6a0f06607418d52a8335f3f20000017da31458f83d",
+          "canonical_subset_digest": "sha256:2ed4a2603afef75237c9114ad5859037132d99e6e64f5f667d12af0c597df363",
+          "canonical_source_count": 35,
+          "projected_asset_count": 29,
+          "projected_asset_digest": "sha256:98d16902c440cd465532d2eb3ec5b40bfc6dc277c2d3cd666920cfd5024b773d",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 3,
-            "runner": 5,
-            "schemas": 3,
+            "runner": 8,
+            "schemas": 8,
             "skills": 9
           },
           "lifecycle_operations": [
@@ -302,20 +319,20 @@
         {
           "adapter_id": "claude_code",
           "renderer_id": "install-claude-adapter",
-          "renderer_version": "4",
+          "renderer_version": "5",
           "renderer_profile": "review",
-          "profile_fingerprint": "sha256:b7ef7d2ade1fb1be6b9fd4d6897e89414061025840c02d18a0c5fc427ebaa1c8",
-          "canonical_subset_digest": "sha256:f0640172cc8bdbe8aa1df93b0b6951d558ae39e4de5f46828402787020ad8f73",
-          "canonical_source_count": 33,
-          "projected_asset_count": 34,
-          "projected_asset_digest": "sha256:158e6904cc20b6ab2c32088069cdd812dc04109eb2f1b97a0b67620043b784f7",
+          "profile_fingerprint": "sha256:2724aa1f36922f9ab73d7edc726fc303fd3acb9c92e61592828e92f5239a0809",
+          "canonical_subset_digest": "sha256:b88d39ea2b54abc6c833b6e121e8ca3fa293f644b9404b83c10b378f977887c9",
+          "canonical_source_count": 44,
+          "projected_asset_count": 38,
+          "projected_asset_digest": "sha256:63319fe7912e6742dae53feb101552cdafa57ba9075c3f0837c44aa3be60c436",
           "projected_asset_counts": {
             "commands": 3,
             "configuration": 1,
             "hooks": 1,
-            "runner": 6,
+            "runner": 7,
             "runtime_data": 2,
-            "schemas": 3,
+            "schemas": 6,
             "skills": 18
           },
           "lifecycle_operations": [
@@ -328,18 +345,18 @@
         {
           "adapter_id": "codex",
           "renderer_id": "install-codex-adapter",
-          "renderer_version": "4",
+          "renderer_version": "9",
           "renderer_profile": "review",
-          "profile_fingerprint": "sha256:c8740399e799d15e7a661b434fcdb7861295146b9ce71afdb081564f56a7e45c",
-          "canonical_subset_digest": "sha256:04a452e98aa09cef35abaa63dc7093fd79103872d3c08e46a71ad97e094e6417",
-          "canonical_source_count": 36,
-          "projected_asset_count": 30,
-          "projected_asset_digest": "sha256:c06b32a04008647e1c96dff425f647ec46f34c203c8270053c1756806ac22eb3",
+          "profile_fingerprint": "sha256:f2058c10511f1f7fe89f4cbf86119bcc9f8d9b43c9d70e10aa3b86176bbce89e",
+          "canonical_subset_digest": "sha256:e1a10c812fe92affa9deb6e1133687ff48a5cab9d81d1462ea5d87c586d8209b",
+          "canonical_source_count": 49,
+          "projected_asset_count": 38,
+          "projected_asset_digest": "sha256:d7003fb7d8240987a327f33d9738b747688c39e7e09b0cd5d5f7d7c92b6510e8",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 3,
-            "runner": 5,
-            "schemas": 3,
+            "runner": 8,
+            "schemas": 8,
             "skills": 18
           },
           "lifecycle_operations": [
@@ -357,20 +374,20 @@
         {
           "adapter_id": "claude_code",
           "renderer_id": "install-claude-adapter",
-          "renderer_version": "4",
+          "renderer_version": "5",
           "renderer_profile": "observability",
-          "profile_fingerprint": "sha256:540e2b9e8b531744c7c72ae3a0f1772b48774e6b4e7c431664a491727192d8b2",
-          "canonical_subset_digest": "sha256:a572c3f61e0c02fa857f5e031cd8afecc15c43ae7025eef789b2d1f5d13c828f",
-          "canonical_source_count": 28,
-          "projected_asset_count": 31,
-          "projected_asset_digest": "sha256:1673e8b84f3c59df130a7161d2571442340a643c1312f4f85d7b829caadbe61a",
+          "profile_fingerprint": "sha256:b4271afe0b70521b75aa5b6835e844f5f3b32aec647e9c95ea40d48d5f234ea6",
+          "canonical_subset_digest": "sha256:beb5d3366515a55defd4e150df1c8848a38eb8e9e75a2cde7c60e9d21c488ee4",
+          "canonical_source_count": 40,
+          "projected_asset_count": 35,
+          "projected_asset_digest": "sha256:1718f57b6770c8c94d869b56d9bce68d977d972c966da44270a510e4a4c2b2c5",
           "projected_asset_counts": {
             "commands": 4,
             "configuration": 4,
             "hooks": 1,
-            "runner": 6,
+            "runner": 7,
             "runtime_data": 2,
-            "schemas": 3,
+            "schemas": 6,
             "skills": 11
           },
           "lifecycle_operations": [
@@ -383,18 +400,18 @@
         {
           "adapter_id": "codex",
           "renderer_id": "install-codex-adapter",
-          "renderer_version": "4",
+          "renderer_version": "9",
           "renderer_profile": "observability",
-          "profile_fingerprint": "sha256:6337f1873743bac38e876b9fb7091a46e68c6f593329d7804c925e7212b7a50e",
-          "canonical_subset_digest": "sha256:e615515ddf6a0b3250b3f0554dd8bb0eb803b63f818bf14f4478cd4201b60c8d",
-          "canonical_source_count": 28,
-          "projected_asset_count": 20,
-          "projected_asset_digest": "sha256:f3e7d1d0e89b136c07c9fec37a9827cbc5a6ada5a64cc9770e6c3190064828a7",
+          "profile_fingerprint": "sha256:55661a9b0623ddc53dc2fb726697ec0345e98b329ce3b639fd837b8ff25ee624",
+          "canonical_subset_digest": "sha256:8de7dc395c9aa7dced0057e0c0f2d2bebe012e17697f0e1ed1cf660c16a9e633",
+          "canonical_source_count": 43,
+          "projected_asset_count": 28,
+          "projected_asset_digest": "sha256:2d34aff4de80953919ba7d23ca7f7c874ef9461f7cc8e56e4ea3f0728f86a9c8",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 2,
-            "runner": 5,
-            "schemas": 3,
+            "runner": 8,
+            "schemas": 8,
             "skills": 9
           },
           "lifecycle_operations": [
@@ -412,20 +429,20 @@
         {
           "adapter_id": "claude_code",
           "renderer_id": "install-claude-adapter",
-          "renderer_version": "4",
+          "renderer_version": "5",
           "renderer_profile": "full",
-          "profile_fingerprint": "sha256:b808ea99c1e43abdcf5aa8b047927f576a0e469a1717a5d15d2f87091351ff59",
-          "canonical_subset_digest": "sha256:d311ae9429e6ea8be3cfc03b963c1c556e32531d5826e44a994054969ff2d006",
-          "canonical_source_count": 63,
-          "projected_asset_count": 69,
-          "projected_asset_digest": "sha256:6dafde3fdf4f76fc479ae68b01d65fd217796a9a42f317dd287a6767fcd5e67a",
+          "profile_fingerprint": "sha256:f1d5abcc865eae203c4a5454b465383ad542c6336af96d2f96951a1a0d5c32da",
+          "canonical_subset_digest": "sha256:a11cff73148c5e7a0373ccaf5cf5fcae1fb059bd3b33762290cb325a0c53cdf4",
+          "canonical_source_count": 77,
+          "projected_asset_count": 73,
+          "projected_asset_digest": "sha256:7ad1e67653954633bc17b77574001eccedef442e2c3048d89434c989a4998f16",
           "projected_asset_counts": {
             "commands": 7,
             "configuration": 4,
             "hooks": 1,
-            "runner": 6,
+            "runner": 7,
             "runtime_data": 2,
-            "schemas": 3,
+            "schemas": 6,
             "skills": 46
           },
           "lifecycle_operations": [
@@ -438,18 +455,18 @@
         {
           "adapter_id": "codex",
           "renderer_id": "install-codex-adapter",
-          "renderer_version": "4",
+          "renderer_version": "9",
           "renderer_profile": "full",
-          "profile_fingerprint": "sha256:5958b3f15d9f155ca078fce945c71304cc79759bab919eaa13211c7820a6ccd8",
-          "canonical_subset_digest": "sha256:bd61cbe9194e48bb7ab67437ebc25ad54c5f55ffe0f30486faf3d9afc3b7df86",
-          "canonical_source_count": 65,
-          "projected_asset_count": 60,
-          "projected_asset_digest": "sha256:c23fde39066da6c695a708ea6aa96d6bb04704eaf1f38454136d2100cdeed73f",
+          "profile_fingerprint": "sha256:689dfe7393e4d75ac8ddceff1e7f8d9c566ba730de29e50e8fba6a3386a5a50f",
+          "canonical_subset_digest": "sha256:03e79b923276c63b8b10bb73e500fee04a1984bcf299619c3f4c3e426b1b1fd6",
+          "canonical_source_count": 82,
+          "projected_asset_count": 68,
+          "projected_asset_digest": "sha256:985e8c2a6f5767b75b20143677e5292214270b93589f6f9cffbeb479f96df8c0",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 5,
-            "runner": 5,
-            "schemas": 3,
+            "runner": 8,
+            "schemas": 8,
             "skills": 46
           },
           "lifecycle_operations": [
@@ -519,13 +536,13 @@
       "scoring_contract_validator_path": "scripts/ask-benchmark-scoring-contract.mjs",
       "scoring_contract_validator_file_sha256": "1662d55f639519b5b27a1a397c584feec84fceabc43f39dea04a04c49b1f7ef6",
       "scoring_authority_validator_path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-      "scoring_authority_validator_file_sha256": "dd2771600fc804f3e212d90a4718f5d7d711fb78c6bb90804ed3484bd9e285c3",
+      "scoring_authority_validator_file_sha256": "f3e6d6ff3987baf3e4f71f40ab7348e6f0e1a027e4efde949ad71d3fc8353404",
       "engineering_result_schema_path": "benchmarks/schemas/portfolio-engineering-result.schema.json",
       "engineering_result_schema_file_sha256": "af1ea7698d3981705c64f184dcddb418b80ec75ab2917c7991f2f574802db76f",
       "scoring_implementation_path": "scripts/ask-benchmark-portfolio-score.mjs",
       "scoring_implementation_file_sha256": "fa8a4b1de313ceeff447bd344e6168bb9b8fc02dfff86864297a83358785667b",
       "scoring_test_path": "scripts/test-ask-benchmark-portfolio-score.mjs",
-      "scoring_test_file_sha256": "70a597e7f87c19d5f6bf24c2bcbadd6760d59bbb2cba3e0e77f6643144d9d0f4",
+      "scoring_test_file_sha256": "9008d74d9ee4b52da24e4e316909fbc274b932687076f82ebe0f603d9720ffc3",
       "atomic_publication_implementation_path": "scripts/ask-benchmark-atomic-publication.mjs",
       "atomic_publication_implementation_file_sha256": "1227b73efd9bcfe254fa8f448acb9aed5078c8f42fa4273ec1f71ab609fdb67a",
       "stable_file_implementation_path": "scripts/ask-benchmark-stable-file.mjs",
@@ -537,7 +554,7 @@
       "engineering_result_set_implementation_path": "scripts/ask-benchmark-portfolio-result-set.mjs",
       "engineering_result_set_implementation_file_sha256": "ae7230381c39c413e4a4b3bb4afb7f07f2be03645dbbe66d5d9d987a6a8f9fda",
       "engineering_result_set_test_path": "scripts/test-ask-benchmark-portfolio-result-set.mjs",
-      "engineering_result_set_test_file_sha256": "fbc95316045abe424a6c3a8316c98748c8faa354dde86d5534fdc0985e90a8a7",
+      "engineering_result_set_test_file_sha256": "2ab0b8351477f3122eb692f97b466a1f0a05f2eff171d966c9bae58cd0cb6e18",
       "repetition_report_schema_path": "benchmarks/schemas/portfolio-repetition-report.schema.json",
       "repetition_report_schema_file_sha256": "51c4d534782ba1c31497ecd2394d377fadcbe65d7e2f4ae92d63124dd772371e",
       "repetition_report_implementation_path": "scripts/ask-benchmark-portfolio-repetition-report.mjs",
@@ -562,6 +579,12 @@
       "mechanism_scorecard_implementation_file_sha256": "c022bf1c33d01e0a7e62e6c98ad1779873f2aba93aa42cf91ce814cb0f61bb12",
       "mechanism_scorecard_test_path": "scripts/test-ask-benchmark-portfolio-mechanism-scorecard.mjs",
       "mechanism_scorecard_test_file_sha256": "37f43b8c6207ea0d814e237610a829cc0588c0a0cc4b1a81cf09e7984b081858",
+      "aggregate_result_schema_path": "benchmarks/schemas/portfolio-aggregate-result.schema.json",
+      "aggregate_result_schema_file_sha256": "919654e9b278a25c6e663e892b86578c803d33e32e04f904218962b1cfc33e71",
+      "aggregate_result_implementation_path": "scripts/ask-benchmark-portfolio-aggregate-result.mjs",
+      "aggregate_result_implementation_file_sha256": "d58a1815e26fc5fb51200c40247263b3d5029949c5140bc1fa323eb1fd26855d",
+      "aggregate_result_test_path": "scripts/test-ask-benchmark-portfolio-aggregate-result.mjs",
+      "aggregate_result_test_file_sha256": "f8235a7d002a781d1dc6383a1edc9de5708edd7af173f3ead267dc79bf7547f9",
       "legacy_calibration_migration_schema_path": "benchmarks/schemas/portfolio-legacy-calibration-migration.schema.json",
       "legacy_calibration_migration_schema_file_sha256": "60294edd35870ce137ca7ebbd832d39827f49e5d3fc014e84dac38aa25fde5d0",
       "legacy_calibration_migration_implementation_path": "scripts/ask-benchmark-portfolio-legacy-calibration-migration.mjs",
@@ -597,16 +620,18 @@
         }
       ],
       "scoring_issue": 197,
-      "scoring_slice": "legacy_calibration_compatibility_migration",
+      "scoring_slice": "deterministic_aggregate_reporting",
       "scoring_implemented": true,
       "result_set_authority_implemented": true,
       "unweighted_repetition_reporting_implemented": true,
       "paired_comparison_reporting_implemented": true,
       "directional_win_loss_tie_reporting_implemented": true,
       "mechanism_observation_scorecard_implemented": true,
+      "aggregate_reporting_implemented": true,
       "legacy_calibration_compatibility_migration_implemented": true,
       "comparative_or_weighted_reporting_implemented": true,
-      "weighted_reporting_implemented": false
+      "weighted_reporting_implemented": true,
+      "measured_aggregate_authority_implemented": false
     },
     "portfolio_design_admission": {
       "issue": 205,
@@ -640,6 +665,120 @@
       "projected_state": "design_reviewed",
       "final_admission_implied": false,
       "implementation_authorized": false
+    },
+    "prompt_v2_preregistration": {
+      "issue": 234,
+      "execution_issue": 235,
+      "phase": "pre_result",
+      "protocol": {
+        "path": "benchmarks/protocol-prompt-v2.md",
+        "file_sha256": "4ab18a466567e0a94df575bddb5aabc4ccf8fff496be11d3af74a32ef44aff3a",
+        "raw_digest": "sha256:4ab18a466567e0a94df575bddb5aabc4ccf8fff496be11d3af74a32ef44aff3a"
+      },
+      "preregistration": {
+        "path": "benchmarks/prompt-v2-preregistration.json",
+        "file_sha256": "4f47496ffa1d00f3336f816795db369e61f9d56ad9336d6e6ea2a99051674053",
+        "preregistration_id": "prompt-v2-prereg-ae74196b851d186ae1e0aa0a45939b3d",
+        "preregistration_digest": "sha256:f5cc838703008896e7864e17501c99c3ae74196b851d186ae1e0aa0a45939b3d",
+        "expected_case_count": 56,
+        "prompt_roles": [
+          "current_prompt",
+          "prompt_v2"
+        ]
+      },
+      "source_archive": {
+        "revision": "c508a767f3386dac10180770edf37a67806fbb1b",
+        "tree": "d7d377c1265f0fb47119bfc80a2f3eb9535cf163",
+        "rendered_root": "docs/fixtures/prompt-v2-preregistration/rendered",
+        "rendered_inventory_digest": "sha256:a7db31d68baf31a99250af4f407815636d38cd13dd5cebddd78eba1eb660a67d"
+      },
+      "generated_authority": {
+        "binding_path": "docs/fixtures/prompt-v2-preregistration/binding.json",
+        "binding_file_sha256": "496b8e592637cefbd0e2f60c118994aa066c18a60e42647bb148f78c06129bfc",
+        "binding_digest": "sha256:75aff7c8158b6b9da23c6a20d514bf156d2b9301d4cc82844eb05c69dc2d99f6",
+        "reference_path": "docs/fixtures/prompt-v2-preregistration/reference.json",
+        "reference_file_sha256": "b059809df015f9bd063c9ff4cf58a7f0a8dc1dda430ed7848856e0cb97dda752",
+        "reference_digest": "sha256:3e973ea52f6e4321379442928d86f39db16fb5c024ef4676254e24c07fd08548",
+        "registry_snapshot_digest": "sha256:fd6a82bb2685fbcb4a394613d8a2521ab91b1b7e9f75cfdb7621c712f52f8173",
+        "store_root": "docs/fixtures/prompt-v2-preregistration/store",
+        "object_count": 57,
+        "object_inventory_digest": "sha256:7c267fbd91cc82c24916c1ad39ad559b1da11752c02fe35d21887aff6fd6c63a"
+      },
+      "schemas": [
+        {
+          "path": "benchmarks/schemas/prompt-v2-preregistration.schema.json",
+          "file_sha256": "e6ef0415208a0e3ea5b5aef8147c427a6b697cbe9231affb4cae8b7719b94843"
+        },
+        {
+          "path": "benchmarks/schemas/prompt-v2-execution-plan.schema.json",
+          "file_sha256": "5da26e4df45dea11f072d65c7d02e11f6edb5743a49093d1b5772311f7e35499"
+        },
+        {
+          "path": "benchmarks/schemas/prompt-v2-materialization-manifest.schema.json",
+          "file_sha256": "d0ab8ef36d2d7fadc621628841711543ed94b5fe596c71f943e58af7c91d9dfb"
+        },
+        {
+          "path": "benchmarks/schemas/prompt-v2-resume-state.schema.json",
+          "file_sha256": "0a7dd1debfff68c6a6c2fe5bd70af273aa753078f7ba603db307e4da54136633"
+        },
+        {
+          "path": "benchmarks/schemas/prompt-v2-normalized-result.schema.json",
+          "file_sha256": "97472a1e2a9792124c6dffe9d7268a7f1b3056fe71da155b1fefd9693403efa9"
+        },
+        {
+          "path": "benchmarks/schemas/prompt-v2-comparison-report.schema.json",
+          "file_sha256": "92c11941b9d290db6eba7de0b49d637f69d5f9b61b2914fe26dfd5a8d8a10ebc"
+        }
+      ],
+      "implementations": [
+        {
+          "path": "scripts/ask-benchmark-prompt-v2.mjs",
+          "file_sha256": "93d991723444e75b5fb1b97b8d0cfe296e6dbc59ba0f2c81d4d2d4f1aa6f500c"
+        },
+        {
+          "path": "scripts/test-ask-benchmark-prompt-v2.mjs",
+          "file_sha256": "831c35c0b1ecd62f5aad6f89198f5e59ac5fdf7b840a816ea53f8f192a7d0af2"
+        },
+        {
+          "path": "scripts/prompt-v2-preregistration-samples.mjs",
+          "file_sha256": "ddf77743676e8ade160d99162d4205433c2b4ce76b857ef90c9c9eb6f124aa41"
+        },
+        {
+          "path": "scripts/test-prompt-v2-preregistration-samples.mjs",
+          "file_sha256": "48c85f1b8593bdfdf21914e944c2d4d9e65713583a61d8706d725668159d9ed2"
+        }
+      ],
+      "adapter_tracks": [
+        {
+          "adapter_track": "codex",
+          "selector_adapter": "codex",
+          "baseline_asset_record_digest": "sha256:60dbe252776cd6f432232a821ed8d85de2d8366650b1695b0ca224954252b89b",
+          "candidate_asset_record_digest": "sha256:bd9c377da681705af17a658cc576d5fe6981ddf351e01d84198054d97d975e76",
+          "baseline_selection_digest": "sha256:fa4223ba5b44eec40a727c9f4df47d23c11e2e1bb05c6a36ea5cc06e7b411b26",
+          "challenger_selection_digest": "sha256:54a6b3598083b431cbd5f00f2329c803e2d59431194a632b39991c2b2e573507",
+          "candidate_digest": "sha256:c46e9d23fdb1db0d06fcb0b37292690985a013454ad16eafe726ecd48cbbc760",
+          "experiment_digest": "sha256:9544aa05b6dfc1e0b4ffc059feabe521b32d0b165fc90740421fc75bac76b4b7"
+        },
+        {
+          "adapter_track": "claude",
+          "selector_adapter": "claude_code",
+          "baseline_asset_record_digest": "sha256:e4fb70aa92444a930e339dd5ca93d3b942eed3d5651ceededd6d268766035ab3",
+          "candidate_asset_record_digest": "sha256:061bc45dbab12ef756f3054352b599a00d4b789cefb4c1e71d3892d1bf5fc118",
+          "baseline_selection_digest": "sha256:c6ad33719e166a3c1e7ddc91ead8bdae915610fbd8d3245eb5e90347fcb161a7",
+          "challenger_selection_digest": "sha256:1e2161d6826dcf170a3494bca78190132f93d3080ba29f544c3e94f90d5cc715",
+          "candidate_digest": "sha256:dd731b505f95f8da50718919830b3c1b54b3fef5ca12e726f446a5db10165e8b",
+          "experiment_digest": "sha256:96509f953bbe328b3d7bdbfa9ca85546148d494bc1babec4c6bed04d8896a0a0"
+        }
+      ],
+      "handoff_path": "docs/prompt-v2-execution-handoff.md",
+      "boundaries": {
+        "measured_execution_authorized": false,
+        "results_accessed": false,
+        "runtime_activation_implied": false,
+        "recommendation_created": false,
+        "lifecycle_mutation_authorized": false,
+        "private_evaluator_content_included": false
+      }
     },
     "portfolio_fixture_admission": {
       "issue": 207,
@@ -684,7 +823,7 @@
       "validator_path": "scripts/ask-benchmark-mn-build-option-update.mjs",
       "validator_file_sha256": "d51640759283df4171b685fbb349caee18e97496928a3498f41a707c2c4e47da",
       "focused_test_path": "scripts/test-ask-benchmark-mn-build-option-update.mjs",
-      "focused_test_file_sha256": "aa5654c1c2b46325bd69679d36bb48eade9f87f03537eace8c9c12fa9d6c4171"
+      "focused_test_file_sha256": "fe04e52fe3b3f6d2a0d5b49e90125b5a660f2251c26e531ad474be28814541f7"
     }
   }
 }

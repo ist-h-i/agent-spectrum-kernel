@@ -238,6 +238,10 @@ function sortedIssues(issues) {
 
 function schemaIssues(value, schemaPath) {
   return validateJsonSchema(value, { schemaPath }).map((message) => {
+    const deterministicSeparator = message.indexOf(": keyword ");
+    if (message.startsWith("instance $") && deterministicSeparator !== -1) {
+      return issue("SCHEMA_INVALID", message.slice("instance ".length, deterministicSeparator), message.slice(deterministicSeparator + 2));
+    }
     const separator = message.indexOf(":");
     return issue(
       "SCHEMA_INVALID",
@@ -1125,7 +1129,19 @@ export function validateWorkPackagePlanValidationContext(context, {
   policySchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.policySchema),
   decisionSchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.decisionSchema),
 } = {}) {
+  const revisionOneLineage = context?.context_revision === 1 && (
+    context.supersedes_context_ref
+    || context.supersedes_plan_ref
+    || context.revision_reason
+  );
   const issues = schemaIssues(context, schemaPath);
+  if (revisionOneLineage
+    && issues.length === 1
+    && issues[0].path === "$"
+    && issues[0].message.includes("keyword then:")
+    && issues[0].message.includes("keyword not:")) {
+    return [issue("REVISION_LINEAGE_UNEXPECTED", "$.supersedes_context_ref", "context revision 1 cannot claim a predecessor or revision reason")];
+  }
   if (issues.length > 0) return sortedIssues(issues);
   if (policy !== undefined) {
     const policyIssues = validateEpicAdmissionPolicy(policy, { schemaPath: policySchemaPath });
@@ -1165,14 +1181,6 @@ export function validateWorkPackagePlanValidationContext(context, {
   )) {
     issues.push(issue("CONTEXT_SUBJECT_MISMATCH", "$.repository", "validation context target differs from the admission decision subject"));
   }
-  if (context.context_revision === 1 && (
-    context.supersedes_context_ref
-    || context.supersedes_plan_ref
-    || context.revision_reason
-  )) {
-    issues.push(issue("REVISION_LINEAGE_UNEXPECTED", "$.supersedes_context_ref", "context revision 1 cannot claim a predecessor or revision reason"));
-  }
-
   for (const [collection, key, code] of [
     [context.upstream_artifacts, "artifact_id", "UPSTREAM_ARTIFACT_DUPLICATE"],
     [context.known_blockers, "blocker_id", "CONTEXT_BLOCKER_DUPLICATE"],

@@ -1,23 +1,37 @@
 ---
-description: Define and run focused verification for a change or readiness claim.
+description: Verify behavior through the fixed-entry Agent Spectrum Kernel profile.
 ---
 
-Use the installed project skills from this repository projection.
+Fixed verification entry. Primary contract: `test-first-verification`; apply it with `risk-gate`.
 
-Use `/test-first-verification` and `docs/lifecycle-artifact-contract.md` to define one reusable Verification Contract before claiming a behavior is correct, fixed, ready, safe, reliable, faster, or regression-free. Preserve the canonical header (`Artifact ID`, `Artifact type: verification`, and `Upstream refs`), reference upstream behavior, and attach later evidence to the same contract ID.
+{{ASK_COMPACT_CONTROLS}}
 
-Verification output should include:
+{{ASK_COMPACT_DIRECT_TRIGGERS}}
 
-- behavior to prove
-- upstream refs
-- focused checks and required evidence
-- insufficient-evidence and completion-claim conditions
-- regression, negative, broader, manual/runtime, or measurement obligations only when applicable
-- manual/runtime check when automated coverage is unavailable
-- evidence from exact commands run
-- what remains unverified
-- one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`
+[agent_activity] opt-in; report started/completed/failed.
 
-Use `/evidence-ledger` when the result includes correctness, readiness, reliability, safety, performance, or no-regression claims. Do not invent command output.
+Select a proof path before implementation claims. `compact_proof` output:
+Use `docs/lifecycle-artifact-contract.md` for formal Verification Contract identity and upstream references.
+
+Proof:
+- Behavior:
+- Focused check:
+- Result or missing evidence:
+- Broader check required when:
+
+`formal_verification_contract` output:
+Verification Contract:
+- Artifact ID:
+- Artifact type: verification
+- Upstream refs:
+- Required evidence and completion condition:
+
+Never downgrade formal; preserve executed evidence on upgrade.
+
+Evidence:
+- Selected proof artifact ref:
+- command and exact result:
+
+Emit one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`. Never invent output.
 
 $ARGUMENTS

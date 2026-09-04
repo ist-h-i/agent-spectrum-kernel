@@ -77,6 +77,12 @@ export const EVALUATOR_DEPENDENCY_ENTRY_PATHS = Object.freeze([
   "scripts/ask-benchmark-evaluator-boundary.mjs",
   "scripts/ask-benchmark-private-evaluator-runner.mjs",
 ]);
+export const EVALUATOR_EAGER_AUTHORITY_READS = Object.freeze([
+  Object.freeze({ path: "schemas/claim-evidence-status.schema.json", reader: "scripts/claim-evidence-status.mjs" }),
+  Object.freeze({ path: "schemas/compact-profile-control-map.json", reader: "scripts/fixed-entry-profile.mjs" }),
+  Object.freeze({ path: "schemas/fixed-entry-profile-registry.json", reader: "scripts/fixed-entry-profile.mjs" }),
+  Object.freeze({ path: "schemas/verification-proof-policy.schema.json", reader: "scripts/verification-proof-policy.mjs" }),
+]);
 export const EVALUATOR_AUTHORITY_PATHS = Object.freeze([
   "benchmarks/schemas/evaluator-authority-manifest.schema.json",
   "benchmarks/schemas/evaluator-reference.schema.json",
@@ -94,6 +100,7 @@ export const EVALUATOR_AUTHORITY_PATHS = Object.freeze([
   "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
   "benchmarks/schemas/normalized-portfolio-result.schema.json",
   "benchmarks/schemas/original-workspace-authority.schema.json",
+  ...EVALUATOR_EAGER_AUTHORITY_READS.map(({ path }) => path),
 ]);
 export const EVALUATOR_FIXTURE_AUTHORITY_PATHS = Object.freeze([
   "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-authority-manifest.json",
@@ -112,7 +119,8 @@ export const SEALED_REGULAR_FILE_MODE = 0o444;
 export const SEALED_EXECUTABLE_FILE_MODE = 0o555;
 export const SEALED_DIRECTORY_MODE = 0o555;
 export const SEALED_EXECUTABLE_PATHS = Object.freeze([]);
-const PRIVATE_EVALUATOR_VIRTUAL_PATH = "private/hidden-evaluator.mjs";
+const PRIVATE_EVALUATOR_VIRTUAL_ROOT = "private";
+const PRIVATE_EVALUATOR_VIRTUAL_PATH = `${PRIVATE_EVALUATOR_VIRTUAL_ROOT}/hidden-evaluator.mjs`;
 const ORIGINAL_WORKSPACE_AUTHORITY_PATH = "original-workspace-authority.json";
 const SEALED_REPOSITORY_DIFF_ARTIFACT_PATH = "repository-diff-artifact.json";
 const EVALUATOR_PRIVATE_ENTRY_PATHS = Object.freeze([
@@ -130,6 +138,7 @@ const REQUIREMENT_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-requirement
 const OUTPUT_CONTRACT_SCHEMA_PATH = "benchmarks/schemas/portfolio-output-contract.schema.json";
 
 const MAX_PUBLIC_ARTIFACT_BYTES = 1024 * 1024;
+const MAX_PRIVATE_EVALUATOR_EXECUTION_BUDGET_MS = 900_000;
 const MAX_JSON_ARTIFACT_BYTES = 1024 * 1024;
 const MAX_BOUNDARY_FILE_BYTES = 256 * 1024 * 1024;
 const MAX_BOUNDARY_FILES = 100_000;
@@ -856,9 +865,11 @@ export function deriveEvaluatorDependencyGraph({
   for (const entry of entries) visit(entry);
   for (const authorityPath of authorities) {
     visit(authorityPath);
-    const owner = authorityPath.includes("scoring-input") || authorityPath.includes("portfolio-" )
-      ? "scripts/ask-benchmark-scoring-contract.mjs"
-      : "scripts/ask-benchmark-evaluator-boundary.mjs";
+    const eagerAuthorityRead = EVALUATOR_EAGER_AUTHORITY_READS.find(({ path }) => path === authorityPath);
+    const owner = eagerAuthorityRead?.reader
+      ?? (authorityPath.includes("scoring-input") || authorityPath.includes("portfolio-" )
+        ? "scripts/ask-benchmark-scoring-contract.mjs"
+        : "scripts/ask-benchmark-evaluator-boundary.mjs");
     const edge = { from: owner, to: authorityPath, kind: "authority_read", specifier: authorityPath, syntax_identity: ["authority_read", owner, authorityPath].join(":") };
     edge.edge_digest = canonicalDigest(edge);
     edges.set(stableCanonicalJson(edge), edge);
@@ -2172,6 +2183,9 @@ function captureVerifiedExecutionAuthority(execution, externalAuthorityAnchor, r
   const captured = {
     runnerBytes: Buffer.from(runner.bytes),
     hiddenEvaluatorPath,
+    privateModuleAssets: privateAuthority.manifest.asset_inventory
+      .filter(({ media_type: mediaType }) => mediaType === "text/javascript")
+      .map(({ path, bytes, sha256 }) => ({ path, bytes, sha256 })),
     sourceGraph: structuredClone(descriptor.source_graph),
     roots: { repository: repository.inventory, private_bundle: privateBundle, frozen, candidate, evidence, original_workspace_authority: originalWorkspaceAuthority },
     originalWorkspaceAuthority: originalAuthority,
@@ -2220,9 +2234,15 @@ function buildInMemoryEvaluatorPayload({ verifiedAuthority, execution, normalize
     if (!bytes || bytes.length !== node.bytes || rawByteDigest(bytes) !== node.sha256) throw new Error(`${label} source module byte map drifted at ${node.path}`);
     return { path: node.path, bytes: bytes.length, sha256: rawByteDigest(bytes), source_base64: bytes.toString("base64") };
   });
-  const hiddenBytes = privateBundle.buffers.get(verifiedAuthority.hiddenEvaluatorPath);
-  if (!hiddenBytes) throw new Error(`${label} hidden evaluator is absent from the verified private bundle byte map`);
-  modules.push({ path: PRIVATE_EVALUATOR_VIRTUAL_PATH, bytes: hiddenBytes.length, sha256: rawByteDigest(hiddenBytes), source_base64: hiddenBytes.toString("base64") });
+  const repositoryModulePaths = new Set(modules.map(({ path }) => path));
+  for (const asset of verifiedAuthority.privateModuleAssets) {
+    const bytes = privateBundle.buffers.get(asset.path);
+    if (!bytes || bytes.length !== asset.bytes || rawByteDigest(bytes) !== asset.sha256) throw new Error(`${label} private module byte map drifted at ${asset.path}`);
+    const modulePath = asset.path === verifiedAuthority.hiddenEvaluatorPath ? PRIVATE_EVALUATOR_VIRTUAL_PATH : `${PRIVATE_EVALUATOR_VIRTUAL_ROOT}/${asset.path}`;
+    if (repositoryModulePaths.has(modulePath) || modules.some(({ path }) => path === modulePath)) throw new Error(`${label} private module virtual path collides at ${modulePath}`);
+    modules.push({ path: modulePath, private_bundle_path: asset.path, bytes: bytes.length, sha256: rawByteDigest(bytes), source_base64: bytes.toString("base64") });
+  }
+  if (!modules.some(({ path, private_bundle_path: privateBundlePath }) => path === PRIVATE_EVALUATOR_VIRTUAL_PATH && privateBundlePath === verifiedAuthority.hiddenEvaluatorPath)) throw new Error(`${label} hidden evaluator is absent from the verified private module inventory`);
   const normalizedSource = normalizedAuthorityBytes(normalized, normalizedBytes, label);
   const base = {
     schema_version: "1.0.0",
@@ -3061,6 +3081,16 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const expectedSealedPrivateBundleDigest = canonicalDigest(expectedSealedPortableEntries(staticPrivateBundleInventory, SEALED_EXECUTABLE_PATHS, "sealed private evaluator bundle"));
   if (expectedSealedPrivateBundleDigest !== sealedPrivateBundleInventory.digest) throw new Error("sealed private evaluator bundle does not match the verified static bundle");
   assertSealedSnapshotModes(sealedPrivateBundleInventory, { label: "sealed private evaluator bundle" });
+  const sealedPrivateBundleManifestBytes = sealedPrivateBundleInventory.buffers.get("private-evaluator-bundle.json");
+  let sealedPrivateBundleManifest;
+  try {
+    sealedPrivateBundleManifest = JSON.parse(sealedPrivateBundleManifestBytes.toString("utf8"));
+  } catch (error) {
+    throw new Error(`sealed private evaluator bundle manifest is invalid JSON: ${error.message}`);
+  }
+  if (stableCanonicalJson(sealedPrivateBundleManifest) !== stableCanonicalJson(bundle.manifest)) throw new Error("sealed private evaluator bundle manifest does not match the verified static manifest");
+  const executionBudgetMs = sealedPrivateBundleManifest.execution_budget_ms;
+  if (!Number.isInteger(executionBudgetMs) || executionBudgetMs < 1 || executionBudgetMs > MAX_PRIVATE_EVALUATOR_EXECUTION_BUDGET_MS) throw new Error("sealed private evaluator bundle execution budget is invalid");
   const frozenInventory = readStableWorkspaceInventory(sealedFrozenWorkspace, "sealed frozen workspace");
   const candidateInventory = readStableWorkspaceInventory(sealedCandidateWorkspace, "sealed candidate workspace");
   const evidenceInventory = readStableWorkspaceInventory(sealedEvaluationInputRoot, "sealed evaluation-input evidence root");
@@ -3109,8 +3139,8 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
     privateBundle: {
       path: sealedPrivateBundleRoot,
       manifestPath: "private-evaluator-bundle.json",
-      manifestBytes: sealedPrivateBundleInventory.buffers.get("private-evaluator-bundle.json").length,
-      manifestSha256: rawByteDigest(sealedPrivateBundleInventory.buffers.get("private-evaluator-bundle.json")),
+      manifestBytes: sealedPrivateBundleManifestBytes.length,
+      manifestSha256: rawByteDigest(sealedPrivateBundleManifestBytes),
       evaluatorBundleId: bundle.manifest.evaluator_bundle_id,
       evaluatorBundleDigest: bundle.manifest.evaluator_bundle_digest,
       sealed: sealedSnapshotBinding(sealedPrivateBundleInventory),
@@ -3134,7 +3164,7 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
     },
   };
   ORIGINAL_EXECUTION_AUTHORITIES.set(execution, privateOriginalWorkspaceSnapshot(originalFrozenInventory, originalCandidateInventory, { run_instance_id: record.run_instance_id, case_id: record.case_id, attempt: record.attempt }, record.candidate_authority));
-  const executed = executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, label: "private hidden evaluator" });
+  const executed = executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, timeout: executionBudgetMs, label: "private hidden evaluator" });
   const actualFragment = executed.firstFragment;
   const repeatedFragment = executed.secondFragment;
   const firstBytes = executed.firstBytes;

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { chmodSync, cpSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, readdirSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
+import assert from "node:assert/strict";
+import { chmodSync, cpSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -7,8 +8,16 @@ import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
 import { CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
-import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
-import { REQUIRED_TRACEABILITY_SCENARIOS, computeAdapterAppliedProvenanceFingerprint, computeAdapterProfileFingerprint, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
+import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
+import {
+  CORE_IMMUTABLE_CONTRACT_ASSETS,
+  CORE_IMMUTABLE_RUNTIME_ASSETS,
+  CORE_OWNED_IMMUTABLE_ASSETS,
+  coreImmutableAssetKind,
+  hashText,
+} from "./installer-lifecycle.mjs";
+import { canonicalDigest, putContentAddressedJson } from "./content-addressed-store.mjs";
+import { REQUIRED_TRACEABILITY_SCENARIOS, computeAdapterAppliedProvenanceFingerprint, computeAdapterProfileFingerprint, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectClaimEvidencePluginProjection, inspectLifecycleScenario, inspectTraceabilityScenarioResult, inspectVerificationProofPolicyContract, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -17,10 +26,41 @@ const sensorsScript = resolve(repoRoot, "scripts/ask-sensors.mjs");
 const runtimeSmokeScript = resolve(repoRoot, "scripts/adapter-runtime-smoke.mjs");
 const codexRunnerScript = resolve(repoRoot, "scripts/codex-exec-runner.mjs");
 const codexCompactProfileTestScript = resolve(repoRoot, "scripts/test-codex-runtime-profile.mjs");
+const fixedEntryProfileTestScript = resolve(repoRoot, "scripts/test-fixed-entry-profiles.mjs");
 const crossAdapterConformanceTestScript = resolve(repoRoot, "scripts/test-adapter-cross-conformance.mjs");
 const adapterMigrationTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-migration.mjs");
 const adapterRuntimeEventTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-event.mjs");
-const fixtureRoot = mkdtempSync(resolve(tmpdir(), "validate-repo-"));
+const verificationProofPolicyTestScript = resolve(repoRoot, "scripts/test-verification-proof-policy.mjs");
+const skillEffectivenessOutcomeTestScript = resolve(repoRoot, "scripts/test-skill-effectiveness-outcome.mjs");
+const reviewDecisionMatrixTestScript = resolve(repoRoot, "scripts/test-review-decision-matrix.mjs");
+const jsonSchemaValidationTestScript = resolve(repoRoot, "scripts/test-json-schema-validation.mjs");
+const codexRiskApprovalTestScript = resolve(repoRoot, "scripts/test-codex-risk-approval.mjs");
+const fixtureRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "validate-repo-")));
+const promptV2PreregistrationDocs = [
+  "docs/adr/0011-prompt-v2-result-blind-canary-authority.md",
+  "docs/prompt-v2-execution-handoff.md",
+  "benchmarks/protocol-prompt-v2.md",
+  "benchmarks/prompt-v2-preregistration.json",
+  "docs/fixtures/prompt-v2-preregistration/binding.json",
+  "docs/fixtures/prompt-v2-preregistration/reference.json",
+  "docs/fixtures/prompt-v2-preregistration/rendered/reference.json",
+  ...["claude_code", "codex"].flatMap((adapter) => ["handoff", "implement", "investigate", "review", "verify"]
+    .map((mode) => `docs/fixtures/prompt-v2-preregistration/rendered/${adapter}/skill-${mode}.md`)),
+];
+const promptV2PreregistrationSchemas = [
+  "benchmarks/schemas/prompt-v2-preregistration.schema.json",
+  "benchmarks/schemas/prompt-v2-execution-plan.schema.json",
+  "benchmarks/schemas/prompt-v2-materialization-manifest.schema.json",
+  "benchmarks/schemas/prompt-v2-resume-state.schema.json",
+  "benchmarks/schemas/prompt-v2-normalized-result.schema.json",
+  "benchmarks/schemas/prompt-v2-comparison-report.schema.json",
+];
+const promptV2PreregistrationAdapters = [
+  "scripts/ask-benchmark-prompt-v2.mjs",
+  "scripts/test-ask-benchmark-prompt-v2.mjs",
+  "scripts/prompt-v2-preregistration-samples.mjs",
+  "scripts/test-prompt-v2-preregistration-samples.mjs",
+];
 
 const compactProfileResult = spawnSync(process.execPath, [codexCompactProfileTestScript], { cwd: repoRoot, encoding: "utf8" });
 if (compactProfileResult.status !== 0) {
@@ -28,9 +68,15 @@ if (compactProfileResult.status !== 0) {
 }
 
 for (const [label, script] of [
+  ["Shared fixed-entry profiles", fixedEntryProfileTestScript],
   ["Normalized adapter runtime event", adapterRuntimeEventTestScript],
   ["Cross-adapter conformance", crossAdapterConformanceTestScript],
   ["Dual-runtime migration", adapterMigrationTestScript],
+  ["Verification proof policy", verificationProofPolicyTestScript],
+  ["One-task Skill effectiveness outcome", skillEffectivenessOutcomeTestScript],
+  ["Review decision matrix", reviewDecisionMatrixTestScript],
+  ["Managed JSON Schema validation", jsonSchemaValidationTestScript],
+  ["Codex exact risk approval", codexRiskApprovalTestScript],
 ]) {
   const result = spawnSync(process.execPath, [script], { cwd: repoRoot, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`${label} tests failed\n${result.stdout}\n${result.stderr}`);
@@ -54,6 +100,42 @@ function envelopeBlock(overrides = {}) {
 }
 
 const validEnvelopeBlock = envelopeBlock();
+function reviewFixture({
+  baselineStatus = "pass",
+  baselineEvidence = "isolated fixture",
+  additionalGates = "- none",
+  missingEvidence = "- none",
+  findings = "- none",
+  decision = null,
+  suffix = "",
+} = {}) {
+  return `Baseline review:
+- Gate: review-ai-quality
+- Status: ${baselineStatus}
+- Evidence: ${baselineEvidence}
+
+Additional required gates:
+${additionalGates}
+
+Missing evidence:
+${missingEvidence}
+
+Findings:
+${findings}
+${decision ? `\nDecision:\n- ${decision}\n` : ""}${suffix ? `\n${suffix}\n` : ""}
+${validEnvelopeBlock}`;
+}
+function codexStructuredResult(responseMarkdown, control = {}) {
+  return JSON.stringify({
+    schema_version: "1.0.0",
+    response_markdown: responseMarkdown,
+    control: {
+      evidence_status: { checked: ["fixture structured result"], missing: [], ...(control.evidence_status ?? {}) },
+      stop_reason: { status: "completed", details: [], human_decision_required: [], stop_if: [], ...(control.stop_reason ?? {}) },
+      next_action: control.next_action ?? "continue bounded verification",
+    },
+  }, null, 2);
+}
 const validMetricsCandidate = {
   schema_version: "1.0.0",
   event_id: "fixture:execution-envelope",
@@ -146,8 +228,8 @@ source_scope: "generic empty template; no project-specific domain rules recorded
 
 ## Domain Rule Entries
 
-| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Applies to | Used by | Last checked | Staleness trigger | Owner |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Authority status | Record state | Applies to | Used by | Last checked | Staleness trigger | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 `;
 
 function skillGroupsFor(skills, overrides = {}) {
@@ -272,6 +354,34 @@ function writeFixture(root, skills = ["alpha"]) {
     "docs/fixtures/issue-275-slice-1-work-package-plan-r1.json",
     "docs/fixtures/issue-275-slice-1-work-package-plan-r2.json",
     "docs/fixtures/issue-275-slice-1-work-package-plan.json",
+    "docs/asset-registry-contract.md",
+    "docs/adr/0003-asset-registry-authority-boundary.md",
+    "docs/fixtures/asset-registry",
+    "docs/portfolio-manager-contract.md",
+    "docs/adr/0004-portfolio-activation-authority-boundary.md",
+    "docs/fixtures/portfolio-manager",
+    "docs/evolution-loop-contract.md",
+    "docs/evolution-loop-sample-prompt-candidate.md",
+    "docs/adr/0005-evolution-authority-boundary.md",
+    "docs/fixtures/evolution-loop",
+    ...promptV2PreregistrationDocs,
+    ...promptV2PreregistrationSchemas,
+    ...promptV2PreregistrationAdapters,
+    "docs/fixtures/prompt-v2-preregistration",
+    "adapters/codex/prompts/skill-verify.md",
+    "scripts/content-addressed-store.mjs",
+    "scripts/git-revision-source.mjs",
+    "scripts/asset-registry.mjs",
+    "scripts/asset-registry-samples.mjs",
+    "scripts/test-content-addressed-store.mjs",
+    "scripts/test-asset-registry.mjs",
+    "scripts/portfolio-manager.mjs",
+    "scripts/portfolio-manager-samples.mjs",
+    "scripts/test-portfolio-manager.mjs",
+    "scripts/evolution-loop.mjs",
+    "scripts/evolution-loop-samples.mjs",
+    "scripts/test-evolution-loop.mjs",
+    "scripts/test-evolution-loop-integration.mjs",
     "scripts/ask-benchmark-portfolio-repetition-report.mjs",
     "scripts/ask-benchmark-portfolio-paired-comparison-report.mjs",
     "scripts/ask-benchmark-portfolio-directional-outcome-report.mjs",
@@ -288,7 +398,7 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/schemas",
   ]) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    if (["benchmarks/portfolio-design-admission-records", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update", "benchmarks/schemas"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
+    if (["benchmarks/portfolio-design-admission-records", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update", "benchmarks/schemas", "docs/fixtures/asset-registry", "docs/fixtures/portfolio-manager", "docs/fixtures/evolution-loop", "docs/fixtures/prompt-v2-preregistration"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
     else writeFileSync(resolve(root, path), readFileSync(resolve(repoRoot, path)));
   }
 
@@ -309,8 +419,10 @@ function writeFixture(root, skills = ["alpha"]) {
         skill_groups: skillGroupsFor(skills),
         allowed_multi_group_skills: [],
         routing: routingFixture(),
-        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md", "docs/ai/domain-rule-ledger.md"],
+        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md", "docs/ai/domain-rule-ledger.md", ...promptV2PreregistrationDocs],
         examples: ["examples/ok.md"],
+        schemas: promptV2PreregistrationSchemas,
+        adapters: promptV2PreregistrationAdapters,
         design: { quality_target: "95+" },
       },
       null,
@@ -319,14 +431,116 @@ function writeFixture(root, skills = ["alpha"]) {
   );
 }
 
+function cloneClaimEvidencePluginFixture(name) {
+  const root = resolve(fixtureRoot, name);
+  for (const path of [
+    "docs/claim-evidence-status-contract.md",
+    "schemas/claim-evidence-status.schema.json",
+    "skills/evidence-ledger/SKILL.md",
+    "scripts/claim-evidence-status.mjs",
+    "adapters/claude-code/plugin/contracts/claim-evidence-status-contract.md",
+    "adapters/claude-code/plugin/schemas/claim-evidence-status.schema.json",
+    "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs",
+    "adapters/claude-code/plugin/skills/evidence-ledger/SKILL.md",
+    "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+    "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
+    "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
+    "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md",
+  ]) {
+    const target = resolve(root, path);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, readFileSync(resolve(repoRoot, path)));
+  }
+  return root;
+}
+
+function assertClaimEvidencePluginProjectionFailure(label, root, expected) {
+  const result = inspectClaimEvidencePluginProjection(root);
+  if (!result.issues.some((issue) => issue.includes(expected))) {
+    throw new Error(`${label} should expose '${expected}'\n${result.issues.join("\n")}`);
+  }
+}
+
+function cloneVerificationProofPolicyFixture(name) {
+  const root = resolve(fixtureRoot, name);
+  for (const path of [
+    "manifest.json",
+    "docs/verification-proof-policy-contract.md",
+    "docs/adr/0008-monotonic-verification-proof-path.md",
+    "docs/fixtures/verification-proof-formal-baseline.md",
+    "docs/fixtures/verification-proof-policy-cases.json",
+    "schemas/verification-proof-policy.schema.json",
+    "schemas/compact-profile-control-map.json",
+    "scripts/verification-proof-policy.mjs",
+    "scripts/test-verification-proof-policy.mjs",
+    "scripts/installer-lifecycle.mjs",
+    "scripts/ask-shared.mjs",
+    "scripts/ask-sensors.mjs",
+    "docs/adapter-runtime-migration.md",
+    ".github/ask-automation/validation-plan.json",
+    ".github/workflows/validate.yml",
+    "docs/fixtures/adapter-cross-conformance.json",
+    "docs/fixtures/adapter-runtime-profiles.json",
+    "docs/fixtures/codex-pre-compact-prompts/skill-verify.md",
+    "skills/test-first-verification/SKILL.md",
+    "skills/controlled-implementation/SKILL.md",
+    "skills/refactor-implementation/SKILL.md",
+    "adapters/claude-code/project/.claude/commands/skill-implement.md",
+    "adapters/claude-code/project/.claude/commands/skill-investigate.md",
+    "adapters/claude-code/project/.claude/commands/skill-verify.md",
+    "adapters/codex/prompts/skill-verify.md",
+  ]) {
+    const target = resolve(root, path);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, readFileSync(resolve(repoRoot, path)));
+  }
+  return root;
+}
+
+function inspectVerificationProofPolicyFixture(root) {
+  const manifest = JSON.parse(readFileSync(resolve(root, "manifest.json"), "utf8"));
+  return inspectVerificationProofPolicyContract(root, manifest);
+}
+
+function assertVerificationProofPolicyFailure(label, root, expected) {
+  const result = inspectVerificationProofPolicyFixture(root);
+  if (!result.issues.some((issue) => issue.includes(expected))) {
+    throw new Error(`${label} should expose '${expected}'\n${result.issues.join("\n")}`);
+  }
+}
+
 function writeAdapterFixture(root) {
+  const canonicalClaimEvidenceSchemaPaths = new Set([
+    "schemas/claim-evidence-status.schema.json",
+    "schemas/verification-proof-policy.schema.json",
+    "schemas/improvement-ledger-entry.schema.json",
+    "schemas/domain-rule-ledger-entry.schema.json",
+    "schemas/architecture-decision-memory-entry.schema.json",
+    "schemas/documentation-knowledge-ledger-entry.schema.json",
+    "schemas/engineering-capability-ledger-entry.schema.json",
+    "schemas/engineering-pattern-ledger-entry.schema.json",
+    "schemas/review-finding.schema.json",
+    "schemas/review-rule-ledger-entry.schema.json",
+    "schemas/verification-pattern-ledger-entry.schema.json",
+    "schemas/epic-admission-decision.schema.json",
+    "schemas/asset-record.schema.json",
+  ]);
   const schemaPaths = [
     "schemas/metrics-event.schema.json",
     "schemas/execution-envelope.schema.json",
+    "schemas/execution-envelope-record.schema.json",
+    "schemas/codex-runner-result.schema.json",
+    "schemas/codex-risk-action.schema.json",
+    "schemas/codex-risk-approval-request.schema.json",
+    "schemas/codex-risk-approval.schema.json",
     "schemas/adapter-runtime-profile.schema.json",
     "schemas/adapter-runtime-evidence.schema.json",
     "schemas/adapter-runtime-event.schema.json",
+    "schemas/claim-evidence-status.schema.json",
+    "schemas/fixed-entry-profile-registry.json",
+    "schemas/verification-proof-policy.schema.json",
     "schemas/normalized-event-schema-registry.json",
+    "schemas/review-finding.schema.json",
     "schemas/review-signal-gate-map.json",
     "schemas/adoption-report.schema.json",
     "schemas/improvement-ledger-entry.schema.json",
@@ -344,10 +558,25 @@ function writeAdapterFixture(root) {
     "schemas/epic-admission-decision.schema.json",
     "schemas/work-package-plan-validation-context.schema.json",
     "schemas/work-package-plan.schema.json",
+    "schemas/asset-content.schema.json",
+    "schemas/asset-record.schema.json",
+    "schemas/asset-registry-snapshot.schema.json",
+    "schemas/asset-lifecycle-authority-context.schema.json",
+    "schemas/portfolio-manifest.schema.json",
+    "schemas/portfolio-lock.schema.json",
+    "schemas/portfolio-authority-context.schema.json",
+    "schemas/portfolio-selection-context.schema.json",
+    "schemas/portfolio-selection.schema.json",
+    "schemas/evolution-candidate.schema.json",
+    "schemas/evolution-experiment.schema.json",
+    "schemas/evolution-recommendation.schema.json",
+    "schemas/evolution-action-proposal.schema.json",
+    "schemas/evolution-human-decision.schema.json",
+    "schemas/evolution-application-receipt.schema.json",
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    const content = path === "schemas/review-signal-gate-map.json"
+    const content = path === "schemas/review-signal-gate-map.json" || canonicalClaimEvidenceSchemaPaths.has(path)
       ? readFileSync(resolve(repoRoot, path), "utf8")
       : path === "schemas/metrics-event.schema.json"
       ? '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "properties": { "command_attempt_metrics": { "properties": { "classified_as_verification": { "type": "boolean" } } } } }\n'
@@ -444,14 +673,29 @@ console.log(path, code, privacy);
     "adapters/claude-code/project/.claude/commands/skill-ledger-refresh.md",
     "adapters/claude-code/github-actions/README.md",
     "adapters/claude-code/plugin/README.md",
+    "adapters/claude-code/plugin/contracts/claim-evidence-status-contract.md",
     "adapters/claude-code/plugin/contracts/execution-envelope-contract.md",
     "adapters/claude-code/plugin/contracts/review-signal-gate-map.json",
+    "adapters/claude-code/plugin/schemas/claim-evidence-status.schema.json",
+    "adapters/claude-code/plugin/schemas/codex-risk-action.schema.json",
+    "adapters/claude-code/plugin/schemas/codex-risk-approval-request.schema.json",
     "adapters/claude-code/plugin/schemas/execution-envelope.schema.json",
     "adapters/claude-code/plugin/schemas/metrics-event.schema.json",
+    "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs",
+    "adapters/claude-code/plugin/skills/evidence-ledger/SKILL.md",
+    "adapters/claude-code/plugin/skills/implement/SKILL.md",
+    "adapters/claude-code/plugin/skills/investigate/SKILL.md",
     "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+    "adapters/claude-code/plugin/skills/verify/SKILL.md",
+    "adapters/claude-code/plugin/skills/handoff/SKILL.md",
     "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
     "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
     "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md",
+    "adapters/claude-code/plugin/templates/implement.md",
+    "adapters/claude-code/plugin/templates/investigate.md",
+    "adapters/claude-code/plugin/templates/review-pr.md",
+    "adapters/claude-code/plugin/templates/verify.md",
+    "adapters/claude-code/plugin/templates/handoff.md",
     "adapters/claude-code/plugin/bin/ai-skills-metrics-record",
     "adapters/codex/README.md",
     "adapters/codex/commands/codex-exec.md",
@@ -462,11 +706,18 @@ console.log(path, code, privacy);
     "adapters/codex/prompts/skill-verify.md",
     "adapters/codex/prompts/skill-handoff.md",
   ];
+  const exactAdapterFiles = new Set([
+    "adapters/claude-code/plugin/contracts/claim-evidence-status-contract.md",
+    "adapters/claude-code/plugin/contracts/review-signal-gate-map.json",
+    "adapters/claude-code/plugin/schemas/claim-evidence-status.schema.json",
+    "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs",
+    "adapters/claude-code/plugin/skills/evidence-ledger/SKILL.md",
+  ]);
   for (const path of adapterFiles) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
     writeFileSync(
       resolve(root, path),
-      path === "adapters/claude-code/plugin/contracts/review-signal-gate-map.json"
+      exactAdapterFiles.has(path)
         ? readFileSync(resolve(repoRoot, path), "utf8")
         : "# Fixture\n",
     );
@@ -537,6 +788,9 @@ function applyLifecyclePlan() {
 const MANAGED_START = "<!-- agent-spectrum-kernel:start -->";
 const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const CORE_IMMUTABLE_CONTRACT_ASSETS = ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"];
+const CORE_IMMUTABLE_RUNTIME_ASSETS = ["scripts/json-schema-validation.mjs"];
+const CORE_OWNED_IMMUTABLE_ASSETS = [...CORE_IMMUTABLE_CONTRACT_ASSETS, ...CORE_IMMUTABLE_RUNTIME_ASSETS];
+function coreImmutableAssetKind(path) { return path.endsWith(".mjs") ? "immutable_runtime" : "immutable_contract"; }
 function install(manifest, options) {
   const skills = manifest.skills;
   const immutableContract = "immutable_contract";
@@ -546,7 +800,7 @@ function install(manifest, options) {
   const record = { sha256: "expected" };
   if (currentHash !== record.sha256) throw new Error("modified managed file; refusing to prune");
   unlinkSync("skills/example/SKILL.md");
-  if (dryRun) return { skills, managed_files, CORE_IMMUTABLE_CONTRACT_ASSETS, immutableContract };
+  if (dryRun) return { skills, managed_files, CORE_OWNED_IMMUTABLE_ASSETS, immutableContract, coreImmutableAssetKind };
   if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
   if (options["--prune"]) return "stale managed projection";
   return STATE_PATH;
@@ -561,14 +815,16 @@ const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const DEFAULT_PROFILE = "implementation";
 const PROMPT_TEMPLATES = ["skill-implement.md"];
 const COMMAND_TEMPLATES = ["codex-exec.md"];
-const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs", "execution-envelope.mjs", "adapter-runtime-event.mjs", "execution-envelope.schema.json", "metrics-event.schema.json", "adapter-runtime-event.schema.json"];
+const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs", "execution-envelope.mjs", "adapter-runtime-event.mjs", "observability-paths.mjs", "execution-envelope.schema.json", "execution-envelope-record.schema.json", "codex-runner-result.schema.json", "metrics-event.schema.json", "adapter-runtime-event.schema.json"];
 const CODEX_PROFILES = { implementation: { skills: ["operating-mode-router"], prompts: PROMPT_TEMPLATES, commands: COMMAND_TEMPLATES } };
 const PROFILE_ROUTING_FIXTURES = { implementation: [{ id: "unfamiliar_repository", selected_route: "repository-orientation", required_skills: ["repository-orientation"] }] };
 const SKILL_RELATIONSHIPS = { "controlled-implementation": { requires: ["test-first-verification"], recommends: ["evidence-ledger"], incompatibleWith: [] } };
 const LIFECYCLE_ASSET = "docs/lifecycle-artifact-contract.md";
 function requiredAssetsForPrompts() { return [LIFECYCLE_ASSET]; }
-const CORE_OWNED_IMMUTABLE_ASSETS = [LIFECYCLE_ASSET];
-const CORE_PRESERVE_PATHS = [LIFECYCLE_ASSET];
+const CORE_IMMUTABLE_RUNTIME_ASSETS = ["scripts/json-schema-validation.mjs"];
+const CORE_OWNED_IMMUTABLE_ASSETS = [LIFECYCLE_ASSET, ...CORE_IMMUTABLE_RUNTIME_ASSETS];
+const CORE_PRESERVE_PATHS = CORE_OWNED_IMMUTABLE_ASSETS;
+function coreImmutableAssetKind(path) { return path.endsWith(".mjs") ? "immutable_runtime" : "immutable_contract"; }
 function requiredAssetsForSkills() { return CORE_OWNED_IMMUTABLE_ASSETS; }
 function routingFixturesForProfile() {
   return { router_reachable_skills: ["repository-orientation"], routing_fixtures: PROFILE_ROUTING_FIXTURES.implementation };
@@ -597,7 +853,7 @@ function install(manifest, options) {
   if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
   if (skipAgents) return ".agents/skills";
   if (options["--prune"]) return "stale Codex managed projection";
-  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill" + "codex_runtime" + "codex-exec-runner.mjs" + CODEX_RUNTIME_SCRIPTS + profile + retained_stale_prompts + retained_stale_commands + stale_codex_prompt + stale_codex_command + validateSkillClosure().required_skills + routingFixturesForProfile().router_reachable_skills + routingFixturesForProfile().routing_fixtures + validateManagedReferences() + requiredAssetsForPrompts() + requiredAssetsForSkills() + CORE_PRESERVE_PATHS + "ASK core immutable contract is missing or stale" + '"spec-driven-development": { requires: ["work-package-compiler"] }';
+  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill" + "codex_runtime" + "codex-exec-runner.mjs" + CODEX_RUNTIME_SCRIPTS + profile + retained_stale_prompts + retained_stale_commands + stale_codex_prompt + stale_codex_command + validateSkillClosure().required_skills + routingFixturesForProfile().router_reachable_skills + routingFixturesForProfile().routing_fixtures + validateManagedReferences() + requiredAssetsForPrompts() + requiredAssetsForSkills() + CORE_PRESERVE_PATHS + coreImmutableAssetKind("scripts/json-schema-validation.mjs") + "ASK core immutable contract is missing or stale" + '"spec-driven-development": { requires: ["work-package-compiler"] }';
 }
 `,
   );
@@ -610,6 +866,10 @@ function install(manifest, options) {
   writeFileSync(resolve(root, "scripts/test-adapter-runtime-event.mjs"), "console.log('adapter runtime event tests');\n");
   writeFileSync(resolve(root, "scripts/adapter-runtime-inventory.mjs"), "export const CODEX_RUNTIME_FILES = [{ name: 'codex-exec-runner.mjs' }];\n");
   writeFileSync(resolve(root, "scripts/codex-runtime-profile.mjs"), "console.log('codex compact profile');\n");
+  writeFileSync(resolve(root, "scripts/fixed-entry-profile.mjs"), "console.log('shared fixed-entry profile');\n");
+  writeFileSync(resolve(root, "scripts/claude-fixed-entry-profile.mjs"), "console.log('Claude fixed-entry projection');\n");
+  writeFileSync(resolve(root, "scripts/claude-plugin-fixed-entries.mjs"), "console.log('Claude plugin fixed-entry generator');\n");
+  writeFileSync(resolve(root, "scripts/test-fixed-entry-profiles.mjs"), "console.log('shared fixed-entry profile tests');\n");
   writeFileSync(resolve(root, "scripts/codex-exec-runner.mjs"), "console.log('codex runner');\n");
   writeFileSync(resolve(root, "scripts/execution-envelope.mjs"), "console.log('execution envelope');\n");
   writeFileSync(
@@ -654,8 +914,10 @@ const COMMAND_METADATA = {
   "skill-review.md": { requiredSkills: ["review-router"], requiredAssets: ["docs/lifecycle-artifact-contract.md"] },
 };
 const SKILL_RELATIONSHIPS = { "spec-driven-development": { requires: ["work-package-compiler"] } };
-const CORE_OWNED_IMMUTABLE_ASSETS = ["docs/lifecycle-artifact-contract.md"];
-const CORE_PRESERVE_PATHS = ["docs/lifecycle-artifact-contract.md"];
+const CORE_IMMUTABLE_RUNTIME_ASSETS = ["scripts/json-schema-validation.mjs"];
+const CORE_OWNED_IMMUTABLE_ASSETS = ["docs/lifecycle-artifact-contract.md", ...CORE_IMMUTABLE_RUNTIME_ASSETS];
+const CORE_PRESERVE_PATHS = CORE_OWNED_IMMUTABLE_ASSETS;
+function coreImmutableAssetKind(path) { return path.endsWith(".mjs") ? "immutable_runtime" : "immutable_contract"; }
 const CLAUDE_PROFILES = { full: { skills: DEFAULT_SKILLS, commands: COMMAND_TEMPLATES } };
 const PROFILE_ROUTING_FIXTURES = {
   implementation: [
@@ -699,7 +961,7 @@ function removeAdapterOwnedHooks() {
 }
 function install(args) {
   if (args.skipHooks || args.skipRuntime) removeManagedHooks();
-  if (args.profile || DEFAULT_PROFILE) return HELP + "Selected Claude commands are not closed over installed skills" + "settings.json" + installAssets(COMMAND_METADATA["skill-review.md"]) + requiredAssetsForSkills() + validateCoreInstalled() + CORE_PRESERVE_PATHS + "ASK core immutable contract is missing or stale" + SKILL_RELATIONSHIPS;
+  if (args.profile || DEFAULT_PROFILE) return HELP + "Selected Claude commands are not closed over installed skills" + "settings.json" + installAssets(COMMAND_METADATA["skill-review.md"]) + requiredAssetsForSkills() + validateCoreInstalled() + CORE_PRESERVE_PATHS + coreImmutableAssetKind("scripts/json-schema-validation.mjs") + "ASK core immutable contract is missing or stale" + SKILL_RELATIONSHIPS;
 }
 `,
   );
@@ -845,8 +1107,8 @@ function writeImprovementLedger(root, content) {
   writeFileSync(resolve(root, "docs/ai/improvement-ledger.md"), content);
 }
 
-const domainRuleHeader = "| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Applies to | Used by | Last checked | Staleness trigger | Owner |";
-const domainRuleSeparator = "|---|---|---|---|---|---|---|---|---|---|---|---|---|";
+const domainRuleHeader = "| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Authority status | Record state | Applies to | Used by | Last checked | Staleness trigger | Owner |";
+const domainRuleSeparator = "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|";
 
 function domainRuleRow(overrides = {}) {
   const row = {
@@ -857,7 +1119,9 @@ function domainRuleRow(overrides = {}) {
     Workflow: "Refund approval",
     "State / condition": "Refund amount exceeds configured threshold",
     Source: "Human-confirmed: fixture domain owner note",
-    "Evidence status": "Human-confirmed",
+    "Evidence status": "Supported",
+    "Authority status": "human_confirmed",
+    "Record state": "active",
     "Applies to": "Refund workflow",
     "Used by": "requirement-grill; review-domain-impact",
     "Last checked": "2999-01-01",
@@ -875,6 +1139,8 @@ function domainRuleRow(overrides = {}) {
     row["State / condition"],
     row.Source,
     row["Evidence status"],
+    row["Authority status"],
+    row["Record state"],
     row["Applies to"],
     row["Used by"],
     row["Last checked"],
@@ -1029,8 +1295,12 @@ function assertCodexCompactProfiles(name, target) {
     if (!record?.compact_profile || !header || header.id !== record.compact_profile.profile_id || header.source_digest !== record.compact_profile.canonical_source_digest) {
       throw new Error(`${name} has invalid compact profile provenance for ${prompt}`);
     }
-    if (record.compact_profile.schema_version !== "1.1.0" || record.compact_profile.profile_fingerprint !== state.projection_plan?.fingerprint) {
-      throw new Error(`${name} compact metadata must derive from shared adapter profile revision 1.1.0 for ${prompt}`);
+    if (record.compact_profile.schema_version !== "1.2.0" || record.compact_profile.profile_fingerprint !== state.projection_plan?.fingerprint) {
+      throw new Error(`${name} compact metadata must derive from shared adapter profile revision 1.2.0 for ${prompt}`);
+    }
+    const exactAssetRefs = record.compact_profile.canonical_asset_refs;
+    if (!Array.isArray(exactAssetRefs) || exactAssetRefs.length !== 2 || `sha256:${hashText(JSON.stringify(exactAssetRefs))}` !== header.canonical_asset_ref_digest) {
+      throw new Error(`${name} compact metadata must preserve the two exact registered fixed-entry Asset references for ${prompt}`);
     }
   }
 }
@@ -1570,13 +1840,13 @@ function assertRuntimeScripts() {
       task_id: "REVIEW-1",
       task_type: "review",
       occurred_at: "2999-01-01T00:00:00.000Z",
-      skills_used: ["review-router", "review-final-merge-gate"],
+      skills_used: ["review-router", "review-ai-quality", "review-final-merge-gate"],
       routing_result: {
         operating_mode: "delivery_quality",
         primary_skill: "review-router",
         correct_routing: true,
-        required_gates: ["review-router", "review-final-merge-gate"],
-        executed_gates: ["review-router", "review-final-merge-gate"],
+        required_gates: ["review-router", "review-ai-quality", "review-final-merge-gate"],
+        executed_gates: ["review-router", "review-ai-quality", "review-final-merge-gate"],
       },
       review_result: {
         decision: "request_changes",
@@ -1601,13 +1871,13 @@ function assertRuntimeScripts() {
       task_id: "REVIEW-2",
       task_type: "review",
       occurred_at: "2999-01-01T00:00:00.000Z",
-      skills_used: ["review-router"],
+      skills_used: ["review-router", "review-ai-quality"],
       routing_result: {
         operating_mode: "delivery_quality",
         primary_skill: "review-router",
         correct_routing: false,
-        required_gates: ["review-router", "review-final-merge-gate"],
-        executed_gates: ["review-router"],
+        required_gates: ["review-router", "review-ai-quality", "review-final-merge-gate"],
+        executed_gates: ["review-router", "review-ai-quality"],
         skipped_gates: [{ gate: "review-final-merge-gate", reason: "fixture missing evidence" }],
       },
       review_result: {
@@ -1645,7 +1915,7 @@ function assertRuntimeScripts() {
   ]);
   assertRuntimePass("metrics summarizer review coverage smoke", reviewSummarizeResult);
   const reviewReport = JSON.parse(readFileSync(resolve(root, "docs/ai/reports/review-report.json"), "utf8"));
-  if (reviewReport.skill_usage.correct_routing_rate !== 0.5 || reviewReport.skill_usage.required_gate_coverage !== 0.75) {
+  if (reviewReport.skill_usage.correct_routing_rate !== 0.5 || reviewReport.skill_usage.required_gate_coverage !== (1 + 2 / 3) / 2) {
     throw new Error(`summarizer should compute routing and gate coverage when evidence exists\n${JSON.stringify(reviewReport.skill_usage, null, 2)}`);
   }
   if (reviewReport.review_quality.review_tasks !== 2 || reviewReport.review_quality.insufficient_evidence_tasks !== 1 || reviewReport.review_quality.required_fixes_count !== 2) {
@@ -1924,7 +2194,7 @@ function assertRuntimeScripts() {
     task_id,
     task_type: "review",
     occurred_at: "2999-01-01T00:00:00.000Z",
-    skills_used: ["review-router"],
+    skills_used: [...new Set(["review-router", ...(routing_result?.executed_gates ?? [])])],
     routing_result,
     review_result,
     changed_file_summary,
@@ -1970,8 +2240,8 @@ function assertRuntimeScripts() {
       task_id: "LIGHT-ROUTE-1",
       changed_file_summary: { count: 1, paths: ["docs/ok.md"] },
       routing_result: {
-        required_gates: ["review-router", "review-final-merge-gate"],
-        executed_gates: ["review-router", "review-final-merge-gate"],
+        required_gates: ["review-router", "review-ai-quality"],
+        executed_gates: ["review-router", "review-ai-quality"],
         gate_applicability: [
           {
             layer: "Domain",
@@ -2017,8 +2287,8 @@ function assertRuntimeScripts() {
       changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
       routing_result: {
         change_signals: [{ signal: "public_api_change", evidence: "schema changed" }],
-        required_gates: ["review-router", "review-architecture-impact", "review-final-merge-gate"],
-        executed_gates: ["review-router", "review-architecture-impact", "review-final-merge-gate"],
+        required_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
         gate_applicability: [
           {
             layer: "Architecture",
@@ -2046,8 +2316,8 @@ function assertRuntimeScripts() {
       changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
       routing_result: {
         change_signals: [{ signal: "public_api_change", evidence: "schema file changed" }],
-        required_gates: ["review-router", "review-architecture-impact"],
-        executed_gates: ["review-router", "review-architecture-impact"],
+        required_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
       },
     }),
   ]);
@@ -2111,12 +2381,12 @@ function assertRuntimeScripts() {
       event_id: "evt-compact-missing-evidence",
       task_id: "COMPACT-MISSING-EVIDENCE-1",
       routing_result: {
-        change_signals: [{ signal: "verification", evidence: "behavior changed" }],
-        required_gates: ["review-automated-gate"],
+        change_signals: [{ signal: "automated_evidence_required", evidence: "behavior changed" }],
+        required_gates: ["review-ai-quality", "review-automated-gate"],
         required_gate_routes: [
-          { gate: "review-automated-gate", reason: "Verification evidence is required.", trigger_signals: ["verification"] },
+          { gate: "review-automated-gate", reason: "Verification evidence is required.", trigger_signals: ["automated_evidence_required"] },
         ],
-        executed_gates: ["review-router"],
+        executed_gates: ["review-router", "review-ai-quality"],
         missing_evidence: [{ input: "verification command output", reason: "Focused command output is unavailable." }],
       },
     }),
@@ -2134,8 +2404,8 @@ function assertRuntimeScripts() {
       event_id: "evt-unexecuted-heavy-gate",
       task_id: "UNEXECUTED-HEAVY-GATE-1",
       routing_result: {
-        required_gates: ["review-architecture-impact"],
-        executed_gates: [],
+        required_gates: ["review-ai-quality", "review-architecture-impact"],
+        executed_gates: ["review-ai-quality"],
       },
     }),
   ]);
@@ -2152,8 +2422,8 @@ function assertRuntimeScripts() {
       task_id: "MISSING-HEAVY-APP-1",
       changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
       routing_result: {
-        required_gates: ["review-router", "review-architecture-impact"],
-        executed_gates: ["review-router", "review-architecture-impact"],
+        required_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
       },
     }),
   ]);
@@ -2170,8 +2440,8 @@ function assertRuntimeScripts() {
       task_id: "MISSING-HEAVY-TRIGGER-1",
       changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
       routing_result: {
-        required_gates: ["review-router", "review-architecture-impact"],
-        executed_gates: ["review-router", "review-architecture-impact"],
+        required_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
         gate_applicability: [
           {
             layer: "Architecture",
@@ -2197,8 +2467,8 @@ function assertRuntimeScripts() {
       event_id: "evt-missing-routing-evidence",
       task_id: "MISSING-ROUTE-1",
       routing_result: {
-        required_gates: ["review-router"],
-        executed_gates: ["review-router"],
+        required_gates: ["review-router", "review-ai-quality"],
+        executed_gates: ["review-router", "review-ai-quality"],
         gate_applicability: [
           {
             layer: "Architecture",
@@ -2226,8 +2496,8 @@ function assertRuntimeScripts() {
       task_id: "MISSING-GATE-ROUTE-1",
       changed_file_summary: { count: 1, paths: ["docs/output.md"] },
       routing_result: {
-        required_gates: ["review-router"],
-        executed_gates: ["review-router"],
+        required_gates: ["review-router", "review-ai-quality"],
+        executed_gates: ["review-router", "review-ai-quality"],
         gate_applicability: [
           {
             layer: "Output quality",
@@ -2254,8 +2524,8 @@ function assertRuntimeScripts() {
       task_id: "UNDER-ROUTE-1",
       changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
       routing_result: {
-        required_gates: ["review-router", "review-architecture-impact"],
-        executed_gates: ["review-router"],
+        required_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-ai-quality"],
         gate_applicability: [
           {
             layer: "Architecture",
@@ -2270,7 +2540,7 @@ function assertRuntimeScripts() {
     }),
   ]);
   if (
-    underProcessingReport.skill_usage.required_gate_coverage !== 0.5 ||
+    underProcessingReport.skill_usage.required_gate_coverage !== 2 / 3 ||
     !underProcessingReport.adoption_effect.weak_signal.some((signal) => signal.includes("Under-processing") && signal.includes("review-architecture-impact"))
   ) {
     throw new Error(`required gate not executed should be flagged\n${JSON.stringify(underProcessingReport.skill_usage, null, 2)}`);
@@ -2282,8 +2552,8 @@ function assertRuntimeScripts() {
       task_id: "OVER-ROUTE-1",
       changed_file_summary: { count: 1, paths: ["docs/ok.md"] },
       routing_result: {
-        required_gates: ["review-router"],
-        executed_gates: ["review-router", "review-adversarial-risk"],
+        required_gates: ["review-router", "review-ai-quality"],
+        executed_gates: ["review-router", "review-ai-quality", "review-adversarial-risk"],
         gate_applicability: [
           {
             layer: "Adversarial risk overlay",
@@ -2469,7 +2739,9 @@ function assertInstallerScripts() {
     "managed file conflict",
   );
   assertRuntimePass("installer force updates managed command", runRepoScript([installer, "--target", target, "--force"]));
-  if (readFileSync(resolve(target, ".claude/commands/skill-handoff.md"), "utf8") !== readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/commands/skill-handoff.md"), "utf8")) {
+  const expectedHandoff = buildClaudeProjectionPlan({ profileName: "full" }).compactProfileArtifacts
+    .find((artifact) => artifact.metadata.prompt_name === "skill-handoff.md")?.content;
+  if (!expectedHandoff || readFileSync(resolve(target, ".claude/commands/skill-handoff.md"), "utf8") !== expectedHandoff) {
     throw new Error("installer --force should refresh locally modified managed commands");
   }
   if (!existsSync(resolve(target, "docs/ai/improvement-ledger.md")) || !existsSync(resolve(target, "docs/ai/skill-adoption-metrics.md")) || !existsSync(resolve(target, "docs/debt-lifecycle-contract.md"))) {
@@ -2530,7 +2802,7 @@ function assertInstallerScripts() {
           throw new Error(`Claude daily available fixture '${id}' is invalid\n${JSON.stringify(profileState, null, 2)}`);
         }
       }
-      for (const id of ["daily_knowledge_capability_missing", "daily_adoption_capability_missing", "daily_observability_capability_missing"]) {
+      for (const id of ["daily_knowledge_capability_missing", "daily_adoption_capability_missing", "daily_observability_capability_missing", "explicit_knowledge_promotion"]) {
         if (fixtures.get(id)?.outcome !== "capability_missing" || profileState.selected_skills.includes(fixtures.get(id)?.selected_route) || fixtures.get(id)?.recommended_profile !== "organizational") {
           throw new Error(`Claude daily capability fixture '${id}' is not fail-closed\n${JSON.stringify(profileState, null, 2)}`);
         }
@@ -2590,8 +2862,8 @@ function assertInstallerScripts() {
   assertRuntimePass("Claude ownership full core setup", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget]));
   assertRuntimePass("Claude ownership adapter setup", runRepoScript([installer, "--target", corePruneOwnershipTarget, "--profile", "implementation"]));
   assertRuntimePass("Claude ownership core shrink prune", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget, "--skills", "evidence-ledger,risk-gate", "--prune"]));
-  if (CORE_IMMUTABLE_CONTRACT_ASSETS.some((asset) => !existsSync(resolve(corePruneOwnershipTarget, asset)))) {
-    throw new Error("core shrink prune must preserve all immutable contracts required by an active Claude adapter");
+  if (CORE_OWNED_IMMUTABLE_ASSETS.some((asset) => !existsSync(resolve(corePruneOwnershipTarget, asset)))) {
+    throw new Error("core shrink prune must preserve all immutable assets required by an active Claude adapter");
   }
   assertInstalledDocReferences("Claude active adapter after core prune", corePruneOwnershipTarget, [".claude/skills", ".claude/commands"]);
 
@@ -2600,8 +2872,8 @@ function assertInstallerScripts() {
   assertRuntimePass("Claude ownership adapter install", runRepoScript([installer, "--target", adapterDetachOwnershipTarget, "--profile", "implementation"]));
   assertRuntimePass("Claude ownership core expand", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget]));
   assertRuntimePass("Claude ownership adapter detach", runRepoScript([installer, "--target", adapterDetachOwnershipTarget, "--detach"]));
-  if (CORE_IMMUTABLE_CONTRACT_ASSETS.some((asset) => !existsSync(resolve(adapterDetachOwnershipTarget, asset)))) {
-    throw new Error("Claude detach must preserve all core-owned immutable contracts");
+  if (CORE_OWNED_IMMUTABLE_ASSETS.some((asset) => !existsSync(resolve(adapterDetachOwnershipTarget, asset)))) {
+    throw new Error("Claude detach must preserve all core-owned immutable assets");
   }
   assertRuntimePass("core check after Claude ownership transition", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget, "--check"]));
 
@@ -2610,7 +2882,7 @@ function assertInstallerScripts() {
   assertRuntimePass("legacy Claude ownership adapter setup", runRepoScript([installer, "--target", legacyOwnershipTarget, "--profile", "full"]));
   const legacyClaudeStatePath = resolve(legacyOwnershipTarget, ".agent-spectrum-kernel/claude-install-state.json");
   const legacyClaudeState = JSON.parse(readFileSync(legacyClaudeStatePath, "utf8"));
-  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
+  for (const asset of CORE_OWNED_IMMUTABLE_ASSETS) {
     const content = readFileSync(resolve(legacyOwnershipTarget, asset), "utf8");
     legacyClaudeState.managed_files[asset] = { kind: "claude_asset", asset, sha256: hashText(content) };
   }
@@ -2619,11 +2891,11 @@ function assertInstallerScripts() {
   assertRuntimePass("legacy Claude ownership implementation prune", runRepoScript([installer, "--target", legacyOwnershipTarget, "--profile", "implementation", "--prune"]));
   const migratedCoreState = JSON.parse(readFileSync(resolve(legacyOwnershipTarget, ".agent-spectrum-kernel/install-state.json"), "utf8"));
   const migratedClaudeState = JSON.parse(readFileSync(legacyClaudeStatePath, "utf8"));
-  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
+  for (const asset of CORE_OWNED_IMMUTABLE_ASSETS) {
     const targetPath = resolve(legacyOwnershipTarget, asset);
     const coreRecord = migratedCoreState.managed_files?.[asset];
-    if (!existsSync(targetPath) || coreRecord?.kind !== "immutable_contract" || hashText(readFileSync(targetPath, "utf8")) !== coreRecord.sha256) {
-      throw new Error(`legacy Claude ownership migration must preserve the core-owned immutable contract: ${asset}`);
+    if (!existsSync(targetPath) || coreRecord?.kind !== coreImmutableAssetKind(asset) || hashText(readFileSync(targetPath, "utf8")) !== coreRecord.sha256) {
+      throw new Error(`legacy Claude ownership migration must preserve the core-owned immutable asset: ${asset}`);
     }
     if (Object.hasOwn(migratedClaudeState.managed_files ?? {}, asset)) {
       throw new Error(`legacy Claude ownership migration must drop the adapter ownership record: ${asset}`);
@@ -2851,23 +3123,29 @@ function assertInstallerScripts() {
     throw new Error("installer invalid partial skills should not install commands");
   }
 
-  const invalidRoutingTarget = resolve(fixtureRoot, "install-invalid-routing-profile-target");
-  assertRuntimePass("installer invalid routing core setup", runRepoScript([coreInstaller, "--target", invalidRoutingTarget]));
-  assertRuntimeFail(
-    "installer invalid routing closure",
+  const boundedRoutingTarget = resolve(fixtureRoot, "install-bounded-routing-profile-target");
+  assertRuntimePass("installer bounded routing core setup", runRepoScript([coreInstaller, "--target", boundedRoutingTarget]));
+  assertRuntimePass(
+    "installer bounded routing closure",
     runRepoScript([
       installer,
       "--target",
-      invalidRoutingTarget,
+      boundedRoutingTarget,
       "--profile",
       "implementation",
       "--skills",
       "operating-mode-router,skill-router,test-first-verification,controlled-implementation,evidence-ledger,risk-gate,handoff-generation",
     ]),
-    "repository-orientation",
   );
-  if (existsSync(resolve(invalidRoutingTarget, ".claude/commands/skill-implement.md"))) {
-    throw new Error("installer invalid routing closure should not install commands");
+  const boundedRoutingState = JSON.parse(readFileSync(resolve(boundedRoutingTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  const unavailableOrientation = boundedRoutingState.skill_closure?.routing_fixtures?.find((fixture) => fixture.id === "unfamiliar_repository");
+  if (
+    unavailableOrientation?.outcome !== "capability_missing" ||
+    unavailableOrientation.selected_route !== "repository-orientation" ||
+    boundedRoutingState.selected_skills.includes("repository-orientation") ||
+    !existsSync(resolve(boundedRoutingTarget, ".claude/commands/skill-implement.md"))
+  ) {
+    throw new Error(`installer bounded routing closure must install the fixed entry and fail closed only when the unavailable trigger is selected\n${JSON.stringify(boundedRoutingState, null, 2)}`);
   }
 
   const missingWorkPackageTarget = resolve(fixtureRoot, "install-missing-work-package-target");
@@ -2945,9 +3223,9 @@ function assertCoreInstallerScripts() {
   if (!existsSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"))) {
     throw new Error("kernel installer should project manifest skills");
   }
-  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
-    if (freshState.managed_files?.[asset]?.kind !== "immutable_contract" || !existsSync(resolve(freshTarget, asset))) {
-      throw new Error(`core installer state must own and project immutable contract: ${asset}`);
+  for (const asset of CORE_OWNED_IMMUTABLE_ASSETS) {
+    if (freshState.managed_files?.[asset]?.kind !== coreImmutableAssetKind(asset) || !existsSync(resolve(freshTarget, asset))) {
+      throw new Error(`core installer state must own and project immutable asset: ${asset}`);
     }
   }
   assertInstalledDocReferences("core installer dependency closure", freshTarget, ["skills"]);
@@ -2955,6 +3233,7 @@ function assertCoreInstallerScripts() {
     throw new Error("kernel installer should project the canonical signal registry");
   }
 
+  assertSkillEffectivenessRuntimeProjection({ installer, freshTarget });
   assertExecutionEnvelopeSchemaProjection({ installer, freshTarget });
 
   const beforeRerunAgents = readFileSync(resolve(freshTarget, "AGENTS.md"), "utf8");
@@ -3114,15 +3393,108 @@ function assertCoreInstallerScripts() {
   }
 }
 
+function assertSkillEffectivenessRuntimeProjection({ installer, freshTarget }) {
+  const statePath = resolve(freshTarget, ".agent-spectrum-kernel/install-state.json");
+  let state = JSON.parse(readFileSync(statePath, "utf8"));
+  for (const asset of CORE_IMMUTABLE_RUNTIME_ASSETS) {
+    const projectedPath = resolve(freshTarget, asset);
+    const canonicalBytes = readFileSync(resolve(repoRoot, asset), "utf8");
+    const digest = hashText(canonicalBytes);
+    const record = state.managed_files?.[asset];
+    if (
+      !existsSync(projectedPath) ||
+      readFileSync(projectedPath, "utf8") !== canonicalBytes ||
+      record?.kind !== "immutable_runtime" ||
+      record?.asset !== asset ||
+      record?.sha256 !== digest ||
+      record?.canonical_sha256 !== digest
+    ) {
+      throw new Error(`fresh core installation must project and exactly identify immutable runtime ${asset}`);
+    }
+  }
+
+  const cliPath = resolve(freshTarget, "scripts/skill-effectiveness-outcome.mjs");
+  const catalog = JSON.parse(readFileSync(resolve(repoRoot, "docs/fixtures/skill-effectiveness-outcome-cases.json"), "utf8"));
+  const input = structuredClone(catalog.base_input);
+  input.outcome_id = "installed-core-cli";
+  input.task_id = "installed-core-cli-task";
+  const build = spawnSync(process.execPath, [cliPath, "build", "-"], {
+    cwd: freshTarget,
+    encoding: "utf8",
+    input: `${JSON.stringify(input)}\n`,
+  });
+  assertRuntimePass("installed core Skill effectiveness CLI build", build);
+  const outcome = JSON.parse(build.stdout);
+  const validate = spawnSync(process.execPath, [cliPath, "validate", "-"], {
+    cwd: freshTarget,
+    encoding: "utf8",
+    input: `${JSON.stringify(outcome)}\n`,
+  });
+  assertRuntimePass("installed core Skill effectiveness CLI validate", validate);
+  if (JSON.parse(validate.stdout).valid !== true) throw new Error("installed core semantic CLI must validate its canonical build");
+
+  const tampered = structuredClone(outcome);
+  tampered.observations.find(({ observation_id }) => observation_id === "obs-outcome-quality").effect.delta = 999;
+  const reject = spawnSync(process.execPath, [cliPath, "validate", "-"], {
+    cwd: freshTarget,
+    encoding: "utf8",
+    input: `${JSON.stringify(tampered)}\n`,
+  });
+  assertRuntimeFail("installed core semantic CLI rejects tampered delta", reject, "EFFECT_DELTA_MISMATCH");
+
+  const sharedPath = resolve(freshTarget, "scripts/json-schema-validation.mjs");
+  rmSync(sharedPath);
+  assertRuntimeFail(
+    "kernel installer check missing shared JSON Schema runtime",
+    runRepoScript([installer, "--target", freshTarget, "--check"]),
+    "core immutable runtime is missing: scripts/json-schema-validation.mjs",
+  );
+  assertRuntimePass("kernel installer repairs missing shared JSON Schema runtime", runRepoScript([installer, "--target", freshTarget]));
+
+  writeFileSync(sharedPath, "// project drift\n");
+  assertRuntimeFail(
+    "kernel installer check drifted shared JSON Schema runtime",
+    runRepoScript([installer, "--target", freshTarget, "--check"]),
+    "core immutable runtime bytes do not match install state: scripts/json-schema-validation.mjs",
+  );
+  assertRuntimeFail(
+    "kernel installer preserves drifted shared JSON Schema runtime",
+    runRepoScript([installer, "--target", freshTarget]),
+    "managed file conflict",
+  );
+  assertRuntimePass("kernel installer force repairs shared JSON Schema runtime", runRepoScript([installer, "--target", freshTarget, "--force"]));
+
+  state = JSON.parse(readFileSync(statePath, "utf8"));
+  state.managed_files["scripts/skill-effectiveness-outcome.mjs"].kind = "immutable_contract";
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  assertRuntimeFail(
+    "kernel installer check semantic CLI ownership mismatch",
+    runRepoScript([installer, "--target", freshTarget, "--check"]),
+    "core immutable runtime ownership mismatch: scripts/skill-effectiveness-outcome.mjs",
+  );
+  assertRuntimePass("kernel installer repairs semantic CLI ownership", runRepoScript([installer, "--target", freshTarget]));
+}
+
 function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
   const schemaPath = "schemas/execution-envelope.schema.json";
+  const recordSchemaPath = "schemas/execution-envelope-record.schema.json";
+  const envelopeDependencySchemaPaths = [
+    "schemas/metrics-event.schema.json",
+    "schemas/codex-risk-action.schema.json",
+    "schemas/codex-risk-approval-request.schema.json",
+    "schemas/codex-risk-approval.schema.json",
+  ];
   const statePath = ".agent-spectrum-kernel/install-state.json";
   const canonicalBytes = readFileSync(resolve(repoRoot, schemaPath), "utf8");
   const canonicalDigest = hashText(canonicalBytes);
+  const recordCanonicalBytes = readFileSync(resolve(repoRoot, recordSchemaPath), "utf8");
+  const recordCanonicalDigest = hashText(recordCanonicalBytes);
   const projectedPath = resolve(freshTarget, schemaPath);
+  const projectedRecordPath = resolve(freshTarget, recordSchemaPath);
   const freshStatePath = resolve(freshTarget, statePath);
   const freshState = JSON.parse(readFileSync(freshStatePath, "utf8"));
   const schemaRecord = freshState.managed_files?.[schemaPath];
+  const envelopeRecordSchemaRecord = freshState.managed_files?.[recordSchemaPath];
 
   if (
     !existsSync(projectedPath) ||
@@ -3134,11 +3506,27 @@ function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
   ) {
     throw new Error("fresh core installation must project and exactly identify the canonical Execution Envelope schema");
   }
+  if (
+    !existsSync(projectedRecordPath) ||
+    readFileSync(projectedRecordPath, "utf8") !== recordCanonicalBytes ||
+    envelopeRecordSchemaRecord?.kind !== "immutable_contract" ||
+    envelopeRecordSchemaRecord?.asset !== recordSchemaPath ||
+    envelopeRecordSchemaRecord?.sha256 !== recordCanonicalDigest ||
+    envelopeRecordSchemaRecord?.canonical_sha256 !== recordCanonicalDigest
+  ) {
+    throw new Error("fresh core installation must project and exactly identify the canonical Execution Envelope record schema");
+  }
   const canonicalExample = inspectExecutionEnvelope(readFileSync(resolve(freshTarget, "docs/execution-envelope-contract.md"), "utf8"), {
     schemaPath: projectedPath,
   });
   if (canonicalExample.status !== "parsed") {
     throw new Error(`projected Execution Envelope schema must validate the canonical contract example\n${canonicalExample.errors.join("\n")}`);
+  }
+  for (const dependencyPath of envelopeDependencySchemaPaths) {
+    const dependencyRecord = freshState.managed_files?.[dependencyPath];
+    if (!existsSync(resolve(freshTarget, dependencyPath)) || dependencyRecord?.kind !== "immutable_contract") {
+      throw new Error(`fresh core installation must project the Execution Envelope Schema dependency ${dependencyPath}`);
+    }
   }
   assertRuntimePass("kernel installer Execution Envelope schema check", runRepoScript([installer, "--target", freshTarget, "--check"]));
 
@@ -3254,6 +3642,24 @@ function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
     if (readFileSync(canonicalPath, "utf8") !== readFileSync(runtimePath, "utf8")) {
       throw new Error(`${label} runtime Execution Envelope schema must be byte-identical to the core canonical projection`);
     }
+    const runtimeExample = inspectExecutionEnvelope(readFileSync(resolve(adapterTarget, "docs/execution-envelope-contract.md"), "utf8"), {
+      schemaPath: runtimePath,
+    });
+    if (runtimeExample.status !== "parsed") {
+      throw new Error(`${label} runtime Execution Envelope schema must resolve every shared dependency\n${runtimeExample.errors.join("\n")}`);
+    }
+    const runtimeRecordPath = resolve(adapterTarget, "scripts/execution-envelope-record.schema.json");
+    const runtimeResultPath = resolve(adapterTarget, "scripts/codex-runner-result.schema.json");
+    if (label === "Codex") {
+      if (readFileSync(resolve(adapterTarget, recordSchemaPath), "utf8") !== readFileSync(runtimeRecordPath, "utf8")) {
+        throw new Error("Codex runtime Execution Envelope record schema must be byte-identical to the core canonical projection");
+      }
+      if (readFileSync(resolve(repoRoot, "schemas/codex-runner-result.schema.json"), "utf8") !== readFileSync(runtimeResultPath, "utf8")) {
+        throw new Error("Codex runner result schema must be byte-identical to its adapter runtime projection");
+      }
+    } else if (existsSync(runtimeRecordPath) || existsSync(runtimeResultPath)) {
+      throw new Error("Claude inline-compatibility runtime must not install Codex-only record or structured-result schemas");
+    }
     const runtimeSchema = JSON.parse(readFileSync(runtimePath, "utf8"));
     runtimeSchema.properties.schema_version.const = "9.9.9";
     writeFileSync(runtimePath, `${JSON.stringify(runtimeSchema, null, 2)}\n`);
@@ -3274,6 +3680,51 @@ function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
       runRepoScript([installer, "--target", adapterTarget, "--check"]),
       "core immutable contract is missing",
     );
+    assertRuntimePass(`${label} core repairs canonical Execution Envelope schema`, runRepoScript([installer, "--target", adapterTarget]));
+
+    const adapterStatePath = resolve(
+      adapterTarget,
+      label === "Codex" ? ".agent-spectrum-kernel/codex-install-state.json" : ".agent-spectrum-kernel/claude-install-state.json",
+    );
+    const adapterState = JSON.parse(readFileSync(adapterStatePath, "utf8"));
+    const adapterManagedPaths = new Set(Object.keys(adapterState.managed_files ?? {}));
+    const projectedManagedPaths = new Set((adapterState.projection_plan?.projected_managed_assets ?? []).map(({ path }) => path));
+    for (const asset of CORE_IMMUTABLE_RUNTIME_ASSETS) {
+      if (adapterManagedPaths.has(asset) || projectedManagedPaths.has(asset)) {
+        throw new Error(`${label} adapter must consume rather than own core immutable runtime ${asset}`);
+      }
+    }
+    if (!adapterManagedPaths.has("scripts/execution-envelope.mjs")) {
+      throw new Error(`${label} adapter must continue to own Execution Envelope transport runtime`);
+    }
+
+    const sharedRuntimePath = resolve(adapterTarget, "scripts/json-schema-validation.mjs");
+    rmSync(sharedRuntimePath);
+    assertRuntimeFail(
+      `${label} adapter rejects missing shared JSON Schema runtime`,
+      runRepoScript([adapter, "--target", adapterTarget, "--check"]),
+      "ASK core immutable runtime is missing or stale: scripts/json-schema-validation.mjs",
+    );
+    assertRuntimePass(`${label} core repairs shared JSON Schema runtime`, runRepoScript([installer, "--target", adapterTarget]));
+
+    assertRuntimePass(`${label} selects Skill effectiveness profile`, runRepoScript([adapter, "--target", adapterTarget, "--profile", "organizational"]));
+    const semanticRuntimePath = resolve(adapterTarget, "scripts/skill-effectiveness-outcome.mjs");
+    rmSync(semanticRuntimePath);
+    assertRuntimeFail(
+      `${label} Skill effectiveness profile rejects missing semantic CLI`,
+      runRepoScript([adapter, "--target", adapterTarget, "--profile", "organizational", "--check"]),
+      "ASK core immutable runtime is missing or stale: scripts/skill-effectiveness-outcome.mjs",
+    );
+    assertRuntimePass(`${label} core repairs semantic CLI`, runRepoScript([installer, "--target", adapterTarget]));
+
+    assertRuntimePass(`${label} adapter detach preserves core runtime`, runRepoScript([adapter, "--target", adapterTarget, "--detach"]));
+    for (const asset of CORE_IMMUTABLE_RUNTIME_ASSETS) {
+      if (!existsSync(resolve(adapterTarget, asset))) throw new Error(`${label} detach must preserve core immutable runtime ${asset}`);
+    }
+    if (existsSync(resolve(adapterTarget, "scripts/execution-envelope.mjs"))) {
+      throw new Error(`${label} detach must remove its adapter-owned Execution Envelope transport runtime`);
+    }
+    assertRuntimePass(`${label} core remains valid after adapter detach`, runRepoScript([installer, "--target", adapterTarget, "--check"]));
   }
 }
 
@@ -3289,6 +3740,15 @@ function assertCodexInstallerScripts() {
     if (!sourceCommand.includes(expectedInvocation)) {
       throw new Error(`source Codex command template must use the managed contract for ${prompt}: ${expectedInvocation}`);
     }
+  }
+  const sourceReviewCommand = sourceCommand
+    .split("\n")
+    .find((line) => line.startsWith("node scripts/codex-exec-runner.mjs --prompt skill-review.md"));
+  if (!sourceReviewCommand?.match(/(?:^|\s)--gates-observed(?:\s|$)/u)) {
+    throw new Error("source Codex review command must record completed gate classification with --gates-observed by default");
+  }
+  if (!sourceCommand.includes("remove it and repeat `--observed-signal <id>` for each exact mapped signal") || !sourceCommand.includes("Never combine those forms")) {
+    throw new Error("source Codex review guidance must explain default observation replacement and mutual exclusion");
   }
 
   const freshTarget = resolve(fixtureRoot, "codex-install-fresh");
@@ -3361,7 +3821,7 @@ function assertCodexInstallerScripts() {
   assertRuntimePass("Codex ownership full core setup", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget]));
   assertRuntimePass("Codex ownership adapter setup", runRepoScript([installer, "--target", corePruneOwnershipTarget]));
   assertRuntimePass("Codex ownership core shrink prune", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget, "--skills", "evidence-ledger,risk-gate", "--prune"]));
-  if (CORE_IMMUTABLE_CONTRACT_ASSETS.some((asset) => !existsSync(resolve(corePruneOwnershipTarget, asset)))) {
+  if (CORE_OWNED_IMMUTABLE_ASSETS.some((asset) => !existsSync(resolve(corePruneOwnershipTarget, asset)))) {
     throw new Error("core shrink prune must preserve all immutable contracts required by an active Codex adapter");
   }
   assertInstalledDocReferences("Codex active adapter after core prune", corePruneOwnershipTarget, [".agents/skills", ".agents/prompts", ".agents/commands"]);
@@ -3371,7 +3831,7 @@ function assertCodexInstallerScripts() {
   assertRuntimePass("Codex ownership adapter install", runRepoScript([installer, "--target", adapterDetachOwnershipTarget]));
   assertRuntimePass("Codex ownership core expand", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget]));
   assertRuntimePass("Codex ownership adapter detach", runRepoScript([installer, "--target", adapterDetachOwnershipTarget, "--detach"]));
-  if (CORE_IMMUTABLE_CONTRACT_ASSETS.some((asset) => !existsSync(resolve(adapterDetachOwnershipTarget, asset)))) {
+  if (CORE_OWNED_IMMUTABLE_ASSETS.some((asset) => !existsSync(resolve(adapterDetachOwnershipTarget, asset)))) {
     throw new Error("Codex detach must preserve all core-owned immutable contracts");
   }
   assertRuntimePass("core check after Codex ownership transition", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget, "--check"]));
@@ -3474,6 +3934,17 @@ function assertCodexInstallerScripts() {
         throw new Error(`codex command template must use the managed contract for ${prompt}: ${expectedInvocation}`);
       }
     }
+    if (profileState.selected_prompts.includes("skill-review.md")) {
+      const generatedReviewCommand = generatedCommand
+        .split("\n")
+        .find((line) => line.startsWith("node scripts/codex-exec-runner.mjs --prompt skill-review.md"));
+      if (!generatedReviewCommand?.match(/(?:^|\s)--gates-observed(?:\s|$)/u)) {
+        throw new Error(`codex ${profile} review command must include --gates-observed by default`);
+      }
+      if (!generatedCommand.includes("remove `--gates-observed` and replace it with repeated exact `--observed-signal <id>` arguments") || !generatedCommand.includes("Never combine `--gates-observed` with `--observed-signal`")) {
+        throw new Error(`codex ${profile} review guidance must preserve observation replacement and mutual exclusion`);
+      }
+    }
     assertCodexInstallClosed(`codex installer ${profile} profile`, profileTarget);
     assertCodexCompactProfiles(`codex installer ${profile} compact profiles`, profileTarget);
     if (profile === "implementation") {
@@ -3489,6 +3960,7 @@ function assertCodexInstallerScripts() {
         "daily_knowledge_capability_missing",
         "daily_adoption_capability_missing",
         "daily_observability_capability_missing",
+        "explicit_knowledge_promotion",
       ]);
     }
   }
@@ -4141,16 +4613,7 @@ function assertCodexRunnerScript() {
   const targetRunnerScript = resolve(target, "scripts/codex-exec-runner.mjs");
 
   const fakeCodex = resolve(target, "fake-codex");
-  writeFileSync(
-    fakeCodex,
-    `#!/bin/sh
-printf 'invoked\n' >> "$0.invocations"
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
-  shift
-done
-cat <<'EOF' > "$output"
-Implementation Contract:
+  const implementationResponse = `Implementation Contract:
 - Artifact ID: IMPL-FAKE
 - Upstream refs: WP-FAKE, VER-FAKE
 - Actual change boundary: local fixture
@@ -4162,7 +4625,17 @@ Evidence:
 - Implementation Contract ref: IMPL-FAKE
 - command: node scripts/test-validate-repo.mjs
   result: pass
-${validEnvelopeBlock}
+`;
+  writeFileSync(
+    fakeCodex,
+    `#!/bin/sh
+printf 'invoked\n' >> "$0.invocations"
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
+${codexStructuredResult(implementationResponse)}
 EOF
 `,
   );
@@ -4184,8 +4657,9 @@ EOF
   if (!passResult.stdout.includes("Codex runner: executed") || !passResult.stdout.includes("Evidence level: executed") || !existsSync(resolve(target, "codex-output.md"))) {
     throw new Error(`codex runner should capture output and report executed evidence\n${passResult.stdout}\n${passResult.stderr}`);
   }
+  if (readFileSync(resolve(target, "codex-output.md"), "utf8").includes("Execution Envelope:")) throw new Error("ordinary managed implementation output must not serialize the runner-owned Envelope");
   for (const expected of [
-    "Requested contracts: 4",
+    "Requested contracts: 3",
     "Projected contracts evidence: projected",
     "Runtime-detected compact output profile evidence: runtime_detected",
     "Runtime-loaded contracts evidence: none",
@@ -4212,7 +4686,7 @@ EOF
   assertRuntimePass("codex runner emits structured execution evidence", jsonResult);
   const jsonReport = JSON.parse(jsonResult.stdout);
   if (
-    jsonReport.execution_evidence?.requested_contracts?.contracts?.length !== 4 ||
+    jsonReport.execution_evidence?.requested_contracts?.contracts?.length !== 3 ||
     jsonReport.execution_evidence?.projected_contracts?.evidence_level !== "projected" ||
     jsonReport.execution_evidence?.runtime_detected_profile?.evidence_level !== "runtime_detected" ||
     jsonReport.execution_evidence?.runtime_loaded_contracts?.evidence_level !== "none" ||
@@ -4229,7 +4703,10 @@ EOF
     jsonReport.normalized_adapter_event?.stop?.status !== "insufficient_evidence" ||
     jsonReport.normalized_adapter_event?.outcome?.claim_effect !== "downgrade" ||
     jsonReport.normalized_adapter_event?.contracts?.applied?.length !== 0 ||
-    jsonReport.normalized_adapter_event?.verification?.passed !== 1 ||
+    jsonReport.normalized_adapter_event?.verification?.passed !== 0 ||
+    jsonReport.execution_envelope_record?.emission_class !== "sidecar" ||
+    jsonReport.execution_envelope_record?.persisted !== true ||
+    !jsonReport.execution_envelope_record?.logical_path?.startsWith("ask-runtime/execution-envelopes/execution-envelope-record-") ||
     Object.hasOwn(jsonReport.execution_evidence ?? {}, "applied")
   ) {
     throw new Error(`codex runner structured evidence stages are invalid\n${jsonResult.stdout}`);
@@ -4240,6 +4717,23 @@ EOF
   assertRuntimePass("codex review runner install setup", runRepoScript([installer, "--target", reviewTarget, "--profile", "review"]));
   const reviewRunnerScript = resolve(reviewTarget, "scripts/codex-exec-runner.mjs");
   const fakeReviewCodex = resolve(reviewTarget, "fake-review-codex");
+  const reviewResponse = `Baseline review:
+- Gate: review-ai-quality
+- Status: pass
+- Evidence: isolated fixture
+
+Additional required gates:
+- none
+
+Missing evidence:
+- none
+
+Findings:
+- none
+
+Decision:
+- approve
+`;
   writeFileSync(
     fakeReviewCodex,
     `#!/bin/sh
@@ -4248,27 +4742,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 cat <<'EOF' > "$output"
-Change signals:
-- signal: fixture
-Required gates:
-- review-final-merge-gate: fixture
-Skipped heavy gates:
-- none
-Missing evidence:
-- none
-Decision:
-- approve
-Blocking evidence:
-- none
-Passed required gates:
-- review-final-merge-gate: fixture
-Insufficient evidence:
-- none
-Non-blocking follow-ups:
-- none
-Residual risk:
-- none
-${validEnvelopeBlock}
+${codexStructuredResult(reviewResponse)}
 EOF
 `,
   );
@@ -4281,6 +4755,8 @@ EOF
     "skill-review.md",
     "--mode",
     "review",
+    "--gates-observed",
+    "--final-decision",
     "--codex-bin",
     fakeReviewCodex,
     "--output",
@@ -4290,14 +4766,113 @@ EOF
   assertRuntimePass("codex review runner emits required gate evidence", reviewResult);
   const reviewReport = JSON.parse(reviewResult.stdout);
   if (
-    JSON.stringify(reviewReport.execution_evidence?.required_gates?.gates) !== JSON.stringify(["review-final-merge-gate"]) ||
-    JSON.stringify(reviewReport.normalized_adapter_event?.gates?.required) !== JSON.stringify(["review-final-merge-gate"]) ||
-    reviewReport.normalized_adapter_event?.review?.final_gate_required !== true
+    JSON.stringify(reviewReport.execution_evidence?.required_gates?.gates) !== JSON.stringify(["review-ai-quality", "review-final-merge-gate"]) ||
+    JSON.stringify(reviewReport.execution_evidence?.required_gates?.observed_signals) !== JSON.stringify([]) ||
+    JSON.stringify(reviewReport.execution_evidence?.required_gates?.additional_gates) !== JSON.stringify([]) ||
+    reviewReport.execution_evidence?.required_gates?.missing_evidence?.includes("required_gate_observation") ||
+    JSON.stringify(reviewReport.normalized_adapter_event?.gates?.required) !== JSON.stringify(["review-ai-quality", "review-final-merge-gate"]) ||
+    reviewReport.normalized_adapter_event?.review?.final_gate_required !== true ||
+    reviewReport.execution_envelope_record?.emission_class !== "sidecar" ||
+    readFileSync(resolve(reviewTarget, "codex-review-output.md"), "utf8").includes("Execution Envelope:")
   ) {
-    throw new Error(`codex review runner must connect review-final-merge-gate to the normalized event\n${reviewResult.stdout}`);
+    throw new Error(`codex review runner must connect the mandatory baseline and requested final gate to the normalized event\n${reviewResult.stdout}`);
+  }
+
+  const unobservedReviewResult = runRepoScript([
+    reviewRunnerScript,
+    "--target", reviewTarget,
+    "--prompt", "skill-review.md",
+    "--mode", "review",
+    "--final-decision",
+    "--codex-bin", fakeReviewCodex,
+    "--output", "codex-review-unobserved-output.md",
+    "--json",
+  ]);
+  assertRuntimePass("codex review runner preserves missing classification evidence", unobservedReviewResult);
+  const unobservedReviewReport = JSON.parse(unobservedReviewResult.stdout);
+  if (
+    !unobservedReviewReport.execution_evidence?.required_gates?.missing_evidence?.includes("required_gate_observation") ||
+    unobservedReviewReport.execution_evidence?.required_gates?.evidence_level !== "projected" ||
+    !unobservedReviewReport.normalized_adapter_event?.evidence?.missing?.includes("required_gate_observation")
+  ) {
+    throw new Error(`baseline and final gates must not suppress missing review classification evidence\n${unobservedReviewResult.stdout}`);
+  }
+
+  const forbiddenReviewGateResult = runRepoScript([
+    reviewRunnerScript,
+    "--target", reviewTarget,
+    "--prompt", "skill-review.md",
+    "--mode", "review",
+    "--required-gate", "review-adversarial-risk",
+    "--dry-run",
+  ]);
+  if (forbiddenReviewGateResult.status === 0 || !forbiddenReviewGateResult.stderr.includes("review --required-gate is forbidden")) {
+    throw new Error(`review runner must reject a bare heavy-gate request\n${forbiddenReviewGateResult.stdout}\n${forbiddenReviewGateResult.stderr}`);
+  }
+
+  const fakeSignalReviewCodex = resolve(reviewTarget, "fake-signal-review-codex");
+  const signalReviewResponse = reviewFixture({
+    additionalGates: "- review-adversarial-risk: status=pass; evidence=isolated adversarial fixture; signals=untrusted_input",
+  }).replace(validEnvelopeBlock, "");
+  writeFileSync(
+    fakeSignalReviewCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
+${codexStructuredResult(signalReviewResponse)}
+EOF
+`,
+  );
+  chmodSync(fakeSignalReviewCodex, 0o755);
+  const signalReviewResult = runRepoScript([
+    reviewRunnerScript,
+    "--target", reviewTarget,
+    "--prompt", "skill-review.md",
+    "--mode", "review",
+    "--observed-signal", "untrusted_input",
+    "--codex-bin", fakeSignalReviewCodex,
+    "--output", "codex-review-signal-output.md",
+    "--json",
+  ]);
+  assertRuntimePass("codex review runner derives and enforces signal-selected gates", signalReviewResult);
+  const signalReviewReport = JSON.parse(signalReviewResult.stdout);
+  if (
+    JSON.stringify(signalReviewReport.execution_evidence?.required_gates?.gates) !== JSON.stringify(["review-ai-quality", "review-adversarial-risk"]) ||
+    JSON.stringify(signalReviewReport.execution_evidence?.required_gates?.observed_signals) !== JSON.stringify(["untrusted_input"]) ||
+    JSON.stringify(signalReviewReport.execution_evidence?.required_gates?.additional_gates) !== JSON.stringify(["review-adversarial-risk"]) ||
+    signalReviewReport.sensor_status !== "pass"
+  ) {
+    throw new Error(`review runner must bind observed signals, derived gates, and gate results\n${signalReviewResult.stdout}`);
   }
 
   const riskInvocationMarker = `${fakeCodex}.invocations`;
+  const riskActionPath = resolve(fixtureRoot, "codex-runner-risk-action.json");
+  writeFileSync(riskActionPath, `${JSON.stringify({
+    schema_version: "1.0.0",
+    action_id: "validate-repo-risk-output",
+    repository_id: "github.com/example/codex-runner-target",
+    risk_gate: "risk-gate",
+    operation: "write_risk_output",
+    target_scope: ["codex-risk-output.md"],
+    permitted_effects: ["write_risk_output"],
+    prohibited_effects: ["publish_production", "write_outside_target_scope"],
+    approval_authority: {
+      authority_id: "fixture-owner",
+      authority_revision: "rev-1",
+      evidence_sha256: `sha256:${"a".repeat(64)}`,
+    },
+  }, null, 2)}\n`);
+  for (const [label, gitArgs] of [
+    ["init", ["init", "-b", "main"]],
+    ["origin", ["remote", "add", "origin", "https://github.com/example/codex-runner-target.git"]],
+    ["add", ["add", "."]],
+    ["commit", ["-c", "user.name=ASK Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "fixture"]],
+  ]) {
+    assertRuntimePass(`codex risk runner git ${label}`, spawnSync("git", gitArgs, { cwd: target, encoding: "utf8" }));
+  }
   const invocationsBeforeRisk = existsSync(riskInvocationMarker) ? readFileSync(riskInvocationMarker, "utf8") : "";
   const riskResult = runRepoScript([
     targetRunnerScript,
@@ -4307,6 +4882,8 @@ EOF
     "skill-implement.md",
     "--required-gate",
     "risk-gate",
+    "--risk-action",
+    riskActionPath,
     "--codex-bin",
     fakeCodex,
     "--output",
@@ -4314,6 +4891,7 @@ EOF
     "--json",
   ]);
   if (riskResult.status === 0) throw new Error(`codex risk runner must stop without specific-action approval\n${riskResult.stdout}`);
+  if (!riskResult.stdout.trim()) throw new Error(`codex risk runner must emit a JSON approval request before stopping\nstderr:\n${riskResult.stderr}`);
   const riskReport = JSON.parse(riskResult.stdout);
   const invocationsAfterRisk = existsSync(riskInvocationMarker) ? readFileSync(riskInvocationMarker, "utf8") : "";
   if (
@@ -4322,10 +4900,165 @@ EOF
     riskReport.normalized_adapter_event?.approval?.required !== true ||
     riskReport.normalized_adapter_event?.approval?.status !== "missing" ||
     riskReport.normalized_adapter_event?.stop?.status !== "risk_gate" ||
+    riskReport.execution_envelope_record?.emission_class !== "inline_required" ||
+    (readFileSync(resolve(target, "codex-risk-output.md"), "utf8").match(/Execution Envelope:/gu) ?? []).length !== 1 ||
     invocationsAfterRisk !== invocationsBeforeRisk
   ) {
     throw new Error(`codex risk runner must emit approval-required state and stop before execution\n${riskResult.stdout}`);
   }
+  rmSync(resolve(target, ".git"), { recursive: true, force: true });
+
+  const invocationsBeforeCapability = existsSync(riskInvocationMarker) ? readFileSync(riskInvocationMarker, "utf8") : "";
+  const capabilityResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--required-gate",
+    "unavailable-gate",
+    "--codex-bin",
+    fakeCodex,
+    "--output",
+    "codex-capability-output.md",
+    "--json",
+  ]);
+  if (capabilityResult.status === 0) throw new Error(`codex capability runner must stop before execution\n${capabilityResult.stdout}`);
+  const capabilityReport = JSON.parse(capabilityResult.stdout);
+  const invocationsAfterCapability = existsSync(riskInvocationMarker) ? readFileSync(riskInvocationMarker, "utf8") : "";
+  if (
+    capabilityReport.execution_envelope_record?.envelope?.stop_reason?.status !== "capability_missing" ||
+    capabilityReport.execution_envelope_record?.emission_class !== "inline_required" ||
+    capabilityReport.normalized_adapter_event?.stop?.status !== "capability_missing" ||
+    (readFileSync(resolve(target, "codex-capability-output.md"), "utf8").match(/Execution Envelope:/gu) ?? []).length !== 1 ||
+    invocationsAfterCapability !== invocationsBeforeCapability
+  ) {
+    throw new Error(`codex capability runner must emit one bound inline stop without invoking Codex\n${capabilityResult.stdout}`);
+  }
+
+  const fakeBlockedCodex = resolve(target, "fake-blocked-codex");
+  writeFileSync(
+    fakeBlockedCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
+${codexStructuredResult(implementationResponse, {
+  evidence_status: { checked: ["repository files"], missing: ["external runtime"] },
+  stop_reason: { status: "insufficient_evidence", details: ["external runtime was not checked"], human_decision_required: [], stop_if: ["external runtime evidence is required"] },
+  next_action: "capture the external runtime result",
+})}
+EOF
+`,
+  );
+  chmodSync(fakeBlockedCodex, 0o755);
+  const blockedResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--codex-bin",
+    fakeBlockedCodex,
+    "--output",
+    "codex-blocked-output.md",
+    "--json",
+  ]);
+  if (blockedResult.status === 0) throw new Error(`blocking insufficient evidence must not report executed success\n${blockedResult.stdout}`);
+  const blockedReport = JSON.parse(blockedResult.stdout);
+  if (
+    blockedReport.execution_envelope_record?.envelope?.stop_reason?.status !== "insufficient_evidence" ||
+    blockedReport.execution_envelope_record?.emission_class !== "inline_required" ||
+    (readFileSync(resolve(target, "codex-blocked-output.md"), "utf8").match(/Execution Envelope:/gu) ?? []).length !== 1
+  ) {
+    throw new Error(`blocking insufficient evidence must emit exactly one inline projection\n${blockedResult.stdout}`);
+  }
+
+  const diagnosticResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--codex-bin",
+    fakeCodex,
+    "--output",
+    "codex-diagnostic-output.md",
+    "--diagnostic-envelope",
+    "--json",
+  ]);
+  assertRuntimePass("codex runner explicitly emits diagnostic Envelope", diagnosticResult);
+  const diagnosticReport = JSON.parse(diagnosticResult.stdout);
+  if (
+    diagnosticReport.execution_envelope_record?.emission_class !== "diagnostic" ||
+    (readFileSync(resolve(target, "codex-diagnostic-output.md"), "utf8").match(/Execution Envelope:/gu) ?? []).length !== 1
+  ) {
+    throw new Error(`explicit diagnostic output must serialize exactly one bound Envelope\n${diagnosticResult.stdout}`);
+  }
+
+  const handoffTarget = resolve(fixtureRoot, "codex-runner-handoff-target");
+  assertRuntimePass("codex handoff runner core setup", runRepoScript([coreInstaller, "--target", handoffTarget]));
+  assertRuntimePass("codex handoff runner install setup", runRepoScript([installer, "--target", handoffTarget, "--profile", "full"]));
+  const handoffRunnerScript = resolve(handoffTarget, "scripts/codex-exec-runner.mjs");
+  const fakeHandoffCodex = resolve(handoffTarget, "fake-handoff-codex");
+  const handoffResponse = `Task:
+- continue the bounded fixture
+Context:
+- exact local state
+Allowed scope:
+- fixture only
+Forbidden scope:
+- external effects
+Expected output:
+- bounded continuation artifact
+Verification:
+- node scripts/test-validate-repo.mjs
+Unverified evidence:
+- external runtime
+`;
+  writeFileSync(
+    fakeHandoffCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
+${codexStructuredResult(handoffResponse, { next_action: "resume the bounded fixture" })}
+EOF
+`,
+  );
+  chmodSync(fakeHandoffCodex, 0o755);
+  const handoffResult = runRepoScript([
+    handoffRunnerScript,
+    "--target",
+    handoffTarget,
+    "--prompt",
+    "skill-handoff.md",
+    "--codex-bin",
+    fakeHandoffCodex,
+    "--output",
+    "codex-handoff-output.md",
+    "--json",
+  ]);
+  assertRuntimePass("codex handoff runner emits inline Envelope", handoffResult);
+  const handoffReport = JSON.parse(handoffResult.stdout);
+  if (
+    handoffReport.execution_envelope_record?.emission_class !== "inline_required" ||
+    (readFileSync(resolve(handoffTarget, "codex-handoff-output.md"), "utf8").match(/Execution Envelope:/gu) ?? []).length !== 1
+  ) {
+    throw new Error(`handoff must serialize exactly one runner-owned Envelope\n${handoffResult.stdout}`);
+  }
+  const handoffRecordPath = resolve(
+    handoffTarget,
+    ".agent-spectrum-kernel/runtime/execution-envelopes",
+    `${handoffReport.execution_envelope_record.record_id}.json`,
+  );
+  if (!existsSync(handoffRecordPath)) throw new Error("handoff runner must persist its content-addressed Envelope record");
+  assertRuntimePass("codex adapter detach preserves runtime Envelope records", runRepoScript([installer, "--target", handoffTarget, "--detach"]));
+  if (!existsSync(handoffRecordPath)) throw new Error("Codex detach must preserve runner-owned Envelope records as runtime data");
 
   const doctorResult = runRepoScript([doctorScript, "--target", target, "--runtime-probe", "--json"]);
   assertRuntimePass("Codex doctor reports static compact-profile evidence", doctorResult);
@@ -4545,6 +5278,9 @@ EOF
   const originalSharedRuntime = readFileSync(resolve(target, "scripts/ask-shared.mjs"), "utf8");
   const originalAdapterEventRuntime = readFileSync(resolve(target, "scripts/adapter-runtime-event.mjs"), "utf8");
   const originalEnvelopeRuntime = readFileSync(resolve(target, "scripts/execution-envelope.mjs"), "utf8");
+  const originalJsonSchemaRuntime = readFileSync(resolve(target, "scripts/json-schema-validation.mjs"), "utf8");
+  const originalRiskApprovalRuntime = readFileSync(resolve(target, "scripts/codex-risk-approval.mjs"), "utf8");
+  const originalObservabilityRuntime = readFileSync(resolve(target, "scripts/observability-paths.mjs"), "utf8");
   const outsideRuntimeDir = resolve(fixtureRoot, "outside-codex-runtime", "scripts");
   mkdirSync(outsideRuntimeDir, { recursive: true });
   const outsideRunnerPath = resolve(outsideRuntimeDir, "codex-exec-runner.mjs");
@@ -4552,6 +5288,9 @@ EOF
   writeFileSync(resolve(outsideRuntimeDir, "ask-shared.mjs"), originalSharedRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "adapter-runtime-event.mjs"), originalAdapterEventRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "execution-envelope.mjs"), originalEnvelopeRuntime);
+  writeFileSync(resolve(outsideRuntimeDir, "json-schema-validation.mjs"), originalJsonSchemaRuntime);
+  writeFileSync(resolve(outsideRuntimeDir, "codex-risk-approval.mjs"), originalRiskApprovalRuntime);
+  writeFileSync(resolve(outsideRuntimeDir, "observability-paths.mjs"), originalObservabilityRuntime);
   rmSync(targetRunnerScript);
   symlinkSync(outsideRunnerPath, targetRunnerScript);
   const symlinkRunnerResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
@@ -4611,6 +5350,39 @@ exit 9
   assertRuntimeFail("codex runner preserves prior output on process failure", failedOutputResult, "codex exec exited 9");
   if (readFileSync(failedOutputPath, "utf8") !== "previous successful output\n") {
     throw new Error("codex runner must preserve the previous official output when Codex exits non-zero");
+  }
+
+  const recordStorePath = resolve(target, ".agent-spectrum-kernel/runtime/execution-envelopes");
+  const recordsBeforeInvalidResult = existsSync(recordStorePath) ? readdirSync(recordStorePath).sort() : [];
+  const fakeInvalidStructuredCodex = resolve(target, "fake-invalid-structured-codex");
+  writeFileSync(
+    fakeInvalidStructuredCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+printf 'not-json\n' > "$output"
+`,
+  );
+  chmodSync(fakeInvalidStructuredCodex, 0o755);
+  const invalidStructuredResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--codex-bin",
+    fakeInvalidStructuredCodex,
+    "--output",
+    "codex-preserved-output.md",
+  ]);
+  assertRuntimeFail("codex runner preserves prior output on invalid structured result", invalidStructuredResult, "Codex structured result is invalid JSON");
+  if (
+    readFileSync(failedOutputPath, "utf8") !== "previous successful output\n" ||
+    JSON.stringify(existsSync(recordStorePath) ? readdirSync(recordStorePath).sort() : []) !== JSON.stringify(recordsBeforeInvalidResult)
+  ) {
+    throw new Error("invalid structured control must preserve the prior official output and publish no Envelope record");
   }
 
   const mismatchResult = runRepoScript([targetRunnerScript, "--target", target, "--prompt", "skill-investigate.md", "--mode", "implementation", "--codex-bin", fakeCodex]);
@@ -4682,6 +5454,27 @@ exit 9
   if (!weakResult.stdout.includes("Codex runner: insufficient_evidence") || !weakResult.stdout.includes("Sensor status: not run") || !weakResult.stdout.includes("Evidence level: runtime_detected")) {
     throw new Error(`codex runner should normalize weak output as insufficient evidence\n${weakResult.stdout}\n${weakResult.stderr}`);
   }
+
+  const outsideRecordStore = resolve(fixtureRoot, "outside-codex-envelope-records");
+  rmSync(recordStorePath, { recursive: true, force: true });
+  mkdirSync(outsideRecordStore, { recursive: true });
+  symlinkSync(outsideRecordStore, recordStorePath);
+  const recordStoreEscapeResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--codex-bin",
+    fakeCodex,
+    "--output",
+    "codex-record-store-escape.md",
+  ]);
+  assertRuntimeFail("codex runner rejects Envelope record store symlink escape", recordStoreEscapeResult, "Execution Envelope record store escapes runtime-owned storage through a symbolic link");
+  if (existsSync(resolve(target, "codex-record-store-escape.md")) || readdirSync(outsideRecordStore).length !== 0) {
+    throw new Error("Codex runner must not publish output or a record through a symlinked runtime store");
+  }
+  rmSync(recordStorePath);
 
   const missingPromptResult = runRepoScript([targetRunnerScript, "--target", target, "--prompt", "missing.md", "--codex-bin", fakeCodex]);
   assertRuntimeFail("codex runner missing prompt preflight", missingPromptResult, "prompt has no validated execution profile");
@@ -4833,64 +5626,195 @@ ${validEnvelopeBlock}
   const reviewPass = resolve(target, "review-pass.txt");
   writeFileSync(
     reviewPass,
-    `Change signals:
-- docs_output_change: docs output fixture changed
-
-Required gates:
-- review-output-quality: output contract review; triggered by docs_output_change
-
-Skipped heavy gates:
-- review-adversarial-risk: no security or misuse signal; changed file is docs-only
-
-Missing evidence:
-- none
-
-Decision:
-- approve with comments
-
-Blocking evidence:
-- none
-
-Passed required gates:
-- review-automated-gate - focused validation
-
-Insufficient evidence:
-- none
-
-Non-blocking follow-ups:
-- none
-
-Residual risk:
-- none
-${validEnvelopeBlock}
-`,
+    reviewFixture({
+      additionalGates: "- review-output-quality: status=pass; evidence=docs output fixture; signals=docs_output_change",
+    }),
   );
-  const reviewPassResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", reviewPass]);
+  const reviewPassResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", reviewPass, "--required-gate", "review-output-quality", "--observed-signal", "docs_output_change"]);
   assertRuntimePass("sensors review pass", reviewPassResult);
   if (!reviewPassResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`review contract fixture should pass sensors\n${reviewPassResult.stdout}`);
   }
 
+  const missingRequiredGate = resolve(target, "review-missing-required-gate.txt");
+  writeFileSync(missingRequiredGate, reviewFixture());
+  const missingRequiredGateResult = runRepoScript([
+    sensorsScript,
+    "--target", target,
+    "--mode", "review",
+    "--input", missingRequiredGate,
+    "--required-gate", "review-adversarial-risk",
+  ]);
+  assertRuntimePass("required additional gate without an observed signal is report-only fail", missingRequiredGateResult);
+  if (!missingRequiredGateResult.stdout.includes("ASK sensors: fail") || !missingRequiredGateResult.stdout.includes("do not match the canonical observed-signal route")) {
+    throw new Error(`a bare required gate with no result must fail review sensors\n${missingRequiredGateResult.stdout}`);
+  }
+
+  const mismatchedGateOutput = resolve(target, "review-mismatched-gate.txt");
+  writeFileSync(mismatchedGateOutput, reviewFixture({
+    additionalGates: "- review-adversarial-risk: status=pass; evidence=wrong route fixture; signals=docs_output_change",
+  }));
+  const mismatchedGateResult = runRepoScript([
+    sensorsScript,
+    "--target", target,
+    "--mode", "review",
+    "--input", mismatchedGateOutput,
+    "--required-gate", "review-output-quality",
+    "--observed-signal", "docs_output_change",
+  ]);
+  assertRuntimePass("untriggered additional gate result is report-only fail", mismatchedGateResult);
+  if (!mismatchedGateResult.stdout.includes("ASK sensors: fail") || !mismatchedGateResult.stdout.includes("order or selection is invalid")) {
+    throw new Error(`an untriggered or mismatched gate result must fail review sensors\n${mismatchedGateResult.stdout}`);
+  }
+
   const quotedLegacyReviewOutput = resolve(target, "quoted-legacy-review-output.txt");
   writeFileSync(
     quotedLegacyReviewOutput,
-    `Change signals:\n- docs_output_change: docs output fixture changed\n\nRequired gates:\n- review-output-quality: output contract review; triggered by docs_output_change\n\nSkipped heavy gates:\n- review-adversarial-risk: no security or misuse signal\n\nMissing evidence:\n- none\n\nDecision:\n- approve\n\nBlocking evidence:\n- none\n- The quoted legacy label is \"Layer summary:\" and must not be interpreted as a heading.\n\nPassed required gates:\n- review-output-quality - output contract checked\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- none\n\nResidual risk:\n- none\n\n\`\`\`text\nLayer summary:\n- legacy example inside a code fence\n\`\`\`\n\n${validEnvelopeBlock}`,
+    reviewFixture({
+      additionalGates: "- review-output-quality: status=pass; evidence=docs output fixture; signals=docs_output_change",
+      suffix: `The quoted legacy label is "Layer summary:" and must not be interpreted as a heading.
+
+\`\`\`text
+Layer summary:
+- legacy example inside a code fence
+\`\`\``,
+    }),
   );
-  const quotedLegacyReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", quotedLegacyReviewOutput]);
+  const quotedLegacyReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", quotedLegacyReviewOutput, "--required-gate", "review-output-quality", "--observed-signal", "docs_output_change"]);
   assertRuntimePass("quoted and fenced legacy heading is ignored", quotedLegacyReviewResult);
   if (!quotedLegacyReviewResult.stdout.includes("ASK sensors: pass")) {
-    throw new Error(`quoted/fenced legacy heading should not fail signal-first sensor\n${quotedLegacyReviewResult.stdout}`);
+    throw new Error(`quoted/fenced legacy heading should not fail the baseline-first sensor\n${quotedLegacyReviewResult.stdout}`);
   }
 
   const separatedReviewOutput = resolve(target, "separated-review-output.txt");
   writeFileSync(
     separatedReviewOutput,
-    `Change signals:\n- docs_output_change: output contract changed\n\nRequired gates:\n- review-output-quality: output contract review; triggered by docs_output_change\n\nSkipped heavy gates:\n- review-adversarial-risk: no security or misuse signal\n\nMissing evidence:\n- none\n\nDecision:\n- request changes\n\nBlocking evidence:\n- [major] review-output-quality - output contract is incomplete\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- IMP candidate: improve documentation example\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`,
+    reviewFixture({
+      additionalGates: "- review-output-quality: status=fail; evidence=output contract fixture; signals=docs_output_change",
+      findings: `- Finding ID: F-FIXTURE-001
+  Severity: major
+  Merge blocker: true
+  Practical impact: output consumers receive an incomplete contract
+  Trigger or failure trace: docs_output_change -> review-output-quality
+  Evidence location: fixture/output-contract
+  Required post-fix condition: complete the output contract`,
+      decision: "block",
+    }),
   );
-  const separatedReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", separatedReviewOutput]);
-  assertRuntimePass("review blocker and follow-up sections stay separate", separatedReviewResult);
+  const separatedReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", separatedReviewOutput, "--required-gate", "review-output-quality", "--required-gate", "review-final-merge-gate", "--observed-signal", "docs_output_change"]);
+  assertRuntimePass("review finding inventory and conditional decision", separatedReviewResult);
   if (!separatedReviewResult.stdout.includes("ASK sensors: pass")) {
-    throw new Error(`review blocker/follow-up separation fixture should pass sensors\n${separatedReviewResult.stdout}`);
+    throw new Error(`review finding inventory and requested decision should pass sensors\n${separatedReviewResult.stdout}`);
+  }
+
+  const decisionSemanticCases = [
+    {
+      label: "baseline fail plus approve",
+      output: reviewFixture({ baselineStatus: "fail", decision: "approve" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "baseline insufficient evidence plus approve",
+      output: reviewFixture({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: current target is unavailable; inspect the exact target", decision: "approve" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "additional gate fail plus approve",
+      output: reviewFixture({ additionalGates: "- review-output-quality: status=fail; evidence=output contract regression; signals=docs_output_change", decision: "approve" }),
+      args: ["--required-gate", "review-output-quality", "--observed-signal", "docs_output_change"],
+      expectedStatus: "fail",
+    },
+    {
+      label: "additional gate insufficient evidence plus approve",
+      output: reviewFixture({
+        additionalGates: "- review-output-quality: status=insufficient_evidence; evidence=rendered output unavailable; signals=docs_output_change",
+        missingEvidence: "- review-output-quality: rendered output unavailable; render the exact candidate",
+        decision: "approve",
+      }),
+      args: ["--required-gate", "review-output-quality", "--observed-signal", "docs_output_change"],
+      expectedStatus: "fail",
+    },
+    {
+      label: "missing evidence plus approve",
+      output: reviewFixture({ missingEvidence: "- current CI: final required job is unavailable; run the required job", decision: "approve" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "blocking finding plus approve",
+      output: reviewFixture({
+        findings: `- Finding ID: F-BLOCKING
+  Severity: blocker
+  Merge blocker: true
+  Practical impact: required output is unsafe to merge
+  Trigger or failure trace: final gate -> blocking finding
+  Evidence location: fixture/blocking
+  Required post-fix condition: resolve the finding`,
+        decision: "approve",
+      }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "all required gates pass plus approve",
+      output: reviewFixture({ additionalGates: "- review-output-quality: status=pass; evidence=exact rendered output; signals=docs_output_change", decision: "approve" }),
+      args: ["--required-gate", "review-output-quality", "--observed-signal", "docs_output_change"],
+      expectedStatus: "pass",
+    },
+    {
+      label: "clean approve with comments alias is rejected",
+      output: reviewFixture({ decision: "approve with comments" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "approve with comments rejects a failing baseline",
+      output: reviewFixture({ baselineStatus: "fail", decision: "approve with comments" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "request changes remains valid",
+      output: reviewFixture({ baselineStatus: "fail", decision: "request changes" }),
+      expectedStatus: "pass",
+    },
+    {
+      label: "block without a blocking Finding is rejected",
+      output: reviewFixture({ baselineStatus: "fail", decision: "block" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "insufficient evidence decision remains valid",
+      output: reviewFixture({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: current target is unavailable; inspect the exact target", decision: "insufficient evidence" }),
+      expectedStatus: "pass",
+    },
+    {
+      label: "unknown decision is rejected",
+      output: reviewFixture({ decision: "ship it" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "ambiguous missing evidence inventory cannot approve",
+      output: reviewFixture({ missingEvidence: "- none\n- current CI: unavailable; run CI", decision: "approve" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "uninterpretable finding inventory cannot approve",
+      output: reviewFixture({ findings: "- Finding ID: F-UNKNOWN\n  Merge blocker: unknown", decision: "approve" }),
+      expectedStatus: "fail",
+    },
+  ];
+  for (const [index, fixture] of decisionSemanticCases.entries()) {
+    const outputPath = resolve(target, `review-decision-semantic-${index}.txt`);
+    writeFileSync(outputPath, fixture.output);
+    const result = runRepoScript([
+      sensorsScript,
+      "--target", target,
+      "--mode", "review",
+      "--input", outputPath,
+      "--required-gate", "review-final-merge-gate",
+      ...(fixture.args ?? []),
+    ]);
+    assertRuntimePass(`review decision semantics: ${fixture.label}`, result);
+    if (!result.stdout.includes(`ASK sensors: ${fixture.expectedStatus}`)) {
+      throw new Error(`review decision semantic case '${fixture.label}' expected ${fixture.expectedStatus}\n${result.stdout}`);
+    }
   }
 
   const legacyReviewOutput = resolve(target, "legacy-review-output.txt");
@@ -4901,7 +5825,7 @@ ${validEnvelopeBlock}
   const legacyReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", legacyReviewOutput]);
   assertRuntimePass("legacy fixed layer summary is rejected", legacyReviewResult);
   if (!legacyReviewResult.stdout.includes("fixed layer summary contract")) {
-    throw new Error(`legacy review output should be rejected by the signal-first sensor\n${legacyReviewResult.stdout}`);
+    throw new Error(`legacy review output should be rejected by the baseline-first sensor\n${legacyReviewResult.stdout}`);
   }
 
   const claudeReviewCommand = readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/commands/skill-review.md"), "utf8");
@@ -4916,9 +5840,9 @@ ${validEnvelopeBlock}
   ];
   for (const adapterPath of distributedReviewAdapters) {
     const adapterText = readFileSync(resolve(repoRoot, adapterPath), "utf8");
-    for (const section of ["Change signals:", "Required gates:", "Skipped heavy gates:", "Missing evidence:"]) {
+    for (const section of ["Baseline review:", "Additional required gates:", "Missing evidence:", "Findings:"]) {
       if (!adapterText.includes(section)) {
-        throw new Error(`${adapterPath} must project the signal-first review route section: ${section}`);
+        throw new Error(`${adapterPath} must project the baseline-first review route section: ${section}`);
       }
     }
     const registryReference = adapterPath.startsWith("adapters/claude-code/plugin/")
@@ -4928,9 +5852,13 @@ ${validEnvelopeBlock}
       throw new Error(`${adapterPath} must reference the controlled signal registry: ${registryReference}`);
     }
   }
+  const claudeReviewFixture = reviewFixture({
+    additionalGates: "- review-automated-gate: status=pass_with_comments; evidence=focused validation with non-blocking comments; signals=automated_evidence_required",
+    decision: "approve with comments",
+  });
   const claudeOutput = resolve(target, "claude-review-output.txt");
-  writeFileSync(claudeOutput, `Change signals:\n- verification: focused validation is available\n\nRequired gates:\n- review-automated-gate: regression evidence; triggered by verification\n\nSkipped heavy gates:\n- review-adversarial-risk: no security or misuse signal\n\nMissing evidence:\n- none\n\nDecision:\n- approve with comments\n\nBlocking evidence:\n- none\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- none\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`);
-  const claudeOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeOutput]);
+  writeFileSync(claudeOutput, claudeReviewFixture);
+  const claudeOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeOutput, "--required-gate", "review-automated-gate", "--required-gate", "review-final-merge-gate", "--observed-signal", "automated_evidence_required"]);
   assertRuntimePass("Claude adapter output smoke", claudeOutputResult);
   if (!claudeOutputResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`Claude adapter output smoke should pass shared envelope validation\n${claudeOutputResult.stdout}`);
@@ -4940,9 +5868,9 @@ ${validEnvelopeBlock}
   const claudePromptMatch = claudeGithubAction.match(/\n {10}prompt: \|\n([\s\S]*?)\n {10}claude_args:/);
   if (!claudePromptMatch) throw new Error("Claude GitHub Actions prompt block is missing");
   const claudePrompt = claudePromptMatch[1].split("\n").map((line) => line.startsWith("            ") ? line.slice(12) : line).join("\n");
-  for (const section of ["Change signals:", "Required gates:", "Skipped heavy gates:", "Missing evidence:"]) {
+  for (const section of ["Baseline review:", "Additional required gates:", "Missing evidence:", "Findings:"]) {
     if (!claudePrompt.includes(section)) {
-      throw new Error(`Claude GitHub Actions prompt must require the signal-first review route section: ${section}`);
+      throw new Error(`Claude GitHub Actions prompt must require the baseline-first review route section: ${section}`);
     }
   }
   const claudeActionEnvelope = inspectExecutionEnvelope(claudePrompt);
@@ -4953,8 +5881,8 @@ ${validEnvelopeBlock}
     throw new Error("Claude GitHub Actions adapter must require a fenced JSON Execution Envelope");
   }
   const claudeGithubOutput = resolve(target, "claude-github-action-output.txt");
-  writeFileSync(claudeGithubOutput, `Change signals:\n- verification: focused validation is available\n\nRequired gates:\n- review-automated-gate: regression evidence; triggered by verification\n\nSkipped heavy gates:\n- review-adversarial-risk: no security or misuse signal\n\nMissing evidence:\n- none\n\nDecision:\n- approve with comments\n\nBlocking evidence:\n- none\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- none\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`);
-  const claudeGithubOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeGithubOutput]);
+  writeFileSync(claudeGithubOutput, claudeReviewFixture);
+  const claudeGithubOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeGithubOutput, "--required-gate", "review-automated-gate", "--required-gate", "review-final-merge-gate", "--observed-signal", "automated_evidence_required"]);
   assertRuntimePass("Claude GitHub Actions adapter output smoke", claudeGithubOutputResult);
   if (!claudeGithubOutputResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`Claude GitHub Actions adapter output smoke should pass shared envelope validation\n${claudeGithubOutputResult.stdout}`);
@@ -4965,8 +5893,8 @@ ${validEnvelopeBlock}
     throw new Error("Claude plugin review skill must require the shared fenced JSON Execution Envelope");
   }
   const claudePluginOutput = resolve(target, "claude-plugin-review-output.txt");
-  writeFileSync(claudePluginOutput, `Change signals:\n- verification: focused validation is available\n\nRequired gates:\n- review-automated-gate: regression evidence; triggered by verification\n\nSkipped heavy gates:\n- review-adversarial-risk: no security or misuse signal\n\nMissing evidence:\n- none\n\nDecision:\n- approve with comments\n\nBlocking evidence:\n- none\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- none\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`);
-  const claudePluginOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudePluginOutput]);
+  writeFileSync(claudePluginOutput, claudeReviewFixture);
+  const claudePluginOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudePluginOutput, "--required-gate", "review-automated-gate", "--required-gate", "review-final-merge-gate", "--observed-signal", "automated_evidence_required"]);
   assertRuntimePass("Claude plugin adapter output smoke", claudePluginOutputResult);
   if (!claudePluginOutputResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`Claude plugin adapter output smoke should pass shared envelope validation\n${claudePluginOutputResult.stdout}`);
@@ -4975,10 +5903,19 @@ ${validEnvelopeBlock}
   const pluginOnlyRoot = resolve(fixtureRoot, "claude-plugin-only-package");
   for (const relativePath of [
     "skills/review-pr/SKILL.md",
+    "skills/adoption-report/SKILL.md",
+    "skills/ledger-refresh/SKILL.md",
+    "skills/implementation-context-check/SKILL.md",
+    "skills/evidence-ledger/SKILL.md",
+    "contracts/claim-evidence-status-contract.md",
     "contracts/execution-envelope-contract.md",
     "contracts/review-signal-gate-map.json",
+    "schemas/claim-evidence-status.schema.json",
+    "schemas/codex-risk-action.schema.json",
+    "schemas/codex-risk-approval-request.schema.json",
     "schemas/execution-envelope.schema.json",
     "schemas/metrics-event.schema.json",
+    "scripts/claim-evidence-status.mjs",
   ]) {
     const sourcePath = resolve(repoRoot, "adapters/claude-code/plugin", relativePath);
     const targetPath = resolve(pluginOnlyRoot, relativePath);
@@ -4988,13 +5925,40 @@ ${validEnvelopeBlock}
   const pluginSkill = readFileSync(resolve(pluginOnlyRoot, "skills/review-pr/SKILL.md"), "utf8");
   const pluginContract = resolve(pluginOnlyRoot, "contracts/execution-envelope-contract.md");
   const pluginSignalRegistry = resolve(pluginOnlyRoot, "contracts/review-signal-gate-map.json");
+  const pluginClaimContract = resolve(pluginOnlyRoot, "contracts/claim-evidence-status-contract.md");
+  const pluginClaimSchema = resolve(pluginOnlyRoot, "schemas/claim-evidence-status.schema.json");
+  const pluginClaimNormalizer = resolve(pluginOnlyRoot, "scripts/claim-evidence-status.mjs");
+  const pluginEvidenceSkill = resolve(pluginOnlyRoot, "skills/evidence-ledger/SKILL.md");
   const pluginSchema = resolve(pluginOnlyRoot, "schemas/execution-envelope.schema.json");
-  if (!pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md") || !pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json") || !existsSync(pluginContract) || !existsSync(pluginSignalRegistry) || !existsSync(pluginSchema)) {
-    throw new Error("Claude plugin-only package must contain resolvable contract, signal registry, and schema assets");
+  if (
+    !pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md") ||
+    !pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json") ||
+    !pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/claim-evidence-status-contract.md") ||
+    !pluginSkill.includes("high_stakes_readiness") ||
+    !pluginSkill.includes("formal_ledger") ||
+    !pluginSkill.includes("/ai-skills:evidence-ledger") ||
+    !existsSync(pluginContract) ||
+    !existsSync(pluginSignalRegistry) ||
+    !existsSync(pluginClaimContract) ||
+    !existsSync(pluginClaimSchema) ||
+    !existsSync(pluginClaimNormalizer) ||
+    !existsSync(pluginEvidenceSkill) ||
+    !existsSync(pluginSchema)
+  ) {
+    throw new Error("Claude plugin-only package must contain resolvable execution and claim contract, Skill, normalizer, signal registry, and schema assets");
   }
   const pluginRegistry = JSON.parse(readFileSync(pluginSignalRegistry, "utf8"));
   if (!pluginRegistry.signal_to_gates?.public_api_change?.includes("review-architecture-impact") || !pluginRegistry.signal_to_gates?.generated_output_failure_mode?.includes("review-adversarial-risk")) {
     throw new Error("Claude plugin-only package must expose the controlled signal registry mapping");
+  }
+  const pluginClaim = JSON.parse(readFileSync(pluginClaimSchema, "utf8"));
+  if (
+    JSON.stringify(pluginClaim.enum) !== JSON.stringify(["Verified", "Supported", "Hypothesis", "Unknown", "Falsified"]) ||
+    pluginClaim["x-ask-contract"]?.ref !== "ask.claim-evidence-status@1.0.0" ||
+    pluginClaim["x-ask-contract"]?.inline_default !== true ||
+    JSON.stringify(pluginClaim["x-ask-contract"]?.formal_ledger?.trigger_ids) !== JSON.stringify(["explicit_claim_audit", "multiple_material_claims", "high_stakes_readiness", "cross_artifact_synthesis", "stable_claim_ids"])
+  ) {
+    throw new Error("Claude plugin-only package must preserve the exact claim evidence taxonomy and formal trigger contract");
   }
   const pluginOnlyEnvelope = inspectExecutionEnvelope(validEnvelopeBlock, { schemaPath: pluginSchema });
   if (pluginOnlyEnvelope.status !== "parsed") {
@@ -5002,9 +5966,9 @@ ${validEnvelopeBlock}
   }
 
   const promptContracts = [
-    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nUnknown / not verified:\n- External runtime.\n\nNext:\n- Continue investigation.\n\n" + validEnvelopeBlock],
+    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n- Unknown: external runtime unavailable.\n\n" + validEnvelopeBlock],
     ["verification", "Verification Contract:\n- Artifact ID: VER-FIXTURE\n- Behavior to prove: fixture.\n\nEvidence:\n- Verification Contract ref: VER-FIXTURE\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\n" + validEnvelopeBlock],
-    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nStop condition:\n- Missing evidence.\n\n" + insufficientEvidenceEnvelopeBlock],
+    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nUnverified evidence:\n- External runtime.\n\n" + insufficientEvidenceEnvelopeBlock],
   ];
   for (const [mode, content] of promptContracts) {
     const input = resolve(target, `${mode}-contract.txt`);
@@ -5014,6 +5978,80 @@ ${validEnvelopeBlock}
     if (!contractResult.stdout.includes("ASK sensors: pass")) {
       throw new Error(`${mode} prompt contract should pass sensors\n${contractResult.stdout}`);
     }
+  }
+
+  const compactVerificationInput = resolve(target, "verification-compact-contract.txt");
+  writeFileSync(compactVerificationInput, `Proof:
+- Behavior: localized fixture behavior.
+- Focused check: node scripts/test-validate-repo.mjs
+- Result or missing evidence: pass.
+- Broader check required when: scope expands.
+
+Evidence:
+- Selected proof artifact ref: PROOF-FIXTURE
+- command: node scripts/test-validate-repo.mjs
+  result: pass
+
+${validEnvelopeBlock}`);
+  const compactVerificationResult = runRepoScript([sensorsScript, "--target", target, "--mode", "verification", "--input", compactVerificationInput]);
+  assertRuntimePass("sensors Compact Proof contract pass", compactVerificationResult);
+  if (!compactVerificationResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`Compact Proof prompt contract should pass sensors\n${compactVerificationResult.stdout}`);
+  }
+
+  const ambiguousVerificationInput = resolve(target, "verification-ambiguous-contract.txt");
+  writeFileSync(ambiguousVerificationInput, `Proof:
+- Behavior: ambiguous fixture.
+
+Verification Contract:
+- Artifact ID: VER-AMBIGUOUS
+
+Evidence:
+- command: node scripts/test-validate-repo.mjs
+  result: pass
+
+${validEnvelopeBlock}`);
+  const ambiguousVerificationResult = runRepoScript([sensorsScript, "--target", target, "--mode", "verification", "--input", ambiguousVerificationInput]);
+  assertRuntimePass("sensors ambiguous proof path is report-only", ambiguousVerificationResult);
+  if (!ambiguousVerificationResult.stdout.includes("ASK sensors: fail") || !ambiguousVerificationResult.stdout.includes("exactly one selected proof section")) {
+    throw new Error(`ambiguous proof-path output must fail the completion sensor\n${ambiguousVerificationResult.stdout}`);
+  }
+
+  const incidentalProofInput = resolve(target, "verification-incidental-proof.txt");
+  writeFileSync(incidentalProofInput, `The prose mentions Proof: but does not select that top-level path.
+
+Evidence:
+- command: node scripts/test-validate-repo.mjs
+  result: pass
+
+${validEnvelopeBlock}`);
+  const incidentalProofResult = runRepoScript([sensorsScript, "--target", target, "--mode", "verification", "--input", incidentalProofInput]);
+  assertRuntimePass("sensors incidental proof label is report-only", incidentalProofResult);
+  if (!incidentalProofResult.stdout.includes("ASK sensors: fail") || !incidentalProofResult.stdout.includes("exactly one selected proof section")) {
+    throw new Error(`incidental Proof label must not satisfy the completion sensor\n${incidentalProofResult.stdout}`);
+  }
+
+  const fencedFormalLabelInput = resolve(target, "verification-fenced-formal-label.txt");
+  writeFileSync(fencedFormalLabelInput, `Proof:
+- Behavior: localized fixture behavior.
+- Focused check: node scripts/test-validate-repo.mjs
+- Result or missing evidence: pass.
+- Broader check required when: scope expands.
+
+Evidence:
+- command: node scripts/test-validate-repo.mjs
+  result: pass
+
+\`\`\`text
+Verification Contract:
+- This is quoted reference material, not the selected path.
+\`\`\`
+
+${validEnvelopeBlock}`);
+  const fencedFormalLabelResult = runRepoScript([sensorsScript, "--target", target, "--mode", "verification", "--input", fencedFormalLabelInput]);
+  assertRuntimePass("sensors fenced formal label is ignored", fencedFormalLabelResult);
+  if (!fencedFormalLabelResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`fenced Verification Contract label must not make Compact Proof ambiguous\n${fencedFormalLabelResult.stdout}`);
   }
 
   const riskInput = resolve(target, "risk.txt");
@@ -5335,8 +6373,16 @@ try {
     if (issues.length > 0) throw new Error(`${profile.profile_id} should pass semantic profile validation\n${issues.join("\n")}`);
   }
   const codexCompactProfile = adapterProfileFixture.profiles.find((profile) => profile.adapter_id === "codex");
-  if (!codexCompactProfile || codexCompactProfile.schema_version !== "1.1.0" || !Array.isArray(codexCompactProfile.rendering.compact_profiles)) {
-    throw new Error("Codex compact metadata must be represented by shared adapter runtime profile schema revision 1.1.0");
+  const claudeCompactProfile = adapterProfileFixture.profiles.find((profile) => profile.adapter_id === "claude_code");
+  for (const profile of [claudeCompactProfile, codexCompactProfile]) {
+    if (!profile || profile.schema_version !== "1.2.0" || !Array.isArray(profile.rendering.compact_profiles)) {
+      throw new Error("Both adapters must represent fixed-entry metadata with shared adapter runtime profile schema revision 1.2.0");
+    }
+    for (const compactProfile of profile.rendering.compact_profiles) {
+      if (!Array.isArray(compactProfile.canonical_asset_refs) || compactProfile.canonical_asset_refs.length !== 2) {
+        throw new Error(`${profile.adapter_id} compact profile must bind the two exact registered fixed-entry Asset references`);
+      }
+    }
   }
   const legacySchemaWithCompactMetadata = JSON.parse(JSON.stringify(codexCompactProfile));
   legacySchemaWithCompactMetadata.schema_version = "1.0.0";
@@ -5347,14 +6393,14 @@ try {
   const revisedSchemaWithoutCompactMetadata = JSON.parse(JSON.stringify(codexCompactProfile));
   delete revisedSchemaWithoutCompactMetadata.rendering.compact_profiles;
   const revisedSchemaWithoutCompactMetadataIssues = inspectAdapterRuntimeProfile(revisedSchemaWithoutCompactMetadata, { root: repoRoot });
-  if (!revisedSchemaWithoutCompactMetadataIssues.includes("schema_version 1.1.0 requires rendering.compact_profiles")) {
-    throw new Error(`schema revision 1.1.0 must require compact metadata\n${revisedSchemaWithoutCompactMetadataIssues.join("\n")}`);
+  if (!revisedSchemaWithoutCompactMetadataIssues.includes("schema_version 1.2.0 requires rendering.compact_profiles")) {
+    throw new Error(`schema revision 1.2.0 must require compact metadata\n${revisedSchemaWithoutCompactMetadataIssues.join("\n")}`);
   }
   const driftedCompactMetadata = JSON.parse(JSON.stringify(codexCompactProfile));
   driftedCompactMetadata.rendering.compact_profiles[0].requested_contracts.push("unsupported-child-contract");
   const driftedCompactMetadataIssues = inspectAdapterRuntimeProfile(driftedCompactMetadata, { root: repoRoot });
-  if (!driftedCompactMetadataIssues.includes("rendering.compact_profiles must exactly match the shared Codex projection plan")) {
-    throw new Error(`compact metadata must remain derived from the shared Codex projection plan\n${driftedCompactMetadataIssues.join("\n")}`);
+  if (!driftedCompactMetadataIssues.includes("rendering.compact_profiles must exactly match the shared adapter projection plan")) {
+    throw new Error(`compact metadata must remain derived from the shared adapter projection plan\n${driftedCompactMetadataIssues.join("\n")}`);
   }
   const invalidDowngradeProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
   invalidDowngradeProfile.capabilities.find((capability) => capability.capability_id === "lifecycle_hooks").downgrade_behavior = "none";
@@ -5550,6 +6596,67 @@ try {
     }
   }
 
+  const validVerificationProofPolicyRoot = cloneVerificationProofPolicyFixture("valid-verification-proof-policy");
+  assert.deepEqual(inspectVerificationProofPolicyFixture(validVerificationProofPolicyRoot).issues, [], "valid verification proof policy projection must pass");
+
+  const missingVerificationProofSchemaRoot = cloneVerificationProofPolicyFixture("missing-verification-proof-schema");
+  rmSync(resolve(missingVerificationProofSchemaRoot, "schemas/verification-proof-policy.schema.json"));
+  assertVerificationProofPolicyFailure(
+    "missing verification proof policy schema",
+    missingVerificationProofSchemaRoot,
+    "required verification proof policy path is missing: schemas/verification-proof-policy.schema.json",
+  );
+
+  const expandedVerificationProofTriggerRoot = cloneVerificationProofPolicyFixture("expanded-verification-proof-trigger");
+  {
+    const schemaPath = resolve(expandedVerificationProofTriggerRoot, "schemas/verification-proof-policy.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema["x-ask-contract"].formal_trigger_ids.push("invented_trigger");
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertVerificationProofPolicyFailure(
+    "expanded verification proof trigger vocabulary",
+    expandedVerificationProofTriggerRoot,
+    "verification proof policy formal trigger IDs differ from the canonical module",
+  );
+
+  const thirdVerificationProofPathRoot = cloneVerificationProofPolicyFixture("third-verification-proof-path");
+  {
+    const schemaPath = resolve(thirdVerificationProofPathRoot, "schemas/verification-proof-policy.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema.oneOf.push({ $ref: "#/$defs/unboundedProof" });
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertVerificationProofPolicyFailure(
+    "third verification proof schema path",
+    thirdVerificationProofPathRoot,
+    "verification proof policy schema root alternatives must remain selection, Compact Proof, and transition only",
+  );
+
+  const driftedVerificationProofControlRoot = cloneVerificationProofPolicyFixture("drifted-verification-proof-control");
+  {
+    const controlPath = resolve(driftedVerificationProofControlRoot, "schemas/compact-profile-control-map.json");
+    const control = JSON.parse(readFileSync(controlPath, "utf8"));
+    control.controls.verification.proof_policy_ref = "ask.verification-proof-policy@2.0.0";
+    writeFileSync(controlPath, `${JSON.stringify(control, null, 2)}\n`);
+  }
+  assertVerificationProofPolicyFailure(
+    "drifted verification proof control ref",
+    driftedVerificationProofControlRoot,
+    "compact profile verification control must project the canonical policy ref",
+  );
+
+  const missingCompactAdapterPathRoot = cloneVerificationProofPolicyFixture("missing-compact-adapter-path");
+  {
+    const commandPath = resolve(missingCompactAdapterPathRoot, "adapters/claude-code/project/.claude/commands/skill-verify.md");
+    writeFileSync(commandPath, readFileSync(commandPath, "utf8").replaceAll("compact_proof", "localized_proof"));
+  }
+  assertVerificationProofPolicyFailure(
+    "missing Compact Proof adapter path",
+    missingCompactAdapterPathRoot,
+    "adapters/claude-code/project/.claude/commands/skill-verify.md must project verification proof policy token: compact_proof",
+  );
+
   const validRoot = cloneFixture("valid");
   assertPass("valid fixture", validRoot);
 
@@ -5583,6 +6690,294 @@ try {
   const missingSchemaRoot = cloneFixture("missing-schema");
   rmSync(resolve(missingSchemaRoot, "schemas/metrics-event.schema.json"));
   assertFail("missing required schema", missingSchemaRoot, "required schema is missing");
+
+  const expandedClaimEvidenceTaxonomyRoot = cloneFixture("expanded-claim-evidence-taxonomy");
+  {
+    const schemaPath = resolve(expandedClaimEvidenceTaxonomyRoot, "schemas/claim-evidence-status.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema.enum.push("weak");
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertFail(
+    "expanded claim evidence taxonomy",
+    expandedClaimEvidenceTaxonomyRoot,
+    "canonical schema enum must be exactly Verified, Supported, Hypothesis, Unknown, Falsified",
+  );
+
+  const copiedClaimEvidenceTaxonomyRoot = cloneFixture("copied-claim-evidence-taxonomy");
+  {
+    const schemaPath = resolve(copiedClaimEvidenceTaxonomyRoot, "schemas/domain-rule-ledger-entry.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema.properties.evidence_status = { type: "string", enum: ["Verified", "Supported"] };
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertFail(
+    "copied claim evidence taxonomy",
+    copiedClaimEvidenceTaxonomyRoot,
+    "schemas/domain-rule-ledger-entry.schema.json evidence_status must reference claim-evidence-status.schema.json without copying an enum",
+  );
+
+  const optionalClaimAuthorityRoot = cloneFixture("optional-claim-authority");
+  {
+    const schemaPath = resolve(optionalClaimAuthorityRoot, "schemas/domain-rule-ledger-entry.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema.required = schema.required.filter((field) => field !== "authority_status");
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertFail(
+    "optional claim authority separation",
+    optionalClaimAuthorityRoot,
+    "schemas/domain-rule-ledger-entry.schema.json must define and require separated field authority_status",
+  );
+
+  const validClaimPluginProjectionRoot = cloneClaimEvidencePluginFixture("valid-plugin-claim-projection");
+  assert.deepEqual(inspectClaimEvidencePluginProjection(validClaimPluginProjectionRoot).issues, [], "valid Claude plugin claim projection must pass");
+
+  const driftedPluginClaimContractRoot = cloneClaimEvidencePluginFixture("drifted-plugin-claim-contract");
+  {
+    const path = resolve(driftedPluginClaimContractRoot, "adapters/claude-code/plugin/contracts/claim-evidence-status-contract.md");
+    writeFileSync(path, `${readFileSync(path, "utf8")}drift\n`);
+  }
+  assertClaimEvidencePluginProjectionFailure(
+    "drifted Claude plugin claim contract",
+    driftedPluginClaimContractRoot,
+    "Claude plugin projection must be byte-identical to docs/claim-evidence-status-contract.md",
+  );
+
+  const missingPluginClaimNormalizerRoot = cloneClaimEvidencePluginFixture("missing-plugin-claim-normalizer");
+  rmSync(resolve(missingPluginClaimNormalizerRoot, "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs"));
+  assertClaimEvidencePluginProjectionFailure(
+    "missing Claude plugin claim normalizer",
+    missingPluginClaimNormalizerRoot,
+    "Claude plugin projection must be byte-identical to scripts/claim-evidence-status.mjs",
+  );
+
+  const weakenedPluginReviewClaimRouteRoot = cloneClaimEvidencePluginFixture("weakened-plugin-review-claim-route");
+  {
+    const path = resolve(weakenedPluginReviewClaimRouteRoot, "adapters/claude-code/plugin/skills/review-pr/SKILL.md");
+    writeFileSync(path, readFileSync(path, "utf8").replace("high_stakes_readiness", "generic_review_claim"));
+  }
+  assertClaimEvidencePluginProjectionFailure(
+    "weakened Claude plugin review claim route",
+    weakenedPluginReviewClaimRouteRoot,
+    "Claude plugin review-pr must preserve claim routing token: high_stakes_readiness",
+  );
+
+  const overactivatedPluginOrdinaryClaimRoot = cloneClaimEvidencePluginFixture("overactivated-plugin-ordinary-claim");
+  {
+    const path = resolve(overactivatedPluginOrdinaryClaimRoot, "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md");
+    writeFileSync(path, readFileSync(path, "utf8").replace("Do not activate", "Always activate"));
+  }
+  assertClaimEvidencePluginProjectionFailure(
+    "overactivated Claude plugin ordinary claim route",
+    overactivatedPluginOrdinaryClaimRoot,
+    "Claude plugin implementation-context-check must preserve claim routing token: Do not activate",
+  );
+
+  const broadenedAssetEvidenceStatusRoot = cloneFixture("broadened-asset-evidence-status");
+  {
+    const schemaPath = resolve(broadenedAssetEvidenceStatusRoot, "schemas/asset-record.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema.$defs.evidenceStatus.$ref = "claim-evidence-status.schema.json#/$defs/lowercase_status";
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertFail(
+    "broadened Asset evidence status",
+    broadenedAssetEvidenceStatusRoot,
+    "schemas/asset-record.schema.json $defs.evidenceStatus must reference claim-evidence-status.schema.json#/$defs/lowercase_observation_status without copying an enum",
+  );
+
+  const detachedEpicEvidenceStatusRoot = cloneFixture("detached-epic-evidence-status");
+  {
+    const schemaPath = resolve(detachedEpicEvidenceStatusRoot, "schemas/epic-admission-decision.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema.$defs.evidenceStatus = { enum: ["verified", "supported", "hypothesis", "unknown", "falsified"] };
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertFail(
+    "detached Epic evidence status",
+    detachedEpicEvidenceStatusRoot,
+    "schemas/epic-admission-decision.schema.json $defs.evidenceStatus must reference claim-evidence-status.schema.json#/$defs/lowercase_status without copying an enum",
+  );
+
+  const missingAssetSchemaRoot = cloneFixture("missing-asset-record-schema");
+  rmSync(resolve(missingAssetSchemaRoot, "schemas/asset-record.schema.json"));
+  assertFail("missing Asset record schema", missingAssetSchemaRoot, "required schema is missing: schemas/asset-record.schema.json");
+
+  const tamperedAssetReferenceRoot = cloneFixture("tampered-asset-registry-reference");
+  {
+    const referencePath = resolve(tamperedAssetReferenceRoot, "docs/fixtures/asset-registry/reference.json");
+    const reference = JSON.parse(readFileSync(referencePath, "utf8"));
+    reference.tampered = true;
+    writeFileSync(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+  }
+  assertFail(
+    "tampered Asset Registry sample reference",
+    tamperedAssetReferenceRoot,
+    "checked-in reference does not match the exact deterministic registry export",
+  );
+
+  const missingPortfolioSchemaRoot = cloneFixture("missing-portfolio-selection-schema");
+  rmSync(resolve(missingPortfolioSchemaRoot, "schemas/portfolio-selection.schema.json"));
+  assertFail(
+    "missing Portfolio selection schema",
+    missingPortfolioSchemaRoot,
+    "required schema is missing: schemas/portfolio-selection.schema.json",
+  );
+
+  const tamperedPortfolioReferenceRoot = cloneFixture("tampered-portfolio-manager-reference");
+  {
+    const referencePath = resolve(tamperedPortfolioReferenceRoot, "docs/fixtures/portfolio-manager/reference.json");
+    const reference = JSON.parse(readFileSync(referencePath, "utf8"));
+    reference.tampered = true;
+    writeFileSync(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+  }
+  assertFail(
+    "tampered Portfolio Manager sample reference",
+    tamperedPortfolioReferenceRoot,
+    "Portfolio Manager sample reference uses an unknown or missing field",
+  );
+
+  const orphanPortfolioObjectRoot = cloneFixture("orphan-portfolio-manager-object");
+  putContentAddressedJson({
+    storeRoot: resolve(orphanPortfolioObjectRoot, "docs/fixtures/portfolio-manager/store"),
+    artifact: { schema_version: "1.0.0", object_kind: "portfolio_fixture_orphan" },
+  });
+  assertFail(
+    "orphan Portfolio Manager sample object",
+    orphanPortfolioObjectRoot,
+    "sample store contains an orphan or omits an exact reachable Portfolio/Registry object",
+  );
+
+  const missingEvolutionSchemaRoot = cloneFixture("missing-evolution-candidate-schema");
+  rmSync(resolve(missingEvolutionSchemaRoot, "schemas/evolution-candidate.schema.json"));
+  assertFail(
+    "missing Evolution candidate schema",
+    missingEvolutionSchemaRoot,
+    "required schema is missing: schemas/evolution-candidate.schema.json",
+  );
+
+  const tamperedEvolutionReferenceRoot = cloneFixture("tampered-evolution-reference");
+  {
+    const referencePath = resolve(tamperedEvolutionReferenceRoot, "docs/fixtures/evolution-loop/reference.json");
+    const reference = JSON.parse(readFileSync(referencePath, "utf8"));
+    reference.tampered = true;
+    writeFileSync(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+  }
+  assertFail(
+    "tampered Evolution sample reference",
+    tamperedEvolutionReferenceRoot,
+    "Evolution sample reference uses an unknown or missing field",
+  );
+
+  const untrustedEvolutionExperimentRoot = cloneFixture("untrusted-evolution-experiment-authority");
+  {
+    const referencePath = resolve(untrustedEvolutionExperimentRoot, "docs/fixtures/evolution-loop/reference.json");
+    const reference = JSON.parse(readFileSync(referencePath, "utf8"));
+    reference.trusted_contexts.experiment[0].authority_id = "unreserved-evolution-experiment-authority";
+    writeFileSync(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+  }
+  assertFail(
+    "untrusted Evolution experiment authority",
+    untrustedEvolutionExperimentRoot,
+    "Evolution experiment authority requires a separately trusted exact authority context",
+  );
+
+  const missingEvolutionObjectRoot = cloneFixture("missing-evolution-application-receipt");
+  {
+    const reference = JSON.parse(readFileSync(resolve(missingEvolutionObjectRoot, "docs/fixtures/evolution-loop/reference.json"), "utf8"));
+    const hex = reference.artifacts.application_receipt.object_digest.slice("sha256:".length);
+    rmSync(resolve(missingEvolutionObjectRoot, `docs/fixtures/evolution-loop/store/objects/sha256/${hex.slice(0, 2)}/${hex.slice(2)}.json`));
+  }
+  assertFail(
+    "missing Evolution closure object",
+    missingEvolutionObjectRoot,
+    "content-addressed object does not exist",
+  );
+
+  const orphanEvolutionObjectRoot = cloneFixture("orphan-evolution-object");
+  putContentAddressedJson({
+    storeRoot: resolve(orphanEvolutionObjectRoot, "docs/fixtures/evolution-loop/store"),
+    artifact: { schema_version: "1.0.0", object_kind: "evolution_fixture_orphan" },
+  });
+  assertFail(
+    "orphan Evolution sample object",
+    orphanEvolutionObjectRoot,
+    "Evolution sample store contains an orphan or omits an exact full reachable closure object",
+  );
+
+  const promptStopDriftRoot = cloneFixture("evolution-prompt-stop-drift");
+  {
+    const referencePath = resolve(promptStopDriftRoot, "docs/fixtures/evolution-loop/reference.json");
+    const reference = JSON.parse(readFileSync(referencePath, "utf8"));
+    reference.prompt_vertical.stop_code = "prompt_v2_assumed_available";
+    writeFileSync(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+  }
+  assertFail(
+    "Evolution Prompt typed stop drift",
+    promptStopDriftRoot,
+    "must retain the typed prompt_v2_materialization_unavailable stop",
+  );
+
+  const missingPromptV2SchemaRoot = cloneFixture("missing-prompt-v2-preregistration-schema");
+  rmSync(resolve(missingPromptV2SchemaRoot, "benchmarks/schemas/prompt-v2-preregistration.schema.json"));
+  assertFail(
+    "missing Prompt v2 preregistration schema",
+    missingPromptV2SchemaRoot,
+    "required schema is missing: benchmarks/schemas/prompt-v2-preregistration.schema.json",
+  );
+
+  const missingPromptV2ManifestEntryRoot = cloneFixture("missing-prompt-v2-preregistration-manifest-entry");
+  {
+    const manifestPath = resolve(missingPromptV2ManifestEntryRoot, "manifest.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    manifest.docs = manifest.docs.filter((path) => path !== "docs/fixtures/prompt-v2-preregistration/binding.json");
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail(
+    "missing Prompt v2 preregistration manifest entry",
+    missingPromptV2ManifestEntryRoot,
+    "manifest.json.docs must list docs/fixtures/prompt-v2-preregistration/binding.json",
+  );
+
+  const tamperedPromptV2BindingRoot = cloneFixture("tampered-prompt-v2-preregistration-binding");
+  {
+    const bindingPath = resolve(tamperedPromptV2BindingRoot, "docs/fixtures/prompt-v2-preregistration/binding.json");
+    const binding = JSON.parse(readFileSync(bindingPath, "utf8"));
+    binding.adapter_bindings[0].roles[0].asset.content_digest = `sha256:${"f".repeat(64)}`;
+    writeFileSync(bindingPath, `${JSON.stringify(binding, null, 2)}\n`);
+  }
+  assertFail(
+    "tampered Prompt v2 preregistration binding",
+    tamperedPromptV2BindingRoot,
+    "binding digest mismatch",
+  );
+
+  const orphanPromptV2ObjectRoot = cloneFixture("orphan-prompt-v2-preregistration-object");
+  putContentAddressedJson({
+    storeRoot: resolve(orphanPromptV2ObjectRoot, "docs/fixtures/prompt-v2-preregistration/store"),
+    artifact: { schema_version: "1.0.0", object_kind: "prompt_v2_preregistration_orphan" },
+  });
+  assertFail(
+    "orphan Prompt v2 preregistration object",
+    orphanPromptV2ObjectRoot,
+    "CAS inventory digest/count mismatch",
+  );
+
+  const accessedPromptV2ResultRoot = cloneFixture("accessed-prompt-v2-preregistration-result");
+  {
+    const referencePath = resolve(accessedPromptV2ResultRoot, "docs/fixtures/prompt-v2-preregistration/reference.json");
+    const reference = JSON.parse(readFileSync(referencePath, "utf8"));
+    reference.boundaries.results_accessed = true;
+    const basis = Object.fromEntries(Object.entries(reference).filter(([key]) => key !== "reference_digest"));
+    reference.reference_digest = canonicalDigest(basis);
+    writeFileSync(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+  }
+  assertFail(
+    "Prompt v2 result-access boundary drift",
+    accessedPromptV2ResultRoot,
+    "forbidden result, lifecycle, or activation boundary",
+  );
 
   const missingAdapterEventSchemaRoot = cloneFixture("missing-adapter-event-schema");
   rmSync(resolve(missingAdapterEventSchemaRoot, "schemas/adapter-runtime-event.schema.json"));
@@ -5906,8 +7301,10 @@ jobs:
         skill_groups: skillGroupsFor(["alpha"], { adoption_bootstrap: ["alpha"] }),
         allowed_multi_group_skills: ["alpha"],
         routing: routingFixture(),
-        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md"],
+        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md", ...promptV2PreregistrationDocs],
         examples: ["examples/ok.md"],
+        schemas: promptV2PreregistrationSchemas,
+        adapters: promptV2PreregistrationAdapters,
         design: { quality_target: "95+" },
       },
       null,
@@ -6210,6 +7607,18 @@ jobs:
   writeDomainRuleLedger(invalidDomainRuleStatusRoot, domainRuleLedgerFixture({ rows: [domainRuleRow({ "Evidence status": "Confirmed" })] }));
   assertFail("invalid domain rule status", invalidDomainRuleStatusRoot, "invalid Evidence status");
 
+  const invalidDomainRuleAuthorityRoot = cloneFixture("invalid-domain-rule-authority");
+  writeDomainRuleLedger(invalidDomainRuleAuthorityRoot, domainRuleLedgerFixture({ rows: [domainRuleRow({ "Authority status": "owner_says_so" })] }));
+  assertFail("invalid domain rule authority", invalidDomainRuleAuthorityRoot, "invalid Authority status");
+
+  const invalidDomainRuleRecordStateRoot = cloneFixture("invalid-domain-rule-record-state");
+  writeDomainRuleLedger(invalidDomainRuleRecordStateRoot, domainRuleLedgerFixture({ rows: [domainRuleRow({ "Record state": "confirmed" })] }));
+  assertFail("invalid domain rule record state", invalidDomainRuleRecordStateRoot, "invalid Record state");
+
+  const missingDomainRuleSeparationRoot = cloneFixture("missing-domain-rule-separation");
+  writeDomainRuleLedger(missingDomainRuleSeparationRoot, domainRuleLedgerFixture({ rows: [domainRuleRow({ "Authority status": "", "Record state": "" })] }));
+  assertFail("missing domain rule separation", missingDomainRuleSeparationRoot, "is missing required fields: Authority status, Record state");
+
   const duplicateDomainRuleRoot = cloneFixture("duplicate-domain-rule");
   writeDomainRuleLedger(duplicateDomainRuleRoot, domainRuleLedgerFixture({ rows: [domainRuleRow(), domainRuleRow()] }));
   assertFail("duplicate domain rule", duplicateDomainRuleRoot, "duplicates domain rule ID");
@@ -6240,8 +7649,10 @@ jobs:
         skill_groups: skillGroupsFor(["alpha"]),
         allowed_multi_group_skills: [],
         routing: routingFixture(),
-        docs: ["CUSTOM_INSTRUCTIONS.md", "docs/ok.md"],
+        docs: ["CUSTOM_INSTRUCTIONS.md", "docs/ok.md", ...promptV2PreregistrationDocs],
         examples: ["examples/ok.md"],
+        schemas: promptV2PreregistrationSchemas,
+        adapters: promptV2PreregistrationAdapters,
         design: { quality_target: "95+" },
       },
       null,
@@ -6254,7 +7665,17 @@ jobs:
   if (customInstructionsEntries.length !== 1 || !dedupedReport.includes("`CUSTOM_INSTRUCTIONS.md`: ok (copy_paste_kernel, docs)")) {
     throw new Error(`deduped path report should list CUSTOM_INSTRUCTIONS.md once with both roles\n${dedupedReport}`);
   }
-
+  const coreImmutableAssetRows = dedupedReport.match(/^- core immutable assets always core-owned: ok$/gm) ?? [];
+  const coreAssetOwnershipRows = dedupedReport.match(/^- core asset ownership preserved: ok$/gm) ?? [];
+  const obsoleteOwnershipLabels = [
+    "- immutable contracts always core-owned:",
+    "- core contract ownership preserved:",
+  ].filter((label) => dedupedReport.includes(label));
+  if (coreImmutableAssetRows.length !== 1 || coreAssetOwnershipRows.length !== 2 || obsoleteOwnershipLabels.length > 0) {
+    throw new Error(
+      `generated report should render current immutable/core asset ownership checks as ok without obsolete contracts-only labels\n${dedupedReport}`,
+    );
+  }
   console.log("validate-repo fixture tests passed");
 } finally {
   rmSync(fixtureRoot, { recursive: true, force: true });

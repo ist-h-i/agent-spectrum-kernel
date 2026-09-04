@@ -4,7 +4,7 @@ description: Refresh improvement-ledger lifecycle state and summarize debt movem
 
 Use `improvement-ledger` and the debt lifecycle contract.
 
-For an explicit knowledge-promotion request, use `/operating-mode-router`, `/domain-rule-ledger`, and `/evidence-ledger`; promote only evidence-backed durable rules.
+For an explicit knowledge-promotion request, use `/operating-mode-router` and `/domain-rule-ledger`. Apply `ask.claim-evidence-status@1.0.0` inline; use `/evidence-ledger` only when the durable consumer's `stable_claim_ids` trigger selects `formal_ledger`. Promote only evidence-backed durable rules.
 
 Do not start or delegate agents unless the request explicitly requires agent activity; report started, completed, and failed counts.
 

@@ -32,6 +32,8 @@ then the smallest selected workflow
 
 Expected output shape:
 
+The following is the visible protected/direct-compatibility form. A managed ordinary runner boundary persists the same payload as a bound sidecar and omits this block from prose.
+
 Execution Envelope:
 ```json
 {
@@ -82,7 +84,7 @@ Workflow:
 
 ```text
 spec-driven-development
-test-first-verification for Verification Contract
+test-first-verification selects Compact Proof or Formal Verification Contract
 controlled-implementation
 test-first-verification for evidence
 ```
@@ -103,13 +105,12 @@ Work Package WP-CSV:
 - allowed/forbidden scope
 - ordered tasks, dependencies, stop conditions, expected evidence
 
-Verification Contract VER-CSV:
-- upstream refs: SPEC-CSV, WP-CSV
-- behavior proof obligations
-- focused checks, required evidence, insufficient-evidence conditions
+Selected proof:
+- use Compact Proof only when all localized eligibility facts are evidenced and no formal trigger exists
+- otherwise use Formal Verification Contract VER-CSV with stable obligations
 
 Implementation Contract IMPL-CSV:
-- upstream refs: WP-CSV, VER-CSV
+- upstream refs: WP-CSV and the selected proof artifact
 - implementation-only decisions
 - actual change boundary, evidence refs, limitations, handoff state
 ```
@@ -130,7 +131,7 @@ Workflow:
 
 ```text
 doubt-driven-development
-test-first-verification for reproduction and Verification Contract
+test-first-verification selects Formal Verification Contract for reproduction/regression
 controlled-implementation
 test-first-verification for regression proof
 ```
@@ -295,44 +296,33 @@ Workflow:
 
 ```text
 review-router
-observed change signals
-required gates, including review-architecture-impact, review-output-quality, and review-adversarial-risk when applicable
+one review-ai-quality baseline
+exact-signal additional gates, including review-architecture-impact, review-output-quality, and review-adversarial-risk when applicable
 review-final-merge-gate
 ```
 
 Expected output:
 
 ```text
-Change signals:
-- signal: observed evidence
+Baseline review:
+- Gate: review-ai-quality
+- Status: pass | pass_with_comments | fail | insufficient_evidence
+- Evidence: target and applicable evidence checked
 
-Required gates:
-- gate: reason; triggered by signal(s)
-
-Skipped heavy gates:
-- gate/layer: observed reason
+Additional required gates:
+- <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<non-empty text>; signals=<comma-separated exact signal IDs>
 
 Missing evidence:
 - input: what remains unknown
 
+Findings:
+- Finding ID, severity, merge blocker, practical impact, trigger/failure trace, evidence location, required post-fix condition
+
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
-
-Blocking evidence:
-- [severity] gate/file:line — issue, evidence, impact, required fix
-
-Passed required gates:
-- gate — evidence checked
-
-Insufficient evidence:
-- gate/input — next check
-
-Non-blocking follow-ups:
-- improvement-ledger candidate or suggestion
-
-Residual risk:
-- ...
 ```
+
+Omit `Decision` unless a final merge decision was requested. Use `- none` for empty sections and omit skipped-gate/category boilerplate.
 
 ## 8. Handoff to another agent
 
@@ -346,7 +336,8 @@ Workflow:
 
 ```text
 handoff-generation
-evidence-ledger
+ask.claim-evidence-status@1.0.0 inline
+evidence-ledger only if a closed formal-audit trigger applies
 ```
 
 Expected output:
@@ -410,6 +401,46 @@ Expected behavior:
 - Separate breadth, reliability, autonomy, evidence quality, and human dependency.
 - Keep `Unknown`, stale, contradicted, and insufficient-evidence areas visible.
 - Do not claim human-equivalent capability or replace task-level verification/review gates.
+
+## 10.1 One-task Skill effectiveness evaluation
+
+User request:
+
+```text
+Evaluate whether the selected Skills helped this completed task.
+```
+
+Workflow:
+
+```text
+operating-mode-router -> observability_metrics
+skill-effectiveness-evaluation
+evidence-ledger only when a closed formal-audit trigger applies
+```
+
+Expected output:
+
+```text
+Skill effectiveness evaluation:
+- Scope: one_task_workflow_retrospective
+- Subject: workflow_and_artifacts
+- Native observations: closed-catalog finding, requirement, claim, route_decision, token, duration, artifact, or measured rework with catalog unit/definition and measurement evidence refs
+- Effect: direct catalog rule or same-unit reference, delta, materiality threshold, rule ref, and effect evidence; impact is derived
+- Unknown / unavailable measurement or effect: null/unknown fields plus explicit limitation
+- Dimensions: outcome_quality, false_positive_control, safety, routing_quality, evidence_quality, overhead, reuse_value
+- Classification: effective | neutral | excessive | harmful | insufficient_evidence
+- Recommendation: expand | retain | simplify | stop | insufficient_evidence
+- Recommendation scope: next_similar_task_workflow_only
+- Authority implied: false
+```
+
+Do not invent a metric, produce a task-effectiveness average, or infer quality
+or effect from overhead. An observed resource value without comparison evidence
+has unknown effect. Any
+harmful dimension yields `stop`; missing evidence remains
+`insufficient_evidence`. This one-task result is separate from adoption trends,
+capability maturity, benchmark scoring, external outcomes, and Portfolio
+authority.
 
 ## 11. MR/PR README generation
 

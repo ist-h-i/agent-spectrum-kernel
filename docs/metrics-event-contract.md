@@ -214,7 +214,7 @@ Signal-first routing summaries make routing deviations detectable without storin
 - `required` gates that are not present in `executed_gates` are under-processing warnings.
 - Executed heavy gates without a matching observed trigger signal are over-processing warnings.
 - Missing changed-file, diff, context, output, or verification evidence should be recorded as `insufficient_evidence`, not as a skipped gate.
-- Skipped heavy gates require evidence-backed reasons. Ordinary unaffected layers do not need a normal-route row.
+- The mandatory baseline is not heavy or over-processing. Additional gates require exact observed signal IDs. Ordinary unselected gates do not need a normal-route row.
 
 The minimal normal-route record is `change_signals`, `required_gates`, and `executed_gates`. `required_gate_routes` may add explicit human-readable traceability, while `skipped_heavy_gates` and `missing_evidence` are added only when those states exist. `gate_applicability` remains an optional complete diagnostic matrix for validation/debug use and must not be required for every review event.
 

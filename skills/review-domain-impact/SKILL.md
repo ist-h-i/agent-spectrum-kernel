@@ -51,17 +51,17 @@ Treat missing, template, stale, or contradicted inputs as evidence limitations. 
 
 ```text
 1. Current explicit user requirement / issue / approved spec
-2. Human-confirmed domain rule
+2. Verified domain rule with explicit source/authority metadata
 3. Verified production/repo behavior
 4. Supported domain rule
 5. Hypothesis domain rule
 ```
 
 Rules:
-- `Human-confirmed` and `Verified` domain rules may be used as review constraints.
+- `Verified` domain rules may be used as review constraints when scope matches; human authority metadata identifies ownership but does not promote evidence.
 - `Supported` rules may support caution or insufficient-evidence findings.
 - `Hypothesis` rules may generate questions or warnings, but cannot be the sole basis for fail or block.
-- `Contradicted` rules must be reported as conflicts requiring human/domain-owner decision.
+- Rules with `Record state=contradicted` must be reported as conflicts requiring human/domain-owner decision.
 - Stale rules require explicit review before use as constraints.
 
 3. Identify the domain object.
@@ -111,7 +111,7 @@ Domain rule checks:
 - Applied confirmed/verified rules:
 - Supported rules considered:
 - Hypothesis rules used only for questions:
-- Contradicted/stale rules:
+- Contradicted record states / stale rules:
 ```
 
 8. Identify responsibility shift.
@@ -133,26 +133,31 @@ Domain rule checks:
    - block.
    - State the next action in work terms, not only as another skill name.
 
+## Finding contract
+
+Any actionable domain finding follows `ask.review-finding@1.0.0` in `docs/review-finding-contract.md`. Use one impact-ordered inventory; category may be `domain` metadata. Do not emit an empty domain category section.
+
 ## Output
 
-Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits the domain impact decision below; it does not repeat the envelope fields.
+Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits a gate result, not final merge approval.
 
 ```text
-Domain impact decision:
-- Classification:
+Domain impact gate:
 - Gate status: pass | pass with note | fail | insufficient evidence
-- Domain input sources:
-- Domain rule checks:
-- Decision boundary:
-- Business object:
-- Business rule changed:
-- Workflow changed:
-- Responsibility changed:
-- Evidence:
-- Missing evidence:
-- Required fix:
-- Required approval:
-- Residual domain risk:
+- Classification and business before/after:
+- Domain sources and rule checks:
+- Decision / responsibility boundary:
+- Missing evidence or required approval:
+
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: domain
 ```
 
 ## Exit criteria
@@ -160,6 +165,7 @@ Domain impact decision:
 - Domain impact classification is explicit.
 - Business before/after is documented when impact exists.
 - Missing owner approval or domain evidence is visible.
+- Every actionable finding uses the closed common finding fields and impact order.
 - A PR with possible domain impact is not approved by logic/design review alone.
 
 ## Failure modes

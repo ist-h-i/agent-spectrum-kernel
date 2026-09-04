@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/schemas/fixed-entry-profile-registry.json",
+  "title": "Canonical fixed-entry profile registry",
+  "registry_version": 1,
+  "control_map_ref": "schemas/compact-profile-control-map.json",
+  "entries": {
+    "skill-implement.md": {
+      "mode": "implementation",
+      "task_class": "implementation",
+      "primary_contract": "controlled-implementation",
+      "requested_contracts": ["controlled-implementation", "test-first-verification", "risk-gate"],
+      "canonical_sources": ["docs/lifecycle-artifact-contract.md", "skills/controlled-implementation/SKILL.md"]
+    },
+    "skill-investigate.md": {
+      "mode": "investigation",
+      "task_class": "investigation",
+      "primary_contract": "doubt-driven-development",
+      "requested_contracts": ["doubt-driven-development", "test-first-verification", "controlled-implementation", "risk-gate"],
+      "canonical_sources": ["skills/doubt-driven-development/SKILL.md", "skills/controlled-implementation/SKILL.md"]
+    },
+    "skill-review.md": {
+      "mode": "review",
+      "task_class": "review",
+      "primary_contract": "review-router",
+      "requested_contracts": ["review-router", "review-ai-quality", "review-final-merge-gate", "risk-gate"],
+      "canonical_sources": ["docs/lifecycle-traceability-contract.md", "docs/review-finding-contract.md", "schemas/review-signal-gate-map.json", "schemas/review-finding.schema.json", "skills/review-router/SKILL.md", "skills/review-ai-quality/SKILL.md", "skills/review-final-merge-gate/SKILL.md"]
+    },
+    "skill-verify.md": {
+      "mode": "verification",
+      "task_class": "verification",
+      "primary_contract": "test-first-verification",
+      "requested_contracts": ["test-first-verification", "risk-gate"],
+      "canonical_sources": ["docs/lifecycle-artifact-contract.md"]
+    },
+    "skill-handoff.md": {
+      "mode": "handoff",
+      "task_class": "handoff",
+      "primary_contract": "handoff-generation",
+      "requested_contracts": ["handoff-generation", "risk-gate"],
+      "canonical_sources": ["docs/agent-session-state-contract.md", "skills/handoff-generation/SKILL.md"]
+    }
+  }
+}

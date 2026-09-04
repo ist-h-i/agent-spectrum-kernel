@@ -8,6 +8,8 @@ export const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "docs/adapter-conformance-contract.md",
   "docs/agent-session-state-contract.md",
+  "docs/claim-evidence-status-contract.md",
+  "docs/claim-evidence-status-contract.md",
   "docs/debt-lifecycle-contract.md",
   "docs/execution-envelope-contract.md",
   "docs/lifecycle-artifact-contract.md",
@@ -15,12 +17,41 @@ export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "docs/metrics-event-contract.md",
   "docs/observability-runtime-contract.md",
   "docs/operation-automation-contract.md",
+  "docs/review-finding-contract.md",
+  "docs/skill-effectiveness-evaluation-contract.md",
   "docs/stack-implementation-overlay-contract.md",
+  "docs/verification-proof-policy-contract.md",
   "schemas/adapter-runtime-event.schema.json",
+  "schemas/claim-evidence-status.schema.json",
+  "schemas/claim-evidence-status.schema.json",
   "schemas/compact-profile-control-map.json",
+  "schemas/fixed-entry-profile-registry.json",
+  "schemas/metrics-event.schema.json",
   "schemas/execution-envelope.schema.json",
+  "schemas/execution-envelope-record.schema.json",
+  "schemas/codex-risk-action.schema.json",
+  "schemas/codex-risk-approval-request.schema.json",
+  "schemas/codex-risk-approval.schema.json",
+  "schemas/effectiveness-decision-vocabulary.schema.json",
   "schemas/normalized-event-schema-registry.json",
+  "schemas/review-finding.schema.json",
+  "schemas/skill-effectiveness-outcome.schema.json",
+  "schemas/verification-proof-policy.schema.json",
 ]);
+export const CORE_IMMUTABLE_RUNTIME_ASSETS = Object.freeze([
+  "scripts/json-schema-validation.mjs",
+  "scripts/skill-effectiveness-outcome.mjs",
+]);
+export const CORE_OWNED_IMMUTABLE_ASSETS = Object.freeze([
+  ...CORE_IMMUTABLE_CONTRACT_ASSETS,
+  ...CORE_IMMUTABLE_RUNTIME_ASSETS,
+]);
+
+export function coreImmutableAssetKind(asset) {
+  if (CORE_IMMUTABLE_CONTRACT_ASSETS.includes(asset)) return "immutable_contract";
+  if (CORE_IMMUTABLE_RUNTIME_ASSETS.includes(asset)) return "immutable_runtime";
+  return null;
+}
 
 export function hashText(text) {
   return createHash("sha256").update(text).digest("hex");
@@ -151,21 +182,23 @@ export function readGitRevision(repoRoot) {
     return null;
   }
   const ref = refMatch[1];
-  const refPath = resolve(gitDir, ref);
-  if (existsSync(refPath)) {
-    return readText(refPath).trim() || null;
-  }
-  const packedRefsPath = resolve(gitDir, "packed-refs");
-  if (!existsSync(packedRefsPath)) {
-    return null;
-  }
-  for (const line of readText(packedRefsPath).split(/\r?\n/)) {
-    if (line.startsWith("#") || line.startsWith("^")) {
-      continue;
+  const commonDirPath = resolve(gitDir, "commondir");
+  const commonDir = existsSync(commonDirPath)
+    ? resolve(gitDir, readText(commonDirPath).trim())
+    : gitDir;
+  for (const refRoot of [...new Set([gitDir, commonDir])]) {
+    const refPath = resolve(refRoot, ref);
+    if (existsSync(refPath)) {
+      return readText(refPath).trim() || null;
     }
-    const [hash, packedRef] = line.split(" ");
-    if (packedRef === ref) {
-      return hash;
+  }
+  for (const refRoot of [...new Set([gitDir, commonDir])]) {
+    const packedRefsPath = resolve(refRoot, "packed-refs");
+    if (!existsSync(packedRefsPath)) continue;
+    for (const line of readText(packedRefsPath).split(/\r?\n/)) {
+      if (line.startsWith("#") || line.startsWith("^")) continue;
+      const [hash, packedRef] = line.split(" ");
+      if (packedRef === ref) return hash;
     }
   }
   return null;

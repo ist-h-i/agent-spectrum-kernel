@@ -10,6 +10,8 @@
     "current_level",
     "evidence_source",
     "evidence_status",
+    "authority_status",
+    "assessment_state",
     "observed_strengths",
     "observed_failures",
     "human_dependency",
@@ -32,9 +34,10 @@
     },
     "evidence_source": { "type": "string", "minLength": 1 },
     "evidence_status": {
-      "type": "string",
-      "enum": ["Verified", "Human-confirmed", "Supported", "Hypothesis", "Deprecated", "Contradicted", "Unknown"]
+      "$ref": "claim-evidence-status.schema.json"
     },
+    "authority_status": { "type": "string", "enum": ["not_asserted", "human_confirmed"] },
+    "assessment_state": { "type": "string", "enum": ["current", "deprecated", "contradicted"] },
     "observed_strengths": { "type": "string", "minLength": 1 },
     "observed_failures": { "type": "string", "minLength": 1 },
     "human_dependency": { "type": "string", "minLength": 1 },

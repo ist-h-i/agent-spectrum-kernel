@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/evolution-recommendation.schema.json",
+  "title": "Agent Spectrum Kernel governed Evolution recommendation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_kind",
+    "experiment_digest",
+    "candidate_digest",
+    "evaluation_authority",
+    "dimensions",
+    "causal_attribution",
+    "recommendation",
+    "decision_scope",
+    "reason_codes",
+    "authority_implied",
+    "recommendation_digest"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "object_kind": { "type": "string", "const": "evolution_recommendation" },
+    "experiment_digest": { "$ref": "#/$defs/digest" },
+    "candidate_digest": { "$ref": "#/$defs/digest" },
+    "evaluation_authority": { "$ref": "#/$defs/evaluationAuthority" },
+    "dimensions": { "$ref": "#/$defs/dimensions" },
+    "causal_attribution": { "$ref": "#/$defs/causalAttribution" },
+    "recommendation": { "$ref": "#/$defs/recommendation" },
+    "decision_scope": { "$ref": "#/$defs/token" },
+    "reason_codes": { "$ref": "#/$defs/nonEmptyTokenSet" },
+    "authority_implied": { "type": "boolean", "const": false },
+    "recommendation_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@/+~-]*$"
+    },
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "tokenSet": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "nonEmptyTokenSet": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "recommendation": {
+      "$ref": "effectiveness-decision-vocabulary.schema.json#/$defs/overallRecommendation"
+    },
+    "dimensionStatus": {
+      "type": "string",
+      "enum": ["complete", "insufficient_evidence", "unknown", "unavailable", "not_applicable"]
+    },
+    "dimensionConclusion": {
+      "type": "string",
+      "enum": [
+        "improved",
+        "retained",
+        "regressed",
+        "unsafe",
+        "observed",
+        "not_observed",
+        "contradicted",
+        "unknown",
+        "unavailable",
+        "not_applicable"
+      ]
+    },
+    "sourceKind": {
+      "type": "string",
+      "enum": [
+        "result_set",
+        "repetition_report",
+        "paired_comparison_report",
+        "directional_outcome_report",
+        "mechanism_scorecard",
+        "portfolio_aggregate_result",
+        "external_outcome_report"
+      ]
+    },
+    "dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "conclusion",
+        "source_kind",
+        "artifact_id",
+        "artifact_digest",
+        "causal_credit_applied",
+        "factor_ids"
+      ],
+      "properties": {
+        "status": { "$ref": "#/$defs/dimensionStatus" },
+        "conclusion": { "$ref": "#/$defs/dimensionConclusion" },
+        "source_kind": { "$ref": "#/$defs/sourceKind" },
+        "artifact_id": { "$ref": "#/$defs/stableId" },
+        "artifact_digest": { "$ref": "#/$defs/digest" },
+        "causal_credit_applied": { "type": "boolean" },
+        "factor_ids": { "$ref": "#/$defs/tokenSet" }
+      }
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quality", "safety", "cost", "variance", "mechanism", "external_outcome"],
+      "properties": {
+        "quality": { "$ref": "#/$defs/qualityDimension" },
+        "safety": { "$ref": "#/$defs/safetyDimension" },
+        "cost": { "$ref": "#/$defs/costDimension" },
+        "variance": { "$ref": "#/$defs/varianceDimension" },
+        "mechanism": { "$ref": "#/$defs/mechanismDimension" },
+        "external_outcome": { "$ref": "#/$defs/externalOutcomeDimension" }
+      }
+    },
+    "qualityDimension": {
+      "allOf": [
+        { "$ref": "#/$defs/dimension" },
+        { "properties": { "source_kind": { "enum": ["result_set", "paired_comparison_report", "directional_outcome_report", "portfolio_aggregate_result"] } } }
+      ]
+    },
+    "safetyDimension": {
+      "allOf": [
+        { "$ref": "#/$defs/dimension" },
+        { "properties": { "source_kind": { "enum": ["result_set", "paired_comparison_report", "directional_outcome_report", "portfolio_aggregate_result"] } } }
+      ]
+    },
+    "costDimension": {
+      "allOf": [
+        { "$ref": "#/$defs/dimension" },
+        { "properties": { "source_kind": { "enum": ["result_set", "paired_comparison_report", "directional_outcome_report", "portfolio_aggregate_result"] } } }
+      ]
+    },
+    "varianceDimension": {
+      "allOf": [
+        { "$ref": "#/$defs/dimension" },
+        { "properties": { "source_kind": { "enum": ["repetition_report", "portfolio_aggregate_result"] } } }
+      ]
+    },
+    "mechanismDimension": {
+      "allOf": [
+        { "$ref": "#/$defs/dimension" },
+        { "properties": { "source_kind": { "const": "mechanism_scorecard" } } }
+      ]
+    },
+    "externalOutcomeDimension": {
+      "allOf": [
+        { "$ref": "#/$defs/dimension" },
+        { "properties": { "source_kind": { "const": "external_outcome_report" } } }
+      ]
+    },
+    "causalAttribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "factor_ids", "evidence_digests"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["supported", "unsupported", "not_claimed"]
+        },
+        "factor_ids": { "$ref": "#/$defs/tokenSet" },
+        "evidence_digests": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/digest" }
+        }
+      }
+    },
+    "evaluationAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "authority_id",
+        "authority_revision",
+        "authority_evidence_digest",
+        "experiment_digest",
+        "verification_mode",
+        "artifact_inventory_digest"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "external_evolution_evaluation_authority" },
+        "authority_id": { "$ref": "#/$defs/stableId" },
+        "authority_revision": { "type": "integer", "minimum": 1 },
+        "authority_evidence_digest": { "$ref": "#/$defs/digest" },
+        "experiment_digest": { "$ref": "#/$defs/digest" },
+        "verification_mode": { "type": "string", "const": "full_verifier" },
+        "artifact_inventory_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

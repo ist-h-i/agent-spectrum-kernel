@@ -16,6 +16,8 @@ doubt-driven-development → test-first-verification for reproduction and Verifi
 
 ## Expected investigation shape
 
+Apply `ask.claim-evidence-status@1.0.0` inline; this ordinary investigation does not require a separate Evidence Ledger.
+
 ```text
 Hypothesis:
 - Timezone boundary conversion includes the end date incorrectly.
@@ -29,7 +31,7 @@ Results:
 - ...
 
 Conclusion:
-- verified | weakened | falsified | unknown
+- Verified | Supported | Hypothesis | Unknown | Falsified
 
 Next:
 - Implement only after reproduction or decisive evidence.
