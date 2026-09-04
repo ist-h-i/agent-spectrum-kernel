@@ -280,12 +280,39 @@ switches/rolls back the Portfolio before terminal Asset retirement.
 
 The immutable receipt binds all Evolution semantic digests, predecessor receipt,
 base/result Registry and Portfolio heads, ordered completed/blocked steps,
-authority-context digests, rollback anchor, stop code, and next step. A completed
-receipt re-verifies its result heads and reconstructs the exact action, base
-heads, transition step, authority-context, target, and rollback history from the
-approved proposal and resulting Portfolio lock. Completed no-op receipts keep
-identical heads and contain no lifecycle steps. Resume requires the predecessor
-result heads to equal the successor base heads.
+authority-context digests, rollback anchor, stop code, and next step. Step IDs
+are unique. Completed steps form a prefix, and each Registry or Portfolio
+resource has its own base-to-result digest chain. A changed head equals the last
+completed output for that resource and is re-verified through the existing
+Registry or Portfolio verifier; pending, failed, and skipped outputs never move
+a head. A completed `apply_*` step must produce a successor head, and each
+resource permits at most one completed lifecycle transition batch per receipt.
+Its trusted authority context must bind the proposal's complete transition
+batch, exact decision authority ID, and decision object digest. Completed
+`verify_*` markers must retain the head and name that verified head's authority
+context.
+
+The five receipt states have one closed matrix:
+
+- `pending` has no stop, identifies its first pending step, keeps both base
+  heads, and contains pending steps only;
+- `in_progress` has no stop, identifies its first pending step, and contains a
+  non-empty completed prefix followed by pending work;
+- `stopped` has a typed stop, identifies its first resumable pending step, has
+  no failed step, and retains only verified completed-prefix heads;
+- `failed` has a typed stop and no next step; it is either empty before the
+  first operation or contains a completed prefix, exactly one failed step, and
+  skipped suffix;
+- `completed` has neither stop nor next step and contains completed steps only.
+
+A completed receipt re-verifies its result heads and reconstructs the exact
+action, base heads, transition step, authority-context, target, and rollback
+history from the approved proposal and resulting Portfolio lock. Completed
+no-op receipts keep identical heads and contain no lifecycle steps. Every
+predecessor back to the null-root anchor must bind the same candidate,
+experiment, recommendation, proposal, decision, action, and rollback anchor.
+The root base heads must equal the approved proposal heads, and every successor
+base must equal its fully verified predecessor result heads.
 
 CAS publication may leave unreferenced objects after interruption, but they do
 not become Registry or Portfolio commit markers. Exact retries are idempotent.

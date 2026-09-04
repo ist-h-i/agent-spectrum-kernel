@@ -1701,6 +1701,122 @@ try {
     assert.ok(resolved.selection.omitted_assets.every((entry) => entry.reason_codes.includes("selector_conflict")));
   });
 
+  const multiUnknownConflictScenario = createExploratoryScenario({
+    storeRoot,
+    registry,
+    assetTrust,
+    portfolioId: "ask.portfolio.issue277.multi-unknown-conflict",
+    entries: reverseIdentityEntries,
+    unresolvedConflicts: [{
+      conflict_id: "multi-unknown-overlap",
+      entry_ids: reverseIdentityEntries.map((entry) => entry.entry_id),
+      selectors: selectors({
+        capabilities: { status: "unknown", included: [], excluded: [] },
+        risk_classes: { status: "unknown", included: [], excluded: [] },
+      }),
+      reason_code: "selector_conflict",
+    }],
+  });
+  check("multiple unknown conflict dimensions with no definitive mismatch stay fail-closed", () => {
+    const resolved = select({ storeRoot, scenario: multiUnknownConflictScenario, assetTrust });
+    assert.equal(resolved.selection.decision, "stop");
+    assert.ok(hasReason(resolved.selection, "selector_conflict", "stop"));
+  });
+
+  const mixedConflictScenario = ({
+    portfolioId,
+    selectorOverrides,
+  }) => createExploratoryScenario({
+    storeRoot,
+    registry,
+    assetTrust,
+    portfolioId,
+    entries: reverseIdentityEntries,
+    unresolvedConflicts: [{
+      conflict_id: "mixed-unknown-definitive",
+      entry_ids: reverseIdentityEntries.map((entry) => entry.entry_id),
+      selectors: selectors(selectorOverrides),
+      reason_code: "selector_conflict",
+    }],
+  });
+  const assertConflictRuledOut = ({ scenario, contextOverrides }) => {
+    const first = select({ storeRoot, scenario, assetTrust, contextOverrides });
+    const second = select({ storeRoot, scenario, assetTrust, contextOverrides });
+    assert.equal(hasReason(first.selection, "selector_conflict"), false);
+    assert.deepEqual(first.selection.reasons, second.selection.reasons);
+    assert.deepEqual(first.selection.selected_assets, second.selection.selected_assets);
+    assert.deepEqual(first.selection.omitted_assets, second.selection.omitted_assets);
+    assert.deepEqual(first.selection.capability_downgrades, second.selection.capability_downgrades);
+    assert.equal(first.selection.decision, second.selection.decision);
+    assert.equal(first.selection.selection_digest, second.selection.selection_digest);
+  };
+
+  check("unknown risk cannot waive a definitive adapter mismatch", () => {
+    assertConflictRuledOut({
+      scenario: mixedConflictScenario({
+        portfolioId: "ask.portfolio.issue277.mixed-risk-adapter-conflict",
+        selectorOverrides: {
+          risk_classes: { status: "unknown", included: [], excluded: [] },
+        },
+      }),
+      contextOverrides: { adapter: "other-adapter" },
+    });
+  });
+
+  check("unknown capability cannot waive a definitive project mismatch", () => {
+    assertConflictRuledOut({
+      scenario: mixedConflictScenario({
+        portfolioId: "ask.portfolio.issue277.mixed-capability-project-conflict",
+        selectorOverrides: {
+          capabilities: { status: "unknown", included: [], excluded: [] },
+        },
+      }),
+      contextOverrides: { projectId: "github.com/example/other" },
+    });
+  });
+
+  check("a known exclusion cannot be waived by another unknown dimension", () => {
+    assertConflictRuledOut({
+      scenario: mixedConflictScenario({
+        portfolioId: "ask.portfolio.issue277.mixed-exclusion-conflict",
+        selectorOverrides: {
+          adapters: { status: "bounded", included: [], excluded: [ADAPTER] },
+          risk_classes: { status: "unknown", included: [], excluded: [] },
+        },
+      }),
+      contextOverrides: {},
+    });
+  });
+
+  const deterministicConflictScenario = createExploratoryScenario({
+    storeRoot,
+    registry,
+    assetTrust,
+    portfolioId: "ask.portfolio.issue277.deterministic-conflicts",
+    entries: reverseIdentityEntries,
+    unresolvedConflicts: [{
+      conflict_id: "z-exact-overlap",
+      entry_ids: reverseIdentityEntries.map((entry) => entry.entry_id),
+      selectors: selectors(),
+      reason_code: "selector_conflict",
+    }, {
+      conflict_id: "a-unknown-overlap",
+      entry_ids: reverseIdentityEntries.map((entry) => entry.entry_id),
+      selectors: selectors({
+        risk_classes: { status: "unknown", included: [], excluded: [] },
+      }),
+      reason_code: "selector_conflict",
+    }],
+  });
+  check("multiple applicable conflicts combine deterministically", () => {
+    const first = select({ storeRoot, scenario: deterministicConflictScenario, assetTrust });
+    const second = select({ storeRoot, scenario: deterministicConflictScenario, assetTrust });
+    assert.equal(first.selection.decision, "stop");
+    assert.equal(first.selection.reasons.filter(({ code }) => code === "selector_conflict").length, 6);
+    assert.equal(first.selection.selection_digest, second.selection.selection_digest);
+    assert.deepEqual(first.selection, second.selection);
+  });
+
   const unknownBudgetEntry = portfolioEntry({
     entryId: "unknown-cost",
     asset: assets.challenger,

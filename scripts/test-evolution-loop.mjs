@@ -718,6 +718,43 @@ closes("human decision requires the proposal's exact reserved authority", () => 
   }
 });
 
+function applicationReceiptDraft(overrides = {}) {
+  return {
+    schema_version: "1.0.0",
+    object_kind: "evolution_application_receipt",
+    predecessor_receipt_digest: null,
+    candidate_digest: candidate.candidate_digest,
+    experiment_digest: experiment.experiment_digest,
+    recommendation_digest: recommendation.recommendation_digest,
+    proposal_digest: proposal.proposal_digest,
+    decision_digest: decision.decision_digest,
+    action: proposal.action,
+    state: "completed",
+    base_heads: {
+      registry_snapshot_digest: candidate.registry.snapshot_digest,
+      portfolio_lock_digest: proposal.lifecycle_plan.base_portfolio_lock_digest,
+    },
+    result_heads: {
+      registry_snapshot_digest: candidate.registry.snapshot_digest,
+      portfolio_lock_digest: D[1],
+    },
+    steps: [{
+      step_id: "portfolio_activation",
+      operation: "apply_portfolio_transition",
+      input_digest: proposal.lifecycle_plan.base_portfolio_lock_digest,
+      authority_context_digest: D[2],
+      output_digest: D[1],
+      status: "completed",
+    }],
+    rollback_anchor: structuredClone(proposal.lifecycle_plan.rollback_anchor),
+    stop: null,
+    next_step: null,
+    history_preserved: true,
+    authority_implied: false,
+    ...structuredClone(overrides),
+  };
+}
+
 closes("application receipt preserves exact history and rollback", () => {
   const receipt = buildEvolutionApplicationReceipt({
     schema_version: "1.0.0",
@@ -777,10 +814,165 @@ closes("completed receipt rejects forged history and unfinished steps", () => {
     history_preserved: true,
     authority_implied: false,
   };
-  assert.throws(() => buildEvolutionApplicationReceipt(draft), /completed.*incomplete step/iu);
+  assert.throws(() => buildEvolutionApplicationReceipt(draft), /completed.*incomplete step|schema.*completed/iu);
   draft.steps[0].status = "completed";
   draft.history_preserved = false;
   assert.throws(() => buildEvolutionApplicationReceipt(draft), /closed schema|preserve history/iu);
+});
+
+closes("non-completed receipt state matrix accepts coherent checkpoints", () => {
+  const base = applicationReceiptDraft();
+  const pendingStep = { ...structuredClone(base.steps[0]), status: "pending" };
+  const markerStep = {
+    step_id: "portfolio_commit_marker",
+    operation: "verify_portfolio_commit_marker",
+    input_digest: base.result_heads.portfolio_lock_digest,
+    authority_context_digest: D[2],
+    output_digest: base.result_heads.portfolio_lock_digest,
+    status: "pending",
+  };
+  assert.equal(buildEvolutionApplicationReceipt(applicationReceiptDraft({
+    state: "pending",
+    result_heads: structuredClone(base.base_heads),
+    steps: [pendingStep],
+    next_step: "portfolio_activation",
+  })).state, "pending");
+  assert.equal(buildEvolutionApplicationReceipt(applicationReceiptDraft({
+    state: "in_progress",
+    steps: [base.steps[0], markerStep],
+    next_step: "portfolio_commit_marker",
+  })).state, "in_progress");
+  assert.equal(buildEvolutionApplicationReceipt(applicationReceiptDraft({
+    state: "stopped",
+    steps: [base.steps[0], markerStep],
+    stop: { code: "portfolio_activation_authority_required", detail: "Resume after exact authority is supplied." },
+    next_step: "portfolio_commit_marker",
+  })).state, "stopped");
+  assert.equal(buildEvolutionApplicationReceipt(applicationReceiptDraft({
+    state: "failed",
+    result_heads: structuredClone(base.base_heads),
+    steps: [],
+    stop: { code: "application_failed", detail: "Failure occurred before the first lifecycle operation." },
+  })).state, "failed");
+  assert.equal(buildEvolutionApplicationReceipt(applicationReceiptDraft({
+    state: "failed",
+    steps: [
+      base.steps[0],
+      { ...markerStep, status: "failed" },
+      { ...markerStep, step_id: "portfolio_commit_marker_cleanup", status: "skipped" },
+    ],
+    stop: { code: "application_failed", detail: "Failure occurred after the verified Portfolio transition." },
+  })).state, "failed");
+});
+
+closes("receipt state matrix rejects contradictory stop, resume, and step topology", () => {
+  const base = applicationReceiptDraft();
+  const pendingStep = { ...structuredClone(base.steps[0]), status: "pending" };
+  const failedStep = { ...structuredClone(base.steps[0]), status: "failed" };
+  const markerStep = {
+    step_id: "portfolio_commit_marker",
+    operation: "verify_portfolio_commit_marker",
+    input_digest: base.result_heads.portfolio_lock_digest,
+    authority_context_digest: D[2],
+    output_digest: base.result_heads.portfolio_lock_digest,
+    status: "pending",
+  };
+  const expectInvalid = (overrides, pattern) => assert.throws(
+    () => buildEvolutionApplicationReceipt(applicationReceiptDraft(overrides)),
+    pattern,
+  );
+  expectInvalid({ state: "pending", result_heads: structuredClone(base.base_heads), steps: [pendingStep], next_step: null }, /pending.*next step|schema/iu);
+  expectInvalid({ state: "pending", result_heads: structuredClone(base.base_heads), steps: [base.steps[0]], next_step: "portfolio_activation" }, /pending.*completed|schema/iu);
+  expectInvalid({ state: "pending", result_heads: structuredClone(base.base_heads), steps: [failedStep], next_step: "portfolio_activation" }, /pending.*failed|schema/iu);
+  expectInvalid({ state: "pending", steps: [pendingStep], next_step: "portfolio_activation" }, /pending.*heads|result head/iu);
+  expectInvalid({
+    state: "in_progress",
+    result_heads: structuredClone(base.base_heads),
+    steps: [{
+      ...structuredClone(base.steps[0]),
+      input_digest: base.base_heads.portfolio_lock_digest,
+      output_digest: base.base_heads.portfolio_lock_digest,
+    }, markerStep],
+    next_step: "portfolio_commit_marker",
+  }, /apply step.*successor head|must produce/iu);
+  expectInvalid({ state: "in_progress", result_heads: structuredClone(base.base_heads), steps: [pendingStep], next_step: "portfolio_activation" }, /in.progress.*completed|prefix|schema/iu);
+  expectInvalid({ state: "in_progress", steps: [base.steps[0], markerStep], next_step: null }, /in.progress.*next step|schema/iu);
+  expectInvalid({
+    state: "in_progress",
+    steps: [pendingStep, { ...structuredClone(base.steps[0]), step_id: "portfolio_activation_2" }],
+    next_step: "portfolio_activation",
+  }, /completed.*after|prefix/iu);
+  expectInvalid({
+    state: "failed",
+    steps: [failedStep, { ...markerStep, status: "completed" }],
+    stop: { code: "application_failed", detail: "Invalid completed step after failure." },
+  }, /completed.*after|failed.*sequence|prefix/iu);
+  expectInvalid({
+    state: "failed",
+    steps: [failedStep, { ...markerStep, status: "failed" }],
+    stop: { code: "application_failed", detail: "Invalid repeated failure." },
+  }, /exactly one failed|failed.*sequence/iu);
+  expectInvalid({ state: "stopped", steps: [pendingStep], stop: null, next_step: "portfolio_activation", result_heads: structuredClone(base.base_heads) }, /stopped.*stop|schema/iu);
+  expectInvalid({
+    state: "stopped",
+    steps: [pendingStep],
+    stop: { code: "stale_head", detail: "Resume after refreshing the head." },
+    next_step: null,
+    result_heads: structuredClone(base.base_heads),
+  }, /stopped.*next step|schema/iu);
+  expectInvalid({ state: "failed", steps: [], stop: null, result_heads: structuredClone(base.base_heads) }, /failed.*stop|schema/iu);
+  expectInvalid({
+    state: "failed",
+    steps: [failedStep],
+    stop: { code: "application_failed", detail: "Terminal failure." },
+    next_step: "portfolio_activation",
+    result_heads: structuredClone(base.base_heads),
+  }, /failed.*next step|schema/iu);
+  expectInvalid({
+    state: "failed",
+    steps: [base.steps[0]],
+    stop: { code: "application_failed", detail: "Cannot fail after all work completed." },
+  }, /failed.*completed|failed.*step/iu);
+  expectInvalid({
+    state: "in_progress",
+    steps: [base.steps[0], markerStep],
+    next_step: "portfolio_commit_marker",
+    result_heads: { ...structuredClone(base.base_heads), portfolio_lock_digest: D[3] },
+  }, /result head|completed.*output/iu);
+  expectInvalid({
+    state: "in_progress",
+    steps: [{
+      ...structuredClone(base.steps[0]),
+      operation: "apply_asset_transition",
+      input_digest: base.base_heads.registry_snapshot_digest,
+    }, markerStep],
+    next_step: "portfolio_commit_marker",
+  }, /Registry.*result head|completed.*output/iu);
+  expectInvalid({
+    state: "in_progress",
+    steps: [
+      base.steps[0],
+      { ...structuredClone(base.steps[0]), step_id: "portfolio_activation_2", input_digest: D[3], output_digest: D[4] },
+      markerStep,
+    ],
+    result_heads: { ...structuredClone(base.result_heads), portfolio_lock_digest: D[4] },
+    next_step: "portfolio_commit_marker",
+  }, /digest chain|step input/iu);
+  expectInvalid({
+    state: "in_progress",
+    steps: [
+      base.steps[0],
+      { ...structuredClone(base.steps[0]), step_id: "portfolio_activation_2", input_digest: D[1], output_digest: D[3] },
+      { ...markerStep, input_digest: D[3], output_digest: D[3] },
+    ],
+    result_heads: { ...structuredClone(base.result_heads), portfolio_lock_digest: D[3] },
+    next_step: "portfolio_commit_marker",
+  }, /at most one.*transition batch/iu);
+  expectInvalid({
+    state: "in_progress",
+    steps: [base.steps[0], { ...markerStep, step_id: base.steps[0].step_id }],
+    next_step: base.steps[0].step_id,
+  }, /duplicate.*step|step ID/iu);
 });
 
 process.stdout.write(`Evolution loop contract tests passed: ${closures} closures\n`);

@@ -69,6 +69,102 @@
     "authority_implied": { "type": "boolean", "const": false },
     "receipt_digest": { "$ref": "#/$defs/digest" }
   },
+  "allOf": [
+    {
+      "if": { "properties": { "state": { "const": "pending" } } },
+      "then": {
+        "properties": {
+          "stop": { "type": "null" },
+          "next_step": { "$ref": "#/$defs/token" },
+          "steps": {
+            "minItems": 1,
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/step" },
+                { "properties": { "status": { "const": "pending" } } }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "in_progress" } } },
+      "then": {
+        "properties": {
+          "stop": { "type": "null" },
+          "next_step": { "$ref": "#/$defs/token" },
+          "steps": {
+            "minItems": 2,
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/step" },
+                { "properties": { "status": { "enum": ["completed", "pending"] } } }
+              ]
+            },
+            "allOf": [
+              { "contains": { "properties": { "status": { "const": "completed" } }, "required": ["status"] }, "minContains": 1 },
+              { "contains": { "properties": { "status": { "const": "pending" } }, "required": ["status"] }, "minContains": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "stopped" } } },
+      "then": {
+        "properties": {
+          "stop": { "$ref": "#/$defs/typedStop" },
+          "next_step": { "$ref": "#/$defs/token" },
+          "steps": {
+            "minItems": 1,
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/step" },
+                { "properties": { "status": { "enum": ["completed", "pending", "skipped"] } } }
+              ]
+            },
+            "contains": { "properties": { "status": { "const": "pending" } }, "required": ["status"] },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "failed" } } },
+      "then": {
+        "properties": {
+          "stop": { "$ref": "#/$defs/typedStop" },
+          "next_step": { "type": "null" },
+          "steps": {
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/step" },
+                { "properties": { "status": { "enum": ["completed", "failed", "skipped"] } } }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "completed" } } },
+      "then": {
+        "properties": {
+          "stop": { "type": "null" },
+          "next_step": { "type": "null" },
+          "steps": {
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/step" },
+                { "properties": { "status": { "const": "completed" } } }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "digest": {
       "type": "string",

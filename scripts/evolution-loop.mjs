@@ -902,18 +902,108 @@ export function computeEvolutionApplicationReceiptDigest(value) {
   return canonicalDigest(withoutField(value, "receipt_digest"));
 }
 
+const RECEIPT_HEAD_OPERATIONS = Object.freeze({
+  registry_snapshot_digest: new Set(["apply_asset_transition", "verify_asset_commit_marker"]),
+  portfolio_lock_digest: new Set(["apply_portfolio_transition", "verify_portfolio_commit_marker"]),
+});
+
+function receiptStepsForHead(receipt, headField, { completedOnly = false } = {}) {
+  return receipt.steps.filter((step) => (
+    RECEIPT_HEAD_OPERATIONS[headField].has(step.operation)
+      && (!completedOnly || step.status === "completed")
+  ));
+}
+
+function validateReceiptStepSequence(receipt) {
+  const stepIds = new Set();
+  for (const step of receipt.steps) {
+    if (stepIds.has(step.step_id)) throw new Error(`Evolution receipt contains duplicate step ID ${step.step_id}`);
+    stepIds.add(step.step_id);
+  }
+
+  const firstNonCompleted = receipt.steps.findIndex(({ status }) => status !== "completed");
+  if (firstNonCompleted >= 0 && receipt.steps.slice(firstNonCompleted + 1).some(({ status }) => status === "completed")) {
+    throw new Error("Evolution receipt cannot contain a completed step after a non-completed boundary");
+  }
+
+  const firstPending = receipt.steps.find(({ status }) => status === "pending");
+  if (["pending", "in_progress", "stopped"].includes(receipt.state)
+    && (!firstPending || receipt.next_step !== firstPending.step_id)) {
+    throw new Error(`${receipt.state} Evolution receipt next step must identify the first pending step`);
+  }
+
+  if (receipt.state === "pending") {
+    if (!compareCanonical(receipt.result_heads, receipt.base_heads)) {
+      throw new Error("pending Evolution receipt result heads must equal its base heads");
+    }
+    if (receipt.steps.some(({ status }) => status !== "pending")) {
+      throw new Error("pending Evolution receipt cannot contain a completed, failed, or skipped step");
+    }
+  } else if (receipt.state === "in_progress") {
+    if (receipt.steps[0]?.status !== "completed") {
+      throw new Error("in_progress Evolution receipt requires a completed prefix");
+    }
+    if (receipt.steps.some(({ status }) => !["completed", "pending"].includes(status))) {
+      throw new Error("in_progress Evolution receipt may contain only a completed prefix followed by pending steps");
+    }
+  } else if (receipt.state === "stopped") {
+    if (receipt.steps.some(({ status }) => status === "failed")) {
+      throw new Error("stopped Evolution receipt cannot contain a failed step");
+    }
+  } else if (receipt.state === "failed") {
+    if (receipt.steps.length > 0) {
+      const failedIndexes = receipt.steps
+        .map(({ status }, index) => status === "failed" ? index : -1)
+        .filter((index) => index >= 0);
+      if (failedIndexes.length !== 1) {
+        throw new Error("failed Evolution receipt with steps requires exactly one failed step");
+      }
+      const [failedIndex] = failedIndexes;
+      if (receipt.steps.slice(0, failedIndex).some(({ status }) => status !== "completed")
+        || receipt.steps.slice(failedIndex + 1).some(({ status }) => status !== "skipped")) {
+        throw new Error("failed Evolution receipt step sequence must be completed prefix, one failed step, then skipped steps");
+      }
+    }
+  }
+}
+
+function validateReceiptHeadChains(receipt) {
+  for (const [headField, operations] of Object.entries(RECEIPT_HEAD_OPERATIONS)) {
+    let expectedHead = receipt.base_heads[headField];
+    let completedApplyCount = 0;
+    for (const step of receipt.steps) {
+      if (step.status !== "completed" || !operations.has(step.operation)) continue;
+      if (step.input_digest !== expectedHead) {
+        throw new Error(`Evolution receipt ${headField} completed-step digest chain has an invalid step input`);
+      }
+      if (step.operation.startsWith("apply_")) {
+        completedApplyCount += 1;
+        if (step.output_digest === step.input_digest) {
+          throw new Error(`Evolution receipt ${headField} completed apply step must produce a successor head`);
+        }
+      }
+      if (step.operation.startsWith("verify_") && step.output_digest !== step.input_digest) {
+        throw new Error(`Evolution receipt ${headField} verification step cannot change the resource head`);
+      }
+      expectedHead = step.output_digest;
+    }
+    if (completedApplyCount > 1) {
+      throw new Error(`Evolution receipt ${headField} permits at most one completed lifecycle transition batch`);
+    }
+    if (receipt.result_heads[headField] !== expectedHead) {
+      throw new Error(`Evolution receipt ${headField} result head does not equal the completed-step output`);
+    }
+  }
+}
+
 export function validateEvolutionApplicationReceipt(receipt) {
   validateSchema(receipt, SCHEMAS.receipt, "Evolution application receipt");
   assertSelfDigest(receipt, "receipt_digest", computeEvolutionApplicationReceiptDigest, "Evolution application receipt");
   if (receipt.history_preserved !== true || receipt.authority_implied !== false) {
     throw new Error("Evolution receipt must preserve history and must not imply lifecycle authority");
   }
-  if (receipt.state === "completed" && (receipt.stop !== null || receipt.next_step !== null)) {
-    throw new Error("completed Evolution receipt cannot carry a stop or next step");
-  }
-  if (receipt.state === "completed" && receipt.steps.some(({ status }) => status !== "completed")) {
-    throw new Error("completed Evolution receipt cannot contain an incomplete step");
-  }
+  validateReceiptStepSequence(receipt);
+  validateReceiptHeadChains(receipt);
   return receipt;
 }
 
@@ -1084,6 +1174,174 @@ export function verifyEvolutionHumanDecision({
   return deepFreeze({ decision_object_digest: decisionObjectDigest, decision: cloneJson(decision), ...proposal });
 }
 
+function assertReceiptClosureMatches(left, right, label) {
+  for (const field of [
+    "candidate_digest",
+    "experiment_digest",
+    "recommendation_digest",
+    "proposal_digest",
+    "decision_digest",
+    "action",
+  ]) {
+    if (left[field] !== right[field]) throw new Error(`${label} ${field} differs from the successor receipt`);
+  }
+  if (!compareCanonical(left.rollback_anchor, right.rollback_anchor)) {
+    throw new Error(`${label} rollback anchor differs from the successor receipt`);
+  }
+}
+
+function compareCanonicalCollection(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  const normalize = (values) => values.map(stableCanonicalJson).sort(compareText);
+  return compareCanonical(normalize(left), normalize(right));
+}
+
+function readTrustedReceiptAuthorityContext({ storeRoot, contextDigest, trustedContexts, label }) {
+  const context = readContentAddressedJson({ storeRoot, digest: contextDigest }).value;
+  exactTrustedAuthority(context, trustedContexts, label);
+  return context;
+}
+
+function assertReceiptAuthorityBinding({
+  context,
+  resource,
+  predecessorDigest,
+  transitions,
+  decision,
+  decisionObjectDigest,
+}) {
+  const isRegistry = resource === "Registry";
+  const expectedKind = isRegistry
+    ? "external_asset_lifecycle_authority"
+    : "external_portfolio_activation_authority";
+  const predecessorField = isRegistry ? "predecessor_snapshot_digest" : "predecessor_lock_digest";
+  if (context[predecessorField] !== predecessorDigest
+    || !compareCanonicalCollection(context.transitions, transitions)
+    || context.authority?.kind !== expectedKind
+    || context.authority?.authority_id !== decision.authority.authority_id
+    || context.authority?.authority_evidence_digest !== decisionObjectDigest) {
+    throw new Error(`Evolution receipt ${resource} authority is not bound to the exact approved proposal and decision`);
+  }
+}
+
+function verifyReceiptResultHeads({
+  storeRoot,
+  receipt,
+  proposal,
+  decision,
+  decisionObjectDigest,
+  trustedAssetAuthorityContexts,
+  trustedPortfolioAuthorityContexts,
+  trustedHighImpactApprovalGrants,
+  verifyUnchanged = false,
+}) {
+  const registryChanged = receipt.result_heads.registry_snapshot_digest
+    !== receipt.base_heads.registry_snapshot_digest;
+  const portfolioChanged = receipt.result_heads.portfolio_lock_digest
+    !== receipt.base_heads.portfolio_lock_digest;
+  let resultRegistry = null;
+  let resultPortfolio = null;
+  const completedRegistrySteps = receiptStepsForHead(receipt, "registry_snapshot_digest", { completedOnly: true });
+  const registryApplySteps = completedRegistrySteps.filter(({ operation }) => operation === "apply_asset_transition");
+  const completedPortfolioSteps = receiptStepsForHead(receipt, "portfolio_lock_digest", { completedOnly: true });
+  const portfolioApplySteps = completedPortfolioSteps.filter(({ operation }) => operation === "apply_portfolio_transition");
+
+  if (registryChanged || verifyUnchanged || completedRegistrySteps.length > 0) {
+    resultRegistry = verifyAssetRegistry({
+      storeRoot,
+      snapshotDigest: receipt.result_heads.registry_snapshot_digest,
+      trustedAuthorityContexts: trustedAssetAuthorityContexts,
+    });
+  }
+  if (registryApplySteps.length > 0) {
+    const [step] = registryApplySteps;
+    const snapshot = readContentAddressedJson({ storeRoot, digest: receipt.result_heads.registry_snapshot_digest }).value;
+    if (proposal.lifecycle_plan.asset_transitions.length === 0
+      || snapshot.predecessor?.snapshot_digest !== step.input_digest
+      || snapshot.lifecycle_authority_context_digest !== step.authority_context_digest) {
+      throw new Error("Evolution receipt Registry result is not the exact completed Asset transition");
+    }
+    const context = readTrustedReceiptAuthorityContext({
+      storeRoot,
+      contextDigest: step.authority_context_digest,
+      trustedContexts: trustedAssetAuthorityContexts,
+      label: "Evolution receipt Registry authority",
+    });
+    assertReceiptAuthorityBinding({
+      context,
+      resource: "Registry",
+      predecessorDigest: step.input_digest,
+      transitions: proposal.lifecycle_plan.asset_transitions,
+      decision,
+      decisionObjectDigest,
+    });
+  } else if (registryChanged) {
+    throw new Error("Evolution receipt Registry result changed without a completed Asset transition");
+  }
+  for (const marker of completedRegistrySteps.filter(({ operation }) => operation === "verify_asset_commit_marker")) {
+    verifyAssetRegistry({
+      storeRoot,
+      snapshotDigest: marker.output_digest,
+      trustedAuthorityContexts: trustedAssetAuthorityContexts,
+    });
+    const snapshot = readContentAddressedJson({ storeRoot, digest: marker.output_digest }).value;
+    if (snapshot.lifecycle_authority_context_digest !== marker.authority_context_digest) {
+      throw new Error("Evolution receipt Registry verification marker authority does not match the verified head");
+    }
+  }
+
+  if (portfolioChanged || verifyUnchanged || completedPortfolioSteps.length > 0) {
+    resultPortfolio = verifyPortfolioLock({
+      storeRoot,
+      lockDigest: receipt.result_heads.portfolio_lock_digest,
+      trustedPortfolioAuthorityContexts,
+      trustedAssetAuthorityContexts,
+      trustedHighImpactApprovalGrants,
+    });
+  }
+  if (portfolioApplySteps.length > 0) {
+    const [step] = portfolioApplySteps;
+    if (proposal.lifecycle_plan.portfolio_transitions.length === 0
+      || resultPortfolio.lock.predecessor?.lock_digest !== step.input_digest
+      || resultPortfolio.lock.authority_context_digest !== step.authority_context_digest
+      || resultPortfolio.lock.current_manifest_digest !== proposal.lifecycle_plan.target_manifest.manifest_digest
+      || resultPortfolio.lock.current_asset_set_digest !== proposal.lifecycle_plan.target_manifest.asset_set_digest) {
+      throw new Error("Evolution receipt Portfolio result is not the exact completed approved transition");
+    }
+    const context = readTrustedReceiptAuthorityContext({
+      storeRoot,
+      contextDigest: step.authority_context_digest,
+      trustedContexts: trustedPortfolioAuthorityContexts,
+      label: "Evolution receipt Portfolio authority",
+    });
+    assertReceiptAuthorityBinding({
+      context,
+      resource: "Portfolio",
+      predecessorDigest: step.input_digest,
+      transitions: proposal.lifecycle_plan.portfolio_transitions,
+      decision,
+      decisionObjectDigest,
+    });
+  } else if (portfolioChanged) {
+    throw new Error("Evolution receipt Portfolio result changed without a completed Portfolio transition");
+  }
+  for (const marker of completedPortfolioSteps.filter(({ operation }) => operation === "verify_portfolio_commit_marker")) {
+    verifyPortfolioLock({
+      storeRoot,
+      lockDigest: marker.output_digest,
+      trustedPortfolioAuthorityContexts,
+      trustedAssetAuthorityContexts,
+      trustedHighImpactApprovalGrants,
+    });
+    const lock = readContentAddressedJson({ storeRoot, digest: marker.output_digest }).value;
+    if (lock.authority_context_digest !== marker.authority_context_digest) {
+      throw new Error("Evolution receipt Portfolio verification marker authority does not match the verified head");
+    }
+  }
+
+  return { resultRegistry, resultPortfolio };
+}
+
 export function verifyEvolutionApplicationReceipt({
   storeRoot,
   receiptObjectDigest,
@@ -1128,25 +1386,70 @@ export function verifyEvolutionApplicationReceipt({
     registry_snapshot_digest: decision.proposal.lifecycle_plan.base_registry_snapshot_digest,
     portfolio_lock_digest: decision.proposal.lifecycle_plan.base_portfolio_lock_digest,
   };
-  if (!compareCanonical(receipt.base_heads, expectedBaseHeads)) {
-    throw new Error("Evolution receipt base heads differ from the approved proposal");
-  }
   if (!compareCanonical(receipt.rollback_anchor, decision.proposal.lifecycle_plan.rollback_anchor)) {
     throw new Error("Evolution receipt rollback anchor differs from the approved proposal");
   }
-  if (receipt.predecessor_receipt_digest !== null) {
-    const predecessor = readArtifact({ storeRoot, objectDigest: receipt.predecessor_receipt_digest, validate: validateEvolutionApplicationReceipt, label: "Evolution predecessor receipt" });
-    if (predecessor.result_heads.registry_snapshot_digest !== receipt.base_heads.registry_snapshot_digest
-      || predecessor.result_heads.portfolio_lock_digest !== receipt.base_heads.portfolio_lock_digest) {
+  const predecessorChain = [];
+  const seenReceiptObjects = new Set([receiptObjectDigest]);
+  let successor = receipt;
+  while (successor.predecessor_receipt_digest !== null) {
+    const predecessorObjectDigest = successor.predecessor_receipt_digest;
+    if (seenReceiptObjects.has(predecessorObjectDigest)) {
+      throw new Error("Evolution predecessor receipt chain contains a cycle");
+    }
+    seenReceiptObjects.add(predecessorObjectDigest);
+    const predecessor = readArtifact({
+      storeRoot,
+      objectDigest: predecessorObjectDigest,
+      validate: validateEvolutionApplicationReceipt,
+      label: "Evolution predecessor receipt",
+    });
+    assertReceiptClosureMatches(predecessor, receipt, "Evolution predecessor receipt");
+    if (!compareCanonical(predecessor.result_heads, successor.base_heads)) {
       throw new Error("Evolution receipt predecessor head drift rejected");
     }
+    predecessorChain.push(predecessor);
+    successor = predecessor;
   }
+  if (!compareCanonical(successor.base_heads, expectedBaseHeads)) {
+    throw new Error("Evolution receipt base heads differ from the approved proposal");
+  }
+  for (const predecessor of predecessorChain) {
+    if (predecessor.steps.some(({ status }) => status === "completed")
+      && decision.decision.disposition !== "approved") {
+      throw new Error("Evolution predecessor completed steps require an approved human decision");
+    }
+    verifyReceiptResultHeads({
+      storeRoot,
+      receipt: predecessor,
+      proposal: decision.proposal,
+      decision: decision.decision,
+      decisionObjectDigest,
+      trustedAssetAuthorityContexts,
+      trustedPortfolioAuthorityContexts,
+      trustedHighImpactApprovalGrants,
+      verifyUnchanged: true,
+    });
+  }
+  if (receipt.steps.some(({ status }) => status === "completed")
+    && decision.decision.disposition !== "approved") {
+    throw new Error("Evolution receipt completed steps require an approved human decision");
+  }
+  const { resultPortfolio } = verifyReceiptResultHeads({
+    storeRoot,
+    receipt,
+    proposal: decision.proposal,
+    decision: decision.decision,
+    decisionObjectDigest,
+    trustedAssetAuthorityContexts,
+    trustedPortfolioAuthorityContexts,
+    trustedHighImpactApprovalGrants,
+    verifyUnchanged: receipt.state === "completed",
+  });
   if (receipt.state === "completed") {
     if (decision.decision.disposition !== "approved") {
       throw new Error("completed Evolution receipt requires an approved human decision");
     }
-    verifyAssetRegistry({ storeRoot, snapshotDigest: receipt.result_heads.registry_snapshot_digest, trustedAuthorityContexts: trustedAssetAuthorityContexts });
-    const resultPortfolio = verifyPortfolioLock({ storeRoot, lockDigest: receipt.result_heads.portfolio_lock_digest, trustedPortfolioAuthorityContexts, trustedAssetAuthorityContexts, trustedHighImpactApprovalGrants });
     if (receipt.action === "adopt_candidate") {
       if (receipt.result_heads.registry_snapshot_digest !== receipt.base_heads.registry_snapshot_digest) {
         throw new Error("Portfolio-only Evolution receipt cannot change the Registry head");

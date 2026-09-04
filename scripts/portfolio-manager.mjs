@@ -1230,7 +1230,9 @@ function assetApplicability(asset, context) {
 
 function selectorConflictMatches(conflict, context) {
   const result = selectorsMatch(conflict.selectors, context);
-  return result.matches || result.unknown.length > 0;
+  const unknown = new Set(result.unknown);
+  const definitiveMismatches = result.mismatched.filter((dimension) => !unknown.has(dimension));
+  return result.matches || (result.unknown.length > 0 && definitiveMismatches.length === 0);
 }
 
 function severityAction(left, right) {

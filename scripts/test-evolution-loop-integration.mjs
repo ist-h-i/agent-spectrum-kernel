@@ -18,7 +18,7 @@ import {
   resolveAsset,
   verifyAssetRegistry,
 } from "./asset-registry.mjs";
-import { canonicalDigest } from "./content-addressed-store.mjs";
+import { canonicalDigest, putContentAddressedJson } from "./content-addressed-store.mjs";
 import {
   applyApprovedEvolutionPortfolioAction,
   buildEvolutionApplicationReceipt,
@@ -26,6 +26,7 @@ import {
   buildEvolutionExperiment,
   buildEvolutionHumanDecision,
   buildEvolutionRecommendation,
+  computeEvolutionApplicationReceiptDigest,
   computeEvolutionHumanDecisionDigest,
   deriveEvolutionActionProposal,
   deriveEvolutionRecommendation,
@@ -1385,14 +1386,320 @@ try {
     assert.equal(verified.receipt.result_heads.portfolio_lock_digest, application.lock_digest);
   });
 
+  const receiptVariant = (overrides = {}) => buildEvolutionApplicationReceipt({
+    ...structuredClone(application.artifact),
+    ...structuredClone(overrides),
+  });
+  const publishReceiptVariant = (overrides = {}) => publishEvolutionApplicationReceipt({
+    storeRoot,
+    receipt: receiptVariant(overrides),
+  });
+  const verifyReceiptObject = (receiptObjectDigest, {
+    portfolioTrustOverride = allPortfolioTrust,
+    assetTrustOverride = assetTrust,
+  } = {}) => verifyEvolutionClosure({
+    storeRoot,
+    receiptObjectDigest,
+    decisionObjectDigest: decisionPublication.object_digest,
+    proposalObjectDigest: proposalPublication.object_digest,
+    candidateObjectDigest: candidatePublication.object_digest,
+    experimentObjectDigest: experimentPublication.object_digest,
+    recommendationObjectDigest: recommendationPublication.object_digest,
+    trustedHumanDecisionAuthorities: humanTrust,
+    trustedExperimentAuthorities: experimentTrust,
+    trustedEvaluationAuthorities: evaluationTrust,
+    trustedAssetAuthorityContexts: assetTrustOverride,
+    trustedPortfolioAuthorityContexts: portfolioTrustOverride,
+  });
+  const portfolioMarker = (status = "pending") => ({
+    step_id: "portfolio_commit_marker",
+    operation: "verify_portfolio_commit_marker",
+    input_digest: application.lock_digest,
+    authority_context_digest: application.artifact.steps[0].authority_context_digest,
+    output_digest: application.lock_digest,
+    status,
+  });
+
+  closes("stored non-completed receipts verify exact partial heads and terminal boundaries", () => {
+    const pending = publishReceiptVariant({
+      state: "pending",
+      result_heads: structuredClone(application.artifact.base_heads),
+      steps: [{ ...structuredClone(application.artifact.steps[0]), status: "pending" }],
+      stop: null,
+      next_step: "portfolio_activation",
+    });
+    assert.equal(verifyReceiptObject(pending.object_digest).receipt.state, "pending");
+    const inProgress = publishReceiptVariant({
+      state: "in_progress",
+      steps: [application.artifact.steps[0], portfolioMarker()],
+      stop: null,
+      next_step: "portfolio_commit_marker",
+    });
+    assert.equal(verifyReceiptObject(inProgress.object_digest).receipt.state, "in_progress");
+    const stopped = publishReceiptVariant({
+      state: "stopped",
+      steps: [application.artifact.steps[0], portfolioMarker()],
+      stop: { code: "portfolio_activation_authority_required", detail: "Resume after exact authority is supplied." },
+      next_step: "portfolio_commit_marker",
+    });
+    assert.equal(verifyReceiptObject(stopped.object_digest).receipt.state, "stopped");
+    const failedBeforeStart = publishReceiptVariant({
+      state: "failed",
+      result_heads: structuredClone(application.artifact.base_heads),
+      steps: [],
+      stop: { code: "application_failed", detail: "Failure occurred before the first lifecycle operation." },
+      next_step: null,
+    });
+    assert.equal(verifyReceiptObject(failedBeforeStart.object_digest).receipt.state, "failed");
+    const failedAfterPrefix = publishReceiptVariant({
+      state: "failed",
+      steps: [application.artifact.steps[0], portfolioMarker("failed")],
+      stop: { code: "application_failed", detail: "Failure occurred after the verified Portfolio transition." },
+      next_step: null,
+    });
+    assert.equal(verifyReceiptObject(failedAfterPrefix.object_digest).receipt.state, "failed");
+
+    const verifiedAfterApply = publishReceiptVariant({
+      state: "in_progress",
+      steps: [
+        application.artifact.steps[0],
+        portfolioMarker("completed"),
+        { ...portfolioMarker(), step_id: "portfolio_post_commit_marker" },
+      ],
+      stop: null,
+      next_step: "portfolio_post_commit_marker",
+    });
+    assert.equal(verifyReceiptObject(verifiedAfterApply.object_digest).receipt.state, "in_progress");
+
+    const driftedMarker = publishReceiptVariant({
+      state: "in_progress",
+      steps: [
+        application.artifact.steps[0],
+        { ...portfolioMarker("completed"), authority_context_digest: digest("unrelated-marker-authority") },
+        { ...portfolioMarker(), step_id: "portfolio_post_commit_marker" },
+      ],
+      stop: null,
+      next_step: "portfolio_post_commit_marker",
+    });
+    assert.throws(
+      () => verifyReceiptObject(driftedMarker.object_digest),
+      /verification marker authority.*verified head/iu,
+    );
+  });
+
+  closes("stored receipt binds the applied Portfolio authority to the exact proposal and decision", () => {
+    const unrelatedAuthorityContext = buildPortfolioAuthorityContext({
+      portfolioId: basePublication.portfolio_id,
+      repositoryId: REPOSITORY_ID,
+      scopeId: SCOPE_ID,
+      predecessorLockDigest: baseScenario.lock.lock_digest,
+      transitions: lifecyclePlan.portfolio_transitions,
+      authority: portfolioAuthority({
+        authorityId: "unrelated-human-maintainer",
+        evidenceDigest: digest("unrelated-human-decision"),
+        revision: 4,
+      }),
+    });
+    const unrelatedApplication = applyPortfolioTransitions({
+      storeRoot,
+      predecessorLockDigest: baseScenario.lock.lock_digest,
+      authorityContext: unrelatedAuthorityContext,
+      trustedPortfolioAuthorityContexts: portfolioTrust,
+      trustedAssetAuthorityContexts: assetTrust,
+    });
+    const transplanted = publishReceiptVariant({
+      result_heads: {
+        ...structuredClone(application.artifact.result_heads),
+        portfolio_lock_digest: unrelatedApplication.lock_digest,
+      },
+      steps: [{
+        ...structuredClone(application.artifact.steps[0]),
+        authority_context_digest: unrelatedApplication.authority_context_digest,
+        output_digest: unrelatedApplication.lock_digest,
+      }],
+    });
+    assert.throws(
+      () => verifyReceiptObject(transplanted.object_digest, {
+        portfolioTrustOverride: [...allPortfolioTrust, unrelatedAuthorityContext],
+      }),
+      /authority.*decision|approved proposal|exact completed approved transition/iu,
+    );
+  });
+
+  closes("stored receipt verification rejects missing and unrelated result heads", () => {
+    const missingHead = digest("missing-portfolio-head");
+    const missing = publishReceiptVariant({
+      state: "in_progress",
+      result_heads: {
+        ...structuredClone(application.artifact.result_heads),
+        portfolio_lock_digest: missingHead,
+      },
+      steps: [{
+        ...structuredClone(application.artifact.steps[0]),
+        output_digest: missingHead,
+      }, {
+        ...portfolioMarker(),
+        input_digest: missingHead,
+        output_digest: missingHead,
+      }],
+      next_step: "portfolio_commit_marker",
+    });
+    assert.throws(() => verifyReceiptObject(missing.object_digest), /does not exist|content-addressed|Portfolio/iu);
+
+    const unrelatedPortfolio = publishReceiptVariant({
+      state: "in_progress",
+      result_heads: {
+        ...structuredClone(application.artifact.result_heads),
+        portfolio_lock_digest: challengerScenario.lock.lock_digest,
+      },
+      steps: [{
+        ...structuredClone(application.artifact.steps[0]),
+        output_digest: challengerScenario.lock.lock_digest,
+        authority_context_digest: challengerScenario.lock.authority_context_digest,
+      }, {
+        ...portfolioMarker(),
+        input_digest: challengerScenario.lock.lock_digest,
+        output_digest: challengerScenario.lock.lock_digest,
+      }],
+      next_step: "portfolio_commit_marker",
+    });
+    assert.throws(() => verifyReceiptObject(unrelatedPortfolio.object_digest), /exact completed approved transition|predecessor|target/iu);
+
+    const unrelatedRegistryContext = assetAuthority({
+      predecessorSnapshotDigest: application.artifact.base_heads.registry_snapshot_digest,
+      transitions: [assetTransition(candidateAsset, "candidate", "admitted")],
+      revision: 99,
+    });
+    const unrelatedRegistryApplication = applyAssetLifecycleTransitions({
+      storeRoot,
+      predecessorSnapshotDigest: application.artifact.base_heads.registry_snapshot_digest,
+      authorityContext: unrelatedRegistryContext,
+      trustedAuthorityContexts: assetTrust,
+    });
+    const unrelatedRegistry = publishReceiptVariant({
+      state: "in_progress",
+      result_heads: {
+        registry_snapshot_digest: unrelatedRegistryApplication.snapshot_digest,
+        portfolio_lock_digest: application.artifact.base_heads.portfolio_lock_digest,
+      },
+      steps: [{
+        step_id: "asset_transition",
+        operation: "apply_asset_transition",
+        input_digest: application.artifact.base_heads.registry_snapshot_digest,
+        authority_context_digest: unrelatedRegistryApplication.authority_context_digest,
+        output_digest: unrelatedRegistryApplication.snapshot_digest,
+        status: "completed",
+      }, {
+        ...structuredClone(application.artifact.steps[0]),
+        status: "pending",
+      }],
+      next_step: "portfolio_activation",
+    });
+    assert.throws(
+      () => verifyReceiptObject(unrelatedRegistry.object_digest, {
+        assetTrustOverride: [...assetTrust, unrelatedRegistryContext],
+      }),
+      /exact completed Asset transition|approved proposal|exact approved proposal/iu,
+    );
+  });
+
+  closes("predecessor resume closes over one exact Evolution lineage and verified heads", () => {
+    const predecessor = publishReceiptVariant({
+      state: "stopped",
+      steps: [application.artifact.steps[0], portfolioMarker()],
+      stop: { code: "portfolio_activation_authority_required", detail: "Resume after exact authority is supplied." },
+      next_step: "portfolio_commit_marker",
+    });
+    const resumed = publishReceiptVariant({
+      predecessor_receipt_digest: predecessor.object_digest,
+      state: "pending",
+      base_heads: structuredClone(predecessor.artifact.result_heads),
+      result_heads: structuredClone(predecessor.artifact.result_heads),
+      steps: [portfolioMarker()],
+      stop: null,
+      next_step: "portfolio_commit_marker",
+    });
+    assert.equal(verifyReceiptObject(resumed.object_digest).receipt.predecessor_receipt_digest, predecessor.object_digest);
+
+    const wrongClosure = publishReceiptVariant({
+      candidate_digest: digest("different-evolution-candidate"),
+      state: "stopped",
+      steps: [application.artifact.steps[0], portfolioMarker()],
+      stop: { code: "stale_head", detail: "Different Evolution closure." },
+      next_step: "portfolio_commit_marker",
+    });
+    const transplanted = publishReceiptVariant({
+      predecessor_receipt_digest: wrongClosure.object_digest,
+      state: "pending",
+      base_heads: structuredClone(wrongClosure.artifact.result_heads),
+      result_heads: structuredClone(wrongClosure.artifact.result_heads),
+      steps: [portfolioMarker()],
+      stop: null,
+      next_step: "portfolio_commit_marker",
+    });
+    assert.throws(() => verifyReceiptObject(transplanted.object_digest), /predecessor.*candidate_digest|successor receipt/iu);
+
+    const drifted = publishReceiptVariant({
+      predecessor_receipt_digest: predecessor.object_digest,
+      state: "pending",
+      result_heads: structuredClone(application.artifact.base_heads),
+      steps: [{ ...portfolioMarker(), input_digest: application.artifact.base_heads.portfolio_lock_digest, output_digest: application.artifact.base_heads.portfolio_lock_digest }],
+      stop: null,
+      next_step: "portfolio_commit_marker",
+    });
+    assert.throws(() => verifyReceiptObject(drifted.object_digest), /predecessor head drift/iu);
+
+    const unrelatedRoot = publishReceiptVariant({
+      candidate_digest: digest("different-root-candidate"),
+      state: "pending",
+      result_heads: structuredClone(application.artifact.base_heads),
+      steps: [{ ...structuredClone(application.artifact.steps[0]), status: "pending" }],
+      stop: null,
+      next_step: "portfolio_activation",
+    });
+    const hiddenTransplant = publishReceiptVariant({
+      predecessor_receipt_digest: unrelatedRoot.object_digest,
+      state: "stopped",
+      base_heads: structuredClone(unrelatedRoot.artifact.result_heads),
+      result_heads: structuredClone(unrelatedRoot.artifact.result_heads),
+      steps: [{ ...structuredClone(application.artifact.steps[0]), status: "pending" }],
+      stop: { code: "portfolio_activation_authority_required", detail: "Resume after exact authority is supplied." },
+      next_step: "portfolio_activation",
+    });
+    const resumedFromHiddenTransplant = publishReceiptVariant({
+      predecessor_receipt_digest: hiddenTransplant.object_digest,
+      state: "pending",
+      base_heads: structuredClone(hiddenTransplant.artifact.result_heads),
+      result_heads: structuredClone(hiddenTransplant.artifact.result_heads),
+      steps: [{ ...structuredClone(application.artifact.steps[0]), status: "pending" }],
+      stop: null,
+      next_step: "portfolio_activation",
+    });
+    assert.throws(
+      () => verifyReceiptObject(resumedFromHiddenTransplant.object_digest),
+      /predecessor.*candidate_digest|successor receipt|approved proposal/iu,
+    );
+  });
+
+  closes("digest-resealed semantically invalid stored receipt still fails closed", () => {
+    const forged = structuredClone(application.artifact);
+    forged.state = "stopped";
+    forged.stop = null;
+    forged.next_step = null;
+    delete forged.receipt_digest;
+    forged.receipt_digest = computeEvolutionApplicationReceiptDigest(forged);
+    const publication = putContentAddressedJson({ storeRoot, artifact: forged });
+    assert.throws(() => verifyReceiptObject(publication.digest), /schema|stopped.*stop|next step/iu);
+  });
+
   closes("completed receipt rejects forged action, heads, steps, and rollback history", () => {
-    const verifyForged = (mutate) => {
+    const verifyForged = (mutate) => () => {
       const draft = structuredClone(application.artifact);
       delete draft.receipt_digest;
       mutate(draft);
       const forged = buildEvolutionApplicationReceipt(draft);
       const published = publishEvolutionApplicationReceipt({ storeRoot, receipt: forged });
-      return () => verifyEvolutionClosure({
+      return verifyEvolutionClosure({
         storeRoot,
         receiptObjectDigest: published.object_digest,
         decisionObjectDigest: decisionPublication.object_digest,
@@ -1408,8 +1715,8 @@ try {
       });
     };
     assert.throws(verifyForged((draft) => { draft.action = "retain_current"; }), /receipt action|action.*mismatch/iu);
-    assert.throws(verifyForged((draft) => { draft.base_heads.portfolio_lock_digest = challengerScenario.lock.lock_digest; }), /receipt base|base.*head/iu);
-    assert.throws(verifyForged((draft) => { draft.steps[0].output_digest = baseScenario.lock.lock_digest; }), /receipt step|step.*output/iu);
+    assert.throws(verifyForged((draft) => { draft.base_heads.portfolio_lock_digest = challengerScenario.lock.lock_digest; }), /receipt base|base.*head|digest chain/iu);
+    assert.throws(verifyForged((draft) => { draft.steps[0].output_digest = baseScenario.lock.lock_digest; }), /receipt step|step.*output|result head|successor head/iu);
     assert.throws(verifyForged((draft) => { draft.rollback_anchor = exactPortfolioRef(targetPublication); }), /receipt rollback|rollback.*anchor/iu);
   });
 
