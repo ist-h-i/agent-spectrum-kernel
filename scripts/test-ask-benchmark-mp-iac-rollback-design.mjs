@@ -702,6 +702,7 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
     const result = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
     const target = result.requirement_results.find(({ requirement_id }) => requirement_id === mutation.requirement_id);
     assert.equal(target?.outcome, "fail", `${mutation.mutation_id} must make ${mutation.requirement_id} unrecoverable`);
+    assert.deepEqual(target?.finding_ids, [`fresh-${mutation.requirement_id}`], `${mutation.mutation_id} must attribute the exact requirement-specific evidence failure`);
     assert.notEqual(result.classification, "correct_narrow_execution", `${mutation.mutation_id} must not preserve the reference classification`);
   }
 
