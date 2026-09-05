@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -266,6 +266,18 @@ try {
 
   const runner = resolve(target, "scripts/codex-exec-runner.mjs");
   const fakeCodex = resolve(target, "fake-codex");
+  const riskPlatform = {
+    "darwin:arm64": { targetTriple: "aarch64-apple-darwin", platformPackage: "codex-darwin-arm64" },
+    "darwin:x64": { targetTriple: "x86_64-apple-darwin", platformPackage: "codex-darwin-x64" },
+    "linux:arm64": { targetTriple: "aarch64-unknown-linux-musl", platformPackage: "codex-linux-arm64" },
+    "linux:x64": { targetTriple: "x86_64-unknown-linux-musl", platformPackage: "codex-linux-x64" },
+  }[`${process.platform}:${process.arch}`];
+  assert.ok(riskPlatform, `risk executor fixture does not support ${process.platform}/${process.arch}`);
+  const { targetTriple, platformPackage } = riskPlatform;
+  const riskPackageRoot = resolve(fixtureRoot, "risk-codex-package");
+  const riskCodexLauncher = resolve(riskPackageRoot, "bin/codex.js");
+  const riskPlatformRoot = resolve(riskPackageRoot, "node_modules/@openai", platformPackage);
+  const riskNativeCodex = resolve(riskPlatformRoot, `vendor/${targetTriple}/bin/codex`);
   writeFileSync(
     fakeCodex,
     `#!/bin/sh
@@ -280,6 +292,38 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
 `,
   );
   chmodSync(fakeCodex, 0o755);
+  mkdirSync(dirname(riskCodexLauncher), { recursive: true });
+  mkdirSync(dirname(riskNativeCodex), { recursive: true });
+  writeFileSync(riskCodexLauncher, "#!/usr/bin/env node\nthrow new Error('risk test launcher must never execute');\n");
+  chmodSync(riskCodexLauncher, 0o755);
+  writeFileSync(resolve(riskPackageRoot, "package.json"), `${JSON.stringify({ name: "@openai/codex", version: "1.2.3", bin: { codex: "bin/codex.js" } }, null, 2)}\n`);
+  writeFileSync(resolve(riskPlatformRoot, "package.json"), `${JSON.stringify({ name: "@openai/codex", version: `1.2.3-${process.platform}-${process.arch}`, os: [process.platform], cpu: [process.arch] }, null, 2)}\n`);
+  const riskNativeSource = `${riskNativeCodex}.c`;
+  writeFileSync(riskNativeSource, `#include <stdio.h>
+#include <string.h>
+
+int main(int argc, char **argv) {
+  const char *output = NULL;
+  for (int i = 1; i + 1 < argc; i++) if (strcmp(argv[i], "--output-last-message") == 0) output = argv[++i];
+  if (!output) return 31;
+  FILE *prompt = fopen(".fixture-codex-invocations", "w");
+  if (!prompt) return 32;
+  char buffer[8192]; size_t count;
+  while ((count = fread(buffer, 1, sizeof(buffer), stdin)) > 0) fwrite(buffer, 1, count, prompt);
+  fclose(prompt);
+  FILE *source = fopen(".fixture-implementation.json", "r");
+  FILE *destination = fopen(output, "w");
+  if (!source || !destination) return 33;
+  while ((count = fread(buffer, 1, sizeof(buffer), source)) > 0) fwrite(buffer, 1, count, destination);
+  fclose(source); fclose(destination);
+  return 0;
+}
+`);
+  const compiler = process.platform === "darwin"
+    ? { command: "/usr/bin/xcrun", args: ["clang"] }
+    : { command: "cc", args: [] };
+  assertPass("compile native risk Codex fixture", spawnSync(compiler.command, [...compiler.args, riskNativeSource, "-o", riskNativeCodex], { encoding: "utf8" }));
+  chmodSync(riskNativeCodex, 0o755);
 
   for (const fixture of modeCases) {
     const resultPath = resolve(target, `.fixture-${fixture.mode}.json`);
@@ -902,7 +946,7 @@ Findings:
     "--mode", "implementation",
     "--required-gate", "risk-gate",
     "--risk-action", riskActionPath,
-    "--codex-bin", fakeCodex,
+    "--codex-bin", riskCodexLauncher,
     "--output", ".agents/runs/conformance-risk-action.md",
     "--json",
   ];
@@ -921,8 +965,9 @@ Findings:
   assert.equal(riskActionReport.normalized_adapter_event?.stop?.status, "risk_gate");
   assert.equal(riskActionReport.execution_envelope_record?.envelope?.risk_approval?.status, "requested");
   assert.equal(riskActionReport.execution_envelope_record?.envelope?.risk_approval?.execution_status, "not_executed");
-  assert.equal(riskActionReport.execution_envelope_record?.envelope?.risk_approval?.request?.invocation?.executor?.canonical_path, realpathSync(fakeCodex));
-  assert.equal(riskActionReport.execution_envelope_record?.envelope?.risk_approval?.request?.invocation?.executor?.raw_sha256, `sha256:${hashText(readFileSync(fakeCodex))}`);
+  assert.equal(riskActionReport.execution_envelope_record?.envelope?.risk_approval?.request?.invocation?.executor?.spawn_path, realpathSync(riskNativeCodex));
+  assert.equal(riskActionReport.execution_envelope_record?.envelope?.risk_approval?.request?.invocation?.executor?.native_binary?.raw_sha256, `sha256:${hashText(readFileSync(riskNativeCodex))}`);
+  assert.equal(riskActionReport.execution_envelope_record?.envelope?.risk_approval?.request?.invocation?.executor?.resolution, "installed_openai_codex_platform_package");
   assert.equal(readFileSync(fakeInvocationPath, "utf8"), invocationsBeforeRiskAction, "non-review risk-gated action must not invoke Codex");
 
   const repeatedRiskActionResult = runNode(riskArgs, {
@@ -1013,12 +1058,12 @@ Findings:
     assert.equal(readFileSync(fakeInvocationPath, "utf8"), invocationsBeforeRejectedApprovals, `${label} rejection must not invoke Codex`);
   };
 
-  const approvedExecutableBytes = readFileSync(fakeCodex);
-  writeFileSync(fakeCodex, Buffer.concat([approvedExecutableBytes, Buffer.from("\n# executable identity drift\n", "utf8")]));
-  chmodSync(fakeCodex, 0o755);
+  const approvedExecutableBytes = readFileSync(riskNativeCodex);
+  writeFileSync(riskNativeCodex, Buffer.concat([approvedExecutableBytes, Buffer.from("executable identity drift", "utf8")]));
+  chmodSync(riskNativeCodex, 0o755);
   assertInstalledApprovalRejected("executable-digest", approvalBytes);
-  writeFileSync(fakeCodex, approvedExecutableBytes);
-  chmodSync(fakeCodex, 0o755);
+  writeFileSync(riskNativeCodex, approvedExecutableBytes);
+  chmodSync(riskNativeCodex, 0o755);
 
   assertInstalledApprovalRejected("stale-head", resealApproval((value) => { value.invocation.repository.head_sha = "0".repeat(40); }));
   assertInstalledApprovalRejected("broader-effects", resealApproval((value) => {

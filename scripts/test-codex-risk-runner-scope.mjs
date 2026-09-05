@@ -2,12 +2,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { riskCodexRuntimePolicy } from "./codex-risk-approval.mjs";
+import { resolveRiskExecutionEnvironment, riskCodexRuntimePolicy } from "./codex-risk-approval.mjs";
 
 const source = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "codex-risk-runner-scope-")));
@@ -15,7 +15,20 @@ const target = resolve(fixtureRoot, "target");
 const actionPath = resolve(fixtureRoot, "action.json");
 const approvalPath = resolve(fixtureRoot, "approval.json");
 const resultPath = resolve(fixtureRoot, "result.json");
-const fakeCodex = resolve(fixtureRoot, "fake-codex.mjs");
+const targetTriple = process.arch === "arm64" ? "aarch64-apple-darwin" : "x86_64-apple-darwin";
+const platformPackage = process.arch === "arm64" ? "codex-darwin-arm64" : "codex-darwin-x64";
+const makePackagePaths = (name) => {
+  const packageRoot = resolve(fixtureRoot, name);
+  const platformRoot = resolve(packageRoot, "node_modules/@openai", platformPackage);
+  return {
+    packageRoot,
+    launcher: resolve(packageRoot, "bin/codex.js"),
+    platformRoot,
+    native: resolve(platformRoot, `vendor/${targetTriple}/bin/codex`),
+  };
+};
+const nativeCodexPackage = makePackagePaths("native-codex-package");
+const nativeOutOfScopeCodexPackage = makePackagePaths("native-codex-out-of-scope-package");
 const syntheticCodexHome = resolve(fixtureRoot, "codex-home");
 const externalToolMarker = resolve(fixtureRoot, "configured-external-tool-ran.txt");
 const configuredExternalTool = resolve(fixtureRoot, "configured-external-tool.mjs");
@@ -63,7 +76,7 @@ try {
   git(["add", "."]);
   git(["-c", "user.name=ASK Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "fixture"]);
 
-  writeFileSync(resultPath, `${JSON.stringify({
+  const resultJson = `${JSON.stringify({
     schema_version: "1.0.0",
     response_markdown: `Implementation Contract:\n- Artifact ID: IMPL-RISK-SCOPE\n- Upstream refs: WP-RISK-SCOPE, VER-RISK-SCOPE\n- Actual change boundary: exact approved path\n- Verification attempted: node scripts/test-codex-risk-runner-scope.mjs\n- Evidence references: isolated workspace delta\n- Handoff state: review pending\n\nEvidence:\n- command: node scripts/test-codex-risk-runner-scope.mjs\n  result: pass\n`,
     control: {
@@ -71,41 +84,81 @@ try {
       stop_reason: { status: "completed", details: [], human_decision_required: [], stop_if: [] },
       next_action: "review the promoted scoped file",
     },
-  }, null, 2)}\n`);
-  writeFileSync(fakeCodex, `#!/usr/bin/env node\nimport { mkdirSync, readFileSync, writeFileSync } from "node:fs";\nimport { dirname, resolve } from "node:path";\nlet output;\nfor (let i = 2; i < process.argv.length; i += 1) if (process.argv[i] === "--output-last-message") output = process.argv[++i];\nconst approved = resolve(process.cwd(), "dist/release.json");\nmkdirSync(dirname(approved), { recursive: true });\nwriteFileSync(approved, "approved\\n");\nif (process.env.ASK_OUT_OF_SCOPE === "1") writeFileSync(resolve(process.cwd(), "README.md"), "unapproved sibling\\n");\nconst destination = resolve(process.cwd(), output);\nmkdirSync(dirname(destination), { recursive: true });\nwriteFileSync(destination, readFileSync(process.env.ASK_FAKE_RESULT, "utf8"));\n`);
-  chmodSync(fakeCodex, 0o755);
-  const fakeCodexImplementation = resolve(fixtureRoot, "fake-codex-implementation.mjs");
-  renameSync(fakeCodex, fakeCodexImplementation);
+  }, null, 2)}\n`;
+  writeFileSync(resultPath, resultJson);
   writeFileSync(configuredExternalTool, `#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nwriteFileSync(process.env.ASK_MUTATING_TOOL_MARKER, "configured external tool invoked\\n");\n`);
   chmodSync(configuredExternalTool, 0o755);
   mkdirSync(syntheticCodexHome);
   writeFileSync(resolve(syntheticCodexHome, "config.toml"), `[mcp_servers.mutating_fixture]\ncommand = ${JSON.stringify(configuredExternalTool)}\n\n[features]\nhooks = true\nplugins = true\napps = true\nbrowser_use = true\ncomputer_use = true\n`);
-  writeFileSync(fakeCodex, `#!/usr/bin/env node
-import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-const expectedPrefix = ${JSON.stringify(["exec", ...expectedRiskPolicyArgs, "--sandbox", "workspace-write"])};
-const actual = process.argv.slice(2);
-const exactPolicy = expectedPrefix.every((value, index) => actual[index] === value);
-if (!exactPolicy) {
-  const config = readFileSync(new URL("config.toml", \`file://\${process.env.CODEX_HOME}/\`), "utf8");
-  const command = config.match(/command = "([^"]+)"/u)?.[1];
-  if (command) spawnSync(command, { env: process.env, stdio: "inherit" });
-  process.exit(17);
+  const compileNativeFixture = (packagePaths, outOfScope) => {
+    mkdirSync(dirname(packagePaths.launcher), { recursive: true });
+    mkdirSync(dirname(packagePaths.native), { recursive: true });
+    writeFileSync(packagePaths.launcher, "#!/usr/bin/env node\nthrow new Error('risk test launcher must never execute');\n");
+    chmodSync(packagePaths.launcher, 0o755);
+    writeFileSync(resolve(packagePaths.packageRoot, "package.json"), `${JSON.stringify({ name: "@openai/codex", version: "1.2.3", bin: { codex: "bin/codex.js" } }, null, 2)}\n`);
+    writeFileSync(resolve(packagePaths.platformRoot, "package.json"), `${JSON.stringify({ name: "@openai/codex", version: `1.2.3-${process.platform}-${process.arch}`, os: [process.platform], cpu: [process.arch] }, null, 2)}\n`);
+    const output = packagePaths.native;
+    const sourcePath = `${output}.c`;
+    writeFileSync(sourcePath, `#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+
+static void mark_external(void) {
+  FILE *marker = fopen(${JSON.stringify(externalToolMarker)}, "w");
+  if (marker) { fputs("configured external tool invoked\\n", marker); fclose(marker); }
 }
-const result = spawnSync(${JSON.stringify(fakeCodexImplementation)}, actual, { env: process.env, stdio: "inherit" });
-process.exit(result.status ?? 1);
+
+int main(int argc, char **argv) {
+  const char *output_path = NULL;
+  const char *codex_home = getenv("CODEX_HOME");
+  if (getenv("NODE_OPTIONS") || getenv("NODE_PATH") || getenv("npm_config_user_agent") || getenv("DYLD_INSERT_LIBRARIES") || getenv("HTTPS_PROXY") || getenv("HTTP_PROXY")) mark_external();
+  if (!getenv("PATH") || strcmp(getenv("PATH"), "/usr/bin:/bin:/usr/sbin:/sbin") != 0) mark_external();
+  if (codex_home) {
+    char config[4096];
+    snprintf(config, sizeof(config), "%s/config.toml", codex_home);
+    FILE *loaded = fopen(config, "r");
+    if (loaded) { fclose(loaded); mark_external(); }
+  }
+  for (int i = 1; i + 1 < argc; i++) if (strcmp(argv[i], "--output-last-message") == 0) output_path = argv[++i];
+  if (!output_path) return 21;
+  mkdir("dist", 0700);
+  FILE *approved = fopen("dist/release.json", "w");
+  if (!approved) return 22;
+  fputs("approved\\n", approved); fclose(approved);
+  ${outOfScope ? 'FILE *sibling = fopen("README.md", "w"); if (!sibling) return 23; fputs("unapproved sibling\\n", sibling); fclose(sibling);' : ""}
+  FILE *result = fopen(output_path, "w");
+  if (!result) return 24;
+  fputs(${JSON.stringify(resultJson)}, result); fclose(result);
+  return 0;
+}
 `);
-  chmodSync(fakeCodex, 0o755);
+    pass("compile native Codex fixture", spawnSync("/usr/bin/xcrun", ["clang", sourcePath, "-o", output], { encoding: "utf8" }));
+    chmodSync(output, 0o755);
+  };
+  compileNativeFixture(nativeCodexPackage, false);
+  compileNativeFixture(nativeOutOfScopeCodexPackage, true);
 
   const syntheticEnvironment = {
-    ASK_FAKE_RESULT: resultPath,
-    ASK_MUTATING_TOOL_MARKER: externalToolMarker,
     CODEX_HOME: syntheticCodexHome,
+    NODE_OPTIONS: "--no-warnings",
+    NODE_PATH: resolve(fixtureRoot, "injected-node-path"),
+    npm_config_user_agent: "injected-package-manager",
+    HTTPS_PROXY: "http://127.0.0.1:9",
+    HTTP_PROXY: "http://127.0.0.1:9",
   };
-  const redControl = runNode([fakeCodex, "exec", "--sandbox", "workspace-write"], { cwd: target, env: syntheticEnvironment });
-  assert.equal(redControl.status, 17, "synthetic Codex must expose the configured mutating tool when the risk policy is absent");
-  assert.equal(readFileSync(externalToolMarker, "utf8"), "configured external tool invoked\n");
-  rmSync(externalToolMarker);
+  const strippedEnvironment = resolveRiskExecutionEnvironment({
+    ...syntheticEnvironment,
+    HOME: process.env.HOME,
+    PATH: `${fixtureRoot}:${process.env.PATH}`,
+    DYLD_INSERT_LIBRARIES: resolve(fixtureRoot, "missing.dylib"),
+    LD_PRELOAD: resolve(fixtureRoot, "missing.so"),
+    ALL_PROXY: "http://127.0.0.1:9",
+  });
+  for (const name of ["NODE_OPTIONS", "NODE_PATH", "npm_config_user_agent", "DYLD_INSERT_LIBRARIES", "LD_PRELOAD", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"]) {
+    assert.equal(Object.hasOwn(strippedEnvironment.environment, name), false, `${name} must be stripped from the risk child environment`);
+  }
 
   const action = {
     schema_version: "1.0.0",
@@ -120,12 +173,27 @@ process.exit(result.status ?? 1);
   };
   writeFileSync(actionPath, `${JSON.stringify(action, null, 2)}\n`);
   const runner = resolve(target, "scripts/codex-exec-runner.mjs");
-  const baseArgs = [runner, "--target", target, "--prompt", "skill-implement.md", "--mode", "implementation", "--required-gate", "risk-gate", "--risk-action", actionPath, "--codex-bin", fakeCodex, "--output", ".agents/runs/risk-scope.md", "--json"];
+  const injectedBareCodex = resolve(fixtureRoot, "codex");
+  copyFileSync("/usr/bin/true", injectedBareCodex);
+  chmodSync(injectedBareCodex, 0o755);
+  const injectedPath = runNode([runner, "--target", target, "--prompt", "skill-implement.md", "--mode", "implementation", "--required-gate", "risk-gate", "--risk-action", actionPath, "--codex-bin", "codex", "--output", ".agents/runs/risk-scope.md", "--json"], {
+    cwd: target,
+    env: { ...syntheticEnvironment, PATH: `${fixtureRoot}:${process.env.PATH}` },
+  });
+  assert.equal(injectedPath.status, 1, "a PATH-injected bare native executor must be rejected rather than approved");
+  assert.match(injectedPath.stderr, /must resolve through the installed @openai\/codex launcher/u);
+
+  const baseArgs = [runner, "--target", target, "--prompt", "skill-implement.md", "--mode", "implementation", "--required-gate", "risk-gate", "--risk-action", actionPath, "--codex-bin", nativeCodexPackage.launcher, "--output", ".agents/runs/risk-scope.md", "--json"];
   const first = runNode(baseArgs, { cwd: target, env: syntheticEnvironment });
   assert.equal(first.status, 2, first.stderr);
   const firstReport = JSON.parse(first.stdout);
   const request = firstReport.execution_envelope_record.envelope.risk_approval.request;
   assert.deepEqual(request.invocation.runtime_policy, riskCodexRuntimePolicy(), "approval must bind the exact closed Codex runtime policy and argv digest");
+  assert.equal(request.invocation.executor.resolution, "installed_openai_codex_platform_package");
+  assert.equal(request.invocation.executor.spawn_path, request.invocation.executor.native_binary.canonical_path, "approved risk execution must directly spawn the bound native binary");
+  assert.equal(request.invocation.environment.inheritance, "none");
+  assert.deepEqual(request.invocation.environment.public_bindings.find((binding) => binding.name === "PATH"), { name: "PATH", value: "/usr/bin:/bin:/usr/sbin:/sbin" });
+  assert.deepEqual(request.invocation.environment.secret_bindings, []);
   assert.equal(firstReport.execution_envelope_record.envelope.risk_approval.enforcement_status, "not_started");
   assert.equal(existsSync(resolve(target, "dist/release.json")), false, "unapproved action must not execute");
   assert.equal(existsSync(externalToolMarker), false, "unapproved action must not reach configured external tools");
@@ -149,7 +217,13 @@ process.exit(result.status ?? 1);
   git(["reset", "--hard", "HEAD"]);
   git(["clean", "-fd"]);
   assert.equal(existsSync(resolve(target, "README.md")), false);
-  const rejected = runNode([...baseArgs, "--risk-approval", approvalPath, "--risk-approval-sha256", sha256(approvalBytes)], { cwd: target, env: { ...syntheticEnvironment, ASK_OUT_OF_SCOPE: "1" } });
+  const outOfScopeArgs = baseArgs.map((value) => value === nativeCodexPackage.launcher ? nativeOutOfScopeCodexPackage.launcher : value);
+  const outOfScopeRequestRun = runNode(outOfScopeArgs, { cwd: target, env: syntheticEnvironment });
+  assert.equal(outOfScopeRequestRun.status, 2, outOfScopeRequestRun.stderr);
+  const outOfScopeRequest = JSON.parse(outOfScopeRequestRun.stdout).execution_envelope_record.envelope.risk_approval.request;
+  const outOfScopeApprovalBytes = `${JSON.stringify({ schema_version: "1.0.0", kind: "codex_risk_approval", decision: "approved", request: outOfScopeRequest, request_sha256: outOfScopeRequest.request_sha256 }, null, 2)}\n`;
+  writeFileSync(approvalPath, outOfScopeApprovalBytes);
+  const rejected = runNode([...outOfScopeArgs, "--risk-approval", approvalPath, "--risk-approval-sha256", sha256(outOfScopeApprovalBytes)], { cwd: target, env: syntheticEnvironment });
   assert.notEqual(rejected.status, 0, "allowed plus out-of-scope mutation must be rejected");
   const rejectedReport = JSON.parse(rejected.stdout);
   assert.equal(rejectedReport.execution_envelope_record.envelope.risk_approval.execution_status, "executed");

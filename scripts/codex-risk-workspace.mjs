@@ -17,7 +17,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 const PERMITTED_FILESYSTEM_EFFECTS = new Set(["create", "modify", "delete"]);
 const REQUIRED_PROHIBITED_EFFECTS = Object.freeze([
@@ -27,6 +27,13 @@ const REQUIRED_PROHIBITED_EFFECTS = Object.freeze([
 ]);
 const RESERVED_TOP_LEVEL = new Set([".git"]);
 const MAX_FILE_BYTES = 512 * 1024 * 1024;
+const SYSTEM_CONFIG_READ_DENY_PATHS = Object.freeze([
+  "/etc/codex/config.toml",
+  "/etc/codex/managed_config.toml",
+  "/etc/codex/requirements.toml",
+  "/Library/Managed Preferences/com.openai.codex.plist",
+  "/Library/Preferences/com.openai.codex.plist",
+]);
 
 function sha256(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
@@ -93,10 +100,42 @@ function trackedEntries(target, headSha) {
     if (!match) throw new Error("cannot parse the exact HEAD tree");
     const [, mode, type, object, path] = match;
     validateRelativePath(path, "tracked path");
+    if (path === ".codex/config.toml" || path.endsWith("/.codex/config.toml")) throw new Error(`risk repository contains a project Codex configuration layer: ${path}`);
     if (type !== "blob" || !["100644", "100755"].includes(mode)) throw new Error(`risk repository contains unsupported tracked entry ${path} (${mode} ${type})`);
     entries.push({ mode, object, path });
   }
   return entries.sort((left, right) => left.path.localeCompare(right.path));
+}
+
+function codexConfigReadDenyPaths(workspace, environment = {}, systemConfigPaths = []) {
+  const paths = new Set(systemConfigPaths);
+  for (const root of [environment.CODEX_HOME, environment.HOME ? join(environment.HOME, ".codex") : null]) {
+    if (root) paths.add(resolve(root, "config.toml"));
+  }
+  let cursor = workspace;
+  while (true) {
+    paths.add(join(cursor, ".codex", "config.toml"));
+    const parent = dirname(cursor);
+    if (parent === cursor) break;
+    cursor = parent;
+  }
+  return [...paths].sort();
+}
+
+function validateClosedEnvironment(environment, policy) {
+  if (!environment || !policy || policy.inheritance !== "none") throw new Error("risk Codex execution requires a closed non-inherited environment policy");
+  const publicBindings = policy.public_bindings ?? [];
+  const secretBindings = policy.secret_bindings ?? [];
+  const expectedNames = [...publicBindings.map((entry) => entry.name), ...secretBindings.map((entry) => entry.name)].sort();
+  const actualNames = Object.keys(environment).sort();
+  if (canonicalJson(actualNames) !== canonicalJson(expectedNames)) throw new Error("risk Codex execution environment contains an unbound or missing name");
+  for (const binding of publicBindings) if (environment[binding.name] !== binding.value) throw new Error(`risk Codex public environment binding changed: ${binding.name}`);
+  for (const binding of secretBindings) if (sha256(canonicalJson(environment[binding.name])) !== binding.value_sha256) throw new Error(`risk Codex secret environment binding changed: ${binding.name}`);
+  const redactedIdentity = Object.fromEntries(actualNames.map((name) => {
+    const secret = secretBindings.some((binding) => binding.name === name);
+    return [name, secret ? sha256(canonicalJson(environment[name])) : environment[name]];
+  }));
+  if (sha256(canonicalJson(redactedIdentity)) !== policy.environment_sha256) throw new Error("risk Codex execution environment digest changed immediately before spawn");
 }
 
 function inventory(root, { ignored = new Set() } = {}) {
@@ -145,6 +184,9 @@ function changedFiles(before, after) {
 
 export function createRiskWorkspace({ target, request, ignoredRepositoryPaths = [] }) {
   validateRiskActionEnforcement(request.action);
+  if (canonicalJson(request.invocation?.runtime_policy?.system_config_paths) !== canonicalJson(SYSTEM_CONFIG_READ_DENY_PATHS)) {
+    throw new Error("risk request does not bind the closed system Codex configuration read-deny paths");
+  }
   for (const path of ignoredRepositoryPaths) {
     const normalized = path.endsWith("/") ? path.slice(0, -1) : path;
     validateRelativePath(normalized, "runner-owned repository path");
@@ -155,8 +197,8 @@ export function createRiskWorkspace({ target, request, ignoredRepositoryPaths = 
   const taskRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-codex-risk-")));
   const workspace = resolve(taskRoot, "workspace");
   mkdirSync(workspace, { mode: 0o700 });
-  const entries = trackedEntries(canonicalTarget, request.invocation.repository.head_sha);
   try {
+    const entries = trackedEntries(canonicalTarget, request.invocation.repository.head_sha);
     for (const entry of entries) {
       const destination = resolve(workspace, entry.path);
       if (!inside(destination, workspace)) throw new Error(`tracked path escapes risk workspace: ${entry.path}`);
@@ -175,6 +217,7 @@ export function createRiskWorkspace({ target, request, ignoredRepositoryPaths = 
       workspace_base_sha256: inventoryDigest(repositoryBaseline),
       request_sha256: request.request_sha256,
       repository: structuredClone(request.invocation.repository),
+      runtime_policy: structuredClone(request.invocation.runtime_policy),
       target_scope: [...request.action.target_scope],
       permitted_effects: [...request.action.permitted_effects],
       ignored_repository_paths: [...ignoredRepositoryPaths],
@@ -185,14 +228,21 @@ export function createRiskWorkspace({ target, request, ignoredRepositoryPaths = 
   }
 }
 
-function sandboxProfile(workspace) {
+function sandboxProfile(workspace, configReadDenyPaths) {
   const escaped = workspace.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
-  return `(version 1)\n(allow default)\n(deny file-write* (require-not (subpath "${escaped}")))\n`;
+  const deniedReads = configReadDenyPaths.map((path) => `(deny file-read* (literal "${path.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"))`).join("\n");
+  return `(version 1)\n(allow default)\n(deny file-write* (require-not (subpath "${escaped}")))\n${deniedReads}\n`;
 }
 
-export async function runInRiskWorkspace({ context, executable, args, input, env = process.env }) {
+export async function runInRiskWorkspace({ context, executable, args, input, env, environmentPolicy }) {
   if (process.platform !== "darwin" || !existsSync("/usr/bin/sandbox-exec")) throw new Error("no supported OS filesystem-isolation provider is available");
-  const commandArgs = ["-p", sandboxProfile(context.workspace), executable, ...args];
+  validateClosedEnvironment(env, environmentPolicy);
+  const configReadDenyPaths = codexConfigReadDenyPaths(context.workspace, env, context.runtime_policy.system_config_paths);
+  const current = inventory(context.workspace);
+  for (const path of Object.keys(current)) {
+    if (path === ".codex/config.toml" || path.endsWith("/.codex/config.toml")) throw new Error(`risk workspace contains a project Codex configuration layer before spawn: ${path}`);
+  }
+  const commandArgs = ["-p", sandboxProfile(context.workspace, configReadDenyPaths), executable, ...args];
   const result = await new Promise((resolveResult) => {
     const child = spawn("/usr/bin/sandbox-exec", commandArgs, {
       cwd: context.workspace,

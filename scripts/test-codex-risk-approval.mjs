@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,8 +10,11 @@ import {
   canonicalRiskDigest,
   createRiskApprovalRequest,
   readRiskAction,
+  resolveRiskCodexExecutor,
+  resolveRiskExecutionEnvironment,
   riskCodexRuntimePolicy,
   verifyRiskApproval,
+  verifyRiskCodexExecutor,
 } from "./codex-risk-approval.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -61,12 +64,37 @@ const invocation = {
     profile_fingerprint: digest("2"),
   },
   executor: {
-    codex_bin: "/usr/bin/codex",
-    canonical_path: "/usr/bin/codex",
-    raw_sha256: digest("3"),
-    size_bytes: 12345,
+    requested_bin: "/usr/bin/codex",
+    resolution: "installed_openai_codex_platform_package",
+    target_triple: "aarch64-apple-darwin",
+    launcher: { canonical_path: "/usr/local/lib/node_modules/@openai/codex/bin/codex.js", raw_sha256: digest("3"), size_bytes: 3000 },
+    package_manifest: { canonical_path: "/usr/local/lib/node_modules/@openai/codex/package.json", raw_sha256: digest("4"), size_bytes: 1000, package_name: "@openai/codex", package_version: "1.2.3" },
+    platform_manifest: { canonical_path: "/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/package.json", raw_sha256: digest("5"), size_bytes: 1000, package_name: "@openai/codex", package_version: "1.2.3-darwin-arm64" },
+    native_binary: {
+      canonical_path: "/usr/bin/codex",
+      raw_sha256: digest("3"),
+      size_bytes: 12345,
+      executable_format: "mach-o",
+    },
+    spawn_path: "/usr/bin/codex",
     output_path: ".agents/runs/release.md",
     candidate_network_access: "disabled",
+  },
+  environment: {
+    inheritance: "none",
+    public_bindings: [
+      { name: "CODEX_HOME", value: "/tmp/codex-home" },
+      { name: "HOME", value: "/tmp/home" },
+      { name: "LANG", value: "C.UTF-8" },
+      { name: "LC_ALL", value: "C.UTF-8" },
+      { name: "NO_COLOR", value: "1" },
+      { name: "PATH", value: "/usr/bin:/bin:/usr/sbin:/sbin" },
+      { name: "SHELL", value: "/bin/sh" },
+      { name: "TERM", value: "dumb" },
+    ],
+    secret_bindings: [],
+    stripped_injection_families: ["NODE_*", "npm_*", "DYLD_*", "LD_*", "*_PROXY", "BASH_ENV", "ENV", "GIT_*", "SSH_*"],
+    environment_sha256: digest("a"),
   },
   runtime_policy: riskCodexRuntimePolicy(),
   mode: "implementation",
@@ -80,6 +108,42 @@ const invocation = {
 
 try {
   mkdirSync(target);
+  const installedExecutor = resolveRiskCodexExecutor("codex", target);
+  assert.equal(installedExecutor.resolution, "installed_openai_codex_platform_package");
+  assert.match(installedExecutor.launcher.canonical_path, /@openai\/codex\/bin\/codex\.js$/u);
+  assert.notEqual(installedExecutor.spawn_path, installedExecutor.launcher.canonical_path, "the JavaScript launcher must be bound but never spawned on the risk path");
+  assert.equal(installedExecutor.spawn_path, installedExecutor.native_binary.canonical_path);
+  assert.doesNotThrow(() => verifyRiskCodexExecutor(installedExecutor));
+  const staleLauncher = structuredClone(installedExecutor);
+  staleLauncher.launcher.raw_sha256 = digest("0");
+  assert.throws(() => verifyRiskCodexExecutor(staleLauncher), /launcher identity changed/u, "launcher drift must fail before the native spawn even though the launcher is not executed");
+  const staleNative = structuredClone(installedExecutor);
+  staleNative.native_binary.raw_sha256 = digest("0");
+  assert.throws(() => verifyRiskCodexExecutor(staleNative), /native executable identity changed/u, "native drift must fail immediately before spawn");
+
+  const scriptExecutor = resolve(temporaryRoot, "script-executor");
+  writeFileSync(scriptExecutor, "#!/bin/sh\nexit 0\n");
+  chmodSync(scriptExecutor, 0o755);
+  assert.throws(() => resolveRiskCodexExecutor(scriptExecutor, target), /rejects script\/interpreter launchers/u);
+  const injectedBare = resolve(temporaryRoot, "codex");
+  copyFileSync("/usr/bin/true", injectedBare);
+  chmodSync(injectedBare, 0o755);
+  assert.throws(() => resolveRiskCodexExecutor("codex", target, { sourceEnv: { PATH: temporaryRoot } }), /must resolve through the installed @openai\/codex launcher/u);
+  assert.throws(() => resolveRiskCodexExecutor(injectedBare, target), /must resolve through the installed @openai\/codex launcher/u);
+
+  const environment = resolveRiskExecutionEnvironment({
+    ...process.env,
+    NODE_OPTIONS: "--require=/tmp/injected.cjs",
+    NODE_PATH: "/tmp/injected-node-path",
+    npm_config_user_agent: "injected",
+    DYLD_INSERT_LIBRARIES: "/tmp/injected.dylib",
+    LD_PRELOAD: "/tmp/injected.so",
+    HTTPS_PROXY: "http://127.0.0.1:9",
+  });
+  assert.deepEqual(Object.keys(environment.environment).filter((name) => /^(?:NODE_|npm_|DYLD_|LD_|.*_PROXY)/u.test(name)), []);
+  assert.deepEqual(environment.environment.PATH, "/usr/bin:/bin:/usr/sbin:/sbin");
+  assert.equal(environment.policy.inheritance, "none");
+
   writeFileSync(actionPath, `${JSON.stringify(action, null, 2)}\n`);
   const actionEvidence = readRiskAction(actionPath, { schemaPath: actionSchemaPath });
   const request = createRiskApprovalRequest({ actionEvidence, invocation });
@@ -137,10 +201,13 @@ try {
     ["prompt", (value) => { value.request.invocation.prompt.invocation_sha256 = digest("6"); }],
     ["profile", (value) => { value.request.invocation.profile.profile_fingerprint = digest("7"); }],
     ["selected profile", (value) => { value.request.invocation.profile.installed_profile = "different-profile"; }],
-    ["Codex binary", (value) => { value.request.invocation.executor.codex_bin = "/other/codex"; }],
-    ["Codex canonical path", (value) => { value.request.invocation.executor.canonical_path = "/other/codex"; }],
-    ["Codex binary digest", (value) => { value.request.invocation.executor.raw_sha256 = digest("4"); }],
-    ["Codex binary size", (value) => { value.request.invocation.executor.size_bytes += 1; }],
+    ["Codex binary", (value) => { value.request.invocation.executor.requested_bin = "/other/codex"; }],
+    ["Codex canonical path", (value) => { value.request.invocation.executor.native_binary.canonical_path = "/other/codex"; }],
+    ["Codex binary digest", (value) => { value.request.invocation.executor.native_binary.raw_sha256 = digest("4"); }],
+    ["Codex binary size", (value) => { value.request.invocation.executor.native_binary.size_bytes += 1; }],
+    ["Codex spawn path", (value) => { value.request.invocation.executor.spawn_path = "/other/codex"; }],
+    ["environment path", (value) => { value.request.invocation.environment.public_bindings.find((entry) => entry.name === "PATH").value = "/tmp/injected"; }],
+    ["environment digest", (value) => { value.request.invocation.environment.environment_sha256 = digest("4"); }],
     ["output path", (value) => { value.request.invocation.executor.output_path = ".agents/runs/other.md"; }],
     ["runtime policy argv", (value) => { value.request.invocation.runtime_policy.argv = ["--ephemeral"]; }],
     ["runtime policy digest", (value) => { value.request.invocation.runtime_policy.argv_sha256 = digest("4"); }],

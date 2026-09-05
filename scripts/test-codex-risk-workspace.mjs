@@ -23,6 +23,7 @@ import {
   runInRiskWorkspace,
   validateRiskActionEnforcement,
 } from "./codex-risk-workspace.mjs";
+import { resolveRiskExecutionEnvironment, riskCodexRuntimePolicy } from "./codex-risk-approval.mjs";
 
 const root = realpathSync(mkdtempSync(resolve(tmpdir(), "codex-risk-workspace-test-")));
 const repository = resolve(root, "repository");
@@ -54,6 +55,7 @@ function request() {
         head_sha: run("git", ["rev-parse", "HEAD^{commit}"]),
         tree_sha: run("git", ["rev-parse", "HEAD^{tree}"]),
       },
+      runtime_policy: riskCodexRuntimePolicy(),
     },
   };
 }
@@ -70,6 +72,12 @@ try {
   assert.throws(() => validateRiskActionEnforcement({ ...action, permitted_effects: ["publish"] }), /create, modify, and delete/u);
   assert.throws(() => validateRiskActionEnforcement({ ...action, target_scope: [".git/config"] }), /reserved Git metadata/u);
   assert.throws(() => validateRiskActionEnforcement({ ...action, prohibited_effects: ["write_outside_target_scope"] }), /must include/u);
+
+  mkdirSync(resolve(repository, ".codex"));
+  writeFileSync(resolve(repository, ".codex/config.toml"), "[mcp_servers.unapproved]\ncommand = '/tmp/unapproved'\n");
+  commit("project config fixture");
+  assert.throws(() => createRiskWorkspace({ target: repository, request: request() }), /project Codex configuration layer/u, "a tracked project config must fail closed before Codex execution");
+  run("git", ["reset", "--hard", "HEAD~1"]);
 
   const exact = createRiskWorkspace({ target: repository, request: request() });
   try {
@@ -138,13 +146,14 @@ try {
   }
 
   if (process.platform === "darwin") {
+    const riskEnvironment = resolveRiskExecutionEnvironment();
     const isolated = createRiskWorkspace({ target: repository, request: request() });
     const executable = resolve(root, "fake-risk-executable.mjs");
-    writeFileSync(executable, `#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nimport { resolve } from "node:path";\nlet denied = false;\ntry { writeFileSync(process.env.ASK_OUTSIDE, "mutated\\n"); } catch { denied = true; }\nwriteFileSync(resolve(process.cwd(), "allowed/isolation.txt"), denied ? "outside-denied\\n" : "outside-allowed\\n");\n`);
+    writeFileSync(executable, `import { writeFileSync } from "node:fs";\nimport { resolve } from "node:path";\nlet denied = false;\ntry { writeFileSync(process.argv[2], "mutated\\n"); } catch { denied = true; }\nwriteFileSync(resolve(process.cwd(), "allowed/isolation.txt"), denied ? "outside-denied\\n" : "outside-allowed\\n");\n`);
     run("chmod", ["755", executable], root);
     writeFileSync(outside, "original\n");
     try {
-      const result = await runInRiskWorkspace({ context: isolated, executable, args: [], input: "", env: { ...process.env, ASK_OUTSIDE: outside } });
+      const result = await runInRiskWorkspace({ context: isolated, executable: process.execPath, args: [executable, outside], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy });
       assert.equal(result.exitCode, 0, result.stderr);
       assert.equal(readFileSync(outside, "utf8"), "original\n", "OS isolation must deny writes outside the disposable workspace");
       assert.equal(readFileSync(resolve(isolated.workspace, "allowed/isolation.txt"), "utf8"), "outside-denied\n");
@@ -154,12 +163,12 @@ try {
 
     const boundary = createRiskWorkspace({ target: repository, request: request() });
     const boundaryExecutable = resolve(root, "fake-cross-boundary-links.mjs");
-    writeFileSync(boundaryExecutable, `#!/usr/bin/env node
+    writeFileSync(boundaryExecutable, `
 import { existsSync, linkSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 for (const [kind, create] of [
-  ["hardlink", (path) => linkSync(process.env.ASK_OUTSIDE, path)],
-  ["symlink", (path) => symlinkSync(process.env.ASK_OUTSIDE, path)],
+  ["hardlink", (path) => linkSync(process.argv[2], path)],
+  ["symlink", (path) => symlinkSync(process.argv[2], path)],
 ]) {
   const path = resolve(process.cwd(), "allowed/" + kind);
   try {
@@ -172,7 +181,7 @@ for (const [kind, create] of [
     run("chmod", ["755", boundaryExecutable], root);
     writeFileSync(outside, "original\n");
     try {
-      const result = await runInRiskWorkspace({ context: boundary, executable: boundaryExecutable, args: [], input: "", env: { ...process.env, ASK_OUTSIDE: outside } });
+      const result = await runInRiskWorkspace({ context: boundary, executable: process.execPath, args: [boundaryExecutable, outside], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy });
       assert.equal(result.exitCode, 0, result.stderr);
       assert.equal(readFileSync(outside, "utf8"), "original\n", "hardlink and symlink attempts must not mutate outside bytes before audit");
       assert.deepEqual(auditRiskWorkspace(boundary).delta, [], "transient cross-boundary links must leave no accepted workspace delta");
@@ -182,10 +191,10 @@ for (const [kind, create] of [
 
     const residual = createRiskWorkspace({ target: repository, request: request() });
     const residualExecutable = resolve(root, "fake-residual-child.mjs");
-    writeFileSync(residualExecutable, "#!/usr/bin/env node\nimport { spawn } from 'node:child_process';\nspawn(process.execPath, ['-e', `setTimeout(() => require('node:fs').writeFileSync('allowed/residual.txt', 'late\\\\n'), 500)`], { detached: true, stdio: 'ignore' }).unref();\n");
+    writeFileSync(residualExecutable, "import { spawn } from 'node:child_process';\nspawn(process.execPath, ['-e', `setTimeout(() => require('node:fs').writeFileSync('allowed/residual.txt', 'late\\\\n'), 500)`], { detached: true, stdio: 'ignore' }).unref();\n");
     run("chmod", ["755", residualExecutable], root);
     try {
-      const result = await runInRiskWorkspace({ context: residual, executable: residualExecutable, args: [], input: "" });
+      const result = await runInRiskWorkspace({ context: residual, executable: process.execPath, args: [residualExecutable], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy });
       await new Promise((resolveWait) => setTimeout(resolveWait, 1000));
       assert.equal(result.error === null || /residual child process/u.test(result.error), true);
       assert.equal(existsSync(resolve(residual.workspace, "allowed/residual.txt")), false, "isolated execution must leave no child able to mutate after process return");

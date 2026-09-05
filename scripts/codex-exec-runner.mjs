@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { delimiter, dirname, isAbsolute, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, deriveReviewSignalGateRoute, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, inspectCodexPromptContractBindings, parseCodexCompactProfileHeader, readReviewSignalGateMap } from "./ask-shared.mjs";
 import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
-import { RISK_CODEX_POLICY_ARGS, canonicalRiskDigest, createRiskApprovalRequest, readRiskAction, readStableExecutableFile, riskCodexRuntimePolicy, verifyRiskApproval } from "./codex-risk-approval.mjs";
+import { RISK_CODEX_POLICY_ARGS, canonicalRiskDigest, createRiskApprovalRequest, readRiskAction, resolveRiskCodexExecutor, resolveRiskExecutionEnvironment, riskCodexRuntimePolicy, verifyRiskApproval, verifyRiskCodexExecutor } from "./codex-risk-approval.mjs";
 import { auditRiskWorkspace, createRiskWorkspace, disposeRiskWorkspace, promoteRiskWorkspace, runInRiskWorkspace } from "./codex-risk-workspace.mjs";
 import { buildExecutionEnvelopeRecord, hasExecutionEnvelopeMarker, inspectExecutionEnvelopeRecordEmission, isMarkdownFenceClosing, markdownFenceOpening, renderExecutionEnvelopeProjection, selectExecutionEnvelopeEmission, validateExecutionEnvelope, validateExecutionEnvelopeRecord, validateJsonSchema } from "./execution-envelope.mjs";
 import { resolveGitDirectory, resolveObservabilityPath } from "./observability-paths.mjs";
@@ -361,26 +361,8 @@ function repositoryIdentity(target) {
   };
 }
 
-function resolveCodexExecutable(codexBin, target) {
-  if (!codexBin || codexBin.includes("\0") || /[\r\n]/u.test(codexBin)) throw new Error("Codex executable argument is invalid");
-  const candidates = codexBin.includes("/")
-    ? [isAbsolute(codexBin) ? codexBin : resolve(target, codexBin)]
-    : (process.env.PATH ?? "").split(delimiter).map((entry) => resolve(entry || target, codexBin));
-  for (const candidate of candidates) {
-    if (!existsSync(candidate)) continue;
-    const canonicalPath = realpathSync(candidate);
-    const evidence = readStableExecutableFile(canonicalPath);
-    return {
-      codex_bin: codexBin,
-      canonical_path: evidence.path,
-      raw_sha256: evidence.file_sha256,
-      size_bytes: evidence.bytes.length,
-    };
-  }
-  throw new Error(`Codex executable cannot be resolved: ${codexBin}`);
-}
-
 function riskInvocation(args, state, compactProfile, prompt, action) {
+  const environment = resolveRiskExecutionEnvironment();
   return {
     repository: repositoryIdentity(args.target),
     target_scope: action.target_scope,
@@ -398,10 +380,11 @@ function riskInvocation(args, state, compactProfile, prompt, action) {
       profile_fingerprint: compactProfile.profile_fingerprint,
     },
     executor: {
-      ...resolveCodexExecutable(args.codexBin, args.target),
+      ...resolveRiskCodexExecutor(args.codexBin, args.target),
       output_path: args.output,
       candidate_network_access: "disabled",
     },
+    environment: environment.policy,
     runtime_policy: riskCodexRuntimePolicy(),
     mode: args.mode,
     sandbox: args.sandbox,
@@ -551,12 +534,19 @@ function runCodex(args, prompt, codexBin = args.codexBin) {
   };
 }
 
-async function runCodexInRiskWorkspace(args, prompt, codexBin, riskContext) {
+async function runCodexInRiskWorkspace(args, prompt, codexBin, riskContext, riskEnvironment) {
   const temporaryOutput = `.agents/runs/codex-risk-${process.pid}-${Date.now()}.json`;
   const temporaryOutputPath = resolve(riskContext.workspace, temporaryOutput);
   mkdirSync(dirname(temporaryOutputPath), { recursive: true });
   const commandArgs = ["exec", ...RISK_CODEX_POLICY_ARGS, "--sandbox", args.sandbox, "--output-schema", "scripts/codex-runner-result.schema.json", "--output-last-message", temporaryOutput];
-  const result = await runInRiskWorkspace({ context: riskContext, executable: codexBin, args: commandArgs, input: prompt });
+  const result = await runInRiskWorkspace({
+    context: riskContext,
+    executable: codexBin,
+    args: commandArgs,
+    input: prompt,
+    env: riskEnvironment.environment,
+    environmentPolicy: riskEnvironment.policy,
+  });
   const outputExists = existsSync(temporaryOutputPath);
   let finalOutput = "";
   let outputError = null;
@@ -870,6 +860,7 @@ try {
   const riskActionRequired = args.requiredGates.includes("risk-gate") && !readOnlyReviewRiskEvaluation;
   let riskApproval = null;
   let approvedCodexBin = null;
+  let approvedCodexEnvironment = null;
   let riskContext = null;
   let approvalBlocked = riskActionRequired;
   const capabilityBlocked = preflightResult.capabilityMissing.length > 0;
@@ -935,15 +926,24 @@ try {
             envelopeRecord = stop.record;
             publication = publishOutput(args, stop.responseMarkdown, stop.record, { inspectDomainOutput: false });
           } else {
-            const finalExecutor = { ...resolveCodexExecutable(args.codexBin, args.target), output_path: args.output, candidate_network_access: "disabled" };
-            if (canonicalRiskDigest(finalExecutor) !== canonicalRiskDigest(rereadApproval.request.invocation.executor)) {
+            let finalExecutor;
+            let finalEnvironment;
+            try {
+              finalExecutor = { ...resolveRiskCodexExecutor(args.codexBin, args.target), output_path: args.output, candidate_network_access: "disabled" };
+              finalEnvironment = resolveRiskExecutionEnvironment();
+              verifyRiskCodexExecutor(finalExecutor);
+            } catch (error) {
+              finalExecutor = { error: error.message };
+            }
+            if (canonicalRiskDigest(finalExecutor) !== canonicalRiskDigest(rereadApproval.request.invocation.executor)
+              || canonicalRiskDigest(finalEnvironment?.policy) !== canonicalRiskDigest(rereadApproval.request.invocation.environment)) {
               riskApproval = {
                 ...rereadApproval,
                 status: "rejected",
                 execution_status: "not_executed",
                 approval_file_sha256: null,
                 rendered_invocation_sha256: null,
-                rejection_reasons: ["Codex executable identity changed immediately before execution"],
+                rejection_reasons: [finalExecutor.error ?? "Codex executable or closed environment identity changed immediately before execution"],
               };
               approvalBlocked = true;
               const stop = runnerObservedStop(args, preflightResult.compactProfile, {
@@ -957,7 +957,8 @@ try {
               envelopeRecord = stop.record;
               publication = publishOutput(args, stop.responseMarkdown, stop.record, { inspectDomainOutput: false });
             } else {
-              approvedCodexBin = finalExecutor.canonical_path;
+              approvedCodexBin = finalExecutor.spawn_path;
+              approvedCodexEnvironment = finalEnvironment;
               spawnPrompt = renderApprovedRiskPrompt(spawnPrompt, rereadApproval.request);
               try {
                 riskContext = createRiskWorkspace({
@@ -1006,9 +1007,12 @@ try {
             }
           }
         }
-        if (!approvalBlocked) codexResult = riskContext
-          ? await runCodexInRiskWorkspace(args, spawnPrompt, approvedCodexBin, riskContext)
-          : runCodex(args, spawnPrompt, approvedCodexBin ?? args.codexBin);
+        if (!approvalBlocked) {
+          codexResult = riskContext
+            ? await runCodexInRiskWorkspace(args, spawnPrompt, approvedCodexBin, riskContext, approvedCodexEnvironment)
+            : runCodex(args, spawnPrompt, approvedCodexBin ?? args.codexBin);
+          command = codexResult.command;
+        }
         try {
           if (codexResult?.exitCode === 0 && codexResult.finalOutput.trim()) {
             if (riskContext) {

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateJsonSchema } from "./execution-envelope.mjs";
@@ -11,6 +11,22 @@ const DEFAULT_ACTION_SCHEMA_PATH = resolve(RUNTIME_ROOT, "codex-risk-action.sche
 const DEFAULT_APPROVAL_SCHEMA_PATH = resolve(RUNTIME_ROOT, "codex-risk-approval.schema.json");
 const MAX_AUTHORITY_BYTES = 1024 * 1024;
 const MAX_EXECUTOR_BYTES = 512 * 1024 * 1024;
+const CLOSED_EXECUTION_PATH = "/usr/bin:/bin:/usr/sbin:/sbin";
+const AUTH_ENVIRONMENT_NAMES = Object.freeze(["CODEX_API_KEY", "OPENAI_API_KEY"]);
+const TARGET_TRIPLES = Object.freeze({
+  "darwin:arm64": { triple: "aarch64-apple-darwin", package: "codex-darwin-arm64", format: "mach-o" },
+  "darwin:x64": { triple: "x86_64-apple-darwin", package: "codex-darwin-x64", format: "mach-o" },
+  "linux:arm64": { triple: "aarch64-unknown-linux-musl", package: "codex-linux-arm64", format: "elf" },
+  "linux:x64": { triple: "x86_64-unknown-linux-musl", package: "codex-linux-x64", format: "elf" },
+});
+
+export const RISK_CODEX_SYSTEM_CONFIG_PATHS = Object.freeze([
+  "/etc/codex/config.toml",
+  "/etc/codex/managed_config.toml",
+  "/etc/codex/requirements.toml",
+  "/Library/Managed Preferences/com.openai.codex.plist",
+  "/Library/Preferences/com.openai.codex.plist",
+]);
 
 export const RISK_CODEX_DISABLED_FEATURES = Object.freeze([
   "apps",
@@ -93,6 +109,11 @@ export function riskCodexRuntimePolicy() {
     update_checks: "disabled",
     model_control_plane: "codex_api_only",
     builtin_mutation_tools: ["shell_tool", "unified_exec"],
+    executor_resolution: "stable_native_direct_spawn",
+    environment_inheritance: "closed_allowlist",
+    project_config_layers: "reject_and_read_deny",
+    system_config_layers: "read_deny",
+    system_config_paths: [...RISK_CODEX_SYSTEM_CONFIG_PATHS],
     disabled_features: [...RISK_CODEX_DISABLED_FEATURES],
     argv,
     argv_sha256: canonicalRiskDigest(argv),
@@ -146,6 +167,182 @@ export function readStableExecutableFile(path, label = "Codex executable") {
   } finally {
     closeSync(descriptor);
   }
+}
+
+function stableFileIdentity(path, label, { executable = false } = {}) {
+  const evidence = executable ? readStableExecutableFile(path, label) : readStableAuthorityFile(path, label);
+  return {
+    canonical_path: evidence.path,
+    raw_sha256: evidence.file_sha256,
+    size_bytes: evidence.bytes.length,
+    bytes: evidence.bytes,
+  };
+}
+
+function nativeExecutableFormat(bytes) {
+  if (bytes.length < 4) return null;
+  const magic = bytes.subarray(0, 4).toString("hex");
+  if (["feedface", "cefaedfe", "feedfacf", "cffaedfe", "cafebabe", "bebafeca", "cafebabf", "bfbafeca"].includes(magic)) return "mach-o";
+  if (magic === "7f454c46") return "elf";
+  if (bytes[0] === 0x4d && bytes[1] === 0x5a) return "pe";
+  return null;
+}
+
+function targetPlatform() {
+  const target = TARGET_TRIPLES[`${process.platform}:${process.arch}`];
+  if (!target) throw new Error(`risk Codex execution has no supported native target for ${process.platform}/${process.arch}`);
+  return target;
+}
+
+function resolveRequestedExecutable(codexBin, target, sourceEnv) {
+  if (!codexBin || codexBin.includes("\0") || /[\r\n]/u.test(codexBin)) throw new Error("Codex executable argument is invalid");
+  const explicitPath = codexBin.includes("/");
+  const candidates = explicitPath
+    ? [isAbsolute(codexBin) ? codexBin : resolve(target, codexBin)]
+    : (sourceEnv.PATH ?? "").split(delimiter).filter(Boolean).map((entry) => resolve(entry, codexBin));
+  for (const candidate of candidates) {
+    try {
+      const canonicalPath = realpathSync(candidate);
+      return { explicitPath, requestedPath: resolve(candidate), canonicalPath };
+    } catch {
+      // Continue through the caller's resolution candidates without executing them.
+    }
+  }
+  throw new Error(`Codex executable cannot be resolved: ${codexBin}`);
+}
+
+function parsePackageManifest(evidence, label) {
+  try {
+    const value = JSON.parse(evidence.bytes.toString("utf8"));
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("root must be an object");
+    return value;
+  } catch (error) {
+    throw new Error(`${label} is not valid package JSON: ${error.message}`);
+  }
+}
+
+export function resolveRiskCodexExecutor(codexBin, target, { sourceEnv = process.env } = {}) {
+  const resolved = resolveRequestedExecutable(codexBin, target, sourceEnv);
+  const requested = stableFileIdentity(resolved.canonicalPath, "Codex requested executable", { executable: true });
+  const requestedFormat = nativeExecutableFormat(requested.bytes);
+  const platform = targetPlatform();
+  if (requestedFormat) {
+    throw new Error("risk Codex execution must resolve through the installed @openai/codex launcher; a direct native or alternate launcher is not an accepted Codex package chain");
+  }
+  if (basename(requested.canonical_path) !== "codex.js" || basename(dirname(requested.canonical_path)) !== "bin") {
+    throw new Error("risk Codex execution rejects script/interpreter launchers other than the installed @openai/codex launcher");
+  }
+  const packageRoot = dirname(dirname(requested.canonical_path));
+  const packageManifest = stableFileIdentity(join(packageRoot, "package.json"), "@openai/codex package manifest");
+  const packageValue = parsePackageManifest(packageManifest, "@openai/codex package manifest");
+  if (packageValue.name !== "@openai/codex" || typeof packageValue.version !== "string" || packageValue.bin?.codex !== "bin/codex.js") {
+    throw new Error("resolved launcher is not the closed installed @openai/codex package layout");
+  }
+  const platformRoot = join(packageRoot, "node_modules", "@openai", platform.package);
+  const platformManifest = stableFileIdentity(join(platformRoot, "package.json"), "@openai/codex platform manifest");
+  const platformValue = parsePackageManifest(platformManifest, "@openai/codex platform manifest");
+  if (platformValue.name !== "@openai/codex"
+    || platformValue.version !== `${packageValue.version}-${process.platform}-${process.arch}`
+    || !Array.isArray(platformValue.os) || !platformValue.os.includes(process.platform)
+    || !Array.isArray(platformValue.cpu) || !platformValue.cpu.includes(process.arch)) {
+    throw new Error("installed @openai/codex platform manifest does not bind the current package version and platform");
+  }
+  const native = stableFileIdentity(join(platformRoot, "vendor", platform.triple, "bin", process.platform === "win32" ? "codex.exe" : "codex"), "@openai/codex native executable", { executable: true });
+  const format = nativeExecutableFormat(native.bytes);
+  if (format !== platform.format) throw new Error(`installed Codex native executable format ${format ?? "unknown"} does not match ${platform.format}`);
+  return {
+    requested_bin: codexBin,
+    resolution: "installed_openai_codex_platform_package",
+    target_triple: platform.triple,
+    launcher: {
+      canonical_path: requested.canonical_path,
+      raw_sha256: requested.raw_sha256,
+      size_bytes: requested.size_bytes,
+    },
+    package_manifest: {
+      canonical_path: packageManifest.canonical_path,
+      raw_sha256: packageManifest.raw_sha256,
+      size_bytes: packageManifest.size_bytes,
+      package_name: packageValue.name,
+      package_version: packageValue.version,
+    },
+    platform_manifest: {
+      canonical_path: platformManifest.canonical_path,
+      raw_sha256: platformManifest.raw_sha256,
+      size_bytes: platformManifest.size_bytes,
+      package_name: platformValue.name,
+      package_version: platformValue.version,
+    },
+    native_binary: {
+      canonical_path: native.canonical_path,
+      raw_sha256: native.raw_sha256,
+      size_bytes: native.size_bytes,
+      executable_format: format,
+    },
+    spawn_path: native.canonical_path,
+  };
+}
+
+export function verifyRiskCodexExecutor(expected) {
+  if (!expected || typeof expected !== "object") throw new Error("approved Codex executor binding is missing");
+  const paths = [
+    ["launcher", expected.launcher],
+    ["package manifest", expected.package_manifest],
+    ["platform manifest", expected.platform_manifest],
+    ["native executable", expected.native_binary],
+  ];
+  for (const [label, binding] of paths) {
+    if (!binding) continue;
+    const evidence = stableFileIdentity(binding.canonical_path, `approved Codex ${label}`, { executable: label === "launcher" || label === "native executable" });
+    if (evidence.raw_sha256 !== binding.raw_sha256 || evidence.size_bytes !== binding.size_bytes) throw new Error(`approved Codex ${label} identity changed immediately before spawn`);
+    if (label === "native executable" && nativeExecutableFormat(evidence.bytes) !== binding.executable_format) throw new Error("approved Codex native executable format changed immediately before spawn");
+  }
+  if (expected.spawn_path !== expected.native_binary?.canonical_path) throw new Error("approved Codex spawn path is not the bound native executable");
+  return expected.spawn_path;
+}
+
+function canonicalDirectory(path, label) {
+  const absolute = resolve(path);
+  const before = lstatSync(absolute);
+  if (before.isSymbolicLink() || !before.isDirectory() || realpathSync(absolute) !== absolute) throw new Error(`${label} must be a canonical non-symlink directory`);
+  return absolute;
+}
+
+export function resolveRiskExecutionEnvironment(sourceEnv = process.env) {
+  const home = canonicalDirectory(sourceEnv.HOME, "HOME");
+  const codexHome = canonicalDirectory(sourceEnv.CODEX_HOME ?? join(home, ".codex"), "CODEX_HOME");
+  const environment = {
+    PATH: CLOSED_EXECUTION_PATH,
+    HOME: home,
+    CODEX_HOME: codexHome,
+    LANG: "C.UTF-8",
+    LC_ALL: "C.UTF-8",
+    NO_COLOR: "1",
+    TERM: "dumb",
+    SHELL: "/bin/sh",
+  };
+  const secretBindings = [];
+  for (const name of AUTH_ENVIRONMENT_NAMES) {
+    const value = sourceEnv[name];
+    if (typeof value !== "string" || value.length === 0) continue;
+    environment[name] = value;
+    secretBindings.push({ name, value_sha256: canonicalRiskDigest(value) });
+  }
+  const publicBindings = Object.entries(environment)
+    .filter(([name]) => !AUTH_ENVIRONMENT_NAMES.includes(name))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, value]) => ({ name, value }));
+  const redactedIdentity = Object.fromEntries(Object.entries(environment).sort(([left], [right]) => left.localeCompare(right)).map(([name, value]) => [name, AUTH_ENVIRONMENT_NAMES.includes(name) ? canonicalRiskDigest(value) : value]));
+  return {
+    environment,
+    policy: {
+      inheritance: "none",
+      public_bindings: publicBindings,
+      secret_bindings: secretBindings,
+      stripped_injection_families: ["NODE_*", "npm_*", "DYLD_*", "LD_*", "*_PROXY", "BASH_ENV", "ENV", "GIT_*", "SSH_*"],
+      environment_sha256: canonicalRiskDigest(redactedIdentity),
+    },
+  };
 }
 
 function parseClosedJson(evidence, schemaPath, label) {
