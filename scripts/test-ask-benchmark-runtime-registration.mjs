@@ -85,6 +85,20 @@ try {
   const currentCli = spawnSync(process.execPath, [SCRIPT, "--check", "--root", work], { encoding: "utf8" });
   assert.equal(currentCli.status, 0, currentCli.stderr || currentCli.stdout);
 
+  writeFileSync(resolve(work, CONFIG_PATH), Buffer.concat([firstBytes, Buffer.from("\n")]));
+  const formattingDrift = checkPortfolioRuntimeRegistrationProjection({ root: work });
+  assert.equal(formattingDrift.status, "stale");
+  assert.notEqual(formattingDrift.current_config_sha256, formattingDrift.expected_config_sha256);
+  assert.equal(writePortfolioRuntimeRegistrationProjection({ root: work }).status, "written");
+  assert.deepEqual(readFileSync(resolve(work, CONFIG_PATH)), firstBytes, "writer must repair exact-byte formatting drift");
+
+  const semanticallyInvalid = readConfig(work);
+  [semanticallyInvalid.conditions[0], semanticallyInvalid.conditions[1]] = [semanticallyInvalid.conditions[1], semanticallyInvalid.conditions[0]];
+  semanticallyInvalid.fixtures[0].input_manifest_sha256 = "0".repeat(64);
+  writeConfig(work, semanticallyInvalid);
+  assert.throws(() => writePortfolioRuntimeRegistrationProjection({ root: work }), /portfolio conditions must be/u);
+  writeFileSync(resolve(work, CONFIG_PATH), firstBytes);
+
   const duplicate = readConfig(work);
   duplicate.fixtures[1].id = duplicate.fixtures[0].id;
   writeConfig(work, duplicate);
@@ -97,6 +111,26 @@ try {
   assert.throws(() => buildPortfolioRuntimeRegistrationProjection({ root: work }), /portable repository-relative path/u);
 
   writeFileSync(resolve(work, CONFIG_PATH), firstBytes);
+  const configSchema = resolve(work, "benchmarks/schemas/portfolio-config.schema.json");
+  const preservedConfigSchema = `${configSchema}.preserved`;
+  cpSync(configSchema, preservedConfigSchema);
+  rmSync(configSchema);
+  symlinkSync(preservedConfigSchema, configSchema);
+  assert.throws(() => buildPortfolioRuntimeRegistrationProjection({ root: work }), /symlink/u);
+  rmSync(configSchema);
+  cpSync(preservedConfigSchema, configSchema);
+  rmSync(preservedConfigSchema);
+
+  const verificationSchema = resolve(work, "benchmarks/schemas/portfolio-verification-command-contract.schema.json");
+  const preservedVerificationSchema = `${verificationSchema}.preserved`;
+  cpSync(verificationSchema, preservedVerificationSchema);
+  rmSync(verificationSchema);
+  symlinkSync(preservedVerificationSchema, verificationSchema);
+  assert.throws(() => buildPortfolioRuntimeRegistrationProjection({ root: work }), /symlink/u);
+  rmSync(verificationSchema);
+  cpSync(preservedVerificationSchema, verificationSchema);
+  rmSync(preservedVerificationSchema);
+
   const target = resolve(work, "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/input-manifest.json");
   const preserved = `${target}.preserved`;
   cpSync(target, preserved);

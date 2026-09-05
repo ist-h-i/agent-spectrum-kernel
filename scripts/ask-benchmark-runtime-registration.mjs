@@ -15,14 +15,16 @@ import {
 } from "node:fs";
 import { basename, dirname, posix, relative, resolve, sep, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
-import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
 import { assertNoSymlinkPathSegments } from "./ask-benchmark-atomic-publication.mjs";
 import { assertStableFileEvidence, readStableFile } from "./ask-benchmark-stable-file.mjs";
+import { validatePortfolioFoundation } from "./ask-benchmark.mjs";
+import { validateSchemaValue } from "./json-schema-validation.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_CONFIG_PATH = "benchmarks/adaptive-portfolio.config.json";
 const CONFIG_SCHEMA_PATH = "benchmarks/schemas/portfolio-config.schema.json";
+const VERIFICATION_SCHEMA_PATH = "benchmarks/schemas/portfolio-verification-command-contract.schema.json";
 const MAX_CONFIG_BYTES = 2 * 1024 * 1024;
 const MAX_ARTIFACT_BYTES = 16 * 1024 * 1024;
 
@@ -68,16 +70,21 @@ export function buildPortfolioRuntimeRegistrationProjection({ root = ROOT, confi
   const configAbsolute = resolveRepositoryFile(repositoryRoot, configPath, "adaptive portfolio config path");
   const configSnapshot = readStableFile(configAbsolute, "adaptive portfolio config", MAX_CONFIG_BYTES, { allowEmpty: false });
   const current = parseJson(configSnapshot.bytes, "adaptive portfolio config");
-  assertBenchmarkSchemaInstance(current, {
-    schemaPath: resolveRepositoryFile(repositoryRoot, CONFIG_SCHEMA_PATH, "portfolio config Schema path"),
-    label: "adaptive portfolio config",
-  });
+  const configSchemaSnapshot = readArtifact(repositoryRoot, CONFIG_SCHEMA_PATH, "portfolio config Schema");
+  const configSchema = parseJson(configSchemaSnapshot.bytes, "portfolio config Schema");
+  const configSchemaErrors = validateSchemaValue(current, configSchema, { baseDir: dirname(configSchemaSnapshot.path), rootSchema: configSchema });
+  if (configSchemaErrors.length > 0) throw new Error(`adaptive portfolio config failed JSON Schema validation:\n${configSchemaErrors.join("\n")}`);
+  const verificationSchemaSnapshot = readArtifact(repositoryRoot, VERIFICATION_SCHEMA_PATH, "verification command contract Schema");
+  const verificationSchema = parseJson(verificationSchemaSnapshot.bytes, "verification command contract Schema");
   const fixtureIds = current.fixtures.map(({ id }) => id);
   if (new Set(fixtureIds).size !== fixtureIds.length) throw new Error("adaptive portfolio config contains duplicate fixture IDs");
 
   const projected = structuredClone(current);
   const changes = [];
-  const artifactSnapshots = [];
+  const artifactSnapshots = [
+    { snapshot: configSchemaSnapshot, label: "portfolio config Schema" },
+    { snapshot: verificationSchemaSnapshot, label: "verification command contract Schema" },
+  ];
   for (const fixture of projected.fixtures) {
     const input = readArtifact(repositoryRoot, fixture.input_manifest_path, `${fixture.id} input manifest`);
     artifactSnapshots.push({ snapshot: input, label: `${fixture.id} input manifest` });
@@ -95,7 +102,7 @@ export function buildPortfolioRuntimeRegistrationProjection({ root = ROOT, confi
       artifactSnapshots.push({ snapshot: contractSnapshot, label: `${fixture.id} verification command contract` });
       const contract = validateVerificationCommandContract(
         parseJson(contractSnapshot.bytes, `${fixture.id} verification command contract`),
-        { root: repositoryRoot },
+        { root: repositoryRoot, schema: verificationSchema },
       );
       if (contract.fixture_id !== fixture.id || contract.fixture_input_digest !== `sha256:${inputDigest}`) throw new Error(`${fixture.id} verification command contract is bound to another fixture input`);
       fixture.verification_command_contract.sha256 = sha256(contractSnapshot.bytes);
@@ -108,11 +115,20 @@ export function buildPortfolioRuntimeRegistrationProjection({ root = ROOT, confi
     if (JSON.stringify(before) !== JSON.stringify(after)) changes.push({ fixture_id: fixture.id, before, after });
   }
 
+  validatePortfolioFoundation(projected, configAbsolute, {
+    root: repositoryRoot,
+    schema: configSchema,
+    verificationCommandSchema: verificationSchema,
+  });
+
+  const bytes = serialized(projected);
+
   return {
     configPath: configAbsolute,
     configSnapshot,
     config: projected,
-    bytes: serialized(projected),
+    bytes,
+    byteDrift: !configSnapshot.bytes.equals(bytes),
     changes,
     artifactSnapshots,
   };
@@ -150,11 +166,11 @@ function replaceStableConfig(projection, { beforePublish = null } = {}) {
 export function writePortfolioRuntimeRegistrationProjection(options = {}) {
   const { beforePublish = null, ...projectionOptions } = options;
   const projection = buildPortfolioRuntimeRegistrationProjection(projectionOptions);
-  if (projection.changes.length > 0) replaceStableConfig(projection, { beforePublish });
+  if (projection.byteDrift) replaceStableConfig(projection, { beforePublish });
   const verified = buildPortfolioRuntimeRegistrationProjection(projectionOptions);
   if (verified.changes.length > 0 || !verified.configSnapshot.bytes.equals(projection.bytes)) throw new Error("adaptive portfolio runtime registration publication is not deterministic");
   return {
-    status: projection.changes.length > 0 ? "written" : "current",
+    status: projection.byteDrift ? "written" : "current",
     fixture_ids: projection.changes.map(({ fixture_id: fixtureId }) => fixtureId),
     config_sha256: sha256(verified.configSnapshot.bytes),
     bytes: verified.configSnapshot.bytes.length,
@@ -164,7 +180,7 @@ export function writePortfolioRuntimeRegistrationProjection(options = {}) {
 export function checkPortfolioRuntimeRegistrationProjection(options = {}) {
   const projection = buildPortfolioRuntimeRegistrationProjection(options);
   return {
-    status: projection.changes.length === 0 ? "current" : "stale",
+    status: projection.byteDrift ? "stale" : "current",
     fixture_ids: projection.changes.map(({ fixture_id: fixtureId }) => fixtureId),
     expected_config_sha256: sha256(projection.bytes),
     current_config_sha256: sha256(projection.configSnapshot.bytes),

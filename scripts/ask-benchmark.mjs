@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { buildPortfolioPlan, PORTFOLIO_CONDITIONS, readExecutionAdmissionEvidenceManifest } from "./ask-benchmark-plan.mjs";
 import { validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
+import { validateSchemaValue } from "./json-schema-validation.mjs";
 import { assertTrackedRepositoryMatchesHead, materializePortfolio } from "./ask-benchmark-materialize.mjs";
 import { sealAdaptiveSelection, verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
 import { executePortfolio, recoverPortfolioCase, verifyPortfolioExecution } from "./ask-benchmark-execution.mjs";
@@ -200,14 +201,14 @@ Commands:
 `);
 }
 
-function resolveRepoPath(value, label) {
-  const path = resolve(ROOT, value);
-  if (path !== ROOT && !path.startsWith(`${ROOT}${sep}`)) throw new Error(`${label} must stay inside the repository`);
+function resolveRepoPath(value, label, repositoryRoot = ROOT) {
+  const path = resolve(repositoryRoot, value);
+  if (path !== repositoryRoot && !path.startsWith(`${repositoryRoot}${sep}`)) throw new Error(`${label} must stay inside the repository`);
   return path;
 }
 
-function fixtureRoot(config) {
-  return resolveRepoPath(config.fixture_root ?? "benchmarks/fixtures", "fixture_root");
+function fixtureRoot(config, repositoryRoot = ROOT) {
+  return resolveRepoPath(config.fixture_root ?? "benchmarks/fixtures", "fixture_root", repositoryRoot);
 }
 
 function fixtureFile(config, fixture, value) {
@@ -235,10 +236,14 @@ function equalOrderedValues(actual, expected) {
   return JSON.stringify(actual) === JSON.stringify(expected);
 }
 
-function validatePortfolioFoundation(config, canonicalConfigPath) {
+export function validatePortfolioFoundation(config, canonicalConfigPath, { root = ROOT, schema = null, verificationCommandSchema = null } = {}) {
   const errors = [];
-  const configSchemaPath = resolve(ROOT, "benchmarks/schemas/portfolio-config.schema.json");
-  assertBenchmarkSchemaInstance(config, { schemaPath: configSchemaPath, label: "portfolio config" });
+  const configSchemaPath = resolve(root, "benchmarks/schemas/portfolio-config.schema.json");
+  if (schema === null) assertBenchmarkSchemaInstance(config, { schemaPath: configSchemaPath, label: "portfolio config" });
+  else {
+    const schemaErrors = validateSchemaValue(config, schema, { baseDir: dirname(configSchemaPath), rootSchema: schema });
+    if (schemaErrors.length > 0) throw new Error(`portfolio config failed JSON Schema validation:\n${schemaErrors.join("\n")}`);
+  }
   if (config.program !== "adaptive_ask_portfolio") errors.push("portfolio program must be adaptive_ask_portfolio");
   if (!["foundation", "frozen"].includes(config.protocol_status)) errors.push("portfolio protocol_status must be foundation or frozen");
 
@@ -261,8 +266,8 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
     if (![3, 5].includes(fixture.repetitions)) errors.push(`${fixture.id} repetitions must be 3 or 5`);
     if (fixture.aggregate_eligible !== (fixture.suite !== "calibration")) errors.push(`${fixture.id} aggregate eligibility must exclude calibration only`);
     if (fixture.id === "impl-transfer-hard" && fixture.suite === "calibration" && fixture.repetitions !== 5) errors.push("concurrent transfer calibration requires 5 repetitions");
-    const root = resolve(fixtureRoot(config), fixture.id);
-    const sourceFreezeCandidatePath = resolve(root, "source-freeze-candidate.json");
+    const fixtureDirectory = resolve(fixtureRoot(config, root), fixture.id);
+    const sourceFreezeCandidatePath = resolve(fixtureDirectory, "source-freeze-candidate.json");
     const sourceFreezeCandidate = existsSync(sourceFreezeCandidatePath) ? readJson(sourceFreezeCandidatePath) : null;
     const isPendingSourceFreezeCandidate = sourceFreezeCandidate?.fixture_id === fixture.id
       && sourceFreezeCandidate?.candidate_state === "source_freeze_candidate"
@@ -276,13 +281,13 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
         ? ["task.md", "workspace/package.json", "metadata.json", "requirement-record.json", "output-contract.json", "source-freeze-candidate.json", "verification-command-contract.json"]
       : ["task.md", "workspace/package.json", "metadata.json", "evaluator-reference.json", "requirement-record.json", "output-contract.json", "final-admission-record.json", "scoring-input-freeze-manifest.json", "admission-review.json"];
     for (const path of requiredFixturePaths) {
-      if (!existsSync(resolve(root, path))) errors.push(`${fixture.id}/${path} is missing`);
+      if (!existsSync(resolve(fixtureDirectory, path))) errors.push(`${fixture.id}/${path} is missing`);
     }
     if (!fixture.input_manifest_path) {
       errors.push(`${fixture.id} input_manifest_path is required`);
       continue;
     }
-    const manifestPath = resolveRepoPath(fixture.input_manifest_path, `${fixture.id} input manifest`);
+    const manifestPath = resolveRepoPath(fixture.input_manifest_path, `${fixture.id} input manifest`, root);
     if (!existsSync(manifestPath)) {
       errors.push(`${fixture.id} input manifest is missing: ${fixture.input_manifest_path}`);
       continue;
@@ -293,11 +298,11 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
     if (!inputManifests.get(manifestPath).fixtures?.[fixture.id]) errors.push(`${fixture.id} is absent from its input manifest`);
     if (fixture.verification_command_contract) {
       try {
-        const contractPath = resolveRepoPath(fixture.verification_command_contract.path, `${fixture.id} verification command contract`);
+        const contractPath = resolveRepoPath(fixture.verification_command_contract.path, `${fixture.id} verification command contract`, root);
         if (!existsSync(contractPath) || !lstatSync(contractPath).isFile()) throw new Error("contract is not a regular file");
         const bytes = readFileSync(contractPath);
         if (sha256(bytes) !== fixture.verification_command_contract.sha256) throw new Error("configured contract digest does not match");
-        const contract = validateVerificationCommandContract(JSON.parse(bytes), { root: ROOT });
+        const contract = validateVerificationCommandContract(JSON.parse(bytes), { root, schema: verificationCommandSchema });
         if (contract.fixture_id !== fixture.id || contract.fixture_input_digest !== `sha256:${fixture.input_manifest_sha256}`) throw new Error("contract fixture identity does not match");
       } catch (error) {
         errors.push(`${fixture.id} verification command contract is invalid: ${error instanceof Error ? error.message : String(error)}`);
@@ -308,7 +313,7 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
   if (config.ordering?.strategy !== "seeded_balanced_rotation" || config.ordering?.condition_count !== PORTFOLIO_CONDITIONS.length) errors.push("portfolio ordering must use four-condition seeded_balanced_rotation");
   if (config.execution_plan?.schema_version !== "1.2.0" || !config.execution_plan?.schema_path) errors.push("portfolio execution plan schema version and path are required");
   else {
-    const planSchemaPath = resolveRepoPath(config.execution_plan.schema_path, "execution plan schema");
+    const planSchemaPath = resolveRepoPath(config.execution_plan.schema_path, "execution plan schema", root);
     if (!existsSync(planSchemaPath)) errors.push(`execution plan schema is missing: ${config.execution_plan.schema_path}`);
     else {
       const planSchema = readJson(planSchemaPath);
@@ -318,7 +323,7 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
   }
   if (config.adaptive_selection?.must_precede_result !== true || config.adaptive_selection?.digest_algorithm !== "sha256") errors.push("Adaptive selection must be sealed with SHA-256 before the result");
   if (config.adaptive_selection?.schema_path) {
-    const selectionPath = resolveRepoPath(config.adaptive_selection.schema_path, "adaptive selection schema");
+    const selectionPath = resolveRepoPath(config.adaptive_selection.schema_path, "adaptive selection schema", root);
     if (!existsSync(selectionPath)) errors.push(`Adaptive selection schema is missing: ${config.adaptive_selection.schema_path}`);
     else {
       const selectionSchema = readJson(selectionPath);
@@ -331,9 +336,9 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
   const privacy = config.privacy ?? {};
   if (["store_raw_prompts", "store_full_outputs", "store_full_event_streams", "store_full_source", "store_secrets_customer_or_personal_data"].some((field) => privacy[field] !== false)) errors.push("portfolio durable raw or sensitive capture must be explicitly disabled");
   if (typeof config.protocol_path !== "string" || config.protocol_path.trim() === "") errors.push("portfolio protocol_path is required");
-  const protocolPath = resolveRepoPath(config.protocol_path ?? "", "protocol_path");
-  if (!existsSync(protocolPath) || protocolPath === ROOT) errors.push(`protocol is missing: ${relative(ROOT, protocolPath)}`);
-  const inputVerifier = resolve(fixtureRoot(config), "verify-inputs.mjs");
+  const protocolPath = resolveRepoPath(config.protocol_path ?? "", "protocol_path", root);
+  if (!existsSync(protocolPath) || protocolPath === root) errors.push(`protocol is missing: ${relative(root, protocolPath)}`);
+  const inputVerifier = resolve(fixtureRoot(config, root), "verify-inputs.mjs");
   if (existsSync(inputVerifier)) {
     const verified = spawnSync(process.execPath, [inputVerifier], { cwd: fixtureRoot(config), encoding: "utf8" });
     if (verified.status !== 0) errors.push(`agent-visible input verification failed: ${verified.stderr || verified.stdout}`);
@@ -1234,7 +1239,7 @@ function verifyLegacyCalibrationMigrationCommand(args) {
   console.log(`Legacy calibration migration verified: ${result.artifact.migration_id}`);
 }
 
-try {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) try {
   const args = parseArgs(process.argv.slice(2));
   if (args.command === "validate") {
     validateProtocol(args.configPath);
