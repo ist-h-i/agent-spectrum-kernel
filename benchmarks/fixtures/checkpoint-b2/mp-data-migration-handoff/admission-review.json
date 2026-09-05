@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
   "fixture_id": "mp-data-migration-handoff",
-  "candidate_input_digest": "sha256:2f32cb0f0c3361a30223b02a243df9e0dc3193e2e70d3035675176b50d9b1033",
-  "candidate_evaluator_digest": "sha256:fd286fd4e6b50f3b156d6e8eed1779c8bc534b06233db1304c70a81f032202d7",
+  "candidate_input_digest": "sha256:d82e1af9883a4336194348151e7fb76bfbc4743f0906d779d9d66cd315cb1995",
+  "candidate_evaluator_digest": "sha256:47e7daff88b8647d276de50eaa7249128ebd74c34bca765cc2eb62372090b20b",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -121,5 +121,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:7e5a51e4c9bf88846e5192ce4a894f8061c35a481554d94d0784644e2abfb5d0"
+  "review_package_digest": "sha256:b980aade4e167e9a11dc78b0adb721c310efacc6f27fa16955c353c8a5dcc1a3"
 }

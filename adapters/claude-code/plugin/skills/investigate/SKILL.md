@@ -2,7 +2,7 @@
 name: investigate
 description: Investigate an unknown cause through the fixed-entry Agent Spectrum Kernel profile.
 ---
-<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"investigation","k":"p","r":"ask-fixed-entry-assets-v1","p":"13fc729130ef3c1ace6ca5ec5ff922a84e947f5aa5a56b2f475dfed9497417a9","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
+<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"investigation","k":"p","r":"ask-fixed-entry-assets-v1","p":"c61e020fc0c7127e7a3412405f86b5e9848fc4ed49f8cede26893d89215316b7","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
 
 # Investigate
 

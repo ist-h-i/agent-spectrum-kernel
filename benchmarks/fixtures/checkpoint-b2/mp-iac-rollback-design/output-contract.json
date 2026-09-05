@@ -6,9 +6,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:328f50bbbfb954cc01e2674186bf78b94bd55c936f47071dee1981a3cdb6854c",
+  "evaluator_public_reference_digest": "sha256:22e3a5966c0303ead7ccb63d55139316eecf5cf7722d6bb11f235ae67dc8abbb",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/verification-command-contract.json",
-  "verification_command_contract_digest": "sha256:604978fcd13de754e4f614a9300885af97d695b027513c4b71f573632e354b35",
+  "verification_command_contract_digest": "sha256:80676b3a046b9d29d6fbf547336b9416699b76cefc3f82a5a230b0830ed0db4b",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:6e10ad324cee282aafbb27772d846c176e1f9d645046422ab9b2f4921f46db04",
   "result_profile": {
@@ -17,7 +17,7 @@
   },
   "declares_findings": false,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:8d4caf070761f81ee3e6abe0534452872a27108c766d06ec90bc0c780d211079",
-  "evaluator_authority_manifest_digest": "sha256:269791dc52e88bb423e3e9c13d0249f177512e940f5162cde6c28cb8aff87615",
-  "output_contract_digest": "sha256:b2d50e50061c9949edc5f92257bd9dba5b1f22513b0eebc6e7f8a866050d19b9"
+  "evaluator_authority_manifest_raw_sha256": "sha256:b21173099481b610a4daa1c5fa2afec946965a48530f1929127097986659b84f",
+  "evaluator_authority_manifest_digest": "sha256:755dd917a270b2d95c3bb28a6331e710e0313f83cba2d17ad931977066014abe",
+  "output_contract_digest": "sha256:154ac1c8d92603aa1f35aba2ea07f46970525328598ec5916b20b2c1b1b9ced8"
 }

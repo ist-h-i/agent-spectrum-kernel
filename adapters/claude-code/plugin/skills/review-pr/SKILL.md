@@ -2,7 +2,7 @@
 name: review-pr
 description: Review a target through the fixed-entry Agent Spectrum Kernel profile.
 ---
-<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"review","k":"p","r":"ask-fixed-entry-assets-v1","p":"13fc729130ef3c1ace6ca5ec5ff922a84e947f5aa5a56b2f475dfed9497417a9","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
+<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"review","k":"p","r":"ask-fixed-entry-assets-v1","p":"c61e020fc0c7127e7a3412405f86b5e9848fc4ed49f8cede26893d89215316b7","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
 
 # Review PR
 
@@ -32,7 +32,7 @@ Additional required gates:
 - <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<text>; signals=<exact IDs>
 
 Missing evidence:
-- input/gate: affected judgment; next check
+- {"gate_id":"<exact insufficient_evidence gate>","missing_input":"<non-empty missing input>","affected_judgment":"<non-empty affected judgment>","next_check":"<non-empty next check>"}
 
 Findings:
 - Finding ID:
@@ -49,6 +49,6 @@ Only when final merge judgment was requested, append:
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
-Use `- none` for empty sections. Emit exactly one fenced JSON `Execution Envelope` using `${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md`.
+Missing evidence is canonical closed JSONL: one exact four-field record per `insufficient_evidence` gate in gate order; no others; `- none` iff no gate is insufficient. Reject missing/extra fields and unknown/duplicate/unmatched/partial gate IDs. Use `- none` for other empty sections. Emit exactly one fenced JSON `Execution Envelope` using `${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md`.
 
 $ARGUMENTS
