@@ -23,7 +23,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { readStableExecutableFile, verifyRiskCodexExecutor } from "./codex-risk-approval.mjs";
+import { assertNoManagedCodexConfiguration, readStableExecutableFile, verifyRiskCodexExecutor } from "./codex-risk-approval.mjs";
 
 const PERMITTED_FILESYSTEM_EFFECTS = new Set(["create", "modify", "delete"]);
 const REQUIRED_PROHIBITED_EFFECTS = Object.freeze([
@@ -128,19 +128,32 @@ function codexConfigReadDenyPaths(workspace, environment = {}, systemConfigPaths
   return [...paths].sort();
 }
 
-function validateClosedEnvironment(environment, policy) {
-  if (!environment || !policy || policy.inheritance !== "none") throw new Error("risk Codex execution requires a closed non-inherited environment policy");
+function validateClosedEnvironment(environment, policy, taskRoot) {
+  if (!environment || !policy || policy.inheritance !== "none" || policy.authentication_mode !== "single_api_key_environment" || policy.runtime_path_derivation !== "runner_task_root_v1") throw new Error("risk Codex execution requires a closed non-inherited single-API-key environment policy");
+  const canonicalTaskRoot = realpathSync(taskRoot);
+  const derivedValues = {
+    "<RUNNER_TASK_ROOT>/home": join(canonicalTaskRoot, "home"),
+    "<RUNNER_TASK_ROOT>/codex-home": join(canonicalTaskRoot, "codex-home"),
+  };
   const publicBindings = policy.public_bindings ?? [];
   const secretBindings = policy.secret_bindings ?? [];
+  if (secretBindings.length !== 1) throw new Error("risk Codex execution requires exactly one approved API-key binding");
   const expectedNames = [...publicBindings.map((entry) => entry.name), ...secretBindings.map((entry) => entry.name)].sort();
   const actualNames = Object.keys(environment).sort();
   if (canonicalJson(actualNames) !== canonicalJson(expectedNames)) throw new Error("risk Codex execution environment contains an unbound or missing name");
-  for (const binding of publicBindings) if (environment[binding.name] !== binding.value) throw new Error(`risk Codex public environment binding changed: ${binding.name}`);
+  for (const binding of publicBindings) {
+    const expectedValue = derivedValues[binding.value] ?? binding.value;
+    if (environment[binding.name] !== expectedValue) throw new Error(`risk Codex public environment binding changed: ${binding.name}`);
+    if (derivedValues[binding.value]) {
+      const status = lstatSync(expectedValue);
+      if (!status.isDirectory() || status.isSymbolicLink() || realpathSync(expectedValue) !== expectedValue || readdirSync(expectedValue).length !== 0) throw new Error(`risk Codex derived ${binding.name} must be an empty canonical directory`);
+    }
+  }
   for (const binding of secretBindings) if (sha256(canonicalJson(environment[binding.name])) !== binding.value_sha256) throw new Error(`risk Codex secret environment binding changed: ${binding.name}`);
-  const redactedIdentity = Object.fromEntries(actualNames.map((name) => {
-    const secret = secretBindings.some((binding) => binding.name === name);
-    return [name, secret ? sha256(canonicalJson(environment[name])) : environment[name]];
-  }));
+  const redactedIdentity = Object.fromEntries([
+    ...publicBindings.map(({ name, value }) => [name, value]),
+    ...secretBindings.map(({ name, value_sha256 }) => [name, value_sha256]),
+  ].sort(([left], [right]) => left.localeCompare(right)));
   if (sha256(canonicalJson(redactedIdentity)) !== policy.environment_sha256) throw new Error("risk Codex execution environment digest changed immediately before spawn");
 }
 
@@ -274,12 +287,13 @@ function openVerifiedExecutorSnapshot(context, executable, executorBinding) {
 
 export async function runInRiskWorkspace({ context, executable, executorBinding, args, input, env, environmentPolicy }) {
   assertRiskIsolationProvider();
-  validateClosedEnvironment(env, environmentPolicy);
+  validateClosedEnvironment(env, environmentPolicy, context.taskRoot);
   const configReadDenyPaths = codexConfigReadDenyPaths(context.workspace, env, context.runtime_policy.system_config_paths);
   const current = inventory(context.workspace);
   for (const path of Object.keys(current)) {
     if (path === ".codex/config.toml" || path.endsWith("/.codex/config.toml")) throw new Error(`risk workspace contains a project Codex configuration layer before spawn: ${path}`);
   }
+  assertNoManagedCodexConfiguration();
   const snapshot = openVerifiedExecutorSnapshot(context, executable, executorBinding);
   const commandArgs = ["-p", sandboxProfile(context.workspace, configReadDenyPaths), snapshot.path, ...args];
   const result = await new Promise((resolveResult) => {

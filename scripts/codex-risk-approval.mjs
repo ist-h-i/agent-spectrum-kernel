@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, realpathSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,6 +27,18 @@ export const RISK_CODEX_SYSTEM_CONFIG_PATHS = Object.freeze([
   "/Library/Managed Preferences/com.openai.codex.plist",
   "/Library/Preferences/com.openai.codex.plist",
 ]);
+
+export function assertNoManagedCodexConfiguration(paths = RISK_CODEX_SYSTEM_CONFIG_PATHS) {
+  for (const path of paths) {
+    try {
+      lstatSync(path);
+      throw new Error(`risk Codex execution rejects managed or system configuration on this host: ${path}`);
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
+  }
+}
 
 export const RISK_CODEX_DISABLED_FEATURES = Object.freeze([
   "apps",
@@ -112,7 +124,8 @@ export function riskCodexRuntimePolicy() {
     executor_resolution: "stable_native_snapshot_spawn",
     environment_inheritance: "closed_allowlist",
     project_config_layers: "reject_and_read_deny",
-    system_config_layers: "read_deny",
+    system_config_layers: "reject_and_read_deny",
+    managed_cloud_configuration: "unavailable_api_key_only",
     system_config_paths: [...RISK_CODEX_SYSTEM_CONFIG_PATHS],
     disabled_features: [...RISK_CODEX_DISABLED_FEATURES],
     argv,
@@ -311,40 +324,68 @@ function canonicalDirectory(path, label) {
 }
 
 export function resolveRiskExecutionEnvironment(sourceEnv = process.env) {
-  const home = canonicalDirectory(sourceEnv.HOME, "HOME");
-  const codexHome = canonicalDirectory(sourceEnv.CODEX_HOME ?? join(home, ".codex"), "CODEX_HOME");
-  const environment = {
+  assertNoManagedCodexConfiguration();
+  const publicValues = {
     PATH: CLOSED_EXECUTION_PATH,
-    HOME: home,
-    CODEX_HOME: codexHome,
+    HOME: "<RUNNER_TASK_ROOT>/home",
+    CODEX_HOME: "<RUNNER_TASK_ROOT>/codex-home",
     LANG: "C.UTF-8",
     LC_ALL: "C.UTF-8",
     NO_COLOR: "1",
     TERM: "dumb",
     SHELL: "/bin/sh",
   };
+  const secretValues = {};
   const secretBindings = [];
   for (const name of AUTH_ENVIRONMENT_NAMES) {
     const value = sourceEnv[name];
     if (typeof value !== "string" || value.length === 0) continue;
-    environment[name] = value;
+    secretValues[name] = value;
     secretBindings.push({ name, value_sha256: canonicalRiskDigest(value) });
   }
-  const publicBindings = Object.entries(environment)
-    .filter(([name]) => !AUTH_ENVIRONMENT_NAMES.includes(name))
+  if (secretBindings.length !== 1) throw new Error("risk Codex execution requires exactly one caller-supplied API-key environment binding and rejects saved ChatGPT authentication");
+  const publicBindings = Object.entries(publicValues)
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([name, value]) => ({ name, value }));
-  const redactedIdentity = Object.fromEntries(Object.entries(environment).sort(([left], [right]) => left.localeCompare(right)).map(([name, value]) => [name, AUTH_ENVIRONMENT_NAMES.includes(name) ? canonicalRiskDigest(value) : value]));
+  const redactedIdentity = Object.fromEntries([
+    ...publicBindings.map(({ name, value }) => [name, value]),
+    ...secretBindings.map(({ name, value_sha256 }) => [name, value_sha256]),
+  ].sort(([left], [right]) => left.localeCompare(right)));
   return {
-    environment,
+    secretValues,
     policy: {
       inheritance: "none",
+      authentication_mode: "single_api_key_environment",
+      runtime_path_derivation: "runner_task_root_v1",
       public_bindings: publicBindings,
       secret_bindings: secretBindings,
       stripped_injection_families: ["NODE_*", "npm_*", "DYLD_*", "LD_*", "*_PROXY", "BASH_ENV", "ENV", "GIT_*", "SSH_*"],
       environment_sha256: canonicalRiskDigest(redactedIdentity),
     },
   };
+}
+
+export function materializeRiskExecutionEnvironment(resolved, taskRoot) {
+  if (!resolved?.policy || !resolved?.secretValues) throw new Error("risk execution environment resolution is incomplete");
+  const canonicalRoot = canonicalDirectory(taskRoot, "risk runner task root");
+  const home = join(canonicalRoot, "home");
+  const codexHome = join(canonicalRoot, "codex-home");
+  mkdirSync(home, { mode: 0o700 });
+  mkdirSync(codexHome, { mode: 0o700 });
+  const environment = {};
+  for (const { name, value } of resolved.policy.public_bindings) {
+    environment[name] = value === "<RUNNER_TASK_ROOT>/home"
+      ? home
+      : value === "<RUNNER_TASK_ROOT>/codex-home"
+        ? codexHome
+        : value;
+  }
+  for (const { name, value_sha256 } of resolved.policy.secret_bindings) {
+    const value = resolved.secretValues[name];
+    if (canonicalRiskDigest(value) !== value_sha256) throw new Error(`risk Codex API-key binding changed before materialization: ${name}`);
+    environment[name] = value;
+  }
+  return { environment, policy: resolved.policy };
 }
 
 function parseClosedJson(evidence, schemaPath, label) {

@@ -275,9 +275,11 @@ const riskRequest = createRiskApprovalRequest({
     },
     environment: {
       inheritance: "none",
+      authentication_mode: "single_api_key_environment",
+      runtime_path_derivation: "runner_task_root_v1",
       public_bindings: [
-        { name: "CODEX_HOME", value: "/tmp/codex-home" },
-        { name: "HOME", value: "/tmp/home" },
+        { name: "CODEX_HOME", value: "<RUNNER_TASK_ROOT>/codex-home" },
+        { name: "HOME", value: "<RUNNER_TASK_ROOT>/home" },
         { name: "LANG", value: "C.UTF-8" },
         { name: "LC_ALL", value: "C.UTF-8" },
         { name: "NO_COLOR", value: "1" },
@@ -285,7 +287,7 @@ const riskRequest = createRiskApprovalRequest({
         { name: "SHELL", value: "/bin/sh" },
         { name: "TERM", value: "dumb" },
       ],
-      secret_bindings: [],
+      secret_bindings: [{ name: "OPENAI_API_KEY", value_sha256: digest("8") }],
       stripped_injection_families: ["NODE_*", "npm_*", "DYLD_*", "LD_*", "*_PROXY", "BASH_ENV", "ENV", "GIT_*", "SSH_*"] ,
       environment_sha256: digest("9"),
     },

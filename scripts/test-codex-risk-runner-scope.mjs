@@ -56,10 +56,12 @@ const expectedRiskPolicyArgs = [
 ];
 
 function runNode(args, options = {}) {
+  const env = { ...process.env, ...(options.env ?? {}) };
+  for (const name of ["CODEX_API_KEY", "OPENAI_API_KEY"]) if (!Object.hasOwn(options.env ?? {}, name)) delete env[name];
   return spawnSync(process.execPath, args, {
     cwd: options.cwd ?? source,
     encoding: "utf8",
-    env: { ...process.env, ...(options.env ?? {}) },
+    env,
     maxBuffer: 20 * 1024 * 1024,
   });
 }
@@ -151,6 +153,7 @@ int main(int argc, char **argv) {
 
   const syntheticEnvironment = {
     CODEX_HOME: syntheticCodexHome,
+    OPENAI_API_KEY: "fixture-api-key",
     NODE_OPTIONS: "--no-warnings",
     NODE_PATH: resolve(fixtureRoot, "injected-node-path"),
     npm_config_user_agent: "injected-package-manager",
@@ -166,8 +169,10 @@ int main(int argc, char **argv) {
     ALL_PROXY: "http://127.0.0.1:9",
   });
   for (const name of ["NODE_OPTIONS", "NODE_PATH", "npm_config_user_agent", "DYLD_INSERT_LIBRARIES", "LD_PRELOAD", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"]) {
-    assert.equal(Object.hasOwn(strippedEnvironment.environment, name), false, `${name} must be stripped from the risk child environment`);
+    assert.equal(Object.hasOwn(strippedEnvironment.secretValues, name), false, `${name} must be stripped from the risk child environment`);
+    assert.equal(strippedEnvironment.policy.public_bindings.some((binding) => binding.name === name), false, `${name} must not enter the public risk environment policy`);
   }
+  assert.deepEqual(Object.keys(strippedEnvironment.secretValues), ["OPENAI_API_KEY"]);
 
   const action = {
     schema_version: "1.0.0",
@@ -203,7 +208,9 @@ int main(int argc, char **argv) {
   assert.equal(request.invocation.executor.spawn_method, "runner_owned_verified_snapshot");
   assert.equal(request.invocation.environment.inheritance, "none");
   assert.deepEqual(request.invocation.environment.public_bindings.find((binding) => binding.name === "PATH"), { name: "PATH", value: "/usr/bin:/bin:/usr/sbin:/sbin" });
-  assert.deepEqual(request.invocation.environment.secret_bindings, []);
+  assert.equal(request.invocation.environment.authentication_mode, "single_api_key_environment");
+  assert.deepEqual(request.invocation.environment.secret_bindings.map(({ name }) => name), ["OPENAI_API_KEY"]);
+  assert.equal(request.invocation.environment.public_bindings.find((binding) => binding.name === "HOME").value, "<RUNNER_TASK_ROOT>/home");
   assert.equal(firstReport.execution_envelope_record.envelope.risk_approval.enforcement_status, "not_started");
   assert.equal(existsSync(resolve(target, "dist/release.json")), false, "unapproved action must not execute");
   assert.equal(existsSync(externalToolMarker), false, "unapproved action must not reach configured external tools");

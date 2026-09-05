@@ -15,10 +15,12 @@ const codexInstaller = resolve(repoRoot, "scripts/install-codex-adapter.mjs");
 const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
 
 function runNode(args, { cwd = repoRoot, env = {} } = {}) {
+  const childEnvironment = { ...process.env, ...env };
+  for (const name of ["CODEX_API_KEY", "OPENAI_API_KEY"]) if (!Object.hasOwn(env, name)) delete childEnvironment[name];
   return spawnSync(process.execPath, args, {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, ...env },
+    env: childEnvironment,
     maxBuffer: 20 * 1024 * 1024,
   });
 }
@@ -950,9 +952,11 @@ Findings:
     "--output", ".agents/runs/conformance-risk-action.md",
     "--json",
   ];
+  const riskAuthEnvironment = { OPENAI_API_KEY: "fixture-api-key" };
   const riskActionResult = runNode(riskArgs, {
     cwd: target,
     env: {
+      ...riskAuthEnvironment,
       ASK_FAKE_RESULT_PATH: generatedReviewResultPath,
       ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
     },
@@ -973,6 +977,7 @@ Findings:
   const repeatedRiskActionResult = runNode(riskArgs, {
     cwd: target,
     env: {
+      ...riskAuthEnvironment,
       ASK_FAKE_RESULT_PATH: resolve(target, ".fixture-implementation.json"),
       ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
     },
@@ -1001,6 +1006,7 @@ Findings:
   ], {
     cwd: target,
     env: {
+      ...riskAuthEnvironment,
       ASK_FAKE_RESULT_PATH: resolve(target, ".fixture-implementation.json"),
       ASK_FAKE_INVOCATION_PATH: "",
       ASK_FAKE_STDIN_PATH: ".fixture-codex-invocations",
@@ -1044,6 +1050,7 @@ Findings:
     ], {
       cwd: target,
       env: {
+        ...riskAuthEnvironment,
         ASK_FAKE_RESULT_PATH: resolve(target, ".fixture-implementation.json"),
         ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
       },
@@ -1090,6 +1097,7 @@ Findings:
   const missingCapabilityRequestResult = runNode(missingCapabilityRiskArgs, {
     cwd: target,
     env: {
+      ...riskAuthEnvironment,
       ASK_FAKE_RESULT_PATH: resolve(target, ".fixture-implementation.json"),
       ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
     },
@@ -1112,6 +1120,7 @@ Findings:
   ], {
     cwd: target,
     env: {
+      ...riskAuthEnvironment,
       ASK_FAKE_RESULT_PATH: resolve(target, ".fixture-implementation.json"),
       ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
     },

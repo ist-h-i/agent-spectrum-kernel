@@ -83,9 +83,11 @@
         "environment": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["inheritance", "public_bindings", "secret_bindings", "stripped_injection_families", "environment_sha256"],
+          "required": ["inheritance", "authentication_mode", "runtime_path_derivation", "public_bindings", "secret_bindings", "stripped_injection_families", "environment_sha256"],
           "properties": {
             "inheritance": { "type": "string", "const": "none" },
+            "authentication_mode": { "type": "string", "const": "single_api_key_environment" },
+            "runtime_path_derivation": { "type": "string", "const": "runner_task_root_v1" },
             "public_bindings": {
               "type": "array",
               "minItems": 8,
@@ -102,7 +104,8 @@
             },
             "secret_bindings": {
               "type": "array",
-              "maxItems": 2,
+              "minItems": 1,
+              "maxItems": 1,
               "uniqueItems": true,
               "items": {
                 "type": "object",
@@ -121,7 +124,7 @@
         "runtime_policy": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["user_config", "execpolicy_rules", "session_persistence", "mcp_servers", "plugins", "external_tool_discovery", "shell_environment_inheritance", "web_search", "candidate_network_access", "telemetry", "update_checks", "model_control_plane", "builtin_mutation_tools", "executor_resolution", "environment_inheritance", "project_config_layers", "system_config_layers", "system_config_paths", "disabled_features", "argv", "argv_sha256"],
+          "required": ["user_config", "execpolicy_rules", "session_persistence", "mcp_servers", "plugins", "external_tool_discovery", "shell_environment_inheritance", "web_search", "candidate_network_access", "telemetry", "update_checks", "model_control_plane", "builtin_mutation_tools", "executor_resolution", "environment_inheritance", "project_config_layers", "system_config_layers", "managed_cloud_configuration", "system_config_paths", "disabled_features", "argv", "argv_sha256"],
           "properties": {
             "user_config": { "type": "string", "const": "ignored" },
             "execpolicy_rules": { "type": "string", "const": "ignored" },
@@ -139,7 +142,8 @@
             "executor_resolution": { "type": "string", "const": "stable_native_snapshot_spawn" },
             "environment_inheritance": { "type": "string", "const": "closed_allowlist" },
             "project_config_layers": { "type": "string", "const": "reject_and_read_deny" },
-            "system_config_layers": { "type": "string", "const": "read_deny" },
+            "system_config_layers": { "type": "string", "const": "reject_and_read_deny" },
+            "managed_cloud_configuration": { "type": "string", "const": "unavailable_api_key_only" },
             "system_config_paths": { "const": ["/etc/codex/config.toml", "/etc/codex/managed_config.toml", "/etc/codex/requirements.toml", "/Library/Managed Preferences/com.openai.codex.plist", "/Library/Preferences/com.openai.codex.plist"] },
             "disabled_features": {
               "const": ["apps", "auth_elicitation", "browser_use", "browser_use_external", "browser_use_full_cdp_access", "code_mode_host", "computer_use", "enable_mcp_apps", "executor_capability_discovery", "guardian_approval", "hooks", "image_generation", "in_app_browser", "in_app_updates", "mcp_2026_07_28", "memories", "multi_agent", "multi_agent_v2", "plugin_sharing", "plugins", "recommended_plugins", "remote_plugin", "skill_mcp_dependency_install", "skill_search", "shell_snapshot", "standalone_web_search", "tool_call_mcp_elicitation", "tool_suggest", "view_image", "workspace_dependencies"]

@@ -7,8 +7,10 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  assertNoManagedCodexConfiguration,
   canonicalRiskDigest,
   createRiskApprovalRequest,
+  materializeRiskExecutionEnvironment,
   readRiskAction,
   resolveRiskCodexExecutor,
   resolveRiskExecutionEnvironment,
@@ -83,9 +85,11 @@ const invocation = {
   },
   environment: {
     inheritance: "none",
+    authentication_mode: "single_api_key_environment",
+    runtime_path_derivation: "runner_task_root_v1",
     public_bindings: [
-      { name: "CODEX_HOME", value: "/tmp/codex-home" },
-      { name: "HOME", value: "/tmp/home" },
+      { name: "CODEX_HOME", value: "<RUNNER_TASK_ROOT>/codex-home" },
+      { name: "HOME", value: "<RUNNER_TASK_ROOT>/home" },
       { name: "LANG", value: "C.UTF-8" },
       { name: "LC_ALL", value: "C.UTF-8" },
       { name: "NO_COLOR", value: "1" },
@@ -93,7 +97,7 @@ const invocation = {
       { name: "SHELL", value: "/bin/sh" },
       { name: "TERM", value: "dumb" },
     ],
-    secret_bindings: [],
+    secret_bindings: [{ name: "OPENAI_API_KEY", value_sha256: digest("b") }],
     stripped_injection_families: ["NODE_*", "npm_*", "DYLD_*", "LD_*", "*_PROXY", "BASH_ENV", "ENV", "GIT_*", "SSH_*"],
     environment_sha256: digest("a"),
   },
@@ -132,8 +136,13 @@ try {
   assert.throws(() => resolveRiskCodexExecutor("codex", target, { sourceEnv: { PATH: temporaryRoot } }), /must resolve through the installed @openai\/codex launcher/u);
   assert.throws(() => resolveRiskCodexExecutor(injectedBare, target), /must resolve through the installed @openai\/codex launcher/u);
 
+  assert.throws(() => resolveRiskExecutionEnvironment({}), /requires exactly one caller-supplied API-key/u);
+  assert.throws(() => resolveRiskExecutionEnvironment({ OPENAI_API_KEY: "one", CODEX_API_KEY: "two" }), /requires exactly one caller-supplied API-key/u);
+  const managedConfig = resolve(temporaryRoot, "managed-config.toml");
+  writeFileSync(managedConfig, "[features]\nhooks = true\n");
+  assert.throws(() => assertNoManagedCodexConfiguration([managedConfig]), /rejects managed or system configuration/u);
   const environment = resolveRiskExecutionEnvironment({
-    ...process.env,
+    OPENAI_API_KEY: "fixture-api-key",
     NODE_OPTIONS: "--require=/tmp/injected.cjs",
     NODE_PATH: "/tmp/injected-node-path",
     npm_config_user_agent: "injected",
@@ -141,9 +150,16 @@ try {
     LD_PRELOAD: "/tmp/injected.so",
     HTTPS_PROXY: "http://127.0.0.1:9",
   });
-  assert.deepEqual(Object.keys(environment.environment).filter((name) => /^(?:NODE_|npm_|DYLD_|LD_|.*_PROXY)/u.test(name)), []);
-  assert.deepEqual(environment.environment.PATH, "/usr/bin:/bin:/usr/sbin:/sbin");
+  const environmentRoot = resolve(temporaryRoot, "environment-root");
+  mkdirSync(environmentRoot);
+  const materializedEnvironment = materializeRiskExecutionEnvironment(environment, environmentRoot);
+  assert.deepEqual(Object.keys(materializedEnvironment.environment).filter((name) => /^(?:NODE_|npm_|DYLD_|LD_|.*_PROXY)/u.test(name)), []);
+  assert.deepEqual(materializedEnvironment.environment.PATH, "/usr/bin:/bin:/usr/sbin:/sbin");
+  assert.equal(materializedEnvironment.environment.HOME, resolve(environmentRoot, "home"));
+  assert.equal(materializedEnvironment.environment.CODEX_HOME, resolve(environmentRoot, "codex-home"));
+  assert.equal(materializedEnvironment.environment.OPENAI_API_KEY, "fixture-api-key");
   assert.equal(environment.policy.inheritance, "none");
+  assert.equal(environment.policy.authentication_mode, "single_api_key_environment");
 
   writeFileSync(actionPath, `${JSON.stringify(action, null, 2)}\n`);
   const actionEvidence = readRiskAction(actionPath, { schemaPath: actionSchemaPath });

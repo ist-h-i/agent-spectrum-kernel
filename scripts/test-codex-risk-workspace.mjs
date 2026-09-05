@@ -25,7 +25,7 @@ import {
   runInRiskWorkspace,
   validateRiskActionEnforcement,
 } from "./codex-risk-workspace.mjs";
-import { readStableExecutableFile, resolveRiskExecutionEnvironment, riskCodexRuntimePolicy, verifyRiskCodexExecutor } from "./codex-risk-approval.mjs";
+import { materializeRiskExecutionEnvironment, readStableExecutableFile, resolveRiskExecutionEnvironment, riskCodexRuntimePolicy, verifyRiskCodexExecutor } from "./codex-risk-approval.mjs";
 
 const root = realpathSync(mkdtempSync(resolve(tmpdir(), "codex-risk-workspace-test-")));
 const repository = resolve(root, "repository");
@@ -148,7 +148,7 @@ try {
   }
 
   if (process.platform === "darwin") {
-    const riskEnvironment = resolveRiskExecutionEnvironment();
+    const riskEnvironmentSpec = resolveRiskExecutionEnvironment({ OPENAI_API_KEY: "fixture-api-key" });
     const nodeEvidence = readStableExecutableFile(process.execPath, "Node test executable");
     const nodeExecutor = {
       native_binary: {
@@ -166,6 +166,7 @@ try {
     run("chmod", ["755", executable], root);
     writeFileSync(outside, "original\n");
     try {
+      const riskEnvironment = materializeRiskExecutionEnvironment(riskEnvironmentSpec, isolated.taskRoot);
       const result = await runInRiskWorkspace({ context: isolated, executable: process.execPath, executorBinding: nodeExecutor, args: [executable, outside], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy });
       assert.equal(result.exitCode, 0, result.stderr);
       assert.equal(readFileSync(outside, "utf8"), "original\n", "OS isolation must deny writes outside the disposable workspace");
@@ -194,6 +195,7 @@ for (const [kind, create] of [
     run("chmod", ["755", boundaryExecutable], root);
     writeFileSync(outside, "original\n");
     try {
+      const riskEnvironment = materializeRiskExecutionEnvironment(riskEnvironmentSpec, boundary.taskRoot);
       const result = await runInRiskWorkspace({ context: boundary, executable: process.execPath, executorBinding: nodeExecutor, args: [boundaryExecutable, outside], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy });
       assert.equal(result.exitCode, 0, result.stderr);
       assert.equal(readFileSync(outside, "utf8"), "original\n", "hardlink and symlink attempts must not mutate outside bytes before audit");
@@ -207,6 +209,7 @@ for (const [kind, create] of [
     writeFileSync(residualExecutable, "import { spawn } from 'node:child_process';\nspawn(process.execPath, ['-e', `setTimeout(() => require('node:fs').writeFileSync('allowed/residual.txt', 'late\\\\n'), 500)`], { detached: true, stdio: 'ignore' }).unref();\n");
     run("chmod", ["755", residualExecutable], root);
     try {
+      const riskEnvironment = materializeRiskExecutionEnvironment(riskEnvironmentSpec, residual.taskRoot);
       const result = await runInRiskWorkspace({ context: residual, executable: process.execPath, executorBinding: nodeExecutor, args: [residualExecutable], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy });
       await new Promise((resolveWait) => setTimeout(resolveWait, 1000));
       assert.equal(result.error === null || /residual child process/u.test(result.error), true);
@@ -234,6 +237,7 @@ for (const [kind, create] of [
     writeFileSync(swappedExecutable, Buffer.concat([swappedEvidence.bytes, Buffer.from("post-verification replacement", "utf8")]));
     chmodSync(swappedExecutable, 0o755);
     try {
+      const riskEnvironment = materializeRiskExecutionEnvironment(riskEnvironmentSpec, swapped.taskRoot);
       await assert.rejects(
         runInRiskWorkspace({ context: swapped, executable: swappedExecutable, executorBinding: swappedBinding, args: [], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy }),
         /identity changed/u,

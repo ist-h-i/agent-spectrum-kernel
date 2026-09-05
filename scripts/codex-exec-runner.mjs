@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, deriveReviewSignalGateRoute, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, inspectCodexPromptContractBindings, parseCodexCompactProfileHeader, readReviewSignalGateMap } from "./ask-shared.mjs";
 import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
-import { RISK_CODEX_POLICY_ARGS, canonicalRiskDigest, createRiskApprovalRequest, readRiskAction, resolveRiskCodexExecutor, resolveRiskExecutionEnvironment, riskCodexRuntimePolicy, verifyRiskApproval, verifyRiskCodexExecutor } from "./codex-risk-approval.mjs";
+import { RISK_CODEX_POLICY_ARGS, canonicalRiskDigest, createRiskApprovalRequest, materializeRiskExecutionEnvironment, readRiskAction, resolveRiskCodexExecutor, resolveRiskExecutionEnvironment, riskCodexRuntimePolicy, verifyRiskApproval, verifyRiskCodexExecutor } from "./codex-risk-approval.mjs";
 import { assertRiskIsolationProvider, auditRiskWorkspace, createRiskWorkspace, disposeRiskWorkspace, promoteRiskWorkspace, runInRiskWorkspace } from "./codex-risk-workspace.mjs";
 import { buildExecutionEnvelopeRecord, hasExecutionEnvelopeMarker, inspectExecutionEnvelopeRecordEmission, isMarkdownFenceClosing, markdownFenceOpening, renderExecutionEnvelopeProjection, selectExecutionEnvelopeEmission, validateExecutionEnvelope, validateExecutionEnvelopeRecord, validateJsonSchema } from "./execution-envelope.mjs";
 import { resolveGitDirectory, resolveObservabilityPath } from "./observability-paths.mjs";
@@ -961,15 +961,21 @@ try {
             } else {
               approvedCodexBin = finalExecutor.spawn_path;
               approvedCodexExecutor = finalExecutor;
-              approvedCodexEnvironment = finalEnvironment;
               spawnPrompt = renderApprovedRiskPrompt(spawnPrompt, rereadApproval.request);
               try {
                 assertRiskIsolationProvider();
-                riskContext = createRiskWorkspace({
+                const createdRiskContext = createRiskWorkspace({
                   target: args.target,
                   request: rereadApproval.request,
                   ignoredRepositoryPaths: [args.output, ".agent-spectrum-kernel/runtime/"],
                 });
+                try {
+                  approvedCodexEnvironment = materializeRiskExecutionEnvironment(finalEnvironment, createdRiskContext.taskRoot);
+                  riskContext = createdRiskContext;
+                } catch (error) {
+                  disposeRiskWorkspace(createdRiskContext);
+                  throw error;
+                }
               } catch (error) {
                 riskApproval = {
                   ...rereadApproval,
