@@ -3002,6 +3002,70 @@ function runCurrentPrivateSiblingModuleRegression() {
   });
 }
 
+function runCurrentPrivateDataModuleRegression() {
+  const sourceFor = (body) => {
+    const bytes = Buffer.from(body);
+    return `data:text/javascript;base64,${bytes.toString("base64")}#${sha256(bytes)}`;
+  };
+  const runScenario = ({ label, specifier, expectedError = null }) => {
+    const environment = createSyntheticCurrentAuthorityEnvironment("executed_success", {
+      hiddenEvaluatorSourceFactory: (fragment) => Buffer.from(`export async function evaluateCandidateSafe() { const generated = await import(${JSON.stringify(specifier)}); if (generated.marker !== 7) throw new Error("private data module result is invalid"); return ${JSON.stringify(fragment)}; }\n`),
+    });
+    const externalAuthorityAnchor = currentExternalAuthorityAnchor();
+    const authorityRoot = mkdtempSync(resolve(tmpdir(), `ask-mn-private-data-${label}-`));
+    const manifest = readJson(resolve(environment.privateEvaluatorRoot, "private-evaluator-bundle.json"));
+    const hiddenAsset = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
+    const workspace = resolve(fixtureRoot, "workspace");
+    const evidence = resolve(authorityRoot, "evidence");
+    mkdirSync(evidence);
+    writeJson(resolve(evidence, "seed.json"), { authority: label });
+    const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot, state: "executed_success" });
+    try {
+      const execution = createSealedEvaluatorExecutionForTest({
+        root,
+        privateEvaluationRoot: authorityRoot,
+        privateRoot: environment.privateEvaluatorRoot,
+        hiddenAsset,
+        frozenWorkspace: workspace,
+        candidateWorkspace: workspace,
+        evaluationInputRoot: evidence,
+        evaluationLineage: normalizedAuthority.normalized.lineage,
+        evaluatorRevision: manifest.evaluator_revision,
+        externalAuthorityAnchor,
+        executionDirectoryName: `private-data-${label}`,
+        label: `current private-data ${label}`,
+      });
+      const execute = () => executeSealedEvaluatorForTest({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized: normalizedAuthority.normalized, label: `current private-data ${label}` });
+      if (expectedError) assert.throws(execute, expectedError, `${label} must fail closed`);
+      else {
+        const result = execute();
+        assert.deepEqual(result.firstFragment, environment.fragment, "digest-closed private data module must execute from its exact bytes");
+        assert.deepEqual(result.secondFragment, environment.fragment, "digest-closed private data module must remain deterministic");
+      }
+    } finally {
+      removeTree(authorityRoot);
+      restoreHistoricalEnvironment(environment);
+    }
+  };
+
+  runScenario({ label: "digest-closed", specifier: sourceFor("export const marker = 7;\n") });
+  runScenario({
+    label: "wrong-digest",
+    specifier: `${sourceFor("export const marker = 7;\n").split("#")[0]}#sha256:${"0".repeat(64)}`,
+    expectedError: /private evaluator data module digest is invalid/u,
+  });
+  runScenario({
+    label: "noncanonical-base64",
+    specifier: `data:text/javascript;base64,QQ===#${sha256(Buffer.from("A"))}`,
+    expectedError: /private evaluator data module encoding is invalid/u,
+  });
+  runScenario({
+    label: "dependency-import",
+    specifier: sourceFor('import "node:fs"; export const marker = 7;\n'),
+    expectedError: /private evaluator data modules cannot import dependencies/u,
+  });
+}
+
 async function runPrivateCandidateChecks(privateRoot) {
   const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
   const assetPath = (role) => resolve(privateRoot, manifest.asset_inventory.find((entry) => entry.role === role).path);
@@ -3539,6 +3603,7 @@ try {
   runHistoricalR21SourceMismatchRegression(historicalR21EvaluatorRevision);
   runCurrentClosedModuleLinkerRegression();
   runCurrentPrivateSiblingModuleRegression();
+  runCurrentPrivateDataModuleRegression();
 
   expectFailure(() => assertAnswerNeutralPublicValue({ hidden_answer: "x" }), /answer-bearing field/u, "public answer-bearing fields must fail closed");
   expectFailure(() => assertPrivateRootOutsideRepository(root, fixtureRoot), /outside the repository/u, "repository-local private bundles must be rejected");

@@ -12,6 +12,8 @@ import * as vm from "node:vm";
 
 const VIRTUAL_ROOT = "/ask-verified-authority";
 const PRIVATE_MODULE_PATH = "private/hidden-evaluator.mjs";
+const PRIVATE_DATA_MODULE_PREFIX = "data:text/javascript;base64,";
+const MAX_PRIVATE_DATA_MODULE_BYTES = 1024 * 1024;
 const SEALED_FILE_MODE = 0o444;
 const SEALED_DIRECTORY_MODE = 0o555;
 const completedBarriers = new Set();
@@ -40,6 +42,19 @@ function stableCanonicalJson(value) {
 
 function canonicalDigest(value) {
   return sha256(Buffer.from(stableCanonicalJson(value)));
+}
+
+function parsePrivateDataModule(specifier) {
+  if (typeof specifier !== "string" || !specifier.startsWith(PRIVATE_DATA_MODULE_PREFIX)) fail("private evaluator data module URL is invalid");
+  const separator = specifier.lastIndexOf("#");
+  if (separator <= PRIVATE_DATA_MODULE_PREFIX.length) fail("private evaluator data module digest is missing");
+  const encoded = specifier.slice(PRIVATE_DATA_MODULE_PREFIX.length, separator);
+  const expectedDigest = specifier.slice(separator + 1);
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(encoded)) fail("private evaluator data module encoding is invalid");
+  const bytes = Buffer.from(encoded, "base64");
+  if (bytes.length === 0 || bytes.length > MAX_PRIVATE_DATA_MODULE_BYTES || bytes.toString("base64") !== encoded) fail("private evaluator data module encoding is invalid");
+  if (expectedDigest !== sha256(bytes)) fail("private evaluator data module digest is invalid");
+  return { source: bytes.toString("utf8"), identifier: specifier };
 }
 
 function fail(message, code = "ERR_VERIFIED_AUTHORITY") {
@@ -514,9 +529,26 @@ async function execute(payload, authority) {
     moduleCache.set(modulePath, module);
     return module;
   };
+  const privateDataModule = (specifier) => {
+    if (moduleCache.has(specifier)) return moduleCache.get(specifier);
+    const parsed = parsePrivateDataModule(specifier);
+    const module = new vm.SourceTextModule(parsed.source, {
+      context,
+      identifier: parsed.identifier,
+      initializeImportMeta(meta, current) { meta.url = current.identifier; },
+      importModuleDynamically: async () => fail("private evaluator data modules cannot import dependencies"),
+    });
+    moduleCache.set(specifier, module);
+    return module;
+  };
   const resolveModule = (specifier, referencingModule, dynamic) => {
+    if (referencingModule.identifier.startsWith(PRIVATE_DATA_MODULE_PREFIX)) fail("private evaluator data modules cannot import dependencies");
     if (specifier.startsWith("node:")) return syntheticBuiltin(specifier);
     const from = pathForIdentifier(referencingModule.identifier);
+    if (specifier.startsWith("data:")) {
+      if (!dynamic || from !== PRIVATE_MODULE_PATH) fail("private evaluator data module import is outside the verified private entry");
+      return privateDataModule(specifier);
+    }
     const targetIdentifier = specifier.startsWith("file:") ? specifier : new URL(specifier, referencingModule.identifier).href;
     const to = pathForIdentifier(targetIdentifier);
     if (!edgeAllowed(from, to, specifier, dynamic)) fail(`module resolution is outside the verified dependency edge: ${from} -> ${to}`);
