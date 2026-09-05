@@ -72,6 +72,8 @@ The repository fixture `scripts/test-adapter-runtime-migration.mjs` verifies all
 
 For adapter-only maintenance that must not read benchmark handoff inputs, use `node scripts/adapter-runtime-bundle.mjs --check-adapters` (or `--write-adapters` when regeneration is intended). The full `--check` remains the repository-wide bundle gate and includes benchmark handoff inputs.
 
+When canonical renderer inputs change, run `node scripts/update-adapter-runtime-fixtures.mjs` before the bundle check. That production writer updates the profile, evidence, verification-prompt proxy, and combined bundle projections as one closure. Run it twice and require byte-identical outputs, then run `node scripts/test-verification-proof-policy.mjs` and the full bundle check.
+
 These checks prove bounded installer behavior. They do not prove an external Claude or Codex process loaded the projected assets or applied canonical risk, evidence, approval, and verification semantics. Capture bounded runtime evidence before upgrading those claims.
 
 For #229, the repository additionally verifies deterministic projection selection between `inline` and `formal_ledger`. Existing lowercase and legacy evidence values are normalized read-only under `docs/claim-evidence-status-contract.md`; migration must not upgrade `weak` to `Verified`, broaden the #276 Asset observation subset, or treat Skill installation as task activation.
