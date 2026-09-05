@@ -37,6 +37,7 @@ const jsonSchemaValidationTestScript = resolve(repoRoot, "scripts/test-json-sche
 const codexRiskApprovalTestScript = resolve(repoRoot, "scripts/test-codex-risk-approval.mjs");
 const codexRiskWorkspaceTestScript = resolve(repoRoot, "scripts/test-codex-risk-workspace.mjs");
 const codexRiskRunnerScopeTestScript = resolve(repoRoot, "scripts/test-codex-risk-runner-scope.mjs");
+const benchmarkRuntimeRegistrationTestScript = resolve(repoRoot, "scripts/test-ask-benchmark-runtime-registration.mjs");
 const fixtureRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "validate-repo-")));
 const promptV2PreregistrationDocs = [
   "docs/adr/0011-prompt-v2-result-blind-canary-authority.md",
@@ -81,6 +82,7 @@ for (const [label, script] of [
   ["Codex exact risk approval", codexRiskApprovalTestScript],
   ["Codex risk workspace enforcement", codexRiskWorkspaceTestScript],
   ["Codex risk runner scoped promotion", codexRiskRunnerScopeTestScript],
+  ["ASK portfolio runtime registration writer", benchmarkRuntimeRegistrationTestScript],
 ]) {
   const result = spawnSync(process.execPath, [script], { cwd: repoRoot, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`${label} tests failed\n${result.stdout}\n${result.stderr}`);

@@ -55,13 +55,14 @@ The measured result is in [results/checkpoint-c-report.md](results/checkpoint-c-
 
 ## Adaptive portfolio foundation, runtime resume, and normalized execution evidence
 
-Issue #197 adds a separate versioned foundation for the redesigned portfolio. The first slice registers the four B2/C fixtures as calibration-only and creates a deterministic plan for separate Codex and Claude tracks across Plain, Kernel-only, Adaptive ASK, and Full ASK:
+Issue #197 adds a separate versioned foundation for the redesigned portfolio. The first slice registers the four B2/C fixtures as calibration-only and creates a deterministic plan for separate Codex and Claude tracks across Plain, Kernel-only, Adaptive ASK, and Full ASK. After an official input-artifact writer changes a fixture manifest or verification contract, run `node scripts/ask-benchmark-runtime-registration.mjs --write` to project those exact byte digests into the runtime config. The checked command below fails closed if any registration is stale:
 
 ```bash
 node scripts/ask-benchmark.mjs validate-portfolio-catalog --catalog benchmarks/portfolio-catalog.json --similarity benchmarks/portfolio-similarity.json
 node scripts/ask-benchmark.mjs validate-portfolio-policy --policy-manifest benchmarks/portfolio-policy-manifest.json
 node scripts/ask-benchmark.mjs validate-portfolio-design-admission --design-admission-manifest benchmarks/portfolio-design-admission-manifest.json --design-review-package benchmarks/portfolio-design-review-package.json
 node scripts/ask-benchmark.mjs validate-portfolio-design-review --independent-design-review benchmarks/portfolio-design-independent-review.json --design-reviewed-state benchmarks/portfolio-design-reviewed-state.json
+node scripts/ask-benchmark-runtime-registration.mjs --check
 node scripts/ask-benchmark.mjs validate --config benchmarks/adaptive-portfolio.config.json
 node scripts/ask-benchmark.mjs plan --config benchmarks/adaptive-portfolio.config.json --output /tmp/adaptive-ask-plan.json --seed local-plan-check
 node scripts/ask-benchmark.mjs materialize --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --output /tmp/adaptive-ask-materialized
