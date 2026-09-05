@@ -77,8 +77,10 @@ export function buildPortfolioRuntimeRegistrationProjection({ root = ROOT, confi
 
   const projected = structuredClone(current);
   const changes = [];
+  const artifactSnapshots = [];
   for (const fixture of projected.fixtures) {
     const input = readArtifact(repositoryRoot, fixture.input_manifest_path, `${fixture.id} input manifest`);
+    artifactSnapshots.push({ snapshot: input, label: `${fixture.id} input manifest` });
     const inputManifest = parseJson(input.bytes, `${fixture.id} input manifest`);
     if (!Object.hasOwn(inputManifest.fixtures ?? {}, fixture.id)) throw new Error(`${fixture.id} is absent from its input manifest`);
     const inputDigest = sha256(input.bytes);
@@ -90,6 +92,7 @@ export function buildPortfolioRuntimeRegistrationProjection({ root = ROOT, confi
 
     if (fixture.verification_command_contract) {
       const contractSnapshot = readArtifact(repositoryRoot, fixture.verification_command_contract.path, `${fixture.id} verification command contract`);
+      artifactSnapshots.push({ snapshot: contractSnapshot, label: `${fixture.id} verification command contract` });
       const contract = validateVerificationCommandContract(
         parseJson(contractSnapshot.bytes, `${fixture.id} verification command contract`),
         { root: repositoryRoot },
@@ -111,10 +114,11 @@ export function buildPortfolioRuntimeRegistrationProjection({ root = ROOT, confi
     config: projected,
     bytes: serialized(projected),
     changes,
+    artifactSnapshots,
   };
 }
 
-function replaceStableConfig(projection) {
+function replaceStableConfig(projection, { beforePublish = null } = {}) {
   const parent = dirname(projection.configPath);
   assertNoSymlinkPathSegments(parent, "adaptive portfolio config parent");
   const current = readStableFile(projection.configPath, "adaptive portfolio config", MAX_CONFIG_BYTES, { allowEmpty: false });
@@ -129,8 +133,13 @@ function replaceStableConfig(projection) {
     fsyncSync(descriptor);
     closeSync(descriptor);
     descriptor = undefined;
+    if (beforePublish !== null) beforePublish();
     const immediatelyBeforePublish = readStableFile(projection.configPath, "adaptive portfolio config", MAX_CONFIG_BYTES, { allowEmpty: false });
     assertStableFileEvidence(projection.configSnapshot, immediatelyBeforePublish, "adaptive portfolio config");
+    for (const { snapshot, label } of projection.artifactSnapshots) {
+      const currentArtifact = readStableFile(snapshot.path, label, MAX_ARTIFACT_BYTES, { allowEmpty: false });
+      assertStableFileEvidence(snapshot, currentArtifact, label);
+    }
     renameSync(staging, projection.configPath);
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
@@ -139,9 +148,10 @@ function replaceStableConfig(projection) {
 }
 
 export function writePortfolioRuntimeRegistrationProjection(options = {}) {
-  const projection = buildPortfolioRuntimeRegistrationProjection(options);
-  if (projection.changes.length > 0) replaceStableConfig(projection);
-  const verified = buildPortfolioRuntimeRegistrationProjection(options);
+  const { beforePublish = null, ...projectionOptions } = options;
+  const projection = buildPortfolioRuntimeRegistrationProjection(projectionOptions);
+  if (projection.changes.length > 0) replaceStableConfig(projection, { beforePublish });
+  const verified = buildPortfolioRuntimeRegistrationProjection(projectionOptions);
   if (verified.changes.length > 0 || !verified.configSnapshot.bytes.equals(projection.bytes)) throw new Error("adaptive portfolio runtime registration publication is not deterministic");
   return {
     status: projection.changes.length > 0 ? "written" : "current",

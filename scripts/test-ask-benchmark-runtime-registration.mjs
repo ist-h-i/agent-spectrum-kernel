@@ -67,6 +67,21 @@ try {
   assert.equal(repeated.status, "current");
   assert.deepEqual(readFileSync(resolve(work, CONFIG_PATH)), firstBytes, "repeated writer must be byte-identical");
 
+  const changedDuringPublication = readConfig(work);
+  const publicationFixture = changedDuringPublication.fixtures.find(({ id }) => id === "mp-data-migration-handoff");
+  publicationFixture.input_manifest_sha256 = "0".repeat(64);
+  writeConfig(work, changedDuringPublication);
+  const configBeforeRejectedPublication = readFileSync(resolve(work, CONFIG_PATH));
+  const publicationInput = resolve(work, publicationFixture.input_manifest_path);
+  const publicationInputBytes = readFileSync(publicationInput);
+  assert.throws(() => writePortfolioRuntimeRegistrationProjection({
+    root: work,
+    beforePublish: () => writeFileSync(publicationInput, Buffer.concat([publicationInputBytes, Buffer.from("\n")])),
+  }), /changed or was replaced during verification/u);
+  assert.deepEqual(readFileSync(resolve(work, CONFIG_PATH)), configBeforeRejectedPublication, "changed source artifact must prevent config publication");
+  writeFileSync(publicationInput, publicationInputBytes);
+  writePortfolioRuntimeRegistrationProjection({ root: work });
+
   const currentCli = spawnSync(process.execPath, [SCRIPT, "--check", "--root", work], { encoding: "utf8" });
   assert.equal(currentCli.status, 0, currentCli.stderr || currentCli.stdout);
 
