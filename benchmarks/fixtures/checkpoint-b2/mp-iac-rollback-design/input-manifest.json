@@ -65,8 +65,8 @@
         },
         {
           "path": "workspace/scripts/validate-change-plan.mjs",
-          "sha256": "04e13413b6cbb1f84d50cb7bf1f255d806f4dd04e0c2b1678a7c11a8737bdc34",
-          "bytes": 8790
+          "sha256": "7e8f157cd0f44de7ba4884e6863b218d529e5cdf0507bcdb71857d5797fe497e",
+          "bytes": 10555
         },
         {
           "path": "workspace/state/current-state.json",
