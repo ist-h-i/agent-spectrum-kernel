@@ -4868,6 +4868,25 @@ EOF
   }
 
   const riskInvocationMarker = `${fakeCodex}.invocations`;
+  const riskPlatform = {
+    "darwin:arm64": { targetTriple: "aarch64-apple-darwin", platformPackage: "codex-darwin-arm64" },
+    "darwin:x64": { targetTriple: "x86_64-apple-darwin", platformPackage: "codex-darwin-x64" },
+    "linux:arm64": { targetTriple: "aarch64-unknown-linux-musl", platformPackage: "codex-linux-arm64" },
+    "linux:x64": { targetTriple: "x86_64-unknown-linux-musl", platformPackage: "codex-linux-x64" },
+  }[`${process.platform}:${process.arch}`];
+  if (!riskPlatform) throw new Error(`codex risk runner fixture does not support ${process.platform}/${process.arch}`);
+  const riskPackageRoot = resolve(target, "fake-openai-codex");
+  const riskPlatformRoot = resolve(riskPackageRoot, "node_modules/@openai", riskPlatform.platformPackage);
+  const riskCodexLauncher = resolve(riskPackageRoot, "bin/codex.js");
+  const riskCodexNative = resolve(riskPlatformRoot, `vendor/${riskPlatform.targetTriple}/bin/codex`);
+  mkdirSync(dirname(riskCodexLauncher), { recursive: true });
+  mkdirSync(dirname(riskCodexNative), { recursive: true });
+  writeFileSync(riskCodexLauncher, "#!/usr/bin/env node\nthrow new Error('unapproved risk fixture must not execute');\n");
+  chmodSync(riskCodexLauncher, 0o755);
+  writeFileSync(resolve(riskPackageRoot, "package.json"), `${JSON.stringify({ name: "@openai/codex", version: "1.2.3", bin: { codex: "bin/codex.js" } }, null, 2)}\n`);
+  writeFileSync(resolve(riskPlatformRoot, "package.json"), `${JSON.stringify({ name: "@openai/codex", version: `1.2.3-${process.platform}-${process.arch}`, os: [process.platform], cpu: [process.arch] }, null, 2)}\n`);
+  cpSync("/usr/bin/true", riskCodexNative);
+  chmodSync(riskCodexNative, 0o755);
   const riskActionPath = resolve(fixtureRoot, "codex-runner-risk-action.json");
   writeFileSync(riskActionPath, `${JSON.stringify({
     schema_version: "1.0.0",
@@ -4876,8 +4895,8 @@ EOF
     risk_gate: "risk-gate",
     operation: "write_risk_output",
     target_scope: ["codex-risk-output.md"],
-    permitted_effects: ["write_risk_output"],
-    prohibited_effects: ["publish_production", "write_outside_target_scope"],
+    permitted_effects: ["create"],
+    prohibited_effects: ["external_side_effects", "git_metadata_changes", "write_outside_target_scope"],
     approval_authority: {
       authority_id: "fixture-owner",
       authority_revision: "rev-1",
@@ -4904,11 +4923,11 @@ EOF
     "--risk-action",
     riskActionPath,
     "--codex-bin",
-    fakeCodex,
+    riskCodexLauncher,
     "--output",
     "codex-risk-output.md",
     "--json",
-  ]);
+  ], { env: { CODEX_API_KEY: "", OPENAI_API_KEY: "fixture-api-key" } });
   if (riskResult.status === 0) throw new Error(`codex risk runner must stop without specific-action approval\n${riskResult.stdout}`);
   if (!riskResult.stdout.trim()) throw new Error(`codex risk runner must emit a JSON approval request before stopping\nstderr:\n${riskResult.stderr}`);
   const riskReport = JSON.parse(riskResult.stdout);
@@ -5299,6 +5318,7 @@ EOF
   const originalEnvelopeRuntime = readFileSync(resolve(target, "scripts/execution-envelope.mjs"), "utf8");
   const originalJsonSchemaRuntime = readFileSync(resolve(target, "scripts/json-schema-validation.mjs"), "utf8");
   const originalRiskApprovalRuntime = readFileSync(resolve(target, "scripts/codex-risk-approval.mjs"), "utf8");
+  const originalRiskWorkspaceRuntime = readFileSync(resolve(target, "scripts/codex-risk-workspace.mjs"), "utf8");
   const originalObservabilityRuntime = readFileSync(resolve(target, "scripts/observability-paths.mjs"), "utf8");
   const outsideRuntimeDir = resolve(fixtureRoot, "outside-codex-runtime", "scripts");
   mkdirSync(outsideRuntimeDir, { recursive: true });
@@ -5309,6 +5329,7 @@ EOF
   writeFileSync(resolve(outsideRuntimeDir, "execution-envelope.mjs"), originalEnvelopeRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "json-schema-validation.mjs"), originalJsonSchemaRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "codex-risk-approval.mjs"), originalRiskApprovalRuntime);
+  writeFileSync(resolve(outsideRuntimeDir, "codex-risk-workspace.mjs"), originalRiskWorkspaceRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "observability-paths.mjs"), originalObservabilityRuntime);
   rmSync(targetRunnerScript);
   symlinkSync(outsideRunnerPath, targetRunnerScript);
