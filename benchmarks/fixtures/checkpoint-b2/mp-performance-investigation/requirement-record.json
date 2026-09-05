@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:6974d86ecc36a151e979d95b99806e2a7c2b12e142fb56c88f3755006d3badf8",
+  "admission_record_digest": "sha256:cd829a9a955ae01468016f0e626477e475bfa9c0929bb2b13a3b8bf89f378703",
   "requirements": [
     {
       "requirement_id": "cache-key-causal-hypothesis",
@@ -100,5 +100,5 @@
     }
   ],
   "requirement_set_digest": "sha256:d67e34ab7e26861d0b89c8adb49b8b27ab79ceb61224a8217d3361d55006b8c3",
-  "requirement_record_digest": "sha256:674201a8ee8bfa63232dc21adea7bd117c7b98dd0a227869a57a5ddfe2cb049d"
+  "requirement_record_digest": "sha256:99c28c97bdfd6cb0be771ebc4acdb7ef8f75661d93ddfa8e59162ce7a7c90111"
 }
