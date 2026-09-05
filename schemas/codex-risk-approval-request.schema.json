@@ -55,7 +55,7 @@
         "executor": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["requested_bin", "resolution", "target_triple", "launcher", "package_manifest", "platform_manifest", "native_binary", "spawn_path", "output_path", "candidate_network_access"],
+          "required": ["requested_bin", "resolution", "target_triple", "launcher", "package_manifest", "platform_manifest", "native_binary", "spawn_path", "spawn_method", "output_path", "candidate_network_access"],
           "properties": {
             "requested_bin": { "type": "string", "minLength": 1, "maxLength": 1000 },
             "resolution": { "type": "string", "const": "installed_openai_codex_platform_package" },
@@ -75,6 +75,7 @@
               }
             },
             "spawn_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+            "spawn_method": { "type": "string", "const": "runner_owned_verified_snapshot" },
             "output_path": { "type": "string", "minLength": 1, "maxLength": 1000 },
             "candidate_network_access": { "type": "string", "const": "disabled" }
           }
@@ -135,7 +136,7 @@
             "update_checks": { "type": "string", "const": "disabled" },
             "model_control_plane": { "type": "string", "const": "codex_api_only" },
             "builtin_mutation_tools": { "const": ["shell_tool", "unified_exec"] },
-            "executor_resolution": { "type": "string", "const": "stable_native_direct_spawn" },
+            "executor_resolution": { "type": "string", "const": "stable_native_snapshot_spawn" },
             "environment_inheritance": { "type": "string", "const": "closed_allowlist" },
             "project_config_layers": { "type": "string", "const": "reject_and_read_deny" },
             "system_config_layers": { "type": "string", "const": "read_deny" },

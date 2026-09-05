@@ -15,8 +15,14 @@ const target = resolve(fixtureRoot, "target");
 const actionPath = resolve(fixtureRoot, "action.json");
 const approvalPath = resolve(fixtureRoot, "approval.json");
 const resultPath = resolve(fixtureRoot, "result.json");
-const targetTriple = process.arch === "arm64" ? "aarch64-apple-darwin" : "x86_64-apple-darwin";
-const platformPackage = process.arch === "arm64" ? "codex-darwin-arm64" : "codex-darwin-x64";
+const riskPlatform = {
+  "darwin:arm64": { targetTriple: "aarch64-apple-darwin", platformPackage: "codex-darwin-arm64" },
+  "darwin:x64": { targetTriple: "x86_64-apple-darwin", platformPackage: "codex-darwin-x64" },
+  "linux:arm64": { targetTriple: "aarch64-unknown-linux-musl", platformPackage: "codex-linux-arm64" },
+  "linux:x64": { targetTriple: "x86_64-unknown-linux-musl", platformPackage: "codex-linux-x64" },
+}[`${process.platform}:${process.arch}`];
+assert.ok(riskPlatform, `risk executor fixture does not support ${process.platform}/${process.arch}`);
+const { targetTriple, platformPackage } = riskPlatform;
 const makePackagePaths = (name) => {
   const packageRoot = resolve(fixtureRoot, name);
   const platformRoot = resolve(packageRoot, "node_modules/@openai", platformPackage);
@@ -134,7 +140,10 @@ int main(int argc, char **argv) {
   return 0;
 }
 `);
-    pass("compile native Codex fixture", spawnSync("/usr/bin/xcrun", ["clang", sourcePath, "-o", output], { encoding: "utf8" }));
+    const compiler = process.platform === "darwin"
+      ? { command: "/usr/bin/xcrun", args: ["clang"] }
+      : { command: "cc", args: [] };
+    pass("compile native Codex fixture", spawnSync(compiler.command, [...compiler.args, sourcePath, "-o", output], { encoding: "utf8" }));
     chmodSync(output, 0o755);
   };
   compileNativeFixture(nativeCodexPackage, false);
@@ -191,6 +200,7 @@ int main(int argc, char **argv) {
   assert.deepEqual(request.invocation.runtime_policy, riskCodexRuntimePolicy(), "approval must bind the exact closed Codex runtime policy and argv digest");
   assert.equal(request.invocation.executor.resolution, "installed_openai_codex_platform_package");
   assert.equal(request.invocation.executor.spawn_path, request.invocation.executor.native_binary.canonical_path, "approved risk execution must directly spawn the bound native binary");
+  assert.equal(request.invocation.executor.spawn_method, "runner_owned_verified_snapshot");
   assert.equal(request.invocation.environment.inheritance, "none");
   assert.deepEqual(request.invocation.environment.public_bindings.find((binding) => binding.name === "PATH"), { name: "PATH", value: "/usr/bin:/bin:/usr/sbin:/sbin" });
   assert.deepEqual(request.invocation.environment.secret_bindings, []);
@@ -201,37 +211,48 @@ int main(int argc, char **argv) {
   const approvalBytes = `${JSON.stringify({ schema_version: "1.0.0", kind: "codex_risk_approval", decision: "approved", request, request_sha256: request.request_sha256 }, null, 2)}\n`;
   writeFileSync(approvalPath, approvalBytes);
   const approved = runNode([...baseArgs, "--risk-approval", approvalPath, "--risk-approval-sha256", sha256(approvalBytes)], { cwd: target, env: syntheticEnvironment });
-  pass("approved isolated runner", approved);
-  const report = JSON.parse(approved.stdout);
-  const state = report.execution_envelope_record.envelope.risk_approval;
-  assert.equal(state.status, "approved");
-  assert.equal(state.execution_status, "executed");
-  assert.equal(state.enforcement_status, "accepted");
-  assert.equal(state.promotion_status, "promoted");
-  assert.deepEqual(state.observed_effects, ["create"]);
-  assert.deepEqual(state.promoted_paths, ["dist/release.json"]);
-  assert.equal(readFileSync(resolve(target, "dist/release.json"), "utf8"), "approved\n");
-  assert.equal(existsSync(externalToolMarker), false, "approved risk execution must not load the configured mutating MCP, hook, plugin, or app surface");
-  assert.equal(existsSync(resolve(target, ".git", "HEAD")), true, "trusted promotion must preserve original Git metadata");
+  if (process.platform !== "darwin") {
+    assert.notEqual(approved.status, 0, "a platform without the required isolation provider must stop before native execution");
+    const report = JSON.parse(approved.stdout);
+    const state = report.execution_envelope_record.envelope.risk_approval;
+    assert.equal(state.status, "rejected");
+    assert.equal(state.execution_status, "not_executed");
+    assert.match(state.rejection_reasons.join("\n"), /no supported OS filesystem-isolation provider/u);
+    assert.equal(existsSync(resolve(target, "dist/release.json")), false);
+    assert.equal(existsSync(externalToolMarker), false);
+  } else {
+    pass("approved isolated runner", approved);
+    const report = JSON.parse(approved.stdout);
+    const state = report.execution_envelope_record.envelope.risk_approval;
+    assert.equal(state.status, "approved");
+    assert.equal(state.execution_status, "executed");
+    assert.equal(state.enforcement_status, "accepted");
+    assert.equal(state.promotion_status, "promoted");
+    assert.deepEqual(state.observed_effects, ["create"]);
+    assert.deepEqual(state.promoted_paths, ["dist/release.json"]);
+    assert.equal(readFileSync(resolve(target, "dist/release.json"), "utf8"), "approved\n");
+    assert.equal(existsSync(externalToolMarker), false, "approved risk execution must not load the configured mutating MCP, hook, plugin, or app surface");
+    assert.equal(existsSync(resolve(target, ".git", "HEAD")), true, "trusted promotion must preserve original Git metadata");
 
-  git(["reset", "--hard", "HEAD"]);
-  git(["clean", "-fd"]);
-  assert.equal(existsSync(resolve(target, "README.md")), false);
-  const outOfScopeArgs = baseArgs.map((value) => value === nativeCodexPackage.launcher ? nativeOutOfScopeCodexPackage.launcher : value);
-  const outOfScopeRequestRun = runNode(outOfScopeArgs, { cwd: target, env: syntheticEnvironment });
-  assert.equal(outOfScopeRequestRun.status, 2, outOfScopeRequestRun.stderr);
-  const outOfScopeRequest = JSON.parse(outOfScopeRequestRun.stdout).execution_envelope_record.envelope.risk_approval.request;
-  const outOfScopeApprovalBytes = `${JSON.stringify({ schema_version: "1.0.0", kind: "codex_risk_approval", decision: "approved", request: outOfScopeRequest, request_sha256: outOfScopeRequest.request_sha256 }, null, 2)}\n`;
-  writeFileSync(approvalPath, outOfScopeApprovalBytes);
-  const rejected = runNode([...outOfScopeArgs, "--risk-approval", approvalPath, "--risk-approval-sha256", sha256(outOfScopeApprovalBytes)], { cwd: target, env: syntheticEnvironment });
-  assert.notEqual(rejected.status, 0, "allowed plus out-of-scope mutation must be rejected");
-  const rejectedReport = JSON.parse(rejected.stdout);
-  assert.equal(rejectedReport.execution_envelope_record.envelope.risk_approval.execution_status, "executed");
-  assert.equal(rejectedReport.execution_envelope_record.envelope.risk_approval.enforcement_status, "rejected");
-  assert.equal(rejectedReport.execution_envelope_record.envelope.risk_approval.promotion_status, "rejected");
-  assert.deepEqual(rejectedReport.execution_envelope_record.envelope.risk_approval.promoted_paths, []);
-  assert.equal(existsSync(resolve(target, "dist/release.json")), false, "mixed allowed and unapproved changes must promote nothing");
-  assert.equal(existsSync(resolve(target, "README.md")), false, "out-of-scope mutation must remain isolated");
+    git(["reset", "--hard", "HEAD"]);
+    git(["clean", "-fd"]);
+    assert.equal(existsSync(resolve(target, "README.md")), false);
+    const outOfScopeArgs = baseArgs.map((value) => value === nativeCodexPackage.launcher ? nativeOutOfScopeCodexPackage.launcher : value);
+    const outOfScopeRequestRun = runNode(outOfScopeArgs, { cwd: target, env: syntheticEnvironment });
+    assert.equal(outOfScopeRequestRun.status, 2, outOfScopeRequestRun.stderr);
+    const outOfScopeRequest = JSON.parse(outOfScopeRequestRun.stdout).execution_envelope_record.envelope.risk_approval.request;
+    const outOfScopeApprovalBytes = `${JSON.stringify({ schema_version: "1.0.0", kind: "codex_risk_approval", decision: "approved", request: outOfScopeRequest, request_sha256: outOfScopeRequest.request_sha256 }, null, 2)}\n`;
+    writeFileSync(approvalPath, outOfScopeApprovalBytes);
+    const rejected = runNode([...outOfScopeArgs, "--risk-approval", approvalPath, "--risk-approval-sha256", sha256(outOfScopeApprovalBytes)], { cwd: target, env: syntheticEnvironment });
+    assert.notEqual(rejected.status, 0, "allowed plus out-of-scope mutation must be rejected");
+    const rejectedReport = JSON.parse(rejected.stdout);
+    assert.equal(rejectedReport.execution_envelope_record.envelope.risk_approval.execution_status, "executed");
+    assert.equal(rejectedReport.execution_envelope_record.envelope.risk_approval.enforcement_status, "rejected");
+    assert.equal(rejectedReport.execution_envelope_record.envelope.risk_approval.promotion_status, "rejected");
+    assert.deepEqual(rejectedReport.execution_envelope_record.envelope.risk_approval.promoted_paths, []);
+    assert.equal(existsSync(resolve(target, "dist/release.json")), false, "mixed allowed and unapproved changes must promote nothing");
+    assert.equal(existsSync(resolve(target, "README.md")), false, "out-of-scope mutation must remain isolated");
+  }
 
   console.log("Codex risk runner scoped promotion tests passed");
 } finally {

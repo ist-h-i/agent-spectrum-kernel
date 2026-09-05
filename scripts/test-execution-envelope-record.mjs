@@ -269,6 +269,7 @@ const riskRequest = createRiskApprovalRequest({
         executable_format: "mach-o",
       },
       spawn_path: "/usr/local/bin/codex",
+      spawn_method: "runner_owned_verified_snapshot",
       output_path: ".agents/runs/release.md",
       candidate_network_access: "disabled",
     },

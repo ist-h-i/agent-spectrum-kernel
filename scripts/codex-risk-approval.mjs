@@ -109,7 +109,7 @@ export function riskCodexRuntimePolicy() {
     update_checks: "disabled",
     model_control_plane: "codex_api_only",
     builtin_mutation_tools: ["shell_tool", "unified_exec"],
-    executor_resolution: "stable_native_direct_spawn",
+    executor_resolution: "stable_native_snapshot_spawn",
     environment_inheritance: "closed_allowlist",
     project_config_layers: "reject_and_read_deny",
     system_config_layers: "read_deny",
@@ -280,11 +280,13 @@ export function resolveRiskCodexExecutor(codexBin, target, { sourceEnv = process
       executable_format: format,
     },
     spawn_path: native.canonical_path,
+    spawn_method: "runner_owned_verified_snapshot",
   };
 }
 
 export function verifyRiskCodexExecutor(expected) {
   if (!expected || typeof expected !== "object") throw new Error("approved Codex executor binding is missing");
+  if (expected.spawn_method !== "runner_owned_verified_snapshot") throw new Error("approved Codex executor does not require a runner-owned verified snapshot");
   const paths = [
     ["launcher", expected.launcher],
     ["package manifest", expected.package_manifest],

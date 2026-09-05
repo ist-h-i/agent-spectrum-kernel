@@ -2,11 +2,15 @@ import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import {
   chmodSync,
+  closeSync,
+  constants,
   copyFileSync,
   existsSync,
+  fstatSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readdirSync,
   readFileSync,
   realpathSync,
@@ -18,6 +22,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
+
+import { readStableExecutableFile, verifyRiskCodexExecutor } from "./codex-risk-approval.mjs";
 
 const PERMITTED_FILESYSTEM_EFFECTS = new Set(["create", "modify", "delete"]);
 const REQUIRED_PROHIBITED_EFFECTS = Object.freeze([
@@ -234,22 +240,62 @@ function sandboxProfile(workspace, configReadDenyPaths) {
   return `(version 1)\n(allow default)\n(deny file-write* (require-not (subpath "${escaped}")))\n${deniedReads}\n`;
 }
 
-export async function runInRiskWorkspace({ context, executable, args, input, env, environmentPolicy }) {
+export function assertRiskIsolationProvider() {
   if (process.platform !== "darwin" || !existsSync("/usr/bin/sandbox-exec")) throw new Error("no supported OS filesystem-isolation provider is available");
+}
+
+function openVerifiedExecutorSnapshot(context, executable, executorBinding) {
+  verifyRiskCodexExecutor(executorBinding);
+  if (executable !== executorBinding.spawn_path || executable !== executorBinding.native_binary?.canonical_path) {
+    throw new Error("risk Codex executable does not match the approved native spawn path");
+  }
+  const source = readStableExecutableFile(executable, "approved Codex native executable at spawn boundary");
+  if (source.path !== executorBinding.native_binary.canonical_path
+    || source.file_sha256 !== executorBinding.native_binary.raw_sha256
+    || source.bytes.length !== executorBinding.native_binary.size_bytes) {
+    throw new Error("approved Codex native executable identity changed at the spawn boundary");
+  }
+  const snapshot = resolve(context.taskRoot, ".codex-native-snapshot");
+  writeFileSync(snapshot, source.bytes, { flag: "wx", mode: 0o500 });
+  let descriptor = null;
+  try {
+    descriptor = openSync(snapshot, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const status = fstatSync(descriptor);
+    if (!status.isFile() || status.nlink !== 1 || status.size !== source.bytes.length) throw new Error("runner-owned Codex native snapshot is not a closed regular file");
+    const snapshotBytes = readFileSync(descriptor);
+    if (sha256(snapshotBytes) !== executorBinding.native_binary.raw_sha256) throw new Error("runner-owned Codex native snapshot digest differs from the approved executable");
+    return { descriptor, path: snapshot };
+  } catch (error) {
+    if (descriptor !== null) closeSync(descriptor);
+    if (existsSync(snapshot)) unlinkSync(snapshot);
+    throw error;
+  }
+}
+
+export async function runInRiskWorkspace({ context, executable, executorBinding, args, input, env, environmentPolicy }) {
+  assertRiskIsolationProvider();
   validateClosedEnvironment(env, environmentPolicy);
   const configReadDenyPaths = codexConfigReadDenyPaths(context.workspace, env, context.runtime_policy.system_config_paths);
   const current = inventory(context.workspace);
   for (const path of Object.keys(current)) {
     if (path === ".codex/config.toml" || path.endsWith("/.codex/config.toml")) throw new Error(`risk workspace contains a project Codex configuration layer before spawn: ${path}`);
   }
-  const commandArgs = ["-p", sandboxProfile(context.workspace, configReadDenyPaths), executable, ...args];
+  const snapshot = openVerifiedExecutorSnapshot(context, executable, executorBinding);
+  const commandArgs = ["-p", sandboxProfile(context.workspace, configReadDenyPaths), snapshot.path, ...args];
   const result = await new Promise((resolveResult) => {
-    const child = spawn("/usr/bin/sandbox-exec", commandArgs, {
-      cwd: context.workspace,
-      env,
-      detached: true,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    let child;
+    try {
+      child = spawn("/usr/bin/sandbox-exec", commandArgs, {
+        cwd: context.workspace,
+        env,
+        detached: true,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    } catch (error) {
+      closeSync(snapshot.descriptor);
+      if (existsSync(snapshot.path)) unlinkSync(snapshot.path);
+      throw error;
+    }
     const stdout = [];
     const stderr = [];
     let stdoutBytes = 0;
@@ -276,17 +322,27 @@ export async function runInRiskWorkspace({ context, executable, args, input, env
         residual = true;
         process.kill(-child.pid, "SIGKILL");
       } catch { /* no residual process group */ }
+      let snapshotError = null;
+      try {
+        const finalSnapshot = readStableExecutableFile(snapshot.path, "runner-owned Codex native snapshot after execution");
+        if (finalSnapshot.file_sha256 !== executorBinding.native_binary.raw_sha256) snapshotError = "runner-owned Codex native snapshot changed during execution";
+      } catch (error) {
+        snapshotError = error.message;
+      } finally {
+        closeSync(snapshot.descriptor);
+        if (existsSync(snapshot.path)) unlinkSync(snapshot.path);
+      }
       resolveResult({
         status: code,
         stdout: Buffer.concat(stdout).toString("utf8"),
         stderr: Buffer.concat(stderr).toString("utf8"),
-        error: spawnError?.message ?? (overflow ? "isolated process output exceeded the accepted bound" : residual ? "isolated process left a residual child process" : null),
+        error: spawnError?.message ?? snapshotError ?? (overflow ? "isolated process output exceeded the accepted bound" : residual ? "isolated process left a residual child process" : null),
       });
     });
     child.stdin.end(input);
   });
   return {
-    command: ["/usr/bin/sandbox-exec", "-p", "<closed-risk-profile>", executable, ...args, "<stdin-prompt>"].join(" "),
+    command: ["/usr/bin/sandbox-exec", "-p", "<closed-risk-profile>", `<runner-owned-native-snapshot:${executable}>`, ...args, "<stdin-prompt>"].join(" "),
     exitCode: result.status,
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",

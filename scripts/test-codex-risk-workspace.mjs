@@ -2,6 +2,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+  chmodSync,
+  copyFileSync,
   linkSync,
   existsSync,
   mkdirSync,
@@ -23,7 +25,7 @@ import {
   runInRiskWorkspace,
   validateRiskActionEnforcement,
 } from "./codex-risk-workspace.mjs";
-import { resolveRiskExecutionEnvironment, riskCodexRuntimePolicy } from "./codex-risk-approval.mjs";
+import { readStableExecutableFile, resolveRiskExecutionEnvironment, riskCodexRuntimePolicy, verifyRiskCodexExecutor } from "./codex-risk-approval.mjs";
 
 const root = realpathSync(mkdtempSync(resolve(tmpdir(), "codex-risk-workspace-test-")));
 const repository = resolve(root, "repository");
@@ -147,13 +149,24 @@ try {
 
   if (process.platform === "darwin") {
     const riskEnvironment = resolveRiskExecutionEnvironment();
+    const nodeEvidence = readStableExecutableFile(process.execPath, "Node test executable");
+    const nodeExecutor = {
+      native_binary: {
+        canonical_path: nodeEvidence.path,
+        raw_sha256: nodeEvidence.file_sha256,
+        size_bytes: nodeEvidence.bytes.length,
+        executable_format: "mach-o",
+      },
+      spawn_path: nodeEvidence.path,
+      spawn_method: "runner_owned_verified_snapshot",
+    };
     const isolated = createRiskWorkspace({ target: repository, request: request() });
     const executable = resolve(root, "fake-risk-executable.mjs");
     writeFileSync(executable, `import { writeFileSync } from "node:fs";\nimport { resolve } from "node:path";\nlet denied = false;\ntry { writeFileSync(process.argv[2], "mutated\\n"); } catch { denied = true; }\nwriteFileSync(resolve(process.cwd(), "allowed/isolation.txt"), denied ? "outside-denied\\n" : "outside-allowed\\n");\n`);
     run("chmod", ["755", executable], root);
     writeFileSync(outside, "original\n");
     try {
-      const result = await runInRiskWorkspace({ context: isolated, executable: process.execPath, args: [executable, outside], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy });
+      const result = await runInRiskWorkspace({ context: isolated, executable: process.execPath, executorBinding: nodeExecutor, args: [executable, outside], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy });
       assert.equal(result.exitCode, 0, result.stderr);
       assert.equal(readFileSync(outside, "utf8"), "original\n", "OS isolation must deny writes outside the disposable workspace");
       assert.equal(readFileSync(resolve(isolated.workspace, "allowed/isolation.txt"), "utf8"), "outside-denied\n");
@@ -181,7 +194,7 @@ for (const [kind, create] of [
     run("chmod", ["755", boundaryExecutable], root);
     writeFileSync(outside, "original\n");
     try {
-      const result = await runInRiskWorkspace({ context: boundary, executable: process.execPath, args: [boundaryExecutable, outside], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy });
+      const result = await runInRiskWorkspace({ context: boundary, executable: process.execPath, executorBinding: nodeExecutor, args: [boundaryExecutable, outside], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy });
       assert.equal(result.exitCode, 0, result.stderr);
       assert.equal(readFileSync(outside, "utf8"), "original\n", "hardlink and symlink attempts must not mutate outside bytes before audit");
       assert.deepEqual(auditRiskWorkspace(boundary).delta, [], "transient cross-boundary links must leave no accepted workspace delta");
@@ -194,12 +207,40 @@ for (const [kind, create] of [
     writeFileSync(residualExecutable, "import { spawn } from 'node:child_process';\nspawn(process.execPath, ['-e', `setTimeout(() => require('node:fs').writeFileSync('allowed/residual.txt', 'late\\\\n'), 500)`], { detached: true, stdio: 'ignore' }).unref();\n");
     run("chmod", ["755", residualExecutable], root);
     try {
-      const result = await runInRiskWorkspace({ context: residual, executable: process.execPath, args: [residualExecutable], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy });
+      const result = await runInRiskWorkspace({ context: residual, executable: process.execPath, executorBinding: nodeExecutor, args: [residualExecutable], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy });
       await new Promise((resolveWait) => setTimeout(resolveWait, 1000));
       assert.equal(result.error === null || /residual child process/u.test(result.error), true);
       assert.equal(existsSync(resolve(residual.workspace, "allowed/residual.txt")), false, "isolated execution must leave no child able to mutate after process return");
     } finally {
       disposeRiskWorkspace(residual);
+    }
+
+    const swapped = createRiskWorkspace({ target: repository, request: request() });
+    const swappedExecutable = resolve(root, "swapped-native");
+    copyFileSync(process.execPath, swappedExecutable);
+    chmodSync(swappedExecutable, 0o755);
+    const swappedEvidence = readStableExecutableFile(swappedExecutable, "pre-swap native executable");
+    const swappedBinding = {
+      native_binary: {
+        canonical_path: swappedEvidence.path,
+        raw_sha256: swappedEvidence.file_sha256,
+        size_bytes: swappedEvidence.bytes.length,
+        executable_format: "mach-o",
+      },
+      spawn_path: swappedEvidence.path,
+      spawn_method: "runner_owned_verified_snapshot",
+    };
+    verifyRiskCodexExecutor(swappedBinding);
+    writeFileSync(swappedExecutable, Buffer.concat([swappedEvidence.bytes, Buffer.from("post-verification replacement", "utf8")]));
+    chmodSync(swappedExecutable, 0o755);
+    try {
+      await assert.rejects(
+        runInRiskWorkspace({ context: swapped, executable: swappedExecutable, executorBinding: swappedBinding, args: [], input: "", env: riskEnvironment.environment, environmentPolicy: riskEnvironment.policy }),
+        /identity changed/u,
+        "an executable replaced after the caller's verification must be rejected again inside the spawn boundary",
+      );
+    } finally {
+      disposeRiskWorkspace(swapped);
     }
   }
 

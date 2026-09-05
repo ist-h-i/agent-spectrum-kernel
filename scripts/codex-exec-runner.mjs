@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, deriveReviewSignalGateRoute, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, inspectCodexPromptContractBindings, parseCodexCompactProfileHeader, readReviewSignalGateMap } from "./ask-shared.mjs";
 import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
 import { RISK_CODEX_POLICY_ARGS, canonicalRiskDigest, createRiskApprovalRequest, readRiskAction, resolveRiskCodexExecutor, resolveRiskExecutionEnvironment, riskCodexRuntimePolicy, verifyRiskApproval, verifyRiskCodexExecutor } from "./codex-risk-approval.mjs";
-import { auditRiskWorkspace, createRiskWorkspace, disposeRiskWorkspace, promoteRiskWorkspace, runInRiskWorkspace } from "./codex-risk-workspace.mjs";
+import { assertRiskIsolationProvider, auditRiskWorkspace, createRiskWorkspace, disposeRiskWorkspace, promoteRiskWorkspace, runInRiskWorkspace } from "./codex-risk-workspace.mjs";
 import { buildExecutionEnvelopeRecord, hasExecutionEnvelopeMarker, inspectExecutionEnvelopeRecordEmission, isMarkdownFenceClosing, markdownFenceOpening, renderExecutionEnvelopeProjection, selectExecutionEnvelopeEmission, validateExecutionEnvelope, validateExecutionEnvelopeRecord, validateJsonSchema } from "./execution-envelope.mjs";
 import { resolveGitDirectory, resolveObservabilityPath } from "./observability-paths.mjs";
 
@@ -534,14 +534,15 @@ function runCodex(args, prompt, codexBin = args.codexBin) {
   };
 }
 
-async function runCodexInRiskWorkspace(args, prompt, codexBin, riskContext, riskEnvironment) {
+async function runCodexInRiskWorkspace(args, prompt, executorBinding, riskContext, riskEnvironment) {
   const temporaryOutput = `.agents/runs/codex-risk-${process.pid}-${Date.now()}.json`;
   const temporaryOutputPath = resolve(riskContext.workspace, temporaryOutput);
   mkdirSync(dirname(temporaryOutputPath), { recursive: true });
   const commandArgs = ["exec", ...RISK_CODEX_POLICY_ARGS, "--sandbox", args.sandbox, "--output-schema", "scripts/codex-runner-result.schema.json", "--output-last-message", temporaryOutput];
   const result = await runInRiskWorkspace({
     context: riskContext,
-    executable: codexBin,
+    executable: executorBinding.spawn_path,
+    executorBinding,
     args: commandArgs,
     input: prompt,
     env: riskEnvironment.environment,
@@ -860,6 +861,7 @@ try {
   const riskActionRequired = args.requiredGates.includes("risk-gate") && !readOnlyReviewRiskEvaluation;
   let riskApproval = null;
   let approvedCodexBin = null;
+  let approvedCodexExecutor = null;
   let approvedCodexEnvironment = null;
   let riskContext = null;
   let approvalBlocked = riskActionRequired;
@@ -958,9 +960,11 @@ try {
               publication = publishOutput(args, stop.responseMarkdown, stop.record, { inspectDomainOutput: false });
             } else {
               approvedCodexBin = finalExecutor.spawn_path;
+              approvedCodexExecutor = finalExecutor;
               approvedCodexEnvironment = finalEnvironment;
               spawnPrompt = renderApprovedRiskPrompt(spawnPrompt, rereadApproval.request);
               try {
+                assertRiskIsolationProvider();
                 riskContext = createRiskWorkspace({
                   target: args.target,
                   request: rereadApproval.request,
@@ -1009,7 +1013,7 @@ try {
         }
         if (!approvalBlocked) {
           codexResult = riskContext
-            ? await runCodexInRiskWorkspace(args, spawnPrompt, approvedCodexBin, riskContext, approvedCodexEnvironment)
+            ? await runCodexInRiskWorkspace(args, spawnPrompt, approvedCodexExecutor, riskContext, approvedCodexEnvironment)
             : runCodex(args, spawnPrompt, approvedCodexBin ?? args.codexBin);
           command = codexResult.command;
         }
