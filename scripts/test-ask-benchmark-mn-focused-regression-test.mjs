@@ -57,7 +57,7 @@ const ISOLATION_NEGATIVE_CASE_IDS = new Set([
 ]);
 const BROKER_FAIL_CLOSED_CASE_IDS = new Set(["unknown-broker-operation-fails-closed", "closed-response-pipe-fails-closed"]);
 const HISTORICAL_REVIEWED_HEAD = "c0804424e5c31ff7c27f38fe39d2380627dcd07d";
-const FRESH_CASE_PAYLOAD_DIGEST = "sha256:06fb634361215f62adc0f856d660961ba0a9b33d5cbf4d75b295cf731dbb99e0";
+const FRESH_CASE_PAYLOAD_DIGEST = "sha256:419d8a48ab38fd7b97b3aa1abe0428ac4e3a1a8e89ce2fb0d1fd4f4f9339da23";
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
