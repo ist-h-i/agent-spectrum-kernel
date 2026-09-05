@@ -538,7 +538,10 @@
     "scripts/test-adapter-runtime-event.mjs",
     "scripts/codex-exec-runner.mjs",
     "scripts/codex-risk-approval.mjs",
-    "scripts/test-codex-risk-approval.mjs"
+    "scripts/codex-risk-workspace.mjs",
+    "scripts/test-codex-risk-approval.mjs",
+    "scripts/test-codex-risk-workspace.mjs",
+    "scripts/test-codex-risk-runner-scope.mjs"
   ],
   "routing": {
     "schema_version": 1,

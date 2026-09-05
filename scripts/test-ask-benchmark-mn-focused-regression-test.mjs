@@ -41,10 +41,22 @@ const FINDING_SEEDS = [
   ["focused-change-scope-not-met", "incorrect_decision", "medium"],
   ["missing-or-inaccurate-verification-evidence", "insufficient_evidence", "medium"],
 ];
+const PRIVATE_TRIAL_IDS = ["mixed-case-lowercasing", "tenant-trim", "empty-region-validation"];
 const FRESH_COVERAGE_CLASSES = new Set(["positive", "regression", "production", "scope", "verification", "evidence_removal", "equivalence", "malformed"]);
 const REQUIRED_FRESH_COVERAGE = ["regression", "production", "scope", "verification", "evidence_removal", "equivalence", "malformed"];
+const ISOLATION_NEGATIVE_CASE_IDS = new Set([
+  "source-literal-gaming-without-api-call",
+  "filesystem-write-capability-denied",
+  "symlink-escape-capability-denied",
+  "child-process-capability-denied",
+  "worker-capability-denied",
+  "loopback-network-capability-denied",
+  "native-addon-capability-denied",
+  "wasi-capability-denied",
+  "inspector-capability-denied",
+]);
 const HISTORICAL_REVIEWED_HEAD = "c0804424e5c31ff7c27f38fe39d2380627dcd07d";
-const FRESH_CASE_PAYLOAD_DIGEST = "sha256:0c260a43bd3f5c87ef877b5c209e2a7c974985a7da233b2a10ffb9b04c0c5f0f";
+const FRESH_CASE_PAYLOAD_DIGEST = "sha256:4b00b9a0bdf86706c93a085f325c5fdad6e7d30d784d53277992ab2a775fa662";
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -99,6 +111,25 @@ function validateFreshPrivateSourceContract({ privateRoot, caseRoot }, { sourceO
   for (const coverageClass of REQUIRED_FRESH_COVERAGE) assert.ok(cases.cases.some((entry) => entry.coverage_class === coverageClass), `fresh mn cases require ${coverageClass} coverage`);
   for (let index = 0; index < REQUIREMENT_IDS.length; index += 1) assert.ok(cases.cases.some((entry) => entry.expected_passes[index] === false), `${REQUIREMENT_IDS[index]} requires a non-pass case`);
   assert.ok(cases.cases.some((entry) => typeof entry.test_source === "string" && entry.test_source.length > 0), "fresh mn cases require an executable reference test source");
+  const loaderBytes = readFileSync(resolve(privateRoot, "authenticated-generic-loader.mjs"));
+  const executionContract = readJson(resolve(privateRoot, "scope-boundaries.json")).mutation_execution_contract;
+  assert.equal(executionContract.revision, "authenticated-generic-loader.v2");
+  assert.deepEqual(executionContract.generic_loader, { path: "authenticated-generic-loader.mjs", bytes: loaderBytes.length, sha256: digestBytes(loaderBytes), answer_neutrality: "identical bytes for every baseline, trial, and variant; no trial-specific authority" });
+  assert.equal(executionContract.isolation_provider.provider, "sandbox-exec-default-deny+node-permission-v24");
+  assert.equal(executionContract.isolation_provider.provider_unavailable, "fail-closed");
+  assert.deepEqual(executionContract.candidate_workspace.closed_inventory, ["src/session-key.mjs", "test/session-key.test.mjs"]);
+  assert.equal(executionContract.candidate_workspace.trusted_implementation_present, false);
+  assert.equal(executionContract.candidate_workspace.mutation_source_present, false);
+  assert.deepEqual(executionContract.trusted_api_mediation.operation_allowlist, ["sessionCacheKey"]);
+  assert.equal(executionContract.trusted_api_mediation.variant_authority_disclosed, false);
+  assert.deepEqual(executionContract.candidate_capabilities, { filesystem_read: "isolated-candidate-workspace-only", filesystem_write: "denied", child_process: "denied", worker: "denied", native_addon: "denied", inspector: "denied", network: "denied-before-candidate-module-evaluation", wasi: "denied", permission_model: "required-native-enforcement" });
+  const hiddenEvaluatorSource = readFileSync(resolve(privateRoot, "hidden-evaluator.mjs"), "utf8");
+  assert.match(hiddenEvaluatorSource, /\(deny default\)/u);
+  assert.match(hiddenEvaluatorSource, /\(deny file-write\*\)/u);
+  assert.match(hiddenEvaluatorSource, /\(deny network\*\)/u);
+  assert.match(hiddenEvaluatorSource, /\(deny process-fork\)/u);
+  assert.match(hiddenEvaluatorSource, /"--permission"/u);
+  assert.doesNotMatch(hiddenEvaluatorSource, /--allow-(?:addons|child-process|inspector|wasi|worker)/u);
   const source = readFileSync(resolve(ROOT, "scripts/ask-benchmark-mn-focused-regression-test-authority.mjs"), "utf8");
   assert.match(source, /current_canonical_public_contracts/u);
   assert.match(source, /historical_private_case_review_bytes_not_reconstructed/u);
@@ -430,11 +461,13 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   }
   const loaderContract = evaluator.authenticatedGenericLoaderContractForTest();
   const loaderBytes = readFileSync(resolve(privateRoot, loaderContract.path));
-  assert.equal(loaderContract.revision, "authenticated-generic-loader.v1");
+  assert.equal(loaderContract.revision, "authenticated-generic-loader.v2");
   assert.equal(loaderContract.runtime, "node-v24.19.0");
   assert.equal(loaderContract.bytes, loaderBytes.length);
   assert.equal(loaderContract.sha256, digestBytes(loaderBytes));
   assert.deepEqual(loaderContract.environment, { LANG: "C", LC_ALL: "C", TZ: "UTC", PATH: "/usr/bin:/bin" });
+  assert.equal(loaderContract.isolation_provider, "darwin-sandbox-exec-default-deny+node-permission-v24");
+  assert.deepEqual(loaderContract.candidate_workspace_inventory, ["src/session-key.mjs", "test/session-key.test.mjs"]);
   if (productionExists) {
     const driftedLoaderRoot = resolve(work, "drifted-authenticated-loader");
     cpSync(privateRoot, driftedLoaderRoot, { recursive: true });
@@ -572,6 +605,16 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       assert.equal(rerunOutcomes.get("mixed-case-lowercasing-mutant-test"), "succeeded", "forged fd4 candidate must not reject the mutant");
       assert.equal(first.requirement_results[0].outcome, "fail", "candidate-originated fd4 data must not establish authenticated behavior coverage");
     }
+    if (ISOLATION_NEGATIVE_CASE_IDS.has(entry.case_id)) {
+      assert.equal(rerunOutcomes.get("candidate-focused-test"), "succeeded", `${entry.case_id} safe denial probe must execute successfully inside the isolated candidate runtime`);
+      assert.equal(PRIVATE_TRIAL_IDS.every((id) => rerunOutcomes.get(`${id}-control-test`) === "succeeded" && rerunOutcomes.get(`${id}-mutant-test`) === "succeeded"), true, `${entry.case_id} must not distinguish trusted variants without behavior assertions`);
+      assert.equal(first.requirement_results[0].outcome, "fail", `${entry.case_id} must not establish regression behavior coverage`);
+    }
+    if (entry.case_id === "unknown-broker-operation-fails-closed") {
+      assert.equal(rerunOutcomes.get("candidate-focused-test"), "failed", "unknown broker operation must terminate the candidate run");
+      assert.equal(first.requirement_results[0].outcome, "fail", "unknown broker operation must not establish regression behavior coverage");
+    }
+    if (entry.case_id === "filesystem-write-capability-denied") assert.equal(existsSync("/private/tmp/ask-mn-focused-denied-write"), false, "filesystem denial probe must not create its dummy target");
     if (index === 0) {
       for (const [label, mutate] of [
         ["digest", (artifact) => { artifact.artifact_digest = `sha256:${"0".repeat(64)}`; }],

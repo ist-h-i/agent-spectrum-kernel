@@ -25,10 +25,10 @@ const FIXTURE_ROOT = resolve(ROOT, `benchmarks/fixtures/checkpoint-b2/${FIXTURE_
 const REQUIREMENT_COUNT = 5;
 const REQUIRED_COVERAGE = Object.freeze(["evidence_removal", "scope", "causal_hypothesis", "competing_hypothesis", "bounded_next_check", "equivalence", "malformed"]);
 const SUCCESSOR_CASE_MATRIX = Object.freeze([
-  "fresh-valid-investigation|positive|11111", "fresh-causal-evidence-removed|evidence_removal|01110", "fresh-wrong-leading-cause|causal_hypothesis|01111", "fresh-unsupported-competing-cause|competing_hypothesis|10111", "fresh-overclaimed-causality|confidence|11011", "fresh-unsafe-next-check|bounded_next_check|11101", "fresh-scope-expansion|scope|11110", "fresh-equivalent-hypothesis-label|equivalence|11111", "fresh-overconfident-leading-hypothesis|confidence|01011", "fresh-next-check-signal-drift|bounded_next_check|11101", "fresh-next-check-stop-drift|bounded_next_check|11101", "fresh-evidence-line-drift|evidence_removal|01110", "fresh-protected-mode-change|scope|11110", "fresh-malformed-investigation|malformed|00000",
+  "fresh-valid-investigation|positive|11111", "fresh-causal-evidence-removed|evidence_removal|01110", "fresh-wrong-leading-cause|causal_hypothesis|01111", "fresh-unsupported-competing-cause|competing_hypothesis|10111", "fresh-overclaimed-causality|confidence|11011", "fresh-unsafe-next-check|bounded_next_check|11101", "fresh-scope-expansion|scope|11110", "fresh-equivalent-hypothesis-label|equivalence|11111", "fresh-equivalent-probative-citation|equivalence|11111", "fresh-heading-only-citation|evidence_removal|01110", "fresh-csv-header-only-citation|evidence_removal|10110", "fresh-irrelevant-exact-citation|evidence_removal|01110", "fresh-cross-hypothesis-citation-transplant|evidence_removal|01110", "fresh-overconfident-leading-hypothesis|confidence|01011", "fresh-next-check-signal-drift|bounded_next_check|11101", "fresh-next-check-stop-drift|bounded_next_check|11101", "fresh-evidence-line-drift|evidence_removal|01110", "fresh-protected-mode-change|scope|11110", "fresh-malformed-investigation|malformed|00000",
 ]);
 const CASE_FIELDS = Object.freeze(["case_id", "coverage_class", "mutations", "expected_passes", "expected_findings", "expected_scope_deviations", "expected_evaluation_status", "expected_verification_correctness", "expected_evidence_correctness", "expected_under_processing", "expected_over_processing", "expected_classification", "expected_public_validation", "extra_candidate_path", "mode_change_candidate_path", "control"]);
-const FRESH_CASE_PAYLOAD_DIGEST = "sha256:c47d88d8ec83de671d4629c535837e37c4162445e83a1a14cc4c05ab30d3b476";
+const FRESH_CASE_PAYLOAD_DIGEST = "sha256:152129ed52250273958aa6c33e553ea4fc0ddd26d04fbbd9b66dbc63f9d256f1";
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -299,14 +299,20 @@ function validateWorkspaceValidatorParity() {
         mechanism: "request_scoped_cache_identity",
         state: "supported",
         confidence: "high",
-        evidence: [{ path: "src/cache-key.mjs", line: 5, source_excerpt: "return `${tenantId}:${windowMinutes}:${requestId}`;" }],
+        evidence: [
+          { path: "src/cache-key.mjs", line: 5, source_excerpt: "return `${tenantId}:${windowMinutes}:${requestId}`;" },
+          { path: "docs/investigation-contract.md", line: 10, source_excerpt: "The summary cache is intended to reuse an entry for the same `tenantId` and `windowMinutes` during its 60-second lifetime." },
+        ],
       },
       {
         id: "traffic",
         mechanism: "traffic_volume",
         state: "weakened",
         confidence: "high",
-        evidence: [{ path: "observability/request-windows.csv", line: 3, source_excerpt: "2026-08-16T10:00:00Z,2026.08.16-1,203.4,782,0.003,0.04,614,44,6" }],
+        evidence: [
+          { path: "observability/request-windows.csv", line: 2, source_excerpt: "2026-08-16T09:00:00Z,2026.08.15-3,201.7,118,0.002,0.91,18,42,5" },
+          { path: "observability/request-windows.csv", line: 3, source_excerpt: "2026-08-16T10:00:00Z,2026.08.16-1,203.4,782,0.003,0.04,614,44,6" },
+        ],
       },
     ],
     next_check: {
@@ -365,6 +371,10 @@ function validateWorkspaceValidatorParity() {
       value.hypotheses[1].evidence[0].source_excerpt = "2026-08-16T09:00:00Z,2026.08.15-3,201.7,118,0.002,0.91,18,42,5";
     }],
     ["unavailable-evidence-path", (value) => { value.hypotheses[0].evidence[0].path = "README.md"; }],
+    ["heading-only-citation", (value) => { value.hypotheses[0].evidence[0] = { path: "docs/investigation-contract.md", line: 1, source_excerpt: "# Summary service incident contract" }; }],
+    ["csv-header-only-citation", (value) => { value.hypotheses[1].evidence[0] = { path: "observability/request-windows.csv", line: 1, source_excerpt: "window_start,release,requests_per_second,p95_ms,error_rate,cache_hit_rate,summary_build_cpu_ms,db_query_p95_ms,gc_pause_p95_ms" }; }],
+    ["irrelevant-exact-citation", (value) => { value.hypotheses[0].evidence[0] = { path: "docs/investigation-contract.md", line: 3, source_excerpt: "The regression window begins with release `2026.08.16-1`, deployed at 09:30 UTC." }; }],
+    ["cross-hypothesis-citation-transplant", (value) => { value.hypotheses[0].evidence = clone(value.hypotheses[1].evidence); }],
   ]) {
     const value = clone(valid);
     mutate(value);
@@ -394,6 +404,14 @@ function validateWorkspaceValidatorParity() {
   assert.doesNotThrow(() => assertBenchmarkSchemaInstance(unresolved, { schemaPath, label: "unresolved performance hypothesis" }));
   const unresolvedResult = spawnSync(process.execPath, [validatorPath, unresolvedPath], { encoding: "utf8" });
   assert.equal(unresolvedResult.status, 0, unresolvedResult.stderr || unresolvedResult.stdout);
+
+  const equivalentProbative = clone(valid);
+  equivalentProbative.hypotheses[0].evidence[0] = { path: "observability/cache-samples.csv", line: 2, source_excerpt: "2026-08-16T10:12:00Z,tenant-a,15,req-8101,tenant-a:15:req-8101,miss,603" };
+  const equivalentProbativePath = resolve(work, "equivalent-probative-evidence.json");
+  writeFileSync(equivalentProbativePath, `${JSON.stringify(equivalentProbative, null, 2)}\n`);
+  assert.doesNotThrow(() => assertBenchmarkSchemaInstance(equivalentProbative, { schemaPath, label: "equivalent probative evidence" }));
+  const equivalentProbativeResult = spawnSync(process.execPath, [validatorPath, equivalentProbativePath], { encoding: "utf8" });
+  assert.equal(equivalentProbativeResult.status, 0, equivalentProbativeResult.stderr || equivalentProbativeResult.stdout);
 }
 
 function validatePublicNegativeCoverage() {

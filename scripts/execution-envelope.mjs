@@ -171,6 +171,20 @@ export function validateExecutionEnvelope(value, { schemaPath = ENVELOPE_SCHEMA_
   if (riskApproval?.execution_status === "executed" && riskApproval.status !== "approved") errors.push("$.risk_approval.execution_status: only approved state may be executed");
   if (riskApproval?.execution_status === "executed" && riskApproval.rendered_invocation_sha256 === null) errors.push("$.risk_approval.rendered_invocation_sha256: executed state requires the exact spawned prompt digest");
   if (riskApproval?.execution_status === "not_executed" && riskApproval.rendered_invocation_sha256 !== null) errors.push("$.risk_approval.rendered_invocation_sha256: not_executed state cannot claim a spawned prompt digest");
+  if (riskApproval?.execution_status === "not_executed" && riskApproval.enforcement_status !== "not_started") errors.push("$.risk_approval.enforcement_status: a non-executed action cannot claim runtime enforcement");
+  if (riskApproval?.enforcement_status === "not_started" && (riskApproval.workspace_base_sha256 !== null || riskApproval.delta_sha256 !== null || (riskApproval.observed_effects?.length ?? 0) > 0 || (riskApproval.promoted_paths?.length ?? 0) > 0 || riskApproval.promotion_status !== "not_started")) errors.push("$.risk_approval: non-started enforcement cannot claim workspace, delta, effects, or promotion");
+  if (["isolated", "accepted", "rejected"].includes(riskApproval?.enforcement_status) && riskApproval.workspace_base_sha256 === null) errors.push("$.risk_approval.workspace_base_sha256: started enforcement requires the exact isolated base digest");
+  if (riskApproval?.enforcement_status === "accepted" && riskApproval.delta_sha256 === null) errors.push("$.risk_approval.delta_sha256: accepted enforcement requires a closed delta digest");
+  if (riskApproval?.promotion_status === "promoted" && (riskApproval.status !== "approved" || riskApproval.execution_status !== "executed" || riskApproval.enforcement_status !== "accepted" || riskApproval.delta_sha256 === null)) errors.push("$.risk_approval.promotion_status: promotion requires an executed approved action and accepted bound delta");
+  if (riskApproval?.promotion_status !== "promoted" && (riskApproval?.promoted_paths?.length ?? 0) > 0) errors.push("$.risk_approval.promoted_paths: only successful promotion may list promoted paths");
+  if (riskApproval?.promotion_status === "promoted") {
+    const scopes = riskApproval.request?.action?.target_scope ?? [];
+    for (const path of riskApproval.promoted_paths ?? []) {
+      if (typeof path !== "string" || path.startsWith("/") || path.includes("\\") || path.split("/").some((part) => !part || part === "." || part === "..") || !scopes.some((scope) => path === scope || path.startsWith(`${scope}/`))) errors.push(`$.risk_approval.promoted_paths: promoted path is outside the approved canonical target scope: ${path}`);
+    }
+    const permitted = new Set(riskApproval.request?.action?.permitted_effects ?? []);
+    for (const effect of riskApproval.observed_effects ?? []) if (!permitted.has(effect)) errors.push(`$.risk_approval.observed_effects: observed effect was not approved: ${effect}`);
+  }
   return errors;
 }
 

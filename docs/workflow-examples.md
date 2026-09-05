@@ -313,7 +313,7 @@ Additional required gates:
 - <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<non-empty text>; signals=<comma-separated exact signal IDs>
 
 Missing evidence:
-- input: what remains unknown
+- {"gate_id":"<exact insufficient_evidence gate>","missing_input":"<non-empty missing input>","affected_judgment":"<non-empty affected judgment>","next_check":"<non-empty next check>"}
 
 Findings:
 - Finding ID, severity, merge blocker, practical impact, trigger/failure trace, evidence location, required post-fix condition
@@ -322,7 +322,7 @@ Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 ```
 
-Omit `Decision` unless a final merge decision was requested. Use `- none` for empty sections and omit skipped-gate/category boilerplate.
+Omit `Decision` unless a final merge decision was requested. Emit exactly one canonical closed four-field Missing evidence JSON line per `insufficient_evidence` gate in gate order. Unknown or duplicate gate IDs, records for non-insufficient gates, partial coverage, missing or extra fields, and `- none` mixed with records are invalid. Use `- none` for Missing evidence only when no gate is insufficient; use it for other empty sections and omit skipped-gate/category boilerplate.
 
 ## 8. Handoff to another agent
 

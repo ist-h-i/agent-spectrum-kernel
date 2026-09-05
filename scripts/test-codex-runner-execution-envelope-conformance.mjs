@@ -87,6 +87,20 @@ Decision:
 `;
 }
 
+function missingEvidenceRecord({
+  gateId,
+  missingInput = "exact review target",
+  affectedJudgment = "the gate cannot reach a supported judgment",
+  nextCheck = "inspect the exact current target",
+} = {}) {
+  return `- ${JSON.stringify({
+    gate_id: gateId,
+    missing_input: missingInput,
+    affected_judgment: affectedJudgment,
+    next_check: nextCheck,
+  })}`;
+}
+
 function findingMarkdown({
   findingId = "F-COMPLETE",
   severity = "minor",
@@ -357,7 +371,7 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     {
       label: "insufficient evidence malformed inventory",
       baselineStatus: "insufficient_evidence",
-      missingEvidence: "- review-ai-quality: exact target unavailable; inspect it",
+      missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality" }),
       decision: "insufficient evidence",
     },
     { label: "approve malformed inventory", decision: "approve" },
@@ -371,7 +385,7 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     {
       label: "insufficient evidence rejects blocker without merge consequence",
       baselineStatus: "insufficient_evidence",
-      missingEvidence: "- review-ai-quality: exact target unavailable; inspect it",
+      missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality" }),
       decision: "insufficient evidence",
     },
     { label: "review without final decision rejects blocker without merge consequence", baselineStatus: "fail", finalDecision: false },
@@ -464,7 +478,7 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     {
       label: "insufficient evidence rejects malformed finding after multiple fences",
       baselineStatus: "insufficient_evidence",
-      missingEvidence: "- review-ai-quality: exact target unavailable; inspect it",
+      missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality" }),
       findings: `${validNonBlockingFinding}\n${fencedFindingExample({ body: exampleFinding })}\n${fencedFindingExample({ opening: "~~~", body: exampleFinding })}\n${withoutFindingField(findingMarkdown({ findingId: "F-POST-FENCE-INSUFFICIENT" }), "Practical impact")}`,
       decision: "insufficient evidence",
       expectedPass: false,
@@ -481,7 +495,7 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     { label: "clean approve remains valid", response: reviewResponse({ decision: "approve" }), expectedPass: true },
     { label: "review without final decision remains valid", response: reviewResponse({}), finalDecision: false, expectedPass: true },
     { label: "baseline fail plus approve", response: reviewResponse({ baselineStatus: "fail", decision: "approve" }), expectedPass: false },
-    { label: "baseline insufficient evidence plus approve", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", decision: "approve" }), expectedPass: false },
+    { label: "baseline insufficient evidence plus approve", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality" }), decision: "approve" }), expectedPass: false },
     {
       label: "additional gate fail plus approve",
       response: reviewResponse({ additionalGates: "- review-output-quality: status=fail; evidence=output regression; signals=docs_output_change", decision: "approve" }),
@@ -492,13 +506,13 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
       label: "additional gate insufficient evidence plus approve",
       response: reviewResponse({
         additionalGates: "- review-output-quality: status=insufficient_evidence; evidence=render unavailable; signals=docs_output_change",
-        missingEvidence: "- review-output-quality: render unavailable; render exact candidate",
+        missingEvidence: missingEvidenceRecord({ gateId: "review-output-quality", missingInput: "rendered output", nextCheck: "render the exact candidate" }),
         decision: "approve",
       }),
       observedSignal: "docs_output_change",
       expectedPass: false,
     },
-    { label: "missing evidence plus approve", response: reviewResponse({ missingEvidence: "- final CI: unavailable; run final CI", decision: "approve" }), expectedPass: false },
+    { label: "missing evidence plus approve", response: reviewResponse({ missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality", missingInput: "final CI", nextCheck: "run final CI" }), decision: "approve" }), expectedPass: false },
     {
       label: "blocking finding plus approve",
       response: reviewResponse({
@@ -551,7 +565,7 @@ Layer summary:
     { label: "approve with comments rejects a failing baseline", response: reviewResponse({ baselineStatus: "fail", decision: "approve with comments" }), expectedPass: false },
     { label: "request changes rejects a complete merge blocker", response: reviewResponse({ baselineStatus: "fail", findings: validBlockingFinding, decision: "request changes" }), expectedPass: false },
     { label: "block accepts a complete merge blocker", response: reviewResponse({ baselineStatus: "fail", findings: validBlockingFinding, decision: "block" }), expectedPass: true },
-    { label: "insufficient evidence rejects a complete merge blocker", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", findings: validBlockingFinding, decision: "insufficient evidence" }), expectedPass: false },
+    { label: "insufficient evidence rejects a complete merge blocker", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality" }), findings: validBlockingFinding, decision: "insufficient evidence" }), expectedPass: false },
     { label: "request changes accepts an explicit non-blocking Major", response: reviewResponse({ baselineStatus: "fail", findings: findingMarkdown({ findingId: "F-MAJOR", severity: "major", mergeBlocker: "false" }), decision: "request changes" }), expectedPass: true },
     { label: "request changes accepts an omitted optional category", response: reviewResponse({ baselineStatus: "fail", findings: findingMarkdown({ severity: "major", mergeBlocker: "false", category: null }), decision: "request changes" }), expectedPass: true },
     {
@@ -562,7 +576,68 @@ Layer summary:
     },
     { label: "request changes keeps none finding inventory", response: reviewResponse({ baselineStatus: "fail", decision: "request changes" }), expectedPass: true },
     { label: "block rejects none finding inventory", response: reviewResponse({ baselineStatus: "fail", decision: "block" }), expectedPass: false },
-    { label: "insufficient evidence keeps none finding inventory", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", decision: "insufficient evidence" }), expectedPass: true },
+    { label: "insufficient evidence keeps none finding inventory", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality" }), decision: "insufficient evidence" }), expectedPass: true },
+    {
+      label: "review without final decision accepts exact missing-evidence coverage",
+      response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality" }) }),
+      finalDecision: false,
+      expectedPass: true,
+    },
+    {
+      label: "review without final decision rejects free-form missing evidence",
+      response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it" }),
+      finalDecision: false,
+      expectedPass: false,
+    },
+    {
+      label: "review without final decision rejects missing evidence for a pass gate",
+      response: reviewResponse({ missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality" }) }),
+      finalDecision: false,
+      expectedPass: false,
+    },
+    {
+      label: "installed runner rejects an unknown missing-evidence gate",
+      response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: missingEvidenceRecord({ gateId: "review-unknown-gate" }), decision: "insufficient evidence" }),
+      expectedPass: false,
+    },
+    {
+      label: "installed runner rejects a missing-evidence record with a missing field",
+      response: reviewResponse({
+        baselineStatus: "insufficient_evidence",
+        missingEvidence: `- ${JSON.stringify({ gate_id: "review-ai-quality", missing_input: "exact target", next_check: "inspect it" })}`,
+        decision: "insufficient evidence",
+      }),
+      expectedPass: false,
+    },
+    {
+      label: "installed runner rejects a missing-evidence record with an unknown field",
+      response: reviewResponse({
+        baselineStatus: "insufficient_evidence",
+        missingEvidence: `- ${JSON.stringify({ gate_id: "review-ai-quality", missing_input: "exact target", affected_judgment: "baseline judgment", next_check: "inspect it", owner: "unbound" })}`,
+        decision: "insufficient evidence",
+      }),
+      expectedPass: false,
+    },
+    {
+      label: "installed runner rejects duplicate missing-evidence gate records",
+      response: reviewResponse({
+        baselineStatus: "insufficient_evidence",
+        missingEvidence: `${missingEvidenceRecord({ gateId: "review-ai-quality" })}\n${missingEvidenceRecord({ gateId: "review-ai-quality", missingInput: "exact patch" })}`,
+        decision: "insufficient evidence",
+      }),
+      expectedPass: false,
+    },
+    {
+      label: "installed runner rejects partial insufficient-gate coverage",
+      response: reviewResponse({
+        baselineStatus: "insufficient_evidence",
+        additionalGates: "- review-output-quality: status=insufficient_evidence; evidence=render unavailable; signals=docs_output_change",
+        missingEvidence: missingEvidenceRecord({ gateId: "review-output-quality" }),
+        decision: "insufficient evidence",
+      }),
+      observedSignal: "docs_output_change",
+      expectedPass: false,
+    },
     ...cleanNonApprovalCases.map(({ label, decision, baselineStatus = "pass", additionalGate = false, additionalStatus = "pass" }) => ({
       label,
       response: reviewResponse({
@@ -790,6 +865,19 @@ Findings:
   assert.match(writeReviewResult.stderr, /prompt\/sandbox mismatch/u);
   assert.equal(readFileSync(fakeInvocationPath, "utf8"), invocationsBeforeWriteReview, "rejected workspace-write review must not invoke Codex");
 
+  assertPass("risk fixture git add", runGit(["add", "."]));
+  assertPass("risk fixture git commit", runGit([
+    "-c", "user.name=ASK Fixture",
+    "-c", "user.email=ask-fixture@example.invalid",
+    "commit", "-m", "risk fixture baseline",
+  ]));
+  assertPass("risk fixture origin main", runGit(["update-ref", "refs/remotes/origin/main", "HEAD"]));
+  for (const record of runGit(["ls-files", "--stage", "-z"]).stdout.split("\0").filter(Boolean)) {
+    const match = record.match(/^(100644|100755) [0-9a-f]+ \d+\t(.+)$/u);
+    assert.ok(match, `risk fixture tracked entry must have a regular-file mode: ${record}`);
+    chmodSync(resolve(target, match[2]), match[1] === "100755" ? 0o755 : 0o644);
+  }
+
   const riskActionPath = resolve(fixtureRoot, "risk-action.json");
   writeFileSync(riskActionPath, `${JSON.stringify({
     schema_version: "1.0.0",
@@ -797,9 +885,9 @@ Findings:
     repository_id: "github.com/example/conformance-target",
     risk_gate: "risk-gate",
     operation: "write_release_candidate",
-    target_scope: ["dist/release-candidate.json"],
-    permitted_effects: ["write_release_candidate"],
-    prohibited_effects: ["publish_production", "write_outside_target_scope"],
+    target_scope: [".fixture-codex-invocations"],
+    permitted_effects: ["modify"],
+    prohibited_effects: ["external_side_effects", "git_metadata_changes", "write_outside_target_scope"],
     approval_authority: {
       authority_id: "fixture-owner",
       authority_revision: "rev-1",
@@ -848,9 +936,10 @@ Findings:
   const repeatedRiskActionReport = JSON.parse(repeatedRiskActionResult.stdout);
   assert.deepEqual(repeatedRiskActionReport.execution_envelope_record?.envelope?.risk_approval?.request, riskActionReport.execution_envelope_record?.envelope?.risk_approval?.request, "two first invocations must emit one deterministic request identity");
   assert.equal(readFileSync(fakeInvocationPath, "utf8"), invocationsBeforeRiskAction, "repeated unapproved action must not invoke Codex");
+  rmSync(resolve(target, ".agents/runs/conformance-risk-action.md"), { force: true });
 
   const approvalPath = resolve(fixtureRoot, "risk-approval.json");
-  const approvedPromptPath = resolve(fixtureRoot, "approved-risk-prompt.txt");
+  const approvedPromptPath = fakeInvocationPath;
   const request = riskActionReport.execution_envelope_record.envelope.risk_approval.request;
   const approvalBytes = `${JSON.stringify({
     schema_version: "1.0.0",
@@ -868,22 +957,27 @@ Findings:
     cwd: target,
     env: {
       ASK_FAKE_RESULT_PATH: resolve(target, ".fixture-implementation.json"),
-      ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
-      ASK_FAKE_STDIN_PATH: approvedPromptPath,
+      ASK_FAKE_INVOCATION_PATH: "",
+      ASK_FAKE_STDIN_PATH: ".fixture-codex-invocations",
     },
   });
   assertPass("exact risk approval executes once", approvedRiskResult);
   const approvedRiskReport = JSON.parse(approvedRiskResult.stdout);
   assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.status, "approved");
   assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.execution_status, "executed");
+  assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.enforcement_status, "accepted");
+  assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.promotion_status, "promoted");
+  assert.deepEqual(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.observed_effects, ["modify"]);
+  assert.deepEqual(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.promoted_paths, [".fixture-codex-invocations"]);
   assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.rendered_invocation_sha256, `sha256:${hashText(readFileSync(approvedPromptPath))}`);
   assert.equal(readFileSync(approvedPromptPath, "utf8").includes(request.request_sha256), true, "spawn prompt must contain the exact approved request digest");
   assert.match(readFileSync(approvedPromptPath, "utf8"), /Operation: write_release_candidate/u, "spawn prompt must contain the exact approved operation");
-  assert.match(readFileSync(approvedPromptPath, "utf8"), /Target scope: dist\/release-candidate\.json/u, "spawn prompt must contain the exact approved target scope");
-  assert.match(readFileSync(approvedPromptPath, "utf8"), /Permitted effects: write_release_candidate/u, "spawn prompt must contain exact permitted effects");
-  assert.match(readFileSync(approvedPromptPath, "utf8"), /Prohibited effects: publish_production, write_outside_target_scope/u, "spawn prompt must contain exact prohibited effects");
+  assert.match(readFileSync(approvedPromptPath, "utf8"), /Target scope: \.fixture-codex-invocations/u, "spawn prompt must contain the exact approved target scope");
+  assert.match(readFileSync(approvedPromptPath, "utf8"), /Permitted effects: modify/u, "spawn prompt must contain exact permitted effects");
+  assert.match(readFileSync(approvedPromptPath, "utf8"), /Prohibited effects: external_side_effects, git_metadata_changes, write_outside_target_scope/u, "spawn prompt must contain exact prohibited effects");
   assert.equal(approvedRiskReport.normalized_adapter_event?.approval?.status, "approved");
-  assert.equal(readFileSync(fakeInvocationPath, "utf8").trim().split("\n").length, 3, "exact approval must add exactly one Codex invocation");
+  writeFileSync(fakeInvocationPath, runGit(["show", "HEAD:.fixture-codex-invocations"]).stdout);
+  chmodSync(fakeInvocationPath, 0o644);
 
   const invocationsBeforeRejectedApprovals = readFileSync(fakeInvocationPath, "utf8");
   const resealApproval = (mutate) => {
@@ -910,6 +1004,7 @@ Findings:
       },
     });
     assert.notEqual(result.status, 0, `${label} approval must stop before Codex`);
+    assert.ok(result.stdout.trim(), `${label} rejection must emit a JSON report\nstderr:\n${result.stderr}`);
     const report = JSON.parse(result.stdout);
     assert.equal(report.execution_envelope_record?.persisted, true, `${label} rejection Envelope must persist`);
     assert.equal(report.execution_envelope_record?.envelope?.risk_approval?.status, "rejected", `${label} rejection status`);
@@ -927,8 +1022,8 @@ Findings:
 
   assertInstalledApprovalRejected("stale-head", resealApproval((value) => { value.invocation.repository.head_sha = "0".repeat(40); }));
   assertInstalledApprovalRejected("broader-effects", resealApproval((value) => {
-    value.action.permitted_effects = ["publish_production", "write_release_candidate"];
-    value.invocation.permitted_effects = ["publish_production", "write_release_candidate"];
+    value.action.permitted_effects = ["create", "modify"];
+    value.invocation.permitted_effects = ["create", "modify"];
     value.action_sha256 = canonicalValueDigest(value.action);
     value.invocation_sha256 = canonicalValueDigest(value.invocation);
   }));
@@ -981,7 +1076,7 @@ Findings:
   assert.equal(capabilityBlockedRiskReport.execution_envelope_record?.envelope?.risk_approval?.status, "approved");
   assert.equal(capabilityBlockedRiskReport.execution_envelope_record?.envelope?.risk_approval?.execution_status, "not_executed");
   assert.equal(capabilityBlockedRiskReport.execution_envelope_record?.envelope?.stop_reason?.status, "capability_missing");
-  assert.equal(readFileSync(fakeInvocationPath, "utf8").trim().split("\n").length, 3, "exact approval with a missing capability must not invoke Codex");
+  assert.equal(readFileSync(fakeInvocationPath, "utf8"), invocationsBeforeRejectedApprovals, "exact approval with a missing capability must not invoke Codex");
 
   const recordDirectory = resolve(target, ".agent-spectrum-kernel/runtime/execution-envelopes");
   const fencedExampleResultPath = resolve(target, ".fixture-fenced-example.json");

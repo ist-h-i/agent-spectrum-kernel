@@ -55,13 +55,14 @@
         "executor": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["codex_bin", "canonical_path", "raw_sha256", "size_bytes", "output_path"],
+          "required": ["codex_bin", "canonical_path", "raw_sha256", "size_bytes", "output_path", "candidate_network_access"],
           "properties": {
             "codex_bin": { "type": "string", "minLength": 1, "maxLength": 1000 },
             "canonical_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
             "raw_sha256": { "$ref": "#/$defs/digest" },
             "size_bytes": { "type": "integer", "minimum": 1, "maximum": 536870912 },
-            "output_path": { "type": "string", "minLength": 1, "maxLength": 1000 }
+            "output_path": { "type": "string", "minLength": 1, "maxLength": 1000 },
+            "candidate_network_access": { "type": "string", "const": "disabled" }
           }
         },
         "mode": { "type": "string", "enum": ["implementation", "investigation", "review", "verification", "handoff"] },
@@ -75,8 +76,8 @@
         },
         "risk_gate": { "type": "string", "const": "risk-gate" },
         "operation": { "$ref": "codex-risk-action.schema.json#/$defs/identifier" },
-        "permitted_effects": { "$ref": "codex-risk-action.schema.json#/$defs/identifiers" },
-        "prohibited_effects": { "$ref": "codex-risk-action.schema.json#/$defs/identifiers" }
+        "permitted_effects": { "$ref": "codex-risk-action.schema.json#/properties/permitted_effects" },
+        "prohibited_effects": { "$ref": "codex-risk-action.schema.json#/properties/prohibited_effects" }
       }
     },
     "invocation_sha256": { "$ref": "#/$defs/digest" },

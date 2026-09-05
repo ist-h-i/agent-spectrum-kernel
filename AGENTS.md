@@ -233,7 +233,7 @@ Additional required gates:
 - <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<non-empty text>; signals=<comma-separated exact signal IDs>
 
 Missing evidence:
-- gate/input — affected judgment and the next check
+- {"gate_id":"<exact insufficient_evidence gate>","missing_input":"<non-empty missing input>","affected_judgment":"<non-empty affected judgment>","next_check":"<non-empty next check>"}
 
 Findings:
 - Finding ID:
@@ -248,6 +248,8 @@ Findings:
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 ```
+
+Missing evidence is a closed canonical JSON-line inventory: emit exactly one four-field record per `insufficient_evidence` gate in gate order, no record for any other gate, and `- none` only when no gate is insufficient. Unknown fields, unknown or duplicate gate IDs, partial coverage, and mixing `- none` with records are invalid.
 
 Omit `Decision` when no final decision was requested. Use one impact-ordered finding inventory; do not emit empty category sections or skipped-heavy-gate boilerplate in ordinary output.
 

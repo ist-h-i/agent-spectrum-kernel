@@ -25,10 +25,10 @@ const FIXTURE_ROOT = resolve(ROOT, `benchmarks/fixtures/checkpoint-b2/${FIXTURE_
 const REQUIREMENT_COUNT = 6;
 const REQUIRED_COVERAGE = Object.freeze(["evidence_removal", "scope", "approval", "rollback", "equivalence", "malformed"]);
 const SUCCESSOR_CASE_MATRIX = Object.freeze([
-  "fresh-valid-plan|positive|111111", "fresh-evidence-removal-control|evidence_removal|101111", "fresh-stale-plan-accepted|plan_integrity|011111", "fresh-wrong-approver|approval|110111", "fresh-untruthful-rollback|rollback|111011", "fresh-premature-promotion|knowledge|111101", "fresh-scope-expansion|scope|111110", "fresh-equivalent-labels|equivalence|111111", "fresh-approval-condition-omitted|approval|110111", "fresh-rollback-boundary-omitted|rollback|111011", "fresh-rollback-trigger-drift|rollback|111011", "fresh-knowledge-destination-drift|knowledge|111101", "fresh-evidence-line-drift|evidence_removal|000000", "fresh-protected-mode-change|scope|111110", "fresh-malformed-output|malformed|000000",
+  "fresh-valid-plan|positive|111111", "fresh-evidence-removal-control|evidence_removal|101111", "fresh-stale-plan-accepted|plan_integrity|011111", "fresh-wrong-approver|approval|110111", "fresh-untruthful-rollback|rollback|111011", "fresh-premature-promotion|knowledge|111101", "fresh-scope-expansion|scope|111110", "fresh-equivalent-labels|equivalence|111111", "fresh-evidence-label-collision|malformed|011110", "fresh-dangling-evidence-label|malformed|011110", "fresh-preparation-mode-swap|scope|101111", "fresh-preparation-cross-step-evidence|evidence_removal|101110", "fresh-preparation-section-transplant|evidence_removal|101110", "fresh-approval-condition-omitted|approval|110111", "fresh-rollback-boundary-omitted|rollback|111011", "fresh-rollback-trigger-drift|rollback|111011", "fresh-knowledge-destination-drift|knowledge|111101", "fresh-evidence-line-drift|evidence_removal|011110", "fresh-protected-mode-change|scope|111110", "fresh-malformed-output|malformed|000000",
 ]);
 const CASE_FIELDS = Object.freeze(["case_id", "coverage_class", "mutations", "expected_passes", "expected_findings", "expected_scope_deviations", "expected_evaluation_status", "expected_verification_correctness", "expected_evidence_correctness", "expected_under_processing", "expected_over_processing", "expected_classification", "expected_public_validation", "extra_candidate_path", "mode_change_candidate_path", "control"]);
-const FRESH_CASE_PAYLOAD_DIGEST = "sha256:343a09b1526e16c10d066f9a18a188862b616ffaf502a39624d635c02c6327e6";
+const FRESH_CASE_PAYLOAD_DIGEST = "sha256:2359a53d7714c1f59373f4210c93853664b9f505d7038ea1c96418bdaae9f7bc";
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -322,7 +322,7 @@ function validateWorkspaceValidatorParity() {
       command_id: "check-format",
       mode: "local_read",
       purpose_id: "format-check",
-      evidence_ids: ["command-format"],
+      evidence_ids: ["command-format", "command-format-mode", "request-preparation"],
     }],
     apply_gate: {
       state: "awaiting_approval",
@@ -355,6 +355,8 @@ function validateWorkspaceValidatorParity() {
     evidence: [
       { evidence_id: "plan-id", path: "plans/candidate-plan.json", line: 2, source_excerpt: "\"plan_id\": \"plan-cr482-317\"," },
       { evidence_id: "command-format", path: "operations/commands.json", line: 4, source_excerpt: "\"command_id\": \"check-format\"," },
+      { evidence_id: "command-format-mode", path: "operations/commands.json", line: 5, source_excerpt: "\"mode\": \"local_read\"," },
+      { evidence_id: "request-preparation", path: "docs/change-request.md", line: 7, source_excerpt: "Preparation may format-check, validate configuration, and create a plan, but it must not mutate cloud resources." },
       { evidence_id: "approval-pending", path: "state/current-state.json", line: 13, source_excerpt: "\"state\": \"pending\"," },
       { evidence_id: "rollback-policy", path: "docs/rollback-policy.md", line: 3, source_excerpt: "Rollback is a new forward change against the then-current Terraform state; reverting Git alone does not change the live alias." },
       { evidence_id: "knowledge-policy", path: "docs/knowledge-policy.md", line: 3, source_excerpt: "Completion of one change does not by itself authorize a durable knowledge write." },
@@ -404,6 +406,9 @@ function validateWorkspaceValidatorParity() {
     ["cross-line-source-excerpt", (value) => { value.evidence[0].line = 3; }],
     ["unavailable-evidence-path", (value) => { value.evidence[0].path = "README.md"; }],
     ["traversal-evidence-path", (value) => { value.evidence[0].path = "../plans/candidate-plan.json"; }],
+    ["preparation-mode-swap", (value) => { value.preparation[0].mode = "remote_read"; }],
+    ["preparation-command-evidence-transplant", (value) => { value.preparation[0].command_id = "validate-config"; }],
+    ["preparation-section-evidence-transplant", (value) => { value.preparation[0].evidence_ids = ["approval-pending"]; }],
   ];
   for (const [name, mutate] of relationalInvalidCases) {
     const value = clone(valid);

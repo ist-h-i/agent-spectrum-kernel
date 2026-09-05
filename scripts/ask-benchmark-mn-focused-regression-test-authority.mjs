@@ -202,7 +202,7 @@ function validateAuthenticatedGenericLoaderContract(privateRoot) {
   const loaderBytes = readFileSync(loaderPath);
   const scope = readJson(resolve(privateRoot, "scope-boundaries.json"), "mn-focused-regression private scope boundaries");
   const expected = {
-    revision: "authenticated-generic-loader.v1",
+    revision: "authenticated-generic-loader.v2",
     runtime: "node-v24.19.0",
     generic_loader: {
       path: "authenticated-generic-loader.mjs",
@@ -211,10 +211,32 @@ function validateAuthenticatedGenericLoaderContract(privateRoot) {
       answer_neutrality: "identical bytes for every baseline, trial, and variant; no trial-specific authority",
     },
     authority_transport: {
-      channel: "stdin-once-before-candidate-module-evaluation",
-      stdin_closed_after_read: true,
+      channel: "duplex-pipe-request-fd3-response-fd4",
+      request_descriptor: 3,
+      response_descriptor: 4,
+      stdin_connected: false,
       argv_env_cwd_marker_disclosure: false,
-      raw_authority_discarded_before_candidate_evaluation: true,
+      raw_authority_present_in_candidate_process: false,
+    },
+    isolation_provider: {
+      operating_system: "darwin",
+      provider: "sandbox-exec-default-deny+node-permission-v24",
+      provider_unavailable: "fail-closed",
+      node_permission_flag: "--permission",
+      inspector_signal_disabled: true,
+    },
+    candidate_workspace: {
+      closed_inventory: ["src/session-key.mjs", "test/session-key.test.mjs"],
+      implementation_proxy_answer_neutral: true,
+      trusted_implementation_present: false,
+      mutation_source_present: false,
+    },
+    trusted_api_mediation: {
+      operation_allowlist: ["sessionCacheKey"],
+      implementation_location: "trusted-parent-outside-candidate-sandbox",
+      candidate_inputs_only: true,
+      variant_authority_disclosed: false,
+      malformed_or_unknown_request: "fail-closed",
     },
     authenticated_observation: {
       scheme: "hmac-sha256",
@@ -237,13 +259,15 @@ function validateAuthenticatedGenericLoaderContract(privateRoot) {
       fixed_timezone: "UTC",
     },
     candidate_capabilities: {
+      filesystem_read: "isolated-candidate-workspace-only",
       filesystem_write: "denied",
       child_process: "denied",
       worker: "denied",
       native_addon: "denied",
       inspector: "denied",
       network: "denied-before-candidate-module-evaluation",
-      permission_model: "defense-in-depth-only",
+      wasi: "denied",
+      permission_model: "required-native-enforcement",
     },
     failure_mode: "fail-closed",
   };

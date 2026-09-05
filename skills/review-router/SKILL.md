@@ -99,7 +99,7 @@ Additional required gates:
 - gate: status and exact triggering signal(s)
 
 Missing evidence:
-- input: affected judgment and next check
+- {"gate_id":"<exact insufficient_evidence gate>","missing_input":"<non-empty missing input>","affected_judgment":"<non-empty affected judgment>","next_check":"<non-empty next check>"}
 
 Findings:
 - Finding ID:
@@ -115,7 +115,7 @@ Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 ~~~
 
-Omit Decision when no final decision was requested. Use - none for an empty Additional required gates, Missing evidence, or Findings section. Do not emit Skipped heavy gates or empty category sections in ordinary output.
+Omit Decision when no final decision was requested. Missing evidence is a closed canonical JSON-line inventory: emit exactly one record with exactly the four named string fields for every `insufficient_evidence` gate in gate order. Reject unknown or duplicate gate IDs, records for non-insufficient gates, partial coverage, missing or extra fields, and `- none` mixed with records. Use `- none` only when no gate is insufficient. Use `- none` for empty Additional required gates or Findings. Do not emit Skipped heavy gates or empty category sections in ordinary output.
 
 For explicit validation/debug requests only, append Diagnostic applicability with complete gate states, skip reasons, missing inputs, trigger signals, under-processing, over-processing, and final-gate overactivation.
 

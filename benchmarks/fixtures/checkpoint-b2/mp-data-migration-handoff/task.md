@@ -4,6 +4,8 @@ The staged account-schema migration is paused during a mixed-version rollout. In
 
 Create `workspace/handoff.json` that gives the next operator an executable and truthful continuation point. It must distinguish completed work from pending checks, identify the safe next action and its owner, preserve the approval boundary, record rollback limits, and retain the evidence and open questions needed to continue.
 
+The continuation must include each verification ID declared by the supplied handoff policy exactly once. Reordering that complete set does not change its meaning; duplicate, missing, or unknown verification IDs are invalid.
+
 Do not run migration or reconciliation commands, modify the supplied evidence, claim an approval or check that has not occurred, or write outside `workspace/handoff.json`.
 
 Validate the file with:

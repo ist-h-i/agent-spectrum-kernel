@@ -237,8 +237,8 @@ const riskAction = {
   risk_gate: "risk-gate",
   operation: "write_release_candidate",
   target_scope: ["dist/release.json"],
-  permitted_effects: ["write_release_candidate"],
-  prohibited_effects: ["publish_production"],
+  permitted_effects: ["create", "modify", "delete"],
+  prohibited_effects: ["external_side_effects", "git_metadata_changes", "write_outside_target_scope"],
   approval_authority: { authority_id: "fixture-owner", authority_revision: "rev-1", evidence_sha256: digest("1") },
 };
 const riskRequest = createRiskApprovalRequest({
@@ -261,6 +261,7 @@ const riskRequest = createRiskApprovalRequest({
       raw_sha256: digest("5"),
       size_bytes: 12345,
       output_path: ".agents/runs/release.md",
+      candidate_network_access: "disabled",
     },
     mode: "implementation",
     sandbox: "workspace-write",
@@ -283,9 +284,15 @@ const requestedRiskEnvelope = {
   risk_approval: {
     status: "requested",
     execution_status: "not_executed",
+    enforcement_status: "not_started",
+    promotion_status: "not_started",
     request: riskRequest,
     approval_file_sha256: null,
     rendered_invocation_sha256: null,
+    workspace_base_sha256: null,
+    delta_sha256: null,
+    observed_effects: [],
+    promoted_paths: [],
     rejection_reasons: [],
   },
 };
@@ -311,6 +318,12 @@ const approvedExecutionEnvelope = {
     execution_status: "executed",
     approval_file_sha256: digest("8"),
     rendered_invocation_sha256: digest("9"),
+    enforcement_status: "accepted",
+    promotion_status: "promoted",
+    workspace_base_sha256: digest("b"),
+    delta_sha256: digest("c"),
+    observed_effects: ["modify"],
+    promoted_paths: ["dist/release.json"],
   },
 };
 const approvedExecutionRecord = buildExecutionEnvelopeRecord({
@@ -326,5 +339,9 @@ assert.deepEqual(validateExecutionEnvelopeRecord(approvedExecutionRecord, { sche
 const invalidApprovedWithoutPrompt = structuredClone(approvedExecutionRecord);
 invalidApprovedWithoutPrompt.envelope.risk_approval.rendered_invocation_sha256 = null;
 assert.match(validateExecutionEnvelopeRecord(invalidApprovedWithoutPrompt, { schemaPath }).join("\n"), /spawned prompt digest|record_id/u);
+
+const invalidPromotedScope = structuredClone(approvedExecutionRecord);
+invalidPromotedScope.envelope.risk_approval.promoted_paths = [".git/config"];
+assert.match(validateExecutionEnvelopeRecord(invalidPromotedScope, { schemaPath }).join("\n"), /outside the approved canonical target scope/u, "final promotion metadata must be rejected before promotion when it cannot bind the approved scope");
 
 console.log("Execution Envelope record tests passed");

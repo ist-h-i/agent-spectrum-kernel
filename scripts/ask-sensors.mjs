@@ -300,14 +300,24 @@ function reviewLayerSummarySensor(text, contract, requiredGates = [], observedSi
   const additionalResult = inspectAdditionalGateResults(
     sections.get("Additional required gates:")?.[0] ?? [],
     route,
-    sections.get("Missing evidence:")?.[0] ?? [],
   );
   if (additionalResult.issue) {
     return sensor("review_layer_summary", "fail", additionalResult.issue, "Emit one closed result record for every derived additional gate and no untriggered gate record.");
   }
-  const missingEvidenceResult = inspectEmptyInventory(sections.get("Missing evidence:")?.[0] ?? [], "Missing evidence");
+  const missingEvidenceResult = inspectMissingEvidenceInventory(
+    sections.get("Missing evidence:")?.[0] ?? [],
+    [
+      { gate: "review-ai-quality", status: baselineResult.status },
+      ...additionalResult.statuses,
+    ],
+  );
   if (missingEvidenceResult.issue) {
-    return sensor("review_layer_summary", "fail", missingEvidenceResult.issue, "Use exactly '- none' or one or more evidence records, never both.");
+    return sensor(
+      "review_layer_summary",
+      "fail",
+      missingEvidenceResult.issue,
+      "Emit exactly one closed JSON line record for every insufficient_evidence gate and no other Missing evidence record.",
+    );
   }
   const findingResult = inspectFindingInventory(
     sections.get("Findings:")?.[0] ?? [],
@@ -360,7 +370,7 @@ function inspectBaselineReview(lines) {
   return { issue: null, status: fields.get("Status") };
 }
 
-function inspectAdditionalGateResults(lines, route, missingEvidenceLines) {
+function inspectAdditionalGateResults(lines, route) {
   const records = contentLines(lines);
   if (route.additional_gates.length === 0) {
     return records.length === 1 && records[0].trim() === "- none"
@@ -387,12 +397,84 @@ function inspectAdditionalGateResults(lines, route, missingEvidenceLines) {
     if (JSON.stringify([...signals].sort()) !== JSON.stringify(route.signals_by_gate[gate])) {
       return { issue: `Additional required gate ${gate} has mismatched trigger signals: expected ${(route.signals_by_gate[gate] ?? []).join(",")}, received ${signals.join(",") || "none"}.`, statuses: [] };
     }
-    if (status === "insufficient_evidence" && !contentLines(missingEvidenceLines).some((missingLine) => missingLine.includes(gate))) {
-      return { issue: `Additional required gate ${gate} is insufficient_evidence but Missing evidence does not name that gate.`, statuses: [] };
-    }
     statuses.push({ gate, status });
   }
   return { issue: null, statuses };
+}
+
+const MISSING_EVIDENCE_FIELDS = ["gate_id", "missing_input", "affected_judgment", "next_check"];
+
+function inspectMissingEvidenceInventory(lines, gateStatuses) {
+  const records = contentLines(lines);
+  if (records.length === 0) return { issue: "Missing evidence inventory is empty or uninterpretable", empty: false };
+  const noneCount = records.filter((line) => line.trim() === "- none").length;
+  const insufficientGateIds = gateStatuses
+    .filter(({ status }) => status === "insufficient_evidence")
+    .map(({ gate }) => gate);
+
+  if (noneCount === 1 && records.length === 1) {
+    return insufficientGateIds.length === 0
+      ? { issue: null, empty: true, records: [] }
+      : { issue: `Missing evidence reports none but insufficient_evidence gates require records: ${insufficientGateIds.join(", ")}.`, empty: true, records: [] };
+  }
+  if (noneCount > 0) return { issue: "Missing evidence inventory mixes '- none' with evidence records", empty: false };
+
+  const knownGateIds = new Set(gateStatuses.map(({ gate }) => gate));
+  const parsedRecords = [];
+  const seenGateIds = new Set();
+  for (const line of records) {
+    const trimmed = line.trim();
+    const match = trimmed.match(/^-\s+(\{.*\})$/u);
+    if (!match) return { issue: `Missing evidence has an invalid closed JSON line record: ${trimmed}.`, empty: false };
+    const recordJson = match[1];
+    let record;
+    try {
+      record = JSON.parse(recordJson);
+    } catch (error) {
+      return { issue: `Missing evidence has invalid JSON: ${error.message}.`, empty: false };
+    }
+    if (!record || Array.isArray(record) || typeof record !== "object") {
+      return { issue: "Missing evidence record must be a JSON object.", empty: false };
+    }
+    if (recordJson !== JSON.stringify(record)) {
+      return { issue: "Missing evidence record must use canonical single-line JSON without duplicate fields or non-canonical whitespace.", empty: false };
+    }
+    const keys = Object.keys(record);
+    const missingFields = MISSING_EVIDENCE_FIELDS.filter((field) => !keys.includes(field));
+    const unknownFields = keys.filter((field) => !MISSING_EVIDENCE_FIELDS.includes(field));
+    if (missingFields.length > 0 || unknownFields.length > 0) {
+      const details = [
+        missingFields.length > 0 ? `missing=${missingFields.join(",")}` : null,
+        unknownFields.length > 0 ? `unknown=${unknownFields.join(",")}` : null,
+      ].filter(Boolean).join("; ");
+      return { issue: `Missing evidence record fields are invalid: ${details}.`, empty: false };
+    }
+    for (const field of MISSING_EVIDENCE_FIELDS) {
+      if (typeof record[field] !== "string" || record[field].trim().length === 0) {
+        return { issue: `Missing evidence record ${field} must be a non-empty string.`, empty: false };
+      }
+    }
+    if (!/^[a-z0-9][a-z0-9-]*$/u.test(record.gate_id)) {
+      return { issue: `Missing evidence gate_id is not a controlled identifier: ${record.gate_id}.`, empty: false };
+    }
+    if (!knownGateIds.has(record.gate_id)) {
+      return { issue: `Missing evidence names an unknown current gate: ${record.gate_id}.`, empty: false };
+    }
+    if (seenGateIds.has(record.gate_id)) {
+      return { issue: `Missing evidence duplicates gate_id: ${record.gate_id}.`, empty: false };
+    }
+    seenGateIds.add(record.gate_id);
+    parsedRecords.push(record);
+  }
+
+  const receivedGateIds = parsedRecords.map(({ gate_id: gateId }) => gateId);
+  if (JSON.stringify(receivedGateIds) !== JSON.stringify(insufficientGateIds)) {
+    return {
+      issue: `Missing evidence does not exactly cover insufficient_evidence gates in gate order: expected ${insufficientGateIds.join(",") || "none"}; received ${receivedGateIds.join(",") || "none"}.`,
+      empty: false,
+    };
+  }
+  return { issue: null, empty: false, records: parsedRecords };
 }
 
 function inspectReviewDecision(lines) {

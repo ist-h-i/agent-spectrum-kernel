@@ -47,6 +47,29 @@ function validatesExactExcerpt(evidence) {
   return evidence.line <= lines.length && evidence.source_excerpt === lines[evidence.line - 1].trim() && evidence.source_excerpt.length > 0;
 }
 
+function citationRole(evidence) {
+  const path = normalizeEvidencePath(evidence.path);
+  if (path === "src/cache-key.mjs" && evidence.line === 5) return "cache_key_implementation";
+  if (path === "observability/cache-samples.csv" && evidence.line >= 2) return "cache_key_observation";
+  if (path === "docs/investigation-contract.md" && [10, 11].includes(evidence.line)) return "cache_identity_contract";
+  if (path === "observability/request-windows.csv" && evidence.line >= 2) return "request_window_observation";
+  if (path === "docs/investigation-contract.md" && evidence.line === 13) return "unsupplied_mechanism_boundary";
+  return null;
+}
+
+function evidenceIsRelevant(hypothesis) {
+  const roles = hypothesis.evidence.map(citationRole);
+  if (roles.includes(null)) return false;
+  if (hypothesis.mechanism === "request_scoped_cache_identity") {
+    return roles.some((role) => ["cache_key_implementation", "cache_key_observation"].includes(role))
+      && roles.includes("cache_identity_contract");
+  }
+  if (["traffic_volume", "database_contention", "garbage_collection"].includes(hypothesis.mechanism)) {
+    return roles.length >= 2 && roles.every((role) => role === "request_window_observation") && new Set(hypothesis.evidence.map(({ line }) => line)).size >= 2;
+  }
+  return hypothesis.state === "unresolved" && roles.every((role) => role === "unsupplied_mechanism_boundary");
+}
+
 if (!exactKeys(value, ["overall_assessment", "hypotheses", "next_check", "scope"])) throw new Error("investigation fields are not closed");
 if (!exactKeys(value.overall_assessment, ["status", "leading_hypothesis_id", "causal_basis"])) throw new Error("overall assessment fields are not closed");
 if (!oneOf(value.overall_assessment.status, ["supported_not_proven", "insufficient_evidence", "no_regression"])
@@ -67,6 +90,7 @@ for (const hypothesis of value.hypotheses) {
   for (const evidence of hypothesis.evidence) {
     if (!exactKeys(evidence, ["path", "line", "source_excerpt"]) || !validatesExactExcerpt(evidence)) throw new Error("hypothesis evidence is not an exact supplied source line");
   }
+  if (!evidenceIsRelevant(hypothesis)) throw new Error("hypothesis evidence is not semantically relevant to the claimed mechanism");
 }
 
 if (!hypothesisIds.has(value.overall_assessment.leading_hypothesis_id)) throw new Error("leading hypothesis target is invalid");

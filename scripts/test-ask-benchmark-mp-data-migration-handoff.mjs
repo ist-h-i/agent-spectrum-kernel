@@ -452,7 +452,12 @@ function validateWorkspaceValidatorParity() {
     rollback: { supported_action_ids: ["synthetic-containment"], forbidden_action_ids: ["synthetic-destruction"], data_preservation: "preserve-synthetic-data" },
     continuation: {
       stop_condition_ids: ["synthetic-stop"],
-      verification_states: [{ verification_id: "synthetic-verification", state: "not_run" }],
+      verification_states: [
+        { verification_id: "batch-42-checksum", state: "failed" },
+        { verification_id: "batch-42-unresolved-row-reconciliation", state: "not_run" },
+        { verification_id: "rollback-drill", state: "passed" },
+        { verification_id: "compatibility-smoke", state: "passed" },
+      ],
       evidence_references: ["synthetic-evidence"],
       open_questions: ["synthetic-question"],
     },
@@ -471,6 +476,29 @@ function validateWorkspaceValidatorParity() {
   const invalidResult = spawnSync(process.execPath, [validator, invalidPath], { encoding: "utf8" });
   assert.notEqual(invalidResult.status, 0, "runtime validator must reject schema-invalid next_batch zero");
   assert.match(invalidResult.stderr, /current_state next_batch is invalid/u);
+
+  for (const [name, mutate, schemaMustReject] of [
+    ["same-state-duplicate-verification", (value) => { value.continuation.verification_states.push(clone(value.continuation.verification_states[0])); }, true],
+    ["conflicting-duplicate-verification", (value) => { value.continuation.verification_states.push({ ...value.continuation.verification_states[0], state: "passed" }); }, false],
+    ["missing-verification", (value) => { value.continuation.verification_states.pop(); }, false],
+    ["unknown-verification", (value) => { value.continuation.verification_states[0].verification_id = "unknown-verification"; }, false],
+  ]) {
+    const candidate = clone(valid);
+    mutate(candidate);
+    const candidatePath = resolve(work, `${name}.json`);
+    writeFileSync(candidatePath, `${JSON.stringify(candidate, null, 2)}\n`);
+    if (schemaMustReject) assert.throws(() => assertBenchmarkSchemaInstance(candidate, { schemaPath: schema, label: name }), /JSON Schema validation/u, `${name} schema rejection`);
+    const result = spawnSync(process.execPath, [validator, candidatePath], { encoding: "utf8" });
+    assert.notEqual(result.status, 0, `${name} runtime rejection`);
+  }
+
+  const reordered = clone(valid);
+  reordered.continuation.verification_states.reverse();
+  const reorderedPath = resolve(work, "reordered-verifications.json");
+  writeFileSync(reorderedPath, `${JSON.stringify(reordered, null, 2)}\n`);
+  assert.doesNotThrow(() => assertBenchmarkSchemaInstance(reordered, { schemaPath: schema, label: "reordered verifications" }));
+  const reorderedResult = spawnSync(process.execPath, [validator, reorderedPath], { encoding: "utf8" });
+  assert.equal(reorderedResult.status, 0, reorderedResult.stderr || reorderedResult.stdout);
 }
 
 function validatePublicNegativeCoverage() {

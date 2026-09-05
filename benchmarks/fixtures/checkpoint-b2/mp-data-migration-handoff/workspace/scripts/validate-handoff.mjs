@@ -1,9 +1,13 @@
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const path = process.argv[2];
 if (!path) throw new Error("usage: validate-handoff.mjs <handoff.json>");
 
 const handoff = JSON.parse(readFileSync(path, "utf8"));
+const workspace = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const policy = JSON.parse(readFileSync(resolve(workspace, "state/handoff-policy.json"), "utf8"));
 const exactKeys = (value, keys, label) => {
   if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join("\0") !== [...keys].sort().join("\0")) throw new Error(`${label} fields are not closed`);
 };
@@ -52,10 +56,15 @@ stringArray(handoff.continuation.stop_condition_ids, "continuation stop_conditio
 stringArray(handoff.continuation.evidence_references, "continuation evidence_references");
 stringArray(handoff.continuation.open_questions, "continuation open_questions");
 if (!Array.isArray(handoff.continuation.verification_states) || handoff.continuation.verification_states.length === 0) throw new Error("continuation verification_states is invalid");
+const verificationIds = [];
 for (const verification of handoff.continuation.verification_states) {
   exactKeys(verification, ["verification_id", "state"], "verification state");
   string(verification.verification_id, "verification_id");
   if (!new Set(["passed", "failed", "not_run"]).has(verification.state)) throw new Error("verification state is invalid");
+  verificationIds.push(verification.verification_id);
 }
+if (new Set(verificationIds).size !== verificationIds.length) throw new Error("verification IDs must be unique");
+const expectedVerificationIds = [...policy.verification_ids].sort();
+if (verificationIds.length !== expectedVerificationIds.length || verificationIds.slice().sort().some((id, index) => id !== expectedVerificationIds[index])) throw new Error("verification IDs must exactly match the supplied policy inventory");
 
 console.log(JSON.stringify({ validation: "pass", verification_states: handoff.continuation.verification_states.length }));

@@ -77,7 +77,7 @@ Additional required gates:
 - gate: status, evidence, and exact trigger signal
 
 Missing evidence:
-- input/gate: affected judgment and next check
+- {"gate_id":"<exact insufficient_evidence gate>","missing_input":"<non-empty missing input>","affected_judgment":"<non-empty affected judgment>","next_check":"<non-empty next check>"}
 
 Findings:
 - Finding ID:
@@ -93,7 +93,7 @@ Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 ~~~
 
-Use - none for empty Additional required gates, Missing evidence, or Findings. Do not emit skipped-heavy or empty category sections. Complete applicability and route deviations remain diagnostic/debug output only.
+Missing evidence is a closed canonical JSON-line inventory. Emit exactly one record with exactly the four named string fields for every `insufficient_evidence` gate in gate order; emit no record for any other gate. Unknown or duplicate gate IDs, partial coverage, missing or extra fields, and `- none` mixed with records are invalid. Use `- none` only when no gate is insufficient. Use `- none` for empty Additional required gates or Findings. Do not emit skipped-heavy or empty category sections. Complete applicability and route deviations remain diagnostic/debug output only.
 
 When a merge claim requires stable traceability, reference the current Review decision, implementation subject, evidence, blockers, and accepted risks under docs/lifecycle-traceability-contract.md without copying their content.
 

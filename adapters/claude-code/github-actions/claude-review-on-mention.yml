@@ -124,7 +124,8 @@ jobs:
             - Normal routing output:
             - Baseline review: exactly one review-ai-quality result with normalized status and non-empty evidence
             - Additional required gates: exactly one closed `<gate>: status=...; evidence=...; signals=...` record per derived gate, in registry order
-            - Missing evidence: missing input, affected judgment, and next check
+            - Missing evidence: exactly one canonical closed JSON line per insufficient_evidence gate in gate order, with exactly gate_id, missing_input, affected_judgment, and next_check as non-empty strings
+            - Reject unknown or duplicate gate IDs, records for non-insufficient gates, partial coverage, missing or extra fields, and `- none` mixed with records; use `- none` only when no gate is insufficient
             - Findings: one impact-ordered inventory
             - Do not deploy, merge, release, publish, or mutate production configuration.
             - Do not store secrets or raw prompts.

@@ -7,6 +7,7 @@ if (!outputPath) throw new Error("usage: validate-change-plan.mjs <change-plan.j
 
 const workspace = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const value = JSON.parse(readFileSync(outputPath, "utf8"));
+const commandCatalog = JSON.parse(readFileSync(resolve(workspace, "operations/commands.json"), "utf8"));
 const exactKeys = (candidate, keys) => candidate && typeof candidate === "object" && !Array.isArray(candidate)
   && Object.keys(candidate).sort().join("\0") === [...keys].sort().join("\0");
 const slug = (candidate) => typeof candidate === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(candidate);
@@ -24,6 +25,11 @@ const evidencePaths = new Set([
   "plans/candidate-plan.json",
   "state/current-state.json",
 ]);
+const commandsById = new Map();
+for (const command of commandCatalog.commands ?? []) {
+  if (!exactKeys(command, ["command_id", "mode", "production_mutation", "approval_required"]) || !slug(command.command_id) || commandsById.has(command.command_id)) throw new Error("supplied command catalog is invalid");
+  commandsById.set(command.command_id, command);
+}
 
 function normalizeEvidencePath(candidate) {
   if (typeof candidate !== "string" || candidate.trim() !== candidate || isAbsolute(candidate) || candidate.includes("\\")) return null;
@@ -54,9 +60,11 @@ if (!Array.isArray(value.preparation) || value.preparation.length === 0) throw n
 const sequences = new Set();
 const commandIds = new Set();
 for (const step of value.preparation) {
+  const suppliedCommand = commandsById.get(step.command_id);
   if (!exactKeys(step, ["sequence", "command_id", "mode", "purpose_id", "evidence_ids"])
     || !Number.isInteger(step.sequence) || step.sequence < 1 || sequences.has(step.sequence)
     || !slug(step.command_id) || commandIds.has(step.command_id) || !oneOf(step.mode, ["local_read", "remote_read"])
+    || !suppliedCommand || suppliedCommand.mode !== step.mode || suppliedCommand.production_mutation !== false || suppliedCommand.approval_required !== false
     || !slug(step.purpose_id) || !nonEmptyUniqueSlugs(step.evidence_ids)) throw new Error("preparation step is invalid");
   sequences.add(step.sequence);
   commandIds.add(step.command_id);
@@ -93,11 +101,13 @@ if (!exactKeys(value.knowledge_promotion, ["state", "trigger_id", "destination",
 
 if (!Array.isArray(value.evidence) || value.evidence.length === 0) throw new Error("evidence is required");
 const evidenceIds = new Set();
+const evidenceById = new Map();
 for (const evidence of value.evidence) {
   if (!exactKeys(evidence, ["evidence_id", "path", "line", "source_excerpt"])
     || !slug(evidence.evidence_id) || evidenceIds.has(evidence.evidence_id)
     || !validatesExactExcerpt(evidence)) throw new Error("evidence is invalid or duplicated");
   evidenceIds.add(evidence.evidence_id);
+  evidenceById.set(evidence.evidence_id, evidence);
 }
 const referencedEvidenceIds = [
   ...value.decision.evidence_ids,
@@ -107,6 +117,15 @@ const referencedEvidenceIds = [
   ...value.knowledge_promotion.evidence_ids,
 ];
 if (!referencedEvidenceIds.every((id) => evidenceIds.has(id)) || ![...evidenceIds].every((id) => referencedEvidenceIds.includes(id))) throw new Error("evidence references are not closed");
+const cites = (ids, path, excerpt) => ids.some((id) => {
+  const citation = evidenceById.get(id);
+  return normalizeEvidencePath(citation?.path) === path && citation.source_excerpt === excerpt;
+});
+for (const step of value.preparation) {
+  if (!cites(step.evidence_ids, "operations/commands.json", `"command_id": "${step.command_id}",`)
+    || !cites(step.evidence_ids, "operations/commands.json", `"mode": "${step.mode}",`)
+    || !cites(step.evidence_ids, "docs/change-request.md", "Preparation may format-check, validate configuration, and create a plan, but it must not mutate cloud resources.")) throw new Error("preparation evidence does not bind the exact command, mode, and safe-preparation authority");
+}
 
 if (!exactKeys(value.scope, ["changes_made", "production_action_authorized"])
   || value.scope.changes_made !== false || value.scope.production_action_authorized !== false) throw new Error("scope is invalid");

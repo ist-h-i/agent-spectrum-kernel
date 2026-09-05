@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, deriveReviewSignalGateRoute, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, inspectCodexPromptContractBindings, parseCodexCompactProfileHeader, readReviewSignalGateMap } from "./ask-shared.mjs";
 import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
 import { canonicalRiskDigest, createRiskApprovalRequest, readRiskAction, readStableExecutableFile, verifyRiskApproval } from "./codex-risk-approval.mjs";
+import { auditRiskWorkspace, createRiskWorkspace, disposeRiskWorkspace, promoteRiskWorkspace, runInRiskWorkspace } from "./codex-risk-workspace.mjs";
 import { buildExecutionEnvelopeRecord, hasExecutionEnvelopeMarker, inspectExecutionEnvelopeRecordEmission, isMarkdownFenceClosing, markdownFenceOpening, renderExecutionEnvelopeProjection, selectExecutionEnvelopeEmission, validateExecutionEnvelope, validateExecutionEnvelopeRecord, validateJsonSchema } from "./execution-envelope.mjs";
 import { resolveGitDirectory, resolveObservabilityPath } from "./observability-paths.mjs";
 
@@ -21,6 +22,7 @@ const MANAGED_CODEX_RUNTIME_FILES = [
   "execution-envelope.mjs",
   "adapter-runtime-event.mjs",
   "codex-risk-approval.mjs",
+  "codex-risk-workspace.mjs",
   "observability-paths.mjs",
   "execution-envelope.schema.json",
   "execution-envelope-record.schema.json",
@@ -149,6 +151,7 @@ function parseArgs(argv) {
   const readOnlyReviewRiskEvaluation = args.mode === "review" && args.sandbox === "read-only";
   const riskActionRequired = args.requiredGates.includes("risk-gate") && !readOnlyReviewRiskEvaluation;
   if (riskActionRequired && !args.riskAction) throw new Error("non-review risk-gate requires --risk-action with a closed descriptor");
+  if (riskActionRequired && args.sandbox !== "workspace-write") throw new Error("non-review risk-gated mutation requires the closed workspace-write sandbox");
   if (!riskActionRequired && (args.riskAction || args.riskApproval || args.riskApprovalSha256)) throw new Error("risk approval arguments require a non-review risk-gated action");
   if (Boolean(args.riskApproval) !== Boolean(args.riskApprovalSha256)) throw new Error("--risk-approval and --risk-approval-sha256 must be provided together");
   return args;
@@ -397,6 +400,7 @@ function riskInvocation(args, state, compactProfile, prompt, action) {
     executor: {
       ...resolveCodexExecutable(args.codexBin, args.target),
       output_path: args.output,
+      candidate_network_access: "disabled",
     },
     mode: args.mode,
     sandbox: args.sandbox,
@@ -411,7 +415,15 @@ function riskInvocation(args, state, compactProfile, prompt, action) {
 function evaluateRiskApproval(args, state, compactProfile, prompt) {
   const actionEvidence = readRiskAction(args.riskAction, { schemaPath: args.riskActionSchemaPath });
   const request = createRiskApprovalRequest({ actionEvidence, invocation: riskInvocation(args, state, compactProfile, prompt, actionEvidence.value) });
-  if (!args.riskApproval) return { status: "requested", execution_status: "not_executed", request, approval_file_sha256: null, rendered_invocation_sha256: null, rejection_reasons: [] };
+  const enforcement = {
+    enforcement_status: "not_started",
+    promotion_status: "not_started",
+    workspace_base_sha256: null,
+    delta_sha256: null,
+    observed_effects: [],
+    promoted_paths: [],
+  };
+  if (!args.riskApproval) return { status: "requested", execution_status: "not_executed", ...enforcement, request, approval_file_sha256: null, rendered_invocation_sha256: null, rejection_reasons: [] };
   const verified = verifyRiskApproval({
     approvalPath: args.riskApproval,
     approvalSha256: args.riskApprovalSha256,
@@ -422,6 +434,7 @@ function evaluateRiskApproval(args, state, compactProfile, prompt) {
   return {
     status: verified.status,
     execution_status: "not_executed",
+    ...enforcement,
     request,
     approval_file_sha256: verified.status === "approved" ? verified.evidence.file_sha256 : null,
     rendered_invocation_sha256: null,
@@ -533,6 +546,34 @@ function runCodex(args, prompt, codexBin = args.codexBin) {
     stderr: result.stderr ?? "",
     error: result.error?.message ?? null,
     temporaryOutputPath: acceptedOutput ? temporaryOutputPath : null,
+    finalOutput: acceptedOutput ? finalOutput : "",
+  };
+}
+
+async function runCodexInRiskWorkspace(args, prompt, codexBin, riskContext) {
+  const temporaryOutput = `.agents/runs/codex-risk-${process.pid}-${Date.now()}.json`;
+  const temporaryOutputPath = resolve(riskContext.workspace, temporaryOutput);
+  mkdirSync(dirname(temporaryOutputPath), { recursive: true });
+  const commandArgs = ["exec", "--sandbox", args.sandbox, "-c", "sandbox_workspace_write.network_access=false", "--output-schema", "scripts/codex-runner-result.schema.json", "--output-last-message", temporaryOutput];
+  const result = await runInRiskWorkspace({ context: riskContext, executable: codexBin, args: commandArgs, input: prompt });
+  const outputExists = existsSync(temporaryOutputPath);
+  let finalOutput = "";
+  let outputError = null;
+  if (outputExists) {
+    const status = lstatSync(temporaryOutputPath);
+    if (status.isSymbolicLink() || !status.isFile() || status.nlink !== 1) {
+      outputError = "isolated Codex output must be a regular non-symlink, non-hard-linked file";
+    } else {
+      finalOutput = readFileSync(temporaryOutputPath, "utf8");
+    }
+    unlinkSync(temporaryOutputPath);
+  }
+  const acceptedOutput = !result.error && !outputError && result.exitCode === 0 && finalOutput.trim().length > 0;
+  return {
+    ...result,
+    error: result.error ?? outputError,
+    temporaryOutputPath: null,
+    temporaryOutput,
     finalOutput: acceptedOutput ? finalOutput : "",
   };
 }
@@ -828,6 +869,7 @@ try {
   const riskActionRequired = args.requiredGates.includes("risk-gate") && !readOnlyReviewRiskEvaluation;
   let riskApproval = null;
   let approvedCodexBin = null;
+  let riskContext = null;
   let approvalBlocked = riskActionRequired;
   const capabilityBlocked = preflightResult.capabilityMissing.length > 0;
   if (preflightResult.failures.length === 0) {
@@ -892,7 +934,7 @@ try {
             envelopeRecord = stop.record;
             publication = publishOutput(args, stop.responseMarkdown, stop.record, { inspectDomainOutput: false });
           } else {
-            const finalExecutor = { ...resolveCodexExecutable(args.codexBin, args.target), output_path: args.output };
+            const finalExecutor = { ...resolveCodexExecutable(args.codexBin, args.target), output_path: args.output, candidate_network_access: "disabled" };
             if (canonicalRiskDigest(finalExecutor) !== canonicalRiskDigest(rereadApproval.request.invocation.executor)) {
               riskApproval = {
                 ...rereadApproval,
@@ -916,26 +958,105 @@ try {
             } else {
               approvedCodexBin = finalExecutor.canonical_path;
               spawnPrompt = renderApprovedRiskPrompt(spawnPrompt, rereadApproval.request);
-              riskApproval = {
+              try {
+                riskContext = createRiskWorkspace({
+                  target: args.target,
+                  request: rereadApproval.request,
+                  ignoredRepositoryPaths: [args.output, ".agent-spectrum-kernel/runtime/"],
+                });
+              } catch (error) {
+                riskApproval = {
+                  ...rereadApproval,
+                  execution_status: "not_executed",
+                  enforcement_status: "not_started",
+                  promotion_status: "not_started",
+                  workspace_base_sha256: null,
+                  delta_sha256: null,
+                  observed_effects: [],
+                  promoted_paths: [],
+                  rendered_invocation_sha256: null,
+                  rejection_reasons: [error.message],
+                  status: "rejected",
+                  approval_file_sha256: null,
+                };
+                approvalBlocked = true;
+                const stop = runnerObservedStop(args, preflightResult.compactProfile, {
+                  status: "risk_gate",
+                  details: riskApproval.rejection_reasons,
+                  missing: ["enforceable_risk_workspace"],
+                  nextAction: "supply an enforceable exact filesystem action against a clean repository",
+                  responseMarkdown: "Codex runner rejected an unenforceable risk action before execution.\n",
+                  riskApproval,
+                });
+                envelopeRecord = stop.record;
+                publication = publishOutput(args, stop.responseMarkdown, stop.record, { inspectDomainOutput: false });
+              }
+              if (riskContext) riskApproval = {
                 ...rereadApproval,
                 execution_status: "executed",
+                enforcement_status: "isolated",
+                promotion_status: "not_started",
+                workspace_base_sha256: riskContext.workspace_base_sha256,
+                delta_sha256: null,
+                observed_effects: [],
+                promoted_paths: [],
                 rendered_invocation_sha256: `sha256:${hashText(spawnPrompt)}`,
               };
             }
           }
         }
-        if (!approvalBlocked) codexResult = runCodex(args, spawnPrompt, approvedCodexBin ?? args.codexBin);
+        if (!approvalBlocked) codexResult = riskContext
+          ? await runCodexInRiskWorkspace(args, spawnPrompt, approvedCodexBin, riskContext)
+          : runCodex(args, spawnPrompt, approvedCodexBin ?? args.codexBin);
         try {
           if (codexResult?.exitCode === 0 && codexResult.finalOutput.trim()) {
-            const parsed = parseStructuredResult(args, preflightResult.compactProfile, codexResult.finalOutput, { riskApproval });
-            envelopeRecord = parsed.record;
-            publication = publishOutput(args, parsed.value.response_markdown, parsed.record);
-            sensorResult = publication.sensorResult;
+            if (riskContext) {
+              const audit = auditRiskWorkspace(riskContext);
+              const plannedRiskApproval = {
+                ...riskApproval,
+                enforcement_status: "accepted",
+                promotion_status: "promoted",
+                delta_sha256: audit.delta_sha256,
+                observed_effects: audit.observed_effects,
+                promoted_paths: audit.delta.map((change) => change.path),
+              };
+              const parsed = parseStructuredResult(args, preflightResult.compactProfile, codexResult.finalOutput, { riskApproval: plannedRiskApproval });
+              promoteRiskWorkspace(riskContext, audit);
+              riskApproval = plannedRiskApproval;
+              envelopeRecord = parsed.record;
+              publication = publishOutput(args, parsed.value.response_markdown, parsed.record);
+              sensorResult = publication.sensorResult;
+            } else {
+              const parsed = parseStructuredResult(args, preflightResult.compactProfile, codexResult.finalOutput, { riskApproval });
+              envelopeRecord = parsed.record;
+              publication = publishOutput(args, parsed.value.response_markdown, parsed.record);
+              sensorResult = publication.sensorResult;
+            }
           }
         } catch (error) {
           structuredError = error.message;
+          if (riskContext && riskApproval.promotion_status !== "promoted") {
+            riskApproval = {
+              ...riskApproval,
+              enforcement_status: "rejected",
+              promotion_status: "rejected",
+              delta_sha256: null,
+              observed_effects: [],
+              promoted_paths: [],
+            };
+            const stop = runnerObservedStop(args, preflightResult.compactProfile, {
+              status: "blocked",
+              details: [structuredError],
+              missing: ["accepted_scoped_delta"],
+              nextAction: "discard the isolated action and issue a new exact request after correcting its runtime behavior",
+              responseMarkdown: "Codex runner rejected the isolated risk-action result without promotion.\n",
+              riskApproval,
+            });
+            envelopeRecord = stop.record;
+          }
         } finally {
           if (codexResult?.temporaryOutputPath && existsSync(codexResult.temporaryOutputPath)) unlinkSync(codexResult.temporaryOutputPath);
+          if (riskContext) disposeRiskWorkspace(riskContext);
         }
       }
     }
@@ -1011,10 +1132,10 @@ try {
         detail: "Output inspection does not expose whether Codex applied the requested workflow contract.",
       },
       risk_approval_contract_application: {
-        evidence_level: riskApproval ? (riskApproval.execution_status === "executed" ? "executed" : "runtime_detected") : "none",
+        evidence_level: riskApproval ? (riskApproval.promotion_status === "promoted" ? "executed" : "runtime_detected") : "none",
         missing_evidence: riskApproval ? [] : ["risk_approval_contract_application"],
         detail: riskApproval
-          ? `Runner-owned exact approval state=${riskApproval.status}, execution=${riskApproval.execution_status}.`
+          ? `Runner-owned exact approval state=${riskApproval.status}, execution=${riskApproval.execution_status}, enforcement=${riskApproval.enforcement_status}, promotion=${riskApproval.promotion_status}.`
           : "No runner-owned risk action was selected for exact approval evaluation.",
       },
       verification_contract_application: {

@@ -22,7 +22,7 @@ Additional required gates:
 - <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<text>; signals=<exact IDs>
 
 Missing evidence:
-- input/gate: affected judgment; next check
+- {"gate_id":"<exact insufficient_evidence gate>","missing_input":"<non-empty missing input>","affected_judgment":"<non-empty affected judgment>","next_check":"<non-empty next check>"}
 
 Findings:
 - Finding ID:
@@ -39,6 +39,6 @@ Only when review-final-merge-gate is runner-required, append:
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
-Use - none for empty sections. Omit skipped gates, empty categories, and applicability diagnostics unless explicitly requested.
+Missing evidence is canonical closed JSONL: one exact four-field record per `insufficient_evidence` gate in gate order; no others; `- none` iff no gate is insufficient. Reject missing/extra fields and unknown/duplicate/unmatched/partial gate IDs. Use - none for other empty sections. Omit skipped gates, empty categories, and applicability diagnostics unless explicitly requested.
 
 $ARGUMENTS

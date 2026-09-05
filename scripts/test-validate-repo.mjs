@@ -35,6 +35,8 @@ const skillEffectivenessOutcomeTestScript = resolve(repoRoot, "scripts/test-skil
 const reviewDecisionMatrixTestScript = resolve(repoRoot, "scripts/test-review-decision-matrix.mjs");
 const jsonSchemaValidationTestScript = resolve(repoRoot, "scripts/test-json-schema-validation.mjs");
 const codexRiskApprovalTestScript = resolve(repoRoot, "scripts/test-codex-risk-approval.mjs");
+const codexRiskWorkspaceTestScript = resolve(repoRoot, "scripts/test-codex-risk-workspace.mjs");
+const codexRiskRunnerScopeTestScript = resolve(repoRoot, "scripts/test-codex-risk-runner-scope.mjs");
 const fixtureRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "validate-repo-")));
 const promptV2PreregistrationDocs = [
   "docs/adr/0011-prompt-v2-result-blind-canary-authority.md",
@@ -77,6 +79,8 @@ for (const [label, script] of [
   ["Review decision matrix", reviewDecisionMatrixTestScript],
   ["Managed JSON Schema validation", jsonSchemaValidationTestScript],
   ["Codex exact risk approval", codexRiskApprovalTestScript],
+  ["Codex risk workspace enforcement", codexRiskWorkspaceTestScript],
+  ["Codex risk runner scoped promotion", codexRiskRunnerScopeTestScript],
 ]) {
   const result = spawnSync(process.execPath, [script], { cwd: repoRoot, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`${label} tests failed\n${result.stdout}\n${result.stderr}`);
@@ -124,6 +128,19 @@ Findings:
 ${findings}
 ${decision ? `\nDecision:\n- ${decision}\n` : ""}${suffix ? `\n${suffix}\n` : ""}
 ${validEnvelopeBlock}`;
+}
+function missingEvidenceRecord({
+  gateId,
+  missingInput = "exact review target",
+  affectedJudgment = "the gate cannot reach a supported judgment",
+  nextCheck = "inspect the exact current target",
+} = {}) {
+  return `- ${JSON.stringify({
+    gate_id: gateId,
+    missing_input: missingInput,
+    affected_judgment: affectedJudgment,
+    next_check: nextCheck,
+  })}`;
 }
 function codexStructuredResult(responseMarkdown, control = {}) {
   return JSON.stringify({
@@ -5715,7 +5732,7 @@ Layer summary:
     },
     {
       label: "baseline insufficient evidence plus approve",
-      output: reviewFixture({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: current target is unavailable; inspect the exact target", decision: "approve" }),
+      output: reviewFixture({ baselineStatus: "insufficient_evidence", missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality" }), decision: "approve" }),
       expectedStatus: "fail",
     },
     {
@@ -5728,7 +5745,7 @@ Layer summary:
       label: "additional gate insufficient evidence plus approve",
       output: reviewFixture({
         additionalGates: "- review-output-quality: status=insufficient_evidence; evidence=rendered output unavailable; signals=docs_output_change",
-        missingEvidence: "- review-output-quality: rendered output unavailable; render the exact candidate",
+        missingEvidence: missingEvidenceRecord({ gateId: "review-output-quality", missingInput: "rendered output", nextCheck: "render the exact candidate" }),
         decision: "approve",
       }),
       args: ["--required-gate", "review-output-quality", "--observed-signal", "docs_output_change"],
@@ -5736,7 +5753,7 @@ Layer summary:
     },
     {
       label: "missing evidence plus approve",
-      output: reviewFixture({ missingEvidence: "- current CI: final required job is unavailable; run the required job", decision: "approve" }),
+      output: reviewFixture({ missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality", missingInput: "final required CI job", nextCheck: "run the required job" }), decision: "approve" }),
       expectedStatus: "fail",
     },
     {
@@ -5781,7 +5798,7 @@ Layer summary:
     },
     {
       label: "insufficient evidence decision remains valid",
-      output: reviewFixture({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: current target is unavailable; inspect the exact target", decision: "insufficient evidence" }),
+      output: reviewFixture({ baselineStatus: "insufficient_evidence", missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality" }), decision: "insufficient evidence" }),
       expectedStatus: "pass",
     },
     {
@@ -5792,6 +5809,45 @@ Layer summary:
     {
       label: "ambiguous missing evidence inventory cannot approve",
       output: reviewFixture({ missingEvidence: "- none\n- current CI: unavailable; run CI", decision: "approve" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "free-form missing evidence is rejected",
+      output: reviewFixture({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: current target is unavailable; inspect it", decision: "insufficient evidence" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "unknown missing-evidence gate is rejected",
+      output: reviewFixture({ baselineStatus: "insufficient_evidence", missingEvidence: missingEvidenceRecord({ gateId: "review-unknown-gate" }), decision: "insufficient evidence" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "missing-evidence record with a missing field is rejected",
+      output: reviewFixture({
+        baselineStatus: "insufficient_evidence",
+        missingEvidence: `- ${JSON.stringify({ gate_id: "review-ai-quality", missing_input: "current target", next_check: "inspect it" })}`,
+        decision: "insufficient evidence",
+      }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "duplicate missing-evidence gate is rejected",
+      output: reviewFixture({
+        baselineStatus: "insufficient_evidence",
+        missingEvidence: `${missingEvidenceRecord({ gateId: "review-ai-quality" })}\n${missingEvidenceRecord({ gateId: "review-ai-quality", missingInput: "current patch" })}`,
+        decision: "insufficient evidence",
+      }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "partial insufficient-gate coverage is rejected",
+      output: reviewFixture({
+        baselineStatus: "insufficient_evidence",
+        additionalGates: "- review-output-quality: status=insufficient_evidence; evidence=rendered output unavailable; signals=docs_output_change",
+        missingEvidence: missingEvidenceRecord({ gateId: "review-output-quality" }),
+        decision: "insufficient evidence",
+      }),
+      args: ["--required-gate", "review-output-quality", "--observed-signal", "docs_output_change"],
       expectedStatus: "fail",
     },
     {
@@ -5850,6 +5906,24 @@ Layer summary:
       : "schemas/review-signal-gate-map.json";
     if (!adapterText.includes(registryReference)) {
       throw new Error(`${adapterPath} must reference the controlled signal registry: ${registryReference}`);
+    }
+  }
+  const missingEvidenceContractSources = [
+    "AGENTS.md",
+    "skills/review-router/SKILL.md",
+    "skills/review-final-merge-gate/SKILL.md",
+    "adapters/codex/prompts/skill-review.md",
+    "adapters/claude-code/project/.claude/commands/skill-review.md",
+    "adapters/claude-code/plugin/templates/review-pr.md",
+    "adapters/claude-code/github-actions/claude-review-on-mention.yml",
+    "docs/workflow-examples.md",
+  ];
+  for (const sourcePath of missingEvidenceContractSources) {
+    const sourceText = readFileSync(resolve(repoRoot, sourcePath), "utf8");
+    for (const field of ["gate_id", "missing_input", "affected_judgment", "next_check"]) {
+      if (!new RegExp(`\\b${field}\\b`, "u").test(sourceText)) {
+        throw new Error(`${sourcePath} must project the closed Missing evidence field ${field}`);
+      }
     }
   }
   const claudeReviewFixture = reviewFixture({

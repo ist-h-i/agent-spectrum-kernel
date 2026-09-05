@@ -4,6 +4,7 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateJsonSchema } from "./execution-envelope.mjs";
+import { validateRiskActionEnforcement } from "./codex-risk-workspace.mjs";
 
 const RUNTIME_ROOT = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ACTION_SCHEMA_PATH = resolve(RUNTIME_ROOT, "codex-risk-action.schema.json");
@@ -98,6 +99,7 @@ export function readRiskAction(path, { schemaPath = DEFAULT_ACTION_SCHEMA_PATH }
   const evidence = readStableAuthorityFile(path, "risk action descriptor");
   const value = parseClosedJson(evidence, schemaPath, "risk action descriptor");
   validateTargetScope(value.target_scope);
+  validateRiskActionEnforcement(value);
   return { ...evidence, value };
 }
 

@@ -18,8 +18,20 @@
       "uniqueItems": true,
       "items": { "type": "string", "minLength": 1, "maxLength": 500 }
     },
-    "permitted_effects": { "$ref": "#/$defs/identifiers" },
-    "prohibited_effects": { "$ref": "#/$defs/identifiers" },
+    "permitted_effects": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": { "type": "string", "enum": ["create", "modify", "delete"] }
+    },
+    "prohibited_effects": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": { "type": "string", "enum": ["external_side_effects", "git_metadata_changes", "write_outside_target_scope"] }
+    },
     "approval_authority": {
       "type": "object",
       "additionalProperties": false,

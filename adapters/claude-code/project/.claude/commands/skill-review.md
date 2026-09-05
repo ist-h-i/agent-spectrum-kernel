@@ -21,7 +21,7 @@ Additional required gates:
 - <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<text>; signals=<exact IDs>
 
 Missing evidence:
-- input/gate: affected judgment; next check
+- {"gate_id":"<exact insufficient_evidence gate>","missing_input":"<non-empty missing input>","affected_judgment":"<non-empty affected judgment>","next_check":"<non-empty next check>"}
 
 Findings:
 - Finding ID:
@@ -38,6 +38,6 @@ Only for a requested final decision:
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
-Use `- none` for empty sections. Emit one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`.
+Canonical Missing evidence: one JSON record per insufficient gate in gate order; `- none` otherwise. Reject other fields, IDs, or coverage. Empty others: `- none`. Emit one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`.
 
 $ARGUMENTS

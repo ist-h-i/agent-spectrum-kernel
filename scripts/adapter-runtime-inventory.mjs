@@ -21,6 +21,7 @@ export const CODEX_RUNTIME_FILES = Object.freeze([
   { name: "execution-envelope.mjs", source: "scripts/execution-envelope.mjs", target: "scripts/execution-envelope.mjs", assetKind: "runner" },
   { name: "adapter-runtime-event.mjs", source: "scripts/adapter-runtime-event.mjs", target: "scripts/adapter-runtime-event.mjs", assetKind: "runner" },
   { name: "codex-risk-approval.mjs", source: "scripts/codex-risk-approval.mjs", target: "scripts/codex-risk-approval.mjs", assetKind: "runner" },
+  { name: "codex-risk-workspace.mjs", source: "scripts/codex-risk-workspace.mjs", target: "scripts/codex-risk-workspace.mjs", assetKind: "runner" },
   { name: "observability-paths.mjs", source: "scripts/observability-paths.mjs", target: "scripts/observability-paths.mjs", assetKind: "runner" },
   { name: "claim-evidence-status.mjs", source: "scripts/claim-evidence-status.mjs", target: "scripts/claim-evidence-status.mjs", assetKind: "runner" },
   { name: "execution-envelope.schema.json", source: "schemas/execution-envelope.schema.json", target: "scripts/execution-envelope.schema.json", assetKind: "schemas" },

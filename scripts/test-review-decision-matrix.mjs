@@ -37,6 +37,20 @@ function finding({
   Required post-fix condition: emit the decision required by the closed matrix`;
 }
 
+function missingEvidenceRecord({
+  gateId,
+  missingInput = "exact review target",
+  affectedJudgment = "the gate cannot reach a supported judgment",
+  nextCheck = "inspect the exact current target",
+} = {}) {
+  return `- ${JSON.stringify({
+    gate_id: gateId,
+    missing_input: missingInput,
+    affected_judgment: affectedJudgment,
+    next_check: nextCheck,
+  })}`;
+}
+
 function reviewOutput({
   baselineStatus = "pass",
   additionalGates = "- none",
@@ -121,7 +135,7 @@ const cases = [
     label: "approve_with_comments rejects insufficient evidence with named missing evidence",
     output: reviewOutput({
       additionalGates: "- review-output-quality: status=insufficient_evidence; evidence=rendered output unavailable; signals=docs_output_change",
-      missingEvidence: "- review-output-quality: rendered output unavailable; render the exact candidate",
+      missingEvidence: missingEvidenceRecord({ gateId: "review-output-quality", missingInput: "rendered output", nextCheck: "render the exact candidate" }),
       decision: "approve with comments",
     }),
     args: outputQualityArgs,
@@ -184,7 +198,7 @@ const cases = [
     label: "named insufficient gate accepts insufficient_evidence",
     output: reviewOutput({
       baselineStatus: "insufficient_evidence",
-      missingEvidence: "- review-ai-quality: exact diff unavailable; inspect the current target",
+      missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality", missingInput: "exact diff" }),
       decision: "insufficient evidence",
     }),
     expectedStatus: "pass",
@@ -207,7 +221,7 @@ const cases = [
     output: reviewOutput({
       baselineStatus: "fail",
       additionalGates: "- review-output-quality: status=insufficient_evidence; evidence=rendered output unavailable; signals=docs_output_change",
-      missingEvidence: "- review-output-quality: rendered output unavailable; render the exact candidate",
+      missingEvidence: missingEvidenceRecord({ gateId: "review-output-quality", missingInput: "rendered output", nextCheck: "render the exact candidate" }),
       findings: finding({ mergeBlocker: true }),
       decision: "block",
     }),
@@ -219,7 +233,7 @@ const cases = [
     output: reviewOutput({
       baselineStatus: "fail",
       additionalGates: "- review-output-quality: status=insufficient_evidence; evidence=rendered output unavailable; signals=docs_output_change",
-      missingEvidence: "- review-output-quality: rendered output unavailable; render the exact candidate",
+      missingEvidence: missingEvidenceRecord({ gateId: "review-output-quality", missingInput: "rendered output", nextCheck: "render the exact candidate" }),
       findings: finding({ severity: "major" }),
       decision: "insufficient evidence",
     }),
@@ -233,6 +247,81 @@ const cases = [
       findings: finding(),
       decision: "request changes",
     }),
+    expectedStatus: "pass",
+  },
+  {
+    label: "free-form missing evidence is rejected",
+    output: reviewOutput({
+      baselineStatus: "insufficient_evidence",
+      missingEvidence: "- review-ai-quality: exact diff unavailable; inspect the current target",
+      decision: "insufficient evidence",
+    }),
+    expectedStatus: "fail",
+  },
+  {
+    label: "missing evidence with an unknown gate is rejected",
+    output: reviewOutput({
+      baselineStatus: "insufficient_evidence",
+      missingEvidence: missingEvidenceRecord({ gateId: "review-unknown-gate" }),
+      decision: "insufficient evidence",
+    }),
+    expectedStatus: "fail",
+  },
+  {
+    label: "missing evidence with a missing field is rejected",
+    output: reviewOutput({
+      baselineStatus: "insufficient_evidence",
+      missingEvidence: `- ${JSON.stringify({ gate_id: "review-ai-quality", missing_input: "exact diff", next_check: "inspect it" })}`,
+      decision: "insufficient evidence",
+    }),
+    expectedStatus: "fail",
+  },
+  {
+    label: "duplicate missing evidence gate records are rejected",
+    output: reviewOutput({
+      baselineStatus: "insufficient_evidence",
+      missingEvidence: `${missingEvidenceRecord({ gateId: "review-ai-quality" })}\n${missingEvidenceRecord({ gateId: "review-ai-quality", missingInput: "exact patch" })}`,
+      decision: "insufficient evidence",
+    }),
+    expectedStatus: "fail",
+  },
+  {
+    label: "duplicate missing evidence JSON fields are rejected",
+    output: reviewOutput({
+      baselineStatus: "insufficient_evidence",
+      missingEvidence: '- {"gate_id":"review-ai-quality","gate_id":"review-ai-quality","missing_input":"exact diff","affected_judgment":"baseline judgment","next_check":"inspect it"}',
+      decision: "insufficient evidence",
+    }),
+    expectedStatus: "fail",
+  },
+  {
+    label: "missing evidence unmatched to an insufficient gate is rejected",
+    output: reviewOutput({
+      missingEvidence: missingEvidenceRecord({ gateId: "review-ai-quality" }),
+      decision: "approve",
+    }),
+    expectedStatus: "fail",
+  },
+  {
+    label: "partial missing evidence coverage is rejected",
+    output: reviewOutput({
+      baselineStatus: "insufficient_evidence",
+      additionalGates: "- review-output-quality: status=insufficient_evidence; evidence=rendered output unavailable; signals=docs_output_change",
+      missingEvidence: missingEvidenceRecord({ gateId: "review-output-quality" }),
+      decision: "insufficient evidence",
+    }),
+    args: outputQualityArgs,
+    expectedStatus: "fail",
+  },
+  {
+    label: "every insufficient gate with exact missing evidence is accepted",
+    output: reviewOutput({
+      baselineStatus: "insufficient_evidence",
+      additionalGates: "- review-output-quality: status=insufficient_evidence; evidence=rendered output unavailable; signals=docs_output_change",
+      missingEvidence: `${missingEvidenceRecord({ gateId: "review-ai-quality", missingInput: "exact diff" })}\n${missingEvidenceRecord({ gateId: "review-output-quality", missingInput: "rendered output" })}`,
+      decision: "insufficient evidence",
+    }),
+    args: outputQualityArgs,
     expectedStatus: "pass",
   },
 ];

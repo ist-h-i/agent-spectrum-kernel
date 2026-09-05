@@ -30,8 +30,8 @@ const action = {
   risk_gate: "risk-gate",
   operation: "publish_release_candidate",
   target_scope: ["dist/release.json"],
-  permitted_effects: ["write_release_candidate"],
-  prohibited_effects: ["publish_production", "write_outside_target_scope"],
+  permitted_effects: ["create", "modify", "delete"],
+  prohibited_effects: ["external_side_effects", "git_metadata_changes", "write_outside_target_scope"],
   approval_authority: {
     authority_id: "release-owner",
     authority_revision: "rev-7",
@@ -65,6 +65,7 @@ const invocation = {
     raw_sha256: digest("3"),
     size_bytes: 12345,
     output_path: ".agents/runs/release.md",
+    candidate_network_access: "disabled",
   },
   mode: "implementation",
   sandbox: "workspace-write",
