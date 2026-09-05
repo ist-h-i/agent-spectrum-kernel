@@ -13,7 +13,7 @@ import {
   selectExecutionEnvelopeEmission,
   validateExecutionEnvelopeRecord,
 } from "./execution-envelope.mjs";
-import { createRiskApprovalRequest } from "./codex-risk-approval.mjs";
+import { createRiskApprovalRequest, riskCodexRuntimePolicy } from "./codex-risk-approval.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const schemaPath = resolve(root, "schemas/execution-envelope-record.schema.json");
@@ -263,6 +263,7 @@ const riskRequest = createRiskApprovalRequest({
       output_path: ".agents/runs/release.md",
       candidate_network_access: "disabled",
     },
+    runtime_policy: riskCodexRuntimePolicy(),
     mode: "implementation",
     sandbox: "workspace-write",
     required_gates: ["risk-gate"],

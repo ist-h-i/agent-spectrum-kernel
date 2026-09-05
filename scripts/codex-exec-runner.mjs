@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, deriveReviewSignalGateRoute, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, inspectCodexPromptContractBindings, parseCodexCompactProfileHeader, readReviewSignalGateMap } from "./ask-shared.mjs";
 import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
-import { canonicalRiskDigest, createRiskApprovalRequest, readRiskAction, readStableExecutableFile, verifyRiskApproval } from "./codex-risk-approval.mjs";
+import { RISK_CODEX_POLICY_ARGS, canonicalRiskDigest, createRiskApprovalRequest, readRiskAction, readStableExecutableFile, riskCodexRuntimePolicy, verifyRiskApproval } from "./codex-risk-approval.mjs";
 import { auditRiskWorkspace, createRiskWorkspace, disposeRiskWorkspace, promoteRiskWorkspace, runInRiskWorkspace } from "./codex-risk-workspace.mjs";
 import { buildExecutionEnvelopeRecord, hasExecutionEnvelopeMarker, inspectExecutionEnvelopeRecordEmission, isMarkdownFenceClosing, markdownFenceOpening, renderExecutionEnvelopeProjection, selectExecutionEnvelopeEmission, validateExecutionEnvelope, validateExecutionEnvelopeRecord, validateJsonSchema } from "./execution-envelope.mjs";
 import { resolveGitDirectory, resolveObservabilityPath } from "./observability-paths.mjs";
@@ -402,6 +402,7 @@ function riskInvocation(args, state, compactProfile, prompt, action) {
       output_path: args.output,
       candidate_network_access: "disabled",
     },
+    runtime_policy: riskCodexRuntimePolicy(),
     mode: args.mode,
     sandbox: args.sandbox,
     required_gates: args.requiredGates,
@@ -554,7 +555,7 @@ async function runCodexInRiskWorkspace(args, prompt, codexBin, riskContext) {
   const temporaryOutput = `.agents/runs/codex-risk-${process.pid}-${Date.now()}.json`;
   const temporaryOutputPath = resolve(riskContext.workspace, temporaryOutput);
   mkdirSync(dirname(temporaryOutputPath), { recursive: true });
-  const commandArgs = ["exec", "--sandbox", args.sandbox, "-c", "sandbox_workspace_write.network_access=false", "--output-schema", "scripts/codex-runner-result.schema.json", "--output-last-message", temporaryOutput];
+  const commandArgs = ["exec", ...RISK_CODEX_POLICY_ARGS, "--sandbox", args.sandbox, "--output-schema", "scripts/codex-runner-result.schema.json", "--output-last-message", temporaryOutput];
   const result = await runInRiskWorkspace({ context: riskContext, executable: codexBin, args: commandArgs, input: prompt });
   const outputExists = existsSync(temporaryOutputPath);
   let finalOutput = "";

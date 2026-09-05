@@ -12,6 +12,55 @@ const DEFAULT_APPROVAL_SCHEMA_PATH = resolve(RUNTIME_ROOT, "codex-risk-approval.
 const MAX_AUTHORITY_BYTES = 1024 * 1024;
 const MAX_EXECUTOR_BYTES = 512 * 1024 * 1024;
 
+export const RISK_CODEX_DISABLED_FEATURES = Object.freeze([
+  "apps",
+  "auth_elicitation",
+  "browser_use",
+  "browser_use_external",
+  "browser_use_full_cdp_access",
+  "code_mode_host",
+  "computer_use",
+  "enable_mcp_apps",
+  "executor_capability_discovery",
+  "guardian_approval",
+  "hooks",
+  "image_generation",
+  "in_app_browser",
+  "in_app_updates",
+  "mcp_2026_07_28",
+  "memories",
+  "multi_agent",
+  "multi_agent_v2",
+  "plugin_sharing",
+  "plugins",
+  "recommended_plugins",
+  "remote_plugin",
+  "skill_mcp_dependency_install",
+  "skill_search",
+  "shell_snapshot",
+  "standalone_web_search",
+  "tool_call_mcp_elicitation",
+  "tool_suggest",
+  "view_image",
+  "workspace_dependencies",
+]);
+
+export const RISK_CODEX_POLICY_ARGS = Object.freeze([
+  "--ephemeral",
+  "--ignore-user-config",
+  "--ignore-rules",
+  "--strict-config",
+  ...RISK_CODEX_DISABLED_FEATURES.flatMap((feature) => ["--disable", feature]),
+  "-c", "analytics.enabled=false",
+  "-c", "feedback.enabled=false",
+  "-c", "check_for_update_on_startup=false",
+  "-c", "include_apps_instructions=false",
+  "-c", "include_collaboration_mode_instructions=false",
+  "-c", "mcp_servers={}",
+  "-c", "shell_environment_policy.inherit=none",
+  "-c", "sandbox_workspace_write.network_access=false",
+]);
+
 function canonicalValue(value) {
   if (Array.isArray(value)) return value.map(canonicalValue);
   if (value && typeof value === "object") {
@@ -26,6 +75,28 @@ export function canonicalRiskJson(value) {
 
 export function canonicalRiskDigest(value) {
   return `sha256:${createHash("sha256").update(canonicalRiskJson(value)).digest("hex")}`;
+}
+
+export function riskCodexRuntimePolicy() {
+  const argv = [...RISK_CODEX_POLICY_ARGS];
+  return {
+    user_config: "ignored",
+    execpolicy_rules: "ignored",
+    session_persistence: "ephemeral",
+    mcp_servers: "disabled",
+    plugins: "disabled",
+    external_tool_discovery: "disabled",
+    shell_environment_inheritance: "none",
+    web_search: "disabled",
+    candidate_network_access: "disabled",
+    telemetry: "disabled",
+    update_checks: "disabled",
+    model_control_plane: "codex_api_only",
+    builtin_mutation_tools: ["shell_tool", "unified_exec"],
+    disabled_features: [...RISK_CODEX_DISABLED_FEATURES],
+    argv,
+    argv_sha256: canonicalRiskDigest(argv),
+  };
 }
 
 function rawDigest(bytes) {
@@ -112,6 +183,9 @@ export function createRiskApprovalRequest({ actionEvidence, invocation }) {
     || canonicalRiskJson(invocation.permitted_effects) !== canonicalRiskJson(action.permitted_effects)
     || canonicalRiskJson(invocation.prohibited_effects) !== canonicalRiskJson(action.prohibited_effects)) {
     throw new Error("risk invocation does not exactly match the action descriptor, including repository identity");
+  }
+  if (canonicalRiskJson(invocation.runtime_policy) !== canonicalRiskJson(riskCodexRuntimePolicy())) {
+    throw new Error("risk invocation runtime policy is not the closed supported Codex policy");
   }
   const requestWithoutDigest = {
     schema_version: "1.0.0",

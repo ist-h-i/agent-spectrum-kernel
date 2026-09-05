@@ -10,6 +10,7 @@ import {
   canonicalRiskDigest,
   createRiskApprovalRequest,
   readRiskAction,
+  riskCodexRuntimePolicy,
   verifyRiskApproval,
 } from "./codex-risk-approval.mjs";
 
@@ -67,6 +68,7 @@ const invocation = {
     output_path: ".agents/runs/release.md",
     candidate_network_access: "disabled",
   },
+  runtime_policy: riskCodexRuntimePolicy(),
   mode: "implementation",
   sandbox: "workspace-write",
   required_gates: ["risk-gate"],
@@ -140,6 +142,9 @@ try {
     ["Codex binary digest", (value) => { value.request.invocation.executor.raw_sha256 = digest("4"); }],
     ["Codex binary size", (value) => { value.request.invocation.executor.size_bytes += 1; }],
     ["output path", (value) => { value.request.invocation.executor.output_path = ".agents/runs/other.md"; }],
+    ["runtime policy argv", (value) => { value.request.invocation.runtime_policy.argv = ["--ephemeral"]; }],
+    ["runtime policy digest", (value) => { value.request.invocation.runtime_policy.argv_sha256 = digest("4"); }],
+    ["runtime policy feature", (value) => { value.request.invocation.runtime_policy.disabled_features = value.request.invocation.runtime_policy.disabled_features.filter((feature) => feature !== "hooks"); }],
     ["mode", (value) => { value.request.invocation.mode = "verification"; }],
     ["sandbox", (value) => { value.request.invocation.sandbox = "read-only"; }],
     ["operation", (value) => { value.request.invocation.operation = "other_operation"; }],
@@ -157,6 +162,12 @@ try {
     changed.request_sha256 = changed.request.request_sha256;
     assert.equal(verify(changed).status, "rejected", `${label} mismatch must not authorize even when resealed`);
   }
+
+  assert.throws(
+    () => createRiskApprovalRequest({ actionEvidence, invocation: { ...invocation, runtime_policy: { ...invocation.runtime_policy, plugins: "enabled" } } }),
+    /closed supported Codex policy/u,
+    "request construction must reject a runtime policy outside the supported closed boundary",
+  );
 
   const targetApprovalPath = resolve(target, "approval.json");
   writeFileSync(targetApprovalPath, `${JSON.stringify(approval)}\n`, { recursive: false });

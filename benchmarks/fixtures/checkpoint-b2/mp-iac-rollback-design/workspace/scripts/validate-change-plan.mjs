@@ -7,7 +7,9 @@ if (!outputPath) throw new Error("usage: validate-change-plan.mjs <change-plan.j
 
 const workspace = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const value = JSON.parse(readFileSync(outputPath, "utf8"));
-const commandCatalog = JSON.parse(readFileSync(resolve(workspace, "operations/commands.json"), "utf8"));
+const commandCatalogText = readFileSync(resolve(workspace, "operations/commands.json"), "utf8");
+const commandCatalogLines = commandCatalogText.split(/\r?\n/u);
+const commandCatalog = JSON.parse(commandCatalogText);
 const exactKeys = (candidate, keys) => candidate && typeof candidate === "object" && !Array.isArray(candidate)
   && Object.keys(candidate).sort().join("\0") === [...keys].sort().join("\0");
 const slug = (candidate) => typeof candidate === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(candidate);
@@ -26,9 +28,28 @@ const evidencePaths = new Set([
   "state/current-state.json",
 ]);
 const commandsById = new Map();
-for (const command of commandCatalog.commands ?? []) {
+const commandSourceById = new Map();
+for (const [index, command] of (commandCatalog.commands ?? []).entries()) {
   if (!exactKeys(command, ["command_id", "mode", "production_mutation", "approval_required"]) || !slug(command.command_id) || commandsById.has(command.command_id)) throw new Error("supplied command catalog is invalid");
+  const commandExcerpt = `"command_id": "${command.command_id}",`;
+  const commandLines = commandCatalogLines.flatMap((line, lineIndex) => line.trim() === commandExcerpt ? [lineIndex] : []);
+  if (commandLines.length !== 1) throw new Error("supplied command catalog source identity is ambiguous");
+  const nextCommand = commandCatalog.commands[index + 1];
+  const nextCommandExcerpt = nextCommand ? `"command_id": "${nextCommand.command_id}",` : null;
+  const nextCommandLine = nextCommandExcerpt === null
+    ? commandCatalogLines.length
+    : commandCatalogLines.findIndex((line, lineIndex) => lineIndex > commandLines[0] && line.trim() === nextCommandExcerpt);
+  if (nextCommandLine < 0) throw new Error("supplied command catalog source order is invalid");
+  const modeExcerpt = `"mode": "${command.mode}",`;
+  const modeLines = commandCatalogLines.flatMap((line, lineIndex) => (
+    lineIndex > commandLines[0] && lineIndex < nextCommandLine && line.trim() === modeExcerpt ? [lineIndex] : []
+  ));
+  if (modeLines.length !== 1) throw new Error("supplied command catalog mode source identity is ambiguous");
   commandsById.set(command.command_id, command);
+  commandSourceById.set(command.command_id, {
+    command_id: { line: commandLines[0] + 1, excerpt: commandExcerpt },
+    mode: { line: modeLines[0] + 1, excerpt: modeExcerpt },
+  });
 }
 
 function normalizeEvidencePath(candidate) {
@@ -117,14 +138,19 @@ const referencedEvidenceIds = [
   ...value.knowledge_promotion.evidence_ids,
 ];
 if (!referencedEvidenceIds.every((id) => evidenceIds.has(id)) || ![...evidenceIds].every((id) => referencedEvidenceIds.includes(id))) throw new Error("evidence references are not closed");
-const cites = (ids, path, excerpt) => ids.some((id) => {
+const cites = (ids, path, line, excerpt) => ids.some((id) => {
   const citation = evidenceById.get(id);
-  return normalizeEvidencePath(citation?.path) === path && citation.source_excerpt === excerpt;
+  return normalizeEvidencePath(citation?.path) === path && citation.line === line && citation.source_excerpt === excerpt;
 });
 for (const step of value.preparation) {
-  if (!cites(step.evidence_ids, "operations/commands.json", `"command_id": "${step.command_id}",`)
-    || !cites(step.evidence_ids, "operations/commands.json", `"mode": "${step.mode}",`)
-    || !cites(step.evidence_ids, "docs/change-request.md", "Preparation may format-check, validate configuration, and create a plan, but it must not mutate cloud resources.")) throw new Error("preparation evidence does not bind the exact command, mode, and safe-preparation authority");
+  const commandSource = commandSourceById.get(step.command_id);
+  if (!cites(step.evidence_ids, "operations/commands.json", commandSource.command_id.line, commandSource.command_id.excerpt)
+    || !cites(step.evidence_ids, "operations/commands.json", commandSource.mode.line, commandSource.mode.excerpt)
+    || !step.evidence_ids.some((id) => {
+      const citation = evidenceById.get(id);
+      return normalizeEvidencePath(citation?.path) === "docs/change-request.md"
+        && citation.source_excerpt === "Preparation may format-check, validate configuration, and create a plan, but it must not mutate cloud resources.";
+    })) throw new Error("preparation evidence does not bind the exact command, mode, and safe-preparation authority");
 }
 
 if (!exactKeys(value.scope, ["changes_made", "production_action_authorized"])

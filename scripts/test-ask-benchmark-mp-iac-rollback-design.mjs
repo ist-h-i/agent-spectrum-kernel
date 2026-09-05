@@ -368,6 +368,11 @@ function validateWorkspaceValidatorParity() {
   assert.doesNotThrow(() => assertBenchmarkSchemaInstance(valid, { schemaPath, label: "valid structured change plan" }));
   const validResult = spawnSync(process.execPath, [validatorPath, validPath], { encoding: "utf8" });
   assert.equal(validResult.status, 0, validResult.stderr || validResult.stdout);
+  assert.equal(
+    readFileSync(resolve(workspace, "operations/commands.json"), "utf8").split(/\r?\n/u)[10].trim(),
+    valid.evidence[2].source_excerpt,
+    "the regression requires another command to expose the same mode excerpt",
+  );
 
   const schemaInvalidCases = [
     ["missing-decision", (value) => { delete value.decision; }],
@@ -408,6 +413,7 @@ function validateWorkspaceValidatorParity() {
     ["traversal-evidence-path", (value) => { value.evidence[0].path = "../plans/candidate-plan.json"; }],
     ["preparation-mode-swap", (value) => { value.preparation[0].mode = "remote_read"; }],
     ["preparation-command-evidence-transplant", (value) => { value.preparation[0].command_id = "validate-config"; }],
+    ["preparation-mode-evidence-transplant", (value) => { value.evidence[2].line = 11; }],
     ["preparation-section-evidence-transplant", (value) => { value.preparation[0].evidence_ids = ["approval-pending"]; }],
   ];
   for (const [name, mutate] of relationalInvalidCases) {

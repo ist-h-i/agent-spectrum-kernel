@@ -15,7 +15,7 @@
     "invocation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repository", "target_scope", "prompt", "profile", "executor", "mode", "sandbox", "required_gates", "risk_gate", "operation", "permitted_effects", "prohibited_effects"],
+      "required": ["repository", "target_scope", "prompt", "profile", "executor", "runtime_policy", "mode", "sandbox", "required_gates", "risk_gate", "operation", "permitted_effects", "prohibited_effects"],
       "properties": {
         "repository": {
           "type": "object",
@@ -63,6 +63,36 @@
             "size_bytes": { "type": "integer", "minimum": 1, "maximum": 536870912 },
             "output_path": { "type": "string", "minLength": 1, "maxLength": 1000 },
             "candidate_network_access": { "type": "string", "const": "disabled" }
+          }
+        },
+        "runtime_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["user_config", "execpolicy_rules", "session_persistence", "mcp_servers", "plugins", "external_tool_discovery", "shell_environment_inheritance", "web_search", "candidate_network_access", "telemetry", "update_checks", "model_control_plane", "builtin_mutation_tools", "disabled_features", "argv", "argv_sha256"],
+          "properties": {
+            "user_config": { "type": "string", "const": "ignored" },
+            "execpolicy_rules": { "type": "string", "const": "ignored" },
+            "session_persistence": { "type": "string", "const": "ephemeral" },
+            "mcp_servers": { "type": "string", "const": "disabled" },
+            "plugins": { "type": "string", "const": "disabled" },
+            "external_tool_discovery": { "type": "string", "const": "disabled" },
+            "shell_environment_inheritance": { "type": "string", "const": "none" },
+            "web_search": { "type": "string", "const": "disabled" },
+            "candidate_network_access": { "type": "string", "const": "disabled" },
+            "telemetry": { "type": "string", "const": "disabled" },
+            "update_checks": { "type": "string", "const": "disabled" },
+            "model_control_plane": { "type": "string", "const": "codex_api_only" },
+            "builtin_mutation_tools": { "const": ["shell_tool", "unified_exec"] },
+            "disabled_features": {
+              "const": ["apps", "auth_elicitation", "browser_use", "browser_use_external", "browser_use_full_cdp_access", "code_mode_host", "computer_use", "enable_mcp_apps", "executor_capability_discovery", "guardian_approval", "hooks", "image_generation", "in_app_browser", "in_app_updates", "mcp_2026_07_28", "memories", "multi_agent", "multi_agent_v2", "plugin_sharing", "plugins", "recommended_plugins", "remote_plugin", "skill_mcp_dependency_install", "skill_search", "shell_snapshot", "standalone_web_search", "tool_call_mcp_elicitation", "tool_suggest", "view_image", "workspace_dependencies"]
+            },
+            "argv": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+            },
+            "argv_sha256": { "$ref": "#/$defs/digest" }
           }
         },
         "mode": { "type": "string", "enum": ["implementation", "investigation", "review", "verification", "handoff"] },

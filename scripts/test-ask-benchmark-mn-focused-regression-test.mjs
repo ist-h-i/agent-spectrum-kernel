@@ -55,8 +55,9 @@ const ISOLATION_NEGATIVE_CASE_IDS = new Set([
   "wasi-capability-denied",
   "inspector-capability-denied",
 ]);
+const BROKER_FAIL_CLOSED_CASE_IDS = new Set(["unknown-broker-operation-fails-closed", "closed-response-pipe-fails-closed"]);
 const HISTORICAL_REVIEWED_HEAD = "c0804424e5c31ff7c27f38fe39d2380627dcd07d";
-const FRESH_CASE_PAYLOAD_DIGEST = "sha256:4b00b9a0bdf86706c93a085f325c5fdad6e7d30d784d53277992ab2a775fa662";
+const FRESH_CASE_PAYLOAD_DIGEST = "sha256:06fb634361215f62adc0f856d660961ba0a9b33d5cbf4d75b295cf731dbb99e0";
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -610,9 +611,9 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       assert.equal(PRIVATE_TRIAL_IDS.every((id) => rerunOutcomes.get(`${id}-control-test`) === "succeeded" && rerunOutcomes.get(`${id}-mutant-test`) === "succeeded"), true, `${entry.case_id} must not distinguish trusted variants without behavior assertions`);
       assert.equal(first.requirement_results[0].outcome, "fail", `${entry.case_id} must not establish regression behavior coverage`);
     }
-    if (entry.case_id === "unknown-broker-operation-fails-closed") {
-      assert.equal(rerunOutcomes.get("candidate-focused-test"), "failed", "unknown broker operation must terminate the candidate run");
-      assert.equal(first.requirement_results[0].outcome, "fail", "unknown broker operation must not establish regression behavior coverage");
+    if (BROKER_FAIL_CLOSED_CASE_IDS.has(entry.case_id)) {
+      assert.equal(rerunOutcomes.get("candidate-focused-test"), "failed", `${entry.case_id} must terminate only the candidate run`);
+      assert.equal(first.requirement_results[0].outcome, "fail", `${entry.case_id} must not establish regression behavior coverage`);
     }
     if (entry.case_id === "filesystem-write-capability-denied") assert.equal(existsSync("/private/tmp/ask-mn-focused-denied-write"), false, "filesystem denial probe must not create its dummy target");
     if (index === 0) {
