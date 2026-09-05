@@ -44,6 +44,14 @@ function canonicalDigest(value) {
   return sha256(Buffer.from(stableCanonicalJson(value)));
 }
 
+function decodeModuleSource(bytes) {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    fail("private evaluator module bytes are not valid UTF-8");
+  }
+}
+
 function parsePrivateDataModule(specifier) {
   if (typeof specifier !== "string" || !specifier.startsWith(PRIVATE_DATA_MODULE_PREFIX)) fail("private evaluator data module URL is invalid");
   const separator = specifier.lastIndexOf("#");
@@ -54,7 +62,7 @@ function parsePrivateDataModule(specifier) {
   const bytes = Buffer.from(encoded, "base64");
   if (bytes.length === 0 || bytes.length > MAX_PRIVATE_DATA_MODULE_BYTES || bytes.toString("base64") !== encoded) fail("private evaluator data module encoding is invalid");
   if (expectedDigest !== sha256(bytes)) fail("private evaluator data module digest is invalid");
-  return { source: bytes.toString("utf8"), identifier: specifier };
+  return { source: decodeModuleSource(bytes), identifier: specifier };
 }
 
 function fail(message, code = "ERR_VERIFIED_AUTHORITY") {
@@ -433,7 +441,7 @@ async function execute(payload, authority) {
       const repositoryNode = authority.nodes.get(path.resolve(repositoryRoot, entry.path));
       if (!repositoryNode || repositoryNode.file_type !== "file" || repositoryNode.bytes !== entry.bytes || repositoryNode.sha256 !== entry.sha256 || Buffer.compare(repositoryNode.content, bytes) !== 0) fail(`in-memory module is detached from repository authority: ${entry.path}`);
     }
-    moduleSources.set(entry.path, bytes.toString("utf8"));
+    moduleSources.set(entry.path, decodeModuleSource(bytes));
   }
   const expectedRepositoryModulePaths = [...graphNodes.values()].filter(({ file_type }) => file_type === "module").map(({ path: modulePath }) => modulePath).sort();
   const actualRepositoryModulePaths = [...moduleSources.keys()].filter((modulePath) => !privateModuleAuthorityByPath.has(modulePath)).sort();

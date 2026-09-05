@@ -55,7 +55,21 @@ function inspectSchemaNode(schema, path, result) {
       continue;
     }
     result.keywordSet.add(keyword);
-    if (ANNOTATION_KEYWORDS.has(keyword)) continue;
+    if (ANNOTATION_KEYWORDS.has(keyword)) {
+      const keywordPath = schemaLocation(path, keyword);
+      if (["$schema", "$id", "$comment", "title", "description"].includes(keyword) && typeof keywordValue !== "string") {
+        result.unsupported.push(`${keywordPath}: ${keyword} must be a string`);
+      } else if (["$schema", "$id"].includes(keyword) && (keywordValue.length === 0 || /[\u0000-\u0020]/u.test(keywordValue))) {
+        result.unsupported.push(`${keywordPath}: ${keyword} must be a non-empty URI-reference string`);
+      } else if (keyword === "$anchor" && (typeof keywordValue !== "string" || !/^[A-Za-z_][-A-Za-z0-9._]*$/u.test(keywordValue))) {
+        result.unsupported.push(`${keywordPath}: $anchor must be a valid plain-name anchor`);
+      } else if (["deprecated", "readOnly", "writeOnly"].includes(keyword) && typeof keywordValue !== "boolean") {
+        result.unsupported.push(`${keywordPath}: ${keyword} must be boolean`);
+      } else if (keyword === "examples" && !Array.isArray(keywordValue)) {
+        result.unsupported.push(`${keywordPath}: examples must be an array`);
+      }
+      continue;
+    }
     const keywordPath = schemaLocation(path, keyword);
     if (MAP_OF_SCHEMAS.has(keyword)) {
       if (!keywordValue || typeof keywordValue !== "object" || Array.isArray(keywordValue)) {
@@ -254,9 +268,11 @@ function schemaSupportErrors(unsupported, path) {
     const unknownKeyword = /unsupported schema keyword ([^\s]+)/u.exec(item)?.[1];
     const unsupportedType = /unsupported type (.+)$/u.exec(item)?.[1];
     const unsupportedFormat = /unsupported format (.+)$/u.exec(item)?.[1];
+    const invalidAnnotation = /: (\$schema|\$id|\$anchor|\$comment|title|description|deprecated|readOnly|writeOnly|examples) must (.+)$/u.exec(item);
     if (unknownKeyword) return validationError(path, unknownKeyword, "unsupported schema keyword");
     if (unsupportedType) return validationError(path, "type", `unsupported type ${unsupportedType}`);
     if (unsupportedFormat) return validationError(path, "format", `unsupported format ${unsupportedFormat}`);
+    if (invalidAnnotation) return validationError(path, invalidAnnotation[1], `${invalidAnnotation[1]} must ${invalidAnnotation[2]}`);
     return validationError(path, "schema", item);
   });
 }

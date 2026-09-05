@@ -3000,11 +3000,18 @@ function runCurrentPrivateSiblingModuleRegression() {
     hiddenEvaluatorSourceFactory: (fragment) => Buffer.from(`import { load } from "./${helperPath}";\nexport async function evaluateCandidateSafe({ repositoryRoot }) { await load(repositoryRoot); return ${JSON.stringify(fragment)}; }\n`),
     expectedError: /module resolution is outside the verified dependency edge/u,
   });
+  runScenario({
+    label: "invalid-utf8-helper",
+    helperBytes: Buffer.concat([Buffer.from("// invalid byte: "), Buffer.from([0xff]), Buffer.from("\nexport function identity(value) { return value; }\n")]),
+    mediaType: "text/javascript",
+    hiddenEvaluatorSourceFactory: (fragment) => Buffer.from(`import { identity } from "./${helperPath}";\nexport async function evaluateCandidateSafe() { return identity(${JSON.stringify(fragment)}); }\n`),
+    expectedError: /module bytes are not valid UTF-8/u,
+  });
 }
 
 function runCurrentPrivateDataModuleRegression() {
   const sourceFor = (body) => {
-    const bytes = Buffer.from(body);
+    const bytes = Buffer.isBuffer(body) ? body : Buffer.from(body);
     return `data:text/javascript;base64,${bytes.toString("base64")}#${sha256(bytes)}`;
   };
   const runScenario = ({ label, specifier, expectedError = null }) => {
@@ -3063,6 +3070,11 @@ function runCurrentPrivateDataModuleRegression() {
     label: "dependency-import",
     specifier: sourceFor('import "node:fs"; export const marker = 7;\n'),
     expectedError: /private evaluator data modules cannot import dependencies/u,
+  });
+  runScenario({
+    label: "invalid-utf8",
+    specifier: sourceFor(Buffer.concat([Buffer.from("// invalid byte: "), Buffer.from([0xff]), Buffer.from("\nexport const marker = 7;\n")])),
+    expectedError: /module bytes are not valid UTF-8/u,
   });
 }
 

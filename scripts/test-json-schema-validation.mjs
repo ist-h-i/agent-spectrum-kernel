@@ -148,6 +148,8 @@ try {
   for (const keyword of ["$schema", "$id", "$anchor", "$comment", "title", "description", "default", "examples", "deprecated", "readOnly", "writeOnly", "x-ask-contract", "x-ask-metric-catalog"]) {
     expectValid("ok", { type: "string", [keyword]: keyword.startsWith("x-") ? { arbitrary: "annotation payload" } : keyword === "examples" ? ["ok"] : keyword === "deprecated" || keyword === "readOnly" || keyword === "writeOnly" ? true : "annotation" }, `${keyword} must be an explicitly supported annotation`);
   }
+  expectInvalid("ok", { type: "string", $id: 42 }, { keyword: "$id", condition: "$id must be a string" }, "$id must not silently accept a non-string identifier");
+  expectInvalid("ok", { type: "string", $anchor: "bad anchor" }, { keyword: "$anchor", condition: "$anchor must be a valid plain-name anchor" }, "$anchor must not silently accept invalid anchor syntax");
   expectInvalid("ok", { type: "string", mysteryValidation: true }, { keyword: "mysteryValidation", condition: "unsupported schema keyword" }, "unknown validation keywords must fail closed");
   expectInvalid("ok", { type: "string", "x-unapproved": true }, { keyword: "x-unapproved", condition: "unsupported schema keyword" }, "unapproved custom annotations must fail closed");
   expectInvalid("ok", { type: "string", format: "hostname" }, { keyword: "format", condition: "unsupported format hostname" }, "unsupported formats must fail closed");
