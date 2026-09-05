@@ -64,10 +64,12 @@
     "risk_approval": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "execution_status", "request", "approval_file_sha256", "rendered_invocation_sha256", "rejection_reasons"],
+      "required": ["status", "execution_status", "enforcement_status", "promotion_status", "request", "approval_file_sha256", "rendered_invocation_sha256", "workspace_base_sha256", "delta_sha256", "observed_effects", "promoted_paths", "rejection_reasons"],
       "properties": {
         "status": { "type": "string", "enum": ["requested", "approved", "rejected"] },
         "execution_status": { "type": "string", "enum": ["not_executed", "executed"] },
+        "enforcement_status": { "type": "string", "enum": ["not_started", "isolated", "accepted", "rejected"] },
+        "promotion_status": { "type": "string", "enum": ["not_started", "promoted", "rejected"] },
         "request": { "$ref": "codex-risk-approval-request.schema.json" },
         "approval_file_sha256": {
           "oneOf": [
@@ -80,6 +82,30 @@
             { "type": "null" },
             { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
           ]
+        },
+        "workspace_base_sha256": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+          ]
+        },
+        "delta_sha256": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+          ]
+        },
+        "observed_effects": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["create", "modify", "delete"] }
+        },
+        "promoted_paths": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 500 }
         },
         "rejection_reasons": {
           "type": "array",
