@@ -72,6 +72,8 @@ The repository fixture `scripts/test-adapter-runtime-migration.mjs` verifies all
 
 For adapter-only maintenance that must not read benchmark handoff inputs, use `node scripts/adapter-runtime-bundle.mjs --check-adapters` (or `--write-adapters` when regeneration is intended). The full `--check` remains the repository-wide bundle gate and includes benchmark handoff inputs.
 
+When canonical adapter contracts or Schemas change, run `node scripts/adapter-runtime-bundle.mjs --write-adapters` twice and require byte-identical projections before the adapter check. After all generated repository projections are final, run `node scripts/validate-repo.mjs --write-report` and then `node scripts/validate-repo.mjs`; the report is part of the generated validation closure.
+
 When canonical renderer inputs change, run `node scripts/update-adapter-runtime-fixtures.mjs` before the bundle check. That production writer updates the profile, evidence, verification-prompt proxy, and combined bundle projections as one closure. Run it twice and require byte-identical outputs, then run `node scripts/test-verification-proof-policy.mjs` and the full bundle check.
 
 These checks prove bounded installer behavior. They do not prove an external Claude or Codex process loaded the projected assets or applied canonical risk, evidence, approval, and verification semantics. Capture bounded runtime evidence before upgrading those claims.
