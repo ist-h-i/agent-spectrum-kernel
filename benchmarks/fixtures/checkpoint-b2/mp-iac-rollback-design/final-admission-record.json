@@ -3,8 +3,8 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "input_manifest_digest": "sha256:a1edd1ffc48e2ea236d8e8eb8aba6c99ddeaec2a6c620e60559bc54f4898931f",
   "evaluator_reference_schema": "benchmarks/schemas/evaluator-reference.schema.json",
-  "evaluator_bundle_id": "evaluator-ab605d960ea9ccd954bc7089995752bde762130801e4447de5569933f4dede74",
-  "evaluator_bundle_digest": "sha256:1d49134782a6c74b3deeb5ed1a5324420aba3e7fd1a592331e6af1ae0dd68749",
+  "evaluator_bundle_id": "evaluator-3a482989cfd9defb047969c1b5455803b5029aecf5c32eee1cb2c782090a4650",
+  "evaluator_bundle_digest": "sha256:80a1212f138d9da32945e223f0eb085177d0618eed38c46d0762063f0033e495",
   "evaluator_byte_count": 166092,
   "evaluator_requirement_count": 6,
   "evidence_map_ids": [
@@ -27,7 +27,7 @@
   "admission_revision": 1,
   "admission_status": "admission_pending",
   "evaluator_source_identity": {
-    "base_git_revision": "848cadb552654b92cefedfdf2f8ad1bdf0505540",
+    "base_git_revision": "3d3f533178c2e343404fa034a214ae8cef70c85c",
     "source_tree_digest": "sha256:ebbc7eb53674778e313cfcea9a9eb9952693ec74082f7c465aadad2c08a7e9d4",
     "generator_source_digest": "sha256:124f4862dbb4eba98605fb558368b561a99c7505f9bec5eeb8d14ecb632c8a53",
     "source_files": [
@@ -1781,9 +1781,9 @@
       "graph_digest": "sha256:c79e6115b8dea75bbf8fde919302dbb8d51d70a1af156f24c1babe969e52143d"
     }
   },
-  "requirement_authority_digest": "sha256:1e84c8673431bd538d2c4e55e4b45f973ee8b166c2f203fb57329dfcaf524c77",
+  "requirement_authority_digest": "sha256:9abe79aff1533720251d52b4358e82f50624ba4c283ed4973fc3dc89533e2bdb",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:4898fb637f34b41c3f0245ffe9231a3e6074ba501d5824d270c7d47436ea24ba",
-  "evaluator_authority_manifest_digest": "sha256:2abab8baf91df70e56f8d2c4d41e0c2cb2bd0f02f84b92d93dae1991694a58d8",
-  "admission_digest": "sha256:65004d7661159821d910a824bc485a283ab28931b4b18c0e7bcecb1bb1851baa"
+  "evaluator_authority_manifest_raw_sha256": "sha256:e659b3d8f2ec9dc5fe686c4ba41c48b7897c02f15dd6bfac89b37884504a0c38",
+  "evaluator_authority_manifest_digest": "sha256:c92fd99ef2f00f8850070a6494474a7f614416061b2233fbec25c028e4dfd673",
+  "admission_digest": "sha256:7931d8f9c8e96a9a370c838fefe0d243062891a179faccc777d18aa509d2624a"
 }
