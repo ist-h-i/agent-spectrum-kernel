@@ -951,6 +951,62 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "evidence-and-review-precision": "fail" },
     },
     {
+      name: "removed-chosen-detail-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Limit the detail pane to removed chosen messages.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "visible-chosen-detail-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Limit the detail pane to visible chosen messages.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "postposed-excluded-detail-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Restrict details to active messages excluded from the visible list.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "postposed-removed-detail-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Limit the detail pane to chosen messages removed from view by filtering.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "visible-active-detail-source-equivalent",
+      mutate(review) {
+        review.findings[0].required_action = "Limit details to visible active items.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "masked-active-selection-transition-equivalent",
+      mutate(review) {
+        review.findings[0].required_action = "Clear the selection after the filter masks the active item.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "plural-filter-selection-transition-equivalent",
+      mutate(review) {
+        review.findings[0].required_action = "Clear the current selection after filters hide its row.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
       name: "hidden-rather-than-visible-remediation-contradiction",
       mutate(review) {
         review.findings[0].required_action = "Base details on hidden messages rather than visible ones.";
