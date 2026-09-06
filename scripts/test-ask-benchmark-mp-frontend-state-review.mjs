@@ -855,6 +855,14 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
     },
     {
+      name: "passive-negated-filter-effect-contradiction",
+      mutate(review) {
+        review.findings[0].title = "The selected message is not hidden by filtering, but stale details remain";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
       name: "negated-detail-observation-contradiction",
       mutate(review) {
         review.findings[0].impact = "The list has no selected row while the detail pane renders no selected message.";
@@ -866,6 +874,14 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       name: "expanded-remediation-source-set-contradiction",
       mutate(review) {
         review.findings[0].required_action = "Derive details from selected messages, not only visible messages.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "negated-selected-remediation-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from visible messages that are not selected.";
       },
       expectedClassification: "under_processing",
       expectedOutcomes: { "evidence-and-review-precision": "fail" },
@@ -915,6 +931,15 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       mutate(review) {
         review.findings[0].title = "The filter excludes the selected row from view but stale details remain";
         review.findings[0].impact = "No selected row remains while the detail panel remains populated with that message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "removes-filled-finding-equivalence",
+      mutate(review) {
+        review.findings[0].title = "Once the filter removes the chosen item from the list, its preview stays filled";
+        review.findings[0].impact = "No chosen row remains while the preview stays filled with that message.";
       },
       expectedClassification: "correct_narrow_execution",
       expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
