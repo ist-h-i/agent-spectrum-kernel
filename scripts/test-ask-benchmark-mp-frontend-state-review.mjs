@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -505,6 +505,69 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "verification-conclusion": "fail" },
     },
     {
+      name: "contradictory-verification-repeated-separator-alias",
+      mutate(review) {
+        review.verification.evidence.push({
+          path: "test//integration/inbox-view.test.mjs",
+          conclusion: "The interaction test passed and the detail pane was empty.",
+        });
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "verification-conclusion": "fail" },
+    },
+    {
+      name: "contradictory-verification-trailing-separator-alias-failure-then-success",
+      mutate(review) {
+        review.verification.evidence.push({
+          path: "test/integration/inbox-view.test.mjs//",
+          conclusion: "The interaction test passed and the detail pane was empty.",
+        });
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "verification-conclusion": "fail" },
+    },
+    {
+      name: "contradictory-verification-trailing-separator-alias-success-then-failure",
+      mutate(review) {
+        review.verification.evidence.unshift({
+          path: "test/integration/inbox-view.test.mjs//",
+          conclusion: "The interaction test passed and the detail pane was empty.",
+        });
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "verification-conclusion": "fail" },
+    },
+    {
+      name: "combined-verification-path-alias",
+      mutate(review) {
+        review.verification.evidence[0].path = ".//test//integration/inbox-view.test.mjs//";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "contradictory-combined-verification-path-alias-failure-then-success",
+      mutate(review) {
+        review.verification.evidence.push({
+          path: ".//test//integration/inbox-view.test.mjs//",
+          conclusion: "The interaction test passed and the detail pane was empty.",
+        });
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "verification-conclusion": "fail" },
+    },
+    {
+      name: "contradictory-combined-verification-path-alias-success-then-failure",
+      mutate(review) {
+        review.verification.evidence.unshift({
+          path: ".//test//integration/inbox-view.test.mjs//",
+          conclusion: "The interaction test passed and the detail pane was empty.",
+        });
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "verification-conclusion": "fail" },
+    },
+    {
       name: "unresolved-verification-meaning",
       mutate(review) {
         review.verification.evidence[0].conclusion = "The interaction evidence discusses selection and detail behavior.";
@@ -512,6 +575,34 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedEvaluationStatus: "manual_review_required",
       expectedClassification: null,
       expectedOutcomes: { "verification-conclusion": "manual_review_required" },
+    },
+    {
+      name: "missing-verification-evidence-target",
+      mutate() {},
+      mutateWorkspace({ frozen, candidate }) {
+        rmSync(resolve(frozen, "test/integration/inbox-view.test.mjs"));
+        rmSync(resolve(candidate, "test/integration/inbox-view.test.mjs"));
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "verification-conclusion": "fail" },
+    },
+    {
+      name: "ancestor-symlink-verification-evidence-target",
+      mutate() {},
+      mutateWorkspace({ frozen, candidate }) {
+        const external = resolve(work, "ancestor-symlink-external");
+        mkdirSync(external, { recursive: true });
+        cpSync(
+          resolve(candidate, "test/integration/inbox-view.test.mjs"),
+          resolve(external, "inbox-view.test.mjs"),
+        );
+        for (const workspace of [frozen, candidate]) {
+          rmSync(resolve(workspace, "test/integration"), { recursive: true });
+          symlinkSync(external, resolve(workspace, "test/integration"));
+        }
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "verification-conclusion": "fail" },
     },
     {
       name: "compatible-distinct-target-verification",
@@ -643,6 +734,7 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
     const candidate = resolve(work, `semantic-${probe.name}-candidate`);
     cpSync(resolve(FIXTURE_ROOT, "workspace"), frozen, { recursive: true });
     cpSync(frozen, candidate, { recursive: true });
+    probe.mutateWorkspace?.({ frozen, candidate });
     const review = clone(referenceReview);
     probe.mutate(review);
     const reviewBytes = Buffer.from(`${JSON.stringify(review, null, 2)}\n`);
