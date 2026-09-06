@@ -609,6 +609,10 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       ["matched-or-more-count", "PR CI omits the required checkout suite with 2 or more passing unit tests", true],
       ["matched-metric-first-comparison-count", "PR CI omits the required checkout suite although the unit-test pass total is at least 2", true],
       ["matched-reordered-comparison-count", "With at least 2 unit tests passing, PR CI omits the required checkout suite", true],
+      ["contradicted-outer-negated-equality-count", "PR CI omits the required checkout suite although it is not the case that exactly 2 unit tests passed", false],
+      ["matched-outer-negated-greater-count", "PR CI omits the required checkout suite although it is not the case that more than 2 unit tests passed", true],
+      ["wrong-run-alias-unit-pass-count", "PR run #999 omits the required checkout suite although 2 unit tests passed", false],
+      ["wrong-target-alias-pass-count", "PR CI omits the required suite although the checkout target reports 2 passing tests", false],
     ]) {
       const review = clone(baseReview);
       review.findings[0].title = title;

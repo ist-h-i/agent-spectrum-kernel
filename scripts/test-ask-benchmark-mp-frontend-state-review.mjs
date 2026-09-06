@@ -839,6 +839,22 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
     },
     {
+      name: "failed-filter-effect-contradiction",
+      mutate(review) {
+        review.findings[0].title = "Filtering fails to hide the selected message but leaves stale details";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "modal-negated-filter-effect-contradiction",
+      mutate(review) {
+        review.findings[0].title = "Filtering cannot conceal the chosen message but obsolete details remain";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
       name: "negated-detail-observation-contradiction",
       mutate(review) {
         review.findings[0].impact = "The list has no selected row while the detail pane renders no selected message.";
@@ -890,6 +906,15 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       name: "keeps-rendering-impact-equivalence",
       mutate(review) {
         review.findings[0].impact = review.findings[0].impact.replace("detail pane renders", "detail pane keeps rendering");
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "excludes-populated-finding-equivalence",
+      mutate(review) {
+        review.findings[0].title = "The filter excludes the selected row from view but stale details remain";
+        review.findings[0].impact = "No selected row remains while the detail panel remains populated with that message.";
       },
       expectedClassification: "correct_narrow_execution",
       expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
