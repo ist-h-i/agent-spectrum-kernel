@@ -1,11 +1,11 @@
 {
   "fixture_id": "mp-iac-rollback-design",
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
-  "input_manifest_digest": "sha256:0ea3327ae8a665d8e67fe752616c56411005bcca106a7a5eeb01fbbee4613af0",
+  "input_manifest_digest": "sha256:a1edd1ffc48e2ea236d8e8eb8aba6c99ddeaec2a6c620e60559bc54f4898931f",
   "evaluator_reference_schema": "benchmarks/schemas/evaluator-reference.schema.json",
-  "evaluator_bundle_id": "evaluator-d04df79381653ce429f1df1c904ba1916e386a0542bf44d0bc6b598af2db94c6",
-  "evaluator_bundle_digest": "sha256:cd06d80f9d2405fa7e967a3c4f83834057c24d57228990a71f10c39c9d426d41",
-  "evaluator_byte_count": 163176,
+  "evaluator_bundle_id": "evaluator-90896ce8c6256e2db9ab29ca73ed5aeb8b56f843388db59d90e23242331d213e",
+  "evaluator_bundle_digest": "sha256:ce3456db944b5dab983c1735fa3d84f4db07c2825e96951817017e88ec590345",
+  "evaluator_byte_count": 166092,
   "evaluator_requirement_count": 6,
   "evidence_map_ids": [
     "candidate-plan-integrity-basis",
@@ -27,7 +27,7 @@
   "admission_revision": 1,
   "admission_status": "admission_pending",
   "evaluator_source_identity": {
-    "base_git_revision": "82920a224fef5edaed705abb8a6e51ffd8b1e99a",
+    "base_git_revision": "6d22b85de28bb064841e30982e77f29930697832",
     "source_tree_digest": "sha256:ebbc7eb53674778e313cfcea9a9eb9952693ec74082f7c465aadad2c08a7e9d4",
     "generator_source_digest": "sha256:124f4862dbb4eba98605fb558368b561a99c7505f9bec5eeb8d14ecb632c8a53",
     "source_files": [
@@ -1781,9 +1781,9 @@
       "graph_digest": "sha256:c79e6115b8dea75bbf8fde919302dbb8d51d70a1af156f24c1babe969e52143d"
     }
   },
-  "requirement_authority_digest": "sha256:86da3c121be0b5bcce3061a16d5da66108b79665550b4d9f0af985e97b511a05",
+  "requirement_authority_digest": "sha256:3ddc5fb1cb539ffd889aa4672e47a9c8b84d79fa9541b2fd87e98437d954a04b",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:608d7d9c91a01dfea2afc3d9106d6bb3e63edb518fbc8af7fc1bb3601cc58090",
-  "evaluator_authority_manifest_digest": "sha256:ab44e1acd2b953d2acc7b4361399e0f16ad67ade8fe7498278b7ce108f57a295",
-  "admission_digest": "sha256:a6212553755159ddf66e7c4c8c2cf76d83bd8627659c2d288838965237ffc483"
+  "evaluator_authority_manifest_raw_sha256": "sha256:5af4b1ee1213da9f34ca416026a3aa8a2cc9efd11bdc72c69cfd45139cbf0fde",
+  "evaluator_authority_manifest_digest": "sha256:d58ecbfcda659cc816f68026524769935677beed0b93e6ce5cdb3ceeae00b519",
+  "admission_digest": "sha256:a00b44fd0a22a69119000ea05a7c995b92beb3f394bb124005c12f8e5c354bfe"
 }

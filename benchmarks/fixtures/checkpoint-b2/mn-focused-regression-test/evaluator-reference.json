@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-23545f4be539eff33b0309afbbd14c56fad8e33ab5b64f717e41f0b9ac7165d0",
-  "evaluator_bundle_digest": "sha256:8a55c76a2ac2ff352441438596df872e8c4fa8953144c92fdb4534feccaf46b6",
+  "evaluator_bundle_id": "evaluator-1c84fd059ffccc8f77c545cf5716b5766b2c7634f966c98a7161ad52ee9e0ec6",
+  "evaluator_bundle_digest": "sha256:9d95997e27e2ee6f55b51b21634e89a615d1d387373e0d668175ab2f197458a8",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mn-focused-regression-test",
   "fixture_input_digest": "sha256:065c84ece98ef98807a63b14790abd368ace054f0194f3e5bcf40e9c0fd9797b",
   "task_class": "verification_only",
   "suite": "mechanism_negative",
-  "evaluator_revision": "82920a224fef5edaed705abb8a6e51ffd8b1e99a",
+  "evaluator_revision": "6d22b85de28bb064841e30982e77f29930697832",
   "evaluator_source_identity": {
-    "base_git_revision": "82920a224fef5edaed705abb8a6e51ffd8b1e99a",
+    "base_git_revision": "6d22b85de28bb064841e30982e77f29930697832",
     "source_tree_digest": "sha256:ebbc7eb53674778e313cfcea9a9eb9952693ec74082f7c465aadad2c08a7e9d4",
     "generator_source_digest": "sha256:124f4862dbb4eba98605fb558368b561a99c7505f9bec5eeb8d14ecb632c8a53",
     "source_files": [
@@ -1766,11 +1766,11 @@
     }
   },
   "generator_identity": "sha256:b7dcf5ec070c30a1c07c4c2503abc585e4446793b96b339fa51b01ee5b553021",
-  "independence_statement_digest": "sha256:3f18634e217549d930dce669c190bfa9c5bb5e5e5cb406daa275fed6f15f9079",
-  "review_record_digest": "sha256:8f52d6ec98496b9b6bb0ff57ced228e1f48b52cc1910efe7633cc2d00d70d97c",
+  "independence_statement_digest": "sha256:fc79cabe427b3c9e3c1e53a8906828b2ba410359b4bfb0e3496051d2c5076f70",
+  "review_record_digest": "sha256:832918c4e7ebfd118cbf1f9f011307bbf979b62595c8b3383b23ef75a440a633",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:e32ba417a50a717cf4530cc231abee2088a8f474cf30f121aa2e64a5cafbda98",
-  "evaluator_authority_manifest_digest": "sha256:69fa5e7e05bb47ecd28713cff50241d63be786e94191c6e63f34dcc3e4b40309",
+  "evaluator_authority_manifest_raw_sha256": "sha256:49fb7bbd1a50054a18fff98d65b86204fb72d8832ddfcaf9581717583ff9a679",
+  "evaluator_authority_manifest_digest": "sha256:acd6fd1abffa13300854627e6a39ed9551c0c2866e9403963a01f4981896be01",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:69ccceff967619eebd166ec3e97b400fefe10f0c6329261bd3409b83282354da"
+  "public_metadata_digest": "sha256:bcf72fbe2d4b5293c76a6101b15d43079319d4f097905e0d455e0cc8ccaf40c6"
 }

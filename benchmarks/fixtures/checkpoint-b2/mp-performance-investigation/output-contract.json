@@ -6,9 +6,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:a1744985160d07a80ecadb05ad867079c90c9cd427fc3b33544d386cc7d937ef",
+  "evaluator_public_reference_digest": "sha256:124ee6b9fbffde1845de4746904e22b444a02d97e92079ab8ef25876c6d335a4",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/verification-command-contract.json",
-  "verification_command_contract_digest": "sha256:6aa457a2270345087628ae1777c6848a5f18cbc553946b283c2a2a4bc8ef65bc",
+  "verification_command_contract_digest": "sha256:4810b42d680d6858f848d8484f22d35faad606f82a5ed3e4aac9100fc387de10",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:65935ed8132c9280bd72741ba91ee9e9e668145949f2d3b2d6ae8328cdcaa948",
   "result_profile": {
@@ -17,7 +17,7 @@
   },
   "declares_findings": true,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:9114c0bf166201b25c08813373b8657af1c8c471a407ff9afd3bb09719f02cda",
-  "evaluator_authority_manifest_digest": "sha256:d9fda4085997f6623a1747efe4497fa8da30d32a3ee6314f0bcd3d1badaf8042",
-  "output_contract_digest": "sha256:4fb56b3073f3037bdb0c3b48a99f67171090905a83766caf60fc0a37ad7ea7c0"
+  "evaluator_authority_manifest_raw_sha256": "sha256:fdc46a3c10dafc58005ce6dc8022750cf79068711be55091d4fd0f4779244b8d",
+  "evaluator_authority_manifest_digest": "sha256:40767d6511344284a1204922ebb9441fabac7c95a5b9628fd6a6a0ea504e10d6",
+  "output_contract_digest": "sha256:49756e16b22079d89112c478092aac0f56fd15df877ae0da9f8684fc6c9b18af"
 }
