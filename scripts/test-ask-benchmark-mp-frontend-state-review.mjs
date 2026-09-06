@@ -577,6 +577,57 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "verification-conclusion": "manual_review_required" },
     },
     {
+      name: "correct-verification-failure-reason",
+      mutate(review) {
+        review.verification.evidence[0].conclusion = "The interaction test fails because the hidden selection still renders details.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "inverse-verification-failure-reason",
+      mutate(review) {
+        review.verification.evidence[0].conclusion = "The interaction test fails because hidden selection does not render details.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "verification-conclusion": "fail" },
+    },
+    {
+      name: "unknown-verification-failure-reason",
+      mutate(review) {
+        review.verification.evidence[0].conclusion = "The interaction test fails for an undetermined reason.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "verification-conclusion": "manual_review_required" },
+    },
+    {
+      name: "expected-null-but-observed-non-null-reason",
+      mutate(review) {
+        review.verification.evidence[0].conclusion = "The interaction test failed: details were expected to be null, but the hidden selection remained non-null.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "expectation-only-non-null-reason",
+      mutate(review) {
+        review.verification.evidence[0].conclusion = "The interaction test failed because the hidden selection was expected to render non-null details.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "verification-conclusion": "manual_review_required" },
+    },
+    {
+      name: "expectation-only-still-renders-reason",
+      mutate(review) {
+        review.verification.evidence[0].conclusion = "The interaction test failed because the hidden selection was expected to still render details.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "verification-conclusion": "manual_review_required" },
+    },
+    {
       name: "missing-verification-evidence-target",
       mutate() {},
       mutateWorkspace({ frozen, candidate }) {
@@ -724,6 +775,30 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
         review.findings[0].title = "Filtering makes the selected message invisible but stale details remain";
         review.findings[0].impact = "No selected row remains while the detail pane renders the hidden selected message.";
         review.findings[0].required_action = "Invalidate selectedMessageId when filtering makes the selection invisible, or restrict detail lookup to the visible selected row.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "selected-message-title-equivalence",
+      mutate(review) {
+        review.findings[0].title = review.findings[0].title.replace("selected row", "selected message");
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "if-trigger-remediation-equivalence",
+      mutate(review) {
+        review.findings[0].required_action = review.findings[0].required_action.replace("when filtering hides it", "if filtering hides it");
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "still-renders-impact-equivalence",
+      mutate(review) {
+        review.findings[0].impact = review.findings[0].impact.replace("detail pane renders", "detail pane still renders");
       },
       expectedClassification: "correct_narrow_execution",
       expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),

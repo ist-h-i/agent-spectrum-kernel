@@ -399,6 +399,19 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
     path: "test/unit/format-toolbar.test.mjs",
     conclusion: "ArrowRight unit assertions passed; defaultPrevented was true and its browser default action was consumed.",
   };
+  const plainSucceededUnitRecord = {
+    path: "test/unit/format-toolbar.test.mjs",
+    conclusion: "The unit tests passed.",
+  };
+  const plainFailedUnitRecord = {
+    path: "test/unit/format-toolbar.test.mjs",
+    conclusion: "The unit tests failed.",
+  };
+  const adverbialSucceededUnitRecord = {
+    path: "test/unit/format-toolbar.test.mjs",
+    conclusion: "The unit suite completed successfully.",
+  };
+  const aliasedPlainFailedUnitRecord = { ...plainFailedUnitRecord, path: "./test/unit/format-toolbar.test.mjs" };
   const aliasedFailedInteractionRecord = { ...failedInteractionRecord, path: "./test/integration/format-toolbar.test.mjs" };
   const aliasedSucceededInteractionRecord = { ...succeededInteractionRecord, path: "./test/integration/format-toolbar.test.mjs" };
   const unsafeSucceededInteractionRecords = [
@@ -423,6 +436,12 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
     })),
     { probeId: "distinct-target-success-then-failure", records: [succeededUnitRecord, failedInteractionRecord], accepted: true },
     { probeId: "distinct-target-failure-then-success", records: [failedInteractionRecord, succeededUnitRecord], accepted: true },
+    { probeId: "plain-unit-success-then-failure", records: [failedInteractionRecord, plainSucceededUnitRecord, plainFailedUnitRecord], accepted: false },
+    { probeId: "plain-unit-failure-then-success", records: [plainFailedUnitRecord, plainSucceededUnitRecord, failedInteractionRecord], accepted: false },
+    { probeId: "aliased-unit-success-then-failure", records: [failedInteractionRecord, plainSucceededUnitRecord, aliasedPlainFailedUnitRecord], accepted: false },
+    { probeId: "plain-distinct-target-success-then-failure", records: [plainSucceededUnitRecord, failedInteractionRecord], accepted: true },
+    { probeId: "plain-distinct-target-failure-then-success", records: [failedInteractionRecord, plainSucceededUnitRecord], accepted: true },
+    { probeId: "adverbial-distinct-target-success", records: [adverbialSucceededUnitRecord, failedInteractionRecord], accepted: true },
   ];
   const verificationRegressionChecks = [];
   for (const [probeIndex, { probeId, records, accepted }] of verificationProbes.entries()) {

@@ -564,6 +564,61 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
         && nounCoordinationWithUnsupportedPredicateResult.classification !== "correct_narrow_execution",
     });
 
+    for (const [probeId, title, accepted] of [
+      ["matched-unqualified-unit-pass-count", "PR CI omits the required checkout suite with 2 passing unit tests", true],
+      ["fabricated-unqualified-unit-pass-count", "PR CI omits the required checkout suite with 999 passing unit tests", false],
+      ["matched-trailing-unit-pass-count", "PR CI omits the required checkout suite with 2 unit tests passed", true],
+      ["fabricated-trailing-unit-pass-count", "PR CI omits the required checkout suite with 999 unit tests passed", false],
+      ["wrong-run-unit-pass-count", "PR #999 CI omits the required checkout suite with 2 passing unit tests", false],
+      ["wrong-target-pass-count", "PR CI omits the required checkout suite with 2 passing checkout tests", false],
+      ["matched-unqualified-event-count", "For PR #314, CI omits the required checkout suite after the cited unit command reports two events", true],
+      ["fabricated-current-tense-unit-pass-count", "PR #314 CI omits the checkout suite although 999 unit tests currently pass", false],
+      ["distant-wrong-run-unit-pass-count", "PR #999 CI omits the checkout suite because repository guidance requires complete validation while the cited successful subset reports 2 passed unit tests", false],
+    ]) {
+      const review = clone(baseReview);
+      review.findings[0].title = title;
+      review.findings[0].evidence.push({ path: "ci/pull-request-314.log", line: 11 });
+      const result = await evaluateReviewProbe({ probeId, review });
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: accepted ? "accepted" : "rejected",
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: accepted
+          ? result.evidence_correctness.state === "pass" && result.classification === "correct_narrow_execution"
+          : result.evidence_correctness.state === "fail" && result.classification !== "correct_narrow_execution",
+      });
+    }
+
+    const adverbObscuredUnsupportedPredicate = clone(baseReview);
+    adverbObscuredUnsupportedPredicate.findings[0].impact = "The successful PR job ran only unit tests, thereby silently erasing customer audit records, so its evidence does not cover the complete test:all contract required for merge.";
+    const adverbObscuredUnsupportedPredicateResult = await evaluateReviewProbe({ probeId: "adverb-obscured-unsupported-predicate", review: adverbObscuredUnsupportedPredicate });
+    reviewRegressionChecks.push({
+      probe_id: "adverb-obscured-unsupported-predicate",
+      expected: "rejected",
+      actual_evidence_correctness: adverbObscuredUnsupportedPredicateResult.evidence_correctness.state,
+      actual_classification: adverbObscuredUnsupportedPredicateResult.classification,
+      satisfied: adverbObscuredUnsupportedPredicateResult.evidence_correctness.state === "fail" && adverbObscuredUnsupportedPredicateResult.classification !== "correct_narrow_execution",
+    });
+
+    for (const [probeId, mutate] of [
+      ["existing-unit-test-modifier", (review) => { review.findings[0].impact = review.findings[0].impact.replace("only unit tests", "only existing unit tests"); }],
+      ["existing-title-modifier", (review) => { review.findings[0].title = `Existing ${review.findings[0].title}`; }],
+      ["article-existing-unit-test-modifier", (review) => { review.findings[0].impact = review.findings[0].impact.replace("only unit tests", "only the existing unit tests"); }],
+      ["adverb-adjective-plural-modifiers", (review) => { review.findings[0].impact = review.findings[0].impact.replace("The successful job ran only unit tests", "The currently successful job ran only the existing unit tests"); }],
+    ]) {
+      const review = clone(baseReview);
+      mutate(review);
+      const result = await evaluateReviewProbe({ probeId, review });
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: "accepted",
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: result.evidence_correctness.state === "pass" && result.classification === "correct_narrow_execution",
+      });
+    }
+
     for (const [probeId, count, accepted] of [
       ["fabricated-exact-unit-pass-count", "9", false],
       ["matched-exact-unit-pass-count", "2", true],
