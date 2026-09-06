@@ -879,6 +879,22 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
     },
     {
+      name: "active-remove-negation-contradiction",
+      mutate(review) {
+        review.findings[0].title = "Filtering does not remove the chosen message from view while stale details remain";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "modal-unable-negation-contradiction",
+      mutate(review) {
+        review.findings[0].title = "Filtering is unable to conceal the active item while stale details remain";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
       name: "negated-detail-observation-contradiction",
       mutate(review) {
         review.findings[0].impact = "The list has no selected row while the detail pane renders no selected message.";
@@ -906,6 +922,14 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       name: "hidden-only-remediation-source-contradiction",
       mutate(review) {
         review.findings[0].required_action = "Derive details only from hidden selected messages.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "hidden-rather-than-visible-remediation-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Base details on hidden messages rather than visible ones.";
       },
       expectedClassification: "under_processing",
       expectedOutcomes: { "evidence-and-review-precision": "fail" },

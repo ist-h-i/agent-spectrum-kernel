@@ -624,6 +624,10 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       ["matched-contracted-outer-negated-greater-count", "PR CI omits the required suite although it isn't true that more than two unit tests passed", true],
       ["wrong-checkout-suite-target-count", "PR CI omits the required suite although the checkout suite reports two passing unit tests", false],
       ["wrong-short-run-identity-count", "Run #999 omits the required checkout suite although two unit tests passed", false],
+      ["matched-word-more-than-lower-count", "PR CI omits the required checkout suite although more than one unit test passes", true],
+      ["matched-word-fewer-than-upper-count", "PR CI omits the required checkout suite although fewer than three unit tests pass", true],
+      ["matched-run-bound-word-more-than-count", "In pull request run 314, CI omits the required checkout suite although more than one unit test passes", true],
+      ["matched-run-bound-word-fewer-than-count", "In pull request run 314, CI omits the required checkout suite although fewer than three unit tests pass", true],
     ]) {
       const review = clone(baseReview);
       review.findings[0].title = title;
@@ -683,6 +687,21 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       satisfied: unresolvedRangeComparisonResult.evaluation_status === "manual_review_required"
         && unresolvedRangeComparisonResult.classification == null
         && unresolvedRangeComparisonRequirement?.outcome === "manual_review_required",
+    });
+
+    const unresolvedRoughComparisonReview = clone(baseReview);
+    unresolvedRoughComparisonReview.findings[0].title = "Roughly two unit tests pass in pull request run 314 while CI omits the required checkout suite";
+    unresolvedRoughComparisonReview.findings[0].evidence.push({ path: "ci/pull-request-314.log", line: 11 });
+    const unresolvedRoughComparisonResult = await evaluateReviewProbe({ probeId: "unresolved-rough-word-comparison-count", review: unresolvedRoughComparisonReview });
+    const unresolvedRoughComparisonRequirement = unresolvedRoughComparisonResult.requirement_results.find(({ requirement_id }) => requirement_id === "scope-and-review-precision");
+    reviewRegressionChecks.push({
+      probe_id: "unresolved-rough-word-comparison-count",
+      expected: "manual_review_required",
+      actual_evidence_correctness: unresolvedRoughComparisonResult.evidence_correctness.state,
+      actual_classification: unresolvedRoughComparisonResult.classification,
+      satisfied: unresolvedRoughComparisonResult.evaluation_status === "manual_review_required"
+        && unresolvedRoughComparisonResult.classification == null
+        && unresolvedRoughComparisonRequirement?.outcome === "manual_review_required",
     });
 
     const adverbObscuredUnsupportedPredicate = clone(baseReview);
