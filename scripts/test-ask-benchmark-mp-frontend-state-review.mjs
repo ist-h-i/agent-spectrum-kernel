@@ -603,6 +603,7 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       },
       expectedClassification: "under_processing",
       expectedOutcomes: { "verification-conclusion": "fail" },
+      expectedSealedBoundaryRejection: /contains a prohibited filesystem entry: test\/integration/u,
     },
     {
       name: "compatible-distinct-target-verification",
@@ -765,7 +766,7 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
         cwd_unverified_command_count: 0,
       },
     };
-    const sealedExecution = production ? createSealedEvaluatorExecutionForTest({
+    const createSealedExecution = () => createSealedEvaluatorExecutionForTest({
       root: ROOT,
       privateEvaluationRoot,
       privateRoot,
@@ -778,7 +779,13 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       externalAuthorityAnchor,
       executionDirectoryName: `sealed-semantic-${probe.name}`,
       label: `mp-frontend-state sealed semantic ${probe.name} evaluator`,
-    }) : null;
+    });
+    let sealedExecution = null;
+    if (production && probe.expectedSealedBoundaryRejection) {
+      assert.throws(createSealedExecution, probe.expectedSealedBoundaryRejection, `${probe.name} sealed boundary must reject the workspace before evaluator execution`);
+    } else if (production) {
+      sealedExecution = createSealedExecution();
+    }
     const repositoryDiffArtifact = sealedExecution
       ? readJson(resolve(sealedExecution.originalWorkspaceAuthority.path, sealedExecution.originalWorkspaceAuthority.repositoryDiffPath))
       : directRepositoryDiffArtifact({}, lineage);
