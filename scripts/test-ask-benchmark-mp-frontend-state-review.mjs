@@ -830,6 +830,79 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedClassification: "correct_narrow_execution",
       expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
     },
+    {
+      name: "negated-filter-effect-contradiction",
+      mutate(review) {
+        review.findings[0].title = "Filtering hides no selected message but leaves stale details";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "negated-detail-observation-contradiction",
+      mutate(review) {
+        review.findings[0].impact = "The list has no selected row while the detail pane renders no selected message.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "expanded-remediation-source-set-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from selected messages, not only visible messages.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "negated-stale-detail-subject-contradiction",
+      mutate(review) {
+        review.findings[0].impact = "The list has no selected row. No stale detail remains.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "negated-displayed-object-contradiction",
+      mutate(review) {
+        review.findings[0].impact = "The list has no selected row while the detail pane displays no selected message.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "visible-source-with-hidden-exclusion-equivalence",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details only from visible selected messages, not hidden selected messages.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "whenever-trigger-remediation-equivalence",
+      mutate(review) {
+        review.findings[0].required_action = review.findings[0].required_action.replace("when filtering hides it", "whenever filtering hides it");
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "keeps-rendering-impact-equivalence",
+      mutate(review) {
+        review.findings[0].impact = review.findings[0].impact.replace("detail pane renders", "detail pane keeps rendering");
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "unresolved-state-claim-meaning",
+      mutate(review) {
+        review.findings[0].impact = "Filtering changes selection topology while details exhibit residual affinity.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
   ];
   const semanticRegressionMismatches = [];
   for (const [index, probe] of semanticRegressionProbes.entries()) {

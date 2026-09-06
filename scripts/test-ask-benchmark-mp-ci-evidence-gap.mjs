@@ -592,6 +592,54 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       });
     }
 
+    for (const [probeId, title, accepted] of [
+      ["matched-bare-comparison-count", "PR CI omits the required checkout suite with 2 passing unit tests", true],
+      ["matched-at-least-comparison-count", "PR CI omits the required checkout suite with at least 2 passing unit tests", true],
+      ["matched-at-most-comparison-count", "PR CI omits the required checkout suite with at most 2 passing unit tests", true],
+      ["contradicted-more-than-comparison-count", "PR CI omits the required checkout suite with more than 2 passing unit tests", false],
+      ["contradicted-fewer-than-comparison-count", "PR CI omits the required checkout suite with fewer than 2 passing unit tests", false],
+      ["matched-more-than-lower-count", "PR CI omits the required checkout suite with more than 1 passing unit test", true],
+      ["matched-fewer-than-higher-count", "PR CI omits the required checkout suite with fewer than 3 passing unit tests", true],
+      ["contradicted-at-least-higher-count", "PR CI omits the required checkout suite with at least 3 passing unit tests", false],
+      ["contradicted-at-most-lower-count", "PR CI omits the required checkout suite with at most 1 passing unit test", false],
+      ["matched-negated-more-than-count", "PR CI omits the required checkout suite with not more than 2 passing unit tests", true],
+      ["contradicted-negated-fewer-than-count", "PR CI omits the required checkout suite with not fewer than 3 passing unit tests", false],
+      ["contradicted-not-exactly-count", "PR CI omits the required checkout suite with not exactly 2 passing unit tests", false],
+      ["matched-not-exactly-other-count", "PR CI omits the required checkout suite with not exactly 3 passing unit tests", true],
+      ["matched-or-more-count", "PR CI omits the required checkout suite with 2 or more passing unit tests", true],
+      ["matched-metric-first-comparison-count", "PR CI omits the required checkout suite although the unit-test pass total is at least 2", true],
+      ["matched-reordered-comparison-count", "With at least 2 unit tests passing, PR CI omits the required checkout suite", true],
+    ]) {
+      const review = clone(baseReview);
+      review.findings[0].title = title;
+      review.findings[0].evidence.push({ path: "ci/pull-request-314.log", line: 11 });
+      const result = await evaluateReviewProbe({ probeId, review });
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: accepted ? "accepted" : "rejected",
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: accepted
+          ? result.evidence_correctness.state === "pass" && result.classification === "correct_narrow_execution"
+          : result.evidence_correctness.state === "fail" && result.classification !== "correct_narrow_execution",
+      });
+    }
+
+    const unresolvedComparisonReview = clone(baseReview);
+    unresolvedComparisonReview.findings[0].title = "PR CI omits the required checkout suite with approximately 2 passing unit tests";
+    unresolvedComparisonReview.findings[0].evidence.push({ path: "ci/pull-request-314.log", line: 11 });
+    const unresolvedComparisonResult = await evaluateReviewProbe({ probeId: "unresolved-approximate-comparison-count", review: unresolvedComparisonReview });
+    const unresolvedComparisonRequirement = unresolvedComparisonResult.requirement_results.find(({ requirement_id }) => requirement_id === "scope-and-review-precision");
+    reviewRegressionChecks.push({
+      probe_id: "unresolved-approximate-comparison-count",
+      expected: "manual_review_required",
+      actual_evidence_correctness: unresolvedComparisonResult.evidence_correctness.state,
+      actual_classification: unresolvedComparisonResult.classification,
+      satisfied: unresolvedComparisonResult.evaluation_status === "manual_review_required"
+        && unresolvedComparisonResult.classification == null
+        && unresolvedComparisonRequirement?.outcome === "manual_review_required",
+    });
+
     const adverbObscuredUnsupportedPredicate = clone(baseReview);
     adverbObscuredUnsupportedPredicate.findings[0].impact = "The successful PR job ran only unit tests, thereby silently erasing customer audit records, so its evidence does not cover the complete test:all contract required for merge.";
     const adverbObscuredUnsupportedPredicateResult = await evaluateReviewProbe({ probeId: "adverb-obscured-unsupported-predicate", review: adverbObscuredUnsupportedPredicate });
