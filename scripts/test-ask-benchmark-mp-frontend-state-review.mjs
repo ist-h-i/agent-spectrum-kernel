@@ -983,6 +983,22 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "evidence-and-review-precision": "fail" },
     },
     {
+      name: "postposed-not-visible-detail-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Restrict details to messages that are not visible after filtering.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "postposed-remain-visible-detail-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Restrict details to selected messages that remain visible after filtering.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
       name: "visible-active-detail-source-equivalent",
       mutate(review) {
         review.findings[0].required_action = "Limit details to visible active items.";
