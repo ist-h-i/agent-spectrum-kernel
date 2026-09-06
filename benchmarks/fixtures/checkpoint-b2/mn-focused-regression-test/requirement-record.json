@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:89f25b950ec3452e67b0087425583a53171734cdf379002518fa75801b7b2b55",
+  "admission_record_digest": "sha256:20d44e9eec6fc98f4f3afab5c02dc50399c195a1523c63b95c2da48277600234",
   "requirements": [
     {
       "requirement_id": "regression-behavior-coverage",
@@ -82,5 +82,5 @@
     }
   ],
   "requirement_set_digest": "sha256:cd27acbf9e74aa17d6e83658e5fa5d5b5f25501089f313818f9a860fd9a3bfc2",
-  "requirement_record_digest": "sha256:3d1fbcc626d8be3782fc25c2187b3148933405a6b52186064a1107301909987a"
+  "requirement_record_digest": "sha256:47a7bb8d6ed26193cb8ce315609dfef61da57fb91231119d95fab34248fc1b58"
 }
