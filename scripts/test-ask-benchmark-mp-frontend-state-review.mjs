@@ -871,6 +871,14 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
     },
     {
+      name: "visible-filter-effect-contradiction",
+      mutate(review) {
+        review.findings[0].title = "Filtering leaves the chosen message visible while obsolete details persist";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
       name: "negated-detail-observation-contradiction",
       mutate(review) {
         review.findings[0].impact = "The list has no selected row while the detail pane renders no selected message.";
@@ -890,6 +898,14 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       name: "negated-selected-remediation-source-contradiction",
       mutate(review) {
         review.findings[0].required_action = "Derive details from visible messages that are not selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "hidden-only-remediation-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details only from hidden selected messages.";
       },
       expectedClassification: "under_processing",
       expectedOutcomes: { "evidence-and-review-precision": "fail" },

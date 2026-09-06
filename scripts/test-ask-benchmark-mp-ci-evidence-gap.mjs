@@ -620,6 +620,10 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       ["contradicted-colon-outer-negated-equality-count", "PR CI omits the required suite although this is not true: exactly two unit tests passed", false],
       ["matched-untrue-less-than-count", "PR CI omits the required suite although it is untrue that under two unit tests passed", true],
       ["wrong-unknown-target-identity-count", "PR CI omits the required suite although the lint target reports two passing unit tests", false],
+      ["contradicted-contracted-outer-negated-equality-count", "PR CI omits the required suite although it isn't true that exactly two unit tests passed", false],
+      ["matched-contracted-outer-negated-greater-count", "PR CI omits the required suite although it isn't true that more than two unit tests passed", true],
+      ["wrong-checkout-suite-target-count", "PR CI omits the required suite although the checkout suite reports two passing unit tests", false],
+      ["wrong-short-run-identity-count", "Run #999 omits the required checkout suite although two unit tests passed", false],
     ]) {
       const review = clone(baseReview);
       review.findings[0].title = title;
@@ -664,6 +668,21 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       satisfied: unresolvedNearComparisonResult.evaluation_status === "manual_review_required"
         && unresolvedNearComparisonResult.classification == null
         && unresolvedNearComparisonRequirement?.outcome === "manual_review_required",
+    });
+
+    const unresolvedRangeComparisonReview = clone(baseReview);
+    unresolvedRangeComparisonReview.findings[0].title = "PR CI omits the required checkout suite although between 1 and 3 unit tests passed";
+    unresolvedRangeComparisonReview.findings[0].evidence.push({ path: "ci/pull-request-314.log", line: 11 });
+    const unresolvedRangeComparisonResult = await evaluateReviewProbe({ probeId: "unresolved-range-comparison-count", review: unresolvedRangeComparisonReview });
+    const unresolvedRangeComparisonRequirement = unresolvedRangeComparisonResult.requirement_results.find(({ requirement_id }) => requirement_id === "scope-and-review-precision");
+    reviewRegressionChecks.push({
+      probe_id: "unresolved-range-comparison-count",
+      expected: "manual_review_required",
+      actual_evidence_correctness: unresolvedRangeComparisonResult.evidence_correctness.state,
+      actual_classification: unresolvedRangeComparisonResult.classification,
+      satisfied: unresolvedRangeComparisonResult.evaluation_status === "manual_review_required"
+        && unresolvedRangeComparisonResult.classification == null
+        && unresolvedRangeComparisonRequirement?.outcome === "manual_review_required",
     });
 
     const adverbObscuredUnsupportedPredicate = clone(baseReview);
