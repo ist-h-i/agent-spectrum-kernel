@@ -29,6 +29,28 @@ const mechanisms = ["request_scoped_cache_identity", "traffic_volume", "database
 const states = ["supported", "weakened", "falsified", "unresolved"];
 const confidenceLevels = ["high", "medium", "low"];
 const expectedSignals = ["cache_reuse_increase", "summary_builds_decrease", "latency_decrease", "request_rate_decrease", "database_latency_decrease", "gc_pause_decrease", "memory_usage_decrease"];
+const requestWindowText = readFileSync(resolve(workspace, "observability/request-windows.csv"), "utf8");
+const requestWindowLines = requestWindowText.split(/\r?\n/u);
+const requestWindowColumns = requestWindowLines[0].split(",");
+const requiredRequestWindowColumns = ["window_start", "release", "p95_ms", "requests_per_second", "db_query_p95_ms", "gc_pause_p95_ms"];
+if (!requiredRequestWindowColumns.every((column) => requestWindowColumns.includes(column))) throw new Error("request window columns are incomplete");
+const requestWindowsByLine = new Map(requestWindowLines.slice(1).flatMap((line, index) => {
+  if (!line) return [];
+  const fields = line.split(",");
+  if (fields.length !== requestWindowColumns.length) throw new Error("request window row is malformed");
+  return [[index + 2, Object.fromEntries(requestWindowColumns.map((column, fieldIndex) => [column, fields[fieldIndex]]))]];
+}));
+const contractText = readFileSync(resolve(workspace, "docs/investigation-contract.md"), "utf8");
+const targetRelease = contractText.match(/regression window begins with release `([^`]+)`/u)?.[1] ?? null;
+const releaseEvents = JSON.parse(readFileSync(resolve(workspace, "observability/release-events.json"), "utf8"));
+const targetReleaseEvents = (releaseEvents.events ?? []).filter((event) => event?.release === targetRelease && Number.isFinite(Date.parse(event?.at)));
+if (!targetRelease || targetReleaseEvents.length !== 1) throw new Error("target release event is missing or ambiguous");
+const targetReleaseAt = Date.parse(targetReleaseEvents[0].at);
+const mechanismSignalColumn = new Map([
+  ["traffic_volume", "requests_per_second"],
+  ["database_contention", "db_query_p95_ms"],
+  ["garbage_collection", "gc_pause_p95_ms"],
+]);
 
 function normalizeEvidencePath(candidate) {
   if (typeof candidate !== "string" || candidate.trim() !== candidate || isAbsolute(candidate) || candidate.includes("\\")) return null;
@@ -57,6 +79,35 @@ function citationRole(evidence) {
   return null;
 }
 
+function requestWindowComparisonSupports(hypothesis) {
+  const signalColumn = mechanismSignalColumn.get(hypothesis.mechanism);
+  if (!signalColumn) return false;
+  const rows = hypothesis.evidence.map((evidence) => requestWindowsByLine.get(evidence.line));
+  if (rows.some((row) => !row)) return false;
+  const classified = rows.map((row) => {
+    const at = Date.parse(row.window_start);
+    const p95 = Number(row.p95_ms);
+    const signal = Number(row[signalColumn]);
+    if (!Number.isFinite(at) || !Number.isFinite(p95) || !Number.isFinite(signal)) return null;
+    if (at < targetReleaseAt && row.release !== targetRelease) return { phase: "pre", p95, signal };
+    if (at >= targetReleaseAt && row.release === targetRelease) return { phase: "post", p95, signal };
+    return null;
+  });
+  if (classified.includes(null)) return false;
+  const pre = classified.filter(({ phase }) => phase === "pre");
+  const post = classified.filter(({ phase }) => phase === "post");
+  if (pre.length === 0 || post.length === 0) return false;
+  return pre.some((before) => post.some((after) => {
+    const latencyIncrease = after.p95 - before.p95;
+    if (!(latencyIncrease > 0) || before.p95 === 0 || before.signal === 0) return false;
+    if (hypothesis.state === "supported") return after.signal > before.signal;
+    const latencyRelativeIncrease = latencyIncrease / Math.abs(before.p95);
+    const signalRelativeChange = Math.abs(after.signal - before.signal) / Math.abs(before.signal);
+    if (["weakened", "falsified"].includes(hypothesis.state)) return signalRelativeChange < latencyRelativeIncrease;
+    return false;
+  }));
+}
+
 function evidenceIsRelevant(hypothesis) {
   const roles = hypothesis.evidence.map(citationRole);
   if (roles.includes(null)) return false;
@@ -65,7 +116,10 @@ function evidenceIsRelevant(hypothesis) {
       && roles.includes("cache_identity_contract");
   }
   if (["traffic_volume", "database_contention", "garbage_collection"].includes(hypothesis.mechanism)) {
-    return roles.length >= 2 && roles.every((role) => role === "request_window_observation") && new Set(hypothesis.evidence.map(({ line }) => line)).size >= 2;
+    return roles.length >= 2
+      && roles.every((role) => role === "request_window_observation")
+      && new Set(hypothesis.evidence.map(({ line }) => line)).size === hypothesis.evidence.length
+      && requestWindowComparisonSupports(hypothesis);
   }
   return hypothesis.state === "unresolved" && roles.every((role) => role === "unsupplied_mechanism_boundary");
 }

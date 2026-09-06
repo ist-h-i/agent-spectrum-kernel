@@ -517,16 +517,26 @@ function validateProductionNegativeCoverage() {
   }
 }
 
-async function validatePrivateCases({ privateRoot, caseRoot, productionExists }) {
+async function validatePrivateCases({ privateRoot, caseRoot, productionExists, semanticRegressionOnly = false, directOnly = false }) {
   const work = mkdtempSync(resolve(tmpdir(), "mp-iac-rollback-design-private-test-"));
   const boundaryRoots = productionExists ? createBoundaryRoots(work) : null;
-  const production = productionExists ? validateMpIacRollbackDesignProductionAuthority({ root: ROOT, privateRoot, boundaryRoots }) : null;
+  const reference = productionExists ? readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")) : null;
+  const bundle = productionExists ? readJson(resolve(privateRoot, "private-evaluator-bundle.json")) : null;
+  if (semanticRegressionOnly && productionExists) {
+    assert.equal(bundle.evaluator_revision, reference.evaluator_revision, "semantic regression bundle revision must match the public reference");
+    assert.equal(bundle.evaluator_bundle_id, reference.evaluator_bundle_id, "semantic regression bundle ID must match the public reference");
+    assert.equal(bundle.evaluator_bundle_digest, reference.evaluator_bundle_digest, "semantic regression bundle digest must match the public reference");
+  }
+  const production = productionExists
+    ? semanticRegressionOnly
+      ? { evaluatorRevision: reference.evaluator_revision, scoringReady: false, admissionState: "admission_pending" }
+      : validateMpIacRollbackDesignProductionAuthority({ root: ROOT, privateRoot, boundaryRoots })
+    : null;
   if (production) { assert.equal(production.scoringReady, false); assert.equal(production.admissionState, "admission_pending"); }
   const evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${createHash("sha256").update(readFileSync(resolve(privateRoot, "hidden-evaluator.mjs"))).digest("hex")}`);
   const cases = readJson(resolve(caseRoot, "cases.json"));
   validateFreshCases(cases);
   const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
-  const bundle = production ? readJson(resolve(privateRoot, "private-evaluator-bundle.json")) : null;
   const independence = production ? readJson(resolve(privateRoot, "independence.json")) : null;
   if (independence) {
     assert.ok(independence.source_classification.includes("current_canonical_public_contracts"));
@@ -547,6 +557,139 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   const privateEvaluationRoot = production ? resolve(work, "sealed-authority") : null;
   const evaluationInputRoot = production ? resolve(work, "sealed-input") : null;
   if (production) { mkdirSync(privateEvaluationRoot); mkdirSync(evaluationInputRoot); writeFileSync(resolve(evaluationInputRoot, "private-regression-authority.json"), "{\"measured_execution\":false,\"scoring_ready\":false}\n"); }
+
+  const evaluateEquivalentControl = async ({ controlId, mutate }) => {
+    const frozen = resolve(work, `${controlId}-frozen`);
+    const candidate = resolve(work, `${controlId}-candidate`);
+    cpSync(resolve(FIXTURE_ROOT, "workspace"), frozen, { recursive: true });
+    cpSync(frozen, candidate, { recursive: true });
+    const changePlan = clone(cases.base_output);
+    mutate(changePlan);
+    assertBenchmarkSchemaInstance(changePlan, { schemaPath: resolve(FIXTURE_ROOT, "workspace/change-plan.schema.json"), label: `${controlId} change plan` });
+    const changePlanPath = resolve(work, `${controlId}-change-plan.json`);
+    writeFileSync(changePlanPath, `${JSON.stringify(changePlan, null, 2)}\n`);
+    const publicValidation = spawnSync(process.execPath, [resolve(FIXTURE_ROOT, "workspace/scripts/validate-change-plan.mjs"), changePlanPath], { encoding: "utf8" });
+    const changePlanBytes = readFileSync(changePlanPath);
+    cpSync(changePlanPath, resolve(candidate, "change-plan.json"));
+    const lineage = {
+      run_instance_id: `20620620-6206-4206-8206-${controlId === "additional-relevant-evidence" ? "000000000901" : "000000000902"}`,
+      case_id: `case-2062062062062062-${controlId === "additional-relevant-evidence" ? "0000000000000901" : "0000000000000902"}`,
+      attempt: "0001",
+      final_output_digest: `sha256:${createHash("sha256").update(changePlanBytes).digest("hex")}`,
+      final_output_bytes: changePlanBytes.length,
+    };
+    const normalizedResult = {
+      normalized_result_digest: canonicalDigest({ fixture_id: FIXTURE_ID, control_id: controlId }),
+      lineage,
+      command_evidence: {
+        capture_support: "supported",
+        evidence_level: "complete",
+        required_command_ids: ["change-plan-contract-validation"],
+        required_alternative_groups: [],
+        references: [{ command_id: "change-plan-contract-validation", match_state: "matched", outcome: "succeeded", exit_code: 0, digest: canonicalDigest({ control_id: controlId, command: "change-plan-contract-validation" }), bytes: 1 }],
+        cwd_unverified_command_count: 0,
+      },
+    };
+    const repositoryDiffArtifact = directRepositoryDiffArtifact({}, lineage);
+    const direct = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
+    if (!production) return { publicStatus: publicValidation.status, direct, productionSafe: null };
+    const sealedExecution = createSealedEvaluatorExecutionForTest({
+      root: ROOT,
+      privateEvaluationRoot,
+      privateRoot,
+      hiddenAsset,
+      frozenWorkspace: frozen,
+      candidateWorkspace: candidate,
+      evaluationInputRoot,
+      evaluationLineage: lineage,
+      evaluatorRevision: production.evaluatorRevision,
+      externalAuthorityAnchor,
+      executionDirectoryName: `sealed-${controlId}`,
+      label: `mp-iac-rollback-design sealed ${controlId} evaluator`,
+    });
+    const sealed = executeSealedEvaluatorForTest({ execution: sealedExecution, externalAuthorityAnchor, repositoryRoot: ROOT, normalized: normalizedResult, label: `mp-iac-rollback-design sealed ${controlId} evaluator` });
+    return { publicStatus: publicValidation.status, direct, productionSafe: sealed.firstFragment };
+  };
+
+  const additionalRelevantEvidence = await evaluateEquivalentControl({
+    controlId: "additional-relevant-evidence",
+    mutate(changePlan) {
+      changePlan.evidence.push({ evidence_id: "command-format-nonmutation", path: "operations/commands.json", line: 6, source_excerpt: '"production_mutation": false,' });
+      changePlan.preparation[0].evidence_ids.push("command-format-nonmutation");
+    },
+  });
+  const dotPrefixedEvidencePath = await evaluateEquivalentControl({
+    controlId: "dot-prefixed-evidence-path",
+    mutate(changePlan) {
+      changePlan.evidence.find(({ evidence_id }) => evidence_id === "request-preparation").path = "./docs/change-request.md";
+    },
+  });
+  const unrelatedAdditionalEvidence = await evaluateEquivalentControl({
+    controlId: "unrelated-additional-evidence",
+    mutate(changePlan) {
+      changePlan.preparation[0].evidence_ids.push("state-approval");
+    },
+  });
+  const duplicateCitationIdentity = await evaluateEquivalentControl({
+    controlId: "duplicate-citation-identity",
+    mutate(changePlan) {
+      const original = changePlan.evidence.find(({ evidence_id }) => evidence_id === "check-format-command");
+      changePlan.evidence.push({ ...original, evidence_id: "command-format-copy" });
+      changePlan.preparation[0].evidence_ids.push("command-format-copy");
+    },
+  });
+  const paddedSourceExcerpt = await evaluateEquivalentControl({
+    controlId: "padded-source-excerpt",
+    mutate(changePlan) {
+      const citation = changePlan.evidence.find(({ evidence_id }) => evidence_id === "check-format-command");
+      citation.source_excerpt = ` ${citation.source_excerpt} `;
+    },
+  });
+  assert.deepEqual({
+    additional_relevant_evidence: {
+      public_status: additionalRelevantEvidence.publicStatus,
+      direct_outcomes: additionalRelevantEvidence.direct.requirement_results.map(({ outcome }) => outcome),
+      direct_classification: additionalRelevantEvidence.direct.classification,
+      production_safe_outcomes: additionalRelevantEvidence.productionSafe?.requirement_results.map(({ outcome }) => outcome) ?? null,
+      production_safe_classification: additionalRelevantEvidence.productionSafe?.classification ?? null,
+    },
+    dot_prefixed_evidence_path: {
+      public_status: dotPrefixedEvidencePath.publicStatus,
+      direct_outcomes: dotPrefixedEvidencePath.direct.requirement_results.map(({ outcome }) => outcome),
+      direct_classification: dotPrefixedEvidencePath.direct.classification,
+      production_safe_outcomes: dotPrefixedEvidencePath.productionSafe?.requirement_results.map(({ outcome }) => outcome) ?? null,
+      production_safe_classification: dotPrefixedEvidencePath.productionSafe?.classification ?? null,
+    },
+  }, {
+    additional_relevant_evidence: {
+      public_status: 0,
+      direct_outcomes: Array(REQUIREMENT_COUNT).fill("pass"),
+      direct_classification: "correct_narrow_execution",
+      production_safe_outcomes: production ? Array(REQUIREMENT_COUNT).fill("pass") : null,
+      production_safe_classification: production ? "correct_narrow_execution" : null,
+    },
+    dot_prefixed_evidence_path: {
+      public_status: 0,
+      direct_outcomes: Array(REQUIREMENT_COUNT).fill("pass"),
+      direct_classification: "correct_narrow_execution",
+      production_safe_outcomes: production ? Array(REQUIREMENT_COUNT).fill("pass") : null,
+      production_safe_classification: production ? "correct_narrow_execution" : null,
+    },
+  }, "equivalent evidence additions and path normalization must remain accepted");
+  for (const [label, control, requiredFailures] of [
+    ["unrelated additional evidence", unrelatedAdditionalEvidence, ["safe-preparation-boundary"]],
+    ["duplicate citation identity", duplicateCitationIdentity, ["safe-preparation-boundary", "evidence-and-scope-precision"]],
+    ["padded source excerpt", paddedSourceExcerpt, ["safe-preparation-boundary", "evidence-and-scope-precision"]],
+  ]) {
+    assert.notEqual(control.publicStatus, 0, `${label} public validator rejection`);
+    for (const requirementId of requiredFailures) {
+      assert.equal(control.direct.requirement_results.find(({ requirement_id }) => requirement_id === requirementId)?.outcome, "fail", `${label} direct ${requirementId} rejection`);
+      if (control.productionSafe) assert.equal(control.productionSafe.requirement_results.find(({ requirement_id }) => requirement_id === requirementId)?.outcome, "fail", `${label} production-safe ${requirementId} rejection`);
+    }
+    assert.notEqual(control.direct.classification, "correct_narrow_execution", `${label} direct classification`);
+    if (control.productionSafe) assert.notEqual(control.productionSafe.classification, "correct_narrow_execution", `${label} production-safe classification`);
+  }
+
   for (const [index, entry] of cases.cases.entries()) {
     const frozen = resolve(work, `${entry.case_id}-frozen`);
     const candidate = resolve(work, `${entry.case_id}-candidate`);
@@ -658,7 +801,7 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
     }
   }
 
-  if (!production) return { cases: cases.cases.length, directPass: cases.cases.length, productionSafePass: 0, mutationBehaviorPass: 0, validatorParityPass: 0, equivalentSolutionControls: cases.cases.filter(({ control }) => control === "equivalent_solution").length };
+  if (!production) return { cases: cases.cases.length, directPass: cases.cases.length, productionSafePass: directOnly ? "not_requested" : 0, sealedPass: directOnly ? "not_requested" : 0, mutationBehaviorPass: directOnly ? "not_requested" : 0, validatorParityPass: directOnly ? "not_requested" : 0, equivalentSolutionControls: cases.cases.filter(({ control }) => control === "equivalent_solution").length };
 
   const admission = readJson(resolve(FIXTURE_ROOT, "final-admission-record.json"));
   const evidenceMap = readJson(resolve(FIXTURE_ROOT, "evidence-map.json"));
@@ -764,17 +907,23 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   return { cases: cases.cases.length, directPass: cases.cases.length, productionSafePass: cases.cases.length, mutationBehaviorPass: mutationAsset.mutations.length, validatorParityPass: invalidChangePlanCases.length, equivalentSolutionControls: cases.cases.filter(({ control }) => control === "equivalent_solution").length };
 }
 
-validateFrozenDesign();
-validateHistoricalAuthority();
-validateMpIacRollbackDesignInputClosure({ root: ROOT });
-validateVisibleScenario();
-validateWorkspaceValidatorParity();
-validatePublicNegativeCoverage();
-
-const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
+const semanticRegressionOnly = process.argv.includes("--semantic-regression-only");
+const semanticRegressionDirectOnly = process.argv.includes("--semantic-regression-direct-only");
 const publicContractOnly = process.argv.includes("--public-contract-only");
+if ([semanticRegressionOnly, semanticRegressionDirectOnly, publicContractOnly].filter(Boolean).length > 1) throw new Error("semantic regression and public contract modes are mutually exclusive");
+const requested = privateArgs(process.argv.slice(2));
+if ((semanticRegressionOnly || semanticRegressionDirectOnly) && !requested) throw new Error("semantic regression modes require --private-root and --private-case-root");
+if (!semanticRegressionOnly && !semanticRegressionDirectOnly) {
+  validateFrozenDesign();
+  validateHistoricalAuthority();
+  validateMpIacRollbackDesignInputClosure({ root: ROOT });
+  validateVisibleScenario();
+  validateWorkspaceValidatorParity();
+  validatePublicNegativeCoverage();
+}
+const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
 let effectiveAdmissionStatus = "admission_pending";
-if (productionExists && !publicContractOnly) {
+if (productionExists && !publicContractOnly && !semanticRegressionOnly && !semanticRegressionDirectOnly) {
   const production = validateMpIacRollbackDesignProductionAuthority({ root: ROOT });
   assert.equal(production.scoringReady, false);
   validateProductionNegativeCoverage();
@@ -793,7 +942,7 @@ if (productionExists && !publicContractOnly) {
   assert.equal(resolvePortfolioExecutionFixtures({ root: ROOT, config }).some(({ id }) => id === FIXTURE_ID), false);
 }
 
-const requested = privateArgs(process.argv.slice(2));
-const sourceSummary = requested ? validateFreshPrivateSourceContract(requested, { sourceOnly: publicContractOnly }) : null;
-const privateSummary = requested ? await validatePrivateCases({ ...requested, productionExists: productionExists && !publicContractOnly }) : null;
-console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", historical_admitted_authority: "pass", production_validation: publicContractOnly ? "not_requested" : productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? publicContractOnly ? "source_behavior_pass" : "pass" : "not_supplied", ...(sourceSummary ? { fresh_source_summary: sourceSummary } : {}), ...(privateSummary ? { private_summary: privateSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));
+const sourceSummary = requested && !semanticRegressionDirectOnly ? validateFreshPrivateSourceContract(requested, { sourceOnly: publicContractOnly }) : null;
+const privateSummary = requested ? await validatePrivateCases({ ...requested, productionExists: productionExists && !publicContractOnly && !semanticRegressionDirectOnly, semanticRegressionOnly, directOnly: semanticRegressionDirectOnly }) : null;
+const semanticMode = semanticRegressionOnly || semanticRegressionDirectOnly;
+console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: semanticMode ? "not_requested" : "pass", source_freeze_validation: semanticRegressionDirectOnly ? "not_requested" : "included", sealed_validation: semanticRegressionDirectOnly ? "not_requested" : "included", production_safe_validation: semanticRegressionDirectOnly ? "not_requested" : "included", frozen_design: semanticMode ? "not_requested" : "pass", visible_scenario: semanticMode ? "not_requested" : "pass", negative_regressions: semanticRegressionDirectOnly ? "semantic_direct_only" : semanticRegressionOnly ? "semantic_direct_and_sealed" : "pass", historical_admitted_authority: semanticMode ? "not_requested" : "pass", production_validation: semanticMode || publicContractOnly ? "not_requested" : productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? publicContractOnly ? "source_behavior_pass" : semanticRegressionDirectOnly ? "semantic_direct_pass" : semanticRegressionOnly ? "semantic_direct_and_sealed_pass" : "pass" : "not_supplied", ...(sourceSummary ? { fresh_source_summary: sourceSummary } : {}), ...(privateSummary ? { private_summary: privateSummary } : {}), admission: semanticMode ? "not_requested" : effectiveAdmissionStatus, scoring_ready: false }));

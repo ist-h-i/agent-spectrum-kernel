@@ -416,7 +416,7 @@ function validatePrivateEvidenceMapClosure(requirement, evidenceMap, oracle) {
   }
 }
 
-async function validatePrivateCases({ privateRoot, caseRoot, productionExists }) {
+async function validatePrivateCases({ privateRoot, caseRoot, productionExists, directOnly = false }) {
   const work = mkdtempSync(resolve(tmpdir(), "mn-focused-regression-private-"));
   const cases = readJson(resolve(caseRoot, "cases.json"));
   assert.equal(cases.fixture_id, FIXTURE_ID);
@@ -512,6 +512,24 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, output: `${validLine}{}\n` }), false, "unexpected extra record must fail");
   assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, output: "not-json\n" }), false, "malformed observation must fail");
   assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, output: `${JSON.stringify(payload)}\n` }), false, "candidate-originated raw JSON must not establish the boundary");
+  const publicApi = await import(`${pathToFileURL(resolve(WORKSPACE_ROOT, "src/session-key.mjs")).href}?error-type-regression=1`);
+  assert.throws(
+    () => publicApi.sessionCacheKey({ tenantId: "acme", region: " " }),
+    TypeError,
+    "the frozen public API must retain its built-in TypeError contract",
+  );
+  const loaderErrorTypeProbe = await evaluator.runIsolatedCandidateProbeForTest({
+    frozenWorkspace: WORKSPACE_ROOT,
+    candidateTest: `import assert from "node:assert/strict";
+import { sessionCacheKey } from "../src/session-key.mjs";
+assert.throws(() => sessionCacheKey({ tenantId: "acme", region: " " }), TypeError);
+`,
+  });
+  assert.deepEqual(
+    loaderErrorTypeProbe,
+    { outcome: "succeeded", exit_code: 0 },
+    "the authenticated generic loader must preserve the frozen API built-in error constructor",
+  );
   for (const [index, entry] of cases.cases.entries()) {
     const frozen = resolve(work, `${entry.case_id}-frozen`);
     const candidate = resolve(work, `${entry.case_id}-candidate`);
@@ -743,11 +761,11 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   return {
     cases: cases.cases.length,
     directPass: cases.cases.length,
-    productionSafePass: productionExists ? cases.cases.length : 0,
+    productionSafePass: directOnly ? "not_requested" : productionExists ? cases.cases.length : 0,
     mutationBehaviorPass: mutationAsset.mutations.length,
     equivalentSolutionControls: equivalenceCount,
     typeBoundaryControls: 3,
-    sealedSymlinkRejections: productionExists ? symlinkControls.length : 0,
+    sealedSymlinkRejections: directOnly ? "not_requested" : productionExists ? symlinkControls.length : 0,
   };
 }
 
@@ -838,15 +856,21 @@ function validateReviewArchiveOutputBoundary() {
   }
 }
 
-validateFrozenDesign();
-validateMnFocusedRegressionTestInputClosure({ root: ROOT });
-validateHistoricalPublicInputInvariance();
-validateVisibleScenario();
-validatePublicNegativeCoverage();
-validateReviewArchiveOutputBoundary();
-
+const semanticRegressionDirectOnly = process.argv.includes("--semantic-regression-direct-only");
 const publicContractOnly = process.argv.includes("--public-contract-only");
-const productionExists = !publicContractOnly && readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
+if (semanticRegressionDirectOnly && publicContractOnly) throw new Error("semantic regression and public contract modes are mutually exclusive");
+const requested = privateArgs(process.argv.slice(2));
+if (semanticRegressionDirectOnly && !requested) throw new Error("semantic regression direct mode requires --private-root and --private-case-root");
+if (!semanticRegressionDirectOnly) {
+  validateFrozenDesign();
+  validateMnFocusedRegressionTestInputClosure({ root: ROOT });
+  validateHistoricalPublicInputInvariance();
+  validateVisibleScenario();
+  validatePublicNegativeCoverage();
+  validateReviewArchiveOutputBoundary();
+}
+
+const productionExists = !publicContractOnly && !semanticRegressionDirectOnly && readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
 let effectiveAdmissionStatus = "admission_pending";
 if (productionExists) {
   const production = validateMnFocusedRegressionTestProductionAuthority({ root: ROOT });
@@ -867,8 +891,7 @@ if (productionExists) {
   }
 }
 
-const requested = privateArgs(process.argv.slice(2));
-const sourceSummary = requested ? validateFreshPrivateSourceContract(requested, { sourceOnly: publicContractOnly }) : null;
-const privateSummary = requested ? await validatePrivateCases({ ...requested, productionExists }) : null;
+const sourceSummary = requested && !semanticRegressionDirectOnly ? validateFreshPrivateSourceContract(requested, { sourceOnly: publicContractOnly }) : null;
+const privateSummary = requested ? await validatePrivateCases({ ...requested, productionExists, directOnly: semanticRegressionDirectOnly }) : null;
 const reviewArchiveSummary = requested && productionExists ? validateReviewArchive(requested) : null;
-console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", historical_public_input_invariance: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? publicContractOnly ? "source_behavior_pass" : "pass" : "not_supplied", ...(sourceSummary ? { fresh_source_summary: sourceSummary } : {}), ...(privateSummary ? { private_summary: privateSummary } : {}), ...(reviewArchiveSummary ? { review_archive_validation: reviewArchiveSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));
+console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: semanticRegressionDirectOnly ? "not_requested" : "pass", source_freeze_validation: semanticRegressionDirectOnly ? "not_requested" : "included", sealed_validation: semanticRegressionDirectOnly ? "not_requested" : "included", production_safe_validation: semanticRegressionDirectOnly ? "not_requested" : "included", historical_public_input_invariance: semanticRegressionDirectOnly ? "not_requested" : "pass", frozen_design: semanticRegressionDirectOnly ? "not_requested" : "pass", visible_scenario: semanticRegressionDirectOnly ? "not_requested" : "pass", negative_regressions: semanticRegressionDirectOnly ? "semantic_direct_only" : "pass", production_validation: semanticRegressionDirectOnly ? "not_requested" : productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? publicContractOnly ? "source_behavior_pass" : semanticRegressionDirectOnly ? "semantic_direct_pass" : "pass" : "not_supplied", ...(sourceSummary ? { fresh_source_summary: sourceSummary } : {}), ...(privateSummary ? { private_summary: privateSummary } : {}), ...(reviewArchiveSummary ? { review_archive_validation: reviewArchiveSummary } : {}), admission: semanticRegressionDirectOnly ? "not_requested" : effectiveAdmissionStatus, scoring_ready: false }));

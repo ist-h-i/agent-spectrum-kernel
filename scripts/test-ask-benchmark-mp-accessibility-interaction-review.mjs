@@ -221,31 +221,35 @@ function validateProductionNegativeCoverage() {
   }
 }
 
-async function validatePrivateCases({ privateRoot, caseRoot }) {
+async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = false } = {}) {
   const work = mkdtempSync(resolve(tmpdir(), "mp-accessibility-private-test-"));
-  const boundaryRoots = createBoundaryRoots(work);
-  const production = validateMpAccessibilityInteractionReviewProductionAuthority({ root: ROOT, privateRoot, boundaryRoots });
-  assert.equal(production.scoringReady, false);
-  assert.equal(production.admissionState, "admission_pending");
-  const evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${production.evaluatorBundleDigest}`);
+  const boundaryRoots = directOnly ? null : createBoundaryRoots(work);
+  const production = directOnly ? null : validateMpAccessibilityInteractionReviewProductionAuthority({ root: ROOT, privateRoot, boundaryRoots });
+  if (production) {
+    assert.equal(production.scoringReady, false);
+    assert.equal(production.admissionState, "admission_pending");
+  }
+  const evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${production?.evaluatorBundleDigest ?? canonicalDigest({ privateRoot, mode: "semantic-regression-direct-only" })}`);
   const cases = readJson(resolve(caseRoot, "cases.json"));
   const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
-  const bundle = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
-  const hiddenAsset = bundle.asset_inventory.find(({ role }) => role === "hidden_tests");
-  assert.ok(hiddenAsset, "private bundle requires a hidden evaluator asset");
-  const freezePath = resolve(FIXTURE_ROOT, "scoring-input-freeze-manifest.json");
-  const externalAuthorityAnchor = readEvaluatorAuthorityAnchorFromFreeze({
+  const bundle = directOnly ? null : readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
+  const hiddenAsset = bundle?.asset_inventory.find(({ role }) => role === "hidden_tests") ?? null;
+  if (!directOnly) assert.ok(hiddenAsset, "private bundle requires a hidden evaluator asset");
+  const freezePath = directOnly ? null : resolve(FIXTURE_ROOT, "scoring-input-freeze-manifest.json");
+  const externalAuthorityAnchor = directOnly ? null : readEvaluatorAuthorityAnchorFromFreeze({
     root: ROOT,
     freezeManifestPath: freezePath,
     freezeManifestSourceDigest: `sha256:${createHash("sha256").update(readFileSync(freezePath)).digest("hex")}`,
     referencePath: resolve(FIXTURE_ROOT, "evaluator-reference.json"),
     label: "mp-accessibility private regression authority",
   });
-  const privateEvaluationRoot = resolve(work, "sealed-authority");
-  const evaluationInputRoot = resolve(work, "sealed-input");
-  mkdirSync(privateEvaluationRoot);
-  mkdirSync(evaluationInputRoot);
-  writeFileSync(resolve(evaluationInputRoot, "private-regression-authority.json"), "{\"measured_execution\":false,\"scoring_ready\":false}\n");
+  const privateEvaluationRoot = directOnly ? null : resolve(work, "sealed-authority");
+  const evaluationInputRoot = directOnly ? null : resolve(work, "sealed-input");
+  if (!directOnly) {
+    mkdirSync(privateEvaluationRoot);
+    mkdirSync(evaluationInputRoot);
+    writeFileSync(resolve(evaluationInputRoot, "private-regression-authority.json"), "{\"measured_execution\":false,\"scoring_ready\":false}\n");
+  }
   for (const [index, entry] of cases.cases.entries()) {
     const frozen = resolve(work, `${entry.case_id}-frozen`);
     const candidate = resolve(work, `${entry.case_id}-candidate`);
@@ -273,7 +277,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
         cwd_unverified_command_count: 0,
       },
     };
-    const sealedExecution = createSealedEvaluatorExecutionForTest({
+    const sealedExecution = directOnly ? null : createSealedEvaluatorExecutionForTest({
       root: ROOT,
       privateEvaluationRoot,
       privateRoot,
@@ -287,7 +291,9 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       executionDirectoryName: `sealed-${entry.case_id}`,
       label: `mp-accessibility sealed ${entry.case_id} evaluator`,
     });
-    const repositoryDiffArtifact = readJson(resolve(sealedExecution.originalWorkspaceAuthority.path, sealedExecution.originalWorkspaceAuthority.repositoryDiffPath));
+    const repositoryDiffArtifact = directOnly
+      ? { artifact_digest: canonicalDigest({ case_id: entry.case_id, kind: "repository-diff" }), artifact_bytes: 1 }
+      : readJson(resolve(sealedExecution.originalWorkspaceAuthority.path, sealedExecution.originalWorkspaceAuthority.repositoryDiffPath));
     const first = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
     const second = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
     assert.deepEqual(first, second, `${entry.case_id} evaluator determinism`);
@@ -307,48 +313,174 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       );
     }
 
-    const sealed = executeSealedEvaluatorForTest({
-      execution: sealedExecution,
-      externalAuthorityAnchor,
-      repositoryRoot: ROOT,
-      normalized: normalizedResult,
-      label: `mp-accessibility sealed ${entry.case_id} evaluator`,
-    });
-    assertBenchmarkSchemaInstance(sealed.firstFragment, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} production-safe private fragment` });
-    assert.deepEqual(evaluatorSemanticProjection(sealed.firstFragment), expected, `${entry.case_id} complete production-safe evaluator projection`);
-    assert.deepEqual(evaluatorSemanticProjection(sealed.firstFragment), evaluatorSemanticProjection(first), `${entry.case_id} direct/production-safe evaluator agreement`);
+    if (!directOnly) {
+      const sealed = executeSealedEvaluatorForTest({
+        execution: sealedExecution,
+        externalAuthorityAnchor,
+        repositoryRoot: ROOT,
+        normalized: normalizedResult,
+        label: `mp-accessibility sealed ${entry.case_id} evaluator`,
+      });
+      assertBenchmarkSchemaInstance(sealed.firstFragment, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} production-safe private fragment` });
+      assert.deepEqual(evaluatorSemanticProjection(sealed.firstFragment), expected, `${entry.case_id} complete production-safe evaluator projection`);
+      assert.deepEqual(evaluatorSemanticProjection(sealed.firstFragment), evaluatorSemanticProjection(first), `${entry.case_id} direct/production-safe evaluator agreement`);
+    }
   }
 
-  const admission = readJson(resolve(FIXTURE_ROOT, "final-admission-record.json"));
-  const evidenceMap = readJson(resolve(FIXTURE_ROOT, "evidence-map.json"));
-  const inputRecord = readJson(resolve(FIXTURE_ROOT, "input-manifest.json")).fixtures[FIXTURE_ID];
-  const mutationAsset = readJson(resolve(privateRoot, "evidence-removal-mutations.json"));
-  const equivalenceAsset = readJson(resolve(privateRoot, "equivalent-solutions.json"));
-  assert.doesNotThrow(() => validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset }));
-  assert.doesNotThrow(() => validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset }));
-  assert.doesNotThrow(() => validateMatchedEquivalenceIds({ requirementRecord: requirement, equivalenceAsset, matchedEquivalenceClassIds: equivalenceAsset.rules.map(({ equivalence_class_id }) => equivalence_class_id) }));
+  const baseReview = readJson(resolve(caseRoot, "correct-review/review.json"));
+  const evaluateVerificationProbe = async ({ probeId, review, index }) => {
+    const frozen = resolve(work, `${probeId}-frozen`);
+    const candidate = resolve(work, `${probeId}-candidate`);
+    cpSync(resolve(FIXTURE_ROOT, "workspace"), frozen, { recursive: true });
+    cpSync(frozen, candidate, { recursive: true });
+    const reviewBytes = Buffer.from(`${JSON.stringify(review, null, 2)}\n`);
+    writeFileSync(resolve(candidate, "review.json"), reviewBytes);
+    const lineage = {
+      run_instance_id: `25125125-1251-4251-8251-${String(index + 1).padStart(12, "0")}`,
+      case_id: `case-2512512512512512-${String(index + 101).padStart(16, "0")}`,
+      attempt: "0001",
+      final_output_digest: `sha256:${createHash("sha256").update(reviewBytes).digest("hex")}`,
+      final_output_bytes: reviewBytes.length,
+    };
+    const normalizedResult = {
+      normalized_result_digest: canonicalDigest({ fixture_id: FIXTURE_ID, probe_id: probeId }),
+      lineage,
+      command_evidence: {
+        capture_support: "supported",
+        evidence_level: "complete",
+        required_command_ids: ["review-contract-validation"],
+        required_alternative_groups: [],
+        references: [{ command_id: "review-contract-validation", match_state: "matched", outcome: "succeeded", exit_code: 0, digest: canonicalDigest({ probe_id: probeId, command: "review-contract-validation" }), bytes: 1 }],
+        cwd_unverified_command_count: 0,
+      },
+    };
+    const sealedExecution = directOnly ? null : createSealedEvaluatorExecutionForTest({
+      root: ROOT,
+      privateEvaluationRoot,
+      privateRoot,
+      hiddenAsset,
+      frozenWorkspace: frozen,
+      candidateWorkspace: candidate,
+      evaluationInputRoot,
+      evaluationLineage: lineage,
+      evaluatorRevision: production.evaluatorRevision,
+      externalAuthorityAnchor,
+      executionDirectoryName: `sealed-${probeId}`,
+      label: `mp-accessibility sealed ${probeId} evaluator`,
+    });
+    const repositoryDiffArtifact = directOnly
+      ? { artifact_digest: canonicalDigest({ probe_id: probeId, kind: "repository-diff" }), artifact_bytes: 1 }
+      : readJson(resolve(sealedExecution.originalWorkspaceAuthority.path, sealedExecution.originalWorkspaceAuthority.repositoryDiffPath));
+    const direct = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
+    assertBenchmarkSchemaInstance(direct, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${probeId} direct fragment` });
+    if (!directOnly) {
+      const sealed = executeSealedEvaluatorForTest({
+        execution: sealedExecution,
+        externalAuthorityAnchor,
+        repositoryRoot: ROOT,
+        normalized: normalizedResult,
+        label: `mp-accessibility sealed ${probeId} evaluator`,
+      });
+      assertBenchmarkSchemaInstance(sealed.firstFragment, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${probeId} production-safe fragment` });
+      assert.deepEqual(evaluatorSemanticProjection(sealed.firstFragment), evaluatorSemanticProjection(direct), `${probeId} direct/production-safe evaluator agreement`);
+    }
+    return direct;
+  };
 
-  const missingMutation = clone(mutationAsset);
-  missingMutation.mutations.pop();
-  expectFailure(() => validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset: missingMutation }), /inventory/u, "evidence-removal violation");
-  const undeclaredEquivalence = clone(equivalenceAsset);
-  undeclaredEquivalence.rules[0].equivalence_class_id = "undeclared-equivalence";
-  expectFailure(() => validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: undeclaredEquivalence }), /inventory|transplanted/u, "undeclared equivalence");
-  const transplantedEquivalence = clone(equivalenceAsset);
-  transplantedEquivalence.fixture_id = "foreign-fixture";
-  expectFailure(() => {
-    if (transplantedEquivalence.fixture_id !== requirement.fixture_id) throw new Error("private equivalence fixture transplant");
-    validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: transplantedEquivalence });
-  }, /transplant/u, "cross-fixture transplant");
-  return { cases: cases.cases.length, directPass: cases.cases.length, productionSafePass: cases.cases.length, falsePositiveControls: cases.cases.filter(({ control }) => control === "suspicious_but_correct").length };
+  const failedInteractionRecord = {
+    path: "test/integration/format-toolbar.test.mjs",
+    conclusion: "Home and End interaction assertions failed because defaultPrevented remained false and the browser default action was not consumed.",
+  };
+  const succeededInteractionRecord = {
+    path: "test/integration/format-toolbar.test.mjs",
+    conclusion: "Home and End interaction assertions passed; defaultPrevented was true and the browser default action was consumed.",
+  };
+  const succeededUnitRecord = {
+    path: "test/unit/format-toolbar.test.mjs",
+    conclusion: "ArrowRight unit assertions passed; defaultPrevented was true and its browser default action was consumed.",
+  };
+  const aliasedFailedInteractionRecord = { ...failedInteractionRecord, path: "./test/integration/format-toolbar.test.mjs" };
+  const aliasedSucceededInteractionRecord = { ...succeededInteractionRecord, path: "./test/integration/format-toolbar.test.mjs" };
+  const unsafeSucceededInteractionRecords = [
+    { ...succeededInteractionRecord, path: "../test/integration/format-toolbar.test.mjs" },
+    { ...succeededInteractionRecord, path: "/test/integration/format-toolbar.test.mjs" },
+    { ...succeededInteractionRecord, path: "workspace/../test/integration/format-toolbar.test.mjs" },
+    { ...succeededInteractionRecord, path: "test\\integration\\format-toolbar.test.mjs" },
+    { ...succeededInteractionRecord, path: "test/integration/format-toolbar.test.mjs/" },
+    { ...succeededInteractionRecord, path: "test//integration/format-toolbar.test.mjs" },
+  ];
+  const verificationProbes = [
+    { probeId: "same-target-failure-then-success", records: [failedInteractionRecord, succeededInteractionRecord], accepted: false },
+    { probeId: "same-target-success-then-failure", records: [succeededInteractionRecord, failedInteractionRecord], accepted: false },
+    { probeId: "aliased-same-target-failure-then-success", records: [failedInteractionRecord, aliasedSucceededInteractionRecord], accepted: false },
+    { probeId: "aliased-same-target-success-then-failure", records: [aliasedSucceededInteractionRecord, failedInteractionRecord], accepted: false },
+    { probeId: "reverse-aliased-same-target-failure-then-success", records: [aliasedFailedInteractionRecord, succeededInteractionRecord], accepted: false },
+    { probeId: "reverse-aliased-same-target-success-then-failure", records: [succeededInteractionRecord, aliasedFailedInteractionRecord], accepted: false },
+    ...unsafeSucceededInteractionRecords.map((record, index) => ({
+      probeId: `unsafe-path-contradiction-${index + 1}`,
+      records: [failedInteractionRecord, record],
+      accepted: false,
+    })),
+    { probeId: "distinct-target-success-then-failure", records: [succeededUnitRecord, failedInteractionRecord], accepted: true },
+    { probeId: "distinct-target-failure-then-success", records: [failedInteractionRecord, succeededUnitRecord], accepted: true },
+  ];
+  const verificationRegressionChecks = [];
+  for (const [probeIndex, { probeId, records, accepted }] of verificationProbes.entries()) {
+    const review = clone(baseReview);
+    review.verification = { state: "failed", evidence: records };
+    const result = await evaluateVerificationProbe({ probeId, review, index: cases.cases.length + probeIndex });
+    const verification = result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-conclusion");
+    verificationRegressionChecks.push({
+      probe_id: probeId,
+      expected: accepted ? "accepted" : "rejected",
+      actual_verification_outcome: verification?.outcome,
+      actual_classification: result.classification,
+      satisfied: accepted
+        ? verification?.outcome === "pass" && result.classification === "correct_narrow_execution"
+        : verification?.outcome !== "pass" && result.classification !== "correct_narrow_execution",
+    });
+  }
+  assert.deepEqual(
+    verificationRegressionChecks.map(({ probe_id, expected, satisfied }) => ({ probe_id, expected, satisfied })),
+    verificationRegressionChecks.map(({ probe_id, expected }) => ({ probe_id, expected, satisfied: true })),
+    `verification contradiction regressions:\n${JSON.stringify(verificationRegressionChecks, null, 2)}`,
+  );
+
+  if (!directOnly) {
+    const admission = readJson(resolve(FIXTURE_ROOT, "final-admission-record.json"));
+    const evidenceMap = readJson(resolve(FIXTURE_ROOT, "evidence-map.json"));
+    const inputRecord = readJson(resolve(FIXTURE_ROOT, "input-manifest.json")).fixtures[FIXTURE_ID];
+    const mutationAsset = readJson(resolve(privateRoot, "evidence-removal-mutations.json"));
+    const equivalenceAsset = readJson(resolve(privateRoot, "equivalent-solutions.json"));
+    assert.doesNotThrow(() => validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset }));
+    assert.doesNotThrow(() => validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset }));
+    assert.doesNotThrow(() => validateMatchedEquivalenceIds({ requirementRecord: requirement, equivalenceAsset, matchedEquivalenceClassIds: equivalenceAsset.rules.map(({ equivalence_class_id }) => equivalence_class_id) }));
+
+    const missingMutation = clone(mutationAsset);
+    missingMutation.mutations.pop();
+    expectFailure(() => validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset: missingMutation }), /inventory/u, "evidence-removal violation");
+    const undeclaredEquivalence = clone(equivalenceAsset);
+    undeclaredEquivalence.rules[0].equivalence_class_id = "undeclared-equivalence";
+    expectFailure(() => validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: undeclaredEquivalence }), /inventory|transplanted/u, "undeclared equivalence");
+    const transplantedEquivalence = clone(equivalenceAsset);
+    transplantedEquivalence.fixture_id = "foreign-fixture";
+    expectFailure(() => {
+      if (transplantedEquivalence.fixture_id !== requirement.fixture_id) throw new Error("private equivalence fixture transplant");
+      validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: transplantedEquivalence });
+    }, /transplant/u, "cross-fixture transplant");
+  }
+  return { cases: cases.cases.length, directPass: cases.cases.length, productionSafePass: directOnly ? "not_requested" : cases.cases.length, sealedPass: directOnly ? "not_requested" : cases.cases.length + verificationProbes.length, semanticRegressionProbes: verificationProbes.length, falsePositiveControls: cases.cases.filter(({ control }) => control === "suspicious_but_correct").length };
 }
 
-validateFrozenDesign();
-validateMpAccessibilityInteractionReviewInputClosure({ root: ROOT });
-validateVisibleScenario();
-validatePublicNegativeCoverage();
+const semanticRegressionDirectOnly = process.argv.includes("--semantic-regression-direct-only");
+if (!semanticRegressionDirectOnly) {
+  validateFrozenDesign();
+  validateMpAccessibilityInteractionReviewInputClosure({ root: ROOT });
+  validateVisibleScenario();
+  validatePublicNegativeCoverage();
+}
 
-const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
+const productionExists = !semanticRegressionDirectOnly && readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
 let effectiveAdmissionStatus = "admission_pending";
 if (productionExists) {
   const production = validateMpAccessibilityInteractionReviewProductionAuthority({ root: ROOT });
@@ -370,5 +502,6 @@ if (productionExists) {
 }
 
 const requested = privateArgs(process.argv.slice(2));
-const privateSummary = requested ? await validatePrivateCases(requested) : null;
-console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));
+if (semanticRegressionDirectOnly && !requested) throw new Error("--semantic-regression-direct-only requires --private-root and --private-case-root");
+const privateSummary = requested ? await validatePrivateCases(requested, { directOnly: semanticRegressionDirectOnly }) : null;
+console.log(JSON.stringify({ fixture_id: FIXTURE_ID, semantic_regression_direct_validation: semanticRegressionDirectOnly ? "pass" : "included", input_closure: semanticRegressionDirectOnly ? "not_requested" : "pass", source_freeze_validation: semanticRegressionDirectOnly ? "not_requested" : "included", sealed_validation: semanticRegressionDirectOnly ? "not_requested" : "included", production_safe_validation: semanticRegressionDirectOnly ? "not_requested" : "included", frozen_design: semanticRegressionDirectOnly ? "not_requested" : "pass", visible_scenario: semanticRegressionDirectOnly ? "not_requested" : "pass", negative_regressions: semanticRegressionDirectOnly ? "not_requested" : "pass", production_validation: semanticRegressionDirectOnly ? "not_requested" : productionExists ? "pass" : "generation_pending", actual_private_validation: semanticRegressionDirectOnly ? "semantic_direct_pass" : requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: semanticRegressionDirectOnly ? "not_requested" : effectiveAdmissionStatus, scoring_ready: false }));

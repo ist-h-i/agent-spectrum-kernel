@@ -29,6 +29,13 @@ const evidencePaths = new Set([
 ]);
 const commandsById = new Map();
 const commandSourceById = new Map();
+const uniqueCommandSource = ({ start, end, excerpt, label }) => {
+  const matches = commandCatalogLines.flatMap((line, lineIndex) => (
+    lineIndex > start && lineIndex < end && line.trim() === excerpt ? [lineIndex] : []
+  ));
+  if (matches.length !== 1) throw new Error(`supplied command catalog ${label} source identity is ambiguous`);
+  return { line: matches[0] + 1, excerpt };
+};
 for (const [index, command] of (commandCatalog.commands ?? []).entries()) {
   if (!exactKeys(command, ["command_id", "mode", "production_mutation", "approval_required"]) || !slug(command.command_id) || commandsById.has(command.command_id)) throw new Error("supplied command catalog is invalid");
   const commandExcerpt = `"command_id": "${command.command_id}",`;
@@ -40,15 +47,15 @@ for (const [index, command] of (commandCatalog.commands ?? []).entries()) {
     ? commandCatalogLines.length
     : commandCatalogLines.findIndex((line, lineIndex) => lineIndex > commandLines[0] && line.trim() === nextCommandExcerpt);
   if (nextCommandLine < 0) throw new Error("supplied command catalog source order is invalid");
-  const modeExcerpt = `"mode": "${command.mode}",`;
-  const modeLines = commandCatalogLines.flatMap((line, lineIndex) => (
-    lineIndex > commandLines[0] && lineIndex < nextCommandLine && line.trim() === modeExcerpt ? [lineIndex] : []
-  ));
-  if (modeLines.length !== 1) throw new Error("supplied command catalog mode source identity is ambiguous");
+  const mode = uniqueCommandSource({ start: commandLines[0], end: nextCommandLine, excerpt: `"mode": "${command.mode}",`, label: "mode" });
+  const productionMutation = uniqueCommandSource({ start: commandLines[0], end: nextCommandLine, excerpt: `"production_mutation": ${command.production_mutation},`, label: "production mutation" });
+  const approvalRequired = uniqueCommandSource({ start: commandLines[0], end: nextCommandLine, excerpt: `"approval_required": ${command.approval_required}`, label: "approval" });
   commandsById.set(command.command_id, command);
   commandSourceById.set(command.command_id, {
     command_id: { line: commandLines[0] + 1, excerpt: commandExcerpt },
-    mode: { line: modeLines[0] + 1, excerpt: modeExcerpt },
+    mode,
+    production_mutation: productionMutation,
+    approval_required: approvalRequired,
   });
 }
 
@@ -123,12 +130,16 @@ if (!exactKeys(value.knowledge_promotion, ["state", "trigger_id", "destination",
 if (!Array.isArray(value.evidence) || value.evidence.length === 0) throw new Error("evidence is required");
 const evidenceIds = new Set();
 const evidenceById = new Map();
+const evidenceSourceIdentities = new Set();
 for (const evidence of value.evidence) {
   if (!exactKeys(evidence, ["evidence_id", "path", "line", "source_excerpt"])
     || !slug(evidence.evidence_id) || evidenceIds.has(evidence.evidence_id)
     || !validatesExactExcerpt(evidence)) throw new Error("evidence is invalid or duplicated");
+  const sourceIdentity = JSON.stringify([normalizeEvidencePath(evidence.path), evidence.line, evidence.source_excerpt]);
+  if (evidenceSourceIdentities.has(sourceIdentity)) throw new Error("evidence source identity is duplicated");
   evidenceIds.add(evidence.evidence_id);
   evidenceById.set(evidence.evidence_id, evidence);
+  evidenceSourceIdentities.add(sourceIdentity);
 }
 const referencedEvidenceIds = [
   ...value.decision.evidence_ids,
@@ -151,6 +162,14 @@ for (const step of value.preparation) {
       return normalizeEvidencePath(citation?.path) === "docs/change-request.md"
         && citation.source_excerpt === "Preparation may format-check, validate configuration, and create a plan, but it must not mutate cloud resources.";
     })) throw new Error("preparation evidence does not bind the exact command, mode, and safe-preparation authority");
+  const relevantEvidence = step.evidence_ids.every((id) => {
+    const citation = evidenceById.get(id);
+    if (normalizeEvidencePath(citation?.path) === "docs/change-request.md"
+      && citation.source_excerpt === "Preparation may format-check, validate configuration, and create a plan, but it must not mutate cloud resources.") return true;
+    if (normalizeEvidencePath(citation?.path) !== "operations/commands.json") return false;
+    return Object.values(commandSource).some(({ line, excerpt }) => citation.line === line && citation.source_excerpt === excerpt);
+  });
+  if (!relevantEvidence) throw new Error("preparation evidence contains a citation unrelated to its exact command and safe-preparation authority");
 }
 
 if (!exactKeys(value.scope, ["changes_made", "production_action_authorized"])

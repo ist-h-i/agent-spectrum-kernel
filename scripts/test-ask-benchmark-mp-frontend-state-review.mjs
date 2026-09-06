@@ -480,6 +480,255 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
     }
   }
 
+  const referenceReview = readJson(resolve(caseRoot, "reference-review/review.json"));
+  const semanticRegressionProbes = [
+    {
+      name: "contradictory-verification-failure-then-success",
+      mutate(review) {
+        review.verification.evidence.push({
+          path: "test/integration/inbox-view.test.mjs",
+          conclusion: "The interaction test passed and the detail pane was empty.",
+        });
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "verification-conclusion": "fail" },
+    },
+    {
+      name: "contradictory-verification-success-then-failure",
+      mutate(review) {
+        review.verification.evidence.unshift({
+          path: "test/integration/inbox-view.test.mjs",
+          conclusion: "The interaction test passed and the detail pane was empty.",
+        });
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "verification-conclusion": "fail" },
+    },
+    {
+      name: "unresolved-verification-meaning",
+      mutate(review) {
+        review.verification.evidence[0].conclusion = "The interaction evidence discusses selection and detail behavior.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "verification-conclusion": "manual_review_required" },
+    },
+    {
+      name: "compatible-distinct-target-verification",
+      mutate(review) {
+        review.verification.evidence.push({
+          path: "test/unit/inbox-state.test.mjs",
+          conclusion: "The unit state-transition test passed.",
+        });
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "unsupported-additional-finding",
+      mutate(review) {
+        review.findings.push({
+          title: "The view rebuilds its message index twice",
+          severity: "medium",
+          evidence: [{ path: "src/inbox-view.mjs", line: 5 }],
+          impact: "Each render performs a duplicate message-index rebuild.",
+          required_action: "Remove the duplicate rebuild.",
+        });
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "unsupported-material-assertion-inside-primary-finding",
+      mutate(review) {
+        review.findings[0].impact = `${review.findings[0].impact} It also permanently deletes the hidden message from storage.`;
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "unsupported-bare-coordinated-impact-predicate",
+      mutate(review) {
+        review.findings[0].impact = "The list has no selected row while the detail pane renders the hidden selected message and permanently deletes it from storage.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "unsupported-unlisted-coordinated-impact-predicate",
+      mutate(review) {
+        review.findings[0].impact = `${review.findings[0].impact.replace(/\.$/u, "")} and corrupts customer account records.`;
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "unsupported-predicate-after-noun-coordination",
+      mutate(review) {
+        review.findings[0].impact = "The inconsistent selection and detail state corrupts customer account records.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "unsupported-bare-coordinated-remediation-action",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it and remove the unrelated audit trail.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "unsupported-unlisted-coordinated-remediation-action",
+      mutate(review) {
+        review.findings[0].required_action = `${review.findings[0].required_action.replace(/\.$/u, "")} and archive the unrelated audit trail.`;
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "unsupported-purpose-after-noun-coordination-remediation",
+      mutate(review) {
+        review.findings[0].required_action = "Clear the selection and detail state to corrupt customer records when filtering hides the selected message.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "unsupported-purpose-after-valid-remediation-prefix",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it to corrupt customer records.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "relevant-contract-evidence-addition",
+      mutate(review) {
+        review.findings[0].evidence.push({ path: "docs/state-contract.md", line: 7 });
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "unrelated-contract-evidence-addition",
+      mutate(review) {
+        review.findings[0].evidence.push({ path: "docs/state-contract.md", line: 5 });
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "reordered-evidence",
+      mutate(review) {
+        review.findings[0].evidence.reverse();
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "equivalent-finding-wording",
+      mutate(review) {
+        review.findings[0].title = "Filtering makes the selected message invisible but stale details remain";
+        review.findings[0].impact = "No selected row remains while the detail pane renders the hidden selected message.";
+        review.findings[0].required_action = "Invalidate selectedMessageId when filtering makes the selection invisible, or restrict detail lookup to the visible selected row.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+  ];
+  const semanticRegressionMismatches = [];
+  for (const [index, probe] of semanticRegressionProbes.entries()) {
+    const frozen = resolve(work, `semantic-${probe.name}-frozen`);
+    const candidate = resolve(work, `semantic-${probe.name}-candidate`);
+    cpSync(resolve(FIXTURE_ROOT, "workspace"), frozen, { recursive: true });
+    cpSync(frozen, candidate, { recursive: true });
+    const review = clone(referenceReview);
+    probe.mutate(review);
+    const reviewBytes = Buffer.from(`${JSON.stringify(review, null, 2)}\n`);
+    writeFileSync(resolve(candidate, "review.json"), reviewBytes);
+    const lineage = {
+      run_instance_id: `36436436-4364-4364-8364-${String(index + 1).padStart(12, "0")}`,
+      case_id: `case-3643643643643643-${String(index + 101).padStart(16, "0")}`,
+      attempt: "0001",
+      final_output_digest: `sha256:${createHash("sha256").update(reviewBytes).digest("hex")}`,
+      final_output_bytes: reviewBytes.length,
+    };
+    const normalizedResult = {
+      normalized_result_digest: canonicalDigest({ fixture_id: FIXTURE_ID, semantic_regression_probe: probe.name }),
+      lineage,
+      command_evidence: {
+        capture_support: "supported",
+        evidence_level: "complete",
+        required_command_ids: ["review-contract-validation"],
+        required_alternative_groups: [],
+        references: [{
+          command_id: "review-contract-validation",
+          match_state: "matched",
+          outcome: "succeeded",
+          exit_code: 0,
+          digest: canonicalDigest({ semantic_regression_probe: probe.name, command: "review-contract-validation" }),
+          bytes: 1,
+        }],
+        cwd_unverified_command_count: 0,
+      },
+    };
+    const sealedExecution = production ? createSealedEvaluatorExecutionForTest({
+      root: ROOT,
+      privateEvaluationRoot,
+      privateRoot,
+      hiddenAsset,
+      frozenWorkspace: frozen,
+      candidateWorkspace: candidate,
+      evaluationInputRoot,
+      evaluationLineage: lineage,
+      evaluatorRevision: production.evaluatorRevision,
+      externalAuthorityAnchor,
+      executionDirectoryName: `sealed-semantic-${probe.name}`,
+      label: `mp-frontend-state sealed semantic ${probe.name} evaluator`,
+    }) : null;
+    const repositoryDiffArtifact = sealedExecution
+      ? readJson(resolve(sealedExecution.originalWorkspaceAuthority.path, sealedExecution.originalWorkspaceAuthority.repositoryDiffPath))
+      : directRepositoryDiffArtifact({}, lineage);
+    const direct = await evaluator.evaluateCandidateSafe({
+      repositoryRoot: ROOT,
+      frozenWorkspace: frozen,
+      candidateWorkspace: candidate,
+      normalizedResult,
+      repositoryDiffArtifact,
+    });
+    assertBenchmarkSchemaInstance(direct, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${probe.name} direct semantic private fragment` });
+    const observe = (mode, result) => {
+      const expectedEvaluationStatus = probe.expectedEvaluationStatus ?? "completed";
+      if (result.evaluation_status !== expectedEvaluationStatus) {
+        semanticRegressionMismatches.push(`${probe.name} ${mode} evaluation_status expected ${expectedEvaluationStatus}, got ${result.evaluation_status}`);
+      }
+      if (probe.expectedClassification === null ? Object.hasOwn(result, "classification") : result.classification !== probe.expectedClassification) {
+        semanticRegressionMismatches.push(`${probe.name} ${mode} classification expected ${probe.expectedClassification ?? "omitted"}, got ${Object.hasOwn(result, "classification") ? result.classification : "omitted"}`);
+      }
+      const actualOutcomes = Object.fromEntries(result.requirement_results.map(({ requirement_id, outcome }) => [requirement_id, outcome]));
+      for (const [requirementId, expectedOutcome] of Object.entries(probe.expectedOutcomes)) {
+        if (actualOutcomes[requirementId] !== expectedOutcome) {
+          semanticRegressionMismatches.push(`${probe.name} ${mode} ${requirementId} expected ${expectedOutcome}, got ${actualOutcomes[requirementId]}`);
+        }
+      }
+    };
+    observe("direct", direct);
+    if (sealedExecution) {
+      const sealed = executeSealedEvaluatorForTest({
+        execution: sealedExecution,
+        externalAuthorityAnchor,
+        repositoryRoot: ROOT,
+        normalized: normalizedResult,
+        label: `mp-frontend-state sealed semantic ${probe.name} evaluator`,
+      });
+      assertBenchmarkSchemaInstance(sealed.firstFragment, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${probe.name} production-safe semantic private fragment` });
+      observe("production-safe", sealed.firstFragment);
+      assert.deepEqual(evaluatorSemanticProjection(sealed.firstFragment), evaluatorSemanticProjection(direct), `${probe.name} direct/production-safe semantic agreement`);
+    }
+  }
+  assert.deepEqual(semanticRegressionMismatches, [], `frontend semantic regression mismatches:\n${semanticRegressionMismatches.join("\n")}`);
+
   if (!production) return { cases: cases.cases.length, directPass: cases.cases.length, productionSafePass: 0, mutationBehaviorPass: 0, validatorParityPass: 0, falsePositiveControls: cases.cases.filter(({ control }) => control === "suspicious_but_correct").length };
 
   const admission = readJson(resolve(FIXTURE_ROOT, "final-admission-record.json"));
@@ -575,16 +824,18 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   return { cases: cases.cases.length, directPass: cases.cases.length, productionSafePass: cases.cases.length, mutationBehaviorPass: mutationAsset.mutations.length, validatorParityPass: invalidReviewCases.length, falsePositiveControls: cases.cases.filter(({ control }) => control === "suspicious_but_correct").length };
 }
 
-validateFrozenDesign();
-validateMpFrontendStateReviewInputClosure({ root: ROOT });
-validateHistoricalPublicInputInvariance();
-validateVisibleScenario();
-validatePullRequestDiff();
-validateWorkspaceValidatorParity();
-validatePublicNegativeCoverage();
-
+const semanticRegressionDirectOnly = process.argv.includes("--semantic-regression-direct-only");
+if (!semanticRegressionDirectOnly) {
+  validateFrozenDesign();
+  validateMpFrontendStateReviewInputClosure({ root: ROOT });
+  validateHistoricalPublicInputInvariance();
+  validateVisibleScenario();
+  validatePullRequestDiff();
+  validateWorkspaceValidatorParity();
+  validatePublicNegativeCoverage();
+}
 const publicContractOnly = process.argv.includes("--public-contract-only");
-const productionExists = !publicContractOnly && readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
+const productionExists = !publicContractOnly && !semanticRegressionDirectOnly && readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
 let effectiveAdmissionStatus = "admission_pending";
 if (productionExists) {
   const production = validateMpFrontendStateReviewProductionAuthority({ root: ROOT });
@@ -606,6 +857,30 @@ if (productionExists) {
 }
 
 const requested = privateArgs(process.argv.slice(2));
-const sourceSummary = requested ? validateFreshPrivateSourceContract(requested, { sourceOnly: publicContractOnly }) : null;
+if (semanticRegressionDirectOnly) assert.ok(requested, "--semantic-regression-direct-only requires exact --private-root and --private-case-root inputs");
+const sourceSummary = requested && !semanticRegressionDirectOnly ? validateFreshPrivateSourceContract(requested, { sourceOnly: publicContractOnly }) : null;
 const privateSummary = requested ? await validatePrivateCases({ ...requested, productionExists }) : null;
-console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", historical_public_input_invariance: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? publicContractOnly ? "source_behavior_pass" : "pass" : "not_supplied", ...(sourceSummary ? { fresh_source_summary: sourceSummary } : {}), ...(privateSummary ? { private_summary: privateSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));
+const reportedPrivateSummary = semanticRegressionDirectOnly && privateSummary ? {
+  ...privateSummary,
+  productionSafePass: "not_requested",
+  mutationBehaviorPass: "not_requested",
+  validatorParityPass: "not_requested",
+} : privateSummary;
+console.log(JSON.stringify({
+  fixture_id: FIXTURE_ID,
+  input_closure: semanticRegressionDirectOnly ? "not_requested" : "pass",
+  input_validation: semanticRegressionDirectOnly ? "not_requested" : "pass",
+  source_freeze_validation: semanticRegressionDirectOnly ? "not_requested" : productionExists ? "pass" : "generation_pending",
+  historical_public_input_invariance: semanticRegressionDirectOnly ? "not_requested" : "pass",
+  frozen_design: semanticRegressionDirectOnly ? "not_requested" : "pass",
+  visible_scenario: semanticRegressionDirectOnly ? "not_requested" : "pass",
+  negative_regressions: semanticRegressionDirectOnly ? "not_requested" : "pass",
+  production_validation: semanticRegressionDirectOnly ? "not_requested" : productionExists ? "pass" : "generation_pending",
+  sealed_validation: semanticRegressionDirectOnly ? "not_requested" : productionExists && requested ? "pass" : "not_requested",
+  production_safe_validation: semanticRegressionDirectOnly ? "not_requested" : productionExists && requested ? "pass" : "not_requested",
+  actual_private_validation: semanticRegressionDirectOnly ? "semantic_direct_pass" : requested ? publicContractOnly ? "source_behavior_pass" : "pass" : "not_supplied",
+  ...(sourceSummary ? { fresh_source_summary: sourceSummary } : {}),
+  ...(reportedPrivateSummary ? { private_summary: reportedPrivateSummary } : {}),
+  admission: semanticRegressionDirectOnly ? "not_requested" : effectiveAdmissionStatus,
+  scoring_ready: false,
+}));

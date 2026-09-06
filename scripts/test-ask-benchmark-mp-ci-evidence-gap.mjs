@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import {
+  createSealedEvaluatorExecutionForTest,
+  executeSealedEvaluatorForTest,
+  readEvaluatorAuthorityAnchorFromFreeze,
+} from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { resolvePortfolioExecutionAdmission, resolvePortfolioExecutionFixtures } from "./ask-benchmark-plan.mjs";
 import { validateEquivalenceAuthority, validateMatchedEquivalenceIds, validateMutationAuthority } from "./ask-benchmark-mn-build-option-update.mjs";
@@ -20,6 +26,18 @@ function readJson(path) {
 
 function clone(value) {
   return structuredClone(value);
+}
+
+function removeTemporaryTree(root) {
+  if (!existsSync(root)) return;
+  const makeDirectoriesWritable = (path) => {
+    const status = lstatSync(path);
+    if (!status.isDirectory() || status.isSymbolicLink()) return;
+    chmodSync(path, 0o700);
+    for (const entry of readdirSync(path)) makeDirectoriesWritable(resolve(path, entry));
+  };
+  makeDirectoriesWritable(root);
+  rmSync(root, { recursive: true, force: true });
 }
 
 function evaluatorSemanticProjection(result) {
@@ -251,15 +269,35 @@ function conceptMatrixEntries(matrix) {
   };
 }
 
-async function validatePrivateCases({ privateRoot, caseRoot }) {
+async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = false } = {}) {
   const work = mkdtempSync(resolve(tmpdir(), "mp-ci-private-test-"));
   try {
-    const boundaryRoots = createBoundaryRoots(work);
-    const production = validateMpCiEvidenceGapProductionAuthority({ root: ROOT, privateRoot, boundaryRoots });
-    assert.equal(production.scoringReady, false);
-    assert.equal(production.admissionState, "admission_pending");
-    const evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${production.evaluatorBundleDigest}`);
+    const boundaryRoots = directOnly ? null : createBoundaryRoots(work);
+    const production = directOnly ? null : validateMpCiEvidenceGapProductionAuthority({ root: ROOT, privateRoot, boundaryRoots });
+    if (production) {
+      assert.equal(production.scoringReady, false);
+      assert.equal(production.admissionState, "admission_pending");
+    }
+    const evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${production?.evaluatorBundleDigest ?? canonicalDigest({ privateRoot, mode: "semantic-regression-direct-only" })}`);
     const cases = readJson(resolve(caseRoot, "cases.json"));
+    const bundle = directOnly ? null : readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
+    const hiddenAsset = bundle?.asset_inventory.find(({ role }) => role === "hidden_tests") ?? null;
+    if (!directOnly) assert.ok(hiddenAsset, "private bundle requires a hidden evaluator asset");
+    const freezePath = directOnly ? null : resolve(FIXTURE_ROOT, "scoring-input-freeze-manifest.json");
+    const externalAuthorityAnchor = directOnly ? null : readEvaluatorAuthorityAnchorFromFreeze({
+      root: ROOT,
+      freezeManifestPath: freezePath,
+      freezeManifestSourceDigest: `sha256:${createHash("sha256").update(readFileSync(freezePath)).digest("hex")}`,
+      referencePath: resolve(FIXTURE_ROOT, "evaluator-reference.json"),
+      label: "mp-ci private regression authority",
+    });
+    const privateEvaluationRoot = directOnly ? null : resolve(work, "sealed-authority");
+    const evaluationInputRoot = directOnly ? null : resolve(work, "sealed-input");
+    if (!directOnly) {
+      mkdirSync(privateEvaluationRoot);
+      mkdirSync(evaluationInputRoot);
+      writeFileSync(resolve(evaluationInputRoot, "private-regression-authority.json"), "{\"measured_execution\":false,\"scoring_ready\":false}\n");
+    }
     for (const entry of cases.cases) {
       const frozen = resolve(work, `${entry.case_id}-frozen`);
       const candidate = resolve(work, `${entry.case_id}-candidate`);
@@ -279,12 +317,14 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
         },
       };
       const repositoryDiffArtifact = { artifact_digest: canonicalDigest({ case_id: entry.case_id, kind: "repository-diff" }), artifact_bytes: 1 };
-      const safeFirst = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
-      const safeSecond = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
-      assert.deepEqual(safeFirst, safeSecond, `${entry.case_id} production-safe evaluator determinism`);
       assertBenchmarkSchemaInstance(first, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} private fragment` });
-      assertBenchmarkSchemaInstance(safeFirst, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} production-safe private fragment` });
-      assert.deepEqual(evaluatorSemanticProjection(safeFirst), evaluatorSemanticProjection(first), `${entry.case_id} direct/production-safe semantic projection`);
+      if (!directOnly) {
+        const safeFirst = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
+        const safeSecond = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
+        assert.deepEqual(safeFirst, safeSecond, `${entry.case_id} production-safe evaluator determinism`);
+        assertBenchmarkSchemaInstance(safeFirst, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} production-safe private fragment` });
+        assert.deepEqual(evaluatorSemanticProjection(safeFirst), evaluatorSemanticProjection(first), `${entry.case_id} direct/production-safe semantic projection`);
+      }
       assert.deepEqual(first.requirement_results.map(({ earned_points }) => earned_points), entry.expected_points, `${entry.case_id} requirement points`);
       assert.equal(first.classification, entry.expected_classification, `${entry.case_id} classification`);
       if (entry.expected_finding_ids) assert.deepEqual(first.findings.map(({ finding_id }) => finding_id), entry.expected_finding_ids, `${entry.case_id} evaluator finding IDs`);
@@ -295,6 +335,306 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
     assert.equal(matrix.fixture_id, "mp-ci-evidence-gap");
     assert.equal(matrix.schema_version, "1.0.0");
     const baseReview = readJson(resolve(caseRoot, matrix.base_review));
+    let regressionProbeIndex = 0;
+    const evaluateReviewProbe = async ({ probeId, review }) => {
+      const index = regressionProbeIndex;
+      regressionProbeIndex += 1;
+      const frozen = resolve(work, `${probeId}-frozen`);
+      const candidate = resolve(work, `${probeId}-candidate`);
+      cpSync(resolve(FIXTURE_ROOT, "workspace"), frozen, { recursive: true });
+      cpSync(frozen, candidate, { recursive: true });
+      const reviewBytes = Buffer.from(`${JSON.stringify(review, null, 2)}\n`);
+      writeFileSync(resolve(candidate, "review.json"), reviewBytes);
+      const lineage = {
+        run_instance_id: `31431431-4314-4314-8314-${String(index + 1).padStart(12, "0")}`,
+        case_id: `case-3143143143143143-${String(index + 101).padStart(16, "0")}`,
+        attempt: "0001",
+        final_output_digest: `sha256:${createHash("sha256").update(reviewBytes).digest("hex")}`,
+        final_output_bytes: reviewBytes.length,
+      };
+      const normalizedResult = {
+        normalized_result_digest: canonicalDigest({ fixture_id: "mp-ci-evidence-gap", probe_id: probeId, authority: "review-regression" }),
+        lineage,
+        command_evidence: {
+          capture_support: "supported",
+          evidence_level: "complete",
+          required_command_ids: ["review-contract-validation"],
+          required_alternative_groups: [],
+          references: [{ command_id: "review-contract-validation", match_state: "matched", outcome: "succeeded", exit_code: 0, digest: canonicalDigest({ probe_id: probeId, command_id: "review-contract-validation" }), bytes: 1 }],
+          cwd_unverified_command_count: 0,
+        },
+      };
+      const sealedExecution = directOnly ? null : createSealedEvaluatorExecutionForTest({
+        root: ROOT,
+        privateEvaluationRoot,
+        privateRoot,
+        hiddenAsset,
+        frozenWorkspace: frozen,
+        candidateWorkspace: candidate,
+        evaluationInputRoot,
+        evaluationLineage: lineage,
+        evaluatorRevision: production.evaluatorRevision,
+        externalAuthorityAnchor,
+        executionDirectoryName: `sealed-${probeId}`,
+        label: `mp-ci sealed ${probeId} evaluator`,
+      });
+      const repositoryDiffArtifact = directOnly
+        ? { artifact_digest: canonicalDigest({ probe_id: probeId, kind: "repository-diff" }), artifact_bytes: 1 }
+        : readJson(resolve(sealedExecution.originalWorkspaceAuthority.path, sealedExecution.originalWorkspaceAuthority.repositoryDiffPath));
+      const direct = directOnly
+        ? await evaluator.evaluateCandidate({ frozenWorkspace: frozen, candidateWorkspace: candidate, verificationState: "executed_success" })
+        : await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
+      assertBenchmarkSchemaInstance(direct, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${probeId} direct fragment` });
+      if (!directOnly) {
+        const sealed = executeSealedEvaluatorForTest({
+          execution: sealedExecution,
+          externalAuthorityAnchor,
+          repositoryRoot: ROOT,
+          normalized: normalizedResult,
+          label: `mp-ci sealed ${probeId} evaluator`,
+        });
+        assertBenchmarkSchemaInstance(sealed.firstFragment, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${probeId} production-safe fragment` });
+        assert.deepEqual(evaluatorSemanticProjection(sealed.firstFragment), evaluatorSemanticProjection(direct), `${probeId} direct/production-safe semantic projection`);
+      }
+      return direct;
+    };
+
+    const failedCheckoutRecord = {
+      path: "test/checkout/quote-order-contract.test.mjs",
+      conclusion: "Pull-request run 314 executed npm run test:all; its checkout target failed because zero was not rejected with RangeError.",
+    };
+    const succeededCheckoutRecord = {
+      path: "test/checkout/quote-order-contract.test.mjs",
+      conclusion: "Pull-request run 314 executed npm run test:all; the same checkout target did not fail, all tests passed, and the RangeError assertions succeeded.",
+    };
+    const succeededUnitRecord = {
+      path: "test/unit/quote-order.test.mjs",
+      conclusion: "Pull-request run 314 executed npm test and its unit target passed.",
+    };
+    const rejectedVerificationProbes = [
+      {
+        probeId: "verification-success-only-negation",
+        records: [succeededCheckoutRecord],
+      },
+      {
+        probeId: "verification-same-target-failure-then-success",
+        records: [failedCheckoutRecord, succeededCheckoutRecord],
+      },
+      {
+        probeId: "verification-same-target-success-then-failure",
+        records: [succeededCheckoutRecord, failedCheckoutRecord],
+      },
+    ];
+    const reviewRegressionChecks = [];
+    for (const { probeId, records } of rejectedVerificationProbes) {
+      const review = clone(baseReview);
+      review.verification = { state: "failed", evidence: records };
+      const result = await evaluateReviewProbe({ probeId, review });
+      const verification = result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-conclusion");
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: "rejected",
+        actual_verification_outcome: verification?.outcome,
+        actual_classification: result.classification,
+        satisfied: verification?.outcome !== "pass" && result.classification !== "correct_narrow_execution",
+      });
+    }
+
+    for (const [probeId, records] of [
+      ["verification-distinct-target-success-then-failure", [succeededUnitRecord, failedCheckoutRecord]],
+      ["verification-distinct-target-failure-then-success", [failedCheckoutRecord, succeededUnitRecord]],
+    ]) {
+      const review = clone(baseReview);
+      review.verification = { state: "failed", evidence: records };
+      const result = await evaluateReviewProbe({ probeId, review });
+      const verification = result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-conclusion");
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: "accepted",
+        actual_verification_outcome: verification?.outcome,
+        actual_classification: result.classification,
+        satisfied: verification?.outcome === "pass" && result.classification === "correct_narrow_execution",
+      });
+    }
+
+    for (const [probeId, findingIndex, evidence] of [
+      ["irrelevant-ci-citation-lines", 0, [
+        { path: ".github/workflows/pull-request.yml", line: 1 },
+        { path: "ci/pull-request-314.log", line: 1 },
+        { path: "docs/verification.md", line: 1 },
+      ]],
+      ["syntax-only-quantity-citation-lines", 1, [
+        { path: "src/quote-order.mjs", line: 10 },
+        { path: "test/checkout/quote-order-contract.test.mjs", line: 8 },
+      ]],
+    ]) {
+      const review = clone(baseReview);
+      review.findings[findingIndex].evidence = evidence;
+      const result = await evaluateReviewProbe({ probeId, review });
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: "rejected",
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: result.classification !== "correct_narrow_execution" && result.evidence_correctness.state === "fail",
+      });
+    }
+
+    const equivalentCitationReview = clone(baseReview);
+    equivalentCitationReview.findings[0].evidence = [
+      { path: "docs/verification.md", line: 5 },
+      { path: "ci/pull-request-314.log", line: 8 },
+      { path: ".github/workflows/pull-request.yml", line: 16 },
+    ];
+    equivalentCitationReview.findings[1].evidence = [
+      { path: "test/checkout/quote-order-contract.test.mjs", line: 6 },
+      { path: "src/quote-order.mjs", line: 2 },
+    ];
+    const equivalentCitationResult = await evaluateReviewProbe({ probeId: "equivalent-relevant-citation-lines", review: equivalentCitationReview });
+    reviewRegressionChecks.push({
+      probe_id: "equivalent-relevant-citation-lines",
+      expected: "accepted",
+      actual_evidence_correctness: equivalentCitationResult.evidence_correctness.state,
+      actual_classification: equivalentCitationResult.classification,
+      satisfied: equivalentCitationResult.evidence_correctness.state === "pass" && equivalentCitationResult.classification === "correct_narrow_execution",
+    });
+
+    const unrelatedMaterialAssertionReview = clone(baseReview);
+    unrelatedMaterialAssertionReview.findings[0].impact += " The PR deployment also corrupts customer account records.";
+    const unrelatedMaterialAssertionResult = await evaluateReviewProbe({ probeId: "valid-ci-plus-unrelated-material-assertion", review: unrelatedMaterialAssertionReview });
+    reviewRegressionChecks.push({
+      probe_id: "valid-ci-plus-unrelated-material-assertion",
+      expected: "rejected",
+      actual_evidence_correctness: unrelatedMaterialAssertionResult.evidence_correctness.state,
+      actual_classification: unrelatedMaterialAssertionResult.classification,
+      satisfied: unrelatedMaterialAssertionResult.evidence_correctness.state === "fail" && unrelatedMaterialAssertionResult.classification !== "correct_narrow_execution",
+    });
+
+    for (const [probeId, field, suffix] of [
+      ["inherited-subject-unsupported-impact", "impact", " and permanently deletes customer account records"],
+      ["inherited-subject-unsupported-remediation", "required_action", " and delete the unrelated audit trail"],
+    ]) {
+      const review = clone(baseReview);
+      review.findings[0][field] = `${review.findings[0][field].replace(/[.!?]+$/u, "")}${suffix}.`;
+      const result = await evaluateReviewProbe({ probeId, review });
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: "rejected",
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: result.evidence_correctness.state === "fail" && result.classification !== "correct_narrow_execution",
+      });
+    }
+
+    for (const [probeId, field, value] of [
+      ["modal-inherited-unsupported-impact", "impact", "Pull-request CI may omit checkout validation and corrupt customer account records."],
+      ["unknown-imperative-quantity-remediation", "required_action", "Run the full checkout suite in pull-request CI and poison order counts below one."],
+      ["then-unknown-imperative-quantity-remediation", "required_action", "Run the full checkout suite in pull-request CI, then poison order counts below one."],
+      ["as-well-as-unknown-imperative-quantity-remediation", "required_action", "Run the full checkout suite in pull-request CI as well as poison order counts below one."],
+      ["unsupported-purpose-remediation", "required_action", "Run the full checkout suite in pull-request CI to poison order counts below one."],
+      ["unsupported-comma-gerund-impact", "impact", "The successful pull request job is only a subset, corrupting customer account records."],
+      ["unsupported-or-finite-impact", "impact", "The successful pull request job is only a subset or corrupts customer account records."],
+      ["unsupported-together-with-gerund-impact", "impact", "The successful pull request job is only a subset, together with corrupting customer account records."],
+      ["unsupported-for-gerund-remediation", "required_action", "Run the full checkout suite in pull-request CI for poisoning order counts below one."],
+    ]) {
+      const review = clone(baseReview);
+      review.findings[0][field] = value;
+      const result = await evaluateReviewProbe({ probeId, review });
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: "rejected",
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: result.evidence_correctness.state === "fail" && result.classification !== "correct_narrow_execution",
+      });
+    }
+
+    const nounCoordinationWithUnsupportedPredicate = clone(baseReview);
+    nounCoordinationWithUnsupportedPredicate.findings[1].impact = "Zero and negative quantities corrupt customer account records.";
+    const nounCoordinationWithUnsupportedPredicateResult = await evaluateReviewProbe({
+      probeId: "noun-coordination-with-unsupported-quantity-predicate",
+      review: nounCoordinationWithUnsupportedPredicate,
+    });
+    reviewRegressionChecks.push({
+      probe_id: "noun-coordination-with-unsupported-quantity-predicate",
+      expected: "rejected",
+      actual_evidence_correctness: nounCoordinationWithUnsupportedPredicateResult.evidence_correctness.state,
+      actual_classification: nounCoordinationWithUnsupportedPredicateResult.classification,
+      satisfied: nounCoordinationWithUnsupportedPredicateResult.evidence_correctness.state === "fail"
+        && nounCoordinationWithUnsupportedPredicateResult.classification !== "correct_narrow_execution",
+    });
+
+    for (const [probeId, count, accepted] of [
+      ["fabricated-exact-unit-pass-count", "9", false],
+      ["matched-exact-unit-pass-count", "2", true],
+      ["fabricated-word-exact-unit-pass-count", "nine", false],
+      ["matched-word-exact-unit-pass-count", "two", true],
+      ["fabricated-compound-word-exact-unit-pass-count", "two dozen", false],
+    ]) {
+      const review = clone(baseReview);
+      review.findings[0].impact += ` The cited CI log reports exactly ${count} passed unit tests.`;
+      review.findings[0].evidence.push({ path: "ci/pull-request-314.log", line: 11 });
+      const result = await evaluateReviewProbe({ probeId, review });
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: accepted ? "accepted" : "rejected",
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: accepted
+          ? result.evidence_correctness.state === "pass" && result.classification === "correct_narrow_execution"
+          : result.evidence_correctness.state === "fail" && result.classification !== "correct_narrow_execution",
+      });
+    }
+
+
+    for (const [probeId, phrase, accepted] of [
+      ["fabricated-trailing-failure-count", "exactly two tests failed", false],
+      ["matched-zero-trailing-failure-count", "exactly zero tests failed", true],
+      ["matched-zero-unit-trailing-failure-count", "exactly zero unit tests failed", true],
+      ["fabricated-plural-event-count", "exactly nine events", false],
+      ["matched-plural-event-count", "exactly two events", true],
+      ["fabricated-plural-failure-count", "exactly two failures", false],
+      ["matched-plural-failure-count", "exactly zero failures", true],
+    ]) {
+      const review = clone(baseReview);
+      review.findings[0].impact += ` The cited CI log reports ${phrase}.`;
+      review.findings[0].evidence.push(
+        { path: "ci/pull-request-314.log", line: 11 },
+        { path: "ci/pull-request-314.log", line: 12 },
+      );
+      const result = await evaluateReviewProbe({ probeId, review });
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: accepted ? "accepted" : "rejected",
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: accepted
+          ? result.evidence_correctness.state === "pass" && result.classification === "correct_narrow_execution"
+          : result.evidence_correctness.state === "fail" && result.classification !== "correct_narrow_execution",
+      });
+    }
+
+    const combinedExactCounts = clone(baseReview);
+    combinedExactCounts.findings[0].impact += " The cited CI log reports exactly two passed unit tests and exactly zero tests failed.";
+    combinedExactCounts.findings[0].evidence.push(
+      { path: "ci/pull-request-314.log", line: 11 },
+      { path: "ci/pull-request-314.log", line: 12 },
+    );
+    const combinedExactCountsResult = await evaluateReviewProbe({ probeId: "matched-combined-pass-fail-counts", review: combinedExactCounts });
+    reviewRegressionChecks.push({
+      probe_id: "matched-combined-pass-fail-counts",
+      expected: "accepted",
+      actual_evidence_correctness: combinedExactCountsResult.evidence_correctness.state,
+      actual_classification: combinedExactCountsResult.classification,
+      satisfied: combinedExactCountsResult.evidence_correctness.state === "pass"
+        && combinedExactCountsResult.classification === "correct_narrow_execution",
+    });
+    assert.deepEqual(
+      reviewRegressionChecks.map(({ probe_id, expected, satisfied }) => ({ probe_id, expected, satisfied })),
+      reviewRegressionChecks.map(({ probe_id, expected }) => ({ probe_id, expected, satisfied: true })),
+      `verification and citation regressions:\n${JSON.stringify(reviewRegressionChecks, null, 2)}`,
+    );
+
     const conceptMatrix = conceptMatrixEntries(matrix);
     const matrixPasses = { quantity_positive: 0, ci_positive: 0, negative: 0 };
     for (const entry of conceptMatrix.entries) {
@@ -315,10 +655,12 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
           references: [{ command_id: "review-contract-validation", match_state: "matched", outcome: "succeeded", exit_code: 0, digest: canonicalDigest({ variant_id: entry.variant_id, command_id: "review-contract-validation" }), bytes: 1 }],
         },
       };
-      const safe = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact: { artifact_digest: canonicalDigest({ variant_id: entry.variant_id, kind: "repository-diff" }), artifact_bytes: 1 } });
       assertBenchmarkSchemaInstance(direct, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.variant_id} paraphrase fragment` });
-      assertBenchmarkSchemaInstance(safe, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.variant_id} safe paraphrase fragment` });
-      assert.deepEqual(evaluatorSemanticProjection(safe), evaluatorSemanticProjection(direct), `${entry.variant_id} direct/production-safe semantic projection`);
+      if (!directOnly) {
+        const safe = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact: { artifact_digest: canonicalDigest({ variant_id: entry.variant_id, kind: "repository-diff" }), artifact_bytes: 1 } });
+        assertBenchmarkSchemaInstance(safe, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.variant_id} safe paraphrase fragment` });
+        assert.deepEqual(evaluatorSemanticProjection(safe), evaluatorSemanticProjection(direct), `${entry.variant_id} direct/production-safe semantic projection`);
+      }
       assert.deepEqual(direct.requirement_results.map(({ earned_points }) => earned_points), entry.expected_points, `${entry.variant_id} requirement points`);
       assert.equal(direct.classification, entry.expected_classification, `${entry.variant_id} classification`);
       if (entry.expected_finding_ids) assert.deepEqual(direct.findings.map(({ finding_id }) => finding_id), entry.expected_finding_ids, `${entry.variant_id} evaluator finding IDs`);
@@ -361,59 +703,66 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
           references: [{ command_id: "review-contract-validation", match_state: "matched", outcome: "succeeded", exit_code: 0, digest: canonicalDigest({ case_id: caseId, command_id: "review-contract-validation" }), bytes: 1 }],
         },
       };
-      const safe = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact: { artifact_digest: canonicalDigest({ case_id: caseId, kind: "repository-diff" }), artifact_bytes: 1 } });
-      assert.deepEqual(evaluatorSemanticProjection(safe), evaluatorSemanticProjection(direct), `${caseId} direct/production-safe semantic projection`);
+      if (!directOnly) {
+        const safe = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact: { artifact_digest: canonicalDigest({ case_id: caseId, kind: "repository-diff" }), artifact_bytes: 1 } });
+        assert.deepEqual(evaluatorSemanticProjection(safe), evaluatorSemanticProjection(direct), `${caseId} direct/production-safe semantic projection`);
+      }
       assert.equal(direct.requirement_results[0].earned_points, 0, `${caseId} CI evidence credit`);
       assert.equal(direct.requirement_results[4].earned_points, 0, `${caseId} precision credit`);
       assert.ok(direct.findings.some(({ finding_id }) => finding_id === "invalid-evidence-reference"), `${caseId} deterministic evaluator finding`);
     }
 
-    const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
-    const admission = readJson(resolve(FIXTURE_ROOT, "final-admission-record.json"));
-    const evidenceMap = readJson(resolve(FIXTURE_ROOT, "evidence-map.json"));
-    const inputRecord = readJson(resolve(FIXTURE_ROOT, "input-manifest.json")).fixtures["mp-ci-evidence-gap"];
-    const mutationAsset = readJson(resolve(privateRoot, "evidence-removal-mutations.json"));
-    const equivalenceAsset = readJson(resolve(privateRoot, "equivalent-solutions.json"));
-    assert.doesNotThrow(() => validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset }));
-    assert.doesNotThrow(() => validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset }));
-    assert.doesNotThrow(() => validateMatchedEquivalenceIds({ requirementRecord: requirement, equivalenceAsset, matchedEquivalenceClassIds: equivalenceAsset.rules.map(({ equivalence_class_id }) => equivalence_class_id) }));
-    expectFailure(() => validateMatchedEquivalenceIds({ requirementRecord: requirement, equivalenceAsset, matchedEquivalenceClassIds: ["undeclared-equivalence"] }), /undeclared/u, "undeclared equivalence must fail");
-    for (const [label, mutate, pattern] of [
+    if (!directOnly) {
+      const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
+      const admission = readJson(resolve(FIXTURE_ROOT, "final-admission-record.json"));
+      const evidenceMap = readJson(resolve(FIXTURE_ROOT, "evidence-map.json"));
+      const inputRecord = readJson(resolve(FIXTURE_ROOT, "input-manifest.json")).fixtures["mp-ci-evidence-gap"];
+      const mutationAsset = readJson(resolve(privateRoot, "evidence-removal-mutations.json"));
+      const equivalenceAsset = readJson(resolve(privateRoot, "equivalent-solutions.json"));
+      assert.doesNotThrow(() => validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset }));
+      assert.doesNotThrow(() => validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset }));
+      assert.doesNotThrow(() => validateMatchedEquivalenceIds({ requirementRecord: requirement, equivalenceAsset, matchedEquivalenceClassIds: equivalenceAsset.rules.map(({ equivalence_class_id }) => equivalence_class_id) }));
+      expectFailure(() => validateMatchedEquivalenceIds({ requirementRecord: requirement, equivalenceAsset, matchedEquivalenceClassIds: ["undeclared-equivalence"] }), /undeclared/u, "undeclared equivalence must fail");
+      for (const [label, mutate, pattern] of [
       ["mutation omission", (value) => value.mutations.pop(), /inventory/u],
       ["mutation duplication", (value) => value.mutations.push(clone(value.mutations[0])), /duplicate/u],
       ["extra mutation", (value) => value.mutations.push({ ...clone(value.mutations[0]), mutation_id: "extra-mutation" }), /inventory/u],
       ["wrong requirement binding", (value) => { value.mutations[0].requirement_id = requirement.requirements[1].requirement_id; }, /transplanted/u],
       ["wrong removal path", (value) => { value.mutations[0].remove_paths = [value.mutations[0].remove_paths[0]]; }, /inventory/u],
       ["mutation digest drift", (value) => { value.mutations[0].mutation_digest = `sha256:${"0".repeat(64)}`; }, /digest/u],
-    ]) {
-      const mutated = clone(mutationAsset); mutate(mutated);
-      expectFailure(() => validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset: mutated }), pattern, label);
-    }
-    for (const [label, mutate, pattern] of [
+      ]) {
+        const mutated = clone(mutationAsset); mutate(mutated);
+        expectFailure(() => validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset: mutated }), pattern, label);
+      }
+      for (const [label, mutate, pattern] of [
       ["equivalence omission", (value) => value.rules.pop(), /inventory/u],
       ["cross-requirement equivalence", (value) => { value.rules[0].requirement_id = requirement.requirements[1].requirement_id; }, /transplanted/u],
       ["cross-fixture equivalence", (value) => { value.fixture_id = "foreign-fixture"; }, /fixture/u],
       ["property-order-only equivalence", (value) => { value.rules[0].property_order_only = true; value.rules[0].rule_digest = canonicalDigest(Object.fromEntries(Object.entries(value.rules[0]).filter(([key]) => key !== "rule_digest"))); }, /observable-contract/u],
-    ]) {
-      const mutated = clone(equivalenceAsset); mutate(mutated);
-      expectFailure(() => {
-        if (mutated.fixture_id !== requirement.fixture_id) throw new Error("private equivalence fixture transplant");
-        validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: mutated });
-      }, pattern, label);
+      ]) {
+        const mutated = clone(equivalenceAsset); mutate(mutated);
+        expectFailure(() => {
+          if (mutated.fixture_id !== requirement.fixture_id) throw new Error("private equivalence fixture transplant");
+          validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: mutated });
+        }, pattern, label);
+      }
     }
     const evaluatedCases = cases.cases.length + conceptMatrix.entries.length + 3;
-    return { distinctCases: cases.cases.length, directPass: evaluatedCases, productionSafePass: evaluatedCases, matrixPasses, generatedCombinations: conceptMatrix.generated, morphologyCombinations: conceptMatrix.morphology, independentProbes: conceptMatrix.probes, polarityPairs: conceptMatrix.polarity, representativePositiveProbes: conceptMatrix.representative, negativeControls: conceptMatrix.negatives, invalidEvidenceNegatives: 5 };
+    return { distinctCases: cases.cases.length, directPass: evaluatedCases, productionSafePass: directOnly ? "not_requested" : evaluatedCases, sealedPass: directOnly ? "not_requested" : reviewRegressionChecks.length, semanticRegressionProbes: reviewRegressionChecks.length, matrixPasses, generatedCombinations: conceptMatrix.generated, morphologyCombinations: conceptMatrix.morphology, independentProbes: conceptMatrix.probes, polarityPairs: conceptMatrix.polarity, representativePositiveProbes: conceptMatrix.representative, negativeControls: conceptMatrix.negatives, invalidEvidenceNegatives: 5 };
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    removeTemporaryTree(work);
   }
 }
 
-validateFrozenDesign();
-validateMpCiEvidenceGapInputClosure({ root: ROOT });
-validateVisibleScenario();
-validateSharedNegativeCoverage();
+const semanticRegressionDirectOnly = process.argv.includes("--semantic-regression-direct-only");
+if (!semanticRegressionDirectOnly) {
+  validateFrozenDesign();
+  validateMpCiEvidenceGapInputClosure({ root: ROOT });
+  validateVisibleScenario();
+  validateSharedNegativeCoverage();
+}
 
-const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
+const productionExists = !semanticRegressionDirectOnly && readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
 if (productionExists) {
   const production = validateMpCiEvidenceGapProductionAuthority({ root: ROOT });
   assert.equal(production.scoringReady, false);
@@ -429,6 +778,47 @@ if (productionExists) {
 }
 
 const requested = privateArgs(process.argv.slice(2));
-const privateSummary = requested ? await validatePrivateCases(requested) : null;
-
-console.log(JSON.stringify({ fixture_id: "mp-ci-evidence-gap", input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: "review_evidence_missing", scoring_ready: false }));
+if (semanticRegressionDirectOnly && !requested) throw new Error("--semantic-regression-direct-only requires --private-root and --private-case-root");
+const privateSummary = requested ? await validatePrivateCases(requested, { directOnly: semanticRegressionDirectOnly }) : null;
+const report = {
+  fixture_id: "mp-ci-evidence-gap",
+  semantic_regression_direct_validation: semanticRegressionDirectOnly ? "pass" : "included",
+  source_freeze_validation: semanticRegressionDirectOnly ? "not_requested" : productionExists ? "pass" : "generation_pending",
+  sealed_validation: semanticRegressionDirectOnly ? "not_requested" : requested ? "pass" : "not_supplied",
+  production_safe_validation: semanticRegressionDirectOnly ? "not_requested" : requested ? "pass" : "not_supplied",
+  input: semanticRegressionDirectOnly ? "not_requested" : "pass",
+  input_closure: semanticRegressionDirectOnly ? "not_requested" : "pass",
+  frozen_design: semanticRegressionDirectOnly ? "not_requested" : "pass",
+  visible_scenario: semanticRegressionDirectOnly ? "not_requested" : "pass",
+  production_validation: semanticRegressionDirectOnly ? "not_requested" : productionExists ? "pass" : "generation_pending",
+  actual_private_validation: semanticRegressionDirectOnly ? "semantic_direct_pass" : requested ? "pass" : "not_supplied",
+  ...(privateSummary ? { private_summary: privateSummary } : {}),
+  admission: semanticRegressionDirectOnly ? "not_requested" : "review_evidence_missing",
+  scoring_ready: false,
+};
+if (semanticRegressionDirectOnly) {
+  assert.deepEqual(
+    {
+      source_freeze_validation: report.source_freeze_validation,
+      sealed_validation: report.sealed_validation,
+      production_safe_validation: report.production_safe_validation,
+      input: report.input,
+      admission: report.admission,
+      actual_private_validation: report.actual_private_validation,
+      productionSafePass: privateSummary.productionSafePass,
+      sealedPass: privateSummary.sealedPass,
+    },
+    {
+      source_freeze_validation: "not_requested",
+      sealed_validation: "not_requested",
+      production_safe_validation: "not_requested",
+      input: "not_requested",
+      admission: "not_requested",
+      actual_private_validation: "semantic_direct_pass",
+      productionSafePass: "not_requested",
+      sealedPass: "not_requested",
+    },
+    "direct-only lifecycle report must not claim unexecuted authority or sealed validation",
+  );
+}
+console.log(JSON.stringify(report));
