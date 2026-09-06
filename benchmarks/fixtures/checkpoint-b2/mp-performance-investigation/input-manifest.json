@@ -60,8 +60,8 @@
         },
         {
           "path": "workspace/scripts/validate-investigation.mjs",
-          "sha256": "7a9767b909b5fd239e4476886b2dc101d277c585a6e84d60dd9d32a1ccd942e1",
-          "bytes": 7897
+          "sha256": "fded94d974f97323c666f5b437d0470b4140fbde322f3e2e131e5b0263e757b7",
+          "bytes": 11347
         },
         {
           "path": "workspace/src/cache-key.mjs",
