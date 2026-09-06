@@ -927,6 +927,14 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "evidence-and-review-precision": "fail" },
     },
     {
+      name: "hidden-lookup-remediation-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Restrict the detail lookup to hidden selected messages.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
       name: "hidden-rather-than-visible-remediation-contradiction",
       mutate(review) {
         review.findings[0].required_action = "Base details on hidden messages rather than visible ones.";
