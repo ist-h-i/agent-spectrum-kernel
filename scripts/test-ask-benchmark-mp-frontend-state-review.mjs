@@ -863,6 +863,14 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
     },
     {
+      name: "passive-never-filter-effect-contradiction",
+      mutate(review) {
+        review.findings[0].title = "The chosen item is never concealed by filtering, while obsolete details persist";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "state-consistency-finding": "fail", "decision-correctness": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
       name: "negated-detail-observation-contradiction",
       mutate(review) {
         review.findings[0].impact = "The list has no selected row while the detail pane renders no selected message.";

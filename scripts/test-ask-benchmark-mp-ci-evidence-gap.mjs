@@ -617,6 +617,9 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       ["matched-not-true-greater-count", "PR CI omits the required suite although it is not true that more than 2 unit tests passed", true],
       ["conflicting-context-and-explicit-target-count", "PR CI omits the required suite although the checkout target reports 2 passing unit tests", false],
       ["wrong-execution-run-alias-count", "Pull request execution #999 omits the required checkout suite although 2 unit tests passed", false],
+      ["contradicted-colon-outer-negated-equality-count", "PR CI omits the required suite although this is not true: exactly two unit tests passed", false],
+      ["matched-untrue-less-than-count", "PR CI omits the required suite although it is untrue that under two unit tests passed", true],
+      ["wrong-unknown-target-identity-count", "PR CI omits the required suite although the lint target reports two passing unit tests", false],
     ]) {
       const review = clone(baseReview);
       review.findings[0].title = title;
@@ -646,6 +649,21 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       satisfied: unresolvedComparisonResult.evaluation_status === "manual_review_required"
         && unresolvedComparisonResult.classification == null
         && unresolvedComparisonRequirement?.outcome === "manual_review_required",
+    });
+
+    const unresolvedNearComparisonReview = clone(baseReview);
+    unresolvedNearComparisonReview.findings[0].title = "PR CI omits the required checkout suite although close to two unit tests passed";
+    unresolvedNearComparisonReview.findings[0].evidence.push({ path: "ci/pull-request-314.log", line: 11 });
+    const unresolvedNearComparisonResult = await evaluateReviewProbe({ probeId: "unresolved-close-to-comparison-count", review: unresolvedNearComparisonReview });
+    const unresolvedNearComparisonRequirement = unresolvedNearComparisonResult.requirement_results.find(({ requirement_id }) => requirement_id === "scope-and-review-precision");
+    reviewRegressionChecks.push({
+      probe_id: "unresolved-close-to-comparison-count",
+      expected: "manual_review_required",
+      actual_evidence_correctness: unresolvedNearComparisonResult.evidence_correctness.state,
+      actual_classification: unresolvedNearComparisonResult.classification,
+      satisfied: unresolvedNearComparisonResult.evaluation_status === "manual_review_required"
+        && unresolvedNearComparisonResult.classification == null
+        && unresolvedNearComparisonRequirement?.outcome === "manual_review_required",
     });
 
     const adverbObscuredUnsupportedPredicate = clone(baseReview);
