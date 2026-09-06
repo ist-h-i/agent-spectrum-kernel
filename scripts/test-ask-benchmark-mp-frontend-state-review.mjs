@@ -798,6 +798,15 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
     },
     {
+      name: "alternate-synonym-finding-wording",
+      mutate(review) {
+        review.findings[0].title = "Filtering masks the active message but outdated details remain";
+        review.findings[0].impact = "No active row remains while the detail pane renders the masked message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
       name: "selected-message-title-equivalence",
       mutate(review) {
         review.findings[0].title = review.findings[0].title.replace("selected row", "selected message");
