@@ -573,6 +573,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       ["wrong-target-pass-count", "PR CI omits the required checkout suite with 2 passing checkout tests", false],
       ["matched-unqualified-event-count", "For PR #314, CI omits the required checkout suite after the cited unit command reports two events", true],
       ["fabricated-current-tense-unit-pass-count", "PR #314 CI omits the checkout suite although 999 unit tests currently pass", false],
+      ["fabricated-noun-first-unit-success-total", "PR #314 CI omits the required checkout suite despite a unit-test success total of 999", false],
       ["distant-wrong-run-unit-pass-count", "PR #999 CI omits the checkout suite because repository guidance requires complete validation while the cited successful subset reports 2 passed unit tests", false],
     ]) {
       const review = clone(baseReview);

@@ -593,6 +593,14 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "verification-conclusion": "fail" },
     },
     {
+      name: "inverse-empty-pane-verification-reason",
+      mutate(review) {
+        review.verification.evidence[0].conclusion = "The interaction test failed even though the hidden selection yielded an empty detail pane.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "verification-conclusion": "fail" },
+    },
+    {
       name: "unknown-verification-failure-reason",
       mutate(review) {
         review.verification.evidence[0].conclusion = "The interaction test fails for an undetermined reason.";
@@ -775,6 +783,16 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
         review.findings[0].title = "Filtering makes the selected message invisible but stale details remain";
         review.findings[0].impact = "No selected row remains while the detail pane renders the hidden selected message.";
         review.findings[0].required_action = "Invalidate selectedMessageId when filtering makes the selection invisible, or restrict detail lookup to the visible selected row.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "synonym-finding-wording",
+      mutate(review) {
+        review.findings[0].title = "Filtering conceals the chosen message but obsolete details remain";
+        review.findings[0].impact = "No chosen row remains while the details panel continues to display the concealed message.";
+        review.findings[0].required_action = "Reset the selection after filtering conceals the chosen message, or limit detail lookup to the visible chosen row.";
       },
       expectedClassification: "correct_narrow_execution",
       expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),

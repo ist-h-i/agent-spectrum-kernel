@@ -423,6 +423,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
     { ...succeededInteractionRecord, path: "test//integration/format-toolbar.test.mjs" },
   ];
   const verificationProbes = [
+    { probeId: "same-record-failure-then-green-success", records: [{ ...failedInteractionRecord, conclusion: `${failedInteractionRecord.conclusion} Nevertheless, every interaction assertion was green.` }], accepted: false },
     { probeId: "same-target-failure-then-success", records: [failedInteractionRecord, succeededInteractionRecord], accepted: false },
     { probeId: "same-target-success-then-failure", records: [succeededInteractionRecord, failedInteractionRecord], accepted: false },
     { probeId: "aliased-same-target-failure-then-success", records: [failedInteractionRecord, aliasedSucceededInteractionRecord], accepted: false },
