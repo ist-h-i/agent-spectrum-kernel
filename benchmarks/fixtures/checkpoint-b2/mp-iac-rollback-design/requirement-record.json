@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:649ddb6519ffe7f5b4bb0fda02a0eb04a6895b76ea19f57dd0928ce45dc38d70",
+  "admission_record_digest": "sha256:cc147eae6b196048b5cf4b6ae35d5fcb49c135ff24916a34fa2a159f81920d64",
   "requirements": [
     {
       "requirement_id": "current-plan-integrity",
@@ -118,5 +118,5 @@
     }
   ],
   "requirement_set_digest": "sha256:958d39cb8e8d84174c7670300845b288129ef46c3d83bcecafabf77d6f230539",
-  "requirement_record_digest": "sha256:f9ed8ce394ec62a4c5723d7ba89e117ad3501f6bc5d6d6bf6d36dd5930fc5f1a"
+  "requirement_record_digest": "sha256:9da8d0660a3e0a057efc4c3fa09f8ee6c0576f885c73abf66bf4f0ac32e582e4"
 }
