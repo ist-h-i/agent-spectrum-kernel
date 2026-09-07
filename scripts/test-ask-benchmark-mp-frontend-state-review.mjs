@@ -1120,6 +1120,14 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "evidence-and-review-precision": "fail" },
     },
     {
+      name: "selection-absent-visible-lookup-fallback-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Restrict detail lookup to visible messages even without a selection.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
       name: "period-separated-expansion-preservation-equivalence",
       mutate(review) {
         review.findings[0].required_action = "Clear selectedMessageId when filtering hides it. Preserve expandedThreadIds.";

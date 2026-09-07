@@ -745,6 +745,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
     for (const [probeId, title] of [
       ["unresolved-modal-negated-lower-bound", "PR CI omits the required checkout suite although there were not necessarily at least 2 passing unit tests"],
       ["unresolved-modal-negated-equality", "PR CI omits the required checkout suite although there were not necessarily exactly 2 passing unit tests"],
+      ["unresolved-fresh-modal-negated-lower-bound", "PR CI omits the required checkout suite although there were not demonstrably at least 2 passing unit tests"],
     ]) {
       const review = clone(baseReview);
       review.findings[0].title = title;
