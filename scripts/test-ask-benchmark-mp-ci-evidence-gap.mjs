@@ -742,6 +742,26 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
         && unresolvedRoughComparisonRequirement?.outcome === "manual_review_required",
     });
 
+    for (const [probeId, title] of [
+      ["unresolved-modal-negated-lower-bound", "PR CI omits the required checkout suite although there were not necessarily at least 2 passing unit tests"],
+      ["unresolved-modal-negated-equality", "PR CI omits the required checkout suite although there were not necessarily exactly 2 passing unit tests"],
+    ]) {
+      const review = clone(baseReview);
+      review.findings[0].title = title;
+      review.findings[0].evidence.push({ path: "ci/pull-request-314.log", line: 11 });
+      const result = await evaluateReviewProbe({ probeId, review });
+      const precisionRequirement = result.requirement_results.find(({ requirement_id }) => requirement_id === "scope-and-review-precision");
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: "manual_review_required",
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: result.evaluation_status === "manual_review_required"
+          && result.classification == null
+          && precisionRequirement?.outcome === "manual_review_required",
+      });
+    }
+
     const adverbObscuredUnsupportedPredicate = clone(baseReview);
     adverbObscuredUnsupportedPredicate.findings[0].impact = "The successful PR job ran only unit tests, thereby silently erasing customer audit records, so its evidence does not cover the complete test:all contract required for merge.";
     const adverbObscuredUnsupportedPredicateResult = await evaluateReviewProbe({ probeId: "adverb-obscured-unsupported-predicate", review: adverbObscuredUnsupportedPredicate });

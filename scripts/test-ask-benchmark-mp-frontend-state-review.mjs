@@ -1079,12 +1079,37 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
     },
     {
+      name: "selected-target-release-trigger-equivalence",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId after the filter conceals the active item.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "unrelated-target-release-trigger-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides an unrelated message.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
       name: "visible-selected-detail-source-equivalence",
       mutate(review) {
         review.findings[0].required_action = "Derive details only from the visible selected message.";
       },
       expectedClassification: "correct_narrow_execution",
       expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "generic-visible-detail-source-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Restrict details to visible messages.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
     },
     {
       name: "unselected-first-visible-fallback-contradiction",
@@ -1138,6 +1163,14 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       name: "coordinated-expansion-remove-contradiction",
       mutate(review) {
         review.findings[0].required_action = "Clear selectedMessageId when filtering hides it, and remove expandedThreadIds.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "suspicious-control-restraint": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "shared-clear-verb-expansion-object-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId and expandedThreadIds when filtering hides it.";
       },
       expectedClassification: "under_processing",
       expectedOutcomes: { "suspicious-control-restraint": "fail", "evidence-and-review-precision": "fail" },
