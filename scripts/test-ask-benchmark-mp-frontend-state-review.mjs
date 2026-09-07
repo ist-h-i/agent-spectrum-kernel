@@ -1063,6 +1063,86 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
     },
     {
+      name: "negated-release-trigger-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering does not hide it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "no-longer-visible-release-trigger-equivalence",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId only when filtering makes the selected message no longer visible.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "visible-selected-detail-source-equivalence",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details only from the visible selected message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "unselected-first-visible-fallback-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the first visible message, even when no row is selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "period-separated-expansion-preservation-equivalence",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it. Preserve expandedThreadIds.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "semicolon-separated-expansion-preservation-equivalence",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it; preserve expandedThreadIds.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "coordinated-expansion-preservation-equivalence",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it, and preserve expandedThreadIds.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "coordinated-negated-expansion-clear-equivalence",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it, and do not clear expandedThreadIds.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "coordinated-expansion-clear-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it, and clear expandedThreadIds.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "suspicious-control-restraint": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "coordinated-expansion-remove-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it, and remove expandedThreadIds.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "suspicious-control-restraint": "fail", "evidence-and-review-precision": "fail" },
+    },
+    {
       name: "keeps-rendering-impact-equivalence",
       mutate(review) {
         review.findings[0].impact = review.findings[0].impact.replace("detail pane renders", "detail pane keeps rendering");

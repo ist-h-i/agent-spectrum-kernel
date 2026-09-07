@@ -628,6 +628,14 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       ["matched-word-fewer-than-upper-count", "PR CI omits the required checkout suite although fewer than three unit tests pass", true],
       ["matched-run-bound-word-more-than-count", "In pull request run 314, CI omits the required checkout suite although more than one unit test passes", true],
       ["matched-run-bound-word-fewer-than-count", "In pull request run 314, CI omits the required checkout suite although fewer than three unit tests pass", true],
+      ["contradicted-inline-not-at-least-boundary-count", "PR CI omits the required checkout suite with not at least 2 passing unit tests", false],
+      ["matched-inline-not-at-least-above-count", "PR CI omits the required checkout suite with not at least 3 passing unit tests", true],
+      ["contradicted-inline-not-at-most-boundary-count", "PR CI omits the required checkout suite with not at most 2 passing unit tests", false],
+      ["matched-inline-not-at-most-below-count", "PR CI omits the required checkout suite with not at most 1 passing unit test", true],
+      ["matched-inline-not-over-boundary-count", "PR CI omits the required checkout suite with not over 2 passing unit tests", true],
+      ["matched-inline-not-under-boundary-count", "PR CI omits the required checkout suite with not under 2 passing unit tests", true],
+      ["matched-inline-not-at-least-word-count", "In pull request run 314, CI omits the required checkout suite with not at least three passing unit tests", true],
+      ["contradicted-inline-not-at-most-word-count", "In pull request run 314, CI omits the required checkout suite with not at most two passing unit tests", false],
     ]) {
       const review = clone(baseReview);
       review.findings[0].title = title;
@@ -642,6 +650,36 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
           ? result.evidence_correctness.state === "pass" && result.classification === "correct_narrow_execution"
           : result.evidence_correctness.state === "fail" && result.classification !== "correct_narrow_execution",
       });
+    }
+
+    const comparisonTruthTable = [
+      ["equal", "exactly", (actual, claimed) => actual === claimed],
+      ["not-equal", "not exactly", (actual, claimed) => actual !== claimed],
+      ["greater-than", "more than", (actual, claimed) => actual > claimed],
+      ["greater-than-or-equal", "at least", (actual, claimed) => actual >= claimed],
+      ["less-than", "fewer than", (actual, claimed) => actual < claimed],
+      ["less-than-or-equal", "at most", (actual, claimed) => actual <= claimed],
+    ];
+    for (const [operatorId, phrase, predicate] of comparisonTruthTable) {
+      for (const outerNegated of [false, true]) {
+        for (const claimed of [1, 2, 3]) {
+          const accepted = outerNegated ? !predicate(2, claimed) : predicate(2, claimed);
+          const probeId = `comparison-truth-table-${operatorId}-${outerNegated ? "negated" : "positive"}-${claimed}`;
+          const review = clone(baseReview);
+          review.findings[0].title = `PR CI omits the required checkout suite although ${outerNegated ? "it is not true that " : ""}${phrase} ${claimed} unit tests passed`;
+          review.findings[0].evidence.push({ path: "ci/pull-request-314.log", line: 11 });
+          const result = await evaluateReviewProbe({ probeId, review });
+          reviewRegressionChecks.push({
+            probe_id: probeId,
+            expected: accepted ? "accepted" : "rejected",
+            actual_evidence_correctness: result.evidence_correctness.state,
+            actual_classification: result.classification,
+            satisfied: accepted
+              ? result.evidence_correctness.state === "pass" && result.classification === "correct_narrow_execution"
+              : result.evidence_correctness.state === "fail" && result.classification !== "correct_narrow_execution",
+          });
+        }
+      }
     }
 
     const unresolvedComparisonReview = clone(baseReview);
