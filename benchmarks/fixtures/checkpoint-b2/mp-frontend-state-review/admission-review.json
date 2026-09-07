@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "mp-frontend-state-review",
   "candidate_input_digest": "sha256:e6bf65ba00ea49cd18857c8e3390c9b3c9e3ef493f4935cbc816094cd90b7105",
-  "candidate_evaluator_digest": "sha256:ac3a077d92cf0575222937b1aba5b66ad5eac95939e0168b1ae371562d6d2ad3",
+  "candidate_evaluator_digest": "sha256:fffb946cdf18ebf4de121ad588a5441728f0dd0807d166e0f5268895fa7eebd7",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -119,5 +119,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:ef60d4f76f4e8222cb7b06432134b8089184f2099e972751af4c7e4a8e96d41d"
+  "review_package_digest": "sha256:ae5f22a85d476c24e13dd531626880762921c4f9fd9e55f6dc33a2404e448a44"
 }
