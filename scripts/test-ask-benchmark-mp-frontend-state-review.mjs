@@ -1264,6 +1264,30 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
     },
     {
+      name: "v1-core-remediation-while-preserving-expansion-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it while preserving expandedThreadIds.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "v2-does-not-leave-visible-release-trigger-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering does not leave the selected message visible.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "v3-never-from-unselected-source-rejection-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, never from an unselected message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
       name: "period-separated-expansion-preservation-equivalence",
       mutate(review) {
         review.findings[0].required_action = "Clear selectedMessageId when filtering hides it. Preserve expandedThreadIds.";
