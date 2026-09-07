@@ -636,6 +636,10 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       ["matched-inline-not-under-boundary-count", "PR CI omits the required checkout suite with not under 2 passing unit tests", true],
       ["matched-inline-not-at-least-word-count", "In pull request run 314, CI omits the required checkout suite with not at least three passing unit tests", true],
       ["contradicted-inline-not-at-most-word-count", "In pull request run 314, CI omits the required checkout suite with not at most two passing unit tests", false],
+      ["v4-numeric-two-pass-count-control", "PR CI omits the required checkout suite with 2 passing unit tests", true],
+      ["v4-numeric-zero-pass-count-contradiction", "PR CI omits the required checkout suite with 0 passing unit tests", false],
+      ["v4-word-zero-pass-count-contradiction", "PR CI omits the required checkout suite with zero passing unit tests", false],
+      ["v4-no-pass-count-contradiction", "PR CI omits the required checkout suite with no passing unit tests", false],
     ]) {
       const review = clone(baseReview);
       review.findings[0].title = title;

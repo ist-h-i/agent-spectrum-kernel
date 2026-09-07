@@ -1168,6 +1168,102 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
     },
     {
+      name: "v1-expansion-preservation-without-core-remediation",
+      mutate(review) {
+        review.findings[0].required_action = "Preserve expandedThreadIds.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "v1-selection-release-core-remediation-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "v1-core-remediation-with-expansion-preservation-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it, and preserve expandedThreadIds.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "v2-no-longer-hides-release-trigger-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering no longer hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "v2-never-hides-release-trigger-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering never hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "v2-not-visible-release-trigger-equivalence",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering makes the selected message not visible.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "v2-hides-release-trigger-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "v2-no-longer-visible-release-trigger-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering makes the selected message no longer visible.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "v3-unselected-adopted-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from unselected visible messages instead of the visible selected message.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "v3-first-unread-adopted-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the first unread message instead of the visible selected message.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "v3-visible-selected-adopted-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "v3-explicit-unselected-source-rejection-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from unselected messages.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
       name: "period-separated-expansion-preservation-equivalence",
       mutate(review) {
         review.findings[0].required_action = "Clear selectedMessageId when filtering hides it. Preserve expandedThreadIds.";
