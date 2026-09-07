@@ -1144,6 +1144,30 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: { "evidence-and-review-precision": "fail" },
     },
     {
+      name: "there-is-no-selected-row-lookup-fallback-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Restrict detail lookup to visible messages when there is no selected row.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "empty-selection-lookup-fallback-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Restrict detail lookup to visible messages if the selection is empty.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "selected-item-pronoun-visible-source-equivalence",
+      mutate(review) {
+        review.findings[0].required_action = "Limit detail lookup to the currently selected item while it remains visible.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
       name: "period-separated-expansion-preservation-equivalence",
       mutate(review) {
         review.findings[0].required_action = "Clear selectedMessageId when filtering hides it. Preserve expandedThreadIds.";
