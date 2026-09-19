@@ -53,7 +53,7 @@ function validateWithAuthorityRoots({ privateRoot, caseRoot }) {
     const substitutedHead = git(repository, ["rev-parse", "HEAD"]);
     assert.throws(
       () => generateMpPerformanceInvestigationReviewArchive({ root: repository, privateRoot, caseRoot, outputPath: resolve(work, "shared-substitution.zip"), reviewedHead: substitutedHead, sourceRevision }),
-      /generator source identity differs/u,
+      /evaluator dependency bytes do not match the base Git revision at scripts\/ask-benchmark-mp-iac-rollback-design-review-archive\.mjs/u,
       "clean direct-child shared generator substitution must fail closed",
     );
     assert.throws(
