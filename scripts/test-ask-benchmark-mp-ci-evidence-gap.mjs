@@ -640,6 +640,34 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       ["v4-numeric-zero-pass-count-contradiction", "PR CI omits the required checkout suite with 0 passing unit tests", false],
       ["v4-word-zero-pass-count-contradiction", "PR CI omits the required checkout suite with zero passing unit tests", false],
       ["v4-no-pass-count-contradiction", "PR CI omits the required checkout suite with no passing unit tests", false],
+      ["w5-unsigned-two-count-control", "PR CI omits the required checkout suite with 2 passing unit tests", true],
+      ["w5-explicit-positive-two-count-control", "PR CI omits the required checkout suite with +2 passing unit tests", true],
+      ["w5-negative-two-count-contradiction", "PR CI omits the required checkout suite with -2 passing unit tests", false],
+      ["w5-negative-one-count-contradiction", "PR CI omits the required checkout suite with -1 passing unit tests", false],
+      ["w5-zero-count-contradiction", "PR CI omits the required checkout suite with 0 passing unit tests", false],
+      ["w5-more-than-negative-one-count-control", "PR CI omits the required checkout suite with more than -1 passing unit tests", true],
+      ["w5-fewer-than-negative-two-count-contradiction", "PR CI omits the required checkout suite with fewer than -2 passing unit tests", false],
+      ["w5-fresh-more-than-positive-one-count-control", "PR CI omits the required checkout suite with more than +1 passing unit tests", true],
+      ["w5-fresh-fewer-than-positive-one-count-contradiction", "PR CI omits the required checkout suite with fewer than +1 passing unit test", false],
+      ["w5-fresh-at-least-negative-one-count-control", "PR CI omits the required checkout suite with at least -1 passing unit tests", true],
+      ["w5-fresh-at-most-negative-one-count-contradiction", "PR CI omits the required checkout suite with at most -1 passing unit tests", false],
+      ["w5-fresh-not-at-least-negative-one-contradiction", "PR CI omits the required checkout suite with not at least -1 passing unit tests", false],
+      ["w5-fresh-not-at-most-negative-one-control", "PR CI omits the required checkout suite with not at most -1 passing unit tests", true],
+      ["w5-fresh-outer-negated-more-than-negative-one-contradiction", "It is not true that PR CI omits the required checkout suite with more than -1 passing unit tests", false],
+      ["w5-fresh-wrong-run-positive-two-contradiction", "In pull request run 999, CI omits the required checkout suite with +2 passing unit tests", false],
+      ["w5-fresh-wrong-target-positive-two-contradiction", "PR CI omits the required checkout suite with +2 passing checkout tests", false],
+      ["x4-two-count-control", "PR CI omits the required checkout suite with 2 passing unit tests", true],
+      ["x4-positive-two-count-control", "PR CI omits the required checkout suite with +2 passing unit tests", true],
+      ["x4-negative-two-count-contradiction", "PR CI omits the required checkout suite with -2 passing unit tests", false],
+      ["x4-decimal-like-count-contradiction", "PR CI omits the required checkout suite with 1.2 passing unit tests", false],
+      ["x4-negative-decimal-like-count-contradiction", "PR CI omits the required checkout suite with -1.2 passing unit tests", false],
+      ["x4-zero-decimal-like-count-contradiction", "PR CI omits the required checkout suite with 0.2 passing unit tests", false],
+      ["x4-leading-decimal-like-count-contradiction", "PR CI omits the required checkout suite with .2 passing unit tests", false],
+      ["x4-negative-leading-decimal-like-count-contradiction", "PR CI omits the required checkout suite with -.2 passing unit tests", false],
+      ["y3-two-count-control", "PR CI omits the required checkout suite with 2 passing unit tests", true],
+      ["y3-positive-two-count-control", "PR CI omits the required checkout suite with +2 passing unit tests", true],
+      ["y3-hundred-count-contradiction", "PR CI omits the required checkout suite with 100 passing unit tests", false],
+      ["y3-decimal-count-contradiction", "PR CI omits the required checkout suite with 1.2 passing unit tests", false],
     ]) {
       const review = clone(baseReview);
       review.findings[0].title = title;
@@ -653,6 +681,134 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
         satisfied: accepted
           ? result.evidence_correctness.state === "pass" && result.classification === "correct_narrow_execution"
           : result.evidence_correctness.state === "fail" && result.classification !== "correct_narrow_execution",
+      });
+    }
+
+    for (const [probeId, title] of [
+      ["y3-exponent-count-unresolved", "PR CI omits the required checkout suite with 1e2 passing unit tests"],
+      ["y3-decimal-exponent-count-unresolved", "PR CI omits the required checkout suite with 1.2e2 passing unit tests"],
+      ["y3-negative-exponent-count-unresolved", "PR CI omits the required checkout suite with 2e-1 passing unit tests"],
+      ["y3-multi-dot-count-unresolved", "PR CI omits the required checkout suite with 1.2.2 passing unit tests"],
+    ]) {
+      const review = clone(baseReview);
+      review.findings[0].title = title;
+      review.findings[0].evidence.push({ path: "ci/pull-request-314.log", line: 11 });
+      const result = await evaluateReviewProbe({ probeId, review });
+      const precisionRequirement = result.requirement_results.find(({ requirement_id }) => requirement_id === "scope-and-review-precision");
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: "manual_review_required",
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: result.evaluation_status === "manual_review_required"
+          && result.classification == null
+          && precisionRequirement?.outcome === "manual_review_required",
+      });
+    }
+
+    for (const [probeId, quantity, expectation] of [
+      ["z3-two-count-control", "2", "accepted"],
+      ["z3-scientific-count-unresolved", "1e2", "manual_review_required"],
+      ["z3-negative-scientific-count-unresolved", "-1.2e2", "manual_review_required"],
+      ["z3-underscore-count-unresolved", "1_002", "manual_review_required"],
+      ["z3-comma-count-contradiction", "1,002", "rejected"],
+      ["z3-unknown-word-count-unresolved", "twelve", "manual_review_required"],
+      ["z3-exact-unknown-word-count-unresolved", "exactly twelve", "manual_review_required"],
+      ["z3-fresh-eleven-count-unresolved", "eleven", "manual_review_required"],
+      ["z3-fresh-compound-word-count-unresolved", "twenty-one", "manual_review_required"],
+      ["z3-fresh-scaled-word-count-unresolved", "one hundred two", "manual_review_required"],
+      ["z3-fresh-several-count-unresolved", "several", "manual_review_required"],
+      ["z3-fresh-dozen-count-contradiction", "a dozen", "rejected"],
+      ["z3-fresh-not-multiple-count-contradiction", "not multiple", "rejected"],
+      ["z3-fresh-single-count-contradiction", "a single", "rejected"],
+      ["z3-fresh-scores-of-count-unresolved", "scores of", "manual_review_required"],
+      ["z3-fresh-multiple-count-control", "multiple", "accepted"],
+      ["z3-fresh-not-single-count-contradiction", "not a single", "rejected"],
+      ["z3-fresh-both-count-control", "both", "accepted"],
+      ["z3-fresh-none-count-contradiction", "none", "rejected"],
+      ["z3-fresh-not-none-count-control", "not none", "accepted"],
+      ["z3-fresh-not-dozen-count-control", "not a dozen", "accepted"],
+      ["z3-fresh-trio-count-contradiction", "a trio of", "rejected"],
+      ["z3-fresh-handful-count-unresolved", "a handful of", "manual_review_required"],
+      ["aa1-q-two-control", "2", "accepted"],
+      ["aa1-q-zero-contradiction", "0", "rejected"],
+      ["aa1-q-no-contradiction", "no", "rejected"],
+      ["aa1-q-single-contradiction", "a single", "rejected"],
+      ["aa1-q-not-single-contradiction", "not a single", "rejected"],
+      ["aa1-q-not-exactly-single-control", "not exactly a single", "accepted"],
+      ["aa1-q-exactly-two-control", "exactly 2", "accepted"],
+      ["aa1-q-not-exactly-two-contradiction", "not exactly 2", "rejected"],
+      ["aa1-q-none-contradiction", "none", "rejected"],
+      ["aa1-q-not-none-control", "not none", "accepted"],
+      ["aa1-q-both-control", "both", "accepted"],
+      ["aa1-q-multiple-control", "multiple", "accepted"],
+      ["aa1-q-twelve-unresolved", "twelve", "manual_review_required"],
+      ["aa1-q-dozen-contradiction", "a dozen", "rejected"],
+      ["ab2-q-two-control", "2", "accepted"],
+      ["ab2-q-single-contradiction", "a single", "rejected"],
+      ["ab2-q-not-single-contradiction", "not a single", "rejected"],
+      ["ab2-q-not-space-a-single-contradiction", "not  a single", "rejected"],
+      ["ab2-q-not-a-space-single-contradiction", "not a  single", "rejected"],
+      ["ab2-q-not-tab-a-single-contradiction", "not\ta single", "rejected"],
+      ["ab2-q-not-exactly-single-control", "not exactly a single", "accepted"],
+      ["ab2-q-not-exactly-space-single-control", "not exactly a  single", "accepted"],
+      ["ab2-fresh-mixed-whitespace-not-single-contradiction", "not   a\t single", "rejected"],
+      ["ab2-fresh-mixed-whitespace-not-exactly-single-control", "not exactly\ta   single", "accepted"],
+      ["ab2-q-no-contradiction", "no", "rejected"],
+      ["ab2-q-not-none-control", "not none", "accepted"],
+    ]) {
+      const review = clone(baseReview);
+      review.findings[0].title = `PR CI omits the required checkout suite with ${quantity} passing unit tests`;
+      review.findings[0].evidence.push({ path: "ci/pull-request-314.log", line: 11 });
+      const result = await evaluateReviewProbe({ probeId, review });
+      const precisionRequirement = result.requirement_results.find(({ requirement_id }) => requirement_id === "scope-and-review-precision");
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: expectation,
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: expectation === "accepted"
+          ? result.evidence_correctness.state === "pass" && result.classification === "correct_narrow_execution"
+          : expectation === "rejected"
+            ? result.evidence_correctness.state === "fail" && result.classification !== "correct_narrow_execution"
+            : result.evaluation_status === "manual_review_required"
+              && result.classification == null
+              && precisionRequirement?.outcome === "manual_review_required",
+      });
+    }
+
+    {
+      const probeId = "z3-fresh-not-both-noun-first-count-unresolved";
+      const review = clone(baseReview);
+      review.findings[0].title = "PR CI omits the required checkout suite with not both unit tests passing";
+      review.findings[0].evidence.push({ path: "ci/pull-request-314.log", line: 11 });
+      const result = await evaluateReviewProbe({ probeId, review });
+      const precisionRequirement = result.requirement_results.find(({ requirement_id }) => requirement_id === "scope-and-review-precision");
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: "rejected",
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: result.evaluation_status === "completed"
+          && result.evidence_correctness.state === "fail"
+          && result.classification !== "correct_narrow_execution"
+          && precisionRequirement?.outcome === "fail",
+      });
+    }
+
+    for (const [probeId, title] of [
+      ["z3-no-count-currently-adverb-control", "PR CI omits the required checkout suite with currently passing unit tests"],
+      ["z3-no-count-existing-adjective-control", "PR CI omits the required checkout suite with existing passing unit tests"],
+    ]) {
+      const review = clone(baseReview);
+      review.findings[0].title = title;
+      const result = await evaluateReviewProbe({ probeId, review });
+      reviewRegressionChecks.push({
+        probe_id: probeId,
+        expected: "accepted",
+        actual_evidence_correctness: result.evidence_correctness.state,
+        actual_classification: result.classification,
+        satisfied: result.evidence_correctness.state === "pass" && result.classification === "correct_narrow_execution",
       });
     }
 

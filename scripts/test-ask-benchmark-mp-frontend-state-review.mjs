@@ -1320,6 +1320,1722 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
       expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
     },
     {
+      name: "w1-core-only-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w1-auxiliary-only-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Preserve expandedThreadIds.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w1-core-and-auxiliary-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it, and preserve expandedThreadIds.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w1-core-or-auxiliary-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it, or preserve expandedThreadIds.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w1-auxiliary-or-core-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Preserve expandedThreadIds, or clear selectedMessageId when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w1-core-alternatives-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it, or derive details only from the visible selected row.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w2-before-render-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w2-only-after-render-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId only after rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w3-release-only-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w3-preserve-selection-otherwise-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it, but preserve selectedMessageId otherwise.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w3-preserve-visible-selection-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it, and preserve selectedMessageId if the selected message remains visible.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w3-preserve-hidden-selection-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Preserve selectedMessageId when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w4-visible-selected-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w4-not-from-visible-selected-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details not from the visible selected message.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w4-never-from-visible-selected-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details never from the visible selected message.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w4-explicit-unselected-source-rejection-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from unselected messages.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w1-fresh-each-alternative-has-core-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it and keep expandedThreadIds, or restrict details to the visible selected row.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w1-fresh-auxiliary-alternative-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Keep expandedThreadIds, or restrict details to the visible selected row.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w2-fresh-after-filter-before-render-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId after filtering hides it but before rendering.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w2-fresh-after-view-render-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId after the view has rendered when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w3-fresh-otherwise-visible-selection-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId if filtering hides it; otherwise keep the still-visible selection.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w4-fresh-rejected-before-adopted-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details not from unselected rows but from the visible selected row.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w4-fresh-wrong-adopted-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from an unselected row rather than the visible selected row.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w1-review-either-core-alternatives-control",
+      mutate(review) {
+        review.findings[0].required_action = "Either clear selectedMessageId when filtering hides it, or derive details only from the visible selected row.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w1-review-either-auxiliary-alternative-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Either preserve expandedThreadIds, or clear selectedMessageId when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w2-review-following-render-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId following rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w2-review-prior-to-render-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId prior to rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "w4-review-no-visible-selected-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from no visible selected row.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w4-rereview-no-currently-visible-selected-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from no currently visible selected row.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "w4-rereview-no-selected-source-relative-clause-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from no selected row that remains visible.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "x1-core-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "x1-independent-core-plus-auxiliary-alternatives-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it. Preserve expandedThreadIds or retain expandedThreadIds.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "x1-auxiliary-alternatives-plus-independent-core-control",
+      mutate(review) {
+        review.findings[0].required_action = "Preserve expandedThreadIds or retain expandedThreadIds. Clear selectedMessageId when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "x1-auxiliary-alternatives-only-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Preserve expandedThreadIds or retain expandedThreadIds.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "x1-core-or-auxiliary-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it, or preserve expandedThreadIds.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "x2-before-render-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "x2-after-render-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId only after rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "x2-not-before-render-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not before rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "x2-never-before-render-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId never before rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "x2-not-after-but-before-render-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not after rendering but before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "x2-not-following-but-ahead-of-render-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not following rendering but ahead of rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "x3-positive-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "x3-rejected-fallback-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the first visible message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "x3-rejected-conditional-fallback-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the first visible message when no row is selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "x3-adopted-conditional-fallback-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the first visible message when no row is selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "y1-selected-visible-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "y1-reject-hidden-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from hidden selected messages.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "y1-reject-relative-hidden-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the selected message that is hidden.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "y1-reject-not-visible-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the selected message that is not visible.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "y1-reject-no-longer-visible-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the selected message that is no longer visible.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "y1-instead-of-no-longer-visible-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message instead of the selected message that is no longer visible.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "y1-adopt-no-longer-visible-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected message that is no longer visible.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "y1-adopt-hidden-with-negative-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected message that is no longer visible, not hidden selected messages.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "y1-visible-with-negative-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not hidden selected messages.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "y1-adopt-hidden-not-from-hidden-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected message that is no longer visible, not from hidden selected messages.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "y2-before-render-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "y2-prior-to-render-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId prior to rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "y2-after-render-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId after rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "y2-not-before-render-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not before rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "y2-no-earlier-than-render-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId no earlier than rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "y2-render-complete-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId once rendering is complete when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "y2-upon-render-completion-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId upon completion of rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "y2-following-render-completion-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId following completion of rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "y2-in-advance-of-render-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId in advance of rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "y2-around-rendering-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId around rendering when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "z1-visible-selected-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "z1-not-hidden-visible-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that is not hidden.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "z1-no-longer-hidden-visible-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that is no longer hidden.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "z1-hidden-selected-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that is hidden.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z1-reject-visible-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the visible selected message.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z1-reject-not-hidden-visible-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the visible selected message that is not hidden.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z1-reject-not-hidden-selected-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the selected message that is not hidden.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z1-reject-hidden-selected-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the selected message that is hidden.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "z2-before-render-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "z2-after-render-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId after rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z2-before-completion-of-rendering-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before completion of rendering when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "z2-before-rendering-completes-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before rendering completes when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "z2-prior-to-rendering-completion-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId prior to rendering completion when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "z2-before-rendering-finishes-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before rendering finishes when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "z2-during-rendering-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId during rendering but before rendering completes when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z2-at-render-completion-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId at completion of rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z2-on-render-completion-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId on completion of rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z2-after-pane-rendered-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId after the pane has rendered when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z2-no-render-timing-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "z1-fresh-not-concealed-visible-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected message that is not concealed.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "z1-fresh-reject-not-concealed-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the selected message that is not concealed.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z1-fresh-reject-concealed-source-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the concealed selected message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "z2-fresh-before-render-start-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before the start of rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "z2-fresh-at-render-start-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId at the start of rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z2-fresh-before-render-end-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before the end of rendering when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "z2-fresh-throughout-rendering-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId throughout rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z2-fresh-by-render-completion-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId by completion of rendering when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "z2-fresh-not-before-render-completion-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not before rendering completes when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z1-fresh-reject-isnt-hidden-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected row that stays visible, not from the selected row that isn't hidden.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z1-fresh-reject-unhidden-source-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected row that stays visible, not from the selected row that remains unhidden.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z2-fresh-as-rendering-begins-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId as rendering begins when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "z2-fresh-near-render-start-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId near the beginning of rendering when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "z2-fresh-before-pane-starts-rendering-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before the pane starts rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "z2-fresh-close-to-render-start-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId close to the start of rendering when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "aa3-s-visible-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa3-s-not-hidden-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that is not hidden.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa3-s-not-hidden-by-filtering-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that is not hidden by filtering.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa3-s-not-hidden-from-view-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that is not hidden from view.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa3-s-no-longer-hidden-by-filtering-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that is no longer hidden by filtering.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa3-s-hidden-by-filtering-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected message that is hidden by filtering.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "aa3-s-reject-visible-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the visible selected message.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "aa3-s-reject-hidden-by-filtering-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the selected message that is hidden by filtering.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa3-s-reject-not-hidden-by-filtering-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the selected message that is not hidden by filtering.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "aa3-s-reject-not-visible-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the selected message that is not visible.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa3-s-adopt-not-visible-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected message that is not visible.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "aa3-s-coordinated-visible-not-concealed-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected row that remains visible and is not concealed by filtering.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa3-s-coordinated-visible-never-masked-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected item that stays visible and is never masked by filtering.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa3-s-never-masked-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected item that is never masked by filtering.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa3-s-reject-never-masked-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the selected item that is never masked by filtering.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "aa3-s-reject-coordinated-visible-never-masked-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from the selected item that stays visible and is never masked by filtering.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "aa3-s-coordinated-visible-concealed-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected row that remains visible and is concealed by filtering.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "aa3-s-coordinated-hidden-not-visible-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected row that is hidden and no longer visible.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "aa3-s-reject-coordinated-visible-not-concealed-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected row, not from a selected row that remains visible and is not concealed by filtering.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "aa2-t-before-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa2-t-during-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId during rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "aa2-t-not-during-before-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not during rendering but before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa2-t-never-during-before-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId never during rendering but before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa2-t-not-at-completion-before-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not at completion of rendering but before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa2-t-not-after-before-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not after rendering but before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa2-t-not-during-only-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not during rendering when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "aa2-t-not-after-only-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not after rendering when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "aa2-t-during-but-not-before-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId during rendering but not before rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "cor1-aa2-t-negated-during-before-redundant-completion-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not during rendering but before rendering, and also at completion of rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "aa2-t-before-completion-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before rendering completes when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "aa2-t-at-completion-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId at completion of rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ab3-t-before-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab3-t-at-completion-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId at completion of rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ab3-t-upon-completion-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId upon completion of rendering when filtering hides it.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ab3-t-not-at-completion-before-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not at completion of rendering but before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab3-t-not-upon-completion-before-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not upon completion of rendering but before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab3-t-never-upon-completion-before-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId never upon completion of rendering but before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab3-t-not-upon-rendering-completion-before-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not upon rendering completion but before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "cor1-t-before-and-redundant-upon-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId before rendering and also upon completion of rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab3-fresh-t-not-once-complete-before-control",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not once rendering is complete but before rendering when filtering hides it.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab3-fresh-t-not-once-complete-only-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Clear selectedMessageId not once rendering is complete when filtering hides it.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "ab1-s-visible-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab1-s-not-hidden-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that is not hidden by filtering.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab1-s-coordinated-not-hidden-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that remains visible and is not hidden by filtering.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab1-s-coordinated-selected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that remains visible and is selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab1-s-coordinated-not-selected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that remains visible and is not selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ab1-s-coordinated-no-longer-selected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that remains visible and is no longer selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ab1-s-coordinated-unselected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that remains visible and is unselected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ab1-fresh-s-coordinated-never-selected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that remains visible and is never selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ab1-fresh-s-coordinated-unselected-first-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that is unselected and remains visible.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ab1-fresh-s-postpositive-selected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the message that remains visible and selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab1-fresh-s-postpositive-unselected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the message that remains visible and unselected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ac1-s-postpositive-selected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ac1-s-postpositive-remains-selected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is selected and remains selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ac1-s-postpositive-still-selected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was selected and is still selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ac1-s-repeated-reference-selected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message when that message is selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ac1-s-postpositive-selection-conflict",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is selected and is not selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ac1-s-postpositive-no-longer-selected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was selected and is no longer selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ac1-s-postpositive-now-unselected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was selected and is now unselected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ac1-s-negated-unselected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not unselected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ad1-s-not-now-selected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not now selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ad1-s-now-not-selected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is now not selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ad1-s-not-now-unselected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not now unselected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ad1-s-now-not-unselected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is now not unselected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ad1-s-followup-not-now-selected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was selected and is not now selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ad1-s-followup-now-not-selected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was selected and is now not selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ad1-s-followup-not-now-unselected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was selected and is not now unselected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ad1-s-followup-now-not-unselected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was selected and is now not unselected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ad1-s-followup-never-now-selected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was selected and is never now selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ad1-s-not-presently-selected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not presently selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ad1-s-not-presently-unselected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not presently unselected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ad1-s-still-not-selected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is still not selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ad1-s-not-still-unselected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not still unselected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ad1-s-historical-unselected-now-selected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was unselected but is now selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ad1-s-historical-not-selected-presently-selected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was not selected but is presently selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ae1-s-historical-still-not-selected-now-selected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was still not selected but is now selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ae1-s-historical-currently-not-selected-now-selected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was currently not selected but is now selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ae1-s-historical-not-currently-selected-now-selected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was not currently selected but is now selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ae1-s-historical-not-still-selected-now-selected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was not still selected but is now selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "af1-shared-historical-copula",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that was visible and unselected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "af1-explicit-historical-copula",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that was visible and was unselected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "af1-shared-historical-explicit-current",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was visible and unselected but is now selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "af1-positive-visible-selected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is visible and is selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "af1-positive-visible-unselected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is visible and is unselected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "af1-unhidden-selected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not hidden and is selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "af1-unhidden-unselected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not hidden and is unselected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "af1-unhidden-not-selected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not hidden and is not selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "af1-unhidden-not-unselected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not hidden and is not unselected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "af1-selected-then-unhidden",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is selected and is not hidden.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "af1-unselected-then-unhidden",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is unselected and is not hidden.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "af1-no-longer-hidden-selected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is no longer hidden and is selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "af1-no-longer-hidden-unselected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is no longer hidden and is unselected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "af1-unhidden-presently-unselected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not hidden and is presently unselected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "af1-unhidden-now-selected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not hidden and is now selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "af1-history-visible-current-unselected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that was visible and is now unselected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "af1-history-visible-current-not-selected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that was visible and is not now selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "af1-history-visible-current-selected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that was visible and is now selected.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "af1-current-visible-current-unselected",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that is visible and is now unselected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ad1-s-current-selection-conflict-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is selected but is currently unselected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ae1-s-current-not-selected-then-current-selected-conflict",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is not selected and is now selected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ad1-s-historical-selected-now-unselected-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that was selected but is now unselected.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ac1-s-unparsed-following-predicate-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible message that is selected and becomes deselected.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "ab1-fresh-s-selected-filter-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from visible messages under the selected filter.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "ab1-fresh-s-selected-account-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from visible messages for the selected account.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "ab1-fresh-s-relative-selected-filter-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from messages that remain visible under the selected filter.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "ab1-fresh-s-relative-selected-account-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from messages that belong to the selected account and remain visible.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "ab1-fresh-s-cross-entity-selected-row-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from visible messages beside selected rows.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "ab1-fresh-s-nested-selected-row-unresolved",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from visible messages containing selected rows.";
+      },
+      expectedEvaluationStatus: "manual_review_required",
+      expectedClassification: null,
+      expectedOutcomes: { "evidence-and-review-precision": "manual_review_required" },
+    },
+    {
+      name: "ab1-fresh-s-coreferential-message-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected message when that message remains visible.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab1-fresh-s-coreferential-row-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the selected row if the row remains visible.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab1-s-coordinated-hidden-contradiction",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message that remains visible and is hidden.";
+      },
+      expectedClassification: "under_processing",
+      expectedOutcomes: { "evidence-and-review-precision": "fail" },
+    },
+    {
+      name: "ab1-s-reject-unselected-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, not from unselected messages.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
+      name: "ab1-s-expansion-preservation-control",
+      mutate(review) {
+        review.findings[0].required_action = "Derive details from the visible selected message, and preserve expandedThreadIds.";
+      },
+      expectedClassification: "correct_narrow_execution",
+      expectedOutcomes: Object.fromEntries(REQUIREMENT_IDS.map((requirementId) => [requirementId, "pass"])),
+    },
+    {
       name: "period-separated-expansion-preservation-equivalence",
       mutate(review) {
         review.findings[0].required_action = "Clear selectedMessageId when filtering hides it. Preserve expandedThreadIds.";
