@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:c42fff4b6bccb0aff7d5ee59d3539e188f1a2c51d65aff28dffeb49819cb82f6",
+  "evaluator_public_reference_digest": "sha256:fb071d7ecb5f59fcdc0ce8a4219e5cd085dc5f78182d6f6dbcbe3f8d7a4ca9cb",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/verification-command-contract.json",
   "verification_command_contract_digest": "sha256:767ae87a94c8abef440d674a3fee0ceea67c991ade589868d24fd8ccad48b40a",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/evidence-map.json",
@@ -17,7 +17,7 @@
   },
   "declares_findings": false,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:f2bfb6d4fbf225ea318f755cf1e26e6216c89343971396b22de26d7015967350",
-  "evaluator_authority_manifest_digest": "sha256:d04875b661192fb86ba9f511aca2c45a52e9fcec3dfcf36e8b4c16060a27b0cd",
-  "output_contract_digest": "sha256:122b159801114f424317f4c9806b25589c8e795565bd305fff657037dce2a893"
+  "evaluator_authority_manifest_raw_sha256": "sha256:8ed1e0acfce84f07d52f90b3ce9e5f5e39a4fdf27c2f1db6729330f9a02bf902",
+  "evaluator_authority_manifest_digest": "sha256:141c0aee40f77565d2be1e1420c141330dcda3d6c5f7562c6194b1165ae43e5b",
+  "output_contract_digest": "sha256:8a3d03b4c930779177e21c6f3b55f9f9ce632e4507cf5fe5907416d7e5034f28"
 }

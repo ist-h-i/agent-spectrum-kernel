@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-a620d39396e4090e580c33f556d0e710619827030dae3b3cffd23baa8690cfd2",
-  "evaluator_bundle_digest": "sha256:99e747722cbdae4cb014288226209e79b7ffe032cd13198d7bc5373e62d2962f",
+  "evaluator_bundle_id": "evaluator-ed19fdc386eb9ce0b8918f98ca1c3aa8df6ccbd9b8760e16ba1f9958823647da",
+  "evaluator_bundle_digest": "sha256:690659efda66f5ade10c829d5105b4c29cd0a8c77619b86e8dc75bbce28703d1",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mp-data-migration-handoff",
   "fixture_input_digest": "sha256:d82e1af9883a4336194348151e7fb76bfbc4743f0906d779d9d66cd315cb1995",
   "task_class": "handoff_resume",
   "suite": "mechanism_positive",
-  "evaluator_revision": "6918e433444389055a9e704489d26146f00a0829",
+  "evaluator_revision": "936bd7417656a0885bf43fa9645ef6106ab3ecb3",
   "evaluator_source_identity": {
-    "base_git_revision": "6918e433444389055a9e704489d26146f00a0829",
+    "base_git_revision": "936bd7417656a0885bf43fa9645ef6106ab3ecb3",
     "source_tree_digest": "sha256:ebbc7eb53674778e313cfcea9a9eb9952693ec74082f7c465aadad2c08a7e9d4",
     "generator_source_digest": "sha256:124f4862dbb4eba98605fb558368b561a99c7505f9bec5eeb8d14ecb632c8a53",
     "source_files": [
@@ -1766,11 +1766,11 @@
     }
   },
   "generator_identity": "sha256:5906b71dbbe8550a22bce92994307cb0c6f7edd642e9fff0568c2b20787c2817",
-  "independence_statement_digest": "sha256:3c46c2eca811ba7347759a8312bc8d0931cb6f3d6a12e7fc53b90ae9cea95297",
-  "review_record_digest": "sha256:1ecb3b24f2d1114f01b8c53cfcf3a4a5581c463db772601e1b241d5d1d0579bf",
+  "independence_statement_digest": "sha256:52fa75bc44438ea1b93ec1b98732df9edd94e611d1f0ca07f3bc2239416c82ed",
+  "review_record_digest": "sha256:a913e3af379575e8c6c1c6949b1d90584cd95564a5510f95a097d0b46ed39725",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:f2bfb6d4fbf225ea318f755cf1e26e6216c89343971396b22de26d7015967350",
-  "evaluator_authority_manifest_digest": "sha256:d04875b661192fb86ba9f511aca2c45a52e9fcec3dfcf36e8b4c16060a27b0cd",
+  "evaluator_authority_manifest_raw_sha256": "sha256:8ed1e0acfce84f07d52f90b3ce9e5f5e39a4fdf27c2f1db6729330f9a02bf902",
+  "evaluator_authority_manifest_digest": "sha256:141c0aee40f77565d2be1e1420c141330dcda3d6c5f7562c6194b1165ae43e5b",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:c42fff4b6bccb0aff7d5ee59d3539e188f1a2c51d65aff28dffeb49819cb82f6"
+  "public_metadata_digest": "sha256:fb071d7ecb5f59fcdc0ce8a4219e5cd085dc5f78182d6f6dbcbe3f8d7a4ca9cb"
 }

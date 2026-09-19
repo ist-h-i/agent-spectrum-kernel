@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "mn-focused-regression-test",
   "candidate_input_digest": "sha256:065c84ece98ef98807a63b14790abd368ace054f0194f3e5bcf40e9c0fd9797b",
-  "candidate_evaluator_digest": "sha256:5e526a57fcf83406895c684d982263f32d326b45342e865d3c2a5e417a33f081",
+  "candidate_evaluator_digest": "sha256:8f4bddce8c458fe2550e77f80a5278c198178e73e274f09c7894d3c53379b4c2",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -105,5 +105,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:de9a5742c0f657c5c8d93f3debd39a3d3bf4687223ae22dd32d521fd610e61de"
+  "review_package_digest": "sha256:9b84dc67b6ca5689eef760f2d55b17275a324f59f628fc6c1bdb4964ecb3095f"
 }

@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:a7a3c4eea0eefef43f9d679233c694a734633f194fa01a66d443d7dd29fca638",
+  "admission_record_digest": "sha256:7994de71ebc2c9ae862032b27ddc25051d741c20ad24fee5a247e98ba1afc233",
   "requirements": [
     {
       "requirement_id": "interaction-defect-finding",
@@ -100,5 +100,5 @@
     }
   ],
   "requirement_set_digest": "sha256:f6201a3252f6fed935af9fcec2e53b64ec3b410bd8e173e3dbccaba6da541b0f",
-  "requirement_record_digest": "sha256:fb80f603a89b5b8424789c968d3bb5457939198a8eceae555eb3c0bf26d2cacf"
+  "requirement_record_digest": "sha256:e2f80477ba08d2311a4e0a2f9ac90aed01792a2f708f2acc3b6f1c7cdb66a2e7"
 }
