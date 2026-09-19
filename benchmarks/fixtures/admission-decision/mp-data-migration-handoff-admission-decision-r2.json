@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-admission-decision.schema.json",
+  "program": "adaptive_ask_portfolio_admission_decision",
+  "decision_id": "admission-decision-14b9e8a9ee0709fe66cc74a2a63d1169",
+  "decision_revision": 2,
+  "predecessor_decision": {
+    "path": "benchmarks/fixtures/admission-decision/mp-data-migration-handoff-admission-decision.json",
+    "raw_byte_digest": "sha256:6038ffd91f7bdf63183c358839b30dc015d1d592d60dff9ae6062e50d2b586b5",
+    "decision_id": "admission-decision-14b9e8a9ee0709fe66cc74a2a63d1169",
+    "decision_revision": 1,
+    "fixture_id": "mp-data-migration-handoff",
+    "decision_digest": "sha256:7cb994b239fd238083017987f74ad9b6c8df36045df44dc2d95ae7e9759e6a0b"
+  },
+  "fixture_id": "mp-data-migration-handoff",
+  "decision_status": "admitted",
+  "review_status": "approved",
+  "author_self_approval": false,
+  "reviewer_type": "independent_human",
+  "reviewer_record_id": "human-pr281-251e353-533a6e82b738a5d7",
+  "reviewer_count": 1,
+  "reviewed_at": "2026-09-19T23:35:12.060Z",
+  "reviewed_repository": "ist-h-i/agent-spectrum-kernel",
+  "reviewed_pull_request": 281,
+  "reviewed_head_revision": "251e353d676b53fb276ebf3c7289c88b0aa3cf78",
+  "blocking_finding_count": 0,
+  "review_evidence": {
+    "archive_sha256": "sha256:1ec99623f628b7f4321c7fd4b3f5329c3dcdb8a2075e44a0ed72e14dcf717585",
+    "archive_bytes": 3469477
+  },
+  "evaluator": {
+    "evaluator_revision": "ab2ce5fedf1e5fe12eff2b161048332da09ce0de",
+    "evaluator_bundle_id": "evaluator-d0e6cd3a4b07a0266527232e829ad3db97ceb9e537436525d1fb5c38ebad2f78",
+    "evaluator_bundle_digest": "sha256:3c579299a98706ff4310905a0c88504281dd65f5f57c6f3808e74d297920a6ba",
+    "evaluator_bundle_bytes": 165272
+  },
+  "evaluator_public_reference_digest": "sha256:952ed7885b2a3ca19a2c3c31e99778c700ec9f43460642ca1c716a73cdc4230c",
+  "frozen_admission_authority": {
+    "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/final-admission-record.json",
+    "raw_byte_digest": "sha256:36995a935d8b11b9aa247391ae344c08eb12249ca6b933a2a40091deb9463b8d",
+    "semantic_digest": "sha256:8611e8b3623335bcbadb6e914f4383acaa25f4fc1d25864697cb28755af7564b",
+    "requirement_authority_digest": "sha256:799a3e64998c109d76b4f49362f06265a51f99d82428050b38277d485d84595c"
+  },
+  "frozen_requirement_record": {
+    "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/requirement-record.json",
+    "raw_byte_digest": "sha256:1eebe9b8587f245431874534e6d22009749bb8c4b5894345143c4d16f002f7bb",
+    "record_digest": "sha256:b09be02396c570978e3b4730be4ff6c84ad83f9fc5cae5db494656ea765cfd41",
+    "set_digest": "sha256:74dc5940ecd42382327d84b269817b254b44118ca73ccc4970c815ccad01cf54"
+  },
+  "frozen_scoring_input_manifest": {
+    "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/scoring-input-freeze-manifest.json",
+    "raw_byte_digest": "sha256:6fd8de7de5c05748abfb628f09a60406d49f06d3c4971d76b995ef924999365a",
+    "semantic_digest": "sha256:4d0534e161d928bfd505bd27cb1bd2d5d661c003c0580515d2ac3ed4700941fc"
+  },
+  "decision_digest": "sha256:0ac3f9b4b7e1a99a9f3316a8be608f8c7ac52a14db31fefe9e87fe80b295ae50"
+}
