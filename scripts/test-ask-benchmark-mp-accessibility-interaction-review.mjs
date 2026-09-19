@@ -423,6 +423,10 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
     { ...succeededInteractionRecord, path: "test//integration/format-toolbar.test.mjs" },
   ];
   const verificationProbes = [
+    { probeId: "same-record-mixed-clause-failed-and-passed", records: [{ ...failedInteractionRecord, conclusion: `${failedInteractionRecord.conclusion} Checks failed and passed.` }], accepted: false },
+    { probeId: "same-record-mixed-clause-passed-and-failed", records: [{ ...failedInteractionRecord, conclusion: `${failedInteractionRecord.conclusion} Checks passed and failed.` }], accepted: false },
+    { probeId: "single-failure-conclusion-positive", records: [failedInteractionRecord], accepted: true },
+    { probeId: "same-record-failure-with-descriptive-clause", records: [{ ...failedInteractionRecord, conclusion: `${failedInteractionRecord.conclusion} The toolbar has boundary keys.` }], accepted: true },
     { probeId: "same-record-failure-then-green-success", records: [{ ...failedInteractionRecord, conclusion: `${failedInteractionRecord.conclusion} Nevertheless, every interaction assertion was green.` }], accepted: false },
     { probeId: "same-record-failure-then-clean-success", records: [{ ...failedInteractionRecord, conclusion: `${failedInteractionRecord.conclusion} Although every assertion completed cleanly.` }], accepted: false },
     { probeId: "same-target-failure-then-success", records: [failedInteractionRecord, succeededInteractionRecord], accepted: false },
@@ -458,7 +462,10 @@ async function validatePrivateCases({ privateRoot, caseRoot }, { directOnly = fa
       actual_classification: result.classification,
       satisfied: accepted
         ? verification?.outcome === "pass" && result.classification === "correct_narrow_execution"
-        : verification?.outcome !== "pass" && result.classification !== "correct_narrow_execution",
+        : verification?.outcome !== "pass"
+          && (verification?.earned_points === 0 || verification?.earned_points === null)
+          && result.verification_correctness.state !== "pass"
+          && result.classification !== "correct_narrow_execution",
     });
   }
   assert.deepEqual(
