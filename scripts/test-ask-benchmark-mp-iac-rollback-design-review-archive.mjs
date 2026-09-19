@@ -71,7 +71,7 @@ function validateWithAuthorityRoots({ privateRoot, caseRoot }) {
     const nonregular = cloneDirectory(privateRoot, resolve(work, "nonregular-private"));
     const fifo = spawnSync("mkfifo", [resolve(nonregular, "unsupported-entry")]);
     assert.equal(fifo.status, 0, String(fifo.stderr));
-    assert.throws(() => generate(nonregular, "nonregular.zip"), /not regular/u, "nonregular private asset");
+    assert.throws(() => generate(nonregular, "nonregular.zip"), /review archive source is not a regular file:/u, "nonregular private asset");
 
     const invalidClosure = cloneDirectory(privateRoot, resolve(work, "invalid-closure"));
     const closurePath = resolve(invalidClosure, "private-evaluator-bundle.json");
