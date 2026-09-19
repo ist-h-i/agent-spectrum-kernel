@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-4e14edb6175ffc03513a558df2bc85ed2f367ae3cd91179290d591e73b1469bb",
-  "evaluator_bundle_digest": "sha256:56f4e25fdd10e89c8c7a071503a02095f13bb156b4410050a6b72a0335d92a9b",
+  "evaluator_bundle_id": "evaluator-c0f8fefd6dbd02e13be2020e222e0cf4c916b53656bc09a38de9e47164468133",
+  "evaluator_bundle_digest": "sha256:2fd7379834a562b86f5dc9fe2e885562e9b1604ba95ba35de3305f39ac45ec12",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mp-accessibility-interaction-review",
   "fixture_input_digest": "sha256:36b74950deefa7445136bfbc49859cbae10e06d502a316c8d2be3d33b6c1da33",
   "task_class": "pr_review",
   "suite": "mechanism_positive",
-  "evaluator_revision": "d94a50eed1ad95160ffa1aa9b3a15fda4096f803",
+  "evaluator_revision": "ab2ce5fedf1e5fe12eff2b161048332da09ce0de",
   "evaluator_source_identity": {
-    "base_git_revision": "d94a50eed1ad95160ffa1aa9b3a15fda4096f803",
+    "base_git_revision": "ab2ce5fedf1e5fe12eff2b161048332da09ce0de",
     "source_tree_digest": "sha256:ebbc7eb53674778e313cfcea9a9eb9952693ec74082f7c465aadad2c08a7e9d4",
     "generator_source_digest": "sha256:124f4862dbb4eba98605fb558368b561a99c7505f9bec5eeb8d14ecb632c8a53",
     "source_files": [
@@ -1766,11 +1766,11 @@
     }
   },
   "generator_identity": "sha256:0737409bd86ee453c21c59c387d995451a7d65cfc9fc48f05bf0d69aeaafd3df",
-  "independence_statement_digest": "sha256:d652e8cd8eac679c952925a0180df3c870e8759e45febed465772c2ddf3c9158",
-  "review_record_digest": "sha256:c4960e53bd24ceac35619b6fa0e14d018f74864b7b82d16412a13be0114fb39d",
+  "independence_statement_digest": "sha256:521777150b8ef38ec0863c048b02b494084e6660b4bf2dcaf7965fb40a0a7c22",
+  "review_record_digest": "sha256:b738cd8fe8f6464873ddb6e6476529fa8d72ff4e43a30490931765f3e39c8eff",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-accessibility-interaction-review/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:4e3aa5312d325d171fea89cef92fab55e71243932b260a73ae293f1b2f4bb1aa",
-  "evaluator_authority_manifest_digest": "sha256:d3d21a8ef7e9e3e07ed92565dfca3e45edcb8bde62211d143301c906c6bda5d3",
+  "evaluator_authority_manifest_raw_sha256": "sha256:06860b9e9f5e9825194ed275dbe6db5f31a09504b8ac4c4856a4e82152517534",
+  "evaluator_authority_manifest_digest": "sha256:d0a6ad7ce7bf2b80c770b4262833abfbf2ff3aa006ba43fac4ceef0543a95110",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:1fa2e8dc8ae7ab3f9a628aa2e739356cc0e551442ab27ef25c1917f44e69c9cd"
+  "public_metadata_digest": "sha256:824fe8fa3894dbd986d2a16b9ed01bf0a9f4457ca802b4c86479ce178c817023"
 }
