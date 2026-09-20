@@ -189,6 +189,45 @@ const REQUIRED_CASE_IDS = Object.freeze([
   "NEG-POLICY-DEPENDENCY-MALFORMED",
   "NEG-REPOSITORY-POLICY-MALFORMED",
   "NEG-REPOSITORY-CATALOG-MALFORMED",
+  "NEG-PREVIOUS-R1-DEPENDENCY",
+  "NEG-PREVIOUS-R2-DEPENDENCY",
+  "NEG-PREVIOUS-R1-DAG",
+  "NEG-PREVIOUS-R2-DAG",
+  "NEG-PREVIOUS-R1-SCOPE",
+  "NEG-PREVIOUS-R2-SCOPE",
+  "NEG-PREVIOUS-R1-AC-OWNER",
+  "NEG-PREVIOUS-R2-AC-OWNER",
+  "NEG-PREVIOUS-R1-AC-COVERAGE",
+  "NEG-PREVIOUS-R2-AC-COVERAGE",
+  "NEG-PREVIOUS-R1-TOPOLOGY",
+  "NEG-PREVIOUS-R2-TOPOLOGY",
+  "NEG-PREVIOUS-R1-GATE",
+  "NEG-PREVIOUS-R2-GATE",
+  "NEG-PREVIOUS-R1-BLOCKER",
+  "NEG-PREVIOUS-R2-BLOCKER",
+  "NEG-PREVIOUS-R1-APPROVAL",
+  "NEG-PREVIOUS-R2-APPROVAL",
+  "NEG-PREVIOUS-R1-DECISION",
+  "NEG-PREVIOUS-R2-DECISION",
+  "POS-REVISION-TWO-TO-THREE",
+  "NEG-PREVIOUS-ADMISSION-HUMAN",
+  "NEG-PREVIOUS-AUTHORITY-MISSING",
+  "NEG-PREVIOUS-AUTHORITY-MALFORMED",
+  "NEG-PREVIOUS-DECISION-MALFORMED",
+  "NEG-PREVIOUS-PLAN-CYCLE",
+  "NEG-PREVIOUS-CONTEXT-CYCLE",
+  "NEG-PREVIOUS-ANCESTOR-BINDING",
+  "POS-PREVIOUS-BOUND-AUTHORITY",
+  "POS-PREVIOUS-PROPOSED",
+  "POS-PREVIOUS-BOUNDED",
+  "NEG-UNSAFE-PLAN-REVISION",
+  "NEG-UNSAFE-CONTEXT-REVISION",
+  "NEG-UNSAFE-CONTEXT-THROUGH-PLAN",
+  "NEG-UNSAFE-PREVIOUS-PLAN-REVISION",
+  "NEG-UNSAFE-PREVIOUS-CONTEXT-REVISION",
+  "NEG-UNSAFE-SAME-REVISION",
+  "NEG-REVISION-SUCCESSOR-OVERFLOW",
+  "POS-REVISION-MAX-SAFE",
 ]);
 
 function compareAscii(left, right) {
@@ -912,6 +951,39 @@ function isPositiveRevision(value) {
   return Number.isInteger(value) && value >= 1;
 }
 
+// Schema checks own shape; these local checks own the numeric lineage domain.
+function positiveSafeRevisionIssues(entries) {
+  return sortedIssues(entries
+    .filter(([value]) => !Number.isSafeInteger(value) || value < 1)
+    .map(([, path]) => issue(
+      "REVISION_OUT_OF_RANGE",
+      path,
+      "revision must be a positive safe integer (1..9007199254740991)",
+    )));
+}
+
+function planRevisionIssues(plan) {
+  const entries = [
+    [plan.plan_revision, "$.plan_revision"],
+    [plan.validation_context_ref.context_revision, "$.validation_context_ref.context_revision"],
+    ...plan.packages.map((workPackage, index) => [
+      workPackage.plan_binding.plan_revision, `$.packages[${index}].plan_binding.plan_revision`,
+    ]),
+  ];
+  if (plan.supersedes_plan_ref) entries.push([plan.supersedes_plan_ref.plan_revision, "$.supersedes_plan_ref.plan_revision"]);
+  return positiveSafeRevisionIssues(entries);
+}
+
+function contextRevisionIssues(context) {
+  const entries = [
+    [context.context_revision, "$.context_revision"],
+    [context.current_plan_ref.plan_revision, "$.current_plan_ref.plan_revision"],
+  ];
+  if (context.supersedes_context_ref) entries.push([context.supersedes_context_ref.context_revision, "$.supersedes_context_ref.context_revision"]);
+  if (context.supersedes_plan_ref) entries.push([context.supersedes_plan_ref.plan_revision, "$.supersedes_plan_ref.plan_revision"]);
+  return positiveSafeRevisionIssues(entries);
+}
+
 function isDigest(value) {
   return typeof value === "string" && /^sha256:[0-9a-f]{64}$/.test(value);
 }
@@ -1143,6 +1215,8 @@ export function validateWorkPackagePlanValidationContext(context, {
     return [issue("REVISION_LINEAGE_UNEXPECTED", "$.supersedes_context_ref", "context revision 1 cannot claim a predecessor or revision reason")];
   }
   if (issues.length > 0) return sortedIssues(issues);
+  issues.push(...contextRevisionIssues(context));
+  if (issues.length > 0) return sortedIssues(issues);
   if (policy !== undefined) {
     const policyIssues = validateEpicAdmissionPolicy(policy, { schemaPath: policySchemaPath });
     if (policyIssues.length > 0) {
@@ -1320,7 +1394,29 @@ function exactArray(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-export function validateWorkPackagePlan(plan, {
+export function validateWorkPackagePlan(plan, options = {}) {
+  const issues = validateWorkPackagePlanRevision(plan, options);
+  if (issues.length > 0) return issues;
+
+  const { previousPlan, previousContext, policy, decision, previousPolicy = policy, previousDecision = decision } = options;
+  // Exact pinned legacy artifacts retain their audit-only admission path.
+  if (plan.plan_revision === 1 || previousPlan.schema_version !== WORK_PACKAGE_PLAN_SCHEMA_VERSION) return issues;
+
+  // Validate exactly one predecessor under its own authority. This private
+  // revision check never follows ancestors or calls the public validator.
+  const previousIssues = validateWorkPackagePlanRevision(previousPlan, {
+    ...options,
+    policy: previousPolicy,
+    decision: previousDecision,
+    context: previousContext,
+  }, false);
+  if (previousIssues.length > 0) {
+    return [issue("PREVIOUS_REVISION_INVALID", "$.supersedes_plan_ref", formatIssues(previousIssues))];
+  }
+  return issues;
+}
+
+function validateWorkPackagePlanRevision(plan, {
   policy,
   decision,
   context,
@@ -1330,8 +1426,10 @@ export function validateWorkPackagePlan(plan, {
   contextSchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.contextSchema),
   policySchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.policySchema),
   decisionSchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.decisionSchema),
-} = {}) {
+} = {}, validateLineage = true) {
   const issues = schemaIssues(plan, planSchemaPath);
+  if (issues.length > 0) return sortedIssues(issues);
+  issues.push(...planRevisionIssues(plan));
   if (issues.length > 0) return sortedIssues(issues);
 
   const policyIssues = validateEpicAdmissionPolicy(policy, { schemaPath: policySchemaPath });
@@ -1372,7 +1470,7 @@ export function validateWorkPackagePlan(plan, {
   if (decisionIssues.length > 0) {
     return sortedIssues([issue("ADMISSION_DECISION_INVALID", "$.admission_decision_ref", formatIssues(decisionIssues))]);
   }
-  if (plan.plan_revision > 1 && previousPlan && previousContext) {
+  if (validateLineage && plan.plan_revision > 1 && previousPlan && previousContext) {
     if (
       !isAdmissiblePreviousPlanArtifact(previousPlan, { schemaPath: planSchemaPath })
       || !isAdmissiblePreviousContextArtifact(previousContext, { schemaPath: contextSchemaPath })
@@ -1382,6 +1480,18 @@ export function validateWorkPackagePlan(plan, {
         "$.supersedes_plan_ref",
         "the supplied previous plan and validation context must satisfy the current Schemas or match exact pinned legacy audit artifacts before lineage and digest validation",
       )]);
+    }
+    // Preflight supplied revisions before the current pair uses them in lineage
+    // arithmetic. The full predecessor semantic check still runs exactly once.
+    const previousIssues = previousPlan.schema_version === WORK_PACKAGE_PLAN_SCHEMA_VERSION
+      ? planRevisionIssues(previousPlan) : [];
+    const previousContextIssues = previousContext.schema_version === WORK_PACKAGE_PLAN_SCHEMA_VERSION
+      ? contextRevisionIssues(previousContext) : [];
+    if (previousContextIssues.length > 0) {
+      previousIssues.push(issue("VALIDATION_CONTEXT_INVALID", "$.validation_context_ref", formatIssues(previousContextIssues)));
+    }
+    if (previousIssues.length > 0) {
+      return [issue("PREVIOUS_REVISION_INVALID", "$.supersedes_plan_ref", formatIssues(sortedIssues(previousIssues)))];
     }
   }
 
@@ -1418,7 +1528,21 @@ export function validateWorkPackagePlan(plan, {
     issues.push(issue("PLAN_CONTEXT_REVISION_MISMATCH", "$.validation_context_ref", "current plan and validation context must advance as one paired revision"));
   }
 
-  if (plan.plan_revision > 1) {
+  if (plan.plan_revision > 1 && !validateLineage) {
+    // Only the immediate pair is supplied. Check its ancestor references for
+    // consistency and strict revision descent without fetching ancestor bytes.
+    if (plan.supersedes_plan_ref.plan_id !== plan.plan_id
+      || plan.supersedes_plan_ref.plan_revision !== plan.plan_revision - 1) {
+      issues.push(issue("PLAN_REVISION_LINEAGE_MISMATCH", "$.supersedes_plan_ref", "predecessor must reference its own immediately prior plan revision"));
+    }
+    if (!sameJson(context.supersedes_plan_ref, plan.supersedes_plan_ref)) {
+      issues.push(issue("CONTEXT_PREVIOUS_PLAN_BINDING_MISMATCH", "$.supersedes_plan_ref", "predecessor plan and context must reference the same ancestor plan"));
+    }
+    if (context.supersedes_context_ref?.context_id !== context.context_id
+      || context.supersedes_context_ref?.context_revision !== context.context_revision - 1) {
+      issues.push(issue("CONTEXT_REVISION_LINEAGE_MISMATCH", "$.supersedes_context_ref", "predecessor context must reference its own immediately prior revision"));
+    }
+  } else if (plan.plan_revision > 1) {
     if (!previousPlan || !previousContext) {
       issues.push(issue("PREVIOUS_REVISION_REQUIRED", "$.supersedes_plan_ref", "a revised plan requires the exact previous plan and context for lineage validation"));
     } else {
@@ -1447,13 +1571,13 @@ export function validateWorkPackagePlan(plan, {
         context_revision: previousContext.context_revision,
         context_digest: previousContext.context_digest,
       };
-      if (!sameJson(plan.supersedes_plan_ref, expectedPlanRef) || previousPlan.plan_id !== plan.plan_id || previousPlan.plan_revision + 1 !== plan.plan_revision) {
+      if (!sameJson(plan.supersedes_plan_ref, expectedPlanRef) || previousPlan.plan_id !== plan.plan_id || previousPlan.plan_revision !== plan.plan_revision - 1) {
         issues.push(issue("PLAN_REVISION_LINEAGE_MISMATCH", "$.supersedes_plan_ref", "plan revision does not exactly supersede the supplied immediately previous stable plan"));
       }
       if (!sameJson(context.supersedes_plan_ref, expectedPlanRef) || !sameJson(context.supersedes_plan_ref, plan.supersedes_plan_ref)) {
         issues.push(issue("CONTEXT_PREVIOUS_PLAN_BINDING_MISMATCH", "$.supersedes_plan_ref", "trusted current context does not bind the exact plan predecessor claimed by the current plan"));
       }
-      if (!sameJson(context.supersedes_context_ref, expectedContextRef) || previousContext.context_id !== context.context_id || previousContext.context_revision + 1 !== context.context_revision) {
+      if (!sameJson(context.supersedes_context_ref, expectedContextRef) || previousContext.context_id !== context.context_id || previousContext.context_revision !== context.context_revision - 1) {
         issues.push(issue("CONTEXT_REVISION_LINEAGE_MISMATCH", "$.supersedes_context_ref", "context revision does not exactly supersede the supplied immediately previous stable context"));
       }
     }

@@ -566,6 +566,201 @@
       "case_id": "NEG-REPOSITORY-CATALOG-MALFORMED",
       "domain": "repository-validation",
       "expected_issue_codes": ["FIXTURE_CATALOG_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R1-DEPENDENCY",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R2-DEPENDENCY",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R1-DAG",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R2-DAG",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R1-SCOPE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R2-SCOPE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R1-AC-OWNER",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R2-AC-OWNER",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R1-AC-COVERAGE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R2-AC-COVERAGE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R1-TOPOLOGY",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R2-TOPOLOGY",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R1-GATE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R2-GATE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R1-BLOCKER",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R2-BLOCKER",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R1-APPROVAL",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R2-APPROVAL",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R1-DECISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-R2-DECISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "POS-REVISION-TWO-TO-THREE",
+      "domain": "plan-context",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "NEG-PREVIOUS-ADMISSION-HUMAN",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-AUTHORITY-MISSING",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-AUTHORITY-MALFORMED",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-DECISION-MALFORMED",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-PLAN-CYCLE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-CONTEXT-CYCLE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-ANCESTOR-BINDING",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "POS-PREVIOUS-BOUND-AUTHORITY",
+      "domain": "plan-context",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-PREVIOUS-PROPOSED",
+      "domain": "plan-context",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-PREVIOUS-BOUNDED",
+      "domain": "plan-context",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "NEG-UNSAFE-PLAN-REVISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["REVISION_OUT_OF_RANGE"]
+    },
+    {
+      "case_id": "NEG-UNSAFE-CONTEXT-REVISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["REVISION_OUT_OF_RANGE"]
+    },
+    {
+      "case_id": "NEG-UNSAFE-CONTEXT-THROUGH-PLAN",
+      "domain": "plan-context",
+      "expected_issue_codes": ["VALIDATION_CONTEXT_INVALID"]
+    },
+    {
+      "case_id": "NEG-UNSAFE-PREVIOUS-PLAN-REVISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-UNSAFE-PREVIOUS-CONTEXT-REVISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-UNSAFE-SAME-REVISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE"]
+    },
+    {
+      "case_id": "NEG-REVISION-SUCCESSOR-OVERFLOW",
+      "domain": "plan-context",
+      "expected_issue_codes": ["REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE"]
+    },
+    {
+      "case_id": "POS-REVISION-MAX-SAFE",
+      "domain": "plan-context",
+      "expected_issue_codes": []
     }
   ]
 }

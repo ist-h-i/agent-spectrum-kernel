@@ -47,6 +47,35 @@ Work Package Plan Schema `1.2.0` also derives a non-circular plan content digest
 
 The implementation reuses `stableCanonicalJson`, `canonicalDigest`, and strict JSON parsing from `scripts/content-addressed-store.mjs`. It does not use or change the CAS object layout, publication algorithm, authority, or storage lifecycle.
 
+### Plan/context revision domain
+
+Current-Schema plan/context revisions must be positive safe integers: `1` through
+`Number.MAX_SAFE_INTEGER` (`9007199254740991`), inclusive. This is a local
+Work Package semantic constraint, not a change to JSON Schema `integer` semantics.
+It covers `plan_revision`, `context_revision`, the corresponding revisions in
+`current_plan_ref`, `validation_context_ref`, `supersedes_plan_ref`, and
+`supersedes_context_ref`, and every package's `plan_binding.plan_revision`.
+Policy, admission-decision, upstream-artifact, and package-owned revisions are
+not redefined by this constraint.
+
+Schema validation establishes shape first. The validator then checks the numeric
+domain before revision arithmetic, for both the current pair and the supplied
+current-Schema predecessor. The standalone context validator applies the same
+context checks. An out-of-domain value returns `REVISION_OUT_OF_RANGE` at its
+exact field path. A context failure reached through plan validation is wrapped
+as `VALIDATION_CONTEXT_INVALID`; a supplied predecessor's numeric failure is
+wrapped as `PREVIOUS_REVISION_INVALID`, retaining the underlying code and path.
+An invalid current revision or reference can be rejected before predecessor
+validation is reached.
+
+Adjacency compares the predecessor revision with the checked current revision
+minus one, without incrementing the predecessor at the upper boundary. A valid
+transition ending at `Number.MAX_SAFE_INTEGER` remains admissible; a successor
+above that bound does not. Neither `10_000_000_000_000_000` nor
+`Number.MAX_SAFE_INTEGER + 1` is an admissible plan/context revision, even when
+all digests and references are resealed. These checks neither traverse ancestors
+nor alter the exact pinned legacy audit exception.
+
 ## Current authority context
 
 Digest integrity does not prove that an artifact is current. `schemas/work-package-plan-validation-context.schema.json` defines caller-supplied current authority containing:
@@ -88,6 +117,37 @@ The current authority context supplies the complete current acceptance-item regi
 - unknown owners, duplicate ownership records, stale refs, and uncovered current refs fail closed.
 
 The plan references acceptance meaning; it does not become a second source of acceptance prose.
+
+### Predecessor semantic validation
+
+`validateWorkPackagePlan` validates both the current revision and the supplied
+immediately previous current-Schema plan/context pair. A Schema-valid, correctly
+resealed predecessor must also satisfy the same identity, canonical content,
+authority binding, package DAG, scope, acceptance ownership, topology,
+verification, and lifecycle-dependent executability checks as a current plan.
+An invalid predecessor returns `PREVIOUS_REVISION_INVALID` at
+`$.supersedes_plan_ref`, with the deterministic underlying issue codes and paths
+in its message. Digest and reference closure alone cannot admit it.
+
+The predecessor is checked against its own bound context and admission authority.
+Optional `previousPolicy` and `previousDecision` inputs supply those exact
+artifacts when they differ from the current `policy` and `decision`. Each omitted
+input defaults to its current counterpart; a missing or incorrect historical
+authority fails closed through the existing binding checks. A valid `proposed`
+predecessor remains valid history: it does not authorize execution, and the
+current plan still has to pass `validateWorkPackagePlanExecutable` before mutation.
+
+Validation is bounded to two revision checks and does not recurse through history.
+For a predecessor after revision 1, its plan/context ancestor references must
+agree, retain the same identities, and decrease each revision by exactly one.
+The caller need not provide an entire ancestor chain. This check does not attest
+to the contents or existence of unsupplied ancestors; authenticating historical
+authority remains the caller's responsibility. The bounded mode is private to the
+validator and cannot be selected through public options.
+
+Exact pinned Schema 1.0/1.1 artifacts retain the existing immutable audit path;
+they are not reinterpreted as current-Schema execution plans. Arbitrary legacy
+shapes and edited or resealed versions of the pins remain rejected.
 
 ### Typed scope
 
