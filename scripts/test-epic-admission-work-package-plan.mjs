@@ -760,6 +760,138 @@ expectCodes("NEG-STACK-DEPENDENCY-CLOSURE", validatePlanBundle(mutatePlan(canoni
     }
     return closePlanContextBinding({ ...template, context: successorContextDraft }, successorPlanDraft);
   };
+  // #283: every predecessor is resealed with an exact context/content binding;
+  // the successor uses the valid template so only predecessor validity can fail.
+  const predecessorRegressions = [
+    ["DEPENDENCY", "DEPENDENCY_TARGET_MISSING", (bundle) => mutatePlan(bundle, (plan) => {
+      plan.packages[0].depends_on_package_ids = ["WP404"];
+    })],
+    ["DAG", "DEPENDENCY_CYCLE", (bundle) => mutatePlan(bundle, (plan) => {
+      plan.packages[0].depends_on_package_ids = [plan.packages[1].package_id];
+    })],
+    ["SCOPE", "SCOPE_ALLOWED_FORBIDDEN_OVERLAP", (bundle) => mutatePlan(bundle, (plan) => {
+      plan.packages[0].forbidden_scope.push(clone(plan.packages[0].allowed_scope[0]));
+    })],
+    ["AC-OWNER", "AC_OWNER_UNKNOWN", (bundle) => mutatePlan(bundle, (plan) => {
+      plan.acceptance_ownership[0].owner_package_ids = ["WP404"];
+    })],
+    ["AC-COVERAGE", "AC_UNCOVERED", (bundle) => mutatePlan(bundle, (plan) => {
+      plan.acceptance_ownership.pop();
+    })],
+    ["TOPOLOGY", "INTEGRATION_ORDER_INVALID", (bundle) => mutatePlan(bundle, (plan) => {
+      plan.topology.integration_order.reverse();
+    })],
+    ["GATE", "FULL_CHECKPOINT_MISSING", (bundle) => mutatePlan(bundle, (plan) => {
+      plan.verification.full_gate_checkpoints = plan.verification.full_gate_checkpoints.filter(
+        (entry) => entry.checkpoint_id !== "CHECKPOINT-EXACT-HEAD-CI",
+      );
+    })],
+    ["BLOCKER", "CURRENT_BLOCKER_UNRESOLVED", (bundle) => mutateContext(bundle, (context) => {
+      context.known_blockers.push({ blocker_id: "BLOCKER-283", status: "open", description: "Unresolved predecessor blocker." });
+    })],
+    ["APPROVAL", "CURRENT_HUMAN_APPROVAL_UNRESOLVED", (bundle) => mutateContext(bundle, (context) => {
+      context.required_human_approvals.push(approvalRecord({ status: "required", authority_ref: null }));
+    })],
+    ["DECISION", "CURRENT_HUMAN_DECISION_REQUIRED", (bundle) => mutateContext(bundle, (context) => {
+      context.required_human_decisions.push({ decision_id: "DECISION-283", description: "Unresolved predecessor decision.", authority_kind: "human_program_owner" });
+    })],
+  ];
+  for (const [name, expectedCode, mutate] of predecessorRegressions) {
+    for (const validPrevious of [revisionOne, revisionTwo]) {
+      const invalidPrevious = mutate(validPrevious);
+      const directIssues = validateWorkPackagePlan(invalidPrevious.plan, {
+        ...invalidPrevious,
+        previousPlan: revisionOne.plan,
+        previousContext: revisionOne.context,
+      });
+      assert.ok(codes(directIssues).includes(expectedCode), `${name}: predecessor must fail its own semantics`);
+      const successor = buildExactRevisionTwoSuccessor(invalidPrevious, `Reject invalid predecessor ${name}.`, revisionOne);
+      const validate = () => validateWorkPackagePlan(successor.plan, {
+        ...successor,
+        previousPlan: invalidPrevious.plan,
+        previousContext: invalidPrevious.context,
+      });
+      const issues = expectDeterministicIssues(
+        `NEG-PREVIOUS-R${validPrevious.plan.plan_revision}-${name}`,
+        validate,
+        ["$.supersedes_plan_ref"],
+      );
+      assert.ok(issues[0].message.includes(expectedCode), `${name}: preserve the semantic rejection cause`);
+    }
+  }
+  const revisionThree = buildExactRevisionTwoSuccessor(revisionTwo, "Preserve later current-schema revisions.");
+  expectDeterministicIssues("POS-REVISION-TWO-TO-THREE", () => validateWorkPackagePlan(revisionThree.plan, {
+    ...revisionThree, previousPlan: revisionTwo.plan, previousContext: revisionTwo.context,
+  }), []);
+
+  const assertPredecessorFailure = (caseId, previous, template, expectedCode, extraOptions = {}) => {
+    const successor = buildExactRevisionTwoSuccessor(previous, `Reject ${caseId}.`, template);
+    const issues = expectDeterministicIssues(caseId, () => validateWorkPackagePlan(successor.plan, {
+      ...successor, previousPlan: previous.plan, previousContext: previous.context, ...extraOptions,
+    }), ["$.supersedes_plan_ref"]);
+    assert.ok(issues[0].message.includes(expectedCode), `${caseId}: preserve rejection cause ${expectedCode}`);
+  };
+  // Historical decisions must actually be evaluated, not merely digest-bound.
+  const unresolvedPrevious = rebindDecision(revisionOne, buildEpicAdmissionDecision({ kind: "unresolved" }));
+  assert.ok(codes(validateWorkPackagePlan(unresolvedPrevious.plan, unresolvedPrevious)).includes("ADMISSION_HUMAN_DECISION"));
+  assertPredecessorFailure("NEG-PREVIOUS-ADMISSION-HUMAN", unresolvedPrevious, revisionOne,
+    "ADMISSION_HUMAN_DECISION", { previousDecision: unresolvedPrevious.decision });
+
+  const newPolicyDraft = clone(revisionOne.policy);
+  newPolicyDraft.policy_revision += 1;
+  const newPolicy = sealEpicAdmissionPolicy(newPolicyDraft);
+  const newDecision = evaluateEpicAdmission({
+    policy: newPolicy, subject: revisionOne.decision.subject,
+    observed_signals: clone(revisionOne.decision.observed_signals), decision_revision: 2,
+  });
+  const newAuthority = rebindDecision(mutateContext({ ...revisionOne, policy: newPolicy }, (context) => {
+    context.current_policy_ref = {
+      policy_id: newPolicy.policy_id, policy_revision: newPolicy.policy_revision, policy_digest: newPolicy.policy_digest,
+    };
+  }), newDecision);
+  const authoritySuccessor = buildExactRevisionTwoSuccessor(revisionOne, "Advance policy and decision independently.", newAuthority);
+  expectDeterministicIssues("POS-PREVIOUS-BOUND-AUTHORITY", () => validateWorkPackagePlan(authoritySuccessor.plan, {
+    ...authoritySuccessor, previousPlan: revisionOne.plan, previousContext: revisionOne.context,
+    previousPolicy: revisionOne.policy, previousDecision: revisionOne.decision,
+  }), []);
+  assertPredecessorFailure("NEG-PREVIOUS-AUTHORITY-MISSING", revisionOne, newAuthority, "CONTEXT_POLICY_MISMATCH");
+  assertPredecessorFailure("NEG-PREVIOUS-AUTHORITY-MALFORMED", revisionOne, revisionOne, "POLICY_INVALID", { previousPolicy: null });
+  assertPredecessorFailure("NEG-PREVIOUS-DECISION-MALFORMED", revisionOne, revisionOne, "ADMISSION_DECISION_INVALID", { previousDecision: {} });
+
+  for (const [name, expectedCode, mutate] of [
+    ["PLAN-CYCLE", "PLAN_REVISION_LINEAGE_MISMATCH", (bundle) => mutatePlan(mutateContext(bundle, (context) => {
+      context.supersedes_plan_ref.plan_revision = 2;
+    }), (plan) => { plan.supersedes_plan_ref.plan_revision = 2; })],
+    ["CONTEXT-CYCLE", "CONTEXT_REVISION_LINEAGE_MISMATCH", (bundle) => mutateContext(bundle, (context) => {
+      context.supersedes_context_ref.context_revision = 2;
+    })],
+    ["ANCESTOR-BINDING", "CONTEXT_PREVIOUS_PLAN_BINDING_MISMATCH", (bundle) => mutateContext(bundle, (context) => {
+      context.supersedes_plan_ref.plan_digest = canonicalDigest({ wrong: "ancestor" });
+    })],
+  ]) {
+    assertPredecessorFailure(`NEG-PREVIOUS-${name}`, mutate(revisionTwo), revisionOne, expectedCode);
+  }
+  // Proposed history is valid history, but is not itself permission to execute.
+  const proposedPrevious = mutatePlan(revisionOne, (plan) => { plan.lifecycle_state = "proposed"; });
+  const acceptedSuccessor = buildExactRevisionTwoSuccessor(proposedPrevious, "Accept a previously proposed plan.", revisionOne);
+  expectDeterministicIssues("POS-PREVIOUS-PROPOSED", () => validateWorkPackagePlanExecutable(acceptedSuccessor.plan, {
+    ...acceptedSuccessor, previousPlan: proposedPrevious.plan, previousContext: proposedPrevious.context,
+  }), []);
+  // Numeric revision size must not control recursion depth or require all ancestors.
+  const highContext = clone(revisionTwo.context);
+  highContext.context_revision = 1000000;
+  highContext.supersedes_context_ref.context_revision = 999999;
+  highContext.supersedes_plan_ref.plan_revision = 999999;
+  const highPlan = clone(revisionTwo.plan);
+  highPlan.plan_revision = 1000000;
+  highPlan.supersedes_plan_ref.plan_revision = 999999;
+  for (const workPackage of highPlan.packages) workPackage.plan_binding.plan_revision = 1000000;
+  const highPrevious = closePlanContextBinding({ ...revisionTwo, context: highContext }, highPlan);
+  const highSuccessor = buildExactRevisionTwoSuccessor(highPrevious, "Validate only the supplied pair.");
+  expectDeterministicIssues("POS-PREVIOUS-BOUNDED", () => validateWorkPackagePlan(highSuccessor.plan, {
+    ...highSuccessor, previousPlan: highPrevious.plan, previousContext: highPrevious.context,
+  }), []);
+
   const revisionOnePlanRef = {
     plan_id: revisionOne.plan.plan_id,
     plan_revision: revisionOne.plan.plan_revision,

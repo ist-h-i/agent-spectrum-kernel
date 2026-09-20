@@ -189,6 +189,37 @@ const REQUIRED_CASE_IDS = Object.freeze([
   "NEG-POLICY-DEPENDENCY-MALFORMED",
   "NEG-REPOSITORY-POLICY-MALFORMED",
   "NEG-REPOSITORY-CATALOG-MALFORMED",
+  "NEG-PREVIOUS-R1-DEPENDENCY",
+  "NEG-PREVIOUS-R2-DEPENDENCY",
+  "NEG-PREVIOUS-R1-DAG",
+  "NEG-PREVIOUS-R2-DAG",
+  "NEG-PREVIOUS-R1-SCOPE",
+  "NEG-PREVIOUS-R2-SCOPE",
+  "NEG-PREVIOUS-R1-AC-OWNER",
+  "NEG-PREVIOUS-R2-AC-OWNER",
+  "NEG-PREVIOUS-R1-AC-COVERAGE",
+  "NEG-PREVIOUS-R2-AC-COVERAGE",
+  "NEG-PREVIOUS-R1-TOPOLOGY",
+  "NEG-PREVIOUS-R2-TOPOLOGY",
+  "NEG-PREVIOUS-R1-GATE",
+  "NEG-PREVIOUS-R2-GATE",
+  "NEG-PREVIOUS-R1-BLOCKER",
+  "NEG-PREVIOUS-R2-BLOCKER",
+  "NEG-PREVIOUS-R1-APPROVAL",
+  "NEG-PREVIOUS-R2-APPROVAL",
+  "NEG-PREVIOUS-R1-DECISION",
+  "NEG-PREVIOUS-R2-DECISION",
+  "POS-REVISION-TWO-TO-THREE",
+  "NEG-PREVIOUS-ADMISSION-HUMAN",
+  "NEG-PREVIOUS-AUTHORITY-MISSING",
+  "NEG-PREVIOUS-AUTHORITY-MALFORMED",
+  "NEG-PREVIOUS-DECISION-MALFORMED",
+  "NEG-PREVIOUS-PLAN-CYCLE",
+  "NEG-PREVIOUS-CONTEXT-CYCLE",
+  "NEG-PREVIOUS-ANCESTOR-BINDING",
+  "POS-PREVIOUS-BOUND-AUTHORITY",
+  "POS-PREVIOUS-PROPOSED",
+  "POS-PREVIOUS-BOUNDED",
 ]);
 
 function compareAscii(left, right) {
@@ -1320,7 +1351,29 @@ function exactArray(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-export function validateWorkPackagePlan(plan, {
+export function validateWorkPackagePlan(plan, options = {}) {
+  const issues = validateWorkPackagePlanRevision(plan, options);
+  if (issues.length > 0) return issues;
+
+  const { previousPlan, previousContext, policy, decision, previousPolicy = policy, previousDecision = decision } = options;
+  // Exact pinned legacy artifacts retain their audit-only admission path.
+  if (plan.plan_revision === 1 || previousPlan.schema_version !== WORK_PACKAGE_PLAN_SCHEMA_VERSION) return issues;
+
+  // Validate exactly one predecessor under its own authority. This private
+  // revision check never follows ancestors or calls the public validator.
+  const previousIssues = validateWorkPackagePlanRevision(previousPlan, {
+    ...options,
+    policy: previousPolicy,
+    decision: previousDecision,
+    context: previousContext,
+  }, false);
+  if (previousIssues.length > 0) {
+    return [issue("PREVIOUS_REVISION_INVALID", "$.supersedes_plan_ref", formatIssues(previousIssues))];
+  }
+  return issues;
+}
+
+function validateWorkPackagePlanRevision(plan, {
   policy,
   decision,
   context,
@@ -1330,7 +1383,7 @@ export function validateWorkPackagePlan(plan, {
   contextSchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.contextSchema),
   policySchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.policySchema),
   decisionSchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.decisionSchema),
-} = {}) {
+} = {}, validateLineage = true) {
   const issues = schemaIssues(plan, planSchemaPath);
   if (issues.length > 0) return sortedIssues(issues);
 
@@ -1372,7 +1425,7 @@ export function validateWorkPackagePlan(plan, {
   if (decisionIssues.length > 0) {
     return sortedIssues([issue("ADMISSION_DECISION_INVALID", "$.admission_decision_ref", formatIssues(decisionIssues))]);
   }
-  if (plan.plan_revision > 1 && previousPlan && previousContext) {
+  if (validateLineage && plan.plan_revision > 1 && previousPlan && previousContext) {
     if (
       !isAdmissiblePreviousPlanArtifact(previousPlan, { schemaPath: planSchemaPath })
       || !isAdmissiblePreviousContextArtifact(previousContext, { schemaPath: contextSchemaPath })
@@ -1418,7 +1471,21 @@ export function validateWorkPackagePlan(plan, {
     issues.push(issue("PLAN_CONTEXT_REVISION_MISMATCH", "$.validation_context_ref", "current plan and validation context must advance as one paired revision"));
   }
 
-  if (plan.plan_revision > 1) {
+  if (plan.plan_revision > 1 && !validateLineage) {
+    // Only the immediate pair is supplied. Check its ancestor references for
+    // consistency and strict revision descent without fetching ancestor bytes.
+    if (plan.supersedes_plan_ref.plan_id !== plan.plan_id
+      || plan.supersedes_plan_ref.plan_revision !== plan.plan_revision - 1) {
+      issues.push(issue("PLAN_REVISION_LINEAGE_MISMATCH", "$.supersedes_plan_ref", "predecessor must reference its own immediately prior plan revision"));
+    }
+    if (!sameJson(context.supersedes_plan_ref, plan.supersedes_plan_ref)) {
+      issues.push(issue("CONTEXT_PREVIOUS_PLAN_BINDING_MISMATCH", "$.supersedes_plan_ref", "predecessor plan and context must reference the same ancestor plan"));
+    }
+    if (context.supersedes_context_ref?.context_id !== context.context_id
+      || context.supersedes_context_ref?.context_revision !== context.context_revision - 1) {
+      issues.push(issue("CONTEXT_REVISION_LINEAGE_MISMATCH", "$.supersedes_context_ref", "predecessor context must reference its own immediately prior revision"));
+    }
+  } else if (plan.plan_revision > 1) {
     if (!previousPlan || !previousContext) {
       issues.push(issue("PREVIOUS_REVISION_REQUIRED", "$.supersedes_plan_ref", "a revised plan requires the exact previous plan and context for lineage validation"));
     } else {

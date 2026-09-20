@@ -89,6 +89,37 @@ The current authority context supplies the complete current acceptance-item regi
 
 The plan references acceptance meaning; it does not become a second source of acceptance prose.
 
+### Predecessor semantic validation
+
+`validateWorkPackagePlan` validates both the current revision and the supplied
+immediately previous current-Schema plan/context pair. A Schema-valid, correctly
+resealed predecessor must also satisfy the same identity, canonical content,
+authority binding, package DAG, scope, acceptance ownership, topology,
+verification, and lifecycle-dependent executability checks as a current plan.
+An invalid predecessor returns `PREVIOUS_REVISION_INVALID` at
+`$.supersedes_plan_ref`, with the deterministic underlying issue codes and paths
+in its message. Digest and reference closure alone cannot admit it.
+
+The predecessor is checked against its own bound context and admission authority.
+Optional `previousPolicy` and `previousDecision` inputs supply those exact
+artifacts when they differ from the current `policy` and `decision`. Each omitted
+input defaults to its current counterpart; a missing or incorrect historical
+authority fails closed through the existing binding checks. A valid `proposed`
+predecessor remains valid history: it does not authorize execution, and the
+current plan still has to pass `validateWorkPackagePlanExecutable` before mutation.
+
+Validation is bounded to two revision checks and does not recurse through history.
+For a predecessor after revision 1, its plan/context ancestor references must
+agree, retain the same identities, and decrease each revision by exactly one.
+The caller need not provide an entire ancestor chain. This check does not attest
+to the contents or existence of unsupplied ancestors; authenticating historical
+authority remains the caller's responsibility. The bounded mode is private to the
+validator and cannot be selected through public options.
+
+Exact pinned Schema 1.0/1.1 artifacts retain the existing immutable audit path;
+they are not reinterpreted as current-Schema execution plans. Arbitrary legacy
+shapes and edited or resealed versions of the pins remain rejected.
+
 ### Typed scope
 
 Scope entries are closed records with `kind`, `value`, and `match`. Slice 1 supports only `repository_path`, with `exact` and normalized repository-relative `subtree` matching. Path overlap uses exact equality or path-segment ancestry, and an allowed/forbidden overlap is invalid. Capability, Issue, and GitHub-operation scopes are deferred because Slice 1 has no complete semantic consumer for them; exposing those kinds would allow a forbidden logical action to be ignored.
