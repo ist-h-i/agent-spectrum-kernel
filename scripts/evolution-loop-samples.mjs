@@ -36,6 +36,7 @@ import {
   buildEvolutionHumanDecision,
   deriveEvolutionActionProposal,
   deriveEvolutionRecommendation,
+  computeEvolutionArtifactInventoryDigest,
   publishEvolutionActionProposal,
   publishEvolutionCandidate,
   publishEvolutionExperiment,
@@ -756,7 +757,7 @@ function syntheticEvaluationEvidence(experiment) {
     causal_credit_applied: causalCreditApplied,
     factor_ids: causalCreditApplied ? ["prompt_instruction_content"] : [],
   });
-  return {
+  const evidence = {
     authority: {
       kind: "external_evolution_evaluation_authority",
       authority_id: "issue-278-synthetic-contract-verifier",
@@ -764,10 +765,6 @@ function syntheticEvaluationEvidence(experiment) {
       authority_evidence_digest: canonicalDigest({ authority: "issue-278-synthetic-contract-verifier" }),
       experiment_digest: experiment.experiment_digest,
       verification_mode: "full_verifier",
-      artifact_inventory_digest: canonicalDigest({
-        fixture_only: true,
-        artifacts: ["quality", "safety", "cost", "variance", "mechanism", "external_outcome"],
-      }),
     },
     dimensions: {
       quality: dimension("quality", "complete", "improved", "portfolio_aggregate_result", true),
@@ -784,6 +781,8 @@ function syntheticEvaluationEvidence(experiment) {
     },
     reason_codes: ["fixture_only_contract_mechanics"],
   };
+  evidence.authority.artifact_inventory_digest = computeEvolutionArtifactInventoryDigest(evidence.dimensions);
+  return evidence;
 }
 
 function loadFoundation(storeRoot) {

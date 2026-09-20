@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -19,6 +21,7 @@ import { resolve } from "node:path";
 
 import {
   auditRiskWorkspace,
+  beginRiskWorkspacePromotion,
   createRiskWorkspace,
   disposeRiskWorkspace,
   promoteRiskWorkspace,
@@ -101,6 +104,148 @@ try {
 
   run("git", ["reset", "--hard", "HEAD"]);
   run("git", ["clean", "-fd"]);
+  // Scoped builtin replacement is test-only; no runtime fault-injection surface.
+  function withFsFaults(replacements, test) {
+    const originals = Object.fromEntries(Object.keys(replacements).map((name) => [name, fs[name]]));
+    try {
+      for (const [name, replacement] of Object.entries(replacements)) fs[name] = replacement(originals[name]);
+      syncBuiltinESMExports();
+      test();
+    } finally {
+      Object.assign(fs, originals);
+      syncBuiltinESMExports();
+    }
+  }
+  function preparePromotion() {
+    const context = createRiskWorkspace({ target: repository, request: request() });
+    writeFileSync(resolve(context.workspace, "allowed/modify.txt"), "candidate\n");
+    chmodSync(resolve(context.workspace, "allowed/modify.txt"), 0o755);
+    rmSync(resolve(context.workspace, "allowed/delete.txt"));
+    mkdirSync(resolve(context.workspace, "allowed/a-new/nested"), { recursive: true });
+    writeFileSync(resolve(context.workspace, "allowed/a-new/nested/first.txt"), "first\n");
+    mkdirSync(resolve(context.workspace, "allowed/z-new/nested"), { recursive: true });
+    writeFileSync(resolve(context.workspace, "allowed/z-new/nested/last.txt"), "last\n");
+    return context;
+  }
+  function assertRestored() {
+    assert.equal(readFileSync(resolve(repository, "allowed/modify.txt"), "utf8"), "before\n");
+    assert.equal(fs.statSync(resolve(repository, "allowed/modify.txt")).mode & 0o777, 0o644);
+    assert.equal(readFileSync(resolve(repository, "allowed/delete.txt"), "utf8"), "delete\n");
+    assert.equal(existsSync(resolve(repository, "allowed/a-new")), false);
+    assert.equal(existsSync(resolve(repository, "allowed/z-new")), false);
+    assert.equal(run("git", ["status", "--porcelain", "--untracked-files=all"]), "");
+  }
+  for (const operation of ["copyFileSync", "chmodSync", "renameSync"]) {
+    const context = preparePromotion();
+    try {
+      const audit = auditRiskWorkspace(context);
+      let injected = false;
+      withFsFaults({ [operation]: (original) => (...args) => {
+        const path = String(operation === "copyFileSync" ? args[1] : args[0]);
+        if (!injected && path.startsWith(resolve(repository, "allowed/z-new")) && path.includes(".ask-risk-")) {
+          injected = true;
+          if (operation === "copyFileSync") fs.writeFileSync(args[1], "partial copy");
+          throw new Error(`injected ${operation}`);
+        }
+        return original(...args);
+      } }, () => assert.throws(() => beginRiskWorkspacePromotion(context, audit), /failed and was rolled back: injected/u));
+      assert.equal(injected, true);
+      assertRestored();
+    } finally { disposeRiskWorkspace(context); }
+  }
+  const reversible = preparePromotion();
+  try {
+    const promotion = beginRiskWorkspacePromotion(reversible, auditRiskWorkspace(reversible));
+    promotion.rollback();
+    promotion.rollback();
+    assertRestored();
+  } finally { disposeRiskWorkspace(reversible); }
+
+  const failedRollback = preparePromotion();
+  let recoveryPath;
+  try {
+    const promotion = beginRiskWorkspacePromotion(failedRollback, auditRiskWorkspace(failedRollback));
+    withFsFaults({ copyFileSync: (original) => (...args) => {
+      if (String(args[0]).includes("/backup/allowed/modify.txt")) throw new Error("injected restoration failure");
+      return original(...args);
+    } }, () => assert.throws(() => promotion.rollback(), (error) => {
+      assert.equal(error.rollback_failed, true);
+      recoveryPath = error.recovery_path;
+      assert.equal(readFileSync(resolve(recoveryPath, "backup/allowed/modify.txt"), "utf8"), "before\n");
+      return /rollback failed; backup retained/u.test(error.message);
+    }));
+    promotion.rollback();
+    assert.equal(existsSync(recoveryPath), false);
+    assertRestored();
+  } finally { disposeRiskWorkspace(failedRollback); }
+
+  const automaticFailure = preparePromotion();
+  let automaticRecovery;
+  try {
+    withFsFaults({
+      chmodSync: (original) => (...args) => {
+        if (String(args[0]).startsWith(resolve(repository, "allowed/z-new"))) throw new Error("injected promotion chmod failure");
+        return original(...args);
+      },
+      copyFileSync: (original) => (...args) => {
+        if (String(args[0]).includes("/backup/allowed/modify.txt")) throw new Error("injected rollback copy failure");
+        return original(...args);
+      },
+    }, () => assert.throws(() => beginRiskWorkspacePromotion(automaticFailure, auditRiskWorkspace(automaticFailure)), (error) => {
+      automaticRecovery = error.recovery_path;
+      assert.equal(error.rollback_failed, true);
+      assert.deepEqual(error.remaining_paths, ["allowed/modify.txt"]);
+      assert.match(error.cause.message, /injected promotion chmod failure/u);
+      assert.equal(readFileSync(resolve(automaticRecovery, "backup/allowed/modify.txt"), "utf8"), "before\n");
+      return /rollback failed; backup retained/u.test(error.message);
+    }));
+  } finally {
+    if (automaticRecovery) rmSync(automaticRecovery, { recursive: true, force: true });
+    run("git", ["reset", "--hard", "HEAD"]);
+    run("git", ["clean", "-fd"]);
+    disposeRiskWorkspace(automaticFailure);
+  }
+
+  const cleanupFailure = preparePromotion();
+  let cleanupRecovery;
+  try {
+    const promotion = beginRiskWorkspacePromotion(cleanupFailure, auditRiskWorkspace(cleanupFailure));
+    withFsFaults({ rmSync: (original) => (...args) => {
+      if (String(args[0]).includes("ask-codex-promotion-")) throw new Error("injected cleanup failure");
+      return original(...args);
+    } }, () => assert.throws(() => promotion.finalize(), (error) => {
+      cleanupRecovery = error.recovery_path;
+      return error.cleanup_failed && /promotion committed but backup cleanup failed/u.test(error.message);
+    }));
+    assert.throws(() => promotion.rollback(), /already finalized/u);
+    assert.equal(readFileSync(resolve(repository, "allowed/modify.txt"), "utf8"), "candidate\n");
+  } finally {
+    if (cleanupRecovery) rmSync(cleanupRecovery, { recursive: true, force: true });
+    run("git", ["reset", "--hard", "HEAD"]);
+    run("git", ["clean", "-fd"]);
+    disposeRiskWorkspace(cleanupFailure);
+  }
+
+  const concurrent = preparePromotion();
+  let concurrentRecovery;
+  try {
+    const promotion = beginRiskWorkspacePromotion(concurrent, auditRiskWorkspace(concurrent));
+    writeFileSync(resolve(repository, "allowed/modify.txt"), "concurrent change\n");
+    writeFileSync(resolve(repository, "allowed/a-new/unrelated.txt"), "unrelated\n");
+    assert.throws(() => promotion.rollback(), (error) => {
+      concurrentRecovery = error.recovery_path;
+      return error.rollback_failed && /concurrent change preserved/u.test(error.message);
+    });
+    assert.equal(readFileSync(resolve(repository, "allowed/modify.txt"), "utf8"), "concurrent change\n");
+    assert.equal(readFileSync(resolve(repository, "allowed/a-new/unrelated.txt"), "utf8"), "unrelated\n");
+    assert.equal(fs.readdirSync(resolve(repository, "allowed")).some((path) => path.startsWith(".ask-risk-")), false);
+  } finally {
+    if (concurrentRecovery) rmSync(concurrentRecovery, { recursive: true, force: true });
+    run("git", ["reset", "--hard", "HEAD"]);
+    run("git", ["clean", "-fd"]);
+    disposeRiskWorkspace(concurrent);
+  }
+
   const outOfScope = createRiskWorkspace({ target: repository, request: request() });
   try {
     writeFileSync(resolve(outOfScope.workspace, "sibling.txt"), "changed\n");
@@ -147,7 +292,7 @@ try {
     disposeRiskWorkspace(drift);
   }
 
-  if (process.platform === "darwin") {
+  if (process.platform === "darwin" && !process.argv.includes("--promotion-only")) {
     const riskEnvironmentSpec = resolveRiskExecutionEnvironment({ OPENAI_API_KEY: "fixture-api-key" });
     const nodeEvidence = readStableExecutableFile(process.execPath, "Node test executable");
     const nodeExecutor = {

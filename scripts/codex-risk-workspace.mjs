@@ -16,6 +16,7 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  rmdirSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -402,7 +403,7 @@ function validatePromotionDestination(target, path, effect) {
   return destination;
 }
 
-export function promoteRiskWorkspace(context, audit) {
+export function beginRiskWorkspacePromotion(context, audit) {
   assertCleanExactRepository(context.target, context.repository, context.ignored_repository_paths);
   const currentInventory = inventory(context.target, { ignored: new Set([".git"]) });
   const currentBaseline = Object.fromEntries(Object.entries(currentInventory).filter(([path]) => !allowedRunnerStatus(path, context.ignored_repository_paths)));
@@ -410,11 +411,84 @@ export function promoteRiskWorkspace(context, audit) {
   const promotionRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-codex-promotion-")));
   const backupRoot = resolve(promotionRoot, "backup");
   const stagedRoot = resolve(promotionRoot, "staged");
-  mkdirSync(backupRoot);
-  mkdirSync(stagedRoot);
   const destinations = new Map();
   const createdDirectories = [];
+  const applied = [];
+  const temporaryFiles = new Map();
+  let state = "pending";
+  const fileState = (path) => {
+    try {
+      const status = lstatSync(path);
+      return { dev: status.dev, ino: status.ino, mode: status.mode, size: status.size,
+        digest: status.isFile() && !status.isSymbolicLink() ? sha256(readFileSync(path)) : null };
+    } catch (error) {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    }
+  };
+  const ownTemporary = (destination) => {
+    const path = resolve(dirname(destination), `.ask-risk-${process.pid}-${createHash("sha256").update(`${promotionRoot}:${destination}`).digest("hex").slice(0, 16)}`);
+    const descriptor = openSync(path, "wx", 0o600);
+    // Register ownership before copy/chmod/rename can fail.
+    temporaryFiles.set(path, fstatSync(descriptor));
+    closeSync(descriptor);
+    return path;
+  };
+  const rollback = () => {
+    if (state === "rolled_back") return;
+    if (state === "finalized") throw new Error("risk promotion was already finalized");
+    const failures = [];
+    for (let index = applied.length - 1; index >= 0; index -= 1) {
+      const { change, published } = applied[index];
+      const destination = destinations.get(change.path);
+      try {
+        if (canonicalJson(fileState(destination)) !== canonicalJson(published)) throw new Error(`concurrent change preserved at ${change.path}`);
+        if (change.effect === "create") unlinkSync(destination);
+        else {
+          const backup = resolve(backupRoot, change.path);
+          const temporary = ownTemporary(destination);
+          copyFileSync(backup, temporary);
+          chmodSync(temporary, lstatSync(backup).mode & 0o777);
+          renameSync(temporary, destination);
+          temporaryFiles.delete(temporary);
+        }
+        applied.splice(index, 1);
+      } catch (error) { failures.push(`${change.path}: ${error.message}`); }
+    }
+    for (const [path, owned] of temporaryFiles) {
+      try {
+        const current = fileState(path);
+        if (current && (current.dev !== owned.dev || current.ino !== owned.ino)) throw new Error(`temporary ownership changed: ${path}`);
+        if (current) unlinkSync(path);
+        temporaryFiles.delete(path);
+      } catch (error) { failures.push(error.message); }
+    }
+    for (const { path: directory, dev, ino } of [...createdDirectories].reverse()) {
+      try {
+        const current = lstatSync(directory);
+        if (current.dev === dev && current.ino === ino) rmdirSync(directory);
+      }
+      catch (error) {
+        // Do not remove unrelated files added to directories created by this promotion.
+        if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error.code)) failures.push(error.message);
+      }
+    }
+    if (!failures.length) {
+      try { rmSync(promotionRoot, { recursive: true, force: true }); }
+      catch (error) { failures.push(`backup cleanup: ${error.message}`); }
+    }
+    if (failures.length) {
+      const error = new Error(`risk promotion rollback failed; backup retained at ${promotionRoot}: ${failures.join("; ")}`);
+      error.rollback_failed = true;
+      error.recovery_path = promotionRoot;
+      error.remaining_paths = applied.map(({ change }) => change.path);
+      throw error;
+    }
+    state = "rolled_back";
+  };
   try {
+    mkdirSync(backupRoot);
+    mkdirSync(stagedRoot);
     for (const change of audit.delta) {
       const destination = validatePromotionDestination(context.target, change.path, change.effect);
       destinations.set(change.path, destination);
@@ -437,52 +511,69 @@ export function promoteRiskWorkspace(context, audit) {
         chmodSync(staged, lstatSync(source).mode & 0o777);
       }
     }
-    const applied = [];
-    try {
-      for (const change of audit.delta) {
-        const destination = destinations.get(change.path);
-        if (change.effect === "delete") {
-          unlinkSync(destination);
-        } else {
-          let parent = dirname(destination);
-          const missing = [];
-          while (parent !== context.target && !existsSync(parent)) {
-            missing.push(parent);
-            parent = dirname(parent);
-          }
-          for (const directory of missing.reverse()) {
-            mkdirSync(directory, { mode: 0o755 });
-            createdDirectories.push(directory);
-          }
-          const staged = resolve(stagedRoot, change.path);
-          const temporary = resolve(dirname(destination), `.ask-risk-${process.pid}-${createHash("sha256").update(change.path).digest("hex").slice(0, 12)}`);
-          copyFileSync(staged, temporary);
-          chmodSync(temporary, lstatSync(staged).mode & 0o777);
-          renameSync(temporary, destination);
+    for (const change of audit.delta) {
+      const destination = destinations.get(change.path);
+      validatePromotionDestination(context.target, change.path, change.effect);
+      const expected = currentInventory[change.path];
+      const current = fileState(destination);
+      if (expected && (!current || current.digest !== expected.sha256 || (current.mode & 0o777) !== expected.mode)) throw new Error(`promotion source changed during promotion: ${change.path}`);
+      if (change.effect === "delete") {
+        unlinkSync(destination);
+        applied.push({ change, published: null });
+      } else {
+        let parent = dirname(destination);
+        const missing = [];
+        while (parent !== context.target && !existsSync(parent)) {
+          missing.push(parent);
+          parent = dirname(parent);
         }
-        applied.push(change);
-      }
-    } catch (error) {
-      for (const change of applied.reverse()) {
-        const destination = destinations.get(change.path);
-        if (change.effect === "create") {
-          if (existsSync(destination)) unlinkSync(destination);
-        } else {
-          const backup = resolve(backupRoot, change.path);
-          mkdirSync(dirname(destination), { recursive: true });
-          copyFileSync(backup, destination);
-          chmodSync(destination, lstatSync(backup).mode & 0o777);
+        for (const directory of missing.reverse()) {
+          mkdirSync(directory, { mode: 0o755 });
+          const { dev, ino } = lstatSync(directory);
+          createdDirectories.push({ path: directory, dev, ino });
         }
+        const staged = resolve(stagedRoot, change.path);
+        const temporary = ownTemporary(destination);
+        copyFileSync(staged, temporary);
+        chmodSync(temporary, lstatSync(staged).mode & 0o777);
+        const published = fileState(temporary);
+        renameSync(temporary, destination);
+        temporaryFiles.delete(temporary);
+        applied.push({ change, published });
       }
-      for (const directory of createdDirectories.reverse()) {
-        try { rmSync(directory); } catch { /* a non-empty/user-modified directory is preserved */ }
-      }
-      throw new Error(`risk promotion failed and was rolled back: ${error.message}`);
     }
-    return { promoted_paths: audit.delta.map((change) => change.path), promotion_sha256: audit.delta_sha256 };
-  } finally {
-    rmSync(promotionRoot, { recursive: true, force: true });
+    return {
+      promoted_paths: audit.delta.map((change) => change.path),
+      promotion_sha256: audit.delta_sha256,
+      rollback,
+      finalize() {
+        if (state === "finalized") return;
+        if (state !== "pending") throw new Error("risk promotion was already rolled back");
+        // Publication is committed by the caller before this cleanup boundary.
+        state = "finalized";
+        try { rmSync(promotionRoot, { recursive: true, force: true }); }
+        catch (cause) {
+          const error = new Error(`risk promotion committed but backup cleanup failed at ${promotionRoot}: ${cause.message}`, { cause });
+          error.cleanup_failed = true;
+          error.recovery_path = promotionRoot;
+          throw error;
+        }
+      },
+    };
+  } catch (error) {
+    try { rollback(); }
+    catch (rollbackError) {
+      rollbackError.cause = error;
+      throw rollbackError;
+    }
+    throw new Error(`risk promotion failed and was rolled back: ${error.message}`, { cause: error });
   }
+}
+
+export function promoteRiskWorkspace(context, audit) {
+  const promotion = beginRiskWorkspacePromotion(context, audit);
+  promotion.finalize();
+  return { promoted_paths: promotion.promoted_paths, promotion_sha256: promotion.promotion_sha256 };
 }
 
 export function disposeRiskWorkspace(context) {

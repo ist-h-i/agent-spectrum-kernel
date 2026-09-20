@@ -10,6 +10,8 @@ import {
   computePromptV2ExactProjectionDigests,
   deriveEvolutionActionProposal,
   deriveEvolutionRecommendation,
+  computeEvolutionArtifactInventoryDigest,
+  computeEvolutionRecommendationDigest,
   validateEvolutionCandidate,
   validateEvolutionExperiment,
   validateEvolutionRecommendation,
@@ -226,7 +228,7 @@ function evaluationEvidence(experimentValue = experiment) {
     causal_credit_applied: causalCreditApplied,
     factor_ids: causalCreditApplied ? ["prompt_instruction_content"] : [],
   });
-  return {
+  const evidence = {
     authority: {
       kind: "external_evolution_evaluation_authority",
       authority_id: "evaluation-authority",
@@ -234,7 +236,6 @@ function evaluationEvidence(experimentValue = experiment) {
       authority_evidence_digest: D[8],
       experiment_digest: experimentValue.experiment_digest,
       verification_mode: "full_verifier",
-      artifact_inventory_digest: D[9],
     },
     dimensions: {
       quality: dimension("complete", "improved", "portfolio_aggregate_result", D.a, true),
@@ -251,6 +252,8 @@ function evaluationEvidence(experimentValue = experiment) {
     },
     reason_codes: ["bounded_canary_evidence_complete"],
   };
+  evidence.authority.artifact_inventory_digest = computeEvolutionArtifactInventoryDigest(evidence.dimensions);
+  return evidence;
 }
 
 let closures = 0;
@@ -421,6 +424,42 @@ const recommendation = deriveEvolutionRecommendation({
   experiment,
   evidence: evaluationEvidence(),
 });
+closes("evaluation inventory binds all six artifact identities independent of order", () => {
+  const evidence = evaluationEvidence();
+  const inventory = Object.fromEntries(Object.entries(evidence.dimensions).map(([name, value]) => [name, {
+    source_kind: value.source_kind, artifact_id: value.artifact_id, artifact_digest: value.artifact_digest,
+  }]));
+  assert.equal(evidence.authority.artifact_inventory_digest, canonicalDigest(inventory));
+  evidence.dimensions = Object.fromEntries(Object.entries(evidence.dimensions).reverse());
+  assert.deepEqual(deriveEvolutionRecommendation({ experiment, evidence }), recommendation);
+  for (const name of Object.keys(evidence.dimensions)) {
+    for (const field of ["artifact_id", "artifact_digest"]) {
+      const changed = structuredClone(evidence);
+      changed.dimensions[name][field] = field === "artifact_id" ? "changed-artifact" : D[0];
+      assert.throws(() => deriveEvolutionRecommendation({ experiment, evidence: changed }), /artifact inventory.*mismatch/iu, `${name}.${field}`);
+    }
+  }
+  const changedKind = structuredClone(evidence);
+  changedKind.dimensions.safety.source_kind = "result_set";
+  assert.throws(() => deriveEvolutionRecommendation({ experiment, evidence: changedKind }), /artifact inventory.*mismatch/iu);
+  const missing = structuredClone(evidence);
+  delete missing.dimensions.external_outcome;
+  assert.throws(() => computeEvolutionArtifactInventoryDigest(missing.dimensions), /exactly six/iu);
+});
+
+closes("resealed recommendation cannot hide an inventory mismatch", () => {
+  const forged = structuredClone(recommendation);
+  forged.dimensions.external_outcome.artifact_id = "different-incomplete-artifact";
+  forged.recommendation_digest = computeEvolutionRecommendationDigest(forged);
+  assert.throws(() => validateEvolutionRecommendation(forged), /artifact inventory.*mismatch/iu);
+});
+
+closes("evaluation inventory rejects stale authority digest", () => {
+  const stale = evaluationEvidence();
+  stale.authority.artifact_inventory_digest = D[0];
+  assert.throws(() => deriveEvolutionRecommendation({ experiment, evidence: stale }), /artifact inventory.*mismatch/iu);
+});
+
 closes("recommendation preserves typed dimensions and carries no mutation authority", () => {
   assert.equal(recommendation.recommendation, "expand");
   assert.equal(recommendation.decision_scope, "portfolio_canary_only");

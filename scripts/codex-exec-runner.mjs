@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { closeSync, fstatSync, openSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, deriveReviewSignalGateRoute, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, inspectCodexPromptContractBindings, parseCodexCompactProfileHeader, readReviewSignalGateMap } from "./ask-shared.mjs";
 import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
 import { RISK_CODEX_POLICY_ARGS, canonicalRiskDigest, createRiskApprovalRequest, materializeRiskExecutionEnvironment, readRiskAction, resolveRiskCodexExecutor, resolveRiskExecutionEnvironment, riskCodexRuntimePolicy, verifyRiskApproval, verifyRiskCodexExecutor } from "./codex-risk-approval.mjs";
-import { assertRiskIsolationProvider, auditRiskWorkspace, createRiskWorkspace, disposeRiskWorkspace, promoteRiskWorkspace, runInRiskWorkspace } from "./codex-risk-workspace.mjs";
+import { assertRiskIsolationProvider, auditRiskWorkspace, createRiskWorkspace, disposeRiskWorkspace, beginRiskWorkspacePromotion, runInRiskWorkspace } from "./codex-risk-workspace.mjs";
 import { buildExecutionEnvelopeRecord, hasExecutionEnvelopeMarker, inspectExecutionEnvelopeRecordEmission, isMarkdownFenceClosing, markdownFenceOpening, renderExecutionEnvelopeProjection, selectExecutionEnvelopeEmission, validateExecutionEnvelope, validateExecutionEnvelopeRecord, validateJsonSchema } from "./execution-envelope.mjs";
 import { resolveGitDirectory, resolveObservabilityPath } from "./observability-paths.mjs";
 
@@ -698,21 +698,46 @@ function runnerObservedStop(args, compactProfile, { status, details, missing, ne
   };
 }
 
+function writeOwnedTemporary(path, bytes, owned) {
+  const descriptor = openSync(path, "wx", 0o600);
+  try {
+    owned.set(path, fstatSync(descriptor));
+    writeFileSync(descriptor, bytes);
+  } finally { closeSync(descriptor); }
+}
+
+function removeOwnedFile(path, identity) {
+  if (!existsSync(path)) return;
+  const current = lstatSync(path);
+  if (current.dev !== identity.dev || current.ino !== identity.ino) throw new Error(`runtime temporary ownership changed: ${path}`);
+  unlinkSync(path);
+}
+
 function prepareOutputCandidate(args, responseMarkdown, record) {
   const output = renderExecutionEnvelopeProjection(responseMarkdown, record);
   const nonce = `${process.pid}-${Date.now()}`;
   const temporaryOutputPath = resolveWithinTarget(args.target, `${args.output}.ask-${nonce}.tmp`, "temporary managed output");
   const temporaryRecordPath = resolveWithinTarget(args.target, `${args.output}.ask-${nonce}.record.json`, "temporary envelope record");
-  mkdirSync(dirname(temporaryOutputPath), { recursive: true });
-  writeFileSync(temporaryOutputPath, output, { flag: "wx", mode: 0o600 });
-  writeFileSync(temporaryRecordPath, `${JSON.stringify(record, null, 2)}\n`, { flag: "wx", mode: 0o600 });
-  return { output, temporaryOutputPath, temporaryRecordPath };
+  const candidate = { output, temporaryOutputPath, temporaryRecordPath, owned: new Map() };
+  try {
+    mkdirSync(dirname(temporaryOutputPath), { recursive: true });
+    writeOwnedTemporary(temporaryOutputPath, output, candidate.owned);
+    writeOwnedTemporary(temporaryRecordPath, `${JSON.stringify(record, null, 2)}\n`, candidate.owned);
+    return candidate;
+  } catch (error) {
+    try { cleanupCandidate(candidate); }
+    catch (cleanupError) { throw new Error(`${error.message}; candidate cleanup failed: ${cleanupError.message}`, { cause: error }); }
+    throw error;
+  }
 }
 
 function cleanupCandidate(candidate) {
-  for (const path of [candidate?.temporaryOutputPath, candidate?.temporaryRecordPath]) {
-    if (path && existsSync(path)) unlinkSync(path);
+  const failures = [];
+  for (const [path, identity] of candidate.owned) {
+    try { removeOwnedFile(path, identity); }
+    catch (error) { failures.push(error.message); }
   }
+  if (failures.length) throw new Error(failures.join("; "));
 }
 
 function insidePath(path, root) {
@@ -735,16 +760,17 @@ function persistEnvelopeRecord(args, record) {
     const stats = lstatSync(recordPath);
     if (stats.isSymbolicLink() || !stats.isFile()) throw new Error("Execution Envelope record path must be a regular runtime-owned file");
     if (readFileSync(recordPath, "utf8") !== bytes) throw new Error("content-addressed Execution Envelope record conflicts with existing bytes");
-    return { logicalPath, recordPath, digest: `sha256:${hashText(bytes)}` };
+    return { logicalPath, recordPath, digest: `sha256:${hashText(bytes)}`, created: false };
   }
   const temporaryPath = `${recordPath}.${process.pid}-${Date.now()}.tmp`;
+  const owned = new Map();
   try {
-    writeFileSync(temporaryPath, bytes, { flag: "wx", mode: 0o600 });
+    writeOwnedTemporary(temporaryPath, bytes, owned);
     renameSync(temporaryPath, recordPath);
   } finally {
-    if (existsSync(temporaryPath)) unlinkSync(temporaryPath);
+    if (owned.has(temporaryPath)) removeOwnedFile(temporaryPath, owned.get(temporaryPath));
   }
-  return { logicalPath, recordPath, digest: `sha256:${hashText(bytes)}` };
+  return { logicalPath, recordPath, digest: `sha256:${hashText(bytes)}`, created: true, identity: owned.get(temporaryPath) };
 }
 
 function runSensors(args, outputPath, recordPath) {
@@ -766,23 +792,58 @@ function runSensors(args, outputPath, recordPath) {
   };
 }
 
-function publishOutput(args, responseMarkdown, record, { inspectDomainOutput = true } = {}) {
+function publishOutput(args, responseMarkdown, record, { inspectDomainOutput = true, promote = null } = {}) {
   const candidate = prepareOutputCandidate(args, responseMarkdown, record);
   let sensorResult = null;
+  let promotion = null;
+  let persistence = null;
   try {
     const inspection = inspectExecutionEnvelopeRecordEmission(candidate.output, record, { schemaPath: args.envelopeRecordSchemaPath });
     if (inspection.status !== "valid") throw new Error(`runner output projection is invalid: ${inspection.errors.join("; ")}`);
     if (inspectDomainOutput) {
       sensorResult = runSensors(args, candidate.temporaryOutputPath, candidate.temporaryRecordPath);
-      if (sensorResult.exitCode !== 0 || sensorResult.status !== "pass") return { published: false, sensorResult, persistence: null };
+      if (sensorResult.exitCode !== 0 || sensorResult.status !== "pass") {
+        cleanupCandidate(candidate);
+        return { published: false, sensorResult, persistence: null };
+      }
     }
-    const persistence = persistEnvelopeRecord(args, record);
+    removeOwnedFile(candidate.temporaryRecordPath, candidate.owned.get(candidate.temporaryRecordPath));
+    // Sensors have accepted the staged output. The exact owned output temporary
+    // is the only additional checkout path excluded from the promotion baseline.
+    if (promote) promotion = promote(candidate.temporaryOutputPath);
+    persistence = persistEnvelopeRecord(args, record);
     renameSync(candidate.temporaryOutputPath, args.outputPath);
-    unlinkSync(candidate.temporaryRecordPath);
-    return { published: true, sensorResult, persistence };
-  } finally {
-    cleanupCandidate(candidate);
+  } catch (error) {
+    const failures = [];
+    if (persistence?.created) {
+      try {
+        if (`sha256:${hashText(readFileSync(persistence.recordPath))}` !== persistence.digest) throw new Error("published record bytes changed; preserving changed record");
+        removeOwnedFile(persistence.recordPath, persistence.identity);
+      } catch (cleanupError) { failures.push(`record cleanup failed: ${cleanupError.message}`); }
+    }
+    if (promotion) {
+      try { promotion.rollback(); }
+      catch (rollbackError) {
+        error.rollback_failed = true;
+        error.recovery_path = rollbackError.recovery_path;
+        error.remaining_paths = rollbackError.remaining_paths;
+        failures.push(rollbackError.message);
+      }
+    }
+    try { cleanupCandidate(candidate); }
+    catch (cleanupError) { failures.push(`candidate cleanup failed: ${cleanupError.message}`); }
+    if (failures.length) error.message += `; ${failures.join("; ")}`;
+    error.sensorResult = sensorResult;
+    throw error;
   }
+  // Output rename is the publication commit point. After that, cleanup failure
+  // must report the committed promotion, never claim that it was rolled back.
+  let cleanupError = null;
+  if (promotion) {
+    try { promotion.finalize(); }
+    catch (error) { cleanupError = error.message; }
+  }
+  return { published: true, sensorResult, persistence, cleanupError };
 }
 
 function resultStatus({ preflightResult, codexResult, sensorResult, dryRun, approvalBlocked, capabilityBlocked, record, published, structuredError }) {
@@ -1036,11 +1097,17 @@ try {
                 promoted_paths: audit.delta.map((change) => change.path),
               };
               const parsed = parseStructuredResult(args, preflightResult.compactProfile, codexResult.finalOutput, { riskApproval: plannedRiskApproval });
-              promoteRiskWorkspace(riskContext, audit);
+              publication = publishOutput(args, parsed.value.response_markdown, parsed.record, {
+                promote: (temporaryOutputPath) => beginRiskWorkspacePromotion({
+                  ...riskContext,
+                  ignored_repository_paths: [...riskContext.ignored_repository_paths, relative(args.target, temporaryOutputPath)],
+                }, audit),
+              });
+              sensorResult = publication.sensorResult;
+              if (!publication.published) throw new Error("risk-action output rejected by sensors before promotion");
               riskApproval = plannedRiskApproval;
               envelopeRecord = parsed.record;
-              publication = publishOutput(args, parsed.value.response_markdown, parsed.record);
-              sensorResult = publication.sensorResult;
+              structuredError = publication.cleanupError;
             } else {
               const parsed = parseStructuredResult(args, preflightResult.compactProfile, codexResult.finalOutput, { riskApproval });
               envelopeRecord = parsed.record;
@@ -1050,6 +1117,7 @@ try {
           }
         } catch (error) {
           structuredError = error.message;
+          sensorResult = error.sensorResult ?? sensorResult;
           if (riskContext && riskApproval.promotion_status !== "promoted") {
             riskApproval = {
               ...riskApproval,
@@ -1064,7 +1132,9 @@ try {
               details: [structuredError],
               missing: ["accepted_scoped_delta"],
               nextAction: "discard the isolated action and issue a new exact request after correcting its runtime behavior",
-              responseMarkdown: "Codex runner rejected the isolated risk-action result without promotion.\n",
+              responseMarkdown: error.rollback_failed
+                ? `Codex runner rejected the isolated risk-action result, but rollback is incomplete. Recovery material: ${error.recovery_path}. Remaining paths: ${(error.remaining_paths ?? []).join(", ")}.\n`
+                : "Codex runner rejected the isolated risk-action result; no promoted changes remain.\n",
               riskApproval,
             });
             envelopeRecord = stop.record;

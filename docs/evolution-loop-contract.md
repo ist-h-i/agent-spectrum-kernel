@@ -166,6 +166,20 @@ authentication remains caller-owned. It exposes six typed dimensions:
 | mechanism | `mechanism_scorecard` | no numeric quality or causal credit |
 | external outcome | `external_outcome_report` | internal proxy does not prove realized value; exact #178 authority is still required for a complete claim |
 
+The artifact inventory digest is `canonicalDigest` of an object keyed by all
+six dimension names: `quality`, `safety`, `cost`, `variance`, `mechanism`, and
+`external_outcome`. Each value is exactly
+`{ source_kind, artifact_id, artifact_digest }` projected from that dimension.
+Incomplete dimensions are included; status, conclusion, and causal fields are
+not part of this inventory. Canonical object hashing makes insertion order
+irrelevant. Derivation, recommendation validation/publication, and stored
+recommendation verification reject a mismatch against
+`authority.artifact_inventory_digest` (serialized as
+`evaluation_authority.artifact_inventory_digest` on a recommendation).
+An inventory match establishes artifact identity binding only, not effectiveness,
+adoption authorization, or trusted evidence equality; the full trusted evidence
+comparison and separate authority/experiment bindings remain required.
+
 Each dimension preserves `complete`, `insufficient_evidence`, `unknown`,
 `unavailable`, or `not_applicable` independently. Incomplete states carry
 `unknown`, `unavailable`, or `not_applicable` conclusions as appropriate. They

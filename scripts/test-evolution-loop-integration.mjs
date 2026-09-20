@@ -30,6 +30,8 @@ import {
   computeEvolutionHumanDecisionDigest,
   deriveEvolutionActionProposal,
   deriveEvolutionRecommendation,
+  computeEvolutionArtifactInventoryDigest,
+  computeEvolutionRecommendationDigest,
   publishEvolutionActionProposal,
   publishEvolutionApplicationReceipt,
   publishEvolutionCandidate,
@@ -738,7 +740,7 @@ function evaluationEvidence(experiment) {
     causal_credit_applied: causalCreditApplied,
     factor_ids: causalCreditApplied ? ["prompt_instruction_content"] : [],
   });
-  return {
+  const evidence = {
     authority: {
       kind: "external_evolution_evaluation_authority",
       authority_id: "issue-278-evaluation-authority",
@@ -746,7 +748,6 @@ function evaluationEvidence(experiment) {
       authority_evidence_digest: digest("issue-278-evaluation-authority"),
       experiment_digest: experiment.experiment_digest,
       verification_mode: "full_verifier",
-      artifact_inventory_digest: digest("issue-278-evaluation-artifacts"),
     },
     dimensions: {
       quality: dimension("complete", "improved", "portfolio_aggregate_result", digest("quality"), true),
@@ -763,6 +764,8 @@ function evaluationEvidence(experiment) {
     },
     reason_codes: ["bounded_canary_evidence_complete"],
   };
+  evidence.authority.artifact_inventory_digest = computeEvolutionArtifactInventoryDigest(evidence.dimensions);
+  return evidence;
 }
 
 const temporaryRoot = mkdtempSync(resolve(tmpdir(), "ask-evolution-integration-"));
@@ -1187,6 +1190,23 @@ try {
         trustedPortfolioAuthorityContexts: portfolioTrust,
       }), /evaluation.*authority.*distinct|generation.*evaluation|decision.*evaluation/iu, authorityId);
     }
+  });
+
+  closes("publication and CAS read reject resealed inventory mismatch", () => {
+    const forged = structuredClone(recommendation);
+    forged.dimensions.external_outcome.artifact_digest = digest("changed-incomplete-artifact");
+    forged.recommendation_digest = computeEvolutionRecommendationDigest(forged);
+    assert.throws(() => publishEvolutionRecommendation({ storeRoot, recommendation: forged }), /artifact inventory.*mismatch/iu);
+    const stored = putContentAddressedJson({ storeRoot, artifact: forged });
+    assert.throws(() => verifyEvolutionRecommendation({
+      storeRoot,
+      recommendationObjectDigest: stored.digest,
+      experimentObjectDigest: experimentPublication.object_digest,
+      trustedExperimentAuthorities: experimentTrust,
+      trustedEvaluationAuthorities: [evidence],
+      trustedAssetAuthorityContexts: assetTrust,
+      trustedPortfolioAuthorityContexts: portfolioTrust,
+    }), /artifact inventory.*mismatch/iu);
   });
 
   closes("full verifier rejects causal credit on incomplete quality evidence", () => {

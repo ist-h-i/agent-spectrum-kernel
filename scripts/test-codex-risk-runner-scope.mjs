@@ -2,14 +2,24 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveObservabilityPath } from "./observability-paths.mjs";
 import { resolveRiskExecutionEnvironment, riskCodexRuntimePolicy } from "./codex-risk-approval.mjs";
 
 const source = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const evidenceFlag = process.argv.indexOf("--evidence-dir");
+const evidenceDirectory = evidenceFlag < 0 ? null : resolve(process.argv[evidenceFlag + 1]);
+function saveEvidence(label, result) {
+  if (!evidenceDirectory) return;
+  mkdirSync(evidenceDirectory, { recursive: true });
+  writeFileSync(resolve(evidenceDirectory, `${label}.stdout.txt`), result.stdout ?? "");
+  writeFileSync(resolve(evidenceDirectory, `${label}.stderr.txt`), result.stderr ?? "");
+  writeFileSync(resolve(evidenceDirectory, `${label}.exit.json`), `${JSON.stringify({ status: result.status, signal: result.signal, runtime: process.version })}\n`);
+}
 const fixtureRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "codex-risk-runner-scope-")));
 const target = resolve(fixtureRoot, "target");
 const actionPath = resolve(fixtureRoot, "action.json");
@@ -34,6 +44,7 @@ const makePackagePaths = (name) => {
   };
 };
 const nativeCodexPackage = makePackagePaths("native-codex-package");
+const nativeSensorRejectedPackage = makePackagePaths("native-codex-sensor-rejected-package");
 const nativeOutOfScopeCodexPackage = makePackagePaths("native-codex-out-of-scope-package");
 const syntheticCodexHome = resolve(fixtureRoot, "codex-home");
 const externalToolMarker = resolve(fixtureRoot, "configured-external-tool-ran.txt");
@@ -73,6 +84,7 @@ function pass(label, result) {
 function git(args) {
   const result = spawnSync("git", args, { cwd: target, encoding: "utf8" });
   pass(`git ${args.join(" ")}`, result);
+  return result.stdout;
 }
 
 try {
@@ -98,7 +110,7 @@ try {
   chmodSync(configuredExternalTool, 0o755);
   mkdirSync(syntheticCodexHome);
   writeFileSync(resolve(syntheticCodexHome, "config.toml"), `[mcp_servers.mutating_fixture]\ncommand = ${JSON.stringify(configuredExternalTool)}\n\n[features]\nhooks = true\nplugins = true\napps = true\nbrowser_use = true\ncomputer_use = true\n`);
-  const compileNativeFixture = (packagePaths, outOfScope) => {
+  const compileNativeFixture = (packagePaths, outOfScope, responseJson = resultJson) => {
     mkdirSync(dirname(packagePaths.launcher), { recursive: true });
     mkdirSync(dirname(packagePaths.native), { recursive: true });
     writeFileSync(packagePaths.launcher, "#!/usr/bin/env node\nthrow new Error('risk test launcher must never execute');\n");
@@ -134,11 +146,11 @@ int main(int argc, char **argv) {
   mkdir("dist", 0700);
   FILE *approved = fopen("dist/release.json", "w");
   if (!approved) return 22;
-  fputs("approved\\n", approved); fclose(approved);
+  fputs("approved\\n", approved); fclose(approved); chmod("dist/release.json", 0644);
   ${outOfScope ? 'FILE *sibling = fopen("README.md", "w"); if (!sibling) return 23; fputs("unapproved sibling\\n", sibling); fclose(sibling);' : ""}
   FILE *result = fopen(output_path, "w");
   if (!result) return 24;
-  fputs(${JSON.stringify(resultJson)}, result); fclose(result);
+  fputs(${JSON.stringify(responseJson)}, result); fclose(result);
   return 0;
 }
 `);
@@ -150,6 +162,7 @@ int main(int argc, char **argv) {
   };
   compileNativeFixture(nativeCodexPackage, false);
   compileNativeFixture(nativeOutOfScopeCodexPackage, true);
+  compileNativeFixture(nativeSensorRejectedPackage, false, `${JSON.stringify({ ...JSON.parse(resultJson), response_markdown: "Completed." })}\n`);
 
   const syntheticEnvironment = {
     CODEX_HOME: syntheticCodexHome,
@@ -218,6 +231,7 @@ int main(int argc, char **argv) {
   const approvalBytes = `${JSON.stringify({ schema_version: "1.0.0", kind: "codex_risk_approval", decision: "approved", request, request_sha256: request.request_sha256 }, null, 2)}\n`;
   writeFileSync(approvalPath, approvalBytes);
   const approved = runNode([...baseArgs, "--risk-approval", approvalPath, "--risk-approval-sha256", sha256(approvalBytes)], { cwd: target, env: syntheticEnvironment });
+  saveEvidence("approved", approved);
   if (process.platform !== "darwin") {
     assert.notEqual(approved.status, 0, "a platform without the required isolation provider must stop before native execution");
     const report = JSON.parse(approved.stdout);
@@ -235,6 +249,10 @@ int main(int argc, char **argv) {
     assert.equal(state.execution_status, "executed");
     assert.equal(state.enforcement_status, "accepted");
     assert.equal(state.promotion_status, "promoted");
+    assert.equal(report.execution_envelope_record.persisted, true);
+    const acceptedReceipt = JSON.parse(readFileSync(resolveObservabilityPath(target, report.execution_envelope_record.logical_path), "utf8"));
+    assert.equal(acceptedReceipt.envelope.risk_approval.promotion_status, "promoted");
+    assert.match(readFileSync(resolve(target, ".agents/runs/risk-scope.md"), "utf8"), /Implementation Contract:/u);
     assert.deepEqual(state.observed_effects, ["create"]);
     assert.deepEqual(state.promoted_paths, ["dist/release.json"]);
     assert.equal(readFileSync(resolve(target, "dist/release.json"), "utf8"), "approved\n");
@@ -244,6 +262,90 @@ int main(int argc, char **argv) {
     git(["reset", "--hard", "HEAD"]);
     git(["clean", "-fd"]);
     assert.equal(existsSync(resolve(target, "README.md")), false);
+    mkdirSync(resolve(target, "dist"), { recursive: true });
+    writeFileSync(resolve(target, "dist/release.json"), "existing release candidate\n");
+    chmodSync(resolve(target, "dist/release.json"), 0o755);
+    git(["add", "dist/release.json"]);
+    git(["-c", "user.name=ASK Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "existing release candidate fixture"]);
+    writeFileSync(actionPath, `${JSON.stringify({ ...action, permitted_effects: ["modify"] }, null, 2)}\n`);
+    const managedOutput = resolve(target, ".agents/runs/risk-scope.md");
+    const receiptDirectory = resolveObservabilityPath(target, "ask-runtime/execution-envelopes");
+    const promotedReceipts = () => existsSync(receiptDirectory)
+      ? readdirSync(receiptDirectory).filter((name) => name.endsWith(".json")).filter((name) => JSON.parse(readFileSync(resolve(receiptDirectory, name), "utf8")).envelope?.risk_approval?.promotion_status === "promoted").sort()
+      : [];
+    const checkoutSnapshot = () => ({
+      files: git(["ls-files", "-z"]).split("\0").filter(Boolean).map((path) => ({
+        path, bytes: sha256(readFileSync(resolve(target, path))), mode: statSync(resolve(target, path)).mode & 0o777,
+      })),
+      status: git(["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude).agents/runs"]),
+      head: git(["rev-parse", "HEAD"]),
+      index: git(["ls-files", "--stage"]),
+    });
+    for (const failure of ["sensor", "persistence", "output-rename"]) {
+      const launcher = failure === "sensor" ? nativeSensorRejectedPackage.launcher : nativeCodexPackage.launcher;
+      const caseArgs = baseArgs.map((value) => value === nativeCodexPackage.launcher ? launcher : value);
+      const pending = runNode(caseArgs, { cwd: target, env: syntheticEnvironment });
+      assert.equal(pending.status, 2, pending.stderr);
+      const caseRequest = JSON.parse(pending.stdout).execution_envelope_record.envelope.risk_approval.request;
+      const caseApproval = `${JSON.stringify({ schema_version: "1.0.0", kind: "codex_risk_approval", decision: "approved", request: caseRequest, request_sha256: caseRequest.request_sha256 })}\n`;
+      writeFileSync(approvalPath, caseApproval);
+      writeFileSync(managedOutput, `previous accepted output: ${failure}\n`);
+      chmodSync(managedOutput, 0o640);
+      const previousOutput = readFileSync(managedOutput);
+      const before = checkoutSnapshot();
+      const receiptsBefore = promotedReceipts();
+      const injectionMarker = resolve(fixtureRoot, `${failure}-injected.txt`);
+      const preload = resolve(fixtureRoot, `${failure}-preload.mjs`);
+      const nodeArgs = [];
+      if (failure !== "sensor") {
+        writeFileSync(preload, `import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+const originalWrite = fs.writeFileSync;
+const originalRename = fs.renameSync;
+fs.renameSync = (...args) => {
+  if (${JSON.stringify(failure)} === "persistence" && String(args[1]).startsWith(${JSON.stringify(receiptDirectory + "/")}) && String(args[1]).endsWith(".json")) {
+    originalWrite(${JSON.stringify(injectionMarker)}, "persistence failure reached\\n");
+    throw new Error("injected envelope persistence failure");
+  }
+  if (${JSON.stringify(failure)} === "output-rename" && String(args[1]) === ${JSON.stringify(managedOutput)}) {
+    originalWrite(${JSON.stringify(injectionMarker)}, "output rename failure reached\\n");
+    throw new Error("injected output publication rename failure");
+  }
+  return originalRename(...args);
+};
+syncBuiltinESMExports();
+`);
+        nodeArgs.push("--import", preload);
+      }
+      const failed = runNode([...nodeArgs, ...caseArgs, "--risk-approval", approvalPath, "--risk-approval-sha256", sha256(caseApproval)], { cwd: target, env: syntheticEnvironment });
+      saveEvidence(failure, failed);
+      assert.notEqual(failed.status, 0, `${failure} must reject publication`);
+      const failedReport = JSON.parse(failed.stdout);
+      const failedState = failedReport.execution_envelope_record.envelope.risk_approval;
+      assert.equal(failedState.execution_status, "executed", `${failure} must exercise the post-execution boundary`);
+      assert.equal(failedState.promotion_status, "rejected");
+      assert.deepEqual(failedState.promoted_paths, []);
+      assert.equal(failedReport.execution_envelope_record.persisted, false);
+      if (failure === "sensor") {
+        assert.notEqual(failedReport.sensor_status, "pass");
+        assert.ok(failedReport.failures.some((message) => /ask-sensors rejected output/u.test(message)), "schema-valid output must reach sensor rejection");
+      } else {
+        assert.equal(existsSync(injectionMarker), true, `${failure} injection must be reached`);
+        assert.ok(failedReport.failures.some((message) => /injected/u.test(message)), `${failure} must preserve the injection error`);
+      }
+      assert.deepEqual(checkoutSnapshot(), before, `${failure} must restore checkout bytes, modes, HEAD, index, and Git status`);
+      assert.equal(readFileSync(resolve(target, "dist/release.json"), "utf8"), "existing release candidate\n");
+      assert.equal(statSync(resolve(target, "dist/release.json")).mode & 0o777, 0o755);
+      assert.deepEqual(readFileSync(managedOutput), previousOutput, `${failure} must retain prior output`);
+      assert.equal(statSync(managedOutput).mode & 0o777, 0o640);
+      assert.deepEqual(promotedReceipts(), receiptsBefore, `${failure} must not leave a promoted receipt`);
+      assert.equal(readdirSync(dirname(managedOutput)).some((name) => name.includes(".ask-") || name.startsWith(".ask-risk-")), false);
+      console.log(`Risk publication regression ${failure}: passed`);
+    }
+
+    git(["reset", "--hard", "HEAD~1"]);
+    git(["clean", "-fd"]);
+    writeFileSync(actionPath, `${JSON.stringify(action, null, 2)}\n`);
     const outOfScopeArgs = baseArgs.map((value) => value === nativeCodexPackage.launcher ? nativeOutOfScopeCodexPackage.launcher : value);
     const outOfScopeRequestRun = runNode(outOfScopeArgs, { cwd: target, env: syntheticEnvironment });
     assert.equal(outOfScopeRequestRun.status, 2, outOfScopeRequestRun.stderr);

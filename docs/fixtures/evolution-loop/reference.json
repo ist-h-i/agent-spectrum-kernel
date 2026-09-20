@@ -254,26 +254,26 @@
       "semantic_digest": "sha256:bb41ef0d0dae67e31b9ca22e1d027ebb679ef4b69aa31bc9d756cda2abc1d544"
     },
     "recommendation": {
-      "object_digest": "sha256:21566d99eef552e79f3776c86fb68b7a75cd52ccff601391982a893e435f55b1",
-      "semantic_digest": "sha256:abf4b4484db1d982705806775a49600e72b6abf2bf64cea9d9a2b7d0598527a2"
+      "object_digest": "sha256:c59e9d1be16ce6db280639c2e872bc5b74efc51c009a91d1f0e57aa092b5f56e",
+      "semantic_digest": "sha256:1e6e10069b403ea5bb79d191d8511fbf7f54c3ad84035adeea31378912d5a2c5"
     },
     "action_proposal": {
-      "object_digest": "sha256:2bb874e33d7ac4ca72b43e5a59ed4ae0e968a9c0880312908f37f77fe125f379",
-      "semantic_digest": "sha256:30aaf940a6c461ac4c753dac87b05eae43632ea69cdf38d067ee5e9cd73aa086"
+      "object_digest": "sha256:fc5f2a89352ba37a194476827d4d495693be257c1623cb07c77895cd6989cd52",
+      "semantic_digest": "sha256:cb716a9bc6ef67bb8896fce3197444617e0dcccd0794a0dc52fa58e57dfb11ea"
     },
     "human_decision": {
-      "object_digest": "sha256:eec65127c27339503729cec191f4be095016393e3395d6271c4b20fb09218f9f",
-      "semantic_digest": "sha256:01e8f2714afb17c6b80da8ec710278e5eefa2e68817caf4efabee43b9ea497ba"
+      "object_digest": "sha256:8f159987be38d11d76096bf7c198c98b324cca48b6f40cad5e8b694685c85073",
+      "semantic_digest": "sha256:35f76367ee68b6c306f2004c97051bb4c1fd4ed71ac16885c80e9f978925ea46"
     },
     "application_receipt": {
-      "object_digest": "sha256:1dfd22044f50990abaca1cc04894b87a628395d8d9b5691537b90bfb1a0463e4",
-      "semantic_digest": "sha256:8e2b1a733bece0eef0df9b31706e3f62eaae96ddb6c0314cafec091e81703070"
+      "object_digest": "sha256:c4e7165068ba3167f078c201104a13045164d56e829b293b91811703620f1583",
+      "semantic_digest": "sha256:6d81e76f3152f0fa52088d62c74dd63ceb8111fb3daccd0be64335a5bf49fd03"
     }
   },
   "application": {
     "gate_evidence_object_digest": "sha256:5416a6960ec4ed19a03fc0dd6a2039f14beb5a0d7db8a1ad8a7f030fe6a3aa12",
     "base_portfolio_lock_digest": "sha256:4e771bfb45ba55e473bbef342fb0139171a2d30a14088e285bfb582c3097f800",
-    "result_portfolio_lock_digest": "sha256:7643df91cd2ef164e21105e1814a688487578a35f2c35e3387c6f2e1a673c3ff",
+    "result_portfolio_lock_digest": "sha256:60bb5e2425ed1590aae2b95fbdb7f8bc0863bcf616d1c604484b54273c1e2d1c",
     "rollback_anchor": {
       "portfolio_id": "ask.portfolio.issue278.sample-runtime",
       "revision": "sample-baseline-v1",
@@ -299,7 +299,7 @@
           "authority_evidence_digest": "sha256:c4eab53f278e1254e0444b49bf60c8abc3163355ea94f854ba5fcb3979645a23",
           "experiment_digest": "sha256:bb41ef0d0dae67e31b9ca22e1d027ebb679ef4b69aa31bc9d756cda2abc1d544",
           "verification_mode": "full_verifier",
-          "artifact_inventory_digest": "sha256:9f5b862133519d3b7c995e55fc1be03564b0a8be191a0cf75ddb89b1f6c70ce9"
+          "artifact_inventory_digest": "sha256:2461afe14436f0782bd28b30a20a37931664d524a488d8694a9964d13a48696c"
         },
         "dimensions": {
           "quality": {
@@ -377,7 +377,7 @@
       {
         "schema_version": "1.0.0",
         "object_kind": "evolution_human_decision",
-        "proposal_digest": "sha256:30aaf940a6c461ac4c753dac87b05eae43632ea69cdf38d067ee5e9cd73aa086",
+        "proposal_digest": "sha256:cb716a9bc6ef67bb8896fce3197444617e0dcccd0794a0dc52fa58e57dfb11ea",
         "action": "adopt_candidate",
         "disposition": "approved",
         "reason_codes": [
@@ -390,7 +390,7 @@
           "authority_evidence_digest": "sha256:201a8fbe4edfabea55f79934bad4709cf5704a2c69f34ddf9856c3537bb9285f"
         },
         "authority_implied": false,
-        "decision_digest": "sha256:01e8f2714afb17c6b80da8ec710278e5eefa2e68817caf4efabee43b9ea497ba"
+        "decision_digest": "sha256:35f76367ee68b6c306f2004c97051bb4c1fd4ed71ac16885c80e9f978925ea46"
       }
     ],
     "asset_lifecycle": [],
@@ -494,9 +494,9 @@
           "kind": "external_portfolio_activation_authority",
           "authority_id": "issue-278-sample-human-maintainer",
           "authority_revision": "3",
-          "authority_evidence_digest": "sha256:eec65127c27339503729cec191f4be095016393e3395d6271c4b20fb09218f9f"
+          "authority_evidence_digest": "sha256:8f159987be38d11d76096bf7c198c98b324cca48b6f40cad5e8b694685c85073"
         },
-        "context_digest": "sha256:39008a7221366262524a3d3e5f6c89fbfcc5589bc9f4d2e01b40233ba2f4ac0f"
+        "context_digest": "sha256:92c4d9ae524680aaf2f9028a8a63e2b0e2585821b4de82c7d673e104fb9e647f"
       }
     ],
     "high_impact_approval_grants": []

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -999,6 +999,8 @@ Findings:
     request_sha256: request.request_sha256,
   }, null, 2)}\n`;
   writeFileSync(approvalPath, approvalBytes);
+  const scopedBytesBefore = readFileSync(fakeInvocationPath);
+  const scopedModeBefore = lstatSync(fakeInvocationPath).mode;
   const approvedRiskResult = runNode([
     ...riskArgs,
     "--risk-approval", approvalPath,
@@ -1012,21 +1014,35 @@ Findings:
       ASK_FAKE_STDIN_PATH: ".fixture-codex-invocations",
     },
   });
-  assertPass("exact risk approval executes once", approvedRiskResult);
-  const approvedRiskReport = JSON.parse(approvedRiskResult.stdout);
-  assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.status, "approved");
-  assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.execution_status, "executed");
-  assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.enforcement_status, "accepted");
-  assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.promotion_status, "promoted");
-  assert.deepEqual(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.observed_effects, ["modify"]);
-  assert.deepEqual(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.promoted_paths, [".fixture-codex-invocations"]);
-  assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.rendered_invocation_sha256, `sha256:${hashText(readFileSync(approvedPromptPath))}`);
-  assert.equal(readFileSync(approvedPromptPath, "utf8").includes(request.request_sha256), true, "spawn prompt must contain the exact approved request digest");
-  assert.match(readFileSync(approvedPromptPath, "utf8"), /Operation: write_release_candidate/u, "spawn prompt must contain the exact approved operation");
-  assert.match(readFileSync(approvedPromptPath, "utf8"), /Target scope: \.fixture-codex-invocations/u, "spawn prompt must contain the exact approved target scope");
-  assert.match(readFileSync(approvedPromptPath, "utf8"), /Permitted effects: modify/u, "spawn prompt must contain exact permitted effects");
-  assert.match(readFileSync(approvedPromptPath, "utf8"), /Prohibited effects: external_side_effects, git_metadata_changes, write_outside_target_scope/u, "spawn prompt must contain exact prohibited effects");
-  assert.equal(approvedRiskReport.normalized_adapter_event?.approval?.status, "approved");
+  if (process.platform === "darwin") {
+    assertPass("exact risk approval executes once", approvedRiskResult);
+    const approvedRiskReport = JSON.parse(approvedRiskResult.stdout);
+    assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.status, "approved");
+    assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.execution_status, "executed");
+    assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.enforcement_status, "accepted");
+    assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.promotion_status, "promoted");
+    assert.deepEqual(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.observed_effects, ["modify"]);
+    assert.deepEqual(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.promoted_paths, [".fixture-codex-invocations"]);
+    assert.equal(approvedRiskReport.execution_envelope_record?.envelope?.risk_approval?.rendered_invocation_sha256, `sha256:${hashText(readFileSync(approvedPromptPath))}`);
+    assert.equal(readFileSync(approvedPromptPath, "utf8").includes(request.request_sha256), true, "spawn prompt must contain the exact approved request digest");
+    assert.match(readFileSync(approvedPromptPath, "utf8"), /Operation: write_release_candidate/u, "spawn prompt must contain the exact approved operation");
+    assert.match(readFileSync(approvedPromptPath, "utf8"), /Target scope: \.fixture-codex-invocations/u, "spawn prompt must contain the exact approved target scope");
+    assert.match(readFileSync(approvedPromptPath, "utf8"), /Permitted effects: modify/u, "spawn prompt must contain exact permitted effects");
+    assert.match(readFileSync(approvedPromptPath, "utf8"), /Prohibited effects: external_side_effects, git_metadata_changes, write_outside_target_scope/u, "spawn prompt must contain exact prohibited effects");
+    assert.equal(approvedRiskReport.normalized_adapter_event?.approval?.status, "approved");
+  } else {
+    assert.notEqual(approvedRiskResult.status, 0, "unsupported isolation provider must reject before execution");
+    const rejected = JSON.parse(approvedRiskResult.stdout).execution_envelope_record.envelope.risk_approval;
+    assert.equal(rejected.status, "rejected");
+    assert.equal(rejected.execution_status, "not_executed");
+    assert.equal(rejected.enforcement_status, "not_started");
+    assert.equal(rejected.promotion_status, "not_started");
+    assert.deepEqual(rejected.promoted_paths, []);
+    assert.deepEqual(rejected.observed_effects, []);
+    assert.match(rejected.rejection_reasons.join("\n"), /no supported OS filesystem-isolation provider/u);
+    assert.deepEqual(readFileSync(fakeInvocationPath), scopedBytesBefore);
+    assert.equal(lstatSync(fakeInvocationPath).mode, scopedModeBefore);
+  }
   writeFileSync(fakeInvocationPath, runGit(["show", "HEAD:.fixture-codex-invocations"]).stdout);
   chmodSync(fakeInvocationPath, 0o644);
 

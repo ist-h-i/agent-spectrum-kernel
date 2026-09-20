@@ -632,10 +632,27 @@ function ruleMatches(rule, dimensions) {
   return Object.entries(rule.match).every(([dimension, allowed]) => allowed.includes(dimensions[dimension].conclusion));
 }
 
+export function computeEvolutionArtifactInventoryDigest(dimensions) {
+  if (!dimensions || !compareCanonical(Object.keys(dimensions).sort(compareText), [...DIMENSION_NAMES].sort(compareText))) {
+    throw new Error("Evolution evidence must contain exactly six separate typed dimensions");
+  }
+  return canonicalDigest(Object.fromEntries(DIMENSION_NAMES.map((name) => {
+    const { source_kind, artifact_id, artifact_digest } = dimensions[name];
+    return [name, { source_kind, artifact_id, artifact_digest }];
+  })));
+}
+
+function assertArtifactInventory(authority, dimensions) {
+  if (authority.artifact_inventory_digest !== computeEvolutionArtifactInventoryDigest(dimensions)) {
+    throw new Error("Evolution evaluation authority artifact inventory digest mismatch");
+  }
+}
+
 export function validateEvolutionRecommendation(recommendation) {
   validateSchema(recommendation, SCHEMAS.recommendation, "Evolution recommendation");
   assertSelfDigest(recommendation, "recommendation_digest", computeEvolutionRecommendationDigest, "Evolution recommendation");
   for (const [name, dimension] of Object.entries(recommendation.dimensions)) assertDimensionSemantics(name, dimension);
+  assertArtifactInventory(recommendation.evaluation_authority, recommendation.dimensions);
   if (recommendation.authority_implied !== false) throw new Error("Evolution recommendation must not imply lifecycle authority");
   return recommendation;
 }
@@ -658,6 +675,7 @@ export function deriveEvolutionRecommendation({ experiment, evidence }) {
     throw new Error("Evolution evidence must contain exactly six separate typed dimensions");
   }
   for (const name of DIMENSION_NAMES) assertDimensionSemantics(name, dimensions[name]);
+  assertArtifactInventory(evidence.authority, dimensions);
   if (experiment.causal_design.mode === "factorial_or_ablation_required"
     && evidence.causal_attribution.status === "supported"
     && experiment.causal_design.ablation_evidence_digests.length === 0) {
