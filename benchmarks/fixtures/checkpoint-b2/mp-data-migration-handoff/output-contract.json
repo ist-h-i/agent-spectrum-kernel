@@ -6,9 +6,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:e43bee5687ef5561a15ec873519404797511938c118d21c2ddfd589dd1c0a8a6",
+  "evaluator_public_reference_digest": "sha256:952ed7885b2a3ca19a2c3c31e99778c700ec9f43460642ca1c716a73cdc4230c",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/verification-command-contract.json",
-  "verification_command_contract_digest": "sha256:c5f527b33a0bc43ceb823073b259ddfec67bbe29efba4c4cac018838c830378f",
+  "verification_command_contract_digest": "sha256:767ae87a94c8abef440d674a3fee0ceea67c991ade589868d24fd8ccad48b40a",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:80293663b7bd980087fc2d26c8daa57ad786b3a25f2a98c4fd41f38e5222467d",
   "result_profile": {
@@ -17,7 +17,7 @@
   },
   "declares_findings": false,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:548717c7cb18bf307e9d192a02db2ff81d13ccb4a66fa59250360b757f6b70ea",
-  "evaluator_authority_manifest_digest": "sha256:c524b19bbba9eb04ef99df082915d010bd2f098b127ac740c0f19bba69581ec3",
-  "output_contract_digest": "sha256:0acd4956189cd5ecd529905429f8c3eb331cc7091f84063b7635675f0d656a40"
+  "evaluator_authority_manifest_raw_sha256": "sha256:9712c140f806b794de55b7d3255f49ecb6d26ed8741ec2988ef49c661569ace2",
+  "evaluator_authority_manifest_digest": "sha256:bb44757f2e7516fe722a7c43b6f458ca4fdc0449eca7c3f67e372ad8a5d5ed7c",
+  "output_contract_digest": "sha256:4f14bc31bfcb34c8dd32c032adb8eccfbc9ec5764c3c6b81ce0374d886a38af9"
 }

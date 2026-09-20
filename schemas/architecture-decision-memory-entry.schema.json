@@ -17,6 +17,8 @@
     "consequences",
     "evidence_source",
     "evidence_status",
+    "authority_status",
+    "record_state",
     "related_adr",
     "related_project_overlay_rule",
     "related_engineering_pattern",
@@ -39,9 +41,10 @@
     "consequences": { "type": "string", "minLength": 1 },
     "evidence_source": { "type": "string", "minLength": 1 },
     "evidence_status": {
-      "type": "string",
-      "enum": ["Verified", "Human-confirmed", "Supported", "Hypothesis", "Deprecated", "Contradicted"]
+      "$ref": "claim-evidence-status.schema.json"
     },
+    "authority_status": { "type": "string", "enum": ["not_asserted", "human_confirmed"] },
+    "record_state": { "type": "string", "enum": ["active", "deprecated", "contradicted"] },
     "related_adr": { "type": "string", "minLength": 1 },
     "related_project_overlay_rule": { "type": "string", "minLength": 1 },
     "related_engineering_pattern": { "type": "string", "minLength": 1 },

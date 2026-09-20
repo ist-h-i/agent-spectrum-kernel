@@ -73,8 +73,10 @@ Use these statuses for important claims:
 | `Verified` | Directly observed in repo files, docs, tests, runtime output, command output, or user input. |
 | `Supported` | Backed by indirect evidence but not fully proven. |
 | `Hypothesis` | Plausible inference that needs confirmation before being used as fact. |
-| `Human-confirmed` | Confirmed by a human owner in the current or prior documented implementation context. |
 | `Unknown` | Not inspected, unavailable, ambiguous, or outside current evidence. |
+| `Falsified` | Direct evidence contradicts the claim and requires correction. |
+
+Use `ask.claim-evidence-status@1.0.0`; record human confirmation in source/owner metadata, not as another status.
 
 ## Process
 
@@ -128,7 +130,7 @@ Use these statuses for important claims:
    - Set `evidence_owner` to the human, agent, team, or source responsible for the update.
    - Set `source_scope` to the repository paths, docs, package/build files, tests, or human input scope inspected.
    - Use `stale` when existing context is known or strongly suspected to lag behind changed source evidence; do not silently rely on stale claims.
-   - Preserve existing `Human-confirmed` content unless contradicted by newer evidence.
+   - Preserve content with explicit human authority metadata unless contradicted by newer evidence; re-evaluate its claim status separately.
    - Keep task progress out of this file.
    - Keep stack-specific rules in overlay hooks or linked project overlay files.
    - Add update triggers so future agents know when context may be stale.

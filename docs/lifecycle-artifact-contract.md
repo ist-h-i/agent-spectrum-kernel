@@ -83,6 +83,8 @@ Conditional fields, included only when present:
 
 An unresolved human decision remains unresolved. Its absence from a later artifact is not approval.
 
+When a lifecycle artifact records the truth strength of a claim, it uses `ask.claim-evidence-status@1.0.0`. Artifact type, delta precedence, ownership, completion, and superseding state remain lifecycle semantics and are not claim statuses.
+
 ## Spec
 
 Required fields:
@@ -135,7 +137,32 @@ The Work Package is executable only when required business and design decisions 
 
 When current epic-admission policy requires multiple packages, `docs/epic-admission-work-package-plan-contract.md` governs the optional control-plane aggregate. A Work Package Plan contains Work Package-owned projections plus typed plan-local topology. Each entry retains lifecycle `dependencies` for free-form or external prerequisites; its separate `depends_on_package_ids` field carries only plan-local DAG edges. `projectWorkPackagePlanEntryToLifecycleArtifact` maps the owned scope, tasks, dependencies, stops, and evidence expectations into this contract's Work Package shape, and the `work-package-plan-projection` lifecycle fixture plus repository validation guard that mapping. The aggregate is not a new lifecycle stage, does not own acceptance meaning, and does not prove implementation approval, verification, review, or merge readiness.
 
+## Verification proof path selection
+
+When verification applies before an implementation completion claim,
+`ask.verification-proof-policy@1.0.0` selects exactly one `compact_proof` or
+`formal_verification_contract` path. The canonical closed eligibility facts,
+formal triggers, record shapes, and transition constraints live only in
+`schemas/verification-proof-policy.schema.json`; their responsibility and
+meaning are documented in `docs/verification-proof-policy-contract.md`.
+
+Compact Proof is a Verification-stage artifact for one evidenced localized
+completion. It is not the generic lifecycle artifact whose `artifact_type` is
+`compact`, the localized no-claim trace exemption, or the Codex compact runtime
+profile. It cannot support merge, release, or another claim protected by a
+formal trigger. Missing or ambiguous compact eligibility selects the formal
+path.
+
+The only path transition is compact to formal. Upgrade retains prior executed
+evidence references, while the formal path remains absorbing and supplies any
+new obligations. Existing Formal Verification Contract artifacts stay readable
+without rewriting. Implementation records reference the selected proof
+selection/artifact and evidence; they do not copy unchanged proof fields.
+
 ## Verification Contract
+
+The following existing shape remains the Formal Verification Contract used by
+`formal_verification_contract` selections.
 
 Required fields:
 
@@ -194,6 +221,10 @@ Do not copy goal, non-goals, expected behavior, acceptance criteria, allowed/for
 
 Missing upstream artifacts do not force synthetic reconstruction. Produce the smallest artifact required by the current task and set `upstream_refs` only for artifacts that exist.
 
+The generic compact lifecycle path below combines localized lifecycle
+boundaries. It does not select `compact_proof`; verification proof-path
+selection is governed separately by `ask.verification-proof-policy@1.0.0`.
+
 For trivial or localized work, one compact artifact may carry multiple boundaries if it keeps them distinguishable. It remains a referenceable artifact and follows the same identity and delta rules:
 
 ```text
@@ -230,7 +261,9 @@ Stop and report the conflicting references when:
 Requirement Contract (business decision)
   -> Spec (observable behavior delta)
   -> Work Package (executable change boundary)
-  -> Verification Contract (proof obligations; reusable before/after implementation)
+  -> Verification proof selected by ask.verification-proof-policy@1.0.0
+       -> Compact Proof (localized completion only), or
+       -> Formal Verification Contract (proof obligations; reusable before/after implementation)
   -> Implementation Contract (implementation-only decisions, record, and evidence refs)
 ```
 

@@ -1,0 +1,490 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/skill-effectiveness-outcome.schema.json",
+  "title": "ASK one-task Skill effectiveness outcome",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_kind",
+    "outcome_id",
+    "task_id",
+    "skill_id",
+    "subject",
+    "observations",
+    "dimensions",
+    "recommendation",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "object_kind": { "type": "string", "const": "skill_effectiveness_outcome" },
+    "outcome_id": { "$ref": "#/$defs/stableId" },
+    "task_id": { "$ref": "#/$defs/stableId" },
+    "skill_id": { "$ref": "#/$defs/stableId" },
+    "subject": { "$ref": "#/$defs/subject" },
+    "observations": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 256,
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "dimensions": { "$ref": "#/$defs/dimensions" },
+    "recommendation": { "$ref": "#/$defs/recommendation" },
+    "limitations": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlankText" }
+    }
+  },
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@/+~-]*$"
+    },
+    "nonBlankText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": ".*\\S.*"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "evaluation_subject"],
+      "properties": {
+        "scope": { "type": "string", "const": "one_task_workflow_retrospective" },
+        "evaluation_subject": { "type": "string", "const": "workflow_and_artifacts" }
+      }
+    },
+    "dimensionId": {
+      "type": "string",
+      "enum": [
+        "outcome_quality",
+        "false_positive_control",
+        "safety",
+        "routing_quality",
+        "evidence_quality",
+        "overhead",
+        "reuse_value"
+      ]
+    },
+    "metricId": {
+      "type": "string",
+      "enum": [
+        "valid_findings",
+        "missed_findings",
+        "requirements_satisfied",
+        "scope_deviations",
+        "verification_overclaims",
+        "completion_overclaims",
+        "false_positive_findings",
+        "guardrail_violations",
+        "route_mismatches",
+        "under_processing_decisions",
+        "over_processing_decisions",
+        "unsupported_overclaims",
+        "task_tokens",
+        "task_duration_ms",
+        "tool_calls",
+        "artifacts_produced",
+        "participating_agents",
+        "human_corrections",
+        "human_investigation_ms",
+        "human_rework_ms",
+        "task_cost_usd_micros",
+        "reusable_artifacts"
+      ]
+    },
+    "nativeValue": {
+      "oneOf": [
+        { "type": "integer", "minimum": 0 },
+        { "type": "null" }
+      ]
+    },
+    "signedNativeDelta": {
+      "oneOf": [
+        { "type": "integer" },
+        { "type": "null" }
+      ]
+    },
+    "nullableText": {
+      "oneOf": [
+        { "$ref": "#/$defs/nonBlankText" },
+        { "type": "null" }
+      ]
+    },
+    "nullableToken": {
+      "oneOf": [
+        { "$ref": "#/$defs/token" },
+        { "type": "null" }
+      ]
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "basis",
+        "reference_value",
+        "delta",
+        "materiality_threshold",
+        "rule_ref",
+        "evidence_refs",
+        "evidence_status",
+        "impact",
+        "limitation"
+      ],
+      "properties": {
+        "status": { "type": "string", "enum": ["established", "unknown"] },
+        "basis": { "type": "string", "enum": ["direct_metric_rule", "observed_comparison", "evidence_gap"] },
+        "reference_value": { "$ref": "#/$defs/nativeValue" },
+        "delta": { "$ref": "#/$defs/signedNativeDelta" },
+        "materiality_threshold": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "null" }
+          ]
+        },
+        "rule_ref": { "$ref": "#/$defs/nullableToken" },
+        "evidence_refs": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/token" }
+        },
+        "evidence_status": { "$ref": "claim-evidence-status.schema.json" },
+        "impact": {
+          "type": "string",
+          "enum": ["beneficial", "neutral", "burdensome", "harmful", "unknown"]
+        },
+        "limitation": { "$ref": "#/$defs/nullableText" }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "dimension",
+        "metric_id",
+        "unit",
+        "measurement_status",
+        "value",
+        "metric_definition",
+        "source_ref",
+        "evidence_refs",
+        "evidence_status",
+        "effect",
+        "limitation"
+      ],
+      "properties": {
+        "observation_id": { "$ref": "#/$defs/stableId" },
+        "dimension": { "$ref": "#/$defs/dimensionId" },
+        "metric_id": { "$ref": "#/$defs/metricId" },
+        "unit": { "$ref": "#/$defs/token" },
+        "measurement_status": {
+          "type": "string",
+          "enum": ["observed", "unknown", "unavailable"]
+        },
+        "value": { "$ref": "#/$defs/nativeValue" },
+        "metric_definition": { "$ref": "#/$defs/nonBlankText" },
+        "source_ref": { "$ref": "#/$defs/nonBlankText" },
+        "evidence_refs": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/token" }
+        },
+        "evidence_status": { "$ref": "claim-evidence-status.schema.json" },
+        "effect": { "$ref": "#/$defs/effect" },
+        "limitation": { "$ref": "#/$defs/nullableText" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["metric_id", "measurement_status"],
+            "properties": {
+              "metric_id": { "const": "guardrail_violations" },
+              "measurement_status": { "const": "observed" }
+            }
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "properties": {
+                  "status": { "const": "established" },
+                  "basis": { "const": "direct_metric_rule" },
+                  "reference_value": { "type": "null" },
+                  "delta": { "type": "null" },
+                  "materiality_threshold": { "type": "null" },
+                  "rule_ref": { "const": "ask.skill-effectiveness.metric.guardrail_violations@1.0.0" },
+                  "evidence_refs": { "minItems": 1 },
+                  "evidence_status": { "enum": ["Verified", "Supported"] },
+                  "limitation": { "type": "null" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["metric_id", "measurement_status", "value"],
+            "properties": {
+              "metric_id": { "const": "guardrail_violations" },
+              "measurement_status": { "const": "observed" },
+              "value": { "const": 0 }
+            }
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "properties": {
+                  "impact": { "const": "neutral" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["metric_id", "measurement_status", "value"],
+            "properties": {
+              "metric_id": { "const": "guardrail_violations" },
+              "measurement_status": { "const": "observed" },
+              "value": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "properties": {
+                  "impact": { "const": "harmful" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "dimensionBasis": {
+      "type": "string",
+      "enum": [
+        "beneficial_observation",
+        "no_material_change",
+        "disproportionate_overhead",
+        "harmful_observation",
+        "evidence_gap"
+      ]
+    },
+    "dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "basis", "observation_refs"],
+      "properties": {
+        "classification": {
+          "$ref": "effectiveness-decision-vocabulary.schema.json#/$defs/dimensionClassification"
+        },
+        "basis": { "$ref": "#/$defs/dimensionBasis" },
+        "observation_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/stableId" }
+        }
+      }
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_quality",
+        "false_positive_control",
+        "safety",
+        "routing_quality",
+        "evidence_quality",
+        "overhead",
+        "reuse_value"
+      ],
+      "properties": {
+        "outcome_quality": { "$ref": "#/$defs/dimension" },
+        "false_positive_control": { "$ref": "#/$defs/dimension" },
+        "safety": { "$ref": "#/$defs/dimension" },
+        "routing_quality": { "$ref": "#/$defs/dimension" },
+        "evidence_quality": { "$ref": "#/$defs/dimension" },
+        "overhead": { "$ref": "#/$defs/dimension" },
+        "reuse_value": { "$ref": "#/$defs/dimension" }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "scope", "rule_ref", "reason_codes", "authority_implied"],
+      "properties": {
+        "value": {
+          "$ref": "effectiveness-decision-vocabulary.schema.json#/$defs/overallRecommendation"
+        },
+        "scope": { "type": "string", "const": "next_similar_task_workflow_only" },
+        "rule_ref": { "type": "string", "const": "ask.skill-effectiveness-decision@1.0.0" },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/token" }
+        },
+        "authority_implied": { "type": "boolean", "const": false }
+      }
+    }
+  },
+  "x-ask-contract": {
+    "id": "ask.skill-effectiveness-outcome",
+    "revision": "1.0.0",
+    "ref": "ask.skill-effectiveness-outcome@1.0.0"
+  },
+  "x-ask-metric-catalog": {
+    "valid_findings": {
+      "dimension": "outcome_quality",
+      "unit": "finding",
+      "definition": "Count of task-relevant findings accepted in the completed artifact.",
+      "effect_rule": "comparison_higher_is_better"
+    },
+    "missed_findings": {
+      "dimension": "outcome_quality",
+      "unit": "finding",
+      "definition": "Count of task-relevant findings missed by the completed workflow.",
+      "effect_rule": "comparison_lower_is_better"
+    },
+    "requirements_satisfied": {
+      "dimension": "outcome_quality",
+      "unit": "requirement",
+      "definition": "Count of scoped requirements satisfied by the completed artifact.",
+      "effect_rule": "comparison_higher_is_better"
+    },
+    "scope_deviations": {
+      "dimension": "outcome_quality",
+      "unit": "deviation",
+      "definition": "Count of task scope deviations established by review evidence.",
+      "effect_rule": "comparison_lower_is_better"
+    },
+    "verification_overclaims": {
+      "dimension": "outcome_quality",
+      "unit": "claim",
+      "definition": "Count of verification claims that exceeded completed verification evidence.",
+      "effect_rule": "comparison_lower_is_better"
+    },
+    "completion_overclaims": {
+      "dimension": "outcome_quality",
+      "unit": "claim",
+      "definition": "Count of completion claims that exceeded completed task evidence.",
+      "effect_rule": "comparison_lower_is_better"
+    },
+    "false_positive_findings": {
+      "dimension": "false_positive_control",
+      "unit": "finding",
+      "definition": "Count of reported findings rejected as false positives during task review.",
+      "effect_rule": "comparison_lower_is_better"
+    },
+    "guardrail_violations": {
+      "dimension": "safety",
+      "unit": "violation",
+      "definition": "Count of task guardrail violations established by the recorded review evidence.",
+      "effect_rule": "direct_nonzero_harmful",
+      "direct_rule_ref": "ask.skill-effectiveness.metric.guardrail_violations@1.0.0"
+    },
+    "route_mismatches": {
+      "dimension": "routing_quality",
+      "unit": "route_decision",
+      "definition": "Count of selected routes contradicted by the completed task evidence.",
+      "effect_rule": "comparison_lower_is_better"
+    },
+    "under_processing_decisions": {
+      "dimension": "routing_quality",
+      "unit": "route_decision",
+      "definition": "Count of route decisions that omitted a gate required by observed task evidence.",
+      "effect_rule": "comparison_lower_is_better"
+    },
+    "over_processing_decisions": {
+      "dimension": "routing_quality",
+      "unit": "route_decision",
+      "definition": "Count of route decisions that added a heavy gate without an observed trigger.",
+      "effect_rule": "comparison_lower_is_better"
+    },
+    "unsupported_overclaims": {
+      "dimension": "evidence_quality",
+      "unit": "claim",
+      "definition": "Count of material task claims that exceeded their recorded evidence.",
+      "effect_rule": "comparison_lower_is_better"
+    },
+    "task_tokens": {
+      "dimension": "overhead",
+      "unit": "token",
+      "definition": "Total recorded model tokens used for the completed task.",
+      "effect_rule": "comparison_lower_is_better_overhead"
+    },
+    "task_duration_ms": {
+      "dimension": "overhead",
+      "unit": "millisecond",
+      "definition": "Recorded elapsed duration of the completed task in milliseconds.",
+      "effect_rule": "comparison_lower_is_better_overhead"
+    },
+    "tool_calls": {
+      "dimension": "overhead",
+      "unit": "tool_call",
+      "definition": "Count of recorded tool calls used for the completed task.",
+      "effect_rule": "comparison_lower_is_better_overhead"
+    },
+    "artifacts_produced": {
+      "dimension": "overhead",
+      "unit": "artifact",
+      "definition": "Count of artifacts produced during the completed task.",
+      "effect_rule": "comparison_lower_is_better_overhead"
+    },
+    "participating_agents": {
+      "dimension": "overhead",
+      "unit": "agent",
+      "definition": "Count of agents that participated in the completed task workflow.",
+      "effect_rule": "comparison_lower_is_better_overhead"
+    },
+    "human_corrections": {
+      "dimension": "overhead",
+      "unit": "correction",
+      "definition": "Count of measured human corrections required by the completed task output.",
+      "effect_rule": "comparison_lower_is_better_overhead"
+    },
+    "human_investigation_ms": {
+      "dimension": "overhead",
+      "unit": "millisecond",
+      "definition": "Measured human investigation duration attributable to the completed task in milliseconds.",
+      "effect_rule": "comparison_lower_is_better_overhead"
+    },
+    "human_rework_ms": {
+      "dimension": "overhead",
+      "unit": "millisecond",
+      "definition": "Measured human rework duration attributable to the completed task in milliseconds.",
+      "effect_rule": "comparison_lower_is_better_overhead"
+    },
+    "task_cost_usd_micros": {
+      "dimension": "overhead",
+      "unit": "usd_micro",
+      "definition": "Measured direct task cost in millionths of a US dollar without ROI attribution.",
+      "effect_rule": "comparison_lower_is_better_overhead"
+    },
+    "reusable_artifacts": {
+      "dimension": "reuse_value",
+      "unit": "artifact",
+      "definition": "Count of task artifacts accepted for reuse in a later workflow.",
+      "effect_rule": "comparison_higher_is_better"
+    }
+  }
+}

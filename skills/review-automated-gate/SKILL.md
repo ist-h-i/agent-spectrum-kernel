@@ -43,6 +43,8 @@ Status: pass | fail | skipped | not run | insufficient
 
 ## Output
 
+An actionable failed-check finding follows `ask.review-finding@1.0.0` in `docs/review-finding-contract.md`. Missing or not-run checks normally remain Missing evidence rather than synthetic findings.
+
 ```text
 Automated gate:
 - Required checks:
@@ -52,6 +54,16 @@ Automated gate:
 - Coverage limits:
 - Gate status: pass | fail | insufficient
 - Next command:
+
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: automated-evidence
 ```
 
 ## Exit criteria
@@ -59,6 +71,7 @@ Automated gate:
 - Commands and results are exact when available.
 - Missing or skipped checks have reasons.
 - Coverage limits are explicit.
+- Any actionable failed-check finding uses the closed common finding fields.
 - No merge decision is made here.
 
 ## Failure modes

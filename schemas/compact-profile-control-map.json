@@ -20,11 +20,14 @@
       "cleanup_boundary": "separate"
     },
     "verification": {
-      "source_refs": ["AGENTS.md", "skills/test-first-verification/SKILL.md"],
-      "verification_contract_before_behavior_change": true,
+      "source_refs": ["AGENTS.md", "docs/verification-proof-policy-contract.md", "schemas/verification-proof-policy.schema.json", "skills/test-first-verification/SKILL.md"],
+      "proof_policy_ref": "ask.verification-proof-policy@1.0.0",
+      "proof_policy_schema_ref": "schemas/verification-proof-policy.schema.json",
+      "proof_path_selected_before_implementation_claim": true,
       "focused_check_first": true,
       "broader_checks_proportional_to_risk": true,
-      "exact_results_required": true
+      "exact_results_required": true,
+      "compact_to_formal_upgrade_required": true
     },
     "risk_approval": {
       "source_refs": ["AGENTS.md", "skills/risk-gate/SKILL.md"],
@@ -40,8 +43,11 @@
       "stop_without_approval": true
     },
     "evidence": {
-      "source_refs": ["AGENTS.md", "skills/evidence-ledger/SKILL.md"],
-      "truth_statuses": ["Verified", "Supported", "Hypothesis", "Unknown", "Falsified"],
+      "source_refs": ["AGENTS.md", "docs/claim-evidence-status-contract.md", "schemas/claim-evidence-status.schema.json"],
+      "contract_ref": "ask.claim-evidence-status@1.0.0",
+      "schema_ref": "schemas/claim-evidence-status.schema.json",
+      "inline_default": true,
+      "formal_ledger_trigger_ids": ["explicit_claim_audit", "multiple_material_claims", "high_stakes_readiness", "cross_artifact_synthesis", "stable_claim_ids"],
       "claims_require_evidence": true,
       "unsupported_claim_behavior": "downgrade"
     },
@@ -54,7 +60,10 @@
     "output": {
       "source_refs": ["docs/execution-envelope-contract.md"],
       "required_sections_from_prompt_contract": true,
-      "execution_envelope_count": 1,
+      "managed_runner_ordinary": "sidecar",
+      "managed_runner_protected": "inline_required",
+      "managed_runner_diagnostic": "explicit_only",
+      "unmanaged_compatibility": "inline_required",
       "next_action_location": "execution_envelope_only"
     }
   },
@@ -99,6 +108,13 @@
         "id": "long_running_or_multi_agent",
         "signal": "work spans sessions or agents",
         "contract": "planning-with-files",
+        "action": "apply_before_primary",
+        "missing_contract_behavior": "capability_missing"
+      },
+      {
+        "id": "explicit_knowledge_promotion",
+        "signal": "the user explicitly requests durable knowledge promotion",
+        "contract": "domain-rule-ledger",
         "action": "apply_before_primary",
         "missing_contract_behavior": "capability_missing"
       }

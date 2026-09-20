@@ -55,7 +55,7 @@ It is not for:
 - blocking read-only investigation or local verification,
 - turning route mismatch into an automatic work blocker.
 
-Route override remains allowed when the agent records the default route, selected route, and reason. The exception is a true required `risk-gate`; risky action approval cannot be bypassed by route override.
+Route override remains allowed when the agent records the default route, selected route, and reason. A `risk-gate` selected inside a managed read-only review is an evaluation gate and does not authorize or perform the risky action. A true risky action still requires specific-action approval and cannot bypass it by route override.
 
 ## User-Facing Work Modes
 
@@ -64,14 +64,14 @@ Users do not need to know skill names to start work. The default surface is a sm
 | User-facing intent | Example request | Selected work mode | Internal route family |
 |---|---|---|---|
 | 進める / proceed with this ticket or task | このチケットを進めて | 要件確認 / 実装準備 / 実装 | requirement, work package, implementation |
-| レビューする / review a PR, diff, design, or output | このPRをレビューして | レビュー | review-router and required gates |
+| レビューする / review a PR, diff, design, or output | このPRをレビューして | レビュー | review-router, mandatory baseline, and exact-signal additional gates |
 | 調べる / investigate a bug, regression, or uncertainty | このバグを調べて | 調査 | doubt-driven-development and verification |
 | 詰める / refine requirement, design, architecture, or decision | この設計を詰めて | 要件確認 / 設計 | requirement, design, architecture |
 | 作業化する / convert to agent-ready work | Codexに渡せる形にして | 実装準備 | work-package |
 | 整理する / document, summarize, or hand off | この状態を整理して | ドキュメント整理 | documentation, handoff |
 | 活かす / preserve review findings or corrections | この指摘を次に活かして | 知識蓄積 | finding, ledger, documentation |
 
-Default route output uses one shared Execution Envelope. The envelope separates user-facing work terms from internal routing and is emitted once per meaningful workflow boundary:
+Default route output uses one shared Execution Envelope. The envelope separates user-facing work terms from internal routing. The JSON below illustrates the canonical payload; a managed ordinary boundary persists it as a runner-owned sidecar, while protected/handoff and explicit compatibility boundaries serialize it once:
 
 Execution Envelope:
 ```json

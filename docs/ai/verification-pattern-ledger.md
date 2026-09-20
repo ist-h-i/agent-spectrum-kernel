@@ -24,14 +24,7 @@ This file recommends evidence. It does not prove current task behavior and must 
 
 ## Evidence Status Key
 
-| Status | Meaning |
-|---|---|
-| `Verified` | Directly supported by tests, CI, validation scripts, runtime checks, or release evidence. |
-| `Human-confirmed` | Confirmed by a responsible human or owner. |
-| `Supported` | Backed by indirect evidence or repeated task outcomes. |
-| `Hypothesis` | Test idea only; cannot justify pass/fail conclusions. |
-| `Deprecated` | Old check retained for context but no longer recommended. |
-| `Contradicted` | Conflicts with current repo behavior or evidence. |
+Use `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`. Record human confirmation in `Authority status` and pattern lifecycle/conflict in `Record state`.
 
 ## Entry ID Convention
 
@@ -59,6 +52,8 @@ VP-0003
 | Do not use when | yes | Conditions where the pattern is not sufficient. |
 | Evidence source | yes | PR, issue, incident, CI, tests, runtime output, docs, or human confirmation. |
 | Evidence status | yes | One of the evidence statuses above. |
+| Authority status | yes | `not_asserted` or `human_confirmed`. |
+| Record state | yes | `active`, `deprecated`, or `contradicted`. |
 | Related files / modules | yes | Paths, modules, or `none`. |
 | Related domain rules | yes | Domain rule IDs, or `none`. |
 | Related engineering patterns | yes | Engineering pattern IDs, or `none`. |
@@ -67,12 +62,12 @@ VP-0003
 
 ## Verification Pattern Entries
 
-| ID | Change type | Risk class | Required evidence | Recommended focused commands | Negative cases | Regression history | Known flaky areas | Applies when | Do not use when | Evidence source | Evidence status | Related files / modules | Related domain rules | Related engineering patterns | Staleness trigger | Owner |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Change type | Risk class | Required evidence | Recommended focused commands | Negative cases | Regression history | Known flaky areas | Applies when | Do not use when | Evidence source | Evidence status | Authority status | Record state | Related files / modules | Related domain rules | Related engineering patterns | Staleness trigger | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 <!--
 Example active row:
-| VP-0001 | Auth guard behavior | high | Unit test for allowed and denied states plus integration route check | npm test -- auth-guard | expired session; missing role | Incident INC-42 | none | Route authorization changes | Copy-only docs changes | Merged PR #123 and CI run #456 | Verified | src/auth; src/routes | DR-0004 | EP-0002 | Auth role model or router changes | platform-team |
+| VP-0001 | Auth guard behavior | high | Unit test for allowed and denied states plus integration route check | npm test -- auth-guard | expired session; missing role | Incident INC-42 | none | Route authorization changes | Copy-only docs changes | Merged PR #123 and CI run #456 | Verified | not_asserted | active | src/auth; src/routes | DR-0004 | EP-0002 | Auth role model or router changes | platform-team |
 -->
 
 ## Stale Pattern Review

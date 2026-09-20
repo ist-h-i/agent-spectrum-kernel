@@ -9,7 +9,7 @@ Start from what the user wants to do. The internal route can name skills, but th
 | User wants to... | Say this | Selected work mode | System should route to... |
 |---|---|---|---|
 | Move a ticket forward | このチケットを進めて | 要件確認 / 実装準備 / 実装 | requirement / work package / implementation route |
-| Review a PR, diff, design, or output | このPRをレビューして | レビュー | review-router and required gates |
+| Review a PR, diff, design, or output | このPRをレビューして | レビュー | review-router, mandatory baseline, and exact-signal additional gates |
 | Investigate a bug or uncertainty | このバグを調べて | 調査 | doubt-driven-development and verification route |
 | Refine a requirement, design, architecture, or decision | この設計を詰めて | 要件確認 / 設計 | requirement / design / architecture route |
 | Prepare work for an agent | Codexに渡せる形にして | 実装準備 | work-package route |
@@ -61,34 +61,34 @@ Current-task blockers stay in execution/review output. A knowledge-plane candida
 | Reusable verification expectation creation, refresh, deprecation, or contradiction | `verification-pattern-ledger` | `test-first-verification`, `work-package-compiler`, `review-automated-gate`, `review-final-merge-gate`, and `release-readiness-gate` consume matching entries | Verification pattern with required evidence, focused commands, negative cases, regression history, flaky areas, and stale trigger |
 | Reusable architecture or boundary decision memory below ADR level | `architecture-decision-memory` | `adr-review` when formal ADR action is needed; `application-boundary-architecture` when mechanics are unresolved; `review-architecture-impact` when reviewing diffs | Architecture memory with alternatives, accepted option, tradeoffs, consequences, evidence status, related ADR, and revisit condition |
 | Repeated implementation context setup | `implementation-context-generation` | `repository-orientation` for repo facts before drafting context | Durable implementation context with evidence-status-labeled stack, commands, patterns, boundaries, overlays, stop conditions, and update triggers |
-| New feature or user-visible behavior | `spec-driven-development` | `work-package-compiler` when packaging is needed -> `test-first-verification` for a reusable Verification Contract -> `controlled-implementation` -> evidence | Referenced Spec, executable Work Package, reusable Verification Contract, implementation-only record, and evidence refs |
-| Clear non-trivial implementation | `controlled-implementation` | consume upstream refs; `test-first-verification` defines or reuses the Verification Contract | Implementation-only decisions, actual change boundary, deviations, evidence refs, limitations, and handoff state |
+| New feature or user-visible behavior | `spec-driven-development` | `work-package-compiler` when packaging is needed -> `test-first-verification` selects Compact Proof or Formal Verification Contract through `ask.verification-proof-policy@1.0.0` -> `controlled-implementation` -> evidence | Referenced Spec, executable Work Package, selected proof ref, implementation-only record, and evidence refs |
+| Clear non-trivial implementation | `controlled-implementation` | consume upstream refs; `test-first-verification` selects or reuses one proof path before implementation claims | Implementation-only decisions, actual change boundary, selected proof ref, deviations, evidence refs, limitations, and handoff state |
 | Approved behavior-preserving refactor implementation | `refactor-implementation` | `test-first-verification` for regression proof; `application-boundary-architecture` first if responsibility, dependency direction, public contract, schema, UI behavior, or ownership boundaries may move; `improvement-ledger` for follow-up debt or prevention candidates | Refactor objective, behavior-preservation contract, allowed/forbidden scope, boundary decision, regression evidence, and before/after structure; ambiguous candidates get a smallest-safe-target proposal before editing |
 | Multi-step task likely to span sessions | `planning-with-files` | `handoff-generation` | Durable planning state and next task |
-| Risk of scope creep/refactor sprawl | `scope-control` | `controlled-implementation` if proceeding to code; review phase uses `review-router` -> required gates, with scope findings generally routed to `review-ai-quality` | Scope contract, scoped implementation path, or review route |
-| Bug, regression, or unknown root cause | `doubt-driven-development` | `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof | Hypothesis, reproduction evidence, Verification Contract, scoped fix, regression proof |
+| Risk of scope creep/refactor sprawl | `scope-control` | `controlled-implementation` if proceeding to code; review phase uses `review-router` -> mandatory `review-ai-quality` baseline -> exact-signal additional gates | Scope contract, scoped implementation path, or review route |
+| Bug, regression, or unknown root cause | `doubt-driven-development` | `test-first-verification` selects Formal Verification Contract for reproduction/regression -> `controlled-implementation` -> `test-first-verification` for regression proof | Hypothesis, reproduction evidence, Formal Verification Contract, scoped fix, regression proof |
 | Hard-to-reverse architecture decision or ADR need | `adr-review` | `grill-with-docs`; `application-boundary-architecture` if boundary mechanics are unresolved | ADR action and decision record |
-| PR/diff/commit review | `review-router` | `review-code-health` when debt, smell, refactor, dependency/tooling, or repeated-finding analysis is applicable; `review-architecture-impact` when structural or boundary impact may exist; `review-output-quality` when consumer-facing or machine-consumed output may change; `review-adversarial-risk` when severe failure paths or blast radius may exist; `review-final-merge-gate` for the final decision; `improvement-ledger` only when non-blocking follow-up needs durable tracking | Change signals, required gates, gate evidence, merge decision, and optional improvement-ledger candidates / rule feedback / deferred code-health risks when applicable |
+| PR/diff/commit review | `review-router` | `review-ai-quality` exactly once as the signal-independent baseline; exact-signal additional gates such as `review-code-health`, `review-architecture-impact`, `review-output-quality`, and `review-adversarial-risk`; `review-final-merge-gate` last only for a requested final decision; `improvement-ledger` only when non-blocking follow-up needs durable tracking | Baseline result, additional gate evidence, missing evidence, one impact-ordered finding inventory, and optional merge decision |
 | Repeated or high-impact review findings should become prevention knowledge | `review-finding-compiler` | Route domain/business rules to `review-to-rule-compiler`; non-blocking work to `improvement-ledger`; implementation and verification lessons to their ledgers | Review rule candidate, prevention target, current PR blocker policy, false-positive risk, suppression rule, and durable routing |
 | Domain behavior or business-rule review | `review-domain-impact` | `review-router` selects it when domain impact may exist; `review-to-rule-compiler` after review only for rule candidates | Domain input sources, domain rule checks, AI-verifiable checks, human decision points, and domain impact decision |
 | Technical debt / code smell / refactor candidate review | `review-router` | `review-code-health`; specialized gates only when findings cross into architecture, adversarial, risk, or evidence concerns | Evidence-backed code-health findings with category, severity, urgency, recommended action, scope guidance, and AI-rule feedback |
-| Persist non-blocking review findings / debt / rule feedback | `improvement-ledger` | `review-code-health` only if findings still need detection; `evidence-ledger` if readiness or resolution claims need evidence classification | Ledger entries with ID, source, evidence, impact, decision, prevention target, owner/status, refresh rule, and close condition |
-| Convert repeated findings into prevention rules or checks | `improvement-ledger` | `evidence-ledger` if repeat pattern, readiness, or conversion claims need evidence classification | Prevention-rule feedback with repeat pattern, target, proposed rule/check, evidence, scope, and convert/defer/reject/needs-more-evidence decision |
+| Persist non-blocking review findings / debt / rule feedback | `improvement-ledger` | `review-code-health` only if findings still need detection; apply claim status inline, with formal `evidence-ledger` only for a closed audit trigger | Ledger entries with ID, source, evidence, impact, decision, prevention target, owner/status, refresh rule, and close condition |
+| Convert repeated findings into prevention rules or checks | `improvement-ledger` | Apply claim status inline; formal `evidence-ledger` only for a closed audit trigger | Prevention-rule feedback with repeat pattern, target, proposed rule/check, evidence, scope, and convert/defer/reject/needs-more-evidence decision |
 | Durable domain rule creation, update, stale review, contradiction handling, or promotion gates | `domain-rule-ledger` | `review-to-rule-compiler` first when extracting candidates from reviews or corrections | Domain rule ledger update with evidence status, promotion decision, stale/contradiction handling, and consumers to refresh |
 | Extract domain rule candidates from reviews, human corrections, incidents, or rejected AI outputs | `review-to-rule-compiler` | `domain-rule-ledger` only when explicitly updating durable rules | Rule extraction with candidates, updated/contradicted/deprecated rules, evidence status, and required human confirmation |
-| Evaluate whether selected skills helped one completed task | `skill-effectiveness-evaluation` | `evidence-ledger` if claims need evidence status | Routing quality, outcome value, evidence quality, overhead, missed coverage, and follow-up recommendation |
+| Evaluate whether selected skills helped one completed task | `skill-effectiveness-evaluation` | Apply `ask.claim-evidence-status@1.0.0` inline; use formal `evidence-ledger` only when a closed audit trigger applies | Closed-catalog native-unit measurements, derived effects, seven evidence-bound classifications, explicit limitations, and a scoped non-authoritative recommendation |
 | Track adoption maturity and impact over multiple tasks | `skill-adoption-metrics` | `skill-effectiveness-evaluation` only for one-task examples inside the period | Instruction maturity, skill usage maturity, task outcomes, maturity movement, privacy note |
 | Evaluate full-layer engineering capability growth | `engineering-capability-evaluation` | `skill-effectiveness-evaluation` for one-task examples; `skill-adoption-metrics` for period evidence | Capability level by area, evidence source/status, strengths, failures, human dependency, reusable assets, reliability signals, and next improvement candidate |
 | Repeated review context setup | `review-context-generation` | `repository-orientation` for repo facts before drafting context | Durable review context with evidence-status-labeled claims |
 | Durable documentation knowledge extraction, freshness review, conflict routing, or target selection | `documentation-knowledge-compiler` | Route review or implementation knowledge to context generation, domain rules to `domain-rule-ledger`, architecture decisions to `architecture-decision-memory` or `adr-review`, and task progress to handoff/planning | Documentation knowledge entry with evidence status, freshness status, conflicts, consumers, recommended target, and stale trigger |
 | MR/PR README, PR explanation, or durable change-context documentation | `mr-readme-generation` | `adr-review` | Durable change context for human review and future AI reuse |
 | Release candidate or bundled change-set readiness | `release-readiness-gate` | `risk-gate` before deploy, publish, migration, external notification, or release execution; `review-final-merge-gate` remains the PR-level decision gate | Release readiness decision, required release conditions, residual risks, and evidence reviewed |
-| Performance/security/reliability/readiness claim | `evidence-ledger` | `doubt-driven-development` | Claim/evidence/status table |
+| Performance/security/reliability/readiness claim | `evidence-ledger` | `doubt-driven-development` | Formal claim/evidence/status table selected by the `high_stakes_readiness` trigger |
 | Opt-in metrics event recording | normal delivery/review skill output | `skill-adoption-metrics` consumes the event later | Metrics event candidate with counts, related IDs, evidence references, and privacy note |
 | Weekly/monthly adoption report | operation layer | `skill-adoption-metrics` plus `docs/ai/adoption-report-template.md` | Period summary without creating a reporting skill |
 | Claude Code project-local adoption | `project-adoption-pack-generation` when first-time rollout; otherwise adapter install script | `docs/observability-runtime-contract.md`; `docs/operation-automation-contract.md`; local hooks | Core skills projected to `.claude/skills/`, local hooks enabled, no external publication by default |
 | Pattern B `@claude review` PR adapter | external operation layer template | `risk-gate` before enabling secrets/workflow; `review-router`; `review-final-merge-gate` | Optional user-triggered PR review, not always-on PR review |
-| End of work or passing to another agent | `handoff-generation` | `evidence-ledger` | Executable next task and residual risk |
+| End of work or passing to another agent | `handoff-generation` | Apply claim status inline; formal `evidence-ledger` only when a closed audit trigger applies | Executable next task and residual risk |
 
 ## Routing rule
 
@@ -111,7 +111,7 @@ Risk overlay:
 If any task involves destructive, external, production, auth, secret, dependency, migration, billing, email, or infra impact, run `risk-gate` before the selected workflow proceeds to action.
 
 Evidence overlay:
-Use `evidence-ledger` whenever the response makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
+Apply `ask.claim-evidence-status@1.0.0` inline for ordinary implementation, investigation, verification, review, and handoff claims. Select formal `evidence-ledger` only for explicit claim audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs.
 
 Full-layer memory overlay:
 Use engineering, verification, review, documentation, architecture, and capability ledgers only when active matching entries materially affect the selected workflow. Template, stale, archived, missing, contradicted, or hypothesis entries are not enforcement evidence.
@@ -123,13 +123,13 @@ Operating mode:
 operating-mode-router -> delivery_quality | adoption_bootstrap | observability_metrics | operation_automation
 
 New feature:
-spec-driven-development -> work-package-compiler when packaging is needed -> test-first-verification for reusable Verification Contract -> controlled-implementation -> test-first-verification for evidence
+spec-driven-development -> work-package-compiler when packaging is needed -> test-first-verification selects Compact Proof or Formal Verification Contract -> controlled-implementation references it -> evidence
 
 Requirement-to-Rule Loop:
 next-best-change-finder -> requirement-grill -> work-package-compiler -> review-domain-impact -> review-to-rule-compiler -> domain-rule-ledger
 
 Bug:
-doubt-driven-development -> test-first-verification for reproduction and Verification Contract -> controlled-implementation -> test-first-verification for regression proof
+doubt-driven-development -> test-first-verification selects Formal Verification Contract for reproduction/regression -> controlled-implementation -> regression proof
 
 Safe refactor:
 refactor-implementation -> test-first-verification for regression proof -> improvement-ledger for follow-up debt or prevention candidates when needed
@@ -144,7 +144,7 @@ Full-layer reusable intelligence:
 engineering-pattern-ledger / verification-pattern-ledger / review-finding-compiler / documentation-knowledge-compiler / architecture-decision-memory -> selected implementation, verification, review, documentation, or architecture workflow by evidence status
 
 Review:
-review-router -> observed change signals -> required gates, including review-code-health, review-architecture-impact, review-output-quality, and review-adversarial-risk when needed -> review-final-merge-gate -> improvement-ledger for non-blocking debt/rule feedback when needed
+review-router -> one review-ai-quality baseline -> exact-signal additional gates, including review-code-health, review-architecture-impact, review-output-quality, and review-adversarial-risk when needed -> requested-only review-final-merge-gate last -> improvement-ledger for accepted non-blocking follow-up
 
 Improvement ledger:
 review-code-health findings or final-gate improvement candidates -> improvement-ledger -> separate PR, backlog, rule/check feedback, accepted risk, or stale review
@@ -165,7 +165,7 @@ Claude local observability:
 Claude project adapter or plugin -> local hooks -> ask-runtime/metrics/events.jsonl -> ai-metrics-summarize -> docs/ai/reports/
 
 Pattern B PR review:
-@claude review comment -> optional GitHub Actions adapter -> review-router -> observed change signals -> required gates -> review-final-merge-gate
+@claude review comment -> optional GitHub Actions adapter -> review-router -> one review-ai-quality baseline -> exact-signal additional gates -> explicitly requested review-final-merge-gate last
 
 Adoption reports:
 operation_automation layer -> skill-adoption-metrics period summary -> docs/ai/adoption-report-template.md

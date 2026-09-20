@@ -243,6 +243,7 @@ function writePrivateAuthority({ root, privateRoot, evaluatorRevision, generatio
     schema_version: "1.0.0",
     schema_path: "benchmarks/schemas/private-evaluator-bundle.schema.json",
     program: "adaptive_ask_private_evaluator_bundle",
+    execution_budget_ms: 120_000,
     fixture_identity: { fixture_id: MP_CI_FIXTURE_ID, task_class: "review_verification", suite: "mechanism_positive" },
     input_identity: { fixture_input_digest: inputDigest },
     evaluator_revision: evaluatorRevision,

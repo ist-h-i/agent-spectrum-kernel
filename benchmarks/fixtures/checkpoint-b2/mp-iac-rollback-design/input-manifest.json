@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "3e0c6dba8df6ab19f83405875e8f493b92ef460ef82bf9da43a98a3190280a59",
-          "bytes": 1272
+          "sha256": "f713dc3e6273195a6f726a9c72d55430901a706256fe8894cc4adb2b1c8c877c",
+          "bytes": 1460
         },
         {
           "path": "workspace/change-plan.schema.json",
@@ -65,8 +65,8 @@
         },
         {
           "path": "workspace/scripts/validate-change-plan.mjs",
-          "sha256": "0fec17f2e557094989d4d40c07a1e112bb90d5461c1969a280f4bf6b1d4d41da",
-          "bytes": 7310
+          "sha256": "ed9f9abed2c25cdd99a816b802991cab9185a12cef5594673d738f1118626bc6",
+          "bytes": 12189
         },
         {
           "path": "workspace/state/current-state.json",

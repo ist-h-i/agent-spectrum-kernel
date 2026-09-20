@@ -24,13 +24,15 @@
 | やりたいこと | こう言う | 期待される内部route |
 |---|---|---|
 | チケットを前に進める | このチケットを進めて | requirement / work package / implementation route |
-| PR、diff、生成物をレビューする | このPRをレビューして | review-router and required gates |
+| PR、diff、生成物をレビューする | このPRをレビューして | review-router, mandatory baseline, and exact-signal additional gates |
 | バグ、regression、原因不明を調べる | このバグを調べて | doubt-driven-development and verification route |
 | 要件、設計、アーキテクチャを詰める | この設計を詰めて | requirement / design / architecture route |
 | Codexや別Agentへ渡せる作業にする | Codexに渡せる形にして | work-package route |
 | レビュー指摘や訂正を次回に活かす | この指摘を次に活かして | finding / ledger / documentation route |
 
 ### 期待する出力
+
+以下はprotected/direct compatibilityでの可視形式です。managed runnerの通常完了では同じpayloadをbound sidecarとして保存し、proseには出力しません。
 
 Execution Envelope:
 ```json
@@ -93,7 +95,6 @@ Execution Envelope:
 - `spec-driven-development`
 - `test-first-verification`
 - `controlled-implementation`
-- `evidence-ledger`
 
 ### 期待する出力
 
@@ -106,6 +107,7 @@ Execution Envelope:
 
 - 仕様が曖昧なら実装前に止めます。
 - stack overlay は generic workflow 選択後、該当する場合だけ使います。
+- 通常の主張は `ask.claim-evidence-status@1.0.0` をインライン適用し、closed formal-audit trigger がある場合だけ `evidence-ledger` を使います。
 
 ## Operating mode routing
 
@@ -167,7 +169,7 @@ Execution Envelope:
 
 - 候補探索は実装承認ではありません。
 - `Hypothesis` domain rule は質問や警告にだけ使い、review blockの単独根拠にしません。
-- AI推測を `Human-confirmed` に昇格しません。
+- AI推測を人間確認だけで強いevidence statusへ昇格せず、human authorityを別metadataとして記録します。
 
 ## Project adoption pack
 
@@ -217,7 +219,7 @@ Hypothesisは質問にだけ使い、enforcementやblockerにしないでくだ�
 - `review-finding-compiler`
 - `documentation-knowledge-compiler`
 - `architecture-decision-memory`
-- `evidence-ledger`
+- `evidence-ledger` only when multiple material claims, cross-artifact synthesis, or another closed formal-audit trigger applies
 
 ### 期待する出力
 
@@ -240,7 +242,8 @@ Hypothesisは質問にだけ使い、enforcementやblockerにしないでくだ�
 ```text
 この完了済みタスクで選んだSkillが有効だったかを評価してください。
 operating-mode-router で observability_metrics に分類し、skill-effectiveness-evaluation を使ってください。
-使ったSkill、skipしたSkill、成果物、検証結果、残リスクを根拠に、routing quality、output usefulness、evidence quality、risk reduction、overhead control、reuse valueを0-100で評価してください。
+使ったSkill、skipしたSkill、成果物、検証結果、残リスクを根拠に、valid/missed findings、false positive、requirements、scope deviation、overclaim、route correctness、tokens、duration、tools、artifacts、agents、実測したhuman correction/reworkを、closed v1 catalogにある元の単位で記録してください。独自metric、score、percentage、aggregate、ordinalは作らないでください。
+measurementとeffectを分け、comparison metricは同じunitのreference、materiality threshold、rule ref、effect evidenceからdeltaとimpactを導出してください。観測済みresourceでも比較根拠がなければeffectはUnknownです。Unknown/unavailableは0にせず、null、Unknown、limitationとして残してください。outcome quality、false-positive control、safety、routing quality、evidence quality、overhead、reuse valueを別々に effective | neutral | excessive | harmful | insufficient_evidence へ分類し、harmを平均で打ち消さず、expand | retain | simplify | stop | insufficient_evidence を決定してください。
 一つの実例だけでSkillを書き換えず、必要なら prompt recipe、validation、project overlay、context、example、improvement-ledger への狭いfollow-upを提案してください。
 ```
 
@@ -248,20 +251,23 @@ operating-mode-router で observability_metrics に分類し、skill-effectivene
 
 - `operating-mode-router`
 - `skill-effectiveness-evaluation`
-- `evidence-ledger` when claims need evidence status
+- `evidence-ledger` only when a closed formal-audit trigger applies; otherwise apply claim status inline
 
 ### 期待する出力
 
-- Scores
+- Catalog-bound native-unit measurements, derived effects, and evidence limitations
+- Seven separate dimension classifications
+- Scoped overall recommendation with authority_implied: false
 - What worked / excessive / missing
 - Defects or risks caught / missed
 - Recommended follow-up
-- Confidence
+- Evidence limitations
 
 ### 注意
 
 - 1タスクの評価です。期間集計は `skill-adoption-metrics` です。
 - 人やチームの評価ではなくworkflow効果の評価です。
+- benchmark score、capability level、ROI、Asset/Portfolio更新authorityとして扱いません。
 
 ## Adoption metrics measurement
 
@@ -432,7 +438,6 @@ doubt-driven-development を使って原因調査してください。
 ### 使われる主なSkill
 
 - `doubt-driven-development`
-- `evidence-ledger`
 
 ### 期待する出力
 
@@ -442,6 +447,7 @@ doubt-driven-development を使って原因調査してください。
 ### 注意
 
 - 調査だけなら実装しません。修正依頼が含まれる場合だけ実装へ進みます。
+- 観測事実・仮説・未確認は `ask.claim-evidence-status@1.0.0` でインライン分類します。
 
 ## Design grill
 
@@ -456,7 +462,6 @@ repoから確認できることは先に調べ、未確定の前提、失敗モ�
 ### 使われる主なSkill
 
 - `grill-design`
-- `evidence-ledger`
 
 ### 期待する出力
 
@@ -467,6 +472,7 @@ repoから確認できることは先に調べ、未確定の前提、失敗モ�
 ### 注意
 
 - deploy、migration、secret、authなどが出たら `risk-gate` が先です。
+- 通常の設計主張はインライン分類し、明示的なclaim auditやcross-artifact synthesisの場合だけformal `evidence-ledger`を追加します。
 
 ## Docs / ADR / terminology fit review
 
@@ -679,28 +685,29 @@ Angular固有の制約は controlled-implementation に、検証補足は test-f
 
 ```text
 review-router を使ってこのdiffをレビューしてください。
-観測した Change signals から Required gates を選び、必要なゲートだけを実行して review-final-merge-gate で判断してください。
-Missing evidence は skipped にせず insufficient evidence として残してください。通常出力では全層の固定表を出さず、必要な場合だけ診断用に添付してください。
-review-code-health が applicable な場合は、current PR blocker と non-blocking な improvement ledger candidate / rule feedback / deferred or accepted code-health risk を分け、final review output に必要時だけ optional section として残してください。
+必ず1件のreview-ai-quality baselineを出し、観測した正確なsignal IDから必要な追加gateだけを実行してください。
+Missing evidenceは該当判断のinsufficient evidenceとして残し、選ばれなかったgateや空のcategoryは通常出力に出さないでください。
+findingは共通fieldを持つ1つのimpact順一覧に統合してください。merge判断も必要なので、review-final-merge-gateを最後に実行してください。
 ```
 
 ### 使われる主なSkill
 
 - `review-router`
-- required gates
+- `review-ai-quality` baseline
+- exact-signal additional gates
 - `review-final-merge-gate`
-- `evidence-ledger`
+- `evidence-ledger` selected by the `high_stakes_readiness` trigger for the final merge/readiness claim
 
 ### 期待する出力
 
-- Change signals / Required gates / Skipped heavy gates / Missing evidence
-- Blocking evidence / Passed required gates / Insufficient evidence / Non-blocking follow-ups / Residual risk
+- Baseline review / Additional required gates / Missing evidence
+- 共通fieldを持つ1つのFindings一覧
 - Decision
 
 ### 注意
 
 - Mechanical pass だけで merge 可とは判断しません。
-- Required fixes と backlog / rule feedback / accepted risk を混ぜません。
+- current blockerと別途追跡する改善候補を混ぜません。
 - final gate は `docs/ai/improvement-ledger.md` を直接更新せず、必要な場合に `improvement-ledger` へ渡せる候補を明示します。
 
 ## Code health review
@@ -711,21 +718,20 @@ review-code-health が applicable な場合は、current PR blocker と non-bloc
 review-code-health を使って、このdiffまたは指定範囲の技術負債、脆弱性/security weakness、リファクタ候補、コードスメル、保守性・テスト容易性・性能・依存関係リスク、dead code、重複、境界問題、repeated review finding を確認してください。
 各findingは evidence、impact、severity、urgency、recommended action、scope guidance、AI-rule feedback を含め、current PRで直すものと separate PR / project-level improvement / no action に分けてください。
 これは完全なセキュリティ監査、SAST、依存脆弱性スキャン、脅威モデリング、ペンテスト、コンプライアンスレビューの代替ではありません。
-review-ai-quality、review-architecture-impact、review-adversarial-risk の責務は置き換えず、該当する場合だけroutingしてください。
+必須baselineのreview-ai-qualityは置き換えず、review-architecture-impactとreview-adversarial-riskは正確なsignalが該当する場合だけroutingしてください。
 ```
 
 ### 使われる主なSkill
 
 - `review-router`
 - `review-code-health`
-- `review-ai-quality` when ordinary implementation quality review is also required
+- `review-ai-quality` mandatory baseline
 - `review-architecture-impact` / `review-adversarial-risk` when specialized signals appear
-- `evidence-ledger` when claims need evidence status
+- `evidence-ledger` only when a closed formal-audit trigger applies; otherwise apply claim status inline
 
 ### 期待する出力
 
-- category / evidence / impact
-- severity / urgency / recommended action
+- 共通Finding field（ID / severity / merge blocker / practical impact / trigger or failure trace / evidence location / required post-fix condition）
 - current PR blocker と backlog candidate の分離
 - AI-rule feedback
 
@@ -773,7 +779,7 @@ deploy、publish、migration、external notification、release execution は実�
 
 ```text
 improvement-ledger を使って、review-code-health やPRレビューで出たnon-blockingな負債、リファクタ候補、rule gap、validation check候補、accepted riskを docs/ai/improvement-ledger.md の形式に沿って整理してください。
-current PR blocker は台帳に逃がさず Blocking evidence（必要なら詳細な Required fixes）に残し、non-blockingなものだけ separate PR / backlog / convert_to_rule / convert_to_check / accept / wont_fix / needs_more_evidence に分類してください。
+current PR blockerは台帳に逃がさずFindings一覧でmerge blockerとして残し、non-blockingなものだけseparate PR / backlog / convert_to_rule / convert_to_check / accept / wont_fix / needs_more_evidenceに分類してください。
 各entryは ID、Source、Finding、Category、Evidence、Impact、Severity、Urgency、Decision、Recommended action、Prevention target、Owner / status、Refresh rule を含めてください。
 repeated finding や high-impact single case がある場合だけ、Repeat pattern、Proposed rule or check、Why this target、Scope、convert / defer / reject / needs_more_evidence の判断も出してください。
 ```
@@ -782,7 +788,7 @@ repeated finding や high-impact single case がある場合だけ、Repeat patt
 
 - `improvement-ledger`
 - `review-code-health` only if findings still need detection
-- `evidence-ledger` when resolution or readiness claims need evidence status
+- `evidence-ledger` only when resolution/readiness reaches a closed formal-audit trigger; otherwise apply claim status inline
 
 ### 期待する出力
 
@@ -811,7 +817,7 @@ improvement-ledger を使って、台帳内またはレビュー内の repeated 
 ### 使われる主なSkill
 
 - `improvement-ledger`
-- `evidence-ledger` when repeat pattern or readiness claims need evidence status
+- `evidence-ledger` only when repeat-pattern/readiness analysis reaches a closed formal-audit trigger; otherwise apply claim status inline
 
 ### 期待する出力
 
@@ -937,7 +943,6 @@ Task、Context、Allowed scope、Forbidden scope、Expected output、Verificatio
 ### 使われる主なSkill
 
 - `handoff-generation`
-- `evidence-ledger`
 
 ### 期待する出力
 
@@ -947,3 +952,4 @@ Task、Context、Allowed scope、Forbidden scope、Expected output、Verificatio
 ### 注意
 
 - 汎用的な助言ではなく、具体的な次タスクにします。
+- 事実・推論・未確認はhandoff内でインライン分類し、stable claim IDなどclosed triggerがある場合だけformal `evidence-ledger`を追加します。

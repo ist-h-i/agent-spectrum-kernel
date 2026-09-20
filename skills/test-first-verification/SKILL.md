@@ -23,14 +23,26 @@ Make success observable before declaring the work complete.
 
 ## Process
 
-1. Read `docs/lifecycle-artifact-contract.md` and produce the Verification Contract before or alongside implementation planning. When evidence will support a completion, merge, or release claim, use `docs/lifecycle-traceability-contract.md` to assign stable obligation and evidence IDs, retain the observed upstream revision, and map each evidence item to its exact supported items.
+1. Read `docs/verification-proof-policy-contract.md` and select exactly one path from `ask.verification-proof-policy@1.0.0` before implementation claims. Use `compact_proof` only when every closed compact-eligibility fact is evidenced and no formal trigger is present; otherwise use `formal_verification_contract`. Record the policy ref, selection evidence, and selected proof ref. The generic lifecycle `compact` artifact, trace exemption, and Codex compact profile are not this selection.
+
+For `compact_proof`, keep the artifact to the exact shape below. The focused check records the exact command. The result records its exact observed result and evidence ref, or explicitly records missing evidence and the next check. Missing or failed evidence cannot support completion.
+
+```text
+Proof:
+- Behavior:
+- Focused check:
+- Result or missing evidence:
+- Broader check required when:
+```
+
+For `formal_verification_contract`, read `docs/lifecycle-artifact-contract.md` and produce the existing Verification Contract before or alongside implementation planning. When evidence will support a merge, release, performance, security, reliability, broad no-regression, or other stable-trace claim, use `docs/lifecycle-traceability-contract.md` to assign stable obligation and evidence IDs, retain the observed upstream revision, and map each evidence item to its exact supported items.
 
 Use available repository context for commands, existing coverage, and test patterns. If a stack or project overlay supplies verification supplements, apply it without hard-coding stack-specific rules into this skill.
 
 When `docs/ai/verification-pattern-ledger.md` exists, consult it only for matching change types, risk classes, regressions, or historically flaky areas:
 
 - `template`: treat as no project-specific reusable verification evidence.
-- `active`: use matching `Verified` or `Human-confirmed` entries as expected evidence, `Supported` entries as candidate evidence requiring current confirmation, and `Hypothesis` entries as test ideas only.
+- `active`: use matching `Verified` entries as expected evidence. Treat `Supported` entries, including a legacy human confirmation normalized to `Supported` with `authority_status=human_confirmed`, as candidate evidence requiring current confirmation. Use `Hypothesis` entries as test ideas only, keep `Unknown` unavailable, and correct claims marked `Falsified` before reuse.
 - `archived`: cite for history only; do not use as current verification requirements.
 
 Stored verification patterns do not prove current task behavior. Current commands, focused tests, runtime checks, or explicit insufficient evidence remain required.
@@ -77,7 +89,9 @@ Conditional fields, omit when irrelevant:
 | Manual/runtime check | User-visible or integration behavior lacks automated coverage. |
 | Benchmark/security check | Performance/security claim is being made. |
 
-5. Run verification and record exact evidence as records that reference the same Verification Contract. Do not rewrite the contract because checks were executed.
+5. Run verification and record exact evidence against the selected Compact Proof or Formal Verification Contract. Do not rewrite the proof obligation because checks were executed.
+
+If a formal trigger appears after compact work begins, upgrade to `formal_verification_contract`, retain every executed evidence ref, and reassess whether that evidence satisfies the new obligations. Formal is absorbing: never downgrade it after failure, resume, or handoff.
 
 6. If verification fails, report failure. Do not bury it under partial success.
 
@@ -86,7 +100,11 @@ Conditional fields, omit when irrelevant:
 
 ## Output
 
-Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits the Verification Contract and evidence artifact below; it does not repeat the envelope fields.
+Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits exactly one selected proof artifact and its evidence; it does not repeat envelope fields.
+
+For `compact_proof`, emit only the five-line Proof shape above plus the selected policy/selection ref in Evidence. Compact can support only the bounded localized completion claim for its behavior. It cannot support merge, release, performance, security, reliability, production, external-readiness, or broad no-regression claims.
+
+For `formal_verification_contract`, emit:
 
 ```text
 Verification Contract:
@@ -106,7 +124,7 @@ Conditional fields, omit when irrelevant:
 - Deltas:
 
 Evidence:
-- Verification Contract ref:
+- Selected proof artifact ref:
 - Trace evidence IDs, when claim mapping is required:
 - command:
   result:
@@ -121,12 +139,13 @@ Keep the next action only in the shared Execution Envelope. Do not add separate 
 
 Only when adoption metrics are explicitly enabled or requested, and verification completes or insufficient evidence is explicitly reported, include a `Metrics event candidate` following `docs/metrics-event-contract.md`.
 
-Record whether a Verification Contract was defined, whether tests were added or updated, whether validation passed, and whether insufficient evidence remained. Do not emit metrics for hidden telemetry or a partial conversation with no durable outcome.
+Record which proof path was selected, whether tests were added or updated, whether validation passed, and whether insufficient evidence remained. Existing metrics fields that name the Verification Contract remain compatibility representations until their schema is revised; do not infer a formal path from that field alone. Do not emit metrics for hidden telemetry or a partial conversation with no durable outcome.
 
 ## Exit criteria
 
-- The Verification Contract exists or the change is explicitly exempt.
-- The pre-implementation and post-implementation evidence use the same contract reference.
+- Exactly one Compact Proof or Formal Verification Contract exists when verification applies, or the work makes no behavior/completion claim.
+- The selection is evidence-based and recorded before implementation claims.
+- Pre-implementation and post-implementation evidence use the same proof reference, or a compact-to-formal upgrade retains the earlier evidence refs.
 - The changed behavior has an observable check.
 - Commands/results are exact.
 - Unverified items are explicit and not presented as fixed or proven.
@@ -141,3 +160,5 @@ Record whether a Verification Contract was defined, whether tests were added or 
 | Manual check used as proof of all behavior | Scope manual evidence narrowly. |
 | Missing required verification path ignored | Report `insufficient evidence` and the next check. |
 | Invented command output | Never invent results; say not run. |
+| Compact selected with incomplete facts or a formal trigger | Select the Formal Verification Contract. |
+| Formal downgraded after failure or resume | Keep formal selected and report the failed or missing evidence. |

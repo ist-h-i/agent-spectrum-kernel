@@ -54,14 +54,15 @@ Ask:
 
 4. Run the cheapest decisive check first.
 
-5. Update status.
+5. Update status under `ask.claim-evidence-status@1.0.0`.
 
 | Status | Meaning |
 |---|---|
-| verified | Evidence supports the hypothesis strongly. |
-| weakened | Evidence makes it less likely. |
-| falsified | Evidence contradicts it. |
-| unknown | Evidence is insufficient. |
+| `Verified` | Direct evidence proves the hypothesis for the scoped behavior. |
+| `Supported` | Indirect evidence supports it, but the decisive check is still missing. |
+| `Hypothesis` | It remains a plausible investigation input; record the next check, including evidence that weakened it. |
+| `Unknown` | Available evidence cannot judge it. |
+| `Falsified` | Direct evidence contradicts it; correct the causal claim. |
 
 6. Only then implement or recommend.
    - State the next action in work terms such as collecting evidence, creating a reproduction, implementing a scoped fix, or stopping because the cause remains unknown.
@@ -82,10 +83,7 @@ Results:
 - ...
 
 Conclusion:
-- verified | weakened | falsified | unknown
-
-Next:
-- ...
+- Verified | Supported | Hypothesis | Unknown | Falsified
 ```
 
 ## Exit criteria

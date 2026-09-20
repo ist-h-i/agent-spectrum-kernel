@@ -63,7 +63,7 @@ This skill starts after detection. It classifies, prioritizes, records, and refr
    - Repeat pattern: `one-off`, `repeated`, `likely_repeated`, or `high_impact_single_case`.
    - Scope: `generic`, `project_specific`, `stack_specific`, `review_only`, or `validation_only`.
    - Prevention decision: `convert`, `defer`, `reject`, or `needs_more_evidence`.
-   - Require evidence before proposing durable rules or checks. `Hypothesis` or `Unknown` evidence cannot be converted without more investigation.
+   - Apply `ask.claim-evidence-status@1.0.0` inline. Require evidence before proposing durable rules or checks; `Hypothesis` or `Unknown` cannot be converted without more investigation. Use formal `evidence-ledger` only for a closed audit trigger.
    - Prefer validation scripts, lint, tests, or CI checks for mechanically detectable patterns.
    - Prefer project overlays or review/implementation context for project-specific or local operating knowledge.
    - Prefer Skill or review checklist updates for reusable workflow behavior.

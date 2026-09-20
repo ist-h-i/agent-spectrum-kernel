@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
   "program": "adaptive_ask_scoring_input_freeze",
   "fixture_id": "mp-data-migration-handoff",
-  "fixture_input_digest": "sha256:2f32cb0f0c3361a30223b02a243df9e0dc3193e2e70d3035675176b50d9b1033",
+  "fixture_input_digest": "sha256:d82e1af9883a4336194348151e7fb76bfbc4743f0906d779d9d66cd315cb1995",
   "catalog": {
     "path": "benchmarks/portfolio-catalog.json",
     "raw_byte_digest": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
@@ -21,29 +21,29 @@
   },
   "admission_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/final-admission-record.json",
-    "raw_byte_digest": "sha256:b3203e249a37d2fcb9e4b7b6d27434c359b6fe1de21cd37e933de60eeef26e6d",
-    "semantic_digest": "sha256:523f25c7006e6f5e3bbc114bd93b318cd775bf9886f58da40418b4dfc0630695"
+    "raw_byte_digest": "sha256:36995a935d8b11b9aa247391ae344c08eb12249ca6b933a2a40091deb9463b8d",
+    "semantic_digest": "sha256:8611e8b3623335bcbadb6e914f4383acaa25f4fc1d25864697cb28755af7564b"
   },
   "requirement_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/requirement-record.json",
-    "raw_byte_digest": "sha256:020141d2f5143f3603925dbd84efdfc1524842b2ffa367fb6165e586de7ea6cb",
-    "record_digest": "sha256:820195a4485dc5a7614402cb053046e5421c727496d7e3492f790ce8721c2bf2",
+    "raw_byte_digest": "sha256:1eebe9b8587f245431874534e6d22009749bb8c4b5894345143c4d16f002f7bb",
+    "record_digest": "sha256:b09be02396c570978e3b4730be4ff6c84ad83f9fc5cae5db494656ea765cfd41",
     "set_digest": "sha256:74dc5940ecd42382327d84b269817b254b44118ca73ccc4970c815ccad01cf54"
   },
   "output_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/output-contract.json",
-    "raw_byte_digest": "sha256:ad0611cc472dfeda9006074821a2ac99b9b074beed1d45f7a0ff4e0828e3ed22",
-    "semantic_digest": "sha256:0acd4956189cd5ecd529905429f8c3eb331cc7091f84063b7635675f0d656a40"
+    "raw_byte_digest": "sha256:6a7765eea489773956ad6a9979e9ca7579a385c5a2be5faba64ff92aa44fe3db",
+    "semantic_digest": "sha256:4f14bc31bfcb34c8dd32c032adb8eccfbc9ec5764c3c6b81ce0374d886a38af9"
   },
   "evaluator_public_reference": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/evaluator-reference.json",
-    "raw_byte_digest": "sha256:84925232d300d189ca2eda8c67ebb24007b7cf8b6aa28ff4570c883186c9864a",
-    "semantic_digest": "sha256:e43bee5687ef5561a15ec873519404797511938c118d21c2ddfd589dd1c0a8a6"
+    "raw_byte_digest": "sha256:6b9369c250c5cfbba49db4ae8f62568149c5e903f1da5466ba3f9319b26f08cf",
+    "semantic_digest": "sha256:952ed7885b2a3ca19a2c3c31e99778c700ec9f43460642ca1c716a73cdc4230c"
   },
   "verification_command_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/verification-command-contract.json",
-    "raw_byte_digest": "sha256:5f5e5b8dc6872228d55878762f57f4c808c51d82ce3954ca69ccc2a8400595dc",
-    "semantic_digest": "sha256:c5f527b33a0bc43ceb823073b259ddfec67bbe29efba4c4cac018838c830378f"
+    "raw_byte_digest": "sha256:1638219787d4965434b8428d3b102c5300128441666ec64463cbc36616f82f04",
+    "semantic_digest": "sha256:767ae87a94c8abef440d674a3fee0ceea67c991ade589868d24fd8ccad48b40a"
   },
   "evidence_map": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/evidence-map.json",
@@ -52,13 +52,13 @@
   },
   "evaluator_authority_manifest": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/evaluator-authority-manifest.json",
-    "raw_byte_digest": "sha256:548717c7cb18bf307e9d192a02db2ff81d13ccb4a66fa59250360b757f6b70ea",
-    "semantic_digest": "sha256:c524b19bbba9eb04ef99df082915d010bd2f098b127ac740c0f19bba69581ec3"
+    "raw_byte_digest": "sha256:9712c140f806b794de55b7d3255f49ecb6d26ed8741ec2988ef49c661569ace2",
+    "semantic_digest": "sha256:bb44757f2e7516fe722a7c43b6f458ca4fdc0449eca7c3f67e372ad8a5d5ed7c"
   },
   "result_profile": {
     "name": "binary_scope_verification_v1",
     "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
   },
   "freeze_revision": "issue-206-mp-data-migration-handoff-r1",
-  "manifest_digest": "sha256:8fd466e757bb31ee2071b01d2b56aafa23d8efd278d3f41226c2d0c24184a0a9"
+  "manifest_digest": "sha256:4d0534e161d928bfd505bd27cb1bd2d5d661c003c0580515d2ac3ed4700941fc"
 }

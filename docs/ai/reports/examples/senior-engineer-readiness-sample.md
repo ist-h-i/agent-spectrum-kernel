@@ -24,8 +24,8 @@ Decision / readiness status:
 - Client-value readiness: insufficient evidence.
 
 Internal workflow quality:
-- Required gates: review-router, review-code-health, review-final-merge-gate.
-- Executed gates: review-router, review-code-health, review-final-merge-gate.
+- Required gates: review-router, review-ai-quality, review-code-health, review-final-merge-gate.
+- Executed gates: review-router, review-ai-quality, review-code-health, review-final-merge-gate.
 - Skipped gate: review-adversarial-risk, justified by no fixture security-sensitive signal.
 - Finding impact: one required fix is represented as fixture data.
 - Verification: test, validate, and build command kinds are represented; raw command text is not stored.

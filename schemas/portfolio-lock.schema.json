@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/portfolio-lock.schema.json",
+  "title": "Agent Spectrum Kernel immutable Portfolio lifecycle lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_kind",
+    "portfolio_id",
+    "repository_id",
+    "scope_id",
+    "lock_revision",
+    "predecessor",
+    "entries",
+    "current_manifest_digest",
+    "current_asset_set_digest",
+    "authority_context_digest"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "object_kind": { "type": "string", "const": "portfolio_lock" },
+    "portfolio_id": { "$ref": "#/$defs/stableId" },
+    "repository_id": { "$ref": "#/$defs/repositoryId" },
+    "scope_id": { "$ref": "#/$defs/stableId" },
+    "lock_revision": { "type": "integer", "minimum": 1 },
+    "predecessor": {
+      "oneOf": [
+        { "$ref": "#/$defs/predecessor" },
+        { "type": "null" }
+      ]
+    },
+    "entries": {
+      "type": "array",
+      "maxItems": 512,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/entry" }
+    },
+    "current_manifest_digest": {
+      "oneOf": [
+        { "$ref": "#/$defs/digest" },
+        { "type": "null" }
+      ]
+    },
+    "current_asset_set_digest": {
+      "oneOf": [
+        { "$ref": "#/$defs/digest" },
+        { "type": "null" }
+      ]
+    },
+    "authority_context_digest": {
+      "oneOf": [
+        { "$ref": "#/$defs/digest" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@/+~-]*$"
+    },
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "repositoryId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/@+-]*$"
+    },
+    "predecessor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lock_revision", "lock_digest"],
+      "properties": {
+        "lock_revision": { "type": "integer", "minimum": 1 },
+        "lock_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "manifest_digest", "asset_set_digest", "state"],
+      "properties": {
+        "revision": { "$ref": "#/$defs/token" },
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "asset_set_digest": { "$ref": "#/$defs/digest" },
+        "state": { "type": "string", "enum": ["current", "historical", "superseded", "retired"] }
+      }
+    }
+  }
+}

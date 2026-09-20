@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/effectiveness-decision-vocabulary.schema.json",
+  "title": "ASK shared effectiveness decision vocabulary",
+  "description": "Shared labels only. The surrounding contract defines scope, evidence, precedence, and authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "dimensionClassification": {
+      "type": "string",
+      "enum": ["effective", "neutral", "excessive", "harmful", "insufficient_evidence"]
+    },
+    "overallRecommendation": {
+      "type": "string",
+      "enum": ["expand", "retain", "simplify", "stop", "insufficient_evidence"]
+    }
+  },
+  "x-ask-contract": {
+    "id": "ask.effectiveness-decision-vocabulary",
+    "revision": "1.0.0",
+    "ref": "ask.effectiveness-decision-vocabulary@1.0.0",
+    "authority_note": "Vocabulary identity does not transfer evidence or lifecycle authority between consumers."
+  }
+}

@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "5d4e6cc1abf852d065a6b65eed801adb61863fc2f4292c87450768ae3ddc0ab5",
-          "bytes": 833
+          "sha256": "2e210dad20cda5c2c4a0c935b96769f20a72f199bf6d64126924d80a7cdc4c8e",
+          "bytes": 1058
         },
         {
           "path": "workspace/docs/migration-plan.md",
@@ -30,8 +30,8 @@
         },
         {
           "path": "workspace/handoff.schema.json",
-          "sha256": "62d4f61b98636d656bc194fc0acbe3eb72c2865a147c9d5a08f27444152bb4c4",
-          "bytes": 3412
+          "sha256": "43f6d048a4301c616a96aa1e3d700a8ad473526fa3b8f7435a6b7ede2ea27578",
+          "bytes": 3468
         },
         {
           "path": "workspace/operations/commands.json",
@@ -50,8 +50,8 @@
         },
         {
           "path": "workspace/scripts/validate-handoff.mjs",
-          "sha256": "d9726651b6333c80b07f2138a051ad45fde0cff34e42aed8cee62d5ea5b94664",
-          "bytes": 4375
+          "sha256": "e417e0863ad446fef9c2aa8688240e3447863c11a5a86ffac68c61d5a8e4c676",
+          "bytes": 5142
         },
         {
           "path": "workspace/state/approval-state.json",

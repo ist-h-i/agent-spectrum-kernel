@@ -62,6 +62,8 @@ Ledger entries must include:
 
 Machine-readable entry examples should conform to `schemas/improvement-ledger-entry.schema.json`.
 
+The nested claim truth field references `ask.claim-evidence-status@1.0.0`. Debt lifecycle, decision, and working-state values remain separate; `stale`, `resolved`, and `wont_fix` are not evidence statuses.
+
 ## State Meanings
 
 | State | Meaning | Metrics count |

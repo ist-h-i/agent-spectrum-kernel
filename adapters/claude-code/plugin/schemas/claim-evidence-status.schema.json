@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/claim-evidence-status.schema.json",
+  "title": "ASK Claim Evidence Status",
+  "description": "Canonical truth status for one claim. Authority, lifecycle, operational, verification-level, and benchmark-result states are separate contracts.",
+  "type": "string",
+  "enum": ["Verified", "Supported", "Hypothesis", "Unknown", "Falsified"],
+  "$defs": {
+    "lowercase_status": {
+      "description": "Read-only compatibility representation used by existing stored #275/#276 artifacts. Writers normalize to the canonical Title Case status.",
+      "type": "string",
+      "enum": ["verified", "supported", "hypothesis", "unknown", "falsified"]
+    },
+    "lowercase_observation_status": {
+      "description": "Backward-compatible subset for existing #276 provenance claims, which never accepted hypotheses or falsified claims.",
+      "type": "string",
+      "enum": ["verified", "supported", "unknown"]
+    },
+    "legacy_status": {
+      "description": "Closed legacy import vocabulary. These values are not canonical writer output.",
+      "type": "string",
+      "enum": ["weak", "Human-confirmed", "Deprecated", "Contradicted"]
+    },
+    "evidence_strength": {
+      "type": "string",
+      "enum": ["direct", "indirect", "assumption", "missing", "contradictory"]
+    }
+  },
+  "x-ask-contract": {
+    "id": "ask.claim-evidence-status",
+    "revision": "1.0.0",
+    "ref": "ask.claim-evidence-status@1.0.0",
+    "inline_default": true,
+    "formal_ledger": {
+      "contract": "evidence-ledger",
+      "direct_trigger_id": "formal_claim_audit_required",
+      "trigger_ids": [
+        "explicit_claim_audit",
+        "multiple_material_claims",
+        "high_stakes_readiness",
+        "cross_artifact_synthesis",
+        "stable_claim_ids"
+      ],
+      "trigger_descriptions": {
+        "explicit_claim_audit": "The user explicitly requests a claim/evidence ledger or independent claim audit.",
+        "multiple_material_claims": "Multiple material claims must be audited independently.",
+        "high_stakes_readiness": "Merge, release, production, security, reliability, performance, cost, ROI, or externally communicated readiness is evaluated.",
+        "cross_artifact_synthesis": "Claims synthesize evidence across multiple artifacts or revisions.",
+        "stable_claim_ids": "A later consumer requires stable claim IDs or missing-evidence closure."
+      }
+    },
+    "legacy": {
+      "lowercase_aliases": {
+        "verified": "Verified",
+        "supported": "Supported",
+        "hypothesis": "Hypothesis",
+        "unknown": "Unknown",
+        "falsified": "Falsified"
+      },
+      "weak": {
+        "qualifying_strengths": ["direct", "indirect"],
+        "qualifying_with_evidence_refs": "Supported",
+        "otherwise": "Hypothesis",
+        "maximum": "Supported"
+      },
+      "fixed_mappings": {
+        "Human-confirmed": {
+          "canonical_status": "Supported",
+          "authority_status": "human_confirmed",
+          "record_state": "active"
+        },
+        "Deprecated": {
+          "canonical_status": "Unknown",
+          "authority_status": null,
+          "record_state": "deprecated"
+        },
+        "Contradicted": {
+          "canonical_status": "Falsified",
+          "authority_status": null,
+          "record_state": "contradicted"
+        }
+      }
+    }
+  }
+}

@@ -106,6 +106,8 @@ The planner validates its output against the exact requirements object and the a
 
 This is a foundation for the later current-target coverage gate. It does not by itself support a completion, merge, or release claim, and it does not replace lifecycle traceability, final review, approval, rollback, or current external-state checks.
 
+Verification result, evidence level, reuse disposition, and coverage state are operational fields owned by this contract. A prose or metadata claim about those fields uses `ask.claim-evidence-status@1.0.0`; referencing that claim contract does not change a stored result or grant reuse, completion, merge, or release authority.
+
 ## Transfer
 
 A transfer contains sorted evidence refs and the corresponding sealed evidence objects. Its digest and ID cover both arrays and the fixed privacy declaration.

@@ -15,7 +15,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, relative, resolve, sep } from "node:path";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import {
@@ -23,6 +23,15 @@ import {
   computeEvaluatorBundleId,
   validateEvaluatorSourceIdentity,
 } from "./ask-benchmark-evaluator-boundary.mjs";
+import { validateMnDocConfigCorrectionProductionAuthority } from "./ask-benchmark-mn-doc-config-correction-authority.mjs";
+import {
+  establishReviewArchiveIdentity,
+  evaluatorSourceReviewEntries,
+  reviewArchiveCommitEntry,
+  validateReviewArchiveCases,
+  validateReviewArchivePrivateBundle,
+  walkReviewArchiveRoot,
+} from "./ask-benchmark-review-archive-identity.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE_ID = "mn-doc-config-correction";
@@ -60,6 +69,32 @@ const REQUIRED_FILESYSTEM_CASE_PATHS = Object.freeze([
   "cases/target-deletion/docs/",
   "cases/target-directory/docs/",
   "cases/target-directory/docs/worker-retries.md/",
+]);
+const MN_DOC_CASE_WORKSPACES = Object.freeze([
+  "correct",
+  "duplicate-contradictory",
+  "duplicate-nested",
+  "duplicate-same-value",
+  "equivalent",
+  "frozen",
+  "heading-rewrite",
+  "justified-investigation",
+  "malformed-json",
+  "missing-verification",
+  "mode-change",
+  "multiple-json-blocks",
+  "over-broad",
+  "protected-config",
+  "target-deletion",
+  "target-directory",
+  "under-processing",
+  "unrelated-text",
+]);
+const MN_DOC_STANDARD_CASE_FILES = Object.freeze([
+  "config/retry-policy.json",
+  "docs/worker-retries.md",
+  "package.json",
+  "test/worker-retries.test.mjs",
 ]);
 
 function sha256(bytes) {
@@ -107,6 +142,11 @@ function validateZipFormatAuthority(authority, root) {
 function readJson(path, label) {
   if (!existsSync(path) || !lstatSync(path).isFile() || lstatSync(path).isSymbolicLink()) throw new Error(`${label} is missing or invalid`);
   try { return JSON.parse(readFileSync(path, "utf8")); }
+  catch { throw new Error(`${label} is invalid JSON`); }
+}
+
+function readJsonBytes(bytes, label) {
+  try { return JSON.parse(bytes.toString("utf8")); }
   catch { throw new Error(`${label} is invalid JSON`); }
 }
 
@@ -194,6 +234,45 @@ function walkSource(root, archivePrefix, category, sourceScope) {
   return entries;
 }
 
+function expectedMnDocCaseInventory(expectations) {
+  const referenced = [...new Set([
+    expectations.frozen_workspace,
+    ...(expectations.cases ?? []).map(({ candidate_workspace }) => candidate_workspace),
+    ...(expectations.adversarial_cases ?? []).map(({ candidate_workspace }) => candidate_workspace),
+  ])].sort(lexicalCompare);
+  if (JSON.stringify(referenced) !== JSON.stringify(MN_DOC_CASE_WORKSPACES)) throw new Error("review archive mn-doc referenced workspace inventory differs");
+  const files = ["expectations.json"];
+  for (const workspace of MN_DOC_CASE_WORKSPACES) {
+    for (const path of MN_DOC_STANDARD_CASE_FILES) {
+      if ((workspace === "target-deletion" || workspace === "target-directory") && path === "docs/worker-retries.md") continue;
+      files.push(`${workspace}/${path}`);
+    }
+    if (workspace === "over-broad") files.push(`${workspace}/notes.txt`);
+  }
+  const directories = new Set();
+  for (const path of files.filter((path) => path !== "expectations.json")) {
+    const parts = path.split("/");
+    for (let index = 1; index < parts.length; index += 1) directories.add(`${parts.slice(0, index).join("/")}/`);
+  }
+  directories.add("target-deletion/docs/");
+  directories.add("target-directory/docs/");
+  directories.add("target-directory/docs/worker-retries.md/");
+  return Object.freeze({
+    filePaths: Object.freeze(files.sort(lexicalCompare)),
+    archivePaths: Object.freeze([...files.map((path) => `cases/${path}`), ...[...directories].map((path) => `cases/${path}`)].sort(lexicalCompare)),
+  });
+}
+
+export function validateMnDocReviewCaseRoot(caseRoot) {
+  const directory = realpathSync(caseRoot);
+  const expectations = readJson(resolve(directory, "expectations.json"), "mn-doc private case expectations");
+  const expected = expectedMnDocCaseInventory(expectations);
+  const entries = orderedArchiveEntries(walkSource(directory, "cases", "case", "private_case_root"));
+  const actualPaths = entries.map(({ archive_path }) => archive_path);
+  if (JSON.stringify(actualPaths) !== JSON.stringify(expected.archivePaths)) throw new Error("review archive mn-doc private case inventory is not closed");
+  return Object.freeze({ directory, expectations, entries, filePaths: expected.filePaths, fileCount: expected.filePaths.length });
+}
+
 function packageDirectoryEntries(entries) {
   const directories = new Map();
   for (const entry of entries) {
@@ -204,22 +283,19 @@ function packageDirectoryEntries(entries) {
   return [...directories.values()];
 }
 
-function publicEntries(root) {
-  const fixtureRoot = resolve(root, FIXTURE_ROOT);
+function publicEntries(root, reviewedHead) {
   return PUBLIC_PATHS.map((sourcePath) => {
-    const absolute = resolve(fixtureRoot, sourcePath);
-    const status = lstatSync(absolute);
-    if (!status.isFile() || status.isSymbolicLink()) throw new Error(`review archive public source is not a regular file: ${sourcePath}`);
-    const bytes = readFileSync(absolute);
-    return { archive_path: `public/${FIXTURE_ROOT}/${sourcePath}`, entry_type: "file", mode: status.mode & 0o777, category: "public", source_scope: "repository", source_path: `${FIXTURE_ROOT}/${sourcePath}`, bytes: bytes.length, sha256: sha256(bytes) };
+    const repositoryPath = `${FIXTURE_ROOT}/${sourcePath}`;
+    const committed = reviewArchiveCommitEntry(root, reviewedHead, repositoryPath, "public");
+    return { archive_path: committed.path, entry_type: "file", mode: committed.mode, category: "public", source_scope: "repository", source_path: repositoryPath, bytes: committed.bytes.length, sha256: sha256(committed.bytes) };
   });
 }
 
-function inventorySources({ root, privateRoot, caseRoot }) {
+function inventorySources({ root, reviewedHead, privateRoot, caseEntries }) {
   const entries = [
-    ...publicEntries(root),
+    ...publicEntries(root, reviewedHead),
     ...walkSource(privateRoot, "private", "private", "private_evaluator_root"),
-    ...walkSource(caseRoot, "cases", "case", "private_case_root"),
+    ...caseEntries,
   ];
   return orderedArchiveEntries([...entries, ...packageDirectoryEntries(entries)]);
 }
@@ -231,8 +307,25 @@ function sourcePathForEntry(entry, { root, privateRoot, caseRoot }) {
   return null;
 }
 
-function assertInventoryMatchesSources(entries, sources) {
+function repositoryRevisionBytes(entries, { root, reviewedHead, sourceRevision }) {
+  const bytesByArchivePath = new Map();
   for (const entry of entries) {
+    if (entry.entry_type !== "file" || entry.source_scope !== "repository") continue;
+    const revision = entry.category === "public" ? reviewedHead : sourceRevision;
+    const committed = reviewArchiveCommitEntry(root, revision, entry.source_path, "repository-source");
+    if (committed.mode !== entry.mode) throw new Error(`review archive repository source mode differs: ${entry.archive_path}`);
+    bytesByArchivePath.set(entry.archive_path, committed.bytes);
+  }
+  return bytesByArchivePath;
+}
+
+function assertInventoryMatchesSources(entries, sources, repositoryBytes = null) {
+  for (const entry of entries) {
+    const committedBytes = repositoryBytes?.get(entry.archive_path);
+    if (committedBytes) {
+      if (entry.entry_type !== "file" || committedBytes.length !== entry.bytes || sha256(committedBytes) !== entry.sha256) throw new Error(`review archive repository source identity drift: ${entry.archive_path}`);
+      continue;
+    }
     const source = sourcePathForEntry(entry, sources);
     if (!source) continue;
     const status = lstatSync(source);
@@ -256,14 +349,18 @@ export function validateReviewArchiveInventoryAgainstSources(entries, sources) {
   return true;
 }
 
-function reviewManifest({ root, privateRoot, caseRoot, reviewedHead, pullRequest, issue, entries }) {
-  const fixtureRoot = resolve(root, FIXTURE_ROOT);
-  const requirement = readJson(resolve(fixtureRoot, "requirement-record.json"), "mn-doc requirement record");
-  const output = readJson(resolve(fixtureRoot, "output-contract.json"), "mn-doc output contract");
-  const reference = readJson(resolve(fixtureRoot, "evaluator-reference.json"), "mn-doc evaluator reference");
-  const authorityManifest = readJson(resolve(fixtureRoot, "evaluator-authority-manifest.json"), "mn-doc evaluator authority manifest");
-  const candidate = readJson(resolve(fixtureRoot, "source-freeze-candidate.json"), "mn-doc source-freeze candidate");
-  const admissionReview = readJson(resolve(fixtureRoot, "admission-review.json"), "mn-doc admission review");
+function reviewManifest({ root, privateRoot, caseRoot, reviewedHead, sourceRevision, pullRequest, issue, entries, identity, privateSummary, caseSummary, repositoryBytes }) {
+  const publicJson = (path, label) => {
+    const bytes = repositoryBytes.get(`public/${FIXTURE_ROOT}/${path}`);
+    if (!bytes) throw new Error(`${label} is absent from reviewed Git object authority`);
+    return readJsonBytes(bytes, label);
+  };
+  const requirement = publicJson("requirement-record.json", "mn-doc requirement record");
+  const output = publicJson("output-contract.json", "mn-doc output contract");
+  const reference = publicJson("evaluator-reference.json", "mn-doc evaluator reference");
+  const authorityManifest = publicJson("evaluator-authority-manifest.json", "mn-doc evaluator authority manifest");
+  const candidate = publicJson("source-freeze-candidate.json", "mn-doc source-freeze candidate");
+  const admissionReview = publicJson("admission-review.json", "mn-doc admission review");
   const bundleBytes = readFileSync(resolve(privateRoot, "private-evaluator-bundle.json"));
   const bundle = JSON.parse(bundleBytes);
   const independenceBytes = readFileSync(resolve(privateRoot, "independence.json"));
@@ -283,7 +380,7 @@ function reviewManifest({ root, privateRoot, caseRoot, reviewedHead, pullRequest
     schema_version: issue === null ? "pr242-exact-private-review-manifest.v3" : "mn-doc-exact-private-review-manifest.v4",
     package_kind: "independent_private_review_archive",
     archive_format: zipFormatAuthority(root),
-    review_target: { repository: "ist-h-i/agent-spectrum-kernel", ...(issue === null ? { pull_request: pullRequest } : { issue }), reviewed_head: reviewedHead, evaluator_revision: reference.evaluator_revision },
+    review_target: { repository: "ist-h-i/agent-spectrum-kernel", ...(issue === null ? { pull_request: pullRequest } : { issue }), reviewed_head: reviewedHead, evaluator_revision: sourceRevision },
     authority: {
       requirement_record_digest: requirement.requirement_record_digest,
       requirement_set_digest: requirement.requirement_set_digest,
@@ -293,14 +390,17 @@ function reviewManifest({ root, privateRoot, caseRoot, reviewedHead, pullRequest
       source_freeze_candidate_digest: candidate.candidate_digest,
       logical_review_package_digest: admissionReview.review_package_digest,
     },
-    private_bundle: { id: bundle.evaluator_bundle_id, digest: bundle.evaluator_bundle_digest, asset_bytes: bundle.asset_inventory.reduce((sum, asset) => sum + asset.bytes, 0), manifest_raw_bytes: bundleBytes.length, manifest_raw_sha256: sha256(bundleBytes) },
+    private_bundle: { id: bundle.evaluator_bundle_id, digest: bundle.evaluator_bundle_digest, asset_bytes: privateSummary.privateAssetBytes, asset_count: privateSummary.privateAssetCount, manifest_raw_bytes: bundleBytes.length, manifest_raw_sha256: sha256(bundleBytes) },
     source_identity: { source_tree_digest: bundle.evaluator_source_identity.source_tree_digest, dependency_graph_digest: bundle.dependency_graph.graph_digest, graph_node_count: bundle.dependency_graph.node_inventory.length, graph_edge_count: bundle.dependency_graph.edge_inventory.length },
+    archive_generator_source_identity: identity.generatorSourceIdentity,
     independence: { statement_digest: bundle.independence.statement_digest, statement_raw_sha256: sha256(independenceBytes), generated_without_agent_output: independence.generated_without_agent_output, public_answer_sources_used: independence.public_answer_sources_used, measured_agent_access_allowed: independence.measured_agent_access_allowed },
-    frozen_state: { review_status: "pending_independent_review", admission_status: "admission_pending", scoring_ready: false, measured_execution: false, fixture_two_admission_overlay_included: false, reviewer_approval_included: false },
+    frozen_state: { review_status: "pending_independent_review", admission_status: "admission_pending", scoring_ready: false, measured_execution: false, scoring_published: false, fixture_two_admission_overlay_included: false, reviewer_approval_included: false },
     review_cases: {
       baseline_workspace: `cases/${expectations.frozen_workspace}`,
       expectations_path: "cases/expectations.json",
       count: expectations.cases.length,
+      closed_manifest_count: caseSummary.caseCount,
+      path_inventory: caseSummary.casePaths,
       totality_state_count: expectations.totality_cases.length,
       cases: expectations.cases.map((entry) => ({ case_id: entry.case_id, candidate_workspace: entry.candidate_workspace, expected_classification: expectations.fragment_projections[entry.expected_projection].classification, verification_state: entry.verification_state, expected_projection: entry.expected_projection })),
       totality_states: expectations.totality_cases.map((entry) => ({ state: entry.state, expected_classification: "under_processing", expected_findings: entry.expected_findings })),
@@ -324,7 +424,7 @@ function reviewManifest({ root, privateRoot, caseRoot, reviewedHead, pullRequest
   };
 }
 
-function materializeStage(stage, manifest, sources) {
+function materializeStage(stage, manifest, sources, repositoryBytes) {
   mkdirSync(stage, { recursive: false, mode: 0o755 });
   for (const entry of manifest.inventory.entries) {
     const target = resolve(stage, entry.archive_path.replace(/\/$/u, ""));
@@ -333,7 +433,9 @@ function materializeStage(stage, manifest, sources) {
       chmodSync(target, entry.mode);
     } else {
       mkdirSync(dirname(target), { recursive: true });
-      copyFileSync(sourcePathForEntry(entry, sources), target);
+      const committedBytes = repositoryBytes.get(entry.archive_path);
+      if (committedBytes) writeFileSync(target, committedBytes, { flag: "wx", mode: entry.mode });
+      else copyFileSync(sourcePathForEntry(entry, sources), target);
       chmodSync(target, entry.mode);
     }
   }
@@ -428,6 +530,7 @@ function archiveStage(stage, outputPath, manifest) {
 export function verifyMnDocConfigCorrectionReviewArchive({ archivePath, root = ROOT, privateRoot, caseRoot }) {
   const extraction = mkdtempSync(resolve(tmpdir(), "ask-mn-doc-review-extract-"));
   try {
+    const caseAuthority = validateMnDocReviewCaseRoot(caseRoot);
     execFileSync("unzip", ["-q", archivePath, "-d", extraction]);
     const manifest = readJson(resolve(extraction, REVIEW_MANIFEST_PATH), "review archive manifest");
     if (!new Set(["pr242-exact-private-review-manifest.v3", "mn-doc-exact-private-review-manifest.v4"]).has(manifest.schema_version)) throw new Error("review archive manifest revision differs");
@@ -436,10 +539,13 @@ export function verifyMnDocConfigCorrectionReviewArchive({ archivePath, root = R
     if (!Number.isInteger(manifest.review_target?.[targetNumberField]) || manifest.review_target[targetNumberField] < 1 || Object.hasOwn(manifest.review_target, unexpectedTargetNumberField)) throw new Error("review archive target identity differs");
     validateZipFormatAuthority(manifest.archive_format, realpathSync(root));
     validateReviewArchiveInventory(manifest.inventory?.entries, manifest.inventory?.expected_archive_entries);
+    const archivedCasePaths = manifest.inventory.entries.filter(({ category }) => category === "case").map(({ archive_path }) => archive_path).sort(lexicalCompare);
+    if (JSON.stringify(archivedCasePaths) !== JSON.stringify(caseAuthority.entries.map(({ archive_path }) => archive_path))) throw new Error("review archive mn-doc private case inventory differs from exact authority");
     const zipEntries = execFileSync("unzip", ["-Z1", archivePath], { encoding: "utf8" }).trim().split("\n");
     if (zipEntries.length !== manifest.inventory.expected_archive_entries.length || zipEntries.some((path, index) => path !== manifest.inventory.expected_archive_entries[index])) throw new Error("review archive ZIP entry order or closure differs");
     const sources = { root: realpathSync(root), privateRoot: realpathSync(privateRoot), caseRoot: realpathSync(caseRoot) };
-    assertInventoryMatchesSources(manifest.inventory.entries, sources);
+    const committedRepositoryBytes = repositoryRevisionBytes(manifest.inventory.entries, { root: sources.root, reviewedHead: manifest.review_target.reviewed_head, sourceRevision: manifest.review_target.evaluator_revision });
+    assertInventoryMatchesSources(manifest.inventory.entries, sources, committedRepositoryBytes);
     for (const entry of manifest.inventory.entries) {
       const extractedPath = resolve(extraction, entry.archive_path.replace(/\/$/u, ""));
       const status = lstatSync(extractedPath);
@@ -461,26 +567,47 @@ export function verifyMnDocConfigCorrectionReviewArchive({ archivePath, root = R
   }
 }
 
-export function generateMnDocConfigCorrectionReviewArchive({ root = ROOT, privateRoot, caseRoot, outputPath, reviewedHead, pullRequest = null, issue = null }) {
+export function generateMnDocConfigCorrectionReviewArchive({ root = ROOT, privateRoot, caseRoot, outputPath, reviewedHead, sourceRevision, pullRequest = null, issue = null }) {
   const repository = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
-  const caseDirectory = realpathSync(caseRoot);
+  const caseAuthority = validateMnDocReviewCaseRoot(caseRoot);
+  const caseDirectory = caseAuthority.directory;
+  const privateEntriesForIdentity = walkReviewArchiveRoot(privateRoot, "private");
+  const caseEntriesForIdentity = walkReviewArchiveRoot(caseRoot, "cases");
+  const archiveTarget = resolve(realpathSync(dirname(resolve(outputPath))), basename(resolve(outputPath)));
+  if ([repository, privateDirectory, caseDirectory].some((directory) => archiveTarget === directory || archiveTarget.startsWith(`${directory}${sep}`))) throw new Error("review archive output must stay outside repository and authority source roots");
   const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repository, encoding: "utf8" }).trim();
   if (reviewedHead !== head || !/^[a-f0-9]{40}$/u.test(reviewedHead)) throw new Error("review archive reviewed HEAD differs from repository HEAD");
+  const reference = readJsonBytes(reviewArchiveCommitEntry(repository, reviewedHead, `${FIXTURE_ROOT}/evaluator-reference.json`, "reviewed-public").bytes, "mn-doc evaluator reference");
+  const identity = establishReviewArchiveIdentity({ root: repository, runtimeRoot: ROOT, reviewedHead, sourceRevision, evaluatorRevision: reference.evaluator_revision, generatorPath: ZIP_GENERATOR_SOURCE_PATH });
+  const productionAuthority = validateMnDocConfigCorrectionProductionAuthority({ root: repository });
+  if (productionAuthority.evaluatorRevision !== reference.evaluator_revision) throw new Error("review archive checked-out public authority differs from reviewed Git object authority");
+  const bundle = readJson(resolve(privateDirectory, "private-evaluator-bundle.json"), "mn-doc private evaluator bundle");
+  const privateSummary = validateReviewArchivePrivateBundle({ fixtureId: FIXTURE_ID, bundle, authority: productionAuthority, privateEntries: privateEntriesForIdentity, privatePrefix: "private" });
+  const caseSummary = validateReviewArchiveCases({ fixtureId: FIXTURE_ID, caseEntries: caseEntriesForIdentity, casePrefix: "cases", manifestName: "expectations.json", exactCasePaths: caseAuthority.filePaths });
   const effectivePullRequest = pullRequest ?? (issue === null ? 242 : null);
   if ((issue === null) === (effectivePullRequest === null)) throw new Error("review archive requires exactly one review target");
   if (issue !== null && (!Number.isInteger(issue) || issue < 1)) throw new Error("review archive issue is invalid");
   if (effectivePullRequest !== null && (!Number.isInteger(effectivePullRequest) || effectivePullRequest < 1)) throw new Error("review archive pull request is invalid");
   const sources = { root: repository, privateRoot: privateDirectory, caseRoot: caseDirectory };
-  const entries = inventorySources(sources);
-  assertInventoryMatchesSources(entries, sources);
-  const manifest = reviewManifest({ ...sources, reviewedHead, pullRequest: effectivePullRequest, issue, entries });
+  const identityFiles = [
+    ...evaluatorSourceReviewEntries({ root: repository, sourceRevision, sourceIdentity: bundle.evaluator_source_identity }),
+    ...identity.generatorEntries,
+  ].map((entry) => {
+    const separator = entry.path.indexOf("/");
+    const sourcePath = entry.path.slice(separator + 1);
+    return { archive_path: entry.path, entry_type: "file", mode: entry.mode, category: entry.path.startsWith("evaluator-source/") ? "evaluator_source" : "archive_generator_source", source_scope: "repository", source_path: sourcePath, bytes: entry.bytes.length, sha256: sha256(entry.bytes) };
+  });
+  const entries = orderedArchiveEntries([...inventorySources({ ...sources, reviewedHead, caseEntries: caseAuthority.entries }), ...identityFiles, ...packageDirectoryEntries(identityFiles)]);
+  const committedRepositoryBytes = repositoryRevisionBytes(entries, { root: repository, reviewedHead, sourceRevision });
+  assertInventoryMatchesSources(entries, sources, committedRepositoryBytes);
+  const manifest = reviewManifest({ ...sources, reviewedHead, sourceRevision, pullRequest: effectivePullRequest, issue, entries, identity, privateSummary, caseSummary, repositoryBytes: committedRepositoryBytes });
   const stagingRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-doc-review-stage-"));
   const stage = resolve(stagingRoot, "package");
   try {
-    materializeStage(stage, manifest, sources);
-    archiveStage(stage, resolve(outputPath), manifest);
-    return { archive_path: resolve(outputPath), raw_sha256: sha256(readFileSync(resolve(outputPath))), raw_bytes: statSync(resolve(outputPath)).size, manifest };
+    materializeStage(stage, manifest, sources, committedRepositoryBytes);
+    archiveStage(stage, archiveTarget, manifest);
+    return { archive_path: archiveTarget, raw_sha256: sha256(readFileSync(archiveTarget)), raw_bytes: statSync(archiveTarget).size, manifest };
   } finally {
     rmSync(stagingRoot, { recursive: true, force: true });
   }
@@ -490,7 +617,7 @@ function parseArgs(argv) {
   const args = {};
   while (argv.length > 0) {
     const flag = argv.shift();
-    if (!["--private-root", "--case-root", "--output", "--reviewed-head", "--pull-request", "--issue"].includes(flag) || argv.length === 0) throw new Error(`unknown or incomplete review archive argument: ${flag}`);
+    if (!["--private-root", "--case-root", "--output", "--reviewed-head", "--source-revision", "--pull-request", "--issue"].includes(flag) || argv.length === 0) throw new Error(`unknown or incomplete review archive argument: ${flag}`);
     args[flag.slice(2).replaceAll("-", "_")] = argv.shift();
   }
   return args;
@@ -498,8 +625,8 @@ function parseArgs(argv) {
 
 if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const command = process.argv[2];
-  if (command !== "generate") throw new Error("usage: generate --private-root <dir> --case-root <dir> --output <zip> --reviewed-head <sha> [--pull-request <number> | --issue <number>]");
+  if (command !== "generate") throw new Error("usage: generate --private-root <dir> --case-root <dir> --output <zip> --reviewed-head <sha> --source-revision <sha> [--pull-request <number> | --issue <number>]");
   const args = parseArgs(process.argv.slice(3));
-  const result = generateMnDocConfigCorrectionReviewArchive({ privateRoot: args.private_root, caseRoot: args.case_root, outputPath: args.output, reviewedHead: args.reviewed_head, pullRequest: args.pull_request ? Number(args.pull_request) : null, issue: args.issue ? Number(args.issue) : null });
+  const result = generateMnDocConfigCorrectionReviewArchive({ privateRoot: args.private_root, caseRoot: args.case_root, outputPath: args.output, reviewedHead: args.reviewed_head, sourceRevision: args.source_revision, pullRequest: args.pull_request ? Number(args.pull_request) : null, issue: args.issue ? Number(args.issue) : null });
   console.log(JSON.stringify({ archive_path: result.archive_path, raw_sha256: result.raw_sha256, raw_bytes: result.raw_bytes, entry_count: result.manifest.inventory.final_archive_entry_count }));
 }

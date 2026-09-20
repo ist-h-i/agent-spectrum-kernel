@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-spectrum-kernel.local/benchmarks/schemas/prompt-v2-preregistration.schema.json",
+  "title": "Prompt v2 result-blind preregistration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "schema_path", "artifact_type", "program", "artifact_id", "protocol", "phase",
+    "results_accessed", "execution_repository", "expected_case_count", "prompt_roles", "ordering",
+    "raw_scoring", "canonical_prompt_v2", "prompt_tracks", "fixture_input_manifest", "fixtures",
+    "runtime", "thresholds", "outcome_policy", "privacy", "generated_authority_binding_contract",
+    "stop_conditions", "boundaries", "preregistration_id", "preregistration_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/prompt-v2-preregistration.schema.json" },
+    "artifact_type": { "const": "prompt_v2_preregistration" },
+    "program": { "const": "ask_prompt_v2_result_blind_canary" },
+    "artifact_id": { "const": "SPEC-234-PROMPT-V2-PREREGISTRATION" },
+    "protocol": { "$ref": "#/$defs/fileBindingNoRole" },
+    "phase": { "const": "pre_result" },
+    "results_accessed": { "const": false },
+    "execution_repository": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository_id", "revision", "tree"],
+      "properties": {
+        "repository_id": { "const": "ist-h-i/agent-spectrum-kernel" },
+        "revision": { "$ref": "#/$defs/git" },
+        "tree": { "$ref": "#/$defs/git" }
+      }
+    },
+    "expected_case_count": { "const": 56 },
+    "prompt_roles": {
+      "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
+      "items": { "enum": ["current_prompt", "prompt_v2"] }
+    },
+    "ordering": {
+      "type": "object", "additionalProperties": false, "required": ["strategy", "seed"],
+      "properties": {
+        "strategy": { "const": "seeded_balanced_two_arm_rotation" },
+        "seed": { "type": "string", "minLength": 1 }
+      }
+    },
+    "raw_scoring": {
+      "type": "object", "additionalProperties": false,
+      "required": ["condition", "implementation", "authority_files", "authority_digest"],
+      "properties": {
+        "condition": { "const": "full_ask" },
+        "implementation": { "const": "reuse_existing_197_authority" },
+        "authority_files": {
+          "type": "array", "minItems": 17, "maxItems": 17,
+          "items": { "$ref": "#/$defs/fileBinding" }
+        },
+        "authority_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "canonical_prompt_v2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["binding_path", "binding_raw_byte_digest", "reference_path", "reference_raw_byte_digest", "registry_snapshot_digest", "asset_binding_digest", "prompt_asset", "policy_asset", "source_maps"],
+      "properties": {
+        "binding_path": { "$ref": "#/$defs/path" },
+        "binding_raw_byte_digest": { "$ref": "#/$defs/digest" },
+        "reference_path": { "$ref": "#/$defs/path" },
+        "reference_raw_byte_digest": { "$ref": "#/$defs/digest" },
+        "registry_snapshot_digest": { "$ref": "#/$defs/digest" },
+        "asset_binding_digest": { "$ref": "#/$defs/digest" },
+        "prompt_asset": { "$ref": "#/$defs/asset" },
+        "policy_asset": { "$ref": "#/$defs/asset" },
+        "source_maps": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/fileBindingNoRole" } }
+      }
+    },
+    "prompt_tracks": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["adapter_track", "stable_asset_id", "current_source_revision", "current_source_files", "renderer"],
+        "properties": {
+          "adapter_track": { "$ref": "#/$defs/adapter" },
+          "stable_asset_id": { "type": "string", "minLength": 1 },
+          "current_source_revision": { "$ref": "#/$defs/git" },
+          "current_source_files": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/fileBindingNoRole" } },
+          "renderer": {
+            "type": "object", "additionalProperties": false,
+            "required": ["renderer_id", "renderer_version", "implementation_path", "implementation_raw_byte_digest"],
+            "properties": {
+              "renderer_id": { "type": "string", "minLength": 1 },
+              "renderer_version": { "type": "string", "minLength": 1 },
+              "implementation_path": { "$ref": "#/$defs/path" },
+              "implementation_raw_byte_digest": { "$ref": "#/$defs/digest" }
+            }
+          }
+        }
+      }
+    },
+    "fixture_input_manifest": { "$ref": "#/$defs/fileBindingNoRole" },
+    "fixtures": {
+      "type": "array", "minItems": 4, "maxItems": 4,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["source_fixture_id", "catalog_fixture_id", "task_class", "repetitions", "catalog_metadata_digest", "input_manifest_fixture_digest", "task_digest", "workspace_digest", "evaluator_visible_input_digest", "frozen_input_digest", "public_evaluator_set"],
+        "properties": {
+          "source_fixture_id": { "type": "string", "minLength": 1 },
+          "catalog_fixture_id": { "type": "string", "minLength": 1 },
+          "task_class": { "enum": ["review", "implementation"] },
+          "repetitions": { "enum": [3, 5] },
+          "catalog_metadata_digest": { "$ref": "#/$defs/digest" },
+          "input_manifest_fixture_digest": { "$ref": "#/$defs/digest" },
+          "task_digest": { "$ref": "#/$defs/digest" },
+          "workspace_digest": { "$ref": "#/$defs/digest" },
+          "evaluator_visible_input_digest": { "$ref": "#/$defs/digest" },
+          "frozen_input_digest": { "$ref": "#/$defs/digest" },
+          "public_evaluator_set": {
+            "type": "object", "additionalProperties": false,
+            "required": ["root_path", "file_count", "inventory_digest"],
+            "properties": {
+              "root_path": { "$ref": "#/$defs/path" },
+              "file_count": { "type": "integer", "minimum": 1 },
+              "inventory_digest": { "$ref": "#/$defs/digest" }
+            }
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object", "additionalProperties": false,
+      "required": ["execution_mode", "fresh_process_per_case", "isolated_workspace_per_case", "share_mutable_result_roots", "provider_cache_state", "cached_tokens_reported_separately", "cached_tokens_added_to_total", "adapters"],
+      "properties": {
+        "execution_mode": { "const": "sequential" },
+        "fresh_process_per_case": { "const": true },
+        "isolated_workspace_per_case": { "const": true },
+        "share_mutable_result_roots": { "const": false },
+        "provider_cache_state": { "const": "unknown" },
+        "cached_tokens_reported_separately": { "const": true },
+        "cached_tokens_added_to_total": { "const": false },
+        "adapters": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "object" } }
+      }
+    },
+    "thresholds": {
+      "type": "object", "additionalProperties": false,
+      "required": ["quality", "guardrails", "route_gates", "tokens", "duration", "stability"],
+      "properties": {
+        "quality": {
+          "type": "object", "additionalProperties": false,
+          "required": ["minimum_fixture_median_delta", "minimum_nonnegative_fraction_numerator", "minimum_nonnegative_fraction_denominator"],
+          "properties": {
+            "minimum_fixture_median_delta": { "const": 0 },
+            "minimum_nonnegative_fraction_numerator": { "const": 2 },
+            "minimum_nonnegative_fraction_denominator": { "const": 3 }
+          }
+        },
+        "guardrails": {
+          "type": "object", "additionalProperties": false, "required": ["maximum_increase", "fields"],
+          "properties": {
+            "maximum_increase": { "const": 0 },
+            "fields": { "type": "array", "minItems": 11, "maxItems": 11, "uniqueItems": true, "items": { "type": "string" } }
+          }
+        },
+        "route_gates": {
+          "type": "object", "additionalProperties": false, "required": ["unknown_or_unavailable_passes", "fields"],
+          "properties": {
+            "unknown_or_unavailable_passes": { "const": false },
+            "fields": { "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": { "type": "string" } }
+          }
+        },
+        "tokens": {
+          "type": "object", "additionalProperties": false,
+          "required": ["total_formula", "cached_tokens_added_again", "minimum_median_reduction_ratio", "minimum_pair_fraction_numerator", "minimum_pair_fraction_denominator", "variability_rule"],
+          "properties": {
+            "total_formula": { "const": "input_tokens + output_tokens" },
+            "cached_tokens_added_again": { "const": false },
+            "minimum_median_reduction_ratio": { "const": 0.3 },
+            "minimum_pair_fraction_numerator": { "const": 2 },
+            "minimum_pair_fraction_denominator": { "const": 3 },
+            "variability_rule": { "const": "median_proportional_reduction_gte_larger_normalized_within_role_mad" }
+          }
+        },
+        "duration": {
+          "type": "object", "additionalProperties": false,
+          "required": ["maximum_unconditional_increase_ratio", "maximum_conditional_increase_ratio", "minimum_conditional_quality_gain", "conditional_variability_rule"],
+          "properties": {
+            "maximum_unconditional_increase_ratio": { "const": 0.2 },
+            "maximum_conditional_increase_ratio": { "const": 0.5 },
+            "minimum_conditional_quality_gain": { "const": 0.05 },
+            "conditional_variability_rule": { "const": "quality_gain_gt_larger_within_role_normalized_quality_mad" }
+          }
+        },
+        "stability": {
+          "type": "object", "additionalProperties": false, "required": ["required_statistics", "incomplete_statistics_pass"],
+          "properties": {
+            "required_statistics": { "type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": { "type": "string" } },
+            "incomplete_statistics_pass": { "const": false }
+          }
+        }
+      }
+    },
+    "outcome_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["precedence", "authoritative", "adapter_pooling_allowed", "repository_outcome_requires_all_adapters_complete"],
+      "properties": {
+        "precedence": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "enum": ["insufficient_evidence", "revise_and_repeat", "retain_current", "adopt_prompt_v2"] } },
+        "authoritative": { "const": false },
+        "adapter_pooling_allowed": { "const": false },
+        "repository_outcome_requires_all_adapters_complete": { "const": true }
+      }
+    },
+    "privacy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["durable_raw_prompt_allowed", "durable_raw_output_allowed", "durable_private_evaluator_allowed", "private_evaluator_semantic_read_allowed", "raw_score_recomputation_allowed", "durable_artifacts_allowlist"],
+      "properties": {
+        "durable_raw_prompt_allowed": { "const": false }, "durable_raw_output_allowed": { "const": false },
+        "durable_private_evaluator_allowed": { "const": false }, "private_evaluator_semantic_read_allowed": { "const": false },
+        "raw_score_recomputation_allowed": { "const": false },
+        "durable_artifacts_allowlist": {
+          "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true,
+          "items": { "enum": ["exact_identity_references", "typed_native_unit_metrics", "aggregate_statistics", "non_authoritative_prompt_outcome"] }
+        }
+      }
+    },
+    "generated_authority_binding_contract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["binding_kind", "source_revision_is_external", "source_must_precede_generated_binding", "rendered_source_root", "required_exact_identities", "post_result_objects_allowed", "activation_implied"],
+      "properties": {
+        "binding_kind": { "const": "prompt_v2_preregistration_generated_authority" },
+        "source_revision_is_external": { "const": true },
+        "source_must_precede_generated_binding": { "const": true },
+        "rendered_source_root": { "$ref": "#/$defs/path" },
+        "required_exact_identities": { "type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": { "type": "string" } },
+        "post_result_objects_allowed": { "const": false },
+        "activation_implied": { "const": false }
+      }
+    },
+    "stop_conditions": { "type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true, "items": { "type": "string" } },
+    "boundaries": {
+      "type": "object", "additionalProperties": false,
+      "required": ["measured_execution_authorized", "recommendation_created", "decision_created", "runtime_activation_implied", "lifecycle_mutation_authorized"],
+      "properties": {
+        "measured_execution_authorized": { "const": false }, "recommendation_created": { "const": false },
+        "decision_created": { "const": false }, "runtime_activation_implied": { "const": false },
+        "lifecycle_mutation_authorized": { "const": false }
+      }
+    },
+    "preregistration_id": { "type": "string", "pattern": "^prompt-v2-prereg-[a-f0-9]{32}$" },
+    "preregistration_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "git": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$" },
+    "adapter": { "enum": ["codex", "claude"] },
+    "fileBinding": {
+      "type": "object", "additionalProperties": false, "required": ["role", "path", "raw_byte_digest"],
+      "properties": { "role": { "type": "string", "minLength": 1 }, "path": { "$ref": "#/$defs/path" }, "raw_byte_digest": { "$ref": "#/$defs/digest" } }
+    },
+    "fileBindingNoRole": {
+      "type": "object", "additionalProperties": false, "required": ["path", "raw_byte_digest"],
+      "properties": { "path": { "$ref": "#/$defs/path" }, "raw_byte_digest": { "$ref": "#/$defs/digest" } }
+    },
+    "asset": {
+      "type": "object", "additionalProperties": false, "required": ["asset_type", "stable_id", "version", "record_digest", "content_digest"],
+      "properties": {
+        "asset_type": { "enum": ["prompt", "policy"] }, "stable_id": { "type": "string", "minLength": 1 }, "version": { "type": "string", "minLength": 1 },
+        "record_digest": { "$ref": "#/$defs/digest" }, "content_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

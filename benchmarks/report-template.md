@@ -42,6 +42,7 @@ Use `unknown`, backed by JSON `null`, for every unavailable measurement. Do not 
 
 - Verified:
 - Supported:
+- Hypothesis:
 - Unknown:
 - Falsified:
 - Causal claims not supported:

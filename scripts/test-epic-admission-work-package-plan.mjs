@@ -886,6 +886,26 @@ expectCodes("NEG-STACK-DEPENDENCY-CLOSURE", validatePlanBundle(mutatePlan(canoni
   }));
 }
 {
+  const colonProperty = clone(canonical.context);
+  colonProperty["bad:key"] = true;
+  const issues = validateWorkPackagePlanValidationContext(sealWorkPackagePlanValidationContext(colonProperty), {
+    policy: canonical.policy,
+    decision: canonical.decision,
+  });
+  assert.equal(issues.some(({ path }) => path === '$["bad:key"]'), true, "deterministic Schema paths must preserve colons in property names");
+}
+{
+  const mixedInvalid = clone(canonical.context);
+  mixedInvalid.context_revision = 1;
+  mixedInvalid["bad:key"] = true;
+  const issues = validateWorkPackagePlanValidationContext(sealWorkPackagePlanValidationContext(mixedInvalid), {
+    policy: canonical.policy,
+    decision: canonical.decision,
+  });
+  assert.equal(issues.every(({ code }) => code === "SCHEMA_INVALID"), true, "lineage compatibility must not mask independent Schema failures");
+  assert.equal(issues.some(({ path }) => path === '$["bad:key"]'), true, "mixed-invalid Schema path must remain exact");
+}
+{
   const alteredPreviousPlan = clone(canonical.plan);
   alteredPreviousPlan.packages[0].ordered_tasks[0].description = "Resealed predecessor meaning that its trusted context did not accept.";
   const sealedAlteredPreviousPlan = sealWorkPackagePlan(alteredPreviousPlan);

@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0.0",
+  "program": "ask_portfolio_manager_samples",
+  "source_revision": "9586ea62888c896e6bda7e5647972218fe96ea0d",
+  "registry_snapshot_digest": "sha256:34a511af596bc1317941241135f053153d9862ff7552a243c0231fc079c4edba",
+  "kernel_only": {
+    "schema_version": "1.0.0",
+    "program": "ask_portfolio_reference",
+    "portfolio_id": "ask.portfolio.reference",
+    "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+    "scope_id": "agent-spectrum-kernel",
+    "lock_revision": 2,
+    "lock_digest": "sha256:646f7738d9eed0b744e1096c74ad4ee7ce2449c2c98fd193cba4aabccd0bd704",
+    "required_portfolio_authority_context_digests": [
+      "sha256:0e499748e1957449343805b97886ade136a1754b899ac7c8425f905ed31877e0"
+    ],
+    "required_high_impact_approval_grant_digests": [],
+    "current_manifest": {
+      "revision": "reference-kernel-only-v1",
+      "manifest_digest": "sha256:ad70988ddb668b2feb9c2bf2ff55df5b83007158f9e5b291408a54d0956cdb47",
+      "asset_set_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "selections": [
+      {
+        "selection_object_digest": "sha256:d01137c27fa79d0828b8735feeb834f85001178d3e3881480444c33b29723f33",
+        "selection_digest": "sha256:1d44860afcffce4d823a4bedaf53bed23272cea430b15f06a73cce0575c7250f",
+        "context_object_digest": "sha256:b3d6e32039faf9c46ed92263b673c441acfd0ff88a73873be8286bc475dd1136",
+        "context_digest": "sha256:1d6348f6e74fabf3dd364b14c89f5063080900bc7eae892b8f0d3ca4b5562637",
+        "decision": "selected"
+      }
+    ],
+    "mutable_latest_pointer_used": false,
+    "runtime_activation_implied": false,
+    "execution_implied": false,
+    "effectiveness_implied": false
+  },
+  "adaptive_ask": {
+    "schema_version": "1.0.0",
+    "program": "ask_portfolio_reference",
+    "portfolio_id": "ask.portfolio.reference",
+    "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+    "scope_id": "agent-spectrum-kernel",
+    "lock_revision": 3,
+    "lock_digest": "sha256:c12f13a5762d3a0c1e6868fca76e43197c541f2ac61965cf6fdc58714079f633",
+    "required_portfolio_authority_context_digests": [
+      "sha256:04b954d103ac3ab1c4b51e8f930d9a314b501c6c88911a375179820353939aa8",
+      "sha256:0e499748e1957449343805b97886ade136a1754b899ac7c8425f905ed31877e0"
+    ],
+    "required_high_impact_approval_grant_digests": [],
+    "current_manifest": {
+      "revision": "reference-adaptive-ask-v1",
+      "manifest_digest": "sha256:8b643e508304b4b23dea1e833c5ea78715dcbba5ebadd08947f7cedf744828e9",
+      "asset_set_digest": "sha256:bf7aa0a97dbdd6fa46453e661ce05482e3619062f9fc949d916e2fdc6c11a329"
+    },
+    "selections": [
+      {
+        "selection_object_digest": "sha256:3cd937a361e7087a4c88a98bc3326cc2f930f4ef88d0cc86dc466cf7f4c7dbb5",
+        "selection_digest": "sha256:4b2492cf9f5777bf66287e8f0b69949e8c02bf760c5ac04288b69ce452926aee",
+        "context_object_digest": "sha256:5a5f82acd97693aee049f4fb2f6060a444f7b9ecb0d205e48d012039b580aba1",
+        "context_digest": "sha256:7d0b8ddb780dafa2f077cbedbafcda611318dc1938f9b9a9486596f6a11db123",
+        "decision": "downgrade"
+      }
+    ],
+    "mutable_latest_pointer_used": false,
+    "runtime_activation_implied": false,
+    "execution_implied": false,
+    "effectiveness_implied": false
+  },
+  "frozen_benchmark_results_mutated": false
+}

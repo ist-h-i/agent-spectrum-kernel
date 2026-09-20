@@ -35,15 +35,15 @@ This is decision support. It may recommend a decision, but unresolved value, pri
 2. Separate evidence lanes.
    - User decisions or stated intent.
    - Verified repo facts.
-   - Human-confirmed or verified domain rules.
+   - Domain rules with canonical evidence status and separately recorded human authority.
    - Supported or hypothesis domain rules.
    - AI hypotheses.
 
 3. Use domain rules safely.
-   - `Human-confirmed` and `Verified` rules are constraints.
+   - `Verified` rules may be constraints when scope matches; human authority identifies the decision owner but does not replace evidence status.
    - `Supported` rules produce caution and follow-up checks.
    - `Hypothesis` rules produce questions only.
-   - `Contradicted` or stale rules require human/domain-owner decision before use as constraints.
+   - Rules with `Record state=contradicted` or stale evidence require human/domain-owner decision before use as constraints.
 
 4. Ask only the next material question when blocked.
    - Do not ask broad question dumps.

@@ -17,6 +17,8 @@
     "do_not_use_when",
     "evidence_source",
     "evidence_status",
+    "authority_status",
+    "record_state",
     "related_files_modules",
     "related_domain_rules",
     "related_engineering_patterns",
@@ -37,9 +39,10 @@
     "do_not_use_when": { "type": "string", "minLength": 1 },
     "evidence_source": { "type": "string", "minLength": 1 },
     "evidence_status": {
-      "type": "string",
-      "enum": ["Verified", "Human-confirmed", "Supported", "Hypothesis", "Deprecated", "Contradicted"]
+      "$ref": "claim-evidence-status.schema.json"
     },
+    "authority_status": { "type": "string", "enum": ["not_asserted", "human_confirmed"] },
+    "record_state": { "type": "string", "enum": ["active", "deprecated", "contradicted"] },
     "related_files_modules": { "type": "array", "items": { "type": "string", "minLength": 1 } },
     "related_domain_rules": { "type": "array", "items": { "type": "string", "minLength": 1 } },
     "related_engineering_patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } },

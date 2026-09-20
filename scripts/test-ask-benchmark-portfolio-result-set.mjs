@@ -37,6 +37,14 @@ import {
   verifyEngineeringMechanismScorecard,
 } from "./ask-benchmark-portfolio-mechanism-scorecard.mjs";
 import {
+  reportPortfolioAggregateResult,
+  verifyPortfolioAggregateResult,
+} from "./ask-benchmark-portfolio-aggregate-result.mjs";
+import {
+  computeClassificationRecordDigest,
+  verifyPortfolioPolicyArtifacts,
+} from "./ask-benchmark-portfolio-policy.mjs";
+import {
   assertVerifiedResultInventory,
   collectEngineeringResults,
   computeEngineeringResultSetDigest,
@@ -66,7 +74,24 @@ const RUN_INSTANCE_ID = "00000000-0000-4000-8000-000000000197";
 const PLAN_ID = `plan-${hash("synthetic-result-set-plan")}`;
 const PLAN_DIGEST = digest("synthetic-result-set-plan-digest");
 const SCORING_POLICY_DIGEST = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-scoring-policy.json"), "utf8")).policy_digest;
+const POLICY_AUTHORITIES = verifyPortfolioPolicyArtifacts({ root });
+const FIXTURE_DEFINITIONS = [
+  { fixture_id: "mp-accessibility-interaction-review", fixture_role: "primary", suite: "mechanism_positive", task_class: "pr_review", repetitions: 3, aggregate_eligible: true },
+  { fixture_id: "cal-concurrent-transfer", fixture_role: "calibration", suite: "calibration", task_class: "implementation", repetitions: 5, aggregate_eligible: false },
+];
+const FIXTURES_BY_ID = new Map(FIXTURE_DEFINITIONS.map((fixture) => [fixture.fixture_id, fixture]));
+const AGGREGATE_NUMERIC_FIXTURE_ID = "mp-accessibility-interaction-review";
+const AGGREGATE_NUMERIC_CONDITIONS = new Set(["kernel_only", "adaptive_ask"]);
 const covered = new Set();
+
+function isAggregateNumericInput({ adapter, fixture, condition }) {
+  return adapter === "codex" && fixture === AGGREGATE_NUMERIC_FIXTURE_ID && AGGREGATE_NUMERIC_CONDITIONS.has(condition);
+}
+
+function aggregateNumericRequirementScore(condition) {
+  const normalized = condition === "kernel_only" ? 0.25 : 0.75;
+  return { scored_requirement_count: 1, requirement_points_earned: normalized, requirement_points_possible: 1, normalized_requirement_score: normalized };
+}
 
 function hash(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -154,6 +179,8 @@ function blockId(adapter, fixture, repetition) {
 }
 
 function normalizedRecord({ adapter, fixture, repetitions, condition, repetition, outcome }) {
+  const fixtureDefinition = FIXTURES_BY_ID.get(fixture);
+  assert.ok(fixtureDefinition, `missing synthetic fixture definition for ${fixture}`);
   const case_id = caseId(adapter, fixture, condition, repetition);
   const attempt = "0001";
   const telemetry = Object.fromEntries(TELEMETRY_FIELDS.map((field) => [field, missingMetric(outcome)]));
@@ -169,11 +196,11 @@ function normalizedRecord({ adapter, fixture, repetitions, condition, repetition
       materialization_manifest_digest: digest("synthetic-materialization"),
       fixture_id: fixture,
       fixture_input_digest: digest(`fixture:${fixture}`),
-      suite: fixture === "fixture-three" ? "mechanism_positive" : "calibration",
-      task_class: "implementation",
+      suite: fixtureDefinition.suite,
+      task_class: fixtureDefinition.task_class,
       difficulty: "synthetic",
       registered_repetitions: repetitions,
-      aggregate_eligible: fixture !== "fixture-five",
+      aggregate_eligible: fixtureDefinition.aggregate_eligible,
       case_id,
       attempt,
       adapter_track: adapter,
@@ -240,10 +267,12 @@ function buildNormalizedRoot(target) {
   const records = [];
   let outcomeIndex = 0;
   for (const adapter of ADAPTERS) {
-    for (const [fixture, repetitions] of [["fixture-three", 3], ["fixture-five", 5]]) {
+    for (const { fixture_id: fixture, repetitions } of FIXTURE_DEFINITIONS) {
       for (const condition of CONDITIONS) {
         for (let repetition = 1; repetition <= repetitions; repetition += 1) {
-          records.push(normalizedRecord({ adapter, fixture, repetitions, condition, repetition, outcome: OUTCOMES[outcomeIndex++ % OUTCOMES.length] }));
+          const syntheticOutcome = OUTCOMES[outcomeIndex++ % OUTCOMES.length];
+          const outcome = isAggregateNumericInput({ adapter, fixture, condition }) ? "completed" : syntheticOutcome;
+          records.push(normalizedRecord({ adapter, fixture, repetitions, condition, repetition, outcome }));
         }
       }
     }
@@ -378,8 +407,12 @@ function observation() {
 
 function engineeringResult(record, index) {
   const evaluatorStatuses = ["completed", "evaluator_unavailable", "evaluator_failed", "invalid_input", "manual_review_required"];
-  const evaluation_status = record.outcome === "completed" ? evaluatorStatuses[index % evaluatorStatuses.length] : "completed";
+  const aggregateNumericInput = isAggregateNumericInput({ adapter: record.lineage.adapter_track, fixture: record.lineage.fixture_id, condition: record.lineage.condition });
+  const evaluation_status = aggregateNumericInput ? "completed" : (record.outcome === "completed" ? evaluatorStatuses[index % evaluatorStatuses.length] : "completed");
   const complete = record.outcome === "completed" && evaluation_status === "completed";
+  const completeRequirementScore = aggregateNumericInput
+    ? aggregateNumericRequirementScore(record.lineage.condition)
+    : { scored_requirement_count: 1, requirement_points_earned: 1, requirement_points_possible: 1, normalized_requirement_score: 1 };
   const normalizedReasons = { failed: "normalized_execution_failed", unavailable: "normalized_execution_unavailable", interrupted: "normalized_execution_interrupted", invalid: "normalized_execution_invalid" };
   const evaluatorReasons = { evaluator_unavailable: "evaluator_unavailable", evaluator_failed: "evaluator_failed", invalid_input: "evaluation_invalid_input", manual_review_required: "manual_review_required" };
   const scoring_reason = complete ? "completed_evaluation_scoring_ready" : record.outcome === "completed" ? evaluatorReasons[evaluation_status] : normalizedReasons[record.outcome];
@@ -429,7 +462,7 @@ function engineeringResult(record, index) {
     condition: record.lineage.condition,
     repetition: record.lineage.repetition,
     requirement_score: complete
-      ? { scored_requirement_count: 1, requirement_points_earned: 1, requirement_points_possible: 1, normalized_requirement_score: 1 }
+      ? completeRequirementScore
       : { scored_requirement_count: null, requirement_points_earned: null, requirement_points_possible: null, normalized_requirement_score: null },
     blockers: complete
       ? { requirement_ids: [], outcomes: [], non_pass_requirement_ids: [], gate_status: "not_applicable" }
@@ -1265,6 +1298,90 @@ try {
   assert.equal(Object.hasOwn(verifiedPairedComparison.artifact, "verified_comparison_report"), false);
   covered.add("paired-comparison-full-authority");
 
+  const aggregateAuthorityRoot = resolve(positive.target, "aggregate-authority");
+  const classificationRecordPath = `classification/${AGGREGATE_NUMERIC_FIXTURE_ID}.json`;
+  const classificationRecord = {
+    classification_record_id: `classification-${AGGREGATE_NUMERIC_FIXTURE_ID}-e2e`,
+    classification_record_schema_path: "benchmarks/schemas/portfolio-classification-record.schema.json",
+    classification_record_path: classificationRecordPath,
+    fixture_id: AGGREGATE_NUMERIC_FIXTURE_ID,
+    fixture_role: "primary",
+    catalog_digest: POLICY_AUTHORITIES.verified_catalog.catalog_digest,
+    policy_manifest_digest: POLICY_AUTHORITIES.verified_policy_manifest.manifest_digest,
+    pilot_result_digest: digest(`${AGGREGATE_NUMERIC_FIXTURE_ID}-e2e-pilot`),
+    supported_adapter_tracks: ["codex"],
+    ceiling_classification_result: "not_candidate",
+    floor_classification_result: "not_candidate",
+    classification_state: "primary_eligible",
+    reason_codes: ["ceiling_and_floor_not_candidate"],
+    classification_revision: 1,
+  };
+  classificationRecord.classification_digest = computeClassificationRecordDigest(classificationRecord);
+  const classificationRecordAbsolutePath = resolve(aggregateAuthorityRoot, classificationRecordPath);
+  writeJson(classificationRecordAbsolutePath, classificationRecord);
+  const classificationRecordSourceDigest = fileDigest(classificationRecordAbsolutePath);
+  const aggregateResultPath = resolve(positive.target, "aggregate-result.json");
+  const aggregateOptions = {
+    ...options(positive),
+    resultSetPath: positive.outputPath,
+    repetitionReportPath,
+    comparisonReportPath: pairedComparisonPath,
+    aggregateAuthorityRoot,
+    classificationRecordPaths: [classificationRecordPath],
+    lineageRecordPaths: [],
+    immutableArtifactDigests: { [classificationRecordPath]: classificationRecordSourceDigest },
+    comparisonView: "adaptive_vs_kernel",
+    suite: "mechanism_positive",
+    taskClass: "pr_review",
+    outputPath: aggregateResultPath,
+  };
+  const numericFixtureComparison = verifiedPairedComparison.verified_comparison_report.fixture_comparisons.find(({ fixture_id }) => fixture_id === AGGREGATE_NUMERIC_FIXTURE_ID);
+  const numericComparisonView = numericFixtureComparison?.comparison_views.find(({ view_id }) => view_id === "adaptive_vs_kernel");
+  assert.equal(numericComparisonView?.structural_pairing_status, "complete");
+  assert.equal(numericComparisonView?.quality_delta_distribution.distribution_status, "complete");
+  assert.equal(numericComparisonView?.quality_delta_distribution.sample_count, 3);
+  assert.equal(Number.isFinite(numericComparisonView?.quality_delta_distribution.mean), true);
+  const expectedNumericDelta = numericComparisonView.quality_delta_distribution.mean;
+  assert.equal(expectedNumericDelta, 0.5);
+  assert.notEqual(expectedNumericDelta, 0);
+  const aggregateResult = reportPortfolioAggregateResult(aggregateOptions);
+  assert.deepEqual(aggregateResult.artifact.expected_fixture_ids, [AGGREGATE_NUMERIC_FIXTURE_ID]);
+  assert.deepEqual(aggregateResult.artifact.included_fixture_ids, [AGGREGATE_NUMERIC_FIXTURE_ID]);
+  assert.deepEqual(aggregateResult.artifact.excluded_fixtures, []);
+  assert.deepEqual(aggregateResult.artifact.fixture_contributions, [{ fixture_id: AGGREGATE_NUMERIC_FIXTURE_ID, normalized_quality_delta: expectedNumericDelta }]);
+  assert.equal(aggregateResult.artifact.unweighted_quality_delta, expectedNumericDelta);
+  assert.equal(aggregateResult.artifact.weighted_quality_delta, null);
+  assert.equal(aggregateResult.artifact.numerator, null);
+  assert.equal(aggregateResult.artifact.denominator, null);
+  assert.equal(aggregateResult.artifact.result_status, "insufficient_evidence");
+  const verifiedAggregateResult = verifyPortfolioAggregateResult({ ...aggregateOptions, outputPath: undefined, aggregateResultPath });
+  assert.equal(verifiedAggregateResult.artifact.aggregate_result_digest, aggregateResult.artifact.aggregate_result_digest);
+  assert.deepEqual(verifiedAggregateResult.artifact, aggregateResult.artifact);
+  assert.equal(Object.isFrozen(verifiedAggregateResult.verified_aggregate_result), true);
+  assert.equal(Object.isFrozen(verifiedAggregateResult.verified_comparison.verified_comparison_report), true);
+  assert.equal(Object.isFrozen(verifiedAggregateResult.verified_policy_artifacts.verified_catalog), true);
+  covered.add("aggregate-full-authority");
+
+  const aggregateCliPath = resolve(positive.target, "aggregate-result-cli.json");
+  const aggregateCliAuthorityArgs = [
+    ...reportCliAuthorityArgs(positive),
+    "--result-set", positive.outputPath,
+    "--repetition-report", repetitionReportPath,
+    "--paired-comparison-report", pairedComparisonPath,
+    "--aggregate-authority-root", aggregateAuthorityRoot,
+    "--classification-record", classificationRecordPath,
+    "--classification-record-source-digest", classificationRecordSourceDigest,
+    "--comparison-view", "adaptive_vs_kernel",
+    "--suite", "mechanism_positive",
+    "--task-class", "pr_review",
+  ];
+  const aggregateCliReport = run(["report-engineering-aggregate-result", ...aggregateCliAuthorityArgs, "--output", aggregateCliPath]);
+  assert.match(aggregateCliReport.stdout, /Published aggregate result .* with status insufficient_evidence/u);
+  assert.deepEqual(readFileSync(aggregateCliPath), aggregateResult.bytes);
+  const aggregateCliVerify = run(["verify-engineering-aggregate-result", ...aggregateCliAuthorityArgs, "--input", aggregateCliPath]);
+  assert.match(aggregateCliVerify.stdout, /Verified aggregate result .* with status insufficient_evidence/u);
+  covered.add("aggregate-cli-report-verify-success");
+
   const directionalOutcomePath = resolve(positive.target, "directional-outcome-report.json");
   const directionalOutcome = reportEngineeringDirectionalOutcomes({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, comparisonReportPath: pairedComparisonPath, outputPath: directionalOutcomePath });
   assert.equal(directionalOutcome.artifact.fixture_outcomes.length, 2);
@@ -1946,6 +2063,7 @@ try {
     "concurrent-mechanism-publication", "mechanism-no-filesystem-reread-after-full-verification",
     "successful-mechanism-publication-inputs-unchanged", "failed-mechanism-publication-inputs-unchanged",
     "paired-comparison-full-authority", "paired-different-valid-bytes-replacement", "paired-same-bytes-different-inode-replacement",
+    "aggregate-full-authority", "aggregate-cli-report-verify-success",
     "concurrent-paired-publication", "successful-paired-publication-inputs-unchanged", "failed-paired-publication-inputs-unchanged",
     "paired-pre-existing-output", "paired-output-symlink", "paired-output-inside-authority-root",
     "directional-full-authority", "directional-different-valid-bytes-replacement", "directional-same-bytes-different-inode-replacement",

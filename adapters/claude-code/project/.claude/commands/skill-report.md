@@ -4,6 +4,8 @@ description: Generate a local adoption and debt movement report from project-loc
 
 Use `skill-adoption-metrics` and the local observability runtime.
 
+This report audits multiple material claims, so select `formal_ledger` under `ask.claim-evidence-status@1.0.0` and apply `/evidence-ledger`.
+
 Read only project-local evidence:
 
 - `docs/ai/metrics/events.jsonl`

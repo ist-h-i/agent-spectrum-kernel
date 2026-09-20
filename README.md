@@ -28,7 +28,7 @@ Project overlay = リポジトリ固有の規約・コマンド・禁止範囲
 
 `skills/operating-mode-router/SKILL.md` は、通常のdelivery/quality作業と、project adoption、observability/metrics、operation/automationを先に分ける上位routerです。`skills/skill-router/SKILL.md` はdelivery/quality内のrouterとして使います。
 
-共通の制御メタデータ（route、evidence status、stop reason、next action）の正本は `docs/execution-envelope-contract.md` です。router、adapter、session state はこの Execution Envelope を意味のあるworkflow境界で一度だけ出し、個別SkillはRequirement Contract、Spec、Verification Contract、Implementation Summary、Review Findingsなどの固有artifactに集中します。Metrics event candidate は明示的なopt-in時だけ任意で出します。
+共通の制御メタデータ（route、evidence status、stop reason、next action）の正本は `docs/execution-envelope-contract.md` です。router、adapter、session state はこの Execution Envelope を意味のあるworkflow境界で一度だけ出し、個別SkillはRequirement Contract、Spec、Compact Proof / Formal Verification Contract、Implementation Summary、Review Findingsなどの固有artifactに集中します。検証pathは `ask.verification-proof-policy@1.0.0` が観測済みtask/risk factsから選択し、compactからformalへの昇格だけを許します。Metrics event candidate は明示的なopt-in時だけ任意で出します。
 
 claim に必要な lifecycle evidence の接続は `docs/lifecycle-traceability-contract.md` が正本です。Requirement から Release Readiness までを stable item ref と observed revision で必要な範囲だけ結び、stale・contradictory・claim-relevant missing evidence を検出します。release gap は acceptance / verification / review / approval / rollback を区別します。trivial/localized task のtrace免除には観測事実が必要で、approvalやrisk gateは免除されません。中央serverやworkflow databaseは不要です。
 
@@ -51,11 +51,29 @@ CHANGELOG.md
 docs/
   adr/0001-verification-evidence-trust-boundary.md
   adr/0002-epic-admission-work-package-plan-authority.md
+  adr/0003-asset-registry-authority-boundary.md
+  adr/0004-portfolio-activation-authority-boundary.md
+  adr/0005-evolution-authority-boundary.md
   routing-model.md
   lifecycle-artifact-contract.md
   lifecycle-traceability-contract.md
   verification-evidence-contract.md
   epic-admission-work-package-plan-contract.md
+  asset-registry-contract.md
+  fixtures/asset-registry/reference.json
+  fixtures/asset-registry/store/objects/sha256/
+  portfolio-manager-contract.md
+  fixtures/portfolio-manager/reference.json
+  fixtures/portfolio-manager/store/objects/sha256/
+  evolution-loop-contract.md
+  evolution-loop-sample-prompt-candidate.md
+  fixtures/evolution-loop/reference.json
+  fixtures/evolution-loop/store/objects/sha256/
+  prompt-v2-execution-handoff.md
+  fixtures/prompt-v2-preregistration/binding.json
+  fixtures/prompt-v2-preregistration/reference.json
+  fixtures/prompt-v2-preregistration/rendered/
+  fixtures/prompt-v2-preregistration/store/objects/sha256/
   fixtures/lifecycle-artifact-chains.json
   fixtures/lifecycle-traceability-chains.json
   agent-session-state-contract.md
@@ -136,6 +154,15 @@ schemas/
   epic-admission-decision.schema.json
   work-package-plan-validation-context.schema.json
   work-package-plan.schema.json
+  asset-content.schema.json
+  asset-record.schema.json
+  asset-registry-snapshot.schema.json
+  asset-lifecycle-authority-context.schema.json
+  portfolio-manifest.schema.json
+  portfolio-lock.schema.json
+  portfolio-authority-context.schema.json
+  portfolio-selection-context.schema.json
+  portfolio-selection.schema.json
 adapters/
   claude-code/
     project/.claude/
@@ -149,6 +176,14 @@ scripts/
   ask-doctor.mjs
   ask-sensors.mjs
   content-addressed-store.mjs
+  asset-registry.mjs
+  asset-registry-samples.mjs
+  portfolio-manager.mjs
+  portfolio-manager-samples.mjs
+  evolution-loop.mjs
+  evolution-loop-samples.mjs
+  ask-benchmark-prompt-v2.mjs
+  prompt-v2-preregistration-samples.mjs
   execution-envelope.mjs
   verification-evidence.mjs
   epic-admission-work-package-plan.mjs
@@ -165,10 +200,17 @@ scripts/
   ai-ledger-refresh.mjs
   ask-benchmark.mjs
   test-verification-evidence.mjs
+  test-content-addressed-store.mjs
+  test-asset-registry.mjs
+  test-portfolio-manager.mjs
+  test-evolution-loop.mjs
+  test-evolution-loop-integration.mjs
   test-ask-benchmark.mjs
 benchmarks/
   README.md
   protocol.md
+  protocol-prompt-v2.md
+  prompt-v2-preregistration.json
   checkpoint-b.config.json
   schemas/
   fixtures/
@@ -244,6 +286,63 @@ node scripts/verification-evidence.mjs verify \
 
 See the contract and `docs/adr/0001-verification-evidence-trust-boundary.md` for the strict schemas, CAS layout, trusted ingress, producer attestation, transfer rules, and full command forms.
 
+## AI Engineering Asset Registry
+
+`docs/asset-registry-contract.md` defines a local immutable registry for exact Skill, Prompt template, and public evaluator-reference Assets. It reuses the generic `objects/sha256` CAS; it does not create a second store or a mutable latest pointer.
+
+The states are deliberately separate: content stored does not mean Asset registered; registered does not mean validated, admitted, or `current`; registry `current` does not mean Portfolio `active`; and neither state proves installation, execution, safety, or effectiveness. Registration creates `candidate` entries only. Lifecycle transitions beyond `candidate` require a separate exact caller-supplied authority context, while Issue #277 remains responsible for Portfolio activation.
+
+The checked-in sample contains exactly three public candidate Assets: `test-first-verification` Skill, the unrendered Codex `skill-verify` Prompt template with an exact Skill dependency, and the public `mn-build-option-update` evaluator reference. It contains no lifecycle-authority context, private evaluator content, runtime selection, or effectiveness claim.
+
+```bash
+node scripts/test-content-addressed-store.mjs
+node scripts/test-asset-registry.mjs
+node scripts/asset-registry-samples.mjs --check
+```
+
+`node scripts/asset-registry-samples.mjs --write` deterministically rebuilds the sample after an intentional source or contract change. See `docs/adr/0003-asset-registry-authority-boundary.md` for the storage, lifecycle-authority, and Portfolio boundary decision.
+
+## Evidence-conditioned Portfolio Manager
+
+`docs/portfolio-manager-contract.md` defines the local versioned Portfolio plane above the Asset Registry. Immutable manifests and full predecessor-closed locks share the same canonical JSON CAS. A stored manifest is not current, a current manifest is not an executed Asset set, and verification-evidence, evaluator, producer, Asset owner, or digest identity does not grant Portfolio activation or rollback authority.
+
+Resolution uses a manifest-sealed pre-result vocabulary, exact Registry and Asset identities, exact verification-reuse plans, unique exact current-state references, explicit selectors and capability differences, known-or-unknown budgets, and typed `selected` / `bypass` / `downgrade` / `stop` outcomes. High-impact activation needs an exact grant from a separately trusted approval authority, while rollback uses a separate exact rollback authority, keeps the active manifest's exact rollback target available, and preserves every historical object.
+
+```bash
+node scripts/test-portfolio-manager.mjs
+node scripts/portfolio-manager-samples.mjs --check
+```
+
+The checked fixture represents an explicit zero-Asset Kernel-only selection and a candidate-only Adaptive ASK shadow challenger that downgrades on missing evidence and unknown safety. It never implies installation, execution, effectiveness, mutable-latest resolution, or a change to frozen benchmark results. `node scripts/portfolio-manager-samples.mjs --write` regenerates it deterministically after an intentional contract change. See `docs/adr/0004-portfolio-activation-authority-boundary.md` for the authority decision.
+
+## Governed Evolution loop
+
+`docs/evolution-loop-contract.md` defines the Issue #278 plane above exact Asset, Portfolio, and evaluation/report identities. Candidate, pre-result experiment, evaluation recommendation, Portfolio action proposal, human decision, and application receipt are six separate shared-CAS objects. Experiment verification exact-binds the candidate-reserved authority, factor identities, and evaluation scope; evaluation authority remains distinct from generation, experiment, and decision roles. Recommendation never becomes mutation authority; an approved canary change still requires an exact separately trusted #277 activation context whose authority evidence binds the human-decision object digest.
+
+The bridge preserves quality, safety, cost, variance, mechanism, and external outcome evidence as separate typed dimensions with closed source vocabularies. Unsupported causal attribution cannot carry credit, and all-incomplete evidence can only produce `insufficient_evidence`, which cannot be remapped to implicit retention or rejection. It performs no raw scoring or arbitrary Asset comparison. A candidate without an exact #197 projection stops as `evaluation_projection_unavailable` instead of being aliased to a frozen benchmark condition.
+
+```bash
+node scripts/test-evolution-loop.mjs
+node scripts/test-evolution-loop-integration.mjs
+node scripts/evolution-loop-samples.mjs --check
+```
+
+The checked generic sample proves deterministic parent/candidate lineage, exact baseline/challenger pre-result selection, a bounded human-approved canary Portfolio successor, and preserved rollback history. Its prompt bytes are not Prompt v2 from Issues #227-#235. The separate Issue #234 preregistration fixture described below supplies exact Prompt Assets and an evaluation projection without changing this generic sample or creating a post-result decision. The fixture is non-product, makes no external-outcome claim, does not autonomously mutate an organizational current head, and leaves frozen benchmark results unchanged. See `docs/adr/0005-evolution-authority-boundary.md`.
+
+## Prompt v2 result-blind canary preregistration
+
+`benchmarks/prompt-v2-preregistration.json` freezes a two-arm `current_prompt` / `prompt_v2` comparison before any measured output is accessed. It keeps Codex and Claude as separate tracks, projects both roles to the existing #197 `full_ask` raw-scoring authority, and expands four protected calibration fixtures to exactly 56 balanced cases. The checked fixture binds adapter-specific rendered Prompt bundles, distinct shadow Portfolio selections, exact rollback targets, and pre-result Evolution candidates/experiments in the shared CAS.
+
+The frozen local environment has an available Codex track and a typed-unavailable Claude track. Unavailable or incomplete evidence remains `insufficient_evidence`; it is never converted to zero, pass, tie, or inferred parity. Registration and preregistration do not authorize measured execution, result access, recommendation, activation, lifecycle mutation, or external publication. Issue #235 must follow the exact handoff in `docs/prompt-v2-execution-handoff.md` before any measured run.
+
+```bash
+node scripts/test-ask-benchmark-prompt-v2.mjs
+node scripts/test-prompt-v2-preregistration-samples.mjs
+node scripts/prompt-v2-preregistration-samples.mjs --check
+```
+
+See `benchmarks/protocol-prompt-v2.md` and `docs/adr/0011-prompt-v2-result-blind-canary-authority.md` for the frozen thresholds, result-access boundary, authority separation, and stop conditions.
+
 ## Epic admission and Work Package Plans
 
 `docs/epic-admission-work-package-plan-contract.md` defines the Issue #275 Slice 1 control plane that runs before repository mutation. Evidence-backed policy evaluation returns `ordinary_execution_allowed`, `work_package_plan_required`, or `human_decision_required`; AI-estimated complexity is recorded but cannot decide admission by itself.
@@ -297,7 +396,7 @@ The measured Checkpoint C result is in `benchmarks/results/checkpoint-c-report.m
 4. For non-trivial tasks, use `operating-mode-router` when the operating layer is unclear, then use `skill-router` for delivery/quality work or invoke an explicitly requested specific skill directly.
 5. Add project-specific rules and skills as a separate overlay, not by bloating the kernel.
 
-From this repository, the generic core installer can project and later update the kernel and canonical skills in an adopting repository:
+From this repository, the generic core installer can project and later update the kernel, canonical skills, immutable contracts/schemas, and dependency-complete shared semantic runtime in an adopting repository:
 
 ```bash
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
@@ -310,7 +409,7 @@ git pull
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 ```
 
-The installer writes only local files, records `.agent-spectrum-kernel/install-state.json`, reports stale managed skill projections, and uses three-way update safety: managed files are updated only when the target still matches the previous managed hash, unless `--force` is used. `--check`, `--dry-run`, `--prune`, `--rollback`, and `--detach` are supported lifecycle commands. `--detach` removes ASK execution surfaces while preserving project-owned content.
+The installer writes only local files, records `.agent-spectrum-kernel/install-state.json`, reports stale managed skill projections, and uses three-way update safety: managed files are updated only when the target still matches the previous managed hash, unless `--force` is used. Core-owned `scripts/json-schema-validation.mjs` and `scripts/skill-effectiveness-outcome.mjs` are tracked as `immutable_runtime`; adapters consume them but do not own or delete them. `--check`, `--dry-run`, `--prune`, `--rollback`, and `--detach` are supported lifecycle commands. `--detach` removes ASK execution surfaces while preserving project-owned content.
 
 For tools that only support a single custom instruction field, use `CUSTOM_INSTRUCTIONS.md`.
 
@@ -326,7 +425,7 @@ node scripts/install-claude-adapter.mjs --target /path/to/project
 Recommended adoption path:
 
 ```text
-1. Install core kernel/skills with `scripts/install-kernel.mjs`.
+1. Install the core kernel, skills, immutable contracts, and shared semantic runtime with `scripts/install-kernel.mjs`.
 2. Install the Claude project adapter or optional plugin.
 3. Enable local hooks for project-local observability.
 4. Use Pattern B @claude review GitHub Actions only when PR-level shared review is needed.
@@ -356,7 +455,7 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-The core installer owns `AGENTS.md`; the Codex installer updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. The default profile is `implementation`, not every manifest skill. Supported profiles are `daily`, `organizational`, `minimal`, `implementation`, `investigation`, `review`, `adoption`, `observability`, and `full`.
+The core installer owns `AGENTS.md`, canonical contracts/schemas, and shared immutable runtime; the Codex installer updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, adapter-owned runner files such as `scripts/execution-envelope.mjs`, and `.agent-spectrum-kernel/codex-install-state.json`. The default profile is `implementation`, not every manifest skill. Supported profiles are `daily`, `organizational`, `minimal`, `implementation`, `investigation`, `review`, `adoption`, `observability`, and `full`.
 
 Use `--profile <name>` for normal installs. Use `--skills <csv>` only as an advanced override; the installer fails before writing files when the override is not closed over required skills for the selected prompts, commands, router-reachable routes, and dependencies of the specified skills.
 
@@ -410,7 +509,7 @@ node ./scripts/codex-exec-runner.mjs --prompt skill-implement.md --mode implemen
 
 The Codex runner can report `executed` after capturing output and running `ask-sensors`; this evidences only the inspected output contract. It does not prove workflow, risk/approval, or verification-contract application, business correctness, product readiness, or no regression.
 
-After classifying the task, pass `--gates-observed` when no task-specific gate applies, or `--required-gate <id>` for each required gate. Review runs include `review-final-merge-gate` from the managed prompt contract. Missing gate observation is recorded as missing evidence; an explicitly required `risk-gate` without specific-action approval stops before Codex invocation.
+After classifying the task, pass `--gates-observed` when no task-specific gate applies. For review, repeat `--observed-signal <exact-id>` and let the canonical registry derive every additional gate; bare `--required-gate` is rejected in review mode. For non-review entries, `--required-gate <id>` remains available. Every review run includes one `review-ai-quality` baseline. Add `--final-decision` only when the run must make a final merge decision; this runs `review-final-merge-gate` last. Missing gate observation is recorded as missing evidence; a derived or non-review-required `risk-gate` without specific-action approval stops before Codex invocation.
 
 Use `ask-sensors` to classify control risks in an implementation or review output:
 
@@ -457,7 +556,7 @@ First-time users should start with `docs/quickstart-ja.md`.
 | User wants to... | Say this | System should route to... |
 |---|---|---|
 | Move a ticket forward | このチケットを進めて | requirement / work package / implementation route |
-| Review a PR | このPRをレビューして | review-router and required gates |
+| Review a PR | このPRをレビューして | review-router, mandatory baseline, and exact-signal additional gates |
 | Investigate a bug | このバグを調べて | doubt-driven-development and verification route |
 | Refine a design | この設計を詰めて | design / architecture route |
 | Prepare agent work | Codexに渡せる形にして | work-package route |
@@ -484,13 +583,13 @@ Default outputs should describe the selected work mode, user-facing route, missi
 | 再利用可能な実装patternを台帳化 | `engineering-pattern-ledger` |
 | 再利用可能な検証patternを台帳化 | `verification-pattern-ledger` |
 | ADR未満のarchitecture decision memory | `architecture-decision-memory`（ADRが必要なら `adr-review`） |
-| 新機能・挙動変更 | `spec-driven-development` → `test-first-verification` for Verification Contract → `controlled-implementation` → `test-first-verification` for evidence |
-| バグ・原因不明 | `doubt-driven-development` → `test-first-verification` for reproduction and Verification Contract → `controlled-implementation` → `test-first-verification` for regression proof |
+| 新機能・挙動変更 | `spec-driven-development` → `test-first-verification` selects Compact Proof or Formal Verification Contract → `controlled-implementation` references it → evidence |
+| バグ・原因不明 | `doubt-driven-development` → `test-first-verification` selects Formal Verification Contract for reproduction/regression → `controlled-implementation` → regression proof |
 | 承認済みリファクタ実装 | `refactor-implementation` → `test-first-verification` for regression proof |
-| スコープが広がりそう | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → required gates） |
+| スコープが広がりそう | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → mandatory baseline → exact-signal additional gates） |
 | 危険操作・外部影響 | `risk-gate` before the selected workflow proceeds to action |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
-| PR/diffレビュー | `review-router` → observed change signals → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
+| PR/diffレビュー | `review-router` → 必須の`review-ai-quality` baseline → exact-signal additional gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ 最終判断を要求した場合だけ`review-final-merge-gate` |
 | 繰り返し/高impact review findingsを予防知識へ変換 | `review-finding-compiler` |
 | 既存要件・業務ルールとの照合 | `review-domain-impact`（Requirement Contract / Work Package / Domain Rule Ledger を入力にできる） |
 | リリース候補のready判定 | `release-readiness-gate`（deploy / publish / migration / external notification / release execution は `risk-gate` と明示承認が先） |
@@ -507,7 +606,7 @@ Default outputs should describe the selected work mode, user-facing route, missi
 | docs/ADR/PR/handoffからdurable knowledgeを抽出 | `documentation-knowledge-compiler` |
 | 次のAgentへ渡す | `handoff-generation` |
 
-Use `evidence-ledger` whenever final text makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
+Use `ask.claim-evidence-status@1.0.0` inline for ordinary claims. Use `evidence-ledger` only for its closed formal-audit triggers: explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs.
 
 ## What changed from v1
 

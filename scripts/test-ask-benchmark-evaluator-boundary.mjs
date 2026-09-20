@@ -26,6 +26,7 @@ import {
   computeEvaluatorBundleId,
   computeEvaluatorReferenceDigest,
   deriveEvaluatorDependencyGraph,
+  EVALUATOR_EAGER_AUTHORITY_READS,
   validateExecutionEventEvidenceReferences,
   verifyEvaluatorAuthority,
   verifyEvaluatorBoundary,
@@ -645,6 +646,7 @@ function createPrivateBundle(path, normalized) {
     schema_version: "1.0.0",
     schema_path: "benchmarks/schemas/private-evaluator-bundle.schema.json",
     program: "adaptive_ask_private_evaluator_bundle",
+    execution_budget_ms: 120_000,
     evaluator_bundle_id: `evaluator-${"0".repeat(64)}`,
     evaluator_bundle_digest: digest("placeholder"),
     fixture_identity: {
@@ -803,6 +805,16 @@ try {
   const currentDependencyGraph = deriveEvaluatorDependencyGraph({ root, baseRevision: currentRevision.stdout.trim() });
   assert.ok(currentDependencyGraph.edge_inventory.some(({ from, to }) => from === "scripts/ask-benchmark-execution.mjs" && to === "scripts/ask-benchmark-command-evidence.mjs"), "current evaluator graph must include execution command-evidence authority");
   assert.ok(currentDependencyGraph.edge_inventory.some(({ from, to }) => from === "scripts/ask-benchmark-evaluator-boundary.mjs" && to === "scripts/ask-benchmark-scoring-contract.mjs"), "current evaluator graph must include evaluator scoring-contract authority");
+  assert.deepEqual(EVALUATOR_EAGER_AUTHORITY_READS, [
+    { path: "schemas/claim-evidence-status.schema.json", reader: "scripts/claim-evidence-status.mjs" },
+    { path: "schemas/compact-profile-control-map.json", reader: "scripts/fixed-entry-profile.mjs" },
+    { path: "schemas/fixed-entry-profile-registry.json", reader: "scripts/fixed-entry-profile.mjs" },
+    { path: "schemas/verification-proof-policy.schema.json", reader: "scripts/verification-proof-policy.mjs" },
+  ], "eager authority reads must remain an exact frozen binding inventory");
+  for (const { path: authorityPath, reader: readerPath } of EVALUATOR_EAGER_AUTHORITY_READS) {
+    assert.ok(currentDependencyGraph.node_inventory.some(({ path, file_type: fileType }) => path === authorityPath && fileType === "authority_data"), `current evaluator graph must freeze ${authorityPath} as authority data`);
+    assert.ok(currentDependencyGraph.edge_inventory.some(({ from, to, kind }) => from === readerPath && to === authorityPath && kind === "authority_read"), `current evaluator graph must bind ${authorityPath} to ${readerPath}`);
+  }
   const dependencyFixture = writeDependencyGraphFixture("template-interpolation", [
     'const ignored = `quasi import("./ignored.mjs")`; ',
     'const evidence = `${import("./command-evidence.mjs")}`;',

@@ -90,6 +90,8 @@ assert.equal(foreignPullIgnored.mode, "advance_issue");
 assert.equal(isDisallowedPath(".github/workflows/validate.yml"), true);
 assert.equal(isDisallowedPath("scripts/test-validate-repo.mjs"), true);
 assert.equal(isDisallowedPath("scripts/validate-repo.mjs"), true);
+assert.equal(isDisallowedPath("scripts/test-execution-envelope-record.mjs"), true);
+assert.equal(isDisallowedPath("scripts/test-codex-runner-execution-envelope-conformance.mjs"), true);
 assert.equal(isDisallowedPath("scripts/test-ask-benchmark.mjs"), true);
 assert.equal(isDisallowedPath("benchmarks/results/measured.json"), true);
 assert.equal(isDisallowedPath("private-evaluator/oracle.json"), true);
@@ -363,10 +365,15 @@ assert.equal(loadedPlan.plan.container.node_major, 24);
 assert.equal(loadedPlan.plan.container.image_digest, VALIDATION_IMAGE_DIGEST);
 assert.deepEqual(loadedPlan.plan.container.environment_allowlist, ["PATH", "HOME", "LANG", "LC_ALL", "NODE_ENV"]);
 const requiredCommandIds = [
-  "changed_mjs_syntax", "autonomous_development_control", "repository_validation_tests", "epic_admission_work_package_plan",
+  "changed_mjs_syntax", "autonomous_development_control", "repository_validation_tests", "review_route_contract", "execution_envelope_record", "codex_runner_execution_envelope_conformance", "managed_json_schema_validation", "codex_exact_risk_approval", "review_decision_matrix", "claim_evidence_status_contract", "skill_effectiveness_outcome_contract", "verification_proof_policy", "epic_admission_work_package_plan",
+  "content_addressed_store", "asset_registry_contract", "asset_registry_sample_check",
+  "portfolio_manager_contract", "portfolio_manager_sample_check",
+  "evolution_loop_contract", "evolution_loop_integration", "evolution_loop_sample_check",
   "portfolio_catalog",
   "portfolio_policy", "design_admission", "design_independent_review", "general_benchmark", "execution",
-  "command_evidence_contract", "normalized_results", "evaluator_boundary", "portfolio_score", "portfolio_result_set", "portfolio_repetition_report", "portfolio_paired_comparison_report", "portfolio_directional_outcome_report", "portfolio_mechanism_scorecard", "portfolio_legacy_calibration_migration", "adapter_runtime_bundle", "repository_consistency", "whitespace",
+  "command_evidence_contract", "normalized_results", "evaluator_boundary",
+  "mp_ci_evidence_gap_review_archive", "mp_accessibility_interaction_review_archive", "mp_data_migration_handoff_review_archive", "mp_frontend_state_review_archive", "mp_iac_rollback_design_review_archive", "mp_performance_investigation_review_archive",
+  "portfolio_score", "portfolio_result_set", "portfolio_repetition_report", "portfolio_paired_comparison_report", "portfolio_aggregate_result", "portfolio_directional_outcome_report", "portfolio_mechanism_scorecard", "portfolio_legacy_calibration_migration", "adapter_runtime_bundle", "repository_consistency", "whitespace",
 ];
 assert.deepEqual(loadedPlan.plan.commands.map((command) => command.id), requiredCommandIds);
 const sampleDockerArgs = dockerArguments({ image: loadedPlan.plan.container.image, repository: "/safe/workspace", control: "/safe/control", planPath: "/safe/plan.json", commandId: "general_benchmark" });

@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { posix, resolve, win32 } from "node:path";
+import { dirname, posix, resolve, win32 } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
+import { validateSchemaValue } from "./json-schema-validation.mjs";
 
 export const VERIFICATION_COMMAND_CONTRACT_SCHEMA_PATH = "benchmarks/schemas/portfolio-verification-command-contract.schema.json";
 export const COMMAND_EVIDENCE_SCHEMA_PATH = "benchmarks/schemas/portfolio-command-evidence.schema.json";
@@ -93,8 +94,13 @@ export function computeVerificationCommandContractDigest(contract) {
   return canonicalDigest(withoutField(contract, "contract_digest"));
 }
 
-export function validateVerificationCommandContract(contract, { root }) {
-  assertBenchmarkSchemaInstance(contract, { schemaPath: resolve(root, VERIFICATION_COMMAND_CONTRACT_SCHEMA_PATH), label: "verification command contract" });
+export function validateVerificationCommandContract(contract, { root, schema = null }) {
+  const schemaPath = resolve(root, VERIFICATION_COMMAND_CONTRACT_SCHEMA_PATH);
+  if (schema === null) assertBenchmarkSchemaInstance(contract, { schemaPath, label: "verification command contract" });
+  else {
+    const errors = validateSchemaValue(contract, schema, { baseDir: dirname(schemaPath), rootSchema: schema });
+    if (errors.length > 0) throw new Error(`verification command contract failed JSON Schema validation:\n${errors.join("\n")}`);
+  }
   if (contract.contract_digest !== computeVerificationCommandContractDigest(contract)) throw new Error("verification command contract digest mismatch");
   assertUnique(contract.commands.map(({ command_id: id }) => id), "verification command IDs");
   assertUnique(contract.commands.map(({ command_contract_digest: digest }) => digest), "verification command digests");

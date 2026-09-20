@@ -11,49 +11,33 @@ Review this PR and tell me whether to merge.
 Use:
 
 ```text
-review-router → observed change signals → required gates → review-final-merge-gate
+review-router → review-ai-quality baseline → exact-signal additional gates → requested review-final-merge-gate
 ```
 
-## Expected routing output
+## Expected output
 
 ```text
-Change signals:
-- generated_output_change: CSV export path and escaping implementation changed.
-- verification: focused export tests are available.
+Baseline review:
+- Gate: review-ai-quality
+- Status: fail
+- Evidence: CSV escaping implementation and focused export tests were inspected.
 
-Required gates:
-- review-output-quality: CSV is a system-consumed output contract; triggered by generated_output_change.
-- review-ai-quality: escaping correctness and edge cases need local logic review.
-- review-automated-gate: focused regression evidence is required; triggered by verification.
-
-Skipped heavy gates:
-- review-domain-impact: no business meaning or workflow responsibility changed.
-- review-architecture-impact: no public API, dependency, persistence, or deployment boundary changed.
-- review-adversarial-risk: no untrusted input, security/privacy, prompt, or critical workflow signal observed.
-- risk-gate: no destructive or external action is being executed.
+Additional required gates:
+- review-output-quality: fail; CSV is a system-consumed output contract; triggered by generated_output_change.
+- review-automated-gate: pass with comments; existing comma cases passed but the quote case is absent; triggered by automated_evidence_required.
 
 Missing evidence:
 - none
-```
 
-## Expected final output
+Findings:
+- Finding ID: F-CSV-001
+  Severity: major
+  Merge blocker: true
+  Practical impact: CSV values containing quotes are emitted with invalid escaping.
+  Trigger or failure trace: generated_output_change → review-output-quality → quote case absent.
+  Evidence location: src/export.ts:42 and focused export tests.
+  Required post-fix condition: escape embedded quotes and add a passing regression case.
 
-```text
 Decision:
 - request changes
-
-Blocking evidence:
-- [major] src/export.ts:42 — CSV escaping does not handle quotes. Existing tests cover commas but not double quotes; escape quotes and add a regression test.
-
-Passed required gates:
-- review-automated-gate — focused tests ran for existing comma cases.
-
-Insufficient evidence:
-- none
-
-Non-blocking follow-ups:
-- Large-file performance benchmark — separate follow-up; not a merge blocker.
-
-Residual risk:
-- Performance was not benchmarked.
 ```

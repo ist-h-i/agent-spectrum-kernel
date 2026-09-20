@@ -42,12 +42,8 @@ This skill turns repeated accepted implementation evidence, review outcomes, and
    - Stack overlay skills such as `angular-implementation-architecture`.
 
 3. Classify evidence status.
-   - `Verified`: directly observed in code, tests, docs, CI, runtime output, or merged PR evidence.
-   - `Human-confirmed`: explicitly confirmed by a responsible human.
-   - `Supported`: indirectly supported by repeated or related evidence.
-   - `Hypothesis`: plausible and useful for questions only.
-   - `Deprecated`: retained for history but no longer recommended.
-   - `Contradicted`: conflicts with newer evidence and needs resolution.
+   - Use `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`.
+   - Record human confirmation as `Authority status=human_confirmed` and lifecycle/conflict as `Record state=active|deprecated|contradicted`.
 
 4. Decide the target.
    - Add or refresh an engineering pattern entry.
@@ -59,10 +55,10 @@ This skill turns repeated accepted implementation evidence, review outcomes, and
 5. Write the entry with source, evidence status, staleness trigger, consumers, and review impact.
 
 6. Apply safely.
-   - `Verified` and `Human-confirmed` entries may be used as implementation constraints when the scope matches.
+   - `Verified` entries may be used as implementation constraints when the scope matches. A human-confirmed source still needs current evidence for implementation behavior.
    - `Supported` entries may guide a preferred shape but need current repo checks.
    - `Hypothesis` entries may generate questions and caution notes only.
-   - `Deprecated` and `Contradicted` entries must stay visible until replaced or closed.
+   - Deprecated and contradicted record states must stay visible until replaced or closed.
 
 ## Output
 
@@ -74,6 +70,8 @@ Engineering pattern ledger update:
 - Layer / boundary:
 - Evidence source:
 - Evidence status:
+- Authority status:
+- Record state:
 - Applies when:
 - Do not use when:
 - Accepted implementation shape:

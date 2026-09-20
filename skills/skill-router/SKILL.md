@@ -100,24 +100,24 @@ The user-facing route should describe work steps and stop points without requiri
 | Reusable verification expectation creation, refresh, deprecation, or contradiction | `verification-pattern-ledger` | `test-first-verification`, `work-package-compiler`, `review-automated-gate`, `review-final-merge-gate`, and `release-readiness-gate` consume only current matching entries |
 | Reusable architecture or boundary decision memory below ADR level | `architecture-decision-memory` | `adr-review` when formal ADR action is needed; `application-boundary-architecture` when mechanics are unresolved; `review-architecture-impact` when reviewing diffs |
 | Repeated implementation context setup | `implementation-context-generation` | `repository-orientation` for repo facts before drafting context |
-| New behavior | `spec-driven-development` | `work-package-compiler` when packaging is needed -> `test-first-verification` for a reusable Verification Contract -> `controlled-implementation` for implementation-only decisions and evidence refs |
-| Implementation after Work Package exists | `controlled-implementation` | Consume upstream refs; `test-first-verification` defines/reuses the Verification Contract before behavior changes when proof is needed; `scope-control` if scope is unclear |
+| New behavior | `spec-driven-development` | `work-package-compiler` when packaging is needed -> `test-first-verification` selects Compact Proof or Formal Verification Contract from `ask.verification-proof-policy@1.0.0` -> `controlled-implementation` references that proof |
+| Implementation after Work Package exists | `controlled-implementation` | Consume upstream refs; `test-first-verification` selects/reuses one proof path before implementation claims when proof is needed; `scope-control` if scope is unclear |
 | Approved behavior-preserving refactor implementation | `refactor-implementation` | `test-first-verification` for regression proof; `application-boundary-architecture` first if responsibility, dependency direction, public contract, schema, UI behavior, or ownership boundaries may move; create an `improvement-ledger` candidate only after an explicit knowledge-promotion trigger |
 | Long-running/multi-agent work | `planning-with-files` | `handoff-generation` |
 | Scope/refactor risk | `scope-control` | `controlled-implementation` if proceeding to code; review phase uses `review-router` -> required gates, with scope findings generally routed to `review-ai-quality` |
-| Bug/unknown cause | `doubt-driven-development` | `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof |
+| Bug/unknown cause | `doubt-driven-development` | `test-first-verification` selects the Formal Verification Contract for reproduction/regression -> `controlled-implementation` -> `test-first-verification` for regression proof |
 | Hard-to-reverse architecture decision or ADR need | `adr-review` | `grill-with-docs`; `application-boundary-architecture` if boundary mechanics are unresolved |
 | PR/diff/generated code review | `review-router` | Required gates from observed change signals, including `review-code-health`, `review-architecture-impact`, `review-output-quality`, and `review-adversarial-risk` when applicable; then `review-final-merge-gate` |
 | Repeated or high-impact review findings should become prevention knowledge | `review-finding-compiler` | Route domain/business rules to `review-to-rule-compiler`; route non-blocking work to `improvement-ledger`; route implementation and verification lessons to their ledgers |
 | Release candidate or bundled change-set readiness | `release-readiness-gate` | `risk-gate` before deploy, publish, migration, external notification, or release execution; `review-final-merge-gate` remains the PR-level decision gate |
 | Technical debt, code smell, or refactor candidate review | `review-router` | `review-code-health`; specialized gates only when findings cross into architecture, adversarial, risk, or evidence concerns |
-| Persisting non-blocking review findings, debt, rule feedback, validation check candidates, accepted risks, or stale improvement items | `improvement-ledger` | `review-code-health` only if findings still need detection; `evidence-ledger` if readiness or resolution claims need evidence classification |
+| Persisting non-blocking review findings, debt, rule feedback, validation check candidates, accepted risks, or stale improvement items | `improvement-ledger` | `review-code-health` only if findings still need detection; apply claim status inline, and select `evidence-ledger` only for a closed formal-audit trigger |
 | Durable domain rule creation, update, stale review, contradiction handling, or promotion gates | `domain-rule-ledger` | `review-to-rule-compiler` first when extracting candidates from review or correction evidence |
 | Extract domain rule candidates from review findings, human corrections, incidents, or rejected AI outputs | `review-to-rule-compiler` | `domain-rule-ledger` only when explicitly updating durable rules |
 | MR/PR README, PR explanation, or durable change-context documentation | `mr-readme-generation` | `adr-review` |
 | Repeated review context setup | `review-context-generation` | `repository-orientation` for repo facts before drafting context |
 | Durable documentation knowledge extraction, freshness review, conflict routing, or target selection | `documentation-knowledge-compiler` | Route reusable review or implementation knowledge to context generation, domain rules to `domain-rule-ledger`, architecture decisions to `architecture-decision-memory` or `adr-review`, and task progress to handoff/planning |
-| Claim validation | `evidence-ledger` | `doubt-driven-development` |
+| Explicit or high-value multi-claim audit | `evidence-ledger` | `doubt-driven-development` when the claim itself needs falsification |
 | End of work | `handoff-generation` | — |
 
 7. Apply project overlay skill selection.
@@ -130,7 +130,7 @@ The user-facing route should describe work steps and stop points without requiri
 
 9. Apply overlays before action.
    - Risk overlay: if any task involves destructive, external, production, auth, secret, dependency, migration, billing, email, or infra impact, run `risk-gate` before the selected workflow proceeds to action.
-   - Evidence overlay: use `evidence-ledger` whenever the response makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
+   - Evidence overlay: apply `ask.claim-evidence-status@1.0.0` inline for ordinary work. Select `evidence-ledger` only for `explicit_claim_audit`, `multiple_material_claims`, `high_stakes_readiness`, `cross_artifact_synthesis`, or `stable_claim_ids`.
 
 10. Preserve review gate minimality.
    - When routing to `review-router`, require observed change signals and trace each required gate to a signal and evidence.

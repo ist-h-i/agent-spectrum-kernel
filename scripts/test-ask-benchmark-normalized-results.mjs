@@ -6,10 +6,40 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, re
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { validateNormalizedPortfolioResult } from "./ask-benchmark-normalized-results.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
 const work = mkdtempSync(resolve(root, ".ask-benchmark-normalized-test-"));
+
+function assertNormalizedSchemaFailClosed() {
+  const invalid = {
+    command_evidence: {
+      references: [{
+        command_id: "focused-schema-check",
+        match_state: "matched",
+        command_evidence_id: `command-evidence-${"a".repeat(32)}`,
+        digest: `sha256:${"b".repeat(64)}`,
+        bytes: 1,
+        outcome: "failed",
+        exit_code: 0,
+      }],
+    },
+  };
+  assert.throws(
+    () => assertBenchmarkSchemaInstance(invalid, { schemaPath: resolve(root, "benchmarks/schemas/normalized-portfolio-result.schema.json"), label: "normalized result ingestion" }),
+    /instance \$\.command_evidence\.references\[0\].*keyword not.*condition subschema matched/u,
+    "normalized result ingestion must enforce the nested failed/nonzero not constraint",
+  );
+}
+
+assertNormalizedSchemaFailClosed();
+if (process.env.ASK_JSON_SCHEMA_FOCUSED === "1") {
+  rmSync(work, { recursive: true, force: true });
+  console.log("ASK benchmark normalized result schema ingestion test passed");
+  process.exit(0);
+}
 
 function run(args, { expectedStatus = 0, env = {} } = {}) {
   const result = spawnSync(process.execPath, [runner, ...args], { cwd: root, encoding: "utf8", env: { ...process.env, ...env }, maxBuffer: 40 * 1024 * 1024 });
@@ -20,6 +50,39 @@ function run(args, { expectedStatus = 0, env = {} } = {}) {
 function writeJson(path, value) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function resealNormalizedRecord(record) {
+  const { normalized_result_id: ignoredId, normalized_result_digest: ignoredDigest, ...base } = record;
+  const normalizedResultDigest = canonicalDigest(base);
+  return {
+    ...base,
+    normalized_result_id: `normalized-${canonicalDigest({
+      run_instance_id: base.lineage.run_instance_id,
+      case_id: base.lineage.case_id,
+      attempt: base.lineage.attempt,
+      normalized_result_digest: normalizedResultDigest,
+    }).slice("sha256:".length, "sha256:".length + 32)}`,
+    normalized_result_digest: normalizedResultDigest,
+  };
+}
+
+function withUnmatchedCommandReference(record, { outcome, exitCode, marker }) {
+  const changed = structuredClone(record);
+  changed.command_evidence.references.push({
+    command_id: null,
+    match_state: "unmatched",
+    command_evidence_id: `command-evidence-${marker.repeat(32)}`,
+    digest: `sha256:${marker.repeat(64)}`,
+    bytes: 1,
+    outcome,
+    exit_code: exitCode,
+  });
+  changed.command_evidence.command_event_count = changed.command_evidence.references.length;
+  changed.command_evidence.unmatched_command_count = changed.command_evidence.references.filter(({ match_state: state }) => state === "unmatched").length;
+  changed.command_evidence.cwd_unverified_command_count = changed.command_evidence.references.filter(({ match_state: state }) => state === "cwd_unverified").length;
+  changed.command_evidence.declined_references = changed.command_evidence.references.filter(({ outcome: referenceOutcome }) => referenceOutcome === "declined");
+  return resealNormalizedRecord(changed);
 }
 
 function fileDigest(path) {
@@ -217,6 +280,19 @@ try {
   const plainRef = normalizedManifest.cases.find((entry) => entry.case_id === completedPlain.case_id).normalized_attempts[0];
   const adaptiveRecord = JSON.parse(readFileSync(resolve(normalizedGeneration.path, adaptiveRef.path), "utf8"));
   const plainRecord = JSON.parse(readFileSync(resolve(normalizedGeneration.path, plainRef.path), "utf8"));
+  validateNormalizedPortfolioResult(plainRecord, { root });
+  validateNormalizedPortfolioResult(withUnmatchedCommandReference(plainRecord, { outcome: "failed", exitCode: 12, marker: "a" }), { root });
+  validateNormalizedPortfolioResult(withUnmatchedCommandReference(plainRecord, { outcome: "succeeded", exitCode: 0, marker: "b" }), { root });
+  assert.throws(
+    () => validateNormalizedPortfolioResult(withUnmatchedCommandReference(plainRecord, { outcome: "failed", exitCode: 0, marker: "c" }), { root }),
+    /instance \$\.command_evidence\.references\[\d+\]\.exit_code.*keyword not.*condition subschema matched/u,
+    "actual normalized ingestion must reject failed command evidence with exit code zero",
+  );
+  assert.throws(
+    () => validateNormalizedPortfolioResult(withUnmatchedCommandReference(plainRecord, { outcome: "succeeded", exitCode: 12, marker: "d" }), { root }),
+    /instance \$\.command_evidence\.references\[\d+\]\.exit_code.*keyword const.*condition value must equal 0/u,
+    "actual normalized ingestion must reject succeeded command evidence with a nonzero exit code",
+  );
   assert.ok(adaptiveRecord.lineage.adaptive_selection_digest, "Adaptive attempts must retain the sealed selection digest");
   assert.equal(plainRecord.lineage.adaptive_selection_digest, null, "non-Adaptive attempts must not invent a selection digest");
   assert.equal(plainRecord.telemetry.input_tokens.status, "unknown", "unreported token telemetry must be typed unknown");
@@ -286,6 +362,7 @@ try {
   const failedRecord = JSON.parse(readFileSync(resolve(failedGeneration.path, failedManifest.cases.find((entry) => entry.case_id === failedCase.case_id).normalized_attempts[0].path), "utf8"));
   assert.equal(failedRecord.outcome, "failed");
   assert.equal(failedRecord.telemetry.final_output_bytes.status, "not_applicable");
+  validateNormalizedPortfolioResult(failedRecord, { root });
 
   const unavailableRun = resolve(work, "unavailable-run");
   const unavailableCase = caseFor("claude", "plain", 1);

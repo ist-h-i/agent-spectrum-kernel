@@ -2,13 +2,32 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ADAPTER_RENDERER_METADATA } from "./adapter-runtime-inventory.mjs";
 import { APPROVAL_REQUIRED_SURFACE_IDS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { codexCompactProfileCanonicalPaths } from "./codex-runtime-profile.mjs";
+import {
+  COMPACT_ELIGIBILITY_FACT_IDS,
+  FORMAL_VERIFICATION_TRIGGER_IDS,
+  PROTECTED_COMPACT_CLAIM_TYPES,
+  VERIFICATION_PROOF_PATHS,
+  VERIFICATION_PROOF_POLICY_REF,
+  renderCompactProofShape,
+} from "./verification-proof-policy.mjs";
+import { exportAssetRegistryReference, listAssets, verifyAssetRegistry } from "./asset-registry.mjs";
+import { listContentAddressedJson, readContentAddressedJson, readJsonFileStrict } from "./content-addressed-store.mjs";
+import { verifyEvolutionClosure } from "./evolution-loop.mjs";
+import { verifyPromptV2PreregistrationFixture } from "./prompt-v2-preregistration-samples.mjs";
+import {
+  CORE_IMMUTABLE_CONTRACT_ASSETS,
+  CORE_IMMUTABLE_RUNTIME_ASSETS,
+  CORE_OWNED_IMMUTABLE_ASSETS,
+} from "./installer-lifecycle.mjs";
+import { verifyPortfolioLock, verifyPortfolioSelection } from "./portfolio-manager.mjs";
+import { validateSkillEffectivenessFixtureCatalog } from "./skill-effectiveness-outcome.mjs";
 import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { validatePortfolioDesignAdmissionArtifacts } from "./ask-benchmark-design-admission.mjs";
@@ -61,9 +80,17 @@ export const APPROVED_ASK_AUTOMATION_ACTION_PINS = Object.freeze({
 const REQUIRED_SCHEMA_PATHS = [
   "schemas/metrics-event.schema.json",
   "schemas/execution-envelope.schema.json",
+  "schemas/execution-envelope-record.schema.json",
+  "schemas/codex-runner-result.schema.json",
+  "schemas/codex-risk-action.schema.json",
+  "schemas/codex-risk-approval-request.schema.json",
+  "schemas/codex-risk-approval.schema.json",
   "schemas/adapter-runtime-profile.schema.json",
   "schemas/adapter-runtime-evidence.schema.json",
   "schemas/adapter-runtime-event.schema.json",
+  "schemas/claim-evidence-status.schema.json",
+  "schemas/fixed-entry-profile-registry.json",
+  "schemas/verification-proof-policy.schema.json",
   "schemas/review-signal-gate-map.json",
   "schemas/adoption-report.schema.json",
   "schemas/improvement-ledger-entry.schema.json",
@@ -81,7 +108,110 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/epic-admission-decision.schema.json",
   "schemas/work-package-plan-validation-context.schema.json",
   "schemas/work-package-plan.schema.json",
+  "schemas/asset-content.schema.json",
+  "schemas/asset-record.schema.json",
+  "schemas/asset-registry-snapshot.schema.json",
+  "schemas/asset-lifecycle-authority-context.schema.json",
+  "schemas/portfolio-manifest.schema.json",
+  "schemas/portfolio-lock.schema.json",
+  "schemas/portfolio-authority-context.schema.json",
+  "schemas/portfolio-selection-context.schema.json",
+  "schemas/portfolio-selection.schema.json",
+  "schemas/evolution-candidate.schema.json",
+  "schemas/evolution-experiment.schema.json",
+  "schemas/evolution-recommendation.schema.json",
+  "schemas/evolution-action-proposal.schema.json",
+  "schemas/evolution-human-decision.schema.json",
+  "schemas/evolution-application-receipt.schema.json",
+  "benchmarks/schemas/prompt-v2-preregistration.schema.json",
+  "benchmarks/schemas/prompt-v2-execution-plan.schema.json",
+  "benchmarks/schemas/prompt-v2-materialization-manifest.schema.json",
+  "benchmarks/schemas/prompt-v2-resume-state.schema.json",
+  "benchmarks/schemas/prompt-v2-normalized-result.schema.json",
+  "benchmarks/schemas/prompt-v2-comparison-report.schema.json",
 ];
+const REQUIRED_ASSET_REGISTRY_PATHS = [
+  "docs/asset-registry-contract.md",
+  "docs/adr/0003-asset-registry-authority-boundary.md",
+  "docs/fixtures/asset-registry/reference.json",
+  "docs/fixtures/asset-registry/store",
+  "scripts/content-addressed-store.mjs",
+  "scripts/git-revision-source.mjs",
+  "scripts/asset-registry.mjs",
+  "scripts/asset-registry-samples.mjs",
+  "scripts/test-content-addressed-store.mjs",
+  "scripts/test-asset-registry.mjs",
+];
+const ASSET_REGISTRY_REFERENCE_PATH = "docs/fixtures/asset-registry/reference.json";
+const ASSET_REGISTRY_STORE_PATH = "docs/fixtures/asset-registry/store";
+const REQUIRED_PORTFOLIO_MANAGER_PATHS = [
+  "docs/portfolio-manager-contract.md",
+  "docs/adr/0004-portfolio-activation-authority-boundary.md",
+  "docs/fixtures/portfolio-manager/reference.json",
+  "docs/fixtures/portfolio-manager/store",
+  "scripts/portfolio-manager.mjs",
+  "scripts/portfolio-manager-samples.mjs",
+  "scripts/test-portfolio-manager.mjs",
+];
+const PORTFOLIO_MANAGER_REFERENCE_PATH = "docs/fixtures/portfolio-manager/reference.json";
+const PORTFOLIO_MANAGER_STORE_PATH = "docs/fixtures/portfolio-manager/store";
+const REQUIRED_EVOLUTION_LOOP_PATHS = [
+  "adapters/codex/prompts/skill-verify.md",
+  "docs/evolution-loop-contract.md",
+  "docs/evolution-loop-sample-prompt-candidate.md",
+  "docs/adr/0005-evolution-authority-boundary.md",
+  "docs/fixtures/evolution-loop/reference.json",
+  "docs/fixtures/evolution-loop/store",
+  "scripts/evolution-loop.mjs",
+  "scripts/evolution-loop-samples.mjs",
+  "scripts/test-evolution-loop.mjs",
+  "scripts/test-evolution-loop-integration.mjs",
+];
+const EVOLUTION_LOOP_REFERENCE_PATH = "docs/fixtures/evolution-loop/reference.json";
+const EVOLUTION_LOOP_STORE_PATH = "docs/fixtures/evolution-loop/store";
+const PROMPT_V2_PREREGISTRATION_FIXTURE_ROOT = "docs/fixtures/prompt-v2-preregistration";
+const REQUIRED_PROMPT_V2_PREREGISTRATION_PATHS = Object.freeze({
+  docs: Object.freeze([
+    "docs/adr/0011-prompt-v2-result-blind-canary-authority.md",
+    "docs/prompt-v2-execution-handoff.md",
+    "benchmarks/protocol-prompt-v2.md",
+    "benchmarks/prompt-v2-preregistration.json",
+    "docs/fixtures/prompt-v2-preregistration/binding.json",
+    "docs/fixtures/prompt-v2-preregistration/reference.json",
+    "docs/fixtures/prompt-v2-preregistration/rendered/reference.json",
+    "docs/fixtures/prompt-v2-preregistration/rendered/claude_code/skill-handoff.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/claude_code/skill-implement.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/claude_code/skill-investigate.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/claude_code/skill-review.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/claude_code/skill-verify.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/codex/skill-handoff.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/codex/skill-implement.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/codex/skill-investigate.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/codex/skill-review.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/codex/skill-verify.md",
+  ]),
+  schemas: Object.freeze([
+    "benchmarks/schemas/prompt-v2-preregistration.schema.json",
+    "benchmarks/schemas/prompt-v2-execution-plan.schema.json",
+    "benchmarks/schemas/prompt-v2-materialization-manifest.schema.json",
+    "benchmarks/schemas/prompt-v2-resume-state.schema.json",
+    "benchmarks/schemas/prompt-v2-normalized-result.schema.json",
+    "benchmarks/schemas/prompt-v2-comparison-report.schema.json",
+  ]),
+  adapters: Object.freeze([
+    "scripts/ask-benchmark-prompt-v2.mjs",
+    "scripts/test-ask-benchmark-prompt-v2.mjs",
+    "scripts/prompt-v2-preregistration-samples.mjs",
+    "scripts/test-prompt-v2-preregistration-samples.mjs",
+  ]),
+});
+const EXPECTED_SAMPLE_ASSETS = new Map([
+  ["ask.skill.test-first-verification", "skill"],
+  ["ask.prompt-template.codex.skill-verify", "prompt"],
+  ["ask.prompt-policy.compact-controls", "prompt"],
+  ["ask.prompt-template.fixed-entry-semantics", "prompt"],
+  ["ask.evaluator-reference.mn-build-option-update", "evaluator_reference"],
+]);
 const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
 const ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH = "docs/adapter-runtime-boundary-contract.md";
 const ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH = "schemas/adapter-runtime-profile.schema.json";
@@ -266,6 +396,8 @@ const EXECUTION_ENVELOPE_PLUGIN_PROJECTION = [
   { canonical: EXECUTION_ENVELOPE_DOC_PATH, packaged: "adapters/claude-code/plugin/contracts/execution-envelope-contract.md" },
   { canonical: LIFECYCLE_TRACEABILITY_CONTRACT_PATH, packaged: "adapters/claude-code/plugin/contracts/lifecycle-traceability-contract.md" },
   { canonical: "schemas/execution-envelope.schema.json", packaged: "adapters/claude-code/plugin/schemas/execution-envelope.schema.json" },
+  { canonical: "schemas/codex-risk-action.schema.json", packaged: "adapters/claude-code/plugin/schemas/codex-risk-action.schema.json" },
+  { canonical: "schemas/codex-risk-approval-request.schema.json", packaged: "adapters/claude-code/plugin/schemas/codex-risk-approval-request.schema.json" },
   { canonical: "schemas/metrics-event.schema.json", packaged: "adapters/claude-code/plugin/schemas/metrics-event.schema.json" },
   { canonical: "schemas/review-signal-gate-map.json", packaged: "adapters/claude-code/plugin/contracts/review-signal-gate-map.json" },
 ];
@@ -275,10 +407,21 @@ const REVIEW_SIGNAL_GATE_REQUIREMENTS = {
   "review-output-quality": ["ui_change", "docs_output_change", "report_output_change", "notification_output_change", "cli_output_change", "api_response_change", "generated_text_change", "generated_output_change", "ai_output_change", "ai_facing_output_change", "structured_output_change", "consumer_facing_wording_change"],
   "review-adversarial-risk": ["untrusted_input", "security_impact", "privacy_impact", "prompt_failure_mode", "generated_output_failure_mode", "critical_workflow_blast_radius", "misuse_path", "release_readiness_risk", "safety_boundary_uncertainty"],
   "review-code-health": ["technical_debt", "code_smell", "duplication", "dead_code", "maintainability_risk", "testability_risk", "performance_risk", "dependency_tooling_risk", "boundary_weakness", "repeated_finding"],
+  "review-automated-gate": ["automated_evidence_required"],
   "risk-gate": ["destructive_action", "external_effect", "auth_change", "secret_change", "production_change", "dependency_change", "migration_change", "billing_change", "email_change", "infrastructure_change", "deployment_change"],
   "adr-review": ["architecture_decision", "hard_to_reverse_boundary"],
   "release-readiness-gate": ["release_readiness", "release_candidate"],
 };
+const REVIEW_HEAVY_GATES = [
+  "review-domain-impact",
+  "review-architecture-impact",
+  "review-output-quality",
+  "review-adversarial-risk",
+  "review-code-health",
+  "risk-gate",
+  "adr-review",
+  "release-readiness-gate",
+];
 const EXECUTION_ENVELOPE_SESSION_STATE_PATH = "docs/agent-session-state-contract.md";
 const EXECUTION_ENVELOPE_SKILL_PATHS = [
   "skills/operating-mode-router/SKILL.md",
@@ -310,7 +453,11 @@ const EXECUTION_ENVELOPE_ADAPTER_PATHS = [
   "adapters/claude-code/project/.claude/commands/skill-verify.md",
   "adapters/claude-code/project/.claude/commands/skill-handoff.md",
   "adapters/claude-code/github-actions/claude-review-on-mention.yml",
+  "adapters/claude-code/plugin/skills/implement/SKILL.md",
+  "adapters/claude-code/plugin/skills/investigate/SKILL.md",
   "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+  "adapters/claude-code/plugin/skills/verify/SKILL.md",
+  "adapters/claude-code/plugin/skills/handoff/SKILL.md",
 ];
 const DUPLICATED_EXECUTION_ENVELOPE_FIELDS = ["Selected work mode:", "User-facing route:", "Internal route:", "Route confidence:", "Evidence checked:"];
 const REQUIRED_CLAUDE_ADAPTER_PATHS = [
@@ -328,13 +475,28 @@ const REQUIRED_CLAUDE_ADAPTER_PATHS = [
   "adapters/claude-code/github-actions/README.md",
   "adapters/claude-code/plugin/.claude-plugin/plugin.json",
   "adapters/claude-code/plugin/README.md",
+  "adapters/claude-code/plugin/contracts/claim-evidence-status-contract.md",
   "adapters/claude-code/plugin/contracts/execution-envelope-contract.md",
+  "adapters/claude-code/plugin/schemas/claim-evidence-status.schema.json",
+  "adapters/claude-code/plugin/schemas/codex-risk-action.schema.json",
+  "adapters/claude-code/plugin/schemas/codex-risk-approval-request.schema.json",
   "adapters/claude-code/plugin/schemas/execution-envelope.schema.json",
   "adapters/claude-code/plugin/schemas/metrics-event.schema.json",
+  "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs",
+  "adapters/claude-code/plugin/skills/evidence-ledger/SKILL.md",
+  "adapters/claude-code/plugin/skills/implement/SKILL.md",
+  "adapters/claude-code/plugin/skills/investigate/SKILL.md",
   "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+  "adapters/claude-code/plugin/skills/verify/SKILL.md",
+  "adapters/claude-code/plugin/skills/handoff/SKILL.md",
   "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
   "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
   "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md",
+  "adapters/claude-code/plugin/templates/implement.md",
+  "adapters/claude-code/plugin/templates/investigate.md",
+  "adapters/claude-code/plugin/templates/review-pr.md",
+  "adapters/claude-code/plugin/templates/verify.md",
+  "adapters/claude-code/plugin/templates/handoff.md",
   "adapters/claude-code/plugin/hooks/hooks.json",
   "adapters/claude-code/plugin/bin/ai-skills-metrics-record",
 ];
@@ -357,6 +519,10 @@ const REQUIRED_ADAPTER_RUNTIME_PATHS = [
   "scripts/test-adapter-runtime-migration.mjs",
   "scripts/test-adapter-runtime-event.mjs",
   "scripts/codex-runtime-profile.mjs",
+  "scripts/fixed-entry-profile.mjs",
+  "scripts/claude-fixed-entry-profile.mjs",
+  "scripts/claude-plugin-fixed-entries.mjs",
+  "scripts/test-fixed-entry-profiles.mjs",
   "scripts/codex-exec-runner.mjs",
   "scripts/execution-envelope.mjs",
 ];
@@ -514,6 +680,8 @@ const REQUIRED_DOMAIN_RULE_FIELDS = [
   "State / condition",
   "Source",
   "Evidence status",
+  "Authority status",
+  "Record state",
   "Applies to",
   "Used by",
   "Last checked",
@@ -522,13 +690,77 @@ const REQUIRED_DOMAIN_RULE_FIELDS = [
 ];
 const ALLOWED_DOMAIN_RULE_EVIDENCE_STATUSES = new Set([
   "Verified",
-  "Human-confirmed",
   "Supported",
   "Hypothesis",
-  "Deprecated",
-  "Contradicted",
+  "Unknown",
+  "Falsified",
 ]);
-
+const ALLOWED_DOMAIN_RULE_AUTHORITY_STATUSES = new Set(["not_asserted", "human_confirmed"]);
+const ALLOWED_DOMAIN_RULE_RECORD_STATES = new Set(["active", "deprecated", "contradicted"]);
+const CLAIM_EVIDENCE_SCHEMA_PATH = "schemas/claim-evidence-status.schema.json";
+const CLAIM_EVIDENCE_CONTRACT_DOC_PATH = "docs/claim-evidence-status-contract.md";
+const CLAIM_EVIDENCE_ADR_PATH = "docs/adr/0006-claim-evidence-status-boundary.md";
+const CLAIM_EVIDENCE_PLUGIN_PROJECTION = Object.freeze([
+  { canonical: CLAIM_EVIDENCE_CONTRACT_DOC_PATH, packaged: "adapters/claude-code/plugin/contracts/claim-evidence-status-contract.md" },
+  { canonical: CLAIM_EVIDENCE_SCHEMA_PATH, packaged: "adapters/claude-code/plugin/schemas/claim-evidence-status.schema.json" },
+  { canonical: "skills/evidence-ledger/SKILL.md", packaged: "adapters/claude-code/plugin/skills/evidence-ledger/SKILL.md" },
+  { canonical: "scripts/claim-evidence-status.mjs", packaged: "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs" },
+]);
+const CANONICAL_CLAIM_EVIDENCE_STATUSES = Object.freeze(["Verified", "Supported", "Hypothesis", "Unknown", "Falsified"]);
+const FORMAL_CLAIM_EVIDENCE_TRIGGER_IDS = Object.freeze([
+  "explicit_claim_audit",
+  "multiple_material_claims",
+  "high_stakes_readiness",
+  "cross_artifact_synthesis",
+  "stable_claim_ids",
+]);
+const DIRECT_CLAIM_EVIDENCE_SCHEMA_CONSUMERS = Object.freeze([
+  "schemas/domain-rule-ledger-entry.schema.json",
+  "schemas/review-rule-ledger-entry.schema.json",
+  "schemas/engineering-pattern-ledger-entry.schema.json",
+  "schemas/verification-pattern-ledger-entry.schema.json",
+  "schemas/architecture-decision-memory-entry.schema.json",
+  "schemas/documentation-knowledge-ledger-entry.schema.json",
+  "schemas/engineering-capability-ledger-entry.schema.json",
+]);
+const CLAIM_EVIDENCE_SEPARATION_REQUIREMENTS = Object.freeze({
+  "schemas/domain-rule-ledger-entry.schema.json": ["authority_status", "record_state"],
+  "schemas/review-rule-ledger-entry.schema.json": ["authority_status", "record_state"],
+  "schemas/engineering-pattern-ledger-entry.schema.json": ["authority_status", "record_state"],
+  "schemas/verification-pattern-ledger-entry.schema.json": ["authority_status", "record_state"],
+  "schemas/architecture-decision-memory-entry.schema.json": ["authority_status", "record_state"],
+  "schemas/documentation-knowledge-ledger-entry.schema.json": ["authority_status", "freshness_status"],
+  "schemas/engineering-capability-ledger-entry.schema.json": ["authority_status", "assessment_state"],
+});
+const VERIFICATION_PROOF_POLICY_SCHEMA_PATH = "schemas/verification-proof-policy.schema.json";
+const VERIFICATION_PROOF_POLICY_CONTRACT_PATH = "docs/verification-proof-policy-contract.md";
+const VERIFICATION_PROOF_POLICY_ADR_PATH = "docs/adr/0008-monotonic-verification-proof-path.md";
+const VERIFICATION_PROOF_POLICY_FIXTURE_PATH = "docs/fixtures/verification-proof-policy-cases.json";
+const VERIFICATION_PROOF_FORMAL_BASELINE_PATH = "docs/fixtures/verification-proof-formal-baseline.md";
+const VERIFICATION_PROOF_POLICY_MODULE_PATH = "scripts/verification-proof-policy.mjs";
+const VERIFICATION_PROOF_POLICY_TEST_PATH = "scripts/test-verification-proof-policy.mjs";
+const VERIFICATION_PROOF_POLICY_MANIFEST_PATHS = Object.freeze({
+  docs: Object.freeze([
+    VERIFICATION_PROOF_POLICY_CONTRACT_PATH,
+    VERIFICATION_PROOF_POLICY_ADR_PATH,
+    VERIFICATION_PROOF_FORMAL_BASELINE_PATH,
+    VERIFICATION_PROOF_POLICY_FIXTURE_PATH,
+  ]),
+  schemas: Object.freeze([VERIFICATION_PROOF_POLICY_SCHEMA_PATH]),
+  adapters: Object.freeze([VERIFICATION_PROOF_POLICY_MODULE_PATH, VERIFICATION_PROOF_POLICY_TEST_PATH]),
+});
+const VERIFICATION_PROOF_POLICY_CORE_ASSETS = Object.freeze([
+  VERIFICATION_PROOF_POLICY_CONTRACT_PATH,
+  VERIFICATION_PROOF_POLICY_SCHEMA_PATH,
+]);
+const VERIFICATION_PROOF_POLICY_RAW_PATH_PROJECTIONS = Object.freeze([
+  "skills/test-first-verification/SKILL.md",
+  "skills/controlled-implementation/SKILL.md",
+  "skills/refactor-implementation/SKILL.md",
+  "adapters/claude-code/project/.claude/commands/skill-implement.md",
+  "adapters/claude-code/project/.claude/commands/skill-investigate.md",
+  "adapters/claude-code/project/.claude/commands/skill-verify.md",
+]);
 function parseArgs(argv) {
   const args = {
     root: DEFAULT_ROOT,
@@ -605,6 +837,115 @@ function validateAskAutomationActionPins(root, errors) {
   const path = resolve(root, ASK_AUTOMATION_WORKFLOW_PATH);
   if (!existsSync(path)) return;
   for (const message of validateAskAutomationActionPinsText(readFileSync(path, "utf8"))) fail(errors, "ASK automation Action pins", message);
+}
+
+function validateSkillEffectivenessOutcomeContract(root, manifest, errors) {
+  if (!manifest?.skills?.includes("skill-effectiveness-evaluation")) return;
+  const section = "one-task Skill effectiveness outcome";
+  const requiredDocs = [
+    "docs/skill-effectiveness-evaluation-contract.md",
+    "docs/adr/0010-one-task-effectiveness-authority-boundary.md",
+    "docs/fixtures/skill-effectiveness-outcome-cases.json",
+  ];
+  const requiredSchemas = [
+    "schemas/effectiveness-decision-vocabulary.schema.json",
+    "schemas/skill-effectiveness-outcome.schema.json",
+  ];
+  const immutableAssets = [
+    "docs/skill-effectiveness-evaluation-contract.md",
+    "schemas/effectiveness-decision-vocabulary.schema.json",
+    "schemas/skill-effectiveness-outcome.schema.json",
+  ];
+  for (const path of requiredDocs) {
+    if (!manifest?.docs?.includes(path)) fail(errors, section, `manifest docs inventory is missing ${path}`);
+  }
+  for (const path of requiredSchemas) {
+    if (!manifest?.schemas?.includes(path)) fail(errors, section, `manifest schema inventory is missing ${path}`);
+  }
+  for (const path of immutableAssets) {
+    if (!CORE_IMMUTABLE_CONTRACT_ASSETS.includes(path)) fail(errors, section, `core installer immutable inventory is missing ${path}`);
+  }
+  for (const path of ["scripts/json-schema-validation.mjs", "scripts/skill-effectiveness-outcome.mjs"]) {
+    if (!CORE_IMMUTABLE_RUNTIME_ASSETS.includes(path)) fail(errors, section, `core installer immutable runtime inventory is missing ${path}`);
+    if (!CORE_OWNED_IMMUTABLE_ASSETS.includes(path)) fail(errors, section, `combined core immutable inventory is missing ${path}`);
+    if (!existsSync(resolve(root, path))) fail(errors, section, `required semantic runtime is missing ${path}`);
+  }
+
+  const skillPath = resolve(root, "skills/skill-effectiveness-evaluation/SKILL.md");
+  const canonicalSkillText = existsSync(skillPath) ? readFileSync(skillPath, "utf8") : "";
+  for (const token of [
+    "scripts/skill-effectiveness-outcome.mjs",
+    "build <input.json|->",
+    "validate <outcome.json|->",
+  ]) {
+    if (!canonicalSkillText.includes(token)) fail(errors, section, `canonical Skill must require semantic CLI token: ${token}`);
+  }
+  const semanticText = existsSync(resolve(root, "scripts/skill-effectiveness-outcome.mjs"))
+    ? readFileSync(resolve(root, "scripts/skill-effectiveness-outcome.mjs"), "utf8")
+    : "";
+  if (!semanticText.includes('from "./json-schema-validation.mjs"') || !semanticText.includes('["build", "validate"]')) {
+    fail(errors, section, "semantic builder/validator must consume the shared Schema runtime and expose build/validate CLI commands");
+  }
+  const envelopeText = existsSync(resolve(root, "scripts/execution-envelope.mjs"))
+    ? readFileSync(resolve(root, "scripts/execution-envelope.mjs"), "utf8")
+    : "";
+  if (!envelopeText.includes('from "./json-schema-validation.mjs"') || !envelopeText.includes('export { validateJsonSchema } from "./json-schema-validation.mjs"')) {
+    fail(errors, section, "Execution Envelope must consume and re-export the shared JSON Schema validator");
+  }
+  const promptRecipeText = existsSync(resolve(root, "docs/prompt-recipes-ja.md"))
+    ? readFileSync(resolve(root, "docs/prompt-recipes-ja.md"), "utf8")
+    : "";
+  const promptSection = promptRecipeText.split("## Skill effectiveness evaluation", 2)[1]?.split("\n## ", 1)[0] ?? "";
+  if (promptSection.includes("- Confidence") || !promptSection.includes("- Evidence limitations")) {
+    fail(errors, section, "Skill effectiveness prompt recipe must use Evidence limitations instead of Confidence");
+  }
+
+  const fixturePath = resolve(root, "docs/fixtures/skill-effectiveness-outcome-cases.json");
+  if (!existsSync(fixturePath)) {
+    fail(errors, section, "fixture catalog is missing");
+  } else {
+    try {
+      const catalog = readJsonFileStrict(fixturePath, "one-task Skill effectiveness outcome fixture catalog");
+      for (const contractIssue of validateSkillEffectivenessFixtureCatalog(catalog)) fail(errors, section, contractIssue);
+    } catch (error) {
+      fail(errors, section, `fixture catalog is invalid: ${error.message}`);
+    }
+  }
+
+  for (const path of ["schemas/evolution-experiment.schema.json", "schemas/evolution-recommendation.schema.json"]) {
+    const absolutePath = resolve(root, path);
+    const text = existsSync(absolutePath) ? readFileSync(absolutePath, "utf8") : "";
+    if (!text.includes('"$ref": "effectiveness-decision-vocabulary.schema.json#/$defs/overallRecommendation"')) {
+      fail(errors, section, `${path} must reference the shared overall recommendation vocabulary`);
+    }
+  }
+
+  const skillText = readFileSync(resolve(root, "skills/skill-effectiveness-evaluation/SKILL.md"), "utf8");
+  const recipeText = readFileSync(resolve(root, "docs/prompt-recipes-ja.md"), "utf8");
+  for (const [path, text] of [["skills/skill-effectiveness-evaluation/SKILL.md", skillText], ["docs/prompt-recipes-ja.md", recipeText]]) {
+    if (/\b0\s*-\s*100\b/u.test(text)) fail(errors, section, `${path} must not request an unanchored 0-100 effectiveness score`);
+  }
+  for (const token of [
+    "docs/skill-effectiveness-evaluation-contract.md",
+    "schemas/skill-effectiveness-outcome.schema.json",
+    "schemas/effectiveness-decision-vocabulary.schema.json",
+  ]) {
+    if (!skillText.includes(token)) fail(errors, section, `Skill contract must name ${token}`);
+  }
+
+  try {
+    const plan = readJsonFileStrict(resolve(root, ".github/ask-automation/validation-plan.json"), "immutable validation plan");
+    const command = plan.commands?.find(({ id }) => id === "skill_effectiveness_outcome_contract");
+    if (JSON.stringify(command?.argv) !== JSON.stringify(["node", "scripts/test-skill-effectiveness-outcome.mjs"])) {
+      fail(errors, section, "immutable validation plan must run the focused outcome contract test");
+    }
+  } catch (error) {
+    fail(errors, section, `immutable validation plan is unavailable: ${error.message}`);
+  }
+  const workflowText = readFileSync(resolve(root, ".github/workflows/validate.yml"), "utf8");
+  if (!workflowText.includes("run: node scripts/test-skill-effectiveness-outcome.mjs")) {
+    fail(errors, section, "repository validation workflow must run the focused outcome contract test");
+  }
 }
 
 function validateAdaptivePortfolioCatalog(root, errors) {
@@ -1276,12 +1617,381 @@ function validateManifestPaths(root, manifest, errors) {
   }
 }
 
+function readClaimEvidenceSchema(root, path, errors) {
+  const absolutePath = resolve(root, path);
+  if (!existsSync(absolutePath)) {
+    fail(errors, "claim evidence status", `required claim evidence schema is missing: ${path}`);
+    return null;
+  }
+  try {
+    return JSON.parse(readFileSync(absolutePath, "utf8"));
+  } catch (error) {
+    fail(errors, "claim evidence status", `${path} is not valid JSON: ${error.message}`);
+    return null;
+  }
+}
+
+export function inspectClaimEvidencePluginProjection(root) {
+  const issues = [];
+  const projection = CLAIM_EVIDENCE_PLUGIN_PROJECTION.map(({ canonical, packaged }) => {
+    const canonicalPath = resolve(root, canonical);
+    const packagedPath = resolve(root, packaged);
+    const ok = existsSync(canonicalPath) && existsSync(packagedPath) && readFileSync(canonicalPath).equals(readFileSync(packagedPath));
+    if (!ok) issues.push(`Claude plugin projection must be byte-identical to ${canonical}: ${packaged}`);
+    return { canonical, packaged, ok };
+  });
+  const readPluginSkill = (name) => {
+    const path = `adapters/claude-code/plugin/skills/${name}/SKILL.md`;
+    if (!existsSync(resolve(root, path))) {
+      issues.push(`Claude plugin claim entry point is missing: ${path}`);
+      return "";
+    }
+    return readFileSync(resolve(root, path), "utf8");
+  };
+  const requiredTokens = [
+    ["review-pr", ["${CLAUDE_PLUGIN_ROOT}/contracts/claim-evidence-status-contract.md", "${CLAUDE_PLUGIN_ROOT}/schemas/claim-evidence-status.schema.json", "high_stakes_readiness", "formal_ledger", "/ai-skills:evidence-ledger"]],
+    ["adoption-report", ["multiple_material_claims", "formal_ledger", "/ai-skills:evidence-ledger"]],
+    ["ledger-refresh", ["inline by default", "stable_claim_ids", "only when an observed closed trigger", "installation alone is not activation"]],
+    ["implementation-context-check", ["ask.claim-evidence-status@1.0.0", "inline", "Do not activate", "only a closed formal-audit trigger"]],
+  ];
+  for (const [name, tokens] of requiredTokens) {
+    const content = readPluginSkill(name);
+    for (const token of tokens) if (!content.includes(token)) issues.push(`Claude plugin ${name} must preserve claim routing token: ${token}`);
+  }
+  const evidencePlugin = readPluginSkill("evidence-ledger");
+  if (!evidencePlugin.includes("${CLAUDE_PLUGIN_ROOT}/scripts/claim-evidence-status.mjs")) {
+    issues.push("Claude plugin evidence-ledger must resolve the bundled legacy normalizer through CLAUDE_PLUGIN_ROOT");
+  }
+  return { issues, projection };
+}
+
+function validateClaimEvidenceStatusContract(root, manifest, errors) {
+  const schema = readClaimEvidenceSchema(root, CLAIM_EVIDENCE_SCHEMA_PATH, errors);
+  if (!schema) return;
+
+  const metadata = schema["x-ask-contract"];
+  if (JSON.stringify(schema.enum) !== JSON.stringify(CANONICAL_CLAIM_EVIDENCE_STATUSES)) {
+    fail(errors, "claim evidence status", "canonical schema enum must be exactly Verified, Supported, Hypothesis, Unknown, Falsified");
+  }
+  if (
+    metadata?.id !== "ask.claim-evidence-status" ||
+    metadata?.revision !== "1.0.0" ||
+    metadata?.ref !== "ask.claim-evidence-status@1.0.0" ||
+    metadata?.inline_default !== true
+  ) {
+    fail(errors, "claim evidence status", "contract identity, revision, ref, and inline_default must remain ask.claim-evidence-status@1.0.0 with inline_default=true");
+  }
+  if (
+    metadata?.formal_ledger?.contract !== "evidence-ledger" ||
+    metadata?.formal_ledger?.direct_trigger_id !== "formal_claim_audit_required" ||
+    JSON.stringify(metadata?.formal_ledger?.trigger_ids) !== JSON.stringify(FORMAL_CLAIM_EVIDENCE_TRIGGER_IDS)
+  ) {
+    fail(errors, "claim evidence status", "formal Evidence Ledger routing must use the closed five-trigger contract");
+  }
+  if (JSON.stringify(schema.$defs?.lowercase_status?.enum) !== JSON.stringify(CANONICAL_CLAIM_EVIDENCE_STATUSES.map((status) => status.toLowerCase()))) {
+    fail(errors, "claim evidence status", "lowercase compatibility statuses must mirror the canonical five-status order");
+  }
+  if (JSON.stringify(schema.$defs?.lowercase_observation_status?.enum) !== JSON.stringify(["verified", "supported", "unknown"])) {
+    fail(errors, "claim evidence status", "Asset observation compatibility must preserve the existing verified, supported, unknown subset");
+  }
+
+  if (manifest?.name === "agent-spectrum-kernel") {
+    if (!Array.isArray(manifest.schemas) || !manifest.schemas.includes(CLAIM_EVIDENCE_SCHEMA_PATH)) {
+      fail(errors, "claim evidence status", `manifest.json.schemas must include ${CLAIM_EVIDENCE_SCHEMA_PATH}`);
+    }
+    for (const path of [CLAIM_EVIDENCE_CONTRACT_DOC_PATH, CLAIM_EVIDENCE_ADR_PATH]) {
+      if (!Array.isArray(manifest.docs) || !manifest.docs.includes(path)) {
+        fail(errors, "claim evidence status", `manifest.json.docs must include ${path}`);
+      }
+    }
+  }
+
+  const validateRef = (path, value, expectedRef, label) => {
+    if (value?.$ref !== expectedRef || Object.hasOwn(value ?? {}, "enum")) {
+      fail(errors, "claim evidence status", `${path} ${label} must reference ${expectedRef} without copying an enum`);
+    }
+  };
+
+  for (const path of DIRECT_CLAIM_EVIDENCE_SCHEMA_CONSUMERS) {
+    const consumer = readClaimEvidenceSchema(root, path, errors);
+    if (consumer) {
+      validateRef(path, consumer.properties?.evidence_status, "claim-evidence-status.schema.json", "evidence_status");
+      for (const field of CLAIM_EVIDENCE_SEPARATION_REQUIREMENTS[path]) {
+        if (!consumer.properties?.[field] || !consumer.required?.includes(field)) {
+          fail(errors, "claim evidence status", `${path} must define and require separated field ${field}`);
+        }
+      }
+    }
+  }
+  const improvement = readClaimEvidenceSchema(root, "schemas/improvement-ledger-entry.schema.json", errors);
+  if (improvement) validateRef("schemas/improvement-ledger-entry.schema.json", improvement.properties?.evidence?.properties?.status, "claim-evidence-status.schema.json", "evidence.status");
+  const epicAdmission = readClaimEvidenceSchema(root, "schemas/epic-admission-decision.schema.json", errors);
+  if (epicAdmission) validateRef("schemas/epic-admission-decision.schema.json", epicAdmission.$defs?.evidenceStatus, "claim-evidence-status.schema.json#/$defs/lowercase_status", "$defs.evidenceStatus");
+  const assetRecord = readClaimEvidenceSchema(root, "schemas/asset-record.schema.json", errors);
+  if (assetRecord) validateRef("schemas/asset-record.schema.json", assetRecord.$defs?.evidenceStatus, "claim-evidence-status.schema.json#/$defs/lowercase_observation_status", "$defs.evidenceStatus");
+
+  if (manifest?.name === "agent-spectrum-kernel") {
+    const plugin = inspectClaimEvidencePluginProjection(root);
+    for (const issue of plugin.issues) fail(errors, "claim evidence status", issue);
+    for (const { packaged } of CLAIM_EVIDENCE_PLUGIN_PROJECTION) {
+      if (!Array.isArray(manifest.adapters) || !manifest.adapters.includes(packaged)) {
+        fail(errors, "claim evidence status", `manifest.json.adapters must include Claude plugin claim projection ${packaged}`);
+      }
+    }
+  }
+}
+
+function readVerificationProofPolicyJson(root, path, issues) {
+  const absolutePath = resolve(root, path);
+  if (!existsSync(absolutePath)) {
+    issues.push(`required verification proof policy path is missing: ${path}`);
+    return null;
+  }
+  try {
+    return JSON.parse(readFileSync(absolutePath, "utf8"));
+  } catch (error) {
+    issues.push(`${path} is not valid JSON: ${error.message}`);
+    return null;
+  }
+}
+
+export function inspectVerificationProofPolicyContract(root, manifest = null) {
+  const issues = [];
+  const requiredPaths = [
+    ...VERIFICATION_PROOF_POLICY_MANIFEST_PATHS.docs,
+    ...VERIFICATION_PROOF_POLICY_MANIFEST_PATHS.schemas,
+    ...VERIFICATION_PROOF_POLICY_MANIFEST_PATHS.adapters,
+    "schemas/compact-profile-control-map.json",
+    "scripts/installer-lifecycle.mjs",
+    "scripts/ask-shared.mjs",
+    "scripts/ask-sensors.mjs",
+    "docs/adapter-runtime-migration.md",
+    ".github/ask-automation/validation-plan.json",
+    ".github/workflows/validate.yml",
+    "docs/fixtures/adapter-cross-conformance.json",
+    "docs/fixtures/adapter-runtime-profiles.json",
+    ...VERIFICATION_PROOF_POLICY_RAW_PATH_PROJECTIONS,
+    "adapters/codex/prompts/skill-verify.md",
+  ];
+  for (const path of requiredPaths) {
+    if (!existsSync(resolve(root, path))) issues.push(`required verification proof policy path is missing: ${path}`);
+  }
+
+  const schema = readVerificationProofPolicyJson(root, VERIFICATION_PROOF_POLICY_SCHEMA_PATH, issues);
+  const metadata = schema?.["x-ask-contract"];
+  if (
+    metadata?.id !== "ask.verification-proof-policy"
+    || metadata?.revision !== "1.0.0"
+    || metadata?.ref !== VERIFICATION_PROOF_POLICY_REF
+  ) {
+    issues.push(`verification proof policy identity must remain ${VERIFICATION_PROOF_POLICY_REF}`);
+  }
+  if (JSON.stringify(metadata?.paths) !== JSON.stringify(VERIFICATION_PROOF_PATHS)) {
+    issues.push("verification proof policy paths must remain exactly compact_proof and formal_verification_contract");
+  }
+  if (JSON.stringify(metadata?.compact_eligibility_fact_ids) !== JSON.stringify(COMPACT_ELIGIBILITY_FACT_IDS)) {
+    issues.push("verification proof policy compact eligibility facts differ from the canonical module");
+  }
+  if (JSON.stringify(metadata?.formal_trigger_ids) !== JSON.stringify(FORMAL_VERIFICATION_TRIGGER_IDS)) {
+    issues.push("verification proof policy formal trigger IDs differ from the canonical module");
+  }
+  if (JSON.stringify(metadata?.protected_compact_claim_types) !== JSON.stringify(PROTECTED_COMPACT_CLAIM_TYPES)) {
+    issues.push("verification proof policy protected compact claim types differ from the canonical module");
+  }
+  if (metadata?.compact_rendered_shape !== renderCompactProofShape()) {
+    issues.push("verification proof policy Compact Proof shape differs from the canonical module");
+  }
+  if (metadata?.formal_path_absorbing !== true || metadata?.execution_evidence_owner_ref !== "docs/verification-evidence-contract.md") {
+    issues.push("verification proof policy must keep formal absorbing and existing execution-evidence ownership");
+  }
+  const rootAlternatives = schema?.oneOf?.map((entry) => entry?.$ref) ?? [];
+  if (JSON.stringify(rootAlternatives) !== JSON.stringify(["#/$defs/selection", "#/$defs/compactProof", "#/$defs/transition"])) {
+    issues.push("verification proof policy schema root alternatives must remain selection, Compact Proof, and transition only");
+  }
+
+  const fixture = readVerificationProofPolicyJson(root, VERIFICATION_PROOF_POLICY_FIXTURE_PATH, issues);
+  if (fixture) {
+    if (fixture.policy_ref !== VERIFICATION_PROOF_POLICY_REF) issues.push(`verification proof fixture policy_ref must be ${VERIFICATION_PROOF_POLICY_REF}`);
+    if (fixture.compact_rendered_shape !== renderCompactProofShape()) issues.push("verification proof fixture Compact Proof shape differs from the canonical module");
+    if (JSON.stringify(fixture.closed_sets?.compact_eligibility_fact_ids) !== JSON.stringify(COMPACT_ELIGIBILITY_FACT_IDS)) issues.push("verification proof fixture compact eligibility facts differ from the canonical module");
+    if (JSON.stringify(fixture.closed_sets?.formal_trigger_ids) !== JSON.stringify(FORMAL_VERIFICATION_TRIGGER_IDS)) issues.push("verification proof fixture formal trigger IDs differ from the canonical module");
+    if (JSON.stringify(fixture.closed_sets?.protected_compact_claim_types) !== JSON.stringify(PROTECTED_COMPACT_CLAIM_TYPES)) issues.push("verification proof fixture protected compact claim types differ from the canonical module");
+
+    if (fixture.size_proxy?.formal_baseline_path !== VERIFICATION_PROOF_FORMAL_BASELINE_PATH) {
+      issues.push(`verification proof fixture formal baseline must remain ${VERIFICATION_PROOF_FORMAL_BASELINE_PATH}`);
+    } else if (existsSync(resolve(root, VERIFICATION_PROOF_FORMAL_BASELINE_PATH))) {
+      const compactBytes = Buffer.byteLength(renderCompactProofShape(), "utf8");
+      const formalBytes = readFileSync(resolve(root, VERIFICATION_PROOF_FORMAL_BASELINE_PATH)).byteLength;
+      const maximumRatio = fixture.size_proxy?.maximum_compact_ratio;
+      if (
+        fixture.size_proxy?.compact_expected_bytes !== compactBytes
+        || fixture.size_proxy?.formal_expected_bytes !== formalBytes
+        || typeof maximumRatio !== "number"
+        || compactBytes > formalBytes * maximumRatio
+      ) {
+        issues.push("verification proof artifact-size proxy does not match the checked-in Compact Proof and formal baseline bytes");
+      }
+    }
+
+    const promptProxy = fixture.size_proxy?.generated_localized_prompt;
+    const expectedPromptBaseline = "docs/fixtures/codex-pre-compact-prompts/skill-verify.md";
+    if (
+      promptProxy?.baseline_path !== expectedPromptBaseline
+      || promptProxy?.candidate_adapter_id !== "codex"
+      || promptProxy?.candidate_profile_id !== "codex-verification-compact-v1"
+      || promptProxy?.candidate_prompt_name !== "skill-verify.md"
+    ) {
+      issues.push("verification proof generated-prompt proxy must bind the immutable Codex verification baseline and current verification profile");
+    } else if (existsSync(resolve(root, expectedPromptBaseline))) {
+      const baselineBytes = readFileSync(resolve(root, expectedPromptBaseline));
+      const baselineDigest = createHash("sha256").update(baselineBytes).digest("hex");
+      if (baselineBytes.byteLength !== promptProxy.baseline_expected_bytes || baselineDigest !== promptProxy.baseline_sha256) {
+        issues.push("verification proof generated-prompt baseline bytes or digest are stale");
+      }
+    } else {
+      issues.push(`required verification proof policy path is missing: ${expectedPromptBaseline}`);
+    }
+
+    const runtimeProfiles = readVerificationProofPolicyJson(root, "docs/fixtures/adapter-runtime-profiles.json", issues);
+    const runtimeCodex = runtimeProfiles?.profiles?.find(({ adapter_id }) => adapter_id === promptProxy?.candidate_adapter_id);
+    const runtimePrompt = runtimeCodex?.rendering?.compact_profiles?.find(({ profile_id }) => profile_id === promptProxy?.candidate_profile_id);
+    if (
+      runtimePrompt?.prompt_name !== promptProxy?.candidate_prompt_name
+      || runtimePrompt?.rendered_bytes !== promptProxy?.candidate_expected_bytes
+      || runtimePrompt?.rendered_sha256 !== `sha256:${promptProxy?.candidate_sha256}`
+      || typeof promptProxy?.maximum_candidate_ratio !== "number"
+      || promptProxy.candidate_expected_bytes > promptProxy.baseline_expected_bytes * promptProxy.maximum_candidate_ratio
+    ) {
+      issues.push("verification proof generated localized prompt does not match the runtime fixture or material-size threshold");
+    }
+  }
+
+  const controlMap = readVerificationProofPolicyJson(root, "schemas/compact-profile-control-map.json", issues);
+  const verificationControl = controlMap?.controls?.verification;
+  if (
+    verificationControl?.proof_policy_ref !== VERIFICATION_PROOF_POLICY_REF
+    || verificationControl?.proof_policy_schema_ref !== VERIFICATION_PROOF_POLICY_SCHEMA_PATH
+    || verificationControl?.proof_path_selected_before_implementation_claim !== true
+    || verificationControl?.compact_to_formal_upgrade_required !== true
+  ) {
+    issues.push("compact profile verification control must project the canonical policy ref, schema, pre-claim selection, and compact-to-formal upgrade");
+  }
+
+  if (existsSync(resolve(root, "scripts/installer-lifecycle.mjs"))) {
+    const installer = readFileSync(resolve(root, "scripts/installer-lifecycle.mjs"), "utf8");
+    for (const path of VERIFICATION_PROOF_POLICY_CORE_ASSETS) {
+      if (!installer.includes(`"${path}"`)) issues.push(`core immutable contract assets must include ${path}`);
+    }
+  }
+
+  for (const path of VERIFICATION_PROOF_POLICY_RAW_PATH_PROJECTIONS) {
+    if (!existsSync(resolve(root, path))) continue;
+    const text = readFileSync(resolve(root, path), "utf8");
+    const generatedClaudeTemplate = path.startsWith("adapters/claude-code/") && text.includes("{{ASK_COMPACT_CONTROLS}}");
+    const tokens = generatedClaudeTemplate
+      ? (path.endsWith("skill-verify.md") ? VERIFICATION_PROOF_PATHS : [])
+      : [VERIFICATION_PROOF_POLICY_REF, ...VERIFICATION_PROOF_PATHS];
+    if (generatedClaudeTemplate && (text.match(/\{\{ASK_COMPACT_CONTROLS\}\}/gu) ?? []).length !== 1) {
+      issues.push(`${path} must contain exactly one generated compact-control placeholder`);
+    }
+    for (const token of tokens) {
+      if (!text.includes(token)) issues.push(`${path} must project verification proof policy token: ${token}`);
+    }
+  }
+  if (existsSync(resolve(root, "adapters/codex/prompts/skill-verify.md"))) {
+    const codexVerify = readFileSync(resolve(root, "adapters/codex/prompts/skill-verify.md"), "utf8");
+    for (const token of [...VERIFICATION_PROOF_PATHS, "Proof:"]) {
+      if (!codexVerify.includes(token)) issues.push(`adapters/codex/prompts/skill-verify.md must preserve verification proof token: ${token}`);
+    }
+  }
+  if (existsSync(resolve(root, "docs/fixtures/adapter-cross-conformance.json"))) {
+    const profiles = readFileSync(resolve(root, "docs/fixtures/adapter-cross-conformance.json"), "utf8");
+    for (const token of [VERIFICATION_PROOF_POLICY_REF, ...VERIFICATION_PROOF_PATHS]) {
+      if (!profiles.includes(token)) issues.push(`adapter cross-conformance fixture must project verification proof policy token: ${token}`);
+    }
+  }
+
+  if (existsSync(resolve(root, "scripts/ask-shared.mjs"))) {
+    const shared = readFileSync(resolve(root, "scripts/ask-shared.mjs"), "utf8");
+    if (!shared.includes('exactlyOneOfSections: ["Proof:", "Verification Contract:"]')) {
+      issues.push("ASK shared verification output must require exactly one Compact Proof or Verification Contract section");
+    }
+  }
+  if (existsSync(resolve(root, "scripts/ask-sensors.mjs"))) {
+    const sensors = readFileSync(resolve(root, "scripts/ask-sensors.mjs"), "utf8");
+    if (!sensors.includes('"Proof:"') || !sensors.includes("exactlyOneOfSections")) {
+      issues.push("ASK sensors must recognize and enforce the exclusive Compact Proof output section");
+    }
+  }
+
+  const validationPlan = readVerificationProofPolicyJson(root, ".github/ask-automation/validation-plan.json", issues);
+  const policyCommand = validationPlan?.commands?.find((command) => command.id === "verification_proof_policy");
+  if (JSON.stringify(policyCommand?.argv) !== JSON.stringify(["node", VERIFICATION_PROOF_POLICY_TEST_PATH])) {
+    issues.push("immutable validation plan must run the verification proof policy contract test");
+  }
+  if (existsSync(resolve(root, ".github/workflows/validate.yml"))) {
+    const workflow = readFileSync(resolve(root, ".github/workflows/validate.yml"), "utf8");
+    if (!workflow.includes(`node ${VERIFICATION_PROOF_POLICY_TEST_PATH}`)) issues.push("repository workflow must run the verification proof policy contract test");
+  }
+
+  if (existsSync(resolve(root, "docs/adapter-runtime-migration.md"))) {
+    const migration = readFileSync(resolve(root, "docs/adapter-runtime-migration.md"), "utf8");
+    for (const token of [VERIFICATION_PROOF_POLICY_REF, "formal-only", "does not downgrade", "97-byte", "287-byte"]) {
+      if (!migration.includes(token)) issues.push(`adapter runtime migration must preserve verification proof migration token: ${token}`);
+    }
+  }
+
+  if (manifest) {
+    for (const [key, paths] of Object.entries(VERIFICATION_PROOF_POLICY_MANIFEST_PATHS)) {
+      for (const path of paths) {
+        if (!Array.isArray(manifest[key]) || !manifest[key].includes(path)) issues.push(`manifest.json.${key} must include ${path}`);
+      }
+    }
+  }
+
+  return {
+    issues,
+    policyRef: metadata?.ref ?? "missing",
+    pathCount: Array.isArray(metadata?.paths) ? metadata.paths.length : 0,
+    compactEligibilityFactCount: Array.isArray(metadata?.compact_eligibility_fact_ids) ? metadata.compact_eligibility_fact_ids.length : 0,
+    formalTriggerCount: Array.isArray(metadata?.formal_trigger_ids) ? metadata.formal_trigger_ids.length : 0,
+    protectedCompactClaimCount: Array.isArray(metadata?.protected_compact_claim_types) ? metadata.protected_compact_claim_types.length : 0,
+    compactBytes: fixture?.size_proxy?.compact_expected_bytes ?? "unknown",
+    formalBaselineBytes: fixture?.size_proxy?.formal_expected_bytes ?? "unknown",
+    generatedPromptBytes: fixture?.size_proxy?.generated_localized_prompt?.candidate_expected_bytes ?? "unknown",
+    generatedPromptBaselineBytes: fixture?.size_proxy?.generated_localized_prompt?.baseline_expected_bytes ?? "unknown",
+  };
+}
+
+function validateVerificationProofPolicyContract(root, manifest, errors) {
+  if (manifest?.name !== "agent-spectrum-kernel") {
+    return {
+      active: false,
+      valid: true,
+      policyRef: "not applicable",
+      pathCount: 0,
+      compactEligibilityFactCount: 0,
+      formalTriggerCount: 0,
+      protectedCompactClaimCount: 0,
+      compactBytes: "not applicable",
+      formalBaselineBytes: "not applicable",
+      generatedPromptBytes: "not applicable",
+      generatedPromptBaselineBytes: "not applicable",
+    };
+  }
+  const result = inspectVerificationProofPolicyContract(root, manifest);
+  for (const issue of result.issues) fail(errors, "verification proof policy", issue);
+  return { active: true, valid: result.issues.length === 0, ...result };
+}
+
 function validateExecutionEnvelope(root, manifest, errors) {
   const active = manifest?.name === "agent-spectrum-kernel";
   const checks = {
     active,
     contractPresent: existsSync(resolve(root, EXECUTION_ENVELOPE_DOC_PATH)),
     schemaListed: Array.isArray(manifest?.schemas) && manifest.schemas.includes("schemas/execution-envelope.schema.json"),
+    recordSchemaListed: Array.isArray(manifest?.schemas) && manifest.schemas.includes("schemas/execution-envelope-record.schema.json"),
+    runnerResultSchemaListed: Array.isArray(manifest?.schemas) && manifest.schemas.includes("schemas/codex-runner-result.schema.json"),
     docListed: Array.isArray(manifest?.docs) && manifest.docs.includes(EXECUTION_ENVELOPE_DOC_PATH),
     pluginProjection: [],
     sessionState: false,
@@ -1308,6 +2018,12 @@ function validateExecutionEnvelope(root, manifest, errors) {
   }
   if (!checks.schemaListed) {
     fail(errors, "execution envelope", "manifest.json.schemas must list schemas/execution-envelope.schema.json");
+  }
+  if (!checks.recordSchemaListed) {
+    fail(errors, "execution envelope", "manifest.json.schemas must list schemas/execution-envelope-record.schema.json");
+  }
+  if (!checks.runnerResultSchemaListed) {
+    fail(errors, "execution envelope", "manifest.json.schemas must list schemas/codex-runner-result.schema.json");
   }
   checks.pluginProjection = EXECUTION_ENVELOPE_PLUGIN_PROJECTION.map(({ canonical, packaged }) => {
     const canonicalPath = resolve(root, canonical);
@@ -1344,6 +2060,49 @@ function validateExecutionEnvelope(root, manifest, errors) {
       }
       if (schema.properties?.metrics_event_candidate?.$ref !== "metrics-event.schema.json") {
         fail(errors, "execution envelope", "schemas/execution-envelope.schema.json.metrics_event_candidate must $ref metrics-event.schema.json");
+      }
+    } catch {
+      // The required-schema validation reports malformed JSON separately.
+    }
+  }
+  const recordSchemaPath = resolve(root, "schemas/execution-envelope-record.schema.json");
+  if (existsSync(recordSchemaPath)) {
+    try {
+      const recordSchema = JSON.parse(readFileSync(recordSchemaPath, "utf8"));
+      const required = new Set(recordSchema.required ?? []);
+      const requiredRecordFields = ["schema_version", "record_id", "emission_class", "authority", "binding", "envelope", "envelope_sha256", "response_sha256", "control_input_sha256"];
+      if (recordSchema.additionalProperties !== false || requiredRecordFields.some((field) => !required.has(field))) {
+        fail(errors, "execution envelope", "schemas/execution-envelope-record.schema.json must remain a closed runner record with all binding and digest fields required");
+      }
+      if (recordSchema.properties?.envelope?.$ref !== "execution-envelope.schema.json") {
+        fail(errors, "execution envelope", "schemas/execution-envelope-record.schema.json.envelope must $ref execution-envelope.schema.json");
+      }
+      if (JSON.stringify(recordSchema.properties?.emission_class?.enum) !== JSON.stringify(["sidecar", "inline_required", "diagnostic"])) {
+        fail(errors, "execution envelope", "schemas/execution-envelope-record.schema.json must keep the closed sidecar, inline_required, and diagnostic emission classes");
+      }
+      if (recordSchema.properties?.authority?.properties?.owner?.const !== "runner") {
+        fail(errors, "execution envelope", "schemas/execution-envelope-record.schema.json must keep the runner as authority owner");
+      }
+    } catch {
+      // The required-schema validation reports malformed JSON separately.
+    }
+  }
+  const runnerResultSchemaPath = resolve(root, "schemas/codex-runner-result.schema.json");
+  if (existsSync(runnerResultSchemaPath)) {
+    try {
+      const runnerResultSchema = JSON.parse(readFileSync(runnerResultSchemaPath, "utf8"));
+      const required = new Set(runnerResultSchema.required ?? []);
+      const control = runnerResultSchema.properties?.control;
+      const controlRequired = new Set(control?.required ?? []);
+      if (
+        runnerResultSchema.additionalProperties !== false ||
+        !required.has("response_markdown") ||
+        !required.has("control") ||
+        Object.hasOwn(runnerResultSchema.properties ?? {}, "route") ||
+        control?.additionalProperties !== false ||
+        ["evidence_status", "stop_reason", "next_action"].some((field) => !controlRequired.has(field))
+      ) {
+        fail(errors, "execution envelope", "schemas/codex-runner-result.schema.json must remain closed, route-free, and limited to response_markdown plus dynamic control");
       }
     } catch {
       // The required-schema validation reports malformed JSON separately.
@@ -1386,12 +2145,15 @@ function validateExecutionEnvelope(root, manifest, errors) {
       || (promptName ? codexCompactProfileCanonicalPaths(promptName).includes(expectedContractReference) : false);
     const hasEnvelope = text.includes("Execution Envelope:") || text.includes("Execution Envelope");
     const hasStructuredEnvelope = text.includes("fenced JSON") || /Execution Envelope:\s*```json/.test(text);
-    const ok = exists && referencesContract && hasEnvelope && hasStructuredEnvelope;
-    checks.adapters.push({ path, expectedContractReference, exists, referencesContract, hasEnvelope, hasStructuredEnvelope, ok });
+    const managedCodexBoundary = Boolean(promptName) && text.includes("{{ASK_COMPACT_CONTROLS}}") && !/Execution Envelope:\s*```json/.test(text);
+    const ok = exists && referencesContract && (promptName ? managedCodexBoundary : hasEnvelope && hasStructuredEnvelope);
+    checks.adapters.push({ path, expectedContractReference, exists, referencesContract, hasEnvelope, hasStructuredEnvelope, managedCodexBoundary, ok });
     if (!exists) {
       fail(errors, "execution envelope", `adapter prompt is missing: ${path}`);
-    } else if (!referencesContract || !hasEnvelope || !hasStructuredEnvelope) {
-      fail(errors, "execution envelope", `${path} must reference and require one fenced JSON shared Execution Envelope`);
+    } else if (!ok) {
+      fail(errors, "execution envelope", promptName
+        ? `${path} must defer managed emission to generated runner controls and must not embed an independent Envelope`
+        : `${path} must reference and require one fenced JSON shared Execution Envelope`);
     }
   }
 
@@ -1426,7 +2188,8 @@ function isCanonicalSourcePath(path) {
   return ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "manifest.json"].includes(path)
     || /^skills\/[a-z0-9-]+\/SKILL\.md$/.test(path)
     || /^docs\/[A-Za-z0-9._/-]+-contract\.md$/.test(path)
-    || /^schemas\/[A-Za-z0-9._/-]+\.(?:json|ya?ml)$/.test(path);
+    || /^schemas\/[A-Za-z0-9._/-]+\.(?:json|ya?ml)$/.test(path)
+    || CORE_IMMUTABLE_RUNTIME_ASSETS.includes(path);
 }
 
 function isCanonicalOwnedTargetPath(path) {
@@ -1674,7 +2437,7 @@ export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
   const add = (message) => issues.push(message);
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) return ["profile must be an object"];
   if (!root) return ["validation root is required"];
-  if (!["1.0.0", "1.1.0"].includes(profile.schema_version)) add("schema_version must be 1.0.0 or 1.1.0");
+  if (!["1.0.0", "1.1.0", "1.2.0"].includes(profile.schema_version)) add("schema_version must be 1.0.0, 1.1.0, or 1.2.0");
   for (const field of ["profile_id", "adapter_id"]) {
     if (typeof profile[field] !== "string" || profile[field].trim() === "") add(`${field} must be a non-empty string`);
   }
@@ -1768,9 +2531,9 @@ export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
         add(`renderer_profile cannot resolve plan-shaping options: ${error.message}`);
       }
     }
-    if (profile.schema_version === "1.1.0") {
-      if (!Array.isArray(rendering.compact_profiles) || rendering.compact_profiles.length === 0) add("schema_version 1.1.0 requires rendering.compact_profiles");
-      else if (stableCanonicalJson(rendering.compact_profiles) !== stableCanonicalJson(resolvedPlan?.compactProfiles ?? [])) add("rendering.compact_profiles must exactly match the shared Codex projection plan");
+    if (["1.1.0", "1.2.0"].includes(profile.schema_version)) {
+      if (!Array.isArray(rendering.compact_profiles) || rendering.compact_profiles.length === 0) add(`schema_version ${profile.schema_version} requires rendering.compact_profiles`);
+      else if (stableCanonicalJson(rendering.compact_profiles) !== stableCanonicalJson(resolvedPlan?.compactProfiles ?? [])) add("rendering.compact_profiles must exactly match the shared adapter projection plan");
     } else if (Object.hasOwn(rendering, "compact_profiles")) {
       add("schema_version 1.0.0 must not contain rendering.compact_profiles");
     }
@@ -2660,7 +3423,7 @@ function validateReviewSignalRegistry(root, manifest, errors) {
   const path = "schemas/review-signal-gate-map.json";
   const absolutePath = resolve(root, path);
   const active = manifest?.name === "agent-spectrum-kernel";
-  const checks = { active, present: existsSync(absolutePath), schemaListed: manifest?.schemas?.includes(path) === true, gates: false, signals: false, coverage: false, pluginProjection: false };
+  const checks = { active, present: existsSync(absolutePath), schemaListed: manifest?.schemas?.includes(path) === true, baseline: false, final: false, gates: false, heavyGates: false, signals: false, coverage: false, findings: false, pluginProjection: false };
   if (!active) {
     return checks;
   }
@@ -2678,14 +3441,41 @@ function validateReviewSignalRegistry(root, manifest, errors) {
     fail(errors, "review signal registry", `${path} is not valid JSON: ${error.message}`);
     return checks;
   }
+  const baseline = registry.baseline_gate;
+  checks.baseline = registry.registry_version === 2
+    && baseline?.gate === "review-ai-quality"
+    && baseline?.required_when === "evaluative_review_requested"
+    && baseline?.result_cardinality === "exactly_one"
+    && baseline?.missing_target_status === "insufficient_evidence"
+    && baseline?.signal_independent === true;
+  if (!checks.baseline) {
+    fail(errors, "review signal registry", `${path}.baseline_gate must define the signal-independent exactly-one review-ai-quality result`);
+  }
+  const finalGate = registry.final_gate;
+  checks.final = finalGate?.gate === "review-final-merge-gate"
+    && finalGate?.required_when === "final_decision_requested"
+    && finalGate?.must_run_last === true;
+  if (!checks.final) {
+    fail(errors, "review signal registry", `${path}.final_gate must define the requested-only final review decision`);
+  }
+  const selectedGates = Array.isArray(registry.signal_selected_gates) ? registry.signal_selected_gates : [];
   const heavyGates = Array.isArray(registry.heavy_gates) ? registry.heavy_gates : [];
   const signalToGates = registry.signal_to_gates && typeof registry.signal_to_gates === "object" ? registry.signal_to_gates : {};
-  checks.gates = heavyGates.length === Object.keys(REVIEW_SIGNAL_GATE_REQUIREMENTS).length
-    && heavyGates.every((gate) => Object.hasOwn(REVIEW_SIGNAL_GATE_REQUIREMENTS, gate));
+  checks.gates = selectedGates.length === Object.keys(REVIEW_SIGNAL_GATE_REQUIREMENTS).length
+    && new Set(selectedGates).size === selectedGates.length
+    && selectedGates.every((gate) => Object.hasOwn(REVIEW_SIGNAL_GATE_REQUIREMENTS, gate))
+    && !selectedGates.includes("review-ai-quality")
+    && !selectedGates.includes("review-final-merge-gate");
   if (!checks.gates) {
-    fail(errors, "review signal registry", `${path}.heavy_gates must contain the canonical heavy gate set`);
+    fail(errors, "review signal registry", `${path}.signal_selected_gates must contain the canonical additional gate set`);
   }
-  checks.signals = Object.entries(signalToGates).every(([signal, gates]) => typeof signal === "string" && signal.length > 0 && Array.isArray(gates) && gates.length > 0 && gates.every((gate) => heavyGates.includes(gate)));
+  checks.heavyGates = JSON.stringify(heavyGates) === JSON.stringify(REVIEW_HEAVY_GATES)
+    && heavyGates.every((gate) => selectedGates.includes(gate))
+    && !heavyGates.includes("review-ai-quality");
+  if (!checks.heavyGates) {
+    fail(errors, "review signal registry", `${path}.heavy_gates must preserve the canonical over-processing subset`);
+  }
+  checks.signals = Object.entries(signalToGates).every(([signal, gates]) => typeof signal === "string" && signal.length > 0 && Array.isArray(gates) && gates.length > 0 && gates.every((gate) => selectedGates.includes(gate)));
   if (!checks.signals) {
     fail(errors, "review signal registry", `${path}.signal_to_gates contains an empty, unknown, or invalid mapping`);
   }
@@ -2693,6 +3483,15 @@ function validateReviewSignalRegistry(root, manifest, errors) {
   checks.coverage = missingCoverage.length === 0;
   if (!checks.coverage) {
     fail(errors, "review signal registry", `${path} is missing router trigger coverage: ${missingCoverage.join(", ")}`);
+  }
+  const findingContract = registry.finding_contract;
+  checks.findings = JSON.stringify(findingContract?.required_fields) === JSON.stringify(["finding_id", "severity", "merge_blocker", "practical_impact", "trigger_or_failure_trace", "evidence_location", "required_post_fix_condition"])
+    && JSON.stringify(findingContract?.optional_fields) === JSON.stringify(["category"])
+    && JSON.stringify(findingContract?.severity_order) === JSON.stringify(["blocker", "major", "minor", "nit"])
+    && JSON.stringify(findingContract?.impact_order) === JSON.stringify(["merge_blocker_true_first", "severity_order", "finding_id_code_unit"])
+    && findingContract?.omit_empty_category_sections === true;
+  if (!checks.findings) {
+    fail(errors, "review signal registry", `${path}.finding_contract must preserve the closed impact-ordered finding contract`);
   }
   const pluginPath = "adapters/claude-code/plugin/contracts/review-signal-gate-map.json";
   const pluginAbsolutePath = resolve(root, pluginPath);
@@ -2977,6 +3776,16 @@ function validateDomainRuleLedgerRows(rows, ledgerStatus, errors) {
     const evidenceStatus = domainRuleValue(row, "Evidence status");
     if (evidenceStatus && !ALLOWED_DOMAIN_RULE_EVIDENCE_STATUSES.has(evidenceStatus)) {
       fail(errors, "domain rule ledger", `${rowLabel} has invalid Evidence status '${evidenceStatus}'`);
+    }
+
+    const authorityStatus = domainRuleValue(row, "Authority status");
+    if (authorityStatus && !ALLOWED_DOMAIN_RULE_AUTHORITY_STATUSES.has(authorityStatus)) {
+      fail(errors, "domain rule ledger", `${rowLabel} has invalid Authority status '${authorityStatus}'`);
+    }
+
+    const recordState = domainRuleValue(row, "Record state");
+    if (recordState && !ALLOWED_DOMAIN_RULE_RECORD_STATES.has(recordState)) {
+      fail(errors, "domain rule ledger", `${rowLabel} has invalid Record state '${recordState}'`);
     }
 
     const lastChecked = domainRuleValue(row, "Last checked");
@@ -3720,7 +4529,7 @@ function validateCoreInstaller(root, checks, errors) {
   checks.coreInstaller.verifiesPruneHash = combinedText.includes("modified managed file; refusing to prune") && /currentHash\s*!==\s*record\.sha256/.test(combinedText);
   checks.coreInstaller.prunesManagedFileOnly = combinedText.includes("unlinkSync") && !combinedText.includes("rmSync(");
   checks.coreInstaller.avoidsCodexProjectionDefault = !/\.agents\/skills/.test(text);
-  checks.coreInstaller.alwaysOwnsImmutableContracts = text.includes("CORE_IMMUTABLE_CONTRACT_ASSETS") && text.includes("immutable_contract");
+  checks.coreInstaller.alwaysOwnsImmutableAssets = text.includes("CORE_OWNED_IMMUTABLE_ASSETS") && text.includes("coreImmutableAssetKind");
 
   for (const [field, ok] of Object.entries(checks.coreInstaller)) {
     if (!ok) {
@@ -3762,7 +4571,7 @@ function validateCodexInstaller(root, checks, errors) {
   checks.codexInstaller.installsRuntimeRunner = text.includes("CODEX_RUNTIME_SCRIPTS") && text.includes("codex_runtime") && combinedText.includes("codex-exec-runner.mjs");
   checks.codexInstaller.projectsLifecycleContract = text.includes("docs/lifecycle-artifact-contract.md") && text.includes("requiredAssetsForPrompts");
   checks.codexInstaller.resolvesSkillOnlyAssets = text.includes("requiredAssetsForSkills") && text.includes("CORE_OWNED_IMMUTABLE_ASSETS");
-  checks.codexInstaller.preservesCoreContracts = text.includes("CORE_PRESERVE_PATHS") && text.includes("ASK core immutable contract is missing or stale");
+  checks.codexInstaller.preservesCoreAssets = text.includes("CORE_PRESERVE_PATHS") && text.includes("coreImmutableAssetKind") && text.includes("scripts/json-schema-validation.mjs");
   checks.codexInstaller.requiresWorkPackageCompiler = /"spec-driven-development"\s*:\s*\{[\s\S]{0,200}requires:\s*\[[^\]]*"work-package-compiler"/.test(text);
   checks.codexInstaller.hasDryRun = text.includes("--dry-run") && /dryRun/.test(text);
   checks.codexInstaller.hasMergeAgents = text.includes("--merge-agents") && text.includes("agent-spectrum-kernel:start") && text.includes("agent-spectrum-kernel:end");
@@ -3812,7 +4621,7 @@ function validateInstallerProjection(root, checks, errors) {
   checks.installerProjection.installsCommandAssets = text.includes("requiredAssets") && text.includes("installAssets");
   checks.installerProjection.projectsLifecycleContract = text.includes("docs/lifecycle-artifact-contract.md") && text.includes("CORE_OWNED_IMMUTABLE_ASSETS");
   checks.installerProjection.resolvesSkillAssets = text.includes("requiredAssetsForSkills") && text.includes("CORE_OWNED_IMMUTABLE_ASSETS");
-  checks.installerProjection.preservesCoreContracts = text.includes("CORE_PRESERVE_PATHS") && text.includes("ASK core immutable contract is missing or stale");
+  checks.installerProjection.preservesCoreAssets = text.includes("CORE_PRESERVE_PATHS") && text.includes("coreImmutableAssetKind") && text.includes("scripts/json-schema-validation.mjs");
   checks.installerProjection.requiresWorkPackageCompiler = /"spec-driven-development"\s*:\s*\{[\s\S]{0,200}requires:\s*\[[^\]]*"work-package-compiler"/.test(text);
   checks.installerProjection.skipRuntimeSkipsHooks = text.includes("args.skipHooks || args.skipRuntime") && text.includes("removeManagedHooks");
   checks.installerProjection.settingsSourceOfTruth =
@@ -3834,7 +4643,7 @@ function validateInstallerProjection(root, checks, errors) {
     "installsCommandAssets",
     "resolvesSkillAssets",
     "projectsLifecycleContract",
-    "preservesCoreContracts",
+    "preservesCoreAssets",
     "requiresWorkPackageCompiler",
     "skipRuntimeSkipsHooks",
     "settingsSourceOfTruth",
@@ -3995,6 +4804,842 @@ function validateAdapterGovernance(root, checks, errors) {
   }
 }
 
+function collectSharedCasFiles(storeRoot, label) {
+  const files = [];
+  const visit = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+      const path = resolve(directory, entry.name);
+      const relativePath = relative(storeRoot, path).split(sep).join("/");
+      if (entry.isSymbolicLink()) throw new Error(`${label} store contains a symlink: ${relativePath}`);
+      if (entry.isDirectory()) {
+        if (!["objects", "objects/sha256"].includes(relativePath)
+          && !/^objects\/sha256\/[a-f0-9]{2}$/u.test(relativePath)) {
+          throw new Error(`${label} store contains a directory outside the shared objects/sha256 layout: ${relativePath}`);
+        }
+        visit(path);
+      }
+      else if (entry.isFile()) files.push(relativePath);
+      else throw new Error(`${label} store contains an unsupported entry: ${relativePath}`);
+    }
+  };
+  visit(storeRoot);
+  return files;
+}
+
+function validateAssetRegistryFixture(root, errors) {
+  for (const path of REQUIRED_ASSET_REGISTRY_PATHS) {
+    if (!existsSync(resolve(root, path))) fail(errors, "Asset Registry", `required Asset Registry path is missing: ${path}`);
+  }
+
+  const referencePath = resolve(root, ASSET_REGISTRY_REFERENCE_PATH);
+  const storeRoot = resolve(root, ASSET_REGISTRY_STORE_PATH);
+  if (!existsSync(referencePath) || !existsSync(storeRoot)) return { valid: false, assetCount: 0 };
+
+  try {
+    const reference = readJsonFileStrict(referencePath, "Asset Registry sample reference");
+    const verified = verifyAssetRegistry({
+      storeRoot,
+      snapshotDigest: reference.snapshot_digest,
+    });
+    const listed = listAssets({
+      storeRoot,
+      snapshotDigest: reference.snapshot_digest,
+    });
+    const exported = exportAssetRegistryReference({
+      storeRoot,
+      snapshotDigest: reference.snapshot_digest,
+    });
+
+    if (stableCanonicalJson(exported) !== stableCanonicalJson(reference)) {
+      throw new Error("checked-in reference does not match the exact deterministic registry export");
+    }
+    if (verified.assets.length !== EXPECTED_SAMPLE_ASSETS.size || listed.length !== EXPECTED_SAMPLE_ASSETS.size) {
+      throw new Error(`expected exactly ${EXPECTED_SAMPLE_ASSETS.size} registered sample Assets`);
+    }
+
+    const listedIds = listed.map((asset) => asset.stable_id);
+    if (stableCanonicalJson(listedIds) !== stableCanonicalJson([...EXPECTED_SAMPLE_ASSETS.keys()].sort())) {
+      throw new Error("sample Asset stable IDs or deterministic list ordering do not match the closed reference set");
+    }
+    for (const asset of verified.assets) {
+      if (EXPECTED_SAMPLE_ASSETS.get(asset.stable_id) !== asset.asset_type) {
+        throw new Error(`sample Asset type mismatch for ${asset.stable_id}`);
+      }
+      if (asset.state !== "candidate") throw new Error(`sample Asset ${asset.stable_id} must remain candidate-only`);
+    }
+    if (listed.some((asset) => asset.state !== "candidate")) throw new Error("listed sample Assets must remain candidate-only");
+
+    const prompt = verified.assets.find((asset) => asset.asset_type === "prompt");
+    if (prompt?.record?.type_extension?.kind !== "prompt_template"
+      || prompt.record.type_extension.rendered_runtime_content !== false) {
+      throw new Error("sample Prompt must remain an unrendered prompt_template Asset");
+    }
+    const evaluator = verified.assets.find((asset) => asset.asset_type === "evaluator_reference");
+    if (evaluator?.record?.type_extension?.kind !== "public_evaluator_reference"
+      || evaluator.record.type_extension.entrypoint !== "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json"
+      || evaluator.record.type_extension.private_evaluator_content_included !== false) {
+      throw new Error("sample evaluator-reference must remain public-only without private evaluator content");
+    }
+
+    const snapshot = readContentAddressedJson({
+      storeRoot,
+      digest: reference.snapshot_digest,
+    }).value;
+    if (snapshot.lifecycle_authority_context_digest !== null) {
+      throw new Error("candidate-only sample must not bind a lifecycle authority context");
+    }
+
+    const objects = listContentAddressedJson({ storeRoot });
+    if (objects.some(({ value }) => value?.object_kind === "asset_lifecycle_authority_context")) {
+      throw new Error("candidate-only sample store must not contain lifecycle authority contexts");
+    }
+    const canonicalStoreRoot = realpathSync(storeRoot);
+    const actualStoreFiles = collectSharedCasFiles(canonicalStoreRoot, "Asset Registry sample");
+    const canonicalStoreFiles = objects
+      .map(({ path }) => relative(canonicalStoreRoot, path).split(sep).join("/"))
+      .sort();
+    if (stableCanonicalJson(actualStoreFiles) !== stableCanonicalJson(canonicalStoreFiles)) {
+      throw new Error("sample store must contain exactly the shared objects/sha256 CAS object set");
+    }
+    if (actualStoreFiles.some((path) => !/^objects\/sha256\/[a-f0-9]{2}\/[a-f0-9]{62}\.json$/u.test(path))) {
+      throw new Error("sample store contains an object outside the shared objects/sha256 layout");
+    }
+
+    return {
+      valid: true,
+      assetCount: verified.assets.length,
+      snapshotDigest: verified.snapshot_digest,
+      assetTypes: [...new Set(verified.assets.map((asset) => asset.asset_type))].sort(),
+    };
+  } catch (error) {
+    fail(errors, "Asset Registry", `checked-in sample verification failed: ${error.message}`);
+    return { valid: false, assetCount: 0 };
+  }
+}
+
+function assertPortablePortfolioReference(value, path = "reference") {
+  if (typeof value === "string") {
+    if (isAbsolute(value)) throw new Error(`${path} contains an absolute path`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertPortablePortfolioReference(entry, `${path}[${index}]`));
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, entry] of Object.entries(value)) {
+      if (/(?:^|_)latest(?:_|$)/iu.test(key) && entry !== false) {
+        throw new Error(`${path}.${key} must explicitly deny mutable latest use`);
+      }
+      assertPortablePortfolioReference(entry, `${path}.${key}`);
+    }
+  }
+}
+
+function assertExactPortfolioReferenceKeys(value, expectedKeys, label) {
+  const actual = Object.keys(value ?? {}).sort();
+  const expected = [...expectedKeys].sort();
+  if (stableCanonicalJson(actual) !== stableCanonicalJson(expected)) {
+    throw new Error(`${label} uses an unknown or missing field`);
+  }
+}
+
+function addPortfolioLockReachability({ storeRoot, lockDigest, reachable }) {
+  let cursorDigest = lockDigest;
+  const visited = new Set();
+  while (cursorDigest !== null) {
+    if (visited.has(cursorDigest)) throw new Error("Portfolio sample lock predecessor cycle detected");
+    visited.add(cursorDigest);
+    reachable.add(cursorDigest);
+    const lock = readContentAddressedJson({ storeRoot, digest: cursorDigest }).value;
+    if (lock.authority_context_digest !== null) reachable.add(lock.authority_context_digest);
+    for (const entry of lock.entries) reachable.add(entry.manifest_digest);
+    cursorDigest = lock.predecessor?.lock_digest ?? null;
+  }
+}
+
+function addAssetRegistryReachability({ storeRoot, snapshotDigest, reachable }) {
+  let cursorDigest = snapshotDigest;
+  const visited = new Set();
+  while (cursorDigest !== null) {
+    if (visited.has(cursorDigest)) throw new Error("Portfolio sample Registry predecessor cycle detected");
+    visited.add(cursorDigest);
+    reachable.add(cursorDigest);
+    const snapshot = readContentAddressedJson({ storeRoot, digest: cursorDigest }).value;
+    for (const entry of snapshot.entries) {
+      reachable.add(entry.record_digest);
+      reachable.add(entry.content_digest);
+    }
+    if (snapshot.lifecycle_authority_context_digest !== null) reachable.add(snapshot.lifecycle_authority_context_digest);
+    cursorDigest = snapshot.predecessor?.snapshot_digest ?? null;
+  }
+}
+
+function validatePortfolioManagerFixture(root, errors) {
+  for (const path of REQUIRED_PORTFOLIO_MANAGER_PATHS) {
+    if (!existsSync(resolve(root, path))) fail(errors, "Portfolio Manager", `required Portfolio Manager path is missing: ${path}`);
+  }
+
+  const referencePath = resolve(root, PORTFOLIO_MANAGER_REFERENCE_PATH);
+  const storeRoot = resolve(root, PORTFOLIO_MANAGER_STORE_PATH);
+  if (!existsSync(referencePath) || !existsSync(storeRoot)) return { valid: false, objectCount: 0 };
+
+  try {
+    const reference = readJsonFileStrict(referencePath, "Portfolio Manager sample reference");
+    if (reference.schema_version !== "1.0.0" || reference.program !== "ask_portfolio_manager_samples") {
+      throw new Error("sample reference program/schema identity mismatch");
+    }
+    assertExactPortfolioReferenceKeys(reference, [
+      "schema_version",
+      "program",
+      "source_revision",
+      "registry_snapshot_digest",
+      "kernel_only",
+      "adaptive_ask",
+      "frozen_benchmark_results_mutated",
+    ], "Portfolio Manager sample reference");
+    if (reference.frozen_benchmark_results_mutated !== false) {
+      throw new Error("sample reference must deny frozen benchmark result mutation");
+    }
+    assertPortablePortfolioReference(reference);
+
+    const views = [
+      ["kernel_only", reference.kernel_only],
+      ["adaptive_ask", reference.adaptive_ask],
+    ];
+    const reachable = new Set();
+    const manifestDigests = new Set();
+    for (const [name, view] of views) {
+      if (!view || view.program !== "ask_portfolio_reference") throw new Error(`${name} Portfolio reference is missing or malformed`);
+      assertExactPortfolioReferenceKeys(view, [
+        "schema_version",
+        "program",
+        "portfolio_id",
+        "repository_id",
+        "scope_id",
+        "lock_revision",
+        "lock_digest",
+        "required_portfolio_authority_context_digests",
+        "required_high_impact_approval_grant_digests",
+        "current_manifest",
+        "selections",
+        "mutable_latest_pointer_used",
+        "runtime_activation_implied",
+        "execution_implied",
+        "effectiveness_implied",
+      ], `${name} Portfolio reference`);
+      assertExactPortfolioReferenceKeys(view.current_manifest, [
+        "revision",
+        "manifest_digest",
+        "asset_set_digest",
+      ], `${name} current manifest reference`);
+      const authorityDigests = view.required_portfolio_authority_context_digests;
+      if (!Array.isArray(authorityDigests) || authorityDigests.length === 0) {
+        throw new Error(`${name} Portfolio reference must declare exact required authority contexts`);
+      }
+      if (stableCanonicalJson(authorityDigests) !== stableCanonicalJson([...new Set(authorityDigests)].sort())) {
+        throw new Error(`${name} required authority contexts are not a deterministic set`);
+      }
+      const highImpactGrantDigests = view.required_high_impact_approval_grant_digests;
+      if (!Array.isArray(highImpactGrantDigests)
+        || stableCanonicalJson(highImpactGrantDigests) !== stableCanonicalJson([...new Set(highImpactGrantDigests)].sort())) {
+        throw new Error(`${name} required high-impact approval grants are not a deterministic digest set`);
+      }
+      if (highImpactGrantDigests.length !== 0) {
+        throw new Error(`${name} candidate-only checked sample cannot require high-impact activation approval`);
+      }
+      const authorityContexts = authorityDigests.map((digest) => {
+        reachable.add(digest);
+        return readContentAddressedJson({ storeRoot, digest }).value;
+      });
+      const verifiedLock = verifyPortfolioLock({
+        storeRoot,
+        lockDigest: view.lock_digest,
+        trustedPortfolioAuthorityContexts: authorityContexts,
+      });
+      if (verifiedLock.lock.lock_revision !== view.lock_revision
+        || verifiedLock.lock.current_manifest_digest !== view.current_manifest.manifest_digest
+        || verifiedLock.lock.current_asset_set_digest !== view.current_manifest.asset_set_digest) {
+        throw new Error(`${name} Portfolio lock/reference identity mismatch`);
+      }
+      addPortfolioLockReachability({ storeRoot, lockDigest: view.lock_digest, reachable });
+      const currentClosure = verifiedLock.manifests.find((entry) => entry.manifest_digest === view.current_manifest.manifest_digest);
+      if (!currentClosure || currentClosure.manifest.revision !== view.current_manifest.revision) {
+        throw new Error(`${name} current manifest reference does not resolve exactly`);
+      }
+      if (currentClosure.manifest.source_revision !== reference.source_revision
+        || currentClosure.manifest.registry.snapshot_digest !== reference.registry_snapshot_digest) {
+        throw new Error(`${name} current manifest source/Registry binding mismatch`);
+      }
+      for (const closure of verifiedLock.manifests) manifestDigests.add(closure.manifest_digest);
+
+      if (!Array.isArray(view.selections) || view.selections.length !== 1) {
+        throw new Error(`${name} reference must contain exactly one deterministic selection`);
+      }
+      for (const selectionRef of view.selections) {
+        assertExactPortfolioReferenceKeys(selectionRef, [
+          "selection_object_digest",
+          "selection_digest",
+          "context_object_digest",
+          "context_digest",
+          "decision",
+        ], `${name} selection reference`);
+        reachable.add(selectionRef.selection_object_digest);
+        reachable.add(selectionRef.context_object_digest);
+        const verifiedSelection = verifyPortfolioSelection({
+          storeRoot,
+          selectionObjectDigest: selectionRef.selection_object_digest,
+          trustedPortfolioAuthorityContexts: authorityContexts,
+        }).selection;
+        if (verifiedSelection.selection_digest !== selectionRef.selection_digest
+          || verifiedSelection.context_object_digest !== selectionRef.context_object_digest
+          || verifiedSelection.context_digest !== selectionRef.context_digest
+          || verifiedSelection.decision !== selectionRef.decision) {
+          throw new Error(`${name} selection reference does not match deterministic reconstruction`);
+        }
+        if (verifiedSelection.selected_assets.length !== 0) {
+          throw new Error(`${name} checked sample must not imply an activated runtime Asset`);
+        }
+      }
+
+      if (name === "kernel_only") {
+        if (currentClosure.manifest.entries.length !== 0 || view.selections[0].decision !== "selected") {
+          throw new Error("Kernel-only sample must be an explicit selected zero-Asset manifest");
+        }
+      } else if (currentClosure.manifest.entries.length === 0
+        || currentClosure.manifest.entries.some((entry) => entry.assurance_lane !== "challenger"
+          || entry.expected_registry_state !== "candidate"
+          || !["shadow", "canary"].includes(entry.exposure.mode))
+        || !["bypass", "downgrade"].includes(view.selections[0].decision)) {
+        throw new Error("Adaptive ASK sample must remain candidate-only shadow/canary with a typed non-active decision");
+      }
+    }
+
+    for (const manifestDigest of manifestDigests) {
+      const manifest = readContentAddressedJson({ storeRoot, digest: manifestDigest }).value;
+      reachable.add(manifest.registry.snapshot_digest);
+      for (const entry of manifest.entries) {
+        reachable.add(entry.asset.record_digest);
+        reachable.add(entry.asset.content_digest);
+      }
+    }
+    addAssetRegistryReachability({
+      storeRoot,
+      snapshotDigest: reference.registry_snapshot_digest,
+      reachable,
+    });
+
+    const canonicalStoreRoot = realpathSync(storeRoot);
+    const objects = listContentAddressedJson({ storeRoot: canonicalStoreRoot });
+    const actualStoreFiles = collectSharedCasFiles(canonicalStoreRoot, "Portfolio Manager sample");
+    const canonicalStoreFiles = objects
+      .map(({ path }) => relative(canonicalStoreRoot, path).split(sep).join("/"))
+      .sort();
+    if (stableCanonicalJson(actualStoreFiles) !== stableCanonicalJson(canonicalStoreFiles)) {
+      throw new Error("sample store must contain exactly canonical shared-CAS object paths");
+    }
+    const actualDigests = objects.map(({ digest }) => digest).sort();
+    const reachableDigests = [...reachable].sort();
+    if (stableCanonicalJson(actualDigests) !== stableCanonicalJson(reachableDigests)) {
+      throw new Error("sample store contains an orphan or omits an exact reachable Portfolio/Registry object");
+    }
+
+    return {
+      valid: true,
+      objectCount: objects.length,
+      finalLockDigest: reference.adaptive_ask.lock_digest,
+    };
+  } catch (error) {
+    fail(errors, "Portfolio Manager", `checked-in sample verification failed: ${error.message}`);
+    return { valid: false, objectCount: 0 };
+  }
+}
+
+function assertEvolutionReferenceKeys(value, expectedKeys, label) {
+  assertExactPortfolioReferenceKeys(value, expectedKeys, label);
+}
+
+function assertEvolutionDigest(value, label) {
+  if (!SHA256_DIGEST_PATTERN.test(value ?? "")) throw new Error(`${label} must be a sha256 digest`);
+}
+
+function assertEvolutionAssetReference(value, label) {
+  assertEvolutionReferenceKeys(value, ["asset_type", "stable_id", "version", "record_digest", "content_digest"], label);
+  assertEvolutionDigest(value.record_digest, `${label}.record_digest`);
+  assertEvolutionDigest(value.content_digest, `${label}.content_digest`);
+}
+
+function assertEvolutionPortfolioReference(value, label, { locked = false } = {}) {
+  const keys = ["portfolio_id", "revision", "manifest_digest", "asset_set_digest"];
+  if (locked) keys.push("lock_digest");
+  assertEvolutionReferenceKeys(value, keys, label);
+  assertEvolutionDigest(value.manifest_digest, `${label}.manifest_digest`);
+  assertEvolutionDigest(value.asset_set_digest, `${label}.asset_set_digest`);
+  if (locked) assertEvolutionDigest(value.lock_digest, `${label}.lock_digest`);
+}
+
+function assertEvolutionPortfolioAuthorityContextShape(value, label) {
+  assertEvolutionReferenceKeys(value, [
+    "schema_version",
+    "object_kind",
+    "portfolio_id",
+    "repository_id",
+    "scope_id",
+    "predecessor_lock_digest",
+    "transitions",
+    "transition_basis_digest",
+    "grants",
+    "grant_basis_digest",
+    "rollback_target",
+    "authority",
+    "context_digest",
+  ], label);
+  if (value.schema_version !== "1.0.0" || value.object_kind !== "portfolio_authority_context") {
+    throw new Error(`${label} program/schema identity mismatch`);
+  }
+  assertEvolutionReferenceKeys(value.authority, ["kind", "authority_id", "authority_revision", "authority_evidence_digest"], `${label}.authority`);
+  assertEvolutionDigest(value.authority.authority_evidence_digest, `${label}.authority.authority_evidence_digest`);
+  assertEvolutionDigest(value.predecessor_lock_digest, `${label}.predecessor_lock_digest`);
+  assertEvolutionDigest(value.transition_basis_digest, `${label}.transition_basis_digest`);
+  assertEvolutionDigest(value.grant_basis_digest, `${label}.grant_basis_digest`);
+  assertEvolutionDigest(value.context_digest, `${label}.context_digest`);
+  if (!Array.isArray(value.transitions) || value.transitions.length === 0) throw new Error(`${label}.transitions must not be empty`);
+  for (const [index, transition] of value.transitions.entries()) {
+    assertEvolutionReferenceKeys(transition, ["manifest", "from_state", "to_state"], `${label}.transitions[${index}]`);
+    assertEvolutionPortfolioReference(transition.manifest, `${label}.transitions[${index}].manifest`);
+  }
+  if (!Array.isArray(value.grants) || value.grants.length !== 0 || value.rollback_target !== null) {
+    throw new Error(`${label} fixture must not claim a high-impact grant or implicit rollback transition`);
+  }
+}
+
+function assertEvolutionReferenceShape(reference) {
+  assertEvolutionReferenceKeys(reference, [
+    "schema_version",
+    "program",
+    "source_revision",
+    "tree_digest",
+    "fixture_scope",
+    "source_files",
+    "foundation",
+    "asset_lineage",
+    "pre_result_roles",
+    "artifacts",
+    "application",
+    "trusted_contexts",
+    "contract_closure_meanings",
+    "synthetic_evidence_provenance",
+    "prompt_vertical",
+    "boundaries",
+  ], "Evolution sample reference");
+  if (reference.schema_version !== "1.0.0" || reference.program !== "ask_evolution_loop_samples") {
+    throw new Error("Evolution sample reference program/schema identity mismatch");
+  }
+  if (!/^[a-f0-9]{40}$/u.test(reference.source_revision ?? "")) throw new Error("Evolution sample source_revision must be an exact commit SHA");
+  assertEvolutionDigest(reference.tree_digest, "Evolution sample tree_digest");
+  if (reference.fixture_scope !== "local_deterministic_contract_test_only") {
+    throw new Error("Evolution sample must remain a local deterministic contract-only fixture");
+  }
+
+  assertEvolutionReferenceKeys(reference.source_files, ["parent", "candidate"], "Evolution source_files");
+  for (const [name, expectedPath] of [
+    ["parent", "adapters/codex/prompts/skill-verify.md"],
+    ["candidate", "docs/evolution-loop-sample-prompt-candidate.md"],
+  ]) {
+    const source = reference.source_files[name];
+    assertEvolutionReferenceKeys(source, ["path", "raw_digest", "byte_length"], `Evolution source_files.${name}`);
+    if (source.path !== expectedPath) throw new Error(`Evolution source_files.${name}.path drifted`);
+    assertEvolutionDigest(source.raw_digest, `Evolution source_files.${name}.raw_digest`);
+    if (!Number.isSafeInteger(source.byte_length) || source.byte_length < 1) throw new Error(`Evolution source_files.${name}.byte_length is invalid`);
+  }
+
+  assertEvolutionReferenceKeys(reference.foundation, ["copied_portfolio_object_count", "portfolio_reference", "portfolio_authority_contexts"], "Evolution foundation");
+  if (!Number.isSafeInteger(reference.foundation.copied_portfolio_object_count) || reference.foundation.copied_portfolio_object_count < 1) {
+    throw new Error("Evolution foundation copied_portfolio_object_count is invalid");
+  }
+  if (!Array.isArray(reference.foundation.portfolio_authority_contexts) || reference.foundation.portfolio_authority_contexts.length === 0) {
+    throw new Error("Evolution foundation must contain exact Portfolio authority contexts");
+  }
+  reference.foundation.portfolio_authority_contexts.forEach((context, index) => (
+    assertEvolutionPortfolioAuthorityContextShape(context, `Evolution foundation.portfolio_authority_contexts[${index}]`)
+  ));
+
+  assertEvolutionReferenceKeys(reference.asset_lineage, [
+    "original_parent",
+    "sample_baseline",
+    "sample_candidate",
+    "registry_snapshot_digest",
+    "original_parent_bytes_preserved",
+    "sample_baseline_content_changed",
+    "candidate_is_only_content_changing_child",
+    "eligibility_metadata_authority",
+    "asset_lifecycle_authority_contexts",
+  ], "Evolution asset_lineage");
+  for (const name of ["original_parent", "sample_baseline", "sample_candidate"]) {
+    assertEvolutionAssetReference(reference.asset_lineage[name], `Evolution asset_lineage.${name}`);
+  }
+  assertEvolutionDigest(reference.asset_lineage.registry_snapshot_digest, "Evolution asset_lineage.registry_snapshot_digest");
+  assertEvolutionReferenceKeys(reference.asset_lineage.eligibility_metadata_authority, [
+    "kind",
+    "authority_id",
+    "authority_revision",
+    "scope",
+    "authority_evidence_digest",
+    "scoring_evidence_implied",
+    "quality_evidence_implied",
+    "effectiveness_implied",
+    "production_eligibility_implied",
+  ], "Evolution eligibility metadata authority");
+  assertEvolutionDigest(reference.asset_lineage.eligibility_metadata_authority.authority_evidence_digest, "Evolution eligibility metadata authority.authority_evidence_digest");
+  if (reference.asset_lineage.original_parent_bytes_preserved !== true
+    || reference.asset_lineage.sample_baseline_content_changed !== false
+    || reference.asset_lineage.candidate_is_only_content_changing_child !== true
+    || reference.asset_lineage.eligibility_metadata_authority.scoring_evidence_implied !== false
+    || reference.asset_lineage.eligibility_metadata_authority.quality_evidence_implied !== false
+    || reference.asset_lineage.eligibility_metadata_authority.effectiveness_implied !== false
+    || reference.asset_lineage.eligibility_metadata_authority.production_eligibility_implied !== false
+    || !Array.isArray(reference.asset_lineage.asset_lifecycle_authority_contexts)
+    || reference.asset_lineage.asset_lifecycle_authority_contexts.length !== 0) {
+    throw new Error("Evolution Asset lineage fixture boundaries drifted");
+  }
+
+  assertEvolutionReferenceKeys(reference.pre_result_roles, ["baseline", "challenger"], "Evolution pre_result_roles");
+  for (const name of ["baseline", "challenger"]) {
+    const role = reference.pre_result_roles[name];
+    assertEvolutionReferenceKeys(role, ["role", "portfolio", "registry_snapshot_digest", "selection_object_digest", "selection_digest", "selected_asset"], `Evolution pre_result_roles.${name}`);
+    if (role.role !== name) throw new Error(`Evolution pre_result_roles.${name}.role drifted`);
+    assertEvolutionPortfolioReference(role.portfolio, `Evolution pre_result_roles.${name}.portfolio`, { locked: true });
+    assertEvolutionDigest(role.registry_snapshot_digest, `Evolution pre_result_roles.${name}.registry_snapshot_digest`);
+    assertEvolutionDigest(role.selection_object_digest, `Evolution pre_result_roles.${name}.selection_object_digest`);
+    assertEvolutionDigest(role.selection_digest, `Evolution pre_result_roles.${name}.selection_digest`);
+    assertEvolutionAssetReference(role.selected_asset, `Evolution pre_result_roles.${name}.selected_asset`);
+  }
+
+  const artifactNames = ["candidate", "experiment", "recommendation", "action_proposal", "human_decision", "application_receipt"];
+  assertEvolutionReferenceKeys(reference.artifacts, artifactNames, "Evolution artifacts");
+  for (const name of artifactNames) {
+    const artifact = reference.artifacts[name];
+    assertEvolutionReferenceKeys(artifact, ["object_digest", "semantic_digest"], `Evolution artifacts.${name}`);
+    assertEvolutionDigest(artifact.object_digest, `Evolution artifacts.${name}.object_digest`);
+    assertEvolutionDigest(artifact.semantic_digest, `Evolution artifacts.${name}.semantic_digest`);
+    if (artifact.object_digest === artifact.semantic_digest) throw new Error(`Evolution artifacts.${name} collapses object and semantic identity`);
+  }
+
+  assertEvolutionReferenceKeys(reference.application, ["gate_evidence_object_digest", "base_portfolio_lock_digest", "result_portfolio_lock_digest", "rollback_anchor"], "Evolution application");
+  for (const field of ["gate_evidence_object_digest", "base_portfolio_lock_digest", "result_portfolio_lock_digest"]) {
+    assertEvolutionDigest(reference.application[field], `Evolution application.${field}`);
+  }
+  assertEvolutionPortfolioReference(reference.application.rollback_anchor, "Evolution application.rollback_anchor");
+
+  assertEvolutionReferenceKeys(reference.trusted_contexts, ["experiment", "evaluation", "human_decision", "asset_lifecycle", "portfolio_lifecycle", "high_impact_approval_grants"], "Evolution trusted_contexts");
+  if (!Array.isArray(reference.trusted_contexts.experiment) || reference.trusted_contexts.experiment.length !== 1
+    || !Array.isArray(reference.trusted_contexts.evaluation) || reference.trusted_contexts.evaluation.length !== 1
+    || !Array.isArray(reference.trusted_contexts.human_decision) || reference.trusted_contexts.human_decision.length !== 1
+    || !Array.isArray(reference.trusted_contexts.asset_lifecycle) || reference.trusted_contexts.asset_lifecycle.length !== 0
+    || !Array.isArray(reference.trusted_contexts.portfolio_lifecycle) || reference.trusted_contexts.portfolio_lifecycle.length !== 3
+    || !Array.isArray(reference.trusted_contexts.high_impact_approval_grants) || reference.trusted_contexts.high_impact_approval_grants.length !== 0) {
+    throw new Error("Evolution trusted context inventory drifted");
+  }
+  const [experimentAuthority] = reference.trusted_contexts.experiment;
+  assertEvolutionReferenceKeys(experimentAuthority, ["kind", "authority_id", "authority_revision", "authority_evidence_digest"], "Evolution trusted experiment authority");
+  if (experimentAuthority.kind !== "external_evolution_experiment_authority") throw new Error("Evolution trusted experiment authority kind drifted");
+  assertEvolutionDigest(experimentAuthority.authority_evidence_digest, "Evolution trusted experiment authority.authority_evidence_digest");
+  const [evaluation] = reference.trusted_contexts.evaluation;
+  assertEvolutionReferenceKeys(evaluation, ["authority", "dimensions", "causal_attribution", "reason_codes"], "Evolution trusted evaluation evidence");
+  assertEvolutionReferenceKeys(evaluation.authority, ["kind", "authority_id", "authority_revision", "authority_evidence_digest", "experiment_digest", "verification_mode", "artifact_inventory_digest"], "Evolution trusted evaluation authority");
+  assertEvolutionReferenceKeys(evaluation.dimensions, ["quality", "safety", "cost", "variance", "mechanism", "external_outcome"], "Evolution trusted evaluation dimensions");
+  for (const name of ["quality", "safety", "cost", "variance", "mechanism", "external_outcome"]) {
+    assertEvolutionReferenceKeys(evaluation.dimensions[name], ["status", "conclusion", "source_kind", "artifact_id", "artifact_digest", "causal_credit_applied", "factor_ids"], `Evolution trusted evaluation dimensions.${name}`);
+  }
+  assertEvolutionReferenceKeys(evaluation.causal_attribution, ["status", "factor_ids", "evidence_digests"], "Evolution trusted evaluation causal_attribution");
+  const [decision] = reference.trusted_contexts.human_decision;
+  assertEvolutionReferenceKeys(decision, ["schema_version", "object_kind", "proposal_digest", "action", "disposition", "reason_codes", "authority", "authority_implied", "decision_digest"], "Evolution trusted human decision");
+  assertEvolutionReferenceKeys(decision.authority, ["kind", "authority_id", "authority_revision", "authority_evidence_digest"], "Evolution trusted human decision authority");
+  reference.trusted_contexts.portfolio_lifecycle.forEach((context, index) => (
+    assertEvolutionPortfolioAuthorityContextShape(context, `Evolution trusted_contexts.portfolio_lifecycle[${index}]`)
+  ));
+
+  const expectedClosureMeanings = [
+    "six_artifact_full_closure_reconstructable",
+    "untrusted_evaluation_authority_rejected",
+    "untrusted_human_decision_authority_rejected",
+    "decision_bound_portfolio_authority_preserves_rollback",
+    "completed_receipt_binds_exact_successor_heads",
+    "all_six_evolution_publications_are_idempotent",
+    "semantic_digest_and_unknown_field_tamper_rejected",
+    "missing_human_decision_rejected_before_mutation",
+    "wrong_decision_evidence_digest_rejected",
+    "stale_portfolio_predecessor_rejected",
+    "untrusted_portfolio_activation_authority_rejected",
+    "rollback_anchor_drift_rejected",
+    "semantic_and_object_digests_remain_distinct",
+    "insufficient_evidence_verified_exact_head_noop_without_implicit_retention",
+    "evaluation_authority_experiment_transplant_rejected",
+    "forged_completed_receipt_reconstruction_rejected",
+    "target_portfolio_transplant_rejected",
+    "candidate_reserved_experiment_authority_and_scope_closure",
+    "evaluation_authority_role_collapse_rejected",
+    "unreserved_human_decision_authority_rejected",
+    "incomplete_evidence_affirmative_or_retention_mapping_rejected",
+    "causal_and_dimension_source_semantics_closed",
+  ];
+  if (!Array.isArray(reference.contract_closure_meanings)
+    || stableCanonicalJson([...reference.contract_closure_meanings].sort()) !== stableCanonicalJson([...expectedClosureMeanings].sort())) {
+    throw new Error("Evolution contract_closure_meanings must contain the exact 22 required closure claims");
+  }
+  assertEvolutionReferenceKeys(reference.synthetic_evidence_provenance, [
+    "fixture_only",
+    "contract_test_scenario",
+    "executed_benchmark_result",
+    "real_scoring_result",
+    "production_recommendation",
+    "generalization_allowed",
+    "external_outcome_evidence_present",
+  ], "Evolution synthetic_evidence_provenance");
+  if (reference.synthetic_evidence_provenance.fixture_only !== true
+    || reference.synthetic_evidence_provenance.contract_test_scenario !== "expand_to_adopt_candidate_mechanics"
+    || reference.synthetic_evidence_provenance.executed_benchmark_result !== false
+    || reference.synthetic_evidence_provenance.real_scoring_result !== false
+    || reference.synthetic_evidence_provenance.production_recommendation !== false
+    || reference.synthetic_evidence_provenance.generalization_allowed !== false
+    || reference.synthetic_evidence_provenance.external_outcome_evidence_present !== false) {
+    throw new Error("Evolution synthetic evidence must remain fixture-only and non-generalizable");
+  }
+  assertEvolutionReferenceKeys(reference.prompt_vertical, ["sample_is_prompt_v2", "status", "stop_code", "generic_issue_197_projection_available"], "Evolution prompt_vertical");
+  if (reference.prompt_vertical.sample_is_prompt_v2 !== false
+    || reference.prompt_vertical.status !== "typed_stop"
+    || reference.prompt_vertical.stop_code !== "prompt_v2_materialization_unavailable"
+    || reference.prompt_vertical.generic_issue_197_projection_available !== false) {
+    throw new Error("Evolution Prompt vertical must retain the typed prompt_v2_materialization_unavailable stop");
+  }
+  assertEvolutionReferenceKeys(reference.boundaries, ["prompt_v2_vertical_completed", "product_evidence_implied", "external_outcome_claimed", "autonomous_mutation", "mutable_latest_pointer_used", "frozen_benchmark_results_mutated"], "Evolution boundaries");
+  if (Object.values(reference.boundaries).some((value) => value !== false)) {
+    throw new Error("Evolution sample boundaries must all remain explicitly false");
+  }
+}
+
+function assertPortableEvolutionReference(value, path = "reference") {
+  if (typeof value === "string") {
+    if (isAbsolute(value)) throw new Error(`${path} contains an absolute path`);
+    if (/(?:^|[._-])latest(?:[._-]|$)/iu.test(value)) throw new Error(`${path} contains a mutable latest label`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertPortableEvolutionReference(entry, `${path}[${index}]`));
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, entry] of Object.entries(value)) {
+      if (/timestamp|created_at|updated_at/iu.test(key)) throw new Error(`${path}.${key} is time-dependent`);
+      if (/(?:^|_)latest(?:_|$)/iu.test(key) && entry !== false) throw new Error(`${path}.${key} must explicitly deny mutable latest use`);
+      assertPortableEvolutionReference(entry, `${path}.${key}`);
+    }
+  }
+}
+
+function collectReachableEvolutionDigests(value, available, reachable) {
+  if (typeof value === "string") {
+    if (available.has(value)) reachable.add(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectReachableEvolutionDigests(entry, available, reachable));
+    return;
+  }
+  if (value && typeof value === "object") {
+    Object.values(value).forEach((entry) => collectReachableEvolutionDigests(entry, available, reachable));
+  }
+}
+
+function validateEvolutionLoopFixture(root, errors) {
+  for (const path of REQUIRED_EVOLUTION_LOOP_PATHS) {
+    if (!existsSync(resolve(root, path))) fail(errors, "Evolution loop", `required Evolution loop path is missing: ${path}`);
+  }
+
+  const referencePath = resolve(root, EVOLUTION_LOOP_REFERENCE_PATH);
+  const storeRoot = resolve(root, EVOLUTION_LOOP_STORE_PATH);
+  const portfolioReferencePath = resolve(root, PORTFOLIO_MANAGER_REFERENCE_PATH);
+  const portfolioStoreRoot = resolve(root, PORTFOLIO_MANAGER_STORE_PATH);
+  if (!existsSync(referencePath) || !existsSync(storeRoot) || !existsSync(portfolioReferencePath) || !existsSync(portfolioStoreRoot)) {
+    return { valid: false, objectCount: 0 };
+  }
+
+  try {
+    const reference = readJsonFileStrict(referencePath, "Evolution loop sample reference");
+    assertEvolutionReferenceShape(reference);
+    assertPortableEvolutionReference(reference);
+
+    const sourceAssets = {
+      parent: reference.asset_lineage.original_parent,
+      candidate: reference.asset_lineage.sample_candidate,
+    };
+    for (const [name, source] of Object.entries(reference.source_files)) {
+      const content = readContentAddressedJson({ storeRoot, digest: sourceAssets[name].content_digest }).value;
+      const packaged = content.files?.find((file) => file.path === source.path);
+      const bytes = packaged?.encoding === "base64" && typeof packaged.bytes_base64 === "string"
+        ? Buffer.from(packaged.bytes_base64, "base64")
+        : null;
+      const digest = bytes ? `sha256:${createHash("sha256").update(bytes).digest("hex")}` : null;
+      if (
+        !bytes ||
+        bytes.length !== source.byte_length ||
+        digest !== source.raw_digest ||
+        packaged.byte_length !== source.byte_length ||
+        packaged.raw_digest !== source.raw_digest
+      ) {
+        throw new Error(`Evolution ${name} source bytes differ from the exact historical CAS reference`);
+      }
+    }
+
+    const portfolioReference = readJsonFileStrict(portfolioReferencePath, "Portfolio Manager sample reference");
+    if (stableCanonicalJson(reference.foundation.portfolio_reference) !== stableCanonicalJson(portfolioReference)) {
+      throw new Error("Evolution foundation does not embed the exact checked Portfolio reference");
+    }
+    const foundationContextDigests = [...new Set([
+      ...portfolioReference.kernel_only.required_portfolio_authority_context_digests,
+      ...portfolioReference.adaptive_ask.required_portfolio_authority_context_digests,
+    ])].sort();
+    const expectedFoundationContexts = foundationContextDigests.map((digest) => (
+      readContentAddressedJson({ storeRoot: portfolioStoreRoot, digest }).value
+    ));
+    if (stableCanonicalJson(reference.foundation.portfolio_authority_contexts) !== stableCanonicalJson(expectedFoundationContexts)) {
+      throw new Error("Evolution foundation Portfolio authority contexts differ from the exact Portfolio sample objects");
+    }
+
+    const canonicalPortfolioStoreRoot = realpathSync(portfolioStoreRoot);
+    const canonicalEvolutionStoreRoot = realpathSync(storeRoot);
+    const portfolioFiles = collectSharedCasFiles(canonicalPortfolioStoreRoot, "Portfolio Manager sample");
+    if (reference.foundation.copied_portfolio_object_count !== portfolioFiles.length) {
+      throw new Error("Evolution copied Portfolio object count differs from the checked Portfolio store");
+    }
+    for (const path of portfolioFiles) {
+      const evolutionPath = resolve(canonicalEvolutionStoreRoot, path);
+      if (!existsSync(evolutionPath)
+        || !readFileSync(resolve(canonicalPortfolioStoreRoot, path)).equals(readFileSync(evolutionPath))) {
+        throw new Error(`Evolution shared CAS changed or omitted Portfolio sample object ${path}`);
+      }
+    }
+
+    const artifacts = reference.artifacts;
+    const closure = verifyEvolutionClosure({
+      storeRoot,
+      receiptObjectDigest: artifacts.application_receipt.object_digest,
+      decisionObjectDigest: artifacts.human_decision.object_digest,
+      proposalObjectDigest: artifacts.action_proposal.object_digest,
+      candidateObjectDigest: artifacts.candidate.object_digest,
+      experimentObjectDigest: artifacts.experiment.object_digest,
+      recommendationObjectDigest: artifacts.recommendation.object_digest,
+      trustedHumanDecisionAuthorities: reference.trusted_contexts.human_decision,
+      trustedExperimentAuthorities: reference.trusted_contexts.experiment,
+      trustedEvaluationAuthorities: reference.trusted_contexts.evaluation,
+      trustedAssetAuthorityContexts: reference.trusted_contexts.asset_lifecycle,
+      trustedPortfolioAuthorityContexts: reference.trusted_contexts.portfolio_lifecycle,
+      trustedHighImpactApprovalGrants: reference.trusted_contexts.high_impact_approval_grants,
+    });
+    const semanticBindings = [
+      ["candidate", closure.candidate.candidate_digest],
+      ["experiment", closure.experiment.experiment_digest],
+      ["recommendation", closure.recommendation.recommendation_digest],
+      ["action_proposal", closure.proposal.proposal_digest],
+      ["human_decision", closure.decision.decision_digest],
+      ["application_receipt", closure.receipt.receipt_digest],
+    ];
+    for (const [name, semanticDigest] of semanticBindings) {
+      if (artifacts[name].semantic_digest !== semanticDigest) throw new Error(`Evolution ${name} semantic digest reference drifted`);
+    }
+    if (stableCanonicalJson(reference.pre_result_roles) !== stableCanonicalJson(closure.experiment.roles)
+      || stableCanonicalJson(reference.asset_lineage.sample_baseline) !== stableCanonicalJson(closure.candidate.parent_asset)
+      || stableCanonicalJson(reference.asset_lineage.sample_candidate) !== stableCanonicalJson(closure.candidate.candidate_asset)
+      || reference.asset_lineage.registry_snapshot_digest !== closure.candidate.registry.snapshot_digest) {
+      throw new Error("Evolution candidate lineage or pre-result role reference drifted");
+    }
+    if (reference.application.base_portfolio_lock_digest !== closure.receipt.base_heads.portfolio_lock_digest
+      || reference.application.result_portfolio_lock_digest !== closure.receipt.result_heads.portfolio_lock_digest
+      || stableCanonicalJson(reference.application.rollback_anchor) !== stableCanonicalJson(closure.receipt.rollback_anchor)) {
+      throw new Error("Evolution application reference differs from the verified receipt heads or rollback anchor");
+    }
+
+    const objects = listContentAddressedJson({ storeRoot: canonicalEvolutionStoreRoot });
+    const byDigest = new Map(objects.map(({ digest, value }) => [digest, value]));
+    const requiredRoots = [
+      ...Object.values(artifacts).map(({ object_digest: digest }) => digest),
+      reference.application.gate_evidence_object_digest,
+      reference.application.base_portfolio_lock_digest,
+      reference.application.result_portfolio_lock_digest,
+      reference.asset_lineage.registry_snapshot_digest,
+      ...foundationContextDigests,
+      portfolioReference.kernel_only.lock_digest,
+      portfolioReference.adaptive_ask.lock_digest,
+      ...[portfolioReference.kernel_only, portfolioReference.adaptive_ask].flatMap((view) => (
+        view.selections.flatMap((selection) => [selection.selection_object_digest, selection.context_object_digest])
+      )),
+      ...Object.values(reference.pre_result_roles).flatMap((role) => [role.portfolio.lock_digest, role.selection_object_digest]),
+    ];
+    for (const digest of requiredRoots) {
+      if (!byDigest.has(digest)) throw new Error(`Evolution exact closure root is missing: ${digest}`);
+    }
+    const reachable = new Set();
+    collectReachableEvolutionDigests(reference, byDigest, reachable);
+    const queue = [...reachable];
+    const traversed = new Set();
+    while (queue.length > 0) {
+      const digest = queue.shift();
+      if (traversed.has(digest)) continue;
+      traversed.add(digest);
+      const before = new Set(reachable);
+      collectReachableEvolutionDigests(byDigest.get(digest), byDigest, reachable);
+      for (const candidate of reachable) if (!before.has(candidate)) queue.push(candidate);
+    }
+    const actualStoreFiles = collectSharedCasFiles(canonicalEvolutionStoreRoot, "Evolution loop sample");
+    const canonicalStoreFiles = objects
+      .map(({ path }) => relative(canonicalEvolutionStoreRoot, path).split(sep).join("/"))
+      .sort();
+    if (stableCanonicalJson(actualStoreFiles) !== stableCanonicalJson(canonicalStoreFiles)) {
+      throw new Error("Evolution sample store must contain exactly canonical shared-CAS object paths");
+    }
+    if (stableCanonicalJson(objects.map(({ digest }) => digest).sort()) !== stableCanonicalJson([...reachable].sort())) {
+      throw new Error("Evolution sample store contains an orphan or omits an exact full reachable closure object");
+    }
+
+    return {
+      valid: true,
+      objectCount: objects.length,
+      receiptObjectDigest: artifacts.application_receipt.object_digest,
+    };
+  } catch (error) {
+    fail(errors, "Evolution loop", `checked-in sample verification failed: ${error.message}`);
+    return { valid: false, objectCount: 0 };
+  }
+}
+
+function validateCheckedPromptV2PreregistrationFixture(root, manifest, errors) {
+  let missing = false;
+  for (const [manifestKey, paths] of Object.entries(REQUIRED_PROMPT_V2_PREREGISTRATION_PATHS)) {
+    for (const path of paths) {
+      if (!existsSync(resolve(root, path))) {
+        fail(errors, "Prompt v2 preregistration", `required Prompt v2 preregistration path is missing: ${path}`);
+        missing = true;
+      }
+      if (!manifest?.[manifestKey]?.includes(path)) {
+        fail(errors, "Prompt v2 preregistration", `manifest.json.${manifestKey} must list ${path}`);
+      }
+    }
+  }
+  const fixtureRoot = resolve(root, PROMPT_V2_PREREGISTRATION_FIXTURE_ROOT);
+  if (!existsSync(fixtureRoot)) {
+    fail(errors, "Prompt v2 preregistration", `required Prompt v2 preregistration path is missing: ${PROMPT_V2_PREREGISTRATION_FIXTURE_ROOT}`);
+    return { valid: false, objectCount: 0 };
+  }
+  if (missing) return { valid: false, objectCount: 0 };
+  try {
+    const summary = verifyPromptV2PreregistrationFixture({ root: fixtureRoot });
+    return { valid: true, ...summary };
+  } catch (error) {
+    fail(errors, "Prompt v2 preregistration", `checked-in result-blind fixture verification failed: ${error.message}`);
+    return { valid: false, objectCount: 0 };
+  }
+}
+
 function validateEpicAdmissionWorkPackagePlanContract(root, errors) {
   const result = validateRepositoryEpicAdmissionWorkPackagePlan({ root });
   for (const contractIssue of result.issues) {
@@ -4016,7 +5661,7 @@ function validateEpicAdmissionWorkPackagePlanContract(root, errors) {
   };
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, epicAdmissionWorkPackagePlanChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, verificationProofPolicyChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, epicAdmissionWorkPackagePlanChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -4146,6 +5791,15 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     `- normalized event schema registry: ${adapterRuntimeProfileChecks.eventSchemaRegistryPresent ? "ok" : "missing"}`,
     `- required adapter fixtures: ${adapterRuntimeProfileChecks.fixturePresent && adapterRuntimeProfileChecks.evidenceFixturePresent && adapterRuntimeProfileChecks.requiredAdaptersPresent && adapterRuntimeProfileChecks.profiles.every((profile) => profile.ok) ? "ok" : "invalid"}`,
     "",
+    "## Verification proof policy checks",
+    "",
+    `- canonical policy: ${verificationProofPolicyChecks.valid ? "ok" : "invalid"}`,
+    `- policy ref: ${verificationProofPolicyChecks.policyRef}`,
+    `- proof paths: ${verificationProofPolicyChecks.pathCount}`,
+    `- compact eligibility facts / formal triggers / protected compact claims: ${verificationProofPolicyChecks.compactEligibilityFactCount} / ${verificationProofPolicyChecks.formalTriggerCount} / ${verificationProofPolicyChecks.protectedCompactClaimCount}`,
+    `- Compact Proof / formal baseline artifact bytes: ${verificationProofPolicyChecks.compactBytes} / ${verificationProofPolicyChecks.formalBaselineBytes}`,
+    `- generated localized / immutable pre-compact verification prompt bytes: ${verificationProofPolicyChecks.generatedPromptBytes} / ${verificationProofPolicyChecks.generatedPromptBaselineBytes}`,
+    "",
     "## Lifecycle artifact contract checks",
     "",
     `- canonical contract: ${lifecycleArtifactChecks.contractPresent ? "ok" : "missing"}`,
@@ -4209,7 +5863,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     `- prune hash verification: ${claudeAdapterChecks.coreInstaller.verifiesPruneHash ? "ok" : "invalid"}`,
     `- prune limited to managed files: ${claudeAdapterChecks.coreInstaller.prunesManagedFileOnly ? "ok" : "invalid"}`,
     `- no Codex-specific projection by default: ${claudeAdapterChecks.coreInstaller.avoidsCodexProjectionDefault ? "ok" : "invalid"}`,
-    `- immutable contracts always core-owned: ${claudeAdapterChecks.coreInstaller.alwaysOwnsImmutableContracts ? "ok" : "invalid"}`,
+    `- core immutable assets always core-owned: ${claudeAdapterChecks.coreInstaller.alwaysOwnsImmutableAssets ? "ok" : "invalid"}`,
     "",
     "## Codex adapter installer checks",
     "",
@@ -4226,7 +5880,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     `- installs command templates: ${claudeAdapterChecks.codexInstaller.installsCommand ? "ok" : "invalid"}`,
     `- lifecycle contract asset projected: ${claudeAdapterChecks.codexInstaller.projectsLifecycleContract ? "ok" : "invalid"}`,
     `- skill-only contract dependencies resolved: ${claudeAdapterChecks.codexInstaller.resolvesSkillOnlyAssets ? "ok" : "invalid"}`,
-    `- core contract ownership preserved: ${claudeAdapterChecks.codexInstaller.preservesCoreContracts ? "ok" : "invalid"}`,
+    `- core asset ownership preserved: ${claudeAdapterChecks.codexInstaller.preservesCoreAssets ? "ok" : "invalid"}`,
     `- spec route requires Work Package Compiler: ${claudeAdapterChecks.codexInstaller.requiresWorkPackageCompiler ? "ok" : "invalid"}`,
     `- dry-run supported: ${claudeAdapterChecks.codexInstaller.hasDryRun ? "ok" : "invalid"}`,
     `- managed AGENTS.md merge supported: ${claudeAdapterChecks.codexInstaller.hasMergeAgents ? "ok" : "invalid"}`,
@@ -4302,7 +5956,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     `- command assets projection: ${claudeAdapterChecks.installerProjection.installsCommandAssets ? "ok" : "invalid"}`,
     `- selected skill assets resolved: ${claudeAdapterChecks.installerProjection.resolvesSkillAssets ? "ok" : "invalid"}`,
     `- lifecycle contract asset projection: ${claudeAdapterChecks.installerProjection.projectsLifecycleContract ? "ok" : "invalid"}`,
-    `- core contract ownership preserved: ${claudeAdapterChecks.installerProjection.preservesCoreContracts ? "ok" : "invalid"}`,
+    `- core asset ownership preserved: ${claudeAdapterChecks.installerProjection.preservesCoreAssets ? "ok" : "invalid"}`,
     `- spec route requires Work Package Compiler: ${claudeAdapterChecks.installerProjection.requiresWorkPackageCompiler ? "ok" : "invalid"}`,
     `- skip-runtime skips hooks: ${claudeAdapterChecks.installerProjection.skipRuntimeSkipsHooks ? "ok" : "invalid"}`,
     `- settings.json hook source of truth: ${claudeAdapterChecks.installerProjection.settingsSourceOfTruth ? "ok" : "invalid"}`,
@@ -4342,7 +5996,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
       ? `- Stale skill-count references found above: ${staleSkillCountFindings.length}.`
       : "- No stale skill-count references found.",
     "- No deleted legacy code-review adapter references found.",
-    "- Review route references use the current signal-first route through `review-router`, observed change signals, required gates, and `review-final-merge-gate`.",
+    "- Review route references use one signal-independent `review-ai-quality` baseline, exact-signal additional gates, one finding inventory, and requested-only last `review-final-merge-gate` authority.",
     "- Implementation route references use Verification Contract, Implementation Contract, `controlled-implementation`, and evidence-oriented verification wording.",
     "- Operating mode routing, skill group metadata, adoption workflows, observability metrics, and operation reporting are represented as separate layers.",
     "- Project overlay, stack overlay, review context, implementation context, and task progress terminology is explicitly separated in maintained auxiliary docs.",
@@ -4404,6 +6058,8 @@ export function validateRepository(options) {
   const planeChecks = validatePlaneModel(root, manifest, errors);
   const routingChecks = validateRoutingManifest(root, manifest, errors);
   validateManifestPaths(root, manifest, errors);
+  validateClaimEvidenceStatusContract(root, manifest, errors);
+  validateSkillEffectivenessOutcomeContract(root, manifest, errors);
   const skillChecks = validateSkills(root, skillDirectories, errors);
   const contextMetadataChecks = validateContextMetadata(root, errors);
   const improvementLedgerChecks = validateImprovementLedger(root, errors);
@@ -4411,8 +6067,13 @@ export function validateRepository(options) {
   const claudeAdapterChecks = validateClaudeAdapterArchitecture(root, manifest, errors);
   const executionEnvelopeChecks = validateExecutionEnvelope(root, manifest, errors);
   const adapterRuntimeProfileChecks = validateAdapterRuntimeProfileContract(root, manifest, errors);
+  const verificationProofPolicyChecks = validateVerificationProofPolicyContract(root, manifest, errors);
   const lifecycleArtifactChecks = validateLifecycleArtifactContract(root, manifest, errors);
   const lifecycleTraceabilityChecks = validateLifecycleTraceabilityContract(root, manifest, errors);
+  validateAssetRegistryFixture(root, errors);
+  validatePortfolioManagerFixture(root, errors);
+  validateEvolutionLoopFixture(root, errors);
+  validateCheckedPromptV2PreregistrationFixture(root, manifest, errors);
   const epicAdmissionWorkPackagePlanChecks = validateEpicAdmissionWorkPackagePlanContract(root, errors);
   const reviewSignalRegistryChecks = validateReviewSignalRegistry(root, manifest, errors);
   const portfolioCatalogChecks = validateAdaptivePortfolioCatalog(root, errors);
@@ -4423,7 +6084,7 @@ export function validateRepository(options) {
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, epicAdmissionWorkPackagePlanChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, verificationProofPolicyChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, epicAdmissionWorkPackagePlanChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
   "program": "adaptive_ask_verification_command_contract",
   "fixture_id": "mp-iac-rollback-design",
-  "fixture_input_digest": "sha256:1c4410249959473825cc8bc58ac608aaaa11535d49f0a1ecb993026caf5b31f6",
+  "fixture_input_digest": "sha256:a1edd1ffc48e2ea236d8e8eb8aba6c99ddeaec2a6c620e60559bc54f4898931f",
   "commands": [
     {
       "command_id": "change-plan-contract-validation",
@@ -21,14 +21,14 @@
           "-lc"
         ]
       },
-      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"change-plan.schema.json\":\"a22fdc8d5593c0b7c2b9be08bcb1412fad906687cd207ac663ea23d11fa6db02\",\"docs/change-request.md\":\"24458fee92c2ed7fa5bfe95f56af6911f1b8639ff10b8ac110c00395c6916c00\",\"docs/knowledge-policy.md\":\"0ad8630575f77faefcb66610d58bf8946f7365f89319f4abd2753d2dc66137b8\",\"docs/rollback-policy.md\":\"050283401cd2f99f120cc41ced0fc3a33195e1e5d9daae1acb4588264d866d3d\",\"infra/alias.tf\":\"6d9ebfd9960efe5c773b4c6e01423041a269c7145c2b02239727281c6f3108a6\",\"infra/iam.tf\":\"225e670871ac615237ede92602f96400bf9e84b2dbbc44493e88b6aa1e5498ba\",\"operations/commands.json\":\"e8807a8289288edb4881104b4cd773b0e1f34ebab685e201481be5126bbe2db3\",\"package-lock.json\":\"913b787bd230691adf255631664e80b87e6a1ae1478fb1f1e4f73ec7a17abac5\",\"package.json\":\"a2f69220942a021487ab441d25d013d427320103a85f2845221758e381ec9377\",\"plans/candidate-plan.json\":\"ae22f7b6f66f252b12530a951592d398be08c56c5702e12bd926f95bffb8f916\",\"scripts/validate-change-plan.mjs\":\"0fec17f2e557094989d4d40c07a1e112bb90d5461c1969a280f4bf6b1d4d41da\",\"state/current-state.json\":\"153f59ae462f3a68017ee8cad14548ae83407fd654a220c6733e6b1631621e18\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm run validate:change-plan",
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"change-plan.schema.json\":\"a22fdc8d5593c0b7c2b9be08bcb1412fad906687cd207ac663ea23d11fa6db02\",\"docs/change-request.md\":\"24458fee92c2ed7fa5bfe95f56af6911f1b8639ff10b8ac110c00395c6916c00\",\"docs/knowledge-policy.md\":\"0ad8630575f77faefcb66610d58bf8946f7365f89319f4abd2753d2dc66137b8\",\"docs/rollback-policy.md\":\"050283401cd2f99f120cc41ced0fc3a33195e1e5d9daae1acb4588264d866d3d\",\"infra/alias.tf\":\"6d9ebfd9960efe5c773b4c6e01423041a269c7145c2b02239727281c6f3108a6\",\"infra/iam.tf\":\"225e670871ac615237ede92602f96400bf9e84b2dbbc44493e88b6aa1e5498ba\",\"operations/commands.json\":\"e8807a8289288edb4881104b4cd773b0e1f34ebab685e201481be5126bbe2db3\",\"package-lock.json\":\"913b787bd230691adf255631664e80b87e6a1ae1478fb1f1e4f73ec7a17abac5\",\"package.json\":\"a2f69220942a021487ab441d25d013d427320103a85f2845221758e381ec9377\",\"plans/candidate-plan.json\":\"ae22f7b6f66f252b12530a951592d398be08c56c5702e12bd926f95bffb8f916\",\"scripts/validate-change-plan.mjs\":\"ed9f9abed2c25cdd99a816b802991cab9185a12cef5594673d738f1118626bc6\",\"state/current-state.json\":\"153f59ae462f3a68017ee8cad14548ae83407fd654a220c6733e6b1631621e18\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm run validate:change-plan",
       "requirement": "required",
       "alternative_group_id": null,
       "timeout_ms": 60000,
-      "logical_command_digest": "sha256:38ec2e042544aa54628b7f33e071d00c9f7ff140acbeac033df912e1159ff2b2",
-      "rendered_event_command_digest": "sha256:3a36c8b8413aab0e42b675373387537a46791ccd91c3b3affb07d26b3165f914",
-      "command_contract_digest": "sha256:567283868fea1d99eb56504d3d164d6cea71c572d0b2e5e1049e2202810926e7"
+      "logical_command_digest": "sha256:07f20ec49854063e1336e52ce8a3c2a472897ca78c19ddef9cf0519f976bd862",
+      "rendered_event_command_digest": "sha256:b91a79af89b82485c8028b9f2f14b028956567188829067cefc34ffcca48e32d",
+      "command_contract_digest": "sha256:85d5cb352b6e427cc4d544629cdd45edaaee0162054fd8dc10eabfa4b1a3e745"
     }
   ],
-  "contract_digest": "sha256:604978fcd13de754e4f614a9300885af97d695b027513c4b71f573632e354b35"
+  "contract_digest": "sha256:7c52a8cddc38082e6021c62b09a61f3b9663487b5173407f2920ce348b670651"
 }

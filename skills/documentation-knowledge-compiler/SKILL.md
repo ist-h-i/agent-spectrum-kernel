@@ -45,7 +45,8 @@ This skill does not create a document management system. It routes durable knowl
    - Docs correction -> docs update or issue.
 
 4. Classify evidence and freshness.
-   - Evidence: `Verified`, `Human-confirmed`, `Supported`, `Hypothesis`, `Deprecated`, `Contradicted`.
+   - Evidence: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified` under `ask.claim-evidence-status@1.0.0`.
+   - Authority: `not_asserted` or `human_confirmed`.
    - Freshness: `current`, `stale`, `conflicting`, `unknown`, `deprecated`.
 
 5. Record only the durable statement, source reference, consumers, conflicts, recommended target, staleness trigger, and owner.
@@ -61,6 +62,7 @@ Documentation knowledge compilation:
 - Source document:
 - Source location:
 - Evidence status:
+- Authority status:
 - Freshness status:
 - Consumers:
 - Conflicts:

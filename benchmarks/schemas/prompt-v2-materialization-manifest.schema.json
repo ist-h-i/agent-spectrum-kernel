@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-spectrum-kernel.local/benchmarks/schemas/prompt-v2-materialization-manifest.schema.json",
+  "title": "Prompt v2 result-blind materialization manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "schema_path", "artifact_type", "program", "preregistration_id",
+    "preregistration_digest", "authority_binding_digest", "plan_id", "plan_digest", "expected_case_count",
+    "cases", "privacy", "materialization_id", "materialization_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/prompt-v2-materialization-manifest.schema.json" },
+    "artifact_type": { "const": "prompt_v2_materialization_manifest" },
+    "program": { "const": "ask_prompt_v2_result_blind_canary" },
+    "preregistration_id": { "type": "string", "pattern": "^prompt-v2-prereg-[a-f0-9]{32}$" },
+    "preregistration_digest": { "$ref": "#/$defs/digest" },
+    "authority_binding_digest": { "$ref": "#/$defs/digest" },
+    "plan_id": { "type": "string", "pattern": "^prompt-v2-plan-[a-f0-9]{32}$" },
+    "plan_digest": { "$ref": "#/$defs/digest" },
+    "expected_case_count": { "const": 56 },
+    "cases": { "type": "array", "minItems": 56, "maxItems": 56, "items": { "$ref": "#/$defs/case" } },
+    "privacy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["agent_visible_bytes_serialized", "private_evaluator_bytes_serialized", "raw_prompt_serialized", "raw_output_serialized"],
+      "properties": {
+        "agent_visible_bytes_serialized": { "const": false }, "private_evaluator_bytes_serialized": { "const": false },
+        "raw_prompt_serialized": { "const": false }, "raw_output_serialized": { "const": false }
+      }
+    },
+    "materialization_id": { "type": "string", "pattern": "^prompt-v2-materialization-[a-f0-9]{32}$" },
+    "materialization_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "case": {
+      "type": "object", "additionalProperties": false,
+      "required": ["position", "case_id", "case_identity_digest", "block_id", "adapter_track", "fixture_id", "source_fixture_id", "repetition", "prompt_role", "role_order_position", "input_manifest_path", "input_manifest_raw_byte_digest", "input_manifest_fixture_digest", "task_digest", "workspace_digest", "evaluator_visible_input_digest", "frozen_input_digest", "public_evaluator_set_identity_digest", "raw_scorer_authority_digest", "common_input_identity_digest", "prompt_projection_digest", "prompt_authority_identity_digest"],
+      "properties": {
+        "position": { "type": "integer", "minimum": 1, "maximum": 56 },
+        "case_id": { "type": "string", "pattern": "^prompt-v2-case-[a-f0-9]{32}$" },
+        "case_identity_digest": { "$ref": "#/$defs/digest" },
+        "block_id": { "type": "string", "pattern": "^prompt-v2-block-[a-f0-9]{32}$" },
+        "adapter_track": { "enum": ["codex", "claude"] },
+        "fixture_id": { "type": "string", "minLength": 1 }, "source_fixture_id": { "type": "string", "minLength": 1 },
+        "repetition": { "type": "integer", "minimum": 1, "maximum": 5 }, "prompt_role": { "enum": ["current_prompt", "prompt_v2"] },
+        "role_order_position": { "enum": [1, 2] }, "input_manifest_path": { "type": "string", "minLength": 1 },
+        "input_manifest_raw_byte_digest": { "$ref": "#/$defs/digest" }, "input_manifest_fixture_digest": { "$ref": "#/$defs/digest" },
+        "task_digest": { "$ref": "#/$defs/digest" }, "workspace_digest": { "$ref": "#/$defs/digest" },
+        "evaluator_visible_input_digest": { "$ref": "#/$defs/digest" }, "frozen_input_digest": { "$ref": "#/$defs/digest" },
+        "public_evaluator_set_identity_digest": { "$ref": "#/$defs/digest" }, "common_input_identity_digest": { "$ref": "#/$defs/digest" },
+        "raw_scorer_authority_digest": { "$ref": "#/$defs/digest" },
+        "prompt_projection_digest": { "$ref": "#/$defs/digest" }, "prompt_authority_identity_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

@@ -36,7 +36,8 @@ This skill is the pre-ADR and cross-task memory layer. ADRs remain the canonical
    - Options considered, accepted option, rejected alternatives, tradeoffs, consequences, and constraints.
 
 3. Classify evidence status.
-   - `Verified`, `Human-confirmed`, `Supported`, `Hypothesis`, `Deprecated`, or `Contradicted`.
+   - Use `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`.
+   - Record human confirmation as `Authority status=human_confirmed` and lifecycle/conflict as `Record state=active|deprecated|contradicted`.
    - Hypothesis decisions may guide questions only.
 
 4. Decide target.
@@ -65,6 +66,8 @@ Architecture decision memory update:
 - Consequences:
 - Evidence source:
 - Evidence status:
+- Authority status:
+- Record state:
 - Related ADR:
 - Related project overlay rule:
 - Related engineering pattern:

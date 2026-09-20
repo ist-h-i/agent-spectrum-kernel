@@ -1,0 +1,468 @@
+#!/usr/bin/env node
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import {
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  createEmptyAssetRegistry,
+  exportAssetRegistryReference,
+  listAssets,
+  registerAsset,
+  resolveAsset,
+  verifyAssetRegistry,
+} from "./asset-registry.mjs";
+import {
+  listContentAddressedJson,
+  readJsonFileStrict,
+  stableCanonicalJson,
+} from "./content-addressed-store.mjs";
+import { materializeGitRevisionSources } from "./git-revision-source.mjs";
+
+const REPOSITORY_ID = "github.com/ist-h-i/agent-spectrum-kernel";
+const BASELINE_SOURCE_REVISION = "656edf1ac611890a3ae5a93a90e9076f50ee2488";
+const FIXED_ENTRY_SOURCE_REVISION = "8f85b9bfc0ac315a2f3298471092fb98f76617f7";
+const REGISTRY_ID = "ask-local-assets";
+const SCOPE_ID = "agent-spectrum-kernel";
+const repositoryRoot = resolve(import.meta.dirname, "..");
+const fixtureRoot = resolve(repositoryRoot, "docs/fixtures/asset-registry");
+const fixtureStoreRoot = resolve(fixtureRoot, "store");
+const fixtureReferencePath = resolve(fixtureRoot, "reference.json");
+
+const samples = [
+  {
+    assetType: "skill",
+    stableId: "ask.skill.test-first-verification",
+    revision: BASELINE_SOURCE_REVISION,
+    version: `git:${BASELINE_SOURCE_REVISION}`,
+    path: "skills/test-first-verification/SKILL.md",
+    mediaType: "text/markdown; charset=utf-8",
+    rawDigest: "sha256:6ab90c0cc61752132f25bb579a35b98e0e9b2ed1a8b36dc2a82db715b9e44684",
+  },
+  {
+    assetType: "prompt",
+    stableId: "ask.prompt-template.codex.skill-verify",
+    revision: BASELINE_SOURCE_REVISION,
+    version: `git:${BASELINE_SOURCE_REVISION}`,
+    path: "adapters/codex/prompts/skill-verify.md",
+    mediaType: "text/markdown; charset=utf-8",
+    rawDigest: "sha256:0fb394cd590cfd00215e581d3d159a31967437f039156f5e5e3d6b4f1b157b82",
+    adapter: "codex",
+    applicabilityAdapters: ["codex"],
+    dependencyStableIds: ["ask.skill.test-first-verification"],
+  },
+  {
+    assetType: "evaluator_reference",
+    stableId: "ask.evaluator-reference.mn-build-option-update",
+    revision: BASELINE_SOURCE_REVISION,
+    version: `git:${BASELINE_SOURCE_REVISION}`,
+    path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json",
+    mediaType: "application/json",
+    rawDigest: "sha256:bc701eb717206d68fed24c037106ae72d3f7d52b63dfcf71a8d767d599f35874",
+  },
+  {
+    assetType: "prompt",
+    stableId: "ask.prompt-policy.compact-controls",
+    revision: FIXED_ENTRY_SOURCE_REVISION,
+    version: `git:${FIXED_ENTRY_SOURCE_REVISION}`,
+    path: "schemas/compact-profile-control-map.json",
+    mediaType: "application/json",
+    rawDigest: "sha256:3dc1cbaf148b7236b86a56f065a772c0623d87240a02a0df066fae0f89077f4f",
+    adapter: "shared",
+    applicabilityAdapters: ["claude-code", "codex"],
+    applicabilityTaskClasses: ["handoff", "implementation", "investigation", "review", "verification"],
+    dependencyStableIds: [],
+  },
+  {
+    assetType: "prompt",
+    stableId: "ask.prompt-template.fixed-entry-semantics",
+    revision: FIXED_ENTRY_SOURCE_REVISION,
+    version: `git:${FIXED_ENTRY_SOURCE_REVISION}`,
+    path: "schemas/fixed-entry-profile-registry.json",
+    mediaType: "application/json",
+    rawDigest: "sha256:065bf20f6af19d3b9d48ad5680a31033b20997ced1c2913826946209272a830c",
+    adapter: "shared",
+    applicabilityAdapters: ["claude-code", "codex"],
+    applicabilityTaskClasses: ["handoff", "implementation", "investigation", "review", "verification"],
+    dependencyStableIds: ["ask.prompt-policy.compact-controls"],
+  },
+];
+
+function rawDigest(bytes) {
+  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function exactAssetRef(resolved) {
+  return {
+    asset_type: resolved.asset_type,
+    stable_id: resolved.stable_id,
+    version: resolved.version,
+    record_digest: resolved.record_digest,
+    content_digest: resolved.content_digest,
+  };
+}
+
+function descriptorFor(sample, dependencies = []) {
+  const typeExtension = sample.assetType === "skill"
+    ? { kind: "skill", entrypoint: sample.path }
+    : sample.assetType === "prompt"
+      ? {
+          kind: "prompt_template",
+          adapter: sample.adapter,
+          entrypoint: sample.path,
+          rendered_runtime_content: false,
+        }
+      : {
+          kind: "public_evaluator_reference",
+          fixture_id: "mn-build-option-update",
+          entrypoint: sample.path,
+          private_evaluator_content_included: false,
+        };
+
+  return {
+    schema_version: "1.0.0",
+    asset_type: sample.assetType,
+    stable_id: sample.stableId,
+    version: sample.version,
+    version_scheme: "git_revision",
+    type_extension: typeExtension,
+    content: {
+      package_format: "canonical_json_base64_files",
+      files: [{
+        path: sample.path,
+        media_type: sample.mediaType,
+        raw_digest: sample.rawDigest,
+      }],
+    },
+    source: {
+      kind: "git_repository",
+      repository_id: REPOSITORY_ID,
+      revision: sample.revision,
+    },
+    provenance: {
+      origin: "repository_file",
+      license: {
+        status: "unknown",
+        spdx_id: null,
+        evidence_ref: null,
+      },
+      owner: {
+        status: "unknown",
+        owner_id: null,
+        evidence_ref: null,
+      },
+    },
+    derivation: { kind: "root", parent: null, delta: null },
+    dependencies,
+    compatibility: {
+      asset_contract_versions: ["1.0.0"],
+      runtime_profiles: [],
+    },
+    applicability: {
+      models: { status: "unknown", included: [], excluded: [] },
+      adapters: sample.assetType === "prompt"
+        ? { status: "bounded", included: sample.applicabilityAdapters, excluded: [] }
+        : { status: "unknown", included: [], excluded: [] },
+      stacks: { status: "unknown", included: [], excluded: [] },
+      domains: { status: "unknown", included: [], excluded: [] },
+      projects: { status: "bounded", included: [REPOSITORY_ID], excluded: [] },
+      task_classes: sample.applicabilityTaskClasses
+        ? { status: "bounded", included: sample.applicabilityTaskClasses, excluded: [] }
+        : { status: "unknown", included: [], excluded: [] },
+      included_scopes: ["local_repository"],
+      excluded_scopes: ["automatic_portfolio_activation"],
+      required_capabilities: [],
+      notes: [],
+    },
+    permissions_and_effects: {
+      status: "not_evaluated",
+      requested_permissions: [],
+      possible_effects: [],
+      permission_refs: [],
+      effect_refs: [],
+    },
+    safety: {
+      status: "not_evaluated",
+      classifications: [],
+      constraint_refs: [],
+    },
+    mechanism_and_evidence: {
+      status: "not_evaluated",
+      mechanism_refs: [],
+      evidence_refs: [],
+    },
+    evaluation_history: {
+      status: "not_evaluated",
+      evidence_refs: [],
+      cost: null,
+    },
+    maintenance: {
+      stale_status: "not_assessed",
+      refresh_conditions: [],
+      regression_refs: [],
+      retirement: null,
+      rollback: {
+        status: "requires_explicit_authority",
+        target: null,
+        authority_ref: null,
+      },
+    },
+  };
+}
+
+function generateFixture() {
+  const temporaryRoot = mkdtempSync(resolve(tmpdir(), "ask-asset-registry-samples-"));
+  const sourceRoot = resolve(temporaryRoot, "source");
+  const storeRoot = resolve(temporaryRoot, "store");
+  for (const revision of new Set(samples.map((sample) => sample.revision))) {
+    materializeGitRevisionSources({
+      repositoryRoot,
+      targetRoot: sourceRoot,
+      revision,
+      sources: samples
+        .filter((sample) => sample.revision === revision)
+        .map((sample) => ({ path: sample.path, rawDigest: sample.rawDigest })),
+    });
+  }
+  mkdirSync(storeRoot, { recursive: true });
+
+  const empty = createEmptyAssetRegistry({
+    storeRoot,
+    registryId: REGISTRY_ID,
+    repositoryId: REPOSITORY_ID,
+    scopeId: SCOPE_ID,
+  });
+  let snapshotDigest = empty.snapshot_digest;
+  const registered = new Map();
+  for (const sample of samples) {
+    const dependencies = (sample.dependencyStableIds ?? []).map((stableId) => {
+      const dependency = registered.get(stableId);
+      if (!dependency) throw new Error(`sample dependency must be registered first: ${stableId}`);
+      return exactAssetRef(dependency);
+    });
+    const registration = registerAsset({
+      storeRoot,
+      sourceRoot,
+      predecessorSnapshotDigest: snapshotDigest,
+      descriptor: descriptorFor(sample, dependencies),
+    });
+    snapshotDigest = registration.snapshot_digest;
+    registered.set(sample.stableId, resolveAsset({
+      storeRoot,
+      snapshotDigest,
+      stableId: sample.stableId,
+      version: sample.version,
+      state: "candidate",
+    }));
+  }
+  const verified = verifyAssetRegistry({ storeRoot, snapshotDigest });
+  const listed = listAssets({ storeRoot, snapshotDigest });
+  const reference = exportAssetRegistryReference({ storeRoot, snapshotDigest });
+  verifyGeneratedView({ storeRoot, snapshotDigest, verified, listed, reference });
+  return { temporaryRoot, storeRoot, snapshotDigest, reference };
+}
+
+function verifyGeneratedView({ storeRoot, snapshotDigest, verified, listed, reference }) {
+  assert.equal(verified.snapshot_digest, snapshotDigest);
+  assert.equal(verified.assets.length, samples.length);
+  assert.equal(listed.length, samples.length);
+  assert.deepEqual(
+    listed.map((entry) => entry.stable_id),
+    [...samples.map((sample) => sample.stableId)].sort(),
+    "registry list must contain every sample in deterministic order",
+  );
+  assert.deepEqual(new Set(listed.map((entry) => entry.state)), new Set(["candidate"]));
+
+  for (const sample of samples) {
+    const resolved = resolveAsset({
+      storeRoot,
+      snapshotDigest,
+      stableId: sample.stableId,
+      version: sample.version,
+      state: "candidate",
+    });
+    assert.equal(resolved.asset_type, sample.assetType);
+    assert.equal(resolved.content.files.length, 1);
+    const [file] = resolved.content.files;
+    assert.equal(file.path, sample.path);
+    assert.equal(file.raw_digest, sample.rawDigest);
+    const decoded = Buffer.from(file.bytes_base64, "base64");
+    assert.equal(decoded.length, file.byte_length);
+    assert.equal(rawDigest(decoded), sample.rawDigest);
+  }
+
+  for (const sample of samples.filter((entry) => (entry.dependencyStableIds ?? []).length > 0)) {
+    const resolved = resolveAsset({
+      storeRoot,
+      snapshotDigest,
+      stableId: sample.stableId,
+      version: sample.version,
+      state: "candidate",
+    });
+    const expected = sample.dependencyStableIds.map((stableId) => {
+      const dependency = samples.find((entry) => entry.stableId === stableId);
+      return exactAssetRef(resolveAsset({
+        storeRoot,
+        snapshotDigest,
+        stableId: dependency.stableId,
+        version: dependency.version,
+        state: "candidate",
+      }));
+    });
+    assert.deepEqual(resolved.dependency_closure.map(exactAssetRef), expected);
+  }
+
+  assert.equal(reference.snapshot_digest, snapshotDigest);
+  const serializedReference = stableCanonicalJson(reference);
+  assert.equal(serializedReference.includes(repositoryRoot), false, "reference must not contain an absolute repository path");
+  assert.equal(serializedReference.includes(storeRoot), false, "reference must not contain an absolute store path");
+  assert.equal(serializedReference.includes('"latest"'), false, "reference must not contain a mutable latest selector");
+  assert.equal(serializedReference.includes("authority_context"), false, "candidate reference must not contain lifecycle authority context");
+  assertPortableReference(reference);
+}
+
+function assertPortableReference(value, location = "reference") {
+  if (typeof value === "string") {
+    assert.equal(isAbsolute(value), false, `${location} contains an absolute path`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertPortableReference(entry, `${location}[${index}]`));
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, entry] of Object.entries(value)) {
+      assert.doesNotMatch(key, /(?:^|_)latest(?:_|$)/iu, `${location}.${key} is a mutable latest selector`);
+      assert.doesNotMatch(key, /(?:authority_context|context_authority)/iu, `${location}.${key} carries lifecycle context authority`);
+      assertPortableReference(entry, `${location}.${key}`);
+    }
+  }
+}
+
+function listTree(root) {
+  const result = [];
+  function visit(current) {
+    for (const entry of readdirSync(current, { withFileTypes: true }).sort((left, right) => {
+      if (left.name === right.name) return 0;
+      return left.name < right.name ? -1 : 1;
+    })) {
+      const path = resolve(current, entry.name);
+      const relativePath = relative(root, path).split(sep).join("/");
+      assert.equal(entry.isSymbolicLink(), false, `fixture symlink is prohibited: ${relativePath}`);
+      if (entry.isDirectory()) visit(path);
+      else {
+        assert.equal(entry.isFile(), true, `unsupported fixture entry: ${relativePath}`);
+        result.push(relativePath);
+      }
+    }
+  }
+  visit(root);
+  return result;
+}
+
+function expectedTree(generated) {
+  const files = listTree(generated.storeRoot);
+  const objectFiles = listContentAddressedJson({ storeRoot: generated.storeRoot })
+    .map(({ digest }) => {
+      const hex = digest.slice("sha256:".length);
+      return `objects/sha256/${hex.slice(0, 2)}/${hex.slice(2)}.json`;
+    })
+    .sort();
+  assert.deepEqual(
+    files,
+    objectFiles,
+    "temporary store contains files outside the shared CAS object set",
+  );
+  return [...files.map((path) => `store/${path}`), "reference.json"].sort();
+}
+
+function referenceBytes(reference) {
+  return Buffer.from(`${JSON.stringify(reference, null, 2)}\n`, "utf8");
+}
+
+function writeFixture(generated) {
+  const expectedFiles = expectedTree(generated);
+  rmSync(fixtureRoot, { recursive: true, force: true });
+  for (const relativePath of expectedFiles) {
+    const target = resolve(fixtureRoot, relativePath);
+    mkdirSync(dirname(target), { recursive: true });
+    if (relativePath === "reference.json") writeFileSync(target, referenceBytes(generated.reference));
+    else copyFileSync(resolve(generated.storeRoot, relativePath.slice("store/".length)), target);
+  }
+  verifyCheckedInFixture(generated);
+}
+
+function verifyCheckedInFixture(generated) {
+  assert.equal(existsSync(fixtureRoot), true, `missing checked-in fixture: ${fixtureRoot}`);
+  assert.equal(lstatSync(fixtureRoot).isDirectory(), true, `fixture root is not a directory: ${fixtureRoot}`);
+  const expectedFiles = expectedTree(generated);
+  const actualFiles = listTree(fixtureRoot);
+  assert.deepEqual(actualFiles, expectedFiles, "checked-in fixture has missing or extra paths");
+
+  for (const relativePath of expectedFiles) {
+    const expectedBytes = relativePath === "reference.json"
+      ? referenceBytes(generated.reference)
+      : readFileSync(resolve(generated.storeRoot, relativePath.slice("store/".length)));
+    assert.deepEqual(readFileSync(resolve(fixtureRoot, relativePath)), expectedBytes, `${relativePath} bytes are stale`);
+  }
+
+  const checkedReference = readJsonFileStrict(fixtureReferencePath, "Asset registry fixture reference");
+  assert.deepEqual(checkedReference, generated.reference, "checked-in reference differs from fresh export");
+  const checkedVerified = verifyAssetRegistry({
+    storeRoot: fixtureStoreRoot,
+    snapshotDigest: checkedReference.snapshot_digest,
+  });
+  const checkedList = listAssets({
+    storeRoot: fixtureStoreRoot,
+    snapshotDigest: checkedReference.snapshot_digest,
+  });
+  verifyGeneratedView({
+    storeRoot: fixtureStoreRoot,
+    snapshotDigest: checkedReference.snapshot_digest,
+    verified: checkedVerified,
+    listed: checkedList,
+    reference: exportAssetRegistryReference({
+      storeRoot: fixtureStoreRoot,
+      snapshotDigest: checkedReference.snapshot_digest,
+    }),
+  });
+}
+
+function parseArgs(argv) {
+  if (argv.length === 1 && argv[0] === "--write") return "write";
+  if (argv.length === 1 && argv[0] === "--check") return "check";
+  if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) return "help";
+  throw new Error("Usage: node scripts/asset-registry-samples.mjs --write | --check");
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  let generated;
+  try {
+    const mode = parseArgs(process.argv.slice(2));
+    if (mode === "help") {
+      console.log("Usage: node scripts/asset-registry-samples.mjs --write | --check");
+    } else {
+      generated = generateFixture();
+      if (mode === "write") writeFixture(generated);
+      else verifyCheckedInFixture(generated);
+      const objectCount = listContentAddressedJson({ storeRoot: generated.storeRoot }).length;
+      console.log(`Asset registry sample fixture ${mode === "write" ? "written" : "is current"}: ${objectCount} objects, snapshot ${generated.snapshotDigest}`);
+    }
+  } catch (error) {
+    console.error(`asset-registry-samples failed: ${error.message}`);
+    process.exitCode = 1;
+  } finally {
+    if (generated?.temporaryRoot) rmSync(generated.temporaryRoot, { recursive: true, force: true });
+  }
+}

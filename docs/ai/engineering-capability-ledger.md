@@ -33,7 +33,7 @@ This checked-in file is an empty generic template. Do not add project-specific e
 
 ## Evidence Status Key
 
-Evidence statuses: `Verified`, `Human-confirmed`, `Supported`, `Hypothesis`, `Deprecated`, `Contradicted`, `Unknown`.
+Evidence status uses `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`. Record human confirmation in `Authority status` (`not_asserted` or `human_confirmed`) and assessment lifecycle in `Assessment state` (`current`, `deprecated`, or `contradicted`).
 
 Level increases require evidence. Entry count, repeated mention, or AI confidence is not maturity evidence.
 
@@ -56,6 +56,8 @@ EC-0003
 | Current level | yes | One of the capability levels. |
 | Evidence source | yes | Ledger, review, verification, report, issue, PR, or human confirmation. |
 | Evidence status | yes | Evidence status for the level claim. |
+| Authority status | yes | Human authority metadata, separate from evidence strength. |
+| Assessment state | yes | Capability assessment lifecycle/conflict state. |
 | Observed strengths | yes | What evidence shows the system does well. |
 | Observed failures | yes | Failures, misses, corrections, or `none`. |
 | Human dependency | yes | Human decisions or approvals still required. |
@@ -67,12 +69,12 @@ EC-0003
 
 ## Engineering Capability Entries
 
-| ID | Capability area | Current level | Evidence source | Evidence status | Observed strengths | Observed failures | Human dependency | Reusable assets involved | Reliability signals | Staleness trigger | Next improvement candidate | Owner |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Capability area | Current level | Evidence source | Evidence status | Authority status | Assessment state | Observed strengths | Observed failures | Human dependency | Reusable assets involved | Reliability signals | Staleness trigger | Next improvement candidate | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 <!--
 Example active row:
-| EC-0001 | Verification/test design | 3 Evidence-backed reusable pattern | VP-0002; review-final-merge-gate results in PR #123 and #145 | Supported | Permission changes consistently include denial checks | Missing stale-session negative case in PR #145 | Human reviewer confirms final sufficiency | verification-pattern-ledger; test-first-verification | Two repeat uses, one correction, no stale entries | Auth model or test framework changes | Add stale-session verification pattern | platform-team |
+| EC-0001 | Verification/test design | 3 Evidence-backed reusable pattern | VP-0002; review-final-merge-gate results in PR #123 and #145 | Supported | human_confirmed | current | Permission changes consistently include denial checks | Missing stale-session negative case in PR #145 | Human reviewer confirms final sufficiency | verification-pattern-ledger; test-first-verification | Two repeat uses, one correction, no stale entries | Auth model or test framework changes | Add stale-session verification pattern | platform-team |
 -->
 
 ## Stale Capability Review

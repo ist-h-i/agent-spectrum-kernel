@@ -157,10 +157,10 @@
       "repetitions": 3,
       "aggregate_eligible": true,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/input-manifest.json",
-      "input_manifest_sha256": "2f32cb0f0c3361a30223b02a243df9e0dc3193e2e70d3035675176b50d9b1033",
+      "input_manifest_sha256": "d82e1af9883a4336194348151e7fb76bfbc4743f0906d779d9d66cd315cb1995",
       "verification_command_contract": {
         "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/verification-command-contract.json",
-        "sha256": "5f5e5b8dc6872228d55878762f57f4c808c51d82ce3954ca69ccc2a8400595dc"
+        "sha256": "1638219787d4965434b8428d3b102c5300128441666ec64463cbc36616f82f04"
       }
     },
     {
@@ -185,10 +185,10 @@
       "repetitions": 3,
       "aggregate_eligible": true,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/input-manifest.json",
-      "input_manifest_sha256": "1c4410249959473825cc8bc58ac608aaaa11535d49f0a1ecb993026caf5b31f6",
+      "input_manifest_sha256": "a1edd1ffc48e2ea236d8e8eb8aba6c99ddeaec2a6c620e60559bc54f4898931f",
       "verification_command_contract": {
         "path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/verification-command-contract.json",
-        "sha256": "048f422da47fe2cc4d602dce03cfcb2b8a6378001355e86b38209eb4a21ff3c1"
+        "sha256": "6d9b35b9bb7facd953e6ed1787108b208ae1b6605de9151383bbe84c69f46f94"
       }
     },
     {
@@ -199,10 +199,10 @@
       "repetitions": 5,
       "aggregate_eligible": true,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/input-manifest.json",
-      "input_manifest_sha256": "a653cf0fe5cc87ece94f8b5474eedbd6ac6ddfdab8245a0174f98eb496b3d693",
+      "input_manifest_sha256": "72509f464545a93889603f05b7e811c48532aeb9da24d190b46c543457537a01",
       "verification_command_contract": {
         "path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/verification-command-contract.json",
-        "sha256": "26ebc42319317a0248cc22cf9dfba2d5f3e65dfc3d54956eba3db1477335f697"
+        "sha256": "5826a6fe97da24f0d341d6df5e7134ffff7d9f20ec4bc69c4189be1762fd1ad6"
       }
     }
   ],

@@ -13,6 +13,8 @@
     "state_condition",
     "source",
     "evidence_status",
+    "authority_status",
+    "record_state",
     "applies_to",
     "used_by",
     "last_checked",
@@ -49,15 +51,15 @@
       "minLength": 1
     },
     "evidence_status": {
+      "$ref": "claim-evidence-status.schema.json"
+    },
+    "authority_status": {
       "type": "string",
-      "enum": [
-        "Verified",
-        "Human-confirmed",
-        "Supported",
-        "Hypothesis",
-        "Deprecated",
-        "Contradicted"
-      ]
+      "enum": ["not_asserted", "human_confirmed"]
+    },
+    "record_state": {
+      "type": "string",
+      "enum": ["active", "deprecated", "contradicted"]
     },
     "applies_to": {
       "type": "string",

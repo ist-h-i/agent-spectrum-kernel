@@ -1,0 +1,94 @@
+{
+  "schema_version": "1.0.0",
+  "object_kind": "prompt_v2_rendered_source_archive",
+  "renderer_profile": "full",
+  "adapters": [
+    {
+      "adapter": "claude_code",
+      "renderer_id": "install-claude-adapter",
+      "renderer_version": "5",
+      "renderer_input_digest": "sha256:afdc237221058e1767f9d55ca037fd18c6d43393418b6e23c5b294db973145df",
+      "fingerprint": "sha256:4409fed5473b1cfea4b8490bb35b129719fe66ceb68c5af837106eb44a050204",
+      "canonical_source_digest": "sha256:57e3523cdcd96d595e85ea4f19af89032b17cd0b8f2f0cde684419f736c019cc",
+      "baseline_source_root": "docs/fixtures/claude-pre-fixed-commands",
+      "files": [
+        {
+          "path": "claude_code/skill-handoff.md",
+          "media_type": "text/markdown; charset=utf-8",
+          "byte_length": 1697,
+          "raw_digest": "sha256:d708a11a0dfc676b77fc7f1240233bcef8fb2d20cc84b0cebd1cd7e8eac20e58"
+        },
+        {
+          "path": "claude_code/skill-implement.md",
+          "media_type": "text/markdown; charset=utf-8",
+          "byte_length": 2412,
+          "raw_digest": "sha256:b975d36b486a2d8f7893dfc054f87d0f5abc157c2c88614bbb1fcda291c3a61b"
+        },
+        {
+          "path": "claude_code/skill-investigate.md",
+          "media_type": "text/markdown; charset=utf-8",
+          "byte_length": 1932,
+          "raw_digest": "sha256:9561544af36200afe35c04a2e9d34f5d97f69642eea4ee8e846cc6de54a6c859"
+        },
+        {
+          "path": "claude_code/skill-review.md",
+          "media_type": "text/markdown; charset=utf-8",
+          "byte_length": 2300,
+          "raw_digest": "sha256:736df587c10c5b1ed0fb4610157d0556344325eefae266c03c56b2f1710eada5"
+        },
+        {
+          "path": "claude_code/skill-verify.md",
+          "media_type": "text/markdown; charset=utf-8",
+          "byte_length": 2033,
+          "raw_digest": "sha256:49e2343aa8fb007b63767ddfd7b24078329837f69a58ec8334aba9481afedb67"
+        }
+      ]
+    },
+    {
+      "adapter": "codex",
+      "renderer_id": "install-codex-adapter",
+      "renderer_version": "8",
+      "renderer_input_digest": "sha256:bdb1816418af4bdfaf77a4ad947582309f8bf12fe291d05efd7e6069d8e10ea8",
+      "fingerprint": "sha256:91e6f3acd435e3cf2bc9a0f85f2f39c41d865859185fcc52b7175f96f0849a4e",
+      "canonical_source_digest": "sha256:4a60c7ddd6b2fcbcc21db2798dd49a938d9e5e23759451012d96fc1a5fe98198",
+      "baseline_source_root": "docs/fixtures/codex-pre-compact-prompts",
+      "files": [
+        {
+          "path": "codex/skill-handoff.md",
+          "media_type": "text/markdown; charset=utf-8",
+          "byte_length": 1688,
+          "raw_digest": "sha256:5c2a008e5e5baccdcb9e341289aeb254838c7ea5f8869f8478779db97cf29a2a"
+        },
+        {
+          "path": "codex/skill-implement.md",
+          "media_type": "text/markdown; charset=utf-8",
+          "byte_length": 2326,
+          "raw_digest": "sha256:0f2cb048b522633b618f1b212ee371026fe2db43629adf5074ad22b64ec38d3e"
+        },
+        {
+          "path": "codex/skill-investigate.md",
+          "media_type": "text/markdown; charset=utf-8",
+          "byte_length": 1974,
+          "raw_digest": "sha256:02354534457a99417fc8134f273ed996bb243d9651f2940ecb827c8a48cc67a0"
+        },
+        {
+          "path": "codex/skill-review.md",
+          "media_type": "text/markdown; charset=utf-8",
+          "byte_length": 2586,
+          "raw_digest": "sha256:7670b5922ab9019e80d3346f241187bdaac02755cf27001e30703ef9a7b054a4"
+        },
+        {
+          "path": "codex/skill-verify.md",
+          "media_type": "text/markdown; charset=utf-8",
+          "byte_length": 2043,
+          "raw_digest": "sha256:45f50e21a999b1d6199bd1ab2ea27fad002bfdabae5f64befaaaba8a6aecfd73"
+        }
+      ]
+    }
+  ],
+  "runtime_application_implied": false,
+  "results_accessed": false,
+  "measured_output_included": false,
+  "private_evaluator_content_included": false,
+  "archive_digest": "sha256:518956f5683680e3517eb9f3916a01364dc1f79181f2eb34eecb395e77d0a28d"
+}

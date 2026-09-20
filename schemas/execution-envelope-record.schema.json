@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/execution-envelope-record.schema.json",
+  "title": "Agent Spectrum Kernel Execution Envelope Record",
+  "description": "Runner-owned immutable transport record for one canonical Execution Envelope payload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "record_id", "emission_class", "authority", "binding", "envelope", "envelope_sha256", "response_sha256", "control_input_sha256"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "record_id": { "type": "string", "pattern": "^execution-envelope-record-[a-f0-9]{64}$" },
+    "emission_class": { "type": "string", "enum": ["sidecar", "inline_required", "diagnostic"] },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "fixed_fields_source", "dynamic_fields_source"],
+      "properties": {
+        "owner": { "type": "string", "const": "runner" },
+        "fixed_fields_source": { "type": "string", "const": "compact_profile" },
+        "dynamic_fields_source": { "type": "string", "enum": ["structured_runtime_result", "runner_observation"] }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter_id", "entry_id", "mode", "profile_id", "profile_schema_version", "canonical_revision", "canonical_source_digest", "profile_fingerprint", "rendered_sha256"],
+      "properties": {
+        "adapter_id": { "type": "string", "const": "codex" },
+        "entry_id": { "type": "string", "enum": ["skill-implement.md", "skill-investigate.md", "skill-review.md", "skill-verify.md", "skill-handoff.md"] },
+        "mode": { "type": "string", "enum": ["implementation", "investigation", "review", "verification", "handoff"] },
+        "profile_id": { "type": "string", "minLength": 1 },
+        "profile_schema_version": { "type": "string", "minLength": 1 },
+        "canonical_revision": { "type": "string", "minLength": 1 },
+        "canonical_source_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "profile_fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "rendered_sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "envelope": { "$ref": "execution-envelope.schema.json" },
+    "envelope_sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "response_sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "control_input_sha256": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "authority": {
+            "properties": {
+              "dynamic_fields_source": { "const": "structured_runtime_result" }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "control_input_sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+        }
+      },
+      "else": {
+        "properties": {
+          "control_input_sha256": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "binding": { "properties": { "entry_id": { "const": "skill-implement.md" } } }
+        }
+      },
+      "then": {
+        "properties": {
+          "binding": { "properties": { "mode": { "const": "implementation" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "binding": { "properties": { "entry_id": { "const": "skill-investigate.md" } } }
+        }
+      },
+      "then": {
+        "properties": {
+          "binding": { "properties": { "mode": { "const": "investigation" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "binding": { "properties": { "entry_id": { "const": "skill-review.md" } } }
+        }
+      },
+      "then": {
+        "properties": {
+          "binding": { "properties": { "mode": { "const": "review" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "binding": { "properties": { "entry_id": { "const": "skill-verify.md" } } }
+        }
+      },
+      "then": {
+        "properties": {
+          "binding": { "properties": { "mode": { "const": "verification" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "binding": { "properties": { "entry_id": { "const": "skill-handoff.md" } } }
+        }
+      },
+      "then": {
+        "properties": {
+          "binding": { "properties": { "mode": { "const": "handoff" } } }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/codex-runner-result.schema.json",
+  "title": "Agent Spectrum Kernel Codex Runner Structured Result",
+  "description": "Machine-only Codex result consumed by the managed runner. Route fields are deliberately absent and remain runner-owned.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "response_markdown", "control"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "response_markdown": { "type": "string", "minLength": 1 },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_status", "stop_reason", "next_action"],
+      "properties": {
+        "evidence_status": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["checked", "missing"],
+          "properties": {
+            "checked": { "type": "array", "items": { "type": "string" } },
+            "missing": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "stop_reason": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "details", "human_decision_required", "stop_if"],
+          "properties": {
+            "status": { "type": "string", "enum": ["none", "human_decision", "insufficient_evidence", "capability_missing", "risk_gate", "completed", "blocked"] },
+            "details": { "type": "array", "items": { "type": "string" } },
+            "human_decision_required": { "type": "array", "items": { "type": "string" } },
+            "stop_if": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "next_action": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

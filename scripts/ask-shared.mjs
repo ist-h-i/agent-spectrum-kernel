@@ -99,31 +99,40 @@ export const CODEX_PROMPT_CONTRACTS = {
     mode: "implementation",
     sandbox: "workspace-write",
     requiredGates: [],
-    requiredSections: ["Implementation Contract:", "Evidence:", "Execution Envelope:"],
+    route: { workMode: "実装", userFacing: "implement and verify the scoped change" },
+    requiredSections: ["Implementation Contract:", "Evidence:"],
   },
   "skill-investigate.md": {
     mode: "investigation",
     sandbox: "workspace-write",
     requiredGates: [],
-    requiredSections: ["Findings:", "Cause:", "Changed:", "Verified:", "Unknown / not verified:", "Next:", "Execution Envelope:"],
+    route: { workMode: "調査", userFacing: "investigate the bounded cause and report evidence" },
+    requiredSections: ["Findings:", "Cause:", "Changed:", "Evidence:"],
   },
   "skill-review.md": {
     mode: "review",
     sandbox: "read-only",
-    requiredGates: ["review-final-merge-gate"],
-    requiredSections: ["Change signals:", "Required gates:", "Skipped heavy gates:", "Missing evidence:", "Decision:", "Blocking evidence:", "Passed required gates:", "Insufficient evidence:", "Non-blocking follow-ups:", "Residual risk:", "Execution Envelope:"],
+    requiredGates: ["review-ai-quality"],
+    conditionalGates: { finalDecision: "review-final-merge-gate" },
+    route: { workMode: "レビュー", userFacing: "review the bounded change and gate the decision" },
+    requiredSections: ["Baseline review:", "Additional required gates:", "Missing evidence:", "Findings:"],
+    conditionalSections: { "review-final-merge-gate": ["Decision:"] },
+    forbiddenOrdinarySections: ["Skipped heavy gates:", "Diagnostic applicability:", "Design findings:", "Logic findings:", "Test adequacy findings:", "Style / maintainability findings:", "Scope findings:"],
   },
   "skill-verify.md": {
     mode: "verification",
     sandbox: "workspace-write",
     requiredGates: [],
-    requiredSections: ["Verification Contract:", "Evidence:", "Execution Envelope:"],
+    route: { workMode: "実装", userFacing: "verify the bounded behavior and report evidence" },
+    requiredSections: ["Evidence:"],
+    exactlyOneOfSections: ["Proof:", "Verification Contract:"],
   },
   "skill-handoff.md": {
     mode: "handoff",
     sandbox: "read-only",
     requiredGates: [],
-    requiredSections: ["Task:", "Context:", "Allowed scope:", "Forbidden scope:", "Expected output:", "Verification:", "Stop condition:", "Execution Envelope:"],
+    route: { workMode: "ドキュメント整理", userFacing: "prepare a bounded executable handoff" },
+    requiredSections: ["Task:", "Context:", "Allowed scope:", "Forbidden scope:", "Expected output:", "Verification:", "Unverified evidence:"],
   },
 };
 
@@ -133,8 +142,77 @@ export function codexPromptContractForMode(mode) {
   return Object.values(CODEX_PROMPT_CONTRACTS).find((contract) => contract.mode === mode) ?? null;
 }
 
-export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {}) {
+export function readReviewSignalGateMap(target = REPO_ROOT) {
+  const path = resolve(target, "schemas/review-signal-gate-map.json");
+  if (!existsSync(path)) throw new Error("review signal gate registry is missing: schemas/review-signal-gate-map.json");
+  let registry;
+  try {
+    registry = JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    throw new Error(`review signal gate registry is invalid JSON: ${error.message}`);
+  }
+  if (
+    registry?.registry_version !== 2
+    || registry?.baseline_gate?.gate !== "review-ai-quality"
+    || registry?.final_gate?.gate !== "review-final-merge-gate"
+    || !Array.isArray(registry?.signal_selected_gates)
+    || !registry?.signal_to_gates
+    || typeof registry.signal_to_gates !== "object"
+    || Array.isArray(registry.signal_to_gates)
+  ) {
+    throw new Error("review signal gate registry has an unsupported route shape");
+  }
+  return registry;
+}
+
+export function deriveReviewSignalGateRoute(registry, observedSignals = []) {
+  const issues = [];
+  if (!Array.isArray(observedSignals)) return { observed_signals: [], additional_gates: [], signals_by_gate: {}, issues: ["observed_signals:invalid"] };
+  if (new Set(observedSignals).size !== observedSignals.length) issues.push("observed_signals:duplicate");
+  const controlledSignals = Object.keys(registry?.signal_to_gates ?? {});
+  for (const signal of observedSignals) if (typeof signal !== "string" || !controlledSignals.includes(signal)) issues.push(`observed_signal:unknown:${String(signal)}`);
+  const normalizedSignals = [...new Set(observedSignals.filter((signal) => controlledSignals.includes(signal)))].sort();
+  const selected = new Set(normalizedSignals.flatMap((signal) => registry.signal_to_gates[signal] ?? []));
+  const additionalGates = (registry?.signal_selected_gates ?? []).filter((gate) => selected.has(gate));
+  const signalsByGate = Object.fromEntries(additionalGates.map((gate) => [
+    gate,
+    normalizedSignals.filter((signal) => (registry.signal_to_gates[signal] ?? []).includes(gate)),
+  ]));
+  return { observed_signals: normalizedSignals, additional_gates: additionalGates, signals_by_gate: signalsByGate, issues };
+}
+
+export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {}, { selectedSkills = [] } = {}) {
   const findings = [];
+  const projectedSkillIds = [];
+  for (const asset of projectionPlan.projected_managed_assets ?? []) {
+    if (asset?.asset_kind !== "skills") continue;
+    const match = typeof asset.path === "string" ? asset.path.match(/^\.agents\/skills\/([a-z0-9][a-z0-9-]*)\/SKILL\.md$/u) : null;
+    if (!match) {
+      findings.push({ path: String(asset?.path), status: "invalid_projected_skill_asset" });
+      continue;
+    }
+    projectedSkillIds.push(match[1]);
+  }
+  const selectedSkillInventory = Array.isArray(selectedSkills) ? [...new Set(selectedSkills)].sort() : [];
+  const projectedSkillInventory = [...new Set(projectedSkillIds)].sort();
+  if (JSON.stringify(selectedSkillInventory) !== JSON.stringify(projectedSkillInventory)
+    || selectedSkillInventory.length !== (Array.isArray(selectedSkills) ? selectedSkills.length : 0)
+    || projectedSkillInventory.length !== projectedSkillIds.length) {
+    findings.push({ path: "selected_skills", status: "selected_skill_inventory_mismatch" });
+  }
+  const selectedSkillSet = new Set(projectedSkillInventory);
+  const rendererInputsDigest = canonicalValueDigest(projectionPlan.renderer_inputs);
+  const managedInventoryDigest = canonicalValueDigest(projectionPlan.projected_managed_assets);
+  const expectedFingerprint = canonicalValueDigest({
+    canonical_source_digest: projectionPlan.canonical_source_digest,
+    renderer_id: projectionPlan.renderer_id,
+    renderer_version: projectionPlan.renderer_version,
+    renderer_profile: projectionPlan.renderer_profile,
+    plan_shaping_options: projectionPlan.plan_shaping_options,
+    renderer_inputs_digest: rendererInputsDigest,
+    managed_inventory_digest: managedInventoryDigest,
+  });
+  if (projectionPlan.fingerprint !== expectedFingerprint) findings.push({ path: "projection_plan", status: "fingerprint_mismatch" });
   for (const input of projectionPlan.renderer_inputs?.canonical ?? []) {
     if (typeof input?.path !== "string" || input.path.startsWith("/") || input.path.split(/[\\/]/).includes("..") || !/^sha256:[a-f0-9]{64}$/.test(input.digest ?? "")) {
       findings.push({ path: String(input?.path), status: "invalid_projection_input" });
@@ -150,6 +228,8 @@ export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {
       if (!managedBlock || hashText(managedBlock) !== blockRecord?.sha256) findings.push({ path: input.path, status: "managed_block_drift" });
       continue;
     }
+    const skillMatch = input.path.match(/^skills\/([a-z0-9][a-z0-9-]*)\/SKILL\.md$/u);
+    if (skillMatch && !selectedSkillSet.has(skillMatch[1])) continue;
     const sourcePath = resolve(target, input.path);
     if (!existsSync(sourcePath)) {
       if (input.path.startsWith("skills/")) findings.push({ path: input.path, status: "missing" });
@@ -159,6 +239,40 @@ export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {
     if (actualSha256 !== input.digest) {
       findings.push({ path: input.path, status: "drift", expected_sha256: input.digest, actual_sha256: actualSha256 });
     }
+  }
+  return findings;
+}
+
+export function inspectCodexPromptContractBindings(target, state = {}, prompt, promptRecord = null) {
+  const findings = [];
+  const registryPath = "schemas/fixed-entry-profile-registry.json";
+  const registry = readJsonIfExists(resolve(target, registryPath));
+  const expectedContracts = registry.ok ? registry.value?.entries?.[prompt]?.requested_contracts : null;
+  if (!Array.isArray(expectedContracts) || expectedContracts.length === 0 || new Set(expectedContracts).size !== expectedContracts.length) {
+    findings.push({ path: registryPath, status: registry.ok ? "invalid_prompt_contract_registry" : "prompt_contract_registry_unavailable" });
+    return findings;
+  }
+  const requiredSkills = promptRecord?.required_skills;
+  if (!Array.isArray(requiredSkills) || requiredSkills.length === 0 || new Set(requiredSkills).size !== requiredSkills.length) {
+    findings.push({ path: prompt, status: "invalid_required_skill_inventory" });
+    return findings;
+  }
+  const requestedContracts = promptRecord?.compact_profile?.requested_contracts;
+  if (JSON.stringify(requestedContracts) !== JSON.stringify(expectedContracts)) {
+    findings.push({ path: prompt, status: "compact_requested_contracts_mismatch" });
+  }
+  const selectedSkillSet = new Set(Array.isArray(state.selected_skills) ? state.selected_skills : []);
+  const projectedSkillSet = new Set((state.projection_plan?.projected_managed_assets ?? []).flatMap((asset) => {
+    if (asset?.asset_kind !== "skills" || typeof asset.path !== "string") return [];
+    const match = asset.path.match(/^\.agents\/skills\/([a-z0-9][a-z0-9-]*)\/SKILL\.md$/u);
+    return match ? [match[1]] : [];
+  }));
+  for (const contract of expectedContracts) {
+    if (!requiredSkills.includes(contract)) findings.push({ path: contract, status: "canonical_required_skill_missing" });
+  }
+  for (const skill of requiredSkills) {
+    if (!selectedSkillSet.has(skill)) findings.push({ path: skill, status: "required_skill_not_selected" });
+    if (!projectedSkillSet.has(skill)) findings.push({ path: skill, status: "required_skill_not_projected" });
   }
   return findings;
 }
@@ -224,6 +338,14 @@ export function parseCodexCompactProfileHeader(content) {
       profile_fingerprint: typeof parsed.p === "string" ? `sha256:${parsed.p}` : null,
       requested_contracts: typeof parsed.rc === "string" ? parsed.rc.split(",").filter(Boolean) : [],
       control_ids: typeof parsed.ci === "string" ? parsed.ci.split(",").filter(Boolean) : [],
+      canonical_asset_ref_digest: typeof parsed.a === "string" ? `sha256:${parsed.a}` : null,
+      canonical_asset_refs: Array.isArray(parsed.ar) ? parsed.ar.map((reference) => ({
+        asset_type: reference.t,
+        stable_id: reference.id,
+        version: reference.v,
+        record_digest: typeof reference.r === "string" ? `sha256:${reference.r}` : null,
+        content_digest: typeof reference.c === "string" ? `sha256:${reference.c}` : null,
+      })) : [],
     };
   } catch {
     return null;
@@ -232,6 +354,16 @@ export function parseCodexCompactProfileHeader(content) {
 
 export function hashText(text) {
   return createHash("sha256").update(text).digest("hex");
+}
+
+function stableCanonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableCanonicalJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableCanonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+function canonicalValueDigest(value) {
+  return `sha256:${hashText(stableCanonicalJson(value ?? null))}`;
 }
 
 export function hashFile(path) {

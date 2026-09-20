@@ -26,8 +26,76 @@
       "argv": ["node", "scripts/test-validate-repo.mjs"]
     },
     {
+      "id": "review_route_contract",
+      "argv": ["node", "scripts/test-review-route.mjs"]
+    },
+    {
+      "id": "execution_envelope_record",
+      "argv": ["node", "scripts/test-execution-envelope-record.mjs"]
+    },
+    {
+      "id": "codex_runner_execution_envelope_conformance",
+      "argv": ["node", "scripts/test-codex-runner-execution-envelope-conformance.mjs"]
+    },
+    {
+      "id": "managed_json_schema_validation",
+      "argv": ["node", "scripts/test-json-schema-validation.mjs"]
+    },
+    {
+      "id": "codex_exact_risk_approval",
+      "argv": ["node", "scripts/test-codex-risk-approval.mjs"]
+    },
+    {
+      "id": "review_decision_matrix",
+      "argv": ["node", "scripts/test-review-decision-matrix.mjs"]
+    },
+    {
+      "id": "claim_evidence_status_contract",
+      "argv": ["node", "scripts/test-claim-evidence-status.mjs"]
+    },
+    {
+      "id": "skill_effectiveness_outcome_contract",
+      "argv": ["node", "scripts/test-skill-effectiveness-outcome.mjs"]
+    },
+    {
+      "id": "verification_proof_policy",
+      "argv": ["node", "scripts/test-verification-proof-policy.mjs"]
+    },
+    {
       "id": "epic_admission_work_package_plan",
       "argv": ["node", "scripts/test-epic-admission-work-package-plan.mjs"]
+    },
+    {
+      "id": "content_addressed_store",
+      "argv": ["node", "scripts/test-content-addressed-store.mjs"]
+    },
+    {
+      "id": "asset_registry_contract",
+      "argv": ["node", "scripts/test-asset-registry.mjs"]
+    },
+    {
+      "id": "asset_registry_sample_check",
+      "argv": ["node", "scripts/asset-registry-samples.mjs", "--check"]
+    },
+    {
+      "id": "portfolio_manager_contract",
+      "argv": ["node", "scripts/test-portfolio-manager.mjs"]
+    },
+    {
+      "id": "portfolio_manager_sample_check",
+      "argv": ["node", "scripts/portfolio-manager-samples.mjs", "--check"]
+    },
+    {
+      "id": "evolution_loop_contract",
+      "argv": ["node", "scripts/test-evolution-loop.mjs"]
+    },
+    {
+      "id": "evolution_loop_integration",
+      "argv": ["node", "scripts/test-evolution-loop-integration.mjs"]
+    },
+    {
+      "id": "evolution_loop_sample_check",
+      "argv": ["node", "scripts/evolution-loop-samples.mjs", "--check"]
     },
     {
       "id": "portfolio_catalog",
@@ -66,6 +134,30 @@
       "argv": ["node", "scripts/test-ask-benchmark-evaluator-boundary.mjs"]
     },
     {
+      "id": "mp_ci_evidence_gap_review_archive",
+      "argv": ["node", "scripts/test-ask-benchmark-mp-ci-evidence-gap-review-archive.mjs"]
+    },
+    {
+      "id": "mp_accessibility_interaction_review_archive",
+      "argv": ["node", "scripts/test-ask-benchmark-mp-accessibility-interaction-review-review-archive.mjs"]
+    },
+    {
+      "id": "mp_data_migration_handoff_review_archive",
+      "argv": ["node", "scripts/test-ask-benchmark-mp-data-migration-handoff-review-archive.mjs"]
+    },
+    {
+      "id": "mp_frontend_state_review_archive",
+      "argv": ["node", "scripts/test-ask-benchmark-mp-frontend-state-review-archive.mjs"]
+    },
+    {
+      "id": "mp_iac_rollback_design_review_archive",
+      "argv": ["node", "scripts/test-ask-benchmark-mp-iac-rollback-design-review-archive.mjs"]
+    },
+    {
+      "id": "mp_performance_investigation_review_archive",
+      "argv": ["node", "scripts/test-ask-benchmark-mp-performance-investigation-review-archive.mjs"]
+    },
+    {
       "id": "portfolio_score",
       "argv": ["node", "scripts/test-ask-benchmark-portfolio-score.mjs"]
     },
@@ -80,6 +172,10 @@
     {
       "id": "portfolio_paired_comparison_report",
       "argv": ["node", "scripts/test-ask-benchmark-portfolio-paired-comparison-report.mjs"]
+    },
+    {
+      "id": "portfolio_aggregate_result",
+      "argv": ["node", "scripts/test-ask-benchmark-portfolio-aggregate-result.mjs"]
     },
     {
       "id": "portfolio_directional_outcome_report",

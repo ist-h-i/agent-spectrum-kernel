@@ -168,6 +168,7 @@ The secret-free `validate_execute` job reads `.github/ask-automation/validation-
 - syntax checks for changed `.mjs` files;
 - `node scripts/test-ask-autonomous-development.mjs` from the protected target checkout;
 - `node scripts/test-validate-repo.mjs` in the development checkout;
+- the canonical Execution Envelope record test and isolated installed-runner conformance test for all five managed Codex prompt modes;
 - `node scripts/test-epic-admission-work-package-plan.mjs` for admission policy, current plan, DAG, scope, ownership, topology, and fail-closed fixtures;
 - the catalog, policy, design-admission, independent-design-review, general benchmark, execution, normalized-result, and evaluator-boundary control tests;
 - `node scripts/adapter-runtime-bundle.mjs --check`;

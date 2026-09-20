@@ -51,7 +51,7 @@ node scripts/install-claude-adapter.mjs --target /path/to/project --detach
 
 The Claude adapter requires `.agent-spectrum-kernel/install-state.json` from the core installer. If the core state is missing, the adapter fails before writing `.claude/`.
 
-The adapter records `.agent-spectrum-kernel/claude-install-state.json` with managed file hashes, managed hook identifiers, partial-file hashes for `.claude/settings.json`, selected profile, previous successful state, and rollback snapshot. `--prune` removes stale unmodified managed assets. `--detach` removes projected Claude execution surfaces and adapter-owned hooks while preserving metrics, reports, and ledgers by default.
+The adapter records `.agent-spectrum-kernel/claude-install-state.json` with managed file hashes, generated fixed-entry metadata and exact registered Asset refs, managed hook identifiers, partial-file hashes for `.claude/settings.json`, selected profile, previous successful state, and rollback snapshot. `--prune` removes stale unmodified managed assets. `--detach` removes projected Claude execution surfaces and adapter-owned hooks while preserving metrics, reports, and ledgers by default.
 
 The installer does not enable external publication. It does not create secrets, tokens, webhooks, or cloud telemetry destinations.
 
@@ -77,9 +77,13 @@ Supported profiles:
 | `observability` | Report, ledger refresh, verification, and handoff commands plus local metrics/evaluation skills. |
 | `full` | All manifest skills and all Claude project commands. This is the default. |
 
-Profiles are closed over command requirements, skill dependencies, managed contract assets, and normal router-reachable routes for their task scope. `spec-driven-development` requires `work-package-compiler`; an advanced override that omits it fails before writes. For example, `implementation` includes routes such as `repository-orientation`, `scope-control`, `application-boundary-architecture`, `grill-design`, `grill-with-docs`, and `planning-with-files`. Durable domain-rule work requires an explicit knowledge-plane profile or advanced override.
+Profiles are closed over unconditional command requirements, skill dependencies, managed contract assets, and profile-declared available routes. `spec-driven-development` requires `work-package-compiler`; an advanced override that omits it fails before writes. For example, `implementation` includes routes such as `repository-orientation`, `scope-control`, `application-boundary-architecture`, `grill-design`, `grill-with-docs`, and `planning-with-files`. A conditional fixed-entry route omitted by a bounded projection remains explicit but fail-closed. Durable domain-rule work requires an explicit knowledge-plane profile or advanced override.
 
-Use `--skills <csv>` only as an advanced override. The installer fails before writing files if the override is not closed over the selected profile's commands and router-reachable skills.
+### Fixed entries
+
+`skill-implement.md`, `skill-investigate.md`, `skill-review.md`, `skill-verify.md`, and `skill-handoff.md` are adapter-owned templates rendered from the shared five-entry registry and six-control map. Their mode is already fixed, so they select `controlled-implementation`, `doubt-driven-development`, `review-router`, `test-first-verification`, or `handoff-generation` directly without `operating-mode-router` or `skill-router`. Conditional secondary contracts remain explicit; an unavailable selected contract stops as `capability_missing`. Generated metadata uses adapter runtime profile schema `1.2.0` and retains the two exact candidate Asset tuples from the verified local registry. Registration does not activate a candidate Asset or alter a portfolio.
+
+Use `--skills <csv>` only as an advanced override. The installer fails before writing files if the override omits an unconditional selected-command dependency. Omitted conditional fixed-entry capabilities are recorded as `capability_missing` and stop only if that trigger is selected.
 
 ## Installed Skills
 
@@ -126,11 +130,13 @@ Claude Code project skills load from `.claude/skills/<skill-name>/SKILL.md` and 
 
 The Requirement-to-Rule Loop and full-layer intelligence skills are projected by default so teams can move from candidate discovery to Requirement Contract, Work Package, domain review, reusable implementation/verification/review/documentation/architecture memory, and capability evaluation without copying extra skill files manually. Projection only makes skills available; routing still loads them only when relevant.
 
+`evidence-ledger` follows the same availability/activation boundary. Ordinary commands apply `ask.claim-evidence-status@1.0.0` inline. A separate formal ledger is selected only when an explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs triggers it. Claude commands remain explicit `inline_required` Execution Envelope compatibility because the Stop collector consumes `last_assistant_message`; the project and plugin must not advertise a runner-owned sidecar.
+
 ## Project Commands
 
 The project adapter installs local command templates for common daily workflows:
 
-- `/skill-review`: layered PR or diff review through `review-router` and `review-final-merge-gate`.
+- `/skill-review`: PR or diff review through one `review-ai-quality` baseline, exact-signal additional gates, and `review-final-merge-gate` only when a final decision is requested.
 - `/skill-implement`: scoped implementation through `skill-router`, `test-first-verification`, and `controlled-implementation`.
 - `/skill-investigate`: bug, regression, performance, or unknown-root-cause work through `doubt-driven-development` and verification.
 - `/skill-verify`: focused verification and evidence classification before readiness or correctness claims.
@@ -170,6 +176,7 @@ Operational boundary:
 
 - Project adapter: owns `.claude/skills/`, `.claude/commands/`, `.claude/settings.json` managed hooks, local runtime scripts, and project-local metrics files.
 - Plugin: owns plugin-packaged commands/hooks and resolves its metrics wrapper through `CLAUDE_PLUGIN_ROOT`.
+- The plugin bundles generated `implement`, `investigate`, `review-pr`, `verify`, and `handoff` fixed entries plus byte-exact claim-evidence contract/schema, formal-ledger Skill, and normalizer projections. Ordinary entry points use inline claim discipline; only a closed trigger activates the bundled formal ledger (`review-pr` uses `high_stakes_readiness`).
 - Local metrics recording requires the project runtime. Plugin hooks no-op when the project runtime is not present.
 - Project and plugin Stop hooks may coexist: the runtime-owned collector uses deterministic event IDs and idempotent upsert to prevent duplicate local rows.
 

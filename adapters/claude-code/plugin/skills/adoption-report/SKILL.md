@@ -6,6 +6,8 @@ description: Generate a local adoption and debt movement report from project-loc
 
 Use `skill-adoption-metrics`, `docs/metrics-event-contract.md`, and `docs/ai/adoption-report-template.md`.
 
+Read `${CLAUDE_PLUGIN_ROOT}/contracts/claim-evidence-status-contract.md` and `${CLAUDE_PLUGIN_ROOT}/schemas/claim-evidence-status.schema.json`. This report audits multiple material claims, so the exact `multiple_material_claims` trigger selects `formal_ledger`; apply `/ai-skills:evidence-ledger`. Installed capability availability alone is not activation.
+
 Read project-local evidence only:
 
 - runtime-owned `ask-runtime/metrics/events.jsonl`

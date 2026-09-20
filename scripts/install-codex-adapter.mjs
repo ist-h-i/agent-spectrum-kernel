@@ -16,7 +16,7 @@ const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const PLANE_ORDER = ["execution", "knowledge", "control"];
 const DEFAULT_PROFILE = "implementation";
 const CANONICAL_REGISTRY_PATH = "schemas/review-signal-gate-map.json";
-const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_IMMUTABLE_CONTRACT_ASSETS;
+const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_OWNED_IMMUTABLE_ASSETS;
 const CORE_PRESERVE_PATHS = [CANONICAL_REGISTRY_PATH, ...CORE_OWNED_IMMUTABLE_ASSETS];
 const PROMPT_TEMPLATES = [
   "skill-implement.md",
@@ -32,23 +32,22 @@ const PROMPT_METADATA = {
   "skill-implement.md": {
     label: "Implementation",
     execution: CODEX_PROMPT_CONTRACTS["skill-implement.md"],
-    requiredSkills: ["controlled-implementation", "test-first-verification", "evidence-ledger", "risk-gate"],
+    requiredSkills: ["controlled-implementation", "test-first-verification", "risk-gate"],
     recommendedSkills: [],
     requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-investigate.md": {
     label: "Investigation",
     execution: CODEX_PROMPT_CONTRACTS["skill-investigate.md"],
-    requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
+    requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation", "risk-gate"],
     recommendedSkills: [],
   },
   "skill-review.md": {
     label: "Review",
     execution: CODEX_PROMPT_CONTRACTS["skill-review.md"],
-    requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
+    requiredSkills: ["review-router", "review-ai-quality", "review-final-merge-gate", "risk-gate"],
     recommendedSkills: [
       "review-automated-gate",
-      "review-ai-quality",
       "review-code-health",
       "review-domain-impact",
       "review-architecture-impact",
@@ -57,19 +56,19 @@ const PROMPT_METADATA = {
       "review-finding-compiler",
       "improvement-ledger",
     ],
-    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-traceability-contract.md"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-traceability-contract.md", "docs/review-finding-contract.md", "schemas/review-finding.schema.json"],
   },
   "skill-verify.md": {
     label: "Verification",
     execution: CODEX_PROMPT_CONTRACTS["skill-verify.md"],
-    requiredSkills: ["test-first-verification", "evidence-ledger", "risk-gate"],
+    requiredSkills: ["test-first-verification", "risk-gate"],
     recommendedSkills: [],
     requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-handoff.md": {
     label: "Handoff",
     execution: CODEX_PROMPT_CONTRACTS["skill-handoff.md"],
-    requiredSkills: ["handoff-generation", "evidence-ledger", "risk-gate"],
+    requiredSkills: ["handoff-generation", "risk-gate"],
     recommendedSkills: [],
   },
 };
@@ -90,8 +89,13 @@ const SKILL_RELATIONSHIPS = {
     recommends: ["controlled-implementation"],
     incompatibleWith: [],
   },
+  "review-router": {
+    requires: ["review-ai-quality"],
+    recommends: ["review-final-merge-gate"],
+    incompatibleWith: [],
+  },
   "review-final-merge-gate": {
-    requires: ["review-router"],
+    requires: ["review-router", "review-ai-quality"],
     recommends: ["evidence-ledger"],
     incompatibleWith: [],
   },
@@ -106,17 +110,17 @@ const SKILL_RELATIONSHIPS = {
     incompatibleWith: [],
   },
   "skill-adoption-metrics": {
-    requires: ["evidence-ledger"],
+    requires: [],
     recommends: [],
     incompatibleWith: [],
   },
   "skill-effectiveness-evaluation": {
-    requires: ["evidence-ledger"],
+    requires: [],
     recommends: [],
     incompatibleWith: [],
   },
   "engineering-capability-evaluation": {
-    requires: ["evidence-ledger"],
+    requires: [],
     recommends: [],
     incompatibleWith: [],
   },
@@ -250,7 +254,7 @@ const PROFILE_ROUTING_FIXTURES = {
   ],
   investigation: [
     { id: "delivery_quality_mode", signal: "Investigation request is classified as delivery_quality", router: "operating-mode-router", selected_route: "skill-router", requiredSkills: ["skill-router"] },
-    { id: "bug_investigation", signal: "Bug, regression, or unknown root cause", router: "skill-router", selected_route: "doubt-driven-development", requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger"] },
+    { id: "bug_investigation", signal: "Bug, regression, or unknown root cause", router: "skill-router", selected_route: "doubt-driven-development", requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation"] },
     { id: "unfamiliar_repository", signal: "Unfamiliar repository before investigation", router: "skill-router", selected_route: "repository-orientation", requiredSkills: ["repository-orientation"] },
     { id: "unclear_scope", signal: "Investigation scope or blast radius is unclear", router: "skill-router", selected_route: "scope-control", requiredSkills: ["scope-control"] },
     { id: "boundary_decision", signal: "Root cause or fix path needs an application boundary decision", router: "skill-router", selected_route: "application-boundary-architecture", requiredSkills: ["application-boundary-architecture"] },
@@ -273,7 +277,6 @@ const PROFILE_ROUTING_FIXTURES = {
         "review-output-quality",
         "review-adversarial-risk",
         "review-final-merge-gate",
-        "evidence-ledger",
         "risk-gate",
         "adr-review",
         "improvement-ledger",
@@ -302,21 +305,21 @@ const PROFILE_ROUTING_FIXTURES = {
       signal: "One-task skill or routing effectiveness evaluation",
       router: "operating-mode-router",
       selected_route: "skill-effectiveness-evaluation",
-      requiredSkills: ["skill-effectiveness-evaluation", "evidence-ledger"],
+      requiredSkills: ["skill-effectiveness-evaluation"],
     },
     {
       id: "adoption_metrics",
       signal: "Adoption maturity, usage metrics, or multi-task adoption impact",
       router: "operating-mode-router",
       selected_route: "skill-adoption-metrics",
-      requiredSkills: ["skill-adoption-metrics", "evidence-ledger"],
+      requiredSkills: ["skill-adoption-metrics"],
     },
     {
       id: "capability_evaluation",
       signal: "Evidence-backed full-layer engineering capability evaluation",
       router: "operating-mode-router",
       selected_route: "engineering-capability-evaluation",
-      requiredSkills: ["engineering-capability-evaluation", "evidence-ledger"],
+      requiredSkills: ["engineering-capability-evaluation"],
     },
   ],
   full: [],
@@ -449,8 +452,10 @@ function validateCoreInstalled(target, statePath, requiredAssets) {
     const sourceContent = readText(resolve(REPO_ROOT, asset));
     const record = state?.managed_files?.[asset];
     const targetPath = resolve(target, asset);
-    if (record?.kind !== "immutable_contract" || record.sha256 !== hashText(sourceContent) || !existsSync(targetPath) || hashText(readText(targetPath)) !== record.sha256) {
-      throw new Error(`ASK core immutable contract is missing or stale: ${asset}. Re-run scripts/install-kernel.mjs before installing the Codex adapter.`);
+    const kind = lifecycle.coreImmutableAssetKind(asset);
+    const label = kind === "immutable_runtime" ? "runtime" : "contract";
+    if (record?.kind !== kind || record.sha256 !== hashText(sourceContent) || !existsSync(targetPath) || hashText(readText(targetPath)) !== record.sha256) {
+      throw new Error(`ASK core immutable ${label} is missing or stale: ${asset}. Re-run scripts/install-kernel.mjs before installing the Codex adapter.`);
     }
   }
   return state;
@@ -803,13 +808,15 @@ function resolveCodexProjectionSelection({ profileName, skills = null, skipPromp
   const prompts = skipPrompts ? [] : [...resolvedProfile.prompts];
   const commands = skipCommand ? [] : [...resolvedProfile.commands];
   const skillSeed = skills ?? resolvedProfile.skills;
-  const routingFixtures = routingFixturesForProfile(profileName, skillSeed, prompts);
+  const routingFixtures = routingFixturesForProfile(profileName, skillSeed, prompts, { customSelection: skills !== null });
   const requiredSkills = computeRequiredClosure(skillSeed, prompts, routingFixtures);
   const selectedSkills = [...(skills ?? requiredSkills)].sort();
   validateSkillNames(selectedSkills, [...manifest.skills].sort());
   validateSkillClosure({ selectedSkills, requiredSkills, profileName });
   const requiredAssets = [...new Set([
+    "scripts/json-schema-validation.mjs",
     "schemas/execution-envelope.schema.json",
+    "schemas/execution-envelope-record.schema.json",
     ...requiredAssetsForPrompts(prompts),
     ...requiredAssetsForSkills(selectedSkills),
   ])].sort();
@@ -828,12 +835,13 @@ function codexRendererInputsForSelection({ prompts, commands, skills, requiredAs
     { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
     ...prompts.flatMap((prompt) => codexCompactProfileCanonicalPaths(prompt).map((path) => ({ path, role: path.startsWith("skills/") ? "skill" : path.startsWith("schemas/") ? "schema" : path === "AGENTS.md" ? "kernel" : "contract" }))),
     ...skills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
-    ...requiredAssets.map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : "contract" })),
+    ...requiredAssets.map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : path.endsWith(".mjs") ? "runtime_source" : "contract" })),
     ...runtimeFiles.filter((file) => file.assetKind === "schemas").map((file) => ({ path: file.source, role: "schema" })),
   ];
   const adapterOwned = [
     { path: "scripts/install-codex-adapter.mjs", role: "renderer" },
     { path: "scripts/codex-runtime-profile.mjs", role: "renderer" },
+    ...(prompts.length > 0 ? [{ path: "scripts/fixed-entry-profile.mjs", role: "renderer" }] : []),
     { path: "scripts/installer-lifecycle.mjs", role: "runtime_source" },
     { path: "scripts/adapter-runtime-inventory.mjs", role: "inventory" },
     ...prompts.map((prompt) => ({ path: `adapters/codex/prompts/${prompt}`, role: "prompt_template" })),
@@ -895,10 +903,6 @@ export function buildCodexProjectionPlan({ profileName, skills = null, skipPromp
   const compactProfileArtifacts = selection.prompts.map((prompt) => renderCodexCompactProfile(prompt, {
     canonicalContract,
     profileFingerprint: provenance.fingerprint,
-    additionalRequestedContracts: profileName === "organizational" && prompt === "skill-implement.md"
-      ? ["operating-mode-router", "domain-rule-ledger"]
-      : [],
-    knowledgePromotion: profileName === "organizational" && prompt === "skill-implement.md",
   }));
   const compactProfiles = compactProfileArtifacts.map((artifact) => artifact.metadata);
   return { ...selection, ...provenance, compactProfiles, compactProfileArtifacts, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };
@@ -923,9 +927,10 @@ function recommendedSkillsForPrompts(prompts) {
   return prompts.flatMap((prompt) => PROMPT_METADATA[prompt]?.recommendedSkills ?? []);
 }
 
-function routingFixturesForProfile(profileName, seedSkills, promptTemplates) {
+function routingFixturesForProfile(profileName, seedSkills, promptTemplates, { customSelection = false } = {}) {
   const selectedRouters = new Set([...seedSkills, ...requiredSkillsForPrompts(promptTemplates)]);
-  const routedFixtures = (PROFILE_ROUTING_FIXTURES[profileName] ?? [])
+  const profileFixtures = PROFILE_ROUTING_FIXTURES[profileName] ?? [];
+  const routedFixtures = profileFixtures
     .filter((fixture) => selectedRouters.has(fixture.router))
     .map((fixture) => ({
       id: fixture.id,
@@ -936,15 +941,24 @@ function routingFixturesForProfile(profileName, seedSkills, promptTemplates) {
       recommended_profile: fixture.recommendedProfile ?? null,
       required_skills: [...(fixture.requiredSkills ?? [])].sort(),
     }));
-  const directFixtures = promptTemplates.flatMap((prompt) => codexDirectTriggersForPrompt(prompt).map((trigger) => ({
-    id: trigger.id,
-    signal: trigger.signal,
-    router: "compact-profile-direct-trigger",
-    selected_route: trigger.contract,
-    outcome: "available",
-    recommended_profile: null,
-    required_skills: [trigger.contract],
-  })));
+  const availableCapabilities = new Set(selectedRouters);
+  for (const fixture of customSelection ? [] : profileFixtures) {
+    if (fixture.outcome === "capability_missing") continue;
+    if (fixture.selected_route) availableCapabilities.add(fixture.selected_route);
+    for (const skill of fixture.requiredSkills ?? []) availableCapabilities.add(skill);
+  }
+  const directFixtures = promptTemplates.flatMap((prompt) => codexDirectTriggersForPrompt(prompt).map((trigger) => {
+    const available = availableCapabilities.has(trigger.contract);
+    return {
+      id: trigger.id,
+      signal: trigger.signal,
+      router: "compact-profile-direct-trigger",
+      selected_route: trigger.contract,
+      outcome: available ? "available" : "capability_missing",
+      recommended_profile: available ? null : "organizational",
+      required_skills: available ? [trigger.contract] : [],
+    };
+  }));
   return [...new Map([...routedFixtures, ...directFixtures].map((fixture) => [fixture.id, fixture])).values()];
 }
 
@@ -1047,10 +1061,10 @@ function commandSectionForPrompt(prompt) {
     return `## ${metadata.label}
 
 \`\`\`bash
-node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox} --diff-base origin/main...HEAD --output codex-review.md
+node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox} --diff-base origin/main...HEAD --gates-observed --output codex-review.md
 \`\`\`
 
-Treat this as diff-only review unless the runner output also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.`;
+When the diff has a mapped signal, remove \`--gates-observed\` and replace it with repeated exact \`--observed-signal <id>\` arguments; the runner derives additional gates from the canonical registry. Never combine \`--gates-observed\` with \`--observed-signal\`. Treat this as diff-only review unless the runner output also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.`;
   }
   if (prompt === "skill-implement.md") {
     return `## ${metadata.label}
@@ -1210,7 +1224,10 @@ function buildPlan(args) {
     managedFiles[relativePath] = {
       ...lifecycle.createManagedFileRecord({ kind: "codex_prompt", prompt, content }),
       prompt,
-      required_skills: [...new Set([...(PROMPT_METADATA[prompt]?.requiredSkills ?? []), ...codexDirectTriggersForPrompt(prompt).map((trigger) => trigger.contract)])].sort(),
+      required_skills: [...new Set([
+        ...(PROMPT_METADATA[prompt]?.requiredSkills ?? []),
+        ...codexDirectTriggersForPrompt(prompt).map((trigger) => trigger.contract).filter((skill) => selectedSkills.has(skill)),
+      ])].sort(),
       recommended_skills: [...(PROMPT_METADATA[prompt]?.recommendedSkills ?? [])].sort(),
       compact_profile: renderedProfile.metadata,
       content,

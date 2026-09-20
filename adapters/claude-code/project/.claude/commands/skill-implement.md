@@ -1,28 +1,32 @@
 ---
-description: Route and execute a scoped implementation through the Agent Spectrum Kernel.
+description: Implement a scoped change through the fixed-entry Agent Spectrum Kernel profile.
 ---
 
-Use the installed project skills from this repository projection.
+Fixed implementation entry. Primary contract: `controlled-implementation`; apply it with `test-first-verification` and `risk-gate`.
 
-Start with `/skill-router` unless the user already named a more specific skill. For behavior changes, define a Verification Contract with `/test-first-verification`, then use `/controlled-implementation` for the edit loop.
+{{ASK_COMPACT_CONTROLS}}
 
-Keep the change boundary narrow:
+{{ASK_COMPACT_DIRECT_TRIGGERS}}
 
-- require approval for the specific action and stop without that approval before any risk-gated action
-- when required evidence is missing, report `insufficient_evidence` and stop; do not infer the missing result
-- do not start or delegate agents unless the request explicitly requires agent activity; report started, completed, and failed counts
-- classify the task and risk before editing
-- follow `docs/lifecycle-artifact-contract.md`; reference upstream Requirement, Spec, Work Package, and Verification artifacts instead of copying unchanged fields
-- read nearby repository patterns first
-- consume allowed and forbidden scope from the Work Package, or use the compact path when no package is required
-- record changed assumptions, acceptance criteria, scope, or proof obligations as explicit deltas with decision evidence
-- use `/risk-gate` before destructive, external, secret, production, auth, dependency, migration, billing, email, or infra-impacting actions
-- verify the observable behavior before claiming completion
-- use `/evidence-ledger` for correctness, readiness, safety, reliability, performance, or no-regression claims
-- emit exactly one fenced JSON `Execution Envelope` per task boundary using `docs/execution-envelope-contract.md`; keep implementation details in the skill artifact
+[agent_activity] opt-in; report started/completed/failed.
 
-The Implementation Contract preserves the canonical header (`Artifact ID`, `Artifact type: implementation`, and `Upstream refs`) and records only implementation decisions not fixed upstream, actual change boundary, verification attempts, evidence refs, remaining limitations, handoff state, and any present deviation/discovery/delta.
+For behavior change, use `compact_proof` only with complete localized eligibility; otherwise use `formal_verification_contract`. Link upstream refs without copying them.
+Use `docs/lifecycle-artifact-contract.md` for the Implementation Contract shape.
 
-Do not deploy, publish, release, send notifications, change secrets, or mutate production configuration from this command.
+Implementation Contract:
+- Artifact ID:
+- Artifact type: implementation
+- Upstream refs:
+- Files/components and boundary:
+- Verification attempted:
+- Evidence references:
+- Selected proof ref:
+- Handoff state:
+
+Evidence:
+- Implementation Contract ref:
+- command/observation and exact result:
+
+Emit one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`. No deploy/publish/release/notification/secret/production mutation.
 
 $ARGUMENTS

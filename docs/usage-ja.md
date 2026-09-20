@@ -53,7 +53,7 @@ git pull
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 ```
 
-`scripts/install-kernel.mjs` は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、`.agent-spectrum-kernel/install-state.json` を更新します。導入先の独自 `AGENTS.md` 本文は保持します。managed file は前回stateのhashと導入先の現在hashが一致する場合だけ更新し、ローカル改変がある場合は `--force` なしでは失敗します。`--check`、`--dry-run`、`--prune`、`--rollback`、`--detach` を使えます。
+`scripts/install-kernel.mjs` は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、immutable contract/schema、core-ownedの `scripts/json-schema-validation.mjs` と `scripts/skill-effectiveness-outcome.mjs`、`.agent-spectrum-kernel/install-state.json` を更新します。2つのscriptは `immutable_runtime` であり、adapterは参照しても所有・prune・detachしません。導入先の独自 `AGENTS.md` 本文は保持します。managed file は前回stateのhashと導入先の現在hashが一致する場合だけ更新し、ローカル改変がある場合は `--force` なしでは失敗します。`--check`、`--dry-run`、`--prune`、`--rollback`、`--detach` を使えます。
 
 Codex のrepo-scoped skill surfaceも使う場合は、Codex adapter installerを使います。
 
@@ -62,7 +62,7 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-このinstallerは profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile daily|organizational|minimal|implementation|investigation|review|adoption|observability|full` を使います。`daily` と `organizational` はそれぞれmanifestの `daily_delivery` と `organizational_intelligence` projection packを使います。`--skills <csv>` は advanced override で、選択 prompt / command、router到達可能route、指定 skill 依存の必須 skill 閉包を満たさない場合は書き込み前に失敗します。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。Codex用のローカル投影だけを行い、hook、telemetry、外部公開、GitHub Actions は作りません。
+このinstallerは profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex-owned runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。Execution Envelope transportはadapter-ownedですが、shared Schema engineは常に、Skill effectiveness semantic CLIはそのSkill選択時に、core stateの完全性を検査して利用します。default は `implementation` profile です。通常は `--profile daily|organizational|minimal|implementation|investigation|review|adoption|observability|full` を使います。`daily` と `organizational` はそれぞれmanifestの `daily_delivery` と `organizational_intelligence` projection packを使います。`--skills <csv>` は advanced override で、選択 prompt / command、router到達可能route、指定 skill 依存の必須 skill 閉包を満たさない場合は書き込み前に失敗します。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。Codex用のローカル投影だけを行い、hook、telemetry、外部公開、GitHub Actions は作りません。
 
 Codex の非対話実行は、導入された runner 経由で行います。
 
@@ -345,25 +345,25 @@ doubt-driven-development を使って、最初の仮説に飛びつかず、反�
 
 ```text
 review-router
+review-ai-quality（必須baseline）
 review-automated-gate
-review-ai-quality
 review-architecture-impact if needed
 review-output-quality if needed
 review-adversarial-risk if needed
 review-domain-impact if needed
 adr-review if needed
 risk-gate if needed
-evidence-ledger if needed
-review-final-merge-gate
+evidence-ledger only for a closed formal-audit trigger
+review-final-merge-gate if a final merge decision is requested
 ```
 
 例:
 
 ```text
-review-router を使ってこのdiffの Change signals を抽出し、必要ゲートを選んでください。必要なレビュー後に review-final-merge-gate で approve/request changes/block の判断を出してください。
+review-router を使ってこのdiffをレビューしてください。必ず1件のreview-ai-quality baselineを出し、観測した正確なsignal IDから必要な追加gateだけを選んでください。merge判断も必要なので、最後にreview-final-merge-gateでapprove/request changes/blockを判断してください。
 ```
 
-`review-router` は、まず観測した Change signals を抽出し、そこから Required gates を選びます。通常出力では影響のない層を列挙せず、重いゲートをスキップした場合だけ観測根拠を残します。diff・context・output・verification が不足している場合は skipped ではなく `insufficient evidence` とします。完全な層診断は検証・debug 用に限定します。
+`review-router` は、すべての評価レビューに1件の `review-ai-quality` baselineを置きます。その後、観測した正確なsignal IDから追加gateだけを選びます。通常出力では、選ばれなかったgateや空のcategoryを列挙しません。diff・context・output・verificationが不足している場合は、該当判断を `insufficient evidence` とします。完全な適用診断はdebug用に限定します。
 
 `review-architecture-impact` は、dependency direction、module boundary、public API、persistence / infrastructure、ownership / lifecycle、cross-module coupling などの構造影響をレビューします。詳細な境界メカニクスは `application-boundary-architecture`、記録が必要な判断は `adr-review` に分けます。
 
@@ -371,7 +371,7 @@ review-router を使ってこのdiffの Change signals を抽出し、必要ゲ�
 
 `review-adversarial-risk` は、通常レビュー後に残る高impactの失敗経路、misuse、blast radiusを最大3件程度に絞って確認します。known issueやaccepted riskを再報告しないため、利用可能なら `docs/ai/review-context.md` を先に読みます。
 
-`review-final-merge-gate` は、Decision、Blocking evidence、Passed required gates、Insufficient evidence、Non-blocking follow-ups、Residual risk を優先して出力します。lint/testのようなMechanical passだけでは、Domain、Architecture、Output quality、Adversarial risk、Risk、Evidenceの未解決問題を上書きできません。
+`review-final-merge-gate` は、merge判断が明示的に要求された場合だけ最後に実行し、`Decision` を追加します。baselineと追加gateのfindingは共通fieldを持つ1つのimpact順一覧に統合します。lint/testのようなMechanical passだけでは、Domain、Architecture、Output quality、Adversarial risk、Risk、Evidenceの未解決問題を上書きできません。
 
 ### 繰り返しレビュー文脈
 
@@ -425,7 +425,7 @@ skill-effectiveness-evaluation for one completed task
 skill-adoption-metrics for multiple tasks or period measurement
 ```
 
-`skill-effectiveness-evaluation` は、1つの完了済みタスクでSkill選択が役に立ったか、過剰だったか、足りなかったかを根拠付きで評価します。
+`skill-effectiveness-evaluation` は、1つの完了済みタスクでSkill選択が役に立ったか、過剰だったか、足りなかったかを根拠付きで評価します。finding、requirement、claim、route decision、token、duration、artifact、実測したreworkなどをclosed catalogの元の単位で記録し、measurementとeffectを分離して7つのdimensionを独立分類します。comparison metricのimpactはreference、native-unit delta、materiality rule、effect evidenceから導出し、観測済みresourceでも比較根拠がなければeffectはUnknownです。Unknown/unavailableは0へ変換せず、独自metric、総合点、平均は作りません。結果は次の類似task workflowへの狭い提案であり、benchmark score、capability level、ROI、Asset/Portfolio更新authorityではありません。
 
 `skill-adoption-metrics` は、複数タスクや期間を対象に、instruction quality、skill usage maturity、task outcomes、quality improvement、maturity movementを見ます。raw promptは既定で保存せず、HR/personnel evaluationには使いません。
 

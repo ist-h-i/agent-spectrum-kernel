@@ -11,65 +11,40 @@ Review this diff for code-health risk. Separate current PR blockers from debt th
 Use:
 
 ```text
-review-router -> observed change signals -> review-code-health when applicable -> review-final-merge-gate -> improvement-ledger only for non-blocking follow-up
+review-router -> review-ai-quality baseline -> review-code-health for exact code-health signals -> improvement-ledger only for separately accepted follow-up
 ```
 
 ## Expected output
 
 ```text
-Change signals:
-- maintainability: The diff changes shared validation helpers and may introduce testability debt.
+Baseline review:
+- Gate: review-ai-quality
+- Status: fail
+- Evidence: changed validation helper, nearby tests, and manifest/report generation were inspected.
 
-Required gates:
-- review-code-health: assess the shared validation helper and separate current blockers from follow-up debt; triggered by maintainability.
+Additional required gates:
+- review-code-health: fail; triggered by maintainability_risk and testability_risk.
 
 Missing evidence:
 - none
 
-Code health review:
-- Gate status: pass with findings
-- Scope reviewed: changed validation helper, nearby tests, and manifest/report generation code
-- Current-PR blockers:
-  - [medium] scripts/validate-repo.mjs:120 - stale count detection misses hyphenated "N-skill" references.
-- Backlog / separate-PR candidates:
-  - [low] docs/usage-ja.md - adoption examples could be clearer, but this does not block the current fix.
-- Rule or check feedback:
-  - Candidate: add validation fixture for stale skill-count phrases if the pattern is repeated and mechanically detectable.
-- Improvement-ledger handoff:
-  - IMP candidate only for non-blocking repeated findings with evidence, impact, owner/status, refresh date, and close condition.
-
-Finding:
-- Stale count detector only matches "<number> skills".
-
-Category:
-- rule_gap
-
-Evidence:
-- scripts/validate-repo.mjs uses a count pattern that misses "current N-skill system" style phrases.
-
-Impact:
-- Quality/adoption docs can drift while validation still reports no stale count references.
-
-Severity:
-- medium
-
-Urgency:
-- now
-
-Recommended action:
-- fix now
-
-Scope guidance:
-- in current PR
-
-AI-rule feedback:
-- Add fixture coverage in validation script tests because this is mechanically detectable.
-
-Specialized signals routed:
-- Architecture: skipped; no boundary or public contract movement.
-- Adversarial/security: skipped; no abuse path or privacy risk. This is not a full security audit.
-- Evidence: required for final correctness claim.
-- Risk: skipped; no destructive or external action.
+Findings:
+- Finding ID: F-VALIDATION-001
+  Severity: major
+  Merge blocker: true
+  Practical impact: quality docs can drift while validation reports no stale count.
+  Trigger or failure trace: maintainability_risk → review-code-health → the detector misses `current N-skill system`.
+  Evidence location: scripts/validate-repo.mjs:120 and its nearby tests.
+  Required post-fix condition: recognize the hyphenated form and add a passing regression fixture.
+  Category: rule_gap
+- Finding ID: F-DOCS-001
+  Severity: minor
+  Merge blocker: false
+  Practical impact: adoption examples remain harder to understand.
+  Trigger or failure trace: maintainability_risk → review-code-health → adjacent documentation observation.
+  Evidence location: docs/usage-ja.md.
+  Required post-fix condition: track separately only if an owner accepts the improvement.
+  Category: documentation_debt
 ```
 
 Do not run `review-code-health` for every PR by default. Use it when the review question or observed evidence makes debt, smell, refactor, maintainability, dependency/tooling, security weakness signals, or repeated findings applicable.

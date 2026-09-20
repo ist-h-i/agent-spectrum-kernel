@@ -45,7 +45,7 @@ This is rule-candidate extraction and promotion support. It must not automatical
 3. Apply promotion rules.
    - AI may create `Hypothesis` candidates from observed patterns.
    - AI may propose `Supported` only when evidence is present but not fully direct.
-   - `Human-confirmed` requires human/domain-owner confirmation.
+   - Human confirmation changes authority metadata and requires an explicit human/domain-owner source; it does not promote evidence status.
    - `Verified` requires direct repo/docs/tests/runtime/production evidence.
    - Contradictions must be visible and routed to human decision.
 
@@ -64,8 +64,8 @@ Rule extraction:
 - Source reviewed:
 - New domain rule candidates:
 - Updated domain rules:
-- Contradicted rules:
-- Deprecated rules:
+- Rules with `Record state=contradicted`:
+- Rules with `Record state=deprecated`:
 - Rejected candidates:
 - Evidence status:
 - Promotion decision:
@@ -78,7 +78,7 @@ Rule extraction:
 - Candidates are separated from confirmed rules.
 - Every candidate has source and evidence status.
 - Human confirmation requirements are explicit.
-- Contradicted, deprecated, and stale entries are visible.
+- Contradicted/deprecated record states and stale entries are visible.
 - Technical debt remains in the improvement workflow.
 
 ## Failure modes

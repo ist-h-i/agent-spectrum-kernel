@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/evolution-application-receipt.schema.json",
+  "title": "Agent Spectrum Kernel resumable Evolution application receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_kind",
+    "predecessor_receipt_digest",
+    "candidate_digest",
+    "experiment_digest",
+    "recommendation_digest",
+    "proposal_digest",
+    "decision_digest",
+    "action",
+    "state",
+    "base_heads",
+    "result_heads",
+    "steps",
+    "rollback_anchor",
+    "stop",
+    "next_step",
+    "history_preserved",
+    "authority_implied",
+    "receipt_digest"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "object_kind": { "type": "string", "const": "evolution_application_receipt" },
+    "predecessor_receipt_digest": {
+      "oneOf": [
+        { "$ref": "#/$defs/digest" },
+        { "type": "null" }
+      ]
+    },
+    "candidate_digest": { "$ref": "#/$defs/digest" },
+    "experiment_digest": { "$ref": "#/$defs/digest" },
+    "recommendation_digest": { "$ref": "#/$defs/digest" },
+    "proposal_digest": { "$ref": "#/$defs/digest" },
+    "decision_digest": { "$ref": "#/$defs/digest" },
+    "action": { "$ref": "#/$defs/action" },
+    "state": {
+      "type": "string",
+      "enum": ["pending", "in_progress", "completed", "stopped", "failed"]
+    },
+    "base_heads": { "$ref": "#/$defs/heads" },
+    "result_heads": { "$ref": "#/$defs/heads" },
+    "steps": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/step" }
+    },
+    "rollback_anchor": { "$ref": "#/$defs/portfolioRef" },
+    "stop": {
+      "oneOf": [
+        { "$ref": "#/$defs/typedStop" },
+        { "type": "null" }
+      ]
+    },
+    "next_step": {
+      "oneOf": [
+        { "$ref": "#/$defs/token" },
+        { "type": "null" }
+      ]
+    },
+    "history_preserved": { "type": "boolean", "const": true },
+    "authority_implied": { "type": "boolean", "const": false },
+    "receipt_digest": { "$ref": "#/$defs/digest" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "state": { "const": "pending" } } },
+      "then": {
+        "properties": {
+          "stop": { "type": "null" },
+          "next_step": { "$ref": "#/$defs/token" },
+          "steps": {
+            "minItems": 1,
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/step" },
+                { "properties": { "status": { "const": "pending" } } }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "in_progress" } } },
+      "then": {
+        "properties": {
+          "stop": { "type": "null" },
+          "next_step": { "$ref": "#/$defs/token" },
+          "steps": {
+            "minItems": 2,
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/step" },
+                { "properties": { "status": { "enum": ["completed", "pending"] } } }
+              ]
+            },
+            "allOf": [
+              { "contains": { "properties": { "status": { "const": "completed" } }, "required": ["status"] }, "minContains": 1 },
+              { "contains": { "properties": { "status": { "const": "pending" } }, "required": ["status"] }, "minContains": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "stopped" } } },
+      "then": {
+        "properties": {
+          "stop": { "$ref": "#/$defs/typedStop" },
+          "next_step": { "$ref": "#/$defs/token" },
+          "steps": {
+            "minItems": 1,
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/step" },
+                { "properties": { "status": { "enum": ["completed", "pending", "skipped"] } } }
+              ]
+            },
+            "contains": { "properties": { "status": { "const": "pending" } }, "required": ["status"] },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "failed" } } },
+      "then": {
+        "properties": {
+          "stop": { "$ref": "#/$defs/typedStop" },
+          "next_step": { "type": "null" },
+          "steps": {
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/step" },
+                { "properties": { "status": { "enum": ["completed", "failed", "skipped"] } } }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "completed" } } },
+      "then": {
+        "properties": {
+          "stop": { "type": "null" },
+          "next_step": { "type": "null" },
+          "steps": {
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/step" },
+                { "properties": { "status": { "const": "completed" } } }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@/+~-]*$"
+    },
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "nonBlankText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "\\S"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "adopt_candidate",
+        "retain_current",
+        "revise_candidate",
+        "reject_candidate",
+        "retire_current",
+        "insufficient_evidence"
+      ]
+    },
+    "heads": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registry_snapshot_digest", "portfolio_lock_digest"],
+      "properties": {
+        "registry_snapshot_digest": { "$ref": "#/$defs/digest" },
+        "portfolio_lock_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step_id",
+        "operation",
+        "input_digest",
+        "authority_context_digest",
+        "output_digest",
+        "status"
+      ],
+      "properties": {
+        "step_id": { "$ref": "#/$defs/stableId" },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "apply_asset_transition",
+            "apply_portfolio_transition",
+            "verify_asset_commit_marker",
+            "verify_portfolio_commit_marker"
+          ]
+        },
+        "input_digest": { "$ref": "#/$defs/digest" },
+        "authority_context_digest": { "$ref": "#/$defs/digest" },
+        "output_digest": { "$ref": "#/$defs/digest" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "completed", "failed", "skipped"]
+        }
+      }
+    },
+    "portfolioRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["portfolio_id", "revision", "manifest_digest", "asset_set_digest"],
+      "properties": {
+        "portfolio_id": { "$ref": "#/$defs/stableId" },
+        "revision": { "$ref": "#/$defs/token" },
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "asset_set_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "typedStop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "detail"],
+      "properties": {
+        "code": { "$ref": "#/$defs/token" },
+        "detail": { "$ref": "#/$defs/nonBlankText" }
+      }
+    }
+  }
+}

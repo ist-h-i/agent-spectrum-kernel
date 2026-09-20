@@ -22,7 +22,7 @@ This checked-in file is an empty generic template. Do not add project-specific e
 
 ## Evidence And Freshness Status
 
-Evidence statuses: `Verified`, `Human-confirmed`, `Supported`, `Hypothesis`, `Deprecated`, `Contradicted`.
+Evidence status uses `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`. Human confirmation is recorded separately as `Authority status`: `not_asserted` or `human_confirmed`.
 
 Freshness statuses:
 
@@ -54,6 +54,7 @@ DK-0003
 | Source document | yes | Source path, URL, issue, PR, ADR, or note. |
 | Source location | yes | Heading, line, section, comment, or `unknown`. |
 | Evidence status | yes | One of the evidence statuses above. |
+| Authority status | yes | Human authority metadata, separate from evidence strength. |
 | Freshness status | yes | One of the freshness statuses above. |
 | Consumers | yes | Skills, contexts, ledgers, or docs that may consume the entry. |
 | Conflicts | yes | Known conflicts or `none`. |
@@ -63,12 +64,12 @@ DK-0003
 
 ## Documentation Knowledge Entries
 
-| ID | Knowledge type | Statement | Source document | Source location | Evidence status | Freshness status | Consumers | Conflicts | Recommended target | Staleness trigger | Owner |
-|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Knowledge type | Statement | Source document | Source location | Evidence status | Authority status | Freshness status | Consumers | Conflicts | Recommended target | Staleness trigger | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 <!--
 Example active row:
-| DK-0001 | implementation convention | API adapters return typed result objects rather than throwing domain errors. | docs/architecture.md | Error boundary section | Verified | current | implementation-context-generation; review-architecture-impact | none | engineering pattern ledger | API adapter error boundary changes | platform-team |
+| DK-0001 | implementation convention | API adapters return typed result objects rather than throwing domain errors. | docs/architecture.md | Error boundary section | Verified | not_asserted | current | implementation-context-generation; review-architecture-impact | none | engineering pattern ledger | API adapter error boundary changes | platform-team |
 -->
 
 ## Stale Knowledge Review

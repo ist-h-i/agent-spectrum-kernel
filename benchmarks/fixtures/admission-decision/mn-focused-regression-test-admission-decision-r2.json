@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-admission-decision.schema.json",
+  "program": "adaptive_ask_portfolio_admission_decision",
+  "decision_id": "admission-decision-a75ca57709fd1113ec77dd108d4de1af",
+  "decision_revision": 2,
+  "predecessor_decision": {
+    "path": "benchmarks/fixtures/admission-decision/mn-focused-regression-test-admission-decision.json",
+    "raw_byte_digest": "sha256:d092d5fb29a2cad12770f79722adacbce46cabab105dbf4219563e627e3cc450",
+    "decision_id": "admission-decision-a75ca57709fd1113ec77dd108d4de1af",
+    "decision_revision": 1,
+    "fixture_id": "mn-focused-regression-test",
+    "decision_digest": "sha256:bf3956d6c7c753159ee7dc651570609a9a064c2233193795e13e863375fc4844"
+  },
+  "fixture_id": "mn-focused-regression-test",
+  "decision_status": "admitted",
+  "review_status": "approved",
+  "author_self_approval": false,
+  "reviewer_type": "independent_human",
+  "reviewer_record_id": "human-pr281-251e353-533a6e82b738a5d7",
+  "reviewer_count": 1,
+  "reviewed_at": "2026-09-19T23:35:12.060Z",
+  "reviewed_repository": "ist-h-i/agent-spectrum-kernel",
+  "reviewed_pull_request": 281,
+  "reviewed_head_revision": "251e353d676b53fb276ebf3c7289c88b0aa3cf78",
+  "blocking_finding_count": 0,
+  "review_evidence": {
+    "archive_sha256": "sha256:6577e44f1b53e39ce9cae66e7d47f82d2a5fa4382b49fc1c8735737db1dfa1ee",
+    "archive_bytes": 3767814
+  },
+  "evaluator": {
+    "evaluator_revision": "ab2ce5fedf1e5fe12eff2b161048332da09ce0de",
+    "evaluator_bundle_id": "evaluator-9b33d5327e6becde46dd63f077ed19e4780bf5d17332423d8039404acaeb5513",
+    "evaluator_bundle_digest": "sha256:dc1e03f017940f7d6fa6a340cfbcd0bcfe7016f9bdcf39a51286dda111024823",
+    "evaluator_bundle_bytes": 171281
+  },
+  "evaluator_public_reference_digest": "sha256:8fd998bdd8ac760bdaff46622e9ad95a77bab1dd449fd5d0461f5f00b06cf188",
+  "frozen_admission_authority": {
+    "path": "benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/final-admission-record.json",
+    "raw_byte_digest": "sha256:240e82713723f3a53c54b1d3fb0d4d67de38e424e1c4b5249ccd992713d92f1b",
+    "semantic_digest": "sha256:fa94269079057eadc510979170ec666ce4e96e60639c296d5b8dcc1e19c5e516",
+    "requirement_authority_digest": "sha256:da1e668c537fbd93908deb1c001159e340f069756773c270f21a97d2347f5ee7"
+  },
+  "frozen_requirement_record": {
+    "path": "benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/requirement-record.json",
+    "raw_byte_digest": "sha256:77e33e9849c84c129999e406376ce79f4669040ac7049174d62ae1f7d8a4dd7d",
+    "record_digest": "sha256:c2d84d685d6b82b1f5a957e4a06e532fbde94087cd8069addd6833e091f8ca28",
+    "set_digest": "sha256:cd27acbf9e74aa17d6e83658e5fa5d5b5f25501089f313818f9a860fd9a3bfc2"
+  },
+  "frozen_scoring_input_manifest": {
+    "path": "benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/scoring-input-freeze-manifest.json",
+    "raw_byte_digest": "sha256:50a120bd71749c6d6e754176f768c555a765c564989cc2f41f9a4a1ae30f9991",
+    "semantic_digest": "sha256:c245333bbe4581c50f5b74aedcb3a3bc43661da567d15a2e789f360540934839"
+  },
+  "decision_digest": "sha256:1ed967f182047c558d00bb88e7ec126f6e247d89fbeecfed7fa0facda8aa1f74"
+}

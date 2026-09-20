@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/evolution-action-proposal.schema.json",
+  "title": "Agent Spectrum Kernel deterministic Evolution action proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_kind",
+    "candidate_digest",
+    "experiment_digest",
+    "recommendation_digest",
+    "recommendation",
+    "action",
+    "mapping_policy_digest",
+    "decision_scope",
+    "required_decision_authority",
+    "lifecycle_plan",
+    "reason_codes",
+    "authority_implied",
+    "proposal_digest"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "object_kind": { "type": "string", "const": "evolution_action_proposal" },
+    "candidate_digest": { "$ref": "#/$defs/digest" },
+    "experiment_digest": { "$ref": "#/$defs/digest" },
+    "recommendation_digest": { "$ref": "#/$defs/digest" },
+    "recommendation": { "$ref": "#/$defs/recommendation" },
+    "action": { "$ref": "#/$defs/action" },
+    "mapping_policy_digest": { "$ref": "#/$defs/digest" },
+    "decision_scope": { "$ref": "#/$defs/token" },
+    "required_decision_authority": { "$ref": "#/$defs/decisionAuthority" },
+    "lifecycle_plan": { "$ref": "#/$defs/lifecyclePlan" },
+    "reason_codes": { "$ref": "#/$defs/nonEmptyTokenSet" },
+    "authority_implied": { "type": "boolean", "const": false },
+    "proposal_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@/+~-]*$"
+    },
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "nonEmptyTokenSet": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "recommendation": {
+      "type": "string",
+      "enum": ["expand", "retain", "simplify", "stop", "insufficient_evidence"]
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "adopt_candidate",
+        "retain_current",
+        "revise_candidate",
+        "reject_candidate",
+        "retire_current",
+        "insufficient_evidence"
+      ]
+    },
+    "portfolioState": {
+      "type": "string",
+      "enum": ["current", "historical", "superseded", "retired"]
+    },
+    "assetState": {
+      "type": "string",
+      "enum": ["candidate", "admitted", "current", "historical", "superseded", "retired"]
+    },
+    "exactAssetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_type", "stable_id", "version", "record_digest", "content_digest"],
+      "properties": {
+        "asset_type": {
+          "type": "string",
+          "enum": ["skill", "prompt", "prompt_template", "evaluator_reference"]
+        },
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "version": { "$ref": "#/$defs/token" },
+        "record_digest": { "$ref": "#/$defs/digest" },
+        "content_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "portfolioRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["portfolio_id", "revision", "manifest_digest", "asset_set_digest"],
+      "properties": {
+        "portfolio_id": { "$ref": "#/$defs/stableId" },
+        "revision": { "$ref": "#/$defs/token" },
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "asset_set_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "portfolioTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest", "from_state", "to_state"],
+      "properties": {
+        "manifest": { "$ref": "#/$defs/portfolioRef" },
+        "from_state": {
+          "oneOf": [
+            { "$ref": "#/$defs/portfolioState" },
+            { "type": "null" }
+          ]
+        },
+        "to_state": { "$ref": "#/$defs/portfolioState" }
+      }
+    },
+    "assetTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset", "from_state", "to_state"],
+      "properties": {
+        "asset": { "$ref": "#/$defs/exactAssetRef" },
+        "from_state": { "$ref": "#/$defs/assetState" },
+        "to_state": { "$ref": "#/$defs/assetState" }
+      }
+    },
+    "lifecyclePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_registry_snapshot_digest",
+        "base_portfolio_lock_digest",
+        "base_current_manifest",
+        "target_manifest",
+        "portfolio_transitions",
+        "asset_transitions",
+        "rollback_anchor",
+        "reason_codes"
+      ],
+      "properties": {
+        "base_registry_snapshot_digest": { "$ref": "#/$defs/digest" },
+        "base_portfolio_lock_digest": { "$ref": "#/$defs/digest" },
+        "base_current_manifest": { "$ref": "#/$defs/portfolioRef" },
+        "target_manifest": { "$ref": "#/$defs/portfolioRef" },
+        "portfolio_transitions": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/portfolioTransition" }
+        },
+        "asset_transitions": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/assetTransition" }
+        },
+        "rollback_anchor": { "$ref": "#/$defs/portfolioRef" },
+        "reason_codes": { "$ref": "#/$defs/nonEmptyTokenSet" }
+      }
+    },
+    "decisionAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "authority_id", "authority_revision", "authority_evidence_digest"],
+      "properties": {
+        "kind": { "type": "string", "const": "external_evolution_human_decision_authority" },
+        "authority_id": { "$ref": "#/$defs/stableId" },
+        "authority_revision": { "type": "integer", "minimum": 1 },
+        "authority_evidence_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

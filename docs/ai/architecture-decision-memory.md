@@ -22,14 +22,7 @@ This checked-in file is an empty generic template. Do not add project-specific e
 
 ## Evidence Status Key
 
-| Status | Meaning |
-|---|---|
-| `Verified` | Directly observed in code, docs, tests, ADRs, CI, runtime output, or merged PR evidence. |
-| `Human-confirmed` | Confirmed by a responsible architecture owner or human. |
-| `Supported` | Backed by indirect or repeated evidence but not fully proven. |
-| `Hypothesis` | May guide questions only; must not be enforced as an architecture rule. |
-| `Deprecated` | Retained for history but no longer recommended. |
-| `Contradicted` | Conflicts with newer evidence and needs resolution. |
+Use `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`. Record human confirmation in `Authority status` and memory lifecycle/conflict in `Record state`.
 
 ## Entry ID Convention
 
@@ -57,6 +50,8 @@ ADM-0003
 | Consequences | yes | Operational or design consequences. |
 | Evidence source | yes | ADR, code, docs, review, issue, test, runtime output, or human confirmation. |
 | Evidence status | yes | One of the evidence statuses above. |
+| Authority status | yes | `not_asserted` or `human_confirmed`. |
+| Record state | yes | `active`, `deprecated`, or `contradicted`. |
 | Related ADR | yes | ADR path/ID or `none`. |
 | Related project overlay rule | yes | Overlay rule or `none`. |
 | Related engineering pattern | yes | Engineering pattern ID or `none`. |
@@ -67,12 +62,12 @@ ADM-0003
 
 ## Architecture Decision Memory Entries
 
-| ID | Decision summary | Architecture boundary | Context | Options considered | Accepted option | Rejected alternatives | Reason | Tradeoffs | Consequences | Evidence source | Evidence status | Related ADR | Related project overlay rule | Related engineering pattern | Review impact | Revisit condition | Staleness trigger | Owner |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Decision summary | Architecture boundary | Context | Options considered | Accepted option | Rejected alternatives | Reason | Tradeoffs | Consequences | Evidence source | Evidence status | Authority status | Record state | Related ADR | Related project overlay rule | Related engineering pattern | Review impact | Revisit condition | Staleness trigger | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 <!--
 Example active row:
-| ADM-0001 | Domain errors do not cross API adapter boundary | DTO/error trust boundary | External API errors need stable internal mapping | Throw raw errors; map to typed result | Map to typed result at adapter boundary | Throw raw errors leaks provider shape | Keeps domain layer independent from provider errors | Slight mapper overhead | Review adapter changes for raw error leaks | ADR-0004 and merged PR #123 | Verified | docs/adr/0004-error-boundary.md | none | EP-0003 | review-architecture-impact checks adapter error boundary | New provider or public API error contract changes | API adapter boundary changes | platform-team |
+| ADM-0001 | Domain errors do not cross API adapter boundary | DTO/error trust boundary | External API errors need stable internal mapping | Throw raw errors; map to typed result | Map to typed result at adapter boundary | Throw raw errors leaks provider shape | Keeps domain layer independent from provider errors | Slight mapper overhead | Review adapter changes for raw error leaks | ADR-0004 and merged PR #123 | Verified | not_asserted | active | docs/adr/0004-error-boundary.md | none | EP-0003 | review-architecture-impact checks adapter error boundary | New provider or public API error contract changes | API adapter boundary changes | platform-team |
 -->
 
 ## Stale Decision Review

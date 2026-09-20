@@ -14,6 +14,8 @@
     "suggested_prevention_target",
     "evidence_source",
     "evidence_status",
+    "authority_status",
+    "record_state",
     "repeat_pattern",
     "false_positive_risk",
     "suppression_rule",
@@ -34,9 +36,10 @@
     },
     "evidence_source": { "type": "string", "minLength": 1 },
     "evidence_status": {
-      "type": "string",
-      "enum": ["Verified", "Human-confirmed", "Supported", "Hypothesis", "Deprecated", "Contradicted"]
+      "$ref": "claim-evidence-status.schema.json"
     },
+    "authority_status": { "type": "string", "enum": ["not_asserted", "human_confirmed"] },
+    "record_state": { "type": "string", "enum": ["active", "deprecated", "contradicted"] },
     "repeat_pattern": {
       "type": "string",
       "enum": ["one-off", "repeated", "likely_repeated", "high_impact_single_case"]
