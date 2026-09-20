@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -113,7 +113,39 @@ const invocation = {
 
 try {
   mkdirSync(target);
-  const installedExecutor = resolveRiskCodexExecutor("codex", target);
+  const platform = {
+    "darwin:arm64": { triple: "aarch64-apple-darwin", package: "codex-darwin-arm64" },
+    "darwin:x64": { triple: "x86_64-apple-darwin", package: "codex-darwin-x64" },
+    "linux:arm64": { triple: "aarch64-unknown-linux-musl", package: "codex-linux-arm64" },
+    "linux:x64": { triple: "x86_64-unknown-linux-musl", package: "codex-linux-x64" },
+  }[`${process.platform}:${process.arch}`];
+  assert.ok(platform, `risk executor fixture does not support ${process.platform}/${process.arch}`);
+  const packageRoot = resolve(temporaryRoot, "node_modules/@openai/codex");
+  const platformRoot = resolve(packageRoot, "node_modules/@openai", platform.package);
+  const launcher = resolve(packageRoot, "bin/codex.js");
+  const native = resolve(platformRoot, "vendor", platform.triple, "bin/codex");
+  const packagePath = resolve(packageRoot, "package.json");
+  const platformPath = resolve(platformRoot, "package.json");
+  const packageManifest = { name: "@openai/codex", version: "1.2.3", bin: { codex: "bin/codex.js" } };
+  const platformManifest = { name: "@openai/codex", version: `1.2.3-${process.platform}-${process.arch}`, os: [process.platform], cpu: [process.arch] };
+  const launcherBytes = "#!/usr/bin/env node\nthrow new Error('identity-only fixture must not execute');\n";
+  mkdirSync(resolve(packageRoot, "bin"), { recursive: true });
+  mkdirSync(resolve(platformRoot, "vendor", platform.triple, "bin"), { recursive: true });
+  writeFileSync(packagePath, JSON.stringify(packageManifest));
+  writeFileSync(platformPath, JSON.stringify(platformManifest));
+  writeFileSync(launcher, launcherBytes);
+  chmodSync(launcher, 0o755);
+  // Only inspect native identity: neither this Node copy nor the launcher is spawned.
+  copyFileSync(process.execPath, native);
+  chmodSync(native, 0o755);
+  const searchPath = resolve(temporaryRoot, "path-bin");
+  mkdirSync(searchPath);
+  symlinkSync(launcher, resolve(searchPath, "codex"));
+  const installedExecutor = resolveRiskCodexExecutor(launcher, target, { sourceEnv: { PATH: "" } });
+  const searchedExecutor = resolveRiskCodexExecutor("codex", target, { sourceEnv: { PATH: searchPath } });
+  assert.deepEqual(searchedExecutor, { ...installedExecutor, requested_bin: "codex" });
+  assert.equal(installedExecutor.target_triple, platform.triple);
+  assert.equal(installedExecutor.native_binary.canonical_path, native);
   assert.equal(installedExecutor.resolution, "installed_openai_codex_platform_package");
   assert.match(installedExecutor.launcher.canonical_path, /@openai\/codex\/bin\/codex\.js$/u);
   assert.notEqual(installedExecutor.spawn_path, installedExecutor.launcher.canonical_path, "the JavaScript launcher must be bound but never spawned on the risk path");
@@ -126,12 +158,28 @@ try {
   staleNative.native_binary.raw_sha256 = digest("0");
   assert.throws(() => verifyRiskCodexExecutor(staleNative), /native executable identity changed/u, "native drift must fail immediately before spawn");
 
+  const emptyPath = resolve(temporaryRoot, "empty-path");
+  mkdirSync(emptyPath);
+  assert.throws(() => resolveRiskCodexExecutor("codex", target, { sourceEnv: { PATH: emptyPath } }), /Codex executable cannot be resolved: codex/u);
+  writeFileSync(packagePath, JSON.stringify({ ...packageManifest, bin: { codex: "other.js" } }));
+  assert.throws(() => resolveRiskCodexExecutor(launcher, target), /closed installed @openai\/codex package layout/u);
+  writeFileSync(packagePath, JSON.stringify(packageManifest));
+  writeFileSync(platformPath, JSON.stringify({ ...platformManifest, version: "0.0.0" }));
+  assert.throws(() => resolveRiskCodexExecutor(launcher, target), /platform manifest does not bind/u);
+  writeFileSync(platformPath, JSON.stringify(platformManifest));
+  appendFileSync(launcher, "// identity drift\n");
+  assert.throws(() => verifyRiskCodexExecutor(installedExecutor), /launcher identity changed/u);
+  writeFileSync(launcher, launcherBytes);
+  assert.doesNotThrow(() => verifyRiskCodexExecutor(installedExecutor));
+  appendFileSync(native, "identity drift\n");
+  assert.throws(() => verifyRiskCodexExecutor(installedExecutor), /native executable identity changed/u);
+
   const scriptExecutor = resolve(temporaryRoot, "script-executor");
   writeFileSync(scriptExecutor, "#!/bin/sh\nexit 0\n");
   chmodSync(scriptExecutor, 0o755);
   assert.throws(() => resolveRiskCodexExecutor(scriptExecutor, target), /rejects script\/interpreter launchers/u);
   const injectedBare = resolve(temporaryRoot, "codex");
-  copyFileSync("/usr/bin/true", injectedBare);
+  copyFileSync(process.execPath, injectedBare);
   chmodSync(injectedBare, 0o755);
   assert.throws(() => resolveRiskCodexExecutor("codex", target, { sourceEnv: { PATH: temporaryRoot } }), /must resolve through the installed @openai\/codex launcher/u);
   assert.throws(() => resolveRiskCodexExecutor(injectedBare, target), /must resolve through the installed @openai\/codex launcher/u);
