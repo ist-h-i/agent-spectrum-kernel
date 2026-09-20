@@ -721,6 +721,46 @@
       "case_id": "POS-PREVIOUS-BOUNDED",
       "domain": "plan-context",
       "expected_issue_codes": []
+    },
+    {
+      "case_id": "NEG-UNSAFE-PLAN-REVISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["REVISION_OUT_OF_RANGE"]
+    },
+    {
+      "case_id": "NEG-UNSAFE-CONTEXT-REVISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["REVISION_OUT_OF_RANGE"]
+    },
+    {
+      "case_id": "NEG-UNSAFE-CONTEXT-THROUGH-PLAN",
+      "domain": "plan-context",
+      "expected_issue_codes": ["VALIDATION_CONTEXT_INVALID"]
+    },
+    {
+      "case_id": "NEG-UNSAFE-PREVIOUS-PLAN-REVISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-UNSAFE-PREVIOUS-CONTEXT-REVISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-UNSAFE-SAME-REVISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE"]
+    },
+    {
+      "case_id": "NEG-REVISION-SUCCESSOR-OVERFLOW",
+      "domain": "plan-context",
+      "expected_issue_codes": ["REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE", "REVISION_OUT_OF_RANGE"]
+    },
+    {
+      "case_id": "POS-REVISION-MAX-SAFE",
+      "domain": "plan-context",
+      "expected_issue_codes": []
     }
   ]
 }

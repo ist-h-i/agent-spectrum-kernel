@@ -892,6 +892,134 @@ expectCodes("NEG-STACK-DEPENDENCY-CLOSURE", validatePlanBundle(mutatePlan(canoni
     ...highSuccessor, previousPlan: highPrevious.plan, previousContext: highPrevious.context,
   }), []);
 
+  // F1: distinguish per-field numeric preflight from a fully bound lineage probe.
+  const assertRevisionProbeIntegrity = ({ plan, context }) => {
+    assert.equal(plan.plan_digest, canonicalDigestExcluding(plan, "plan_digest"));
+    assert.equal(context.context_digest, canonicalDigestExcluding(context, "context_digest"));
+    assert.equal(context.current_plan_ref.plan_content_digest, deriveWorkPackagePlanContentDigest(plan));
+    assert.equal(plan.validation_context_ref.context_digest, context.context_digest);
+  };
+  const resealRevisionProbe = (bundle) => {
+    const contextDraft = clone(bundle.context);
+    let plan = sealWorkPackagePlan(bundle.plan);
+    // Preserve the intentionally changed revision; only close digest bindings.
+    contextDraft.current_plan_ref.plan_content_digest = deriveWorkPackagePlanContentDigest(plan);
+    const context = sealWorkPackagePlanValidationContext(contextDraft);
+    plan.validation_context_ref.context_digest = context.context_digest;
+    plan = sealWorkPackagePlan(plan);
+    const result = { ...bundle, context, plan };
+    assertRevisionProbeIntegrity(result);
+    return result;
+  };
+  const withNumericPrevious = (previous) => {
+    const successor = clone(revisionThree);
+    successor.plan.supersedes_plan_ref.plan_digest = previous.plan.plan_digest;
+    successor.context.supersedes_plan_ref.plan_digest = previous.plan.plan_digest;
+    successor.context.supersedes_context_ref.context_digest = previous.context.context_digest;
+    return { ...resealRevisionProbe(successor), previousPlan: previous.plan, previousContext: previous.context };
+  };
+  const unsafeRevisions = [10_000_000_000_000_000, Number.MAX_SAFE_INTEGER + 1];
+  const planRevisionSlots = [
+    ["$.plan_revision", (plan, value) => { plan.plan_revision = value; }],
+    ["$.validation_context_ref.context_revision", (plan, value) => { plan.validation_context_ref.context_revision = value; }],
+    ["$.supersedes_plan_ref.plan_revision", (plan, value) => { plan.supersedes_plan_ref.plan_revision = value; }],
+    ...revisionTwo.plan.packages.map((_, index) => [
+      `$.packages[${index}].plan_binding.plan_revision`,
+      (plan, value) => { plan.packages[index].plan_binding.plan_revision = value; },
+    ]),
+  ];
+  const contextRevisionSlots = [
+    ["$.context_revision", (context, value) => { context.context_revision = value; }],
+    ["$.current_plan_ref.plan_revision", (context, value) => { context.current_plan_ref.plan_revision = value; }],
+    ["$.supersedes_context_ref.context_revision", (context, value) => { context.supersedes_context_ref.context_revision = value; }],
+    ["$.supersedes_plan_ref.plan_revision", (context, value) => { context.supersedes_plan_ref.plan_revision = value; }],
+  ];
+  // Slot probes intentionally vary one revision, not all reference revisions.
+  // They prove exact preflight provenance, not acceptance by the old validator.
+  for (const value of unsafeRevisions) {
+    for (const [path, mutate] of planRevisionSlots) {
+      const draft = clone(revisionTwo);
+      mutate(draft.plan, value);
+      const probe = resealRevisionProbe(draft);
+      const options = { ...probe, previousPlan: revisionOne.plan, previousContext: revisionOne.context };
+      for (const validate of [validateWorkPackagePlan, validateWorkPackagePlanExecutable]) {
+        expectDeterministicIssues("NEG-UNSAFE-PLAN-REVISION", () => validate(probe.plan, options), [path]);
+      }
+      const successor = withNumericPrevious(probe);
+      const issues = expectDeterministicIssues("NEG-UNSAFE-PREVIOUS-PLAN-REVISION",
+        () => validateWorkPackagePlan(successor.plan, successor), ["$.supersedes_plan_ref"]);
+      assert.ok(issues[0].message.includes(`REVISION_OUT_OF_RANGE ${path}:`), `preserve predecessor numeric cause at ${path}`);
+    }
+    for (const [path, mutate] of contextRevisionSlots) {
+      const draft = clone(revisionTwo);
+      mutate(draft.context, value);
+      const probe = resealRevisionProbe(draft);
+      expectDeterministicIssues("NEG-UNSAFE-CONTEXT-REVISION",
+        () => validateWorkPackagePlanValidationContext(probe.context, probe), [path]);
+      const options = { ...probe, previousPlan: revisionOne.plan, previousContext: revisionOne.context };
+      const currentIssues = expectDeterministicIssues("NEG-UNSAFE-CONTEXT-THROUGH-PLAN",
+        () => validateWorkPackagePlan(probe.plan, options), ["$.validation_context_ref"]);
+      assert.ok(currentIssues[0].message.includes(`REVISION_OUT_OF_RANGE ${path}:`), `preserve current context numeric cause at ${path}`);
+      const successor = withNumericPrevious(probe);
+      const previousIssues = expectDeterministicIssues("NEG-UNSAFE-PREVIOUS-CONTEXT-REVISION",
+        () => validateWorkPackagePlan(successor.plan, successor), ["$.supersedes_plan_ref"]);
+      assert.ok(previousIssues[0].message.includes("VALIDATION_CONTEXT_INVALID $.validation_context_ref:"));
+      assert.ok(previousIssues[0].message.includes(`REVISION_OUT_OF_RANGE ${path}:`), `preserve predecessor context numeric cause at ${path}`);
+    }
+  }
+
+  const buildRevisionAt = (revision) => {
+    const context = clone(revisionTwo.context);
+    context.context_revision = revision;
+    context.supersedes_context_ref.context_revision = revision - 1;
+    context.supersedes_plan_ref.plan_revision = revision - 1;
+    const plan = clone(revisionTwo.plan);
+    plan.plan_revision = revision;
+    plan.supersedes_plan_ref.plan_revision = revision - 1;
+    for (const workPackage of plan.packages) workPackage.plan_binding.plan_revision = revision;
+    return closePlanContextBinding({ ...revisionTwo, context }, plan);
+  };
+  const checkRevisionBoundary = (caseId, previous, successor, paths) => {
+    assertRevisionProbeIntegrity(previous);
+    assertRevisionProbeIntegrity(successor);
+    assert.deepEqual(successor.plan.supersedes_plan_ref, {
+      plan_id: previous.plan.plan_id, plan_revision: previous.plan.plan_revision, plan_digest: previous.plan.plan_digest,
+    });
+    assert.deepEqual(successor.context.supersedes_plan_ref, successor.plan.supersedes_plan_ref);
+    assert.deepEqual(successor.context.supersedes_context_ref, {
+      context_id: previous.context.context_id, context_revision: previous.context.context_revision, context_digest: previous.context.context_digest,
+    });
+    assert.notEqual(successor.plan.plan_digest, previous.plan.plan_digest, "the lineage probe does not require a digest self-cycle");
+    for (const validate of [validateWorkPackagePlan, validateWorkPackagePlanExecutable]) {
+      expectDeterministicIssues(caseId, () => validate(successor.plan, {
+        ...successor, previousPlan: previous.plan, previousContext: previous.context,
+      }), paths);
+    }
+  };
+  const upperRevisionPaths = [
+    ...revisionTwo.plan.packages.map((_, index) => `$.packages[${index}].plan_binding.plan_revision`),
+    "$.plan_revision",
+    "$.validation_context_ref.context_revision",
+  ];
+  for (const revision of unsafeRevisions) {
+    const previous = buildRevisionAt(revision);
+    const successor = buildExactRevisionTwoSuccessor(previous, "Reject resealed same-revision lineage.", revisionTwo);
+    assert.equal(Number.isInteger(revision), true);
+    assert.equal(successor.plan.plan_revision, previous.plan.plan_revision);
+    assert.equal(successor.context.context_revision, previous.context.context_revision);
+    if (revision === 10_000_000_000_000_000) assert.equal(revision - 1, revision);
+    checkRevisionBoundary("NEG-UNSAFE-SAME-REVISION", previous, successor,
+      [...upperRevisionPaths, "$.supersedes_plan_ref.plan_revision"].sort());
+  }
+  const upperPrevious = buildRevisionAt(Number.MAX_SAFE_INTEGER - 1);
+  const upperCurrent = buildExactRevisionTwoSuccessor(upperPrevious, "Accept a transition ending at the safe upper bound.");
+  assert.equal(upperCurrent.plan.plan_revision, Number.MAX_SAFE_INTEGER);
+  assert.equal(upperCurrent.context.context_revision, Number.MAX_SAFE_INTEGER);
+  checkRevisionBoundary("POS-REVISION-MAX-SAFE", upperPrevious, upperCurrent, []);
+  const overflow = buildExactRevisionTwoSuccessor(upperCurrent, "Reject succession beyond the safe upper bound.");
+  assert.equal(overflow.plan.plan_revision, Number.MAX_SAFE_INTEGER + 1);
+  checkRevisionBoundary("NEG-REVISION-SUCCESSOR-OVERFLOW", upperCurrent, overflow, upperRevisionPaths);
+
   const revisionOnePlanRef = {
     plan_id: revisionOne.plan.plan_id,
     plan_revision: revisionOne.plan.plan_revision,

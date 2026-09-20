@@ -220,6 +220,14 @@ const REQUIRED_CASE_IDS = Object.freeze([
   "POS-PREVIOUS-BOUND-AUTHORITY",
   "POS-PREVIOUS-PROPOSED",
   "POS-PREVIOUS-BOUNDED",
+  "NEG-UNSAFE-PLAN-REVISION",
+  "NEG-UNSAFE-CONTEXT-REVISION",
+  "NEG-UNSAFE-CONTEXT-THROUGH-PLAN",
+  "NEG-UNSAFE-PREVIOUS-PLAN-REVISION",
+  "NEG-UNSAFE-PREVIOUS-CONTEXT-REVISION",
+  "NEG-UNSAFE-SAME-REVISION",
+  "NEG-REVISION-SUCCESSOR-OVERFLOW",
+  "POS-REVISION-MAX-SAFE",
 ]);
 
 function compareAscii(left, right) {
@@ -943,6 +951,39 @@ function isPositiveRevision(value) {
   return Number.isInteger(value) && value >= 1;
 }
 
+// Schema checks own shape; these local checks own the numeric lineage domain.
+function positiveSafeRevisionIssues(entries) {
+  return sortedIssues(entries
+    .filter(([value]) => !Number.isSafeInteger(value) || value < 1)
+    .map(([, path]) => issue(
+      "REVISION_OUT_OF_RANGE",
+      path,
+      "revision must be a positive safe integer (1..9007199254740991)",
+    )));
+}
+
+function planRevisionIssues(plan) {
+  const entries = [
+    [plan.plan_revision, "$.plan_revision"],
+    [plan.validation_context_ref.context_revision, "$.validation_context_ref.context_revision"],
+    ...plan.packages.map((workPackage, index) => [
+      workPackage.plan_binding.plan_revision, `$.packages[${index}].plan_binding.plan_revision`,
+    ]),
+  ];
+  if (plan.supersedes_plan_ref) entries.push([plan.supersedes_plan_ref.plan_revision, "$.supersedes_plan_ref.plan_revision"]);
+  return positiveSafeRevisionIssues(entries);
+}
+
+function contextRevisionIssues(context) {
+  const entries = [
+    [context.context_revision, "$.context_revision"],
+    [context.current_plan_ref.plan_revision, "$.current_plan_ref.plan_revision"],
+  ];
+  if (context.supersedes_context_ref) entries.push([context.supersedes_context_ref.context_revision, "$.supersedes_context_ref.context_revision"]);
+  if (context.supersedes_plan_ref) entries.push([context.supersedes_plan_ref.plan_revision, "$.supersedes_plan_ref.plan_revision"]);
+  return positiveSafeRevisionIssues(entries);
+}
+
 function isDigest(value) {
   return typeof value === "string" && /^sha256:[0-9a-f]{64}$/.test(value);
 }
@@ -1174,6 +1215,8 @@ export function validateWorkPackagePlanValidationContext(context, {
     return [issue("REVISION_LINEAGE_UNEXPECTED", "$.supersedes_context_ref", "context revision 1 cannot claim a predecessor or revision reason")];
   }
   if (issues.length > 0) return sortedIssues(issues);
+  issues.push(...contextRevisionIssues(context));
+  if (issues.length > 0) return sortedIssues(issues);
   if (policy !== undefined) {
     const policyIssues = validateEpicAdmissionPolicy(policy, { schemaPath: policySchemaPath });
     if (policyIssues.length > 0) {
@@ -1386,6 +1429,8 @@ function validateWorkPackagePlanRevision(plan, {
 } = {}, validateLineage = true) {
   const issues = schemaIssues(plan, planSchemaPath);
   if (issues.length > 0) return sortedIssues(issues);
+  issues.push(...planRevisionIssues(plan));
+  if (issues.length > 0) return sortedIssues(issues);
 
   const policyIssues = validateEpicAdmissionPolicy(policy, { schemaPath: policySchemaPath });
   if (policyIssues.length > 0) {
@@ -1435,6 +1480,18 @@ function validateWorkPackagePlanRevision(plan, {
         "$.supersedes_plan_ref",
         "the supplied previous plan and validation context must satisfy the current Schemas or match exact pinned legacy audit artifacts before lineage and digest validation",
       )]);
+    }
+    // Preflight supplied revisions before the current pair uses them in lineage
+    // arithmetic. The full predecessor semantic check still runs exactly once.
+    const previousIssues = previousPlan.schema_version === WORK_PACKAGE_PLAN_SCHEMA_VERSION
+      ? planRevisionIssues(previousPlan) : [];
+    const previousContextIssues = previousContext.schema_version === WORK_PACKAGE_PLAN_SCHEMA_VERSION
+      ? contextRevisionIssues(previousContext) : [];
+    if (previousContextIssues.length > 0) {
+      previousIssues.push(issue("VALIDATION_CONTEXT_INVALID", "$.validation_context_ref", formatIssues(previousContextIssues)));
+    }
+    if (previousIssues.length > 0) {
+      return [issue("PREVIOUS_REVISION_INVALID", "$.supersedes_plan_ref", formatIssues(sortedIssues(previousIssues)))];
     }
   }
 
@@ -1514,13 +1571,13 @@ function validateWorkPackagePlanRevision(plan, {
         context_revision: previousContext.context_revision,
         context_digest: previousContext.context_digest,
       };
-      if (!sameJson(plan.supersedes_plan_ref, expectedPlanRef) || previousPlan.plan_id !== plan.plan_id || previousPlan.plan_revision + 1 !== plan.plan_revision) {
+      if (!sameJson(plan.supersedes_plan_ref, expectedPlanRef) || previousPlan.plan_id !== plan.plan_id || previousPlan.plan_revision !== plan.plan_revision - 1) {
         issues.push(issue("PLAN_REVISION_LINEAGE_MISMATCH", "$.supersedes_plan_ref", "plan revision does not exactly supersede the supplied immediately previous stable plan"));
       }
       if (!sameJson(context.supersedes_plan_ref, expectedPlanRef) || !sameJson(context.supersedes_plan_ref, plan.supersedes_plan_ref)) {
         issues.push(issue("CONTEXT_PREVIOUS_PLAN_BINDING_MISMATCH", "$.supersedes_plan_ref", "trusted current context does not bind the exact plan predecessor claimed by the current plan"));
       }
-      if (!sameJson(context.supersedes_context_ref, expectedContextRef) || previousContext.context_id !== context.context_id || previousContext.context_revision + 1 !== context.context_revision) {
+      if (!sameJson(context.supersedes_context_ref, expectedContextRef) || previousContext.context_id !== context.context_id || previousContext.context_revision !== context.context_revision - 1) {
         issues.push(issue("CONTEXT_REVISION_LINEAGE_MISMATCH", "$.supersedes_context_ref", "context revision does not exactly supersede the supplied immediately previous stable context"));
       }
     }
