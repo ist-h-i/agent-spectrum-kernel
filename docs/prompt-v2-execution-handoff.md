@@ -11,7 +11,7 @@ Execute and interpret the preregistered `current_prompt` versus `prompt_v2` cana
 - Preregistration source commit A: `c508a767f3386dac10180770edf37a67806fbb1b`.
 - Source tree: `d7d377c1265f0fb47119bfc80a2f3eb9535cf163`.
 - Frozen execution repository: `869d96b16543ef68b4c459064c8010e1cdb0b8de` / tree `1546f9cd522716f5d266018b7cc4901bed98c204`.
-- Preregistration digest: `sha256:5c7c9d0a8bce5171f5c9b6bbb4c737d509a8375bb8db1bdb89df80a684d49cce`.
+- Preregistration digest: `sha256:f5cc838703008896e7864e17501c99c3ae74196b851d186ae1e0aa0a45939b3d`.
 - Protocol raw-byte digest: `sha256:4ab18a466567e0a94df575bddb5aabc4ccf8fff496be11d3af74a32ef44aff3a`.
 - Exact generated authority: `docs/fixtures/prompt-v2-preregistration/binding.json`, `reference.json`, and the adjacent shared CAS.
 - Inventory: 56 cases in 28 paired blocks: four protected fixtures, two Prompt roles, and separate Codex and Claude tracks.
