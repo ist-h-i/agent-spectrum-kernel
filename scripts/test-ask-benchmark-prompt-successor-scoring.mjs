@@ -49,7 +49,10 @@ async function worker(contextPath) {
   const work = context.work;
   const record = { source_revision: context.sourceRevision, synthetic_clone_revision: context.cloneRevision,
     node: process.version, platform: process.platform, architecture: process.arch,
-    provider_calls: 0, measured_result_reads: 0, private_evaluator_process_calls: 0,
+    // Test-design declarations, not observed counters. No instrumentation is
+    // installed at these boundaries; do not cite these values as telemetry.
+    declared_activity: { evidence_kind: "expected_not_instrumented", expected_provider_calls: 0,
+      expected_measured_result_reads: 0, expected_private_evaluator_process_calls: 0 },
     synthetic_native_attempts: 0, checks: [], completed: false,
     limits: "Synthetic legacy-profile evaluator envelopes and pending admission; no real evaluator approval, token measurement or adoption evidence." };
   const check = async (name, fn) => { await fn(); record.checks.push({ name, status: "pass" }); console.log(`PASS ${name}`); };
@@ -268,7 +271,9 @@ if (process.argv[2] === "--worker") {
     assert.equal(git(root, "rev-parse", "HEAD"), sourceRevision); assert.equal(git(root, "status", "--porcelain"), "");
     assert.equal(result.error, undefined, result.error?.message); assert.equal(result.status, 0, result.stderr || result.stdout);
     const proof = read(resolve(work, "scoring-verification.json")); assert.equal(proof.completed, true); assert.equal(proof.synthetic_native_attempts, 28);
-    assert.equal(proof.provider_calls, 0); assert.equal(proof.measured_result_reads, 0); assert.equal(proof.private_evaluator_process_calls, 0);
+    assert.deepEqual(proof.declared_activity, { evidence_kind: "expected_not_instrumented", expected_provider_calls: 0,
+      expected_measured_result_reads: 0, expected_private_evaluator_process_calls: 0 });
+    for (const key of ["provider_calls", "measured_result_reads", "private_evaluator_process_calls"]) assert.equal(Object.hasOwn(proof, key), false);
     t.diagnostic(`Evidence: ${resolve(work, "scoring-verification.json")}`);
   });
 }

@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalDigest, readStableBytes } from "./content-addressed-store.mjs";
-import { inspectSuccessorScoringInputs, successorScoringOptions, assertSuccessorScoringExecution } from "./ask-benchmark-prompt-successor-scoring-inputs.mjs";
+import { inspectSuccessorScoringInputs, successorScoringOptions, assertSuccessorScoringExecution, assertSuccessorFrozenAdmissionOptions } from "./ask-benchmark-prompt-successor-scoring-inputs.mjs";
 import { openSuccessorPromptInput, consumeSuccessorPromptInput, successorInputProjection, assertSuccessorAdapterFacts } from "./ask-benchmark-prompt-successor-delivery.mjs";
 import {
   successorExact, successorClosed, successorFail,
@@ -62,6 +62,8 @@ export async function verifySuccessorSourceProvenance({
   successorClosed(source, ["paths", "sourceManifestSourceDigest", "sourceSnapshotDigest"], "source inputs");
   successorClosed(execution, ["config", "planPath", "materializedPath", "selectionState", "runDir"], "execution inputs");
   successorExact(Object.keys(evaluatorOptionsByCase).sort(), scope.source.bindings.map((entry) => entry.successor_case_id).sort(), "evaluator input inventory");
+  // Reject every case's late authority before opening any result or private input.
+  for (const options of Object.values(evaluatorOptionsByCase)) assertSuccessorFrozenAdmissionOptions(options);
   const inputIdentity = inspectSuccessorScoringInputs(scoringInputs, preparation);
   assertSuccessorScoringExecution(scoringInputs, preparation, execution);
   const [runner, evaluator, scorer, admission] = await Promise.all([
@@ -123,30 +125,13 @@ export async function verifySuccessorSourceProvenance({
     // Mirror #197's admission-resolution boundary; do not fabricate its private
     // verified-authority handle or infer admission from the result's status.
     const inputs = derived.scoringInputs;
-    const frozen = {
+    // The preparation-1.1 manifest binds only the frozen admission record.
+    // An otherwise valid later overlay is not this experiment's pinned authority.
+    const effectiveAdmissionAuthority = admission.resolveEffectiveAdmissionAuthority({
       frozenAdmissionRecord: inputs.admissionRecord,
-      frozenAdmissionSource: inputs.sources.admissionRecord,
       requirementRecord: inputs.requirementRecord,
-      requirementRecordSource: inputs.sources.requirementRecord,
-      evaluatorReference: inputs.evaluatorReference,
-      scoringInputFreezeManifest: inputs.freezeManifest,
-      scoringInputFreezeManifestSource: inputs.freezeManifestSource, root,
-    };
-    const authorityFields = ["admissionDecisionPath", "admissionReviewAuthorityPath", "admissionReviewAuthoritySourceDigest", "admissionReviewArchivePath"];
-    const count = authorityFields.filter((key) => Boolean(options[key])).length;
-    if (count !== 0 && count !== authorityFields.length) successorFail("SUCCESSOR_ADMISSION_EVIDENCE_PARTIAL", "admission authority");
-    const effectiveAdmissionAuthority = count === authorityFields.length
-      ? admission.resolveEffectiveAdmissionAuthorityFromFiles({
-        ...frozen, decisionPath: options.admissionDecisionPath,
-        reviewAuthorityPath: options.admissionReviewAuthorityPath,
-        reviewAuthoritySourceDigest: options.admissionReviewAuthoritySourceDigest,
-        reviewArchivePath: options.admissionReviewArchivePath,
-      })
-      : admission.resolveEffectiveAdmissionAuthority({
-        frozenAdmissionRecord: inputs.admissionRecord,
-        requirementRecord: inputs.requirementRecord,
-        evaluatorReference: inputs.evaluatorReference, root,
-      });
+      evaluatorReference: inputs.evaluatorReference, root,
+    });
     // Existing #197 raw scoring remains the only score calculation.
     const rebuilt = scorer.buildPortfolioEngineeringResult({ ...derived, effectiveAdmissionAuthority }, { root });
     successorExact(rebuilt, saved.engineering, "rederived complete engineering result");

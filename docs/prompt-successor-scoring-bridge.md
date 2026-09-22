@@ -51,6 +51,14 @@ Missing or mismatched files fail without creating a capability. The returned
 opaque handle remains bound to the full preparation identity. Per-case use
 rereads its public references and prevents caller-supplied path overrides.
 
+The handle retains a detached config parsed from the verified file bytes.
+`assertSuccessorScoringExecution` requires complete public-field equality, not
+just `_configPath` equality. Only `_kind`, `_configPath` and `_protocolPath` are
+loader metadata; their expected values are checked separately. Added, missing,
+or changed public fields, changed arrays and arbitrary underscore fields fail.
+This check occurs before the provenance API opens saved results. It does not
+change the generic #197 planner or retroactively authorize a different config.
+
 The existing #197 public-input API anchors these files to its repository root.
 An externally stored real package must first have its public metadata supplied
 through that supported boundary; this code does not pretend that an arbitrary
@@ -62,6 +70,16 @@ transport/preparation checks. It cannot create a full provenance report. A
 non-null digest does not make inputs admitted or authorize a model call. Pending
 admission stays pending. Missing real evaluator packages are still a measured-run
 blocker; no placeholder approval or oracle is created by the production API.
+
+Preparation 1.1 has no pre-result decision-overlay binding. Every case rejects
+`admissionDecisionPath`, `admissionReviewAuthorityPath`,
+`admissionReviewAuthoritySourceDigest` and `admissionReviewArchivePath` by
+presence, even when null or undefined, before any result/private input is opened.
+The provenance API uses only the existing frozen-record admission resolver.
+A valid overlay supplied later is still not this experiment's authority. Future
+overlay support requires a separately defined pre-result contract binding its
+exact per-fixture paths, bytes and digests into preparation identity; it must not
+reinterpret an existing 1.1 run or loosen the generic #197 resolver.
 
 ## Existing verifier/scorer connection
 
@@ -103,6 +121,28 @@ handles, caller path overrides and later public-input changes. It uses the same
 preparation/runtime for both arms, separate native run IDs, and the exact frozen
 source inputs. No real credentials or provider executable are used.
 
+The verification record's `declared_activity` is explicitly
+`expected_not_instrumented`. Its expected zero provider calls, measured-result
+reads and private-evaluator process calls describe the synthetic test design;
+they are not observed counters or an independent zero-call attestation.
+`synthetic_native_attempts` remains an incremented test counter. Older saved
+records and hashes stay unchanged, but their constant zero fields must likewise
+not be relabeled as observed telemetry.
+
+## Bounded mandatory regressions
+
+The normal validation workflow runs the input-guard unit suite and
+`test-ask-benchmark-prompt-successor-scoring-contract.mjs`. The latter uses the
+existing synthetic input generator in a separate local clone and the real public
+input opener. It checks same-path config substitution, late overlays in all
+28 case/role positions, frozen pending admission, and actual materialization of
+the four mappings (112 native plan cases). Synthetic scopes are used only for
+preflight rejection and never create successful result-provenance handles.
+It launches no native agent and does not run the 28-attempt scoring integration.
+The worker has a 240-second bound; timeout or failure is not a successful skip.
+These tests supplement rather than replace existing current-source and frozen
+compatibility gates. No required checks or error handling are disabled.
+
 ## Verification commands
 
 In a clean commit of the candidate (Node 24; a C compiler for process tests):
@@ -110,6 +150,8 @@ In a clean commit of the candidate (Node 24; a C compiler for process tests):
 ```sh
 node --test scripts/test-ask-benchmark-calibration-source.mjs
 node --test scripts/test-ask-benchmark-prompt-successor-scoring-inputs.mjs
+node --test scripts/test-ask-benchmark-prompt-successor-input-guards.mjs
+node --test scripts/test-ask-benchmark-prompt-successor-scoring-contract.mjs
 node --test scripts/test-ask-benchmark-prompt-successor-delivery.mjs
 node --test scripts/test-ask-benchmark-prompt-successor-report.mjs
 node --test scripts/test-ask-benchmark-prompt-successor.mjs

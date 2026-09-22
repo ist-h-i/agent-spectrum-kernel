@@ -150,7 +150,7 @@ export async function openSuccessorScoringInputs({ preparation, manifestPath, ro
   if (!raw.equals(readStableBytes(manifestPath, "scoring input manifest after", MAX_BYTES))) successorFail("SUCCESSOR_SCORING_INPUT_DRIFT", "manifest changed");
   successorExact(readSuccessorImplementationIdentity(root), preparation.implementation, "scoring implementation after reads");
   const handle = Object.freeze({ kind: "verified_successor_scoring_inputs" });
-  handles.set(handle, { root, manifestPath, raw, manifest, entries, preparationDigest: preparation.preparation_digest });
+  handles.set(handle, { root, manifestPath, raw, manifest, entries, executionConfig: structuredClone(config.value), preparationDigest: preparation.preparation_digest });
   return handle;
 }
 
@@ -183,5 +183,36 @@ export function successorScoringOptions(handle, preparation, fixtureId) {
 export function assertSuccessorScoringExecution(handle, preparation, execution) {
   const value = get(handle, preparation);
   const file = readReference(value.root, value.manifest.execution_config);
-  successorExact(resolve(execution.config._configPath), file.path, "pinned native execution config");
+  assertSuccessorExecutionConfigObject(execution.config, value.executionConfig, { root: value.root, configPath: file.path });
+}
+
+/** Pure comparison only; this function cannot create a scoring capability. */
+export function assertSuccessorExecutionConfigObject(config, pinnedConfig, { root, configPath }) {
+  successorClosed(config, [...Object.keys(pinnedConfig), "_kind", "_configPath", "_protocolPath"], "native execution config");
+  const { _kind, _configPath, _protocolPath, ...publicConfig } = config;
+  successorExact(_kind, "portfolio", "native execution config kind");
+  if (typeof _configPath !== "string" || !_configPath || typeof _protocolPath !== "string" || !_protocolPath) {
+    successorFail("SUCCESSOR_SCORING_INPUT_PATH", "native execution config metadata");
+  }
+  successorExact(resolve(_configPath), resolve(configPath), "pinned native execution config");
+  successorExact(resolve(_protocolPath), resolve(root, pinnedConfig.protocol_path), "pinned native execution protocol");
+  // Only the three verified loader fields above are metadata. Do not discard
+  // arbitrary underscore-prefixed fields or compare only a subset of public data.
+  successorExact(publicConfig, pinnedConfig, "pinned native execution config content");
+}
+
+export const SUCCESSOR_UNPINNED_ADMISSION_FIELDS = Object.freeze([
+  "admissionDecisionPath", "admissionReviewAuthorityPath",
+  "admissionReviewAuthoritySourceDigest", "admissionReviewArchivePath",
+]);
+
+/** Preparation 1.1 does not bind decision overlays. Presence is forbidden even
+ * for null/undefined fields; an overlay needs a new pre-result contract. */
+export function assertSuccessorFrozenAdmissionOptions(options) {
+  if (!options || typeof options !== "object" || Array.isArray(options)) {
+    successorFail("SUCCESSOR_SHAPE_INVALID", "per-case evaluator options");
+  }
+  for (const field of SUCCESSOR_UNPINNED_ADMISSION_FIELDS) {
+    if (Object.hasOwn(options, field)) successorFail("SUCCESSOR_UNPINNED_ADMISSION_AUTHORITY", field);
+  }
 }
