@@ -16,6 +16,7 @@ import { buildPromptSuccessorPreparation, buildSuccessorSourceScope } from "./as
 import { readSuccessorParent, readSuccessorImplementationIdentity } from "./ask-benchmark-prompt-successor-repository.mjs";
 import { openSuccessorPromptInput, consumeSuccessorPromptInput, successorInputProjection } from "./ask-benchmark-prompt-successor-delivery.mjs";
 import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
+import { inspectChildTermination } from "./test-successor-process-state.mjs";
 
 // This entry is for a clean committed candidate. All generated files stay outside
 // it. There is no PATH lookup of Codex, provider call, real credential or evaluator.
@@ -99,10 +100,6 @@ function independentStdin(preparation, target, task) {
   assert.ok(index >= 0 && template.indexOf(marker, index + marker.length) < 0, "one template marker");
   return Buffer.concat([template.subarray(0, index), task, template.subarray(index + marker.length)]);
 }
-function dead(pid) {
-  try { process.kill(pid, 0); return false; }
-  catch (error) { if (error.code === "ESRCH") return true; throw error; }
-}
 
 await test("F3: successor input traverses the real native runner without a provider", { timeout: 600000 }, async (t) => {
   assert.equal(process.versions.node.split(".")[0], "24", "requires Node 24; wrong runtime is a failure, not a skip");
@@ -115,6 +112,13 @@ await test("F3: successor input traverses the real native runner without a provi
   const evidence = { target: implementation, base: "e6db9604ed0d66b11289b2f6ceb768657e245849", node: process.version,
     platform: process.platform, architecture: process.arch, provider_calls: 0, evaluator_calls: 0, measured_result_reads: 0,
     protected_files_modified: false, checks: [], native_attempts: [], limitation: "Fake-process transport/control evidence, not real Codex isolation or evaluator/opaque-provenance report acceptance." };
+  evidence.child_termination = [];
+  const assertTerminatedChild = (pid, mode) => {
+    const observed = inspectChildTermination(pid);
+    evidence.child_termination.push({ pid, mode, ...observed });
+    assert.equal(observed.execution_terminated, true, "the fake descendant must no longer execute");
+    if (!observed.reaped) t.diagnostic(`${mode}: terminated zombie remains owned by the host reaper; reaped=false`);
+  };
   t.diagnostic(`Generated test artifacts (outside checkout): ${work}`);
   const check = async (name, action) => t.test(name, async () => {
     try { await action(); evidence.checks.push({ name, status: "pass" }); }
@@ -293,7 +297,7 @@ await test("F3: successor input traverses the real native runner without a provi
       const before = nativeCaptureIds(captures); const result = s.invoke(() => executePortfolio(args));
       const capture = nativeCapture(captures, before);
       const pid = Number(readFileSync(resolve(captures, `${capture.id}.child`), "utf8").trim());
-      assert.ok(Number.isInteger(pid) && pid > 1); assert.equal(dead(pid), true, "the known fake descendant is gone");
+      assertTerminatedChild(pid, "residual");
       assert.deepEqual(result.outcomes, [{ case_id: args.caseId, status: "invalid" }]);
       const actual = observed(role, args.caseId).attempt;
       assert.equal(actual.result.final_output, null); assert.equal(actual.result.terminal_workspace_authority_availability, "unavailable");
@@ -311,7 +315,7 @@ await test("F3: successor input traverses the real native runner without a provi
       const actual = inspectVerifiedPortfolioExecution(execution).cases.find((entry) => entry.entry.case_id === nativeCase).attempts[0];
       assert.equal(actual.result.failure_kind, "timeout"); assert.equal(actual.result.final_output, null);
       const pid = Number(readFileSync(resolve(captures, `${capture.id}.child`), "utf8").trim());
-      assert.equal(dead(pid), true); assert.equal(existsSync(capture.meta[0]), false);
+      assertTerminatedChild(pid, "timeout"); assert.equal(existsSync(capture.meta[0]), false);
       evidence.timeout_limit = { observed_path: "shared_runner_ordinary_control", observed_timeout_ms: 1200, successor_deadline_ms: 900000, successor_full_deadline_elapsed: false };
     });
   } finally {

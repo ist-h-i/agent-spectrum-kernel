@@ -59,6 +59,7 @@ function gitBytes(root, revision, path) {
  * The returned handle cannot be created by matching caller-supplied digests.
  */
 export async function openSuccessorPromptInput({ preparation, scope, expectedScopeDigest, caseId, root = ROOT }) {
+  ({ preparation, scope } = structuredClone({ preparation, scope }));
   const implementation = readSuccessorImplementationIdentity(root);
   successorExact(preparation.implementation, implementation, "loaded implementation");
   const { parent } = await readSuccessorParent({ root });
@@ -111,6 +112,7 @@ export async function openSuccessorPromptInput({ preparation, scope, expectedSco
   if (!bytes.equals(gitBytes(root, parent.source_revision, path))) successorFail("SUCCESSOR_PROMPT_SOURCE_DRIFT", "frozen source bytes");
   // Validate the marker without substituting any actual task or reading outputs.
   renderSuccessorStdin(bytes, Buffer.from("synthetic-marker-check"));
+  successorExact(readSuccessorImplementationIdentity(root), implementation, "source session after Prompt read");
   const handle = Object.freeze({ kind: "successor_prompt_source_handle" });
   handles.set(handle, { preparation: copy(preparation), target: copy(target), path, native: copy(native), scope: copy(scope), bytes: Buffer.from(bytes), used: false });
   return handle;

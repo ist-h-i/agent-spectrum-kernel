@@ -52,6 +52,10 @@ export async function verifySuccessorSourceProvenance({
   accessMode, root = ROOT,
 }) {
   if (accessMode !== "synthetic_only") successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "provenance access mode");
+  // Snapshot data, but retain the identity of the opaque scoring-input capability.
+  ({ preparation, scope, source, execution, evaluatorOptionsByCase } = structuredClone({
+    preparation, scope, source, execution, evaluatorOptionsByCase,
+  }));
   validatePromptSuccessorPreparation(preparation);
   validateSuccessorSourceScope(scope, preparation, expectedScopeDigest);
   successorExact(resolve(root), ROOT, "loaded verifier root");

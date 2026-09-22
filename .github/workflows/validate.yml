@@ -18,6 +18,12 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Run successor snapshot and source-session regressions (current HEAD)
+        run: |
+          node --test scripts/test-ask-benchmark-source-session.mjs scripts/test-successor-process-state.test.mjs scripts/test-frozen-evaluator-fixture.test.mjs
+          node --test scripts/test-ask-benchmark-calibration-source.mjs scripts/test-ask-benchmark-prompt-successor.mjs scripts/test-ask-benchmark-prompt-successor-delivery.mjs scripts/test-ask-benchmark-prompt-successor-native.mjs scripts/test-ask-benchmark-prompt-successor-report.mjs scripts/test-ask-benchmark-prompt-successor-scoring-inputs.mjs
+          node --test scripts/test-ask-benchmark-prompt-successor-integration.mjs scripts/test-ask-benchmark-successor-input-snapshot.mjs scripts/test-ask-benchmark-evaluator-root-manifest.mjs
+
       - name: Run repository validation tests
         run: node scripts/test-validate-repo.mjs
 
@@ -117,47 +123,49 @@ jobs:
       - name: Run build-option fixture contract tests
         run: node scripts/test-ask-benchmark-mn-build-option-update.mjs
 
+      # Frozen fixture contracts run against their declared source closure, not
+      # the evolving runner. Current-HEAD runtime/scorer gates remain above/below.
       - name: Run documentation/config fixture source-freeze tests
-        run: node scripts/test-ask-benchmark-mn-doc-config-correction.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mn-doc-config-correction.mjs
 
       - name: Run focused regression fixture source-freeze tests
-        run: node scripts/test-ask-benchmark-mn-focused-regression-test.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mn-focused-regression-test.mjs
 
       - name: Run CI-evidence review fixture source-freeze tests
-        run: node scripts/test-ask-benchmark-mp-ci-evidence-gap.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-ci-evidence-gap.mjs
 
       - name: Run accessibility interaction review fixture source-freeze tests
-        run: node scripts/test-ask-benchmark-mp-accessibility-interaction-review.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-accessibility-interaction-review.mjs
 
       - name: Run data migration handoff fixture source-freeze tests
-        run: node scripts/test-ask-benchmark-mp-data-migration-handoff.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-data-migration-handoff.mjs
 
       - name: Run frontend state review fixture source-freeze tests
-        run: node scripts/test-ask-benchmark-mp-frontend-state-review.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-frontend-state-review.mjs
 
       - name: Run IaC rollback design fixture source-freeze tests
-        run: node scripts/test-ask-benchmark-mp-iac-rollback-design.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-iac-rollback-design.mjs
 
       - name: Run performance investigation fixture source-freeze tests
-        run: node scripts/test-ask-benchmark-mp-performance-investigation.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-performance-investigation.mjs
 
       - name: Run CI-evidence review archive contract tests
-        run: node scripts/test-ask-benchmark-mp-ci-evidence-gap-review-archive.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-ci-evidence-gap-review-archive.mjs
 
       - name: Run accessibility interaction review archive contract tests
-        run: node scripts/test-ask-benchmark-mp-accessibility-interaction-review-review-archive.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-accessibility-interaction-review-review-archive.mjs
 
       - name: Run data migration handoff review archive contract tests
-        run: node scripts/test-ask-benchmark-mp-data-migration-handoff-review-archive.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-data-migration-handoff-review-archive.mjs
 
       - name: Run frontend state review archive contract tests
-        run: node scripts/test-ask-benchmark-mp-frontend-state-review-archive.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-frontend-state-review-archive.mjs
 
       - name: Run IaC rollback design review archive contract tests
-        run: node scripts/test-ask-benchmark-mp-iac-rollback-design-review-archive.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-iac-rollback-design-review-archive.mjs
 
       - name: Run performance investigation review archive contract tests
-        run: node scripts/test-ask-benchmark-mp-performance-investigation-review-archive.mjs
+        run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-performance-investigation-review-archive.mjs
 
       - name: Run evaluator-authority integration contract tests
         run: node scripts/test-ask-benchmark-portfolio-evaluator-result.mjs

@@ -101,6 +101,7 @@ function get(handle, preparation) {
  * Missing real packages are errors; this entrypoint never supplies placeholders.
  */
 export async function openSuccessorScoringInputs({ preparation, manifestPath, root = ROOT }) {
+  preparation = structuredClone(preparation);
   validatePromptSuccessorPreparation(preparation);
   if (preparation.scoring_input_manifest_digest === null) successorFail("SUCCESSOR_SCORING_INPUTS_REQUIRED", "preparation");
   successorExact(resolve(root), ROOT, "loaded scoring input root");
@@ -147,6 +148,7 @@ export async function openSuccessorScoringInputs({ preparation, manifestPath, ro
   readReference(root, manifest.execution_config);
   for (const entry of manifest.fixtures) for (const role of SUCCESSOR_SCORING_INPUT_ROLES) readReference(root, entry.artifacts[role]);
   if (!raw.equals(readStableBytes(manifestPath, "scoring input manifest after", MAX_BYTES))) successorFail("SUCCESSOR_SCORING_INPUT_DRIFT", "manifest changed");
+  successorExact(readSuccessorImplementationIdentity(root), preparation.implementation, "scoring implementation after reads");
   const handle = Object.freeze({ kind: "verified_successor_scoring_inputs" });
   handles.set(handle, { root, manifestPath, raw, manifest, entries, preparationDigest: preparation.preparation_digest });
   return handle;

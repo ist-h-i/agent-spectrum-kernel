@@ -107,6 +107,8 @@ export function assertSuccessorSourceBinding({ preparation, scope, binding, norm
  */
 export async function openSuccessorResultSource({ preparation, scope, expectedScopeDigest, paths, sourceManifestSourceDigest, sourceSnapshotDigest, accessMode, root = ROOT }) {
   if (accessMode !== "synthetic_only") successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "accessMode");
+  // Own the complete validation input before the first asynchronous boundary.
+  ({ preparation, scope, paths } = structuredClone({ preparation, scope, paths }));
   validatePromptSuccessorPreparation(preparation);
   validateSuccessorSourceScope(scope, preparation, expectedScopeDigest);
   successorClosed(paths, ["normalizedResultsPath", "engineeringResultsPath", "sourceManifestPath"], "paths");
