@@ -223,7 +223,7 @@ export function prepareSuccessorInputForAttempt(handle, { entry, context, adapte
   if (!source || source.used) successorFail("SUCCESSOR_UNVERIFIED_PROMPT_SOURCE", "execution input");
   successorExact(entry.case_id, source.native.source_case_id, "native case");
   successorExact(entry.condition, "full_ask", "native condition");
-  successorExact(entry.fixture_id, source.target.source_fixture_id, "native fixture");
+  successorExact(entry.fixture_id, source.target.fixture_id, "native fixture");
   successorExact(entry.repetition, source.target.repetition, "native repetition");
   successorExact(context.identity.run_instance_id, source.scope.source.run_instance_id, "native run");
   successorExact(context.plan.plan_id, source.scope.source.plan_id, "native plan");

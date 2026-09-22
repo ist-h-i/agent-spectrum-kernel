@@ -19,7 +19,7 @@ function context() {
   const rows = preparation.cases.map((target) => ({
     case_id: target.case_id,
     engineering: {
-      fixture_id: target.source_fixture_id, task_class: target.task_class, repetition: target.repetition,
+      fixture_id: target.fixture_id, task_class: target.task_class, repetition: target.repetition,
       adapter: "codex", condition: "full_ask", scoring_status: "complete",
       requirement_score: { normalized_requirement_score: 0.8 },
       correctness_observations: {

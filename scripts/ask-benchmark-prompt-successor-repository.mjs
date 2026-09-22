@@ -64,7 +64,7 @@ export function readSuccessorImplementationIdentity(root = ROOT) {
   if (git(["status", "--porcelain", "--untracked-files=normal"]) !== "") successorFail("SUCCESSOR_DIRTY_SOURCE", "repository");
   // Bind the implementation actually imported by this process, not just a clean,
   // unrelated checkout supplied as --root. The package has no dynamic plugin path.
-  for (const path of ["scripts/ask-benchmark-prompt-successor.mjs", "scripts/ask-benchmark-prompt-successor-repository.mjs", "scripts/ask-benchmark-prompt-successor-bridge.mjs", "scripts/ask-benchmark-prompt-successor-check.mjs", "scripts/ask-benchmark-prompt-successor-delivery.mjs", "scripts/ask-benchmark-prompt-successor-provenance.mjs", "scripts/ask-benchmark-prompt-successor-report.mjs", "scripts/ask-benchmark-execution.mjs", "scripts/ask-benchmark-prompt-successor-native.mjs"]) {
+  for (const path of ["scripts/ask-benchmark-calibration-source.mjs", "scripts/ask-benchmark-prompt-successor-scoring-inputs.mjs", "scripts/ask-benchmark-materialize.mjs", "scripts/ask-benchmark-evaluator-boundary.mjs", "benchmarks/schemas/portfolio-config.schema.json", "scripts/ask-benchmark-prompt-successor.mjs", "scripts/ask-benchmark-prompt-successor-repository.mjs", "scripts/ask-benchmark-prompt-successor-bridge.mjs", "scripts/ask-benchmark-prompt-successor-check.mjs", "scripts/ask-benchmark-prompt-successor-delivery.mjs", "scripts/ask-benchmark-prompt-successor-provenance.mjs", "scripts/ask-benchmark-prompt-successor-report.mjs", "scripts/ask-benchmark-execution.mjs", "scripts/ask-benchmark-prompt-successor-native.mjs"]) {
     const live = readStableBytes(resolve(ROOT, path), "loaded implementation", 4 * 1024 * 1024);
     const pinned = execFileSync("git", ["-C", root, "show", `${revision}:${path}`], { encoding: null, timeout: 10000, maxBuffer: 4 * 1024 * 1024 });
     if (!live.equals(pinned)) successorFail("SUCCESSOR_IMPLEMENTATION_TRANSPLANT", path);
@@ -72,10 +72,10 @@ export function readSuccessorImplementationIdentity(root = ROOT) {
   return { revision, tree };
 }
 
-export async function prepareSuccessorFromRepository({ root = ROOT, runtime, seed, changeReason }) {
+export async function prepareSuccessorFromRepository({ root = ROOT, runtime, seed, changeReason, scoringInputManifestDigest = null }) {
   const implementation = readSuccessorImplementationIdentity(root);
   const { parent } = await readSuccessorParent({ root });
-  return buildPromptSuccessorPreparation({ parent, runtime, implementation, seed, changeReason });
+  return buildPromptSuccessorPreparation({ parent, runtime, implementation, seed, changeReason, scoringInputManifestDigest });
 }
 
 export async function validateSuccessorFromRepository(preparation, { root = ROOT } = {}) {

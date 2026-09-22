@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalDigest, readStableBytes } from "./content-addressed-store.mjs";
+import { inspectSuccessorScoringInputs, successorScoringOptions, assertSuccessorScoringExecution } from "./ask-benchmark-prompt-successor-scoring-inputs.mjs";
 import { openSuccessorPromptInput, consumeSuccessorPromptInput, successorInputProjection, assertSuccessorAdapterFacts } from "./ask-benchmark-prompt-successor-delivery.mjs";
 import {
   successorExact, successorClosed, successorFail,
@@ -47,7 +48,7 @@ export function assertSuccessorAttemptProvenance({ normalized, engineering, atte
  * This entrypoint intentionally does NOT authorize access to measured material.
  */
 export async function verifySuccessorSourceProvenance({
-  preparation, scope, expectedScopeDigest, source, execution, evaluatorOptionsByCase,
+  preparation, scope, expectedScopeDigest, source, execution, evaluatorOptionsByCase, scoringInputs,
   accessMode, root = ROOT,
 }) {
   if (accessMode !== "synthetic_only") successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "provenance access mode");
@@ -57,6 +58,8 @@ export async function verifySuccessorSourceProvenance({
   successorClosed(source, ["paths", "sourceManifestSourceDigest", "sourceSnapshotDigest"], "source inputs");
   successorClosed(execution, ["config", "planPath", "materializedPath", "selectionState", "runDir"], "execution inputs");
   successorExact(Object.keys(evaluatorOptionsByCase).sort(), scope.source.bindings.map((entry) => entry.successor_case_id).sort(), "evaluator input inventory");
+  const inputIdentity = inspectSuccessorScoringInputs(scoringInputs, preparation);
+  assertSuccessorScoringExecution(scoringInputs, preparation, execution);
   const [runner, evaluator, scorer, admission] = await Promise.all([
     import("./ask-benchmark-execution.mjs"),
     import("./ask-benchmark-evaluator-boundary.mjs"),
@@ -94,6 +97,12 @@ export async function verifySuccessorSourceProvenance({
     });
     successorExact(actual.attempts[0].request.projection, successorInputProjection(delivered.binding), "runner stdin binding");
     const options = { ...evaluatorOptionsByCase[binding.successor_case_id], root };
+    const target = preparation.cases.find(item => item.case_id === binding.successor_case_id);
+    const pinnedInputs = successorScoringOptions(scoringInputs, preparation, target.fixture_id);
+    for (const [key, value] of Object.entries(pinnedInputs)) {
+      if (options[key] !== undefined) successorExact(options[key], value, `pre-result evaluator input.${key}`);
+      options[key] = value;
+    }
     // These fields are set by this bridge, not by an arbitrary case resolver.
     for (const key of ["planPath", "materializedPath", "selectionState", "runDir"]) {
       if (options[key] !== undefined) successorExact(resolve(options[key]), resolve(execution[key]), `evaluator.${key}`);
@@ -139,6 +148,7 @@ export async function verifySuccessorSourceProvenance({
     successorExact(rebuilt, saved.engineering, "rederived complete engineering result");
     rows.push({ case_id: binding.successor_case_id, engineering: structuredClone(rebuilt), normalized: structuredClone(saved.normalized), execution_evidence: structuredClone(actual.attempts[0].evidence), request_projection: structuredClone(actual.attempts[0].request.projection) });
   }
+  for (const fixture of preparation.predecessor.fixtures) successorScoringOptions(scoringInputs, preparation, fixture.fixture_id);
   const last = inspect();
   const closure = (value) => canonicalDigest({
     identity: value.identity,
@@ -149,6 +159,7 @@ export async function verifySuccessorSourceProvenance({
     schema_version: "1.0.0", kind: "prompt_successor_reverified_provenance",
     access_mode: "synthetic_only", preparation_digest: preparation.preparation_digest,
     scope_digest: scope.scope_digest, source: inspectSuccessorSource(stored),
+    scoring_input_manifest_digest: inputIdentity.manifest_digest,
     native_run_instance_id: first.identity.run_instance_id,
     native_plan_id: first.plan.plan_id,
     native_plan_digest: first.identity.plan.digest,

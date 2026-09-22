@@ -132,13 +132,14 @@ await test("F3: successor input traverses the real native runner without a provi
     const { parent } = await readSuccessorParent({ root });
     // A tracked test config keeps source paths repository-relative while all
     // generated state remains outside the clean checkout. No config is rewritten.
-    const configFile = resolve(root, "scripts/test-fixtures/prompt-successor-execution.config.json");
+    const configFile = resolve(root, "benchmarks/prompt-successor-execution.config.json");
     const inputConfig = json(configFile);
     assertBenchmarkSchemaInstance(inputConfig, { schemaPath: resolve(root, "benchmarks/schemas/portfolio-config.schema.json"), label: "F3 test configuration" });
     assert.equal(inputConfig.fixtures.length, 4);
     for (const fixture of inputConfig.fixtures) {
-      const declared = parent.fixtures.find((entry) => entry.source_fixture_id === fixture.id);
+      const declared = parent.fixtures.find((entry) => entry.fixture_id === fixture.id);
       assert.ok(declared); assert.equal(fixture.repetitions, declared.repetitions);
+      assert.equal(fixture.source_fixture_id, declared.source_fixture_id);
     }
     const config = { ...inputConfig, _kind: "portfolio", _configPath: configFile, _protocolPath: resolve(root, inputConfig.protocol_path) };
     const plan = buildPortfolioPlan({ root, config, repositoryRevision: implementation.revision, seed: "f3-native-fake-source-plan" });
@@ -172,7 +173,7 @@ await test("F3: successor input traverses the real native runner without a provi
       assert.deepEqual(nativeCaptureIds(captures), before, "source preparation may probe version/help but must not execute a case");
       assert.equal(prepared.model_calls, 0); assert.equal(prepared.case_attempts_created, 0);
       const bindings = preparation.cases.filter((target) => target.prompt_role === role).map((target) => {
-        const entry = prepared.cases.find((entry) => entry.fixture_id === target.source_fixture_id && entry.repetition === target.repetition);
+        const entry = prepared.cases.find((entry) => entry.fixture_id === target.fixture_id && entry.repetition === target.repetition);
         assert.ok(entry, `native source case for ${target.case_id}`);
         return { successor_case_id: target.case_id, source_case_id: entry.case_id, fixture_input_digest: entry.fixture_input_digest,
           effective_command_digest: prepared.effective_command_digest, environment_snapshot_digest: prepared.environment_snapshot_digest };

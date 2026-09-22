@@ -75,7 +75,7 @@ export function assertSuccessorSourceBinding({ preparation, scope, binding, norm
     repository_revision: scope.source.repository_revision,
     materialization_manifest_digest: scope.source.materialization_manifest_digest,
     runtime_identity_digest: scope.source.runtime_identity_digest,
-    fixture_id: target.source_fixture_id,
+    fixture_id: target.fixture_id,
     fixture_input_digest: binding.fixture_input_digest,
     adapter_track: "codex", condition: "full_ask", repetition: target.repetition,
     registered_repetitions: preparation.predecessor.fixtures.find(({ fixture_id }) => fixture_id === target.fixture_id).repetitions,

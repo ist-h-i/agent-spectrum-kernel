@@ -1,14 +1,10 @@
 import { canonicalDigest, stableCanonicalJson } from "./content-addressed-store.mjs";
+import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
 
 // Preparation and inventory operations only. This module cannot spawn a runtime.
-export const SUCCESSOR_VERSION = "1.0.0";
+export const SUCCESSOR_VERSION = "1.1.0";
 export const SUCCESSOR_ROLES = Object.freeze(["current_prompt", "prompt_v2"]);
-export const SUCCESSOR_FIXTURES = Object.freeze([
-  ["cal-session-refresh", "pr-session-refresh-medium-hard", "review", 3],
-  ["cal-export-lease", "pr-export-lease-hard", "review", 3],
-  ["cal-atomic-rule-batch", "impl-rule-batch-medium-hard", "implementation", 3],
-  ["cal-concurrent-transfer", "impl-transfer-hard", "implementation", 5],
-]);
+export const SUCCESSOR_FIXTURES = CALIBRATION_SOURCE_BINDINGS;
 const DIGEST = /^sha256:[a-f0-9]{64}$/u;
 const GIT = /^[a-f0-9]{40}$/u;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu;
@@ -95,7 +91,8 @@ export function validateSuccessorParent(value) {
   return value;
 }
 
-export function buildPromptSuccessorPreparation({ parent, runtime, implementation, seed, changeReason }) {
+export function buildPromptSuccessorPreparation({ parent, runtime, implementation, seed, changeReason, scoringInputManifestDigest = null }) {
+  if (scoringInputManifestDigest !== null) successorDigest(scoringInputManifestDigest, "scoring input manifest");
   successorClosed(implementation, ["revision", "tree"], "implementation");
   git(implementation.revision, "implementation.revision");
   git(implementation.tree, "implementation.tree");
@@ -109,6 +106,8 @@ export function buildPromptSuccessorPreparation({ parent, runtime, implementatio
     predecessor: clone(parent),
     implementation: clone(implementation),
     runtime: clone(runtime),
+    scoring_input_manifest_digest: scoringInputManifestDigest,
+    execution_fixture_namespace: "catalog",
     seed,
     change_reason: changeReason,
     decision_scope: { adapter: "codex", model: runtime.model, task_classes: ["review", "implementation"], excluded_adapters: ["claude"], repository_wide: false },
@@ -142,9 +141,9 @@ export function buildPromptSuccessorPreparation({ parent, runtime, implementatio
 }
 
 export function validatePromptSuccessorPreparation(value, { expectedParent } = {}) {
-  successorClosed(value, ["schema_version", "kind", "predecessor", "implementation", "runtime", "seed", "change_reason", "decision_scope", "readiness", "permissions", "experiment_digest", "runtime_digest", "expected_case_count", "cases", "preparation_id", "preparation_digest"], "preparation");
+  successorClosed(value, ["schema_version", "kind", "predecessor", "implementation", "runtime", "scoring_input_manifest_digest", "execution_fixture_namespace", "seed", "change_reason", "decision_scope", "readiness", "permissions", "experiment_digest", "runtime_digest", "expected_case_count", "cases", "preparation_id", "preparation_digest"], "preparation");
   if (expectedParent !== undefined) successorExact(value.predecessor, expectedParent, "preparation.predecessor");
-  const expected = buildPromptSuccessorPreparation({ parent: value.predecessor, runtime: value.runtime, implementation: value.implementation, seed: value.seed, changeReason: value.change_reason });
+  const expected = buildPromptSuccessorPreparation({ parent: value.predecessor, runtime: value.runtime, implementation: value.implementation, seed: value.seed, changeReason: value.change_reason, scoringInputManifestDigest: value.scoring_input_manifest_digest });
   successorExact(value, expected, "preparation");
   return value;
 }

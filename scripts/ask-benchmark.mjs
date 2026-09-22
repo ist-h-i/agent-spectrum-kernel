@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
+import { resolvePortfolioFixtureSource } from "./ask-benchmark-calibration-source.mjs";
 import {
   chmodSync,
   copyFileSync,
@@ -266,7 +267,8 @@ export function validatePortfolioFoundation(config, canonicalConfigPath, { root 
     if (![3, 5].includes(fixture.repetitions)) errors.push(`${fixture.id} repetitions must be 3 or 5`);
     if (fixture.aggregate_eligible !== (fixture.suite !== "calibration")) errors.push(`${fixture.id} aggregate eligibility must exclude calibration only`);
     if (fixture.id === "impl-transfer-hard" && fixture.suite === "calibration" && fixture.repetitions !== 5) errors.push("concurrent transfer calibration requires 5 repetitions");
-    const fixtureDirectory = resolve(fixtureRoot(config, root), fixture.id);
+    const sourceFixtureId = resolvePortfolioFixtureSource(fixture);
+    const fixtureDirectory = resolve(fixtureRoot(config, root), sourceFixtureId);
     const sourceFreezeCandidatePath = resolve(fixtureDirectory, "source-freeze-candidate.json");
     const sourceFreezeCandidate = existsSync(sourceFreezeCandidatePath) ? readJson(sourceFreezeCandidatePath) : null;
     const isPendingSourceFreezeCandidate = sourceFreezeCandidate?.fixture_id === fixture.id
@@ -295,7 +297,7 @@ export function validatePortfolioFoundation(config, canonicalConfigPath, { root 
     const actualDigest = sha256(readFileSync(manifestPath));
     if (actualDigest !== fixture.input_manifest_sha256) errors.push(`${fixture.id} input manifest digest does not match`);
     if (!inputManifests.has(manifestPath)) inputManifests.set(manifestPath, readJson(manifestPath));
-    if (!inputManifests.get(manifestPath).fixtures?.[fixture.id]) errors.push(`${fixture.id} is absent from its input manifest`);
+    if (!inputManifests.get(manifestPath).fixtures?.[sourceFixtureId]) errors.push(`${fixture.id} is absent from its input manifest`);
     if (fixture.verification_command_contract) {
       try {
         const contractPath = resolveRepoPath(fixture.verification_command_contract.path, `${fixture.id} verification command contract`, root);

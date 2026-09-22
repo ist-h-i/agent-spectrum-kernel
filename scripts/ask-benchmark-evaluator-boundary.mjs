@@ -3474,6 +3474,11 @@ function verifyEvaluatorAuthorityCore({
   return { bundle, normalized, result, verified, scoringInputs, ...readiness };
 }
 
+/** Public pre-result inputs only: no private bundle or result is opened. */
+export function verifyPortfolioScoringInputs(options) {
+  return readScoringInputSources(options);
+}
+
 export function verifyEvaluatorAuthority(options) {
   return verifyEvaluatorAuthorityCore(options);
 }

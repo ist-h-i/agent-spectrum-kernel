@@ -121,7 +121,7 @@ export function calculateSuccessorComparison({ preparation, policy, rows }) {
     if (!target || byCase.has(row.case_id)) successorFail("SUCCESSOR_REPORT_TRANSPLANT", "report case");
     const result = row.engineering;
     successorExact([result.fixture_id, result.task_class, result.adapter, result.condition, result.repetition],
-      [target.source_fixture_id, target.task_class, "codex", "full_ask", target.repetition], "engineering case identity");
+      [target.fixture_id, target.task_class, "codex", "full_ask", target.repetition], "engineering case identity");
     byCase.set(row.case_id, result);
   }
   const missing = []; const regressions = []; const paired = [];
