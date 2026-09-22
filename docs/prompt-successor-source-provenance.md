@@ -1,7 +1,7 @@
 # Prompt successor source and provenance repair candidate
 
 Status: authored, not published, not executed in the full repository.
-Target: PR #290 at b2606073ff4934aafc619201f47c0195c8fc00ad; Issue #289.
+Target: PR #290 / Issue #289. The predecessor published snapshot was `b2606073ff4934aafc619201f47c0195c8fc00ad`; the exact candidate is the Git commit containing this document.
 
 ## Decisions
 
@@ -25,10 +25,29 @@ metadata binds preparation, input and template digests without publishing the ra
 Prompt. Common workspace files are not overwritten. Calls without the optional
 handle preserve the ordinary native execution path. The successor-only command
 adds an explicit network_access=false setting. Declared model, CLI version,
-binary/config identity, reasoning, sandbox, approval, timeout and local Node/OS/arch
-are checked against native runtime facts. configuration_digest is the exact
-native runtime-config file digest. These checks do not establish effective OS
-isolation, authentication/backend availability or dependency attestation.
+native-binary/config identity, reasoning, sandbox, approval, timeout and local
+Node/OS/arch are checked against native runtime facts. The successor runner requires
+the directly invoked executable to be the platform-native `codex` / `codex.exe`;
+the Node package wrapper is not accepted as the measured executable.
+Before version/help probes, the runner inspects format, CPU architecture and the
+complete SHA-256 from one stable open file. A script renamed `codex` is rejected.
+The existing exact-byte checks remain in effect before and after probes and
+execution. Supported header formats are thin little-endian Mach-O64, ELF64 and
+PE32+ for x64/arm64; other formats fail closed rather than falling back to a
+wrapper. Header classification is not code signing, a complete loader check,
+backend availability, dynamic dependency attestation or proof against a hostile
+same-user process racing the operating system's eventual executable open.
+
+Additional no-provider check:
+`node --test scripts/test-ask-benchmark-prompt-successor-native.mjs`.
+The test includes synthetic headers and one local Node binary inspection. It does
+not invoke the real Codex executable or prove that F3's successor runner path has
+been exercised. F1's opaque-handle positive report and F3's native-process
+integration remain separate acceptance work.
+`configuration_digest` is the exact native runtime-config file digest. The former
+unobserved `dependency_digest` declaration was removed rather than presenting an
+unverified dependency closure as authority. These checks still do not establish
+effective OS isolation or authentication/backend availability.
 
 `prepareSuccessorPortfolioSource` prepares native run identity and performs bounded
 version/help probes without starting a case. It is a target-host operation, not a

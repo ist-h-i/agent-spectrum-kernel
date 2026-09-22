@@ -198,6 +198,25 @@ export function calculateSuccessorComparison({ preparation, policy, rows }) {
     prompt_outcome: outcome, mutation_authorized: false };
 }
 
+/**
+ * Pure identity validation only. This does not confer provenance authority.
+ * The caller must already hold opaque handles returned by the real verifier.
+ */
+export function validateSuccessorProvenancePair(current, candidate) {
+  successorExact(current.source.run_instance_id, candidate.source.run_instance_id, "successor experiment run");
+  if (current.native_run_instance_id === candidate.native_run_instance_id) {
+    successorFail("SUCCESSOR_NATIVE_RUN_COLLISION", "paired native runs");
+  }
+  for (const [field, label] of [
+    ["native_plan_id", "paired native plan id"],
+    ["native_plan_digest", "paired native plan"],
+    ["native_repository_revision", "paired repository revision"],
+    ["native_runtime_identity_digest", "paired native runtime"],
+    ["native_materialization_manifest_digest", "paired materialization"],
+  ]) successorExact(current[field], candidate[field], label);
+  return true;
+}
+
 export function buildSuccessorComparisonFromProvenance({ preparation, policy, sources }) {
   successorClosed(sources, ["current_prompt", "prompt_v2"], "report sources");
   const evidence = []; const rows = [];
@@ -212,7 +231,7 @@ export function buildSuccessorComparisonFromProvenance({ preparation, policy, so
     evidence.push({ prompt_role: role, provenance_digest: canonicalDigest(source), source: clone(source) });
     rows.push(...readSuccessorProvenanceRows(sources[role]).map(({ case_id, engineering }) => ({ case_id, engineering })));
   }
-  if (evidence[0].source.source.run_instance_id !== evidence[1].source.source.run_instance_id) successorFail("SUCCESSOR_RUN_TRANSPLANT", "paired successor run");
+  validateSuccessorProvenancePair(evidence[0].source, evidence[1].source);
   const analysis = calculateSuccessorComparison({ preparation, policy, rows });
   const base = { schema_version: "1.0.0", kind: "prompt_successor_synthetic_comparison_report",
     preparation_digest: preparation.preparation_digest, policy_digest: policy.policy_digest, sources: evidence,

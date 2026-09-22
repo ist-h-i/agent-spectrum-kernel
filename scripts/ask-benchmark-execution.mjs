@@ -21,6 +21,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, parse, relative, resolve, sep } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
 import { assertTrackedRepositoryMatchesHead, canonicalDigest, stableCanonicalJson, validateMaterializedPortfolio } from "./ask-benchmark-materialize.mjs";
 import { verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
 import { assertStableFileEvidence, readStableFile } from "./ask-benchmark-stable-file.mjs";
@@ -45,7 +46,8 @@ import {
 } from "./ask-benchmark-terminal-workspace.mjs";
 import {
   assertSuccessorInputRun, prepareSuccessorInputForAttempt, successorInputProjection,
-  successorRuntimeForInput, successorEffectiveCommand, assertSuccessorAdapterFacts, assertSuccessorVersionOutput,
+  successorRuntimeForInput, successorEffectiveCommand, assertSuccessorAdapterFacts, assertSuccessorExecutableDescriptor,
+  assertSuccessorVersionOutput,
 } from "./ask-benchmark-prompt-successor-delivery.mjs";
 
 export const EXECUTION_RUNNER_VERSION = "1.0.0";
@@ -429,9 +431,17 @@ function probeAvailableRuntime(runtime, verifiedExecutable, command, environment
   const version = spawnSync(executable, ["--version"], { encoding: "utf8", env: environmentFor(environmentSnapshot), timeout: 10000, killSignal: "SIGKILL", maxBuffer: 1024 * 1024 });
   assertExecutableIdentity(verifiedExecutable);
   const observedVersionOutput = `${version.stdout ?? ""}${version.stderr ?? ""}`;
-  if (successorRuntime !== null) assertSuccessorVersionOutput(successorRuntime.cli_version, observedVersionOutput);
+  let successorVersion = null;
+  if (successorRuntime !== null) {
+    assertSuccessorVersionOutput(successorRuntime.cli_version, observedVersionOutput);
+    successorVersion = successorRuntime.cli_version;
+  }
   const versionConfirmed = version.status === 0 && observedVersionOutput.includes(runtime.expected_executable_version);
-  const versionEvidence = durableScalarEvidence(observedVersionOutput, versionConfirmed ? runtime.expected_executable_version : "unconfirmed", "unconfirmed");
+  const versionEvidence = durableScalarEvidence(
+    observedVersionOutput,
+    versionConfirmed ? (successorVersion ?? runtime.expected_executable_version) : "unconfirmed",
+    "unconfirmed",
+  );
   const executableEvidence = {
     ...verifiedExecutable.descriptor,
     observed_version: versionEvidence.value,
@@ -697,6 +707,17 @@ function ensureAdapterIdentity({ root, runDir, plan, adapter, runtimeConfig, ver
   let executable = null;
   let availabilityEvidence = null;
   if (effectiveRuntime.availability === "available") {
+    if (successorRuntime !== null) {
+      assertSuccessorExecutableDescriptor(successorRuntime, verifiedExecutable.descriptor);
+      // Tie native format/CPU checks to the same exact bytes as the runtime pin.
+      // A script named "codex" must fail before --version or --help can run.
+      assertSuccessorNativeExecutable({
+        path: verifiedExecutable.path,
+        expectedDigest: successorRuntime.executable_digest,
+        os: successorRuntime.os,
+        arch: successorRuntime.arch,
+      });
+    }
     try {
       executable = probeAvailableRuntime(effectiveRuntime, verifiedExecutable, command, environmentSnapshot, successorRuntime);
     } catch (error) {

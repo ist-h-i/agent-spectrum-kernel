@@ -41,7 +41,7 @@ are changed. PR #288's documentary correction is independent.
 
 A runtime proposal must explicitly identify CLI version, executable bytes, Node24,
 OS/architecture, model, provider revision status, auth class (not credentials),
-config/dependency digests, reasoning, sandbox/approval/network and timeout. These
+config digest, direct native executable digest, reasoning, sandbox/approval/network and timeout. These
 are declarations that a host test must substantiate, **not attestation from a
 matching hash or user-supplied `verified: true`**. Unknown model/auth/config inputs
 block preparation rather than being fabricated. The fixture helpers use a clearly

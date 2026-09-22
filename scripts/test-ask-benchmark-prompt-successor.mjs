@@ -39,7 +39,7 @@ test("balanced pairs share exact fixture, runtime and scoring condition", () => 
   }
 });
 test("CLI/model/config changes create new identities, not a rewritten historical parent", () => {
-  for (const field of ["cli_version", "model", "configuration_digest", "dependency_digest", "executable_digest"]) {
+  for (const field of ["cli_version", "model", "configuration_digest", "executable_digest"]) {
     const runtime = syntheticRuntime(); runtime[field] = field.endsWith("digest") ? d(`new:${field}`) : field === "cli_version" ? "0.154.0" : "different-synthetic-model";
     const other = syntheticPreparation({ runtime });
     assert.notEqual(other.preparation_digest, prep.preparation_digest);

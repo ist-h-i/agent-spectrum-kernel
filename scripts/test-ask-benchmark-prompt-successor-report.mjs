@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { canonicalDigest } from "./content-addressed-store.mjs";
-import { buildSuccessorComparisonPolicy, calculateSuccessorComparison, buildSuccessorComparisonFromProvenance } from "./ask-benchmark-prompt-successor-report.mjs";
-import { syntheticPreparation, syntheticParent } from "./test-prompt-successor-fixtures.mjs";
+import { buildSuccessorComparisonPolicy, calculateSuccessorComparison, buildSuccessorComparisonFromProvenance, validateSuccessorProvenancePair } from "./ask-benchmark-prompt-successor-report.mjs";
+import { syntheticPreparation, syntheticParent, syntheticDigest as d } from "./test-prompt-successor-fixtures.mjs";
 
 const thresholds = {
   quality: { minimum_fixture_median_delta: 0, minimum_nonnegative_fraction_numerator: 2, minimum_nonnegative_fraction_denominator: 3 },
@@ -108,6 +108,35 @@ test("policy drift cannot be relabeled as the same frozen comparison", () => {
   const c = context(); c.policy.thresholds.tokens.minimum_median_reduction_ratio = 0;
   assert.throws(() => calculateSuccessorComparison(c));
 });
+
+test("paired provenance requires one successor experiment and two distinct equivalent native runs", () => {
+  const common = {
+    preparation_digest: d("prep"),
+    source: { run_instance_id: "00000000-0000-4000-8000-000000000289" },
+    native_plan_id: `plan-${"1".repeat(64)}`,
+    native_plan_digest: d("plan"),
+    native_repository_revision: "a".repeat(40),
+    native_runtime_identity_digest: d("runtime"),
+    native_materialization_manifest_digest: d("materialization"),
+  };
+  const current = { ...structuredClone(common), native_run_instance_id: "00000000-0000-4000-8000-000000000001" };
+  const candidate = { ...structuredClone(common), native_run_instance_id: "00000000-0000-4000-8000-000000000002" };
+  assert.doesNotThrow(() => validateSuccessorProvenancePair(current, candidate));
+
+  assert.throws(
+    () => validateSuccessorProvenancePair(current, { ...candidate, native_run_instance_id: current.native_run_instance_id }),
+    { code: "SUCCESSOR_NATIVE_RUN_COLLISION" },
+  );
+  assert.throws(() => validateSuccessorProvenancePair(current, {
+    ...candidate,
+    native_runtime_identity_digest: d("other-runtime"),
+  }));
+  assert.throws(() => validateSuccessorProvenancePair(current, {
+    ...candidate,
+    source: { run_instance_id: "00000000-0000-4000-8000-000000000999" },
+  }));
+});
+
 test("ordinary objects and stored-reader handles cannot become provenance reports", () => {
   const c = context();
   for (const handle of [{}, { provenance_digest: canonicalDigest("fake") }, { source_digest: canonicalDigest("fake") }]) {

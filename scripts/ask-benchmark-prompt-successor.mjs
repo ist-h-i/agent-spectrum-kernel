@@ -53,11 +53,11 @@ function tagged(base, field, prefix) {
 }
 
 export function validateSuccessorRuntime(value) {
-  successorClosed(value, ["adapter", "cli_version", "executable_digest", "node_version", "os", "arch", "model", "provider_model_revision", "reasoning_effort", "authentication_mode", "configuration_digest", "dependency_digest", "sandbox", "approval_policy", "agent_network", "provider_network", "timeout_ms"], "runtime");
+  successorClosed(value, ["adapter", "cli_version", "executable_digest", "node_version", "os", "arch", "model", "provider_model_revision", "reasoning_effort", "authentication_mode", "configuration_digest", "sandbox", "approval_policy", "agent_network", "provider_network", "timeout_ms"], "runtime");
   successorExact(value.adapter, "codex", "runtime.adapter");
   if (typeof value.cli_version !== "string" || !/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/u.test(value.cli_version)) successorFail("SUCCESSOR_VERSION_INVALID", "runtime.cli_version");
   if (typeof value.node_version !== "string" || !/^v?24\.\d+\.\d+$/u.test(value.node_version)) successorFail("SUCCESSOR_NODE24_REQUIRED", "runtime.node_version");
-  for (const key of ["executable_digest", "configuration_digest", "dependency_digest"]) successorDigest(value[key], `runtime.${key}`);
+  for (const key of ["executable_digest", "configuration_digest"]) successorDigest(value[key], `runtime.${key}`);
   for (const key of ["model", "os", "arch"]) token(value[key], `runtime.${key}`);
   if (/(?:^|[-_:/])latest(?:$|[-_:/])/iu.test(value.model)) successorFail("SUCCESSOR_MUTABLE_MODEL_REJECTED", "runtime.model");
   successorClosed(value.provider_model_revision, ["status", "value"], "runtime.provider_model_revision");

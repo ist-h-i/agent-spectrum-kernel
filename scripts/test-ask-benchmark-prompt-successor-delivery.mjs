@@ -95,7 +95,7 @@ test("declared runtime cannot be replaced by a different valid-looking native di
   const identity = {
     adapter: "codex", availability: "available", model: runtime.model,
     reasoning_effort: "high", sandbox_policy: "workspace-write", permission_policy: "never", case_timeout_ms: 900000,
-    executable: { observed_version: runtime.cli_version, executable_sha256: runtime.executable_digest.slice(7) },
+    executable: { executable_basename: "codex", observed_version: runtime.cli_version, executable_sha256: runtime.executable_digest.slice(7) },
     runtime_config_sha256: runtime.configuration_digest.slice(7), effective_command: command,
     effective_command_digest: canonicalDigest(command),
   };
@@ -104,6 +104,8 @@ test("declared runtime cannot be replaced by a different valid-looking native di
     assert.throws(() => assertSuccessorAdapterFacts(runtime, { ...identity, [field]: "different" }));
   }
   assert.throws(() => assertSuccessorAdapterFacts(runtime, { ...identity, executable: { ...identity.executable, observed_version: "0.147.0" } }));
+  assert.throws(() => assertSuccessorAdapterFacts(runtime, { ...identity, executable: { ...identity.executable, executable_basename: "codex.js" } }));
+  assert.throws(() => assertSuccessorAdapterFacts(runtime, { ...identity, executable: { ...identity.executable, executable_sha256: d("substituted-native").slice(7) } }));
 });
 
 

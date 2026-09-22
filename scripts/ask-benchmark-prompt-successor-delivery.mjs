@@ -154,6 +154,18 @@ export function validateSuccessorStdinBinding(value, expected) {
 }
 
 
+/**
+ * Validate the executable that is invoked directly by the native runner.
+ * This does not accept the @openai/codex Node wrapper as the successor executable:
+ * the measured runner must invoke the pinned platform-native codex binary itself.
+ */
+export function assertSuccessorExecutableDescriptor(runtime, descriptor) {
+  validateSuccessorRuntime(runtime);
+  const expectedBasename = runtime.os === "win32" ? "codex.exe" : "codex";
+  successorExact(descriptor?.executable_basename, expectedBasename, "native executable basename");
+  successorExact(`sha256:${descriptor?.executable_sha256}`, runtime.executable_digest, "native binary");
+}
+
 /** Exact local runtime facts, distinct from effective host-isolation evidence. */
 export function assertSuccessorAdapterFacts(runtime, identity, { checkHost = false } = {}) {
   validateSuccessorRuntime(runtime);
@@ -163,7 +175,7 @@ export function assertSuccessorAdapterFacts(runtime, identity, { checkHost = fal
     permission_policy: runtime.approval_policy, case_timeout_ms: runtime.timeout_ms,
   })) successorExact(identity[field], expected, `native runtime.${field}`);
   successorExact(identity.executable?.observed_version, runtime.cli_version, "native CLI version");
-  successorExact(`sha256:${identity.executable?.executable_sha256}`, runtime.executable_digest, "native binary");
+  assertSuccessorExecutableDescriptor(runtime, identity.executable);
   // configuration_digest is defined as the exact native runtime-config file hash.
   successorExact(`sha256:${identity.runtime_config_sha256}`, runtime.configuration_digest, "native config bytes");
   successorExact(identity.effective_command.task_transport, "stdin", "native stdin transport");
