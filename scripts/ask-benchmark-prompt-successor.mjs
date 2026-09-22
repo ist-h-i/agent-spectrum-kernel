@@ -149,7 +149,9 @@ export function validatePromptSuccessorPreparation(value, { expectedParent } = {
   return value;
 }
 
-const BINDING_FIELDS = ["successor_case_id", "source_case_id", "fixture_input_digest", "request_digest", "effective_command_digest", "environment_snapshot_digest"];
+// Request bytes contain the runner claim/workspace identity and are observed
+// after the pre-result scope is sealed. Bind them from actual execution evidence.
+const BINDING_FIELDS = ["successor_case_id", "source_case_id", "fixture_input_digest", "effective_command_digest", "environment_snapshot_digest"];
 // A source scope is a pre-result mapping into an existing #197 run, not a new score.
 export function buildSuccessorSourceScope({ preparation, promptRole, runInstanceId, source }) {
   validatePromptSuccessorPreparation(preparation);

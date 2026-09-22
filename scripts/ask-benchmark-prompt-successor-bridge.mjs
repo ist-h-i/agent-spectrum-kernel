@@ -80,11 +80,13 @@ export function assertSuccessorSourceBinding({ preparation, scope, binding, norm
     adapter_track: "codex", condition: "full_ask", repetition: target.repetition,
     registered_repetitions: preparation.predecessor.fixtures.find(({ fixture_id }) => fixture_id === target.fixture_id).repetitions,
     task_class: target.task_class, attempt: "0001",
-    request_digest: binding.request_digest,
     effective_command_digest: binding.effective_command_digest,
     environment_snapshot_digest: binding.environment_snapshot_digest,
   };
   for (const [field, value] of Object.entries(expected)) successorExact(normalized.lineage[field], value, `normalized.lineage.${field}`);
+  // Shape only here: exact request identity is verified against actual runner
+  // evidence by the provenance reader, never predicted in a pre-result scope.
+  successorDigest(normalized.lineage.request_digest, "normalized.lineage.request_digest");
   const rawFields = ["case_id", "run_instance_id", "plan_id", "plan_digest", "fixture_id", "fixture_input_digest", "condition", "repetition", "task_class", "attempt"];
   for (const field of rawFields) successorExact(engineering[field], expected[field], `engineering.${field}`);
   successorExact(engineering.adapter, "codex", "engineering.adapter");
