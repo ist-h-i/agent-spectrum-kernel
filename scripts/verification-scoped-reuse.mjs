@@ -17,6 +17,7 @@ export const VERIFICATION_SCOPED_REUSE_SCHEMA_PATH = resolve(ROOT, "schemas/veri
 export const VERIFICATION_SCOPED_REUSE_SCHEMA_REVISION = "1.0.0";
 export const VERIFICATION_SCOPED_PLANNER_REVISION = "1.0.0";
 export const VERIFICATION_SCOPED_REQUIREMENTS_PATH = ".ask/verification-scoped-requirements.json";
+export const VERIFICATION_SCOPED_GATE_INVENTORY_PATH = ".ask/verification-scoped-gates.json";
 export const VERIFICATION_SCOPED_RUNTIME_CONTEXT = "ask.verification-scoped-reuse.runtime.v1";
 export const VERIFICATION_SCOPED_GIT_TREE_CONTEXT = "ask.verification-scoped-reuse.git-tree.v1";
 export const VERIFICATION_SCOPED_INVENTORY_CONTEXT = "ask.verification-scoped-reuse.inventory.v1";
@@ -369,6 +370,17 @@ function gateRequirementKey(gate) {
   return gate.gate_id;
 }
 
+function normalizeGateDefinition(gate) {
+  return {
+    gate_id: gate.gate_id,
+    dependency_manifest_path: gate.dependency_manifest_path,
+    required_obligation_refs: [...new Set(gate.required_obligation_refs)].sort(),
+    authority: normalizeAuthority(gate.authority),
+    execution_availability: gate.execution_availability,
+    delta_review: normalizeReviewRequirement(gate.delta_review),
+  };
+}
+
 function normalizeAuthority(authority) {
   const value = clone(authority);
   value.accepted_producers = uniqueSorted(value.accepted_producers, "scoped accepted producers", (entry) => `${entry.kind}\0${entry.identity_digest}`);
@@ -391,6 +403,50 @@ function normalizeReviewRequirement(review) {
   return value;
 }
 
+export function sealScopedGateInventory(draft) {
+  const content = clone(draft);
+  delete content.inventory_id;
+  delete content.inventory_digest;
+  content.schema_version = VERIFICATION_SCOPED_REUSE_SCHEMA_REVISION;
+  content.schema_path = "schemas/verification-scoped-reuse.schema.json";
+  content.program = "ask_verification_scoped_gate_inventory";
+  content.required_gates = uniqueSorted(content.required_gates.map(normalizeGateDefinition), "scoped gate inventory", gateRequirementKey);
+  content.current_obligations = uniqueSorted(content.current_obligations ?? [], "gate inventory current obligations", (entry) => entry.obligation_id);
+  const inventory = sealSelfIdentified(content, {
+    idField: "inventory_id",
+    digestField: "inventory_digest",
+    idPrefix: "verification-scoped-gate-inventory-",
+  });
+  validateScopedGateInventory(inventory);
+  return inventory;
+}
+
+function validateScopedGateInventory(inventory) {
+  failSchema(inventory, "verification scoped gate inventory");
+  if (inventory.program !== "ask_verification_scoped_gate_inventory") throw new Error("artifact is not scoped verification gate inventory");
+  assertSelfIdentified(inventory, {
+    idField: "inventory_id",
+    digestField: "inventory_digest",
+    idPrefix: "verification-scoped-gate-inventory-",
+    label: "verification scoped gate inventory",
+  });
+  assertCanonicalArray(inventory.required_gates, "scoped gate inventory", gateRequirementKey);
+  if (inventory.required_gates.length > MAX_GATES) throw new Error(`scoped gate inventory exceeds ${MAX_GATES} gates`);
+  for (const gate of inventory.required_gates) {
+    portablePath(gate.dependency_manifest_path, `${gate.gate_id} dependency_manifest_path`);
+    assertCanonicalArray(gate.required_obligation_refs, `${gate.gate_id} required obligations`, (entry) => entry);
+    assertCanonicalArray(gate.authority.accepted_producers, `${gate.gate_id} accepted producers`, (entry) => `${entry.kind}\0${entry.identity_digest}`);
+    assertCanonicalArray(gate.authority.accepted_evidence_levels, `${gate.gate_id} accepted evidence levels`, (entry) => entry);
+    if (gate.delta_review) {
+      assertCanonicalArray(gate.delta_review.surface_selectors, `${gate.gate_id} delta review selectors`, (entry) => `${entry.kind}\0${entry.pattern}`);
+      assertCanonicalArray(gate.delta_review.obligation_refs, `${gate.gate_id} delta review obligations`, (entry) => entry);
+      assertCanonicalArray(gate.delta_review.prior_finding_refs, `${gate.gate_id} prior finding refs`, (entry) => entry);
+    }
+  }
+  assertCanonicalArray(inventory.current_obligations, "gate inventory current obligations", (entry) => entry.obligation_id);
+  return inventory;
+}
+
 export function sealScopedRequirements(draft) {
   const content = clone(draft);
   delete content.requirements_id;
@@ -399,10 +455,8 @@ export function sealScopedRequirements(draft) {
   content.schema_path = "schemas/verification-scoped-reuse.schema.json";
   content.program = "ask_verification_scoped_requirements";
   content.required_gates = uniqueSorted(content.required_gates.map((gate) => ({
-    ...clone(gate),
-    required_obligation_refs: [...new Set(gate.required_obligation_refs)].sort(),
-    authority: normalizeAuthority(gate.authority),
-    delta_review: normalizeReviewRequirement(gate.delta_review),
+    ...normalizeGateDefinition(gate),
+    source_evidence_id: gate.source_evidence_id,
   })), "scoped required gates", gateRequirementKey);
   content.current_obligations = uniqueSorted(content.current_obligations ?? [], "current obligations", (entry) => entry.obligation_id);
   const requirements = sealSelfIdentified(content, {
@@ -418,6 +472,8 @@ function validateScopedRequirements(requirements) {
   failSchema(requirements, "verification scoped requirements");
   if (requirements.program !== "ask_verification_scoped_requirements") throw new Error("artifact is not scoped verification requirements");
   assertFullCommit(requirements.base_revision, "scoped requirements base_revision");
+  if (!/^verification-scoped-gate-inventory-[a-f0-9]{64}$/u.test(requirements.gate_inventory_id ?? "")) throw new Error("scoped requirements gate inventory ID is invalid");
+  assertDigest(requirements.gate_inventory_digest, "scoped requirements gate_inventory_digest");
   assertSelfIdentified(requirements, {
     idField: "requirements_id",
     digestField: "requirements_digest",
@@ -663,6 +719,49 @@ function validatePlan(plan, requirements) {
   return plan;
 }
 
+function loadScopedGateInventory({ repositoryRoot, revision }) {
+  const inventory = readGitJson({
+    repositoryRoot,
+    revision,
+    path: VERIFICATION_SCOPED_GATE_INVENTORY_PATH,
+    label: "scoped verification gate inventory",
+  });
+  return validateScopedGateInventory(inventory);
+}
+
+function setContainsAll(values, required) {
+  const available = new Set(values);
+  return required.every((entry) => available.has(entry));
+}
+
+function assertRequirementsMatchGateInventory(requirements, inventory) {
+  if (requirements.gate_inventory_id !== inventory.inventory_id || requirements.gate_inventory_digest !== inventory.inventory_digest) {
+    throw new Error("scoped requirements gate inventory binding mismatch");
+  }
+  const baselineByGate = new Map(inventory.required_gates.map((gate) => [gate.gate_id, gate]));
+  if (requirements.required_gates.length !== inventory.required_gates.length) {
+    throw new Error("scoped requirements cannot add or remove gate inventory entries");
+  }
+  for (const requirement of requirements.required_gates) {
+    const baseline = baselineByGate.get(requirement.gate_id);
+    if (!baseline) throw new Error(`scoped requirements contain a gate outside the baseline inventory: ${requirement.gate_id}`);
+    if (requirement.dependency_manifest_path !== baseline.dependency_manifest_path) throw new Error(`${requirement.gate_id} dependency manifest path cannot change`);
+    if (!setContainsAll(requirement.required_obligation_refs, baseline.required_obligation_refs)) throw new Error(`${requirement.gate_id} cannot remove baseline obligations`);
+    if (baseline.authority.independent_judgment_required && !requirement.authority.independent_judgment_required) throw new Error(`${requirement.gate_id} cannot remove independent judgment`);
+    const baselineProducers = new Set(baseline.authority.accepted_producers.map((entry) => `${entry.kind}\0${entry.identity_digest}`));
+    if (requirement.authority.accepted_producers.some((entry) => !baselineProducers.has(`${entry.kind}\0${entry.identity_digest}`))) throw new Error(`${requirement.gate_id} cannot broaden accepted producers`);
+    const baselineLevels = new Set(baseline.authority.accepted_evidence_levels);
+    if (requirement.authority.accepted_evidence_levels.some((entry) => !baselineLevels.has(entry))) throw new Error(`${requirement.gate_id} cannot broaden accepted evidence levels`);
+    if (baseline.execution_availability === "unavailable" && requirement.execution_availability !== "unavailable") throw new Error(`${requirement.gate_id} cannot make unavailable execution available`);
+    if (stableCanonicalJson(requirement.delta_review) !== stableCanonicalJson(baseline.delta_review)) throw new Error(`${requirement.gate_id} delta-review authority cannot change within a scoped baseline`);
+  }
+  const baselineCurrent = new Set(inventory.current_obligations.map((entry) => `${entry.obligation_id}\0${entry.kind}`));
+  const current = new Set(requirements.current_obligations.map((entry) => `${entry.obligation_id}\0${entry.kind}`));
+  for (const obligation of baselineCurrent) {
+    if (!current.has(obligation)) throw new Error("scoped requirements cannot remove baseline current-state obligations");
+  }
+}
+
 function loadTargetRequirements({ repositoryRoot, targetRevision }) {
   const requirements = readGitJson({
     repositoryRoot,
@@ -679,6 +778,13 @@ export function planScopedReuse({ repositoryRoot, storeRoot, targetRevision }) {
   const requirements = loadTargetRequirements({ repositoryRoot, targetRevision });
   const baseRevision = resolveGitCommit({ repositoryRoot, revision: requirements.base_revision });
   assertAncestor({ repositoryRoot, baseRevision, targetRevision });
+  const baseGateInventoryBytes = gitObjectBytes({ repositoryRoot, revision: baseRevision, path: VERIFICATION_SCOPED_GATE_INVENTORY_PATH });
+  const targetGateInventoryBytes = gitObjectBytes({ repositoryRoot, revision: targetRevision, path: VERIFICATION_SCOPED_GATE_INVENTORY_PATH });
+  if (rawDigest(baseGateInventoryBytes) !== rawDigest(targetGateInventoryBytes)) {
+    throw new Error("scoped gate inventory changed between base and target; establish a new scoped baseline");
+  }
+  const gateInventory = loadScopedGateInventory({ repositoryRoot, revision: baseRevision });
+  assertRequirementsMatchGateInventory(requirements, gateInventory);
   const diff = gitDiffSummary({ repositoryRoot, baseRevision, targetRevision });
   const dispositions = requirements.required_gates.map((requirement) => evaluateGate({
     repositoryRoot,
@@ -700,6 +806,9 @@ export function planScopedReuse({ repositoryRoot, storeRoot, targetRevision }) {
     requirements_id: requirements.requirements_id,
     requirements_digest: requirements.requirements_digest,
     requirements_path: VERIFICATION_SCOPED_REQUIREMENTS_PATH,
+    gate_inventory_id: gateInventory.inventory_id,
+    gate_inventory_digest: gateInventory.inventory_digest,
+    gate_inventory_path: VERIFICATION_SCOPED_GATE_INVENTORY_PATH,
     actual_diff: {
       digest: canonicalDigest({ base_revision: baseRevision, target_revision: targetRevision, records: diff.records, truncated: diff.truncated }),
       changed_paths: changedPaths(diff),
