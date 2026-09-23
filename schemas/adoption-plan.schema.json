@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/adoption-plan.schema.json",
+  "title": "Agent Spectrum Kernel Adoption Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "source",
+    "target",
+    "selection",
+    "recommendation",
+    "assets",
+    "portfolio",
+    "operations",
+    "preservation",
+    "conflicts",
+    "human_decisions",
+    "rollback",
+    "readiness",
+    "verification",
+    "environment",
+    "plan_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "kind": { "const": "ask.adoption-plan" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "revision", "projection_digest", "files", "identity_digest", "runtime_profile_fixture_digest"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": ["string", "null"] },
+        "revision": { "type": ["string", "null"] },
+        "projection_digest": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+            }
+          }
+        },
+        "identity_digest": { "$ref": "#/$defs/digest" },
+        "runtime_profile_fixture_digest": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_id", "revision", "snapshot_digest", "snapshot_paths"],
+      "properties": {
+        "repository_id": { "type": ["string", "null"] },
+        "revision": { "type": ["string", "null"] },
+        "snapshot_digest": { "$ref": "#/$defs/digest" },
+        "snapshot_paths": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "profile"],
+      "properties": {
+        "adapter": { "enum": ["codex", "claude-code", "kernel-only"] },
+        "profile": { "type": "string", "minLength": 1 }
+      }
+    },
+    "recommendation": { "$ref": "#/$defs/recommendation" },
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "exact_refs"],
+      "properties": {
+        "status": { "enum": ["confirmed_from_projection", "none_confirmed"] },
+        "exact_refs": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "portfolio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "identity"],
+      "properties": {
+        "status": { "enum": ["unselected", "provided_reference_unverified"] },
+        "identity": {
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["portfolio_id", "repository_id", "scope_id", "lock_digest", "current_manifest", "selection_digest"],
+              "properties": {
+                "portfolio_id": { "type": ["string", "null"] },
+                "repository_id": { "type": ["string", "null"] },
+                "scope_id": { "type": ["string", "null"] },
+                "lock_digest": { "type": ["string", "null"] },
+                "current_manifest": { "type": ["object", "null"] },
+                "selection_digest": { "type": ["string", "null"] }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "path", "ownership", "installer"],
+        "properties": {
+          "action": { "enum": ["create", "update", "remove", "preserve"] },
+          "path": { "type": "string", "minLength": 1 },
+          "ownership": { "enum": ["managed_file", "managed_block", "managed_partial_file", "managed_state", "project_owned"] },
+          "installer": { "type": ["string", "null"] },
+          "before_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+          "after_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "preservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_owned_state", "privacy"],
+      "properties": {
+        "project_owned_state": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "preserved_boundary"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "preserved_boundary": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["raw_prompt_storage", "secret_values", "global_auth_reading", "external_publication"],
+          "properties": {
+            "raw_prompt_storage": { "const": "not_enabled" },
+            "secret_values": { "const": "not_emitted" },
+            "global_auth_reading": { "const": "not_performed" },
+            "external_publication": { "const": "not_enabled" }
+          }
+        }
+      }
+    },
+    "conflicts": { "type": "array", "items": { "type": "object" } },
+    "human_decisions": { "type": "array", "items": { "$ref": "#/$defs/humanDecision" } },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supported_by_installers", "note"],
+      "properties": {
+        "supported_by_installers": { "type": "boolean" },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["installed", "activated", "operational"],
+      "properties": {
+        "installed": { "enum": ["planned_not_applied", "installed", "not_installed", "unknown"] },
+        "activated": { "enum": ["insufficient_evidence", "activated", "not_activated", "unknown"] },
+        "operational": { "enum": ["insufficient_evidence", "operational", "blocked", "unknown"] }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["planning_phases", "target_unchanged", "first_run"],
+      "properties": {
+        "planning_phases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["phase", "command", "exit_status", "dry_run_exit_status", "dry_run_output_digest"],
+            "properties": {
+              "phase": { "enum": ["kernel", "adapter"] },
+              "command": { "type": "array", "items": { "type": "string" } },
+              "exit_status": { "type": "integer" },
+              "dry_run_exit_status": { "type": "integer" },
+              "dry_run_output_digest": { "$ref": "#/$defs/digest" }
+            }
+          }
+        },
+        "target_unchanged": { "const": true },
+        "first_run": { "type": "string", "minLength": 1 }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_realpath", "node", "platform", "arch"],
+      "properties": {
+        "target_realpath": { "type": "string", "minLength": 1 },
+        "node": { "type": "string", "minLength": 1 },
+        "platform": { "type": "string", "minLength": 1 },
+        "arch": { "type": "string", "minLength": 1 }
+      }
+    },
+    "plan_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "humanDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question", "options"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "question": { "type": "string", "minLength": 1 },
+        "options": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "adapter", "profile", "purpose", "risk", "basis", "capabilities", "human_decisions"],
+      "properties": {
+        "schema_version": { "const": "1.0.0" },
+        "adapter": { "type": ["string", "null"] },
+        "profile": { "type": ["string", "null"] },
+        "purpose": { "type": ["string", "null"] },
+        "risk": { "type": "string" },
+        "basis": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "effectiveness_proven", "note"],
+          "properties": {
+            "source": { "const": "current_adapter_projection_and_runtime_capability_contracts" },
+            "effectiveness_proven": { "const": false },
+            "note": { "type": "string", "minLength": 1 }
+          }
+        },
+        "capabilities": { "type": "array", "items": { "type": "object" } },
+        "human_decisions": { "type": "array", "items": { "$ref": "#/$defs/humanDecision" } }
+      }
+    }
+  }
+}
