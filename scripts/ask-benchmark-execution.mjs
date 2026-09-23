@@ -1753,12 +1753,15 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     fault("after_request_published");
     const temporaryOutput = resolve(ephemeralRoot, "agent-final.json");
     const started = process.hrtime.bigint();
+    // Execution or residual-group inspection may throw before returning a result.
+    // Keep catch-path capture disabled until the runner confirms no descendants.
+    terminalWorkspaceCaptureAllowed = false;
     const raw = executeVerifiedAgent({ root, runtime, verifiedExecutable, workspace, outputTemporary: temporaryOutput, command: adapter.identity.effective_command, environmentSnapshot, successorStdin });
     processResult = { ...raw, duration_ms: Math.round(Number(process.hrtime.bigint() - started) / 1_000_000) };
     if (processResult.workspace_descendants_detected) {
-      terminalWorkspaceCaptureAllowed = false;
       throw new Error("terminal workspace capture rejected residual agent descendants");
     }
+    terminalWorkspaceCaptureAllowed = true;
     terminalWorkspaceAuthority = publishTerminalWorkspaceAuthority({ root, attemptRoot, entry, claim, baseSnapshot: terminalWorkspaceBase, workspace, record: materializedRecord, projection });
     sealedCommandEvidence = sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity: adapter.identity, processResult, contract, workspaceRoot: workspace });
     if (selection) {

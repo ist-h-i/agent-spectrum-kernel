@@ -287,6 +287,8 @@ await test("F3: successor input traverses the real native runner without a provi
       nativeCapture(captures, before); const actual = observed(role, args.caseId).attempt;
       assert.equal(actual.result.exit_code, 7); assert.equal(actual.result.final_output, null);
       assert.equal(actual.result.failure_kind, "agent_failure"); assert.equal(actual.commit.status, "failed");
+      assert.equal(actual.result.terminal_workspace_authority_availability, "captured", "a cleanly terminated failing agent retains workspace evidence");
+      assert.ok(actual.terminalWorkspaceAuthority);
       const count = nativeCaptureIds(captures).length;
       assert.throws(() => s.invoke(() => executePortfolio({ ...args, successorPromptInput: handle })));
       assert.equal(nativeCaptureIds(captures).length, count);
@@ -301,6 +303,13 @@ await test("F3: successor input traverses the real native runner without a provi
       assert.deepEqual(result.outcomes, [{ case_id: args.caseId, status: "invalid" }]);
       const actual = observed(role, args.caseId).attempt;
       assert.equal(actual.result.final_output, null); assert.equal(actual.result.terminal_workspace_authority_availability, "unavailable");
+      for (const field of ["terminal_workspace_authority_path", "terminal_workspace_authority_sha256", "terminal_workspace_authority_bytes", "terminal_workspace_authority_digest", "terminal_workspace_tree_digest"]) {
+        assert.equal(actual.result[field], null, `invalid result must not retain ${field}`);
+        assert.equal(actual.commit[field], null, `invalid commit must not retain ${field}`);
+      }
+      assert.equal(actual.terminalWorkspaceAuthority, null);
+      const attemptPath = resolve(role.execution.runDir, "cases", args.caseId, "attempts", "0001");
+      assert.equal(existsSync(resolve(attemptPath, "terminal-workspace-authority.json")), false, "catch must not publish workspace authority after residual cleanup fails");
       assert.equal(existsSync(capture.meta[0]), false);
     });
     await check("the same contained-runner timeout path rejects a hanging native fake (ordinary-path control)", () => {
@@ -314,6 +323,8 @@ await test("F3: successor input traverses the real native runner without a provi
       assert.deepEqual(result.outcomes, [{ case_id: nativeCase, status: "failed" }]);
       const actual = inspectVerifiedPortfolioExecution(execution).cases.find((entry) => entry.entry.case_id === nativeCase).attempts[0];
       assert.equal(actual.result.failure_kind, "timeout"); assert.equal(actual.result.final_output, null);
+      assert.equal(actual.result.terminal_workspace_authority_availability, "captured", "a cleanly terminated timeout retains workspace evidence");
+      assert.ok(actual.terminalWorkspaceAuthority);
       const pid = Number(readFileSync(resolve(captures, `${capture.id}.child`), "utf8").trim());
       assertTerminatedChild(pid, "timeout"); assert.equal(existsSync(capture.meta[0]), false);
       evidence.timeout_limit = { observed_path: "shared_runner_ordinary_control", observed_timeout_ms: 1200, successor_deadline_ms: 900000, successor_full_deadline_elapsed: false };
