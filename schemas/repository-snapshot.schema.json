@@ -182,7 +182,8 @@
         "path",
         "state",
         "digest",
-        "bytes"
+        "bytes",
+        "executable"
       ],
       "properties": {
         "path": {
@@ -207,6 +208,9 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 262144
+        },
+        "executable": {
+          "type": "boolean"
         }
       }
     },

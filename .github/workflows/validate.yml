@@ -40,6 +40,10 @@ jobs:
           node --test scripts/test-ask-benchmark-prompt-successor-input-guards.mjs
           node --test scripts/test-ask-benchmark-prompt-successor-scoring-contract.mjs
 
+      # Exercise checkpoint boundaries before the expensive repository suite.
+      - name: Run session checkpoint and resume tests
+        run: node scripts/test-session-checkpoint.mjs
+
       - name: Run repository validation tests
         run: node scripts/test-validate-repo.mjs
 
@@ -75,9 +79,6 @@ jobs:
 
       - name: Run epic admission and Work Package Plan contract tests
         run: node scripts/test-epic-admission-work-package-plan.mjs
-
-      - name: Run session checkpoint and resume tests
-        run: node scripts/test-session-checkpoint.mjs
 
       - name: Run generic content-addressed store tests
         run: node scripts/test-content-addressed-store.mjs

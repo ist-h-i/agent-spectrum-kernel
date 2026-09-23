@@ -96,7 +96,7 @@ function readPathIdentity(root, repositoryPath, { allowMissing = true, maxBytes 
   assertNoSymlinkPathSegments(absolute, `repository path ${path}`, { allowMissingLeaf: true });
   if (!existsSync(absolute)) {
     if (!allowMissing) throw new Error(`required repository path is missing: ${path}`);
-    return { path, state: "missing", digest: null, bytes: 0 };
+    return { path, state: "missing", digest: null, bytes: 0, executable: false };
   }
   const status = lstatSync(absolute);
   if (!status.isFile()) throw new Error(`repository path must be a regular file: ${path}`);
@@ -120,7 +120,14 @@ function readPathIdentity(root, repositoryPath, { allowMissing = true, maxBytes 
   } else {
     bytes = readStableBytes(absolute, `repository path ${path}`, maxBytes);
   }
-  return { path, state: "present", digest: sha256(bytes), bytes: bytes.length };
+  // Bind executable state to the same file observation as the byte digest,
+  // including explicit ignored targets/contracts outside Git's inventory.
+  const final = lstatSync(absolute);
+  const keys = ["dev", "ino", "mode", "size", "mtimeMs", "ctimeMs", "uid", "gid"];
+  if (!final.isFile() || keys.some((key) => status[key] !== final[key])) {
+    throw new Error(`repository path ${path} changed during identity capture`);
+  }
+  return { path, state: "present", digest: sha256(bytes), bytes: bytes.length, executable: (final.mode & 0o111) !== 0 };
 }
 
 function nulList(buffer) {
@@ -166,8 +173,7 @@ function captureGitState(root) {
     });
     totalBytes += identity.bytes;
     if (totalBytes > MAX_WORKTREE_BYTES) throw new Error("repository state exceeds the worktree-byte limit");
-    const executable = identity.state === "present" && (lstatSync(containedPath(root, path)).mode & 0o111) !== 0;
-    worktreeHasher.update(stableCanonicalJson({ ...identity, executable }));
+    worktreeHasher.update(stableCanonicalJson(identity));
     worktreeHasher.update("\u0000");
   }
 

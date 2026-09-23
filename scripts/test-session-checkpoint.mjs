@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,6 +22,11 @@ function run(command, args, options = {}) {
   return result.stdout.trim();
 }
 function git(root, ...args) { return run("git", ["-C", root, ...args]); }
+// Git keeps raw object IDs in the patch header even when textconv hides the
+// changed bytes. Compare only the rendered patch, not those identity fields.
+function textconvDisplay(diff) {
+  return diff.replace(/^index [a-f0-9]+\.\.[a-f0-9]+(?: [0-7]{6})?\n/gmu, "");
+}
 function fixture(path) { return readJsonFileStrict(resolve(ROOT, path), path); }
 const fixtureBundle = {
   policy: fixture("docs/fixtures/epic-admission-policy.json"),
@@ -157,6 +162,8 @@ try {
   });
   assert.equal(saved.reference.checkpoint_digest, saved.checkpointDigest);
   assert.equal(saved.reference.snapshot_digest, saved.snapshotDigest);
+  assert.equal(saved.snapshot.target_paths.find((entry) => entry.path === "future.txt").executable, false);
+  assert.equal(saved.snapshot.target_paths.find((entry) => entry.path === "empty.txt").executable, false);
   assert.equal(stableCanonicalJson(saved.snapshot).includes("do-not-copy-this-body"), false);
   assert.equal(readJsonFileStrict(resolve(root, "resume-reference.json"), "resume reference").checkpoint_digest, saved.checkpointDigest);
   const fresh = resume(options, saved);
@@ -234,7 +241,7 @@ try {
   assert.throws(() => createRepositorySnapshot(options), /descendant/iu);
   checked("same branch name and tree do not substitute for base ancestry");
 
-  for (const mode of ["textconv", "assume-unchanged", "staged-reverted"]) {
+  for (const mode of ["textconv", "assume-unchanged", "skip-worktree", "staged-reverted"]) {
     const item = repository(`raw-${mode}`);
     const file = resolve(item.repo, "private.txt");
     if (mode === "textconv") {
@@ -243,21 +250,68 @@ try {
       git(item.repo, "commit", "-m", "lossy display configuration");
       git(item.repo, "config", "diff.lossy.textconv", "head -n 1");
       writeFileSync(file, "constant header\nfirst private value\n");
-    } else if (mode === "assume-unchanged") {
-      git(item.repo, "update-index", "--assume-unchanged", "private.txt");
+    } else if (mode === "assume-unchanged" || mode === "skip-worktree") {
+      git(item.repo, "update-index", `--${mode}`, "private.txt");
     } else {
       writeFileSync(file, "staged private value\n");
       git(item.repo, "add", "private.txt");
       writeFileSync(file, "do-not-copy-this-body\n");
     }
-    const beforeDiff = git(item.repo, "diff", "HEAD", "--", "private.txt");
+    const diffArgs = ["diff", "--no-color", "--no-ext-diff", "--textconv", "HEAD", "--", "private.txt"];
+    const beforeDiff = git(item.repo, ...diffArgs);
+    const beforeRawObject = git(item.repo, "hash-object", "--no-filters", "private.txt");
     const before = persistSessionCheckpoint(item.options);
     assert.equal(resume(item.options, before).status, "context_rollover_required");
     writeFileSync(file, mode === "textconv" ? "constant header\nsecond private value\n" : "second private value\n");
-    if (mode !== "staged-reverted") assert.equal(git(item.repo, "diff", "HEAD", "--", "private.txt"), beforeDiff);
+    assert.notEqual(git(item.repo, "hash-object", "--no-filters", "private.txt"), beforeRawObject);
+    const afterDiff = git(item.repo, ...diffArgs);
+    if (mode === "textconv") {
+      assert.match(textconvDisplay(beforeDiff), /^\+constant header$/mu, "lossy display must actually run");
+      assert.equal(textconvDisplay(beforeDiff).includes("first private value"), false);
+      assert.equal(textconvDisplay(afterDiff), textconvDisplay(beforeDiff));
+    } else if (mode !== "staged-reverted") {
+      assert.equal(beforeDiff, "", "index flag must conceal the tracked change");
+      assert.equal(afterDiff, beforeDiff);
+    }
     expectBlocked(resume(item.options, before), "WORKTREE_DIGEST_MISMATCH");
     checked(`raw tracked identity outside targetPaths: ${mode}`);
   }
+
+  for (const kind of ["target", "contract"]) {
+    const item = repository(`ignored-${kind}-mode`);
+    writeFileSync(resolve(item.repo, ".gitignore"), "ignored.sh\n");
+    git(item.repo, "add", ".gitignore");
+    git(item.repo, "commit", "-m", "declare ignored runtime file");
+    const file = resolve(item.repo, "ignored.sh");
+    writeFileSync(file, "echo unchanged bytes\n");
+    chmodSync(file, 0o644);
+    const pathOptions = { ...item.options, [kind === "target" ? "targetPaths" : "contractPaths"]: ["ignored.sh"] };
+    const before = persistSessionCheckpoint(pathOptions);
+    const field = kind === "target" ? "target_paths" : "contract_refs";
+    const reason = kind === "target" ? "TARGET_PATH_IDENTITY_MISMATCH" : "CONTRACT_IDENTITY_MISMATCH";
+    assert.equal(before.snapshot[field][0].executable, false);
+    assert.equal(resume(pathOptions, before).status, "context_rollover_required");
+    chmodSync(file, 0o755);
+    const after = createRepositorySnapshot(pathOptions);
+    assert.deepEqual(after.repository, before.snapshot.repository, "ignored chmod is outside automatic Git-state identity");
+    assert.equal(after[field][0].digest, before.snapshot[field][0].digest, "bytes are unchanged");
+    assert.equal(after[field][0].executable, true);
+    expectBlocked(resume(pathOptions, before), reason);
+    expectBlocked(freshResume(pathOptions, before, `ignored-${kind}`), reason);
+    chmodSync(file, 0o644);
+    assert.equal(resume(pathOptions, before).status, "context_rollover_required");
+    checked(`explicit ignored ${kind} executable drift is rejected, including fresh process`);
+  }
+
+  const noExecutable = structuredClone(saved.snapshot);
+  delete noExecutable.target_paths[0].executable;
+  assert.throws(() => createSessionCheckpoint({
+    snapshot: noExecutable,
+    snapshotDigest: canonicalDigest(noExecutable),
+    planBundle: bundle,
+    completedPackageIds: options.completedPackageIds,
+  }), /Schema validation/iu);
+  checked("explicit path identities cannot omit executable state");
 
   const submodule = repository("submodule-parent");
   const child = repository("submodule-child");
