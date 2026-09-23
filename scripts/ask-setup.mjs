@@ -14,7 +14,8 @@ import { tmpdir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { CORE_OWNED_IMMUTABLE_ASSETS, readGitRevision } from "./installer-lifecycle.mjs";
+import { CORE_OWNED_IMMUTABLE_ASSETS, buildGitDir, readGitRevision } from "./installer-lifecycle.mjs";
+import { readSetupRepositoryId } from "./ask-setup-git.mjs";
 import {
   KERNEL_SETUP_INPUTS,
   buildSetupSourceIdentity,
@@ -128,18 +129,14 @@ async function planningSource(adapter, profile) {
 }
 
 function gitFacts(target) {
-  const gitDir = resolve(target, ".git");
-  if (!existsSync(gitDir)) return { detected: false, repository_id: null, revision: null };
-  const run = (args) => {
-    const result = spawnSync("git", args, { cwd: target, encoding: "utf8", timeout: 5000 });
-    return result.status === 0 ? result.stdout.trim() : null;
-  };
-  const origin = run(["config", "--get", "remote.origin.url"]);
-  const revision = run(["rev-parse", "HEAD"]);
+  const gitDir = buildGitDir(target);
+  if (!gitDir) return { detected: false, repository_id: null, revision: null };
+  // The existing ref reader does not load Git configuration or auth settings.
+  const revision = readGitRevision(target);
   return {
     detected: true,
-    repository_id: origin ? `git:${origin}` : null,
-    revision,
+    repository_id: readSetupRepositoryId(gitDir),
+    revision: /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(revision ?? "") ? revision : null,
   };
 }
 
@@ -280,7 +277,10 @@ export function recommendFromFacts({ inspection, adapter = null, purpose = null,
   if (selectedAdapter && !ADAPTERS.includes(selectedAdapter)) throw new Error(`Unknown adapter: ${selectedAdapter}`);
 
   let selectedProfile = profile;
-  if (selectedAdapter === "kernel-only") selectedProfile = "kernel-only";
+  if (selectedAdapter === "kernel-only") {
+    if (profile !== null && profile !== "kernel-only") throw new Error(`Unknown kernel-only profile: ${profile}`);
+    selectedProfile = "kernel-only";
+  }
   if (!selectedProfile && purpose) selectedProfile = PURPOSE_TO_PROFILE[purpose] ?? null;
   if (!selectedProfile && selectedAdapter && selectedAdapter !== "kernel-only") {
     const installed = selectedAdapter === "codex" ? inspection.ask.codex : inspection.ask.claude;
@@ -586,7 +586,11 @@ function parseArgs(argv) {
     const token = rest[i];
     if (token === "--target") args.target = resolve(rest[++i]);
     else if (token === "--adapter") args.adapter = rest[++i];
-    else if (token === "--profile") args.profile = rest[++i];
+    else if (token === "--profile") {
+      const value = rest[++i];
+      if (!value?.trim() || value.startsWith("--")) throw new Error("--profile requires an explicit profile name.");
+      args.profile = value;
+    }
     else if (token === "--purpose") args.purpose = rest[++i];
     else if (token === "--risk") args.risk = rest[++i];
     else if (token === "--require-capability") args.requiredCapabilities.push(rest[++i]);

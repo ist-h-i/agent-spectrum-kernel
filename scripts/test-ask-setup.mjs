@@ -14,6 +14,7 @@ import {
   verifySavedPlan,
 } from "./ask-setup.mjs";
 import { auditFixtureTree, runSetupInputTests } from "./test-ask-setup-inputs.mjs";
+import { runSetupGitTests, runSetupGitCliTests } from "./test-ask-setup-git.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ASK_SETUP = resolve(REPO_ROOT, "scripts/ask-setup.mjs");
@@ -75,6 +76,15 @@ async function unitTests() {
       "kernel-only": [{ profile: "kernel-only" }],
     },
   };
+  for (const profile of [undefined, null, "kernel-only"]) {
+    const recommendation = recommendFromFacts({ inspection: baseInspection, adapter: "kernel-only", profile });
+    assert.equal(recommendation.profile, "kernel-only");
+    assert.deepEqual(recommendation.human_decisions, []);
+  }
+  for (const profile of ["full", "not-a-profile", "", " "]) {
+    assert.throws(() => recommendFromFacts({ inspection: baseInspection, adapter: "kernel-only", profile }), /Unknown kernel-only profile/);
+  }
+
   const undecided = recommendFromFacts({ inspection: baseInspection });
   assert.equal(undecided.adapter, null);
   assert.ok(undecided.human_decisions.some((entry) => entry.id === "adapter"));
@@ -97,6 +107,8 @@ async function integrationTests() {
     console.log("SKIP integration: full ASK repository source is not available in this checkout");
     return;
   }
+
+  runSetupGitCliTests({ setupScript: ASK_SETUP, repoRoot: REPO_ROOT, auditTree: auditFixtureTree });
 
   const target = tempDir("ask-setup-integration-");
   const outputRoot = tempDir("ask-setup-output-");
@@ -286,6 +298,7 @@ async function sourceDriftIntegrationTests() {
 }
 
 runSetupInputTests();
+runSetupGitTests();
 await unitTests();
 await integrationTests();
 await sourceDriftIntegrationTests();
