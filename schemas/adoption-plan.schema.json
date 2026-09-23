@@ -29,10 +29,12 @@
     "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version", "files", "identity_digest", "runtime_profile_fixture_digest"],
+      "required": ["name", "version", "revision", "projection_digest", "files", "identity_digest", "runtime_profile_fixture_digest"],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "version": { "type": ["string", "null"] },
+        "revision": { "type": ["string", "null"] },
+        "projection_digest": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
         "files": {
           "type": "array",
           "items": {

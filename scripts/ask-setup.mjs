@@ -1,25 +1,33 @@
 #!/usr/bin/env node
-import { createHash } from "node:crypto";
 import {
-  cpSync,
   existsSync,
-  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
-  readlinkSync,
   realpathSync,
   rmSync,
   statSync,
-  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { CORE_OWNED_IMMUTABLE_ASSETS } from "./installer-lifecycle.mjs";
+import { CORE_OWNED_IMMUTABLE_ASSETS, readGitRevision } from "./installer-lifecycle.mjs";
+import {
+  KERNEL_SETUP_INPUTS,
+  buildSetupSourceIdentity,
+  canonicalJson,
+  collectPathEntries,
+  copyTargetForSimulation,
+  jsonDigest,
+  pathInside,
+  safeLstat,
+  sha256,
+  validateSetupPaths,
+} from "./ask-setup-inputs.mjs";
+export { canonicalize, canonicalJson } from "./ask-setup-inputs.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PLAN_SCHEMA_VERSION = "1.0.0";
@@ -53,29 +61,6 @@ const BASE_SETUP_RELEVANT_PATHS = [
   ".github/workflows",
   ".github/copilot-instructions.md",
 ];
-const SENSITIVE_BASENAMES = new Set([".env", ".npmrc", ".netrc", "credentials", "credentials.json"]);
-const SENSITIVE_SUFFIXES = [".pem", ".key", ".p12", ".pfx", ".jks"];
-
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-export function canonicalize(value) {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
-  }
-  return value;
-}
-
-export function canonicalJson(value) {
-  return JSON.stringify(canonicalize(value));
-}
-
-function jsonDigest(value) {
-  return `sha256:${sha256(canonicalJson(value))}`;
-}
-
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
@@ -89,61 +74,8 @@ function readJsonIfExists(path) {
   }
 }
 
-function pathInside(root, candidate) {
-  const rel = relative(root, candidate);
-  return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
-}
-
-function isSensitivePath(relativePath) {
-  const normalized = relativePath.split(sep).join("/");
-  const base = basename(normalized);
-  if (SENSITIVE_BASENAMES.has(base) || base.startsWith(".env.")) return true;
-  if (SENSITIVE_SUFFIXES.some((suffix) => base.endsWith(suffix))) return true;
-  return normalized.startsWith(".git/") || normalized.startsWith(".ssh/") || normalized.startsWith(".aws/");
-}
-
-function safeLstat(path) {
-  try {
-    return lstatSync(path);
-  } catch {
-    return null;
-  }
-}
-
-function collectPathEntries(root, relativeRoot, { includeContentHash = true } = {}) {
-  const absolute = resolve(root, relativeRoot);
-  const stat = safeLstat(absolute);
-  if (!stat) return [];
-  const entries = [];
-  const visit = (path, rel) => {
-    const current = lstatSync(path);
-    const posixRel = rel.split(sep).join("/");
-    if (current.isSymbolicLink()) {
-      const link = readlinkSync(path);
-      const resolved = resolve(dirname(path), link);
-      entries.push({ path: posixRel, type: "symlink", link, escapes_target: !pathInside(root, resolved) });
-      return;
-    }
-    if (current.isDirectory()) {
-      entries.push({ path: `${posixRel}/`, type: "directory" });
-      for (const name of readdirSync(path).sort()) visit(resolve(path, name), resolve(rel, name));
-      return;
-    }
-    if (!current.isFile()) {
-      entries.push({ path: posixRel, type: "other" });
-      return;
-    }
-    if (!includeContentHash || isSensitivePath(posixRel)) {
-      entries.push({ path: posixRel, type: "file", content: "omitted" });
-      return;
-    }
-    entries.push({ path: posixRel, type: "file", sha256: sha256(readFileSync(path)) });
-  };
-  visit(absolute, relativeRoot);
-  return entries;
-}
-
 function managedPathsFromState(target) {
+  validateSetupPaths(target, MANAGED_STATE_PATHS);
   const paths = [];
   for (const statePath of MANAGED_STATE_PATHS.filter((path) => !path.endsWith(".in-progress.json"))) {
     const state = readJsonIfExists(resolve(target, statePath));
@@ -169,29 +101,30 @@ export function snapshotTarget(target, { extraPaths = [] } = {}) {
   };
 }
 
-function sourceIdentity() {
-  const manifestPath = resolve(REPO_ROOT, "manifest.json");
-  const runtimeProfilePath = resolve(REPO_ROOT, "docs/fixtures/adapter-runtime-profiles.json");
-  const files = [
-    "manifest.json",
-    "scripts/install-kernel.mjs",
-    "scripts/install-codex-adapter.mjs",
-    "scripts/install-claude-adapter.mjs",
-    "scripts/installer-lifecycle.mjs",
-    "scripts/ask-doctor.mjs",
-    "scripts/ask-setup.mjs",
-    "schemas/adoption-plan.schema.json",
-    "docs/fixtures/adapter-runtime-profiles.json",
-  ].map((path) => ({ path, sha256: existsSync(resolve(REPO_ROOT, path)) ? sha256(readFileSync(resolve(REPO_ROOT, path))) : null }));
-  const manifest = existsSync(manifestPath) ? readJson(manifestPath) : null;
-  const runtimeProfiles = existsSync(runtimeProfilePath) ? readJson(runtimeProfilePath) : null;
-  return {
-    name: manifest?.name ?? "agent-spectrum-kernel",
-    version: manifest?.version ?? null,
-    files,
-    identity_digest: jsonDigest(files),
-    runtime_profile_fixture_digest: runtimeProfiles ? jsonDigest(runtimeProfiles) : null,
-  };
+async function planningSource(adapter, profile) {
+  if (!ADAPTERS.includes(adapter)) throw new Error(`Unknown adapter: ${adapter}`);
+  let projection = null;
+  let selectedSkills;
+  if (adapter === "kernel-only") {
+    if (profile !== "kernel-only") throw new Error(`Unknown kernel-only profile: ${profile}`);
+    selectedSkills = [...readJson(resolve(REPO_ROOT, "manifest.json")).skills].sort();
+  } else {
+    const build = await projectionBuilder(adapter);
+    projection = build(profile);
+    if (!projection.renderer_inputs?.canonical || !projection.renderer_inputs?.adapter_owned) {
+      throw new Error("Adapter projection is missing its authoritative renderer inputs.");
+    }
+    selectedSkills = projection.skills ?? projection.selectedSkills;
+  }
+  if (!Array.isArray(selectedSkills) || selectedSkills.length === 0) throw new Error("Setup requires a non-empty resolved Skill selection.");
+  const source = buildSetupSourceIdentity(REPO_ROOT, {
+    selectedSkills,
+    coreAssets: CORE_OWNED_IMMUTABLE_ASSETS,
+    rendererInputs: projection?.renderer_inputs ?? {},
+    projection,
+    revision: readGitRevision(REPO_ROOT),
+  });
+  return { source, selectedSkills, projection };
 }
 
 function gitFacts(target) {
@@ -280,6 +213,7 @@ async function availableProfiles(adapter) {
 
 export async function inspectRepository(target) {
   const root = realpathSync(target);
+  const snapshot = snapshotTarget(root);
   const core = stateSummary(root, ".agent-spectrum-kernel/install-state.json", "agent-spectrum-kernel");
   const codex = stateSummary(root, ".agent-spectrum-kernel/codex-install-state.json", "agent-spectrum-codex-adapter");
   const claude = stateSummary(root, ".agent-spectrum-kernel/claude-install-state.json", "agent-spectrum-claude-adapter");
@@ -289,7 +223,7 @@ export async function inspectRepository(target) {
   return {
     schema_version: "1.0.0",
     target: { realpath: root, ...gitFacts(root) },
-    snapshot: snapshotTarget(root),
+    snapshot,
     ask: { core, codex, claude, active_adapters: presentAdapters },
     instructions: inspectInstructions(root),
     ci: listNames(resolve(root, ".github/workflows"), (name) => /\.ya?ml$/i.test(name)),
@@ -389,46 +323,6 @@ export function recommendFromFacts({ inspection, adapter = null, purpose = null,
   };
 }
 
-function copyEntryPreservingSymlink(sourceRoot, destinationRoot, relativePath) {
-  const source = resolve(sourceRoot, relativePath);
-  if (!existsSync(source)) return;
-  const stat = lstatSync(source);
-  const destination = resolve(destinationRoot, relativePath);
-  mkdirSync(dirname(destination), { recursive: true });
-  if (stat.isSymbolicLink()) {
-    symlinkSync(readlinkSync(source), destination);
-    return;
-  }
-  cpSync(source, destination, { recursive: true, dereference: false, preserveTimestamps: false });
-}
-
-function validateNoEscapingSymlink(target, paths) {
-  const root = realpathSync(target);
-  const escapes = [];
-  for (const relativePath of [...new Set(paths)]) {
-    const candidate = resolve(root, relativePath);
-    if (existsSync(candidate)) {
-      const resolved = realpathSync(candidate);
-      if (!pathInside(root, resolved)) escapes.push(relativePath);
-      for (const entry of collectPathEntries(root, relativePath, { includeContentHash: false })) {
-        if (entry.type === "symlink" && entry.escapes_target) escapes.push(entry.path);
-      }
-      continue;
-    }
-    let parent = dirname(candidate);
-    while (!existsSync(parent) && parent !== root && pathInside(root, parent)) parent = dirname(parent);
-    if (existsSync(parent) && !pathInside(root, realpathSync(parent))) escapes.push(relativePath);
-  }
-  const unique = [...new Set(escapes)].sort();
-  if (unique.length > 0) throw new Error(`Symlink escapes target repository: ${unique.join(", ")}`);
-}
-
-function copyTargetForSimulation(target, destination, paths) {
-  validateNoEscapingSymlink(target, paths);
-  mkdirSync(destination, { recursive: true });
-  for (const item of [...new Set(paths)].sort()) copyEntryPreservingSymlink(target, destination, item);
-}
-
 function normalizedOutputDigest(output, staging) {
   const normalized = String(output ?? "").split(staging).join("<staging>").replaceAll("\\", "/");
   return `sha256:${sha256(normalized)}`;
@@ -522,23 +416,12 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
   if (!recommendation.profile) throw new Error(`Plan requires resolved profile. Outstanding decisions: ${recommendation.human_decisions.map((entry) => entry.id).join(", ")}`);
   if (recommendation.human_decisions.some((entry) => entry.id.startsWith("capability:"))) throw new Error(`Required capability is unsupported or unknown: ${recommendation.human_decisions.filter((entry) => entry.id.startsWith("capability:")).map((entry) => entry.id.slice("capability:".length)).join(", ")}`);
 
-  const source = sourceIdentity();
-  let selectedSkills = null;
-  let projection = null;
-  if (adapter === "kernel-only") {
-    const manifest = readJson(resolve(REPO_ROOT, "manifest.json"));
-    selectedSkills = [...(manifest.skills ?? [])].sort();
-  } else {
-    const build = await projectionBuilder(adapter);
-    projection = build(recommendation.profile);
-    selectedSkills = projection.skills ?? projection.selectedSkills ?? [];
-  }
+  const { source, selectedSkills, projection } = await planningSource(adapter, recommendation.profile);
   const projectedTargetPaths = (projection?.projectedManagedAssets ?? [])
     .filter((asset) => asset.ownership_mode !== "runtime_directory")
     .map((asset) => asset.path);
   const planningPaths = [...new Set([
-    "AGENTS.md",
-    "CUSTOM_INSTRUCTIONS.md",
+    ...KERNEL_SETUP_INPUTS,
     ...MANAGED_STATE_PATHS,
     ...managedPathsFromState(root),
     ...CORE_OWNED_IMMUTABLE_ASSETS,
@@ -547,10 +430,13 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
   ])].sort();
   const planTargetSnapshot = snapshotTarget(root, { extraPaths: planningPaths });
 
-  const stagingRoot = mkdtempSync(resolve(tmpdir(), "ask-setup-plan-"));
+  const stagingParent = realpathSync(tmpdir());
+  if (pathInside(root, stagingParent)) throw new Error("Staging must be outside the target repository.");
+  const stagingRoot = mkdtempSync(resolve(stagingParent, "ask-setup-plan-"));
   const staging = resolve(stagingRoot, "target");
   try {
     copyTargetForSimulation(root, staging, planningPaths);
+    validateSetupPaths(staging, planningPaths);
     const beforeInstall = installerNamespaceSnapshot(staging, planningPaths);
     const phaseEvidence = [];
 
@@ -567,6 +453,7 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
       dry_run_output_digest: normalizedOutputDigest(kernelDryRun.stdout, staging),
     });
 
+    validateSetupPaths(staging, planningPaths);
     if (adapter === "codex") {
       const adapterArgs = ["--target", staging, "--profile", recommendation.profile];
       const dryRun = runNode("scripts/install-codex-adapter.mjs", [...adapterArgs, "--dry-run"]);
@@ -596,6 +483,8 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
     const operations = diffSnapshots(beforeInstall, afterInstall, ownershipMap(staging));
     const afterTargetSnapshot = snapshotTarget(root, { extraPaths: planningPaths });
     if (planTargetSnapshot.digest !== afterTargetSnapshot.digest) throw new Error("Target changed while setup inspection/plan was running; retry from a fresh inspection.");
+    const afterSource = await planningSource(adapter, recommendation.profile);
+    if (source.identity_digest !== afterSource.source.identity_digest) throw new Error("ASK setup source changed while planning; generate a fresh plan.");
 
     const assetRefs = projection
       ? [...new Map((projection.compactProfiles ?? []).flatMap((entry) => entry.canonical_asset_refs ?? []).map((entry) => [canonicalJson(entry), entry])).values()]
@@ -654,14 +543,14 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
   }
 }
 
-export function verifySavedPlan(plan, { target, adapter = null } = {}) {
+export async function verifySavedPlan(plan, { target, adapter = null } = {}) {
   if (!plan || plan.schema_version !== PLAN_SCHEMA_VERSION || plan.kind !== PLAN_KIND) throw new Error("Unsupported or invalid adoption plan.");
   const expectedDigest = jsonDigest(planDigestPayload(plan));
   if (plan.plan_digest !== expectedDigest) throw new Error("Plan digest mismatch.");
   const root = realpathSync(target);
   if (plan.environment?.target_realpath !== root) throw new Error("Plan target repository path does not match the requested repository.");
   if (adapter && plan.selection?.adapter !== adapter) throw new Error(`Plan adapter mismatch: planned=${plan.selection?.adapter} requested=${adapter}`);
-  const currentSource = sourceIdentity();
+  const { source: currentSource } = await planningSource(plan.selection?.adapter, plan.selection?.profile);
   if (plan.source?.identity_digest !== currentSource.identity_digest) throw new Error("ASK setup source changed after the plan was generated.");
   const current = snapshotTarget(root, { extraPaths: Array.isArray(plan.target?.snapshot_paths) ? plan.target.snapshot_paths : [] });
   if (plan.target?.snapshot_digest !== current.digest) throw new Error("Target repository changed after the plan was generated.");
@@ -671,6 +560,7 @@ export function verifySavedPlan(plan, { target, adapter = null } = {}) {
 }
 
 function doctor(target) {
+  snapshotTarget(target);
   const result = runNode("scripts/ask-doctor.mjs", ["--target", target, "--json"], { expected: [0, 1] });
   let report;
   try {
@@ -739,7 +629,7 @@ function writePlan(path, target, plan) {
   const candidate = resolve(resolvedParent, basename(requested));
   if (pathInside(root, candidate)) throw new Error("Plan output must be outside the target repository.");
   if (safeLstat(candidate)) throw new Error(`Plan output already exists: ${candidate}`);
-  writeFileSync(candidate, `${JSON.stringify(plan, null, 2)}\n`);
+  writeFileSync(candidate, `${JSON.stringify(plan, null, 2)}\n`, { flag: "wx" });
   return candidate;
 }
 
@@ -791,7 +681,7 @@ async function main(argv = process.argv.slice(2)) {
     if (args.output) writePlan(args.output, args.target, value);
   } else if (args.command === "check") {
     if (!args.plan) throw new Error("check requires --plan <path>.");
-    value = verifySavedPlan(readJson(args.plan), { target: args.target, adapter: args.adapter });
+    value = await verifySavedPlan(readJson(args.plan), { target: args.target, adapter: args.adapter });
   } else if (args.command === "doctor") {
     value = doctor(realpathSync(args.target));
   } else {

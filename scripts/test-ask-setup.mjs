@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,7 @@ import {
   snapshotTarget,
   verifySavedPlan,
 } from "./ask-setup.mjs";
+import { auditFixtureTree, runSetupInputTests } from "./test-ask-setup-inputs.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ASK_SETUP = resolve(REPO_ROOT, "scripts/ask-setup.mjs");
@@ -24,9 +25,9 @@ function tempDir(prefix) {
   return mkdtempSync(resolve(tmpdir(), prefix));
 }
 
-function runNode(script, args, { expected = [0] } = {}) {
+function runNode(script, args, { expected = [0], cwd = REPO_ROOT } = {}) {
   const result = spawnSync(process.execPath, [script, ...args], {
-    cwd: REPO_ROOT,
+    cwd,
     encoding: "utf8",
     timeout: 180000,
     maxBuffer: 32 * 1024 * 1024,
@@ -54,9 +55,9 @@ async function unitTests() {
 
     mkdirSync(resolve(target, "scripts"), { recursive: true });
     writeFileSync(resolve(target, "scripts/.env"), "SECRET=first\n");
-    const secretFirst = snapshotTarget(target);
+    const secretFirst = snapshotTarget(target, { extraPaths: ["scripts"] });
     writeFileSync(resolve(target, "scripts/.env"), "SECRET=second\n");
-    const secretSecond = snapshotTarget(target);
+    const secretSecond = snapshotTarget(target, { extraPaths: ["scripts"] });
     assert.equal(secretFirst.digest, secretSecond.digest, "secret content must be omitted from the setup snapshot");
   } finally {
     rmSync(target, { recursive: true, force: true });
@@ -102,10 +103,14 @@ async function integrationTests() {
   try {
     writeFileSync(resolve(target, "AGENTS.md"), "# Project-owned instructions\n\nKeep this text.\n");
     writeFileSync(resolve(target, "README.md"), "# Sample target\n");
+    mkdirSync(resolve(target, ".github/workflows"), { recursive: true });
+    writeFileSync(resolve(target, ".github/workflows/ci.yml"), "name: fixture\n");
     const before = snapshotDigest(target);
+    const fullBefore = auditFixtureTree(target);
 
     const first = await createAdoptionPlan({ target, adapter: "codex", profile: "minimal" });
     assert.equal(snapshotDigest(target), before, "plan generation must not change the target repository");
+    assert.deepEqual(auditFixtureTree(target), fullBefore, "all target bytes must be unchanged, including paths outside the setup snapshot");
     assert.equal(first.selection.adapter, "codex");
     assert.equal(first.selection.profile, "minimal");
     assert.equal(first.portfolio.status, "unselected");
@@ -128,23 +133,27 @@ async function integrationTests() {
     const cliPlan = runNode(ASK_SETUP, ["plan", "--target", target, "--adapter", "codex", "--profile", "minimal", "--output", planPath, "--json"]);
     const saved = JSON.parse(readFileSync(planPath, "utf8"));
     const printed = JSON.parse(cliPlan.stdout);
+    const otherCwd = resolve(outputRoot, "other-cwd");
+    mkdirSync(otherCwd);
+    const checkedFromElsewhere = runNode(ASK_SETUP, ["check", "--target", target, "--adapter", "codex", "--plan", planPath, "--json"], { cwd: otherCwd });
+    assert.equal(JSON.parse(checkedFromElsewhere.stdout).valid, true, "cwd alone must not invalidate a saved plan");
     assert.equal(saved.plan_digest, printed.plan_digest);
-    assert.deepEqual(verifySavedPlan(saved, { target, adapter: "codex" }), {
+    assert.deepEqual(await verifySavedPlan(saved, { target, adapter: "codex" }), {
       valid: true,
       plan_digest: saved.plan_digest,
       target_snapshot_digest: saved.target.snapshot_digest,
     });
 
     writeFileSync(resolve(target, "AGENTS.md"), "# Project-owned instructions\n\nChanged after plan.\n");
-    assert.throws(() => verifySavedPlan(saved, { target, adapter: "codex" }), /changed after the plan|snapshot/i);
+    await assert.rejects(() => verifySavedPlan(saved, { target, adapter: "codex" }), /changed after the plan|snapshot/i);
     writeFileSync(resolve(target, "AGENTS.md"), "# Project-owned instructions\n\nKeep this text.\n");
-    assert.throws(() => verifySavedPlan(saved, { target, adapter: "claude-code" }), /adapter mismatch/i);
+    await assert.rejects(() => verifySavedPlan(saved, { target, adapter: "claude-code" }), /adapter mismatch/i);
 
     const otherTarget = tempDir("ask-setup-other-");
     try {
       writeFileSync(resolve(otherTarget, "AGENTS.md"), "# Project-owned instructions\n\nKeep this text.\n");
       writeFileSync(resolve(otherTarget, "README.md"), "# Sample target\n");
-      assert.throws(() => verifySavedPlan(saved, { target: otherTarget, adapter: "codex" }), /path does not match/i);
+      await assert.rejects(() => verifySavedPlan(saved, { target: otherTarget, adapter: "codex" }), /path does not match/i);
     } finally {
       rmSync(otherTarget, { recursive: true, force: true });
     }
@@ -189,7 +198,7 @@ async function integrationTests() {
       const selectedSkillPath = resolve(target, ".agents/skills/test-first-verification");
       try {
         symlinkSync(external, selectedSkillPath);
-        await assert.rejects(() => createAdoptionPlan({ target, adapter: "codex", profile: "minimal" }), /Symlink escapes target repository/i);
+        await assert.rejects(() => createAdoptionPlan({ target, adapter: "codex", profile: "minimal" }), /Symlink is not supported/i);
       } catch (error) {
         if (error?.code !== "EPERM" && error?.code !== "EACCES") throw error;
       }
@@ -200,6 +209,23 @@ async function integrationTests() {
   } finally {
     rmSync(target, { recursive: true, force: true });
     rmSync(outputRoot, { recursive: true, force: true });
+  }
+
+  for (const linkKind of ["absolute", "relative", "dangling", "chain"]) {
+    const linked = tempDir("ask-setup-linked-target-");
+    try {
+      writeFileSync(resolve(linked, "local.md"), "project-owned rules\n");
+      const link = linkKind === "absolute" ? resolve(linked, "local.md")
+        : linkKind === "dangling" ? "missing.md" : linkKind === "chain" ? "middle" : "local.md";
+      if (linkKind === "chain") symlinkSync("local.md", resolve(linked, "middle"));
+      symlinkSync(link, resolve(linked, "AGENTS.md"));
+      const before = auditFixtureTree(linked);
+      const rejected = runNode(ASK_SETUP, ["plan", "--target", linked, "--adapter", "kernel-only", "--json"], { expected: [1] });
+      assert.match(rejected.stderr, /Symlink is not supported/);
+      assert.deepEqual(auditFixtureTree(linked), before, `${linkKind} symlink must not change any target bytes`);
+    } finally {
+      rmSync(linked, { recursive: true, force: true });
+    }
   }
 
   const dirty = tempDir("ask-setup-dirty-");
@@ -216,6 +242,51 @@ async function integrationTests() {
   }
 }
 
+async function sourceDriftIntegrationTests() {
+  if (!HAS_FULL_SOURCE) return;
+  const root = tempDir("ask-setup-source-drift-");
+  try {
+    const source = resolve(root, "source");
+    // Never mutate the checkout running the suite or its recorded source revision.
+    cpSync(REPO_ROOT, source, {
+      recursive: true,
+      filter: (path) => ![".git", "node_modules"].includes(path.split(/[\\/]/).at(-1)),
+    });
+    const script = resolve(source, "scripts/ask-setup.mjs");
+    for (const [adapter, profile] of [["kernel-only", "kernel-only"], ["codex", "minimal"], ["claude-code", "implementation"]]) {
+      const target = resolve(root, `target-${adapter}`);
+      mkdirSync(target);
+      writeFileSync(resolve(target, "AGENTS.md"), "# Local rules\n");
+      const before = auditFixtureTree(target);
+      const planPath = resolve(root, `${adapter}-plan.json`);
+      const result = runNode(script, ["plan", "--target", target, "--adapter", adapter, "--profile", profile, "--output", planPath, "--json"]);
+      const plan = JSON.parse(result.stdout);
+      const checkArgs = ["check", "--target", target, "--adapter", adapter, "--plan", planPath, "--json"];
+      assert.equal(JSON.parse(runNode(script, checkArgs).stdout).valid, true);
+      const paths = ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "skills/test-first-verification/SKILL.md", "docs/execution-envelope-contract.md"];
+      if (adapter !== "kernel-only") paths.push("scripts/fixed-entry-profile.mjs", "scripts/asset-registry.mjs");
+      for (const path of paths) {
+        assert.ok(plan.source.files.some((file) => file.path === path), `${path} must be bound for ${adapter}`);
+        const file = resolve(source, path);
+        const original = readFileSync(file);
+        try {
+          writeFileSync(file, Buffer.concat([original, Buffer.from("\n")]));
+          const rejected = runNode(script, checkArgs, { expected: [1] });
+          assert.match(rejected.stderr, /source changed after the plan/);
+        } finally {
+          writeFileSync(file, original);
+        }
+        assert.equal(JSON.parse(runNode(script, checkArgs).stdout).valid, true, "restored source must validate again");
+      }
+      assert.deepEqual(auditFixtureTree(target), before, `${adapter} plan/check must leave every target byte unchanged`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+runSetupInputTests();
 await unitTests();
 await integrationTests();
+await sourceDriftIntegrationTests();
 console.log("ASK setup tests passed");

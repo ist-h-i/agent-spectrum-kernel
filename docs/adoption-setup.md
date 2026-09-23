@@ -87,17 +87,30 @@ projection に exact Asset reference がある場合は plan に保持します�
 
 この方式により、別の installation engine や独自 ownership 規則を追加せず、既存 installer の managed-file conflict、partial-file、prune、rollback / detach の規則をそのまま利用します。
 
-次の場合は副作用前に停止します。
+setup では、読取・複製対象とその親ディレクトリにある symlink を拒否します。リンク先が対象リポジトリ内でも例外にせず、相対リンク、リンクの連鎖、リンク切れも対象にします。staging から実リポジトリへ書き込みが届かないよう、installer の起動前にも staging 側を検査します。setup と無関係な場所のリンクは対象外です。
+
+次の場合は、対象リポジトリを書き換えずに停止します。
 
 - managed file が利用者によって変更されている。
 - profile が adapter に登録されていない。
 - 必須 capability が unsupported / unknown である。
-- setup 対象の symlink がリポジトリ外へ逸脱する。
-- plan 生成中または保存後に setup-relevant な target state が変わる。
+- setup 対象またはその親ディレクトリに symlink がある。
+- 一時ディレクトリが対象リポジトリ内にある。
+- plan 生成中または保存後に、導入に関係する target の状態や source が変わる。
 - plan の出力先が対象リポジトリ内、または既存ファイルである。
 - `apply` が呼ばれる。
 
 global 認証設定は探索しません。`.env`、秘密鍵など既知の secret file の content は snapshot identity に取り込みません。既存 installer が安全な partial-file merge を判断するために対象リポジトリ内の setup file を読む場合も、その値を plan へ出力しません。installer の完全な標準出力も保存せず、dry-run 証跡には一時パスを正規化した出力 digest のみを保持します。
+
+## 保存した計画の再確認
+
+`check` は、現在の adapter / profile から既存の projection を再構築します。source の検証対象は、kernel 本文、選択した Skill、immutable asset、既存 renderer が公開する入力一覧です。間接 import の変更も見逃さないよう、source の `scripts` 配下にある `.mjs` も含めます。このため、導入に直接関係しないスクリプトの変更でも計画が無効になる場合があります。
+
+source の Git revision と、Asset reference を含む projection の digest も記録します。Git 情報がない source では revision を `null` とし、ファイルと projection の digest で確認します。必要な入力が欠けている場合は、有効な計画として扱いません。以前の検証方式で作った計画は再生成してください。
+
+target の snapshot 内のパスは、リポジトリ基準の相対パスです。同じ `--target` と `--plan` を指定していれば、コマンドの実行ディレクトリだけを変えても計画は無効になりません。JavaScript から `verifySavedPlan()` を呼ぶ場合は、非同期の検証結果を `await` で取得してください。
+
+計画作成中は、source と対象リポジトリを他の処理から変更しないでください。前後の snapshot 比較は、並行して動く別プロセスに対する OS レベルの隔離ではありません。
 
 ## Doctor
 
