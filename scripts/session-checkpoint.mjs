@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, lstatSync, openSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -14,7 +14,7 @@ import {
   writeCanonicalJsonNoReplace,
 } from "./content-addressed-store.mjs";
 import { validateJsonSchema } from "./json-schema-validation.mjs";
-import { validateWorkPackagePlanExecutable } from "./epic-admission-work-package-plan.mjs";
+import { validateWorkPackagePlan, validateWorkPackagePlanExecutable } from "./epic-admission-work-package-plan.mjs";
 import { readVerificationEvidence } from "./verification-evidence.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -24,6 +24,10 @@ export const REPOSITORY_SNAPSHOT_SCHEMA_PATH = resolve(ROOT, "schemas/repository
 export const SESSION_CHECKPOINT_SCHEMA_PATH = resolve(ROOT, "schemas/session-checkpoint.schema.json");
 export const MAX_SNAPSHOT_PATHS = 128;
 export const MAX_SNAPSHOT_FILE_BYTES = 256 * 1024;
+// Runtime-only contract: docs/session-checkpoint-contract.md.
+const MAX_WORKTREE_FILES = 4096;
+const MAX_TRACKED_FILE_BYTES = 8 * 1024 * 1024;
+const MAX_WORKTREE_BYTES = 64 * 1024 * 1024;
 
 function sha256(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
@@ -86,23 +90,43 @@ function containedPath(root, repositoryPath) {
   return absolute;
 }
 
-function readPathIdentity(root, repositoryPath, { allowMissing = true } = {}) {
+function readPathIdentity(root, repositoryPath, { allowMissing = true, maxBytes = MAX_SNAPSHOT_FILE_BYTES } = {}) {
   const path = validateRelativePath(repositoryPath);
   const absolute = containedPath(root, path);
+  assertNoSymlinkPathSegments(absolute, `repository path ${path}`, { allowMissingLeaf: true });
   if (!existsSync(absolute)) {
     if (!allowMissing) throw new Error(`required repository path is missing: ${path}`);
     return { path, state: "missing", digest: null, bytes: 0 };
   }
-  assertNoSymlinkPathSegments(absolute, `repository path ${path}`);
   const status = lstatSync(absolute);
   if (!status.isFile()) throw new Error(`repository path must be a regular file: ${path}`);
-  const bytes = readStableBytes(absolute, `repository path ${path}`, MAX_SNAPSHOT_FILE_BYTES);
+  // The JSON CAS reader deliberately rejects empty objects. Empty repository
+  // files are valid; bind an empty open descriptor to the same stable inode.
+  let bytes;
+  if (status.size === 0) {
+    const descriptor = openSync(absolute, "r");
+    try {
+      const opened = fstatSync(descriptor);
+      const final = lstatSync(absolute);
+      const keys = ["dev", "ino", "mode", "size", "mtimeMs", "ctimeMs", "uid", "gid"];
+      if (!opened.isFile() || !final.isFile() || final.isSymbolicLink()
+        || keys.some((key) => status[key] !== opened[key] || opened[key] !== final[key])) {
+        throw new Error(`repository path ${path} changed during empty-file read`);
+      }
+      bytes = Buffer.alloc(0);
+    } finally {
+      closeSync(descriptor);
+    }
+  } else {
+    bytes = readStableBytes(absolute, `repository path ${path}`, maxBytes);
+  }
   return { path, state: "present", digest: sha256(bytes), bytes: bytes.length };
 }
 
 function nulList(buffer) {
-  if (buffer.length === 0) return [];
-  return buffer.toString("utf8").split("\u0000").filter(Boolean);
+  const text = buffer.toString("utf8");
+  if (!Buffer.from(text, "utf8").equals(buffer)) throw new Error("Git paths must be valid UTF-8");
+  return text.split("\u0000").filter(Boolean);
 }
 
 function captureGitState(root) {
@@ -110,36 +134,54 @@ function captureGitState(root) {
   const branch = gitText(root, ["symbolic-ref", "--quiet", "--short", "HEAD"]);
   const head = gitText(root, ["rev-parse", "HEAD"]);
   const tree = gitText(root, ["rev-parse", "HEAD^{tree}"]);
-  const statusBytes = gitBuffer(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]).stdout;
-  const indexDiff = gitBuffer(root, ["diff", "--cached", "--binary", "--no-ext-diff", "HEAD", "--"]).stdout;
-  const worktreeDiff = gitBuffer(root, ["diff", "--binary", "--no-ext-diff", "HEAD", "--"]).stdout;
-  const changedTracked = nulList(gitBuffer(root, ["diff", "--name-only", "-z", "HEAD", "--"]).stdout);
+  const indexEntries = gitBuffer(root, ["ls-files", "--stage", "-z"]).stdout;
+  const headEntries = gitBuffer(root, ["ls-tree", "-r", "-z", "HEAD"]).stdout;
+  const tracked = new Set();
+  for (const entry of [...nulList(indexEntries), ...nulList(headEntries)]) {
+    // A gitlink identifies a commit, not the nested worktree bytes. Even an
+    // ignored/clean submodule is unsupported until recursive identity exists.
+    if (entry.startsWith("160000 ")) throw new Error("submodule worktrees are unsupported for checkpoint capture");
+    const tab = entry.indexOf("\t");
+    if (tab < 0) throw new Error("invalid Git tracked-file inventory");
+    tracked.add(validateRelativePath(entry.slice(tab + 1), "tracked path"));
+  }
+  const statusBytes = gitBuffer(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"]).stdout;
+  const diffOptions = ["--no-ext-diff", "--no-textconv", "--ignore-submodules=none", "--no-renames"];
+  const changedTracked = nulList(gitBuffer(root, ["diff", ...diffOptions, "--name-only", "-z", "HEAD", "--"]).stdout);
+  const changedIndex = nulList(gitBuffer(root, ["diff", ...diffOptions, "--cached", "--name-only", "-z", "HEAD", "--"]).stdout);
   const untracked = nulList(gitBuffer(root, ["ls-files", "--others", "--exclude-standard", "-z"]).stdout);
-  const changedPaths = [...new Set([...changedTracked, ...untracked].map((path) => validateRelativePath(path, "changed path")))]
-    .sort((left, right) => left.localeCompare(right, "en"));
+  const changedPaths = [...new Set([...changedTracked, ...changedIndex, ...untracked].map((path) => validateRelativePath(path, "changed path")))].sort();
   if (changedPaths.length > MAX_SNAPSHOT_PATHS) throw new Error("repository state exceeds the changed-path limit");
 
+  const paths = [...new Set([...tracked, ...untracked])].sort();
+  if (paths.length > MAX_WORKTREE_FILES) throw new Error("repository state exceeds the worktree-file limit");
   const worktreeHasher = createHash("sha256");
-  worktreeHasher.update(worktreeDiff);
-  for (const path of untracked.sort((left, right) => left.localeCompare(right, "en"))) {
-    const identity = readPathIdentity(root, path, { allowMissing: false });
+  let totalBytes = 0;
+  // Hash actual bytes, including Git-clean tracked files: filters and index
+  // flags can conceal changes from status/diff. Never persist the file bodies.
+  for (const path of paths) {
+    const identity = readPathIdentity(root, path, {
+      allowMissing: tracked.has(path),
+      maxBytes: tracked.has(path) ? MAX_TRACKED_FILE_BYTES : MAX_SNAPSHOT_FILE_BYTES,
+    });
+    totalBytes += identity.bytes;
+    if (totalBytes > MAX_WORKTREE_BYTES) throw new Error("repository state exceeds the worktree-byte limit");
+    const executable = identity.state === "present" && (lstatSync(containedPath(root, path)).mode & 0o111) !== 0;
+    worktreeHasher.update(stableCanonicalJson({ ...identity, executable }));
     worktreeHasher.update("\u0000");
-    worktreeHasher.update(path);
-    worktreeHasher.update("\u0000");
-    worktreeHasher.update(identity.digest);
   }
 
-  const indexDirty = gitBuffer(root, ["diff", "--cached", "--quiet", "HEAD", "--"], { allowFailure: true }).status !== 0;
-  const worktreeDirty = statusBytes.length > 0;
+  const indexStatus = gitBuffer(root, ["diff", ...diffOptions, "--cached", "--quiet", "HEAD", "--"], { allowFailure: true }).status;
+  if (indexStatus !== 0 && indexStatus !== 1) throw new Error("Git index state is unverifiable");
   return {
     repository_id: repositoryId,
     branch,
     head,
     tree,
-    index_state: indexDirty ? "dirty" : "clean",
-    worktree_state: worktreeDirty ? "dirty" : "clean",
+    index_state: indexStatus === 1 ? "dirty" : "clean",
+    worktree_state: statusBytes.length > 0 ? "dirty" : "clean",
     status_digest: sha256(statusBytes),
-    index_digest: sha256(indexDiff),
+    index_digest: sha256(indexEntries),
     worktree_digest: `sha256:${worktreeHasher.digest("hex")}`,
     changed_paths: changedPaths,
   };
@@ -147,18 +189,32 @@ function captureGitState(root) {
 
 function loadPlanBundle(bundle) {
   if (!bundle || typeof bundle !== "object") throw new Error("planBundle is required");
-  const { plan, context, policy, decision, previousPlan, previousContext } = bundle;
-  const issues = validateWorkPackagePlanExecutable(plan, {
-    policy,
-    decision,
-    context,
-    previousPlan,
-    previousContext,
-  });
+  const { plan, policy, decision, context, previousPlan, previousContext, previousPolicy, previousDecision } = bundle;
+  // Do not forward caller-controlled schema paths or other validator options.
+  const options = { policy, decision, context, previousPlan, previousContext, previousPolicy, previousDecision };
+  const issues = validateWorkPackagePlan(plan, options);
   if (issues.length > 0) {
-    throw new Error(`Work Package Plan is not executable: ${issues.slice(0, 8).map((entry) => `${entry.code}@${entry.path}`).join(", ")}`);
+    throw new Error(`Work Package Plan is invalid: ${issues.slice(0, 8).map((entry) => `${entry.code}@${entry.path}`).join(", ")}`);
   }
-  return bundle;
+  // A valid bounded/proposed plan may be saved, but it does not authorize work.
+  // Keep the existing execution validator (including admission) authoritative.
+  return { ...bundle, executionIssues: validateWorkPackagePlanExecutable(plan, options) };
+}
+
+function assertPlanTarget(root, repository, integrationBase, plan, activePackageId) {
+  const active = packageById(plan, activePackageId);
+  for (const target of [plan.repository, active.target_binding]) {
+    if (repository.repository_id !== target.repository_id || repository.branch !== target.branch) {
+      throw new Error("live repository/branch differs from the Work Package Plan target");
+    }
+    if (integrationBase.commit !== target.base_commit || integrationBase.tree !== target.base_tree) {
+      throw new Error("integration base differs from the Work Package Plan target");
+    }
+    const actualTree = gitText(root, ["rev-parse", "--verify", `${target.base_commit}^{tree}`]);
+    if (actualTree !== target.base_tree) throw new Error("Work Package Plan base tree differs from Git");
+    const ancestry = gitBuffer(root, ["merge-base", "--is-ancestor", target.base_commit, repository.head], { allowFailure: true });
+    if (ancestry.status !== 0) throw new Error("live HEAD is not a verified descendant of the Work Package Plan base");
+  }
 }
 
 function planRef(plan) {
@@ -235,20 +291,22 @@ export function createRepositorySnapshot({
   contractPaths = [],
   verificationStoreRoot = null,
   evidenceIds = [],
-  integrationBase = "HEAD",
+  integrationBase = null,
 } = {}) {
   const { plan } = loadPlanBundle(planBundle);
   packageById(plan, activePackageId);
   const root = normalizedRepositoryRoot(repositoryRoot);
   const repository = captureGitState(root);
-  if (repository.repository_id !== plan.repository.repository_id) {
-    throw new Error("live repository identity differs from the executable Work Package Plan repository");
+  if (repository.repository_id !== plan.repository.repository_id || repository.branch !== plan.repository.branch) {
+    throw new Error("live repository/branch differs from the Work Package Plan target");
   }
+  integrationBase ??= plan.repository.base_commit;
   if (typeof integrationBase !== "string" || !/^[A-Za-z0-9._/-]+$/u.test(integrationBase) || integrationBase.startsWith("-") || integrationBase.includes("..")) {
     throw new Error("integrationBase must be a bounded Git revision name");
   }
   const baseCommit = gitText(root, ["rev-parse", "--verify", `${integrationBase}^{commit}`]);
   const baseTree = gitText(root, ["rev-parse", "--verify", `${integrationBase}^{tree}`]);
+  assertPlanTarget(root, repository, { commit: baseCommit, tree: baseTree }, plan, activePackageId);
   const snapshot = {
     artifact_kind: "ask_repository_snapshot",
     schema_version: REPOSITORY_SNAPSHOT_SCHEMA_VERSION,
@@ -274,14 +332,14 @@ export function createSessionCheckpoint({
   nextTaskId = null,
   rolloverReason = "operator_request",
 } = {}) {
-  const { plan } = loadPlanBundle(planBundle);
+  const { plan, executionIssues } = loadPlanBundle(planBundle);
   if (canonicalDigest(snapshot) !== snapshotDigest) throw new Error("snapshot digest does not match snapshot content");
   if (stableCanonicalJson(snapshot.plan_ref) !== stableCanonicalJson(planRef(plan))) throw new Error("snapshot plan reference differs from the current Work Package Plan");
   const completed = assertCompletedPackageClosure(plan, completedPackageIds, snapshot.active_package_id);
   const active = packageById(plan, snapshot.active_package_id);
   const controls = planControls(plan);
   let nextAction;
-  if (controls.open_blocker_ids.length || controls.unresolved_decision_ids.length || controls.required_approval_ids.length) {
+  if (executionIssues.length > 0) {
     if (nextTaskId !== null) throw new Error("nextTaskId cannot bypass unresolved plan controls");
     nextAction = { kind: "await_control_resolution", package_id: active.package_id, task_id: null };
   } else {
@@ -308,7 +366,7 @@ export function createSessionCheckpoint({
   return checkpoint;
 }
 
-function checkpointSemantics(checkpoint, snapshot, plan) {
+function checkpointSemantics(checkpoint, snapshot, plan, executionIssues) {
   const reasons = [];
   const expectedPlanRef = planRef(plan);
   if (stableCanonicalJson(checkpoint.plan_ref) !== stableCanonicalJson(expectedPlanRef)
@@ -332,8 +390,8 @@ function checkpointSemantics(checkpoint, snapshot, plan) {
     if (checkpoint.next_action.package_id !== active.package_id) reasons.push("NEXT_ACTION_PACKAGE_MISMATCH");
     if (checkpoint.next_action.kind === "ordered_task"
       && !active.ordered_tasks.some((entry) => entry.task_id === checkpoint.next_action.task_id)) reasons.push("NEXT_ACTION_TASK_UNKNOWN");
-    if (checkpoint.next_action.kind === "await_control_resolution"
-      && !(controls.open_blocker_ids.length || controls.unresolved_decision_ids.length || controls.required_approval_ids.length)) reasons.push("NEXT_ACTION_CONTROL_STATE_MISMATCH");
+    if ((checkpoint.next_action.kind === "await_control_resolution") !== (executionIssues.length > 0)
+      || (executionIssues.length > 0 && checkpoint.next_action.task_id !== null)) reasons.push("NEXT_ACTION_CONTROL_STATE_MISMATCH");
   }
   return [...new Set(reasons)].sort();
 }
@@ -405,7 +463,7 @@ export function persistSessionCheckpoint({
   contractPaths = [],
   verificationStoreRoot = null,
   evidenceIds = [],
-  integrationBase = "HEAD",
+  integrationBase = null,
   resumeReferencePath = null,
 } = {}) {
   const snapshot = createRepositorySnapshot({
@@ -456,7 +514,13 @@ export function validateSessionResume({
   planBundle,
   verificationStoreRoot = null,
 } = {}) {
-  const { plan } = loadPlanBundle(planBundle);
+  let bundle;
+  try {
+    bundle = loadPlanBundle(planBundle);
+  } catch (error) {
+    return { state_valid: false, status: "blocked", reasons: ["PLAN_INVALID"], detail: error.message, restart_package: null };
+  }
+  const { plan, executionIssues } = bundle;
   let checkpoint;
   let snapshot;
   try {
@@ -474,11 +538,16 @@ export function validateSessionResume({
     };
   }
 
-  const reasons = checkpointSemantics(checkpoint, snapshot, plan);
+  const reasons = checkpointSemantics(checkpoint, snapshot, plan, executionIssues);
   let current = null;
   try {
     current = currentSnapshotComparable(repositoryRoot, snapshot);
     reasons.push(...repositoryMismatchReasons(snapshot, current));
+    try {
+      assertPlanTarget(normalizedRepositoryRoot(repositoryRoot), current.repository, current.integration_base, plan, checkpoint.active_package_id);
+    } catch {
+      reasons.push("PLAN_TARGET_BINDING_MISMATCH");
+    }
   } catch (error) {
     reasons.push("REPOSITORY_STATE_UNVERIFIABLE");
   }
@@ -486,19 +555,20 @@ export function validateSessionResume({
     if (!verificationStoreRoot) reasons.push("EVIDENCE_STORE_REQUIRED");
     else reasons.push(...validateEvidenceReferences(verificationStoreRoot, snapshot.evidence_refs));
   }
-  if (checkpoint.open_blocker_ids.length > 0) reasons.push("OPEN_BLOCKER");
-  if (checkpoint.unresolved_decision_ids.length > 0) reasons.push("HUMAN_DECISION_REQUIRED");
-  if (checkpoint.required_approval_ids.length > 0) reasons.push("HUMAN_APPROVAL_REQUIRED");
-
-  const uniqueReasons = [...new Set(reasons)].sort();
-  if (uniqueReasons.length > 0) {
+  if (reasons.length > 0) {
     return {
-      state_valid: !uniqueReasons.some((entry) => entry.includes("MISMATCH") || entry.includes("INVALID") || entry.includes("UNVERIFIABLE") || entry.includes("MISSING")),
+      state_valid: false,
       status: "blocked",
-      reasons: uniqueReasons,
+      reasons: [...new Set(reasons)].sort(),
       restart_package: null,
     };
   }
+  // Valid saved state and execution permission are different results. Preserve
+  // the bounded waiting package without granting an executable next action.
+  const executionReasons = executionIssues.map((entry) => entry.code);
+  if (checkpoint.open_blocker_ids.length > 0) executionReasons.push("OPEN_BLOCKER");
+  if (checkpoint.unresolved_decision_ids.length > 0) executionReasons.push("HUMAN_DECISION_REQUIRED");
+  if (checkpoint.required_approval_ids.length > 0) executionReasons.push("HUMAN_APPROVAL_REQUIRED");
 
   const restartPackage = {
     artifact_kind: "ask_validated_restart_package",
@@ -512,6 +582,7 @@ export function validateSessionResume({
     plan_ref: checkpoint.plan_ref,
     active_package_id: checkpoint.active_package_id,
     completed_package_ids: checkpoint.completed_package_ids,
+    current_phase: checkpoint.current_phase,
     evidence_refs: checkpoint.evidence_refs,
     open_blocker_ids: checkpoint.open_blocker_ids,
     unresolved_decision_ids: checkpoint.unresolved_decision_ids,
@@ -524,19 +595,22 @@ export function validateSessionResume({
   };
   return {
     state_valid: true,
-    status: "context_rollover_required",
-    reasons: [],
+    status: executionReasons.length > 0 ? "blocked" : "context_rollover_required",
+    reasons: [...new Set(executionReasons)].sort(),
     restart_package: restartPackage,
     restart_package_digest: canonicalDigest(restartPackage),
   };
 }
 
 function loadPlanBundlePaths(paths) {
-  const required = ["policy", "decision", "context", "plan", "previousPlan", "previousContext"];
+  const required = ["policy", "decision", "context", "plan"];
   const values = {};
   for (const key of required) {
     if (!paths?.[key]) throw new Error(`plan_bundle_paths.${key} is required`);
     values[key] = readJsonFileStrict(paths[key], `plan bundle ${key}`);
+  }
+  for (const key of ["previousPlan", "previousContext", "previousPolicy", "previousDecision"]) {
+    if (paths?.[key]) values[key] = readJsonFileStrict(paths[key], `plan bundle ${key}`);
   }
   return values;
 }
