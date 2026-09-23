@@ -339,6 +339,27 @@ try {
   const initialCoverage = buildCurrentCoverage({ repositoryRoot: root, storeRoot: store, targetRevision: requirementsTarget });
   assert.equal(initialCoverage.coverage.status, "covered");
 
+  git(root, ["checkout", "-B", "case-requirement-shrink", requirementsTarget]);
+  writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, sealScopedRequirements({
+    base_revision: baseRevision,
+    gate_inventory_id: baseGateInventory.inventory_id,
+    gate_inventory_digest: baseGateInventory.inventory_digest,
+    required_gates: [gateRequirement({ evidence: sourceEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations, deltaReview: {
+      surface_selectors: [{ kind: "glob", pattern: "src/**" }],
+      obligation_refs: ["independent-semantic-review"],
+      prior_review_ref: "review-baseline-1",
+      prior_finding_refs: ["finding-baseline-1"],
+    } })],
+    current_obligations: [],
+  }));
+  const shrinkTarget = commitAll(root, "attempt to shrink required gate inventory");
+  assert.throws(() => planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: shrinkTarget }), /cannot add or remove gate inventory entries/u);
+
+  git(root, ["checkout", "-B", "case-gate-inventory-tamper", requirementsTarget]);
+  write(root, VERIFICATION_SCOPED_GATE_INVENTORY_PATH, `${readFileSync(resolve(root, VERIFICATION_SCOPED_GATE_INVENTORY_PATH), "utf8").trimEnd()}\n \n`);
+  const gateInventoryTamperTarget = commitAll(root, "tamper gate inventory bytes");
+  assert.throws(() => planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: gateInventoryTamperTarget }), /gate inventory changed between base and target/u);
+
   git(root, ["checkout", "-B", "case-docs", requirementsTarget]);
   write(root, "docs/readme.md", "# Fixture\n\nDocs-only change.\n");
   const docsTarget = commitAll(root, "docs only");
@@ -437,12 +458,15 @@ try {
     base_revision: baseRevision,
     gate_inventory_id: baseGateInventory.inventory_id,
     gate_inventory_digest: baseGateInventory.inventory_digest,
-    required_gates: [gateRequirement({ evidence: unboundEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations })],
+    required_gates: [
+      gateRequirement({ evidence: unboundEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations }),
+      gateRequirement({ evidence: schemaEvidence, manifestPath: schemaManifestPath, obligations: schemaObligations }),
+    ],
     current_obligations: [],
   });
   writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, unboundRequirements);
   const unboundTarget = commitAll(root, "bind unbound source evidence");
-  assert.equal(planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: unboundTarget }).dispositions[0].reason_code, "source_evidence_input_mismatch");
+  assert.equal(planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: unboundTarget }).dispositions.find((entry) => entry.gate_id === "source-test").reason_code, "source_evidence_input_mismatch");
 
   const changedRuntime = structuredClone(runtime);
   changedRuntime.toolchain[0].version = "v0.0.0";
@@ -464,29 +488,44 @@ try {
     base_revision: baseRevision,
     gate_inventory_id: baseGateInventory.inventory_id,
     gate_inventory_digest: baseGateInventory.inventory_digest,
-    required_gates: [gateRequirement({ evidence: staleRuntimeEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations })],
+    required_gates: [
+      gateRequirement({ evidence: staleRuntimeEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations }),
+      gateRequirement({ evidence: schemaEvidence, manifestPath: schemaManifestPath, obligations: schemaObligations }),
+    ],
     current_obligations: [],
   }));
   const runtimeTarget = commitAll(root, "bind stale runtime evidence");
-  assert.equal(planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: runtimeTarget }).dispositions[0].reason_code, "toolchain_changed");
+  assert.equal(planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: runtimeTarget }).dispositions.find((entry) => entry.gate_id === "source-test").reason_code, "toolchain_changed");
 
-  git(root, ["checkout", "-B", "case-unknown", requirementsTarget]);
-  const unknownRequirements = sealScopedRequirements({
-    base_revision: baseRevision,
-    gate_inventory_id: baseGateInventory.inventory_id,
-    gate_inventory_digest: baseGateInventory.inventory_digest,
+  git(root, ["checkout", "-B", "case-unknown-base", requirementsTarget]);
+  const unknownGateInventory = sealScopedGateInventory({
     required_gates: [{
       gate_id: "unknown-test",
       dependency_manifest_path: unknownManifestPath,
-      source_evidence_id: `verification-evidence-${"0".repeat(64)}`,
       required_obligation_refs: ["AC-unknown"],
-      authority: acceptedAuthority(sourceEvidence),
+      authority: baselineAuthority,
       execution_availability: "available",
       delta_review: null,
     }],
     current_obligations: [],
   });
-  writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, unknownRequirements);
+  writeJson(root, VERIFICATION_SCOPED_GATE_INVENTORY_PATH, unknownGateInventory);
+  const unknownBase = commitAll(root, "establish incomplete dependency baseline");
+  writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, sealScopedRequirements({
+    base_revision: unknownBase,
+    gate_inventory_id: unknownGateInventory.inventory_id,
+    gate_inventory_digest: unknownGateInventory.inventory_digest,
+    required_gates: [{
+      gate_id: "unknown-test",
+      dependency_manifest_path: unknownManifestPath,
+      source_evidence_id: `verification-evidence-${"0".repeat(64)}`,
+      required_obligation_refs: ["AC-unknown"],
+      authority: baselineAuthority,
+      execution_availability: "available",
+      delta_review: null,
+    }],
+    current_obligations: [],
+  }));
   const unknownTarget = commitAll(root, "require incomplete dependency gate");
   assert.equal(planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: unknownTarget }).dispositions[0].reason_code, "dependency_information_incomplete");
 
@@ -497,13 +536,17 @@ try {
     base_revision: baseRevision,
     gate_inventory_id: baseGateInventory.inventory_id,
     gate_inventory_digest: baseGateInventory.inventory_digest,
-    required_gates: [gateRequirement({ evidence: sourceEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations, authority: independentAuthority })],
+    required_gates: [
+      gateRequirement({ evidence: sourceEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations, authority: independentAuthority }),
+      gateRequirement({ evidence: schemaEvidence, manifestPath: schemaManifestPath, obligations: schemaObligations }),
+    ],
     current_obligations: [],
   }));
   const independentTarget = commitAll(root, "require independent judgment");
   const independentPlan = planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: independentTarget });
-  assert.equal(independentPlan.dispositions[0].disposition, "independent_judgment_required");
-  assert.equal(independentPlan.dispositions[0].execution_evidence_reusable, true);
+  const independentSource = independentPlan.dispositions.find((entry) => entry.gate_id === "source-test");
+  assert.equal(independentSource.disposition, "independent_judgment_required");
+  assert.equal(independentSource.execution_evidence_reusable, true);
   assert.equal(buildCurrentCoverage({ repositoryRoot: root, storeRoot: store, targetRevision: independentTarget }).coverage.status, "blocked");
 
   git(root, ["checkout", "-B", "case-external", requirementsTarget]);
@@ -511,7 +554,10 @@ try {
     base_revision: baseRevision,
     gate_inventory_id: baseGateInventory.inventory_id,
     gate_inventory_digest: baseGateInventory.inventory_digest,
-    required_gates: [gateRequirement({ evidence: sourceEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations })],
+    required_gates: [
+      gateRequirement({ evidence: sourceEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations }),
+      gateRequirement({ evidence: schemaEvidence, manifestPath: schemaManifestPath, obligations: schemaObligations }),
+    ],
     current_obligations: [{ obligation_id: "pr-head-current", kind: "pr_head" }],
   }));
   const externalTarget = commitAll(root, "require current PR observation");
@@ -522,7 +568,10 @@ try {
     base_revision: baseRevision,
     gate_inventory_id: baseGateInventory.inventory_id,
     gate_inventory_digest: baseGateInventory.inventory_digest,
-    required_gates: [gateRequirement({ evidence: sourceEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations })],
+    required_gates: [
+      gateRequirement({ evidence: sourceEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations }),
+      gateRequirement({ evidence: schemaEvidence, manifestPath: schemaManifestPath, obligations: schemaObligations }),
+    ],
     current_obligations: [{ obligation_id: "pr-head-current", kind: "pr_head", fresh: true }],
   }), /schema|additional|propert/iu, "self-reported freshness must not satisfy current-state coverage");
 
