@@ -1,0 +1,53 @@
+name: Verify Issue 197 reporting
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/issue197-reporting.yml'
+      - 'scripts/ask-benchmark-portfolio-*'
+      - 'scripts/test-ask-benchmark-portfolio-*'
+      - 'scripts/evolution-loop*'
+      - 'schemas/evolution-*'
+      - 'benchmarks/schemas/portfolio-*'
+      - 'docs/portfolio-aggregate-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue197-reporting-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reporting:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Record exact environment
+        run: |
+          node --version
+          git rev-parse HEAD HEAD^{tree}
+          git diff --check
+      - name: Verify existing aggregate authority chain
+        run: node scripts/test-ask-benchmark-portfolio-aggregate-result-v2.mjs
+      - name: Capture temporary local-verification inputs
+        run: |
+          mkdir -p "$RUNNER_TEMP/issue197-verification-inputs"
+          git rev-parse HEAD > "$RUNNER_TEMP/issue197-verification-inputs/commit.txt"
+          git ls-tree -r HEAD > "$RUNNER_TEMP/issue197-verification-inputs/tree.txt"
+          git archive --format=tar HEAD | gzip > "$RUNNER_TEMP/issue197-verification-inputs/source.tar.gz"
+          cp "$(command -v node)" "$RUNNER_TEMP/issue197-verification-inputs/node"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: issue197-verification-inputs
+          path: ${{ runner.temp }}/issue197-verification-inputs
+          retention-days: 1
+          if-no-files-found: error
