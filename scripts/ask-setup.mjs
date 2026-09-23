@@ -718,12 +718,27 @@ function writePlan(path, target, plan) {
   const root = realpathSync(target);
   const requested = resolve(path);
   if (pathInside(root, requested)) throw new Error("Plan output must be outside the target repository.");
+  if (safeLstat(requested)) throw new Error(`Plan output already exists: ${requested}`);
+
   const parent = dirname(requested);
+  let existingAncestor = parent;
+  while (!existsSync(existingAncestor)) {
+    const next = dirname(existingAncestor);
+    if (next === existingAncestor) break;
+    existingAncestor = next;
+  }
+  if (!existsSync(existingAncestor)) throw new Error(`Plan output parent cannot be resolved: ${parent}`);
+  const ancestorRealpath = realpathSync(existingAncestor);
+  const unresolvedTail = relative(existingAncestor, parent);
+  const prospectiveParent = resolve(ancestorRealpath, unresolvedTail);
+  const prospectiveCandidate = resolve(prospectiveParent, basename(requested));
+  if (pathInside(root, prospectiveCandidate)) throw new Error("Plan output must be outside the target repository.");
+
   if (!existsSync(parent)) mkdirSync(parent, { recursive: true });
   const resolvedParent = realpathSync(parent);
   const candidate = resolve(resolvedParent, basename(requested));
   if (pathInside(root, candidate)) throw new Error("Plan output must be outside the target repository.");
-  if (existsSync(candidate)) throw new Error(`Plan output already exists: ${candidate}`);
+  if (safeLstat(candidate)) throw new Error(`Plan output already exists: ${candidate}`);
   writeFileSync(candidate, `${JSON.stringify(plan, null, 2)}\n`);
   return candidate;
 }

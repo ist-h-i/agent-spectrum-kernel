@@ -154,6 +154,22 @@ async function integrationTests() {
     assert.match(insideResult.stderr, /outside the target repository/i);
     assert.equal(existsSync(resolve(target, "generated")), false, "refused output must not create a target directory");
 
+    const symlinkOutputRoot = tempDir("ask-setup-output-link-");
+    try {
+      const targetLink = resolve(symlinkOutputRoot, "target-link");
+      try {
+        symlinkSync(target, targetLink);
+        const viaLink = resolve(targetLink, "created-by-output", "plan.json");
+        const linkedResult = runNode(ASK_SETUP, ["plan", "--target", target, "--adapter", "codex", "--profile", "minimal", "--output", viaLink], { expected: [1] });
+        assert.match(linkedResult.stderr, /outside the target repository/i);
+        assert.equal(existsSync(resolve(target, "created-by-output")), false, "symlinked output ancestor must be rejected before mkdir");
+      } catch (error) {
+        if (error?.code !== "EPERM" && error?.code !== "EACCES") throw error;
+      }
+    } finally {
+      rmSync(symlinkOutputRoot, { recursive: true, force: true });
+    }
+
     writeFileSync(resolve(outputRoot, "existing.json"), "{}\n");
     const conflictOutput = runNode(ASK_SETUP, ["plan", "--target", target, "--adapter", "codex", "--profile", "minimal", "--output", resolve(outputRoot, "existing.json")], { expected: [1] });
     assert.match(conflictOutput.stderr, /already exists/i);
