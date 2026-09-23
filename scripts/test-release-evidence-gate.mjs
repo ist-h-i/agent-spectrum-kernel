@@ -192,6 +192,20 @@ try {
   missingReview.catalog.evidence = missingReview.catalog.evidence.filter((entry) => entry.evidence_id !== missingReviewId);
   expectNotReady(assess(root, missingReview.matrix, missingReview.catalog), "independent_review_missing");
 
+  const sameIdentityReview = buildReady(root);
+  const sameIdentityPrimary = findPrimary(sameIdentityReview.catalog, "release.guided_setup");
+  const sameIdentityReviewer = findReview(sameIdentityReview.catalog, "release.guided_setup");
+  sameIdentityReviewer.authority.identity_digest = sameIdentityPrimary.authority.identity_digest;
+  expectNotReady(assess(root, sameIdentityReview.matrix, sameIdentityReview.catalog), "independent_review_missing");
+
+  const partiallyUncheckedGate = buildReady(root);
+  const uncheckedGateEvidence = clone(findPrimary(partiallyUncheckedGate.catalog, "release.asset_registry"));
+  uncheckedGateEvidence.evidence_id = "release-evidence-release-asset-registry-unchecked";
+  uncheckedGateEvidence.status = "not_checked";
+  uncheckedGateEvidence.artifact = null;
+  partiallyUncheckedGate.catalog.evidence.push(uncheckedGateEvidence);
+  expectNotReady(assess(root, partiallyUncheckedGate.matrix, partiallyUncheckedGate.catalog), "evidence_not_checked");
+
   const arbitrarySupported = buildReady(root);
   arbitrarySupported.matrix.claims[0].evidence_refs = [];
   expectNotReady(assess(root, arbitrarySupported.matrix, arbitrarySupported.catalog), "supported_claim_has_no_evidence");
@@ -200,6 +214,17 @@ try {
   const synthetic = findPrimary(syntheticOverclaim.catalog, "release.activation_bypass_decisions");
   synthetic.kind = "synthetic_fixture";
   expectNotReady(assess(root, syntheticOverclaim.matrix, syntheticOverclaim.catalog), "supported_claim_evidence_kind_or_status_insufficient");
+
+  const partiallyUncheckedClaim = buildReady(root);
+  const uncheckedClaimEvidence = clone(findPrimary(partiallyUncheckedClaim.catalog, "release.activation_bypass_decisions"));
+  uncheckedClaimEvidence.evidence_id = "release-evidence-release-activation-bypass-decisions-unchecked";
+  uncheckedClaimEvidence.status = "not_checked";
+  uncheckedClaimEvidence.artifact = null;
+  uncheckedClaimEvidence.gate_ids = [];
+  uncheckedClaimEvidence.claim_ids = [CLAIM_ID];
+  partiallyUncheckedClaim.catalog.evidence.push(uncheckedClaimEvidence);
+  partiallyUncheckedClaim.matrix.claims[0].evidence_refs.push(uncheckedClaimEvidence.evidence_id);
+  expectNotReady(assess(root, partiallyUncheckedClaim.matrix, partiallyUncheckedClaim.catalog), "claim_evidence_not_checked");
 
   const excludedOptional = buildReady(root);
   excludedOptional.matrix.claims.push({
@@ -242,6 +267,18 @@ try {
   assert.equal(cli.status, 0, cli.stderr);
   assert.equal(JSON.parse(cli.stdout).decision, "not_ready", "not_ready is a valid assessment, not a CLI failure");
 
+  const forbiddenOutput = resolve(root, "assessment.json");
+  const outputCli = spawnSync(process.execPath, [
+    resolve(SCRIPT_ROOT, "scripts/release-evidence-gate.mjs"), "assess",
+    "--matrix", matrixPath,
+    "--evidence", catalogPath,
+    "--source-revision", SOURCE,
+    "--root", root,
+    "--output", forbiddenOutput,
+  ], { encoding: "utf8" });
+  assert.equal(outputCli.status, 1, "release assessment CLI must stay read-only and reject --output");
+  assert.match(outputCli.stderr, /unknown release evidence gate option: --output/u);
+
   const currentMatrix = JSON.parse(readFileSync(resolve(SCRIPT_ROOT, "docs/fixtures/release-evidence-gate/current-main-756c72-claim-matrix.json"), "utf8"));
   const currentCatalog = JSON.parse(readFileSync(resolve(SCRIPT_ROOT, "docs/fixtures/release-evidence-gate/current-main-756c72-evidence.json"), "utf8"));
   const current = assessRelease({
@@ -254,7 +291,7 @@ try {
   assert(current.blockers.includes("release-blocker-173-guided-setup"));
   assert(current.reason_codes.includes("required_gate_evidence_missing"));
 
-  process.stdout.write("Release evidence gate tests passed: 14 scenarios.\n");
+  process.stdout.write("Release evidence gate tests passed: 18 scenarios.\n");
 } finally {
   rmSync(root, { recursive: true, force: true });
 }
