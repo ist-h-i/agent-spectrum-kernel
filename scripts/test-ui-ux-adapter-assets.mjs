@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
+import { inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs } from "./ask-shared.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const refs = ["principles.md", "decision-patterns.md", "anti-patterns.md"];
@@ -51,12 +52,20 @@ for (const { adapter, surface, plan } of definitions) {
     const statePath = resolve(target, `.agent-spectrum-kernel/${adapter}-install-state.json`);
     const state = () => readJson(statePath);
     for (const ref of refs) assert.equal(readFileSync(resolve(target, `${surface}/skills/ui-ux-design/references/${ref}`), "utf8"), readFileSync(resolve(source, `skills/ui-ux-design/references/${ref}`), "utf8"));
+    if (adapter === "codex") {
+      const installed = state();
+      assert.deepEqual(inspectCodexProjectionCanonicalInputs(target, installed.projection_plan, { selectedSkills: installed.selected_skills }), []);
+      assert.deepEqual(inspectCodexDiscoverySkillAssets(target, installed), []);
+    }
     const originalDigest = state().projection_plan.canonical_source_digest;
     writeFileSync(sourceRef, `${before}\nReference lifecycle regression.\n`);
     install();
     assert.notEqual(state().projection_plan.canonical_source_digest, originalDigest);
     assert.equal(readFileSync(destination, "utf8"), readFileSync(sourceRef, "utf8"));
     writeFileSync(destination, "Local user edit\n");
+    if (adapter === "codex") {
+      assert.ok(inspectCodexDiscoverySkillAssets(target, state()).some((finding) => finding.path === relative && finding.status === "hash_mismatch"));
+    }
     install([], false);
     assert.equal(readFileSync(destination, "utf8"), "Local user edit\n");
     writeFileSync(destination, readFileSync(sourceRef, "utf8"));
