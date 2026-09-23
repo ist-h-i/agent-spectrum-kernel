@@ -50,7 +50,7 @@ Every passed or failed evidence record must point to an exact repository-relativ
 - `ready`
 - `not_ready`
 
-Every required gate and every claim has its own result and reason codes. Open blockers remain explicit. `not_ready` exits the CLI successfully because the assessment completed; malformed input, unreadable artifacts, or contract violations fail the CLI.
+Every required gate and every claim has its own result and reason codes. Open blockers remain explicit. `not_ready` exits the CLI successfully because the assessment completed. Invalid JSON, schema violations, or malformed evidence/reference contracts fail the CLI. Valid records with stale revisions or missing, unreadable, or digest-mismatched artifacts produce `not_ready` with reason codes.
 
 ## Fixed required release gates
 
@@ -73,7 +73,7 @@ The caller cannot remove required gates to manufacture a pass. v1.0 assessment a
 15. semantic version/changelog state;
 16. explicit human release approval.
 
-Optional claims can be `excluded` without making unrelated optional features mandatory. A release-required claim that remains `experimental`, `unknown`, or `falsified` keeps the assessment `not_ready`.
+Only optional claims can be `excluded` without making unrelated optional features mandatory. A release-required claim that remains `experimental`, `unknown`, `falsified`, or `excluded` keeps the assessment `not_ready`. In particular, `release_required: true` with `disposition: "excluded"` produces `release_required_claim_excluded`; exclusion never removes a required claim.
 
 ## Evidence strength and inference boundaries
 
@@ -91,6 +91,20 @@ The gate rejects these shortcuts:
 - release readiness without explicit release-owner approval evidence.
 
 Schema validity, artifact integrity, semantic support, independent review, and release approval are separate checks. Passing one does not imply the others.
+
+### Complete evidence and review sets
+
+Except for optional excluded claims, the assessment checks both the matrix's `evidence_refs` and primary catalog records whose `claim_ids` bind that claim. An unlisted primary record produces `claim_evidence_reference_missing`; its status, scope, revision, and artifact are still checked and its ID remains visible in the claim result. Review/approval records are not required to be duplicated in the matrix's primary-evidence list. An optional excluded claim does not acquire dependencies through these inverse references.
+
+Every qualifying primary record used by a supported claim must have valid independent review. Reviewed primary evidence must identify a `producer` with a non-null SHA-256 identity; an unknown producer or a different authority role cannot establish independence. The reviewer identity must differ from that producer identity.
+
+Assessment checks all independent reviews bound to the evidence and the assessed gate or claim. A `passed` review cannot hide a bound `failed`, `not_checked`, `not_applicable`, stale, wrong-scope, or corrupt review. Result evidence references include the assessed reviews, including adverse ones. v1 has no implicit supersession: a later passing review does not by itself invalidate an earlier adverse review. Reviews not bound to the assessed gate or claim are not used to decide that target.
+
+### Risk acceptance
+
+An accepted-risk reference is not proof of acceptance by itself. Its review/approval record must have the required authority role and passing status, the assessed source revision, and a readable repository-bounded artifact with a matching digest. An independent-review acceptance also verifies the reviewed subjects' revisions, artifact integrity, scope, and producer/reviewer separation.
+
+Acceptance with invalid source, artifact, scope, or independence produces `risk_acceptance_*` reason codes and `not_ready`; the affected risk is not emitted in `accepted_risks`. Other valid accepted risks remain visible. Accepting a risk does not waive required gates, required claims, or open blockers.
 
 ## Current repository fixture
 
@@ -115,6 +129,8 @@ The expected decision is `not_ready`; the CLI emits a deterministic assessment f
 ## Synthetic all-pass example
 
 `scripts/test-release-evidence-gate.mjs` builds an isolated synthetic repository and complete synthetic evidence graph to prove the validator's positive path. It then mutates one condition at a time to exercise missing gates, stale source, tampering, scope transplant, duplicate IDs, contradictory evidence, missing independent review, arbitrary `supported`, synthetic overclaiming, optional exclusion, lower-tail regression, and open blockers.
+
+The focused suite also covers the PR #298 review regressions: required-claim exclusion, conflicting/incomplete review sets, unknown producer identity, inverse-only claim evidence, and invalid risk acceptance. Positive controls preserve multiple valid reviews, reciprocal references, valid risk acceptance, and optional exclusion. CLI checks verify that successful and rejected invocations leave input bytes unchanged.
 
 That all-pass fixture proves only that the gate can distinguish valid and invalid contract states. It must never be cited as evidence that the real ASK repository, a real adapter, or v1.0 is ready.
 

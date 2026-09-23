@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -141,6 +141,53 @@ function assess(root, matrix, catalog) { return assessRelease({ matrix, catalog,
 function reasonSet(result) { return new Set(result.reason_codes); }
 function expectNotReady(result, code) { assert.equal(result.decision, "not_ready"); assert(reasonSet(result).has(code), `missing reason ${code}: ${result.reason_codes.join(", ")}`); }
 
+function snapshotFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name)).map((entry) => {
+    const path = resolve(directory, entry.name);
+    return [entry.name, entry.isDirectory() ? snapshotFiles(path) : digest(readFileSync(path))];
+  });
+}
+
+function claimOnlyEvidence(root, state) {
+  const gateId = "release.activation_bypass_decisions";
+  const gatePrimary = findPrimary(state.catalog, gateId);
+  const gateReview = findReview(state.catalog, gateId);
+  const primary = clone(gatePrimary);
+  primary.evidence_id = "release-evidence-claim-only";
+  primary.gate_ids = [];
+  primary.artifact = writeArtifact(root, primary.evidence_id);
+  const review = clone(gateReview);
+  review.evidence_id = "release-evidence-review-claim-only";
+  review.gate_ids = [];
+  review.related_evidence_refs = [primary.evidence_id];
+  review.artifact = writeArtifact(root, review.evidence_id);
+  gatePrimary.claim_ids = [];
+  gateReview.claim_ids = [];
+  state.catalog.evidence.push(primary, review);
+  state.matrix.claims[0].evidence_refs = [primary.evidence_id];
+  return { primary, review };
+}
+
+function addRiskAcceptance(root, state) {
+  const subject = findPrimary(state.catalog, "release.repository_validation");
+  const acceptance = clone(findReview(state.catalog, "release.guided_setup"));
+  acceptance.evidence_id = "release-evidence-risk-acceptance";
+  acceptance.gate_ids = [];
+  acceptance.claim_ids = [];
+  acceptance.related_evidence_refs = [subject.evidence_id];
+  acceptance.artifact = writeArtifact(root, acceptance.evidence_id);
+  const risk = { risk_id: "release-risk-test", description: "Explicitly accepted bounded risk", acceptance_evidence_ref: acceptance.evidence_id };
+  state.catalog.evidence.push(acceptance);
+  state.catalog.accepted_risks.push(risk);
+  return { acceptance, risk, subject };
+}
+
+let reviewRegressionCount = 0;
+function regression(name, check) {
+  try { check(); } catch (error) { throw new Error(`Review regression failed: ${name}`, { cause: error }); }
+  reviewRegressionCount += 1;
+}
+
 const root = mkdtempSync(resolve(tmpdir(), "ask-release-evidence-gate-"));
 try {
   const ready = buildReady(root);
@@ -250,6 +297,214 @@ try {
   openBlocker.catalog.blockers.push({ blocker_id: "release-blocker-test", status: "open", description: "Known unresolved release blocker", evidence_refs: [] });
   expectNotReady(assess(root, openBlocker.matrix, openBlocker.catalog), "unresolved_release_blocker");
 
+  // F1: required claims cannot use optional exclusion to bypass readiness.
+  for (const disposition of ["excluded", "unknown", "experimental", "falsified"]) {
+    regression(`required ${disposition}`, () => {
+      const state = buildReady(root);
+      Object.assign(state.matrix.claims[0], { release_required: true, disposition, evidence_refs: [] });
+      const result = assess(root, state.matrix, state.catalog);
+      expectNotReady(result, `release_required_claim_${disposition}`);
+      assert.equal(result.claim_results[0].status, "not_ready");
+    });
+  }
+  regression("supported required claim", () => {
+    const state = buildReady(root);
+    state.matrix.claims[0].release_required = true;
+    assert.equal(assess(root, state.matrix, state.catalog).decision, "ready");
+  });
+
+  // F2: evaluate every bound review in both gate and claim-only paths.
+  for (const claimOnly of [false, true]) {
+    for (const status of ["failed", "not_checked", "not_applicable"]) {
+      regression(`mixed reviews ${status}, claimOnly=${claimOnly}`, () => {
+        const state = buildReady(root);
+        const originalReview = claimOnly ? claimOnlyEvidence(root, state).review : findReview(state.catalog, "release.activation_bypass_decisions");
+        const adverse = clone(originalReview);
+        adverse.evidence_id = `release-evidence-review-adverse-${status}`;
+        adverse.status = status;
+        adverse.artifact = status === "failed" ? writeArtifact(root, adverse.evidence_id) : null;
+        state.catalog.evidence.push(adverse);
+        const result = assess(root, state.matrix, state.catalog);
+        expectNotReady(result, `independent_review_${status}`);
+        assert.equal(result.claim_results[0].status, "not_ready");
+        assert(result.claim_results[0].evidence_refs.includes(adverse.evidence_id));
+        if (claimOnly) assert(result.gate_results.every((entry) => entry.status === "pass"));
+        else {
+          const gate = result.gate_results.find((entry) => entry.gate_id === "release.activation_bypass_decisions");
+          assert.equal(gate.status, "not_ready");
+          assert(gate.evidence_refs.includes(adverse.evidence_id));
+        }
+        const reordered = clone(state.catalog);
+        reordered.evidence.reverse();
+        assert.deepEqual(assess(root, state.matrix, reordered).claim_results, result.claim_results);
+        assert.deepEqual(assess(root, state.matrix, reordered).gate_results, result.gate_results);
+      });
+    }
+  }
+  for (const [name, mutate, reason] of [
+    ["stale", (review) => { review.source_revision = OLD_SOURCE; }, "stale_source_revision"],
+    ["wrong-scope", (review) => { review.scope.adapter_id = "claude_code"; }, "independent_review_scope_mismatch"],
+    ["tampered", (review) => { writeFileSync(resolve(root, review.artifact.path), "tampered\n"); }, "artifact_integrity_mismatch"],
+  ]) {
+    regression(`invalid review cannot hide behind passed review: ${name}`, () => {
+      const state = buildReady(root);
+      const review = clone(findReview(state.catalog, "release.activation_bypass_decisions"));
+      review.evidence_id = `release-evidence-review-invalid-${name}`;
+      review.artifact = writeArtifact(root, review.evidence_id);
+      mutate(review);
+      state.catalog.evidence.push(review);
+      expectNotReady(assess(root, state.matrix, state.catalog), reason);
+    });
+  }
+  regression("multiple valid reviews", () => {
+    const state = buildReady(root);
+    const review = clone(findReview(state.catalog, "release.activation_bypass_decisions"));
+    review.evidence_id = "release-evidence-review-second-passed";
+    review.authority.identity_digest = authorityDigest("second-reviewer");
+    review.artifact = writeArtifact(root, review.evidence_id);
+    state.catalog.evidence.push(review);
+    assert.equal(assess(root, state.matrix, state.catalog).decision, "ready");
+  });
+  regression("unrelated review does not veto a supported claim", () => {
+    const state = buildReady(root);
+    const review = clone(findReview(state.catalog, "release.guided_setup"));
+    review.evidence_id = "release-evidence-review-unrelated";
+    review.gate_ids = [];
+    review.status = "failed";
+    review.artifact = writeArtifact(root, review.evidence_id);
+    state.catalog.evidence.push(review);
+    assert.equal(assess(root, state.matrix, state.catalog).decision, "ready");
+  });
+
+  // F3: unknown or non-producer identities do not establish independence.
+  for (const claimOnly of [false, true]) {
+    for (const authority of [{ kind: "none", identity_digest: null }, { kind: "release_owner", identity_digest: authorityDigest("not-a-producer") }]) {
+      regression(`primary authority ${authority.kind}, claimOnly=${claimOnly}`, () => {
+        const state = buildReady(root);
+        const primary = claimOnly ? claimOnlyEvidence(root, state).primary : findPrimary(state.catalog, "release.activation_bypass_decisions");
+        primary.authority = clone(authority);
+        const result = assess(root, state.matrix, state.catalog);
+        expectNotReady(result, "evidence_producer_identity_missing");
+        assert.equal(result.claim_results[0].status, "not_ready");
+        if (claimOnly) assert(result.gate_results.every((entry) => entry.status === "pass"));
+      });
+    }
+  }
+  regression("one reviewed primary cannot cover a second unreviewed primary", () => {
+    const state = buildReady(root);
+    const { primary } = claimOnlyEvidence(root, state);
+    const second = clone(primary);
+    second.evidence_id = "release-evidence-claim-second-unreviewed";
+    second.artifact = writeArtifact(root, second.evidence_id);
+    state.catalog.evidence.push(second);
+    state.matrix.claims[0].evidence_refs.push(second.evidence_id);
+    expectNotReady(assess(root, state.matrix, state.catalog), "supported_claim_independent_review_missing");
+  });
+
+  // F4: catalog-side binding cannot hide unlisted primary evidence.
+  for (const status of ["failed", "not_checked", "not_applicable"]) {
+    regression(`inverse-only claim evidence: ${status}`, () => {
+      const state = buildReady(root);
+      const extra = clone(findPrimary(state.catalog, "release.activation_bypass_decisions"));
+      extra.evidence_id = `release-evidence-inverse-only-${status}`;
+      extra.gate_ids = [];
+      extra.status = status;
+      extra.artifact = status === "failed" ? writeArtifact(root, extra.evidence_id) : null;
+      state.catalog.evidence.push(extra);
+      const result = assess(root, state.matrix, state.catalog);
+      expectNotReady(result, "claim_evidence_reference_missing");
+      expectNotReady(result, `claim_evidence_${status}`);
+      assert.equal(result.claim_results[0].status, "not_ready");
+      assert(result.claim_results[0].evidence_refs.includes(extra.evidence_id));
+      assert(result.gate_results.every((entry) => entry.status === "pass"));
+    });
+  }
+  regression("reciprocal claim refs and review may support a second primary", () => {
+    const state = buildReady(root);
+    const { primary, review } = claimOnlyEvidence(root, state);
+    const second = clone(primary);
+    second.evidence_id = "release-evidence-claim-second-reviewed";
+    second.artifact = writeArtifact(root, second.evidence_id);
+    const secondReview = clone(review);
+    secondReview.evidence_id = "release-evidence-review-second-primary";
+    secondReview.related_evidence_refs = [second.evidence_id];
+    secondReview.artifact = writeArtifact(root, secondReview.evidence_id);
+    state.catalog.evidence.push(second, secondReview);
+    expectNotReady(assess(root, state.matrix, state.catalog), "claim_evidence_reference_missing");
+    state.matrix.claims[0].evidence_refs.push(second.evidence_id);
+    assert.equal(assess(root, state.matrix, state.catalog).decision, "ready");
+  });
+  regression("excluded optional claim does not acquire inverse-only dependencies", () => {
+    const state = buildReady(root);
+    const { primary } = claimOnlyEvidence(root, state);
+    primary.status = "failed";
+    Object.assign(state.matrix.claims[0], { disposition: "excluded", release_required: false, evidence_refs: [] });
+    const result = assess(root, state.matrix, state.catalog);
+    assert.equal(result.decision, "ready");
+    assert.equal(result.claim_results[0].status, "excluded");
+  });
+
+  // F5: risk acceptance is independently checked even without gate/claim bindings.
+  for (const [name, mutate, reason] of [
+    ["stale", ({ acceptance }) => { acceptance.source_revision = OLD_SOURCE; }, "stale_source_revision"],
+    ["missing", ({ acceptance }) => { rmSync(resolve(root, acceptance.artifact.path)); }, "artifact_missing"],
+    ["tampered", ({ acceptance }) => { writeFileSync(resolve(root, acceptance.artifact.path), "tampered\n"); }, "artifact_integrity_mismatch"],
+    ["escape", ({ acceptance }) => { acceptance.artifact.path = "../outside.json"; }, "artifact_unreadable"],
+    ["directory", ({ acceptance }) => { acceptance.artifact.path = "evidence"; }, "artifact_unreadable"],
+    ["same-identity", ({ acceptance, subject }) => { acceptance.authority.identity_digest = subject.authority.identity_digest; }, "independent_review_identity_conflict"],
+    ["unknown-producer", ({ subject }) => { subject.authority = { kind: "none", identity_digest: null }; }, "evidence_producer_identity_missing"],
+    ["wrong-scope", ({ acceptance }) => { acceptance.scope.adapter_id = "wrong-adapter"; }, "independent_review_scope_mismatch"],
+  ]) {
+    regression(`risk acceptance ${name}`, () => {
+      const state = buildReady(root);
+      const inputs = addRiskAcceptance(root, state);
+      mutate(inputs);
+      const result = assess(root, state.matrix, state.catalog);
+      expectNotReady(result, `risk_acceptance_${reason}`);
+      assert.deepEqual(result.accepted_risks, []);
+      assert(result.gate_results.every((entry) => entry.status === "pass"));
+    });
+  }
+  regression("risk acceptance symlink", () => {
+    const state = buildReady(root);
+    const { acceptance } = addRiskAcceptance(root, state);
+    const target = acceptance.artifact.path;
+    const link = resolve(root, "evidence/risk-link.json");
+    symlinkSync(resolve(root, target), link);
+    try {
+      acceptance.artifact.path = "evidence/risk-link.json";
+      const result = assess(root, state.matrix, state.catalog);
+      expectNotReady(result, "risk_acceptance_artifact_unreadable");
+      assert.deepEqual(result.accepted_risks, []);
+    } finally { rmSync(link); }
+  });
+  regression("valid independent risk acceptance", () => {
+    const state = buildReady(root);
+    const { risk } = addRiskAcceptance(root, state);
+    const result = assess(root, state.matrix, state.catalog);
+    assert.equal(result.decision, "ready");
+    assert.deepEqual(result.accepted_risks, [risk.risk_id]);
+  });
+  regression("valid release-owner acceptance; invalid risk is not listed", () => {
+    const state = buildReady(root);
+    const { acceptance } = addRiskAcceptance(root, state);
+    state.catalog.accepted_risks.push({
+      risk_id: "release-risk-owner-accepted", description: "Owner accepted risk",
+      acceptance_evidence_ref: findPrimary(state.catalog, "release.human_approval").evidence_id,
+    });
+    assert.equal(assess(root, state.matrix, state.catalog).decision, "ready");
+    acceptance.source_revision = OLD_SOURCE;
+    const result = assess(root, state.matrix, state.catalog);
+    expectNotReady(result, "risk_acceptance_stale_source_revision");
+    assert.deepEqual(result.accepted_risks, ["release-risk-owner-accepted"]);
+  });
+  regression("risk acceptance cannot carry the wrong authority role", () => {
+    const state = buildReady(root);
+    const { acceptance } = addRiskAcceptance(root, state);
+    acceptance.authority.kind = "producer";
+    assert.throws(() => assess(root, state.matrix, state.catalog), /independent review requires independent_reviewer authority/u);
+  });
+
   const cliCase = buildReady(root);
   findPrimary(cliCase.catalog, "release.clean_install_upgrade").status = "not_checked";
   findPrimary(cliCase.catalog, "release.clean_install_upgrade").artifact = null;
@@ -257,6 +512,7 @@ try {
   const catalogPath = resolve(root, "catalog.json");
   writeFileSync(matrixPath, `${JSON.stringify(cliCase.matrix, null, 2)}\n`);
   writeFileSync(catalogPath, `${JSON.stringify(cliCase.catalog, null, 2)}\n`);
+  const filesBeforeCli = snapshotFiles(root);
   const cli = spawnSync(process.execPath, [
     resolve(SCRIPT_ROOT, "scripts/release-evidence-gate.mjs"), "assess",
     "--matrix", matrixPath,
@@ -264,6 +520,7 @@ try {
     "--source-revision", SOURCE,
     "--root", root,
   ], { encoding: "utf8" });
+  assert.deepEqual(snapshotFiles(root), filesBeforeCli, "assessment must not mutate its inputs");
   assert.equal(cli.status, 0, cli.stderr);
   assert.equal(JSON.parse(cli.stdout).decision, "not_ready", "not_ready is a valid assessment, not a CLI failure");
 
@@ -278,6 +535,8 @@ try {
   ], { encoding: "utf8" });
   assert.equal(outputCli.status, 1, "release assessment CLI must stay read-only and reject --output");
   assert.match(outputCli.stderr, /unknown release evidence gate option: --output/u);
+  assert.equal(existsSync(forbiddenOutput), false);
+  assert.deepEqual(snapshotFiles(root), filesBeforeCli, "rejected CLI must not mutate inputs");
 
   const currentMatrix = JSON.parse(readFileSync(resolve(SCRIPT_ROOT, "docs/fixtures/release-evidence-gate/current-main-756c72-claim-matrix.json"), "utf8"));
   const currentCatalog = JSON.parse(readFileSync(resolve(SCRIPT_ROOT, "docs/fixtures/release-evidence-gate/current-main-756c72-evidence.json"), "utf8"));
@@ -290,8 +549,9 @@ try {
   assert.equal(current.decision, "not_ready", "the checked current-repository fixture must remain explicitly not_ready");
   assert(current.blockers.includes("release-blocker-173-guided-setup"));
   assert(current.reason_codes.includes("required_gate_evidence_missing"));
+  assert.deepEqual(current.claim_results.find((entry) => entry.claim_id === "ASK-PLATFORM-CLAIM-EVIDENCE-STATUS").reason_codes, []);
 
-  process.stdout.write("Release evidence gate tests passed: 18 scenarios.\n");
+  process.stdout.write(`Release evidence gate tests passed: 18 original scenarios + ${reviewRegressionCount} review regressions.\n`);
 } finally {
   rmSync(root, { recursive: true, force: true });
 }
