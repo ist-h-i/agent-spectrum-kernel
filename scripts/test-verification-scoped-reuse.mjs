@@ -159,6 +159,10 @@ try {
 
   write(root, "src/app.mjs", "export const answer = 42;\n");
   write(root, "schema/model.json", "{\"type\":\"object\"}\n");
+  write(root, "tests/app.test.mjs", "assert.equal(answer, 42);\n");
+  write(root, "generator/build.mjs", "export const generatorVersion = 1;\n");
+  write(root, "config/gate.json", "{\"strict\":true}\n");
+  write(root, "fixtures/input.json", "{\"case\":1}\n");
   write(root, "docs/readme.md", "# Fixture\n");
   const sourceRevision = commitAll(root, "fixture source");
 
@@ -174,7 +178,13 @@ try {
     adapter_version: "1.0.0",
     evidence_level: "executed",
   };
-  const sourceSelectors = [{ kind: "glob", pattern: "src/**", evidence_kind: "file" }];
+  const sourceSelectors = [
+    { kind: "glob", pattern: "config/**", evidence_kind: "dependency" },
+    { kind: "glob", pattern: "fixtures/**", evidence_kind: "fixture" },
+    { kind: "glob", pattern: "generator/**", evidence_kind: "dependency" },
+    { kind: "glob", pattern: "src/**", evidence_kind: "file" },
+    { kind: "glob", pattern: "tests/**", evidence_kind: "file" },
+  ];
   const schemaSelectors = [{ kind: "glob", pattern: "schema/**", evidence_kind: "schema" }];
   const sourceInventoryBeforeManifest = dependencyInventory({ repositoryRoot: root, revision: sourceRevision, selectors: sourceSelectors });
   const schemaInventoryBeforeManifest = dependencyInventory({ repositoryRoot: root, revision: sourceRevision, selectors: schemaSelectors });
@@ -228,3 +238,192 @@ try {
     repositoryId,
     baseRevision,
     treeDigest,
+    manifestPath: sourceManifestPath,
+    manifestBytes: gitBytes(root, baseRevision, sourceManifestPath),
+    manifest: sourceManifest,
+    inventory: sourceInventory,
+    obligations: sourceObligations,
+    runtime,
+  }), { privateKey: producerKeys.privateKey });
+  const schemaEvidence = attestVerificationEvidence(evidenceDraft({
+    repositoryId,
+    baseRevision,
+    treeDigest,
+    manifestPath: schemaManifestPath,
+    manifestBytes: gitBytes(root, baseRevision, schemaManifestPath),
+    manifest: schemaManifest,
+    inventory: schemaInventory,
+    obligations: schemaObligations,
+    runtime,
+  }), { privateKey: producerKeys.privateKey });
+  const store = resolve(root, ".evidence-store");
+  putVerificationEvidence({ storeRoot: store, evidence: sourceEvidence });
+  putVerificationEvidence({ storeRoot: store, evidence: schemaEvidence });
+
+  const defaultRequirements = sealScopedRequirements({
+    base_revision: baseRevision,
+    required_gates: [
+      gateRequirement({
+        evidence: sourceEvidence,
+        manifestPath: sourceManifestPath,
+        obligations: sourceObligations,
+        deltaReview: {
+          surface_selectors: [{ kind: "glob", pattern: "src/**" }],
+          obligation_refs: ["independent-semantic-review"],
+          prior_review_ref: "review-baseline-1",
+          prior_finding_refs: ["finding-baseline-1"],
+        },
+      }),
+      gateRequirement({ evidence: schemaEvidence, manifestPath: schemaManifestPath, obligations: schemaObligations }),
+    ],
+    current_obligations: [],
+  });
+  writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, defaultRequirements);
+  const requirementsTarget = commitAll(root, "bind current scoped requirements");
+
+  const initialPlan = planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: requirementsTarget });
+  assert.deepEqual(initialPlan.dispositions.map((entry) => entry.disposition), ["reuse_scoped", "reuse_scoped"]);
+  assert.equal(initialPlan.coverage.status, "covered");
+  assert.deepEqual(initialPlan.execution_summary, {
+    required_gate_count: 2,
+    full_rerun_gate_count: 2,
+    reused_execution_gate_count: 2,
+    rerun_gate_count: 0,
+    saved_execution_gate_count: 2,
+  });
+  const initialDelta = buildDeltaReviewRequest({ repositoryRoot: root, targetRevision: requirementsTarget, plan: initialPlan });
+  assert.equal(initialDelta.status, "not_required");
+  assert.deepEqual(initialDelta.affected_paths, []);
+  const initialCoverage = buildCurrentCoverage({ repositoryRoot: root, storeRoot: store, targetRevision: requirementsTarget });
+  assert.equal(initialCoverage.coverage.status, "covered");
+
+  git(root, ["checkout", "-B", "case-docs", requirementsTarget]);
+  write(root, "docs/readme.md", "# Fixture\n\nDocs-only change.\n");
+  const docsTarget = commitAll(root, "docs only");
+  const docsPlan = planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: docsTarget });
+  assert.deepEqual(docsPlan.dispositions.map((entry) => entry.disposition), ["reuse_scoped", "reuse_scoped"]);
+  assert.equal(docsPlan.execution_summary.rerun_gate_count, 0);
+  assert.equal(docsPlan.execution_summary.saved_execution_gate_count, 2);
+  assert.equal(buildCurrentCoverage({ repositoryRoot: root, storeRoot: store, targetRevision: docsTarget }).coverage.status, "covered");
+
+  for (const [label, path, content] of [
+    ["test", "tests/app.test.mjs", "assert.equal(answer, 43);\n"],
+    ["generator", "generator/build.mjs", "export const generatorVersion = 2;\n"],
+    ["dependency-config", "config/gate.json", "{\"strict\":false}\n"],
+    ["fixture", "fixtures/input.json", "{\"case\":2}\n"],
+  ]) {
+    git(root, ["checkout", "-B", `case-${label}`, requirementsTarget]);
+    write(root, path, content);
+    const target = commitAll(root, `change ${label} dependency`);
+    const disposition = planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: target }).dispositions.find((entry) => entry.gate_id === "source-test");
+    assert.equal(disposition.reason_code, "declared_dependency_changed", `${label} changes must invalidate the source gate`);
+  }
+
+  git(root, ["checkout", "-B", "case-source", requirementsTarget]);
+  write(root, "src/app.mjs", "export const answer = 43;\n");
+  const sourceTarget = commitAll(root, "change source");
+  const sourcePlan = planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: sourceTarget });
+  const sourceByGate = new Map(sourcePlan.dispositions.map((entry) => [entry.gate_id, entry]));
+  assert.equal(sourceByGate.get("source-test").disposition, "rerun_required");
+  assert.equal(sourceByGate.get("source-test").reason_code, "declared_dependency_changed");
+  assert.equal(sourceByGate.get("schema-test").disposition, "reuse_scoped");
+  assert.equal(sourcePlan.execution_summary.rerun_gate_count, 1);
+  const sourceDelta = buildDeltaReviewRequest({ repositoryRoot: root, targetRevision: sourceTarget, plan: sourcePlan });
+  assert.equal(sourceDelta.status, "current_judgment_required");
+  assert.deepEqual(sourceDelta.affected_paths, ["src/app.mjs"]);
+  assert.deepEqual(sourceDelta.prior_review_refs, ["review-baseline-1"]);
+  assert.deepEqual(sourceDelta.prior_finding_refs, ["finding-baseline-1"]);
+  assert.equal(sourceDelta.privacy.raw_diff_stored, false);
+  const sourceCoverage = buildCurrentCoverage({ repositoryRoot: root, storeRoot: store, targetRevision: sourceTarget }).coverage;
+  assert.equal(sourceCoverage.status, "blocked");
+  assert.ok(sourceCoverage.blockers.some((entry) => entry.reason_code === "current_delta_judgment_unperformed"));
+
+  git(root, ["checkout", "-B", "case-add", requirementsTarget]);
+  write(root, "src/new.mjs", "export const added = true;\n");
+  const addTarget = commitAll(root, "add selected input");
+  assert.equal(planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: addTarget }).dispositions.find((entry) => entry.gate_id === "source-test").reason_code, "declared_dependency_changed");
+
+  git(root, ["checkout", "-B", "case-rename", requirementsTarget]);
+  git(root, ["mv", "src/app.mjs", "src/main.mjs"]);
+  const renameTarget = commitAll(root, "rename selected input");
+  const renamePlan = planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: renameTarget });
+  assert.equal(renamePlan.dispositions.find((entry) => entry.gate_id === "source-test").reason_code, "declared_dependency_changed");
+  assert.ok(renamePlan.actual_diff.changed_paths.includes("src/app.mjs"));
+  assert.ok(renamePlan.actual_diff.changed_paths.includes("src/main.mjs"));
+  assert.ok(renamePlan.actual_diff.change_records.some((entry) => entry.status === "renamed" && entry.old_path === "src/app.mjs" && entry.new_path === "src/main.mjs"));
+
+  git(root, ["checkout", "-B", "case-mode", requirementsTarget]);
+  const chmodResult = spawnSync("chmod", ["+x", resolve(root, "src/app.mjs")], { encoding: "utf8" });
+  assert.equal(chmodResult.status, 0, chmodResult.stderr || "chmod failed");
+  const modeTarget = commitAll(root, "change selected input mode");
+  const modeDetail = planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: modeTarget }).dispositions.find((entry) => entry.gate_id === "source-test").detail;
+  assert.ok(modeDetail.some((entry) => entry.kind === "mode_changed"));
+
+  git(root, ["checkout", "-B", "case-manifest", requirementsTarget]);
+  write(root, sourceManifestPath, `${readFileSync(resolve(root, sourceManifestPath), "utf8").trimEnd()}\n \n`);
+  const manifestTarget = commitAll(root, "tamper manifest bytes");
+  assert.equal(planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: manifestTarget }).dispositions.find((entry) => entry.gate_id === "source-test").reason_code, "dependency_manifest_changed");
+
+  const unboundEvidenceDraft = evidenceDraft({
+    repositoryId,
+    baseRevision,
+    treeDigest,
+    manifestPath: sourceManifestPath,
+    manifestBytes: gitBytes(root, baseRevision, sourceManifestPath),
+    manifest: sourceManifest,
+    inventory: sourceInventory,
+    obligations: sourceObligations,
+    runtime,
+  });
+  unboundEvidenceDraft.consumed_inputs = unboundEvidenceDraft.consumed_inputs.filter((entry) => entry.path !== sourceManifestPath);
+  const unboundEvidence = attestVerificationEvidence(unboundEvidenceDraft, { privateKey: producerKeys.privateKey });
+  putVerificationEvidence({ storeRoot: store, evidence: unboundEvidence });
+  git(root, ["checkout", "-B", "case-unbound-evidence", requirementsTarget]);
+  const unboundRequirements = sealScopedRequirements({
+    base_revision: baseRevision,
+    required_gates: [gateRequirement({ evidence: unboundEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations })],
+    current_obligations: [],
+  });
+  writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, unboundRequirements);
+  const unboundTarget = commitAll(root, "bind unbound source evidence");
+  assert.equal(planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: unboundTarget }).dispositions[0].reason_code, "source_evidence_input_mismatch");
+
+  const changedRuntime = structuredClone(runtime);
+  changedRuntime.toolchain[0].version = "v0.0.0";
+  changedRuntime.toolchain[0].identity_digest = digest("non-current-node");
+  const staleRuntimeEvidence = attestVerificationEvidence(evidenceDraft({
+    repositoryId,
+    baseRevision,
+    treeDigest,
+    manifestPath: sourceManifestPath,
+    manifestBytes: gitBytes(root, baseRevision, sourceManifestPath),
+    manifest: sourceManifest,
+    inventory: sourceInventory,
+    obligations: sourceObligations,
+    runtime: changedRuntime,
+  }), { privateKey: producerKeys.privateKey });
+  putVerificationEvidence({ storeRoot: store, evidence: staleRuntimeEvidence });
+  git(root, ["checkout", "-B", "case-runtime", requirementsTarget]);
+  writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, sealScopedRequirements({
+    base_revision: baseRevision,
+    required_gates: [gateRequirement({ evidence: staleRuntimeEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations })],
+    current_obligations: [],
+  }));
+  const runtimeTarget = commitAll(root, "bind stale runtime evidence");
+  assert.equal(planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: runtimeTarget }).dispositions[0].reason_code, "toolchain_changed");
+
+  git(root, ["checkout", "-B", "case-unknown", requirementsTarget]);
+  const unknownRequirements = sealScopedRequirements({
+    base_revision: baseRevision,
+    required_gates: [{
+      gate_id: "unknown-test",
+      dependency_manifest_path: unknownManifestPath,
+      source_evidence_id: `verification-evidence-${"0".repeat(64)}`,
+      required_obligation_refs: ["AC-unknown"],
+      authority: acceptedAuthority(sourceEvidence),
+      execution_availability: "available",
+      delta_review: null,
+    }],
+    current_obligations: [],
+  });
+  writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, unknownRequirements);
