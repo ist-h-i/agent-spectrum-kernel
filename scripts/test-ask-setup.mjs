@@ -169,14 +169,16 @@ async function integrationTests() {
     const external = tempDir("ask-setup-external-");
     try {
       mkdirSync(resolve(target, ".agents/skills"), { recursive: true });
+      writeFileSync(resolve(external, "SKILL.md"), "external\n");
+      const selectedSkillPath = resolve(target, ".agents/skills/test-first-verification");
       try {
-        symlinkSync(external, resolve(target, ".agents/skills/escape"));
+        symlinkSync(external, selectedSkillPath);
         await assert.rejects(() => createAdoptionPlan({ target, adapter: "codex", profile: "minimal" }), /Symlink escapes target repository/i);
       } catch (error) {
         if (error?.code !== "EPERM" && error?.code !== "EACCES") throw error;
       }
     } finally {
-      rmSync(resolve(target, ".agents/skills/escape"), { force: true });
+      rmSync(resolve(target, ".agents/skills/test-first-verification"), { recursive: true, force: true });
       rmSync(external, { recursive: true, force: true });
     }
   } finally {
