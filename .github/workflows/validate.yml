@@ -29,6 +29,19 @@ jobs:
           diff -u docs/fixtures/adapter-runtime-bundle.json "$RUNNER_TEMP/ask-expected-runtime-bundle.json"
           exit 1
 
+      # Reject generated-report drift before running the expensive suites.
+      - name: Validate repository consistency
+        id: repository_consistency
+        run: node scripts/validate-repo.mjs
+
+      - name: Show generated validation report diff on failure
+        if: ${{ failure() && steps.repository_consistency.outcome == 'failure' }}
+        run: |
+          # Diagnostics only: retain the failed gate and never commit generated output.
+          node scripts/validate-repo.mjs --write-report
+          git diff -- docs/validation-report.md
+          exit 1
+
       - name: Run successor snapshot and source-session regressions (current HEAD)
         run: |
           node --test scripts/test-ask-benchmark-source-session.mjs scripts/test-successor-process-state.test.mjs scripts/test-frozen-evaluator-fixture.test.mjs
@@ -222,9 +235,6 @@ jobs:
 
       - name: Check Prompt v2 preregistration authority fixture freshness
         run: node scripts/prompt-v2-preregistration-samples.mjs --check
-
-      - name: Validate repository consistency
-        run: node scripts/validate-repo.mjs
 
       - name: Check whitespace errors
         run: |
