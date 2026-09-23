@@ -43,6 +43,9 @@ jobs:
       - name: Run repository validation tests
         run: node scripts/test-validate-repo.mjs
 
+      - name: Run read-only ASK setup planning tests
+        run: node scripts/test-ask-setup.mjs
+
       - name: Run baseline semantic review route contract tests
         run: node scripts/test-review-route.mjs
 
