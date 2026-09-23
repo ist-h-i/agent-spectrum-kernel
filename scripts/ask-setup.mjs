@@ -14,8 +14,9 @@ import { tmpdir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { CORE_OWNED_IMMUTABLE_ASSETS, buildGitDir, readGitRevision } from "./installer-lifecycle.mjs";
-import { readSetupRepositoryId } from "./ask-setup-git.mjs";
+import { CORE_OWNED_IMMUTABLE_ASSETS, readGitRevision } from "./installer-lifecycle.mjs";
+import { readSetupRepositoryId, validateSetupGitMetadata } from "./ask-setup-git.mjs";
+import { readSetupJson, sanitizeSetupDoctorReport, summarizeSetupProcessFailure } from "./ask-setup-diagnostics.mjs";
 import {
   KERNEL_SETUP_INPUTS,
   buildSetupSourceIdentity,
@@ -63,15 +64,15 @@ const BASE_SETUP_RELEVANT_PATHS = [
   ".github/copilot-instructions.md",
 ];
 function readJson(path) {
-  return JSON.parse(readFileSync(path, "utf8"));
+  return readSetupJson(path);
 }
 
 function readJsonIfExists(path) {
   if (!existsSync(path)) return null;
   try {
     return readJson(path);
-  } catch (error) {
-    return { __invalid_json: error.message };
+  } catch {
+    return { __invalid_json: "Setup JSON input is unreadable or invalid; contents are not included." };
   }
 }
 
@@ -118,6 +119,7 @@ async function planningSource(adapter, profile) {
     selectedSkills = projection.skills ?? projection.selectedSkills;
   }
   if (!Array.isArray(selectedSkills) || selectedSkills.length === 0) throw new Error("Setup requires a non-empty resolved Skill selection.");
+  validateSetupGitMetadata(REPO_ROOT);
   const source = buildSetupSourceIdentity(REPO_ROOT, {
     selectedSkills,
     coreAssets: CORE_OWNED_IMMUTABLE_ASSETS,
@@ -129,7 +131,7 @@ async function planningSource(adapter, profile) {
 }
 
 function gitFacts(target) {
-  const gitDir = buildGitDir(target);
+  const gitDir = validateSetupGitMetadata(target);
   if (!gitDir) return { detected: false, repository_id: null, revision: null };
   // The existing ref reader does not load Git configuration or auth settings.
   const revision = readGitRevision(target);
@@ -154,7 +156,7 @@ function stateSummary(target, relativePath, expectedInstaller) {
   const path = resolve(target, relativePath);
   const value = readJsonIfExists(path);
   if (!value) return { path: relativePath, present: false };
-  if (value.__invalid_json) return { path: relativePath, present: true, valid: false, error: value.__invalid_json };
+  if (value.__invalid_json) return { path: relativePath, present: true, valid: false, error: "Setup JSON input is unreadable or invalid; contents are not included." };
   return {
     path: relativePath,
     present: true,
@@ -176,6 +178,7 @@ function runtimeProfiles() {
 }
 
 async function projectionBuilder(adapter) {
+  validateSetupGitMetadata(REPO_ROOT);
   if (adapter === "codex") {
     const module = await import("./install-codex-adapter.mjs");
     return (profileName) => module.buildCodexProjectionPlan({ profileName });
@@ -331,9 +334,7 @@ function normalizedOutputDigest(output, staging) {
 function runNode(script, args, { cwd = REPO_ROOT, expected = [0] } = {}) {
   const result = spawnSync(process.execPath, [resolve(REPO_ROOT, script), ...args], { cwd, encoding: "utf8", timeout: 120000, maxBuffer: 32 * 1024 * 1024 });
   if (!expected.includes(result.status)) {
-    const stderr = (result.stderr || "").trim();
-    const stdout = (result.stdout || "").trim();
-    throw new Error(`${script} failed (${result.status}): ${stderr || stdout || "no output"}`);
+    throw new Error(`${script} failed (${result.status}): ${summarizeSetupProcessFailure(result)}`);
   }
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
@@ -561,12 +562,13 @@ export async function verifySavedPlan(plan, { target, adapter = null } = {}) {
 
 function doctor(target) {
   snapshotTarget(target);
+  validateSetupGitMetadata(target);
   const result = runNode("scripts/ask-doctor.mjs", ["--target", target, "--json"], { expected: [0, 1] });
   let report;
   try {
-    report = JSON.parse(result.stdout);
+    report = sanitizeSetupDoctorReport(JSON.parse(result.stdout));
   } catch {
-    throw new Error(`ask-doctor did not return JSON: ${(result.stdout || result.stderr).slice(0, 500)}`);
+    throw new Error("ask-doctor did not return JSON; subprocess output is not included to protect project data.");
   }
   return {
     ...report,
@@ -688,6 +690,7 @@ async function main(argv = process.argv.slice(2)) {
     value = await verifySavedPlan(readJson(args.plan), { target: args.target, adapter: args.adapter });
   } else if (args.command === "doctor") {
     value = doctor(realpathSync(args.target));
+    if (value.status === "fail") process.exitCode = 1;
   } else {
     throw new Error(`Unknown command: ${args.command}`);
   }

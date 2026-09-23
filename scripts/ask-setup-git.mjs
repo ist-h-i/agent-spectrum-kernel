@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { devNull } from "node:os";
-import { resolve } from "node:path";
+import { isAbsolute, parse, resolve, sep } from "node:path";
 
 // Only an opaque digest of a credential-free locator may leave this module.
 // Unknown transports are not guessed or hashed with their credentials intact.
@@ -28,13 +28,85 @@ export function setupRepositoryId(origin) {
   return `git:sha256:${createHash("sha256").update(locator).digest("hex")}`;
 }
 
-export function readSetupRepositoryId(gitDir) {
-  if (!gitDir || !existsSync(gitDir)) return null;
+// Inspect every component before following it. Missing optional metadata is
+// allowed, but dangling links and special files must not become reads or waits.
+function metadataPath(path, kind) {
+  const absolute = resolve(path);
+  let cursor = parse(absolute).root;
+  const parts = absolute.slice(cursor.length).split(sep).filter(Boolean);
+  let stat;
+  for (let index = 0; index < parts.length; index += 1) {
+    cursor = resolve(cursor, parts[index]);
+    try {
+      stat = lstatSync(cursor);
+    } catch (error) {
+      if (error.code === "ENOENT") return null;
+      throw new Error("Setup Git metadata cannot be inspected safely.");
+    }
+    if (stat.isSymbolicLink()) throw new Error("Symlink is not supported for setup Git metadata.");
+    const expected = index < parts.length - 1 ? "directory" : kind;
+    if ((expected === "directory" && !stat.isDirectory())
+      || (expected === "file" && !stat.isFile())
+      || (expected === "either" && !stat.isDirectory() && !stat.isFile())) {
+      throw new Error("Unsupported setup Git metadata file type.");
+    }
+  }
+  return stat;
+}
+
+function metadataDirectory(base, pointer) {
+  const value = pointer.trim();
+  if (!value || /[\u0000-\u001f\u007f]/u.test(value)) throw new Error("Invalid setup Git directory pointer.");
+  const directory = resolve(base, value);
+  if (!metadataPath(directory, "directory")) throw new Error("Setup Git metadata directory is missing.");
+  return directory;
+}
+
+function metadataLayout(gitDir) {
+  if (!gitDir || !metadataPath(gitDir, "directory")) return null;
   const commonDirPath = resolve(gitDir, "commondir");
-  const commonDir = existsSync(commonDirPath)
-    ? resolve(gitDir, readFileSync(commonDirPath, "utf8").trim()) : gitDir;
+  const commonDir = metadataPath(commonDirPath, "file")
+    ? metadataDirectory(gitDir, readFileSync(commonDirPath, "utf8")) : gitDir;
   const configPath = resolve(commonDir, "config");
-  if (!existsSync(configPath)) return null;
+  metadataPath(configPath, "file");
+  return { commonDir, configPath };
+}
+
+// Guard all paths used by the existing readGitRevision() before invoking it.
+// Git worktree/submodule pointer files remain supported; filesystem links do not.
+// As with setup snapshots, concurrent mutation is outside this static boundary.
+export function validateSetupGitMetadata(target) {
+  const root = realpathSync(target);
+  const gitPath = resolve(root, ".git");
+  const stat = metadataPath(gitPath, "either");
+  if (!stat) return null;
+  let gitDir = gitPath;
+  if (stat.isFile()) {
+    const match = readFileSync(gitPath, "utf8").trim().match(/^gitdir:\s*(.+)$/);
+    if (!match) throw new Error("Invalid setup Git directory pointer.");
+    gitDir = metadataDirectory(root, match[1]);
+  }
+  const { commonDir } = metadataLayout(gitDir);
+  const headPath = resolve(gitDir, "HEAD");
+  const head = metadataPath(headPath, "file") ? readFileSync(headPath, "utf8").trim() : "";
+  const refMatch = head.match(/^ref:\s*(.+)$/);
+  if (refMatch) {
+    const ref = refMatch[1];
+    if (!ref.startsWith("refs/") || isAbsolute(ref) || ref.includes("\\")
+      || /[\u0000-\u001f\u007f]/u.test(ref)
+      || ref.split("/").some((part) => !part || part === "." || part === "..")) {
+      throw new Error("Invalid setup Git reference path.");
+    }
+    for (const refRoot of new Set([gitDir, commonDir])) metadataPath(resolve(refRoot, ref), "file");
+  }
+  for (const refRoot of new Set([gitDir, commonDir])) metadataPath(resolve(refRoot, "packed-refs"), "file");
+  return gitDir;
+}
+
+export function readSetupRepositoryId(gitDir) {
+  const layout = metadataLayout(gitDir);
+  if (!layout || !metadataPath(layout.configPath, "file")) return null;
+  const { configPath } = layout;
   // Ignore inherited config, repository selection, and tracing overrides.
   // In particular, tracing must not write the raw origin to an external file.
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith("GIT_")));

@@ -1,19 +1,20 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { devNull, tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { readSetupRepositoryId, setupRepositoryId } from "./ask-setup-git.mjs";
+import { runSetupSafetyTests, runSetupSafetyCliTests } from "./test-ask-setup-safety.mjs";
 
 const CANARY = "ASK_TEST_ONLY_CREDENTIAL_296";
 const ORIGIN = `https://fixture-user:${CANARY}@example.invalid/team/repo.git?token=${CANARY}#${CANARY}`;
 const CLEAN_ORIGIN = "https://example.invalid/team/repo.git";
 
 function fixture() {
-  const root = mkdtempSync(resolve(tmpdir(), "ask-setup-git-"));
+  const root = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-setup-git-")));
   const target = resolve(root, "target");
   const home = resolve(root, "home");
   const globalConfig = resolve(home, ".gitconfig");
@@ -144,6 +145,7 @@ export function runSetupGitTests() {
     rmSync(f.root, { recursive: true, force: true });
   }
   console.log(`ASK setup Git privacy tests passed: ${count} cases`);
+  runSetupSafetyTests();
   return count;
 }
 
@@ -213,6 +215,7 @@ export function runSetupGitCliTests({ setupScript, repoRoot, auditTree }) {
     rmSync(f.root, { recursive: true, force: true });
   }
   console.log("ASK setup Git privacy and profile CLI regressions passed");
+  runSetupSafetyCliTests({ setupScript, repoRoot, auditTree });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) runSetupGitTests();

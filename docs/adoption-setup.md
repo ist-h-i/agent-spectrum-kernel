@@ -44,7 +44,7 @@ node scripts/ask-setup.mjs recommend --target /path/to/project --adapter claude-
 node scripts/ask-setup.mjs plan --target /path/to/project --adapter claude-code --profile review --json
 ```
 
-Kernel のみを計画する場合は `kernel-only` を指定します。
+Kernel のみを計画する場合は `kernel-only` を指定します。`--profile` を省略すると `kernel-only` が補完されます。明示した別の profile、空値、値のない `--profile` は拒否し、暗黙に読み替えません。
 
 ```bash
 node scripts/ask-setup.mjs plan --target /path/to/project --adapter kernel-only --json
@@ -89,6 +89,8 @@ projection に exact Asset reference がある場合は plan に保持します�
 
 setup では、読取・複製対象とその親ディレクトリにある symlink を拒否します。リンク先が対象リポジトリ内でも例外にせず、相対リンク、リンクの連鎖、リンク切れも対象にします。staging から実リポジトリへ書き込みが届かないよう、installer の起動前にも staging 側を検査します。setup と無関係な場所のリンクは対象外です。
 
+Git 情報の読取前には、source と target の `.git`、`config`、`HEAD`、参照先の ref、`packed-refs`、`commondir` と各親ディレクトリも検査します。symlink、特殊ファイル、参照パスの逸脱は拒否します。worktree / submodule の通常の `gitdir:` / `commondir` ポインターファイルは利用できますが、その参照経路にある symlink は利用できません。
+
 次の場合は、対象リポジトリを書き換えずに停止します。
 
 - managed file が利用者によって変更されている。
@@ -101,6 +103,10 @@ setup では、読取・複製対象とその親ディレクトリにある syml
 - `apply` が呼ばれる。
 
 global 認証設定は探索しません。`.env`、秘密鍵など既知の secret file の content は snapshot identity に取り込みません。既存 installer が安全な partial-file merge を判断するために対象リポジトリ内の setup file を読む場合も、その値を plan へ出力しません。installer の完全な標準出力も保存せず、dry-run 証跡には一時パスを正規化した出力 digest のみを保持します。
+
+Git の repository identity は、リポジトリの config に明示された origin だけから取得します。global / system / include / includeIf の設定や、継承した Git 設定・trace は使用しません。認証情報・query・fragment を除いた接続先を digest にし、origin の値自体は出力しません。複数 origin や未対応形式は `null` とし、推測しません。認証情報だけの更新では identity は変わりません。
+
+JSON の解析に失敗した場合も、入力の断片を含む parser の例外は出力しません。installer の失敗時は標準出力・標準エラーを転記せず、失敗の種類を示す固定メッセージを返します。`doctor` が返す JSON 内に parser の例外が含まれる場合も、内容を除いた診断に置き換えます。
 
 ## 保存した計画の再確認
 
@@ -125,6 +131,8 @@ node scripts/ask-setup.mjs doctor --target /path/to/project --json
 - **Operational**: bounded workflow の実行証拠があり、必要な contract が適用されたと確認できるか。
 
 static projection、file presence、caller の `operational=true` だけでは Operational にしません。
+
+`doctor` の診断結果が `fail` の場合、JSON / 人間向け表示のどちらでも終了コードは `1` です。呼出元のスクリプトは、出力が得られたことだけで診断成功と判断しないでください。
 
 ## この slice の後続範囲
 
