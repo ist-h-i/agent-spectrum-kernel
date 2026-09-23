@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/release-evidence-catalog.schema.json",
+  "title": "ASK Release Evidence Catalog",
+  "description": "Offline release-gate evidence inputs. Artifact integrity, semantic review, and release approval remain separate evidence records.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "schema_path", "catalog_id", "repository_id",
+    "source_revision", "evidence", "blockers", "accepted_risks"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "schemas/release-evidence-catalog.schema.json" },
+    "catalog_id": { "type": "string", "pattern": "^release-evidence-catalog-[a-z0-9][a-z0-9._-]*$" },
+    "repository_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "source_revision": { "$ref": "#/$defs/revision" },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence_record" }
+    },
+    "blockers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/blocker" }
+    },
+    "accepted_risks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/accepted_risk" }
+    }
+  },
+  "$defs": {
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "nullable_label": { "type": ["string", "null"], "minLength": 1, "maxLength": 160 },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability", "task_class", "adapter_id", "profile_id"],
+      "properties": {
+        "capability": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "task_class": { "$ref": "#/$defs/nullable_label" },
+        "adapter_id": { "$ref": "#/$defs/nullable_label" },
+        "profile_id": { "$ref": "#/$defs/nullable_label" }
+      }
+    },
+    "artifact": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "identity_digest"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["none", "producer", "independent_reviewer", "release_owner"]
+        },
+        "identity_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "guardrails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quality", "safety", "lower_tail", "variance", "human_effort", "publication_permission"],
+      "properties": {
+        "quality": { "enum": ["passed", "failed", "not_checked", "not_required"] },
+        "safety": { "enum": ["passed", "failed", "not_checked", "not_required"] },
+        "lower_tail": { "enum": ["passed", "failed", "not_checked", "not_required"] },
+        "variance": { "enum": ["passed", "failed", "not_checked", "not_required"] },
+        "human_effort": { "enum": ["measured", "unknown", "not_applicable"] },
+        "publication_permission": { "enum": ["granted", "not_granted", "not_checked", "not_required"] }
+      }
+    },
+    "evidence_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id", "kind", "status", "source_revision", "artifact", "scope",
+        "gate_ids", "claim_ids", "related_evidence_refs", "authority", "guardrails", "limitations"
+      ],
+      "properties": {
+        "evidence_id": { "type": "string", "pattern": "^release-evidence-[A-Za-z0-9._:-]+$" },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "implementation", "static_verification", "synthetic_fixture", "runtime_execution",
+            "controlled_benchmark", "adopting_project", "independent_review", "formal_approval"
+          ]
+        },
+        "status": { "enum": ["passed", "failed", "not_checked", "not_applicable"] },
+        "source_revision": { "$ref": "#/$defs/revision" },
+        "artifact": { "$ref": "#/$defs/artifact" },
+        "scope": { "$ref": "#/$defs/scope" },
+        "gate_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^release\\.[a-z0-9._-]+$" }
+        },
+        "claim_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$" }
+        },
+        "related_evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^release-evidence-[A-Za-z0-9._:-]+$" }
+        },
+        "authority": { "$ref": "#/$defs/authority" },
+        "guardrails": { "$ref": "#/$defs/guardrails" },
+        "limitations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 600 }
+        }
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blocker_id", "status", "description", "evidence_refs"],
+      "properties": {
+        "blocker_id": { "type": "string", "pattern": "^release-blocker-[A-Za-z0-9._:-]+$" },
+        "status": { "enum": ["open", "resolved"] },
+        "description": { "type": "string", "minLength": 1, "maxLength": 800 },
+        "evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^release-evidence-[A-Za-z0-9._:-]+$" }
+        }
+      }
+    },
+    "accepted_risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["risk_id", "description", "acceptance_evidence_ref"],
+      "properties": {
+        "risk_id": { "type": "string", "pattern": "^release-risk-[A-Za-z0-9._:-]+$" },
+        "description": { "type": "string", "minLength": 1, "maxLength": 800 },
+        "acceptance_evidence_ref": { "type": "string", "pattern": "^release-evidence-[A-Za-z0-9._:-]+$" }
+      }
+    }
+  },
+  "x-ask-contract": {
+    "id": "ask.release-evidence-catalog",
+    "revision": "1.0.0",
+    "ref": "ask.release-evidence-catalog@1.0.0"
+  }
+}

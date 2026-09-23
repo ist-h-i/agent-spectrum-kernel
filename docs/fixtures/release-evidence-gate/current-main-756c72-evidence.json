@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "schemas/release-evidence-catalog.schema.json",
+  "catalog_id": "release-evidence-catalog-current-main-756c72",
+  "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+  "source_revision": "756c72b3fba158fbbc33642128bf5ab87097914b",
+  "evidence": [
+    {
+      "evidence_id": "release-evidence-current-claim-status-schema",
+      "kind": "static_verification",
+      "status": "passed",
+      "source_revision": "756c72b3fba158fbbc33642128bf5ab87097914b",
+      "artifact": {"path": "schemas/claim-evidence-status.schema.json", "digest": "sha256:be0ad5f23e3eeae32ac80f9e27e05a4dc397c479cd3719692764609569690098"},
+      "scope": {"capability": "claim evidence status contract", "task_class": null, "adapter_id": null, "profile_id": null},
+      "gate_ids": [],
+      "claim_ids": ["ASK-PLATFORM-CLAIM-EVIDENCE-STATUS"],
+      "related_evidence_refs": [],
+      "authority": {"kind": "producer", "identity_digest": "sha256:f9cf29aff847111601d296c5944d96512f7cf59ad7e9790e683939b7662e9224"},
+      "guardrails": {"quality": "not_required", "safety": "not_required", "lower_tail": "not_required", "variance": "not_required", "human_effort": "not_applicable", "publication_permission": "not_required"},
+      "limitations": ["This record proves only exact bytes of the checked repository schema at the stated source boundary."]
+    }
+  ],
+  "blockers": [
+    {"blocker_id": "release-blocker-required-platform-integration", "status": "open", "description": "Required #274/#275/#278 release evidence is not yet projected into this gate; #278 also depends on the real #291 disposition.", "evidence_refs": []},
+    {"blocker_id": "release-blocker-173-guided-setup", "status": "open", "description": "Issue #173 remains open for evidence-backed setup and first-run verification.", "evidence_refs": []},
+    {"blocker_id": "release-blocker-197-report-authority", "status": "open", "description": "Issue #197 remains open for residual evaluation/report authority work.", "evidence_refs": []},
+    {"blocker_id": "release-blocker-192-198-product-evidence", "status": "open", "description": "Issues #192/#198 have not produced release-required measured activation/bypass decisions.", "evidence_refs": []}
+  ],
+  "accepted_risks": []
+}

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/release-assessment.schema.json",
+  "title": "ASK Release Assessment",
+  "description": "Deterministic offline result. A successful CLI execution may still return not_ready.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "schema_path", "program", "program_revision", "repository_id",
+    "source_revision", "matrix_id", "matrix_digest", "catalog_id", "catalog_digest",
+    "decision", "gate_results", "claim_results", "blockers", "accepted_risks", "reason_codes"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "schemas/release-assessment.schema.json" },
+    "program": { "const": "ask_release_evidence_gate" },
+    "program_revision": { "const": "1.0.0" },
+    "repository_id": { "type": "string", "minLength": 1 },
+    "source_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "matrix_id": { "type": "string", "minLength": 1 },
+    "matrix_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "catalog_id": { "type": "string", "minLength": 1 },
+    "catalog_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "decision": { "enum": ["ready", "not_ready"] },
+    "gate_results": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["gate_id", "status", "evidence_refs", "reason_codes"],
+        "properties": {
+          "gate_id": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["pass", "not_ready"] },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "reason_codes": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "claim_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "disposition", "status", "evidence_refs", "reason_codes"],
+        "properties": {
+          "claim_id": { "type": "string", "minLength": 1 },
+          "disposition": { "enum": ["supported", "experimental", "unknown", "falsified", "excluded"] },
+          "status": { "enum": ["supported", "non_blocking", "excluded", "not_ready"] },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "reason_codes": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "accepted_risks": { "type": "array", "items": { "type": "string" } },
+    "reason_codes": { "type": "array", "items": { "type": "string" } }
+  },
+  "x-ask-contract": {
+    "id": "ask.release-assessment",
+    "revision": "1.0.0",
+    "ref": "ask.release-assessment@1.0.0"
+  }
+}
