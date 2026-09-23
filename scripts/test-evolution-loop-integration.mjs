@@ -65,12 +65,15 @@ import {
   verificationCommandIdentity,
 } from "./verification-evidence.mjs";
 
+import { runPortfolioEvolutionFileRegressions } from "./test-ask-benchmark-portfolio-evolution-files.mjs";
+
 const REPOSITORY_ID = "github.com/ist-h-i/agent-spectrum-kernel";
 const REGISTRY_ID = "issue-278-evolution-assets";
 const SCOPE_ID = "agent-spectrum-kernel";
 const SOURCE_REVISION = "88e34a7591fd9b61122f377c464fdc232fc4f6e0";
 const TREE_DIGEST = digest("issue-278-integration-tree");
-const TASK_CLASS = "implementation";
+// Align this synthetic scope with the existing mn-build-option-update fixture.
+const TASK_CLASS = "configuration";
 const MODEL = "gpt-5.6-sol";
 const ADAPTER = "codex";
 const STACK = "node";
@@ -2063,6 +2066,10 @@ try {
       assert.notEqual(publication.object_digest, publication.artifact[semanticField]);
       assert.equal(canonicalDigest(publication.artifact), publication.object_digest);
     }
+  });
+  runPortfolioEvolutionFileRegressions({
+    root: resolve(import.meta.dirname, ".."), work: temporaryRoot, storeRoot,
+    baseExperiment: experiment, assetTrust, portfolioTrust, check: closes,
   });
 } finally {
   rmSync(temporaryRoot, { recursive: true, force: true });
