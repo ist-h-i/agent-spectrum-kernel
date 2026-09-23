@@ -51,6 +51,7 @@
     "skill-router",
     "spec-driven-development",
     "test-first-verification",
+    "ui-ux-design",
     "verification-pattern-ledger",
     "work-package-compiler"
   ],
@@ -99,6 +100,7 @@
     "skill-router": "control",
     "spec-driven-development": "execution",
     "test-first-verification": "execution",
+    "ui-ux-design": "execution",
     "verification-pattern-ledger": "knowledge",
     "work-package-compiler": "execution"
   },
@@ -196,6 +198,7 @@
         "skill-router",
         "spec-driven-development",
         "test-first-verification",
+        "ui-ux-design",
         "verification-pattern-ledger",
         "work-package-compiler"
       ],
@@ -246,6 +249,7 @@
       "skill-router",
       "spec-driven-development",
       "test-first-verification",
+      "ui-ux-design",
       "verification-pattern-ledger",
       "work-package-compiler"
     ],
@@ -325,6 +329,11 @@
     "docs/fixtures/skill-effectiveness-outcome-cases.json",
     "docs/fixtures/lifecycle-artifact-chains.json",
     "docs/fixtures/lifecycle-traceability-chains.json",
+    "docs/fixtures/ui-ux-design/README.md",
+    "docs/fixtures/ui-ux-design/index.html",
+    "docs/fixtures/ui-ux-design/fixture.mjs",
+    "docs/fixtures/ui-ux-design/fixture-state.mjs",
+    "docs/fixtures/ui-ux-design/fixture-state.test.mjs",
     "docs/fixtures/verification-proof-formal-baseline.md",
     "docs/fixtures/verification-proof-policy-cases.json",
     "docs/fixtures/review-route-cases.json",
