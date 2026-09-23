@@ -74,6 +74,7 @@
         ],
         "properties": {
           "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "source_fixture_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
           "suite": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"] },
           "task_class": { "type": "string", "minLength": 1 },
           "difficulty": { "type": "string", "minLength": 1 },

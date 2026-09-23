@@ -3358,11 +3358,15 @@ function assertBoundaryRootLineage(bundle, verified) {
   const materializedPath = bundle.markerPaths.materializedPath;
   const selectionStatePath = bundle.markerPaths.selectionState;
   const runIdentityPath = bundle.markerPaths.runDir;
-  readJsonArtifact(materializedPath, "materialized root manifest");
+  // This inventory covers all projected files in every materialized case, not
+  // one small public JSON artifact. Keep the existing boundary-file cap and
+  // derive the lineage digest from the same stable bytes that were parsed.
+  const materializedEvidence = readStableJsonFile(
+    realpathSync(materializedPath), "materialized root manifest", MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false },
+  );
   readJsonArtifact(selectionStatePath, "selection-state root index");
-  const materializedEvidence = streamingFileDigest(materializedPath, "materialized root manifest");
   const selectionEvidence = streamingFileDigest(selectionStatePath, "selection-state root index");
-  if (materializedEvidence.digest !== source.materialization_manifest_digest) {
+  if (materializedEvidence.rawByteDigest !== source.materialization_manifest_digest) {
     throw new Error("materialized root manifest does not match normalized result lineage");
   }
   if (selectionEvidence.digest !== source.selection_state_digest) {
@@ -3375,6 +3379,11 @@ function assertBoundaryRootLineage(bundle, verified) {
   if (!isInside(bundle.canonicalRoots.normalizedResultsPath, verified.generationPath)) {
     throw new Error("normalized generation escapes the normalized-results root");
   }
+}
+
+/** Root-marker consistency only; never creates an evaluator or scoring capability. */
+export function verifyEvaluatorBoundaryRootLineageForTest(bundle, verified) {
+  return assertBoundaryRootLineage(bundle, verified);
 }
 
 function verifyEvaluatorAuthorityCore({
@@ -3472,6 +3481,11 @@ function verifyEvaluatorAuthorityCore({
     verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, verified, normalized, normalizedBytes: normalizedSource.bytes, result, scoringInputs });
   }
   return { bundle, normalized, result, verified, scoringInputs, ...readiness };
+}
+
+/** Public pre-result inputs only: no private bundle or result is opened. */
+export function verifyPortfolioScoringInputs(options) {
+  return readScoringInputSources(options);
 }
 
 export function verifyEvaluatorAuthority(options) {

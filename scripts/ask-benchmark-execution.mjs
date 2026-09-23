@@ -21,6 +21,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, parse, relative, resolve, sep } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
 import { assertTrackedRepositoryMatchesHead, canonicalDigest, stableCanonicalJson, validateMaterializedPortfolio } from "./ask-benchmark-materialize.mjs";
 import { verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
 import { assertStableFileEvidence, readStableFile } from "./ask-benchmark-stable-file.mjs";
@@ -43,6 +44,11 @@ import {
   TERMINAL_WORKSPACE_AUTHORITY_PATH,
   terminalWorkspaceAuthorityReference,
 } from "./ask-benchmark-terminal-workspace.mjs";
+import {
+  assertSuccessorInputRun, prepareSuccessorInputForAttempt, successorInputProjection,
+  successorRuntimeForInput, successorEffectiveCommand, assertSuccessorAdapterFacts, assertSuccessorExecutableDescriptor,
+  assertSuccessorVersionOutput,
+} from "./ask-benchmark-prompt-successor-delivery.mjs";
 
 export const EXECUTION_RUNNER_VERSION = "1.0.0";
 export const RUNTIME_CONFIG_SCHEMA_PATH = "benchmarks/schemas/portfolio-runtime-config.schema.json";
@@ -420,13 +426,22 @@ function assertExecutableIdentity(verifiedExecutable) {
   return executable;
 }
 
-function probeAvailableRuntime(runtime, verifiedExecutable, command, environmentSnapshot) {
+function probeAvailableRuntime(runtime, verifiedExecutable, command, environmentSnapshot, successorRuntime = null) {
   const executable = assertExecutableIdentity(verifiedExecutable);
-  const version = spawnSync(executable, ["--version"], { encoding: "utf8", env: environmentFor(environmentSnapshot), maxBuffer: 1024 * 1024 });
+  const version = spawnSync(executable, ["--version"], { encoding: "utf8", env: environmentFor(environmentSnapshot), timeout: 10000, killSignal: "SIGKILL", maxBuffer: 1024 * 1024 });
   assertExecutableIdentity(verifiedExecutable);
   const observedVersionOutput = `${version.stdout ?? ""}${version.stderr ?? ""}`;
+  let successorVersion = null;
+  if (successorRuntime !== null) {
+    assertSuccessorVersionOutput(successorRuntime.cli_version, observedVersionOutput);
+    successorVersion = successorRuntime.cli_version;
+  }
   const versionConfirmed = version.status === 0 && observedVersionOutput.includes(runtime.expected_executable_version);
-  const versionEvidence = durableScalarEvidence(observedVersionOutput, versionConfirmed ? runtime.expected_executable_version : "unconfirmed", "unconfirmed");
+  const versionEvidence = durableScalarEvidence(
+    observedVersionOutput,
+    versionConfirmed ? (successorVersion ?? runtime.expected_executable_version) : "unconfirmed",
+    "unconfirmed",
+  );
   const executableEvidence = {
     ...verifiedExecutable.descriptor,
     observed_version: versionEvidence.value,
@@ -437,7 +452,7 @@ function probeAvailableRuntime(runtime, verifiedExecutable, command, environment
   {
     const helpArgs = runtime.adapter === "codex" ? ["exec", "--help"] : ["--help"];
     assertExecutableIdentity(verifiedExecutable);
-    const help = spawnSync(executable, helpArgs, { encoding: "utf8", env: environmentFor(environmentSnapshot), maxBuffer: 1024 * 1024 });
+    const help = spawnSync(executable, helpArgs, { encoding: "utf8", env: environmentFor(environmentSnapshot), timeout: 10000, killSignal: "SIGKILL", maxBuffer: 1024 * 1024 });
     assertExecutableIdentity(verifiedExecutable);
     const helpOutput = `${help.stdout ?? ""}${help.stderr ?? ""}`;
     const requiredFlags = runtime.adapter === "codex"
@@ -685,14 +700,26 @@ function readAdapterIdentity(root, runDir, adapter) {
   return identity;
 }
 
-function ensureAdapterIdentity({ root, runDir, plan, adapter, runtimeConfig, verifiedExecutable, environmentSnapshot }) {
+function ensureAdapterIdentity({ root, runDir, plan, adapter, runtimeConfig, verifiedExecutable, environmentSnapshot, successorRuntime = null }) {
   let effectiveRuntime = runtimeConfig.value;
   let command = effectiveCommand(root, effectiveRuntime);
+  if (successorRuntime !== null) command = successorEffectiveCommand(command);
   let executable = null;
   let availabilityEvidence = null;
   if (effectiveRuntime.availability === "available") {
+    if (successorRuntime !== null) {
+      assertSuccessorExecutableDescriptor(successorRuntime, verifiedExecutable.descriptor);
+      // Tie native format/CPU checks to the same exact bytes as the runtime pin.
+      // A script named "codex" must fail before --version or --help can run.
+      assertSuccessorNativeExecutable({
+        path: verifiedExecutable.path,
+        expectedDigest: successorRuntime.executable_digest,
+        os: successorRuntime.os,
+        arch: successorRuntime.arch,
+      });
+    }
     try {
-      executable = probeAvailableRuntime(effectiveRuntime, verifiedExecutable, command, environmentSnapshot);
+      executable = probeAvailableRuntime(effectiveRuntime, verifiedExecutable, command, environmentSnapshot, successorRuntime);
     } catch (error) {
       if (error instanceof RuntimeIntegrityError) throw error;
       effectiveRuntime = {
@@ -706,6 +733,7 @@ function ensureAdapterIdentity({ root, runDir, plan, adapter, runtimeConfig, ver
     }
   }
   const identity = adapterIdentity({ adapter, runtime: effectiveRuntime, runtimeConfigDigest: runtimeConfig.digest, executable, command, environmentSnapshot, availabilityEvidence });
+  if (successorRuntime !== null) assertSuccessorAdapterFacts(successorRuntime, identity, { checkHost: true });
   const path = adapterIdentityPath(runDir, adapter);
   if (!existsSync(path) && adapterHasAttempts(runDir, plan, adapter)) throw new Error(`${adapter} runtime identity is missing after attempts were created; refusing replacement`);
   const published = publishJsonExclusive(path, identity);
@@ -1023,8 +1051,9 @@ function executeContainedAgent(executable, args, options) {
   return { ...result, workspace_descendants_detected: terminateResidualAgentProcessGroup(result.pid) };
 }
 
-function executeAgent({ root, runtime, executable, workspace, outputTemporary, command, environmentSnapshot }) {
-  const task = readFileSync(resolve(workspace, "BENCHMARK_TASK.md"), "utf8");
+function executeAgent({ root, runtime, executable, workspace, outputTemporary, command, environmentSnapshot, successorStdin = null }) {
+  if (successorStdin !== null && (!Buffer.isBuffer(successorStdin) || runtime.adapter !== "codex")) throw new Error("invalid successor stdin transport");
+  const task = successorStdin === null ? readFileSync(resolve(workspace, "BENCHMARK_TASK.md"), "utf8") : successorStdin;
   const environment = environmentFor(environmentSnapshot);
   if (runtime.adapter === "codex") {
     const codexHome = isolatedCodexHome(environment);
@@ -1668,6 +1697,7 @@ function markUnavailable({ root, context, entry, state, runtime, adapter }) {
 
 function executeCase({ root, config, context, entry, runtime, verifiedExecutable, adapter, environmentSnapshot }) {
   const state = readCaseState(root, context.runDir, entry);
+  if (context.successorPromptInput && state.status !== "pending") throw new Error("successor cases cannot be silently retried or resumed after an uncertain attempt");
   if (TERMINAL_STATUSES.has(state.status)) validateTerminalCase({ root, context, entry, state });
   if (preflightCaseClaim({ root, context, entry, state })) return "active";
   if (TERMINAL_STATUSES.has(state.status) && (["completed", "unavailable", "invalid"].includes(state.status) || (state.status === "failed" && !context.retryFailed))) return state.status;
@@ -1680,6 +1710,7 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
   let processResult = null;
   let ephemeralRoot = null;
   let projection = { status: "attempt_setup_failed" };
+  let successorStdin = null;
   let sealedCommandEvidence = null;
   let terminalWorkspaceBase = null;
   let terminalWorkspaceAuthority = null;
@@ -1701,6 +1732,14 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     workspace = copied.workspace;
     fault("after_workspace_created");
     projection = selection ? applyAdaptiveSelection({ root, adapter: entry.adapter_track, selection, workspace }) : { status: "materialized" };
+    if (context.successorPromptInput) {
+      if (selection || entry.condition !== "full_ask") throw new Error("successor Prompt input requires a native full_ask case");
+      const delivery = prepareSuccessorInputForAttempt(context.successorPromptInput, {
+        entry, context, adapterIdentity: adapter.identity, workspace, materializedRecord,
+      });
+      successorStdin = delivery.stdin;
+      projection = successorInputProjection(delivery.binding);
+    }
     terminalWorkspaceBase = captureTerminalWorkspaceInventory(workspace);
     if (stableCanonicalJson(terminalWorkspaceBase.inventory.filter((item) => item.file_type === "regular_file")) !== stableCanonicalJson(expectedBaseRegularInventory(materializedRecord, projection))) throw new Error("terminal workspace base does not match verified materialization");
     if (selection) {
@@ -1714,12 +1753,15 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     fault("after_request_published");
     const temporaryOutput = resolve(ephemeralRoot, "agent-final.json");
     const started = process.hrtime.bigint();
-    const raw = executeVerifiedAgent({ root, runtime, verifiedExecutable, workspace, outputTemporary: temporaryOutput, command: adapter.identity.effective_command, environmentSnapshot });
+    // Execution or residual-group inspection may throw before returning a result.
+    // Keep catch-path capture disabled until the runner confirms no descendants.
+    terminalWorkspaceCaptureAllowed = false;
+    const raw = executeVerifiedAgent({ root, runtime, verifiedExecutable, workspace, outputTemporary: temporaryOutput, command: adapter.identity.effective_command, environmentSnapshot, successorStdin });
     processResult = { ...raw, duration_ms: Math.round(Number(process.hrtime.bigint() - started) / 1_000_000) };
     if (processResult.workspace_descendants_detected) {
-      terminalWorkspaceCaptureAllowed = false;
       throw new Error("terminal workspace capture rejected residual agent descendants");
     }
+    terminalWorkspaceCaptureAllowed = true;
     terminalWorkspaceAuthority = publishTerminalWorkspaceAuthority({ root, attemptRoot, entry, claim, baseSnapshot: terminalWorkspaceBase, workspace, record: materializedRecord, projection });
     sealedCommandEvidence = sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity: adapter.identity, processResult, contract, workspaceRoot: workspace });
     if (selection) {
@@ -1771,7 +1813,36 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
   }
 }
 
-export function executePortfolio({ root, config, planPath, materializedPath, selectionState, runDir, adapter, runtimeConfigPath, agentBin, caseId = null, maxCases = null, retryFailed = false }) {
+// Explicit no-model native preparation: version/help probes and local run state
+// only. This function never calls executeCase or executeAgent.
+export function prepareSuccessorPortfolioSource({ root, config, planPath, materializedPath, selectionState, runDir, runtimeConfigPath, agentBin, preparation }) {
+  const adapter = "codex";
+  const runtimeConfig = readRuntimeConfig(root, runtimeConfigPath, adapter);
+  if (runtimeConfig.value.availability !== "available") throw new Error("successor native preparation requires an available declared runtime");
+  const environmentSnapshot = captureEnvironment(runtimeConfig.value);
+  const verifiedExecutable = validateAgentExecutable(agentBin);
+  const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir });
+  if (context.plan.cases.some((entry) => readCaseState(root, context.runDir, entry).status !== "pending")) throw new Error("successor native preparation rejects a previously started run");
+  const runtimeIdentity = ensureAdapterIdentity({ root, runDir: context.runDir, plan: context.plan, adapter, runtimeConfig, verifiedExecutable, environmentSnapshot, successorRuntime: preparation.runtime });
+  if (runtimeIdentity.identity.availability !== "available") throw new Error("successor runtime contract is unconfirmed; no cases were started");
+  return {
+    run_instance_id: context.identity.run_instance_id,
+    plan_id: context.plan.plan_id, plan_digest: context.identity.plan.digest,
+    repository_revision: context.repositoryRevision,
+    runtime_identity_digest: runtimeIdentity.digest,
+    materialization_manifest_digest: context.materialized.manifestDigest,
+    effective_command_digest: runtimeIdentity.identity.effective_command_digest,
+    environment_snapshot_digest: runtimeIdentity.identity.environment_snapshot.digest,
+    cases: context.plan.cases.filter((entry) => entry.adapter_track === adapter && entry.condition === "full_ask").map((entry) => ({
+      case_id: entry.case_id, fixture_id: entry.fixture_id, repetition: entry.repetition,
+      fixture_input_digest: `sha256:${entry.input_manifest_sha256}`,
+    })),
+    model_calls: 0, case_attempts_created: 0, execution_authorized: false,
+  };
+}
+
+export function executePortfolio({ root, config, planPath, materializedPath, selectionState, runDir, adapter, runtimeConfigPath, agentBin, caseId = null, maxCases = null, retryFailed = false, successorPromptInput = null }) {
+  if (successorPromptInput !== null) assertSuccessorInputRun(successorPromptInput, { adapter, caseId, retryFailed, maxCases });
   if (!adapter || !["codex", "claude"].includes(adapter)) throw new Error("execute-portfolio requires --adapter codex or claude");
   if (maxCases !== null && (!Number.isInteger(maxCases) || maxCases < 1)) throw new Error("--max-cases must be a positive integer");
   const runtimeConfig = readRuntimeConfig(root, runtimeConfigPath, adapter);
@@ -1783,7 +1854,8 @@ export function executePortfolio({ root, config, planPath, materializedPath, sel
   context.materializedPath = materializedPath;
   context.selectionState = selectionState;
   context.retryFailed = retryFailed;
-  const runtimeIdentity = ensureAdapterIdentity({ root, runDir: context.runDir, plan: context.plan, adapter, runtimeConfig, verifiedExecutable, environmentSnapshot });
+  context.successorPromptInput = successorPromptInput;
+  const runtimeIdentity = ensureAdapterIdentity({ root, runDir: context.runDir, plan: context.plan, adapter, runtimeConfig, verifiedExecutable, environmentSnapshot, successorRuntime: successorPromptInput === null ? null : successorRuntimeForInput(successorPromptInput) });
   const cases = context.plan.cases.filter((entry) => entry.adapter_track === adapter && (!caseId || entry.case_id === caseId));
   if (caseId && cases.length === 0) throw new Error(`case ${caseId} does not belong to adapter ${adapter}`);
   const outcomes = [];

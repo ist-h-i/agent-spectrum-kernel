@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { resolvePortfolioFixtureSource } from "./ask-benchmark-calibration-source.mjs";
 import {
   chmodSync,
   copyFileSync,
@@ -134,14 +135,15 @@ function validateFixtureInputs({ root, config, plan }) {
     if (manifestDigest !== fixture.input_manifest_sha256) throw new Error(`${fixture.id} fixture manifest digest mismatch`);
     const manifest = JSON.parse(manifestBytes);
     if (manifest.scope !== "agent-visible task.md + workspace/**") throw new Error(`${fixture.id} fixture manifest must explicitly scope agent-visible task and workspace files`);
-    const fixtureRecord = manifest.fixtures?.[fixture.id];
+    const sourceFixtureId = resolvePortfolioFixtureSource(fixture);
+    const fixtureRecord = manifest.fixtures?.[sourceFixtureId];
     if (!fixtureRecord || !Array.isArray(fixtureRecord.files)) throw new Error(`${fixture.id} is missing from its fixture manifest`);
     const seen = new Set();
     const records = fixtureRecord.files.map((record) => {
       const path = validateAgentVisibleRecord(record, fixture.id);
       if (seen.has(path)) throw new Error(`${fixture.id} fixture manifest contains duplicate path: ${path}`);
       seen.add(path);
-      const fixtureRoot = assertInside(root, resolve(root, config.fixture_root, fixture.id), `${fixture.id} fixture root`);
+      const fixtureRoot = assertInside(root, resolve(root, config.fixture_root, sourceFixtureId), `${fixture.id} fixture root`);
       const source = assertInside(fixtureRoot, resolve(fixtureRoot, path), `${fixture.id}/${path}`);
       assertNoSymlinkSegments(source, `${fixture.id}/${path}`);
       if (!existsSync(source) || !lstatSync(source).isFile()) throw new Error(`${fixture.id}/${path} is missing or not a regular file`);
