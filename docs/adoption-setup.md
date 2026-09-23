@@ -124,6 +124,8 @@ target の snapshot 内のパスは、リポジトリ基準の相対パスです
 node scripts/ask-setup.mjs doctor --target /path/to/project --json
 ```
 
+`doctor` は導入計画より広い範囲を診断します。起動前に `docs`、`adapters`、`.claude`、`.agents`、`.agent-spectrum-kernel` の診断対象ディレクトリ全体と、Git ディレクトリに置かれた runtime health ログを検査します。未管理ファイルも含め、symlink と特殊ファイルを拒否します。install state が参照する target / source のパスも検査し、参照先の逸脱やリンク経由の読み取りを拒否します。この事前検査も並行変更に対する OS レベルの隔離ではありません。
+
 状態は次のように分けます。
 
 - **Installed**: 期待する managed state / projection が存在し、現在の管理対象と整合しているか。

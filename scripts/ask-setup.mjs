@@ -17,6 +17,7 @@ import { spawnSync } from "node:child_process";
 import { CORE_OWNED_IMMUTABLE_ASSETS, readGitRevision } from "./installer-lifecycle.mjs";
 import { readSetupRepositoryId, validateSetupGitMetadata } from "./ask-setup-git.mjs";
 import { readSetupJson, sanitizeSetupDoctorReport, summarizeSetupProcessFailure } from "./ask-setup-diagnostics.mjs";
+import { validateSetupDoctorInputs } from "./ask-setup-doctor-inputs.mjs";
 import {
   KERNEL_SETUP_INPUTS,
   buildSetupSourceIdentity,
@@ -562,7 +563,7 @@ export async function verifySavedPlan(plan, { target, adapter = null } = {}) {
 
 function doctor(target) {
   snapshotTarget(target);
-  validateSetupGitMetadata(target);
+  validateSetupDoctorInputs(target, REPO_ROOT);
   const result = runNode("scripts/ask-doctor.mjs", ["--target", target, "--json"], { expected: [0, 1] });
   let report;
   try {

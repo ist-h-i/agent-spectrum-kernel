@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { readSetupRepositoryId, setupRepositoryId } from "./ask-setup-git.mjs";
 import { runSetupSafetyTests, runSetupSafetyCliTests } from "./test-ask-setup-safety.mjs";
+import { runSetupDoctorInputTests } from "./test-ask-setup-doctor-inputs.mjs";
 
 const CANARY = "ASK_TEST_ONLY_CREDENTIAL_296";
 const ORIGIN = `https://fixture-user:${CANARY}@example.invalid/team/repo.git?token=${CANARY}#${CANARY}`;
@@ -146,6 +147,7 @@ export function runSetupGitTests() {
   }
   console.log(`ASK setup Git privacy tests passed: ${count} cases`);
   runSetupSafetyTests();
+  runSetupDoctorInputTests();
   return count;
 }
 
@@ -216,6 +218,7 @@ export function runSetupGitCliTests({ setupScript, repoRoot, auditTree }) {
   }
   console.log("ASK setup Git privacy and profile CLI regressions passed");
   runSetupSafetyCliTests({ setupScript, repoRoot, auditTree });
+  runSetupDoctorInputTests({ cli: true });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) runSetupGitTests();
