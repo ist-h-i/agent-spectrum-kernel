@@ -201,6 +201,9 @@ jobs:
       - name: Run portfolio aggregate result tests
         run: node scripts/test-ask-benchmark-portfolio-aggregate-result.mjs
 
+      - name: Run portfolio aggregate v2 component sensitivity tests
+        run: node scripts/test-ask-benchmark-portfolio-aggregate-result-v2.mjs
+
       - name: Run portfolio directional outcome report tests
         run: node scripts/test-ask-benchmark-portfolio-directional-outcome-report.mjs
 
