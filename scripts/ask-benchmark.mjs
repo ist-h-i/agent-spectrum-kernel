@@ -36,6 +36,7 @@ import { reportEngineeringPairedComparisons, verifyEngineeringPairedComparisonRe
 import { reportEngineeringDirectionalOutcomes, verifyEngineeringDirectionalOutcomeReport } from "./ask-benchmark-portfolio-directional-outcome-report.mjs";
 import { reportEngineeringMechanismScorecards, verifyEngineeringMechanismScorecard } from "./ask-benchmark-portfolio-mechanism-scorecard.mjs";
 import { reportPortfolioAggregateResult, verifyPortfolioAggregateResult } from "./ask-benchmark-portfolio-aggregate-result.mjs";
+import { reportPortfolioAggregateResult as reportPortfolioAggregateResultV2, verifyPortfolioAggregateResult as verifyPortfolioAggregateResultV2 } from "./ask-benchmark-portfolio-aggregate-result-v2.mjs";
 import { migrateLegacyCalibrationResult, verifyLegacyCalibrationMigration } from "./ask-benchmark-portfolio-legacy-calibration-migration.mjs";
 import {
   DEFAULT_PORTFOLIO_CATALOG_PATH,
@@ -195,6 +196,8 @@ Commands:
   verify-engineering-mechanism-scorecard --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --input <mechanism-scorecard.json>
   report-engineering-aggregate-result --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --paired-comparison-report <paired-comparison-report.json> --aggregate-authority-root <directory> --classification-record <relative-path> --classification-record-source-digest <sha256:digest> [--classification-record <relative-path> --classification-record-source-digest <sha256:digest> ...] [--lineage-record <relative-path> --lineage-record-source-digest <sha256:digest> ...] --comparison-view <view> --suite <suite> --task-class <task-class> --output <aggregate-result.json>
   verify-engineering-aggregate-result --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --paired-comparison-report <paired-comparison-report.json> --aggregate-authority-root <directory> --classification-record <relative-path> --classification-record-source-digest <sha256:digest> [--classification-record <relative-path> --classification-record-source-digest <sha256:digest> ...] [--lineage-record <relative-path> --lineage-record-source-digest <sha256:digest> ...] --comparison-view <view> --suite <suite> --task-class <task-class> --input <aggregate-result.json>
+  report-engineering-aggregate-result-v2 --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --paired-comparison-report <paired-comparison-report.json> --aggregate-authority-root <directory> --classification-record <relative-path> --classification-record-source-digest <sha256:digest> [--classification-record <relative-path> --classification-record-source-digest <sha256:digest> ...] [--lineage-record <relative-path> --lineage-record-source-digest <sha256:digest> ...] --comparison-view <view> --suite <suite> --task-class <task-class> --output <aggregate-result-v2.json>
+  verify-engineering-aggregate-result-v2 --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --paired-comparison-report <paired-comparison-report.json> --aggregate-authority-root <directory> --classification-record <relative-path> --classification-record-source-digest <sha256:digest> [--classification-record <relative-path> --classification-record-source-digest <sha256:digest> ...] [--lineage-record <relative-path> --lineage-record-source-digest <sha256:digest> ...] --comparison-view <view> --suite <suite> --task-class <task-class> --input <aggregate-result-v2.json>
   recover-case --run-dir <run-directory> --case-id <case-id> --claim-id <claim-id> --reason <reason>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
@@ -792,6 +795,18 @@ function verifyEngineeringAggregateResultCommand(args) {
   console.log(`Verified aggregate result ${result.artifact.aggregate_result_digest} with status ${result.artifact.result_status}`);
 }
 
+function reportEngineeringAggregateResultV2Command(args) {
+  if (!args.output) throw new Error("report-engineering-aggregate-result-v2 requires --output");
+  const result = reportPortfolioAggregateResultV2({ ...aggregateAuthorityOptions(args), outputPath: args.output });
+  console.log(`Published aggregate result v2 ${result.artifact.aggregate_result_digest} with status ${result.artifact.result_status}`);
+}
+
+function verifyEngineeringAggregateResultV2Command(args) {
+  if (!args.input) throw new Error("verify-engineering-aggregate-result-v2 requires --input");
+  const result = verifyPortfolioAggregateResultV2({ ...aggregateAuthorityOptions(args), aggregateResultPath: args.input });
+  console.log(`Verified aggregate result v2 ${result.artifact.aggregate_result_digest} with status ${result.artifact.result_status}`);
+}
+
 function recoverCase(args) {
   if (!args.runDir) throw new Error("recover-case requires --run-dir");
   const result = recoverPortfolioCase({ root: ROOT, runDir: args.runDir, caseId: args.caseId, claimId: args.claimId, reason: args.reason });
@@ -1289,6 +1304,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   else if (args.command === "verify-engineering-mechanism-scorecard") verifyEngineeringMechanismScorecardCommand(args);
   else if (args.command === "report-engineering-aggregate-result") reportEngineeringAggregateResultCommand(args);
   else if (args.command === "verify-engineering-aggregate-result") verifyEngineeringAggregateResultCommand(args);
+  else if (args.command === "report-engineering-aggregate-result-v2") reportEngineeringAggregateResultV2Command(args);
+  else if (args.command === "verify-engineering-aggregate-result-v2") verifyEngineeringAggregateResultV2Command(args);
   else if (args.command === "recover-case") recoverCase(args);
   else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);

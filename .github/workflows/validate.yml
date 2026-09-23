@@ -29,6 +29,10 @@ jobs:
           diff -u docs/fixtures/adapter-runtime-bundle.json "$RUNNER_TEMP/ask-expected-runtime-bundle.json"
           exit 1
 
+      # Catch bounded aggregate regressions before the long repository suites.
+      - name: Run portfolio aggregate v2 component sensitivity tests
+        run: node scripts/test-ask-benchmark-portfolio-aggregate-result-v2.mjs
+
       - name: Run successor snapshot and source-session regressions (current HEAD)
         run: |
           node --test scripts/test-ask-benchmark-source-session.mjs scripts/test-successor-process-state.test.mjs scripts/test-frozen-evaluator-fixture.test.mjs
