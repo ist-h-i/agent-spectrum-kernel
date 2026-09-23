@@ -120,28 +120,34 @@ The user-facing route should describe work steps and stop points without requiri
 | Explicit or high-value multi-claim audit | `evidence-ledger` | `doubt-driven-development` when the claim itself needs falsification |
 | End of work | `handoff-generation` | — |
 
-7. Apply project overlay skill selection.
-   - If a project overlay contains framework, domain, UI/UX, architecture, CI, data, security, or other repository-specific skills, consider them after generic workflow selection.
+7. Apply bounded execution supplements after selecting the generic workflow.
+   - When current evidence contains a user-visible interactive UI signal (screen/form/navigation, focus or selection state, loading/error/success state, reversible or consequential UI action, partial UI failure/retry, or UI language that affects task completion), add `ui-ux-design` as a secondary execution supplement.
+   - `ui-ux-design` is never the primary lifecycle route. It supplements the selected requirement, design, implementation, verification, or review workflow and must not replace `requirement-grill`, `grill-design`, `controlled-implementation`, `test-first-verification`, or final review gates.
+   - Skip `ui-ux-design` for non-UI work and for output that is purely machine-consumed. Do not load it merely because a repository contains frontend code.
+   - Record the observed UI signal and the applicable pattern/verification subset; do not invent project users, branding, business priorities, or missing interaction states.
+
+8. Apply project overlay skill selection.
+   - If a project overlay contains framework, domain, UI/UX, architecture, CI, data, security, or other repository-specific skills, consider them after generic workflow selection and bounded ASK execution supplements.
    - Select overlay skills only when the overlay signal applies to the selected work type.
-   - Do not add project-specific skills to the generic routing table.
+   - Do not copy project-specific users, branding, rules, or patterns into the generic routing table.
    - For stack-specific implementation overlays, follow `docs/stack-implementation-overlay-contract.md`. They may supplement `controlled-implementation` and `test-first-verification`, but must not replace the generic workflow.
 
-8. State what is intentionally skipped.
+9. State what is intentionally skipped.
 
-9. Apply overlays before action.
+10. Apply overlays before action.
    - Risk overlay: if any task involves destructive, external, production, auth, secret, dependency, migration, billing, email, or infra impact, run `risk-gate` before the selected workflow proceeds to action.
    - Evidence overlay: apply `ask.claim-evidence-status@1.0.0` inline for ordinary work. Select `evidence-ledger` only for `explicit_claim_audit`, `multiple_material_claims`, `high_stakes_readiness`, `cross_artifact_synthesis`, or `stable_claim_ids`.
 
-10. Preserve review gate minimality.
+11. Preserve review gate minimality.
    - When routing to `review-router`, require observed change signals and trace each required gate to a signal and evidence.
    - Missing changed-file, diff, context, output, or verification evidence must be reported as `insufficient evidence`, not as a skipped gate.
    - Required gates not present in executed gate evidence must be reported as under-processing.
    - Heavy gates selected without trigger signals must be reported as over-processing warnings.
    - Do not select every review gate by default.
 
-11. Continue into the selected primary workflow only when the capability gate passes and the task does not require user approval.
+12. Continue into the selected primary workflow only when the capability gate passes and the task does not require user approval.
 
-12. Preserve lifecycle responsibility boundaries.
+13. Preserve lifecycle responsibility boundaries.
    - Use `docs/lifecycle-artifact-contract.md` as the canonical Requirement -> Spec -> Work Package -> Verification -> Implementation boundary.
    - Downstream artifacts reference upstream IDs and emit only owned fields or explicit deltas.
    - Missing upstream artifacts do not force synthetic reconstruction; use the compact path for localized work.
@@ -166,6 +172,7 @@ Routing Decision:
 - Decisive signals:
 - Reason for primary route:
 - Reason for each secondary route:
+- Applicable execution supplements:
 - Intentionally skipped:
 - Risk overlay:
 - Uncertainty:

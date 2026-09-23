@@ -18,6 +18,10 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Run UI harness and Skill-reference regressions
+        run: |
+          node --test scripts/test-codex-skill-reference-preflight.mjs scripts/test-skill-assets.mjs scripts/test-skill-reference-canonical.mjs scripts/test-ui-ux-adapter-assets.mjs docs/fixtures/ui-ux-design/fixture-state.test.mjs scripts/test-prompt-v2-historical-renderer.mjs
+
       # Fail before expensive suites, retaining the generator's exact-byte check.
       - name: Check adapter runtime bundle freshness
         run: |
@@ -32,6 +36,9 @@ jobs:
       # Catch bounded aggregate regressions before the long repository suites.
       - name: Run portfolio aggregate v2 component sensitivity tests
         run: node scripts/test-ask-benchmark-portfolio-aggregate-result-v2.mjs
+
+      - name: Run portfolio consumer sensitivity detail tests
+        run: node scripts/test-ask-benchmark-portfolio-consumer-report.mjs
 
       - name: Run successor snapshot and source-session regressions (current HEAD)
         run: |

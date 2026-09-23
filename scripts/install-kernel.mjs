@@ -24,6 +24,7 @@ import {
   rollbackLifecycleState,
   applyLifecyclePlan,
 } from "./installer-lifecycle.mjs";
+import { skillAssets } from "./skill-assets.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STATE_PATH = ".agent-spectrum-kernel/install-state.json";
@@ -295,37 +296,57 @@ function buildPlan(args) {
     });
   }
 
-  for (const skill of skills) {
-    const source = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
-    ensureSource(source, `skills/${skill}/SKILL.md`);
+  for (const asset of skillAssets(REPO_ROOT, skills)) {
+    const source = resolve(REPO_ROOT, asset.sourcePath);
     const content = readText(source);
-    const relativePath = `skills/${skill}/SKILL.md`;
+    const relativePath = asset.sourcePath;
     const destination = resolve(args.target, relativePath);
     if (args.noOverwriteSkills && existsSync(destination) && readText(destination) !== content) {
       throw new Error(`Projected skill already exists and would be overwritten: ${relativePath}`);
     }
-    managedFiles[relativePath] = createManagedFileRecord({ kind: "skill", skill, content });
+    managedFiles[relativePath] = createManagedFileRecord({ kind: "skill", skill: asset.skill, content });
     planWriteManaged(operations, {
       target: args.target,
       relativePath,
       content,
-      reason: `skill:${skill}`,
+      reason: `skill:${asset.skill}`,
       previousState,
       force: args.force,
       rollback,
     });
   }
 
-  for (const skill of staleSkills) {
-    const relativePath = `skills/${skill}/SKILL.md`;
+  for (const [relativePath, record] of Object.entries(previousState?.managed_files ?? {}).sort()) {
+    if (!["skill", "stale_skill"].includes(record?.kind)) continue;
+    const skill = record.skill;
+    if (typeof skill !== "string" || !SKILL_NAME_PATTERN.test(skill)) {
+      throw new Error(`Invalid managed skill record: ${relativePath}`);
+    }
+    const prefix = `skills/${skill}/`;
+    if (!relativePath.startsWith(prefix)) {
+      throw new Error(`Managed skill path does not match its skill: ${relativePath}`);
+    }
+    const suffix = relativePath.slice(prefix.length);
+    const parts = suffix.split("/");
+    const validSuffix = suffix === "SKILL.md"
+      || (parts[0] === "references" && parts.length > 1);
+    if (!validSuffix || parts.some((part) => !part || part === "." || part === "..")
+      || relativePath.includes("\\") || /[\u0000-\u001f]/u.test(relativePath)) {
+      throw new Error(`Invalid managed skill asset path: ${relativePath}`);
+    }
+    if (Object.hasOwn(managedFiles, relativePath)) continue;
     if (args.prune) {
-      planDeleteManaged(operations, { target: args.target, relativePath, previousState, force: args.force, rollback, reason: `stale managed projection:${skill}` });
+      planDeleteManaged(operations, {
+        target: args.target,
+        relativePath,
+        previousState,
+        force: args.force,
+        rollback,
+        reason: `stale managed projection:${skill}`,
+      });
       planRemoveEmptyDirectory(operations, args.target, dirname(relativePath), `empty stale managed projection directory:${skill}`);
     } else {
-      const record = previousManagedRecord(previousState, relativePath);
-      if (record) {
-        managedFiles[relativePath] = { ...record, kind: "stale_skill", skill };
-      }
+      managedFiles[relativePath] = { ...record, kind: "stale_skill", skill };
     }
   }
 

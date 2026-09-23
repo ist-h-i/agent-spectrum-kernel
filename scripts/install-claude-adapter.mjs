@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSy
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
+import { skillAssets } from "./skill-assets.mjs";
 import { ADAPTER_RENDERER_METADATA, CLAUDE_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 import { renderClaudeFixedEntryProfile, measureClaudeFixedEntryProfiles } from "./claude-fixed-entry-profile.mjs";
 import { FIXED_ENTRY_NAMES, fixedEntryCanonicalPaths, fixedEntryDirectTriggers } from "./fixed-entry-profile.mjs";
@@ -62,6 +63,7 @@ const DEFAULT_SKILLS = [
   "skill-router",
   "spec-driven-development",
   "test-first-verification",
+  "ui-ux-design",
   "verification-pattern-ledger",
   "work-package-compiler",
 ];
@@ -168,6 +170,7 @@ const CLAUDE_PROFILES = {
   },
   implementation: {
     skills: [
+      "ui-ux-design",
       "operating-mode-router",
       "skill-router",
       "requirement-grill",
@@ -183,6 +186,7 @@ const CLAUDE_PROFILES = {
   },
   investigation: {
     skills: [
+      "ui-ux-design",
       "operating-mode-router",
       "skill-router",
       "doubt-driven-development",
@@ -196,6 +200,7 @@ const CLAUDE_PROFILES = {
   },
   review: {
     skills: [
+      "ui-ux-design",
       "review-router",
       "review-automated-gate",
       "review-ai-quality",
@@ -608,9 +613,9 @@ function deleteFilePlanned(destination, args, writes) {
 }
 
 function installSkills(args, writes) {
-  for (const skill of args.selectedSkills) {
-    const source = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
-    const destination = resolve(args.target, ".claude", "skills", skill, "SKILL.md");
+  for (const { skill, relativePath, sourcePath } of args.skillFiles) {
+    const source = resolve(REPO_ROOT, sourcePath);
+    const destination = resolve(args.target, ".claude", "skills", skill, relativePath);
     copyFilePlanned(source, destination, args, writes, { kind: "claude_skill", skill });
   }
 }
@@ -965,6 +970,7 @@ function resolveSelection(args) {
   const initialProjectStateAssets = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].initialProjectStateAssets ?? []))].sort();
   const runtimeDirectories = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].runtimeDirectories ?? []))].sort();
   args.selectedSkills = selectedSkills;
+  args.skillFiles = skillAssets(REPO_ROOT, selectedSkills);
   args.manifest = manifest;
   args.selectedCommands = selectedCommands;
   args.requiredAssets = requiredAssets;
@@ -987,11 +993,12 @@ function claudeRendererInputsForSelection(args, { skipHooks, skipRuntime }) {
     { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
     { path: "schemas/metrics-event.schema.json", role: "schema" },
     ...fixedCommands.flatMap((command) => fixedEntryCanonicalPaths(command).map((path) => ({ path, role: path.startsWith("skills/") ? "skill" : path.startsWith("schemas/") ? "schema" : path.endsWith(".mjs") ? "runtime_source" : "contract" }))),
-    ...args.selectedSkills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
+    ...args.skillFiles.map(({ sourcePath }) => ({ path: sourcePath, role: "skill" })),
     ...args.requiredAssets.filter((path) => CORE_OWNED_IMMUTABLE_ASSETS.includes(path) || path.startsWith("schemas/") || path.endsWith("-contract.md")).map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : path.endsWith(".mjs") ? "runtime_source" : "contract" })),
   ];
   const adapterOwned = [
     { path: "scripts/install-claude-adapter.mjs", role: "renderer" },
+    { path: "scripts/skill-assets.mjs", role: "inventory" },
     ...(fixedCommands.length > 0 ? [{ path: "scripts/fixed-entry-profile.mjs", role: "renderer" }] : []),
     ...(fixedCommands.length > 0 ? [{ path: "scripts/claude-fixed-entry-profile.mjs", role: "renderer" }] : []),
     { path: "scripts/installer-lifecycle.mjs", role: "runtime_source" },
@@ -1010,7 +1017,7 @@ function claudeRendererInputsForSelection(args, { skipHooks, skipRuntime }) {
 function claudeProjectedManagedAssets(args, { skipHooks, skipRuntime }) {
   const inventorySourceRef = "scripts/install-claude-adapter.mjs";
   const assets = [
-    ...args.selectedSkills.map((skill) => ({ path: `.claude/skills/${skill}/SKILL.md`, asset_kind: "skills", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    ...args.skillFiles.map(({ skill, relativePath }) => ({ path: `.claude/skills/${skill}/${relativePath}`, asset_kind: "skills", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
     ...args.selectedCommands.map((command) => ({ path: `.claude/commands/${command}`, asset_kind: "commands", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
     ...(!skipHooks && !skipRuntime ? [{ path: ".claude/settings.json", asset_kind: "hooks", ownership_mode: "partial_file", inventory_source_ref: inventorySourceRef }] : []),
     ...(!skipRuntime ? CLAUDE_RUNTIME_FILES.map((file) => ({ path: file.target, asset_kind: file.assetKind, ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })) : []),
@@ -1213,11 +1220,10 @@ function buildState(args, manifest) {
     throw new Error(`pure projection plan inventory does not match Claude lifecycle state: planned=${plannedInventoryPaths.join(",")} actual=${stateInventoryPaths.join(",")}`);
   }
   const selectedSkills = args.selectedSkills;
-  const retainedStaleSkills = args.retainedStaleFiles
+  const retainedStaleSkills = [...new Set(args.retainedStaleFiles
     .filter((path) => path.startsWith(".claude/skills/"))
     .map((path) => path.split("/")[2])
-    .filter(Boolean)
-    .sort();
+    .filter((skill) => skill && !selectedSkills.includes(skill)))].sort();
   const installedSkills = [...new Set([...selectedSkills, ...retainedStaleSkills])].sort();
   const projectionPackName = matchingProjectionPack(selectedSkills, manifest);
   const targetPartialFileState = Object.fromEntries(Object.keys(args.managedPartialFiles).sort().map((path) => [path, existsSync(resolve(args.target, path)) ? readFileSync(resolve(args.target, path), "utf8") : null]));
@@ -1378,6 +1384,7 @@ function main() {
   });
   Object.assign(args, {
     selectedSkills: args.projectionPlan.selectedSkills,
+    skillFiles: args.projectionPlan.skillFiles,
     selectedCommands: args.projectionPlan.selectedCommands,
     requiredAssets: args.projectionPlan.requiredAssets,
     initialProjectStateAssets: args.projectionPlan.initialProjectStateAssets,
