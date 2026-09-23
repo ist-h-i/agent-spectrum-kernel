@@ -248,3 +248,103 @@
         "dependency_manifest_id": { "oneOf": [{ "type": "string", "pattern": "^verification-dependency-manifest-[a-f0-9]{64}$" }, { "type": "null" }] },
         "dependency_manifest_digest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
         "base_inventory_digest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "target_inventory_digest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "required_obligation_refs": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "covered_obligation_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "uncovered_obligation_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "execution_evidence_reusable": { "type": "boolean" },
+        "reuse_basis": { "type": ["string", "null"], "enum": ["exact_target", "declared_dependency_manifest", null] },
+        "detail": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "maxLength": 2048 },
+            { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/inventoryChange" } }
+          ]
+        }
+      }
+    },
+    "coverageSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "required_gate_count", "reuse_exact_count", "reuse_scoped_count", "rerun_required_count", "independent_judgment_required_count", "blocked_uncovered_count", "covered_gate_ids", "blocking_gate_ids"],
+      "properties": {
+        "status": { "type": "string", "enum": ["covered", "blocked"] },
+        "required_gate_count": { "type": "integer", "minimum": 1 },
+        "reuse_exact_count": { "type": "integer", "minimum": 0 },
+        "reuse_scoped_count": { "type": "integer", "minimum": 0 },
+        "rerun_required_count": { "type": "integer", "minimum": 0 },
+        "independent_judgment_required_count": { "type": "integer", "minimum": 0 },
+        "blocked_uncovered_count": { "type": "integer", "minimum": 0 },
+        "covered_gate_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "blocking_gate_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } }
+      }
+    },
+    "executionSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_gate_count", "full_rerun_gate_count", "reused_execution_gate_count", "rerun_gate_count", "saved_execution_gate_count"],
+      "properties": {
+        "required_gate_count": { "type": "integer", "minimum": 1 },
+        "full_rerun_gate_count": { "type": "integer", "minimum": 1 },
+        "reused_execution_gate_count": { "type": "integer", "minimum": 0 },
+        "rerun_gate_count": { "type": "integer", "minimum": 0 },
+        "saved_execution_gate_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "diffRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "score", "old_path", "new_path"],
+      "properties": {
+        "status": { "type": "string", "enum": ["added", "deleted", "modified", "type_changed", "renamed", "copied"] },
+        "score": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+        "old_path": { "oneOf": [{ "$ref": "#/$defs/portablePath" }, { "type": "null" }] },
+        "new_path": { "oneOf": [{ "$ref": "#/$defs/portablePath" }, { "type": "null" }] }
+      }
+    },
+    "scopedPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "schema_path", "program", "plan_id", "plan_digest", "planner_revision",
+        "repository_id", "base_revision", "target_revision", "target_tree_digest", "requirements_id", "requirements_digest",
+        "requirements_path", "actual_diff", "dispositions", "coverage", "execution_summary"
+      ],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_scoped_reuse_plan" },
+        "plan_id": { "type": "string", "pattern": "^verification-scoped-reuse-plan-[a-f0-9]{64}$" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "planner_revision": { "type": "string", "const": "1.0.0" },
+        "repository_id": { "$ref": "#/$defs/token" },
+        "base_revision": { "$ref": "#/$defs/commit" },
+        "target_revision": { "$ref": "#/$defs/commit" },
+        "target_tree_digest": { "$ref": "#/$defs/digest" },
+        "requirements_id": { "type": "string", "pattern": "^verification-scoped-requirements-[a-f0-9]{64}$" },
+        "requirements_digest": { "$ref": "#/$defs/digest" },
+        "requirements_path": { "type": "string", "const": ".ask/verification-scoped-requirements.json" },
+        "actual_diff": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["digest", "changed_paths", "change_records", "record_count", "truncated"],
+          "properties": {
+            "digest": { "$ref": "#/$defs/digest" },
+            "changed_paths": { "type": "array", "maxItems": 2048, "uniqueItems": true, "items": { "$ref": "#/$defs/portablePath" } },
+            "change_records": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/diffRecord" } },
+            "record_count": { "type": "integer", "minimum": 0, "maximum": 1024 },
+            "truncated": { "type": "boolean" }
+          }
+        },
+        "dispositions": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/disposition" } },
+        "coverage": { "$ref": "#/$defs/coverageSummary" },
+        "execution_summary": { "$ref": "#/$defs/executionSummary" }
+      }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "evidence_id", "evidence_digest"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/token" },
+        "evidence_id": { "type": "string", "pattern": "^verification-evidence-[a-f0-9]{64}$" },
