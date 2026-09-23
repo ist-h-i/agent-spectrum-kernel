@@ -23,13 +23,13 @@
 <body>
 <main>
   <h1>通知設定</h1>
-  <p class="muted">状態遷移と復旧境界を確認するための authored demonstration です。モデル効果の証拠ではありません。</p>
+  <p class="muted">状態遷移と復旧境界を確認するためのデモです。モデルの効果を示す証拠ではありません。</p>
 
   <div id="foundation-block" role="alert" hidden>
     <h2>この画面を利用できません</h2>
     <p id="foundation-reason"></p>
     <p>権限とデータ整合性を確認してから再読み込みしてください。</p>
-    <button id="restore-foundation">検証用: 復旧</button>
+    <button id="restore-foundation">検証用：復旧する</button>
   </div>
 
   <div id="app-content">
@@ -66,8 +66,8 @@
       <h2>不可逆操作</h2>
       <button id="open-confirm" type="button">API連携を完全に削除</button>
       <div id="confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title" hidden>
-        <h3 id="confirm-title">API連携 alpha を完全に削除しますか？</h3>
-        <p>対象: API連携 alpha。保存済みの認証設定を削除します。このfixtureでは削除後に元へ戻せません。</p>
+        <h3 id="confirm-title">API連携「alpha」を完全に削除しますか？</h3>
+        <p>対象：API連携「alpha」。保存済みの認証設定を削除します。この検証画面では、削除後に元へ戻せません。</p>
         <button id="cancel-delete" type="button">削除せず戻る</button>
         <button id="commit-delete" type="button">完全に削除</button>
       </div>
@@ -80,8 +80,8 @@
       <p>合計: <strong id="total"></strong></p>
       <button id="dependent-action" type="button">集計結果を使う</button>
       <button id="retry-metrics" type="button" hidden>集計だけ再試行</button>
-      <button id="fail-metrics" type="button">検証用: 取得失敗</button>
-      <button id="missing-metrics" type="button">検証用: 欠測</button>
+      <button id="fail-metrics" type="button">検証用：取得失敗にする</button>
+      <button id="missing-metrics" type="button">検証用：欠測にする</button>
     </section>
 
     <section id="preview-region">
@@ -89,12 +89,12 @@
       <div id="preview-content">通知プレビューは利用できます。</div>
       <p id="preview-error" role="alert"></p>
       <button id="retry-preview" type="button" hidden>プレビューだけ再試行</button>
-      <button id="fail-preview" type="button">検証用: 描画失敗</button>
+      <button id="fail-preview" type="button">検証用：描画失敗にする</button>
     </section>
 
     <section>
       <h2>基礎障害</h2>
-      <button id="block-foundation" type="button">検証用: 権限エラー</button>
+      <button id="block-foundation" type="button">検証用：権限エラーにする</button>
     </section>
   </div>
 </main>
