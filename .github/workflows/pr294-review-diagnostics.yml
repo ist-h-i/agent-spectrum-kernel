@@ -1,0 +1,55 @@
+name: PR 294 review diagnostics
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    if: github.event.pull_request.number == 294
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - name: Export tracked source for offline review
+        run: |
+          mkdir -p "$RUNNER_TEMP/pr294-review"
+          git bundle create "$RUNNER_TEMP/pr294-review/source.bundle" --all
+          git rev-parse HEAD > "$RUNNER_TEMP/pr294-review/head.txt"
+          cp "$(command -v node)" "$RUNNER_TEMP/pr294-review/node"
+          node --version > "$RUNNER_TEMP/pr294-review/node-version.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr294-review-source
+          path: ${{ runner.temp }}/pr294-review/
+          retention-days: 1
+      - name: Diagnose execution cases without changing assertions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/test-ask-benchmark-execution.mjs')
+          text = path.read_text()
+          needle = '  assert.equal(readFileSync(logPath, "utf8").trim().split("\\n").filter((line) => line === "codex").length, codexCases.length, "resume must execute only pending Codex cases");'
+          assert text.count(needle) == 1
+          diagnostic = '''  for (const entry of codexCases) {
+              const statePath = resolve(runDir, "cases", entry.case_id, "state.json");
+              console.log("PR294_CASE", entry.condition, entry.case_id, existsSync(statePath) ? readFileSync(statePath, "utf8") : "missing");
+              const attemptsPath = resolve(runDir, "cases", entry.case_id, "attempts");
+              if (existsSync(attemptsPath)) for (const attempt of readdirSync(attemptsPath)) {
+                const resultPath = resolve(attemptsPath, attempt, "result.json");
+                if (existsSync(resultPath)) console.log("PR294_RESULT", entry.condition, readFileSync(resultPath, "utf8"));
+              }
+            }
+          '''
+          path.write_text(text.replace(needle, diagnostic + needle))
+          PY
+          node scripts/test-ask-benchmark-execution.mjs
