@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/verification-completion-policy.schema.json",
+  "title": "Verification completion decision-point provider policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "repository_id",
+    "maximum_decision_ms",
+    "providers",
+    "forbidden_actor_ids"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "repository_id": {
+      "$ref": "#/$defs/token"
+    },
+    "maximum_decision_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 60000
+    },
+    "forbidden_actor_ids": {
+      "$ref": "#/$defs/actors"
+    },
+    "providers": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "provider_id",
+          "actor_ids"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "pr_head",
+              "required_ci",
+              "approval",
+              "mergeability",
+              "release_state",
+              "authorization",
+              "external_state",
+              "independent_judgment",
+              "human_approval"
+            ]
+          },
+          "provider_id": {
+            "$ref": "#/$defs/token"
+          },
+          "actor_ids": {
+            "$ref": "#/$defs/actors"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "token": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@+/-]{0,255}$"
+    },
+    "actors": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/token"
+      }
+    }
+  }
+}
