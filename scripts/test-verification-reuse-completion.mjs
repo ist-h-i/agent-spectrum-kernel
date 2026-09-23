@@ -347,3 +347,23 @@ test("CLI emits bounded prepare output, rejects history flags, and fails blocked
   const history = spawnSync(process.execPath, [script, "coverage", ...args, "--fresh", "true"], { encoding: "utf8" });
   assert.equal(history.status, 1);
 });
+
+test("invalid current-target diagnostics never coerce or retain non-string revisions", async (t) => {
+  const f = fixture(t);
+  let coercions = 0;
+  const payload = Object.defineProperty({ raw_response: "PRIVATE TARGET PAYLOAD" }, "toString", {
+    value() { coercions += 1; return f.initial; },
+  });
+  for (const targetRevision of [[f.initial], new String(f.initial), payload, 1, true, null, undefined, Symbol("target")]) {
+    const result = await buildFinalVerificationCoverage({ ...f.options(), targetRevision });
+    assert.equal(result.status, "blocked");
+    assert.equal(result.target_revision, null);
+    assert.equal(result.authorizes_action, false);
+    assert.equal(result.historical_state_is_current, false);
+    assert.ok(!JSON.stringify(result).includes("PRIVATE TARGET PAYLOAD"));
+  }
+  assert.equal(coercions, 0, "error diagnostics must not invoke caller-owned coercion code");
+  const stale = await buildFinalVerificationCoverage(f.options(f.base));
+  assert.equal(stale.status, "blocked");
+  assert.equal(stale.target_revision, f.base, "preserve well-formed string identities in diagnostics");
+});

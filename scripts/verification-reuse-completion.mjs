@@ -242,7 +242,7 @@ export async function buildFinalVerificationCoverage({ repositoryRoot, storeRoot
     control = completionPolicy(repositoryRoot, resolved.artifact);
   } catch {
     return sealed("ask_verification_final_coverage", {
-      target_revision: /^[a-f0-9]{40}$/u.test(targetRevision ?? "") ? targetRevision : null,
+      target_revision: typeof targetRevision === "string" && /^[a-f0-9]{40}$/u.test(targetRevision) ? targetRevision : null,
       status: "blocked", blockers: [{ kind: "binding", ref: "current-target", reason_code: "current_target_evidence_or_policy_invalid" }],
       authorizes_action: false, historical_state_is_current: false,
     });
