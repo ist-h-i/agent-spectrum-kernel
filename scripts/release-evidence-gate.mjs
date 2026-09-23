@@ -57,8 +57,12 @@ function rawDigest(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
+function compareIdentifiers(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function sortedUnique(values) {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(values)].sort(compareIdentifiers);
 }
 
 function sameJson(left, right) {
@@ -185,12 +189,12 @@ function reviewIdentityReasons(evidence, review) {
   return reasons;
 }
 
-function assessIndependentReviews({ evidence, evidenceById, gateId = null, claim = null, root, targetRevision }) {
+function assessIndependentReviews({ evidence, evidenceById, gateId = null, claim = null, required = true, root, targetRevision }) {
   const reviews = [...evidenceById.values()]
     .filter((entry) => entry.kind === "independent_review" && entry.related_evidence_refs.includes(evidence.evidence_id))
     .filter((entry) => gateId === null || entry.gate_ids.includes(gateId))
     .filter((entry) => claim === null || entry.claim_ids.includes(claim.claim_id))
-    .sort((left, right) => left.evidence_id.localeCompare(right.evidence_id));
+    .sort((left, right) => compareIdentifiers(left.evidence_id, right.evidence_id));
   const reasons = [];
   let passedCount = 0;
   // This release-scoped catalog has no supersession contract: never select only a favorable review.
@@ -202,7 +206,7 @@ function assessIndependentReviews({ evidence, evidenceById, gateId = null, claim
     if (reviewReasons.length === 0) passedCount += 1;
     reasons.push(...reviewReasons);
   }
-  if (passedCount === 0) reasons.push("independent_review_missing");
+  if (required && passedCount === 0) reasons.push("independent_review_missing");
   return { evidence_refs: reviews.map((entry) => entry.evidence_id), reason_codes: sortedUnique(reasons) };
 }
 
@@ -224,7 +228,7 @@ function assessRiskAcceptance(risk, { evidenceById, root, targetRevision }) {
 function assessGate(spec, { catalog, evidenceById, root, targetRevision }) {
   const primary = catalog.evidence
     .filter((entry) => entry.gate_ids.includes(spec.gate_id) && entry.kind !== "independent_review")
-    .sort((left, right) => left.evidence_id.localeCompare(right.evidence_id));
+    .sort((left, right) => compareIdentifiers(left.evidence_id, right.evidence_id));
   if (primary.length === 0) return { gate_id: spec.gate_id, status: "not_ready", evidence_refs: [], reason_codes: ["required_gate_evidence_missing"] };
   const statuses = new Set(primary.map((entry) => entry.status));
   if (statuses.has("passed") && statuses.has("failed")) {
@@ -274,28 +278,30 @@ function assessClaim(claim, { evidenceById, root, targetRevision }) {
   }
   if (claim.disposition === "supported") {
     if (claim.evidence_refs.length === 0) reasons.push("supported_claim_has_no_evidence");
-    for (const evidence of present.filter((entry) => !NON_PRIMARY_KINDS.has(entry.kind))) {
+    const primary = present.filter((entry) => !NON_PRIMARY_KINDS.has(entry.kind));
+    for (const evidence of primary) {
       if (evidence.status === "failed") reasons.push("claim_evidence_failed");
       if (evidence.status === "not_checked") reasons.push("claim_evidence_not_checked");
       if (evidence.status === "not_applicable") reasons.push("claim_evidence_not_applicable");
     }
     const allowedKinds = new Set(CLAIM_KINDS[claim.claim_class]);
-    const qualified = present
-      .filter((entry) => !NON_PRIMARY_KINDS.has(entry.kind))
+    const qualified = primary
       .filter((entry) => entry.status === "passed" && allowedKinds.has(entry.kind))
       .filter((entry) => sameJson(entry.scope, claim.scope) && entry.source_revision === targetRevision)
       .filter((entry) => evidenceArtifactReasons(entry, root, targetRevision).length === 0);
     if (qualified.length === 0) reasons.push("supported_claim_evidence_kind_or_status_insufficient");
-    for (const evidence of qualified) {
-      const outcomeReasons = claim.claim_class === "controlled_effect"
-        ? guardrailReasons(evidence)
-        : claim.claim_class === "adopting_project_outcome"
-          ? guardrailReasons(evidence, { publicationPermission: true })
-          : claim.claim_class === "roi"
-            ? guardrailReasons(evidence, { publicationPermission: true, humanEffort: true })
-            : [];
-      reasons.push(...outcomeReasons);
-      const review = assessIndependentReviews({ evidence, evidenceById, claim, root, targetRevision });
+    const qualifiedIds = new Set(qualified.map((entry) => entry.evidence_id));
+    const outcomeClaim = ["controlled_effect", "adopting_project_outcome", "roi"].includes(claim.claim_class);
+    // Proof strength limits positive support, not which adverse evidence remains visible.
+    for (const evidence of primary) {
+      const qualifies = qualifiedIds.has(evidence.evidence_id);
+      if (outcomeClaim && OUTCOME_KINDS.has(evidence.kind)) {
+        reasons.push(...guardrailReasons(evidence, {
+          publicationPermission: qualifies && ["adopting_project_outcome", "roi"].includes(claim.claim_class),
+          humanEffort: qualifies && claim.claim_class === "roi",
+        }));
+      }
+      const review = assessIndependentReviews({ evidence, evidenceById, claim, required: qualifies, root, targetRevision });
       assessedRefs.push(...review.evidence_refs);
       reasons.push(...review.reason_codes);
       if (review.reason_codes.includes("independent_review_missing")) reasons.push("supported_claim_independent_review_missing");
@@ -328,10 +334,10 @@ export function assessRelease({ matrix, catalog, repositoryRoot = ROOT, sourceRe
 
   const gateResults = REQUIRED_RELEASE_GATES.map((spec) => assessGate(spec, {
     catalog, evidenceById, root: repositoryRoot, targetRevision: sourceRevision,
-  })).sort((left, right) => left.gate_id.localeCompare(right.gate_id));
+  })).sort((left, right) => compareIdentifiers(left.gate_id, right.gate_id));
   const claimResults = matrix.claims.map((claim) => assessClaim(claim, {
     evidenceById, root: repositoryRoot, targetRevision: sourceRevision,
-  })).sort((left, right) => left.claim_id.localeCompare(right.claim_id));
+  })).sort((left, right) => compareIdentifiers(left.claim_id, right.claim_id));
 
   const riskResults = catalog.accepted_risks.map((risk) => assessRiskAcceptance(risk, {
     evidenceById, root: repositoryRoot, targetRevision: sourceRevision,

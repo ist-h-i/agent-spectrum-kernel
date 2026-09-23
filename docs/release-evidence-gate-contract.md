@@ -52,6 +52,8 @@ Every passed or failed evidence record must point to an exact repository-relativ
 
 Every required gate and every claim has its own result and reason codes. Open blockers remain explicit. `not_ready` exits the CLI successfully because the assessment completed. Invalid JSON, schema violations, or malformed evidence/reference contracts fail the CLI. Valid records with stale revisions or missing, unreadable, or digest-mismatched artifacts produce `not_ready` with reason codes.
 
+Assessment IDs and reason codes use locale-independent code-unit ordering. Changing the host locale does not change canonical CLI output for identical inputs.
+
 ## Fixed required release gates
 
 The caller cannot remove required gates to manufacture a pass. v1.0 assessment always includes:
@@ -100,6 +102,10 @@ Every qualifying primary record used by a supported claim must have valid indepe
 
 Assessment checks all independent reviews bound to the evidence and the assessed gate or claim. A `passed` review cannot hide a bound `failed`, `not_checked`, `not_applicable`, stale, wrong-scope, or corrupt review. Result evidence references include the assessed reviews, including adverse ones. v1 has no implicit supersession: a later passing review does not by itself invalidate an earlier adverse review. Reviews not bound to the assessed gate or claim are not used to decide that target.
 
+Positive support and adverse evidence have different boundaries. Evidence below a claim's required strength cannot prove that claim, but its bound reviews are still assessed. Missing review of a non-qualifying auxiliary record does not create a new proof requirement; a supplied adverse or invalid review cannot be hidden by filtering that record out of positive support.
+
+For supported outcome claims, every bound controlled-benchmark or adopting-project record must pass quality, safety, lower-tail, and variance guardrails, even when it cannot independently support a stronger adopting-project or ROI claim. Publication permission and measured human effort remain required for the qualifying evidence used to support the corresponding claim class; auxiliary controlled benchmarks are not promoted to adopting-project or ROI proof.
+
 ### Risk acceptance
 
 An accepted-risk reference is not proof of acceptance by itself. Its review/approval record must have the required authority role and passing status, the assessed source revision, and a readable repository-bounded artifact with a matching digest. An independent-review acceptance also verifies the reviewed subjects' revisions, artifact integrity, scope, and producer/reviewer separation.
@@ -130,7 +136,7 @@ The expected decision is `not_ready`; the CLI emits a deterministic assessment f
 
 `scripts/test-release-evidence-gate.mjs` builds an isolated synthetic repository and complete synthetic evidence graph to prove the validator's positive path. It then mutates one condition at a time to exercise missing gates, stale source, tampering, scope transplant, duplicate IDs, contradictory evidence, missing independent review, arbitrary `supported`, synthetic overclaiming, optional exclusion, lower-tail regression, and open blockers.
 
-The focused suite also covers the PR #298 review regressions: required-claim exclusion, conflicting/incomplete review sets, unknown producer identity, inverse-only claim evidence, and invalid risk acceptance. Positive controls preserve multiple valid reviews, reciprocal references, valid risk acceptance, and optional exclusion. CLI checks verify that successful and rejected invocations leave input bytes unchanged.
+The focused suite also covers the PR #298 review regressions: required-claim exclusion, conflicting/incomplete review sets, unknown producer identity, inverse-only claim evidence, invalid risk acceptance, adverse lower-strength auxiliary evidence/reviews, and byte-identical CLI output across English, Turkish, and Japanese locales. Positive controls preserve multiple valid reviews, reciprocal references, valid risk acceptance, and optional exclusion. CLI checks verify that successful and rejected invocations leave input bytes unchanged.
 
 That all-pass fixture proves only that the gate can distinguish valid and invalid contract states. It must never be cited as evidence that the real ASK repository, a real adapter, or v1.0 is ready.
 

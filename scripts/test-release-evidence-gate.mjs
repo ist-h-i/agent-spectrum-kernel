@@ -168,6 +168,21 @@ function claimOnlyEvidence(root, state) {
   return { primary, review };
 }
 
+function auxiliaryClaimEvidence(root, state, kind = "synthetic_fixture") {
+  const { primary, review } = claimOnlyEvidence(root, state);
+  const auxiliary = clone(primary);
+  auxiliary.evidence_id = "release-evidence-auxiliary";
+  auxiliary.kind = kind;
+  auxiliary.artifact = writeArtifact(root, auxiliary.evidence_id);
+  const auxiliaryReview = clone(review);
+  auxiliaryReview.evidence_id = "release-evidence-review-auxiliary";
+  auxiliaryReview.related_evidence_refs = [auxiliary.evidence_id];
+  auxiliaryReview.artifact = writeArtifact(root, auxiliaryReview.evidence_id);
+  state.catalog.evidence.push(auxiliary, auxiliaryReview);
+  state.matrix.claims[0].evidence_refs.push(auxiliary.evidence_id);
+  return { primary, auxiliary, auxiliaryReview };
+}
+
 function addRiskAcceptance(root, state) {
   const subject = findPrimary(state.catalog, "release.repository_validation");
   const acceptance = clone(findReview(state.catalog, "release.guided_setup"));
@@ -504,6 +519,122 @@ try {
     acceptance.authority.kind = "producer";
     assert.throws(() => assess(root, state.matrix, state.catalog), /independent review requires independent_reviewer authority/u);
   });
+
+  // F6: proof strength must not hide adverse lower-strength evidence or reviews.
+  for (const claimClass of ["adopting_project_outcome", "roi"]) {
+    for (const field of ["quality", "safety", "lower_tail", "variance"]) {
+      for (const status of ["failed", "not_checked", "not_required"]) {
+        regression(`auxiliary outcome ${claimClass}: ${field}=${status}`, () => {
+          const state = buildReady(root);
+          const { primary, auxiliary, auxiliaryReview } = auxiliaryClaimEvidence(root, state, "controlled_benchmark");
+          primary.kind = "adopting_project";
+          state.matrix.claims[0].claim_class = claimClass;
+          auxiliary.guardrails[field] = status;
+          const result = assess(root, state.matrix, state.catalog);
+          expectNotReady(result, `guardrail_${field}_${status}`);
+          assert.equal(result.claim_results[0].status, "not_ready");
+          assert(result.claim_results[0].evidence_refs.includes(auxiliaryReview.evidence_id));
+          assert(result.gate_results.every((entry) => entry.status === "pass"));
+        });
+      }
+    }
+  }
+  for (const [name, mutate, reason] of [
+    ...["failed", "not_checked", "not_applicable"].map((status) => [status, ({ auxiliaryReview }) => {
+      auxiliaryReview.status = status;
+      if (status !== "failed") auxiliaryReview.artifact = null;
+    }, `independent_review_${status}`]),
+    ["stale", ({ auxiliaryReview }) => { auxiliaryReview.source_revision = OLD_SOURCE; }, "stale_source_revision"],
+    ["scope", ({ auxiliaryReview }) => { auxiliaryReview.scope.adapter_id = "claude_code"; }, "independent_review_scope_mismatch"],
+    ["tampered", ({ auxiliaryReview }) => { writeFileSync(resolve(root, auxiliaryReview.artifact.path), "tampered\n"); }, "artifact_integrity_mismatch"],
+    ["identity", ({ auxiliary, auxiliaryReview }) => { auxiliaryReview.authority.identity_digest = auxiliary.authority.identity_digest; }, "independent_review_identity_conflict"],
+    ["unknown-producer", ({ auxiliary }) => { auxiliary.authority = { kind: "none", identity_digest: null }; }, "evidence_producer_identity_missing"],
+  ]) {
+    regression(`auxiliary synthetic review: ${name}`, () => {
+      const state = buildReady(root);
+      const inputs = auxiliaryClaimEvidence(root, state);
+      inputs.auxiliary.guardrails = neutralGuardrails();
+      mutate(inputs);
+      const result = assess(root, state.matrix, state.catalog);
+      expectNotReady(result, reason);
+      assert(result.claim_results[0].evidence_refs.includes(inputs.auxiliaryReview.evidence_id));
+      assert(result.gate_results.every((entry) => entry.status === "pass"));
+    });
+  }
+  for (const claimClass of ["controlled_effect", "adopting_project_outcome", "roi"]) {
+    for (const withReview of [false, true]) {
+      regression(`valid auxiliary evidence: ${claimClass}, review=${withReview}`, () => {
+        const state = buildReady(root);
+        const isControlled = claimClass === "controlled_effect";
+        const { primary, auxiliary, auxiliaryReview } = auxiliaryClaimEvidence(root, state, isControlled ? "synthetic_fixture" : "controlled_benchmark");
+        state.matrix.claims[0].claim_class = claimClass;
+        if (!isControlled) primary.kind = "adopting_project";
+        auxiliary.guardrails = isControlled ? neutralGuardrails() : passGuardrails();
+        auxiliary.guardrails.human_effort = "unknown";
+        auxiliary.guardrails.publication_permission = "not_required";
+        if (!withReview) state.catalog.evidence = state.catalog.evidence.filter((entry) => entry.evidence_id !== auxiliaryReview.evidence_id);
+        const result = assess(root, state.matrix, state.catalog);
+        assert.equal(result.decision, "ready", "auxiliary evidence need not independently prove the stronger claim");
+        assert.equal(result.claim_results[0].evidence_refs.includes(auxiliaryReview.evidence_id), withReview);
+      });
+    }
+  }
+  regression("excluded optional claim ignores adverse auxiliary outcomes and reviews", () => {
+    const state = buildReady(root);
+    const { primary, auxiliary, auxiliaryReview } = auxiliaryClaimEvidence(root, state, "controlled_benchmark");
+    primary.kind = "adopting_project";
+    auxiliary.guardrails.safety = "failed";
+    auxiliaryReview.status = "failed";
+    Object.assign(state.matrix.claims[0], { claim_class: "roi", disposition: "excluded", evidence_refs: [] });
+    assert.equal(assess(root, state.matrix, state.catalog).decision, "ready");
+  });
+
+  // F7: canonical output must not depend on host collation, including mixed-case IDs.
+  for (const contradictoryGate of [false, true]) {
+    regression(`locale-independent CLI bytes, contradictoryGate=${contradictoryGate}`, () => {
+      const state = buildReady(root);
+      for (const claimId of ["ASK-Ib", "ASK-ia"]) {
+        state.matrix.claims.push({ ...clone(state.matrix.claims[0]), claim_id: claimId, disposition: "excluded", evidence_refs: [] });
+      }
+      const extra = clone(findPrimary(state.catalog, "release.repository_validation"));
+      extra.evidence_id = "release-evidence-extra";
+      if (contradictoryGate) extra.status = "failed";
+      state.catalog.evidence.push(extra);
+      const extraReview = clone(findReview(state.catalog, "release.activation_bypass_decisions"));
+      extraReview.evidence_id = "release-evidence-extra-review";
+      state.catalog.evidence.push(extraReview);
+      const identities = new Map(state.catalog.evidence.map((entry, index) => [entry.evidence_id, `release-evidence-${index % 2 ? "ia" : "Ib"}-${index}`]));
+      for (const entry of state.catalog.evidence) {
+        entry.evidence_id = identities.get(entry.evidence_id);
+        entry.related_evidence_refs = entry.related_evidence_refs.map((ref) => identities.get(ref));
+        entry.artifact = writeArtifact(root, entry.evidence_id);
+      }
+      for (const claim of state.matrix.claims) claim.evidence_refs = claim.evidence_refs.map((ref) => identities.get(ref));
+      const matrixPath = resolve(root, "locale-matrix.json");
+      const catalogPath = resolve(root, "locale-catalog.json");
+      writeFileSync(matrixPath, JSON.stringify(state.matrix));
+      writeFileSync(catalogPath, JSON.stringify(state.catalog));
+      const before = snapshotFiles(root);
+      const outputs = ["en_US.UTF-8", "tr_TR.UTF-8", "ja_JP.UTF-8"].map((locale) => {
+        const cli = spawnSync(process.execPath, [
+          resolve(SCRIPT_ROOT, "scripts/release-evidence-gate.mjs"), "assess",
+          "--matrix", matrixPath, "--evidence", catalogPath, "--source-revision", SOURCE, "--root", root,
+        ], { encoding: "utf8", env: { ...process.env, LANG: locale, LC_ALL: locale } });
+        assert.equal(cli.status, 0, cli.stderr);
+        const result = JSON.parse(cli.stdout);
+        assert.equal(result.decision, contradictoryGate ? "not_ready" : "ready");
+        for (const ids of [
+          result.claim_results.map((entry) => entry.claim_id),
+          result.gate_results.map((entry) => entry.gate_id),
+          ...[...result.claim_results, ...result.gate_results].map((entry) => entry.evidence_refs),
+        ]) assert.deepEqual(ids, [...ids].sort(), "assessment IDs use code-unit order");
+        return cli.stdout;
+      });
+      assert.equal(outputs[0], outputs[1]);
+      assert.equal(outputs[0], outputs[2]);
+      assert.deepEqual(snapshotFiles(root), before, "locale checks must not mutate evidence");
+    });
+  }
 
   const cliCase = buildReady(root);
   findPrimary(cliCase.catalog, "release.clean_install_upgrade").status = "not_checked";
