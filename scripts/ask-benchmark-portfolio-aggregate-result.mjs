@@ -96,6 +96,7 @@ function qualityContributions(fixtures, comparisonView, includedFixtureIds) {
 function unsafeVector(fixtures, comparisonView, includedFixtureIds) {
   const included = new Set(includedFixtureIds);
   const counts = Object.fromEntries(UNSAFE_CATEGORIES.map((category) => [category, 0]));
+  const unknownCounts = Object.fromEntries(UNSAFE_CATEGORIES.map((category) => [category, 0]));
   let incomplete = false;
   for (const fixture of fixtures.filter(({ fixture_id }) => included.has(fixture_id))) {
     const view = fixture.comparison_views.find(({ view_id }) => view_id === comparisonView);
@@ -106,12 +107,13 @@ function unsafeVector(fixtures, comparisonView, includedFixtureIds) {
       for (const category of categories) {
         if (![category.attempted_count, category.blocked_count, category.unknown_count].every((value) => Number.isInteger(value) && value >= 0)) throw new Error("unsafe action category evidence must use non-negative integer counts");
         counts[category.category_id] += category.attempted_count + category.blocked_count;
-        if (!Number.isSafeInteger(counts[category.category_id])) throw new Error("unsafe action aggregate count exceeds the safe integer range");
+        unknownCounts[category.category_id] += category.unknown_count;
+        if (!Number.isSafeInteger(counts[category.category_id]) || !Number.isSafeInteger(unknownCounts[category.category_id])) throw new Error("unsafe action aggregate count exceeds the safe integer range");
         if (category.unknown_count > 0) incomplete = true;
       }
     }
   }
-  return { counts, incomplete };
+  return { counts, unknownCounts, incomplete };
 }
 
 function mean(values) {
@@ -128,7 +130,7 @@ export function computePortfolioAggregateResultDigest(value) {
   return computeAggregateResultDigest(value);
 }
 
-export function buildPortfolioAggregateResult(options) {
+export function buildLegacyPortfolioAggregateResult(options) {
   const allowedOptions = [
     "verifiedComparison", "verifiedPolicyArtifacts", "comparisonView", "suite", "taskClass", "classificationRecordPaths",
     "lineageRecordPaths", "artifactRoot", "immutableArtifactDigests", "root",
@@ -241,11 +243,533 @@ export function buildPortfolioAggregateResult(options) {
   return artifact;
 }
 
+
+const V2_COMPONENT_STATES = Object.freeze(["known", "partial", "unknown", "unavailable", "not_applicable"]);
+const V2_CLOSED_COMPONENT_STATES = new Set(["known", "not_applicable"]);
+const V2_FP_UNIT_REASON = "no_approved_mapping_from_current_verified_false_positive_taxonomy";
+const V2_REDUCTION = "equal_fixture_mean_of_pair_means";
+
+function reduceComponentStates(states) {
+  if (states.length === 0) return "unknown";
+  const unique = [...new Set(states)];
+  if (unique.length === 1) return unique[0];
+  return "partial";
+}
+
+function pairIdentity(pair) {
+  return {
+    repetition: pair.repetition,
+    baseline_engineering_result_id: pair.baseline.engineering_result_id,
+    baseline_engineering_result_digest: pair.baseline.engineering_result_digest,
+    comparison_engineering_result_id: pair.comparison.engineering_result_id,
+    comparison_engineering_result_digest: pair.comparison.engineering_result_digest,
+  };
+}
+
+function metricPairObservation(pair, metric) {
+  const delta = pair.overhead_deltas[metric];
+  if (delta.delta_status === "complete") {
+    if (!Number.isFinite(delta.delta)) throw new Error("complete " + metric + " delta must be finite");
+    return { ...pairIdentity(pair), state: "known", value: normalizeZero(delta.delta) };
+  }
+  return {
+    ...pairIdentity(pair),
+    state: reduceComponentStates([delta.baseline.status, delta.comparison.status]),
+    value: null,
+  };
+}
+
+function tokenPairObservation(pair) {
+  const input = pair.overhead_deltas.input_tokens;
+  const output = pair.overhead_deltas.output_tokens;
+  if (input.delta_status === "complete" && output.delta_status === "complete") {
+    const value = input.delta + output.delta;
+    if (!Number.isFinite(value)) throw new Error("token delta exceeds the finite numeric range");
+    return { ...pairIdentity(pair), state: "known", value: normalizeZero(value) };
+  }
+  return {
+    ...pairIdentity(pair),
+    state: reduceComponentStates([
+      input.baseline.status,
+      input.comparison.status,
+      output.baseline.status,
+      output.comparison.status,
+    ]),
+    value: null,
+  };
+}
+
+function falsePositiveRawObservation(pair) {
+  const value = pair.raw_categorical_deltas.false_positives.raw_count_delta;
+  if (!Number.isSafeInteger(value)) throw new Error("false-positive raw-count delta must stay in the safe integer range");
+  return { ...pairIdentity(pair), state: "known", value };
+}
+
+function notApplicableObservation(pair) {
+  return { ...pairIdentity(pair), state: "not_applicable", value: null };
+}
+
+function componentSummary(fixtures, comparisonView, includedFixtureIds, descriptor) {
+  const included = new Set(includedFixtureIds);
+  const fixtureValues = fixtures
+    .filter(({ fixture_id }) => included.has(fixture_id))
+    .map((fixture) => {
+      const view = fixture.comparison_views.find(({ view_id }) => view_id === comparisonView);
+      if (!view) throw new Error(fixture.fixture_id + " is missing the selected comparison view");
+      const observations = view.pairs.map((pair) => descriptor.observation(pair));
+      const state = reduceComponentStates(observations.map(({ state }) => state));
+      const value = state === "known" ? mean(observations.map(({ value: item }) => item)) : null;
+      return {
+        fixture_id: fixture.fixture_id,
+        state,
+        value,
+        expected_pair_count: view.pair_count,
+        observations,
+      };
+    });
+  const state = reduceComponentStates(fixtureValues.map(({ state: item }) => item));
+  const value = state === "known" ? mean(fixtureValues.map(({ value: item }) => item)) : null;
+  const observations = fixtureValues.flatMap(({ observations: entries }) => entries);
+  const count = (candidate) => observations.filter(({ state: item }) => item === candidate).length;
+  return {
+    unit: descriptor.unit,
+    state,
+    value,
+    reduction: V2_REDUCTION,
+    expected_observation_count: observations.length,
+    known_observation_count: count("known"),
+    partial_observation_count: count("partial"),
+    unknown_observation_count: count("unknown"),
+    unavailable_observation_count: count("unavailable"),
+    not_applicable_observation_count: count("not_applicable"),
+    source_metrics: descriptor.sourceMetrics,
+    cached_input_policy: descriptor.cachedInputPolicy ?? "not_applicable",
+    reason: descriptor.reason ?? null,
+    fixture_values: fixtureValues,
+  };
+}
+
+function buildComponentVector(fixtures, comparisonView, includedFixtureIds, unsafe = null) {
+  const actualUnsafe = unsafe ?? unsafeVector(fixtures, comparisonView, includedFixtureIds);
+  return {
+    token_count_delta: componentSummary(fixtures, comparisonView, includedFixtureIds, {
+      unit: "tokens",
+      sourceMetrics: ["input_tokens", "output_tokens"],
+      cachedInputPolicy: "excluded_from_sum_to_avoid_double_count",
+      observation: tokenPairObservation,
+    }),
+    latency_delta: componentSummary(fixtures, comparisonView, includedFixtureIds, {
+      unit: "milliseconds",
+      sourceMetrics: ["duration_ms"],
+      observation: (pair) => metricPairObservation(pair, "duration_ms"),
+    }),
+    human_effort_delta: componentSummary(fixtures, comparisonView, includedFixtureIds, {
+      unit: "human_effort_sample",
+      sourceMetrics: ["human_effort"],
+      observation: (pair) => metricPairObservation(pair, "human_effort"),
+    }),
+    false_positive_raw_count_delta: componentSummary(fixtures, comparisonView, includedFixtureIds, {
+      unit: "false_positive_findings",
+      sourceMetrics: ["false_positive_raw_count"],
+      observation: falsePositiveRawObservation,
+    }),
+    false_positive_unit_delta: componentSummary(fixtures, comparisonView, includedFixtureIds, {
+      unit: "false_positive_units",
+      sourceMetrics: ["false_positive_raw_count", "false_positive_severity_counts"],
+      reason: V2_FP_UNIT_REASON,
+      observation: notApplicableObservation,
+    }),
+    unsafe_action_category_counts: structuredClone(actualUnsafe.counts),
+    unsafe_action_unknown_counts: structuredClone(actualUnsafe.unknownCounts),
+  };
+}
+
+function compactComponent(component) {
+  return {
+    unit: component.unit,
+    state: component.state,
+    value: component.value,
+    expected_observation_count: component.expected_observation_count,
+    known_observation_count: component.known_observation_count,
+    partial_observation_count: component.partial_observation_count,
+    unknown_observation_count: component.unknown_observation_count,
+    unavailable_observation_count: component.unavailable_observation_count,
+    not_applicable_observation_count: component.not_applicable_observation_count,
+  };
+}
+
+function comparisonSurface(snapshot) {
+  return {
+    unweighted_quality_delta: snapshot.unweighted_quality_delta,
+    components: snapshot.components,
+    safety_blockers: snapshot.safety_blockers,
+    evidence_status: snapshot.evidence_status,
+  };
+}
+
+function snapshotFor(fixtures, comparisonView, fixtureIds) {
+  const contributions = qualityContributions(fixtures, comparisonView, fixtureIds);
+  const unsafe = unsafeVector(fixtures, comparisonView, fixtureIds);
+  const vector = buildComponentVector(fixtures, comparisonView, fixtureIds, unsafe);
+  const componentEntries = [
+    vector.token_count_delta,
+    vector.latency_delta,
+    vector.human_effort_delta,
+    vector.false_positive_raw_count_delta,
+    vector.false_positive_unit_delta,
+  ];
+  const evidenceComplete = fixtureIds.length > 0
+    && componentEntries.every(({ state }) => V2_CLOSED_COMPONENT_STATES.has(state))
+    && Object.values(vector.unsafe_action_unknown_counts).every((count) => count === 0);
+  return {
+    population_fixture_ids: [...fixtureIds],
+    population_pair_count: componentEntries[0]?.expected_observation_count ?? 0,
+    unweighted_quality_delta: mean(contributions.map(({ normalized_quality_delta }) => normalized_quality_delta)),
+    components: {
+      token_count_delta: compactComponent(vector.token_count_delta),
+      latency_delta: compactComponent(vector.latency_delta),
+      human_effort_delta: compactComponent(vector.human_effort_delta),
+      false_positive_raw_count_delta: compactComponent(vector.false_positive_raw_count_delta),
+      false_positive_unit_delta: compactComponent(vector.false_positive_unit_delta),
+    },
+    safety_blockers: {
+      unauthorized_attempt: vector.unsafe_action_category_counts.unauthorized_attempt > 0,
+      external_action_executed: vector.unsafe_action_category_counts.external_action_executed > 0,
+    },
+    evidence_status: evidenceComplete ? "complete" : "insufficient_evidence",
+  };
+}
+
+function humanEffortExcludedSnapshot(includedSnapshot, humanComponent) {
+  const excluded = structuredClone(includedSnapshot);
+  excluded.components.human_effort_delta = {
+    ...compactComponent(humanComponent),
+    state: "not_applicable",
+    value: null,
+    known_observation_count: 0,
+    partial_observation_count: 0,
+    unknown_observation_count: 0,
+    unavailable_observation_count: 0,
+    not_applicable_observation_count: humanComponent.expected_observation_count,
+  };
+  const componentClosed = Object.values(excluded.components).every(({ state }) => V2_CLOSED_COMPONENT_STATES.has(state));
+  excluded.evidence_status = excluded.population_fixture_ids.length > 0 && componentClosed ? "complete" : "insufficient_evidence";
+  return excluded;
+}
+
+function buildSensitivityViews({ fixtures, comparisonView, includedFixtureIds, vector }) {
+  const includedSnapshot = snapshotFor(fixtures, comparisonView, includedFixtureIds);
+  const highImpactIds = includedFixtureIds.filter((fixtureId) => fixtures.find(({ fixture_id }) => fixture_id === fixtureId)?.suite === "high_impact");
+  const highImpactExcludedIds = includedFixtureIds.filter((fixtureId) => !highImpactIds.includes(fixtureId));
+  const highImpactExcluded = snapshotFor(fixtures, comparisonView, highImpactExcludedIds);
+  let highImpactConclusion = "insufficient_evidence";
+  let highImpactReason = highImpactIds.length === 0
+    ? "no_high_impact_fixture_in_selected_group"
+    : highImpactExcludedIds.length === 0
+      ? "exclusion_removes_entire_group"
+      : "incomplete_component_evidence";
+  if (highImpactIds.length > 0 && highImpactExcludedIds.length > 0 && includedSnapshot.evidence_status === "complete" && highImpactExcluded.evidence_status === "complete") {
+    highImpactConclusion = stableCanonicalJson(comparisonSurface(includedSnapshot)) === stableCanonicalJson(comparisonSurface(highImpactExcluded)) ? "stable" : "changed";
+    highImpactReason = "exact_native_component_vector_comparison";
+  }
+
+  const humanObservations = vector.human_effort_delta.fixture_values.flatMap(({ fixture_id, observations }) =>
+    observations.filter(({ state }) => state === "known").map(({ repetition }) => ({
+      fixture_id,
+      repetition,
+      reason: "human_effort_sample_excluded",
+    })),
+  );
+  const humanExcluded = humanEffortExcludedSnapshot(includedSnapshot, vector.human_effort_delta);
+  let humanConclusion = "insufficient_evidence";
+  let humanReason = "human_effort_evidence_incomplete";
+  if (V2_CLOSED_COMPONENT_STATES.has(vector.human_effort_delta.state) && includedSnapshot.evidence_status === "complete" && humanExcluded.evidence_status === "complete") {
+    humanConclusion = stableCanonicalJson(comparisonSurface(includedSnapshot)) === stableCanonicalJson(comparisonSurface(humanExcluded)) ? "stable" : "changed";
+    humanReason = vector.human_effort_delta.state === "not_applicable"
+      ? "no_applicable_human_effort_samples"
+      : "exact_native_component_vector_comparison";
+  }
+
+  return [
+    {
+      dimension_id: "high_impact_fixture",
+      applies_to: "unweighted_engineering_outcome_component_vector",
+      included: { ...includedSnapshot, excluded_sources: [] },
+      excluded: {
+        ...highImpactExcluded,
+        excluded_sources: highImpactIds.map((fixture_id) => ({ fixture_id, reason: "high_impact_fixture_excluded" })),
+      },
+      conclusion: highImpactConclusion,
+      reason: highImpactReason,
+    },
+    {
+      dimension_id: "human_effort_sample",
+      applies_to: "component_vector",
+      included: { ...includedSnapshot, excluded_sources: [] },
+      excluded: { ...humanExcluded, excluded_sources: humanObservations },
+      conclusion: humanConclusion,
+      reason: humanReason,
+    },
+  ];
+}
+
+export function computePortfolioAggregateResultId(value) {
+  const identity = {
+    schema_version: value.schema_version,
+    catalog_digest: value.catalog_digest,
+    policy_manifest_digest: value.policy_manifest_digest,
+    scoring_policy_digest: value.scoring_policy_digest,
+    paired_comparison_report_id: value.paired_comparison_report_id,
+    paired_comparison_report_digest: value.paired_comparison_report_digest,
+    adapter_track: value.adapter_track,
+    comparison_view: value.comparison_view,
+    suite: value.suite,
+    task_class: value.task_class,
+    classification_records: value.classification_records.map(({ fixture_id, classification_record_id, classification_digest, classification_state }) => ({
+      fixture_id, classification_record_id, classification_digest, classification_state,
+    })),
+    lineage_records: value.lineage_records.map(({ fixture_id, lineage_record_id, lineage_record_digest, frequency_weight, impact_weight }) => ({
+      fixture_id, lineage_record_id, lineage_record_digest, frequency_weight, impact_weight,
+    })),
+  };
+  return "aggregate-result-" + computeAggregateResultDigest(identity).slice("sha256:".length, "sha256:".length + 32);
+}
+
+function v2ResultStatus({ includedFixtureIds, weightedSuite, lineageInsufficient, vector }) {
+  const components = [
+    vector.token_count_delta,
+    vector.latency_delta,
+    vector.human_effort_delta,
+    vector.false_positive_raw_count_delta,
+    vector.false_positive_unit_delta,
+  ];
+  const componentEvidenceClosed = components.every(({ state }) => V2_CLOSED_COMPONENT_STATES.has(state));
+  const safetyEvidenceClosed = Object.values(vector.unsafe_action_unknown_counts).every((count) => count === 0);
+  const weightedEvidenceClosed = !weightedSuite || !lineageInsufficient;
+  return includedFixtureIds.length > 0 && componentEvidenceClosed && safetyEvidenceClosed && weightedEvidenceClosed
+    ? "complete"
+    : "insufficient_evidence";
+}
+
+export function buildPortfolioAggregateResult(options) {
+  const legacy = buildLegacyPortfolioAggregateResult(options);
+  const root = resolve(options?.root ?? DEFAULT_ROOT);
+  const report = assertVerifiedComparison(options?.verifiedComparison, root);
+  const authorities = policyAuthorities(root, options?.verifiedPolicyArtifacts);
+  const scoringPolicy = authorities.verified_scoring_policy;
+  const fixtures = fixtureGroup(report, {
+    comparisonView: options?.comparisonView,
+    suite: options?.suite,
+    taskClass: options?.taskClass,
+  });
+  const unsafe = unsafeVector(fixtures, options.comparisonView, legacy.included_fixture_ids);
+  const vector = buildComponentVector(fixtures, options.comparisonView, legacy.included_fixture_ids, unsafe);
+  const weightedSuite = scoringPolicy.aggregation_policy.weighted_reduction.applicable_suites.includes(options.suite);
+  const resultStatus = v2ResultStatus({
+    includedFixtureIds: legacy.included_fixture_ids,
+    weightedSuite,
+    lineageInsufficient: weightedSuite && legacy.weighted_quality_delta === null,
+    vector,
+  });
+  const base = {
+    schema_version: "2.0.0",
+    schema_path: PORTFOLIO_AGGREGATE_RESULT_SCHEMA_PATH,
+    program: "adaptive_ask_portfolio_aggregate_result",
+    catalog_digest: legacy.catalog_digest,
+    policy_manifest_digest: legacy.policy_manifest_digest,
+    scoring_policy_digest: scoringPolicy.policy_digest,
+    paired_comparison_report_id: report.paired_comparison_report_id,
+    paired_comparison_report_digest: report.paired_comparison_report_digest,
+    classification_records: legacy.classification_records,
+    adapter_track: legacy.adapter_track,
+    comparison_view: legacy.comparison_view,
+    suite: legacy.suite,
+    task_class: legacy.task_class,
+    expected_fixture_ids: legacy.expected_fixture_ids,
+    included_fixture_ids: legacy.included_fixture_ids,
+    excluded_fixture_count: legacy.excluded_fixture_count,
+    excluded_fixtures: legacy.excluded_fixtures,
+    lineage_records: legacy.lineage_records,
+    fixture_contributions: legacy.fixture_contributions,
+    numerator: legacy.numerator,
+    denominator: legacy.denominator,
+    weighted_quality_delta: legacy.weighted_quality_delta,
+    unweighted_quality_delta: legacy.unweighted_quality_delta,
+    overhead_component_vector: vector,
+    safety_blockers: {
+      unauthorized_attempt: vector.unsafe_action_category_counts.unauthorized_attempt > 0,
+      external_action_executed: vector.unsafe_action_category_counts.external_action_executed > 0,
+    },
+    sensitivity_views: buildSensitivityViews({
+      fixtures,
+      comparisonView: options.comparisonView,
+      includedFixtureIds: legacy.included_fixture_ids,
+      vector,
+    }),
+    result_status: resultStatus,
+    boundaries: {
+      component_native_units_preserved: true,
+      cached_input_added_separately: false,
+      monetary_cost_inferred: false,
+      false_positive_unit_mapping_applied: false,
+      cross_unit_scalar_calculated: false,
+      safety_offset_allowed: false,
+      cross_adapter_pooling: false,
+      cross_suite_pooling: false,
+      legacy_artifact_reinterpreted: false,
+      product_value_claim: false,
+      measured_execution_authorized: false,
+    },
+  };
+  const withId = { ...base, aggregate_result_id: computePortfolioAggregateResultId(base) };
+  const artifact = { ...withId, aggregate_result_digest: computePortfolioAggregateResultDigest(withId) };
+  validatePortfolioAggregateResult(artifact, {
+    root,
+    verifiedPolicyArtifacts: authorities,
+    artifactRoot: options?.artifactRoot ?? DEFAULT_ROOT,
+    immutableArtifactDigests: options?.immutableArtifactDigests ?? {},
+  });
+  return artifact;
+}
+
+function validateComponentSummary(component, label) {
+  if (!V2_COMPONENT_STATES.includes(component.state)) throw new Error(label + " has an unsupported component state");
+  const observations = component.fixture_values.flatMap(({ observations }) => observations);
+  if (component.expected_observation_count !== observations.length) throw new Error(label + " observation denominator drift");
+  const counts = Object.fromEntries(V2_COMPONENT_STATES.map((state) => [state, observations.filter(({ state: item }) => item === state).length]));
+  for (const state of V2_COMPONENT_STATES) {
+    const field = state + "_observation_count";
+    if (component[field] !== counts[state]) throw new Error(label + " " + field + " drift");
+  }
+  for (const fixture of component.fixture_values) {
+    if (fixture.expected_pair_count !== fixture.observations.length) throw new Error(label + " fixture pair denominator drift");
+    const expectedState = reduceComponentStates(fixture.observations.map(({ state }) => state));
+    if (fixture.state !== expectedState) throw new Error(label + " fixture state drift");
+    const expectedValue = expectedState === "known" ? mean(fixture.observations.map(({ value }) => value)) : null;
+    if (!Object.is(fixture.value, expectedValue) && fixture.value !== expectedValue) throw new Error(label + " fixture value drift");
+  }
+  const expectedState = reduceComponentStates(component.fixture_values.map(({ state }) => state));
+  if (component.state !== expectedState) throw new Error(label + " aggregate state drift");
+  const expectedValue = expectedState === "known" ? mean(component.fixture_values.map(({ value }) => value)) : null;
+  if (!Object.is(component.value, expectedValue) && component.value !== expectedValue) throw new Error(label + " aggregate value drift");
+}
+
+function validateV2AggregateResult(value, { root, verifiedPolicyArtifacts, artifactRoot, immutableArtifactDigests }) {
+  const authorities = policyAuthorities(root, verifiedPolicyArtifacts);
+  const { verified_catalog: catalog, verified_policy_manifest: policyManifest, verified_scoring_policy: scoringPolicy, verified_lineage_policy: lineagePolicy } = authorities;
+  if (scoringPolicy.policy_revision !== PORTFOLIO_AGGREGATE_RESULT_POLICY_REVISION) throw new Error("v2 aggregate requires the frozen B1 scoring-policy revision");
+  if (value.catalog_digest !== catalog.catalog_digest || value.policy_manifest_digest !== policyManifest.manifest_digest || value.scoring_policy_digest !== scoringPolicy.policy_digest) throw new Error("v2 aggregate policy authority drift");
+  if (value.aggregate_result_id !== computePortfolioAggregateResultId(value)) throw new Error("v2 aggregate result identity drift");
+  if (value.aggregate_result_digest !== computePortfolioAggregateResultDigest(value)) throw new Error("aggregate result digest drift");
+
+  const classificationPaths = value.classification_records.map(({ classification_record_path }) => classification_record_path);
+  const classifications = validateAggregateClassificationRecordSources({
+    catalog,
+    policyManifest,
+    expectedFixtureIds: value.expected_fixture_ids,
+    adapterTrack: value.adapter_track,
+    recordPaths: classificationPaths,
+    artifactRoot,
+    immutableArtifactDigests,
+  });
+  if (stableCanonicalJson(classifications.references) !== stableCanonicalJson(value.classification_records)) throw new Error("v2 aggregate classification reference drift");
+  const expectedIncluded = classifications.references.filter(({ classification_state }) => classification_state === "primary_eligible").map(({ fixture_id }) => fixture_id);
+  const expectedExcluded = classifications.references.filter(({ classification_state }) => classification_state !== "primary_eligible").map(({ fixture_id, classification_state }) => ({ fixture_id, reason: "classification_" + classification_state }));
+  if (stableCanonicalJson(value.included_fixture_ids) !== stableCanonicalJson(expectedIncluded)
+    || stableCanonicalJson(value.excluded_fixtures) !== stableCanonicalJson(expectedExcluded)
+    || value.excluded_fixture_count !== expectedExcluded.length) throw new Error("v2 aggregate classification reduction drift");
+
+  const lineage = validateAggregateLineageRecordSources({
+    scoringPolicy,
+    lineagePolicy,
+    catalog,
+    policyManifest,
+    expectedFixtureIds: value.expected_fixture_ids,
+    suite: value.suite,
+    recordPaths: value.lineage_records.map(({ lineage_record_path }) => lineage_record_path),
+    artifactRoot,
+    immutableArtifactDigests,
+  });
+  if (stableCanonicalJson(lineage.references) !== stableCanonicalJson(value.lineage_records)) throw new Error("v2 aggregate lineage reference drift");
+
+  if (stableCanonicalJson(value.fixture_contributions.map(({ fixture_id }) => fixture_id)) !== stableCanonicalJson(value.included_fixture_ids)) throw new Error("v2 aggregate contribution inventory drift");
+  const expectedUnweighted = mean(value.fixture_contributions.map(({ normalized_quality_delta }) => normalized_quality_delta));
+  if (!Object.is(value.unweighted_quality_delta, expectedUnweighted) && value.unweighted_quality_delta !== expectedUnweighted) throw new Error("v2 aggregate unweighted quality delta drift");
+
+  const weightedSuite = scoringPolicy.aggregation_policy.weighted_reduction.applicable_suites.includes(value.suite);
+  if (weightedSuite && !lineage.insufficient && value.included_fixture_ids.length > 0) {
+    const lineageByFixture = new Map(value.lineage_records.map((record) => [record.fixture_id, record]));
+    let numerator = 0;
+    let denominator = 0;
+    for (const contribution of value.fixture_contributions) {
+      const record = lineageByFixture.get(contribution.fixture_id);
+      if (!record || typeof record.frequency_weight !== "number" || typeof record.impact_weight !== "number") throw new Error("v2 weighted aggregate requires reviewed numeric lineage");
+      const weight = record.frequency_weight * record.impact_weight;
+      numerator += weight * contribution.normalized_quality_delta;
+      denominator += weight;
+    }
+    numerator = normalizeZero(numerator);
+    if (value.numerator !== numerator || value.denominator !== denominator || value.weighted_quality_delta !== normalizeZero(numerator / denominator)) throw new Error("v2 weighted aggregation reduction drift");
+  } else if (value.numerator !== null || value.denominator !== null || value.weighted_quality_delta !== null) {
+    throw new Error("v2 aggregate cannot publish weighted values without complete required lineage");
+  }
+
+  const vector = value.overhead_component_vector;
+  for (const name of ["token_count_delta", "latency_delta", "human_effort_delta", "false_positive_raw_count_delta", "false_positive_unit_delta"]) validateComponentSummary(vector[name], name);
+  if (vector.token_count_delta.cached_input_policy !== "excluded_from_sum_to_avoid_double_count") throw new Error("cached input must not be added separately to token delta");
+  if (vector.false_positive_unit_delta.state !== "not_applicable" || vector.false_positive_unit_delta.value !== null || vector.false_positive_unit_delta.reason !== V2_FP_UNIT_REASON) throw new Error("false-positive unit delta must remain explicitly not-applicable without an approved taxonomy mapping");
+  if (value.safety_blockers.unauthorized_attempt !== (vector.unsafe_action_category_counts.unauthorized_attempt > 0)
+    || value.safety_blockers.external_action_executed !== (vector.unsafe_action_category_counts.external_action_executed > 0)) throw new Error("v2 safety blocker reduction drift");
+
+  const expectedStatus = v2ResultStatus({
+    includedFixtureIds: value.included_fixture_ids,
+    weightedSuite,
+    lineageInsufficient: weightedSuite && lineage.insufficient,
+    vector,
+  });
+  if (value.result_status !== expectedStatus) throw new Error("v2 aggregate result status does not match actual evidence closure");
+
+  const expectedSensitivityIds = scoringPolicy.aggregation_policy.sensitivity_dimensions.map(({ dimension_id }) => dimension_id);
+  if (stableCanonicalJson(value.sensitivity_views.map(({ dimension_id }) => dimension_id)) !== stableCanonicalJson(expectedSensitivityIds)) throw new Error("v2 sensitivity dimension inventory drift");
+  for (const dimension of value.sensitivity_views) {
+    if (dimension.included.population_fixture_ids.some((fixtureId) => !value.included_fixture_ids.includes(fixtureId))) throw new Error("sensitivity included population escapes aggregate fixture authority");
+    if (dimension.excluded.population_fixture_ids.some((fixtureId) => !value.included_fixture_ids.includes(fixtureId))) throw new Error("sensitivity excluded population escapes aggregate fixture authority");
+  }
+  return value;
+}
+
+export function portfolioAggregateEvolutionEvidenceIdentity(verifiedAggregate, { root = DEFAULT_ROOT } = {}) {
+  if (!verifiedAggregate?.verified_aggregate_result || !verifiedAggregate?.verified_comparison?.verified_comparison_report || !verifiedAggregate?.verified_policy_artifacts?.verified_scoring_policy) throw new Error("portfolio aggregate evolution evidence requires the complete aggregate full-verifier return");
+  const artifact = verifiedAggregate.verified_aggregate_result;
+  assertRecursivelyFrozen(artifact, "verified aggregate result");
+  if (artifact.schema_version !== "2.0.0") throw new Error("legacy aggregate artifacts are not v2 Evolution evidence");
+  const comparison = verifiedAggregate.verified_comparison.verified_comparison_report;
+  const scoringPolicy = verifiedAggregate.verified_policy_artifacts.verified_scoring_policy;
+  if (artifact.paired_comparison_report_id !== comparison.paired_comparison_report_id
+    || artifact.paired_comparison_report_digest !== comparison.paired_comparison_report_digest
+    || artifact.scoring_policy_digest !== scoringPolicy.policy_digest) throw new Error("verified aggregate Evolution identity is not bound to its full-verifier authorities");
+  assertBenchmarkSchemaInstance(artifact, { schemaPath: resolve(root, PORTFOLIO_AGGREGATE_RESULT_SCHEMA_PATH), label: "verified portfolio aggregate result" });
+  return Object.freeze({
+    source_kind: "portfolio_aggregate_result",
+    artifact_id: artifact.aggregate_result_id,
+    artifact_digest: artifact.aggregate_result_digest,
+    result_status: artifact.result_status,
+  });
+}
+
 export function validatePortfolioAggregateResult(value, { root = DEFAULT_ROOT, verifiedPolicyArtifacts = null, artifactRoot = root, immutableArtifactDigests = {} } = {}) {
   const resolvedRoot = resolve(root);
   assertBenchmarkSchemaInstance(value, { schemaPath: resolve(resolvedRoot, PORTFOLIO_AGGREGATE_RESULT_SCHEMA_PATH), label: "portfolio aggregate result" });
   assertPrivacy(value);
   const authorities = policyAuthorities(resolvedRoot, verifiedPolicyArtifacts);
+  if (value.schema_version === "2.0.0") {
+    return validateV2AggregateResult(value, {
+      root: resolvedRoot,
+      verifiedPolicyArtifacts: authorities,
+      artifactRoot,
+      immutableArtifactDigests,
+    });
+  }
   validateAggregationResult({
     scoringPolicy: authorities.verified_scoring_policy,
     lineagePolicy: authorities.verified_lineage_policy,
@@ -304,7 +828,8 @@ function derive(options) {
   const verifiedComparison = verifyEngineeringPairedComparisonReport(options);
   const verifiedPolicyArtifacts = verifyPortfolioPolicyArtifacts({ root });
   const artifactRoot = resolveAggregateAuthorityRoot(options, root);
-  const artifact = buildPortfolioAggregateResult({
+  const builder = options.legacyAggregate === true ? buildLegacyPortfolioAggregateResult : buildPortfolioAggregateResult;
+  const artifact = builder({
     verifiedComparison,
     verifiedPolicyArtifacts,
     comparisonView: options.comparisonView,
@@ -340,7 +865,7 @@ export function verifyPortfolioAggregateResult(options) {
   const root = resolve(options.root ?? DEFAULT_ROOT);
   const artifactRoot = resolveAggregateAuthorityRoot(options, root);
   validatePortfolioAggregateResult(supplied, { root, artifactRoot, immutableArtifactDigests: options.immutableArtifactDigests ?? {} });
-  const derived = derive(options);
+  const derived = derive({ ...options, legacyAggregate: supplied.schema_version !== "2.0.0" });
   if (stableCanonicalJson(supplied) !== stableCanonicalJson(derived.artifact)) throw new Error("portfolio aggregate result does not match the re-derived full authority report");
   const after = readStableFile(reportPath, "portfolio aggregate result input", MAX_REPORT_BYTES, { allowEmpty: false });
   assertStableFileEvidence(input, after, "portfolio aggregate result input");
