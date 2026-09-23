@@ -70,6 +70,65 @@ for record in records:
     if git("hash-object", "--", record["path"]) != record["new_blob"]:
         raise SystemExit(f"Postimage mismatch: {record['path']}")
 
+# Exact source corrections verified against the published Git history.
+def replace_text(path, before, after):
+    text = Path(path).read_text()
+    if before not in text:
+        raise SystemExit(f"Correction preimage is absent: {path}")
+    Path(path).write_text(text.replace(before, after))
+
+for path in [
+    "scripts/ask-benchmark-prompt-v2.mjs",
+    "scripts/ask-benchmark-prompt-successor-repository.mjs",
+    "scripts/prompt-v2-preregistration-samples.mjs",
+    "scripts/test-ask-benchmark-prompt-v2.mjs",
+    "scripts/test-prompt-v2-historical-renderer.mjs",
+]:
+    replace_text(path, "frozen_execution_repository", "frozen_renderer_source")
+replace_text("scripts/prompt-v2-historical-renderer.mjs", "const RENDERERS =", '''// Source A is the source of the frozen rendered archive, not the older
+// execution_repository used for the evaluation workspace. These are the same
+// immutable pins previously exported by prompt-v2-preregistration-samples.mjs.
+export const PROMPT_V2_RENDERER_SOURCE = Object.freeze({
+  revision: "c508a767f3386dac10180770edf37a67806fbb1b",
+  tree: "d7d377c1265f0fb47119bfc80a2f3eb9535cf163",
+});
+
+const RENDERERS =''')
+replace_text("scripts/prompt-v2-historical-renderer.mjs", "exact execution revision and tree", "exact source revision and tree")
+replace_text("scripts/prompt-v2-historical-renderer.mjs", "execution tree mismatch", "source tree mismatch")
+replace_text("scripts/ask-benchmark-prompt-v2.mjs", "import { verifyHistoricalRenderer }", "import { PROMPT_V2_RENDERER_SOURCE, verifyHistoricalRenderer }")
+replace_text("scripts/ask-benchmark-prompt-v2.mjs", "verifyHistoricalRenderer(root, value.execution_repository, rendererBinding);", "verifyHistoricalRenderer(root, PROMPT_V2_RENDERER_SOURCE, rendererBinding);")
+replace_text("scripts/prompt-v2-preregistration-samples.mjs", 'import assert from "node:assert/strict";', 'import assert from "node:assert/strict";\nimport { PROMPT_V2_RENDERER_SOURCE } from "./prompt-v2-historical-renderer.mjs";')
+replace_text("scripts/prompt-v2-preregistration-samples.mjs", 'export const PROMPT_V2_SOURCE_REVISION = "c508a767f3386dac10180770edf37a67806fbb1b";', 'export const PROMPT_V2_SOURCE_REVISION = PROMPT_V2_RENDERER_SOURCE.revision;')
+replace_text("scripts/prompt-v2-preregistration-samples.mjs", 'export const PROMPT_V2_SOURCE_TREE = "d7d377c1265f0fb47119bfc80a2f3eb9535cf163";', 'export const PROMPT_V2_SOURCE_TREE = PROMPT_V2_RENDERER_SOURCE.tree;')
+replace_text("scripts/test-ask-benchmark-prompt-v2.mjs", 'validatePromptV2Preregistration(preregistration, { root })', 'validatePromptV2Preregistration(preregistration, { root, rendererSource: "frozen_renderer_source" })')
+replace_text("scripts/test-prompt-v2-historical-renderer.mjs", "exact execution", "exact source")
+replace_text("scripts/test-prompt-v2-historical-renderer.mjs", "substituted execution", "substituted source")
+p = Path("scripts/test-prompt-v2-historical-renderer.mjs")
+p.write_text(p.read_text() + '''
+// Exercise the real source pins as well as isolated synthetic Git fixtures.
+// The execution workspace revision is intentionally not the renderer archive
+// revision; the Codex renderer differs between them.
+test("historical preregistration resolves the real frozen renderer source", () => {
+  assert.doesNotThrow(() => loadPromptV2Preregistration({ rendererSource: "frozen_renderer_source" }));
+});
+''')
+replace_text("docs/adapter-runtime-boundary-contract.md", "explicitly verify renderer bytes at the preregistered execution repository's\nexact Git revision and tree.", "explicitly verify renderer bytes at the frozen rendered archive's source A\n(`c508a767f3386dac10180770edf37a67806fbb1b`, tree\n`d7d377c1265f0fb47119bfc80a2f3eb9535cf163`). This is distinct from the\nolder execution-workspace revision; neither identity is rewritten.")
+os.chmod("scripts/install-codex-adapter.mjs", 0o644)
+corrected = {
+    "docs/adapter-runtime-boundary-contract.md": "64f82bbaaf628fe978b1db0449cd006d76b7a6a3",
+    "scripts/ask-benchmark-prompt-successor-repository.mjs": "ccce09c39d34f92cc2fe4b18c4ed383bc152d183",
+    "scripts/ask-benchmark-prompt-v2.mjs": "0f80c19e8428252040d87753b3100d86d4c0b067",
+    "scripts/prompt-v2-historical-renderer.mjs": "2e4630f0ba3b38030385af69a0da2a4ccf01b40e",
+    "scripts/prompt-v2-preregistration-samples.mjs": "355105c2c813f230036b2d22152befe301059690",
+    "scripts/test-ask-benchmark-prompt-v2.mjs": "f0b02548f94c8432b827a936392114be20b19b80",
+    "scripts/test-prompt-v2-historical-renderer.mjs": "17f19d543bdedb31e9273a03348328f599abe08c",
+}
+for record in records:
+    expected = corrected.get(record["path"], record["new_blob"])
+    if git("hash-object", "--", record["path"]) != expected:
+        raise SystemExit(f"Corrected postimage mismatch: {record['path']}")
+
 # Restore current generated metadata from the actual source, never edit frozen
 # preregistration/CAS/archive/admission objects or waive an existing validator.
 run("node", "scripts/update-adapter-runtime-fixtures.mjs")
