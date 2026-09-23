@@ -343,6 +343,18 @@ try {
   const addTarget = commitAll(root, "add selected input");
   assert.equal(planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: addTarget }).dispositions.find((entry) => entry.gate_id === "source-test").reason_code, "declared_dependency_changed");
 
+  git(root, ["checkout", "-B", "case-delete", requirementsTarget]);
+  git(root, ["rm", "src/app.mjs"]);
+  const deleteTarget = commitAll(root, "delete selected input");
+  assert.equal(planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: deleteTarget }).dispositions.find((entry) => entry.gate_id === "source-test").reason_code, "declared_dependency_changed");
+
+  git(root, ["checkout", "-B", "case-copy", requirementsTarget]);
+  write(root, "src/copy.mjs", readFileSync(resolve(root, "src/app.mjs"), "utf8"));
+  const copyTarget = commitAll(root, "copy selected input");
+  const copyPlan = planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: copyTarget });
+  assert.equal(copyPlan.dispositions.find((entry) => entry.gate_id === "source-test").reason_code, "declared_dependency_changed");
+  assert.ok(copyPlan.actual_diff.change_records.some((entry) => entry.status === "copied" && entry.old_path === "src/app.mjs" && entry.new_path === "src/copy.mjs"));
+
   git(root, ["checkout", "-B", "case-rename", requirementsTarget]);
   git(root, ["mv", "src/app.mjs", "src/main.mjs"]);
   const renameTarget = commitAll(root, "rename selected input");
