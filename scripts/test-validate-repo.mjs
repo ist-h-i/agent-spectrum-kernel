@@ -5,6 +5,8 @@
     "docs/fixtures/issue-275-slice-1-work-package-plan-r1.json",
     "docs/fixtures/issue-275-slice-1-work-package-plan-r2.json",
     "docs/fixtures/issue-275-slice-1-work-package-plan.json",
+    "schemas/repository-snapshot.schema.json",
+    "schemas/session-checkpoint.schema.json",
     "docs/asset-registry-contract.md",
     "docs/adr/0003-asset-registry-authority-boundary.md",
     "docs/fixtures/asset-registry",
