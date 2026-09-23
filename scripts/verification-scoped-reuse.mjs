@@ -438,3 +438,223 @@ function validateScopedRequirements(requirements) {
       assertCanonicalArray(gate.delta_review.prior_finding_refs, `${gate.gate_id} prior finding refs`, (entry) => entry);
     }
   }
+  assertCanonicalArray(requirements.current_obligations, "current obligations", (entry) => entry.obligation_id);
+  return requirements;
+}
+
+export function currentRuntimeIdentity() {
+  const toolchain = {
+    name: "node",
+    version: process.version,
+    identity_digest: canonicalDigest({
+      context: `${VERIFICATION_SCOPED_RUNTIME_CONTEXT}:toolchain`,
+      name: "node",
+      version: process.version,
+      architecture: process.arch,
+    }),
+  };
+  const environment = {
+    os: process.platform,
+    architecture: process.arch,
+    identity_digest: canonicalDigest({
+      context: `${VERIFICATION_SCOPED_RUNTIME_CONTEXT}:environment`,
+      os: process.platform,
+      architecture: process.arch,
+    }),
+  };
+  return { toolchain: [toolchain], environment };
+}
+
+function evidenceAuthorityAccepted(evidence, requirement) {
+  return requirement.authority.accepted_producers.some((producer) => (
+    producer.kind === evidence.producer.kind && producer.identity_digest === evidence.producer.identity_digest
+  )) && requirement.authority.accepted_evidence_levels.includes(evidence.execution.runner.evidence_level);
+}
+
+function evidenceCovers(evidence, requirement) {
+  const covered = new Set(evidence.coverage.obligation_refs);
+  const denied = new Set(evidence.coverage.explicit_non_coverage);
+  return requirement.required_obligation_refs.every((obligation) => covered.has(obligation) && !denied.has(obligation));
+}
+
+function evidenceInputBinding(evidence, inventory, manifestPath, manifestDigest) {
+  const expected = inventory.entries.map((entry) => ({
+    kind: entry.evidence_kind,
+    path: entry.path,
+    digest: entry.content_digest,
+  }));
+  expected.push({ kind: "manifest", path: manifestPath, digest: manifestDigest });
+  expected.sort((left, right) => `${left.path}\0${left.kind}\0${left.digest}`.localeCompare(`${right.path}\0${right.kind}\0${right.digest}`));
+  const actual = clone(evidence.consumed_inputs).sort((left, right) => `${left.path}\0${left.kind}\0${left.digest}`.localeCompare(`${right.path}\0${right.kind}\0${right.digest}`));
+  return stableCanonicalJson(expected) === stableCanonicalJson(actual);
+}
+
+function runtimeBinding(evidence, manifest) {
+  if (manifest.runtime_observation.mode !== "node_process_v1") return { ok: false, reason: "runtime_observation_unknown" };
+  const current = currentRuntimeIdentity();
+  if (stableCanonicalJson(evidence.execution.toolchain) !== stableCanonicalJson(current.toolchain)) return { ok: false, reason: "toolchain_changed" };
+  if (stableCanonicalJson(evidence.execution.environment) !== stableCanonicalJson(current.environment)) return { ok: false, reason: "environment_changed" };
+  return { ok: true, reason: null };
+}
+
+function blockingDisposition(requirement, reasonCode, detail = null) {
+  const blocked = requirement.execution_availability === "unavailable";
+  return {
+    gate_id: requirement.gate_id,
+    disposition: blocked ? "blocked_uncovered" : "rerun_required",
+    reason_code: reasonCode,
+    source_evidence_id: requirement.source_evidence_id,
+    source_evidence_digest: null,
+    dependency_manifest_id: null,
+    dependency_manifest_digest: null,
+    base_inventory_digest: null,
+    target_inventory_digest: null,
+    required_obligation_refs: clone(requirement.required_obligation_refs),
+    covered_obligation_refs: [],
+    uncovered_obligation_refs: clone(requirement.required_obligation_refs),
+    execution_evidence_reusable: false,
+    reuse_basis: null,
+    detail,
+  };
+}
+
+function successfulDisposition({ requirement, evidence, manifest, baseInventory, targetInventory, exact }) {
+  const independent = requirement.authority.independent_judgment_required;
+  const disposition = independent ? "independent_judgment_required" : (exact ? "reuse_exact" : "reuse_scoped");
+  return {
+    gate_id: requirement.gate_id,
+    disposition,
+    reason_code: independent ? "independent_judgment_required" : (exact ? "exact_source_binding_verified" : "scoped_dependencies_unchanged"),
+    source_evidence_id: evidence.evidence_id,
+    source_evidence_digest: evidence.evidence_digest,
+    dependency_manifest_id: manifest.manifest_id,
+    dependency_manifest_digest: manifest.manifest_digest,
+    base_inventory_digest: baseInventory.inventory_digest,
+    target_inventory_digest: targetInventory.inventory_digest,
+    required_obligation_refs: clone(requirement.required_obligation_refs),
+    covered_obligation_refs: clone(requirement.required_obligation_refs),
+    uncovered_obligation_refs: [],
+    execution_evidence_reusable: true,
+    reuse_basis: exact ? "exact_target" : "declared_dependency_manifest",
+    detail: null,
+  };
+}
+
+function evaluateGate({ repositoryRoot, storeRoot, repositoryId, baseRevision, targetRevision, requirement }) {
+  let manifest;
+  let manifestBytes;
+  try {
+    manifestBytes = gitObjectBytes({ repositoryRoot, revision: baseRevision, path: requirement.dependency_manifest_path });
+    manifest = parseJsonRejectDuplicateKeys(manifestBytes, `${requirement.gate_id} dependency manifest`);
+    validateDependencyManifest(manifest, { manifestPath: requirement.dependency_manifest_path });
+  } catch (error) {
+    return blockingDisposition(requirement, "dependency_manifest_invalid", error.message);
+  }
+  if (manifest.gate_id !== requirement.gate_id) return blockingDisposition(requirement, "dependency_manifest_gate_mismatch");
+  if (manifest.dependency_completeness !== "complete") return blockingDisposition(requirement, "dependency_information_incomplete");
+
+  let targetManifestBytes;
+  try {
+    targetManifestBytes = gitObjectBytes({ repositoryRoot, revision: targetRevision, path: requirement.dependency_manifest_path });
+  } catch {
+    return blockingDisposition(requirement, "dependency_manifest_changed", "manifest is missing at target revision");
+  }
+  if (rawDigest(targetManifestBytes) !== rawDigest(manifestBytes)) return blockingDisposition(requirement, "dependency_manifest_changed");
+
+  let baseInventory;
+  let targetInventory;
+  try {
+    baseInventory = dependencyInventory({ repositoryRoot, revision: baseRevision, selectors: manifest.selectors });
+    targetInventory = dependencyInventory({ repositoryRoot, revision: targetRevision, selectors: manifest.selectors });
+  } catch (error) {
+    return blockingDisposition(requirement, "dependency_inventory_unavailable", error.message);
+  }
+  if (baseInventory.inventory_digest !== manifest.base_inventory_digest) {
+    return blockingDisposition(requirement, "dependency_manifest_base_inventory_mismatch");
+  }
+  if (baseInventory.entries.some((entry) => entry.type !== "blob" || entry.content_digest === null)) {
+    return blockingDisposition(requirement, "dependency_input_type_unsupported");
+  }
+
+  let evidence;
+  try {
+    evidence = readVerificationEvidence({ storeRoot, evidenceId: requirement.source_evidence_id });
+  } catch (error) {
+    return blockingDisposition(requirement, "source_evidence_invalid", error.message);
+  }
+  const manifestContentDigest = rawDigest(manifestBytes);
+  const expectedTreeDigest = gitTreeDigest({ repositoryRoot, revision: baseRevision });
+  if (
+    evidence.target.repository_id !== repositoryId
+    || evidence.target.target_revision !== baseRevision
+    || evidence.target.tree_digest !== expectedTreeDigest
+  ) return blockingDisposition(requirement, "source_evidence_target_mismatch");
+  if (evidence.gate.gate_id !== requirement.gate_id || evidence.gate.contract_digest !== manifest.gate_contract_digest) {
+    return blockingDisposition(requirement, "gate_contract_changed");
+  }
+  if (stableCanonicalJson(evidence.execution.command) !== stableCanonicalJson(manifest.execution.command)
+    || stableCanonicalJson(evidence.execution.runner) !== stableCanonicalJson(manifest.execution.runner)) {
+    return blockingDisposition(requirement, "execution_contract_changed");
+  }
+  if (!evidenceInputBinding(evidence, baseInventory, requirement.dependency_manifest_path, manifestContentDigest)) {
+    return blockingDisposition(requirement, "source_evidence_input_mismatch");
+  }
+  if (!evidenceAuthorityAccepted(evidence, requirement)) return blockingDisposition(requirement, "source_evidence_authority_mismatch");
+  if (evidence.execution.terminal.status !== "succeeded") return blockingDisposition(requirement, "source_evidence_not_passing");
+  if (!evidenceCovers(evidence, requirement)) return blockingDisposition(requirement, "source_evidence_coverage_mismatch");
+  const runtime = runtimeBinding(evidence, manifest);
+  if (!runtime.ok) return blockingDisposition(requirement, runtime.reason);
+
+  const changes = inventoryChanges(baseInventory, targetInventory);
+  if (changes.length > 0) return blockingDisposition(requirement, "declared_dependency_changed", changes.slice(0, 64));
+  return successfulDisposition({
+    requirement,
+    evidence,
+    manifest,
+    baseInventory,
+    targetInventory,
+    exact: baseRevision === targetRevision,
+  });
+}
+
+function coverageSummary(dispositions) {
+  const count = (name) => dispositions.filter((entry) => entry.disposition === name).length;
+  const covered = dispositions.filter((entry) => ["reuse_exact", "reuse_scoped"].includes(entry.disposition)).map((entry) => entry.gate_id).sort();
+  const blocking = dispositions.filter((entry) => !["reuse_exact", "reuse_scoped"].includes(entry.disposition)).map((entry) => entry.gate_id).sort();
+  return {
+    status: blocking.length === 0 ? "covered" : "blocked",
+    required_gate_count: dispositions.length,
+    reuse_exact_count: count("reuse_exact"),
+    reuse_scoped_count: count("reuse_scoped"),
+    rerun_required_count: count("rerun_required"),
+    independent_judgment_required_count: count("independent_judgment_required"),
+    blocked_uncovered_count: count("blocked_uncovered"),
+    covered_gate_ids: covered,
+    blocking_gate_ids: blocking,
+  };
+}
+
+function executionSummary(dispositions) {
+  const rerun = dispositions.filter((entry) => ["rerun_required", "blocked_uncovered"].includes(entry.disposition)).length;
+  const reused = dispositions.filter((entry) => entry.execution_evidence_reusable).length;
+  return {
+    required_gate_count: dispositions.length,
+    full_rerun_gate_count: dispositions.length,
+    reused_execution_gate_count: reused,
+    rerun_gate_count: rerun,
+    saved_execution_gate_count: Math.max(0, dispositions.length - rerun),
+  };
+}
+
+function validatePlan(plan, requirements) {
+  failSchema(plan, "verification scoped reuse plan");
+  if (plan.program !== "ask_verification_scoped_reuse_plan") throw new Error("artifact is not a scoped reuse plan");
+  assertSelfIdentified(plan, {
+    idField: "plan_id",
+    digestField: "plan_digest",
+    idPrefix: "verification-scoped-reuse-plan-",
+    label: "verification scoped reuse plan",
+  });
+  if (plan.requirements_id !== requirements.requirements_id || plan.requirements_digest !== requirements.requirements_digest) throw new Error("scoped reuse plan requirements binding mismatch");
+  assertCanonicalArray(plan.dispositions, "scoped reuse dispositions", (entry) => entry.gate_id);
+  const expected = coverageSummary(plan.dispositions);
