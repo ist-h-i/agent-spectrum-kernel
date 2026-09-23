@@ -18,6 +18,22 @@ jobs:
         with:
           node-version: "24"
 
+      # Exercise exact apply and no-write boundaries before long fixture suites.
+      - name: Check whitespace errors
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --check "origin/${{ github.base_ref }}...HEAD"
+          else
+            git diff --check
+          fi
+
+      - name: Run ASK setup planning and exact apply tests
+        run: node scripts/test-ask-setup.mjs
+
+      - name: Run UI harness and Skill-reference regressions
+        run: |
+          node --test scripts/test-codex-skill-reference-preflight.mjs scripts/test-skill-assets.mjs scripts/test-skill-reference-canonical.mjs scripts/test-ui-ux-adapter-assets.mjs docs/fixtures/ui-ux-design/fixture-state.test.mjs scripts/test-prompt-v2-historical-renderer.mjs
+
       # Fail before expensive suites, retaining the generator's exact-byte check.
       - name: Check adapter runtime bundle freshness
         run: |
@@ -32,6 +48,9 @@ jobs:
       # Catch bounded aggregate regressions before the long repository suites.
       - name: Run portfolio aggregate v2 component sensitivity tests
         run: node scripts/test-ask-benchmark-portfolio-aggregate-result-v2.mjs
+
+      - name: Run portfolio consumer sensitivity detail tests
+        run: node scripts/test-ask-benchmark-portfolio-consumer-report.mjs
 
       - name: Run successor snapshot and source-session regressions (current HEAD)
         run: |
@@ -63,9 +82,6 @@ jobs:
 
       - name: Run repository validation tests
         run: node scripts/test-validate-repo.mjs
-
-      - name: Run read-only ASK setup planning tests
-        run: node scripts/test-ask-setup.mjs
 
       - name: Run baseline semantic review route contract tests
         run: node scripts/test-review-route.mjs
@@ -245,11 +261,3 @@ jobs:
 
       - name: Check Prompt v2 preregistration authority fixture freshness
         run: node scripts/prompt-v2-preregistration-samples.mjs --check
-
-      - name: Check whitespace errors
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git diff --check "origin/${{ github.base_ref }}...HEAD"
-          else
-            git diff --check
-          fi

@@ -35,6 +35,8 @@ If `docs/ai/review-context.md` has `context_status: template`, treat it as missi
 
 If target audience, purpose, medium, or output contract is missing, mark the affected judgment as `insufficient evidence` instead of giving generic UX, copy, or formatting advice.
 
+For an interactive UI target, consume the current task's `UX supplement` when one exists and read only the applicable parts of `skills/ui-ux-design/SKILL.md` and its referenced patterns. Absence of that supplement is missing evidence only for judgments that actually depend on unstated interaction semantics; it is not a reason to invent a persona, product goal, or generic redesign.
+
 ## Process
 
 1. Identify the output target.
@@ -43,16 +45,24 @@ If target audience, purpose, medium, or output contract is missing, mark the aff
    - purpose: decision support, task completion, recovery, integration, audit, communication, or other,
    - observed artifact or contract.
 
-2. Check human-facing output when applicable.
-   - visibility,
-   - information hierarchy,
-   - cognitive load,
-   - information density,
-   - persona or audience fit,
-   - accessibility constraints,
-   - actionability and recovery from errors.
+2. For interactive UI output, bind findings to applicable harness patterns and evidence.
+   - Confirm the observed UI signal that made `ui-ux-design` applicable.
+   - Trace each UX finding to the applicable pattern, task consequence, and observed artifact/state.
+   - Use screenshots/rendered artifacts for static hierarchy, labeling, and visible state only.
+   - Require interactive or state evidence for focus/selection transitions, loading, duplicate-action prevention, actual undo, pre-commit cancellation, input retention, scoped retry, recovery, and whole-screen blocking.
+   - For partial data, distinguish legitimate empty, missing, stale, partial, and complete. Do not accept zero-filled or derived output when prerequisite truth is incomplete unless the product contract explicitly defines that semantics.
 
-3. Check system or AI-facing output when applicable.
+3. Check human-facing output when applicable.
+   - visibility and information hierarchy,
+   - cognitive load and information density,
+   - evidenced user/audience fit without invented personas,
+   - natural task language and unambiguous action/result wording,
+   - accessibility and equivalent interaction constraints,
+   - current/focus/selected/loading/error/success/completed state when applicable,
+   - actionability, continuation, reversibility, and recovery,
+   - preservation of healthy regions and user input across independent failure.
+
+4. Check system or AI-facing output when applicable.
    - structure,
    - completeness,
    - consistency,
@@ -61,13 +71,14 @@ If target audience, purpose, medium, or output contract is missing, mark the aff
    - machine-consumable fields,
    - missing or ambiguous information.
 
-4. Control review noise.
+5. Control review noise.
    - Do not critique taste without persona, style guide, product promise, or output contract evidence.
    - Do not invent brand, persona, or project goals.
    - Do not report internal implementation concerns here.
    - Do not block on optional polish unless it breaks the consumer's task or contract.
+   - Visual taste alone is not a Major or Blocker; require an evidenced task, contract, inclusion, state, recovery, or consequence failure.
 
-5. Return output quality gate status, not final merge approval.
+6. Return output quality gate status, not final merge approval.
 
 ## Output
 
@@ -88,8 +99,20 @@ Human-output checks:
 - information hierarchy:
 - cognitive load:
 - persona fit:
-- accessibility:
-- actionability / recovery:
+- language / action semantics:
+- interaction states / feedback:
+- accessibility / equivalent paths:
+- actionability / continuation:
+- reversibility / consequence:
+- partial failure / recovery:
+
+Interactive UI evidence:
+- applicable harness patterns:
+- rendered/static evidence:
+- exercised state transitions:
+- retained or restored state:
+- retry / recovery result:
+- missing interactive evidence:
 
 System/AI-output checks:
 - structure:
@@ -117,7 +140,9 @@ Residual output risk:
 
 - Output-layer findings are separated from implementation, domain, and adversarial findings.
 - Human-facing and system/AI-facing output checks are represented when applicable.
-- Missing persona, medium, sample output, or output contract produces `insufficient evidence`.
+- Dynamic UI claims are not accepted from screenshot-only evidence.
+- Applicable UI findings trace to a harness pattern plus an observed task/state/recovery consequence.
+- Missing persona, medium, sample output, output contract, or required interactive evidence produces `insufficient evidence` only for the affected judgment.
 - Every actionable finding uses the closed common fields and names the consumer impact and observed failure trace.
 - Final merge decision is left to `review-final-merge-gate`.
 
@@ -127,6 +152,7 @@ Residual output risk:
 |---|---|
 | Inventing persona or brand goals | Mark persona or style evidence as missing and limit findings to observable contract issues. |
 | Reviewing internal code design | Route to `review-ai-quality` or `review-architecture-impact`. |
-| Treating preference as defect | Require consumer impact, contract evidence, or accessibility evidence. |
-| Judging unobserved output | Request screenshot, sample response, rendered text, generated artifact, or contract. |
+| Treating preference as defect | Require consumer impact, contract, inclusion, state, recovery, or consequence evidence; do not promote taste to Major/Blocker. |
+| Proving dynamic UI behavior with a screenshot | Exercise the transition and inspect the resulting visible and underlying state. |
+| Judging unobserved output | Request screenshot, sample response, rendered text, generated artifact, contract, or interactive evidence appropriate to the claim. |
 | Approving the PR directly | Report gate status only. |

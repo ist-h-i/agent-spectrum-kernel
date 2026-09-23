@@ -5,13 +5,14 @@ import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { canonicalJson, jsonDigest, sha256 } from "./ask-setup-inputs.mjs";
+import { buildSetupSourceIdentity, canonicalJson, copyTargetForSimulation, jsonDigest, sha256 } from "./ask-setup-inputs.mjs";
 import {
   SetupApplyError, SETUP_INSTALLERS, assertNoSetupInProgress, assertSetupWritePaths,
   captureApplyTarget, captureApplyTree, managedSetupIdentities, overlayStagingResult,
   readApplyJson, resultBinding, setupChildEnvironment, setupInstallerInvocations,
 } from "./ask-setup-apply-state.mjs";
 import { applyAdoptionPlan, executeValidatedSetupApply } from "./ask-setup-apply.mjs";
+import { skillAssets } from "./skill-assets.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtures = [];
@@ -135,6 +136,46 @@ export async function runSetupApplyUnitTests() {
     symlinkSync(resolve(outside, "owned.txt"), resolve(repo, ".git/index"));
     rejects(() => captureApplyTarget(repo), /Symlink/);
 
+    const source = temp();
+    const sourceFiles = [
+      "manifest.json", "scripts/install-kernel.mjs", "scripts/install-codex-adapter.mjs",
+      "scripts/install-claude-adapter.mjs", "scripts/installer-lifecycle.mjs", "scripts/ask-doctor.mjs",
+      "scripts/ask-setup.mjs", "scripts/ask-setup-inputs.mjs", "schemas/adoption-plan.schema.json",
+      "schemas/adoption-apply-result.schema.json", "docs/fixtures/adapter-runtime-profiles.json",
+      "AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "schemas/review-signal-gate-map.json",
+      "skills/example/SKILL.md", "skills/example/references/nested/example.md",
+    ];
+    for (const path of sourceFiles) put(source, path, path.endsWith(".json") ? "{}\n" : "canonical\n");
+    const sourceOptions = { selectedSkills: ["example"], coreAssets: [], revision: "a".repeat(40) };
+    const sourceIdentity = () => buildSetupSourceIdentity(source, sourceOptions);
+    const pinnedSource = sourceIdentity();
+    const reference = "skills/example/references/nested/example.md";
+    equal(pinnedSource.files.some((entry) => entry.path === reference), true, "kernel-only binds reference bytes without a renderer inventory");
+    put(source, reference, "changed canonical reference\n");
+    equal(sourceIdentity().identity_digest === pinnedSource.identity_digest, false, "reference content drift");
+    put(source, reference, "canonical\n");
+    equal(sourceIdentity().identity_digest, pinnedSource.identity_digest);
+    put(source, "skills/example/references/new.md", "new reference\n");
+    equal(sourceIdentity().identity_digest === pinnedSource.identity_digest, false, "reference addition");
+    rmSync(resolve(source, "skills/example/references/new.md"));
+    equal(sourceIdentity().identity_digest, pinnedSource.identity_digest, "removed new reference restores inventory");
+    const targetWithReference = temp();
+    put(targetWithReference, reference, "project owned reference\n");
+    const selectedPaths = skillAssets(source, ["example"]).map((asset) => asset.sourcePath);
+    const copy = resolve(temp(), "staging");
+    const beforeCopy = captureApplyTarget(targetWithReference).binding;
+    copyTargetForSimulation(targetWithReference, copy, selectedPaths);
+    equal(readFileSync(resolve(copy, reference), "utf8"), "project owned reference\n", "staging must expose unmanaged canonical reference conflicts to the installer");
+    equal(captureApplyTarget(targetWithReference).binding, beforeCopy, "reference simulation is target-read-only");
+    rmSync(resolve(targetWithReference, reference));
+    symlinkSync(resolve(outside, "owned.txt"), resolve(targetWithReference, reference));
+    const rejectedCopy = resolve(temp(), "staging");
+    rejects(() => copyTargetForSimulation(targetWithReference, rejectedCopy, selectedPaths), /Symlink/);
+    equal(existsSync(rejectedCopy), false, "reject reference symlink before staging");
+    rmSync(resolve(source, reference));
+    symlinkSync(resolve(outside, "owned.txt"), resolve(source, reference));
+    rejects(sourceIdentity, /symlinks/);
+
     const savedEnvironment = { NODE_OPTIONS: process.env.NODE_OPTIONS, GIT_TRACE: process.env.GIT_TRACE, SECRET_TOKEN: process.env.SECRET_TOKEN };
     Object.assign(process.env, { NODE_OPTIONS: "--import ./evil.mjs", GIT_TRACE: "secret-file", SECRET_TOKEN: "PRIVATE" });
     try {
@@ -157,12 +198,16 @@ export async function runSetupApplyUnitTests() {
     equal(unauthorized.reason, "authorization_required");
     equal(unauthorized.mutation_attempted, false);
 
-    for (const scenario of ["success", "no_authorization", "before_source_drift", "before_target_drift", "first_failure_no_write", "partial_first", "second_failure", "throw_after_write", "unexpected_write", "observation_failure", "source_drift_after_write"]) {
+    for (const scenario of ["success", "no_authorization", "before_source_drift", "before_target_drift", "first_failure_no_write", "partial_first", "second_failure", "throw_after_write", "unexpected_write", "observation_failure", "source_drift_after_write", "final_target_drift", "final_pending_marker"]) {
       const fixture = phaseFixture();
       let calls = 0;
       let sourceCalls = 0;
+      let observationCalls = 0;
       const verifySource = async () => {
         sourceCalls += 1;
+        if (scenario === "final_pending_marker" && sourceCalls === 4) {
+          put(fixture.root, SETUP_INSTALLERS.codex.state + ".in-progress.json", "{}");
+        }
         if (scenario === "before_source_drift" || scenario === "source_drift_after_write" && sourceCalls > 1) throw new SetupApplyError("source_drift");
       };
       if (scenario === "before_target_drift") put(fixture.root, "project.txt", "changed\n");
@@ -183,6 +228,8 @@ export async function runSetupApplyUnitTests() {
           return outcome;
         },
         observe: (path) => {
+          observationCalls += 1;
+          if (scenario === "final_target_drift" && observationCalls === 5) put(path, ".agents/prompt.md", "PRIVATE later edit\n");
           if (scenario === "observation_failure" && calls > 0) throw new Error("PRIVATE observation");
           return captureApplyTarget(path);
         },
@@ -205,6 +252,12 @@ export async function runSetupApplyUnitTests() {
         if (scenario === "second_failure") equal(result.applied_operations.length > 0 && result.not_applied_operations.length > 0, true);
         if (scenario === "partial_first") equal(result.recovery[0].in_progress, true);
         if (scenario === "observation_failure") equal(result.observation, "unavailable");
+        if (scenario === "final_target_drift") {
+          equal(result.observation, "complete");
+          equal(result.reason, "final_target_mismatch");
+          equal(result.blocked_operations.some((entry) => entry.path === ".agents/prompt.md"), true);
+        }
+        if (scenario === "final_pending_marker") equal(result.recovery[0].in_progress, true);
       }
       equal(readFileSync(resolve(fixture.root, "project.txt"), "utf8"), scenario === "before_target_drift" ? "changed\n" : "must survive\n");
     }

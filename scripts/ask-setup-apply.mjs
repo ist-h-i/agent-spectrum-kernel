@@ -129,6 +129,12 @@ export async function executeValidatedSetupApply({ plan, target, sourceRoot, inv
     result.applied_operations = operations.filter((entry) => entry.outcome === "applied");
     result.not_applied_operations = operations.filter((entry) => entry.outcome === "not_applied");
     result.blocked_operations = operations.filter((entry) => entry.outcome === "unknown");
+    // Phase success is historical evidence. The final report must also match
+    // the exact final target, including changes made after the last phase check.
+    if (!failure && completed === invocations.length
+      && !equals(observed.binding, plan.application.phases.at(-1).expected_target)) {
+      failure = "final_target_mismatch";
+    }
   } catch {
     result.observation = "unavailable";
     result.repository_changed = null;
@@ -137,6 +143,10 @@ export async function executeValidatedSetupApply({ plan, target, sourceRoot, inv
   }
   try {
     result.resulting_managed_identities = managedSetupIdentities(target);
+    if (!failure && completed === invocations.length
+      && !equals(result.resulting_managed_identities, plan.application.phases.at(-1).managed_identities)) {
+      failure = "final_managed_identity_mismatch";
+    }
   } catch {
     result.resulting_managed_identities = [];
     failure ??= "managed_identity_unavailable";
@@ -146,6 +156,7 @@ export async function executeValidatedSetupApply({ plan, target, sourceRoot, inv
     // state of an unattempted adapter is not an apply rollback instruction.
     const attempted = invocations.filter((_, index) => ["applied", "failed", "attempted"].includes(result.phases[index].status));
     result.recovery = setupRecovery(target, attempted);
+    if (result.recovery.some((item) => item.in_progress)) failure ??= "installer_recovery_required";
   } catch {
     result.recovery = [];
     failure ??= "recovery_observation_unavailable";

@@ -15,6 +15,7 @@ import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { CORE_OWNED_IMMUTABLE_ASSETS, readGitRevision } from "./installer-lifecycle.mjs";
+import { skillAssets } from "./skill-assets.mjs";
 import { readSetupRepositoryId, validateSetupGitMetadata } from "./ask-setup-git.mjs";
 import { readSetupJson, sanitizeSetupDoctorReport, summarizeSetupProcessFailure } from "./ask-setup-diagnostics.mjs";
 import { validateSetupDoctorInputs } from "./ask-setup-doctor-inputs.mjs";
@@ -441,7 +442,7 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
     ...MANAGED_STATE_PATHS,
     ...managedPathsFromState(root),
     ...CORE_OWNED_IMMUTABLE_ASSETS,
-    ...(selectedSkills ?? []).map((skill) => `skills/${skill}/SKILL.md`),
+    ...skillAssets(REPO_ROOT, selectedSkills).map((asset) => asset.sourcePath),
     ...projectedTargetPaths,
   ])].sort();
   assertSetupWritePaths(root, planningPaths);
@@ -567,12 +568,14 @@ export async function verifyPlanIdentity(plan, { target, adapter = null } = {}) 
 
 export async function verifySavedPlan(plan, { target, adapter = null } = {}) {
   const { root } = await verifyPlanIdentity(plan, { target, adapter });
+  // Preserve the existing identity/revision diagnostic before the stronger
+  // whole-target comparison reports index or working-tree drift.
+  const git = gitFacts(root);
+  if (plan.target?.repository_id !== git.repository_id || plan.target?.revision !== git.revision) throw new Error("Target repository identity or revision changed after the plan was generated.");
   if (plan.application?.contract !== "exact-installer-apply-v1"
     || captureApplyTarget(root).binding.digest !== plan.application.target_before?.digest) throw new Error("Target repository changed after the plan was generated.");
   const current = snapshotTarget(root, { extraPaths: Array.isArray(plan.target?.snapshot_paths) ? plan.target.snapshot_paths : [] });
   if (plan.target?.snapshot_digest !== current.digest) throw new Error("Target repository changed after the plan was generated.");
-  const git = gitFacts(root);
-  if (plan.target?.repository_id !== git.repository_id || plan.target?.revision !== git.revision) throw new Error("Target repository identity or revision changed after the plan was generated.");
   return { valid: true, plan_digest: plan.plan_digest, target_snapshot_digest: current.digest };
 }
 

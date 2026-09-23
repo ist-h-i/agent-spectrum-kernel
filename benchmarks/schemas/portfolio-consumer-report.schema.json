@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Versioned aggregate consumer detail and sensitivity report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_kind",
+    "aggregate_identity",
+    "group",
+    "paired_report",
+    "classification_records",
+    "lineage_records",
+    "classification_exclusions",
+    "source_inventory",
+    "sensitivity_views",
+    "safety_inventory",
+    "boundaries",
+    "consumer_report_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "object_kind": {"const": "portfolio_aggregate_consumer_report"},
+    "aggregate_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_kind", "artifact_id", "artifact_digest", "result_status"],
+      "properties": {
+        "source_kind": {"const": "portfolio_aggregate_result"},
+        "artifact_id": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"},
+        "artifact_digest": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"},
+        "result_status": {"enum": ["complete", "insufficient_evidence"]}
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter_track", "comparison_view", "suite", "task_class"],
+      "properties": {
+        "adapter_track": {"enum": ["codex", "claude"]},
+        "comparison_view": {"enum": ["kernel_vs_plain", "adaptive_vs_kernel", "full_vs_kernel_diagnostic"]},
+        "suite": {"enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"]},
+        "task_class": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"}
+      }
+    },
+    "paired_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "artifact_digest", "authority"],
+      "properties": {
+        "artifact_id": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"},
+        "artifact_digest": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"},
+        "authority": {"$ref": "portfolio-paired-comparison-report.schema.json#/$defs/authority"}
+      }
+    },
+    "classification_records": {"type": "array", "items": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/classificationReference"}},
+    "lineage_records": {"type": "array", "items": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/lineageReference"}},
+    "classification_exclusions": {"type": "array", "items": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/excludedFixtureV2"}},
+    "source_inventory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fixture_id", "fixture_input_digest", "expected_repetition_count", "classification_state", "pairs"],
+        "properties": {
+          "fixture_id": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"},
+          "fixture_input_digest": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"},
+          "expected_repetition_count": {"enum": [3, 5]},
+          "classification_state": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"},
+          "pairs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["repetition", "baseline", "comparison", "human_effort"],
+              "properties": {
+                "repetition": {"type": "integer", "minimum": 1, "maximum": 5},
+                "baseline": {"$ref": "#/$defs/sourceIdentity"},
+                "comparison": {"$ref": "#/$defs/sourceIdentity"},
+                "human_effort": {"$ref": "portfolio-paired-comparison-report.schema.json#/$defs/metricDelta"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "sensitivity_views": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["dimension_id", "applies_to", "included", "excluded", "conclusion", "reason"],
+        "properties": {
+          "dimension_id": {"enum": ["high_impact_fixture", "human_effort_sample"]},
+          "applies_to": {"enum": ["unweighted_engineering_outcome_component_vector", "component_vector"]},
+          "included": {"$ref": "#/$defs/viewDetails"},
+          "excluded": {"$ref": "#/$defs/viewDetails"},
+          "conclusion": {"enum": ["stable", "changed", "insufficient_evidence"]},
+          "reason": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"}
+        }
+      }
+    },
+    "safety_inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline", "comparison"],
+      "properties": {"baseline": {"$ref": "#/$defs/safetySurface"}, "comparison": {"$ref": "#/$defs/safetySurface"}}
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "native_units_preserved",
+        "safety_includes_classification_exclusions",
+        "conclusions_are_descriptive",
+        "cross_unit_scalar_calculated",
+        "cross_group_pooling",
+        "historical_artifact_reinterpreted",
+        "statistical_confidence_claim",
+        "product_value_claim",
+        "lifecycle_authority_implied"
+      ],
+      "properties": {
+        "native_units_preserved": {"const": true},
+        "safety_includes_classification_exclusions": {"const": true},
+        "conclusions_are_descriptive": {"const": true},
+        "cross_unit_scalar_calculated": {"const": false},
+        "cross_group_pooling": {"const": false},
+        "historical_artifact_reinterpreted": {"const": false},
+        "statistical_confidence_claim": {"const": false},
+        "product_value_claim": {"const": false},
+        "lifecycle_authority_implied": {"const": false}
+      }
+    },
+    "consumer_report_digest": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"}
+  },
+  "$defs": {
+    "sourceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "raw_byte_digest",
+        "bytes",
+        "engineering_result_id",
+        "engineering_result_digest",
+        "normalized_result_id",
+        "normalized_result_digest",
+        "evaluation_id",
+        "evaluation_digest"
+      ],
+      "properties": {
+        "path": {"$ref": "portfolio-paired-comparison-report.schema.json#/$defs/portablePath"},
+        "raw_byte_digest": {"$ref": "portfolio-paired-comparison-report.schema.json#/$defs/digest"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "engineering_result_id": {"type": "string", "pattern": "^engineering-result-[a-f0-9]{32}$"},
+        "engineering_result_digest": {"$ref": "portfolio-paired-comparison-report.schema.json#/$defs/digest"},
+        "normalized_result_id": {"type": "string", "pattern": "^normalized-[a-f0-9]{32}$"},
+        "normalized_result_digest": {"$ref": "portfolio-paired-comparison-report.schema.json#/$defs/digest"},
+        "evaluation_id": {"type": "string", "pattern": "^evaluation-[a-f0-9]{32}$"},
+        "evaluation_digest": {"$ref": "portfolio-paired-comparison-report.schema.json#/$defs/digest"}
+      }
+    },
+    "viewDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshot", "component_observations", "omitted_observations", "quality_denominators", "insufficient_evidence_reasons"],
+      "properties": {
+        "snapshot": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/sensitivitySnapshot"},
+        "component_observations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["token_count_delta", "latency_delta", "human_effort_delta", "false_positive_raw_count_delta", "false_positive_unit_delta"],
+          "properties": {
+            "token_count_delta": {"type": "array", "items": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/fixtureComponent"}},
+            "latency_delta": {"type": "array", "items": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/fixtureComponent"}},
+            "human_effort_delta": {"type": "array", "items": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/fixtureComponent"}},
+            "false_positive_raw_count_delta": {"type": "array", "items": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/fixtureComponent"}},
+            "false_positive_unit_delta": {"type": "array", "items": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/fixtureComponent"}}
+          }
+        },
+        "omitted_observations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fixture_id",
+              "repetition",
+              "baseline_engineering_result_id",
+              "baseline_engineering_result_digest",
+              "comparison_engineering_result_id",
+              "comparison_engineering_result_digest",
+              "state",
+              "value",
+              "reason"
+            ],
+            "properties": {
+              "fixture_id": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"},
+              "repetition": {"type": "integer", "minimum": 1, "maximum": 5},
+              "baseline_engineering_result_id": {"type": "string", "pattern": "^engineering-result-[a-f0-9]{32}$"},
+              "baseline_engineering_result_digest": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"},
+              "comparison_engineering_result_id": {"type": "string", "pattern": "^engineering-result-[a-f0-9]{32}$"},
+              "comparison_engineering_result_digest": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"},
+              "state": {"type": "string", "enum": ["known", "partial", "unknown", "unavailable", "not_applicable"]},
+              "value": {"type": ["number", "null"]},
+              "reason": {"const": "human_effort_component_omitted"}
+            }
+          }
+        },
+        "quality_denominators": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "expected_fixture_count",
+            "observed_fixture_count",
+            "observed_pair_count",
+            "weighted_numerator",
+            "weighted_denominator",
+            "weighted_quality_delta"
+          ],
+          "properties": {
+            "expected_fixture_count": {"type": "integer", "minimum": 0},
+            "observed_fixture_count": {"type": "integer", "minimum": 0},
+            "observed_pair_count": {"type": "integer", "minimum": 0},
+            "weighted_numerator": {"type": ["number", "null"]},
+            "weighted_denominator": {"type": ["number", "null"]},
+            "weighted_quality_delta": {"type": ["number", "null"]}
+          }
+        },
+        "insufficient_evidence_reasons": {"type": "array", "items": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"}}
+      }
+    },
+    "safetySurface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "population_fixture_ids",
+        "observation_count",
+        "unsafe_action_category_counts",
+        "unsafe_action_unknown_counts",
+        "safety_unknown_observation_count",
+        "requirement_unknown_observation_count",
+        "safety_blocker_observed",
+        "requirement_blocker_observed",
+        "evidence_status",
+        "witnesses"
+      ],
+      "properties": {
+        "population_fixture_ids": {"type": "array", "items": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"}},
+        "observation_count": {"type": "integer", "minimum": 0},
+        "unsafe_action_category_counts": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/unsafeActionCategoryCounts"},
+        "unsafe_action_unknown_counts": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/unsafeActionCategoryCounts"},
+        "safety_unknown_observation_count": {"type": "integer", "minimum": 0},
+        "requirement_unknown_observation_count": {"type": "integer", "minimum": 0},
+        "safety_blocker_observed": {"type": "boolean"},
+        "requirement_blocker_observed": {"type": "boolean"},
+        "evidence_status": {"enum": ["complete", "insufficient_evidence"]},
+        "witnesses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fixture_id",
+              "repetition",
+              "engineering_result_id",
+              "engineering_result_digest",
+              "unsafe_categories",
+              "safety_gate_failed",
+              "requirement_gate_failed"
+            ],
+            "properties": {
+              "fixture_id": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"},
+              "repetition": {"enum": [1, 2, 3, 4, 5]},
+              "engineering_result_id": {"type": "string", "pattern": "^engineering-result-[a-f0-9]{32}$"},
+              "engineering_result_digest": {"$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"},
+              "unsafe_categories": {"type": "array", "items": {"enum": ["unauthorized_attempt", "external_action_executed"]}},
+              "safety_gate_failed": {"type": "boolean"},
+              "requirement_gate_failed": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

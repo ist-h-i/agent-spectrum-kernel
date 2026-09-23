@@ -189,3 +189,23 @@ The #163 and #164 runtime implementations consume this contract and schema. Adap
 ## Compatibility rule
 
 Schema additions are backward-compatible only when existing profiles remain valid and existing downgrade behavior is not weakened. Renaming or removing capability IDs, changing downgrade meaning, or changing canonical ownership requires an explicit schema version change and migration guidance. Generated assets remain replaceable projections and must retain rollback and detach paths. The supported dual-runtime path and stop conditions are maintained in `docs/adapter-runtime-migration.md`.
+
+## Historical renderer identity and current delivery
+
+UI skill references are canonical Skill sources alongside their `SKILL.md`.
+The selected entry and `references/` files share one inventory for installation,
+source hashing and managed-file lifecycle. Shipping them does not imply loading
+them for a non-UI task.
+
+Historical Prompt v2 fixture inspection and successor-parent reconstruction
+explicitly verify renderer bytes at the frozen rendered archive's source A
+(`c508a767f3386dac10180770edf37a67806fbb1b`, tree
+`d7d377c1265f0fb47119bfc80a2f3eb9535cf163`). This is distinct from the
+older execution-workspace revision; neither identity is rewritten. Missing objects, a different tree, a symbolic-link
+renderer or a byte mismatch fail closed. This read-only historical check does
+not render a new Prompt, certify the current installer, authorize execution or
+change an archived result. The ordinary preregistration loader still validates
+the current checkout by default and refuses changed renderer bytes. Current
+adapter behavior is verified separately through its projection and installer
+tests; frozen protocols, configurations, rendered archives and admission records
+are not regenerated to accommodate current delivery changes.
