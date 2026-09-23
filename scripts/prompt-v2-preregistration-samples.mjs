@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { PROMPT_V2_RENDERER_SOURCE } from "./prompt-v2-historical-renderer.mjs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -92,8 +93,8 @@ const ALLOWED_OBJECT_KINDS = new Set([
 ]);
 
 export const PROMPT_V2_PREREGISTRATION_RENDERED_ROOT = "docs/fixtures/prompt-v2-preregistration/rendered";
-export const PROMPT_V2_SOURCE_REVISION = "c508a767f3386dac10180770edf37a67806fbb1b";
-export const PROMPT_V2_SOURCE_TREE = "d7d377c1265f0fb47119bfc80a2f3eb9535cf163";
+export const PROMPT_V2_SOURCE_REVISION = PROMPT_V2_RENDERER_SOURCE.revision;
+export const PROMPT_V2_SOURCE_TREE = PROMPT_V2_RENDERER_SOURCE.tree;
 
 const adapterDefinitions = Object.freeze([
   Object.freeze({
@@ -1225,7 +1226,9 @@ export function verifyPromptV2PreregistrationFixture({ root }) {
   if (!root) throw new Error("Prompt v2 preregistration fixture root is required");
   const fixtureRoot = resolve(root);
   assertNoSymlinkPathSegments(fixtureRoot, "Prompt v2 preregistration fixture root");
-  const preregistration = loadPromptV2Preregistration({ root: repositoryRoot });
+  // Historical fixture integrity is checked at its frozen renderer revision.
+  // This does not certify or activate the current adapter implementation.
+  const preregistration = loadPromptV2Preregistration({ root: repositoryRoot, rendererSource: "frozen_renderer_source" });
   const binding = readJsonFileStrict(resolve(fixtureRoot, "binding.json"), "Prompt v2 preregistration binding");
   const reference = readJsonFileStrict(resolve(fixtureRoot, "reference.json"), "Prompt v2 preregistration reference");
   if (reference.reference_digest !== canonicalDigest(without(reference, ["reference_digest"]))) throw new Error("Prompt v2 preregistration reference digest mismatch");

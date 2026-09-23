@@ -93,3 +93,79 @@ test("foundational authorization failure is a distinct whole-screen block", () =
   assert.match(state.foundation.reason, /権限/);
   assert.equal(state.name, "保持対象");
 });
+
+// Regression: successful saves describe a snapshot, never the mutable draft.
+test("editing after save invalidates success without replacing the saved record", async () => {
+  const { updateName } = await import("./fixture-state.mjs");
+  const state = createFixtureState();
+  updateName(state, "設定A");
+  assert.equal(startSubmit(state), true);
+  completeSubmit(state);
+  updateName(state, "設定B");
+  assert.equal(state.savedName, "設定A");
+  assert.equal(state.submitState, "idle");
+  assert.throws(() => continueAfterSubmit(state), /current draft/);
+  assert.equal(state.route, "edit");
+  assert.equal(startSubmit(state), true);
+  completeSubmit(state);
+  continueAfterSubmit(state);
+  assert.equal(state.savedName, "設定B");
+  assert.equal(state.route, "list");
+});
+
+test("editing during save preserves both the submitted snapshot and the newer draft", async () => {
+  const { updateName } = await import("./fixture-state.mjs");
+  const state = createFixtureState();
+  updateName(state, "送信済みA");
+  assert.equal(startSubmit(state), true);
+  updateName(state, "編集中B");
+  assert.equal(startSubmit(state), false);
+  assert.equal(state.pendingName, "送信済みA");
+  assert.equal(state.submitState, "loading");
+  completeSubmit(state);
+  assert.equal(state.pendingName, null);
+  assert.equal(state.savedName, "送信済みA");
+  assert.equal(state.name, "編集中B");
+  assert.equal(state.submitState, "idle");
+  assert.throws(() => continueAfterSubmit(state), /current draft/);
+});
+
+test("restoring a saved draft permits continuation, but blank drafts do not", async () => {
+  const { updateName } = await import("./fixture-state.mjs");
+  const state = createFixtureState();
+  updateName(state, "設定A");
+  startSubmit(state);
+  completeSubmit(state);
+  updateName(state, "");
+  assert.equal(startSubmit(state), false);
+  assert.equal(state.savedName, "設定A");
+  assert.throws(() => continueAfterSubmit(state), /current draft/);
+  updateName(state, "設定A");
+  assert.equal(state.formError, "");
+  assert.equal(state.submitState, "success");
+  continueAfterSubmit(state);
+  assert.equal(state.route, "list");
+});
+
+test("foundation failure closes confirmation and refuses subsequent writes", async () => {
+  const { commitIrreversible } = await import("./fixture-state.mjs");
+  const state = createFixtureState();
+  state.name = "入力を保持";
+  openIrreversibleConfirm(state);
+  setFoundationFailure(state);
+  assert.equal(state.confirmOpen, false);
+  assert.equal(openIrreversibleConfirm(state), false);
+  assert.throws(() => commitIrreversible(state), /confirmation/);
+  assert.equal(startSubmit(state), false);
+  assert.equal(state.name, "入力を保持");
+});
+
+test("irreversible commit cannot be repeated or reopened", async () => {
+  const { commitIrreversible } = await import("./fixture-state.mjs");
+  const state = createFixtureState();
+  assert.equal(openIrreversibleConfirm(state), true);
+  commitIrreversible(state);
+  assert.equal(state.irreversibleCommitted, true);
+  assert.equal(openIrreversibleConfirm(state), false);
+  assert.throws(() => commitIrreversible(state), /confirmation/);
+});

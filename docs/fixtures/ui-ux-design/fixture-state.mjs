@@ -2,6 +2,8 @@ export function createFixtureState() {
   return {
     route: "edit",
     name: "",
+    pendingName: null,
+    savedName: null,
     formError: "",
     submitState: "idle",
     selectedId: "alpha",
@@ -23,19 +25,35 @@ export function validateName(state) {
   return !state.formError;
 }
 
+export function hasUnsavedChanges(state) {
+  return state.name !== (state.savedName ?? "");
+}
+
+export function updateName(state, name) {
+  state.name = name;
+  if (state.formError) validateName(state);
+  if (state.submitState !== "loading") {
+    state.submitState = state.savedName !== null && !hasUnsavedChanges(state) ? "success" : "idle";
+  }
+}
+
 export function startSubmit(state) {
+  if (state.submitState === "loading" || state.foundation.status === "blocked") return false;
   if (!validateName(state)) return false;
+  state.pendingName = state.name;
   state.submitState = "loading";
   return true;
 }
 
 export function completeSubmit(state) {
   if (state.submitState !== "loading") throw new Error("submit is not loading");
-  state.submitState = "success";
+  state.savedName = state.pendingName;
+  state.pendingName = null;
+  state.submitState = hasUnsavedChanges(state) ? "idle" : "success";
 }
 
 export function continueAfterSubmit(state) {
-  if (state.submitState !== "success") throw new Error("continuation requires successful submit");
+  if (state.submitState !== "success" || hasUnsavedChanges(state)) throw new Error("continuation requires successful submit of the current draft");
   state.route = "list";
 }
 
@@ -64,7 +82,9 @@ export function undoLast(state) {
 }
 
 export function openIrreversibleConfirm(state) {
+  if (state.irreversibleCommitted || state.foundation.status === "blocked") return false;
   state.confirmOpen = true;
+  return true;
 }
 
 export function cancelIrreversible(state) {
@@ -72,7 +92,7 @@ export function cancelIrreversible(state) {
 }
 
 export function commitIrreversible(state) {
-  if (!state.confirmOpen) throw new Error("commit requires pre-commit confirmation state");
+  if (!state.confirmOpen || state.irreversibleCommitted || state.foundation.status === "blocked") throw new Error("commit requires pre-commit confirmation state");
   state.irreversibleCommitted = true;
   state.confirmOpen = false;
 }
@@ -112,6 +132,7 @@ export function derivedTotal(state) {
 
 export function setFoundationFailure(state, reason = "権限を確認できないため操作を停止しました") {
   state.foundation = { status: "blocked", reason };
+  state.confirmOpen = false;
 }
 
 export function restoreFoundation(state) {

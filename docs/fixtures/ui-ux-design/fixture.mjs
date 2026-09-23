@@ -9,6 +9,8 @@ import {
   failMetrics,
   failPreview,
   makeMetricsMissing,
+  hasUnsavedChanges,
+  updateName,
   openDetails,
   openIrreversibleConfirm,
   removeRow,
@@ -25,20 +27,23 @@ const $ = (id) => document.getElementById(id);
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function renderSelection() {
-  $("selection").replaceChildren(...["alpha", "beta"].map((id) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = id;
-    button.dataset.id = id;
+  for (const id of ["alpha", "beta"]) {
+    let button = document.querySelector(`#selection button[data-id="${id}"]`);
+    if (!button) {
+      button = document.createElement("button");
+      button.type = "button";
+      button.textContent = id;
+      button.dataset.id = id;
+      button.addEventListener("click", () => {
+        state.selectedId = id;
+        render();
+        button.focus();
+      });
+      $("selection").append(button);
+    }
     button.className = state.selectedId === id ? "selected" : "";
     button.setAttribute("aria-pressed", String(state.selectedId === id));
-    button.addEventListener("click", () => {
-      state.selectedId = id;
-      render();
-      document.querySelector(`#selection button[data-id="${id}"]`)?.focus();
-    });
-    return button;
-  }));
+  }
 }
 
 function render() {
@@ -49,14 +54,16 @@ function render() {
   $("edit-view").hidden = state.route !== "edit";
   $("list-view").hidden = state.route !== "list";
   $("details-view").hidden = state.route !== "details";
-  $("saved-setting").textContent = state.submitState === "success" ? `保存済み: ${state.name}` : "";
+  $("saved-setting").textContent = state.savedName !== null ? `保存済み: ${state.savedName}` : "";
   $("current-selection").textContent = `選択中: ${state.selectedId}`;
   $("name").value = state.name;
   $("name-error").textContent = state.formError;
+  $("name").setAttribute("aria-invalid", String(Boolean(state.formError)));
   $("save").disabled = state.submitState === "loading";
   $("submit-status").textContent = state.submitState === "loading"
     ? "保存しています…"
-    : state.submitState === "success" ? "保存しました。" : "";
+    : state.submitState === "success" ? "保存しました。"
+      : hasUnsavedChanges(state) ? "未保存の変更があります。" : "";
   $("next-action").hidden = state.submitState !== "success";
 
   renderSelection();
@@ -65,7 +72,10 @@ function render() {
   }));
   $("undo").hidden = !state.undo;
 
-  $("confirm").hidden = !state.confirmOpen;
+  const confirm = $("confirm");
+  if (state.confirmOpen && !confirm.open) confirm.showModal();
+  else if (!state.confirmOpen && confirm.open) confirm.close();
+  $("open-confirm").disabled = state.irreversibleCommitted;
   $("delete-status").textContent = state.irreversibleCommitted ? "API連携 alpha を削除しました。" : "";
 
   const total = derivedTotal(state);
@@ -81,32 +91,63 @@ function render() {
   $("retry-preview").hidden = state.preview.status !== "error";
 }
 
-$("name").addEventListener("input", (event) => { state.name = event.target.value; });
+$("name").addEventListener("input", (event) => {
+  updateName(state, event.target.value);
+  render();
+});
 $("settings-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  state.name = $("name").value;
+  if (state.submitState === "loading" || state.foundation.status === "blocked") return;
+  updateName(state, $("name").value);
   if (!startSubmit(state)) { render(); $("name").focus(); return; }
   render();
+  if (document.activeElement === document.body) $("submit-status").focus();
   await wait(60);
   completeSubmit(state);
   render();
-  $("next-action").focus();
+  if (state.route === "edit" && state.foundation.status === "ok" && !state.confirmOpen
+      && state.submitState === "success" && $("settings-form").contains(document.activeElement)) {
+    $("next-action").focus();
+  }
 });
 $("next-action").addEventListener("click", () => { continueAfterSubmit(state); render(); $("edit-again").focus(); });
 $("edit-again").addEventListener("click", () => { state.route = "edit"; render(); $("name").focus(); });
-$("open-details").addEventListener("click", () => { state.name = $("name").value; openDetails(state); render(); $("back").focus(); });
+$("open-details").addEventListener("click", () => { updateName(state, $("name").value); openDetails(state); render(); $("back").focus(); });
 $("back").addEventListener("click", () => { backToEdit(state); render(); $(state.focusReturnId).focus(); });
 $("remove-alpha").addEventListener("click", () => { removeRow(state, "alpha"); render(); $("undo").focus(); });
 $("undo").addEventListener("click", () => { undoLast(state); render(); $("remove-alpha").focus(); });
 $("open-confirm").addEventListener("click", () => { openIrreversibleConfirm(state); render(); $("cancel-delete").focus(); });
 $("cancel-delete").addEventListener("click", () => { cancelIrreversible(state); render(); $("open-confirm").focus(); });
-$("commit-delete").addEventListener("click", () => { commitIrreversible(state); render(); $("open-confirm").focus(); });
+$("commit-delete").addEventListener("click", () => { commitIrreversible(state); render(); $("delete-status").focus(); });
+// Native modality makes the background inert; keep Tab within the two choices.
+$("confirm").addEventListener("keydown", (event) => {
+  if (event.key !== "Tab") return;
+  const first = $("cancel-delete");
+  const last = $("commit-delete");
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
+$("confirm").addEventListener("cancel", (event) => {
+  event.preventDefault();
+  cancelIrreversible(state);
+  render();
+  $("open-confirm").focus();
+});
 $("fail-metrics").addEventListener("click", () => { failMetrics(state); render(); $("retry-metrics").focus(); });
-$("retry-metrics").addEventListener("click", () => { retryMetrics(state); render(); $("metrics-region").focus?.(); });
+$("retry-metrics").addEventListener("click", () => {
+  const recovered = retryMetrics(state);
+  render();
+  $(recovered ? "metrics-region" : "retry-metrics").focus();
+});
 $("missing-metrics").addEventListener("click", () => { makeMetricsMissing(state); render(); });
 $("fail-preview").addEventListener("click", () => { failPreview(state); render(); $("retry-preview").focus(); });
 $("retry-preview").addEventListener("click", () => { restorePreview(state); render(); $("fail-preview").focus(); });
-$("block-foundation").addEventListener("click", () => { state.name = $("name").value; setFoundationFailure(state); render(); $("restore-foundation").focus(); });
+$("block-foundation").addEventListener("click", () => { updateName(state, $("name").value); setFoundationFailure(state); render(); $("restore-foundation").focus(); });
 $("restore-foundation").addEventListener("click", () => { restoreFoundation(state); render(); $("block-foundation").focus(); });
 
 render();

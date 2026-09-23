@@ -22,3 +22,15 @@ python3 -m http.server 4173
 ```
 
 Browser verification should exercise keyboard focus and the actual state transitions. A screenshot alone is not evidence for Undo, loading, retry, or state restoration.
+
+## Review regressions
+
+The state suite also checks draft/pending/saved-value separation, duplicate
+submission, edit-during-save, and continuation after an edit. Browser checks
+must include Tab/Shift+Tab and Escape within the native confirmation dialog,
+focus return on cancel/commit, retry failure and success, and an independent
+selection remaining focused when a save finishes.
+
+The adapter integration suite (`node --test scripts/test-ui-ux-adapter-assets.mjs`)
+checks ordinary profiles and actual reference-file install, update, local-edit
+conflict, stale retention, prune and rollback for both adapters.

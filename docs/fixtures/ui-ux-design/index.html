@@ -12,7 +12,7 @@
     input, button { font: inherit; }
     input { padding: 8px; width: min(360px, 100%); }
     button { padding: 8px 12px; margin: 4px 4px 4px 0; }
-    button:focus-visible, input:focus-visible { outline: 3px solid currentColor; outline-offset: 2px; }
+    button:focus-visible, input:focus-visible, [tabindex="-1"]:focus { outline: 3px solid currentColor; outline-offset: 2px; }
     [role="status"], [role="alert"] { margin: 8px 0; }
     .muted { opacity: .75; }
     .selected { font-weight: 700; text-decoration: underline; }
@@ -37,10 +37,10 @@
       <h2>設定を編集</h2>
       <form id="settings-form" novalidate>
         <label for="name">設定名</label>
-        <input id="name" name="name" autocomplete="off" />
+        <input id="name" name="name" autocomplete="off" aria-describedby="name-error" />
         <p id="name-error" role="alert"></p>
         <button id="save" type="submit">設定を保存</button>
-        <p id="submit-status" role="status" aria-live="polite"></p>
+        <p id="submit-status" role="status" aria-live="polite" tabindex="-1"></p>
         <button id="next-action" type="button" hidden>一覧へ戻る</button>
       </form>
 
@@ -71,17 +71,17 @@
     <section>
       <h2>不可逆操作</h2>
       <button id="open-confirm" type="button">API連携を完全に削除</button>
-      <div id="confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title" hidden>
+      <dialog id="confirm" aria-labelledby="confirm-title" aria-describedby="confirm-description">
         <h3 id="confirm-title">API連携「alpha」を完全に削除しますか？</h3>
-        <p>対象：API連携「alpha」。保存済みの認証設定を削除します。この検証画面では、削除後に元へ戻せません。</p>
-        <button id="cancel-delete" type="button">削除せず戻る</button>
+        <p id="confirm-description">対象：API連携「alpha」。保存済みの認証設定を削除します。この検証画面では、削除後に元へ戻せません。</p>
+        <button id="cancel-delete" type="button" autofocus>削除せず戻る</button>
         <button id="commit-delete" type="button">完全に削除</button>
-      </div>
-      <p id="delete-status" role="status"></p>
+      </dialog>
+      <p id="delete-status" role="status" tabindex="-1"></p>
     </section>
 
-    <section id="metrics-region">
-      <h2>集計</h2>
+    <section id="metrics-region" tabindex="-1" aria-labelledby="metrics-title" aria-describedby="metrics-status">
+      <h2 id="metrics-title">集計</h2>
       <p id="metrics-status" role="status"></p>
       <p>合計: <strong id="total"></strong></p>
       <button id="dependent-action" type="button">集計結果を使う</button>

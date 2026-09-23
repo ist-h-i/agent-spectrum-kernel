@@ -142,6 +142,7 @@
         "skill-router",
         "spec-driven-development",
         "test-first-verification",
+        "ui-ux-design",
         "work-package-compiler"
       ],
       "knowledge_write_policy": "explicit_only"
