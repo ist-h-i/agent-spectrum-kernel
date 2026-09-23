@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/verification-scoped-reuse.schema.json",
+  "title": "Agent Spectrum Kernel scoped verification reuse, delta review, and current coverage",
+  "oneOf": [
+    { "$ref": "#/$defs/dependencyManifest" },
+    { "$ref": "#/$defs/scopedRequirements" },
+    { "$ref": "#/$defs/scopedPlan" },
+    { "$ref": "#/$defs/deltaReviewRequest" },
+    { "$ref": "#/$defs/currentCoverage" }
+  ],
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@+/-]*$"
+    },
+    "portablePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?:\\.|(?!(?:.*\\/)?\\.{1,2}(?:\\/|$))[A-Za-z0-9._?*-]+(?:/[A-Za-z0-9._?*-]+)*)$"
+    },
+    "artifactHeader": {
+      "type": "object",
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "pattern", "evidence_kind"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["file", "directory", "glob"] },
+        "pattern": { "$ref": "#/$defs/portablePath" },
+        "evidence_kind": { "type": "string", "enum": ["contract", "dependency", "file", "fixture", "manifest", "schema"] }
+      }
+    },
+    "reviewSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "pattern"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["file", "directory", "glob"] },
+        "pattern": { "$ref": "#/$defs/portablePath" }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executable", "argument_identity_scheme", "arguments_digest", "argument_count", "opaque_argument_count", "working_directory"],
+      "properties": {
+        "executable": { "$ref": "#/$defs/token" },
+        "argument_identity_scheme": { "type": "string", "const": "opaque-references-v1" },
+        "arguments_digest": { "$ref": "#/$defs/digest" },
+        "argument_count": { "type": "integer", "minimum": 0, "maximum": 128 },
+        "opaque_argument_count": { "type": "integer", "minimum": 0, "maximum": 128 },
+        "working_directory": { "$ref": "#/$defs/portablePath" }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runner_id", "runner_version", "adapter_id", "adapter_version", "evidence_level"],
+      "properties": {
+        "runner_id": { "$ref": "#/$defs/token" },
+        "runner_version": { "$ref": "#/$defs/token" },
+        "adapter_id": { "$ref": "#/$defs/token" },
+        "adapter_version": { "$ref": "#/$defs/token" },
+        "evidence_level": { "type": "string", "enum": ["projected", "runtime_detected", "executed", "behavior_verified"] }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["independent_judgment_required", "accepted_producers", "accepted_evidence_levels"],
+      "properties": {
+        "independent_judgment_required": { "type": "boolean" },
+        "accepted_producers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "identity_digest"],
+            "properties": {
+              "kind": { "type": "string", "enum": ["automation", "ci", "developer", "reviewer"] },
+              "identity_digest": { "$ref": "#/$defs/digest" }
+            }
+          }
+        },
+        "accepted_evidence_levels": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["projected", "runtime_detected", "executed", "behavior_verified"] }
+        }
+      }
+    },
+    "dependencyManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "schema_path", "program", "manifest_id", "manifest_digest",
+        "gate_id", "gate_contract_digest", "dependency_completeness", "base_inventory_digest",
+        "selectors", "execution", "runtime_observation", "invalidation"
+      ],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_dependency_manifest" },
+        "manifest_id": { "type": "string", "pattern": "^verification-dependency-manifest-[a-f0-9]{64}$" },
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "gate_id": { "$ref": "#/$defs/token" },
+        "gate_contract_digest": { "$ref": "#/$defs/digest" },
+        "dependency_completeness": { "type": "string", "enum": ["complete", "incomplete"] },
+        "base_inventory_digest": { "$ref": "#/$defs/digest" },
+        "selectors": { "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/selector" } },
+        "execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["command", "runner"],
+          "properties": {
+            "command": { "$ref": "#/$defs/command" },
+            "runner": { "$ref": "#/$defs/runner" }
+          }
+        },
+        "runtime_observation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "toolchain_names"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["node_process_v1", "unknown"] },
+            "toolchain_names": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/token" }
+            }
+          }
+        },
+        "invalidation": {
