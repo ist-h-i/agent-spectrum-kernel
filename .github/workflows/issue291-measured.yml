@@ -1,4 +1,4 @@
-name: Verify measured successor bridge
+name: Check measured successor preparation
 
 on:
   pull_request:
@@ -13,6 +13,10 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      EXPECTED_CHECKOUT_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -20,17 +24,32 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '24'
-      - name: Preserve public source for local verification
+      - name: Preserve exact preparation source for local verification
         run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_CHECKOUT_SHA"
+          git merge-base --is-ancestor "$PR_BASE_SHA" HEAD
+          git merge-base --is-ancestor "$PR_HEAD_SHA" HEAD
           mkdir -p "$RUNNER_TEMP/ask291-source"
-          git bundle create "$RUNNER_TEMP/ask291-source/source.bundle" --all
+          # Preserve the tested ancestry, not unrelated local or remote refs.
+          git bundle create "$RUNNER_TEMP/ask291-source/source.bundle" HEAD
+          # Keep the original two-line checkout commit/tree format.
           git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/ask291-source/identity.txt"
+          {
+            printf 'evidence_scope=preparation_only\n'
+            printf 'pr_base_commit=%s\n' "$PR_BASE_SHA"
+            printf 'pr_base_tree=%s\n' "$(git rev-parse "$PR_BASE_SHA^{tree}")"
+            printf 'pr_head_commit=%s\n' "$PR_HEAD_SHA"
+            printf 'pr_head_tree=%s\n' "$(git rev-parse "$PR_HEAD_SHA^{tree}")"
+          } > "$RUNNER_TEMP/ask291-source/pr-context.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: ask291-public-source
           path: ${{ runner.temp }}/ask291-source
           retention-days: 1
-      - name: Validate existing successor boundaries
+          if-no-files-found: error
+      # These are existing synthetic compatibility tests, not measured-bridge
+      # implementation tests or authority for a real experiment.
+      - name: Validate existing synthetic successor boundaries
         run: |
           node --test scripts/test-ask-benchmark-prompt-successor.mjs scripts/test-ask-benchmark-prompt-successor-report.mjs scripts/test-ask-benchmark-prompt-successor-input-guards.mjs
-          git diff --check origin/main...HEAD
+          git diff --check "$PR_BASE_SHA...$PR_HEAD_SHA"

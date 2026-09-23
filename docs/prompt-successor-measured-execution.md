@@ -1,9 +1,33 @@
 # Measured Prompt successor execution bridge
 
-Progresses #291. This is the formal verification contract for the measured bridge.
-Implementation and verification status are recorded in the PR, not inferred from
-this document. The old #291 source (`756c72b3fba158fbbc33642128bf5ab87097914b`)
-and the #234/#235 artifacts remain immutable.
+Progresses #291. This document defines the measured bridge's formal verification
+contract, not evidence of implementation. Exact delivery and verification evidence
+is recorded in the PR. The old #291 source
+(`756c72b3fba158fbbc33642128bf5ab87097914b`) and the #234/#235 artifacts remain immutable.
+
+## Delivery status and merge gate
+
+This change is **preparation only**: the contract and a compatibility workflow.
+It does not yet implement a measured launcher, execution journal/resume, measured
+provenance access, or the measured report gate. The existing result/provenance
+entrypoints still reject any access mode other than `synthetic_only`; do not
+remove that guard to make the draft appear executable.
+
+A green `Check measured successor preparation` run proves only its named
+existing synthetic compatibility checks. The source archive is an input for
+reproduction, not proof that tests passed or authority to execute a trial.
+`identity.txt` records the tested checkout commit/tree (normally the PR merge
+commit); `pr-context.txt` separately records the event's exact base/head
+commit/tree and the preparation-only evidence scope. Whitespace validation uses
+those pinned PR commits, not a moving `origin/main` reference.
+
+Before this PR is ready to merge, the implementation and verification must cover
+all invariants below, including the separately authorized measured entrypoint,
+actual runner/evaluator/admission/scoring linkage, ordered no-retry execution,
+stop/resume rules, and measured-only report provenance. Deterministic fake-process
+proof is required here; real trials and the new result-blind experiment freeze
+remain separate work after a suitable source is merged. Keeping this status
+explicit does not satisfy any of those implementation requirements.
 
 ## Goal and authority boundary
 
