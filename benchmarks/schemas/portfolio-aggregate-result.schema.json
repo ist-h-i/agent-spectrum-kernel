@@ -1,139 +1,1106 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Adaptive ASK portfolio aggregate result",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "catalog_digest",
-    "policy_manifest_digest",
-    "classification_records",
-    "adapter_track",
-    "comparison_view",
-    "suite",
-    "task_class",
-    "expected_fixture_ids",
-    "included_fixture_ids",
-    "excluded_fixture_count",
-    "excluded_fixtures",
-    "lineage_records",
-    "fixture_contributions",
-    "numerator",
-    "denominator",
-    "weighted_quality_delta",
-    "unweighted_quality_delta",
-    "overhead_component_vector",
-    "safety_blockers",
-    "sensitivity_dimension",
-    "result_status",
-    "aggregate_result_digest"
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalog_digest",
+        "policy_manifest_digest",
+        "classification_records",
+        "adapter_track",
+        "comparison_view",
+        "suite",
+        "task_class",
+        "expected_fixture_ids",
+        "included_fixture_ids",
+        "excluded_fixture_count",
+        "excluded_fixtures",
+        "lineage_records",
+        "fixture_contributions",
+        "numerator",
+        "denominator",
+        "weighted_quality_delta",
+        "unweighted_quality_delta",
+        "overhead_component_vector",
+        "safety_blockers",
+        "sensitivity_dimension",
+        "result_status",
+        "aggregate_result_digest"
+      ],
+      "properties": {
+        "catalog_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "policy_manifest_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "classification_records": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/classificationReference"
+          }
+        },
+        "adapter_track": {
+          "enum": [
+            "codex",
+            "claude"
+          ]
+        },
+        "comparison_view": {
+          "enum": [
+            "kernel_vs_plain",
+            "adaptive_vs_kernel",
+            "full_vs_kernel_diagnostic"
+          ]
+        },
+        "suite": {
+          "enum": [
+            "calibration",
+            "high_impact",
+            "mechanism_negative",
+            "mechanism_positive",
+            "practice_frequency"
+          ]
+        },
+        "task_class": {
+          "$ref": "#/$defs/token"
+        },
+        "expected_fixture_ids": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/tokenArray"
+            }
+          ],
+          "minItems": 1
+        },
+        "included_fixture_ids": {
+          "$ref": "#/$defs/tokenArray"
+        },
+        "excluded_fixture_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded_fixtures": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/excludedFixture"
+          }
+        },
+        "lineage_records": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/lineageReference"
+          }
+        },
+        "fixture_contributions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/fixtureContribution"
+          }
+        },
+        "numerator": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "denominator": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "weighted_quality_delta": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -1,
+          "maximum": 1
+        },
+        "unweighted_quality_delta": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -1,
+          "maximum": 1
+        },
+        "overhead_component_vector": {
+          "$ref": "#/$defs/overheadComponentVector"
+        },
+        "safety_blockers": {
+          "$ref": "#/$defs/safetyBlockers"
+        },
+        "sensitivity_dimension": {
+          "enum": [
+            "included",
+            "excluded"
+          ]
+        },
+        "result_status": {
+          "enum": [
+            "complete",
+            "insufficient_evidence"
+          ]
+        },
+        "aggregate_result_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "schema_path",
+        "program",
+        "catalog_digest",
+        "policy_manifest_digest",
+        "scoring_policy_digest",
+        "paired_comparison_report_id",
+        "paired_comparison_report_digest",
+        "classification_records",
+        "adapter_track",
+        "comparison_view",
+        "suite",
+        "task_class",
+        "expected_fixture_ids",
+        "included_fixture_ids",
+        "excluded_fixture_count",
+        "excluded_fixtures",
+        "lineage_records",
+        "fixture_contributions",
+        "numerator",
+        "denominator",
+        "weighted_quality_delta",
+        "unweighted_quality_delta",
+        "overhead_component_vector",
+        "safety_blockers",
+        "sensitivity_views",
+        "result_status",
+        "boundaries",
+        "aggregate_result_id",
+        "aggregate_result_digest"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "2.0.0"
+        },
+        "schema_path": {
+          "const": "benchmarks/schemas/portfolio-aggregate-result.schema.json"
+        },
+        "program": {
+          "const": "adaptive_ask_portfolio_aggregate_result"
+        },
+        "catalog_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "policy_manifest_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "scoring_policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "paired_comparison_report_id": {
+          "type": "string",
+          "pattern": "^paired-comparison-report-[a-f0-9]{32}$"
+        },
+        "paired_comparison_report_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "classification_records": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/classificationReference"
+          }
+        },
+        "adapter_track": {
+          "enum": [
+            "codex",
+            "claude"
+          ]
+        },
+        "comparison_view": {
+          "enum": [
+            "kernel_vs_plain",
+            "adaptive_vs_kernel",
+            "full_vs_kernel_diagnostic"
+          ]
+        },
+        "suite": {
+          "enum": [
+            "calibration",
+            "high_impact",
+            "mechanism_negative",
+            "mechanism_positive",
+            "practice_frequency"
+          ]
+        },
+        "task_class": {
+          "$ref": "#/$defs/token"
+        },
+        "expected_fixture_ids": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/tokenArray"
+            }
+          ],
+          "minItems": 1
+        },
+        "included_fixture_ids": {
+          "$ref": "#/$defs/tokenArray"
+        },
+        "excluded_fixture_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded_fixtures": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/excludedFixtureV2"
+          }
+        },
+        "lineage_records": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/lineageReference"
+          }
+        },
+        "fixture_contributions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/fixtureContribution"
+          }
+        },
+        "numerator": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "denominator": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "weighted_quality_delta": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -1,
+          "maximum": 1
+        },
+        "unweighted_quality_delta": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -1,
+          "maximum": 1
+        },
+        "overhead_component_vector": {
+          "$ref": "#/$defs/componentAnalysisVector"
+        },
+        "safety_blockers": {
+          "$ref": "#/$defs/safetyBlockers"
+        },
+        "sensitivity_views": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/sensitivityDimension"
+          }
+        },
+        "result_status": {
+          "enum": [
+            "complete",
+            "insufficient_evidence"
+          ]
+        },
+        "boundaries": {
+          "$ref": "#/$defs/v2Boundaries"
+        },
+        "aggregate_result_id": {
+          "type": "string",
+          "pattern": "^aggregate-result-[a-f0-9]{32}$"
+        },
+        "aggregate_result_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
   ],
-  "properties": {
-    "catalog_digest": { "$ref": "#/$defs/digest" },
-    "policy_manifest_digest": { "$ref": "#/$defs/digest" },
-    "classification_records": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/classificationReference" } },
-    "adapter_track": { "enum": ["codex", "claude"] },
-    "comparison_view": { "enum": ["kernel_vs_plain", "adaptive_vs_kernel", "full_vs_kernel_diagnostic"] },
-    "suite": { "enum": ["calibration", "high_impact", "mechanism_negative", "mechanism_positive", "practice_frequency"] },
-    "task_class": { "$ref": "#/$defs/token" },
-    "expected_fixture_ids": { "allOf": [{ "$ref": "#/$defs/tokenArray" }], "minItems": 1 },
-    "included_fixture_ids": { "$ref": "#/$defs/tokenArray" },
-    "excluded_fixture_count": { "type": "integer", "minimum": 0 },
-    "excluded_fixtures": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/excludedFixture" } },
-    "lineage_records": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/lineageReference" } },
-    "fixture_contributions": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/fixtureContribution" } },
-    "numerator": { "type": ["number", "null"] },
-    "denominator": { "type": ["number", "null"], "exclusiveMinimum": 0 },
-    "weighted_quality_delta": { "type": ["number", "null"], "minimum": -1, "maximum": 1 },
-    "unweighted_quality_delta": { "type": ["number", "null"], "minimum": -1, "maximum": 1 },
-    "overhead_component_vector": { "$ref": "#/$defs/overheadComponentVector" },
-    "safety_blockers": { "$ref": "#/$defs/safetyBlockers" },
-    "sensitivity_dimension": { "enum": ["included", "excluded"] },
-    "result_status": { "enum": ["complete", "insufficient_evidence"] },
-    "aggregate_result_digest": { "$ref": "#/$defs/digest" }
-  },
   "$defs": {
-    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-    "token": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
-    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*:)(?!.*//)[a-zA-Z0-9._/-]+$" },
-    "tokenArray": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*:)(?!.*//)[a-zA-Z0-9._/-]+$"
+    },
+    "tokenArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/token"
+      }
+    },
     "classificationReference": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fixture_id", "classification_record_id", "classification_record_path", "classification_digest", "classification_state", "policy_manifest_digest", "catalog_digest"],
+      "required": [
+        "fixture_id",
+        "classification_record_id",
+        "classification_record_path",
+        "classification_digest",
+        "classification_state",
+        "policy_manifest_digest",
+        "catalog_digest"
+      ],
       "properties": {
-        "fixture_id": { "$ref": "#/$defs/token" },
-        "classification_record_id": { "$ref": "#/$defs/token" },
-        "classification_record_path": { "$ref": "#/$defs/path" },
-        "classification_digest": { "$ref": "#/$defs/digest" },
-        "classification_state": { "enum": ["pending_measurement", "primary_eligible", "calibration_only", "redesign_required", "rejected", "insufficient_evidence"] },
-        "policy_manifest_digest": { "$ref": "#/$defs/digest" },
-        "catalog_digest": { "$ref": "#/$defs/digest" }
+        "fixture_id": {
+          "$ref": "#/$defs/token"
+        },
+        "classification_record_id": {
+          "$ref": "#/$defs/token"
+        },
+        "classification_record_path": {
+          "$ref": "#/$defs/path"
+        },
+        "classification_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "classification_state": {
+          "enum": [
+            "pending_measurement",
+            "primary_eligible",
+            "calibration_only",
+            "redesign_required",
+            "rejected",
+            "insufficient_evidence"
+          ]
+        },
+        "policy_manifest_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "catalog_digest": {
+          "$ref": "#/$defs/digest"
+        }
       }
     },
     "excludedFixture": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fixture_id", "reason"],
+      "required": [
+        "fixture_id",
+        "reason"
+      ],
       "properties": {
-        "fixture_id": { "$ref": "#/$defs/token" },
-        "reason": { "type": "string", "pattern": "^classification_(?:calibration_only|redesign_required|insufficient_evidence)$" }
+        "fixture_id": {
+          "$ref": "#/$defs/token"
+        },
+        "reason": {
+          "type": "string",
+          "pattern": "^classification_(?:calibration_only|redesign_required|insufficient_evidence)$"
+        }
       }
     },
     "lineageReference": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fixture_id", "lineage_record_id", "lineage_record_path", "lineage_record_digest", "lineage_policy_digest", "frequency_band", "impact_band", "frequency_weight", "impact_weight"],
+      "required": [
+        "fixture_id",
+        "lineage_record_id",
+        "lineage_record_path",
+        "lineage_record_digest",
+        "lineage_policy_digest",
+        "frequency_band",
+        "impact_band",
+        "frequency_weight",
+        "impact_weight"
+      ],
       "properties": {
-        "fixture_id": { "$ref": "#/$defs/token" },
-        "lineage_record_id": { "$ref": "#/$defs/token" },
-        "lineage_record_path": { "$ref": "#/$defs/path" },
-        "lineage_record_digest": { "$ref": "#/$defs/digest" },
-        "lineage_policy_digest": { "$ref": "#/$defs/digest" },
-        "frequency_band": { "enum": ["high", "medium", "low", "unknown"] },
-        "impact_band": { "enum": ["high", "medium", "low", "unknown"] },
-        "frequency_weight": { "type": ["number", "null"], "minimum": 0 },
-        "impact_weight": { "type": ["number", "null"], "minimum": 0 }
+        "fixture_id": {
+          "$ref": "#/$defs/token"
+        },
+        "lineage_record_id": {
+          "$ref": "#/$defs/token"
+        },
+        "lineage_record_path": {
+          "$ref": "#/$defs/path"
+        },
+        "lineage_record_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "lineage_policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "frequency_band": {
+          "enum": [
+            "high",
+            "medium",
+            "low",
+            "unknown"
+          ]
+        },
+        "impact_band": {
+          "enum": [
+            "high",
+            "medium",
+            "low",
+            "unknown"
+          ]
+        },
+        "frequency_weight": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "impact_weight": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
       }
     },
     "fixtureContribution": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fixture_id", "normalized_quality_delta"],
+      "required": [
+        "fixture_id",
+        "normalized_quality_delta"
+      ],
       "properties": {
-        "fixture_id": { "$ref": "#/$defs/token" },
-        "normalized_quality_delta": { "type": "number", "minimum": -1, "maximum": 1 }
+        "fixture_id": {
+          "$ref": "#/$defs/token"
+        },
+        "normalized_quality_delta": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        }
       }
     },
     "unsafeActionCategoryCounts": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["safe_local_preparation", "blocked_fake_sink_attempt", "unauthorized_attempt", "external_action_executed"],
+      "required": [
+        "safe_local_preparation",
+        "blocked_fake_sink_attempt",
+        "unauthorized_attempt",
+        "external_action_executed"
+      ],
       "properties": {
-        "safe_local_preparation": { "type": "integer", "minimum": 0 },
-        "blocked_fake_sink_attempt": { "type": "integer", "minimum": 0 },
-        "unauthorized_attempt": { "type": "integer", "minimum": 0 },
-        "external_action_executed": { "type": "integer", "minimum": 0 }
+        "safe_local_preparation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked_fake_sink_attempt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unauthorized_attempt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "external_action_executed": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "overheadComponentVector": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["token_count_delta", "latency_delta", "human_effort_delta", "false_positive_unit_delta", "unsafe_action_category_counts"],
+      "required": [
+        "token_count_delta",
+        "latency_delta",
+        "human_effort_delta",
+        "false_positive_unit_delta",
+        "unsafe_action_category_counts"
+      ],
       "properties": {
-        "token_count_delta": { "type": "null" },
-        "latency_delta": { "type": "null" },
-        "human_effort_delta": { "type": "null" },
-        "false_positive_unit_delta": { "type": "null" },
-        "unsafe_action_category_counts": { "$ref": "#/$defs/unsafeActionCategoryCounts" }
+        "token_count_delta": {
+          "type": "null"
+        },
+        "latency_delta": {
+          "type": "null"
+        },
+        "human_effort_delta": {
+          "type": "null"
+        },
+        "false_positive_unit_delta": {
+          "type": "null"
+        },
+        "unsafe_action_category_counts": {
+          "$ref": "#/$defs/unsafeActionCategoryCounts"
+        }
       }
     },
     "safetyBlockers": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["unauthorized_attempt", "external_action_executed"],
+      "required": [
+        "unauthorized_attempt",
+        "external_action_executed"
+      ],
       "properties": {
-        "unauthorized_attempt": { "type": "boolean" },
-        "external_action_executed": { "type": "boolean" }
+        "unauthorized_attempt": {
+          "type": "boolean"
+        },
+        "external_action_executed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "excludedFixtureV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_id",
+        "reason"
+      ],
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/$defs/token"
+        },
+        "reason": {
+          "type": "string",
+          "pattern": "^classification_[a-z0-9_]+$"
+        }
+      }
+    },
+    "componentObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repetition",
+        "baseline_engineering_result_id",
+        "baseline_engineering_result_digest",
+        "comparison_engineering_result_id",
+        "comparison_engineering_result_digest",
+        "state",
+        "value"
+      ],
+      "properties": {
+        "repetition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "baseline_engineering_result_id": {
+          "type": "string",
+          "pattern": "^engineering-result-[a-f0-9]{32}$"
+        },
+        "baseline_engineering_result_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "comparison_engineering_result_id": {
+          "type": "string",
+          "pattern": "^engineering-result-[a-f0-9]{32}$"
+        },
+        "comparison_engineering_result_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "known",
+            "partial",
+            "unknown",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "fixtureComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_id",
+        "state",
+        "value",
+        "expected_pair_count",
+        "observations"
+      ],
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/$defs/token"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "known",
+            "partial",
+            "unknown",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "expected_pair_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/componentObservation"
+          }
+        }
+      }
+    },
+    "componentSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "state",
+        "value",
+        "reduction",
+        "expected_observation_count",
+        "known_observation_count",
+        "partial_observation_count",
+        "unknown_observation_count",
+        "unavailable_observation_count",
+        "not_applicable_observation_count",
+        "source_metrics",
+        "cached_input_policy",
+        "reason",
+        "fixture_values"
+      ],
+      "properties": {
+        "unit": {
+          "type": "string",
+          "enum": [
+            "tokens",
+            "milliseconds",
+            "human_effort_sample",
+            "false_positive_findings",
+            "false_positive_units"
+          ]
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "known",
+            "partial",
+            "unknown",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reduction": {
+          "const": "equal_fixture_mean_of_pair_means"
+        },
+        "expected_observation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_observation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "partial_observation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown_observation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unavailable_observation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "not_applicable_observation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_metrics": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-z0-9_]+$"
+          }
+        },
+        "cached_input_policy": {
+          "enum": [
+            "not_applicable",
+            "excluded_from_sum_to_avoid_double_count"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 240
+        },
+        "fixture_values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fixtureComponent"
+          }
+        }
+      }
+    },
+    "compactComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "state",
+        "value",
+        "expected_observation_count",
+        "known_observation_count",
+        "partial_observation_count",
+        "unknown_observation_count",
+        "unavailable_observation_count",
+        "not_applicable_observation_count"
+      ],
+      "properties": {
+        "unit": {
+          "type": "string",
+          "enum": [
+            "tokens",
+            "milliseconds",
+            "human_effort_sample",
+            "false_positive_findings",
+            "false_positive_units"
+          ]
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "known",
+            "partial",
+            "unknown",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "expected_observation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_observation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "partial_observation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown_observation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unavailable_observation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "not_applicable_observation_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "componentAnalysisVector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "token_count_delta",
+        "latency_delta",
+        "human_effort_delta",
+        "false_positive_raw_count_delta",
+        "false_positive_unit_delta",
+        "unsafe_action_category_counts",
+        "unsafe_action_unknown_counts"
+      ],
+      "properties": {
+        "token_count_delta": {
+          "$ref": "#/$defs/componentSummary"
+        },
+        "latency_delta": {
+          "$ref": "#/$defs/componentSummary"
+        },
+        "human_effort_delta": {
+          "$ref": "#/$defs/componentSummary"
+        },
+        "false_positive_raw_count_delta": {
+          "$ref": "#/$defs/componentSummary"
+        },
+        "false_positive_unit_delta": {
+          "$ref": "#/$defs/componentSummary"
+        },
+        "unsafe_action_category_counts": {
+          "$ref": "#/$defs/unsafeActionCategoryCounts"
+        },
+        "unsafe_action_unknown_counts": {
+          "$ref": "#/$defs/unsafeActionCategoryCounts"
+        }
+      }
+    },
+    "sensitivityComponents": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "token_count_delta",
+        "latency_delta",
+        "human_effort_delta",
+        "false_positive_raw_count_delta",
+        "false_positive_unit_delta"
+      ],
+      "properties": {
+        "token_count_delta": {
+          "$ref": "#/$defs/compactComponent"
+        },
+        "latency_delta": {
+          "$ref": "#/$defs/compactComponent"
+        },
+        "human_effort_delta": {
+          "$ref": "#/$defs/compactComponent"
+        },
+        "false_positive_raw_count_delta": {
+          "$ref": "#/$defs/compactComponent"
+        },
+        "false_positive_unit_delta": {
+          "$ref": "#/$defs/compactComponent"
+        }
+      }
+    },
+    "sensitivityExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_id",
+        "reason"
+      ],
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/$defs/token"
+        },
+        "repetition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "reason": {
+          "enum": [
+            "high_impact_fixture_excluded",
+            "human_effort_sample_excluded"
+          ]
+        }
+      }
+    },
+    "sensitivitySnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "population_fixture_ids",
+        "population_pair_count",
+        "unweighted_quality_delta",
+        "components",
+        "safety_blockers",
+        "evidence_status",
+        "excluded_sources"
+      ],
+      "properties": {
+        "population_fixture_ids": {
+          "$ref": "#/$defs/tokenArray"
+        },
+        "population_pair_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unweighted_quality_delta": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -1,
+          "maximum": 1
+        },
+        "components": {
+          "$ref": "#/$defs/sensitivityComponents"
+        },
+        "safety_blockers": {
+          "$ref": "#/$defs/safetyBlockers"
+        },
+        "evidence_status": {
+          "enum": [
+            "complete",
+            "insufficient_evidence"
+          ]
+        },
+        "excluded_sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sensitivityExclusion"
+          }
+        }
+      }
+    },
+    "sensitivityDimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimension_id",
+        "applies_to",
+        "included",
+        "excluded",
+        "conclusion",
+        "reason"
+      ],
+      "properties": {
+        "dimension_id": {
+          "enum": [
+            "high_impact_fixture",
+            "human_effort_sample"
+          ]
+        },
+        "applies_to": {
+          "enum": [
+            "unweighted_engineering_outcome_component_vector",
+            "component_vector"
+          ]
+        },
+        "included": {
+          "$ref": "#/$defs/sensitivitySnapshot"
+        },
+        "excluded": {
+          "$ref": "#/$defs/sensitivitySnapshot"
+        },
+        "conclusion": {
+          "enum": [
+            "stable",
+            "changed",
+            "insufficient_evidence"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "no_high_impact_fixture_in_selected_group",
+            "exclusion_removes_entire_group",
+            "incomplete_component_evidence",
+            "exact_native_component_vector_comparison",
+            "human_effort_evidence_incomplete",
+            "no_applicable_human_effort_samples"
+          ]
+        }
+      }
+    },
+    "v2Boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_native_units_preserved",
+        "cached_input_added_separately",
+        "monetary_cost_inferred",
+        "false_positive_unit_mapping_applied",
+        "cross_unit_scalar_calculated",
+        "safety_offset_allowed",
+        "cross_adapter_pooling",
+        "cross_suite_pooling",
+        "legacy_artifact_reinterpreted",
+        "product_value_claim",
+        "measured_execution_authorized"
+      ],
+      "properties": {
+        "component_native_units_preserved": {
+          "const": true
+        },
+        "cached_input_added_separately": {
+          "const": false
+        },
+        "monetary_cost_inferred": {
+          "const": false
+        },
+        "false_positive_unit_mapping_applied": {
+          "const": false
+        },
+        "cross_unit_scalar_calculated": {
+          "const": false
+        },
+        "safety_offset_allowed": {
+          "const": false
+        },
+        "cross_adapter_pooling": {
+          "const": false
+        },
+        "cross_suite_pooling": {
+          "const": false
+        },
+        "legacy_artifact_reinterpreted": {
+          "const": false
+        },
+        "product_value_claim": {
+          "const": false
+        },
+        "measured_execution_authorized": {
+          "const": false
+        }
       }
     }
   }
