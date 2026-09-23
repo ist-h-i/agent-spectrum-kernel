@@ -316,7 +316,11 @@ function gitDiffSummary({ repositoryRoot, baseRevision, targetRevision }) {
 }
 
 function changedPaths(diffSummary) {
-  return [...new Set(diffSummary.records.flatMap((entry) => [entry.old_path, entry.new_path].filter(Boolean)))].sort();
+  // A copy's source is context only; a separate record captures any source change.
+  const paths = diffSummary.records.flatMap((entry) => (
+    entry.status === "copied" ? [entry.new_path] : [entry.old_path, entry.new_path]
+  ));
+  return [...new Set(paths.filter(Boolean))].sort();
 }
 
 function validateCommandBoundary(command, label) {

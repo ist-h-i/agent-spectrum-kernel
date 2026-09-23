@@ -433,6 +433,8 @@ try {
   const copyPlan = planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: copyTarget });
   assert.equal(copyPlan.dispositions.find((entry) => entry.gate_id === "source-test").reason_code, "declared_dependency_changed");
   assert.ok(copyPlan.actual_diff.change_records.some((entry) => entry.status === "copied" && entry.old_path === "src/app.mjs" && entry.new_path === "src/copy.mjs"));
+  assert.deepEqual(copyPlan.actual_diff.changed_paths, [...initialPlan.actual_diff.changed_paths, "src/copy.mjs"].sort());
+  assert.deepEqual(buildDeltaReviewRequest({ repositoryRoot: root, targetRevision: copyTarget, plan: copyPlan }).affected_paths, ["src/copy.mjs"]);
 
   git(root, ["checkout", "-B", "case-rename", requirementsTarget]);
   git(root, ["mv", "src/app.mjs", "src/main.mjs"]);
@@ -644,6 +646,39 @@ try {
     git(root, ["add", "--", VERIFICATION_SCOPED_REQUIREMENTS_PATH]);
     git(root, ["commit", "-m", `bind ${label} review evidence`]);
     return git(root, ["rev-parse", "HEAD"]);
+  }
+
+  // Keep the deterministic gate reusable so delta-review paths alone decide coverage.
+  const copyReviewTarget = reviewBaseline("copy-paths", [{ kind: "glob", pattern: "src/**" }]);
+  for (const [label, status, from, to, modifySource, expectedPaths, affectedPaths] of [
+    ["copy-out", "copied", "src/app.mjs", "docs/example.mjs", false, ["docs/example.mjs"], []],
+    ["copy-in", "copied", "docs/readme.md", "src/example.md", false, ["src/example.md"], ["src/example.md"]],
+    ["copy-source-modified", "copied", "src/app.mjs", "docs/example.mjs", true, ["docs/example.mjs", "src/app.mjs"], ["src/app.mjs"]],
+    ["rename-out", "renamed", "src/app.mjs", "docs/example.mjs", false, ["docs/example.mjs", "src/app.mjs"], ["src/app.mjs"]],
+    ["delete-source", "deleted", "src/app.mjs", null, false, ["src/app.mjs"], ["src/app.mjs"]],
+  ]) {
+    git(root, ["checkout", "-B", `case-review-${label}`, copyReviewTarget]);
+    if (status === "copied") write(root, to, readFileSync(resolve(root, from), "utf8"));
+    else if (status === "renamed") git(root, ["mv", from, to]);
+    else git(root, ["rm", from]);
+    if (modifySource) write(root, from, "export const answer = 43;\n");
+    if (status === "copied") git(root, ["add", "--", from, to]);
+    git(root, ["commit", "-m", `change review surface: ${label}`]);
+    const target = git(root, ["rev-parse", "HEAD"]);
+    const result = buildCurrentCoverage({ repositoryRoot: root, storeRoot: store, targetRevision: target });
+    const diff = result.plan.actual_diff;
+    assert.equal(diff.truncated, false, label);
+    assert.deepEqual(diff.changed_paths, [VERIFICATION_SCOPED_REQUIREMENTS_PATH, ...expectedPaths].sort(), label);
+    assert.ok(diff.change_records.some((entry) => entry.status === status && entry.old_path === from && entry.new_path === to), label);
+    if (modifySource) assert.ok(diff.change_records.some((entry) => entry.status === "modified" && entry.new_path === from), label);
+    if (status === "copied" && !modifySource) {
+      assert.equal(git(root, ["rev-parse", `${copyReviewTarget}:${from}`]), git(root, ["rev-parse", `${target}:${from}`]), label);
+    }
+    assert.deepEqual(result.plan.dispositions.map((entry) => entry.disposition), ["reuse_scoped"], label);
+    assert.deepEqual(result.delta_review_request.affected_paths, affectedPaths, label);
+    assert.equal(result.delta_review_request.status, affectedPaths.length === 0 ? "not_required" : "current_judgment_required", label);
+    assert.equal(result.coverage.status, affectedPaths.length === 0 ? "covered" : "blocked", label);
+    assert.deepEqual(result.coverage.blockers.map((entry) => entry.reason_code), affectedPaths.length === 0 ? [] : ["current_delta_judgment_unperformed"], label);
   }
 
   for (const [label, selectors] of [
