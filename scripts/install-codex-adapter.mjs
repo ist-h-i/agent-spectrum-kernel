@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, statSync, 
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
+import { skillAssets } from "./skill-assets.mjs";
 import { CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
 import { ADAPTER_RENDERER_METADATA, CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 import { codexCompactCanonicalContractForPaths, codexCompactProfileCanonicalPaths, codexDirectTriggersForPrompt, renderCodexCompactProfile } from "./codex-runtime-profile.mjs";
@@ -148,6 +149,7 @@ const CODEX_PROFILES = {
   implementation: {
     description: "Default scoped implementation profile.",
     skills: [
+      "ui-ux-design",
       "test-first-verification",
       "controlled-implementation",
       "evidence-ledger",
@@ -160,6 +162,7 @@ const CODEX_PROFILES = {
   investigation: {
     description: "Bug, regression, reliability, and unknown-root-cause profile.",
     skills: [
+      "ui-ux-design",
       "doubt-driven-development",
       "test-first-verification",
       "controlled-implementation",
@@ -173,6 +176,7 @@ const CODEX_PROFILES = {
   review: {
     description: "PR, diff, generated-output, and readiness review profile.",
     skills: [
+      "ui-ux-design",
       "review-router",
       "review-automated-gate",
       "review-ai-quality",
@@ -820,10 +824,10 @@ function resolveCodexProjectionSelection({ profileName, skills = null, skipPromp
     ...requiredAssetsForPrompts(prompts),
     ...requiredAssetsForSkills(selectedSkills),
   ])].sort();
-  return { manifest, resolvedProfile, prompts, commands, skills: selectedSkills, requiredSkills, requiredAssets, routingFixtures, routerReachableSkills: skillsForRoutingFixtures(routingFixtures) };
+  return { manifest, resolvedProfile, prompts, commands, skills: selectedSkills, skillFiles: skillAssets(REPO_ROOT, selectedSkills), requiredSkills, requiredAssets, routingFixtures, routerReachableSkills: skillsForRoutingFixtures(routingFixtures) };
 }
 
-function codexRendererInputsForSelection({ prompts, commands, skills, requiredAssets }) {
+function codexRendererInputsForSelection({ prompts, commands, skillFiles, requiredAssets }) {
   const runtimeFiles = commands.includes("codex-exec.md") ? CODEX_RUNTIME_FILES : [];
   const canonical = [
     { path: "AGENTS.md", role: "kernel" },
@@ -834,12 +838,13 @@ function codexRendererInputsForSelection({ prompts, commands, skills, requiredAs
     { path: "schemas/adapter-runtime-event.schema.json", role: "schema" },
     { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
     ...prompts.flatMap((prompt) => codexCompactProfileCanonicalPaths(prompt).map((path) => ({ path, role: path.startsWith("skills/") ? "skill" : path.startsWith("schemas/") ? "schema" : path === "AGENTS.md" ? "kernel" : "contract" }))),
-    ...skills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
+    ...skillFiles.map(({ sourcePath }) => ({ path: sourcePath, role: "skill" })),
     ...requiredAssets.map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : path.endsWith(".mjs") ? "runtime_source" : "contract" })),
     ...runtimeFiles.filter((file) => file.assetKind === "schemas").map((file) => ({ path: file.source, role: "schema" })),
   ];
   const adapterOwned = [
     { path: "scripts/install-codex-adapter.mjs", role: "renderer" },
+    { path: "scripts/skill-assets.mjs", role: "inventory" },
     { path: "scripts/codex-runtime-profile.mjs", role: "renderer" },
     ...(prompts.length > 0 ? [{ path: "scripts/fixed-entry-profile.mjs", role: "renderer" }] : []),
     { path: "scripts/installer-lifecycle.mjs", role: "runtime_source" },
@@ -852,12 +857,12 @@ function codexRendererInputsForSelection({ prompts, commands, skills, requiredAs
   return { canonical: dedupe(canonical), adapter_owned: dedupe(adapterOwned) };
 }
 
-function codexProjectedManagedAssets({ prompts, commands, skills, requiredAssets }) {
+function codexProjectedManagedAssets({ prompts, commands, skillFiles, requiredAssets }) {
   const adapterRequiredAssets = requiredAssets.filter((path) => !CORE_OWNED_IMMUTABLE_ASSETS.includes(path)).sort();
   const runtimeFiles = commands.includes("codex-exec.md") ? CODEX_RUNTIME_FILES : [];
   const inventorySourceRef = "scripts/install-codex-adapter.mjs";
   const assets = [
-    ...skills.map((skill) => ({ path: `.agents/skills/${skill}/SKILL.md`, asset_kind: "skills", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    ...skillFiles.map(({ skill, relativePath }) => ({ path: `.agents/skills/${skill}/${relativePath}`, asset_kind: "skills", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
     ...prompts.map((prompt) => ({ path: `.agents/prompts/${prompt}`, asset_kind: "prompts", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
     ...commands.map((command) => ({ path: `.agents/commands/${command}`, asset_kind: "commands", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
     ...runtimeFiles.map((file) => ({ path: file.target, asset_kind: file.assetKind, ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
@@ -1136,6 +1141,7 @@ function buildPlan(args) {
     requiredAssets,
     compactProfiles,
     compactProfileArtifacts,
+    skillFiles,
   } = projectionPlan;
   const coreStatePath = resolve(args.target, ".agent-spectrum-kernel/install-state.json");
   validateCoreInstalled(args.target, coreStatePath, requiredAssets);
@@ -1193,11 +1199,11 @@ function buildPlan(args) {
     });
   }
 
-  for (const skill of skills) {
-    const source = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
-    ensureSource(source, `skills/${skill}/SKILL.md`);
+  for (const { skill, relativePath: skillPath, sourcePath } of skillFiles) {
+    const source = resolve(REPO_ROOT, sourcePath);
+    ensureSource(source, sourcePath);
     const content = readText(source);
-    const relativePath = `.agents/skills/${skill}/SKILL.md`;
+    const relativePath = `.agents/skills/${skill}/${skillPath}`;
     const destination = resolve(args.target, relativePath);
     if (args.noOverwriteSkills && existsSync(destination) && readText(destination) !== content) {
       throw new Error(`Projected Codex skill already exists and would be overwritten: ${relativePath}`);
@@ -1286,8 +1292,13 @@ function buildPlan(args) {
     });
   }
 
-  for (const skill of staleSkills) {
-    const relativePath = `.agents/skills/${skill}/SKILL.md`;
+  // References can disappear while their parent skill remains selected.
+  // Retain/prune previous managed files, not just whole removed skill names.
+  const staleSkillFiles = Object.entries(previousState?.managed_files ?? {})
+    .filter(([path, record]) => ["codex_skill", "stale_codex_skill"].includes(record?.kind) && !Object.hasOwn(managedFiles, path))
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+  for (const [relativePath, previousRecord] of staleSkillFiles) {
+    const skill = previousRecord.skill;
     if (args.prune) {
       lifecycle.planDeleteManaged(operations, {
         target: args.target,

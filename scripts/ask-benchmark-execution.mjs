@@ -960,14 +960,6 @@ function copyWorkspace({ materializedRoot, record, claim, runIdentity }) {
   return { ephemeralRoot, workspace };
 }
 
-function sourceForProjectedSkill(root, adapter, path) {
-  const prefix = adapter === "codex" ? ".agents/skills/" : ".claude/skills/";
-  if (!path.startsWith(prefix) || !path.endsWith("/SKILL.md")) throw new Error(`selection projection contains a non-skill asset: ${path}`);
-  const skill = path.slice(prefix.length, -"/SKILL.md".length);
-  if (!/^[a-z0-9][a-z0-9-]*$/u.test(skill)) throw new Error(`selection projection has an invalid skill path: ${path}`);
-  return resolve(root, "skills", skill, "SKILL.md");
-}
-
 function applyAdaptiveSelection({ root, adapter, selection, workspace }) {
   const requested = [...new Set([...selection.selected_mechanisms, ...selection.required_gates])];
   if (selection.lightweight_bypass.used) {
@@ -978,9 +970,17 @@ function applyAdaptiveSelection({ root, adapter, selection, workspace }) {
   const plan = adapter === "codex"
     ? buildCodexProjectionPlan({ profileName: "minimal", skills: closure, skipPrompts: true, skipCommand: true })
     : buildClaudeProjectionPlan({ profileName: "implementation", skills: closure, skipHooks: true, skipRuntime: true, skipCommands: true });
+  // Use the installer's bounded, validated source inventory for entries and
+  // references alike. An arbitrary projected path never becomes a source path.
+  const prefix = adapter === "codex" ? ".agents/skills/" : ".claude/skills/";
+  const sources = new Map(plan.skillFiles.map(({ skill, relativePath, sourcePath }) => [
+    `${prefix}${skill}/${relativePath}`, resolve(root, sourcePath),
+  ]));
   const inventory = [];
   for (const asset of plan.projectedManagedAssets) {
-    const source = sourceForProjectedSkill(root, adapter, asset.path);
+    const source = sources.get(asset.path);
+    if (asset.asset_kind !== "skills" || !source) throw new Error(`selection projection contains an unbound skill asset: ${asset.path}`);
+    assertNoSymlinkSegments(source, "selection projection source");
     if (!existsSync(source) || !lstatSync(source).isFile()) throw new Error(`selection projection source is unavailable: ${asset.path}`);
     const destination = assertInside(workspace, resolve(workspace, asset.path), "selection projection destination");
     mkdirSync(dirname(destination), { recursive: true });
@@ -990,7 +990,7 @@ function applyAdaptiveSelection({ root, adapter, selection, workspace }) {
   }
   return {
     status: selection.capability_downgrades.length > 0 ? "capability_downgraded" : "projected",
-    selected_skills: plan.selectedSkills,
+    selected_skills: closure,
     inventory: inventory.sort((left, right) => left.path.localeCompare(right.path)),
     source_digests: Object.values(plan.renderer_inputs).flat().map((item) => ({ path: item.path, sha256: item.digest })).sort((left, right) => left.path.localeCompare(right.path)),
     projection_fingerprint: plan.fingerprint,
@@ -1155,7 +1155,9 @@ function expectedBaseRegularInventory(record, projection) {
     if (existing && stableCanonicalJson(existing) !== stableCanonicalJson(normalized)) throw new Error(`terminal workspace base inventory conflicts at ${entry.path}`);
     byPath.set(entry.path, normalized);
   }
-  return [...byPath.values()].sort((left, right) => left.path.localeCompare(right.path));
+  // Match the terminal-workspace contract's locale-independent path order.
+  // SKILL.md sorts before references/, even in locales that fold letter case.
+  return [...byPath.values()].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
 }
 
 function terminalWorkspaceAuthorityPath(attemptRoot) {

@@ -18,6 +18,10 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Run UI harness and Skill-reference regressions
+        run: |
+          node --test scripts/test-codex-skill-reference-preflight.mjs scripts/test-skill-assets.mjs scripts/test-skill-reference-canonical.mjs scripts/test-ui-ux-adapter-assets.mjs docs/fixtures/ui-ux-design/fixture-state.test.mjs scripts/test-prompt-v2-historical-renderer.mjs
+
       # Fail before expensive suites, retaining the generator's exact-byte check.
       - name: Check adapter runtime bundle freshness
         run: |

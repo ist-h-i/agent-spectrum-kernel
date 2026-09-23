@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PROMPT_V2_RENDERER_SOURCE, verifyHistoricalRenderer } from "./prompt-v2-historical-renderer.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import {
   canonicalDigest as canonicalDigestBase,
@@ -249,7 +250,9 @@ const FROZEN_THRESHOLDS = Object.freeze({
   },
 });
 
-export function validatePromptV2Preregistration(value, { root = ROOT, verifyRepositoryBindings = true } = {}) {
+export function validatePromptV2Preregistration(value, { root = ROOT, verifyRepositoryBindings = true, rendererSource = "current_checkout" } = {}) {
+  if (!["current_checkout", "frozen_renderer_source"].includes(rendererSource)) fail("unknown renderer source");
+  if (rendererSource !== "current_checkout" && !verifyRepositoryBindings) fail("historical renderer verification cannot skip repository bindings");
   assertBenchmarkSchemaInstance(value, { schemaPath: schemaPath(root, PROMPT_V2_PREREGISTRATION_SCHEMA_PATH), label: "Prompt v2 preregistration" });
   exact(value.prompt_roles, PROMPT_ROLES, "preregistration prompt-role order drifted");
   exact(value.prompt_tracks.map(({ adapter_track }) => adapter_track), ADAPTERS, "preregistration adapter-track order drifted");
@@ -281,7 +284,12 @@ export function validatePromptV2Preregistration(value, { root = ROOT, verifyRepo
     for (const binding of value.canonical_prompt_v2.source_maps) assertFileBinding(root, binding, "canonical Prompt v2 source map");
     for (const track of value.prompt_tracks) {
       for (const binding of track.current_source_files) assertFileBinding(root, binding, `${track.adapter_track} current Prompt source`);
-      assertFileBinding(root, { path: track.renderer.implementation_path, raw_byte_digest: track.renderer.implementation_raw_byte_digest }, `${track.adapter_track} renderer`);
+      const rendererBinding = { path: track.renderer.implementation_path, raw_byte_digest: track.renderer.implementation_raw_byte_digest };
+      if (rendererSource === "frozen_renderer_source") {
+        verifyHistoricalRenderer(root, PROMPT_V2_RENDERER_SOURCE, rendererBinding);
+      } else {
+        assertFileBinding(root, rendererBinding, `${track.adapter_track} renderer`);
+      }
     }
     assertFileBinding(root, value.fixture_input_manifest, "fixture input manifest");
     const inputManifest = readJson(resolve(root, value.fixture_input_manifest.path));
@@ -298,9 +306,9 @@ export function validatePromptV2Preregistration(value, { root = ROOT, verifyRepo
   return value;
 }
 
-export function loadPromptV2Preregistration({ root = ROOT, path = PROMPT_V2_PREREGISTRATION_PATH, verifyRepositoryBindings = true } = {}) {
+export function loadPromptV2Preregistration({ root = ROOT, path = PROMPT_V2_PREREGISTRATION_PATH, verifyRepositoryBindings = true, rendererSource = "current_checkout" } = {}) {
   assertPortablePath(path, "preregistration path");
-  return validatePromptV2Preregistration(readJson(resolve(root, path)), { root, verifyRepositoryBindings });
+  return validatePromptV2Preregistration(readJson(resolve(root, path)), { root, verifyRepositoryBindings, rendererSource });
 }
 
 function validateExactAsset(asset, stableId, label) {

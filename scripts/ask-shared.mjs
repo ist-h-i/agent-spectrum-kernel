@@ -181,17 +181,29 @@ export function deriveReviewSignalGateRoute(registry, observedSignals = []) {
   return { observed_signals: normalizedSignals, additional_gates: additionalGates, signals_by_gate: signalsByGate, issues };
 }
 
+// Entry points and reference files use the same bounded path grammar. A
+// reference is an asset of its selected Skill, never another selected Skill.
+function codexSkillAsset(path, prefix) {
+  if (typeof path !== "string" || path.includes("\\") || path.includes("\0")
+    || path.split("/").some((segment) => ["", ".", ".."].includes(segment)) || !path.startsWith(prefix)) return null;
+  const match = path.slice(prefix.length).match(/^([a-z0-9][a-z0-9-]*)\/(SKILL\.md|references\/.+)$/u);
+  return match ? { skill: match[1], relativePath: match[2], sourcePath: `skills/${match[1]}/${match[2]}` } : null;
+}
+
 export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {}, { selectedSkills = [] } = {}) {
   const findings = [];
   const projectedSkillIds = [];
+  const projectedSkillAssets = new Map();
   for (const asset of projectionPlan.projected_managed_assets ?? []) {
     if (asset?.asset_kind !== "skills") continue;
-    const match = typeof asset.path === "string" ? asset.path.match(/^\.agents\/skills\/([a-z0-9][a-z0-9-]*)\/SKILL\.md$/u) : null;
-    if (!match) {
+    const parsed = codexSkillAsset(asset.path, ".agents/skills/");
+    if (!parsed) {
       findings.push({ path: String(asset?.path), status: "invalid_projected_skill_asset" });
       continue;
     }
-    projectedSkillIds.push(match[1]);
+    if (projectedSkillAssets.has(parsed.sourcePath)) findings.push({ path: asset.path, status: "duplicate_projected_skill_asset" });
+    projectedSkillAssets.set(parsed.sourcePath, parsed);
+    if (parsed.relativePath === "SKILL.md") projectedSkillIds.push(parsed.skill);
   }
   const selectedSkillInventory = Array.isArray(selectedSkills) ? [...new Set(selectedSkills)].sort() : [];
   const projectedSkillInventory = [...new Set(projectedSkillIds)].sort();
@@ -201,6 +213,18 @@ export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {
     findings.push({ path: "selected_skills", status: "selected_skill_inventory_mismatch" });
   }
   const selectedSkillSet = new Set(projectedSkillInventory);
+  const canonicalSkillPaths = new Set();
+  for (const input of projectionPlan.renderer_inputs?.canonical ?? []) {
+    const parsed = codexSkillAsset(input?.path, "skills/");
+    if (!parsed || !selectedSkillSet.has(parsed.skill)) continue;
+    if (canonicalSkillPaths.has(input.path)) findings.push({ path: input.path, status: "duplicate_canonical_skill_asset" });
+    canonicalSkillPaths.add(input.path);
+    if (!projectedSkillAssets.has(input.path)) findings.push({ path: input.path, status: "skill_asset_not_projected" });
+  }
+  for (const [path, asset] of projectedSkillAssets) {
+    if (!selectedSkillSet.has(asset.skill)) findings.push({ path, status: "reference_skill_not_selected" });
+    if (!canonicalSkillPaths.has(path)) findings.push({ path, status: "skill_asset_source_missing" });
+  }
   const rendererInputsDigest = canonicalValueDigest(projectionPlan.renderer_inputs);
   const managedInventoryDigest = canonicalValueDigest(projectionPlan.projected_managed_assets);
   const expectedFingerprint = canonicalValueDigest({
@@ -228,8 +252,19 @@ export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {
       if (!managedBlock || hashText(managedBlock) !== blockRecord?.sha256) findings.push({ path: input.path, status: "managed_block_drift" });
       continue;
     }
-    const skillMatch = input.path.match(/^skills\/([a-z0-9][a-z0-9-]*)\/SKILL\.md$/u);
-    if (skillMatch && !selectedSkillSet.has(skillMatch[1])) continue;
+    const skillAsset = codexSkillAsset(input.path, "skills/");
+    if (input.path.startsWith("skills/") && !skillAsset) {
+      findings.push({ path: input.path, status: "invalid_projection_input" });
+      continue;
+    }
+    if (skillAsset && !selectedSkillSet.has(skillAsset.skill)) continue;
+    if (skillAsset) {
+      const inspection = inspectCodexDiscoveryPathSegments(target, input.path);
+      if (inspection.status !== "ok" || !inspection.leafStatus.isFile()) {
+        findings.push({ path: input.path, status: inspection.status === "ok" ? "not_regular_file" : inspection.status });
+        continue;
+      }
+    }
     const sourcePath = resolve(target, input.path);
     if (!existsSync(sourcePath)) {
       if (input.path.startsWith("skills/")) findings.push({ path: input.path, status: "missing" });
@@ -295,12 +330,24 @@ function inspectCodexDiscoveryPathSegments(target, path) {
 export function inspectCodexDiscoverySkillAssets(target, state = {}) {
   if (!Array.isArray(state?.selected_skills)) return [{ path: "selected_skills", status: "invalid_state" }];
   const findings = [];
+  const paths = new Map();
   for (const skill of state.selected_skills) {
     if (typeof skill !== "string" || !/^[a-z0-9][a-z0-9-]*$/u.test(skill)) {
       findings.push({ path: `.agents/skills/${String(skill)}/SKILL.md`, status: "invalid_skill_id" });
       continue;
     }
-    const path = `.agents/skills/${skill}/SKILL.md`;
+    paths.set(`.agents/skills/${skill}/SKILL.md`, skill);
+  }
+  for (const asset of state.projection_plan?.projected_managed_assets ?? []) {
+    if (asset?.asset_kind !== "skills") continue;
+    const parsed = codexSkillAsset(asset.path, ".agents/skills/");
+    if (!parsed || !state.selected_skills.includes(parsed.skill)) {
+      findings.push({ path: String(asset?.path), status: "invalid_projected_skill_asset" });
+      continue;
+    }
+    paths.set(asset.path, parsed.skill);
+  }
+  for (const [path, skill] of paths) {
     const absolutePath = resolve(target, path);
     const pathInspection = inspectCodexDiscoveryPathSegments(target, path);
     if (pathInspection.status !== "ok") {

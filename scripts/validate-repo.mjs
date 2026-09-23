@@ -2189,6 +2189,7 @@ function profilePathHasSymlink(root, path) {
 function isCanonicalSourcePath(path) {
   return ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "manifest.json"].includes(path)
     || /^skills\/[a-z0-9-]+\/SKILL\.md$/.test(path)
+    || /^skills\/[a-z0-9-]+\/references\/[A-Za-z0-9._/-]+$/.test(path)
     || /^docs\/[A-Za-z0-9._/-]+-contract\.md$/.test(path)
     || /^schemas\/[A-Za-z0-9._/-]+\.(?:json|ya?ml)$/.test(path)
     || CORE_IMMUTABLE_RUNTIME_ASSETS.includes(path);
