@@ -6,47 +6,17 @@ on:
 
 jobs:
   validate:
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 294 && github.event.pull_request.head.repo.full_name == 'ist-h-i/agent-spectrum-kernel' && github.event.pull_request.head.ref == 'feat/284-ui-ux-harness'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "24"
-
-      - name: Apply and publish exact reviewed repair
-        run: python3 .github/pr294-repair.py
-
-      - name: Capture source and Git objects for local final verification
-        if: always()
-        run: |
-          mkdir -p "$RUNNER_TEMP/pr294-source"
-          git rev-parse HEAD > "$RUNNER_TEMP/pr294-source/commit.txt"
-          git status --porcelain > "$RUNNER_TEMP/pr294-source/status.txt"
-          git update-ref refs/pr294-diagnostic/head HEAD
-          git update-ref refs/pr294-diagnostic/execution 869d96b16543ef68b4c459064c8010e1cdb0b8de
-          git update-ref refs/pr294-diagnostic/source-a c508a767f3386dac10180770edf37a67806fbb1b
-          git bundle create "$RUNNER_TEMP/pr294-source/source.bundle" refs/pr294-diagnostic/head refs/pr294-diagnostic/execution refs/pr294-diagnostic/source-a
-          git archive --format=tar --prefix=source/ HEAD | gzip > "$RUNNER_TEMP/pr294-source/source.tar.gz"
-          git ls-tree -r HEAD > "$RUNNER_TEMP/pr294-source/tree.txt"
-          sha256sum "$RUNNER_TEMP/pr294-source/"* > "$RUNNER_TEMP/pr294-source/checksums.txt"
-
-      - name: Retain final verification source
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: pr294-repair-source
-          path: ${{ runner.temp }}/pr294-source/
-          retention-days: 1
-          if-no-files-found: error
 
       # Fail before expensive suites, retaining the generator's exact-byte check.
       - name: Check adapter runtime bundle freshness
