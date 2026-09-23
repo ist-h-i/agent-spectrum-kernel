@@ -6,8 +6,10 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync,
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import {
+  buildLegacyPortfolioAggregateResult,
   buildPortfolioAggregateResult,
   computePortfolioAggregateResultDigest,
+  portfolioAggregateEvolutionEvidenceIdentity,
   PORTFOLIO_AGGREGATE_RESULT_SCHEMA_PATH,
   reportPortfolioAggregateResult,
   validatePortfolioAggregateResult,
@@ -21,6 +23,7 @@ import {
   verifyPortfolioPolicyArtifacts,
 } from "./ask-benchmark-portfolio-policy.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
+import { computeEvolutionArtifactInventoryDigest } from "./evolution-loop.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
@@ -205,12 +208,26 @@ try {
   const aggregate = buildPortfolioAggregateResult(options);
   const schema = JSON.parse(readFileSync(resolve(root, PORTFOLIO_AGGREGATE_RESULT_SCHEMA_PATH), "utf8"));
 
-  check("closed root exactly matches B1 required fields", () => {
-    assert.equal(schema.additionalProperties, false);
-    assert.deepEqual(schema.required, policy.aggregation_policy.aggregate_result_contract.required_fields);
-    assert.deepEqual(Object.keys(aggregate), schema.required);
+  check("schema keeps the frozen legacy branch and closes the v2 artifact", () => {
+    assert.equal(schema.oneOf.length, 2);
+    assert.equal(schema.oneOf[0].additionalProperties, false);
+    assert.deepEqual(schema.oneOf[0].required, policy.aggregation_policy.aggregate_result_contract.required_fields);
+    assert.equal(schema.oneOf[1].additionalProperties, false);
+    assert.deepEqual(Object.keys(aggregate), schema.oneOf[1].required);
+    assert.equal(aggregate.schema_version, "2.0.0");
   });
-  check("base aggregate validates", () => assert.equal(validate(aggregate), aggregate));
+  check("base v2 aggregate validates", () => {
+    assert.equal(validate(aggregate), aggregate);
+    assert.equal(aggregate.result_status, "complete");
+  });
+  check("legacy aggregate remains byte-shape compatible and validates", () => {
+    const legacy = buildLegacyPortfolioAggregateResult(options);
+    assert.equal("schema_version" in legacy, false);
+    assert.equal(legacy.overhead_component_vector.token_count_delta, null);
+    assert.equal(legacy.sensitivity_dimension, "included");
+    assert.equal(legacy.result_status, "insufficient_evidence");
+    assert.equal(validate(legacy), legacy);
+  });
   check("adapter comes only from paired authority", () => assert.equal(aggregate.adapter_track, "codex"));
   check("expected fixtures derive from exact suite and task class", () => assert.deepEqual(aggregate.expected_fixture_ids, FIXTURES.map(([fixtureId]) => fixtureId).sort()));
   check("an empty expected fixture group is rejected", () => {
@@ -344,24 +361,126 @@ try {
     const changed = buildPortfolioAggregateResult(buildOptions({ lineageOverrides: [{ frequency_band: "high", impact_band: "low" }, {}] }));
     assert.deepEqual([changed.lineage_records[0].frequency_weight, changed.lineage_records[0].impact_weight], [4, 1]);
   });
-  check("undefined overhead scalars and false-positive units remain null", () => {
-    assert.equal(aggregate.overhead_component_vector.token_count_delta, null);
-    assert.equal(aggregate.overhead_component_vector.latency_delta, null);
-    assert.equal(aggregate.overhead_component_vector.human_effort_delta, null);
-    assert.equal(aggregate.overhead_component_vector.false_positive_unit_delta, null);
+  check("known zero native components remain numeric zero rather than missing", () => {
+    assert.deepEqual(
+      [
+        aggregate.overhead_component_vector.token_count_delta.state,
+        aggregate.overhead_component_vector.token_count_delta.value,
+        aggregate.overhead_component_vector.latency_delta.state,
+        aggregate.overhead_component_vector.latency_delta.value,
+        aggregate.overhead_component_vector.human_effort_delta.state,
+        aggregate.overhead_component_vector.human_effort_delta.value,
+        aggregate.overhead_component_vector.false_positive_raw_count_delta.state,
+        aggregate.overhead_component_vector.false_positive_raw_count_delta.value,
+      ],
+      ["known", 0, "known", 0, "known", 0, "known", 0],
+    );
+    assert.equal(aggregate.overhead_component_vector.false_positive_unit_delta.state, "not_applicable");
+    assert.equal(aggregate.overhead_component_vector.false_positive_unit_delta.value, null);
   });
-  check("required null components keep aggregate insufficient", () => assert.equal(aggregate.result_status, "insufficient_evidence"));
-  check("complete status is rejected while required components are null", () => {
-    const changed = structuredClone(aggregate);
-    changed.result_status = "complete";
-    reclose(changed);
-    assert.throws(() => validate(changed), /cannot be complete while required B1 component values remain unknown/);
+  check("complete status follows closed evidence instead of an unconditional constant", () => {
+    assert.equal(aggregate.result_status, "complete");
+    assert.equal(aggregate.boundaries.cross_unit_scalar_calculated, false);
+    assert.equal(aggregate.boundaries.monetary_cost_inferred, false);
   });
-  check("nonzero inferred false-positive units are rejected", () => {
+  check("incomplete human-effort evidence keeps the aggregate insufficient", () => {
+    const comparison = verifiedComparison((verified) => {
+      const target = verified.verified_results.find(({ result }) =>
+        result.fixture_id === FIXTURES[0][0] && result.condition === "adaptive_ask" && result.repetition === 1,
+      ).result;
+      target.overhead_telemetry.human_effort = { status: "unknown", value: null, reason: "synthetic_not_measured" };
+    });
+    const changed = buildPortfolioAggregateResult(buildOptions({ comparison }));
+    assert.equal(changed.overhead_component_vector.human_effort_delta.state, "partial");
+    assert.equal(changed.overhead_component_vector.human_effort_delta.value, null);
+    assert.equal(changed.result_status, "insufficient_evidence");
+    assert.equal(changed.sensitivity_views.find(({ dimension_id }) => dimension_id === "human_effort_sample").conclusion, "insufficient_evidence");
+    const forged = structuredClone(changed);
+    forged.result_status = "complete";
+    reclose(forged);
+    assert.throws(() => validate(forged), /result status does not match actual evidence closure/);
+  });
+  check("false-positive units cannot be invented from the current raw severity taxonomy", () => {
     const changed = structuredClone(aggregate);
-    changed.overhead_component_vector.false_positive_unit_delta = 1;
+    changed.overhead_component_vector.false_positive_unit_delta.state = "known";
+    changed.overhead_component_vector.false_positive_unit_delta.value = 1;
     reclose(changed);
-    assert.throws(() => validate(changed), /failed JSON Schema validation|false_positive_unit_delta.*must be null/);
+    assert.throws(() => validate(changed), /false-positive unit delta must remain explicitly not-applicable|aggregate state drift/);
+  });
+  check("nonzero native deltas retain provenance and cached input is not double counted", () => {
+    const comparison = verifiedComparison((verified) => {
+      for (const entry of verified.verified_results) {
+        if (entry.result.condition !== "adaptive_ask") continue;
+        entry.result.overhead_telemetry.input_tokens.value += 10;
+        entry.result.overhead_telemetry.output_tokens.value += 20;
+        entry.result.overhead_telemetry.cached_tokens.value += 1000;
+        entry.result.overhead_telemetry.duration_ms.value += 5;
+        entry.result.overhead_telemetry.human_effort.value += 2;
+        entry.result.false_positives.raw_count = 1;
+        entry.result.false_positives.severity_counts.high = 1;
+      }
+    });
+    const changed = buildPortfolioAggregateResult(buildOptions({ comparison }));
+    assert.equal(changed.overhead_component_vector.token_count_delta.value, 30);
+    assert.equal(changed.overhead_component_vector.latency_delta.value, 5);
+    assert.equal(changed.overhead_component_vector.human_effort_delta.value, 2);
+    assert.equal(changed.overhead_component_vector.false_positive_raw_count_delta.value, 1);
+    assert.equal(changed.overhead_component_vector.token_count_delta.cached_input_policy, "excluded_from_sum_to_avoid_double_count");
+    assert.equal(changed.overhead_component_vector.token_count_delta.fixture_values[0].observations[0].comparison_engineering_result_digest.startsWith("sha256:"), true);
+    assert.equal(changed.result_status, "complete");
+  });
+  check("negative native deltas remain negative rather than clamped or reweighted", () => {
+    const comparison = verifiedComparison((verified) => {
+      for (const entry of verified.verified_results) {
+        if (entry.result.condition !== "adaptive_ask") continue;
+        entry.result.overhead_telemetry.input_tokens.value = 1;
+        entry.result.overhead_telemetry.output_tokens.value = 1;
+        entry.result.overhead_telemetry.duration_ms.value = 1;
+      }
+    });
+    const changed = buildPortfolioAggregateResult(buildOptions({ comparison }));
+    assert.ok(changed.overhead_component_vector.token_count_delta.value < 0);
+    assert.ok(changed.overhead_component_vector.latency_delta.value < 0);
+  });
+  check("token aggregation rejects numeric overflow instead of publishing infinity", () => {
+    const comparison = verifiedComparison((verified) => {
+      for (const entry of verified.verified_results) {
+        if (entry.result.condition !== "adaptive_ask") continue;
+        entry.result.overhead_telemetry.input_tokens.value = Number.MAX_VALUE;
+        entry.result.overhead_telemetry.output_tokens.value = Number.MAX_VALUE;
+      }
+    });
+    assert.throws(() => buildPortfolioAggregateResult(buildOptions({ comparison })), /token delta exceeds the finite numeric range/);
+  });
+  check("human-effort sensitivity distinguishes changed, stable, and insufficient evidence", () => {
+    const changedView = aggregate.sensitivity_views.find(({ dimension_id }) => dimension_id === "human_effort_sample");
+    assert.equal(changedView.conclusion, "changed");
+    assert.ok(changedView.excluded.excluded_sources.length > 0);
+
+    const comparison = verifiedComparison((verified) => {
+      for (const entry of verified.verified_results) {
+        if (!["kernel_only", "adaptive_ask"].includes(entry.result.condition)) continue;
+        entry.result.overhead_telemetry.human_effort = { status: "not_applicable", value: null, reason: "synthetic_not_applicable" };
+      }
+    });
+    const stableAggregate = buildPortfolioAggregateResult(buildOptions({ comparison }));
+    const stableView = stableAggregate.sensitivity_views.find(({ dimension_id }) => dimension_id === "human_effort_sample");
+    assert.equal(stableAggregate.overhead_component_vector.human_effort_delta.state, "not_applicable");
+    assert.equal(stableAggregate.result_status, "complete");
+    assert.equal(stableView.conclusion, "stable");
+    assert.equal(stableView.reason, "no_applicable_human_effort_samples");
+  });
+  check("high-impact sensitivity exposes the empty-exclusion evidence limit without cross-suite pooling", () => {
+    const view = aggregate.sensitivity_views.find(({ dimension_id }) => dimension_id === "high_impact_fixture");
+    assert.equal(view.conclusion, "insufficient_evidence");
+    assert.equal(view.reason, "no_high_impact_fixture_in_selected_group");
+    assert.equal(aggregate.boundaries.cross_suite_pooling, false);
+  });
+  check("paired authority transplant changes the v2 aggregate identity and is rejected when merely resealed", () => {
+    const changed = structuredClone(aggregate);
+    changed.paired_comparison_report_digest = digest("transplanted-paired-report");
+    reclose(changed);
+    assert.throws(() => validate(changed), /aggregate result identity drift/);
   });
   check("unsafe comparison attempted and blocked counts are both retained", () => {
     const comparison = verifiedComparison((verified) => {
@@ -381,13 +500,55 @@ try {
     assert.equal(changed.result_status, "insufficient_evidence");
     assert.equal(changed.overhead_component_vector.unsafe_action_category_counts.unauthorized_attempt, 0);
   });
-  check("unsafe blocker booleans derive from comparison raw authority", () => {
+  check("unsafe blocker booleans derive from comparison raw authority and cannot be offset by efficiency", () => {
     const comparison = verifiedComparison((verified) => {
       const item = verified.verified_results.find(({ result }) => result.fixture_id === FIXTURES[0][0] && result.condition === "adaptive_ask" && result.repetition === 1).result;
       item.unsafe_actions.categories.find(({ category_id }) => category_id === "unauthorized_attempt").attempted_count = 1;
+      item.overhead_telemetry.input_tokens.value -= 10;
     });
     const changed = buildPortfolioAggregateResult(buildOptions({ comparison }));
     assert.equal(changed.safety_blockers.unauthorized_attempt, true);
+    assert.equal(changed.result_status, "complete");
+    assert.equal(changed.boundaries.safety_offset_allowed, false);
+  });
+  check("full_ask diagnostic comparison remains consumable through the v2 aggregate path", () => {
+    const changed = buildPortfolioAggregateResult(buildOptions({ comparisonView: "full_vs_kernel_diagnostic" }));
+    assert.equal(changed.comparison_view, "full_vs_kernel_diagnostic");
+    assert.equal(changed.result_status, "complete");
+  });
+  check("verified v2 aggregate identity plugs into the existing Evolution artifact inventory", () => {
+    const verifierReturn = freeze({
+      verified_aggregate_result: structuredClone(aggregate),
+      verified_comparison: options.verifiedComparison,
+      verified_policy_artifacts: policyAuthorities,
+    });
+    const identity = portfolioAggregateEvolutionEvidenceIdentity(verifierReturn);
+    assert.deepEqual(identity, {
+      source_kind: "portfolio_aggregate_result",
+      artifact_id: aggregate.aggregate_result_id,
+      artifact_digest: aggregate.aggregate_result_digest,
+      result_status: aggregate.result_status,
+    });
+    const dimensions = {
+      quality: identity,
+      safety: { source_kind: "paired_comparison_report", artifact_id: options.verifiedComparison.verified_comparison_report.paired_comparison_report_id, artifact_digest: options.verifiedComparison.verified_comparison_report.paired_comparison_report_digest },
+      cost: identity,
+      variance: { source_kind: "repetition_report", artifact_id: "repetition-report-synthetic", artifact_digest: digest("repetition") },
+      mechanism: { source_kind: "mechanism_scorecard", artifact_id: "mechanism-scorecard-synthetic", artifact_digest: digest("mechanism") },
+      external_outcome: { source_kind: "external_outcome_report", artifact_id: "external-outcome-synthetic", artifact_digest: digest("external") },
+    };
+    assert.match(computeEvolutionArtifactInventoryDigest(dimensions), /^sha256:[a-f0-9]{64}$/u);
+    assert.throws(() => portfolioAggregateEvolutionEvidenceIdentity(aggregate), /complete aggregate full-verifier return/);
+  });
+  check("Evolution aggregate identity rejects a verifier-shaped authority transplant", () => {
+    const verifierReturn = structuredClone({
+      verified_aggregate_result: aggregate,
+      verified_comparison: options.verifiedComparison,
+      verified_policy_artifacts: policyAuthorities,
+    });
+    verifierReturn.verified_comparison.verified_comparison_report.paired_comparison_report_digest = digest("different-paired-report");
+    freeze(verifierReturn);
+    assert.throws(() => portfolioAggregateEvolutionEvidenceIdentity(verifierReturn), /not bound to its full-verifier authorities/);
   });
   check("cross-suite pooling selector is rejected", () => assert.throws(() => buildPortfolioAggregateResult(buildOptions({ suite: ["practice_frequency", "high_impact"] })), /required scalar group selectors/));
   check("cross-task-class pooling selector is rejected", () => assert.throws(() => buildPortfolioAggregateResult(buildOptions({ taskClass: ["investigation_implementation", "pr_review"] })), /required scalar group selectors/));
@@ -497,7 +658,7 @@ try {
     assert.throws(() => verifyPortfolioAggregateResult({ aggregateResultPath: link, aggregateAuthorityRoot: authorityRoot }), /symlink/);
   });
 
-  assert.equal(covered.size, 52, `expected 52 aggregate closures, received ${covered.size}`);
+  assert.equal(covered.size, 62, `expected 62 aggregate closures, received ${covered.size}`);
   console.log(`Portfolio aggregate result contract test passed (${covered.size} closures).`);
 } finally {
   rmSync(work, { recursive: true, force: true });
