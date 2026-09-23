@@ -684,7 +684,8 @@ try {
     const changed = structuredClone(aggregate);
     changed.measured_execution_authorized = true;
     reclose(changed);
-    assert.throws(() => validate(changed), /unknown property|Schema validation failed/);
+    // oneOf reports the schema boundary, not the rejected branch's property.
+    assert.throws(() => validate(changed), /portfolio aggregate result failed JSON Schema validation:/);
   });
   check("private classification paths are rejected from the report", () => {
     const changed = buildOptions({ classificationOverrides: [{ classification_record_path: `private-evaluator/classification-${sourceSequence + 1}.json` }] });
