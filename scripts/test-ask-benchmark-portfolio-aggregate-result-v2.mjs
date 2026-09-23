@@ -133,9 +133,9 @@ function engineeringResult(fixtureId, repetitions, condition, repetition) {
   };
 }
 
-function verifiedComparison(mutate = null) {
+function verifiedComparisonForFixtures(fixtureSet, mutate = null) {
   const verified_results = [];
-  for (const [fixtureId, repetitions] of FIXTURES) for (const condition of CONDITIONS) for (let repetition = 1; repetition <= repetitions; repetition += 1) {
+  for (const [fixtureId, repetitions] of fixtureSet) for (const condition of CONDITIONS) for (let repetition = 1; repetition <= repetitions; repetition += 1) {
     const result = engineeringResult(fixtureId, repetitions, condition, repetition);
     verified_results.push({ path: `${fixtureId}/${condition}/${repetition}.json`, raw_byte_digest: digest(`bytes:${fixtureId}:${condition}:${repetition}`), bytes: 1000 + repetition, result });
   }
@@ -151,6 +151,10 @@ function verifiedComparison(mutate = null) {
   const repetition = buildPortfolioRepetitionReport({ verified, policyRevision: policy.policy_revision, scoringPolicyDigest: policy.policy_digest });
   const paired = buildPortfolioPairedComparisonReport({ verifiedReport: freeze(structuredClone(repetition)), verifiedResultSet: verified, verifiedScoringPolicy: policy });
   return freeze({ verified_comparison_report: paired, verified_scoring_policy: policy });
+}
+
+function verifiedComparison(mutate = null) {
+  return verifiedComparisonForFixtures(FIXTURES, mutate);
 }
 
 function buildOptions({
@@ -400,6 +404,29 @@ try {
     reclose(forged);
     assert.throws(() => validate(forged), /result status does not match actual evidence closure/);
   });
+  check("all-missing human-effort evidence keeps unknown and unavailable distinct", () => {
+    const allUnknown = verifiedComparison((verified) => {
+      for (const entry of verified.verified_results) {
+        if (!["kernel_only", "adaptive_ask"].includes(entry.result.condition)) continue;
+        entry.result.overhead_telemetry.human_effort = { status: "unknown", value: null, reason: "synthetic_not_measured" };
+      }
+    });
+    const unknownAggregate = buildPortfolioAggregateResult(buildOptions({ comparison: allUnknown }));
+    assert.equal(unknownAggregate.overhead_component_vector.human_effort_delta.state, "unknown");
+    assert.equal(unknownAggregate.overhead_component_vector.human_effort_delta.value, null);
+    assert.equal(unknownAggregate.result_status, "insufficient_evidence");
+
+    const allUnavailable = verifiedComparison((verified) => {
+      for (const entry of verified.verified_results) {
+        if (!["kernel_only", "adaptive_ask"].includes(entry.result.condition)) continue;
+        entry.result.overhead_telemetry.human_effort = { status: "unavailable", value: null, reason: "synthetic_source_unavailable" };
+      }
+    });
+    const unavailableAggregate = buildPortfolioAggregateResult(buildOptions({ comparison: allUnavailable }));
+    assert.equal(unavailableAggregate.overhead_component_vector.human_effort_delta.state, "unavailable");
+    assert.equal(unavailableAggregate.overhead_component_vector.human_effort_delta.value, null);
+    assert.equal(unavailableAggregate.result_status, "insufficient_evidence");
+  });
   check("false-positive units cannot be invented from the current raw severity taxonomy", () => {
     const changed = structuredClone(aggregate);
     changed.overhead_component_vector.false_positive_unit_delta.state = "known";
@@ -475,6 +502,25 @@ try {
     assert.equal(view.conclusion, "insufficient_evidence");
     assert.equal(view.reason, "no_high_impact_fixture_in_selected_group");
     assert.equal(aggregate.boundaries.cross_suite_pooling, false);
+  });
+  check("high-impact sensitivity reports an empty excluded population instead of treating it as zero evidence", () => {
+    const fixtureSet = [["hi-financial-state-integrity", 5]];
+    const comparison = verifiedComparisonForFixtures(fixtureSet);
+    const classificationRecordPaths = fixtureSet.map(([fixtureId]) => classificationPath(fixtureId));
+    const changed = buildPortfolioAggregateResult(buildOptions({
+      comparison,
+      suite: "high_impact",
+      taskClass: "investigation_implementation",
+      classificationRecordPaths,
+      lineageRecordPaths: [],
+    }));
+    const view = changed.sensitivity_views.find(({ dimension_id }) => dimension_id === "high_impact_fixture");
+    assert.equal(view.included.population_fixture_ids.length, 1);
+    assert.deepEqual(view.excluded.population_fixture_ids, []);
+    assert.equal(view.excluded.population_pair_count, 0);
+    assert.equal(view.excluded.evidence_status, "insufficient_evidence");
+    assert.equal(view.conclusion, "insufficient_evidence");
+    assert.equal(view.reason, "exclusion_removes_entire_group");
   });
   check("paired authority transplant changes the v2 aggregate identity and is rejected when merely resealed", () => {
     const changed = structuredClone(aggregate);
@@ -658,7 +704,7 @@ try {
     assert.throws(() => verifyPortfolioAggregateResult({ aggregateResultPath: link, aggregateAuthorityRoot: authorityRoot }), /symlink/);
   });
 
-  assert.equal(covered.size, 62, `expected 62 aggregate closures, received ${covered.size}`);
+  assert.equal(covered.size, 64, `expected 64 aggregate closures, received ${covered.size}`);
   console.log(`Portfolio aggregate result contract test passed (${covered.size} closures).`);
 } finally {
   rmSync(work, { recursive: true, force: true });
