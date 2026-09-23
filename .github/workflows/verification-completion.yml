@@ -1,0 +1,31 @@
+name: Validate verification completion
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verification-completion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - name: Run decision-point protocol and accounting tests
+        run: node --test scripts/test-verification-decision-core.mjs
+      - name: Run real-Git multirevision and completion tests
+        run: node --test scripts/test-verification-reuse-completion.mjs
+      - name: Preserve exact and scoped evidence compatibility
+        run: |
+          node scripts/test-verification-evidence.mjs
+          node scripts/test-verification-scoped-reuse.mjs
+      - name: Check whitespace
+        run: git diff --check "origin/${{ github.base_ref }}...HEAD"
