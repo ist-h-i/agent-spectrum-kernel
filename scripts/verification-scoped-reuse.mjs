@@ -98,3 +98,123 @@ function sealSelfIdentified(content, { idField, digestField, idPrefix }) {
     [digestField]: digest,
   };
 }
+
+function assertSelfIdentified(value, { idField, digestField, idPrefix, label }) {
+  const digest = selfDigest(value, idField, digestField);
+  if (value[digestField] !== digest || value[idField] !== `${idPrefix}${digest.slice("sha256:".length)}`) {
+    throw new Error(`${label} digest or ID mismatch`);
+  }
+}
+
+function runGit(repositoryRoot, args, { encoding = "utf8", allowFailure = false } = {}) {
+  const result = spawnSync("git", ["--no-replace-objects", "-C", repositoryRoot, ...args], {
+    encoding,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.error) throw result.error;
+  if (!allowFailure && result.status !== 0) {
+    const stderr = Buffer.isBuffer(result.stderr) ? result.stderr.toString("utf8") : result.stderr;
+    throw new Error(`git ${args[0]} failed: ${String(stderr ?? "").trim() || `exit ${result.status}`}`);
+  }
+  return result;
+}
+
+export function resolveGitCommit({ repositoryRoot, revision }) {
+  assertFullCommit(revision, "Git revision");
+  const result = runGit(repositoryRoot, ["rev-parse", "--verify", `${revision}^{commit}`]);
+  const resolvedRevision = result.stdout.trim();
+  if (resolvedRevision !== revision) throw new Error(`Git revision did not resolve exactly: ${revision}`);
+  return revision;
+}
+
+function assertAncestor({ repositoryRoot, baseRevision, targetRevision }) {
+  const result = runGit(repositoryRoot, ["merge-base", "--is-ancestor", baseRevision, targetRevision], { allowFailure: true });
+  if (result.status !== 0) throw new Error(`scoped reuse base revision is not an ancestor of target: ${baseRevision} -> ${targetRevision}`);
+}
+
+function normalizeRepositoryRemote(remote) {
+  const value = String(remote ?? "").trim();
+  const https = value.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/u);
+  if (https) return `github.com/${https[1]}/${https[2]}`;
+  const ssh = value.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/u);
+  if (ssh) return `github.com/${ssh[1]}/${ssh[2]}`;
+  const sshUrl = value.match(/^ssh:\/\/git@github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/u);
+  if (sshUrl) return `github.com/${sshUrl[1]}/${sshUrl[2]}`;
+  throw new Error("scoped reuse requires a canonical GitHub origin remote");
+}
+
+export function gitRepositoryId({ repositoryRoot }) {
+  const remote = runGit(repositoryRoot, ["config", "--get", "remote.origin.url"]);
+  return normalizeRepositoryRemote(remote.stdout);
+}
+
+function gitTreeOid({ repositoryRoot, revision }) {
+  resolveGitCommit({ repositoryRoot, revision });
+  const result = runGit(repositoryRoot, ["rev-parse", `${revision}^{tree}`]);
+  const oid = result.stdout.trim();
+  if (!/^[a-f0-9]{40,64}$/u.test(oid)) throw new Error("Git tree object ID is invalid");
+  return oid;
+}
+
+export function gitTreeDigest({ repositoryRoot, revision }) {
+  return canonicalDigest({
+    context: VERIFICATION_SCOPED_GIT_TREE_CONTEXT,
+    tree_oid: gitTreeOid({ repositoryRoot, revision }),
+  });
+}
+
+function gitObjectBytes({ repositoryRoot, revision, path, maximumBytes = 1024 * 1024 }) {
+  portablePath(path, "Git object path");
+  resolveGitCommit({ repositoryRoot, revision });
+  const result = runGit(repositoryRoot, ["show", `${revision}:${path}`], { encoding: null, allowFailure: true });
+  if (result.status !== 0) throw new Error(`Git object is unavailable at ${revision}: ${path}`);
+  if (!Buffer.isBuffer(result.stdout) || result.stdout.length === 0 || result.stdout.length > maximumBytes) {
+    throw new Error(`Git object is empty or exceeds the byte limit: ${path}`);
+  }
+  return result.stdout;
+}
+
+function readGitJson({ repositoryRoot, revision, path, label }) {
+  return parseJsonRejectDuplicateKeys(gitObjectBytes({ repositoryRoot, revision, path }), label);
+}
+
+function selectorKey(selector) {
+  return `${selector.kind}\0${selector.pattern}\0${selector.evidence_kind}`;
+}
+
+function normalizeSelector(selector) {
+  const normalized = clone(selector);
+  if (!["file", "directory", "glob"].includes(normalized.kind)) throw new Error(`unsupported dependency selector kind: ${normalized.kind}`);
+  portablePath(normalized.pattern, "dependency selector pattern");
+  if (normalized.kind === "glob" && !/[?*]/u.test(normalized.pattern)) throw new Error("glob dependency selector must contain * or ?");
+  if (normalized.kind !== "glob" && /[?*]/u.test(normalized.pattern)) throw new Error("file/directory dependency selectors cannot contain wildcard characters");
+  return normalized;
+}
+
+function globRegex(pattern) {
+  let source = "^";
+  for (let index = 0; index < pattern.length; index += 1) {
+    const character = pattern[index];
+    if (character === "*") {
+      if (pattern[index + 1] === "*") {
+        index += 1;
+        if (pattern[index + 1] === "/") {
+          index += 1;
+          source += "(?:.*/)?";
+        } else source += ".*";
+      } else source += "[^/]*";
+    } else if (character === "?") source += "[^/]";
+    else source += character.replace(/[|\\{}()[\]^$+?.]/gu, "\\$&");
+  }
+  return new RegExp(`${source}$`, "u");
+}
+
+function selectorMatches(selector, path) {
+  if (selector.kind === "file") return path === selector.pattern;
+  if (selector.kind === "directory") return path.startsWith(`${selector.pattern}/`);
+  return globRegex(selector.pattern).test(path);
+}
+
+function matchingSelector(selectors, path) {
+  const matches = selectors.filter((selector) => selectorMatches(selector, path));
+  if (matches.length > 1) {
