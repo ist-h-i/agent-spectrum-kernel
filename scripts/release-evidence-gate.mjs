@@ -244,8 +244,11 @@ function assessGate(spec, { catalog, evidenceById, root, targetRevision }) {
     if (entry.status === "not_applicable") candidateReasons.push("required_gate_not_applicable");
     candidateReasons.push(...evidenceArtifactReasons(entry, root, targetRevision));
     if (spec.outcome_guardrails_required && OUTCOME_KINDS.has(entry.kind)) candidateReasons.push(...guardrailReasons(entry));
-    if (candidateReasons.length === 0 && spec.independent_review_required) {
-      const review = assessIndependentReviews({ evidence: entry, evidenceById, gateId: spec.gate_id, root, targetRevision });
+    if (candidateReasons.length === 0) {
+      const review = assessIndependentReviews({
+        evidence: entry, evidenceById, gateId: spec.gate_id,
+        required: spec.independent_review_required, root, targetRevision,
+      });
       assessedRefs.push(...review.evidence_refs);
       candidateReasons.push(...review.reason_codes);
     }

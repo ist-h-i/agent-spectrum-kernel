@@ -636,6 +636,102 @@ try {
     });
   }
 
+  // F8: optional review means absence is allowed, not that supplied reviews are ignored.
+  for (const gateId of ["release.repository_validation", "release.semantic_version_changelog"]) {
+    const spec = REQUIRED_RELEASE_GATES.find((entry) => entry.gate_id === gateId);
+    for (const status of ["failed", "not_checked", "not_applicable"]) {
+      for (const withPassingReview of [false, true]) {
+        regression(`optional gate review ${gateId}: ${status}, passing=${withPassingReview}`, () => {
+          const state = buildReady(root);
+          const primary = findPrimary(state.catalog, gateId);
+          const adverse = reviewEvidence(root, spec, primary);
+          if (withPassingReview) {
+            const favorable = clone(adverse);
+            favorable.evidence_id += "-passed";
+            favorable.artifact = writeArtifact(root, favorable.evidence_id);
+            state.catalog.evidence.push(favorable);
+          }
+          adverse.status = status;
+          if (status !== "failed") adverse.artifact = null;
+          state.catalog.evidence.push(adverse);
+          const result = assess(root, state.matrix, state.catalog);
+          expectNotReady(result, `independent_review_${status}`);
+          const gate = result.gate_results.find((entry) => entry.gate_id === gateId);
+          assert.equal(gate.status, "not_ready");
+          assert(gate.evidence_refs.includes(adverse.evidence_id));
+          if (withPassingReview) assert(gate.evidence_refs.includes(`${adverse.evidence_id}-passed`));
+          assert(result.gate_results.filter((entry) => entry.gate_id !== gateId).every((entry) => entry.status === "pass"));
+          assert.equal(result.claim_results[0].status, "supported");
+          state.catalog.evidence.reverse();
+          assert.deepEqual(assess(root, state.matrix, state.catalog).gate_results, result.gate_results);
+        });
+      }
+    }
+    for (const [name, mutate, reason] of [
+      ["stale", (review) => { review.source_revision = OLD_SOURCE; }, "stale_source_revision"],
+      ["scope", (review) => { review.scope.adapter_id = "wrong-adapter"; }, "independent_review_scope_mismatch"],
+      ["tampered", (review) => { writeFileSync(resolve(root, review.artifact.path), "tampered\n"); }, "artifact_integrity_mismatch"],
+      ["missing", (review) => { rmSync(resolve(root, review.artifact.path)); }, "artifact_missing"],
+      ["same-identity", (review, primary) => { review.authority.identity_digest = primary.authority.identity_digest; }, "independent_review_identity_conflict"],
+      ["unknown-producer", (_review, primary) => { primary.authority = { kind: "none", identity_digest: null }; }, "evidence_producer_identity_missing"],
+      ["non-producer", (_review, primary) => { primary.authority.kind = "release_owner"; }, "evidence_producer_identity_missing"],
+    ]) {
+      regression(`invalid optional gate review ${gateId}: ${name}`, () => {
+        const state = buildReady(root);
+        const primary = findPrimary(state.catalog, gateId);
+        const review = reviewEvidence(root, spec, primary);
+        mutate(review, primary);
+        state.catalog.evidence.push(review);
+        const result = assess(root, state.matrix, state.catalog);
+        expectNotReady(result, reason);
+        const gate = result.gate_results.find((entry) => entry.gate_id === gateId);
+        assert.equal(gate.status, "not_ready");
+        assert(gate.evidence_refs.includes(review.evidence_id));
+      });
+    }
+    for (const reviewCount of [0, 1, 2]) {
+      regression(`valid optional gate review ${gateId}: count=${reviewCount}`, () => {
+        const state = buildReady(root);
+        const primary = findPrimary(state.catalog, gateId);
+        const reviewIds = [];
+        for (let index = 0; index < reviewCount; index += 1) {
+          const review = reviewEvidence(root, spec, primary);
+          review.evidence_id += `-${index}`;
+          review.artifact = writeArtifact(root, review.evidence_id);
+          state.catalog.evidence.push(review);
+          reviewIds.push(review.evidence_id);
+        }
+        const result = assess(root, state.matrix, state.catalog);
+        assert.equal(result.decision, "ready", "optional review does not become mandatory");
+        const gate = result.gate_results.find((entry) => entry.gate_id === gateId);
+        assert.deepEqual(gate.evidence_refs, [primary.evidence_id, ...reviewIds].sort());
+      });
+    }
+    for (const missingBinding of ["gate", "subject"]) {
+      regression(`unbound optional gate review ${gateId}: ${missingBinding}`, () => {
+        const state = buildReady(root);
+        const review = reviewEvidence(root, spec, findPrimary(state.catalog, gateId));
+        review.status = "failed";
+        if (missingBinding === "gate") review.gate_ids = [];
+        else review.related_evidence_refs = [findPrimary(state.catalog, "release.guided_setup").evidence_id];
+        state.catalog.evidence.push(review);
+        const result = assess(root, state.matrix, state.catalog);
+        assert.equal(result.decision, "ready", "both gate and subject bindings are required");
+        assert(result.gate_results.every((entry) => !entry.evidence_refs.includes(review.evidence_id)));
+      });
+    }
+  }
+  regression("optional review does not promote formal approval into primary evidence", () => {
+    const state = buildReady(root);
+    const gateId = "release.human_approval";
+    const spec = REQUIRED_RELEASE_GATES.find((entry) => entry.gate_id === gateId);
+    const review = reviewEvidence(root, spec, findPrimary(state.catalog, gateId));
+    state.catalog.evidence.push(review);
+    const result = assess(root, state.matrix, state.catalog);
+    expectNotReady(result, "evidence_producer_identity_missing");
+    assert(result.gate_results.find((entry) => entry.gate_id === gateId).evidence_refs.includes(review.evidence_id));
+  });
+
   const cliCase = buildReady(root);
   findPrimary(cliCase.catalog, "release.clean_install_upgrade").status = "not_checked";
   findPrimary(cliCase.catalog, "release.clean_install_upgrade").artifact = null;
