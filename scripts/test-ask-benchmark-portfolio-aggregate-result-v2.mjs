@@ -604,11 +604,11 @@ try {
     assert.throws(() => reportPortfolioAggregateResult({ outputPath, aggregateAuthorityRoot: authorityRootLink }), /aggregate source authority root.*canonical|aggregate source authority root.*symlink/);
     assert.equal(existsSync(outputPath), false);
   });
-  check("CLI help exposes aggregate report and verify commands", () => {
+  check("CLI help exposes versioned aggregate report and verify commands", () => {
     const result = spawnSync(process.execPath, [runner, "help"], { cwd: root, encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /report-engineering-aggregate-result/);
-    assert.match(result.stdout, /verify-engineering-aggregate-result/);
+    assert.match(result.stdout, /report-engineering-aggregate-result-v2/);
+    assert.match(result.stdout, /verify-engineering-aggregate-result-v2/);
   });
   check("CLI rejects an unpaired classification source digest before publication", () => {
     const outputPath = resolve(outputDir, "cli-unpaired-digest.json");
