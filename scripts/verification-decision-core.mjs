@@ -14,11 +14,14 @@ const ACTOR_BOUND = new Set(["independent_judgment", "approval", "human_approval
 const TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:#@+/-]{0,255}$/u;
 const DIGEST = /^sha256:[a-f0-9]{64}$/u;
 
+// Accept JSON-like data fields only; getters and hidden fields bypass a closed
+// response contract and can change after validation or expose provider payloads.
 export function closedObject(value, keys, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)
     || ![Object.prototype, null].includes(Object.getPrototypeOf(value))
     || Object.getOwnPropertySymbols(value).length
-    || Object.keys(value).sort().join("\0") !== [...keys].sort().join("\0")) {
+    || Object.getOwnPropertyNames(value).sort().join("\0") !== [...keys].sort().join("\0")
+    || Object.values(Object.getOwnPropertyDescriptors(value)).some((entry) => !entry.enumerable || !Object.hasOwn(entry, "value"))) {
     throw new Error(`${label}: unknown or missing fields`);
   }
   return value;
@@ -58,11 +61,11 @@ export function validateCompletionPolicy(policy) {
 function validateBinding(binding) {
   closedObject(binding, ["repository_id", "target_revision", "target_tree_digest", "requirements_digest", "plan_digest", "request_digest", "policy_digest", "claim"], "decision binding");
   token(binding.repository_id, "repository");
-  if (!/^[a-f0-9]{40}$/u.test(binding.target_revision ?? "")) throw new Error("invalid target revision");
+  if (typeof binding.target_revision !== "string" || !/^[a-f0-9]{40}$/u.test(binding.target_revision)) throw new Error("invalid target revision");
   for (const field of ["target_tree_digest", "requirements_digest", "plan_digest", "request_digest", "policy_digest"]) {
-    if (!DIGEST.test(binding[field] ?? "")) throw new Error(`invalid ${field}`);
+    if (typeof binding[field] !== "string" || !DIGEST.test(binding[field])) throw new Error(`invalid ${field}`);
   }
-  if (!Object.hasOwn(CLAIM_OBSERVATIONS, binding.claim)) throw new Error("unsupported claim");
+  if (typeof binding.claim !== "string" || !Object.hasOwn(CLAIM_OBSERVATIONS, binding.claim)) throw new Error("unsupported claim");
 }
 
 function validateObservation(record, query, authority, forbiddenActors) {
@@ -73,9 +76,9 @@ function validateObservation(record, query, authority, forbiddenActors) {
   }
   if (!["satisfied", "unsatisfied", "unavailable"].includes(record.status)) throw new Error("invalid current status");
   if (record.actor_id !== null) token(record.actor_id, "observer actor");
-  if (record.evidence_digest !== null && !DIGEST.test(record.evidence_digest)) throw new Error("invalid observation evidence digest");
+  if (record.evidence_digest !== null && (typeof record.evidence_digest !== "string" || !DIGEST.test(record.evidence_digest))) throw new Error("invalid observation evidence digest");
   if (record.status === "satisfied") {
-    if (!DIGEST.test(record.evidence_digest ?? "")) throw new Error("positive observation requires evidence");
+    if (record.evidence_digest === null) throw new Error("positive observation requires evidence");
     if (ACTOR_BOUND.has(query.kind)
       && (!authority.actor_ids.includes(record.actor_id) || forbiddenActors.has(record.actor_id))) {
       throw new Error("current judgment or approval actor is not independent/authorized");
@@ -170,7 +173,8 @@ function normalizeMeasurements(measurements) {
     closedObject(entry, ["status", "value", "source_ref"], name);
     const valid = entry.status === "unavailable"
       ? entry.value === null && entry.source_ref === null
-      : entry.status === "observed" && Number.isSafeInteger(entry.value) && entry.value >= 0 && TOKEN.test(entry.source_ref ?? "");
+      : entry.status === "observed" && Number.isSafeInteger(entry.value) && entry.value >= 0
+        && typeof entry.source_ref === "string" && TOKEN.test(entry.source_ref);
     if (!valid) throw new Error(`invalid measurement: ${name}`);
     output[name] = { ...entry };
   }

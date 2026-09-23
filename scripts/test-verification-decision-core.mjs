@@ -162,3 +162,79 @@ test("runtime measurements require actual source references and keep missingness
   assert.throws(() => summarizeVerificationWork({ dispositions, events: [{ kind: "prompt", text: "private" }] }));
   assert.throws(() => summarizeVerificationWork({ dispositions, events: [{ kind: "deterministic_execution", gate_id: "unknown", status: "succeeded" }] }));
 });
+
+test("observation evidence must be a primitive digest, never a coercible payload", async () => {
+  let coercions = 0;
+  const payload = { toString() { coercions += 1; return digest; }, raw_response: "PRIVATE PAYLOAD" };
+  for (const evidence_digest of [[digest], new String(digest), payload, 1, true]) {
+    const result = await run((query) => ({ ...positive(query), evidence_digest }));
+    assert.equal(result.status, "blocked");
+    assert.equal(result.observations[0].evidence_digest, null);
+    assert.ok(!JSON.stringify(result).includes("PRIVATE PAYLOAD"));
+  }
+  assert.equal(coercions, 0, "validation must not invoke provider-owned coercion code");
+});
+
+test("closed observations reject accessors and hidden fields before reading them", async () => {
+  let reads = 0;
+  for (const field of ["status", "actor_id", "evidence_digest"]) {
+    const result = await run((query) => {
+      const record = positive(query);
+      const value = record[field];
+      Object.defineProperty(record, field, { enumerable: true, get() { reads += 1; return value; } });
+      return record;
+    });
+    assert.equal(result.status, "blocked", field);
+  }
+  assert.equal(reads, 0);
+  const result = await run((query) => Object.defineProperty(positive(query), "raw_response", { value: "PRIVATE PAYLOAD" }));
+  assert.equal(result.status, "blocked");
+  assert.ok(!JSON.stringify(result).includes("PRIVATE PAYLOAD"));
+});
+
+test("query bindings reject accessors rather than evaluating provider code", async () => {
+  let reads = 0;
+  const result = await run((query) => {
+    const record = positive(query);
+    Object.defineProperty(record.query, "target_revision", { enumerable: true, get() { reads += 1; return query.target_revision; } });
+    return record;
+  });
+  assert.equal(result.status, "blocked");
+  assert.equal(reads, 0);
+});
+
+test("decision binding scalars reject array and boxed-string coercion before dispatch", async () => {
+  let calls = 0;
+  const provider = (query) => { calls += 1; return positive(query); };
+  for (const field of ["target_revision", "target_tree_digest", "requirements_digest", "plan_digest", "request_digest", "policy_digest", "claim"]) {
+    for (const value of [[binding[field]], new String(binding[field])]) {
+      await assert.rejects(run(provider, { binding: { ...binding, [field]: value } }), field);
+    }
+  }
+  assert.equal(calls, 0);
+});
+
+test("observed measurement references reject non-string values without coercion", () => {
+  let coercions = 0;
+  const payload = { toString() { coercions += 1; return "runtime:1"; }, raw_response: "PRIVATE PAYLOAD" };
+  for (const source_ref of [0, 123, true, ["runtime:1"], new String("runtime:1"), payload]) {
+    const measurements = unavailableMeasurements();
+    measurements.input_tokens = { status: "observed", value: 1, source_ref };
+    assert.throws(() => summarizeVerificationWork({ dispositions, events: [], measurements }));
+  }
+  assert.equal(coercions, 0);
+});
+
+test("frozen and null-prototype data records retain supported positive behavior", async () => {
+  const result = await run((query) => {
+    const record = Object.assign(Object.create(null), positive(query));
+    record.query = Object.freeze(Object.assign(Object.create(null), record.query));
+    return Object.freeze(record);
+  });
+  assert.equal(result.status, "covered");
+  assert.equal(typeof result.observations[0].evidence_digest, "string");
+  assert.equal(result.authorizes_action, false);
+  const measurements = unavailableMeasurements();
+  measurements.input_tokens = { status: "observed", value: 0, source_ref: "runtime:0" };
+  assert.equal(summarizeVerificationWork({ dispositions, events: [], measurements }).runtime_measurements.input_tokens.value, 0);
+});
