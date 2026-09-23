@@ -39,6 +39,8 @@ jobs:
           for (const profile of profiles.profiles) {
             const plan = plans[profile.adapter_id]({ profileName: profile.rendering.renderer_profile });
             profile.profile_fingerprint = plan.fingerprint;
+            profile.rendering.renderer_inputs = plan.renderer_inputs;
+            profile.rendering.compact_profiles = plan.compactProfiles;
             for (const record of evidence.records) {
               if (record.evidence_kind === 'projection_manifest' && record.profile_id === profile.profile_id) record.profile_fingerprint = plan.fingerprint;
             }
@@ -56,6 +58,7 @@ jobs:
           node --test scripts/test-codex-skill-reference-preflight.mjs scripts/test-skill-assets.mjs scripts/test-skill-reference-canonical.mjs scripts/test-ui-ux-adapter-assets.mjs docs/fixtures/ui-ux-design/fixture-state.test.mjs scripts/test-prompt-v2-historical-renderer.mjs
           node scripts/test-codex-risk-runner-scope.mjs
           node scripts/adapter-runtime-bundle.mjs --check
+          node scripts/validate-repo.mjs --write-report
           node scripts/validate-repo.mjs
           git diff --check
       # Publish exact tested blobs only. No branch, tag, commit, or PR is changed
@@ -75,10 +78,16 @@ jobs:
             '.github/workflows/validate.yml': '9c725610c3f693235ec300e5f03760885e0223f77aea5884240fd6fc59a69dc1',
             'docs/fixtures/adapter-runtime-bundle.json': '020b30fe91810d063fecc97449c14a2f1d2c91fb5c73ed90f13df3ee2a3b8b35',
             'docs/fixtures/adapter-runtime-evidence.json': '4c97bd128f40715cdb30791ab249e541527ae40582c82c2717ebd802f5ab5421',
-            'docs/fixtures/adapter-runtime-profiles.json': 'f0b77812c5a8eee3c59abb73098027d5c0e57fd7fc15f1567196794b462ec50e',
+            'docs/fixtures/adapter-runtime-profiles.json': '2e36d98eff85846ebd1e9e147b84b460dab049a2282b09ba215fe965e650c3e9',
           };
           const changed = execFileSync('git', ['diff', '--name-only'], { encoding: 'utf8' }).trim().split('\n').sort();
-          assert.deepEqual(changed, Object.keys(expected).sort());
+          const reportPath = 'docs/validation-report.md';
+          assert.deepEqual(changed.filter((path) => path !== reportPath), Object.keys(expected).sort());
+          if (changed.includes(reportPath)) {
+            expected[reportPath] = createHash('sha256').update(readFileSync(reportPath)).digest('hex');
+            writeFileSync(`${process.env.RUNNER_TEMP}/ask-pr294-validation-report.md`, readFileSync(reportPath));
+            console.log(execFileSync('git', ['diff', '--', reportPath], { encoding: 'utf8' }));
+          }
           const result = { base_commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), node: process.version, tree_elements: [] };
           for (const [path, sha256] of Object.entries(expected)) {
             const bytes = readFileSync(path);
@@ -98,5 +107,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ask-pr294-candidate-blobs
-          path: ${{ runner.temp }}/ask-pr294-candidate-blobs.json
+          path: |
+            ${{ runner.temp }}/ask-pr294-candidate-blobs.json
+            ${{ runner.temp }}/ask-pr294-validation-report.md
           retention-days: 1
