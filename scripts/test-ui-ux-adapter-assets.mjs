@@ -75,3 +75,59 @@ for (const { adapter, surface, plan } of definitions) {
     assert.ok(existsSync(resolve(target, `${surface}/skills/ui-ux-design/SKILL.md`)));
   });
 }
+
+
+test("core: UI skill references are installed, retained safely, pruned and rollback-restored", async (t) => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "ask-core-references-"));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+  const source = resolve(workspace, "source");
+  const target = resolve(workspace, "target");
+  cpSync(root, source, { recursive: true, filter: (path) => ![".git", "node_modules"].some((name) => path === resolve(root, name) || path.startsWith(`${resolve(root, name)}/`)) });
+
+  const run = (args, success = true) => {
+    const result = spawnSync(process.execPath, [resolve(source, "scripts/install-kernel.mjs"), "--target", target, "--merge-agents", ...args], {
+      encoding: "utf8",
+      timeout: 120000,
+    });
+    if (success) assert.equal(result.status, 0, `${result.error ?? ""}\n${result.stdout}\n${result.stderr}`);
+    else assert.notEqual(result.status, 0);
+    return result;
+  };
+
+  run(["--skills", "ui-ux-design"]);
+  const relative = "skills/ui-ux-design/references/principles.md";
+  const destination = resolve(target, relative);
+  const sourceRef = resolve(source, relative);
+  const statePath = resolve(target, ".agent-spectrum-kernel/install-state.json");
+  const state = () => readJson(statePath);
+  for (const ref of refs) {
+    assert.equal(
+      readFileSync(resolve(target, `skills/ui-ux-design/references/${ref}`), "utf8"),
+      readFileSync(resolve(source, `skills/ui-ux-design/references/${ref}`), "utf8"),
+    );
+    assert.equal(state().managed_files[`skills/ui-ux-design/references/${ref}`].skill, "ui-ux-design");
+  }
+
+  const before = readFileSync(sourceRef, "utf8");
+  writeFileSync(sourceRef, `${before}\nCore reference lifecycle regression.\n`);
+  run(["--skills", "ui-ux-design"]);
+  assert.equal(readFileSync(destination, "utf8"), readFileSync(sourceRef, "utf8"));
+
+  writeFileSync(destination, "Local user edit\n");
+  run(["--skills", "ui-ux-design"], false);
+  assert.equal(readFileSync(destination, "utf8"), "Local user edit\n");
+  writeFileSync(destination, readFileSync(sourceRef, "utf8"));
+
+  const restoreBytes = readFileSync(destination, "utf8");
+  rmSync(sourceRef);
+  run(["--skills", "ui-ux-design"]);
+  assert.equal(state().managed_files[relative].kind, "stale_skill");
+  assert.ok(existsSync(destination));
+
+  run(["--skills", "ui-ux-design", "--prune"]);
+  assert.equal(existsSync(destination), false);
+  assert.equal(Object.hasOwn(state().managed_files, relative), false);
+
+  run(["--rollback"]);
+  assert.equal(readFileSync(destination, "utf8"), restoreBytes);
+});
