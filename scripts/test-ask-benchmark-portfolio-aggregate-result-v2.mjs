@@ -473,8 +473,10 @@ try {
     const comparison = verifiedComparison((verified) => {
       for (const entry of verified.verified_results) {
         if (entry.result.condition !== "adaptive_ask") continue;
-        entry.result.overhead_telemetry.input_tokens.value = Number.MAX_VALUE;
-        entry.result.overhead_telemetry.output_tokens.value = Number.MAX_VALUE;
+        // Keep each upstream repetition distribution finite while making the
+        // downstream cross-fixture native-token reduction overflow.
+        entry.result.overhead_telemetry.input_tokens.value = Number.MAX_VALUE / 10;
+        entry.result.overhead_telemetry.output_tokens.value = Number.MAX_VALUE / 10;
       }
     });
     assert.throws(() => buildPortfolioAggregateResult(buildOptions({ comparison })), /token delta exceeds the finite numeric range/);
