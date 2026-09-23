@@ -202,7 +202,7 @@ function check(name, callback) {
   covered.add(name);
 }
 
-assert.equal(PORTFOLIO_AGGREGATE_RESULT_SCHEMA_PATH, "benchmarks/schemas/portfolio-aggregate-result.schema.json");
+assert.equal(PORTFOLIO_AGGREGATE_RESULT_SCHEMA_PATH, "benchmarks/schemas/portfolio-aggregate-result-v2.schema.json");
 try {
   const options = buildOptions();
   const aggregate = buildPortfolioAggregateResult(options);
