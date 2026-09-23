@@ -33,6 +33,7 @@ jobs:
           import { buildClaudeProjectionPlan } from './scripts/install-claude-adapter.mjs';
           const evidencePath = 'docs/fixtures/adapter-runtime-evidence.json';
           const profilesPath = 'docs/fixtures/adapter-runtime-profiles.json';
+          const proofPath = 'docs/fixtures/verification-proof-policy-cases.json';
           const evidence = JSON.parse(readFileSync(evidencePath, 'utf8'));
           const profiles = JSON.parse(readFileSync(profilesPath, 'utf8'));
           const plans = { claude_code: buildClaudeProjectionPlan, codex: buildCodexProjectionPlan };
@@ -50,19 +51,24 @@ jobs:
           for (const profile of profiles.profiles) for (const capability of profile.capabilities) for (const reference of capability.evidence_refs ?? []) {
             if (reference.artifact_ref === evidencePath) reference.artifact_digest = digest;
           }
+          const proof = JSON.parse(readFileSync(proofPath, 'utf8'));
+          const proxy = proof.size_proxy.generated_localized_prompt;
+          const prompt = profiles.profiles.find((profile) => profile.adapter_id === proxy.candidate_adapter_id).rendering.compact_profiles.find((profile) => profile.profile_id === proxy.candidate_profile_id);
+          proxy.candidate_sha256 = prompt.rendered_sha256.replace(/^sha256:/, '');
+          proxy.candidate_expected_bytes = prompt.rendered_bytes;
           writeFileSync(evidencePath, bytes);
           writeFileSync(profilesPath, JSON.stringify(profiles, null, 2) + '\n');
+          writeFileSync(proofPath, JSON.stringify(proof, null, 2) + '\n');
           JS
       - name: Verify candidate on Node 24 with real source history
         run: |
           node --test scripts/test-codex-skill-reference-preflight.mjs scripts/test-skill-assets.mjs scripts/test-skill-reference-canonical.mjs scripts/test-ui-ux-adapter-assets.mjs docs/fixtures/ui-ux-design/fixture-state.test.mjs scripts/test-prompt-v2-historical-renderer.mjs
           node scripts/test-codex-risk-runner-scope.mjs
+          node scripts/test-verification-proof-policy.mjs
           node scripts/adapter-runtime-bundle.mjs --check
-          node scripts/validate-repo.mjs --write-report
           node scripts/validate-repo.mjs
           git diff --check
-      # Publish exact tested blobs only. No branch, tag, commit, or PR is changed
-      # by this job; the reviewer checks identities and performs the final push.
+      # Publish tested blobs only. No branch, tag, commit, or PR is changed here.
       - name: Publish verified candidate blobs
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -79,15 +85,10 @@ jobs:
             'docs/fixtures/adapter-runtime-bundle.json': '020b30fe91810d063fecc97449c14a2f1d2c91fb5c73ed90f13df3ee2a3b8b35',
             'docs/fixtures/adapter-runtime-evidence.json': '4c97bd128f40715cdb30791ab249e541527ae40582c82c2717ebd802f5ab5421',
             'docs/fixtures/adapter-runtime-profiles.json': '2e36d98eff85846ebd1e9e147b84b460dab049a2282b09ba215fe965e650c3e9',
+            'docs/fixtures/verification-proof-policy-cases.json': '00771e92505200266fc4ca48000c7673251ee8fb7066bb3596d2b5b2475b5251',
           };
           const changed = execFileSync('git', ['diff', '--name-only'], { encoding: 'utf8' }).trim().split('\n').sort();
-          const reportPath = 'docs/validation-report.md';
-          assert.deepEqual(changed.filter((path) => path !== reportPath), Object.keys(expected).sort());
-          if (changed.includes(reportPath)) {
-            expected[reportPath] = createHash('sha256').update(readFileSync(reportPath)).digest('hex');
-            writeFileSync(`${process.env.RUNNER_TEMP}/ask-pr294-validation-report.md`, readFileSync(reportPath));
-            console.log(execFileSync('git', ['diff', '--', reportPath], { encoding: 'utf8' }));
-          }
+          assert.deepEqual(changed, Object.keys(expected).sort());
           const result = { base_commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), node: process.version, tree_elements: [] };
           for (const [path, sha256] of Object.entries(expected)) {
             const bytes = readFileSync(path);
@@ -107,7 +108,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ask-pr294-candidate-blobs
-          path: |
-            ${{ runner.temp }}/ask-pr294-candidate-blobs.json
-            ${{ runner.temp }}/ask-pr294-validation-report.md
+          path: ${{ runner.temp }}/ask-pr294-candidate-blobs.json
           retention-days: 1
