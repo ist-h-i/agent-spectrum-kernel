@@ -13,6 +13,25 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Temporary PR 294 diagnostic: tracked public source only, no .git or credentials.
+      - name: Capture exact source for adapter regeneration diagnostics
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 294
+        run: |
+          mkdir -p "$RUNNER_TEMP/pr294-source"
+          git archive --format=tar --prefix=source/ HEAD | gzip > "$RUNNER_TEMP/pr294-source/source.tar.gz"
+          git rev-parse HEAD > "$RUNNER_TEMP/pr294-source/commit.txt"
+          git ls-tree -r HEAD > "$RUNNER_TEMP/pr294-source/tree.txt"
+          sha256sum "$RUNNER_TEMP/pr294-source/source.tar.gz" > "$RUNNER_TEMP/pr294-source/archive.sha256"
+
+      - name: Retain source diagnostic for local verification
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 294
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr294-source-diagnostic
+          path: ${{ runner.temp }}/pr294-source/
+          retention-days: 1
+          if-no-files-found: error
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
