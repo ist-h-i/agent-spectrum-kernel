@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "schemas/release-claim-matrix.schema.json",
+  "matrix_id": "release-claim-matrix-current-main-756c72",
+  "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+  "source_revision": "756c72b3fba158fbbc33642128bf5ab87097914b",
+  "claims": [
+    {
+      "claim_id": "ASK-PLATFORM-CLAIM-EVIDENCE-STATUS",
+      "wording": "ASK defines a canonical repository contract for claim evidence status.",
+      "claim_class": "implementation",
+      "scope": {"capability": "claim evidence status contract", "task_class": null, "adapter_id": null, "profile_id": null},
+      "source_revision": "756c72b3fba158fbbc33642128bf5ab87097914b",
+      "evidence_refs": ["release-evidence-current-claim-status-schema"],
+      "limitations": ["This record checks repository bytes only; no independent release review is projected here."],
+      "invalid_inference_boundaries": ["Schema presence does not establish release readiness, runtime behavior, product effectiveness, or approval."],
+      "residual_items": ["Project an independent review before promoting this release claim to supported."],
+      "disposition": "experimental",
+      "release_required": false
+    },
+    {
+      "claim_id": "ASK-PLATFORM-GUIDED-SETUP",
+      "wording": "ASK provides the evidence-backed guided setup and first-run verification path required for v1.0 adoption.",
+      "claim_class": "runtime",
+      "scope": {"capability": "guided setup and first-run verification", "task_class": null, "adapter_id": null, "profile_id": null},
+      "source_revision": "756c72b3fba158fbbc33642128bf5ab87097914b",
+      "evidence_refs": [],
+      "limitations": ["Issue #173 remains open."],
+      "invalid_inference_boundaries": ["Successful installation does not imply activation, execution, or operational readiness."],
+      "residual_items": ["Complete #173 and project clean-install, upgrade, detach, and first-run evidence."],
+      "disposition": "unknown",
+      "release_required": true
+    },
+    {
+      "claim_id": "ASK-PLATFORM-EVALUATION-REPORT-AUTHORITY",
+      "wording": "ASK can produce the reusable evaluation/report authority required by the release evidence path.",
+      "claim_class": "runtime",
+      "scope": {"capability": "evaluation and report authority", "task_class": null, "adapter_id": null, "profile_id": null},
+      "source_revision": "756c72b3fba158fbbc33642128bf5ab87097914b",
+      "evidence_refs": [],
+      "limitations": ["Issue #197 remains open for residual reporting and final end-to-end proof."],
+      "invalid_inference_boundaries": ["Reusable scoring infrastructure does not itself establish product effectiveness."],
+      "residual_items": ["Complete #197 residual acceptance criteria and project current report authority evidence."],
+      "disposition": "unknown",
+      "release_required": true
+    },
+    {
+      "claim_id": "ASK-PLATFORM-ACTIVATION-BYPASS",
+      "wording": "ASK has evidence-bounded task-class decisions for when to activate Adaptive ASK, remain Kernel-only, or bypass ASK.",
+      "claim_class": "controlled_effect",
+      "scope": {"capability": "activation and bypass decisions", "task_class": null, "adapter_id": null, "profile_id": null},
+      "source_revision": "756c72b3fba158fbbc33642128bf5ab87097914b",
+      "evidence_refs": [],
+      "limitations": ["Issues #192 and #198 remain open and measured decision evidence is not available to this fixture."],
+      "invalid_inference_boundaries": ["Synthetic success or installation success cannot establish task-class activation policy."],
+      "residual_items": ["Complete the Product Evidence Run and project negative, lower-tail, variance, cost, and safety evidence by scope."],
+      "disposition": "unknown",
+      "release_required": true
+    },
+    {
+      "claim_id": "ASK-OPTIONAL-OPERATOR-DEPENDENCE",
+      "wording": "ASK reduces avoidable outcome sensitivity to request structuring, manual Asset selection, and managed-environment state within explicitly supported scopes.",
+      "claim_class": "controlled_effect",
+      "scope": {"capability": "operator dependence", "task_class": null, "adapter_id": null, "profile_id": null},
+      "source_revision": "756c72b3fba158fbbc33642128bf5ab87097914b",
+      "evidence_refs": [],
+      "limitations": ["The optional #285/#286 evidence lane is incomplete."],
+      "invalid_inference_boundaries": ["This claim cannot imply productivity, ROI, client value, or universal effort reduction."],
+      "residual_items": ["Keep excluded unless compatible #285/#286 evidence reaches a bounded terminal result."],
+      "disposition": "excluded",
+      "release_required": false
+    }
+  ]
+}

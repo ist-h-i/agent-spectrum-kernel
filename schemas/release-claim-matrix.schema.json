@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/release-claim-matrix.schema.json",
+  "title": "ASK Release Claim Matrix",
+  "description": "Release-scoped public claim inventory. It records bounded wording and evidence references; it does not by itself prove a claim or authorize release.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schema_path", "matrix_id", "repository_id", "source_revision", "claims"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "schemas/release-claim-matrix.schema.json" },
+    "matrix_id": { "type": "string", "pattern": "^release-claim-matrix-[a-z0-9][a-z0-9._-]*$" },
+    "repository_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "source_revision": { "$ref": "#/$defs/revision" },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/claim" }
+    }
+  },
+  "$defs": {
+    "revision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "nullable_label": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability", "task_class", "adapter_id", "profile_id"],
+      "properties": {
+        "capability": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "task_class": { "$ref": "#/$defs/nullable_label" },
+        "adapter_id": { "$ref": "#/$defs/nullable_label" },
+        "profile_id": { "$ref": "#/$defs/nullable_label" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id", "wording", "claim_class", "scope", "source_revision",
+        "evidence_refs", "limitations", "invalid_inference_boundaries",
+        "residual_items", "disposition", "release_required"
+      ],
+      "properties": {
+        "claim_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$" },
+        "wording": { "type": "string", "minLength": 1, "maxLength": 1200 },
+        "claim_class": {
+          "type": "string",
+          "enum": ["implementation", "runtime", "controlled_effect", "adopting_project_outcome", "roi"]
+        },
+        "scope": { "$ref": "#/$defs/scope" },
+        "source_revision": { "$ref": "#/$defs/revision" },
+        "evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^release-evidence-[A-Za-z0-9._:-]+$" }
+        },
+        "limitations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 600 }
+        },
+        "invalid_inference_boundaries": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 600 }
+        },
+        "residual_items": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 600 }
+        },
+        "disposition": {
+          "type": "string",
+          "enum": ["supported", "experimental", "unknown", "falsified", "excluded"]
+        },
+        "release_required": { "type": "boolean" }
+      }
+    }
+  },
+  "x-ask-contract": {
+    "id": "ask.release-claim-matrix",
+    "revision": "1.0.0",
+    "ref": "ask.release-claim-matrix@1.0.0"
+  }
+}
