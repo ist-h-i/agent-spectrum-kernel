@@ -31,9 +31,22 @@ import {
   validateSetupPaths,
 } from "./ask-setup-inputs.mjs";
 export { canonicalize, canonicalJson } from "./ask-setup-inputs.mjs";
+import {
+  applyAssert,
+  assertNoSetupInProgress,
+  assertSetupWritePaths,
+  captureApplyTarget,
+  captureApplyTree,
+  managedSetupIdentities,
+  overlayStagingResult,
+  readApplyJson,
+  resultBinding,
+  setupChildEnvironment,
+  setupInstallerInvocations,
+} from "./ask-setup-apply-state.mjs";
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const PLAN_SCHEMA_VERSION = "1.0.0";
+export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const PLAN_SCHEMA_VERSION = "1.1.0";
 const PLAN_KIND = "ask.adoption-plan";
 const ADAPTERS = ["codex", "claude-code", "kernel-only"];
 const PROFILE_CANDIDATES = ["daily", "organizational", "minimal", "implementation", "investigation", "review", "adoption", "observability", "full"];
@@ -104,7 +117,7 @@ export function snapshotTarget(target, { extraPaths = [] } = {}) {
   };
 }
 
-async function planningSource(adapter, profile) {
+export async function planningSource(adapter, profile) {
   if (!ADAPTERS.includes(adapter)) throw new Error(`Unknown adapter: ${adapter}`);
   let projection = null;
   let selectedSkills;
@@ -333,7 +346,7 @@ function normalizedOutputDigest(output, staging) {
 }
 
 function runNode(script, args, { cwd = REPO_ROOT, expected = [0] } = {}) {
-  const result = spawnSync(process.execPath, [resolve(REPO_ROOT, script), ...args], { cwd, encoding: "utf8", timeout: 120000, maxBuffer: 32 * 1024 * 1024 });
+  const result = spawnSync(process.execPath, [resolve(REPO_ROOT, script), ...args], { cwd, env: setupChildEnvironment(), encoding: "utf8", timeout: 120000, maxBuffer: 32 * 1024 * 1024 });
   if (!expected.includes(result.status)) {
     throw new Error(`${script} failed (${result.status}): ${summarizeSetupProcessFailure(result)}`);
   }
@@ -399,7 +412,7 @@ function portfolioReference(path) {
   return { status: "provided_reference_unverified", identity };
 }
 
-function planDigestPayload(plan) {
+export function planDigestPayload(plan) {
   const { environment, target, plan_digest, ...semantic } = plan;
   const targetSemantic = target ? {
     repository_id: target.repository_id,
@@ -414,13 +427,14 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
   const root = realpathSync(target);
   if (!ADAPTERS.includes(adapter)) throw new Error(`Unknown adapter: ${adapter}`);
   const beforeInspection = await inspectRepository(root);
+  const applyBefore = captureApplyTarget(root);
+  assertNoSetupInProgress(root);
   const recommendation = recommendFromFacts({ inspection: beforeInspection, adapter, purpose, profile, risk, requiredCapabilities });
   if (!recommendation.profile) throw new Error(`Plan requires resolved profile. Outstanding decisions: ${recommendation.human_decisions.map((entry) => entry.id).join(", ")}`);
   if (recommendation.human_decisions.some((entry) => entry.id.startsWith("capability:"))) throw new Error(`Required capability is unsupported or unknown: ${recommendation.human_decisions.filter((entry) => entry.id.startsWith("capability:")).map((entry) => entry.id.slice("capability:".length)).join(", ")}`);
 
   const { source, selectedSkills, projection } = await planningSource(adapter, recommendation.profile);
   const projectedTargetPaths = (projection?.projectedManagedAssets ?? [])
-    .filter((asset) => asset.ownership_mode !== "runtime_directory")
     .map((asset) => asset.path);
   const planningPaths = [...new Set([
     ...KERNEL_SETUP_INPUTS,
@@ -430,6 +444,7 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
     ...(selectedSkills ?? []).map((skill) => `skills/${skill}/SKILL.md`),
     ...projectedTargetPaths,
   ])].sort();
+  assertSetupWritePaths(root, planningPaths);
   const planTargetSnapshot = snapshotTarget(root, { extraPaths: planningPaths });
 
   const stagingParent = realpathSync(tmpdir());
@@ -441,42 +456,24 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
     validateSetupPaths(staging, planningPaths);
     const beforeInstall = installerNamespaceSnapshot(staging, planningPaths);
     const phaseEvidence = [];
-
-    const kernelArgs = ["--target", staging, "--merge-agents"];
-    if (selectedSkills && selectedSkills.length > 0) kernelArgs.push("--skills", selectedSkills.join(","));
-    const kernelCommand = ["node", "scripts/install-kernel.mjs", "--target", "<staging>", "--merge-agents", ...(selectedSkills && selectedSkills.length ? ["--skills", selectedSkills.join(",")] : [])];
-    const kernelDryRun = runNode("scripts/install-kernel.mjs", [...kernelArgs, "--dry-run"]);
-    const kernel = runNode("scripts/install-kernel.mjs", kernelArgs);
-    phaseEvidence.push({
-      phase: "kernel",
-      command: kernelCommand,
-      exit_status: kernel.status,
-      dry_run_exit_status: kernelDryRun.status,
-      dry_run_output_digest: normalizedOutputDigest(kernelDryRun.stdout, staging),
-    });
-
-    validateSetupPaths(staging, planningPaths);
-    if (adapter === "codex") {
-      const adapterArgs = ["--target", staging, "--profile", recommendation.profile];
-      const dryRun = runNode("scripts/install-codex-adapter.mjs", [...adapterArgs, "--dry-run"]);
-      const result = runNode("scripts/install-codex-adapter.mjs", adapterArgs);
+    const applyPhases = [];
+    const beforeStaging = captureApplyTree(staging);
+    for (const invocation of setupInstallerInvocations(adapter, recommendation.profile, selectedSkills, staging)) {
+      assertSetupWritePaths(staging, planningPaths);
+      const dryRun = runNode(invocation.script, [...invocation.args, "--dry-run"]);
+      const result = runNode(invocation.script, invocation.args);
       phaseEvidence.push({
-        phase: "adapter",
-        command: ["node", "scripts/install-codex-adapter.mjs", "--target", "<staging>", "--profile", recommendation.profile],
+        phase: invocation.phase,
+        command: ["node", invocation.script, ...invocation.args.map((value) => value === staging ? "<staging>" : value)],
         exit_status: result.status,
         dry_run_exit_status: dryRun.status,
         dry_run_output_digest: normalizedOutputDigest(dryRun.stdout, staging),
       });
-    } else if (adapter === "claude-code") {
-      const adapterArgs = ["--target", staging, "--profile", recommendation.profile];
-      const dryRun = runNode("scripts/install-claude-adapter.mjs", [...adapterArgs, "--dry-run"]);
-      const result = runNode("scripts/install-claude-adapter.mjs", adapterArgs);
-      phaseEvidence.push({
-        phase: "adapter",
-        command: ["node", "scripts/install-claude-adapter.mjs", "--target", "<staging>", "--profile", recommendation.profile],
-        exit_status: result.status,
-        dry_run_exit_status: dryRun.status,
-        dry_run_output_digest: normalizedOutputDigest(dryRun.stdout, staging),
+      const expectedEntries = overlayStagingResult(applyBefore.entries, beforeStaging, captureApplyTree(staging));
+      applyPhases.push({
+        phase: invocation.phase,
+        expected_target: resultBinding(applyBefore.binding.git, expectedEntries),
+        managed_identities: managedSetupIdentities(staging),
       });
     }
 
@@ -485,6 +482,7 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
     const operations = diffSnapshots(beforeInstall, afterInstall, ownershipMap(staging));
     const afterTargetSnapshot = snapshotTarget(root, { extraPaths: planningPaths });
     if (planTargetSnapshot.digest !== afterTargetSnapshot.digest) throw new Error("Target changed while setup inspection/plan was running; retry from a fresh inspection.");
+    applyAssert(captureApplyTarget(root).binding.digest === applyBefore.binding.digest, "target_changed_during_planning");
     const afterSource = await planningSource(adapter, recommendation.profile);
     if (source.identity_digest !== afterSource.source.identity_digest) throw new Error("ASK setup source changed while planning; generate a fresh plan.");
 
@@ -506,6 +504,15 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
       assets: { status: assetRefs.length > 0 ? "confirmed_from_projection" : "none_confirmed", exact_refs: assetRefs },
       portfolio: portfolioReference(portfolioPath),
       operations,
+      application: {
+        contract: "exact-installer-apply-v1",
+        repository_locator_digest: jsonDigest({ target_realpath: root }),
+        execution_environment: { node: process.version, platform: process.platform, arch: process.arch, umask: process.umask() },
+        target_before: applyBefore.binding,
+        selected_skills: selectedSkills,
+        write_paths: planningPaths,
+        phases: applyPhases,
+      },
       preservation: {
         project_owned_state: operations.filter((entry) => entry.ownership === "managed_block" || entry.ownership === "managed_partial_file").map((entry) => ({ path: entry.path, preserved_boundary: entry.ownership === "managed_block" ? "content outside ASK managed block" : "non-ASK keys/fields" })),
         privacy: {
@@ -519,7 +526,7 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
       human_decisions: recommendation.human_decisions,
       rollback: {
         supported_by_installers: true,
-        note: "Apply is not implemented by ask-setup in this slice. Existing installers retain rollback/detach ownership semantics.",
+        note: "Explicit apply reuses installer rollback/detach snapshots. Apply is not transactional; recovery requires a separate reviewed installer action.",
       },
       readiness: {
         installed: "planned_not_applied",
@@ -545,15 +552,23 @@ export async function createAdoptionPlan({ target, adapter, profile, purpose = n
   }
 }
 
-export async function verifySavedPlan(plan, { target, adapter = null } = {}) {
+export async function verifyPlanIdentity(plan, { target, adapter = null } = {}) {
   if (!plan || plan.schema_version !== PLAN_SCHEMA_VERSION || plan.kind !== PLAN_KIND) throw new Error("Unsupported or invalid adoption plan.");
   const expectedDigest = jsonDigest(planDigestPayload(plan));
   if (plan.plan_digest !== expectedDigest) throw new Error("Plan digest mismatch.");
   const root = realpathSync(target);
-  if (plan.environment?.target_realpath !== root) throw new Error("Plan target repository path does not match the requested repository.");
+  if (plan.environment?.target_realpath !== root
+    || plan.application?.repository_locator_digest !== jsonDigest({ target_realpath: root })) throw new Error("Plan target repository path does not match the requested repository.");
   if (adapter && plan.selection?.adapter !== adapter) throw new Error(`Plan adapter mismatch: planned=${plan.selection?.adapter} requested=${adapter}`);
   const { source: currentSource } = await planningSource(plan.selection?.adapter, plan.selection?.profile);
-  if (plan.source?.identity_digest !== currentSource.identity_digest) throw new Error("ASK setup source changed after the plan was generated.");
+  if (canonicalJson(plan.source) !== canonicalJson(currentSource)) throw new Error("ASK setup source changed after the plan was generated.");
+  return { root, currentSource };
+}
+
+export async function verifySavedPlan(plan, { target, adapter = null } = {}) {
+  const { root } = await verifyPlanIdentity(plan, { target, adapter });
+  if (plan.application?.contract !== "exact-installer-apply-v1"
+    || captureApplyTarget(root).binding.digest !== plan.application.target_before?.digest) throw new Error("Target repository changed after the plan was generated.");
   const current = snapshotTarget(root, { extraPaths: Array.isArray(plan.target?.snapshot_paths) ? plan.target.snapshot_paths : [] });
   if (plan.target?.snapshot_digest !== current.digest) throw new Error("Target repository changed after the plan was generated.");
   const git = gitFacts(root);
@@ -584,7 +599,7 @@ function doctor(target) {
 
 function parseArgs(argv) {
   const [command, ...rest] = argv;
-  const args = { command, target: process.cwd(), adapter: null, profile: null, purpose: null, risk: "normal", requiredCapabilities: [], json: false, output: null, plan: null, portfolio: null };
+  const args = { command, target: process.cwd(), adapter: null, profile: null, purpose: null, risk: "normal", requiredCapabilities: [], json: false, output: null, plan: null, portfolio: null, dryRun: false };
   for (let i = 0; i < rest.length; i += 1) {
     const token = rest[i];
     if (token === "--target") args.target = resolve(rest[++i]);
@@ -601,6 +616,7 @@ function parseArgs(argv) {
     else if (token === "--output") args.output = resolve(rest[++i]);
     else if (token === "--plan") args.plan = resolve(rest[++i]);
     else if (token === "--json") args.json = true;
+    else if (token === "--dry-run") args.dryRun = true;
     else if (token === "--help" || token === "-h") args.command = "help";
     else throw new Error(`Unknown argument: ${token}`);
   }
@@ -608,7 +624,7 @@ function parseArgs(argv) {
 }
 
 function help() {
-  console.log(`Usage: node scripts/ask-setup.mjs <inspect|recommend|plan|check|doctor|apply> [options]\n\nOptions:\n  --target <path>                 Target repository (default: cwd)\n  --adapter <codex|claude-code|kernel-only>\n  --profile <name>                Exact existing installer profile\n  --purpose <name>                daily|organizational|implementation|investigation|review|adoption|observability\n  --risk <normal|high>            Recommendation guard only; does not invent project policy\n  --require-capability <id>       Repeatable adapter capability requirement\n  --portfolio-reference <path>    Exact exported Portfolio reference JSON\n  --output <path>                 Save a plan outside the target repository\n  --plan <path>                   Saved plan for check\n  --json                          Machine-readable output\n\nCommands are read-only for the target repository. 'apply' is intentionally unavailable in this slice.`);
+  console.log(`Usage: node scripts/ask-setup.mjs <inspect|recommend|plan|check|doctor|apply> [options]\n\nOptions:\n  --target <path>                 Target repository (default: cwd)\n  --adapter <codex|claude-code|kernel-only>\n  --profile <name>                Exact existing installer profile\n  --purpose <name>                daily|organizational|implementation|investigation|review|adoption|observability\n  --risk <normal|high>            Recommendation guard only; does not invent project policy\n  --require-capability <id>       Repeatable adapter capability requirement\n  --portfolio-reference <path>    Exact exported Portfolio reference JSON\n  --output <path>                 Save a plan outside the target repository\n  --plan <path>                   Exact saved plan for check/apply\n  --dry-run                       Validate apply without writing the target\n  --json                          Machine-readable output\n\ninspect/recommend/plan/check/doctor never write the target. Explicit 'apply --plan' authorizes the exact plan; 'apply --plan ... --dry-run' only validates. Apply results are printed (use --json); --output remains plan-only. No first workflow is executed.`);
 }
 
 function writePlan(path, target, plan) {
@@ -655,7 +671,13 @@ function printHuman(command, value) {
   if (command === "plan") {
     console.log(`導入計画: ${value.selection.adapter}/${value.selection.profile}`);
     console.log(`変更予定: ${value.operations.filter((entry) => entry.action !== "preserve").length}件 / plan=${value.plan_digest}`);
-    console.log("対象repositoryへの書き込みは行っていません。applyと実workflow確認は未対応です。");
+    console.log("対象repositoryへの書き込みは行っていません。適用には apply --plan が必要です。実workflow確認は別途必要です。");
+    return;
+  }
+  if (command === "apply") {
+    console.log(`Apply=${value.status}, Installed=${value.readiness.installed}, Operational=${value.readiness.operational}`);
+    console.log(`適用済み=${value.applied_operations.length}, 未適用=${value.not_applied_operations.length}, 要復旧=${value.recovery_required}`);
+    if (value.reason) console.log(`理由: ${value.reason}`);
     return;
   }
   if (command === "check") {
@@ -673,7 +695,31 @@ async function main(argv = process.argv.slice(2)) {
     help();
     return;
   }
-  if (args.command === "apply") throw new Error("apply is not implemented in this slice; refusing before any target mutation.");
+  if (args.command === "apply") {
+    const { applyAdoptionPlan, blockedApplyResult } = await import("./ask-setup-apply.mjs");
+    let value;
+    let savedPlan;
+    if (!args.plan) {
+      // No exact Plan means no authorization, even when the command is named apply.
+      throw new Error("apply requires --plan <path>; no target mutation was attempted.");
+    }
+    try {
+      applyAssert(!args.output && !args.profile && !args.purpose && !args.portfolio
+        && args.requiredCapabilities.length === 0 && args.risk === "normal", "apply_uses_exact_plan_options_only");
+      savedPlan = readApplyJson(args.plan);
+    } catch {
+      value = blockedApplyResult("invalid_apply_input", { authorized: true, dryRun: args.dryRun });
+    }
+    // Do not turn an unexpected post-mutation exception into a no-write result.
+    if (!value) value = await applyAdoptionPlan(savedPlan, {
+      target: args.target, adapter: args.adapter, authorized: true, dryRun: args.dryRun,
+    });
+    if (args.json) console.log(JSON.stringify(value, null, 2));
+    else printHuman("apply", value);
+    if (!["applied", "already_applied", "validated"].includes(value.status)) process.exitCode = 1;
+    return;
+  }
+  if (args.dryRun) throw new Error("--dry-run is only valid with apply; other setup commands are already read-only.");
   if (!existsSync(args.target) || !statSync(args.target).isDirectory()) throw new Error(`Target is not a directory: ${args.target}`);
 
   let value;

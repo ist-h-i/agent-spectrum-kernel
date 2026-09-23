@@ -2,7 +2,7 @@
 
 `ask-setup` は、ASK を導入する前に対象リポジトリを読み取り、利用可能な profile と adapter capability を確認し、既存 installer が行う変更を事前に計画する CLI です。
 
-この段階では対象リポジトリへ書き込みません。`apply`、実際の Codex / Claude 実行、初回 workflow の operational 確認は後続範囲です。
+`inspect / recommend / plan / check / doctor` は対象リポジトリへ書き込みません。明示的な `apply --plan` だけが、検証済みの exact Plan を既存 installer で適用します。実際の Codex / Claude 実行と初回 workflow の Operational 確認は後続範囲です。認可・適用結果・復旧の詳細は [明示承認された計画の適用](adoption-apply.md) を参照してください。
 
 ## できること
 
@@ -11,6 +11,7 @@
 - `plan`: 既存 installer を隔離した一時ディレクトリで実行し、作成・更新・削除予定と managed / project-owned 境界を machine-readable な adoption plan にする。
 - `check`: 保存済み plan の source、target snapshot、repository identity、adapter が現在も一致するか確認する。
 - `doctor`: 既存 `ask-doctor` を使い、Installed / Activated / Operational を別々に診断する。
+- `apply`: 保存 Plan を再検証し、明示承認された変更だけを実リポジトリへ適用する。`--dry-run` では書き込まない。
 
 ## 基本操作
 
@@ -79,6 +80,8 @@ node scripts/ask-setup.mjs plan \
   --json
 ```
 
+Portfolio reference は参照だけでは lifecycle authority を証明しないため、`provided_reference_unverified` の Plan の apply は書き込み前に停止します。Portfolio の activation や承認を推測しません。
+
 projection に exact Asset reference がある場合は plan に保持します。登録済み・installed・activated・operational は別状態であり、一つの状態から次を推測しません。
 
 ## Dry-run と安全境界
@@ -100,7 +103,7 @@ Git 情報の読取前には、source と target の `.git`、`config`、`HEAD`�
 - 一時ディレクトリが対象リポジトリ内にある。
 - plan 生成中または保存後に、導入に関係する target の状態や source が変わる。
 - plan の出力先が対象リポジトリ内、または既存ファイルである。
-- `apply` が呼ばれる。
+- exact Plan なしで `apply` が呼ばれる、または Plan の検証・認可条件を満たさない。
 
 global 認証設定は探索しません。`.env`、秘密鍵など既知の secret file の content は snapshot identity に取り込みません。既存 installer が安全な partial-file merge を判断するために対象リポジトリ内の setup file を読む場合も、その値を plan へ出力しません。installer の完全な標準出力も保存せず、dry-run 証跡には一時パスを正規化した出力 digest のみを保持します。
 
@@ -116,7 +119,9 @@ source の Git revision と、Asset reference を含む projection の digest �
 
 target の snapshot 内のパスは、リポジトリ基準の相対パスです。同じ `--target` と `--plan` を指定していれば、コマンドの実行ディレクトリだけを変えても計画は無効になりません。JavaScript から `verifySavedPlan()` を呼ぶ場合は、非同期の検証結果を `await` で取得してください。
 
-計画作成中は、source と対象リポジトリを他の処理から変更しないでください。前後の snapshot 比較は、並行して動く別プロセスに対する OS レベルの隔離ではありません。
+Plan 1.1 は追加で HEAD/ref、index、作業ツリーの通常ファイルの bytes/mode と関連する特殊パスのメタデータを束縛します。既知の秘密ファイルは内容を読まず、サイズ・mtime・ctime 等のメタデータだけを確認します。対象パスと実行環境も Plan digest に束縛するため、旧 Plan 1.0 は再生成してください。
+
+計画作成中・apply 実行中は、source と対象リポジトリを他の処理から変更しないでください。前後の snapshot 比較は、並行して動く別プロセスに対する OS レベルの隔離ではありません。
 
 ## Doctor
 
@@ -138,4 +143,4 @@ static projection、file presence、caller の `operational=true` だけでは O
 
 ## この slice の後続範囲
 
-`ask-setup apply` は未対応で、必ず拒否します。#173 の後続で、明示承認された apply、初回 workflow、実ホスト上の operational 確認を既存 installer / runtime contract に接続します。効果や operator dependence の評価は #285 / #286 の実測範囲です。
+今回の apply は既存 kernel / Codex / Claude project installer の適用までです。#173 全体の完了、Portfolio authority を伴う選択の適用、Claude plugin のホスト側インストール、初回 workflow、実ホスト上の Operational 確認は含みません。効果や operator dependence の評価は #285 / #286 の実測範囲です。

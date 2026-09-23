@@ -14,6 +14,7 @@
     "assets",
     "portfolio",
     "operations",
+    "application",
     "preservation",
     "conflicts",
     "human_decisions",
@@ -24,7 +25,7 @@
     "plan_digest"
   ],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
+    "schema_version": { "const": "1.1.0" },
     "kind": { "const": "ask.adoption-plan" },
     "source": {
       "type": "object",
@@ -34,21 +35,22 @@
         "name": { "type": "string", "minLength": 1 },
         "version": { "type": ["string", "null"] },
         "revision": { "type": ["string", "null"] },
-        "projection_digest": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "projection_digest": {
+          "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }]
+        },
         "files": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "required": ["path", "sha256"],
-            "properties": {
-              "path": { "type": "string", "minLength": 1 },
-              "sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
-            }
+            "properties": { "path": { "type": "string", "minLength": 1 }, "sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" } }
           }
         },
         "identity_digest": { "$ref": "#/$defs/digest" },
-        "runtime_profile_fixture_digest": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] }
+        "runtime_profile_fixture_digest": {
+          "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }]
+        }
       }
     },
     "target": {
@@ -59,27 +61,25 @@
         "repository_id": { "type": ["string", "null"] },
         "revision": { "type": ["string", "null"] },
         "snapshot_digest": { "$ref": "#/$defs/digest" },
-        "snapshot_paths": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+        "snapshot_paths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
       }
     },
     "selection": {
       "type": "object",
       "additionalProperties": false,
       "required": ["adapter", "profile"],
-      "properties": {
-        "adapter": { "enum": ["codex", "claude-code", "kernel-only"] },
-        "profile": { "type": "string", "minLength": 1 }
-      }
+      "properties": { "adapter": { "enum": ["codex", "claude-code", "kernel-only"] }, "profile": { "type": "string", "minLength": 1 } }
     },
     "recommendation": { "$ref": "#/$defs/recommendation" },
     "assets": {
       "type": "object",
       "additionalProperties": false,
       "required": ["status", "exact_refs"],
-      "properties": {
-        "status": { "enum": ["confirmed_from_projection", "none_confirmed"] },
-        "exact_refs": { "type": "array", "items": { "type": "object" } }
-      }
+      "properties": { "status": { "enum": ["confirmed_from_projection", "none_confirmed"] }, "exact_refs": { "type": "array", "items": { "type": "object" } } }
     },
     "portfolio": {
       "type": "object",
@@ -89,7 +89,6 @@
         "status": { "enum": ["unselected", "provided_reference_unverified"] },
         "identity": {
           "anyOf": [
-            { "type": "null" },
             {
               "type": "object",
               "additionalProperties": false,
@@ -102,7 +101,8 @@
                 "current_manifest": { "type": ["object", "null"] },
                 "selection_digest": { "type": ["string", "null"] }
               }
-            }
+            },
+            { "type": "null" }
           ]
         }
       }
@@ -123,6 +123,52 @@
         }
       }
     },
+    "application": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "target_before", "selected_skills", "write_paths", "phases", "repository_locator_digest", "execution_environment"],
+      "properties": {
+        "contract": { "const": "exact-installer-apply-v1" },
+        "target_before": { "$ref": "#/$defs/targetBinding" },
+        "selected_skills": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "write_paths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["phase", "expected_target", "managed_identities"],
+            "properties": {
+              "phase": { "enum": ["kernel", "adapter"] },
+              "expected_target": { "$ref": "#/$defs/targetBinding" },
+              "managed_identities": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/managedIdentity" }
+              }
+            }
+          },
+          "minItems": 1,
+          "maxItems": 2
+        },
+        "repository_locator_digest": { "$ref": "#/$defs/digest" },
+        "execution_environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["node", "platform", "arch", "umask"],
+          "properties": { "node": { "type": "string" }, "platform": { "type": "string" }, "arch": { "type": "string" }, "umask": { "type": "integer", "minimum": 0, "maximum": 511 } }
+        }
+      }
+    },
     "preservation": {
       "type": "object",
       "additionalProperties": false,
@@ -134,10 +180,7 @@
             "type": "object",
             "additionalProperties": false,
             "required": ["path", "preserved_boundary"],
-            "properties": {
-              "path": { "type": "string", "minLength": 1 },
-              "preserved_boundary": { "type": "string", "minLength": 1 }
-            }
+            "properties": { "path": { "type": "string", "minLength": 1 }, "preserved_boundary": { "type": "string", "minLength": 1 } }
           }
         },
         "privacy": {
@@ -153,16 +196,19 @@
         }
       }
     },
-    "conflicts": { "type": "array", "items": { "type": "object" } },
-    "human_decisions": { "type": "array", "items": { "$ref": "#/$defs/humanDecision" } },
+    "conflicts": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "human_decisions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/humanDecision" }
+    },
     "rollback": {
       "type": "object",
       "additionalProperties": false,
       "required": ["supported_by_installers", "note"],
-      "properties": {
-        "supported_by_installers": { "type": "boolean" },
-        "note": { "type": "string", "minLength": 1 }
-      }
+      "properties": { "supported_by_installers": { "type": "boolean" }, "note": { "type": "string", "minLength": 1 } }
     },
     "readiness": {
       "type": "object",
@@ -187,7 +233,10 @@
             "required": ["phase", "command", "exit_status", "dry_run_exit_status", "dry_run_output_digest"],
             "properties": {
               "phase": { "enum": ["kernel", "adapter"] },
-              "command": { "type": "array", "items": { "type": "string" } },
+              "command": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
               "exit_status": { "type": "integer" },
               "dry_run_exit_status": { "type": "integer" },
               "dry_run_output_digest": { "$ref": "#/$defs/digest" }
@@ -220,7 +269,10 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "question": { "type": "string", "minLength": 1 },
-        "options": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        "options": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
       }
     },
     "recommendation": {
@@ -243,8 +295,71 @@
             "note": { "type": "string", "minLength": 1 }
           }
         },
-        "capabilities": { "type": "array", "items": { "type": "object" } },
-        "human_decisions": { "type": "array", "items": { "$ref": "#/$defs/humanDecision" } }
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "human_decisions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/humanDecision" }
+        }
+      }
+    },
+    "targetBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["git", "worktree_digest", "digest"],
+      "properties": {
+        "git": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository_id", "head_digest", "index_digest"],
+          "properties": {
+            "repository_id": { "type": ["string", "null"] },
+            "head_digest": {
+              "anyOf": [{ "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }, { "type": "null" }]
+            },
+            "index_digest": {
+              "anyOf": [{ "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }, { "type": "null" }]
+            }
+          }
+        },
+        "worktree_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "managedIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["installer", "state_path", "install_status", "profile", "source_revision", "files", "ownership_digest", "projection_digest", "installed_inventory_digest", "identity_digest"],
+      "properties": {
+        "installer": { "enum": ["agent-spectrum-kernel", "agent-spectrum-codex-adapter", "agent-spectrum-claude-adapter"] },
+        "state_path": { "type": "string", "minLength": 1 },
+        "install_status": { "enum": ["installed", "detached", "unknown"] },
+        "profile": { "type": ["string", "null"] },
+        "source_revision": { "type": ["string", "null"] },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "ownership", "actual_sha256", "managed_sha256"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "ownership": { "enum": ["managed_file", "managed_block", "managed_partial_file"] },
+              "actual_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+              "managed_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+            }
+          }
+        },
+        "ownership_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "projection_digest": {
+          "anyOf": [{ "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }, { "type": "null" }]
+        },
+        "installed_inventory_digest": {
+          "anyOf": [{ "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }, { "type": "null" }]
+        },
+        "identity_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
       }
     }
   }

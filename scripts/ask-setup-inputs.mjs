@@ -17,6 +17,7 @@ const SETUP_SOURCE_INPUTS = Object.freeze([
   "scripts/ask-setup.mjs",
   "scripts/ask-setup-inputs.mjs",
   "schemas/adoption-plan.schema.json",
+  "schemas/adoption-apply-result.schema.json",
   "docs/fixtures/adapter-runtime-profiles.json",
 ]);
 const SENSITIVE_BASENAMES = new Set([".env", ".npmrc", ".netrc", "credentials", "credentials.json"]);

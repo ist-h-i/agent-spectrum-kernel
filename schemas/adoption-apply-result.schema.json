@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/adoption-apply-result.schema.json",
+  "title": "Exact ASK Adoption Apply Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "status",
+    "reason",
+    "plan_digest",
+    "plan_validation",
+    "authorization",
+    "mutation_attempted",
+    "observation",
+    "repository_changed",
+    "phases",
+    "applied_operations",
+    "not_applied_operations",
+    "preserved_operations",
+    "blocked_operations",
+    "resulting_managed_identities",
+    "assets",
+    "portfolio",
+    "capabilities",
+    "recovery_required",
+    "recovery",
+    "readiness",
+    "next_verification",
+    "result_digest",
+    "selection",
+    "source",
+    "recovery_semantics"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "kind": { "const": "ask.adoption-apply-result" },
+    "status": { "enum": ["blocked", "validated", "already_applied", "applied", "failed", "partial"] },
+    "reason": {
+      "anyOf": [{ "type": "string", "pattern": "^[a-z0-9_]+$" }, { "type": "null" }]
+    },
+    "plan_digest": {
+      "anyOf": [{ "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }, { "type": "null" }]
+    },
+    "plan_validation": { "enum": ["not_validated", "valid_exact_plan"] },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "explicit", "dry_run", "mutation_allowed"],
+      "properties": { "action": { "const": "apply" }, "explicit": { "type": "boolean" }, "dry_run": { "type": "boolean" }, "mutation_allowed": { "type": "boolean" } }
+    },
+    "mutation_attempted": { "type": "boolean" },
+    "observation": { "enum": ["not_started", "complete", "unavailable"] },
+    "repository_changed": { "type": ["boolean", "null"] },
+    "phases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["phase", "installer", "status", "exit_status"],
+        "properties": {
+          "phase": { "enum": ["kernel", "adapter"] },
+          "installer": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["not_attempted", "attempted", "applied", "blocked", "failed"] },
+          "exit_status": { "type": ["integer", "null"] }
+        }
+      }
+    },
+    "applied_operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "path", "ownership", "installer"],
+        "properties": {
+          "action": { "enum": ["create", "update", "remove", "preserve"] },
+          "path": { "type": "string", "minLength": 1 },
+          "ownership": { "enum": ["managed_file", "managed_block", "managed_partial_file", "managed_state", "project_owned"] },
+          "installer": { "type": ["string", "null"] },
+          "before_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+          "after_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+          "outcome": { "enum": ["applied", "not_applied", "unknown"] },
+          "actual_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "not_applied_operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "path", "ownership", "installer"],
+        "properties": {
+          "action": { "enum": ["create", "update", "remove", "preserve"] },
+          "path": { "type": "string", "minLength": 1 },
+          "ownership": { "enum": ["managed_file", "managed_block", "managed_partial_file", "managed_state", "project_owned"] },
+          "installer": { "type": ["string", "null"] },
+          "before_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+          "after_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+          "outcome": { "enum": ["applied", "not_applied", "unknown"] },
+          "actual_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "preserved_operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "preserved_boundary"],
+        "properties": { "path": { "type": "string", "minLength": 1 }, "preserved_boundary": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "blocked_operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "path", "ownership", "installer"],
+        "properties": {
+          "action": { "enum": ["create", "update", "remove", "preserve"] },
+          "path": { "type": "string", "minLength": 1 },
+          "ownership": { "enum": ["managed_file", "managed_block", "managed_partial_file", "managed_state", "project_owned"] },
+          "installer": { "type": ["string", "null"] },
+          "before_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+          "after_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+          "outcome": { "enum": ["applied", "not_applied", "unknown"] },
+          "actual_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "resulting_target": { "$ref": "adoption-plan.schema.json#/$defs/targetBinding" },
+    "resulting_managed_identities": {
+      "type": "array",
+      "items": { "$ref": "adoption-plan.schema.json#/$defs/managedIdentity" }
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "exact_refs"],
+      "properties": { "status": { "enum": ["not_verified", "confirmed_from_projection", "none_confirmed"] }, "exact_refs": { "type": "array", "items": { "type": "object" } } }
+    },
+    "portfolio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "identity"],
+      "properties": { "status": { "enum": ["not_verified", "unselected"] }, "identity": { "type": "null" } }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "recovery_required": { "type": "boolean" },
+    "recovery": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["phase", "state_path", "in_progress", "rollback", "rollback_command", "detach_command"],
+        "properties": {
+          "phase": { "enum": ["kernel", "adapter"] },
+          "state_path": { "type": "string", "minLength": 1 },
+          "in_progress": { "type": "boolean" },
+          "rollback": { "enum": ["unavailable", "snapshot_available_requires_dry_run", "unknown"] },
+          "rollback_command": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "detach_command": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["installed", "activated", "operational"],
+      "properties": {
+        "installed": { "enum": ["unknown", "planned_not_applied", "installed"] },
+        "activated": { "const": "insufficient_evidence" },
+        "operational": { "const": "insufficient_evidence" }
+      }
+    },
+    "next_verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "first_workflow"],
+      "properties": { "command": { "type": "array", "items": { "type": "string" } }, "first_workflow": { "type": "string", "minLength": 1 } }
+    },
+    "result_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "selection": {
+      "anyOf": [{ "$ref": "adoption-plan.schema.json#/properties/selection" }, { "type": "null" }]
+    },
+    "source": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["identity_digest", "revision", "projection_digest", "runtime_profile_fixture_digest"],
+          "properties": {
+            "identity_digest": { "$ref": "adoption-plan.schema.json#/$defs/digest" },
+            "revision": { "type": ["string", "null"] },
+            "projection_digest": { "type": ["string", "null"] },
+            "runtime_profile_fixture_digest": { "type": ["string", "null"] }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "recovery_semantics": { "const": "non_transactional_installer_snapshots_only; initialized_project_owned_state_and_directories_may_remain" }
+  }
+}
