@@ -50,12 +50,13 @@ try {
   git(repo, "init", "-b", "main");
   git(repo, "config", "user.email", "test@example.com");
   git(repo, "config", "user.name", "ASK Test");
-  git(repo, "remote", "add", "origin", "https://github.com/example/resume-fixture.git");
+  git(repo, "remote", "add", "origin", "https://github.com/ist-h-i/agent-spectrum-kernel.git");
   writeFileSync(resolve(repo, "work.txt"), "bounded work\n", "utf8");
   writeFileSync(resolve(repo, "contract.txt"), "contract v1\n", "utf8");
   writeFileSync(resolve(repo, "private.txt"), "do-not-copy-this-body\n", "utf8");
   git(repo, "add", ".");
   git(repo, "commit", "-m", "fixture");
+  git(repo, "checkout", "-b", "feature");
 
   const active = planBundle.plan.packages[1];
   const completed = [planBundle.plan.packages[0].package_id];
@@ -70,6 +71,7 @@ try {
     nextTaskId,
     targetPaths: ["work.txt", "private.txt", "future.txt"],
     contractPaths: ["contract.txt"],
+    integrationBase: "main",
     resumeReferencePath: resumeRef,
   });
 
@@ -118,7 +120,7 @@ try {
   const wrongBranch = validateSessionResume({ repositoryRoot: repo, storeRoot: store, checkpointDigest: saved.checkpointDigest, planBundle });
   assert.equal(wrongBranch.status, "blocked");
   assert.ok(wrongBranch.reasons.includes("BRANCH_MISMATCH"));
-  git(repo, "checkout", "main");
+  git(repo, "checkout", "feature");
 
   const transplantRoot = resolve(root, "transplant");
   mkdirSync(transplantRoot);
@@ -157,6 +159,15 @@ try {
 
   const duplicatePublication = putContentAddressedJson({ storeRoot: store, artifact: saved.snapshot, digest: saved.snapshotDigest });
   assert.equal(duplicatePublication.created, false);
+
+  git(repo, "checkout", "main");
+  writeFileSync(resolve(repo, "base-only.txt"), "base moved\n", "utf8");
+  git(repo, "add", "base-only.txt");
+  git(repo, "commit", "-m", "advance integration base");
+  git(repo, "checkout", "feature");
+  const movedBase = validateSessionResume({ repositoryRoot: repo, storeRoot: store, checkpointDigest: saved.checkpointDigest, planBundle });
+  assert.equal(movedBase.status, "blocked");
+  assert.ok(movedBase.reasons.includes("INTEGRATION_BASE_MISMATCH"));
 
   writeFileSync(resolve(repo, "oversized.txt"), Buffer.alloc(300 * 1024, 0x61));
   assert.throws(() => createRepositorySnapshot({

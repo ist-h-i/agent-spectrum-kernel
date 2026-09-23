@@ -108,10 +108,17 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "ref",
         "commit",
         "tree"
       ],
       "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9._/-]+$"
+        },
         "commit": {
           "type": "string",
           "pattern": "^[a-f0-9]{40}$"

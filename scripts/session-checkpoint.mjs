@@ -241,8 +241,14 @@ export function createRepositorySnapshot({
   packageById(plan, activePackageId);
   const root = normalizedRepositoryRoot(repositoryRoot);
   const repository = captureGitState(root);
-  const baseCommit = gitText(root, ["rev-parse", integrationBase]);
-  const baseTree = gitText(root, ["rev-parse", `${baseCommit}^{tree}`]);
+  if (repository.repository_id !== plan.repository.repository_id) {
+    throw new Error("live repository identity differs from the executable Work Package Plan repository");
+  }
+  if (typeof integrationBase !== "string" || !/^[A-Za-z0-9._/-]+$/u.test(integrationBase) || integrationBase.startsWith("-") || integrationBase.includes("..")) {
+    throw new Error("integrationBase must be a bounded Git revision name");
+  }
+  const baseCommit = gitText(root, ["rev-parse", "--verify", `${integrationBase}^{commit}`]);
+  const baseTree = gitText(root, ["rev-parse", "--verify", `${integrationBase}^{tree}`]);
   const snapshot = {
     artifact_kind: "ask_repository_snapshot",
     schema_version: REPOSITORY_SNAPSHOT_SCHEMA_VERSION,
@@ -250,7 +256,7 @@ export function createRepositorySnapshot({
     target_paths: captureBoundedPaths(root, targetPaths, { allowMissing: true }),
     plan_ref: planRef(plan),
     active_package_id: activePackageId,
-    integration_base: { commit: baseCommit, tree: baseTree },
+    integration_base: { ref: integrationBase, commit: baseCommit, tree: baseTree },
     contract_refs: captureBoundedPaths(root, contractPaths, { allowMissing: false }),
     evidence_refs: evidenceRefs(verificationStoreRoot, evidenceIds),
     limitations: repository.worktree_state === "dirty" ? ["dirty_state_requires_same_working_environment"] : [],
@@ -334,13 +340,20 @@ function checkpointSemantics(checkpoint, snapshot, plan) {
 
 function currentSnapshotComparable(repositoryRoot, snapshot) {
   const root = normalizedRepositoryRoot(repositoryRoot);
+  let integrationBase = null;
+  try {
+    integrationBase = {
+      ref: snapshot.integration_base.ref,
+      commit: gitText(root, ["rev-parse", "--verify", `${snapshot.integration_base.ref}^{commit}`]),
+      tree: gitText(root, ["rev-parse", "--verify", `${snapshot.integration_base.ref}^{tree}`]),
+    };
+  } catch {
+    integrationBase = { ref: snapshot.integration_base.ref, commit: null, tree: null };
+  }
   return {
     repository: captureGitState(root),
     target_paths: captureBoundedPaths(root, snapshot.target_paths.map((entry) => entry.path), { allowMissing: true }),
-    integration_base: {
-      commit: gitText(root, ["rev-parse", snapshot.integration_base.commit]),
-      tree: gitText(root, ["rev-parse", `${snapshot.integration_base.commit}^{tree}`]),
-    },
+    integration_base: integrationBase,
     contract_refs: captureBoundedPaths(root, snapshot.contract_refs.map((entry) => entry.path), { allowMissing: false }),
   };
 }
