@@ -500,6 +500,10 @@ try {
     const attemptRoot = resolve(runDir, "cases", entry.case_id, "attempts", state.terminal_attempt);
     const request = JSON.parse(readFileSync(resolve(attemptRoot, "request.json"), "utf8"));
     const authority = JSON.parse(readFileSync(resolve(attemptRoot, "terminal-workspace-authority.json"), "utf8"));
+    if (entry.condition === "adaptive_ask") {
+      const owners = [...new Set(request.projection.inventory.map((asset) => asset.path.split("/")[2]))].sort();
+      assert.deepEqual(request.projection.selected_skills, owners, "selected Skill entries must match projected owners, not reference-file count");
+    }
     const prefix = entry.adapter_track === "codex" ? ".agents/skills/ui-ux-design/" : ".claude/skills/ui-ux-design/";
     const selected = entry.condition === "full_ask" || (entry.condition === "adaptive_ask" && request.projection.status !== "lightweight_bypass");
     const paths = ["SKILL.md", "references/anti-patterns.md", "references/decision-patterns.md", "references/principles.md"];

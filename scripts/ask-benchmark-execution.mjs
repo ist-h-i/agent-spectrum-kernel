@@ -990,7 +990,7 @@ function applyAdaptiveSelection({ root, adapter, selection, workspace }) {
   }
   return {
     status: selection.capability_downgrades.length > 0 ? "capability_downgraded" : "projected",
-    selected_skills: plan.selectedSkills,
+    selected_skills: closure,
     inventory: inventory.sort((left, right) => left.path.localeCompare(right.path)),
     source_digests: Object.values(plan.renderer_inputs).flat().map((item) => ({ path: item.path, sha256: item.digest })).sort((left, right) => left.path.localeCompare(right.path)),
     projection_fingerprint: plan.fingerprint,
