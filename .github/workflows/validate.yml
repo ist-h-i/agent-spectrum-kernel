@@ -130,6 +130,9 @@ jobs:
       - name: Run verification evidence exact-reuse tests
         run: node scripts/test-verification-evidence.mjs
 
+      - name: Run verification scoped reuse and coverage tests
+        run: node scripts/test-verification-scoped-reuse.mjs
+
       - name: Run adaptive portfolio normalized result tests
         run: node scripts/test-ask-benchmark-normalized-results.mjs
 

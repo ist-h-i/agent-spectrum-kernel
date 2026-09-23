@@ -1,0 +1,484 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/verification-scoped-reuse.schema.json",
+  "title": "Agent Spectrum Kernel scoped verification reuse, delta review, and current coverage",
+  "oneOf": [
+    { "$ref": "#/$defs/dependencyManifest" },
+    { "$ref": "#/$defs/scopedGateInventory" },
+    { "$ref": "#/$defs/scopedRequirements" },
+    { "$ref": "#/$defs/scopedPlan" },
+    { "$ref": "#/$defs/deltaReviewRequest" },
+    { "$ref": "#/$defs/currentCoverage" }
+  ],
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@+/-]*$"
+    },
+    "portablePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?:\\.|(?!(?:.*\\/)?\\.{1,2}(?:\\/|$))[A-Za-z0-9._?*-]+(?:/[A-Za-z0-9._?*-]+)*)$"
+    },
+    "artifactHeader": {
+      "type": "object",
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "pattern", "evidence_kind"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["file", "directory", "glob"] },
+        "pattern": { "$ref": "#/$defs/portablePath" },
+        "evidence_kind": { "type": "string", "enum": ["contract", "dependency", "file", "fixture", "manifest", "schema"] }
+      }
+    },
+    "reviewSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "pattern"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["file", "directory", "glob"] },
+        "pattern": { "$ref": "#/$defs/portablePath" }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executable", "argument_identity_scheme", "arguments_digest", "argument_count", "opaque_argument_count", "working_directory"],
+      "properties": {
+        "executable": { "$ref": "#/$defs/token" },
+        "argument_identity_scheme": { "type": "string", "const": "opaque-references-v1" },
+        "arguments_digest": { "$ref": "#/$defs/digest" },
+        "argument_count": { "type": "integer", "minimum": 0, "maximum": 128 },
+        "opaque_argument_count": { "type": "integer", "minimum": 0, "maximum": 128 },
+        "working_directory": { "$ref": "#/$defs/portablePath" }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runner_id", "runner_version", "adapter_id", "adapter_version", "evidence_level"],
+      "properties": {
+        "runner_id": { "$ref": "#/$defs/token" },
+        "runner_version": { "$ref": "#/$defs/token" },
+        "adapter_id": { "$ref": "#/$defs/token" },
+        "adapter_version": { "$ref": "#/$defs/token" },
+        "evidence_level": { "type": "string", "enum": ["projected", "runtime_detected", "executed", "behavior_verified"] }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["independent_judgment_required", "accepted_producers", "accepted_evidence_levels"],
+      "properties": {
+        "independent_judgment_required": { "type": "boolean" },
+        "accepted_producers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "identity_digest"],
+            "properties": {
+              "kind": { "type": "string", "enum": ["automation", "ci", "developer", "reviewer"] },
+              "identity_digest": { "$ref": "#/$defs/digest" }
+            }
+          }
+        },
+        "accepted_evidence_levels": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["projected", "runtime_detected", "executed", "behavior_verified"] }
+        }
+      }
+    },
+    "dependencyManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "schema_path", "program", "manifest_id", "manifest_digest",
+        "gate_id", "gate_contract_digest", "dependency_completeness", "base_inventory_digest",
+        "selectors", "execution", "runtime_observation", "invalidation"
+      ],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_dependency_manifest" },
+        "manifest_id": { "type": "string", "pattern": "^verification-dependency-manifest-[a-f0-9]{64}$" },
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "gate_id": { "$ref": "#/$defs/token" },
+        "gate_contract_digest": { "$ref": "#/$defs/digest" },
+        "dependency_completeness": { "type": "string", "enum": ["complete", "incomplete"] },
+        "base_inventory_digest": { "$ref": "#/$defs/digest" },
+        "selectors": { "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/selector" } },
+        "execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["command", "runner"],
+          "properties": {
+            "command": { "$ref": "#/$defs/command" },
+            "runner": { "$ref": "#/$defs/runner" }
+          }
+        },
+        "runtime_observation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "toolchain_names"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["node_process_v1", "unknown"] },
+            "toolchain_names": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/token" }
+            }
+          }
+        },
+        "invalidation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["unknown_dependencies_require_rerun"],
+          "properties": {
+            "unknown_dependencies_require_rerun": { "type": "boolean", "const": true }
+          }
+        }
+      }
+    },
+    "deltaReviewRequirement": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["surface_selectors", "obligation_refs", "prior_review_ref", "prior_finding_refs"],
+      "properties": {
+        "surface_selectors": { "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/reviewSelector" } },
+        "obligation_refs": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "prior_review_ref": { "oneOf": [{ "$ref": "#/$defs/token" }, { "type": "null" }] },
+        "prior_finding_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } }
+      }
+    },
+    "gateDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "dependency_manifest_path", "required_obligation_refs", "authority", "execution_availability", "delta_review"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/token" },
+        "dependency_manifest_path": { "$ref": "#/$defs/portablePath" },
+        "required_obligation_refs": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "authority": { "$ref": "#/$defs/authority" },
+        "execution_availability": { "type": "string", "enum": ["available", "unavailable"] },
+        "delta_review": { "$ref": "#/$defs/deltaReviewRequirement" }
+      }
+    },
+    "requiredGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "dependency_manifest_path", "source_evidence_id", "required_obligation_refs", "authority", "execution_availability", "delta_review"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/token" },
+        "dependency_manifest_path": { "$ref": "#/$defs/portablePath" },
+        "source_evidence_id": { "type": "string", "pattern": "^verification-evidence-[a-f0-9]{64}$" },
+        "required_obligation_refs": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "authority": { "$ref": "#/$defs/authority" },
+        "execution_availability": { "type": "string", "enum": ["available", "unavailable"] },
+        "delta_review": { "$ref": "#/$defs/deltaReviewRequirement" }
+      }
+    },
+    "currentObligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["obligation_id", "kind"],
+      "properties": {
+        "obligation_id": { "$ref": "#/$defs/token" },
+        "kind": { "type": "string", "enum": ["pr_head", "required_ci", "approval", "mergeability", "release_state", "authorization", "external_state"] }
+      }
+    },
+    "scopedGateInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "schema_path", "program", "inventory_id", "inventory_digest", "required_gates", "current_obligations"],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_scoped_gate_inventory" },
+        "inventory_id": { "type": "string", "pattern": "^verification-scoped-gate-inventory-[a-f0-9]{64}$" },
+        "inventory_digest": { "$ref": "#/$defs/digest" },
+        "required_gates": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/gateDefinition" } },
+        "current_obligations": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/currentObligation" } }
+      }
+    },
+    "scopedRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "schema_path", "program", "requirements_id", "requirements_digest", "base_revision", "gate_inventory_id", "gate_inventory_digest", "required_gates", "current_obligations"],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_scoped_requirements" },
+        "requirements_id": { "type": "string", "pattern": "^verification-scoped-requirements-[a-f0-9]{64}$" },
+        "requirements_digest": { "$ref": "#/$defs/digest" },
+        "base_revision": { "$ref": "#/$defs/commit" },
+        "gate_inventory_id": { "type": "string", "pattern": "^verification-scoped-gate-inventory-[a-f0-9]{64}$" },
+        "gate_inventory_digest": { "$ref": "#/$defs/digest" },
+        "required_gates": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/requiredGate" } },
+        "current_obligations": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/currentObligation" } }
+      }
+    },
+    "inventoryEntry": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["path", "evidence_kind", "mode", "type", "object_id", "content_digest"],
+      "properties": {
+        "path": { "$ref": "#/$defs/portablePath" },
+        "evidence_kind": { "type": "string", "enum": ["contract", "dependency", "file", "fixture", "manifest", "schema"] },
+        "mode": { "type": "string", "pattern": "^[0-9]{6}$" },
+        "type": { "type": "string", "enum": ["blob", "commit", "tree"] },
+        "object_id": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+        "content_digest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] }
+      }
+    },
+    "inventoryChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "before", "after"],
+      "properties": {
+        "path": { "$ref": "#/$defs/portablePath" },
+        "kind": { "type": "string", "enum": ["added", "deleted", "content_changed", "mode_changed", "type_changed"] },
+        "before": { "$ref": "#/$defs/inventoryEntry" },
+        "after": { "$ref": "#/$defs/inventoryEntry" }
+      }
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_id", "disposition", "reason_code", "source_evidence_id", "source_evidence_digest",
+        "dependency_manifest_id", "dependency_manifest_digest", "base_inventory_digest", "target_inventory_digest",
+        "required_obligation_refs", "covered_obligation_refs", "uncovered_obligation_refs", "execution_evidence_reusable",
+        "reuse_basis", "detail"
+      ],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/token" },
+        "disposition": { "type": "string", "enum": ["reuse_exact", "reuse_scoped", "rerun_required", "independent_judgment_required", "blocked_uncovered"] },
+        "reason_code": { "$ref": "#/$defs/token" },
+        "source_evidence_id": { "type": "string", "pattern": "^verification-evidence-[a-f0-9]{64}$" },
+        "source_evidence_digest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "dependency_manifest_id": { "oneOf": [{ "type": "string", "pattern": "^verification-dependency-manifest-[a-f0-9]{64}$" }, { "type": "null" }] },
+        "dependency_manifest_digest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "base_inventory_digest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "target_inventory_digest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "required_obligation_refs": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "covered_obligation_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "uncovered_obligation_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "execution_evidence_reusable": { "type": "boolean" },
+        "reuse_basis": { "type": ["string", "null"], "enum": ["exact_target", "declared_dependency_manifest", null] },
+        "detail": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "maxLength": 2048 },
+            { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/inventoryChange" } }
+          ]
+        }
+      }
+    },
+    "coverageSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "required_gate_count", "reuse_exact_count", "reuse_scoped_count", "rerun_required_count", "independent_judgment_required_count", "blocked_uncovered_count", "covered_gate_ids", "blocking_gate_ids"],
+      "properties": {
+        "status": { "type": "string", "enum": ["covered", "blocked"] },
+        "required_gate_count": { "type": "integer", "minimum": 1 },
+        "reuse_exact_count": { "type": "integer", "minimum": 0 },
+        "reuse_scoped_count": { "type": "integer", "minimum": 0 },
+        "rerun_required_count": { "type": "integer", "minimum": 0 },
+        "independent_judgment_required_count": { "type": "integer", "minimum": 0 },
+        "blocked_uncovered_count": { "type": "integer", "minimum": 0 },
+        "covered_gate_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "blocking_gate_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } }
+      }
+    },
+    "executionSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_gate_count", "full_rerun_gate_count", "reused_execution_gate_count", "rerun_gate_count", "saved_execution_gate_count"],
+      "properties": {
+        "required_gate_count": { "type": "integer", "minimum": 1 },
+        "full_rerun_gate_count": { "type": "integer", "minimum": 1 },
+        "reused_execution_gate_count": { "type": "integer", "minimum": 0 },
+        "rerun_gate_count": { "type": "integer", "minimum": 0 },
+        "saved_execution_gate_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "diffRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "score", "old_path", "new_path"],
+      "properties": {
+        "status": { "type": "string", "enum": ["added", "deleted", "modified", "type_changed", "renamed", "copied"] },
+        "score": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+        "old_path": { "oneOf": [{ "$ref": "#/$defs/portablePath" }, { "type": "null" }] },
+        "new_path": { "oneOf": [{ "$ref": "#/$defs/portablePath" }, { "type": "null" }] }
+      }
+    },
+    "scopedPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "schema_path", "program", "plan_id", "plan_digest", "planner_revision",
+        "repository_id", "base_revision", "target_revision", "target_tree_digest", "requirements_id", "requirements_digest",
+        "requirements_path", "gate_inventory_id", "gate_inventory_digest", "gate_inventory_path", "actual_diff", "dispositions", "coverage", "execution_summary"
+      ],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_scoped_reuse_plan" },
+        "plan_id": { "type": "string", "pattern": "^verification-scoped-reuse-plan-[a-f0-9]{64}$" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "planner_revision": { "type": "string", "const": "1.0.0" },
+        "repository_id": { "$ref": "#/$defs/token" },
+        "base_revision": { "$ref": "#/$defs/commit" },
+        "target_revision": { "$ref": "#/$defs/commit" },
+        "target_tree_digest": { "$ref": "#/$defs/digest" },
+        "requirements_id": { "type": "string", "pattern": "^verification-scoped-requirements-[a-f0-9]{64}$" },
+        "requirements_digest": { "$ref": "#/$defs/digest" },
+        "requirements_path": { "type": "string", "const": ".ask/verification-scoped-requirements.json" },
+        "gate_inventory_id": { "type": "string", "pattern": "^verification-scoped-gate-inventory-[a-f0-9]{64}$" },
+        "gate_inventory_digest": { "$ref": "#/$defs/digest" },
+        "gate_inventory_path": { "type": "string", "const": ".ask/verification-scoped-gates.json" },
+        "actual_diff": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["digest", "changed_paths", "change_records", "record_count", "truncated"],
+          "properties": {
+            "digest": { "$ref": "#/$defs/digest" },
+            "changed_paths": { "type": "array", "maxItems": 2048, "uniqueItems": true, "items": { "$ref": "#/$defs/portablePath" } },
+            "change_records": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/diffRecord" } },
+            "record_count": { "type": "integer", "minimum": 0, "maximum": 1024 },
+            "truncated": { "type": "boolean" }
+          }
+        },
+        "dispositions": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/disposition" } },
+        "coverage": { "$ref": "#/$defs/coverageSummary" },
+        "execution_summary": { "$ref": "#/$defs/executionSummary" }
+      }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "evidence_id", "evidence_digest"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/token" },
+        "evidence_id": { "type": "string", "pattern": "^verification-evidence-[a-f0-9]{64}$" },
+        "evidence_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "deltaReviewRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "schema_path", "program", "request_id", "request_digest", "repository_id", "base_revision", "target_revision",
+        "plan_id", "plan_digest", "diff_ref", "status", "affected_paths", "obligation_refs", "prior_review_refs", "prior_finding_refs",
+        "reusable_evidence_refs", "privacy"
+      ],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_delta_review_request" },
+        "request_id": { "type": "string", "pattern": "^verification-delta-review-request-[a-f0-9]{64}$" },
+        "request_digest": { "$ref": "#/$defs/digest" },
+        "repository_id": { "$ref": "#/$defs/token" },
+        "base_revision": { "$ref": "#/$defs/commit" },
+        "target_revision": { "$ref": "#/$defs/commit" },
+        "plan_id": { "type": "string", "pattern": "^verification-scoped-reuse-plan-[a-f0-9]{64}$" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "diff_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["digest", "changed_path_count"],
+          "properties": {
+            "digest": { "$ref": "#/$defs/digest" },
+            "changed_path_count": { "type": "integer", "minimum": 0, "maximum": 2048 }
+          }
+        },
+        "status": { "type": "string", "enum": ["not_required", "current_judgment_required", "blocked_unbounded"] },
+        "affected_paths": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/portablePath" } },
+        "obligation_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "prior_review_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "prior_finding_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "reusable_evidence_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceRef" } },
+        "privacy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bounded_references_only", "raw_diff_stored", "raw_prompts_stored", "transcripts_stored", "raw_output_stored", "secrets_stored", "private_evaluators_stored"],
+          "properties": {
+            "bounded_references_only": { "type": "boolean", "const": true },
+            "raw_diff_stored": { "type": "boolean", "const": false },
+            "raw_prompts_stored": { "type": "boolean", "const": false },
+            "transcripts_stored": { "type": "boolean", "const": false },
+            "raw_output_stored": { "type": "boolean", "const": false },
+            "secrets_stored": { "type": "boolean", "const": false },
+            "private_evaluators_stored": { "type": "boolean", "const": false }
+          }
+        }
+      }
+    },
+    "coverageBlocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "reason_code"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["gate", "independent_judgment", "current_observation"] },
+        "ref": { "$ref": "#/$defs/token" },
+        "reason_code": { "$ref": "#/$defs/token" }
+      }
+    },
+    "currentCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "schema_path", "program", "coverage_id", "coverage_digest", "repository_id", "target_revision", "target_tree_digest",
+        "requirements_id", "requirements_digest", "plan_id", "plan_digest", "delta_review_request_id", "delta_review_request_digest",
+        "status", "blockers", "external_state_policy"
+      ],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_current_coverage" },
+        "coverage_id": { "type": "string", "pattern": "^verification-current-coverage-[a-f0-9]{64}$" },
+        "coverage_digest": { "$ref": "#/$defs/digest" },
+        "repository_id": { "$ref": "#/$defs/token" },
+        "target_revision": { "$ref": "#/$defs/commit" },
+        "target_tree_digest": { "$ref": "#/$defs/digest" },
+        "requirements_id": { "type": "string", "pattern": "^verification-scoped-requirements-[a-f0-9]{64}$" },
+        "requirements_digest": { "$ref": "#/$defs/digest" },
+        "plan_id": { "type": "string", "pattern": "^verification-scoped-reuse-plan-[a-f0-9]{64}$" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "delta_review_request_id": { "type": "string", "pattern": "^verification-delta-review-request-[a-f0-9]{64}$" },
+        "delta_review_request_digest": { "$ref": "#/$defs/digest" },
+        "status": { "type": "string", "enum": ["covered", "blocked"] },
+        "blockers": { "type": "array", "maxItems": 768, "uniqueItems": true, "items": { "$ref": "#/$defs/coverageBlocker" } },
+        "external_state_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["historical_state_is_current", "self_reported_freshness_accepted"],
+          "properties": {
+            "historical_state_is_current": { "type": "boolean", "const": false },
+            "self_reported_freshness_accepted": { "type": "boolean", "const": false }
+          }
+        }
+      }
+    }
+  }
+}
