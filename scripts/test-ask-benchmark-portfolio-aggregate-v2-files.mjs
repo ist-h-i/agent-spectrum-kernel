@@ -66,7 +66,8 @@ function normalizedRecord(adapter, condition, repetition) {
   const ordinal = CONDITIONS.indexOf(condition) + 1;
   const telemetry = Object.fromEntries(TELEMETRY.map((field) => [field, { status: "unknown", value: null, reason: "synthetic_result_set_fixture" }]));
   for (const [field, value] of Object.entries({ input_tokens: ordinal * 10, output_tokens: ordinal * 20, duration_ms: ordinal * 5, human_effort: ordinal * 2, cached_tokens: ordinal })) {
-    telemetry[field] = { status: "known", value, reason: "synthetic_result_set_fixture" };
+    // Exercise the committed-evidence schema; the surrounding run is synthetic.
+    telemetry[field] = { status: "known", value, reason: "committed_runtime_evidence" };
   }
   const base = {
     schema_version: "1.3.0", schema_path: "benchmarks/schemas/normalized-portfolio-result.schema.json", program: "adaptive_ask_normalized_execution_result",
