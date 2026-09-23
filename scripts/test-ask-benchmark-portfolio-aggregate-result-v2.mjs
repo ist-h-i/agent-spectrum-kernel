@@ -23,7 +23,7 @@ import {
   verifyPortfolioPolicyArtifacts,
 } from "./ask-benchmark-portfolio-policy.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
-import { computeEvolutionArtifactInventoryDigest } from "./evolution-loop.mjs";
+import { runAggregateV2FileRegressions } from "./test-ask-benchmark-portfolio-aggregate-v2-files.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
@@ -320,6 +320,28 @@ try {
     assert.deepEqual(changed.excluded_fixtures, [{ fixture_id: FIXTURES[1][0], reason: "classification_redesign_required" }]);
     assert.deepEqual(changed.fixture_contributions.map(({ fixture_id }) => fixture_id), [FIXTURES[0][0]]);
   });
+  check("all classified fixtures excluded still produce a valid insufficient report", () => {
+    const excluded = { ceiling_classification_result: "candidate", classification_state: "redesign_required", reason_codes: ["ceiling_candidate"] };
+    const changed = buildPortfolioAggregateResult(buildOptions({ classificationOverrides: FIXTURES.map(() => excluded) }));
+    assert.deepEqual(changed.included_fixture_ids, []);
+    assert.equal(changed.excluded_fixture_count, FIXTURES.length);
+    assert.equal(changed.result_status, "insufficient_evidence");
+    assert.equal(changed.weighted_quality_delta, null);
+    assert.equal(changed.unweighted_quality_delta, null);
+    for (const name of ["token_count_delta", "latency_delta", "human_effort_delta", "false_positive_raw_count_delta", "false_positive_unit_delta"]) {
+      const component = changed.overhead_component_vector[name];
+      assert.equal(component.state, "unknown");
+      assert.equal(component.value, null);
+      assert.equal(component.expected_observation_count, 0);
+      assert.deepEqual(component.fixture_values, []);
+    }
+    assert.equal(validate(changed), changed);
+    for (const view of changed.sensitivity_views) {
+      assert.equal(view.conclusion, "insufficient_evidence");
+      assert.equal(view.included.evidence_status, "insufficient_evidence");
+      assert.equal(view.excluded.evidence_status, "insufficient_evidence");
+    }
+  });
   check("classification adapter ordering is deterministic", () => {
     const changed = buildOptions({ classificationOverrides: [{ supported_adapter_tracks: ["codex", "claude"] }] });
     assert.throws(() => buildPortfolioAggregateResult(changed), /deterministic ASCII ordering/);
@@ -469,17 +491,33 @@ try {
     assert.ok(changed.overhead_component_vector.token_count_delta.value < 0);
     assert.ok(changed.overhead_component_vector.latency_delta.value < 0);
   });
-  check("token aggregation rejects numeric overflow instead of publishing infinity", () => {
+  check("finite large token deltas are not mistaken for overflow", () => {
     const comparison = verifiedComparison((verified) => {
       for (const entry of verified.verified_results) {
         if (entry.result.condition !== "adaptive_ask") continue;
-        // Keep each upstream repetition distribution finite while making the
-        // downstream cross-fixture native-token reduction overflow.
         entry.result.overhead_telemetry.input_tokens.value = Number.MAX_VALUE / 10;
         entry.result.overhead_telemetry.output_tokens.value = Number.MAX_VALUE / 10;
       }
     });
-    assert.throws(() => buildPortfolioAggregateResult(buildOptions({ comparison })), /token delta exceeds the finite numeric range/);
+    const changed = buildPortfolioAggregateResult(buildOptions({ comparison }));
+    assert.equal(changed.overhead_component_vector.token_count_delta.state, "known");
+    assert.ok(Number.isFinite(changed.overhead_component_vector.token_count_delta.value));
+    assert.equal(changed.result_status, "complete");
+  });
+  check("five-pair native-token reduction rejects an overflowing sum", () => {
+    // An exact power of two keeps each upstream metric distribution finite
+    // with zero variance. Each token pair is also finite (2 ** 1022), but the
+    // sum of five pairs exceeds Number.MAX_VALUE in the component mean.
+    const comparison = verifiedComparison((verified) => {
+      for (const entry of verified.verified_results) {
+        if (entry.result.condition !== "adaptive_ask") continue;
+        entry.result.overhead_telemetry.input_tokens.value = 2 ** 1021;
+        entry.result.overhead_telemetry.output_tokens.value = 2 ** 1021;
+      }
+    });
+    // Building comparison outside assert.throws proves the upstream guards
+    // accepted this input; the expected error belongs to the v2 reducer.
+    assert.throws(() => buildPortfolioAggregateResult(buildOptions({ comparison })), /aggregate quality sum is not finite/);
   });
   check("human-effort sensitivity distinguishes changed, stable, and insufficient evidence", () => {
     const changedView = aggregate.sensitivity_views.find(({ dimension_id }) => dimension_id === "human_effort_sample");
@@ -564,28 +602,13 @@ try {
     assert.equal(changed.comparison_view, "full_vs_kernel_diagnostic");
     assert.equal(changed.result_status, "complete");
   });
-  check("verified v2 aggregate identity plugs into the existing Evolution artifact inventory", () => {
+  check("hand-built frozen wrappers cannot grant Evolution verification authority", () => {
     const verifierReturn = freeze({
       verified_aggregate_result: structuredClone(aggregate),
       verified_comparison: options.verifiedComparison,
       verified_policy_artifacts: policyAuthorities,
     });
-    const identity = portfolioAggregateEvolutionEvidenceIdentity(verifierReturn);
-    assert.deepEqual(identity, {
-      source_kind: "portfolio_aggregate_result",
-      artifact_id: aggregate.aggregate_result_id,
-      artifact_digest: aggregate.aggregate_result_digest,
-      result_status: aggregate.result_status,
-    });
-    const dimensions = {
-      quality: identity,
-      safety: { source_kind: "paired_comparison_report", artifact_id: options.verifiedComparison.verified_comparison_report.paired_comparison_report_id, artifact_digest: options.verifiedComparison.verified_comparison_report.paired_comparison_report_digest },
-      cost: identity,
-      variance: { source_kind: "repetition_report", artifact_id: "repetition-report-synthetic", artifact_digest: digest("repetition") },
-      mechanism: { source_kind: "mechanism_scorecard", artifact_id: "mechanism-scorecard-synthetic", artifact_digest: digest("mechanism") },
-      external_outcome: { source_kind: "external_outcome_report", artifact_id: "external-outcome-synthetic", artifact_digest: digest("external") },
-    };
-    assert.match(computeEvolutionArtifactInventoryDigest(dimensions), /^sha256:[a-f0-9]{64}$/u);
+    assert.throws(() => portfolioAggregateEvolutionEvidenceIdentity(verifierReturn), /issued by verifyPortfolioAggregateResult/);
     assert.throws(() => portfolioAggregateEvolutionEvidenceIdentity(aggregate), /complete aggregate full-verifier return/);
   });
   check("Evolution aggregate identity rejects a verifier-shaped authority transplant", () => {
@@ -596,7 +619,7 @@ try {
     });
     verifierReturn.verified_comparison.verified_comparison_report.paired_comparison_report_digest = digest("different-paired-report");
     freeze(verifierReturn);
-    assert.throws(() => portfolioAggregateEvolutionEvidenceIdentity(verifierReturn), /not bound to its full-verifier authorities/);
+    assert.throws(() => portfolioAggregateEvolutionEvidenceIdentity(verifierReturn), /issued by verifyPortfolioAggregateResult/);
   });
   check("cross-suite pooling selector is rejected", () => assert.throws(() => buildPortfolioAggregateResult(buildOptions({ suite: ["practice_frequency", "high_impact"] })), /required scalar group selectors/));
   check("cross-task-class pooling selector is rejected", () => assert.throws(() => buildPortfolioAggregateResult(buildOptions({ taskClass: ["investigation_implementation", "pr_review"] })), /required scalar group selectors/));
@@ -706,7 +729,9 @@ try {
     assert.throws(() => verifyPortfolioAggregateResult({ aggregateResultPath: link, aggregateAuthorityRoot: authorityRoot }), /symlink/);
   });
 
-  assert.equal(covered.size, 64, `expected 64 aggregate closures, received ${covered.size}`);
+  assert.equal(covered.size, 66, `expected 66 aggregate unit closures, received ${covered.size}`);
+  runAggregateV2FileRegressions({ root, work, check });
+  assert.equal(covered.size, 74, `expected 74 aggregate closures, received ${covered.size}`);
   console.log(`Portfolio aggregate result contract test passed (${covered.size} closures).`);
 } finally {
   rmSync(work, { recursive: true, force: true });
