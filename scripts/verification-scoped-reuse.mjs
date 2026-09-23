@@ -658,3 +658,223 @@ function validatePlan(plan, requirements) {
   if (plan.requirements_id !== requirements.requirements_id || plan.requirements_digest !== requirements.requirements_digest) throw new Error("scoped reuse plan requirements binding mismatch");
   assertCanonicalArray(plan.dispositions, "scoped reuse dispositions", (entry) => entry.gate_id);
   const expected = coverageSummary(plan.dispositions);
+  if (stableCanonicalJson(plan.coverage) !== stableCanonicalJson(expected)) throw new Error("scoped reuse coverage summary mismatch");
+  if (stableCanonicalJson(plan.execution_summary) !== stableCanonicalJson(executionSummary(plan.dispositions))) throw new Error("scoped reuse execution summary mismatch");
+  return plan;
+}
+
+function loadTargetRequirements({ repositoryRoot, targetRevision }) {
+  const requirements = readGitJson({
+    repositoryRoot,
+    revision: targetRevision,
+    path: VERIFICATION_SCOPED_REQUIREMENTS_PATH,
+    label: "target scoped verification requirements",
+  });
+  return validateScopedRequirements(requirements);
+}
+
+export function planScopedReuse({ repositoryRoot, storeRoot, targetRevision }) {
+  resolveGitCommit({ repositoryRoot, revision: targetRevision });
+  const repositoryId = gitRepositoryId({ repositoryRoot });
+  const requirements = loadTargetRequirements({ repositoryRoot, targetRevision });
+  const baseRevision = resolveGitCommit({ repositoryRoot, revision: requirements.base_revision });
+  assertAncestor({ repositoryRoot, baseRevision, targetRevision });
+  const diff = gitDiffSummary({ repositoryRoot, baseRevision, targetRevision });
+  const dispositions = requirements.required_gates.map((requirement) => evaluateGate({
+    repositoryRoot,
+    storeRoot,
+    repositoryId,
+    baseRevision,
+    targetRevision,
+    requirement,
+  }));
+  const content = {
+    schema_version: VERIFICATION_SCOPED_REUSE_SCHEMA_REVISION,
+    schema_path: "schemas/verification-scoped-reuse.schema.json",
+    program: "ask_verification_scoped_reuse_plan",
+    planner_revision: VERIFICATION_SCOPED_PLANNER_REVISION,
+    repository_id: repositoryId,
+    base_revision: baseRevision,
+    target_revision: targetRevision,
+    target_tree_digest: gitTreeDigest({ repositoryRoot, revision: targetRevision }),
+    requirements_id: requirements.requirements_id,
+    requirements_digest: requirements.requirements_digest,
+    requirements_path: VERIFICATION_SCOPED_REQUIREMENTS_PATH,
+    actual_diff: {
+      digest: canonicalDigest({ base_revision: baseRevision, target_revision: targetRevision, records: diff.records, truncated: diff.truncated }),
+      changed_paths: changedPaths(diff),
+      change_records: clone(diff.records),
+      record_count: diff.records.length,
+      truncated: diff.truncated,
+    },
+    dispositions,
+    coverage: coverageSummary(dispositions),
+    execution_summary: executionSummary(dispositions),
+  };
+  const plan = sealSelfIdentified(content, {
+    idField: "plan_id",
+    digestField: "plan_digest",
+    idPrefix: "verification-scoped-reuse-plan-",
+  });
+  validatePlan(plan, requirements);
+  return plan;
+}
+
+function pathMatchesReviewSelector(selector, path) {
+  return selectorMatches({ ...selector, evidence_kind: "file" }, path);
+}
+
+export function buildDeltaReviewRequest({ repositoryRoot, targetRevision, plan = null }) {
+  const requirements = loadTargetRequirements({ repositoryRoot, targetRevision });
+  if (!plan) throw new Error("delta review request requires the resolved scoped reuse plan");
+  const resolvedPlan = plan;
+  validatePlan(resolvedPlan, requirements);
+  if (resolvedPlan.target_revision !== targetRevision) throw new Error("delta review target revision does not match the scoped reuse plan");
+  const affected = [];
+  const obligations = new Set();
+  const priorReviews = new Set();
+  const priorFindings = new Set();
+  for (const gate of requirements.required_gates) {
+    if (!gate.delta_review) continue;
+    const paths = resolvedPlan.actual_diff.changed_paths.filter((path) => gate.delta_review.surface_selectors.some((selector) => pathMatchesReviewSelector(selector, path)));
+    if (paths.length === 0) continue;
+    affected.push(...paths);
+    for (const obligation of gate.delta_review.obligation_refs) obligations.add(obligation);
+    if (gate.delta_review.prior_review_ref) priorReviews.add(gate.delta_review.prior_review_ref);
+    for (const finding of gate.delta_review.prior_finding_refs) priorFindings.add(finding);
+  }
+  const affectedPaths = [...new Set(affected)].sort();
+  const bounded = !resolvedPlan.actual_diff.truncated && affectedPaths.length <= MAX_DELTA_PATHS;
+  const reusableEvidence = resolvedPlan.dispositions
+    .filter((entry) => entry.execution_evidence_reusable && entry.source_evidence_digest)
+    .map((entry) => ({ gate_id: entry.gate_id, evidence_id: entry.source_evidence_id, evidence_digest: entry.source_evidence_digest }))
+    .sort((left, right) => left.gate_id.localeCompare(right.gate_id));
+  const content = {
+    schema_version: VERIFICATION_SCOPED_REUSE_SCHEMA_REVISION,
+    schema_path: "schemas/verification-scoped-reuse.schema.json",
+    program: "ask_verification_delta_review_request",
+    repository_id: resolvedPlan.repository_id,
+    base_revision: resolvedPlan.base_revision,
+    target_revision: resolvedPlan.target_revision,
+    plan_id: resolvedPlan.plan_id,
+    plan_digest: resolvedPlan.plan_digest,
+    diff_ref: {
+      digest: resolvedPlan.actual_diff.digest,
+      changed_path_count: resolvedPlan.actual_diff.changed_paths.length,
+    },
+    status: !bounded ? "blocked_unbounded" : (affectedPaths.length === 0 ? "not_required" : "current_judgment_required"),
+    affected_paths: bounded ? affectedPaths : [],
+    obligation_refs: [...obligations].sort(),
+    prior_review_refs: [...priorReviews].sort(),
+    prior_finding_refs: [...priorFindings].sort(),
+    reusable_evidence_refs: reusableEvidence,
+    privacy: {
+      bounded_references_only: true,
+      raw_diff_stored: false,
+      raw_prompts_stored: false,
+      transcripts_stored: false,
+      raw_output_stored: false,
+      secrets_stored: false,
+      private_evaluators_stored: false,
+    },
+  };
+  const request = sealSelfIdentified(content, {
+    idField: "request_id",
+    digestField: "request_digest",
+    idPrefix: "verification-delta-review-request-",
+  });
+  failSchema(request, "verification delta review request");
+  return request;
+}
+
+export function buildCurrentCoverage({ repositoryRoot, storeRoot, targetRevision }) {
+  const requirements = loadTargetRequirements({ repositoryRoot, targetRevision });
+  const plan = planScopedReuse({ repositoryRoot, storeRoot, targetRevision });
+  const delta = buildDeltaReviewRequest({ repositoryRoot, targetRevision, plan });
+  const blockers = [];
+  for (const disposition of plan.dispositions) {
+    if (!["reuse_exact", "reuse_scoped"].includes(disposition.disposition)) {
+      blockers.push({ kind: "gate", ref: disposition.gate_id, reason_code: disposition.reason_code });
+    }
+  }
+  if (delta.status === "current_judgment_required") blockers.push({ kind: "independent_judgment", ref: delta.request_id, reason_code: "current_delta_judgment_unperformed" });
+  if (delta.status === "blocked_unbounded") blockers.push({ kind: "independent_judgment", ref: delta.request_id, reason_code: "delta_review_input_unbounded" });
+  for (const obligation of requirements.current_obligations) {
+    blockers.push({ kind: "current_observation", ref: obligation.obligation_id, reason_code: "current_observation_required" });
+  }
+  blockers.sort((left, right) => `${left.kind}\0${left.ref}`.localeCompare(`${right.kind}\0${right.ref}`));
+  const content = {
+    schema_version: VERIFICATION_SCOPED_REUSE_SCHEMA_REVISION,
+    schema_path: "schemas/verification-scoped-reuse.schema.json",
+    program: "ask_verification_current_coverage",
+    repository_id: plan.repository_id,
+    target_revision: plan.target_revision,
+    target_tree_digest: plan.target_tree_digest,
+    requirements_id: requirements.requirements_id,
+    requirements_digest: requirements.requirements_digest,
+    plan_id: plan.plan_id,
+    plan_digest: plan.plan_digest,
+    delta_review_request_id: delta.request_id,
+    delta_review_request_digest: delta.request_digest,
+    status: blockers.length === 0 ? "covered" : "blocked",
+    blockers,
+    external_state_policy: {
+      historical_state_is_current: false,
+      self_reported_freshness_accepted: false,
+    },
+  };
+  const coverage = sealSelfIdentified(content, {
+    idField: "coverage_id",
+    digestField: "coverage_digest",
+    idPrefix: "verification-current-coverage-",
+  });
+  failSchema(coverage, "verification current coverage");
+  return { plan, delta_review_request: delta, coverage };
+}
+
+function parseCliArgs(argv) {
+  const [command, ...tokens] = argv;
+  if (!command) throw new Error("verification scoped reuse command is required");
+  const options = {};
+  for (let index = 0; index < tokens.length; index += 2) {
+    const flag = tokens[index];
+    const value = tokens[index + 1];
+    if (!flag?.startsWith("--") || value === undefined || value.startsWith("--")) throw new Error(`invalid scoped reuse option: ${flag ?? "missing"}`);
+    const key = flag.slice(2).replaceAll("-", "_");
+    if (Object.hasOwn(options, key)) throw new Error(`duplicate scoped reuse option: ${flag}`);
+    options[key] = value;
+  }
+  return { command, options };
+}
+
+function requiredOption(options, key) {
+  if (!options[key]) throw new Error(`--${key.replaceAll("_", "-")} is required`);
+  return options[key];
+}
+
+function runCli(argv) {
+  const { command, options } = parseCliArgs(argv);
+  const allowed = new Set(["repository", "store", "target", "output"]);
+  const unknown = Object.keys(options).find((key) => !allowed.has(key));
+  if (unknown) throw new Error(`unknown scoped reuse option: --${unknown.replaceAll("_", "-")}`);
+  if (!["plan", "delta-review", "coverage"].includes(command)) throw new Error(`unknown scoped reuse command: ${command}`);
+  const repositoryRoot = requiredOption(options, "repository");
+  const targetRevision = requiredOption(options, "target");
+  let artifact;
+  if (command === "plan") artifact = planScopedReuse({ repositoryRoot, storeRoot: requiredOption(options, "store"), targetRevision });
+  else if (command === "delta-review") {
+    const plan = planScopedReuse({ repositoryRoot, storeRoot: requiredOption(options, "store"), targetRevision });
+    artifact = buildDeltaReviewRequest({ repositoryRoot, targetRevision, plan });
+  } else artifact = buildCurrentCoverage({ repositoryRoot, storeRoot: requiredOption(options, "store"), targetRevision });
+  if (options.output) writeCanonicalJsonNoReplace({ outputPath: options.output, artifact, label: "verification scoped reuse CLI output" });
+  else process.stdout.write(`${stableCanonicalJson(artifact)}\n`);
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    runCli(process.argv.slice(2));
+  } catch (error) {
+    console.error(`Verification scoped reuse failed: ${error.message}`);
+    process.exit(1);
+  }
+}
