@@ -83,8 +83,8 @@ The gate rejects these shortcuts:
 - synthetic evidence used as controlled-effect, adopting-project, production, client-value, or ROI evidence;
 - runtime evidence transplanted from another source revision, adapter, Profile, or task-class scope;
 - a digest string whose referenced file bytes do not match;
-- contradictory pass/fail evidence for the same gate or claim;
-- semantic claims without an independent review record;
+- contradictory or incomplete evidence for the same required gate or supported claim, including `passed` mixed with `not_checked`;
+- semantic claims without an independent review record from an authority identity distinct from the evidence producer;
 - controlled outcome claims whose quality, safety, lower-tail, or variance guardrail is not passing;
 - adopting-project claims without publication permission;
 - ROI claims without measured human effort;
@@ -120,7 +120,7 @@ That all-pass fixture proves only that the gate can distinguish valid and invali
 
 ## Read-only boundary
 
-Assessment reads local files only. It performs no network request, provider/model call, GitHub mutation, tag/release creation, installation, configuration update, or repository write unless the caller explicitly supplies `--output`; that option creates a new assessment file and refuses to overwrite an existing path.
+Assessment reads local files only and writes its assessment to stdout. It performs no network request, provider/model call, GitHub mutation, tag/release creation, installation, configuration update, or repository write. The CLI intentionally has no file-output option so the assessment entry point remains read-only.
 
 External current state is not inferred. If current CI, approval, publication permission, runtime execution, or benchmark evidence has not been captured in a compatible evidence record, the corresponding required gate remains `not_ready`.
 
