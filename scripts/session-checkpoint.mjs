@@ -333,6 +333,7 @@ export function createSessionCheckpoint({
   rolloverReason = "operator_request",
 } = {}) {
   const { plan, executionIssues } = loadPlanBundle(planBundle);
+  validateSchema(snapshot, REPOSITORY_SNAPSHOT_SCHEMA_PATH, "repository snapshot");
   if (canonicalDigest(snapshot) !== snapshotDigest) throw new Error("snapshot digest does not match snapshot content");
   if (stableCanonicalJson(snapshot.plan_ref) !== stableCanonicalJson(planRef(plan))) throw new Error("snapshot plan reference differs from the current Work Package Plan");
   const completed = assertCompletedPackageClosure(plan, completedPackageIds, snapshot.active_package_id);
@@ -450,6 +451,31 @@ function validateEvidenceReferences(storeRoot, refs) {
   return reasons;
 }
 
+function pathContains(parent, child) {
+  const rel = relative(parent, child);
+  return rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`));
+}
+
+function assertCheckpointOutputs(root, storeRoot, resumeReferencePath) {
+  // Publication must not mutate either the captured worktree or Git metadata,
+  // including the common Git directory outside a linked worktree.
+  const protectedRoots = [
+    root,
+    realpathSync(gitText(root, ["rev-parse", "--absolute-git-dir"])),
+    realpathSync(resolve(root, gitText(root, ["rev-parse", "--git-common-dir"]))),
+  ];
+  const outputs = [["checkpoint store", storeRoot]];
+  if (resumeReferencePath !== null) outputs.push(["resume reference", resumeReferencePath]);
+  for (const [label, path] of outputs) {
+    if (typeof path !== "string" || !path.trim()) throw new Error(`${label} requires a non-empty path`);
+    const output = resolve(path);
+    assertNoSymlinkPathSegments(output, label, { allowMissingLeaf: true });
+    if (protectedRoots.some((protectedRoot) => pathContains(protectedRoot, output) || pathContains(output, protectedRoot))) {
+      throw new Error(`${label} must be outside and not overlap the worktree or Git metadata`);
+    }
+  }
+}
+
 export function persistSessionCheckpoint({
   storeRoot,
   repositoryRoot,
@@ -466,8 +492,10 @@ export function persistSessionCheckpoint({
   integrationBase = null,
   resumeReferencePath = null,
 } = {}) {
+  const root = normalizedRepositoryRoot(repositoryRoot);
+  assertCheckpointOutputs(root, storeRoot, resumeReferencePath);
   const snapshot = createRepositorySnapshot({
-    repositoryRoot,
+    repositoryRoot: root,
     planBundle,
     activePackageId,
     targetPaths,
@@ -494,6 +522,19 @@ export function persistSessionCheckpoint({
   putContentAddressedJson({ storeRoot, artifact: checkpoint, digest: checkpointDigest });
   const storedCheckpoint = readContentAddressedJson({ storeRoot, digest: checkpointDigest }).value;
   validateSchema(storedCheckpoint, SESSION_CHECKPOINT_SCHEMA_PATH, "stored session checkpoint");
+
+  // Read-back shape checks alone do not prove that publication left a resumable
+  // state. Preserve unreferenced CAS objects, but never publish a stale entrypoint.
+  const resume = validateSessionResume({
+    repositoryRoot: root,
+    storeRoot,
+    checkpointDigest,
+    planBundle,
+    verificationStoreRoot,
+  });
+  if (!resume.state_valid) {
+    throw new Error(`checkpoint state changed or became invalid during publication: ${resume.reasons.join(", ")}`);
+  }
 
   const reference = {
     artifact_kind: "ask_session_checkpoint_reference",
@@ -616,8 +657,9 @@ function loadPlanBundlePaths(paths) {
 }
 
 function parseCli() {
-  const [command, flag, requestPath] = process.argv.slice(2);
-  if (command !== "resume" || flag !== "--request" || !requestPath) {
+  const args = process.argv.slice(2);
+  const [command, flag, requestPath] = args;
+  if (args.length !== 3 || command !== "resume" || flag !== "--request" || !requestPath) {
     throw new Error("usage: node scripts/session-checkpoint.mjs resume --request <request.json>");
   }
   const request = readJsonFileStrict(requestPath, "session resume request");

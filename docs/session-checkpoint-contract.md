@@ -16,7 +16,7 @@ Submodules, symlinks (including dangling symlinks), non-regular files and non-UT
 
 Capture bounds are 128 changed paths, 128 explicit target or contract paths per list, 64 evidence references, 4,096 observed worktree paths and 64 MiB of observed file bytes. Tracked files are bounded to 8 MiB each; explicit target/contract and visible untracked files retain the 256 KiB limit. Git command output is bounded to 8 MiB. Exceeding a bound rejects capture; no partial inventory is accepted.
 
-Ignored untracked files are outside automatic Git-state coverage. Relevant ignored contracts or targets must be explicitly named. Dirty continuation requires the same working environment and byte identities; a snapshot does not restore unsaved changes or certify the checkout's correctness. Quiesce writers during capture and resume; this is not a filesystem transaction or lock.
+Ignored untracked files are outside automatic Git-state coverage. Relevant ignored contracts or targets must be explicitly named. Dirty continuation requires the same working environment and byte identities; a snapshot does not restore unsaved changes or certify the checkout's correctness. Quiesce writers during capture, publication and resume; this is not a filesystem transaction or lock.
 
 ## Saving state versus executing work
 
@@ -24,7 +24,7 @@ Saving requires a structurally and semantically valid current Work Package Plan,
 
 Execution permission still comes from `validateWorkPackagePlanExecutable`. Any unresolved execution condition produces an `await_control_resolution` next action with a null task ID. Callers cannot override that action with an ordered task. Completed packages must preserve dependency closure. Control IDs, evidence and stop conditions are derived from the supplied authoritative Plan, not independently asserted by the caller.
 
-Snapshot and checkpoint objects use the existing content-addressed store. A resumable reference is published only after both stored objects have been read back and validated. Keep the store and resume-reference output outside observed worktree paths so that publication itself does not change the captured state. An unreferenced partial object is not a resume entrypoint.
+Snapshot and checkpoint objects use the existing content-addressed store. A resumable reference is published only after both stored objects have been read back and validated. Before any write, the store and resume-reference output must be outside and not overlap the worktree or its Git metadata, including a linked worktree's shared Git directory. Symlink output paths and ignored output directories inside the worktree are rejected. After CAS publication, the full resume validator must confirm that the stored state still matches the live checkout and evidence before a resume reference can be published. A valid waiting state remains publishable without authorizing work. An unreferenced partial object is not a resume entrypoint.
 
 ## Resume outcomes
 
@@ -38,4 +38,4 @@ These artifacts must not contain raw prompts, transcripts, source bodies, comman
 
 ## Verification
 
-Run `node scripts/test-session-checkpoint.mjs` with the repository's Node 24 environment. The suite rebinds synthetic Plans to real temporary Git repositories without editing historical fixtures. It exercises fresh-process CAS continuation, initial and resumed target mismatches, descendant versus unrelated history, raw-byte drift hidden by textconv/index flags, index/worktree divergence, unsupported submodules, empty/missing paths, bounds and waiting-state control preservation. The original Plan validators, schema validator and CAS implementation remain in the integration path.
+Run `node scripts/test-session-checkpoint.mjs` with the repository's Node 24 environment. The suite rebinds synthetic Plans to real temporary Git repositories without editing historical fixtures. It exercises fresh-process CAS continuation, initial and resumed target mismatches, descendant versus unrelated history, raw-byte drift hidden by textconv/index flags, index/worktree divergence, unsupported submodules, empty/missing paths, bounds, waiting-state control preservation, unsafe output locations and publication-time state drift. The original Plan validators, schema validator and CAS implementation remain in the integration path.

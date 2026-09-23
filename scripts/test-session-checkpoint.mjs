@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { createRepositorySnapshot, persistSessionCheckpoint, validateSessionResume } from "./session-checkpoint.mjs";
+import { createRepositorySnapshot, createSessionCheckpoint, persistSessionCheckpoint, validateSessionResume } from "./session-checkpoint.mjs";
 import { canonicalDigest, putContentAddressedJson, readJsonFileStrict, stableCanonicalJson } from "./content-addressed-store.mjs";
 import {
   deriveWorkPackagePlanContentDigest,
@@ -85,7 +85,7 @@ function bindPlan(repo) {
   return result;
 }
 
-const root = mkdtempSync(resolve(tmpdir(), "ask-session-checkpoint-"));
+const root = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-session-checkpoint-")));
 let passed = 0;
 function checked(name) { passed += 1; console.log(`ok ${passed} - ${name}`); }
 function repository(name) {
@@ -330,6 +330,101 @@ try {
     }
     checked(`persist and fresh-resume ${kind} without authorizing an ordered task`);
   }
+  // Invalid snapshot shape must be rejected at the public builder boundary,
+  // not deferred until a consumer happens to call resume.
+  const invalidSnapshot = structuredClone(saved.snapshot);
+  delete invalidSnapshot.repository;
+  assert.throws(() => createSessionCheckpoint({
+    snapshot: invalidSnapshot,
+    snapshotDigest: canonicalDigest(invalidSnapshot),
+    planBundle: bundle,
+    completedPackageIds: options.completedPackageIds,
+  }), /Schema validation/iu);
+  checked("checkpoint builder rejects malformed snapshot shape");
+
+  for (const kind of ["store", "reference", "ignored", "git-metadata", "symlink"]) {
+    const item = repository(`publication-${kind}`);
+    const reference = resolve(root, `publication-${kind}-resume.json`);
+    const unsafe = { ...item.options, resumeReferencePath: reference };
+    const internalStore = resolve(item.repo, kind === "git-metadata" ? ".git/checkpoint-store" : "checkpoint-store");
+    if (kind === "reference") unsafe.resumeReferencePath = resolve(item.repo, "resume.json");
+    else if (kind === "symlink") {
+      const alias = resolve(root, "publication-alias");
+      symlinkSync(item.repo, alias);
+      unsafe.resumeReferencePath = resolve(alias, "resume.json");
+    } else {
+      unsafe.storeRoot = internalStore;
+      if (kind === "ignored") {
+        writeFileSync(resolve(item.repo, ".gitignore"), "checkpoint-store/\n");
+        git(item.repo, "add", ".gitignore");
+        git(item.repo, "commit", "-m", "ignore checkpoint path");
+      }
+    }
+    assert.throws(() => persistSessionCheckpoint(unsafe), /outside|overlap|symlink/iu);
+    assert.equal(existsSync(internalStore), false);
+    assert.equal(existsSync(unsafe.resumeReferencePath), false);
+    assert.deepEqual(readdirSync(item.options.storeRoot), [], "invalid outputs must fail before CAS writes");
+    checked(`unsafe ${kind} output rejected before publication`);
+  }
+
+  const mainWorktree = repository("publication-common-dir");
+  const linked = resolve(root, "publication-linked");
+  git(mainWorktree.repo, "worktree", "add", "-b", "linked", linked);
+  const linkedBundle = bindPlan(linked);
+  const metadataStore = resolve(mainWorktree.repo, ".git/checkpoint-store");
+  assert.throws(() => persistSessionCheckpoint({
+    ...mainWorktree.options, repositoryRoot: linked, planBundle: linkedBundle, storeRoot: metadataStore,
+  }), /outside|overlap/iu);
+  assert.equal(existsSync(metadataStore), false);
+  checked("linked worktree cannot publish into shared Git metadata");
+
+  // Deterministically mutate the checkout at the CAS publication boundary in a
+  // fresh process. Product code has no test-only dependency injection surface.
+  const raced = repository("publication-drift");
+  const driftReference = resolve(root, "publication-drift-reference.json");
+  const driftRequest = resolve(root, "publication-drift-request.json");
+  writeFileSync(driftRequest, JSON.stringify({
+    module_path: resolve(ROOT, "scripts/session-checkpoint.mjs"),
+    options: { ...raced.options, resumeReferencePath: driftReference },
+  }));
+  run(process.execPath, ["--input-type=module", "-e", `
+    import assert from "node:assert/strict";
+    import fs from "node:fs";
+    import { syncBuiltinESMExports } from "node:module";
+    import { resolve } from "node:path";
+    import { pathToFileURL } from "node:url";
+    const request = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    const original = fs.linkSync;
+    let injected = false;
+    fs.linkSync = (source, target) => {
+      original(source, target);
+      const artifact = JSON.parse(fs.readFileSync(target, "utf8"));
+      if (artifact.artifact_kind === "ask_session_checkpoint") {
+        injected = true;
+        fs.appendFileSync(resolve(request.options.repositoryRoot, "work.txt"), "publication drift\\n");
+      }
+    };
+    syncBuiltinESMExports();
+    try {
+      const { persistSessionCheckpoint } = await import(pathToFileURL(request.module_path));
+      assert.throws(() => persistSessionCheckpoint(request.options), /changed|invalid.*publication/iu);
+      assert.equal(injected, true, "test must reach the checkpoint publication boundary");
+      assert.equal(fs.existsSync(request.options.resumeReferencePath), false);
+    } finally {
+      fs.linkSync = original;
+      syncBuiltinESMExports();
+    }
+  `, driftRequest]);
+  assert.equal(existsSync(driftReference), false);
+  checked("publication drift suppresses the resume reference");
+
+  const extraArguments = spawnSync(process.execPath, [
+    resolve(ROOT, "scripts/session-checkpoint.mjs"), "resume", "--request", "missing-request.json", "--unexpected",
+  ], { encoding: "utf8" });
+  assert.equal(extraArguments.status, 1);
+  assert.match(extraArguments.stderr, /usage:/u);
+  checked("CLI rejects unexpected arguments before reading a request");
+
   const malformed = structuredClone(waiting.bundle);
   malformed.plan.plan_digest = `sha256:${"f".repeat(64)}`;
   assert.throws(() => persistSessionCheckpoint({ ...waiting.options, planBundle: malformed }), /invalid/iu);
