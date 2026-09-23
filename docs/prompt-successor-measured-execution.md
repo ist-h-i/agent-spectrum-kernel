@@ -14,12 +14,24 @@ entrypoints still reject any access mode other than `synthetic_only`; do not
 remove that guard to make the draft appear executable.
 
 A green `Check measured successor preparation` run proves only its named
-existing synthetic compatibility checks. The source archive is an input for
+synthetic compatibility and source-packaging checks. The source archive is an input for
 reproduction, not proof that tests passed or authority to execute a trial.
 `identity.txt` records the tested checkout commit/tree (normally the PR merge
 commit); `pr-context.txt` separately records the event's exact base/head
 commit/tree and the preparation-only evidence scope. Whitespace validation uses
 those pinned PR commits, not a moving `origin/main` reference.
+
+The packaging regression suite is committed at
+`scripts/test-ask-benchmark-prompt-successor-workflow.mjs` and is run by the same
+workflow. It executes the actual workflow shell against disposable local Git
+repositories: exact bundle restoration, event identities, exclusion of unrelated
+refs, missing/mismatched inputs, a non-main base, moving refs and whitespace
+rejection. A missing runner temporary directory variable is rejected before any
+artifact directory is created. These tests do not invoke a model or evaluator.
+
+```sh
+node --test scripts/test-ask-benchmark-prompt-successor-workflow.mjs
+```
 
 Before this PR is ready to merge, the implementation and verification must cover
 all invariants below, including the separately authorized measured entrypoint,

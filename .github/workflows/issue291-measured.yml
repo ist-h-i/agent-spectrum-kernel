@@ -26,6 +26,10 @@ jobs:
           node-version: '24'
       - name: Preserve exact preparation source for local verification
         run: |
+          : "${PR_BASE_SHA:?PR base SHA is required}"
+          : "${PR_HEAD_SHA:?PR head SHA is required}"
+          : "${EXPECTED_CHECKOUT_SHA:?Checkout SHA is required}"
+          : "${RUNNER_TEMP:?Runner temp directory is required}"
           test "$(git rev-parse HEAD)" = "$EXPECTED_CHECKOUT_SHA"
           git merge-base --is-ancestor "$PR_BASE_SHA" HEAD
           git merge-base --is-ancestor "$PR_HEAD_SHA" HEAD
@@ -52,4 +56,8 @@ jobs:
       - name: Validate existing synthetic successor boundaries
         run: |
           node --test scripts/test-ask-benchmark-prompt-successor.mjs scripts/test-ask-benchmark-prompt-successor-report.mjs scripts/test-ask-benchmark-prompt-successor-input-guards.mjs
+      - name: Verify preparation workflow packaging
+        run: node --test scripts/test-ask-benchmark-prompt-successor-workflow.mjs
+      - name: Check exact PR whitespace
+        run: |
           git diff --check "$PR_BASE_SHA...$PR_HEAD_SHA"
