@@ -234,6 +234,9 @@ await test("F3: successor input traverses the real native runner without a provi
         assert.deepEqual(attempt.request.projection, successorInputProjection(expected.binding));
         assert.equal(attempt.result.request_sha256, attempt.evidence.request_digest);
         assert.equal(attempt.commit.result_sha256, attempt.evidence.result_digest);
+        assert.equal(attempt.result.schema_version, "1.3.0");
+        assert.deepEqual(attempt.result.successor_usage.source_stdout, attempt.result.stdout);
+        assert.equal(attempt.result.successor_usage.metrics.total_tokens.value, 120);
         assert.equal(attempt.result.terminal_workspace_authority_availability, "captured");
         assert.ok(attempt.terminalWorkspaceAuthority);
         assert.equal(existsSync(cwd), false, "runner's temporary workspace is gone");
@@ -267,6 +270,9 @@ await test("F3: successor input traverses the real native runner without a provi
           assert.equal(row.lineage.request_digest, actual.evidence.request_digest);
           assert.equal(row.lineage.raw_result_digest, actual.evidence.result_digest);
           assert.equal(row.lineage.terminal_commit_digest, actual.evidence.commit_digest);
+          assert.equal(row.telemetry.input_tokens.value, 100);
+          assert.equal(row.telemetry.output_tokens.value, 20);
+          assert.equal(row.telemetry.cached_tokens.value, 80);
         }
         assert.ok(normalized.sourceSnapshotDigest);
       }

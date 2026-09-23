@@ -152,6 +152,11 @@ function telemetryFor(attempt, adapterIdentity) {
   const downgrades = request.projection.capability_downgrades;
   const unavailable = runtimeUnavailableEvidence(adapterIdentity, result);
   const unavailableMissing = () => unavailableOrUnknown(outcome);
+  const usage = (name) => {
+    const observed = result.successor_usage?.metrics[name];
+    if (!observed) return unavailableMissing();
+    return observed.status === "known" ? known(observed.value) : missing(observed.status, observed.reason);
+  };
   return {
     duration_ms: typedObserved(result.duration_ms, outcome),
     exit_code: typedObserved(result.exit_code, outcome),
@@ -174,9 +179,11 @@ function telemetryFor(attempt, adapterIdentity) {
     reasoning_effort: known(portableTelemetryScalar(adapterIdentity.reasoning_effort, "reasoning effort")),
     sandbox_policy: known(portableTelemetryScalar(adapterIdentity.sandbox_policy, "sandbox policy")),
     permission_policy: known(portableTelemetryScalar(adapterIdentity.permission_policy, "permission policy")),
-    input_tokens: unavailableMissing(),
-    output_tokens: unavailableMissing(),
-    cached_tokens: unavailableMissing(),
+    // Only usage sealed inside the reverified native terminal result is used.
+    // Older artifacts and non-successor adapters keep their original unknowns.
+    input_tokens: usage("input_tokens"),
+    output_tokens: usage("output_tokens"),
+    cached_tokens: usage("cached_tokens"),
     monetary_cost: unavailableMissing(),
     tool_call_count: unavailableMissing(),
     file_read_count: unavailableMissing(),

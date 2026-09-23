@@ -21,6 +21,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, parse, relative, resolve, sep } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { captureSuccessorUsage, validateSuccessorUsage } from "./ask-benchmark-prompt-successor-usage.mjs";
 import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
 import { assertTrackedRepositoryMatchesHead, canonicalDigest, stableCanonicalJson, validateMaterializedPortfolio } from "./ask-benchmark-materialize.mjs";
 import { verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
@@ -1329,11 +1330,11 @@ function sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity,
   };
 }
 
-function resultRecord({ entry, attempt, claim, requestPath, commandEvidence, status, processResult = null, finalOutput = null, failureKind = null, recoveryReason = null, terminalWorkspaceAuthority = null }) {
+function resultRecord({ entry, attempt, claim, requestPath, commandEvidence, status, processResult = null, finalOutput = null, failureKind = null, recoveryReason = null, terminalWorkspaceAuthority = null, successorUsage = false }) {
   const stdout = streamEvidence(processResult?.stdout ?? "");
   const stderr = streamEvidence(processResult?.stderr ?? "");
   return {
-    schema_version: "1.2.0",
+    schema_version: successorUsage ? "1.3.0" : "1.2.0",
     kind: "result",
     run_instance_id: claim.run_instance_id,
     case_id: entry.case_id,
@@ -1354,6 +1355,7 @@ function resultRecord({ entry, attempt, claim, requestPath, commandEvidence, sta
     stdout,
     stderr,
     event_counts: { json_lines: jsonLineCount(processResult?.stdout ?? "") },
+    ...(successorUsage ? { successor_usage: captureSuccessorUsage(processResult) } : {}),
   };
 }
 
@@ -1475,6 +1477,10 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
   const contract = entry.verification_command_contract === undefined ? null : loadVerificationCommandContract(root, entry);
   const verifiedCommandEvidence = validateCommandEvidenceManifest(commandEvidence, { root, contract, expectedContractDigest: request.input_identity.verification_command_contract_digest });
   validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${entry.case_id} result`);
+  if (result.successor_usage !== undefined) {
+    validateSuccessorUsage(result.successor_usage, { stdout: result.stdout });
+    if (result.adapter !== "codex" || result.condition !== "full_ask") throw new Error("successor usage requires a Codex full_ask result");
+  }
   validate(root, commit, ATTEMPT_COMMIT_SCHEMA_PATH, `${entry.case_id} terminal commit`);
   const adapterIdentity = readAdapterIdentity(root, runDir, entry.adapter_track);
   const runtimeIdentityDigest = canonicalDigest(adapterIdentity);
@@ -1690,7 +1696,7 @@ function markUnavailable({ root, context, entry, state, runtime, adapter }) {
   writeJsonAtomic(requestPath, request, { stagingOwner: claim.claim_id, faultName: "after_request_staged" });
   const contract = loadVerificationCommandContract(root, entry);
   const sealed = sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity: adapter.identity, contract, forceUnavailable: { probe: "runtime_unavailable", reason: "runtime_unavailable" } });
-  completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, commandEvidence: sealed.reference, status: "unavailable", failureKind: "runtime_unavailable" }) });
+  completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, commandEvidence: sealed.reference, status: "unavailable", failureKind: "runtime_unavailable", successorUsage: context.successorPromptInput !== null && context.successorPromptInput !== undefined }) });
   removeEphemeralWorkspace(claim, context.identity);
   return "unavailable";
 }
@@ -1772,7 +1778,7 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     if (processResult.error?.code === "ETIMEDOUT") throw new Error("case timeout");
     if (processResult.status !== 0) throw new Error(`agent exited ${processResult.status}`);
     const finalOutput = inspectFinal(root, temporaryOutput).record;
-    completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, commandEvidence: sealedCommandEvidence.reference, status: "completed", processResult, finalOutput, terminalWorkspaceAuthority }), finalSource: temporaryOutput });
+    completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, commandEvidence: sealedCommandEvidence.reference, status: "completed", processResult, finalOutput, terminalWorkspaceAuthority, successorUsage: context.successorPromptInput !== null }), finalSource: temporaryOutput });
     return "completed";
   } catch (error) {
     if (error instanceof RuntimeIntegrityError) throw error;
@@ -1802,6 +1808,7 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
       commandEvidence: sealedCommandEvidence?.reference,
       status: invalid ? "invalid" : "failed",
       processResult,
+      successorUsage: context.successorPromptInput !== null,
       failureKind: /timeout/u.test(message) ? "timeout" : invalid ? "invalid_input_or_selection" : "agent_failure",
       terminalWorkspaceAuthority,
     });

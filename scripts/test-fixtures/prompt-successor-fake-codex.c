@@ -134,6 +134,7 @@ int main(int argc, char **argv) {
   if (fd < 0) fail("fake output");
   const char *json = "{\"task_type\":\"implementation\",\"decision\":\"not_applicable\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"complete\",\"route\":null,\"summary\":\"Synthetic native transport fixture. No model or evaluator.\"}\n";
   write_all(fd, json, strlen(json)); close(fd);
-  puts("{\"type\":\"turn.completed\"}");
+  puts("{\"type\":\"turn.started\"}");
+  puts("{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":100,\"cached_input_tokens\":80,\"output_tokens\":20}}");
   return 0;
 }

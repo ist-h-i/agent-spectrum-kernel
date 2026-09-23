@@ -70,6 +70,7 @@ async function worker(contextPath) {
     const { buildPortfolioEngineeringResult } = await import("./ask-benchmark-portfolio-score.mjs");
     const { computeEngineeringResultSourceManifestDigest, validateEngineeringResultSourceManifest } = await import("./ask-benchmark-portfolio-result-set.mjs");
     const { verifySuccessorSourceProvenance, inspectSuccessorProvenance } = await import("./ask-benchmark-prompt-successor-provenance.mjs");
+    const { inspectSuccessorCollectionControl } = await import("./ask-benchmark-prompt-successor-collection.mjs");
     const { buildSuccessorComparisonPolicy, buildSuccessorComparisonFromProvenance } = await import("./ask-benchmark-prompt-successor-report.mjs");
     const configFile = resolve(root, "benchmarks/prompt-successor-execution.config.json");
     const rawConfig = read(configFile);
@@ -138,6 +139,18 @@ async function worker(contextPath) {
       }
       assert.notEqual(roles.current_prompt.native.run_instance_id, roles.prompt_v2.native.run_instance_id);
     });
+    const collectionInputs = () => ({ preparation, root, accessMode: "synthetic_only",
+      sources: Object.fromEntries(Object.entries(roles).map(([name, role]) => {
+        const { root: _root, ...execution } = role.execution;
+        return [name, { scope: role.scope, expectedScopeDigest: role.scope.scope_digest, execution }];
+      })) });
+    await check("collection preflight reopens the two exact native runs without authorizing execution", async () => {
+      const inspected = await inspectSuccessorCollectionControl(collectionInputs());
+      assert.equal(inspected.control.terminal_count, 0);
+      assert.equal(inspected.control.next_case_id, preparation.cases[0].case_id);
+      assert.equal(inspected.execution_authorized, false);
+      await assert.rejects(() => inspectSuccessorCollectionControl({ preparation: null, sources: null, accessMode: "measured" }), { code: "SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED" });
+    });
     await check("28 compiled-fake executions preserve canonical request and terminal identities", async () => {
       for (const target of preparation.cases) {
         const role = roles[target.prompt_role]; const binding = role.scope.source.bindings.find(b => b.successor_case_id === target.case_id);
@@ -145,12 +158,36 @@ async function worker(contextPath) {
         const output = environment(env, () => executePortfolio({ ...role.execution, adapter: "codex", runtimeConfigPath, agentBin,
           caseId: binding.source_case_id, maxCases: 1, retryFailed: false, successorPromptInput: input }));
         assert.deepEqual(output.outcomes, [{ case_id: binding.source_case_id, status: "completed" }]); record.synthetic_native_attempts++;
+        if (record.synthetic_native_attempts === 1) {
+          const resumed = await inspectSuccessorCollectionControl(collectionInputs());
+          assert.equal(resumed.control.terminal_count, 1);
+          assert.equal(resumed.control.total_tokens.value, 120);
+          assert.equal(resumed.control.next_case_id, preparation.cases[1].case_id);
+        }
       }
       for (const role of Object.values(roles)) {
         const actual = inspectVerifiedPortfolioExecution(role.execution);
         const completed = actual.cases.filter(c => c.state.status === "completed"); assert.equal(completed.length, 14);
         for (const item of completed) assert.equal(item.attempts[0].request.input_identity.fixture_id, item.entry.fixture_id);
       }
+    });
+    await check("native collection inspection retains all 28 cases and rejects a tampered usage receipt", async () => {
+      const inspected = await inspectSuccessorCollectionControl(collectionInputs());
+      assert.equal(inspected.control.status, "collected");
+      assert.equal(inspected.control.total_tokens.value, 28 * 120);
+      assert.equal(inspected.control.terminal_count, 28);
+      assert.equal(inspected.durable_global_sequence_verified, false);
+      assert.equal(inspected.measured_decision_authorized, false);
+      const first = preparation.cases[0]; const role = roles[first.prompt_role];
+      const nativeCase = role.scope.source.bindings.find(b => b.successor_case_id === first.case_id).source_case_id;
+      const path = resolve(role.execution.runDir, "cases", nativeCase, "attempts", "0001", "result.json");
+      const original = readFileSync(path); const altered = JSON.parse(original);
+      altered.successor_usage.metrics.total_tokens.value = 1;
+      try {
+        writeFileSync(path, `${JSON.stringify(altered, null, 2)}\n`);
+        await assert.rejects(() => inspectSuccessorCollectionControl(collectionInputs()));
+      } finally { writeFileSync(path, original); }
+      assert.equal((await inspectSuccessorCollectionControl(collectionInputs())).control.total_tokens.value, 28 * 120);
     });
     const sources = {}; const handles = {};
     for (const roleName of ["current_prompt", "prompt_v2"]) {
@@ -166,6 +203,10 @@ async function worker(contextPath) {
           const entry = verified.manifest.cases.find(c => c.case_id === binding.source_case_id); assert.ok(entry);
           assert.equal(entry.normalized_attempts.length, 1);
           const result = read(resolve(verified.generationPath, entry.normalized_attempts[0].path));
+          assert.equal(result.telemetry.input_tokens.value, 100);
+          assert.equal(result.telemetry.output_tokens.value, 20);
+          assert.equal(result.telemetry.cached_tokens.value, 80);
+          assert.equal(result.telemetry.input_tokens.reason, "committed_runtime_evidence");
           const fixtureContext = context.scoring.contexts[result.lineage.fixture_id]; assert.ok(fixtureContext);
           const envelope = syntheticSuccessorEvaluatorEnvelope({ normalized: result, sourceSnapshotDigest: snapshot, context: fixtureContext });
           const resultPath = resolve(evaluatorDirectory, `${result.normalized_result_id}.json`); write(resultPath, envelope);

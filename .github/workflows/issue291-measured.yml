@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'scripts/*successor*'
+      - 'scripts/ask-benchmark-execution.mjs'
+      - 'scripts/ask-benchmark-normalized-results.mjs'
+      - 'scripts/test-fixtures/prompt-successor-fake-codex.c'
+      - 'benchmarks/schemas/portfolio-attempt-result.schema.json'
       - 'docs/prompt-successor-measured-execution.md'
       - '.github/workflows/issue291-measured.yml'
 
@@ -58,6 +62,12 @@ jobs:
           node --test scripts/test-ask-benchmark-prompt-successor.mjs scripts/test-ask-benchmark-prompt-successor-report.mjs scripts/test-ask-benchmark-prompt-successor-input-guards.mjs
       - name: Verify preparation workflow packaging
         run: node --test scripts/test-ask-benchmark-prompt-successor-workflow.mjs
+      - name: Verify successor usage and collection control
+        run: node --test scripts/test-ask-benchmark-prompt-successor-usage.mjs scripts/test-ask-benchmark-prompt-successor-control.mjs
+      - name: Verify native successor transport and normalized usage
+        run: node --test scripts/test-ask-benchmark-prompt-successor-execution.mjs
+      - name: Verify native collection and existing scoring boundaries
+        run: node --test scripts/test-ask-benchmark-prompt-successor-scoring.mjs
       - name: Check exact PR whitespace
         run: |
           git diff --check "$PR_BASE_SHA...$PR_HEAD_SHA"
