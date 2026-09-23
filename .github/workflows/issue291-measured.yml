@@ -1,0 +1,36 @@
+name: Verify measured successor bridge
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/*successor*'
+      - 'docs/prompt-successor-measured-execution.md'
+      - '.github/workflows/issue291-measured.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Preserve public source for local verification
+        run: |
+          mkdir -p "$RUNNER_TEMP/ask291-source"
+          git bundle create "$RUNNER_TEMP/ask291-source/source.bundle" --all
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/ask291-source/identity.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ask291-public-source
+          path: ${{ runner.temp }}/ask291-source
+          retention-days: 1
+      - name: Validate existing successor boundaries
+        run: |
+          node --test scripts/test-ask-benchmark-prompt-successor.mjs scripts/test-ask-benchmark-prompt-successor-report.mjs scripts/test-ask-benchmark-prompt-successor-input-guards.mjs
+          git diff --check origin/main...HEAD
