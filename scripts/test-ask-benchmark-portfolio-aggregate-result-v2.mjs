@@ -404,6 +404,50 @@ try {
     assert.equal(aggregate.overhead_component_vector.false_positive_unit_delta.state, "not_applicable");
     assert.equal(aggregate.overhead_component_vector.false_positive_unit_delta.value, null);
   });
+  for (const name of ["token_count_delta", "latency_delta", "human_effort_delta", "false_positive_raw_count_delta"]) {
+    check(`${name} rejects a reclosed known observation with a null value`, () => {
+      const changed = structuredClone(aggregate);
+      const observation = changed.overhead_component_vector[name].fixture_values[0].observations[0];
+      assert.equal(observation.state, "known");
+      assert.equal(observation.value, 0);
+      // Keep zero fixture/aggregate means intact: null previously coerced to 0.
+      observation.value = null;
+      reclose(changed);
+      assert.throws(() => validate(changed), /known observation value must be finite/);
+    });
+  }
+  for (const state of ["partial", "unknown", "unavailable", "not_applicable"]) {
+    check(`${state} observations preserve null and reject reclosed numeric values`, () => {
+      const comparison = verifiedComparison((verified) => {
+        for (const { result } of verified.verified_results) {
+          if (!["kernel_only", "adaptive_ask"].includes(result.condition)) continue;
+          if (state === "partial" && result.condition === "kernel_only") continue;
+          result.overhead_telemetry.human_effort = {
+            status: state === "partial" ? "unknown" : state,
+            value: null,
+            reason: "synthetic_missing_effort",
+          };
+        }
+      });
+      const valid = buildPortfolioAggregateResult(buildOptions({ comparison }));
+      const component = valid.overhead_component_vector.human_effort_delta;
+      assert.equal(component.state, state);
+      assert.equal(component.value, null);
+      assert.equal(component.fixture_values[0].observations[0].state, state);
+      assert.equal(component.fixture_values[0].observations[0].value, null);
+      assert.equal(validate(valid), valid);
+      const changed = structuredClone(valid);
+      changed.overhead_component_vector.human_effort_delta.fixture_values[0].observations[0].value = 0;
+      reclose(changed);
+      assert.throws(() => validate(changed), /non-known observation value must be null/);
+    });
+  }
+  check("not-applicable false-positive-unit observations reject reclosed numeric values", () => {
+    const changed = structuredClone(aggregate);
+    changed.overhead_component_vector.false_positive_unit_delta.fixture_values[0].observations[0].value = 0;
+    reclose(changed);
+    assert.throws(() => validate(changed), /non-known observation value must be null/);
+  });
   check("complete status follows closed evidence instead of an unconditional constant", () => {
     assert.equal(aggregate.result_status, "complete");
     assert.equal(aggregate.boundaries.cross_unit_scalar_calculated, false);
@@ -729,9 +773,9 @@ try {
     assert.throws(() => verifyPortfolioAggregateResult({ aggregateResultPath: link, aggregateAuthorityRoot: authorityRoot }), /symlink/);
   });
 
-  assert.equal(covered.size, 66, `expected 66 aggregate unit closures, received ${covered.size}`);
+  assert.equal(covered.size, 75, `expected 75 aggregate unit closures, received ${covered.size}`);
   runAggregateV2FileRegressions({ root, work, check });
-  assert.equal(covered.size, 74, `expected 74 aggregate closures, received ${covered.size}`);
+  assert.equal(covered.size, 83, `expected 83 aggregate closures, received ${covered.size}`);
   console.log(`Portfolio aggregate result contract test passed (${covered.size} closures).`);
 } finally {
   rmSync(work, { recursive: true, force: true });

@@ -637,6 +637,11 @@ export function buildPortfolioAggregateResult(options) {
 function validateComponentSummary(component, label) {
   if (!V2_COMPONENT_STATES.includes(component.state)) throw new Error(label + " has an unsupported component state");
   const observations = component.fixture_values.flatMap(({ observations }) => observations);
+  // Check each observation before reduction: null would otherwise coerce to 0.
+  for (const { state, value } of observations) {
+    if (state === "known" && !Number.isFinite(value)) throw new Error(label + " known observation value must be finite");
+    if (state !== "known" && value !== null) throw new Error(label + " non-known observation value must be null");
+  }
   if (component.expected_observation_count !== observations.length) throw new Error(label + " observation denominator drift");
   const counts = Object.fromEntries(V2_COMPONENT_STATES.map((state) => [state, observations.filter(({ state: item }) => item === state).length]));
   for (const state of V2_COMPONENT_STATES) {
