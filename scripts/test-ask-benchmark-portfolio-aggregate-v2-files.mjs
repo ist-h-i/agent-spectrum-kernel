@@ -14,7 +14,7 @@ import {
   reportPortfolioAggregateResult,
   verifyPortfolioAggregateResult,
 } from "./ask-benchmark-portfolio-aggregate-result-v2.mjs";
-import { computeClassificationRecordDigest, verifyPortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
+import { computeClassificationRecordDigest, validateAggregateClassificationRecordSources, validateAggregateLineageRecordSources, verifyPortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { computeEvolutionArtifactInventoryDigest } from "./evolution-loop.mjs";
 
 // Closed-file fixtures follow test-ask-benchmark-portfolio-result-set.mjs.
@@ -59,10 +59,12 @@ function workspaceFields() {
     terminal_workspace_authority_digest: null, terminal_workspace_tree_digest: null, terminal_workspace_authority_bytes: null,
   };
 }
-function normalizedRecord(adapter, condition, repetition) {
-  const key = `${adapter}:${FIXTURE}:${condition}:${repetition}`;
+function normalizedRecord(adapter, condition, repetition, config = {}) {
+  const fixtureId = config.fixture?.fixture_id ?? FIXTURE;
+  const revision = config.sourceRevision ?? REVISION;
+  const key = `${adapter}:${fixtureId}:${condition}:${repetition}`;
   const caseId = `case-${hash(key).slice(0, 16)}-${hash(`case:${key}`).slice(0, 16)}`;
-  const blockKey = `${adapter}:${FIXTURE}:${repetition}`;
+  const blockKey = `${adapter}:${fixtureId}:${repetition}`;
   const ordinal = CONDITIONS.indexOf(condition) + 1;
   const telemetry = Object.fromEntries(TELEMETRY.map((field) => [field, { status: "unknown", value: null, reason: "synthetic_result_set_fixture" }]));
   for (const [field, value] of Object.entries({ input_tokens: ordinal * 10, output_tokens: ordinal * 20, duration_ms: ordinal * 5, human_effort: ordinal * 2, cached_tokens: ordinal })) {
@@ -72,9 +74,9 @@ function normalizedRecord(adapter, condition, repetition) {
   const base = {
     schema_version: "1.3.0", schema_path: "benchmarks/schemas/normalized-portfolio-result.schema.json", program: "adaptive_ask_normalized_execution_result",
     lineage: {
-      run_instance_id: RUN, plan_id: PLAN, plan_digest: PLAN_DIGEST, repository_revision: REVISION,
-      materialization_manifest_digest: digest("synthetic-materialization"), fixture_id: FIXTURE, fixture_input_digest: digest(`fixture:${FIXTURE}`),
-      suite: "mechanism_positive", task_class: "pr_review", difficulty: "synthetic", registered_repetitions: REPETITIONS, aggregate_eligible: true,
+      run_instance_id: RUN, plan_id: PLAN, plan_digest: PLAN_DIGEST, repository_revision: revision,
+      materialization_manifest_digest: digest("synthetic-materialization"), fixture_id: fixtureId, fixture_input_digest: digest(`fixture:${fixtureId}`),
+      suite: config.fixture?.suite ?? "mechanism_positive", task_class: config.fixture?.task_class ?? "pr_review", difficulty: "synthetic", registered_repetitions: REPETITIONS, aggregate_eligible: true,
       case_id: caseId, attempt: "0001", adapter_track: adapter, condition, repetition, condition_order_position: ordinal,
       block_id: `block-${hash(blockKey).slice(0, 16)}-${hash(`block:${blockKey}`).slice(0, 12)}`,
       runtime_identity_digest: digest(`runtime:${adapter}`), effective_command_digest: digest(`command:${adapter}`), environment_snapshot_digest: digest(`environment:${adapter}`),
@@ -90,12 +92,14 @@ function normalizedRecord(adapter, condition, repetition) {
     telemetry,
     privacy: { raw_stdout_stored: false, raw_stderr_stored: false, final_output_content_stored: false, prompt_stored: false, transcript_stored: false, environment_values_stored: false, absolute_private_paths_stored: false },
   };
+  config.mutateNormalized?.(base);
   const normalized_result_digest = canonicalDigest(base);
   const normalized_result_id = `normalized-${canonicalDigest({ run_instance_id: RUN, case_id: caseId, attempt: "0001", normalized_result_digest }).slice(7, 39)}`;
   return { ...base, normalized_result_id, normalized_result_digest };
 }
-function buildNormalizedRoot(target) {
-  const records = ADAPTERS.flatMap((adapter) => CONDITIONS.flatMap((condition) => Array.from({ length: REPETITIONS }, (_, index) => normalizedRecord(adapter, condition, index + 1))));
+function buildNormalizedRoot(target, config = {}) {
+  const revision = config.sourceRevision ?? REVISION;
+  const records = ADAPTERS.flatMap((adapter) => CONDITIONS.flatMap((condition) => Array.from({ length: REPETITIONS }, (_, index) => normalizedRecord(adapter, condition, index + 1, config))));
   records.sort((a, b) => ADAPTERS.indexOf(a.lineage.adapter_track) - ADAPTERS.indexOf(b.lineage.adapter_track) || a.lineage.case_id.localeCompare(b.lineage.case_id));
   const source_snapshot = {
     adapter_identities: [...ADAPTERS].sort().map((adapter) => ({ adapter, runtime_identity_digest: digest(`runtime:${adapter}`) })),
@@ -114,7 +118,7 @@ function buildNormalizedRoot(target) {
     const bytes = readFileSync(resolve(generation, path));
     inventory.push({ path, sha256: digest(bytes), bytes: bytes.length });
     return {
-      case_id: l.case_id, adapter_track: l.adapter_track, condition: l.condition, fixture_id: FIXTURE, repetition: l.repetition,
+      case_id: l.case_id, adapter_track: l.adapter_track, condition: l.condition, fixture_id: l.fixture_id, repetition: l.repetition,
       condition_order_position: l.condition_order_position, block_id: l.block_id, status: record.outcome, attempt_count: 1, terminal_attempt: l.attempt,
       normalized_attempts: [{ attempt: l.attempt, normalized_result_id: record.normalized_result_id, normalized_result_digest: record.normalized_result_digest, path }],
     };
@@ -125,8 +129,8 @@ function buildNormalizedRoot(target) {
   });
   const manifestBase = {
     schema_version: "1.3.0", schema_path: "benchmarks/schemas/normalized-portfolio-run.schema.json", program: "adaptive_ask_normalized_execution_run", artifact_role: "derived_execution_evidence",
-    normalizer: { version: "1.3.0", source_revision: REVISION },
-    source: { run_instance_id: RUN, run_identity_digest: digest("run-identity"), plan_id: PLAN, plan_digest: PLAN_DIGEST, repository_revision: REVISION, materialization_manifest_digest: digest("synthetic-materialization"), selection_state_digest: digest("synthetic-selection-state") },
+    normalizer: { version: "1.3.0", source_revision: revision },
+    source: { run_instance_id: RUN, run_identity_digest: digest("run-identity"), plan_id: PLAN, plan_digest: PLAN_DIGEST, repository_revision: revision, materialization_manifest_digest: digest("synthetic-materialization"), selection_state_digest: digest("synthetic-selection-state") },
     source_snapshot, source_snapshot_digest: sourceSnapshotDigest,
     output_root_identity: canonicalDigest({ run_instance_id: RUN, plan_id: PLAN, normalizer_version: "1.3.0", source_snapshot_digest: sourceSnapshotDigest }),
     pool_adapter_results: false,
@@ -146,26 +150,27 @@ function buildNormalizedRoot(target) {
   writeJson(resolve(generation, "normalized-run.json"), manifest);
   const collection = {
     schema_version: "1.0.0", schema_path: "benchmarks/schemas/normalized-portfolio-root.schema.json", program: "adaptive_ask_normalized_execution_collection", artifact_role: "immutable_snapshot_collection",
-    normalizer: { version: "1.3.0", source_revision: REVISION },
-    source: { run_instance_id: RUN, run_identity_digest: digest("run-identity"), plan_id: PLAN, plan_digest: PLAN_DIGEST, repository_revision: REVISION }, generations_directory: "generations",
+    normalizer: { version: "1.3.0", source_revision: revision },
+    source: { run_instance_id: RUN, run_identity_digest: digest("run-identity"), plan_id: PLAN, plan_digest: PLAN_DIGEST, repository_revision: revision }, generations_directory: "generations",
   };
   writeJson(resolve(target, "normalized-results-root.json"), { ...collection, output_collection_identity: canonicalDigest(collection) });
   return { records, manifest, sourceSnapshotDigest };
 }
-function engineeringResult(record, sourceSnapshotDigest, policyDigest) {
+function engineeringResult(record, sourceSnapshotDigest, policyDigest, config = {}) {
+  const fixtureId = record.lineage.fixture_id;
   const l = record.lineage;
   const score = (CONDITIONS.indexOf(l.condition) + 1) / 4;
   const metric = (name) => structuredClone(record.telemetry[name]);
   const base = {
     schema_version: "1.0.0", schema_path: "benchmarks/schemas/portfolio-engineering-result.schema.json", program: "adaptive_ask_portfolio_engineering_result",
     scoring_status: "complete", scoring_reason: "completed_evaluation_scoring_ready", scoring_input_freeze_manifest_source_digest: digest("freeze-source"), scoring_input_freeze_manifest_digest: digest("freeze-manifest"),
-    catalog_digest: digest("catalog"), policy_manifest_digest: digest("policy-manifest"), scoring_policy_digest: policyDigest, admission_record_digest: digest(`admission:${FIXTURE}`),
-    effective_admission_mode: "legacy_admitted_record", effective_admission_status: "admitted", frozen_admission_record_digest: digest(`admission:${FIXTURE}`), requirement_authority_digest: digest(`admission:${FIXTURE}`), admission_decision_digest: null, admission_decision_revision: null,
-    requirement_record_digest: digest(`requirements:${FIXTURE}`), requirement_set_digest: digest(`requirement-set:${FIXTURE}`), output_contract_digest: digest(`output-contract:${FIXTURE}`), evaluator_public_reference_digest: digest(`evaluator-reference:${FIXTURE}`),
+    catalog_digest: digest("catalog"), policy_manifest_digest: digest("policy-manifest"), scoring_policy_digest: policyDigest, admission_record_digest: digest(`admission:${fixtureId}`),
+    effective_admission_mode: "legacy_admitted_record", effective_admission_status: "admitted", frozen_admission_record_digest: digest(`admission:${fixtureId}`), requirement_authority_digest: digest(`admission:${fixtureId}`), admission_decision_digest: null, admission_decision_revision: null,
+    requirement_record_digest: digest(`requirements:${fixtureId}`), requirement_set_digest: digest(`requirement-set:${fixtureId}`), output_contract_digest: digest(`output-contract:${fixtureId}`), evaluator_public_reference_digest: digest(`evaluator-reference:${fixtureId}`),
     evaluation_id: `evaluation-${hash(`evaluation:${record.normalized_result_id}`).slice(0, 32)}`, evaluation_digest: digest(`evaluation:${record.normalized_result_id}`), evaluation_status: "completed",
-    evaluator_bundle_id: `evaluator-${hash(`bundle:${FIXTURE}`)}`, evaluator_bundle_digest: digest(`bundle-digest:${FIXTURE}`), evaluator_revision: REVISION,
+    evaluator_bundle_id: `evaluator-${hash(`bundle:${fixtureId}`)}`, evaluator_bundle_digest: digest(`bundle-digest:${fixtureId}`), evaluator_revision: config.sourceRevision ?? REVISION,
     normalized_result_id: record.normalized_result_id, normalized_result_digest: record.normalized_result_digest, normalized_outcome: record.outcome, source_snapshot_digest: sourceSnapshotDigest,
-    run_instance_id: RUN, plan_id: PLAN, plan_digest: PLAN_DIGEST, fixture_id: FIXTURE, fixture_input_digest: l.fixture_input_digest, suite: l.suite, task_class: l.task_class, case_id: l.case_id, attempt: l.attempt, adapter: l.adapter_track, condition: l.condition, repetition: l.repetition,
+    run_instance_id: RUN, plan_id: PLAN, plan_digest: PLAN_DIGEST, fixture_id: fixtureId, fixture_input_digest: l.fixture_input_digest, suite: l.suite, task_class: l.task_class, case_id: l.case_id, attempt: l.attempt, adapter: l.adapter_track, condition: l.condition, repetition: l.repetition,
     requirement_score: { scored_requirement_count: 1, requirement_points_earned: score, requirement_points_possible: 1, normalized_requirement_score: score },
     blockers: { requirement_ids: [], outcomes: [], non_pass_requirement_ids: [], gate_status: "not_applicable" },
     false_positives: { raw_count: 0, findings: [], severity_counts: { critical: 0, high: 0, medium: 0, low: 0, informational: 0 }, false_positive_units: null, unit_mapping_status: "not_implemented_no_approved_mapping" },
@@ -176,16 +181,18 @@ function engineeringResult(record, sourceSnapshotDigest, policyDigest) {
     boundaries: { single_evaluator_result: true, single_normalized_attempt: true, aggregate_result: false, comparison_result: false, false_positive_units_calculated: false, correctness_penalty_calculated: false, mechanism_scorecard_calculated: false, variance_calculated: false, practice_weight_applied: false },
     privacy: { private_evaluator_content_stored: false, private_path_stored: false, raw_evaluator_prompt_stored: false, secret_customer_or_personal_data_stored: false },
   };
+  config.mutateEngineering?.(base);
   const withId = { ...base, engineering_result_id: computeEngineeringResultId(base) };
   return { ...withId, engineering_result_digest: computeEngineeringResultDigest(withId) };
 }
-function buildFileInputs(root, target, authorities) {
+function buildFileInputs(root, target, authorities, config = {}) {
+  const adapter = config.adapter ?? "codex";
   const normalizedRoot = resolve(target, "normalized");
-  const normalized = buildNormalizedRoot(normalizedRoot);
-  const resultRoot = resolve(target, "engineering-codex");
-  const inventory = normalized.records.filter((record) => record.lineage.adapter_track === "codex").map((record) => {
-    const result = engineeringResult(record, normalized.sourceSnapshotDigest, authorities.verified_scoring_policy.policy_digest);
-    const path = `${FIXTURE}/${result.condition}/${String(result.repetition).padStart(2, "0")}.json`;
+  const normalized = buildNormalizedRoot(normalizedRoot, config);
+  const resultRoot = resolve(target, `engineering-${adapter}`);
+  const inventory = normalized.records.filter((record) => record.lineage.adapter_track === adapter).map((record) => {
+    const result = engineeringResult(record, normalized.sourceSnapshotDigest, authorities.verified_scoring_policy.policy_digest, config);
+    const path = `${result.fixture_id}/${result.condition}/${String(result.repetition).padStart(2, "0")}.json`;
     writeJson(resolve(resultRoot, path), result);
     const bytes = readFileSync(resolve(resultRoot, path));
     const keys = ["engineering_result_id", "engineering_result_digest", "effective_admission_mode", "effective_admission_status", "frozen_admission_record_digest", "requirement_authority_digest", "admission_decision_digest", "admission_decision_revision", "normalized_result_id", "normalized_result_digest", "case_id", "attempt", "condition", "repetition"];
@@ -193,24 +200,72 @@ function buildFileInputs(root, target, authorities) {
   }).sort((a, b) => a.path.localeCompare(b.path));
   const source = {
     schema_version: "1.0.0", schema_path: "benchmarks/schemas/portfolio-engineering-result-source-manifest.schema.json", program: "adaptive_ask_portfolio_engineering_result_source_manifest",
-    plan_id: PLAN, plan_digest: PLAN_DIGEST, run_instance_id: RUN, source_snapshot_digest: normalized.sourceSnapshotDigest, adapter_track: "codex",
-    normalized_generation_id: `snapshot-${normalized.sourceSnapshotDigest.slice(7)}`, normalized_manifest_digest: normalized.manifest.normalized_run_digest, inventory, source_revision: REVISION,
+    plan_id: PLAN, plan_digest: PLAN_DIGEST, run_instance_id: RUN, source_snapshot_digest: normalized.sourceSnapshotDigest, adapter_track: adapter,
+    normalized_generation_id: `snapshot-${normalized.sourceSnapshotDigest.slice(7)}`, normalized_manifest_digest: normalized.manifest.normalized_run_digest, inventory, source_revision: config.sourceRevision ?? REVISION,
   };
-  const sourcePath = resolve(target, "source-codex.json");
+  const sourcePath = resolve(target, `source-${adapter}.json`);
   writeJson(sourcePath, { ...source, manifest_digest: computeEngineeringResultSourceManifestDigest(source) });
-  return { root, normalizedResultsPath: normalizedRoot, sourceSnapshotDigest: normalized.sourceSnapshotDigest, engineeringResultsPath: resultRoot, sourceManifestPath: sourcePath, sourceManifestSourceDigest: digest(readFileSync(sourcePath)), adapter: "codex" };
+  return { root, normalizedResultsPath: normalizedRoot, sourceSnapshotDigest: normalized.sourceSnapshotDigest, engineeringResultsPath: resultRoot, sourceManifestPath: sourcePath, sourceManifestSourceDigest: digest(readFileSync(sourcePath)), adapter };
 }
-function classificationOptions(authorityRoot, authorities, excluded) {
+function classificationOptions(authorityRoot, authorities, excluded, fixtureId = FIXTURE, adapter = "codex") {
   const name = excluded ? "excluded" : "eligible";
   const path = `classification/${name}.json`;
   const record = {
     classification_record_id: `classification-v2-files-${name}`, classification_record_schema_path: "benchmarks/schemas/portfolio-classification-record.schema.json", classification_record_path: path,
-    fixture_id: FIXTURE, fixture_role: "primary", catalog_digest: authorities.verified_catalog.catalog_digest, policy_manifest_digest: authorities.verified_policy_manifest.manifest_digest,
-    pilot_result_digest: digest("synthetic-file-pilot"), supported_adapter_tracks: ["codex"], ceiling_classification_result: excluded ? "candidate" : "not_candidate", floor_classification_result: "not_candidate",
+    fixture_id: fixtureId, fixture_role: "primary", catalog_digest: authorities.verified_catalog.catalog_digest, policy_manifest_digest: authorities.verified_policy_manifest.manifest_digest,
+    pilot_result_digest: digest("synthetic-file-pilot"), supported_adapter_tracks: [adapter], ceiling_classification_result: excluded ? "candidate" : "not_candidate", floor_classification_result: "not_candidate",
     classification_state: excluded ? "redesign_required" : "primary_eligible", reason_codes: [excluded ? "ceiling_candidate" : "ceiling_and_floor_not_candidate"], classification_revision: 1,
   };
   writeJson(resolve(authorityRoot, path), { ...record, classification_digest: computeClassificationRecordDigest(record) });
   return { aggregateAuthorityRoot: authorityRoot, classificationRecordPaths: [path], lineageRecordPaths: [], immutableArtifactDigests: { [path]: digest(readFileSync(resolve(authorityRoot, path))) } };
+}
+
+// Prepare only fixed identities/classification inputs. collect() is deliberately
+// separate so tests can pin an Evolution experiment before creating result files.
+export function prepareAggregateV2FileFixture({ root, target, fixtureId = FIXTURE, adapter = "codex", sourceRevision = REVISION, excluded = false }) {
+  const authorities = verifyPortfolioPolicyArtifacts({ root });
+  const fixture = authorities.verified_catalog.fixtures.find(({ fixture_id }) => fixture_id === fixtureId);
+  assert.ok(fixture, "synthetic aggregate fixture must exist in the frozen public catalog");
+  const authorityRoot = resolve(target, "classification-authority");
+  const classification = classificationOptions(authorityRoot, authorities, excluded, fixtureId, adapter);
+  const classificationRecords = validateAggregateClassificationRecordSources({
+    catalog: authorities.verified_catalog, policyManifest: authorities.verified_policy_manifest,
+    expectedFixtureIds: [fixtureId], adapterTrack: adapter, recordPaths: classification.classificationRecordPaths,
+    artifactRoot: authorityRoot, immutableArtifactDigests: classification.immutableArtifactDigests,
+  }).references;
+  const lineageRecords = validateAggregateLineageRecordSources({
+    scoringPolicy: authorities.verified_scoring_policy, lineagePolicy: authorities.verified_lineage_policy,
+    catalog: authorities.verified_catalog, policyManifest: authorities.verified_policy_manifest,
+    expectedFixtureIds: [fixtureId], suite: fixture.suite, recordPaths: [],
+    artifactRoot: authorityRoot, immutableArtifactDigests: classification.immutableArtifactDigests,
+  }).references;
+  const execution = {
+    source_revision: sourceRevision, plan_id: PLAN, plan_digest: PLAN_DIGEST, run_instance_id: RUN,
+    adapter_track: adapter, runtime_identity_digest: digest(`runtime:${adapter}`),
+    materialization_manifest_digest: digest("synthetic-materialization"), selection_state_digest: digest("synthetic-selection-state"),
+    group: { comparison_view: "adaptive_vs_kernel", suite: fixture.suite, task_class: fixture.task_class },
+    fixtures: [{ fixture_id: fixtureId, fixture_input_digest: digest(`fixture:${fixtureId}`), expected_repetition_count: REPETITIONS }],
+    catalog_digest: authorities.verified_catalog.catalog_digest, policy_manifest_digest: authorities.verified_policy_manifest.manifest_digest,
+    scoring_policy_digest: authorities.verified_scoring_policy.policy_digest,
+    classification_records: classificationRecords, lineage_records: lineageRecords,
+  };
+  return {
+    execution: freezeJson(execution),
+    collect({ mutateNormalized = null, mutateEngineering = null } = {}) {
+      const inputs = buildFileInputs(root, target, authorities, { fixture, adapter, sourceRevision, mutateNormalized, mutateEngineering });
+      const options = {
+        ...inputs, ...classification,
+        resultSetPath: resolve(target, "result-set.json"), repetitionReportPath: resolve(target, "repetition.json"),
+        comparisonReportPath: resolve(target, "paired.json"), aggregateResultPath: resolve(target, "aggregate.json"),
+        comparisonView: "adaptive_vs_kernel", suite: fixture.suite, taskClass: fixture.task_class,
+      };
+      collectEngineeringResults({ ...inputs, outputPath: options.resultSetPath });
+      reportEngineeringResultRepetitions({ ...inputs, inputPath: options.resultSetPath, outputPath: options.repetitionReportPath });
+      reportEngineeringPairedComparisons({ ...options, outputPath: options.comparisonReportPath });
+      reportPortfolioAggregateResult({ ...options, outputPath: options.aggregateResultPath });
+      return { options, verified: verifyPortfolioAggregateResult(options) };
+    },
+  };
 }
 
 export function runAggregateV2FileRegressions({ root, work, check }) {

@@ -26,7 +26,7 @@ const DEFAULT_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const MAX_REPORT_BYTES = 512 * 1024 * 1024;
 // Process-local capability, not a serializable verification claim. Only the
 // full verifier below may issue a return accepted by the Evolution projection.
-const VERIFIED_AGGREGATE_RETURNS = new WeakSet();
+const VERIFIED_AGGREGATE_RETURNS = new WeakMap();
 const UNSAFE_CATEGORIES = Object.freeze(["safe_local_preparation", "blocked_fake_sink_attempt", "unauthorized_attempt", "external_action_executed"]);
 const PRIVATE_PATH_PATTERN = /(?:^|\/)(?:private[-_]?evaluator|evaluator[-_]?private)(?:\/|$)/iu;
 const ABSOLUTE_PATH_PATTERN = /^(?:\/|[A-Za-z]:[\\/]|\\\\)/u;
@@ -751,12 +751,11 @@ function validateV2AggregateResult(value, { root, verifiedPolicyArtifacts, artif
 
 export function portfolioAggregateEvolutionEvidenceIdentity(verifiedAggregate, { root = DEFAULT_ROOT } = {}) {
   if (!VERIFIED_AGGREGATE_RETURNS.has(verifiedAggregate)) throw new Error("portfolio aggregate evolution evidence requires the complete aggregate full-verifier return issued by verifyPortfolioAggregateResult in this module instance");
-  if (!verifiedAggregate?.verified_aggregate_result || !verifiedAggregate?.verified_comparison?.verified_comparison_report || !verifiedAggregate?.verified_policy_artifacts?.verified_scoring_policy) throw new Error("portfolio aggregate evolution evidence requires the complete aggregate full-verifier return");
+  if (!verifiedAggregate?.verified_aggregate_result) throw new Error("portfolio aggregate evolution evidence requires the complete aggregate full-verifier return");
   const artifact = verifiedAggregate.verified_aggregate_result;
   assertRecursivelyFrozen(artifact, "verified aggregate result");
   if (artifact.schema_version !== "2.0.0") throw new Error("legacy aggregate artifacts are not v2 Evolution evidence");
-  const comparison = verifiedAggregate.verified_comparison.verified_comparison_report;
-  const scoringPolicy = verifiedAggregate.verified_policy_artifacts.verified_scoring_policy;
+  const { comparison, scoringPolicy } = VERIFIED_AGGREGATE_RETURNS.get(verifiedAggregate);
   if (artifact.paired_comparison_report_id !== comparison.paired_comparison_report_id
     || artifact.paired_comparison_report_digest !== comparison.paired_comparison_report_digest
     || artifact.scoring_policy_digest !== scoringPolicy.policy_digest) throw new Error("verified aggregate Evolution identity is not bound to its full-verifier authorities");
@@ -767,6 +766,15 @@ export function portfolioAggregateEvolutionEvidenceIdentity(verifiedAggregate, {
     artifact_digest: artifact.aggregate_result_digest,
     result_status: artifact.result_status,
   });
+}
+
+// Downstream reporting must not read replaceable convenience fields on the
+// verifier return. These snapshots are captured privately at issuance, before
+// any caller can replace verified_comparison or its nested properties.
+export function portfolioAggregateEvolutionContext(verifiedAggregate, options = {}) {
+  const identity = portfolioAggregateEvolutionEvidenceIdentity(verifiedAggregate, options);
+  const { comparison, repetition, scoringPolicy } = VERIFIED_AGGREGATE_RETURNS.get(verifiedAggregate);
+  return Object.freeze({ identity, aggregate: verifiedAggregate.verified_aggregate_result, comparison, repetition, scoringPolicy });
 }
 
 export function validatePortfolioAggregateResult(value, { root = DEFAULT_ROOT, verifiedPolicyArtifacts = null, artifactRoot = root, immutableArtifactDigests = {} } = {}) {
@@ -888,6 +896,10 @@ export function verifyPortfolioAggregateResult(options) {
     verified_comparison: derived.verified_comparison,
     verified_policy_artifacts: derived.verified_policy_artifacts,
   });
-  VERIFIED_AGGREGATE_RETURNS.add(verified);
+  VERIFIED_AGGREGATE_RETURNS.set(verified, deepFreezeJson({
+    comparison: structuredClone(derived.verified_comparison.verified_comparison_report),
+    repetition: structuredClone(derived.verified_comparison.verified_repetition_report),
+    scoringPolicy: structuredClone(derived.verified_policy_artifacts.verified_scoring_policy),
+  }));
   return verified;
 }
