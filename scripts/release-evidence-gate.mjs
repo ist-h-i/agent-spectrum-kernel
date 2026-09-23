@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, posix, relative, resolve, sep, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateJsonSchema } from "./json-schema-validation.mjs";
@@ -185,6 +185,7 @@ function reviewForEvidence({ evidence, evidenceById, gateId = null, claim = null
     .sort((left, right) => left.evidence_id.localeCompare(right.evidence_id));
   for (const review of reviews) {
     if (review.status !== "passed") continue;
+    if (review.authority.identity_digest === evidence.authority.identity_digest) continue;
     if (review.source_revision !== targetRevision) continue;
     if (!sameJson(review.scope, evidence.scope)) continue;
     if (claim && !sameJson(review.scope, claim.scope)) continue;
@@ -204,6 +205,7 @@ function assessGate(spec, { catalog, evidenceById, root, targetRevision }) {
     return { gate_id: spec.gate_id, status: "not_ready", evidence_refs: primary.map((entry) => entry.evidence_id), reason_codes: ["contradictory_gate_evidence"] };
   }
   const reasons = [];
+  const passingRefs = [];
   for (const entry of primary) {
     const candidateReasons = [];
     if (!spec.accepted_kinds.includes(entry.kind)) candidateReasons.push("evidence_kind_insufficient");
@@ -212,18 +214,22 @@ function assessGate(spec, { catalog, evidenceById, root, targetRevision }) {
     if (entry.status === "not_applicable") candidateReasons.push("required_gate_not_applicable");
     candidateReasons.push(...evidenceArtifactReasons(entry, root, targetRevision));
     if (spec.outcome_guardrails_required && OUTCOME_KINDS.has(entry.kind)) candidateReasons.push(...guardrailReasons(entry));
+    let review = null;
     if (candidateReasons.length === 0 && spec.independent_review_required) {
-      const review = reviewForEvidence({ evidence: entry, evidenceById, gateId: spec.gate_id, root, targetRevision });
+      review = reviewForEvidence({ evidence: entry, evidenceById, gateId: spec.gate_id, root, targetRevision });
       if (!review) candidateReasons.push("independent_review_missing");
     }
     if (candidateReasons.length === 0) {
-      const refs = [entry.evidence_id];
-      if (spec.independent_review_required) refs.push(reviewForEvidence({ evidence: entry, evidenceById, gateId: spec.gate_id, root, targetRevision }).evidence_id);
-      return { gate_id: spec.gate_id, status: "pass", evidence_refs: sortedUnique(refs), reason_codes: [] };
+      passingRefs.push(entry.evidence_id);
+      if (review) passingRefs.push(review.evidence_id);
+    } else {
+      reasons.push(...candidateReasons);
     }
-    reasons.push(...candidateReasons);
   }
-  return { gate_id: spec.gate_id, status: "not_ready", evidence_refs: primary.map((entry) => entry.evidence_id), reason_codes: sortedUnique(reasons) };
+  if (reasons.length > 0) {
+    return { gate_id: spec.gate_id, status: "not_ready", evidence_refs: primary.map((entry) => entry.evidence_id), reason_codes: sortedUnique(reasons) };
+  }
+  return { gate_id: spec.gate_id, status: "pass", evidence_refs: sortedUnique(passingRefs), reason_codes: [] };
 }
 
 function assessClaim(claim, { evidenceById, root, targetRevision }) {
@@ -242,6 +248,11 @@ function assessClaim(claim, { evidenceById, root, targetRevision }) {
   }
   if (claim.disposition === "supported") {
     if (present.length === 0) reasons.push("supported_claim_has_no_evidence");
+    for (const evidence of present.filter((entry) => !NON_PRIMARY_KINDS.has(entry.kind))) {
+      if (evidence.status === "failed") reasons.push("claim_evidence_failed");
+      if (evidence.status === "not_checked") reasons.push("claim_evidence_not_checked");
+      if (evidence.status === "not_applicable") reasons.push("claim_evidence_not_applicable");
+    }
     const allowedKinds = new Set(CLAIM_KINDS[claim.claim_class]);
     const qualified = present
       .filter((entry) => !NON_PRIMARY_KINDS.has(entry.kind))
@@ -340,7 +351,7 @@ function parseCli(argv) {
     if (Object.hasOwn(options, key)) throw new Error(`duplicate release evidence gate option: ${flag}`);
     options[key] = value;
   }
-  const allowed = new Set(["matrix", "evidence", "source_revision", "root", "output"]);
+  const allowed = new Set(["matrix", "evidence", "source_revision", "root"]);
   const unknown = Object.keys(options).find((key) => !allowed.has(key));
   if (unknown) throw new Error(`unknown release evidence gate option: --${unknown.replaceAll("_", "-")}`);
   for (const key of ["matrix", "evidence", "source_revision"]) if (!options[key]) throw new Error(`--${key.replaceAll("_", "-")} is required`);
@@ -357,9 +368,7 @@ function runCli(argv) {
     repositoryRoot: options.root ? resolve(options.root) : ROOT,
     sourceRevision: options.source_revision,
   });
-  const output = `${stableCanonicalJson(assessment)}\n`;
-  if (options.output) writeFileSync(resolve(options.output), output, { encoding: "utf8", flag: "wx" });
-  else process.stdout.write(output);
+  process.stdout.write(`${stableCanonicalJson(assessment)}\n`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
