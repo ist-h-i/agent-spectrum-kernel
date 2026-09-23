@@ -4,6 +4,7 @@
   "title": "Agent Spectrum Kernel scoped verification reuse, delta review, and current coverage",
   "oneOf": [
     { "$ref": "#/$defs/dependencyManifest" },
+    { "$ref": "#/$defs/scopedGateInventory" },
     { "$ref": "#/$defs/scopedRequirements" },
     { "$ref": "#/$defs/scopedPlan" },
     { "$ref": "#/$defs/deltaReviewRequest" },
@@ -168,6 +169,19 @@
         "prior_finding_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } }
       }
     },
+    "gateDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "dependency_manifest_path", "required_obligation_refs", "authority", "execution_availability", "delta_review"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/token" },
+        "dependency_manifest_path": { "$ref": "#/$defs/portablePath" },
+        "required_obligation_refs": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "authority": { "$ref": "#/$defs/authority" },
+        "execution_availability": { "type": "string", "enum": ["available", "unavailable"] },
+        "delta_review": { "$ref": "#/$defs/deltaReviewRequirement" }
+      }
+    },
     "requiredGate": {
       "type": "object",
       "additionalProperties": false,
@@ -191,10 +205,24 @@
         "kind": { "type": "string", "enum": ["pr_head", "required_ci", "approval", "mergeability", "release_state", "authorization", "external_state"] }
       }
     },
+    "scopedGateInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "schema_path", "program", "inventory_id", "inventory_digest", "required_gates", "current_obligations"],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_scoped_gate_inventory" },
+        "inventory_id": { "type": "string", "pattern": "^verification-scoped-gate-inventory-[a-f0-9]{64}$" },
+        "inventory_digest": { "$ref": "#/$defs/digest" },
+        "required_gates": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/gateDefinition" } },
+        "current_obligations": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/currentObligation" } }
+      }
+    },
     "scopedRequirements": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schema_version", "schema_path", "program", "requirements_id", "requirements_digest", "base_revision", "required_gates", "current_obligations"],
+      "required": ["schema_version", "schema_path", "program", "requirements_id", "requirements_digest", "base_revision", "gate_inventory_id", "gate_inventory_digest", "required_gates", "current_obligations"],
       "properties": {
         "schema_version": { "type": "string", "const": "1.0.0" },
         "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" },
@@ -202,6 +230,8 @@
         "requirements_id": { "type": "string", "pattern": "^verification-scoped-requirements-[a-f0-9]{64}$" },
         "requirements_digest": { "$ref": "#/$defs/digest" },
         "base_revision": { "$ref": "#/$defs/commit" },
+        "gate_inventory_id": { "type": "string", "pattern": "^verification-scoped-gate-inventory-[a-f0-9]{64}$" },
+        "gate_inventory_digest": { "$ref": "#/$defs/digest" },
         "required_gates": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/requiredGate" } },
         "current_obligations": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/currentObligation" } }
       }
@@ -308,7 +338,7 @@
       "required": [
         "schema_version", "schema_path", "program", "plan_id", "plan_digest", "planner_revision",
         "repository_id", "base_revision", "target_revision", "target_tree_digest", "requirements_id", "requirements_digest",
-        "requirements_path", "actual_diff", "dispositions", "coverage", "execution_summary"
+        "requirements_path", "gate_inventory_id", "gate_inventory_digest", "gate_inventory_path", "actual_diff", "dispositions", "coverage", "execution_summary"
       ],
       "properties": {
         "schema_version": { "type": "string", "const": "1.0.0" },
@@ -324,6 +354,9 @@
         "requirements_id": { "type": "string", "pattern": "^verification-scoped-requirements-[a-f0-9]{64}$" },
         "requirements_digest": { "$ref": "#/$defs/digest" },
         "requirements_path": { "type": "string", "const": ".ask/verification-scoped-requirements.json" },
+        "gate_inventory_id": { "type": "string", "pattern": "^verification-scoped-gate-inventory-[a-f0-9]{64}$" },
+        "gate_inventory_digest": { "$ref": "#/$defs/digest" },
+        "gate_inventory_path": { "type": "string", "const": ".ask/verification-scoped-gates.json" },
         "actual_diff": {
           "type": "object",
           "additionalProperties": false,
