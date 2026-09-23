@@ -333,9 +333,20 @@ try {
   checked("dangling symlink and oversized untracked file are rejected");
 
   const waiting = repository("waiting");
+  const invalidLifecycle = structuredClone(waiting.bundle);
+  invalidLifecycle.plan.lifecycle_state = "bounded";
+  const invalidLifecycleBundle = closePlanContextBinding(invalidLifecycle);
+  assert.ok(validateWorkPackagePlan(invalidLifecycleBundle.plan, invalidLifecycleBundle)
+    .some((entry) => entry.code === "SCHEMA_INVALID" && entry.path === "$.lifecycle_state"));
+  assert.throws(() => persistSessionCheckpoint({ ...waiting.options, planBundle: invalidLifecycleBundle }), /invalid/iu);
+  expectBlocked(validateSessionResume({ ...waiting.options, planBundle: invalidLifecycleBundle }), "PLAN_INVALID");
+  assert.deepEqual(readdirSync(waiting.options.storeRoot), [], "invalid lifecycle must not publish any CAS object");
+  checked("unknown bounded lifecycle remains invalid under the original Plan schema");
   for (const kind of ["blocker", "decision", "approval", "proposed"]) {
     let controlBundle = structuredClone(waiting.bundle);
-    controlBundle.plan.lifecycle_state = kind === "proposed" ? "proposed" : "bounded";
+    // Pending controls belong to a proposed Plan. "bounded" is not a
+    // lifecycle state in the authoritative Work Package Plan schema.
+    controlBundle.plan.lifecycle_state = "proposed";
     let field;
     let id;
     if (kind === "blocker") {

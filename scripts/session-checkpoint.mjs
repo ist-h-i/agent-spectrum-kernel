@@ -202,7 +202,7 @@ function loadPlanBundle(bundle) {
   if (issues.length > 0) {
     throw new Error(`Work Package Plan is invalid: ${issues.slice(0, 8).map((entry) => `${entry.code}@${entry.path}`).join(", ")}`);
   }
-  // A valid bounded/proposed plan may be saved, but it does not authorize work.
+  // A valid proposed plan may be saved, but it does not authorize work.
   // Keep the existing execution validator (including admission) authoritative.
   return { ...bundle, executionIssues: validateWorkPackagePlanExecutable(plan, options) };
 }
