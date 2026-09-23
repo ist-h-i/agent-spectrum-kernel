@@ -427,3 +427,50 @@ try {
     current_obligations: [],
   });
   writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, unknownRequirements);
+  const unknownTarget = commitAll(root, "require incomplete dependency gate");
+  assert.equal(planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: unknownTarget }).dispositions[0].reason_code, "dependency_information_incomplete");
+
+  git(root, ["checkout", "-B", "case-independent", requirementsTarget]);
+  const independentAuthority = acceptedAuthority(sourceEvidence);
+  independentAuthority.independent_judgment_required = true;
+  writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, sealScopedRequirements({
+    base_revision: baseRevision,
+    required_gates: [gateRequirement({ evidence: sourceEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations, authority: independentAuthority })],
+    current_obligations: [],
+  }));
+  const independentTarget = commitAll(root, "require independent judgment");
+  const independentPlan = planScopedReuse({ repositoryRoot: root, storeRoot: store, targetRevision: independentTarget });
+  assert.equal(independentPlan.dispositions[0].disposition, "independent_judgment_required");
+  assert.equal(independentPlan.dispositions[0].execution_evidence_reusable, true);
+  assert.equal(buildCurrentCoverage({ repositoryRoot: root, storeRoot: store, targetRevision: independentTarget }).coverage.status, "blocked");
+
+  git(root, ["checkout", "-B", "case-external", requirementsTarget]);
+  writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, sealScopedRequirements({
+    base_revision: baseRevision,
+    required_gates: [gateRequirement({ evidence: sourceEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations })],
+    current_obligations: [{ obligation_id: "pr-head-current", kind: "pr_head" }],
+  }));
+  const externalTarget = commitAll(root, "require current PR observation");
+  const externalCoverage = buildCurrentCoverage({ repositoryRoot: root, storeRoot: store, targetRevision: externalTarget }).coverage;
+  assert.equal(externalCoverage.status, "blocked");
+  assert.deepEqual(externalCoverage.blockers, [{ kind: "current_observation", ref: "pr-head-current", reason_code: "current_observation_required" }]);
+  assert.throws(() => sealScopedRequirements({
+    base_revision: baseRevision,
+    required_gates: [gateRequirement({ evidence: sourceEvidence, manifestPath: sourceManifestPath, obligations: sourceObligations })],
+    current_obligations: [{ obligation_id: "pr-head-current", kind: "pr_head", fresh: true }],
+  }), /schema|additional|propert/iu, "self-reported freshness must not satisfy current-state coverage");
+
+  const cli = spawnSync(process.execPath, [
+    resolve("scripts/verification-scoped-reuse.mjs"),
+    "coverage",
+    "--repository", root,
+    "--store", store,
+    "--target", externalTarget,
+  ], { cwd: resolve("."), encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
+  assert.equal(cli.status, 0, cli.stderr || cli.stdout);
+  assert.equal(JSON.parse(cli.stdout).coverage.status, "blocked");
+
+  console.log("verification scoped reuse tests passed");
+} finally {
+  rmSync(root, { recursive: true, force: true });
+}
