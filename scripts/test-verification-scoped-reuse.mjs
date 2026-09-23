@@ -205,6 +205,22 @@ try {
   const sourceInventoryBeforeManifest = dependencyInventory({ repositoryRoot: root, revision: sourceRevision, selectors: sourceSelectors });
   const schemaInventoryBeforeManifest = dependencyInventory({ repositoryRoot: root, revision: sourceRevision, selectors: schemaSelectors });
 
+  // Root directory selectors cover the whole tree, including when mixed with files.
+  const rootSelector = { kind: "directory", pattern: ".", evidence_kind: "file" };
+  const rootInventory = dependencyInventory({ repositoryRoot: root, revision: sourceRevision, selectors: [rootSelector] });
+  const allFilesInventory = dependencyInventory({ repositoryRoot: root, revision: sourceRevision, selectors: [
+    { kind: "glob", pattern: "**", evidence_kind: "file" },
+  ] });
+  assert.equal(rootInventory.inventory_digest, allFilesInventory.inventory_digest);
+  assert.equal(rootInventory.entries.length, 7);
+  assert.equal(dependencyInventory({ repositoryRoot: root, revision: sourceRevision, selectors: [
+    rootSelector,
+    { kind: "file", pattern: "tests/app.test.mjs", evidence_kind: "file" },
+  ] }).inventory_digest, rootInventory.inventory_digest);
+  assert.deepEqual(dependencyInventory({ repositoryRoot: root, revision: sourceRevision, selectors: [
+    { kind: "directory", pattern: "src", evidence_kind: "file" },
+  ] }).entries.map((entry) => entry.path), ["src/app.mjs"]);
+
   const sourceManifestPath = ".ask/manifests/source-gate.json";
   const schemaManifestPath = ".ask/manifests/schema-gate.json";
   const unknownManifestPath = ".ask/manifests/unknown-gate.json";
@@ -584,6 +600,141 @@ try {
   ], { cwd: resolve("."), encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
   assert.equal(cli.status, 0, cli.stderr || cli.stdout);
   assert.equal(JSON.parse(cli.stdout).coverage.status, "blocked");
+
+  // Establish fresh authority and signed evidence when changing a review surface.
+  // Stage only named files so an intentionally unpopulated gitlink stays in the tree.
+  function reviewBaseline(label, surfaceSelectors, withGitlink = false) {
+    git(root, ["checkout", "-B", `case-review-${label}`, requirementsTarget]);
+    const review = { ...sourceReviewRequirement(), surface_selectors: surfaceSelectors };
+    const inventory = sealScopedGateInventory({
+      required_gates: [{
+        ...baseGateInventory.required_gates.find((gate) => gate.gate_id === "schema-test"),
+        delta_review: review,
+      }],
+      current_obligations: [],
+    });
+    writeJson(root, VERIFICATION_SCOPED_GATE_INVENTORY_PATH, inventory);
+    git(root, ["add", "--", VERIFICATION_SCOPED_GATE_INVENTORY_PATH]);
+    if (withGitlink) {
+      write(root, ".gitmodules", '[submodule "vendor/lib"]\n\tpath = vendor/lib\n\turl = https://example.invalid/lib.git\n\tignore = all\n');
+      git(root, ["add", "--", ".gitmodules"]);
+      git(root, ["update-index", "--add", "--cacheinfo", `160000,${sourceRevision},vendor/lib`]);
+    }
+    git(root, ["commit", "-m", `declare ${label} review baseline`]);
+    const reviewBase = git(root, ["rev-parse", "HEAD"]);
+    const evidence = attestVerificationEvidence(evidenceDraft({
+      repositoryId,
+      baseRevision: reviewBase,
+      treeDigest: gitTreeDigest({ repositoryRoot: root, revision: reviewBase }),
+      manifestPath: schemaManifestPath,
+      manifestBytes: gitBytes(root, reviewBase, schemaManifestPath),
+      manifest: schemaManifest,
+      inventory: schemaInventory,
+      obligations: schemaObligations,
+      runtime,
+    }), { privateKey: producerKeys.privateKey });
+    putVerificationEvidence({ storeRoot: store, evidence });
+    writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, sealScopedRequirements({
+      base_revision: reviewBase,
+      gate_inventory_id: inventory.inventory_id,
+      gate_inventory_digest: inventory.inventory_digest,
+      required_gates: [gateRequirement({ evidence, manifestPath: schemaManifestPath, obligations: schemaObligations, deltaReview: review })],
+      current_obligations: [],
+    }));
+    git(root, ["add", "--", VERIFICATION_SCOPED_REQUIREMENTS_PATH]);
+    git(root, ["commit", "-m", `bind ${label} review evidence`]);
+    return git(root, ["rev-parse", "HEAD"]);
+  }
+
+  for (const [label, selectors] of [
+    ["root", [{ kind: "directory", pattern: "." }]],
+    ["nested", [{ kind: "directory", pattern: "docs" }]],
+  ]) {
+    reviewBaseline(label, selectors);
+    write(root, "docs/readme.md", "# Changed review-only surface\n");
+    write(root, "docs-extra/readme.md", "# Not under docs/\n");
+    git(root, ["add", "--", "docs/readme.md", "docs-extra/readme.md"]);
+    git(root, ["commit", "-m", `change ${label} review surface`]);
+    const target = git(root, ["rev-parse", "HEAD"]);
+    const result = buildCurrentCoverage({ repositoryRoot: root, storeRoot: store, targetRevision: target });
+    assert.deepEqual(result.plan.dispositions.map((entry) => entry.disposition), ["reuse_scoped"]);
+    assert.equal(result.delta_review_request.status, "current_judgment_required");
+    assert.deepEqual(result.delta_review_request.affected_paths, label === "root" ? result.plan.actual_diff.changed_paths : ["docs/readme.md"]);
+    assert.ok(result.delta_review_request.affected_paths.includes("docs/readme.md"));
+    assert.equal(result.coverage.status, "blocked");
+    assert.deepEqual(result.coverage.blockers.map((entry) => entry.reason_code), ["current_delta_judgment_unperformed"]);
+  }
+
+  // A root dependency selector must still reject inclusion of its own manifest.
+  for (const [label, selectors] of [
+    ["root", [rootSelector]],
+    ["root-and-file", [rootSelector, { kind: "file", pattern: "tests/app.test.mjs", evidence_kind: "file" }]],
+  ]) {
+    git(root, ["checkout", "-B", `case-self-manifest-${label}`, requirementsTarget]);
+    const manifestPath = ".ask/manifests/root-gate.json";
+    writeJson(root, manifestPath, sealDependencyManifest(manifestDraft({
+      gateId: "root-test",
+      contractDigest: digest("root-contract-v1"),
+      inventoryDigest: rootInventory.inventory_digest,
+      selectors,
+      command,
+      runner,
+    })));
+    const inventory = sealScopedGateInventory({
+      required_gates: [{
+        gate_id: "root-test",
+        dependency_manifest_path: manifestPath,
+        required_obligation_refs: ["AC-root"],
+        authority: baselineAuthority,
+        execution_availability: "available",
+        delta_review: null,
+      }],
+      current_obligations: [],
+    });
+    writeJson(root, VERIFICATION_SCOPED_GATE_INVENTORY_PATH, inventory);
+    const selfBase = commitAll(root, `declare ${label} self-selecting manifest`);
+    writeJson(root, VERIFICATION_SCOPED_REQUIREMENTS_PATH, sealScopedRequirements({
+      base_revision: selfBase,
+      gate_inventory_id: inventory.inventory_id,
+      gate_inventory_digest: inventory.inventory_digest,
+      required_gates: [{ ...inventory.required_gates[0], source_evidence_id: sourceEvidence.evidence_id }],
+      current_obligations: [],
+    }));
+    const target = commitAll(root, `require ${label} self-selecting gate`);
+    const result = buildCurrentCoverage({ repositoryRoot: root, storeRoot: store, targetRevision: target });
+    assert.equal(result.plan.dispositions[0].disposition, "rerun_required");
+    assert.equal(result.plan.dispositions[0].reason_code, "dependency_manifest_invalid");
+    assert.match(result.plan.dispositions[0].detail, /must not include its own path/u);
+    assert.equal(result.coverage.status, "blocked");
+  }
+
+  const gitlinkBefore = reviewBaseline("gitlink", [{ kind: "file", pattern: "vendor/lib" }], true);
+  assert.equal(buildCurrentCoverage({ repositoryRoot: root, storeRoot: store, targetRevision: gitlinkBefore }).coverage.status, "covered");
+  git(root, ["update-index", "--cacheinfo", `160000,${baseRevision},vendor/lib`]);
+  git(root, ["commit", "-m", "change review-only gitlink"]);
+  const gitlinkTarget = git(root, ["rev-parse", "HEAD"]);
+  let gitlinkReference = null;
+  try {
+    for (const diffIgnore of ["none", "all"]) {
+      for (const submoduleIgnore of ["none", "all"]) {
+        git(root, ["config", "diff.ignoreSubmodules", diffIgnore]);
+        git(root, ["config", "submodule.vendor/lib.ignore", submoduleIgnore]);
+        const result = buildCurrentCoverage({ repositoryRoot: root, storeRoot: store, targetRevision: gitlinkTarget });
+        assert.equal(result.plan.actual_diff.truncated, false);
+        assert.ok(result.plan.actual_diff.change_records.some((entry) => entry.status === "modified" && entry.new_path === "vendor/lib"));
+        assert.deepEqual(result.plan.dispositions.map((entry) => entry.disposition), ["reuse_scoped"]);
+        assert.equal(result.delta_review_request.status, "current_judgment_required");
+        assert.deepEqual(result.delta_review_request.affected_paths, ["vendor/lib"]);
+        assert.equal(result.coverage.status, "blocked");
+        assert.deepEqual(result.coverage.blockers.map((entry) => entry.reason_code), ["current_delta_judgment_unperformed"]);
+        if (gitlinkReference) assert.deepEqual(result, gitlinkReference, "Git ignore settings must not change the same-target plan, request, or coverage");
+        else gitlinkReference = result;
+      }
+    }
+  } finally {
+    git(root, ["config", "--unset-all", "diff.ignoreSubmodules"]);
+    git(root, ["config", "--unset-all", "submodule.vendor/lib.ignore"]);
+  }
 
   console.log("verification scoped reuse tests passed");
 } finally {

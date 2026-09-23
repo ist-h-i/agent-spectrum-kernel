@@ -212,7 +212,7 @@ function globRegex(pattern) {
 
 function selectorMatches(selector, path) {
   if (selector.kind === "file") return path === selector.pattern;
-  if (selector.kind === "directory") return path.startsWith(`${selector.pattern}/`);
+  if (selector.kind === "directory") return selector.pattern === "." || path.startsWith(`${selector.pattern}/`);
   return globRegex(selector.pattern).test(path);
 }
 
@@ -290,7 +290,7 @@ function inventoryChanges(baseInventory, targetInventory) {
 }
 
 function gitDiffSummary({ repositoryRoot, baseRevision, targetRevision }) {
-  const result = runGit(repositoryRoot, ["diff", "--name-status", "-z", "-M", "-C", "--find-copies-harder", baseRevision, targetRevision, "--"], { encoding: null });
+  const result = runGit(repositoryRoot, ["diff", "--ignore-submodules=none", "--name-status", "-z", "-M", "-C", "--find-copies-harder", baseRevision, targetRevision, "--"], { encoding: null });
   const parts = result.stdout.toString("utf8").split("\0").filter(Boolean);
   const records = [];
   for (let index = 0; index < parts.length;) {
