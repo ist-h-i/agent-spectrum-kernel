@@ -41,8 +41,6 @@ jobs:
                 assert.deepEqual(request.projection.selected_skills, owners, "selected Skill entries must match projected owners, not reference-file count");
               }
           '''
-          # Keep exact source indentation rather than depending on YAML indentation.
-          added = '\n'.join(line[10:] if index else line for index, line in enumerate(added.split('\n')))
           tests.write_text(text.replace(needle, added + needle))
           assert hashlib.sha256(source.read_bytes()).hexdigest() == '7ec8b44dec278dac3c0a23dcb99922133d4c40b91476d3cf9f357e169b7c4685'
           assert hashlib.sha256(tests.read_bytes()).hexdigest() == '8a9fc83418fcf66ee87209bfe2daec27cbc55c5b6b6bbfa3251822544db5ec0e'
