@@ -110,7 +110,9 @@ function selectionInput(caseRecord, plan, bypass = false) {
   return {
     task_class: planCase.task_class,
     observed_signals: ["cross-file contract"],
-    selected_mechanisms: bypass ? [] : ["repository-orientation"],
+    // Exercise reference-bearing selections on both adapter tracks, not only
+    // the full profile. This is synthetic execution coverage, not UI efficacy.
+    selected_mechanisms: bypass ? [] : ["repository-orientation", "ui-ux-design"],
     skipped_mechanisms: bypass ? ["repository-orientation"] : ["agent-orchestration"],
     required_gates: bypass ? [] : ["test-first-verification"],
     agents: { requested: ["subagent"], omitted: ["runtime_capability_unproven"] },
@@ -492,6 +494,27 @@ try {
     assert.deepEqual(terminalInventory(runDir, entry.case_id, state.terminal_attempt), ["command-evidence.json", "commit.json", "final.json", "request.json", "result.json", "terminal-workspace-authority.json"], "completed attempts must include the approved terminal workspace authority");
   }
 
+  function assertUiReferenceExecution(entry) {
+    const state = JSON.parse(readFileSync(resolve(runDir, "cases", entry.case_id, "state.json"), "utf8"));
+    assert.equal(state.status, "completed", `${entry.adapter_track}/${entry.condition} must reach the executor`);
+    const attemptRoot = resolve(runDir, "cases", entry.case_id, "attempts", state.terminal_attempt);
+    const request = JSON.parse(readFileSync(resolve(attemptRoot, "request.json"), "utf8"));
+    const authority = JSON.parse(readFileSync(resolve(attemptRoot, "terminal-workspace-authority.json"), "utf8"));
+    const prefix = entry.adapter_track === "codex" ? ".agents/skills/ui-ux-design/" : ".claude/skills/ui-ux-design/";
+    const selected = entry.condition === "full_ask" || (entry.condition === "adaptive_ask" && request.projection.status !== "lightweight_bypass");
+    const paths = ["SKILL.md", "references/anti-patterns.md", "references/decision-patterns.md", "references/principles.md"];
+    const projected = authority.base_inventory.filter((asset) => asset.file_type === "regular_file" && asset.path.startsWith(prefix));
+    assert.deepEqual(projected.map((asset) => asset.path), selected ? paths.map((path) => `${prefix}${path}`) : [], "entries and references must use the terminal contract's exact path order; nonselected Skills stay absent");
+    for (const asset of projected) {
+      const source = resolve(root, "skills/ui-ux-design", asset.path.slice(prefix.length));
+      assert.equal(asset.sha256, prefixedFileDigest(source).slice("sha256:".length), "executed reference bytes must match the selected source");
+      assert.equal(asset.bytes, statSync(source).size, "executed reference sizes must match the selected source");
+      assert.ok(authority.managed_asset_paths.includes(asset.path), "references must remain managed, not candidate-created files");
+      if (entry.condition === "adaptive_ask") assert.ok(request.projection.inventory.some((item) => item.path === asset.path && item.sha256 === asset.sha256), "selection evidence must bind every executed reference");
+    }
+  }
+  for (const entry of codexCases) assertUiReferenceExecution(entry);
+
   const noOpByCondition = new Map();
   for (const entry of codexCases) {
     if (noOpByCondition.has(entry.condition)) continue;
@@ -775,6 +798,11 @@ try {
   assert.equal(claudeCommandEvidence.capture.support, "unsupported", "Claude command capture support must remain explicit");
   assert.equal(claudeCommandEvidence.capture.evidence_level, "unavailable", "Claude execution must not infer command evidence from final output");
   assert.equal(claudeCommandEvidence.command_event_count, 0, "Claude unavailable command evidence must remain zero-count");
+  for (const condition of ["full_ask", "adaptive_ask"]) {
+    const entry = plan.cases.find((item) => item.adapter_track === "claude" && item.condition === condition);
+    run(["execute-portfolio", ...common, "--adapter", "claude", "--runtime-config", claudeRuntime, "--agent-bin", claudeBin, "--case-id", entry.case_id], { env });
+    assertUiReferenceExecution(entry);
+  }
   const normalizedEvidenceRoot = resolve(work, "normalized-command-evidence");
   run(["normalize-execution", ...common, "--output", normalizedEvidenceRoot]);
   const normalizedGeneration = resolve(normalizedEvidenceRoot, "generations", readdirSync(resolve(normalizedEvidenceRoot, "generations"))[0]);
