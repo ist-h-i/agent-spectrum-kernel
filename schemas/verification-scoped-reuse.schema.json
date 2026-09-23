@@ -348,3 +348,104 @@
       "properties": {
         "gate_id": { "$ref": "#/$defs/token" },
         "evidence_id": { "type": "string", "pattern": "^verification-evidence-[a-f0-9]{64}$" },
+        "evidence_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "deltaReviewRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "schema_path", "program", "request_id", "request_digest", "repository_id", "base_revision", "target_revision",
+        "plan_id", "plan_digest", "diff_ref", "status", "affected_paths", "obligation_refs", "prior_review_refs", "prior_finding_refs",
+        "reusable_evidence_refs", "privacy"
+      ],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_delta_review_request" },
+        "request_id": { "type": "string", "pattern": "^verification-delta-review-request-[a-f0-9]{64}$" },
+        "request_digest": { "$ref": "#/$defs/digest" },
+        "repository_id": { "$ref": "#/$defs/token" },
+        "base_revision": { "$ref": "#/$defs/commit" },
+        "target_revision": { "$ref": "#/$defs/commit" },
+        "plan_id": { "type": "string", "pattern": "^verification-scoped-reuse-plan-[a-f0-9]{64}$" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "diff_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["digest", "changed_path_count"],
+          "properties": {
+            "digest": { "$ref": "#/$defs/digest" },
+            "changed_path_count": { "type": "integer", "minimum": 0, "maximum": 2048 }
+          }
+        },
+        "status": { "type": "string", "enum": ["not_required", "current_judgment_required", "blocked_unbounded"] },
+        "affected_paths": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/portablePath" } },
+        "obligation_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "prior_review_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "prior_finding_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "reusable_evidence_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceRef" } },
+        "privacy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bounded_references_only", "raw_diff_stored", "raw_prompts_stored", "transcripts_stored", "raw_output_stored", "secrets_stored", "private_evaluators_stored"],
+          "properties": {
+            "bounded_references_only": { "type": "boolean", "const": true },
+            "raw_diff_stored": { "type": "boolean", "const": false },
+            "raw_prompts_stored": { "type": "boolean", "const": false },
+            "transcripts_stored": { "type": "boolean", "const": false },
+            "raw_output_stored": { "type": "boolean", "const": false },
+            "secrets_stored": { "type": "boolean", "const": false },
+            "private_evaluators_stored": { "type": "boolean", "const": false }
+          }
+        }
+      }
+    },
+    "coverageBlocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "reason_code"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["gate", "independent_judgment", "current_observation"] },
+        "ref": { "$ref": "#/$defs/token" },
+        "reason_code": { "$ref": "#/$defs/token" }
+      }
+    },
+    "currentCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "schema_path", "program", "coverage_id", "coverage_digest", "repository_id", "target_revision", "target_tree_digest",
+        "requirements_id", "requirements_digest", "plan_id", "plan_digest", "delta_review_request_id", "delta_review_request_digest",
+        "status", "blockers", "external_state_policy"
+      ],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-scoped-reuse.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_current_coverage" },
+        "coverage_id": { "type": "string", "pattern": "^verification-current-coverage-[a-f0-9]{64}$" },
+        "coverage_digest": { "$ref": "#/$defs/digest" },
+        "repository_id": { "$ref": "#/$defs/token" },
+        "target_revision": { "$ref": "#/$defs/commit" },
+        "target_tree_digest": { "$ref": "#/$defs/digest" },
+        "requirements_id": { "type": "string", "pattern": "^verification-scoped-requirements-[a-f0-9]{64}$" },
+        "requirements_digest": { "$ref": "#/$defs/digest" },
+        "plan_id": { "type": "string", "pattern": "^verification-scoped-reuse-plan-[a-f0-9]{64}$" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "delta_review_request_id": { "type": "string", "pattern": "^verification-delta-review-request-[a-f0-9]{64}$" },
+        "delta_review_request_digest": { "$ref": "#/$defs/digest" },
+        "status": { "type": "string", "enum": ["covered", "blocked"] },
+        "blockers": { "type": "array", "maxItems": 768, "uniqueItems": true, "items": { "$ref": "#/$defs/coverageBlocker" } },
+        "external_state_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["historical_state_is_current", "self_reported_freshness_accepted"],
+          "properties": {
+            "historical_state_is_current": { "type": "boolean", "const": false },
+            "self_reported_freshness_accepted": { "type": "boolean", "const": false }
+          }
+        }
+      }
+    }
+  }
+}
