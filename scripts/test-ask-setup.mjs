@@ -15,6 +15,8 @@ import {
 } from "./ask-setup.mjs";
 import { auditFixtureTree, runSetupInputTests } from "./test-ask-setup-inputs.mjs";
 import { runSetupGitTests, runSetupGitCliTests } from "./test-ask-setup-git.mjs";
+import { runSetupApplyUnitTests } from "./test-ask-setup-apply.mjs";
+import { runSetupApplyIntegrationTests } from "./test-ask-setup-apply-integration.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ASK_SETUP = resolve(REPO_ROOT, "scripts/ask-setup.mjs");
@@ -197,8 +199,8 @@ async function integrationTests() {
 
     const applyBefore = snapshotDigest(target);
     const apply = runNode(ASK_SETUP, ["apply", "--target", target], { expected: [1] });
-    assert.match(apply.stderr, /apply is not implemented/i);
-    assert.equal(snapshotDigest(target), applyBefore, "unsupported apply must fail before target mutation");
+    assert.match(apply.stderr, /apply requires --plan/i);
+    assert.equal(snapshotDigest(target), applyBefore, "apply without an exact plan must fail before target mutation");
 
     await assert.rejects(() => createAdoptionPlan({ target, adapter: "codex", profile: "not-a-profile" }), /resolved profile|Outstanding decisions/i);
     await assert.rejects(() => createAdoptionPlan({ target, adapter: "codex", profile: "minimal", requiredCapabilities: ["not-a-capability"] }), /unsupported or unknown/i);
@@ -300,6 +302,8 @@ async function sourceDriftIntegrationTests() {
 runSetupInputTests();
 runSetupGitTests();
 await unitTests();
+await runSetupApplyUnitTests();
 await integrationTests();
 await sourceDriftIntegrationTests();
+if (HAS_FULL_SOURCE) await runSetupApplyIntegrationTests();
 console.log("ASK setup tests passed");

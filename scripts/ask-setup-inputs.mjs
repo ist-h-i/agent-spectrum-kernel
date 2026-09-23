@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { skillAssets } from "./skill-assets.mjs";
 import { cpSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
@@ -17,6 +18,7 @@ const SETUP_SOURCE_INPUTS = Object.freeze([
   "scripts/ask-setup.mjs",
   "scripts/ask-setup-inputs.mjs",
   "schemas/adoption-plan.schema.json",
+  "schemas/adoption-apply-result.schema.json",
   "docs/fixtures/adapter-runtime-profiles.json",
 ]);
 const SENSITIVE_BASENAMES = new Set([".env", ".npmrc", ".netrc", "credentials", "credentials.json"]);
@@ -155,7 +157,7 @@ export function buildSetupSourceIdentity(sourceRoot, { selectedSkills, coreAsset
     ...SETUP_SOURCE_INPUTS,
     ...KERNEL_SETUP_INPUTS,
     ...coreAssets,
-    ...selectedSkills.map((skill) => `skills/${skill}/SKILL.md`),
+    ...skillAssets(root, selectedSkills).map((asset) => asset.sourcePath),
     ...Object.values(rendererInputs).flat().map((input) => input.path),
   ])].sort();
   const files = paths.map((path) => {

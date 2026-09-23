@@ -150,6 +150,7 @@ export function runSetupInputTests() {
     "manifest.json", "scripts/install-kernel.mjs", "scripts/install-codex-adapter.mjs",
     "scripts/install-claude-adapter.mjs", "scripts/installer-lifecycle.mjs", "scripts/ask-doctor.mjs",
     "scripts/ask-setup.mjs", "scripts/ask-setup-inputs.mjs", "schemas/adoption-plan.schema.json",
+    "schemas/adoption-apply-result.schema.json",
     "docs/fixtures/adapter-runtime-profiles.json", "AGENTS.md", "CUSTOM_INSTRUCTIONS.md",
     "schemas/review-signal-gate-map.json", "docs/immutable.md", "skills/example/SKILL.md",
     "scripts/indirect-renderer.mjs", "adapters/example/prompt.md", "schemas/renderer.json",
