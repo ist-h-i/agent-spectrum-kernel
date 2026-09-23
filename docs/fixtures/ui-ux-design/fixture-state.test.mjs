@@ -4,6 +4,7 @@ import {
   backToEdit,
   cancelIrreversible,
   completeSubmit,
+  continueAfterSubmit,
   createFixtureState,
   derivedTotal,
   failMetrics,
@@ -27,6 +28,8 @@ test("form validation, loading, success and continuation are distinct", () => {
   assert.equal(state.submitState, "loading");
   completeSubmit(state);
   assert.equal(state.submitState, "success");
+  continueAfterSubmit(state);
+  assert.equal(state.route, "list");
 });
 
 test("selection and input survive move and back", () => {

@@ -8,7 +8,7 @@ export function createFixtureState() {
     focusReturnId: "open-details",
     rows: ["alpha", "beta"],
     undo: null,
-    irreversibleTarget: "API連携 alpha",
+    irreversibleTarget: "API連携「alpha」",
     irreversibleCommitted: false,
     confirmOpen: false,
     metrics: { status: "complete", values: [3, 4], retryCount: 0 },
@@ -32,6 +32,11 @@ export function startSubmit(state) {
 export function completeSubmit(state) {
   if (state.submitState !== "loading") throw new Error("submit is not loading");
   state.submitState = "success";
+}
+
+export function continueAfterSubmit(state) {
+  if (state.submitState !== "success") throw new Error("continuation requires successful submit");
+  state.route = "list";
 }
 
 export function openDetails(state) {

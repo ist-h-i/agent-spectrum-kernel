@@ -68,7 +68,7 @@
       "candidate_profile_id": "codex-verification-compact-v1",
       "candidate_prompt_name": "skill-verify.md",
       "candidate_expected_bytes": 2043,
-      "candidate_sha256": "ff25986f9bd2d564208f7c4311f701eb654ecf5688b249ddd42e7628a5e11148",
+      "candidate_sha256": "283c03c431a7f2b6ff1dec9a49dee8c750bb18fc7f5d17c0c07210e71117c376",
       "maximum_candidate_ratio": 0.9
     }
   },
@@ -150,14 +150,54 @@
         "selected_path": "compact_proof",
         "behavior_ref": "SPEC-TEXT@1#BEHAVIOR-COPY",
         "eligibility_facts": [
-          { "fact_id": "localized_scope", "evidence_refs": ["OBS-TEXT-SCOPE"] },
-          { "fact_id": "reversible_change", "evidence_refs": ["OBS-TEXT-REVERSIBLE"] },
-          { "fact_id": "single_observable_behavior", "evidence_refs": ["SPEC-TEXT@1#BEHAVIOR-COPY"] },
-          { "fact_id": "single_focused_check", "evidence_refs": ["CHECK-TEXT-1"] },
-          { "fact_id": "single_session_no_handoff", "evidence_refs": ["OBS-TEXT-SESSION"] },
-          { "fact_id": "no_cross_boundary_change", "evidence_refs": ["OBS-TEXT-BOUNDARY"] },
-          { "fact_id": "consistent_local_upstream_proof", "evidence_refs": ["SPEC-TEXT@1#BEHAVIOR-COPY"] },
-          { "fact_id": "localized_completion_claim_only", "evidence_refs": ["CLAIM-TEXT-LOCAL"] }
+          {
+            "fact_id": "localized_scope",
+            "evidence_refs": [
+              "OBS-TEXT-SCOPE"
+            ]
+          },
+          {
+            "fact_id": "reversible_change",
+            "evidence_refs": [
+              "OBS-TEXT-REVERSIBLE"
+            ]
+          },
+          {
+            "fact_id": "single_observable_behavior",
+            "evidence_refs": [
+              "SPEC-TEXT@1#BEHAVIOR-COPY"
+            ]
+          },
+          {
+            "fact_id": "single_focused_check",
+            "evidence_refs": [
+              "CHECK-TEXT-1"
+            ]
+          },
+          {
+            "fact_id": "single_session_no_handoff",
+            "evidence_refs": [
+              "OBS-TEXT-SESSION"
+            ]
+          },
+          {
+            "fact_id": "no_cross_boundary_change",
+            "evidence_refs": [
+              "OBS-TEXT-BOUNDARY"
+            ]
+          },
+          {
+            "fact_id": "consistent_local_upstream_proof",
+            "evidence_refs": [
+              "SPEC-TEXT@1#BEHAVIOR-COPY"
+            ]
+          },
+          {
+            "fact_id": "localized_completion_claim_only",
+            "evidence_refs": [
+              "CLAIM-TEXT-LOCAL"
+            ]
+          }
         ],
         "formal_triggers": []
       },
@@ -178,7 +218,9 @@
           "command": "node scripts/test-copy-resource.mjs",
           "exit_code": 0,
           "exact_result": "copy resource test passed",
-          "execution_evidence_refs": ["EVID-TEXT-1"]
+          "execution_evidence_refs": [
+            "EVID-TEXT-1"
+          ]
         },
         "broader_check_required_when": "formal_trigger_or_incomplete_compact_eligibility"
       },
@@ -198,14 +240,54 @@
         "selected_path": "compact_proof",
         "behavior_ref": "SPEC-LOCAL@1#BEHAVIOR-LABEL",
         "eligibility_facts": [
-          { "fact_id": "localized_scope", "evidence_refs": ["OBS-LOCAL-SCOPE"] },
-          { "fact_id": "reversible_change", "evidence_refs": ["OBS-LOCAL-REVERSIBLE"] },
-          { "fact_id": "single_observable_behavior", "evidence_refs": ["SPEC-LOCAL@1#BEHAVIOR-LABEL"] },
-          { "fact_id": "single_focused_check", "evidence_refs": ["CHECK-LOCAL-1"] },
-          { "fact_id": "single_session_no_handoff", "evidence_refs": ["OBS-LOCAL-SESSION"] },
-          { "fact_id": "no_cross_boundary_change", "evidence_refs": ["OBS-LOCAL-BOUNDARY"] },
-          { "fact_id": "consistent_local_upstream_proof", "evidence_refs": ["SPEC-LOCAL@1#BEHAVIOR-LABEL"] },
-          { "fact_id": "localized_completion_claim_only", "evidence_refs": ["CLAIM-LOCAL-ONLY"] }
+          {
+            "fact_id": "localized_scope",
+            "evidence_refs": [
+              "OBS-LOCAL-SCOPE"
+            ]
+          },
+          {
+            "fact_id": "reversible_change",
+            "evidence_refs": [
+              "OBS-LOCAL-REVERSIBLE"
+            ]
+          },
+          {
+            "fact_id": "single_observable_behavior",
+            "evidence_refs": [
+              "SPEC-LOCAL@1#BEHAVIOR-LABEL"
+            ]
+          },
+          {
+            "fact_id": "single_focused_check",
+            "evidence_refs": [
+              "CHECK-LOCAL-1"
+            ]
+          },
+          {
+            "fact_id": "single_session_no_handoff",
+            "evidence_refs": [
+              "OBS-LOCAL-SESSION"
+            ]
+          },
+          {
+            "fact_id": "no_cross_boundary_change",
+            "evidence_refs": [
+              "OBS-LOCAL-BOUNDARY"
+            ]
+          },
+          {
+            "fact_id": "consistent_local_upstream_proof",
+            "evidence_refs": [
+              "SPEC-LOCAL@1#BEHAVIOR-LABEL"
+            ]
+          },
+          {
+            "fact_id": "localized_completion_claim_only",
+            "evidence_refs": [
+              "CLAIM-LOCAL-ONLY"
+            ]
+          }
         ],
         "formal_triggers": []
       },
@@ -226,7 +308,9 @@
           "command": "node scripts/test-local-label.mjs",
           "exit_code": 0,
           "exact_result": "local label test passed",
-          "execution_evidence_refs": ["EVID-LOCAL-1"]
+          "execution_evidence_refs": [
+            "EVID-LOCAL-1"
+          ]
         },
         "broader_check_required_when": "formal_trigger_or_incomplete_compact_eligibility"
       },
@@ -247,7 +331,12 @@
         "behavior_ref": "SPEC-BUG@1#BEHAVIOR-REPRODUCTION",
         "eligibility_facts": [],
         "formal_triggers": [
-          { "trigger_id": "bug_reproduction_or_regression", "evidence_refs": ["ISSUE-BUG-REPRO"] }
+          {
+            "trigger_id": "bug_reproduction_or_regression",
+            "evidence_refs": [
+              "ISSUE-BUG-REPRO"
+            ]
+          }
         ],
         "formal_verification_contract_ref": "VER-BUG-1"
       }
@@ -264,7 +353,12 @@
         "behavior_ref": "SPEC-CONCURRENCY@1#BEHAVIOR-LEASE",
         "eligibility_facts": [],
         "formal_triggers": [
-          { "trigger_id": "state_concurrency_persistence_lifecycle_or_cross_module", "evidence_refs": ["SPEC-CONCURRENCY@1#BEHAVIOR-LEASE"] }
+          {
+            "trigger_id": "state_concurrency_persistence_lifecycle_or_cross_module",
+            "evidence_refs": [
+              "SPEC-CONCURRENCY@1#BEHAVIOR-LEASE"
+            ]
+          }
         ],
         "formal_verification_contract_ref": "VER-CONCURRENCY-1"
       }
@@ -281,7 +375,12 @@
         "behavior_ref": "SPEC-SCHEMA@1#BEHAVIOR-PUBLIC-SCHEMA",
         "eligibility_facts": [],
         "formal_triggers": [
-          { "trigger_id": "public_api_schema_or_compatibility", "evidence_refs": ["SCHEMA-PUBLIC-DIFF"] }
+          {
+            "trigger_id": "public_api_schema_or_compatibility",
+            "evidence_refs": [
+              "SCHEMA-PUBLIC-DIFF"
+            ]
+          }
         ],
         "formal_verification_contract_ref": "VER-SCHEMA-1"
       }
@@ -298,7 +397,12 @@
         "behavior_ref": "SPEC-PERFORMANCE@1#BEHAVIOR-LATENCY",
         "eligibility_facts": [],
         "formal_triggers": [
-          { "trigger_id": "performance_or_reliability", "evidence_refs": ["SPEC-PERFORMANCE@1#BEHAVIOR-LATENCY"] }
+          {
+            "trigger_id": "performance_or_reliability",
+            "evidence_refs": [
+              "SPEC-PERFORMANCE@1#BEHAVIOR-LATENCY"
+            ]
+          }
         ],
         "formal_verification_contract_ref": "VER-PERFORMANCE-1"
       }
@@ -308,17 +412,28 @@
       "operation": "transition",
       "expected": "valid",
       "expected_path": "formal_verification_contract",
-      "expected_retained_evidence_refs": ["EVID-LOCAL-1"],
+      "expected_retained_evidence_refs": [
+        "EVID-LOCAL-1"
+      ],
       "transition": {
         "policy_ref": "ask.verification-proof-policy@1.0.0",
         "selection_id": "SEL-UPGRADE-1",
         "from_path": "compact_proof",
         "to_path": "formal_verification_contract",
         "formal_triggers": [
-          { "trigger_id": "multiple_specialized_checks", "evidence_refs": ["OBS-SECOND-CHECK"] }
+          {
+            "trigger_id": "multiple_specialized_checks",
+            "evidence_refs": [
+              "OBS-SECOND-CHECK"
+            ]
+          }
         ],
-        "executed_compact_evidence_refs": ["EVID-LOCAL-1"],
-        "retained_evidence_refs": ["EVID-LOCAL-1"],
+        "executed_compact_evidence_refs": [
+          "EVID-LOCAL-1"
+        ],
+        "retained_evidence_refs": [
+          "EVID-LOCAL-1"
+        ],
         "formal_verification_contract_ref": "VER-UPGRADE-1"
       }
     },
@@ -347,17 +462,62 @@
         "selected_path": "compact_proof",
         "behavior_ref": "SPEC-NEG-FORMAL@1#BEHAVIOR-SCHEMA",
         "eligibility_facts": [
-          { "fact_id": "localized_scope", "evidence_refs": ["OBS-NEG-FORMAL-SCOPE"] },
-          { "fact_id": "reversible_change", "evidence_refs": ["OBS-NEG-FORMAL-REVERSIBLE"] },
-          { "fact_id": "single_observable_behavior", "evidence_refs": ["SPEC-NEG-FORMAL@1#BEHAVIOR-SCHEMA"] },
-          { "fact_id": "single_focused_check", "evidence_refs": ["CHECK-NEG-FORMAL-1"] },
-          { "fact_id": "single_session_no_handoff", "evidence_refs": ["OBS-NEG-FORMAL-SESSION"] },
-          { "fact_id": "no_cross_boundary_change", "evidence_refs": ["OBS-NEG-FORMAL-BOUNDARY"] },
-          { "fact_id": "consistent_local_upstream_proof", "evidence_refs": ["SPEC-NEG-FORMAL@1#BEHAVIOR-SCHEMA"] },
-          { "fact_id": "localized_completion_claim_only", "evidence_refs": ["CLAIM-NEG-FORMAL-LOCAL"] }
+          {
+            "fact_id": "localized_scope",
+            "evidence_refs": [
+              "OBS-NEG-FORMAL-SCOPE"
+            ]
+          },
+          {
+            "fact_id": "reversible_change",
+            "evidence_refs": [
+              "OBS-NEG-FORMAL-REVERSIBLE"
+            ]
+          },
+          {
+            "fact_id": "single_observable_behavior",
+            "evidence_refs": [
+              "SPEC-NEG-FORMAL@1#BEHAVIOR-SCHEMA"
+            ]
+          },
+          {
+            "fact_id": "single_focused_check",
+            "evidence_refs": [
+              "CHECK-NEG-FORMAL-1"
+            ]
+          },
+          {
+            "fact_id": "single_session_no_handoff",
+            "evidence_refs": [
+              "OBS-NEG-FORMAL-SESSION"
+            ]
+          },
+          {
+            "fact_id": "no_cross_boundary_change",
+            "evidence_refs": [
+              "OBS-NEG-FORMAL-BOUNDARY"
+            ]
+          },
+          {
+            "fact_id": "consistent_local_upstream_proof",
+            "evidence_refs": [
+              "SPEC-NEG-FORMAL@1#BEHAVIOR-SCHEMA"
+            ]
+          },
+          {
+            "fact_id": "localized_completion_claim_only",
+            "evidence_refs": [
+              "CLAIM-NEG-FORMAL-LOCAL"
+            ]
+          }
         ],
         "formal_triggers": [
-          { "trigger_id": "public_api_schema_or_compatibility", "evidence_refs": ["SCHEMA-NEG-FORMAL-DIFF"] }
+          {
+            "trigger_id": "public_api_schema_or_compatibility",
+            "evidence_refs": [
+              "SCHEMA-NEG-FORMAL-DIFF"
+            ]
+          }
         ]
       }
     },
@@ -375,14 +535,54 @@
         "selected_path": "compact_proof",
         "behavior_ref": "SPEC-NEG-MISSING@1#BEHAVIOR-LABEL",
         "eligibility_facts": [
-          { "fact_id": "localized_scope", "evidence_refs": ["OBS-NEG-MISSING-SCOPE"] },
-          { "fact_id": "reversible_change", "evidence_refs": ["OBS-NEG-MISSING-REVERSIBLE"] },
-          { "fact_id": "single_observable_behavior", "evidence_refs": ["SPEC-NEG-MISSING@1#BEHAVIOR-LABEL"] },
-          { "fact_id": "single_focused_check", "evidence_refs": ["CHECK-NEG-MISSING-1"] },
-          { "fact_id": "single_session_no_handoff", "evidence_refs": ["OBS-NEG-MISSING-SESSION"] },
-          { "fact_id": "no_cross_boundary_change", "evidence_refs": ["OBS-NEG-MISSING-BOUNDARY"] },
-          { "fact_id": "consistent_local_upstream_proof", "evidence_refs": ["SPEC-NEG-MISSING@1#BEHAVIOR-LABEL"] },
-          { "fact_id": "localized_completion_claim_only", "evidence_refs": ["CLAIM-NEG-MISSING-LOCAL"] }
+          {
+            "fact_id": "localized_scope",
+            "evidence_refs": [
+              "OBS-NEG-MISSING-SCOPE"
+            ]
+          },
+          {
+            "fact_id": "reversible_change",
+            "evidence_refs": [
+              "OBS-NEG-MISSING-REVERSIBLE"
+            ]
+          },
+          {
+            "fact_id": "single_observable_behavior",
+            "evidence_refs": [
+              "SPEC-NEG-MISSING@1#BEHAVIOR-LABEL"
+            ]
+          },
+          {
+            "fact_id": "single_focused_check",
+            "evidence_refs": [
+              "CHECK-NEG-MISSING-1"
+            ]
+          },
+          {
+            "fact_id": "single_session_no_handoff",
+            "evidence_refs": [
+              "OBS-NEG-MISSING-SESSION"
+            ]
+          },
+          {
+            "fact_id": "no_cross_boundary_change",
+            "evidence_refs": [
+              "OBS-NEG-MISSING-BOUNDARY"
+            ]
+          },
+          {
+            "fact_id": "consistent_local_upstream_proof",
+            "evidence_refs": [
+              "SPEC-NEG-MISSING@1#BEHAVIOR-LABEL"
+            ]
+          },
+          {
+            "fact_id": "localized_completion_claim_only",
+            "evidence_refs": [
+              "CLAIM-NEG-MISSING-LOCAL"
+            ]
+          }
         ],
         "formal_triggers": []
       },
@@ -425,7 +625,12 @@
         "from_path": "formal_verification_contract",
         "to_path": "compact_proof",
         "formal_triggers": [
-          { "trigger_id": "bug_reproduction_or_regression", "evidence_refs": ["ISSUE-NEG-DOWNGRADE-REPRO"] }
+          {
+            "trigger_id": "bug_reproduction_or_regression",
+            "evidence_refs": [
+              "ISSUE-NEG-DOWNGRADE-REPRO"
+            ]
+          }
         ],
         "prior_result_status": "failed",
         "resumed": true,
@@ -447,19 +652,68 @@
         "selected_path": "compact_proof",
         "behavior_ref": "SPEC-NEG-CONFLICT-A@1#AC-ARCHIVE",
         "eligibility_facts": [
-          { "fact_id": "localized_scope", "evidence_refs": ["OBS-NEG-CONFLICT-SCOPE"] },
-          { "fact_id": "reversible_change", "evidence_refs": ["OBS-NEG-CONFLICT-REVERSIBLE"] },
-          { "fact_id": "single_observable_behavior", "evidence_refs": ["SPEC-NEG-CONFLICT-A@1#AC-ARCHIVE"] },
-          { "fact_id": "single_focused_check", "evidence_refs": ["CHECK-NEG-CONFLICT-1"] },
-          { "fact_id": "single_session_no_handoff", "evidence_refs": ["OBS-NEG-CONFLICT-SESSION"] },
-          { "fact_id": "no_cross_boundary_change", "evidence_refs": ["OBS-NEG-CONFLICT-BOUNDARY"] },
-          { "fact_id": "consistent_local_upstream_proof", "evidence_refs": ["SPEC-NEG-CONFLICT-A@1#AC-ARCHIVE", "SPEC-NEG-CONFLICT-B@1#AC-ARCHIVE"] },
-          { "fact_id": "localized_completion_claim_only", "evidence_refs": ["CLAIM-NEG-CONFLICT-LOCAL"] }
+          {
+            "fact_id": "localized_scope",
+            "evidence_refs": [
+              "OBS-NEG-CONFLICT-SCOPE"
+            ]
+          },
+          {
+            "fact_id": "reversible_change",
+            "evidence_refs": [
+              "OBS-NEG-CONFLICT-REVERSIBLE"
+            ]
+          },
+          {
+            "fact_id": "single_observable_behavior",
+            "evidence_refs": [
+              "SPEC-NEG-CONFLICT-A@1#AC-ARCHIVE"
+            ]
+          },
+          {
+            "fact_id": "single_focused_check",
+            "evidence_refs": [
+              "CHECK-NEG-CONFLICT-1"
+            ]
+          },
+          {
+            "fact_id": "single_session_no_handoff",
+            "evidence_refs": [
+              "OBS-NEG-CONFLICT-SESSION"
+            ]
+          },
+          {
+            "fact_id": "no_cross_boundary_change",
+            "evidence_refs": [
+              "OBS-NEG-CONFLICT-BOUNDARY"
+            ]
+          },
+          {
+            "fact_id": "consistent_local_upstream_proof",
+            "evidence_refs": [
+              "SPEC-NEG-CONFLICT-A@1#AC-ARCHIVE",
+              "SPEC-NEG-CONFLICT-B@1#AC-ARCHIVE"
+            ]
+          },
+          {
+            "fact_id": "localized_completion_claim_only",
+            "evidence_refs": [
+              "CLAIM-NEG-CONFLICT-LOCAL"
+            ]
+          }
         ],
         "formal_triggers": [],
         "upstream_proof_facts": [
-          { "source_ref": "SPEC-NEG-CONFLICT-A@1#AC-ARCHIVE", "field": "archive_policy", "value": "include" },
-          { "source_ref": "SPEC-NEG-CONFLICT-B@1#AC-ARCHIVE", "field": "archive_policy", "value": "exclude" }
+          {
+            "source_ref": "SPEC-NEG-CONFLICT-A@1#AC-ARCHIVE",
+            "field": "archive_policy",
+            "value": "include"
+          },
+          {
+            "source_ref": "SPEC-NEG-CONFLICT-B@1#AC-ARCHIVE",
+            "field": "archive_policy",
+            "value": "exclude"
+          }
         ]
       }
     },
@@ -477,14 +731,54 @@
         "selected_path": "compact_proof",
         "behavior_ref": "SPEC-NEG-INVENTED@1#BEHAVIOR-COPY",
         "eligibility_facts": [
-          { "fact_id": "localized_scope", "evidence_refs": ["OBS-NEG-INVENTED-SCOPE"] },
-          { "fact_id": "reversible_change", "evidence_refs": ["OBS-NEG-INVENTED-REVERSIBLE"] },
-          { "fact_id": "single_observable_behavior", "evidence_refs": ["SPEC-NEG-INVENTED@1#BEHAVIOR-COPY"] },
-          { "fact_id": "single_focused_check", "evidence_refs": ["CHECK-TEXT-1"] },
-          { "fact_id": "single_session_no_handoff", "evidence_refs": ["OBS-NEG-INVENTED-SESSION"] },
-          { "fact_id": "no_cross_boundary_change", "evidence_refs": ["OBS-NEG-INVENTED-BOUNDARY"] },
-          { "fact_id": "consistent_local_upstream_proof", "evidence_refs": ["SPEC-NEG-INVENTED@1#BEHAVIOR-COPY"] },
-          { "fact_id": "localized_completion_claim_only", "evidence_refs": ["CLAIM-NEG-INVENTED-LOCAL"] }
+          {
+            "fact_id": "localized_scope",
+            "evidence_refs": [
+              "OBS-NEG-INVENTED-SCOPE"
+            ]
+          },
+          {
+            "fact_id": "reversible_change",
+            "evidence_refs": [
+              "OBS-NEG-INVENTED-REVERSIBLE"
+            ]
+          },
+          {
+            "fact_id": "single_observable_behavior",
+            "evidence_refs": [
+              "SPEC-NEG-INVENTED@1#BEHAVIOR-COPY"
+            ]
+          },
+          {
+            "fact_id": "single_focused_check",
+            "evidence_refs": [
+              "CHECK-TEXT-1"
+            ]
+          },
+          {
+            "fact_id": "single_session_no_handoff",
+            "evidence_refs": [
+              "OBS-NEG-INVENTED-SESSION"
+            ]
+          },
+          {
+            "fact_id": "no_cross_boundary_change",
+            "evidence_refs": [
+              "OBS-NEG-INVENTED-BOUNDARY"
+            ]
+          },
+          {
+            "fact_id": "consistent_local_upstream_proof",
+            "evidence_refs": [
+              "SPEC-NEG-INVENTED@1#BEHAVIOR-COPY"
+            ]
+          },
+          {
+            "fact_id": "localized_completion_claim_only",
+            "evidence_refs": [
+              "CLAIM-NEG-INVENTED-LOCAL"
+            ]
+          }
         ],
         "formal_triggers": []
       },
@@ -505,7 +799,9 @@
           "command": "node scripts/test-copy-resource.mjs",
           "exit_code": 0,
           "exact_result": "two copy resource tests passed",
-          "execution_evidence_refs": ["EVID-TEXT-1"]
+          "execution_evidence_refs": [
+            "EVID-TEXT-1"
+          ]
         },
         "broader_check_required_when": "formal_trigger_or_incomplete_compact_eligibility"
       },
@@ -528,14 +824,54 @@
         "selected_path": "compact_proof",
         "behavior_ref": "SPEC-NEG-PROTECTED@1#BEHAVIOR-COPY",
         "eligibility_facts": [
-          { "fact_id": "localized_scope", "evidence_refs": ["OBS-NEG-PROTECTED-SCOPE"] },
-          { "fact_id": "reversible_change", "evidence_refs": ["OBS-NEG-PROTECTED-REVERSIBLE"] },
-          { "fact_id": "single_observable_behavior", "evidence_refs": ["SPEC-NEG-PROTECTED@1#BEHAVIOR-COPY"] },
-          { "fact_id": "single_focused_check", "evidence_refs": ["CHECK-TEXT-1"] },
-          { "fact_id": "single_session_no_handoff", "evidence_refs": ["OBS-NEG-PROTECTED-SESSION"] },
-          { "fact_id": "no_cross_boundary_change", "evidence_refs": ["OBS-NEG-PROTECTED-BOUNDARY"] },
-          { "fact_id": "consistent_local_upstream_proof", "evidence_refs": ["SPEC-NEG-PROTECTED@1#BEHAVIOR-COPY"] },
-          { "fact_id": "localized_completion_claim_only", "evidence_refs": ["CLAIM-NEG-PROTECTED-LOCAL"] }
+          {
+            "fact_id": "localized_scope",
+            "evidence_refs": [
+              "OBS-NEG-PROTECTED-SCOPE"
+            ]
+          },
+          {
+            "fact_id": "reversible_change",
+            "evidence_refs": [
+              "OBS-NEG-PROTECTED-REVERSIBLE"
+            ]
+          },
+          {
+            "fact_id": "single_observable_behavior",
+            "evidence_refs": [
+              "SPEC-NEG-PROTECTED@1#BEHAVIOR-COPY"
+            ]
+          },
+          {
+            "fact_id": "single_focused_check",
+            "evidence_refs": [
+              "CHECK-TEXT-1"
+            ]
+          },
+          {
+            "fact_id": "single_session_no_handoff",
+            "evidence_refs": [
+              "OBS-NEG-PROTECTED-SESSION"
+            ]
+          },
+          {
+            "fact_id": "no_cross_boundary_change",
+            "evidence_refs": [
+              "OBS-NEG-PROTECTED-BOUNDARY"
+            ]
+          },
+          {
+            "fact_id": "consistent_local_upstream_proof",
+            "evidence_refs": [
+              "SPEC-NEG-PROTECTED@1#BEHAVIOR-COPY"
+            ]
+          },
+          {
+            "fact_id": "localized_completion_claim_only",
+            "evidence_refs": [
+              "CLAIM-NEG-PROTECTED-LOCAL"
+            ]
+          }
         ],
         "formal_triggers": []
       },
@@ -556,7 +892,9 @@
           "command": "node scripts/test-copy-resource.mjs",
           "exit_code": 0,
           "exact_result": "copy resource test passed",
-          "execution_evidence_refs": ["EVID-TEXT-1"]
+          "execution_evidence_refs": [
+            "EVID-TEXT-1"
+          ]
         },
         "broader_check_required_when": "formal_trigger_or_incomplete_compact_eligibility"
       },

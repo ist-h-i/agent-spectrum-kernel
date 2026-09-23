@@ -3,6 +3,7 @@ import {
   cancelIrreversible,
   commitIrreversible,
   completeSubmit,
+  continueAfterSubmit,
   createFixtureState,
   derivedTotal,
   failMetrics,
@@ -46,7 +47,9 @@ function render() {
   $("foundation-reason").textContent = state.foundation.reason;
 
   $("edit-view").hidden = state.route !== "edit";
+  $("list-view").hidden = state.route !== "list";
   $("details-view").hidden = state.route !== "details";
+  $("saved-setting").textContent = state.submitState === "success" ? `保存済み: ${state.name}` : "";
   $("current-selection").textContent = `選択中: ${state.selectedId}`;
   $("name").value = state.name;
   $("name-error").textContent = state.formError;
@@ -89,6 +92,8 @@ $("settings-form").addEventListener("submit", async (event) => {
   render();
   $("next-action").focus();
 });
+$("next-action").addEventListener("click", () => { continueAfterSubmit(state); render(); $("edit-again").focus(); });
+$("edit-again").addEventListener("click", () => { state.route = "edit"; render(); $("name").focus(); });
 $("open-details").addEventListener("click", () => { state.name = $("name").value; openDetails(state); render(); $("back").focus(); });
 $("back").addEventListener("click", () => { backToEdit(state); render(); $(state.focusReturnId).focus(); });
 $("remove-alpha").addEventListener("click", () => { removeRow(state, "alpha"); render(); $("undo").focus(); });
