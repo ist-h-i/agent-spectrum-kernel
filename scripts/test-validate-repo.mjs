@@ -39,6 +39,10 @@ const codexRiskWorkspaceTestScript = resolve(repoRoot, "scripts/test-codex-risk-
 const codexRiskRunnerScopeTestScript = resolve(repoRoot, "scripts/test-codex-risk-runner-scope.mjs");
 const benchmarkRuntimeRegistrationTestScript = resolve(repoRoot, "scripts/test-ask-benchmark-runtime-registration.mjs");
 const fixtureRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "validate-repo-")));
+const checkpointSchemaPaths = [
+  "schemas/repository-snapshot.schema.json",
+  "schemas/session-checkpoint.schema.json",
+];
 const promptV2PreregistrationDocs = [
   "docs/adr/0011-prompt-v2-result-blind-canary-authority.md",
   "docs/prompt-v2-execution-handoff.md",
@@ -577,6 +581,7 @@ function writeAdapterFixture(root) {
     "schemas/epic-admission-decision.schema.json",
     "schemas/work-package-plan-validation-context.schema.json",
     "schemas/work-package-plan.schema.json",
+    ...checkpointSchemaPaths,
     "schemas/asset-content.schema.json",
     "schemas/asset-record.schema.json",
     "schemas/asset-registry-snapshot.schema.json",
@@ -595,7 +600,7 @@ function writeAdapterFixture(root) {
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    const content = path === "schemas/review-signal-gate-map.json" || canonicalClaimEvidenceSchemaPaths.has(path)
+    const content = path === "schemas/review-signal-gate-map.json" || canonicalClaimEvidenceSchemaPaths.has(path) || checkpointSchemaPaths.includes(path)
       ? readFileSync(resolve(repoRoot, path), "utf8")
       : path === "schemas/metrics-event.schema.json"
       ? '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "properties": { "command_attempt_metrics": { "properties": { "classified_as_verification": { "type": "boolean" } } } } }\n'
@@ -6755,7 +6760,15 @@ try {
   );
 
   const validRoot = cloneFixture("valid");
+  for (const path of checkpointSchemaPaths) {
+    assert.equal(readFileSync(resolve(validRoot, path), "utf8"), readFileSync(resolve(repoRoot, path), "utf8"), `${path} fixture must copy the exact schema`);
+  }
   assertPass("valid fixture", validRoot);
+  for (const path of checkpointSchemaPaths) {
+    const missingRoot = cloneFixture(`missing-${path.split("/").at(-1)}`);
+    rmSync(resolve(missingRoot, path));
+    assertFail(`missing checkpoint schema ${path}`, missingRoot, `required schema is missing: ${path}`);
+  }
 
   const tamperedHistoricalPlanRoot = cloneFixture("tampered-historical-r1-plan");
   {

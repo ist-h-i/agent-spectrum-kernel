@@ -44,6 +44,23 @@ jobs:
           node --test scripts/test-ask-benchmark-prompt-successor-input-guards.mjs
           node --test scripts/test-ask-benchmark-prompt-successor-scoring-contract.mjs
 
+      # Exercise checkpoint boundaries before the expensive repository suite.
+      - name: Run session checkpoint and resume tests
+        run: node scripts/test-session-checkpoint.mjs
+
+      # Reject generated-report drift before running the expensive suites.
+      - name: Validate repository consistency
+        id: repository_consistency
+        run: node scripts/validate-repo.mjs
+
+      - name: Show generated validation report diff on failure
+        if: ${{ failure() && steps.repository_consistency.outcome == 'failure' }}
+        run: |
+          # Diagnostics only: retain the failed gate and never commit generated output.
+          node scripts/validate-repo.mjs --write-report
+          git diff -- docs/validation-report.md
+          exit 1
+
       - name: Run repository validation tests
         run: node scripts/test-validate-repo.mjs
 
@@ -228,9 +245,6 @@ jobs:
 
       - name: Check Prompt v2 preregistration authority fixture freshness
         run: node scripts/prompt-v2-preregistration-samples.mjs --check
-
-      - name: Validate repository consistency
-        run: node scripts/validate-repo.mjs
 
       - name: Check whitespace errors
         run: |

@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-spectrum-kernel.local/schemas/repository-snapshot.schema.json",
+  "title": "ASK bounded repository snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_kind",
+    "schema_version",
+    "repository",
+    "target_paths",
+    "plan_ref",
+    "active_package_id",
+    "integration_base",
+    "contract_refs",
+    "evidence_refs",
+    "limitations"
+  ],
+  "properties": {
+    "artifact_kind": {
+      "const": "ask_repository_snapshot"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_id",
+        "branch",
+        "head",
+        "tree",
+        "index_state",
+        "worktree_state",
+        "status_digest",
+        "index_digest",
+        "worktree_digest",
+        "changed_paths"
+      ],
+      "properties": {
+        "repository_id": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "head": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "tree": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "index_state": {
+          "enum": [
+            "clean",
+            "dirty"
+          ]
+        },
+        "worktree_state": {
+          "enum": [
+            "clean",
+            "dirty"
+          ]
+        },
+        "status_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "index_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "worktree_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "changed_paths": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      }
+    },
+    "target_paths": {
+      "$ref": "#/$defs/pathRefs"
+    },
+    "plan_ref": {
+      "$ref": "#/$defs/planRef"
+    },
+    "active_package_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "integration_base": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "commit",
+        "tree"
+      ],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9._/-]+$"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "tree": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        }
+      }
+    },
+    "contract_refs": {
+      "$ref": "#/$defs/pathRefs"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/evidenceRef"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "dirty_state_requires_same_working_environment"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "planRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan_id",
+        "plan_revision",
+        "plan_digest"
+      ],
+      "properties": {
+        "plan_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "plan_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "plan_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "pathRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "state",
+        "digest",
+        "bytes",
+        "executable"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "state": {
+          "enum": [
+            "present",
+            "missing"
+          ]
+        },
+        "digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 262144
+        },
+        "executable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pathRefs": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/pathRef"
+      }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "evidence_digest"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "evidence_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

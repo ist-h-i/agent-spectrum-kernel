@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-spectrum-kernel.local/schemas/session-checkpoint.schema.json",
+  "title": "ASK bounded session checkpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_kind",
+    "schema_version",
+    "snapshot_ref",
+    "plan_ref",
+    "active_package_id",
+    "completed_package_ids",
+    "current_phase",
+    "open_blocker_ids",
+    "unresolved_decision_ids",
+    "required_approval_ids",
+    "evidence_refs",
+    "next_action",
+    "stop_condition_refs",
+    "rollover_reason",
+    "adapter_capability"
+  ],
+  "properties": {
+    "artifact_kind": {
+      "const": "ask_session_checkpoint"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "snapshot_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "digest"
+      ],
+      "properties": {
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "plan_ref": {
+      "$ref": "#/$defs/planRef"
+    },
+    "active_package_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "completed_package_ids": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "current_phase": {
+      "enum": [
+        "implementation",
+        "verification",
+        "handoff",
+        "waiting_for_approval"
+      ]
+    },
+    "open_blocker_ids": {
+      "$ref": "#/$defs/idList"
+    },
+    "unresolved_decision_ids": {
+      "$ref": "#/$defs/idList"
+    },
+    "required_approval_ids": {
+      "$ref": "#/$defs/idList"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/evidenceRef"
+      }
+    },
+    "next_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "package_id",
+        "task_id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "ordered_task",
+            "await_control_resolution"
+          ]
+        },
+        "package_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "task_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        }
+      }
+    },
+    "stop_condition_refs": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "code"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      }
+    },
+    "rollover_reason": {
+      "enum": [
+        "operator_request",
+        "context_pressure",
+        "interruption",
+        "handoff"
+      ]
+    },
+    "adapter_capability": {
+      "const": "restart_package_only"
+    }
+  },
+  "$defs": {
+    "planRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan_id",
+        "plan_revision",
+        "plan_digest"
+      ],
+      "properties": {
+        "plan_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "plan_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "plan_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "idList": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "evidence_digest"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "evidence_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}
