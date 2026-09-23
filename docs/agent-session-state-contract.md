@@ -65,3 +65,18 @@ Do not store:
 - unrelated chat history.
 
 The record may be embedded in a handoff, saved by a project-specific operation layer, or used as a bounded local JSON artifact. The generic kernel does not require a global session-state file for every task.
+
+
+## Content-addressed checkpoint extension
+
+Slice 2 of Issue #275 adds bounded repository snapshots and session checkpoints for non-trivial continuation. These artifacts extend this contract without becoming a second lifecycle or control authority.
+
+- A repository snapshot records facts read from Git and the filesystem: repository/branch/HEAD/tree, index and worktree identity, bounded path digests, the active Work Package Plan/package, integration base, contract references, and bounded verification-evidence references.
+- A session checkpoint references one validated snapshot and the exact executable Work Package Plan. Completed packages must preserve dependency closure. Open blockers, unresolved human decisions, required approvals, the next action, and stop-condition references are derived from the current plan rather than promoted by caller assertion.
+- Snapshot and checkpoint objects are stored through the existing content-addressed store. A resumable reference may be published only after both stored objects are read back and validated. An unreferenced partial object is not a resume entrypoint.
+- Resume validation reads the content-addressed objects in a fresh process, revalidates the current plan, and compares the live checkout with the stored repository, branch, HEAD/tree, index/worktree, target, contract, integration-base, and evidence identities. Mismatch stops safely; the validator never checks out, resets, or overwrites files.
+- Dirty continuation does not claim that a snapshot hash can restore unsaved files. The same working environment and the same bounded identities are required.
+- Slice 2 does not prove automatic fresh-context creation. A valid local restart yields a bounded restart package and `context_rollover_required`; the adapter runtime remains responsible for starting a fresh execution context in a later slice.
+- These artifacts contain references and bounded identities only. They do not store raw prompts, transcripts, source bodies, full diffs, command output, secrets, customer data, or personal data.
+
+The Execution Envelope remains the sole runner-owned authority for stop reason, approval requirement, and next action. Checkpoint fields are validated projections/references needed to reconstruct continuation; they are not an independently editable replacement for Envelope control state.

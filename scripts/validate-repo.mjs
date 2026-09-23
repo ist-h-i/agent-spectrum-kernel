@@ -108,6 +108,8 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/epic-admission-decision.schema.json",
   "schemas/work-package-plan-validation-context.schema.json",
   "schemas/work-package-plan.schema.json",
+  "schemas/repository-snapshot.schema.json",
+  "schemas/session-checkpoint.schema.json",
   "schemas/asset-content.schema.json",
   "schemas/asset-record.schema.json",
   "schemas/asset-registry-snapshot.schema.json",
