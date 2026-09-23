@@ -1,0 +1,27 @@
+name: PR 294 review diagnostics
+
+on:
+  pull_request:
+
+jobs:
+  reference-regression:
+    if: github.event.pull_request.number == 294
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      # Temporary, tracked files only: no credentials, .git, or runner environment.
+      - name: Capture exact review source
+        run: git archive --format=tar HEAD > "$RUNNER_TEMP/ask-pr294-source.tar"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ask-pr294-review-source
+          path: ${{ runner.temp }}/ask-pr294-source.tar
+          retention-days: 1
+      - name: Verify reference preflight regression
+        run: node --test scripts/test-codex-skill-reference-preflight.mjs
