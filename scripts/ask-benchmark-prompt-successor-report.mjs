@@ -239,6 +239,13 @@ export function buildSuccessorComparisonFromProvenance({ preparation, policy, so
     rows.push(...readSuccessorProvenanceRows(sources[role]).map(({ case_id, engineering }) => ({ case_id, engineering })));
   }
   validateSuccessorProvenancePair(evidence[0].source, evidence[1].source);
+  if (reportAccessMode === "measured") {
+    successorExact(
+      evidence[0].source.measured_collection_digest,
+      evidence[1].source.measured_collection_digest,
+      "paired measured collection completion",
+    );
+  }
   const analysis = calculateSuccessorComparison({ preparation, policy, rows });
   const measured = reportAccessMode === "measured";
   const base = { schema_version: measured ? "1.1.0" : "1.0.0", kind: measured ? "prompt_successor_measured_comparison_report" : "prompt_successor_synthetic_comparison_report",

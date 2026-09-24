@@ -51,6 +51,7 @@ function authorityPathForSources(sources) {
 }
 
 function readAuthorityRecord(path) {
+  assertNoSymlinkPathSegments(path, "measured authority record");
   const bytes = readFileSync(path);
   if (bytes.length < 2 || bytes.length > MAX_AUTHORITY_BYTES) successorFail("SUCCESSOR_MEASURED_AUTHORITY_RECORD_INVALID", "authority record size");
   const value = parseJsonRejectDuplicateKeys(bytes, "measured authority record");

@@ -59,6 +59,7 @@ function writeDurableJson(path, value) {
 }
 
 function readJsonBounded(path, label, maxBytes = MAX_JOURNAL_BYTES) {
+  assertNoSymlinkPathSegments(path, label);
   const bytes = readFileSync(path);
   if (bytes.length < 2 || bytes.length > maxBytes) successorFail("SUCCESSOR_JOURNAL_SIZE", label);
   return parseJsonRejectDuplicateKeys(bytes, label);
@@ -67,7 +68,7 @@ function readJsonBounded(path, label, maxBytes = MAX_JOURNAL_BYTES) {
 function validateEntry(entry, index, preparation, sources, control) {
   successorClosed(entry, [
     "schema_version", "kind", "position", "case_id", "prompt_role", "native_case_id", "status",
-    "pre_collection_digest", "post_collection_digest", "request_digest", "result_digest",
+    "global_claim_digest", "pre_collection_digest", "post_collection_digest", "request_digest", "result_digest",
     "commit_digest", "entry_digest",
   ], `measured journal entry ${index + 1}`);
   const { entry_digest: digest, ...body } = entry;
@@ -85,7 +86,7 @@ function validateEntry(entry, index, preparation, sources, control) {
   successorExact(entry.request_digest, observed.request_digest, "measured journal request digest");
   successorExact(entry.result_digest, observed.result_digest, "measured journal result digest");
   successorExact(entry.commit_digest, observed.commit_digest, "measured journal commit digest");
-  for (const key of ["pre_collection_digest", "post_collection_digest", "request_digest", "result_digest", "commit_digest"]) successorDigest(entry[key], `measured journal.${key}`);
+  for (const key of ["global_claim_digest", "pre_collection_digest", "post_collection_digest", "request_digest", "result_digest", "commit_digest"]) successorDigest(entry[key], `measured journal.${key}`);
   return entry;
 }
 
@@ -181,6 +182,7 @@ function terminalEntry({ preparation, sources, claim, before, after }) {
     prompt_role: target.prompt_role,
     native_case_id: claim.native_case_id,
     status: observed.status,
+    global_claim_digest: claim.claim_digest,
     pre_collection_digest: before.control.control_digest,
     post_collection_digest: after.control.control_digest,
     request_digest: observed.request_digest,

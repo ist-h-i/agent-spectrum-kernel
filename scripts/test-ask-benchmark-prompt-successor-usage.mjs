@@ -79,7 +79,7 @@ test("top-level subscription usage-limit failure is typed without persisting pro
     JSON.stringify({ type: "thread.started", thread_id: "private-thread" }),
     JSON.stringify({ type: "turn.started" }),
     JSON.stringify({ type: "error", message: "You've hit your usage limit. Try again later." }),
-    JSON.stringify({ type: "turn.failed", error: { codex_error_info: "usage_limit_exceeded", message: "private provider detail" } }),
+    JSON.stringify({ type: "turn.failed", error: { message: "private provider detail" } }),
     "",
   ].join("\n");
   const value = capture(stdout, { status: 1 });

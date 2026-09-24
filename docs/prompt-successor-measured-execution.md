@@ -149,13 +149,18 @@ original Issue #291 source revision remains historical experiment provenance; it
 is not substituted for the preregistration source or the implementation revision
 needed to run this bridge. The capability cannot be reconstructed from JSON.
 
+The two native role run directories must share one verified parent directory;
+that parent is the only location used for the durable authority record, journal
+and global claim. This makes the cross-role lock namespace unique for the
+experiment and avoids a caller-selected coordination path.
+
 `executeNextMeasuredSuccessorCase` derives one canonical journal path from the
 two native run roots; callers cannot choose a second journal path to bypass the
 global lock. It acquires one durable claim before opening Prompt bytes or calling
 the existing #197 runner, launches only the exact next preregistered case with
 `maxCases=1` and `retryFailed=false`, then reopens terminal evidence.
-The fsync-backed journal records the ordered terminal prefix, each claim's
-pre/post collection-control digests, and request/result/commit digests. Each
+The fsync-backed journal records the ordered terminal prefix, each global claim
+digest, pre/post collection-control digests, and request/result/commit digests. Each
 subsequent claim must match that journal and the reverified native prefix before
 execution. Cross-role order is therefore prevented concurrently and durably
 reverified after every terminal case.

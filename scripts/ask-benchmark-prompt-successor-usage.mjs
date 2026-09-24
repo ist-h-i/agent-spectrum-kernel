@@ -69,6 +69,8 @@ function classifyProviderStop(event) {
 function combineProviderStop(current, next) {
   if (current.status === "not_detected") return next;
   if (next.status === "not_detected") return current;
+  if (current.status === "detected" && next.status === "unknown") return current;
+  if (current.status === "unknown" && next.status === "detected") return next;
   if (current.status === "detected" && next.status === "detected" && current.reason === next.reason) return current;
   return providerUnknown("terminal_failure_unclassified");
 }
