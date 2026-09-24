@@ -142,9 +142,11 @@ unchanged no-retry and synthetic-only boundaries.
 ## Measured authority, launcher and durable global sequence
 
 `openSuccessorMeasuredAuthority` reopens both native role runs on the current
-Node 24 host, checks the exact implementation, the preregistered Prompt authority source,
-ChatGPT-subscription authentication class, runtime, command, materialization and
-paired source identities, then returns an opaque in-process capability. The
+Node 24 host, checks the exact implementation and repository-canonical preregistered
+Prompt authority source, and requires a verified pre-result scoring-input capability
+whose execution config matches both role runs. It also binds the ChatGPT-subscription
+authentication class, runtime, command, materialization and paired source identities,
+then returns an opaque in-process capability. The
 original Issue #291 source revision remains historical experiment provenance; it
 is not substituted for the preregistration source or the implementation revision
 needed to run this bridge. The capability cannot be reconstructed from JSON.

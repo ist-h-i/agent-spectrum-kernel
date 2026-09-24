@@ -99,7 +99,7 @@ function validateNativeSourceAtFreeze({ role, source, preparation, root }) {
   return actual;
 }
 
-function authorityEvidence({ preparation, sources }) {
+function authorityEvidence({ preparation, sources, scoringIdentity }) {
   const authorityPath = authorityPathForSources(sources);
   return {
     schema_version: "1.1.0",
@@ -117,6 +117,8 @@ function authorityEvidence({ preparation, sources }) {
     },
     preparation_digest: preparation.preparation_digest,
     implementation: structuredClone(preparation.implementation),
+    scoring_input_identity: structuredClone(scoringIdentity),
+    scoring_inputs_verified_at_freeze: true,
     experiment_run_instance_id: sources.current_prompt.scope.run_instance_id,
     source_closures: Object.fromEntries(Object.entries(sources).map(([role, value]) => [role, sourceClosure(value)])),
     authority_record_path_digest: canonicalDigest({ path: authorityPath }),
@@ -133,10 +135,14 @@ function authorityEvidence({ preparation, sources }) {
   };
 }
 
-export async function openSuccessorMeasuredAuthority({ preparation, sources, root = ROOT }) {
+export async function openSuccessorMeasuredAuthority({ preparation, sources, scoringInputs, root = ROOT }) {
   ({ preparation, sources } = structuredClone({ preparation, sources }));
   successorExact(resolve(root), ROOT, "measured authority root");
   await validateSuccessorFromRepository(preparation, { root });
+  if (preparation.scoring_input_manifest_digest === null) successorFail("SUCCESSOR_SCORING_INPUTS_REQUIRED", "measured authority");
+  const { inspectSuccessorScoringInputs, assertSuccessorScoringExecution } = await import("./ask-benchmark-prompt-successor-scoring-inputs.mjs");
+  const scoringIdentity = inspectSuccessorScoringInputs(scoringInputs, preparation);
+  successorExact(scoringIdentity.manifest_digest, preparation.scoring_input_manifest_digest, "measured scoring input manifest");
   successorExact(preparation.runtime.authentication_mode, ISSUE_291_MEASURED_AUTHORITY.authentication_mode, "issue291 authentication class");
   successorExact(preparation.runtime.timeout_ms, ISSUE_291_MEASURED_AUTHORITY.timeout_ms, "issue291 timeout");
   successorExact(preparation.expected_case_count, ISSUE_291_MEASURED_AUTHORITY.planned_trials, "issue291 trial count");
@@ -147,6 +153,7 @@ export async function openSuccessorMeasuredAuthority({ preparation, sources, roo
     validateSuccessorSourceScope(source.scope, preparation, source.expectedScopeDigest);
     successorExact(source.scope.prompt_role, role, "measured source role");
     successorExact(source.scope.source.repository_revision, preparation.implementation.revision, "measured scoped repository revision");
+    assertSuccessorScoringExecution(scoringInputs, preparation, source.execution);
   }
   successorExact(sources.current_prompt.scope.run_instance_id, sources.prompt_v2.scope.run_instance_id, "measured experiment run");
   if (sources.current_prompt.scope.source.run_instance_id === sources.prompt_v2.scope.source.run_instance_id) {
@@ -168,7 +175,7 @@ export async function openSuccessorMeasuredAuthority({ preparation, sources, roo
     if (current.identity.run_instance_id === candidate.identity.run_instance_id) successorFail("SUCCESSOR_NATIVE_RUN_COLLISION", "measured native runs");
   }
 
-  const baseEvidence = authorityEvidence({ preparation, sources });
+  const baseEvidence = authorityEvidence({ preparation, sources, scoringIdentity });
   const body = { schema_version: "1.0.0", kind: "prompt_successor_measured_authority_freeze", evidence: baseEvidence };
   const expectedRecord = { ...body, record_digest: canonicalDigest(body) };
   if (!hadRecord) writeAuthorityRecordOnce(recordPath, expectedRecord);
