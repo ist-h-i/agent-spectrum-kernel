@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
   const char *directory = getenv("ASK_SUCCESSOR_FAKE_CAPTURE");
   const char *mode = getenv("ASK_SUCCESSOR_FAKE_MODE");
   if (!directory || !mode || argc < 3 || strcmp(argv[1], "exec") || strcmp(argv[argc - 1], "-")) return 64;
-  if (strcmp(mode, "success") && strcmp(mode, "failure") && strcmp(mode, "residual") && strcmp(mode, "timeout") && strcmp(mode, "invalid-utf8")) return 64;
+  if (strcmp(mode, "success") && strcmp(mode, "failure") && strcmp(mode, "failure-complete") && strcmp(mode, "residual") && strcmp(mode, "timeout") && strcmp(mode, "invalid-utf8")) return 64;
   const char *output = NULL;
   for (int i = 2; i < argc - 1; ++i) {
     const char *arg = argv[i];
@@ -142,5 +142,8 @@ int main(int argc, char **argv) {
     fputc(0xff, stderr); fputc(0xfe, stderr); fputc('\n', stderr);
   }
   puts("{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":100,\"cached_input_tokens\":80,\"output_tokens\":20}}");
+  if (!strcmp(mode, "failure-complete")) {
+    fputs("intentional native failure after complete usage\n", stderr); return 7;
+  }
   return 0;
 }

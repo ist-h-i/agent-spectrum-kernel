@@ -4,7 +4,7 @@ import { canonicalDigest, readStableBytes } from "./content-addressed-store.mjs"
 import { validateSuccessorFromRepository, readSuccessorImplementationIdentity } from "./ask-benchmark-prompt-successor-repository.mjs";
 import { validateSuccessorSourceScope, successorClosed, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
 import { assertSuccessorAdapterFacts, openSuccessorPromptInput, consumeSuccessorPromptInput, successorInputProjection } from "./ask-benchmark-prompt-successor-delivery.mjs";
-import { evaluateSuccessorCollection } from "./ask-benchmark-prompt-successor-control.mjs";
+import { classifySuccessorProcessOutcome, evaluateSuccessorCollection } from "./ask-benchmark-prompt-successor-control.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 function closure(inspection) {
@@ -65,7 +65,7 @@ export async function inspectSuccessorCollectionControl({ preparation, sources, 
       successorExact(adapter.effective_command_digest, binding.effective_command_digest, "collection command");
       successorExact(adapter.environment_snapshot.digest, binding.environment_snapshot_digest, "collection environment");
       const record = { case_id: target.case_id, status: actual.state.status, attempt_count: actual.state.attempt_count,
-        request_digest: null, result_digest: null, commit_digest: null, duration_ms: null, workspace_evidence: "unavailable", usage: null };
+        request_digest: null, result_digest: null, commit_digest: null, duration_ms: null, process_outcome: null, workspace_evidence: "unavailable", usage: null };
       if (!["pending", "active"].includes(actual.state.status)) {
         if (actual.attempts.length !== 1 || actual.state.terminal_attempt !== "0001") successorFail("SUCCESSOR_EXECUTION_ATTEMPT_MISSING", "collection single terminal attempt");
         const attempt = actual.attempts[0];
@@ -79,6 +79,7 @@ export async function inspectSuccessorCollectionControl({ preparation, sources, 
         successorExact(attempt.request.projection, successorInputProjection(delivered.binding), "collection actual Prompt delivery");
         Object.assign(record, { request_digest: attempt.evidence.request_digest, result_digest: attempt.evidence.result_digest,
           commit_digest: attempt.evidence.commit_digest, duration_ms: attempt.result.duration_ms,
+          process_outcome: classifySuccessorProcessOutcome(attempt.result),
           workspace_evidence: attempt.result.terminal_workspace_authority_availability, usage: attempt.result.successor_usage ?? null });
       }
       records.set(target.case_id, record);
@@ -94,7 +95,7 @@ export async function inspectSuccessorCollectionControl({ preparation, sources, 
     successorExact(closure(inspectVerifiedPortfolioExecution({ ...sources[role].execution, root })), closure(inspections[role]), "collection changed during read");
   }
   successorExact(readSuccessorImplementationIdentity(root), preparation.implementation, "collection source after read");
-  const base = { schema_version: "1.0.0", kind: "prompt_successor_native_collection_inspection", access_mode: "synthetic_only",
+  const base = { schema_version: "1.1.0", kind: "prompt_successor_native_collection_inspection", access_mode: "synthetic_only",
     preparation_digest: preparation.preparation_digest, control,
     native_closures: Object.fromEntries(Object.entries(inspections).map(([role, value]) => [role, closure(value)])),
     native_evidence_reverified: true, durable_global_sequence_verified: false,

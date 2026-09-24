@@ -80,6 +80,21 @@ missing duration or a duration at/above 900,000 ms stops the next proposed claim
 A later attempt after a stop is a protocol violation, not a replacement trial.
 The observed-token lower bound is separate from an unknown cumulative total.
 
+Collection control and native inspection version `1.1.0` require a bounded
+`process_outcome` rederived from the verified native result's `exit_code` and
+`failure_kind`. A complete usage turn followed by a nonzero process exit must
+retain the result and observed tokens but stop with `native_process_failed`.
+An unproven exit or unrecognized failure kind stops as `native_process_uncertain`;
+a native timeout stops even when the measured duration alone is below 900,000 ms.
+A zero-exit deliverable failure remains an ordinary terminal result, not a retry.
+Pending/active cases cannot carry terminal process facts. Older projections must
+be recomputed from native evidence, not defaulted to a successful process.
+This conservative process boundary does not diagnose subscription exhaustion or
+implement the still-missing provider classifier, measured launcher or journal.
+The native integration fixture exercises a complete usage turn plus exit 7,
+reopens both role runs, and checks that exactly one terminal trial is retained
+while the other 27 remain unclaimed. No provider or evaluator is called.
+
 `inspectSuccessorCollectionControl` obtains those records by reopening the
 actual #197 run/adapter/request/result/commit/workspace evidence, matching the
 pre-result role scopes and frozen Prompt delivery, and checking the closure

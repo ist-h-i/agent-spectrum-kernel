@@ -16,6 +16,7 @@ import { buildPromptSuccessorPreparation, buildSuccessorSourceScope } from "./as
 import { readSuccessorParent, readSuccessorImplementationIdentity } from "./ask-benchmark-prompt-successor-repository.mjs";
 import { openSuccessorPromptInput, consumeSuccessorPromptInput, successorInputProjection } from "./ask-benchmark-prompt-successor-delivery.mjs";
 import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
+import { inspectSuccessorCollectionControl } from "./ask-benchmark-prompt-successor-collection.mjs";
 import { inspectChildTermination } from "./test-successor-process-state.mjs";
 
 // This entry is for a clean committed candidate. All generated files stay outside
@@ -287,6 +288,41 @@ await test("F3: successor input traverses the real native runner without a provi
       }
       assert.deepEqual(nativeCaptureIds(captures), before);
     });
+    await check("native failure with complete usage stops the reverified paired collection before another claim", async () => {
+      const s = scenario("failure-complete"); const prep = prepare(s); const experimentRun = randomUUID();
+      const pair = Object.fromEntries(["current_prompt", "prompt_v2"].map((name) => [name, prepareRole(s, prep, name, experimentRun)]));
+      const target = prep.cases[0]; const role = pair[target.prompt_role];
+      const args = argsFor(role, target, await input(role, target));
+      const before = nativeCaptureIds(captures); const result = s.invoke(() => executePortfolio(args));
+      assert.deepEqual(result.outcomes, [{ case_id: args.caseId, status: "failed" }]);
+      const capture = nativeCapture(captures, before); const actual = observed(role, args.caseId).attempt;
+      assert.equal(actual.result.exit_code, 7); assert.equal(actual.result.failure_kind, "agent_failure");
+      assert.equal(actual.result.successor_usage.metrics.total_tokens.value, 120);
+      assert.equal(actual.result.terminal_workspace_authority_availability, "captured");
+      assert.equal(existsSync(capture.meta[0]), false, "the failed process workspace is cleaned before inspection");
+      assert.equal(existsSync(resolve(role.execution.runDir, "cases", args.caseId, "claim")), false);
+      const sources = Object.fromEntries(Object.entries(pair).map(([name, value]) => {
+        const { root: ignoredRoot, ...execution } = value.execution;
+        assert.equal(ignoredRoot, root);
+        return [name, { scope: value.scope, expectedScopeDigest: value.scope.scope_digest, execution }];
+      }));
+      const inspection = await inspectSuccessorCollectionControl({ preparation: prep, sources, accessMode: "synthetic_only", root });
+      assert.equal(inspection.schema_version, "1.1.0");
+      assert.equal(inspection.native_evidence_reverified, true);
+      assert.equal(inspection.durable_global_sequence_verified, false);
+      const control = inspection.control;
+      assert.equal(control.schema_version, "1.1.0");
+      assert.equal(control.status, "stopped"); assert.equal(control.next_case_id, null);
+      assert.deepEqual(control.stop_reasons, ["native_process_failed"]);
+      assert.equal(control.terminal_count, 1); assert.equal(control.pending_count, 27);
+      assert.equal(control.total_tokens.value, 120);
+      assert.equal(control.cases[0].process_outcome, "exit_nonzero");
+      assert.equal(control.cases[0].result_digest, actual.evidence.result_digest);
+      assert.ok(control.cases.slice(1).every((entry) => entry.status === "pending" && entry.attempt_count === 0 && entry.process_outcome === null));
+      for (const record of [inspection, control]) for (const key of ["execution_authorized", "measured_decision_authorized", "mutation_authorized"]) assert.equal(record[key], false);
+      assert.equal(nativeCaptureIds(captures).length, before.length + 1, "read-only inspection must not start or retry a process");
+      assert.equal(observed(role, args.caseId).record.attempts.length, 1);
+    });
     await check("a failing native fake stays failed, keeps terminal evidence and cannot be silently retried", async () => {
       const s = scenario("failure"); const prep = prepare(s); const role = prepareRole(s, prep, "current_prompt", randomUUID());
       const target = targetFor(prep, "current_prompt", "implementation"); const handle = await input(role, target); const args = argsFor(role, target, handle);
@@ -372,7 +408,7 @@ await test("F3: successor input traverses the real native runner without a provi
   } finally {
     evidence.final_status = git("status", "--porcelain", "--untracked-files=normal");
     evidence.final_revision = git("rev-parse", "HEAD");
-    evidence.completed = evidence.checks.length === 11 && evidence.checks.every((entry) => entry.status === "pass");
+    evidence.completed = evidence.checks.length === 12 && evidence.checks.every((entry) => entry.status === "pass");
     writeFileSync(resolve(work, "verification.json"), `${JSON.stringify(evidence, null, 2)}\n`, { flag: "wx" });
     t.diagnostic(`Evidence: ${resolve(work, "verification.json")}`);
     assert.equal(evidence.final_status, "", "test must not mutate the candidate");

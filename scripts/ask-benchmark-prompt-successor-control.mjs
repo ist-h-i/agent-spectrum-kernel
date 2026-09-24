@@ -7,9 +7,21 @@ export const SUCCESSOR_STOP_POLICY = Object.freeze({
   trial_token_warning: 250000, cumulative_token_warning: 3000000, token_escalation: 5000000,
 });
 const TERMINAL = new Set(["completed", "failed", "unavailable", "interrupted", "invalid"]);
-const FIELDS = ["case_id", "status", "attempt_count", "request_digest", "result_digest", "commit_digest", "duration_ms", "workspace_evidence", "usage"];
+const FIELDS = ["case_id", "status", "attempt_count", "request_digest", "result_digest", "commit_digest", "duration_ms", "process_outcome", "workspace_evidence", "usage"];
 const safeCount = (value) => Number.isSafeInteger(value) && value >= 0;
 function reject(label) { successorFail("SUCCESSOR_COLLECTION_INVALID", label); }
+
+/** Project only bounded process facts from a reverified native attempt result.
+ * A complete usage turn is not proof of a successful process. This is not a
+ * provider/subscription diagnosis and does not grant execution authority.
+ */
+export function classifySuccessorProcessOutcome(result) {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return "unknown";
+  if (result.failure_kind === "timeout") return "timeout";
+  if (result.failure_kind !== null && result.failure_kind !== "agent_failure") return "unknown";
+  if (!Number.isSafeInteger(result.exit_code)) return "unknown";
+  return result.exit_code === 0 ? "exit_zero" : "exit_nonzero";
+}
 
 /**
  * Pure protocol/usage calculation, NOT an execution or measured-result grant.
@@ -31,7 +43,7 @@ export function evaluateSuccessorCollection(options) {
     if (item.status === "pending" || item.status === "active") {
       const active = item.status === "active";
       if (item.attempt_count !== (active ? 1 : 0)) reject("pending/active attempt count");
-      if ([item.request_digest, item.result_digest, item.commit_digest, item.duration_ms, item.usage].some((value) => value !== null) || item.workspace_evidence !== "unavailable") reject("pending/active terminal evidence");
+      if ([item.request_digest, item.result_digest, item.commit_digest, item.duration_ms, item.process_outcome, item.usage].some((value) => value !== null) || item.workspace_evidence !== "unavailable") reject("pending/active terminal evidence");
       if (active) {
         if (pendingSeen || stops.size) reject("active case after gap or stop");
         stops.add("execution_uncertain");
@@ -43,8 +55,13 @@ export function evaluateSuccessorCollection(options) {
     if (!TERMINAL.has(item.status)) reject("terminal status");
     if (pendingSeen || stops.size) reject("terminal case after gap or stop");
     if (item.attempt_count !== 1) reject("retry or missing attempt");
+    if (!["exit_zero", "exit_nonzero", "timeout", "unknown"].includes(item.process_outcome)) reject("terminal process outcome");
+    if (item.status === "completed" && item.process_outcome !== "exit_zero") reject("completed process outcome");
     for (const key of ["request_digest", "result_digest", "commit_digest"]) successorDigest(item[key], key);
     terminalCount += 1;
+    if (item.process_outcome === "exit_nonzero") stops.add("native_process_failed");
+    if (item.process_outcome === "unknown") stops.add("native_process_uncertain");
+    if (item.process_outcome === "timeout") stops.add("timeout_boundary");
     if (item.status === "interrupted") stops.add("execution_uncertain");
     if (item.status === "invalid") stops.add("execution_invalid");
     if (item.status === "unavailable") stops.add("runtime_unavailable");
@@ -65,7 +82,7 @@ export function evaluateSuccessorCollection(options) {
   if (observed >= SUCCESSOR_STOP_POLICY.cumulative_token_warning) warnings.push({ code: "cumulative_token_warning", observed_token_lower_bound: observed });
   const status = stops.size ? "stopped" : terminalCount === cases.length ? "collected" : "ready_for_authorized_claim";
   const base = {
-    schema_version: "1.0.0", kind: "prompt_successor_collection_control",
+    schema_version: "1.1.0", kind: "prompt_successor_collection_control",
     preparation_digest: preparation.preparation_digest, policy: { ...SUCCESSOR_STOP_POLICY },
     status, terminal_count: terminalCount, pending_count: cases.filter((item) => item.status === "pending").length,
     total_tokens: unknownUsage ? { status: "unknown", value: null, reason: "trial_usage_unavailable" } : { status: "known", value: observed, reason: null },
