@@ -1,0 +1,384 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_kind",
+    "registration_object_digest",
+    "registration",
+    "source_report",
+    "membership_inventory",
+    "included",
+    "excluded",
+    "all_population_safety_inventory",
+    "conclusion",
+    "reason",
+    "boundaries",
+    "report_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "object_kind": {
+      "const": "portfolio_high_impact_sensitivity_report"
+    },
+    "registration_object_digest": {
+      "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"
+    },
+    "registration": {
+      "$ref": "portfolio-high-impact-sensitivity-registration.schema.json"
+    },
+    "source_report": {
+      "$ref": "portfolio-consumer-report.schema.json"
+    },
+    "membership_inventory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "fixture_metadata_digest",
+          "risk_boundary",
+          "high_impact",
+          "classification_state"
+        ],
+        "properties": {
+          "fixture_id": {
+            "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"
+          },
+          "fixture_metadata_digest": {
+            "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"
+          },
+          "risk_boundary": {
+            "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"
+          },
+          "high_impact": {
+            "type": "boolean"
+          },
+          "classification_state": {
+            "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"
+          }
+        }
+      }
+    },
+    "included": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "details",
+        "safety_inventory",
+        "quality_contributions",
+        "quality_observations"
+      ],
+      "properties": {
+        "details": {
+          "$ref": "portfolio-consumer-report.schema.json#/$defs/viewDetails"
+        },
+        "safety_inventory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "baseline",
+            "comparison"
+          ],
+          "properties": {
+            "baseline": {
+              "$ref": "portfolio-consumer-report.schema.json#/$defs/safetySurface"
+            },
+            "comparison": {
+              "$ref": "portfolio-consumer-report.schema.json#/$defs/safetySurface"
+            }
+          }
+        },
+        "quality_contributions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fixture_id",
+              "normalized_quality_delta",
+              "frequency_weight",
+              "impact_weight"
+            ],
+            "properties": {
+              "fixture_id": {
+                "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"
+              },
+              "normalized_quality_delta": {
+                "type": "number"
+              },
+              "frequency_weight": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "impact_weight": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "quality_observations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fixture_id",
+              "distribution",
+              "pairs"
+            ],
+            "properties": {
+              "fixture_id": {
+                "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"
+              },
+              "distribution": {
+                "$ref": "portfolio-paired-comparison-report.schema.json#/$defs/distribution"
+              },
+              "pairs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "repetition",
+                    "baseline_engineering_result_id",
+                    "baseline_engineering_result_digest",
+                    "comparison_engineering_result_id",
+                    "comparison_engineering_result_digest",
+                    "quality_delta"
+                  ],
+                  "properties": {
+                    "repetition": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 5
+                    },
+                    "baseline_engineering_result_id": {
+                      "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"
+                    },
+                    "baseline_engineering_result_digest": {
+                      "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"
+                    },
+                    "comparison_engineering_result_id": {
+                      "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"
+                    },
+                    "comparison_engineering_result_digest": {
+                      "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"
+                    },
+                    "quality_delta": {
+                      "$ref": "portfolio-paired-comparison-report.schema.json#/$defs/qualityDelta"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "excluded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "details",
+        "safety_inventory",
+        "quality_contributions",
+        "quality_observations"
+      ],
+      "properties": {
+        "details": {
+          "$ref": "portfolio-consumer-report.schema.json#/$defs/viewDetails"
+        },
+        "safety_inventory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "baseline",
+            "comparison"
+          ],
+          "properties": {
+            "baseline": {
+              "$ref": "portfolio-consumer-report.schema.json#/$defs/safetySurface"
+            },
+            "comparison": {
+              "$ref": "portfolio-consumer-report.schema.json#/$defs/safetySurface"
+            }
+          }
+        },
+        "quality_contributions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fixture_id",
+              "normalized_quality_delta",
+              "frequency_weight",
+              "impact_weight"
+            ],
+            "properties": {
+              "fixture_id": {
+                "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"
+              },
+              "normalized_quality_delta": {
+                "type": "number"
+              },
+              "frequency_weight": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "impact_weight": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "quality_observations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fixture_id",
+              "distribution",
+              "pairs"
+            ],
+            "properties": {
+              "fixture_id": {
+                "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"
+              },
+              "distribution": {
+                "$ref": "portfolio-paired-comparison-report.schema.json#/$defs/distribution"
+              },
+              "pairs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "repetition",
+                    "baseline_engineering_result_id",
+                    "baseline_engineering_result_digest",
+                    "comparison_engineering_result_id",
+                    "comparison_engineering_result_digest",
+                    "quality_delta"
+                  ],
+                  "properties": {
+                    "repetition": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 5
+                    },
+                    "baseline_engineering_result_id": {
+                      "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"
+                    },
+                    "baseline_engineering_result_digest": {
+                      "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"
+                    },
+                    "comparison_engineering_result_id": {
+                      "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"
+                    },
+                    "comparison_engineering_result_digest": {
+                      "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"
+                    },
+                    "quality_delta": {
+                      "$ref": "portfolio-paired-comparison-report.schema.json#/$defs/qualityDelta"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "all_population_safety_inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline",
+        "comparison"
+      ],
+      "properties": {
+        "baseline": {
+          "$ref": "portfolio-consumer-report.schema.json#/$defs/safetySurface"
+        },
+        "comparison": {
+          "$ref": "portfolio-consumer-report.schema.json#/$defs/safetySurface"
+        }
+      }
+    },
+    "conclusion": {
+      "enum": [
+        "stable",
+        "changed",
+        "insufficient_evidence"
+      ]
+    },
+    "reason": {
+      "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/token"
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "native_units_preserved",
+        "all_population_safety_preserved",
+        "conclusions_are_descriptive",
+        "chronology_proven_by_hash",
+        "cross_group_pooling",
+        "cross_unit_scalar_calculated",
+        "historical_artifact_reinterpreted",
+        "lifecycle_authority_implied",
+        "product_value_claim"
+      ],
+      "properties": {
+        "native_units_preserved": {
+          "const": true
+        },
+        "all_population_safety_preserved": {
+          "const": true
+        },
+        "conclusions_are_descriptive": {
+          "const": true
+        },
+        "chronology_proven_by_hash": {
+          "const": false
+        },
+        "cross_group_pooling": {
+          "const": false
+        },
+        "cross_unit_scalar_calculated": {
+          "const": false
+        },
+        "historical_artifact_reinterpreted": {
+          "const": false
+        },
+        "lifecycle_authority_implied": {
+          "const": false
+        },
+        "product_value_claim": {
+          "const": false
+        }
+      }
+    },
+    "report_digest": {
+      "$ref": "portfolio-aggregate-result-v2.schema.json#/$defs/digest"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Nondegenerate high-impact sensitivity report (additive v1 sidecar)"
+}

@@ -65,6 +65,7 @@ import {
   verificationCommandIdentity,
 } from "./verification-evidence.mjs";
 
+import { runHighImpactEvolutionFileRegressions } from "./test-ask-benchmark-portfolio-high-impact-evolution-files.mjs";
 import { runPortfolioEvolutionFileRegressions } from "./test-ask-benchmark-portfolio-evolution-files.mjs";
 
 const REPOSITORY_ID = "github.com/ist-h-i/agent-spectrum-kernel";
@@ -72,8 +73,10 @@ const REGISTRY_ID = "issue-278-evolution-assets";
 const SCOPE_ID = "agent-spectrum-kernel";
 const SOURCE_REVISION = "88e34a7591fd9b61122f377c464fdc232fc4f6e0";
 const TREE_DIGEST = digest("issue-278-integration-tree");
-// Align this synthetic scope with the existing mn-build-option-update fixture.
-const TASK_CLASS = "configuration";
+// Each mode keeps one compatible frozen catalog task population. No pooling.
+const HIGH_IMPACT_MODE = process.argv.includes("--high-impact-population");
+const TASK_CLASS = HIGH_IMPACT_MODE ? "implementation_verification" : "configuration";
+const FIXTURE_IDS = HIGH_IMPACT_MODE ? ["pf-api-pagination-behavior", "pf-data-schema-evolution"] : ["mn-build-option-update"];
 const MODEL = "gpt-5.6-sol";
 const ADAPTER = "codex";
 const STACK = "node";
@@ -611,7 +614,7 @@ function buildCandidate({ registry, parentAsset, candidateAsset, basePublication
       ],
     },
     evaluation_scope: {
-      fixture_ids: ["mn-build-option-update"],
+      fixture_ids: [...FIXTURE_IDS],
       task_classes: [TASK_CLASS],
       exclusions: [],
     },
@@ -676,13 +679,13 @@ function buildExperiment({ candidate, candidateObjectDigest, baselineRole, chall
       model: MODEL,
       cli: { name: "codex", version: "1.0.0", identity_digest: digest("codex-cli") },
       adapter: { name: ADAPTER, version: "1.0.0", identity_digest: digest("codex-adapter") },
-      fixture_ids: ["mn-build-option-update"],
+      fixture_ids: [...FIXTURE_IDS],
       task_classes: [TASK_CLASS],
       exclusions: structuredClone(candidate.evaluation_scope.exclusions),
       candidate_evaluation_scope_digest: canonicalDigest(candidate.evaluation_scope),
       repetitions: 3,
       evaluator: {
-        stable_id: "ask.evaluator-reference.mn-build-option-update",
+        stable_id: HIGH_IMPACT_MODE ? "ask.evaluator-reference.synthetic-high-impact-group" : "ask.evaluator-reference.mn-build-option-update",
         version: `git:${SOURCE_REVISION}`,
         record_digest: digest("issue-278-evaluator-record"),
         content_digest: digest("issue-278-evaluator-content"),
@@ -2067,7 +2070,7 @@ try {
       assert.equal(canonicalDigest(publication.artifact), publication.object_digest);
     }
   });
-  runPortfolioEvolutionFileRegressions({
+  (HIGH_IMPACT_MODE ? runHighImpactEvolutionFileRegressions : runPortfolioEvolutionFileRegressions)({
     root: resolve(import.meta.dirname, ".."), work: temporaryRoot, storeRoot,
     baseExperiment: experiment, assetTrust, portfolioTrust, check: closes,
   });

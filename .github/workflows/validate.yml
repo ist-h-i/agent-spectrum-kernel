@@ -52,6 +52,12 @@ jobs:
       - name: Run portfolio consumer sensitivity detail tests
         run: node scripts/test-ask-benchmark-portfolio-consumer-report.mjs
 
+      - name: Run nondegenerate high-impact sensitivity and exact Evolution tests
+        run: |
+          node --version
+          node scripts/test-ask-benchmark-portfolio-high-impact-sensitivity.mjs
+          node scripts/test-evolution-loop-integration.mjs --high-impact-population
+
       - name: Run successor snapshot and source-session regressions (current HEAD)
         run: |
           node --test scripts/test-ask-benchmark-source-session.mjs scripts/test-successor-process-state.test.mjs scripts/test-frozen-evaluator-fixture.test.mjs

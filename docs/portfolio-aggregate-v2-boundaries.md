@@ -2,7 +2,9 @@
 
 PR #295 introduced native-unit aggregate reporting. The consumer extension adds
 reconstructable sensitivity details and a bounded Evolution integration, not a new
-scorer. Issue #197 remains open for the high-impact population-definition gap below.
+scorer. The historical high-impact limitation below is retained for B1 artifacts;
+the separately versioned [risk-boundary sensitivity contract](portfolio-high-impact-sensitivity.md)
+adds a nondegenerate contrast for newly preregistered executions.
 The frozen B1 policy and all historical artifacts remain unchanged; synthetic
 contract verification is not measured product value.
 
@@ -43,7 +45,7 @@ of eligible observations is not a measured zero, successful evaluation or except
 The FP-unit mapping reason remains visible even when its empty-population state is
 unknown rather than not_applicable.
 
-## High-impact sensitivity: unresolved R2 contrast
+## Historical B1 high-impact sensitivity: intentionally degenerate
 
 B1 groups aggregates by adapter, comparison view, suite and task class. Its current
 high-impact discriminator is membership in the high_impact suite. Within one such
@@ -62,7 +64,10 @@ of the population and exclusion rule compatible with the group boundaries, or a
 new approved policy version. The consumer extension does not select a leave-one-out subset, reuse
 practice-frequency impact bands as a new authority, pool suites, change the frozen
 policy or apply new rules to historical runs. This is a specification limit, not
-merely missing #198/#208 measurements. Keep the R2 acceptance criterion open.
+merely missing #198/#208 measurements. The new companion policy resolves this
+infrastructure gap for explicitly registered new executions; it does not change
+these historical B1 conclusions. Existing callers still receive exactly this B1
+shape unless they opt into the separate sidecar.
 
 Human-effort sensitivity compares the exact included/excluded component surfaces.
 Its stable/changed labels describe that representation, including applicability

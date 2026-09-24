@@ -777,6 +777,30 @@ export function portfolioAggregateEvolutionContext(verifiedAggregate, options = 
   return Object.freeze({ identity, aggregate: verifiedAggregate.verified_aggregate_result, comparison, repetition, scoringPolicy });
 }
 
+// Reuse native reductions for an explicitly selected subset of already eligible
+// fixtures. This helper grants no population/policy authority; versioned consumers
+// must independently bind their full population before requesting a subset.
+export function portfolioAggregatePopulationDetails(verifiedAggregate, { fixtureIds, root = DEFAULT_ROOT } = {}) {
+  const context = portfolioAggregateEvolutionContext(verifiedAggregate, { root });
+  const aggregate = context.aggregate;
+  if (!Array.isArray(fixtureIds) || new Set(fixtureIds).size !== fixtureIds.length
+    || fixtureIds.some((id) => !aggregate.included_fixture_ids.includes(id))
+    || stableCanonicalJson(fixtureIds) !== stableCanonicalJson([...fixtureIds].sort((a, b) => a.localeCompare(b)))) {
+    throw new Error("population must be an ordered unique subset of verified eligible fixtures");
+  }
+  const fixtures = fixtureGroup(context.comparison, { comparisonView: aggregate.comparison_view, suite: aggregate.suite, taskClass: aggregate.task_class });
+  return deepFreezeJson({
+    snapshot: snapshotFor(fixtures, aggregate.comparison_view, fixtureIds),
+    components: buildComponentVector(fixtures, aggregate.comparison_view, fixtureIds),
+    quality_contributions: qualityContributions(fixtures, aggregate.comparison_view, fixtureIds),
+    quality_observations: fixtures.filter((fixture) => fixtureIds.includes(fixture.fixture_id)).map((fixture) => {
+      const view = fixture.comparison_views.find((entry) => entry.view_id === aggregate.comparison_view);
+      return { fixture_id: fixture.fixture_id, distribution: structuredClone(view.quality_delta_distribution),
+        pairs: view.pairs.map((pair) => ({ ...pairIdentity(pair), quality_delta: structuredClone(pair.quality_delta) })) };
+    }),
+  });
+}
+
 export function validatePortfolioAggregateResult(value, { root = DEFAULT_ROOT, verifiedPolicyArtifacts = null, artifactRoot = root, immutableArtifactDigests = {} } = {}) {
   const resolvedRoot = resolve(root);
   assertBenchmarkSchemaInstance(value, { schemaPath: resolve(resolvedRoot, PORTFOLIO_AGGREGATE_RESULT_SCHEMA_PATH), label: "portfolio aggregate result" });

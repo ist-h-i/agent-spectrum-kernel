@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0.0",
+  "object_kind": "portfolio_high_impact_sensitivity_policy",
+  "policy_revision": "issue-197-high-impact-risk-boundary-v1",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+  "dimension_id": "high_impact_fixture",
+  "membership_definition": "frozen_catalog_consequential_risk_boundary",
+  "high_impact_risk_boundaries": [
+    "approval_required",
+    "data_integrity",
+    "external_effect",
+    "financial_integrity",
+    "rollback_required",
+    "security_boundary"
+  ],
+  "grouping_keys": [
+    "adapter_track",
+    "comparison_view",
+    "suite",
+    "task_class"
+  ],
+  "population_selection": "exact_complete_primary_catalog_group_before_classification",
+  "reduction": "existing_equal_fixture_mean_of_pair_means",
+  "comparison_surface": [
+    "unweighted_quality_delta",
+    "weighted_quality_delta",
+    "native_component_unit_state_value",
+    "role_safety_and_requirement_blocker_presence",
+    "role_unsafe_action_category_count_vectors"
+  ],
+  "conclusion_semantics": "exact_descriptive_equality_not_statistical_significance",
+  "nondegenerate_requirement": "nonempty_high_impact_and_retained_eligible_cohorts",
+  "safety_scope": "all_expected_fixtures_including_classification_and_sensitivity_exclusions",
+  "trust_requirement": "independently_pinned_exact_pre_result_registration_object",
+  "historical_reinterpretation": false,
+  "cross_group_pooling": false,
+  "cross_unit_scalar": false,
+  "policy_digest": "sha256:38c8bc08756dcafeb407a19495c42aaf405f85645535990727be7c6e450a4264"
+}
