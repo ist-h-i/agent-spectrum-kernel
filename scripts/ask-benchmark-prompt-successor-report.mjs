@@ -219,7 +219,7 @@ export function validateSuccessorProvenancePair(current, candidate) {
 
 export function buildSuccessorComparisonFromProvenance({ preparation, policy, sources }) {
   successorClosed(sources, ["current_prompt", "prompt_v2"], "report sources");
-  const evidence = []; const rows = [];
+  const evidence = []; const rows = []; let reportAccessMode = null;
   for (const role of ["current_prompt", "prompt_v2"]) {
     const source = inspectSuccessorProvenance(sources[role]);
     successorExact(source.preparation_digest, preparation.preparation_digest, "report preparation");
@@ -227,14 +227,19 @@ export function buildSuccessorComparisonFromProvenance({ preparation, policy, so
     for (const flag of ["execution_source_reverified", "evaluator_authority_reverified", "raw_score_rederived_by_existing_197", "runner_stdin_binding_reverified"]) {
       successorExact(source[flag], true, `report provenance.${flag}`);
     }
-    successorExact(source.access_mode, "synthetic_only", "report access mode");
+    if (!["synthetic_only", "measured"].includes(source.access_mode)) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "report access mode");
+    if (reportAccessMode === null) reportAccessMode = source.access_mode;
+    else successorExact(source.access_mode, reportAccessMode, "paired report access mode");
+    successorExact(source.comparison_eligible, source.access_mode === "measured", "report comparison eligibility");
     evidence.push({ prompt_role: role, provenance_digest: canonicalDigest(source), source: clone(source) });
     rows.push(...readSuccessorProvenanceRows(sources[role]).map(({ case_id, engineering }) => ({ case_id, engineering })));
   }
   validateSuccessorProvenancePair(evidence[0].source, evidence[1].source);
   const analysis = calculateSuccessorComparison({ preparation, policy, rows });
-  const base = { schema_version: "1.0.0", kind: "prompt_successor_synthetic_comparison_report",
+  const measured = reportAccessMode === "measured";
+  const base = { schema_version: "1.1.0", kind: measured ? "prompt_successor_measured_comparison_report" : "prompt_successor_synthetic_comparison_report",
     preparation_digest: preparation.preparation_digest, policy_digest: policy.policy_digest, sources: evidence,
-    analysis, evidence_kind: "synthetic_integration_only", measured_decision_authorized: false, mutation_authorized: false };
+    analysis, evidence_kind: measured ? "measured_reverified_provenance" : "synthetic_integration_only",
+    measured_decision_authorized: measured, mutation_authorized: false };
   return { ...base, report_digest: canonicalDigest(base) };
 }

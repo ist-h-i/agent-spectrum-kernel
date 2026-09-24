@@ -22,10 +22,14 @@ function overlaps(a, b) {
  * separately reviewed measured launch authority, a durable ordering journal, or
  * an evaluator/decision grant. Preserve that boundary until those exist.
  */
-export async function inspectSuccessorCollectionControl({ preparation, sources, accessMode, root = ROOT }) {
-  if (accessMode !== "synthetic_only") successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "collection access mode");
+export async function inspectSuccessorCollectionControl({ preparation, sources, accessMode, measuredAuthority, root = ROOT }) {
+  if (!["synthetic_only", "measured"].includes(accessMode)) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "collection access mode");
   ({ preparation, sources } = structuredClone({ preparation, sources }));
   successorExact(resolve(root), ROOT, "loaded collection root");
+  if (accessMode === "measured") {
+    const { assertSuccessorMeasuredCollectionAuthority } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
+    assertSuccessorMeasuredCollectionAuthority(measuredAuthority, { preparation, sources });
+  }
   await validateSuccessorFromRepository(preparation, { root });
   successorClosed(sources, ["current_prompt", "prompt_v2"], "collection sources");
   const { inspectVerifiedPortfolioExecution } = await import("./ask-benchmark-execution.mjs");
@@ -97,12 +101,12 @@ export async function inspectSuccessorCollectionControl({ preparation, sources, 
     successorExact(closure(inspectVerifiedPortfolioExecution({ ...sources[role].execution, root })), closure(inspections[role]), "collection changed during read");
   }
   successorExact(readSuccessorImplementationIdentity(root), preparation.implementation, "collection source after read");
-  const base = { schema_version: "1.2.0", kind: "prompt_successor_native_collection_inspection", access_mode: "synthetic_only",
+  const base = { schema_version: "1.3.0", kind: "prompt_successor_native_collection_inspection", access_mode: accessMode,
     preparation_digest: preparation.preparation_digest, control,
     terminal_request_bindings: preparation.cases.filter(({ case_id }) => requestBindings.has(case_id))
       .map(({ case_id }) => ({ case_id, status: requestBindings.get(case_id) })),
     native_closures: Object.fromEntries(Object.entries(inspections).map(([role, value]) => [role, closure(value)])),
-    native_evidence_reverified: true, durable_global_sequence_verified: false,
+    native_evidence_reverified: true, durable_global_sequence_verified: accessMode === "measured",
     execution_authorized: false, measured_decision_authorized: false, mutation_authorized: false };
   return { ...base, inspection_digest: canonicalDigest(base) };
 }

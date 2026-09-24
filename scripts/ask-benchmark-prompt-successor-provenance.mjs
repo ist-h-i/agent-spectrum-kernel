@@ -49,9 +49,9 @@ export function assertSuccessorAttemptProvenance({ normalized, engineering, atte
  */
 export async function verifySuccessorSourceProvenance({
   preparation, scope, expectedScopeDigest, source, execution, evaluatorOptionsByCase, scoringInputs,
-  accessMode, root = ROOT,
+  accessMode, measuredAuthority, root = ROOT,
 }) {
-  if (accessMode !== "synthetic_only") successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "provenance access mode");
+  if (!["synthetic_only", "measured"].includes(accessMode)) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "provenance access mode");
   // Snapshot data, but retain the identity of the opaque scoring-input capability.
   ({ preparation, scope, source, execution, evaluatorOptionsByCase } = structuredClone({
     preparation, scope, source, execution, evaluatorOptionsByCase,
@@ -72,7 +72,11 @@ export async function verifySuccessorSourceProvenance({
     import("./ask-benchmark-portfolio-score.mjs"),
     import("./ask-benchmark-admission-decision.mjs"),
   ]);
-  const stored = await openSuccessorResultSource({ preparation, scope, expectedScopeDigest, ...source, accessMode, root });
+  if (accessMode === "measured") {
+    const { assertSuccessorMeasuredSourceAuthority } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
+    assertSuccessorMeasuredSourceAuthority(measuredAuthority, { preparation, scope });
+  }
+  const stored = await openSuccessorResultSource({ preparation, scope, expectedScopeDigest, ...source, accessMode, measuredAuthority, root });
   // Unlike the saved-snapshot reader, this checks the actual native execution
   // files, run/adapter identity, requests, command evidence and terminal commits.
   const inspect = () => runner.inspectVerifiedPortfolioExecution({ ...execution, root });
@@ -146,7 +150,7 @@ export async function verifySuccessorSourceProvenance({
   successorExact(closure(last), closure(first), "execution changed during provenance verification");
   const evidence = {
     schema_version: "1.0.0", kind: "prompt_successor_reverified_provenance",
-    access_mode: "synthetic_only", preparation_digest: preparation.preparation_digest,
+    access_mode: accessMode, preparation_digest: preparation.preparation_digest,
     scope_digest: scope.scope_digest, source: inspectSuccessorSource(stored),
     scoring_input_manifest_digest: inputIdentity.manifest_digest,
     native_run_instance_id: first.identity.run_instance_id,
@@ -157,7 +161,7 @@ export async function verifySuccessorSourceProvenance({
     native_materialization_manifest_digest: first.materialization.manifestDigest,
     execution_closure_digest: closure(first), execution_source_reverified: true,
     evaluator_authority_reverified: true, raw_score_rederived_by_existing_197: true,
-    runner_stdin_binding_reverified: true, provider_prompt_receipt_verified: false, comparison_eligible: false, mutation_authorized: false,
+    runner_stdin_binding_reverified: true, provider_prompt_receipt_verified: false, comparison_eligible: accessMode === "measured", mutation_authorized: false,
     entries: rows.map(({ case_id, engineering, execution_evidence }) => ({ case_id, engineering_result_digest: engineering.engineering_result_digest, request_digest: execution_evidence.request_digest })),
   };
   // Keep remaining delivery/metric/admission gates explicit. Provenance closure

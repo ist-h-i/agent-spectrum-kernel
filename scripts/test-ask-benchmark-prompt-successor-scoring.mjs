@@ -71,6 +71,8 @@ async function worker(contextPath) {
     const { computeEngineeringResultSourceManifestDigest, validateEngineeringResultSourceManifest } = await import("./ask-benchmark-portfolio-result-set.mjs");
     const { verifySuccessorSourceProvenance, inspectSuccessorProvenance } = await import("./ask-benchmark-prompt-successor-provenance.mjs");
     const { inspectSuccessorCollectionControl } = await import("./ask-benchmark-prompt-successor-collection.mjs");
+    const { openSuccessorMeasuredAuthority } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
+    const { executeNextMeasuredSuccessorCase, recoverMeasuredSuccessorSession } = await import("./ask-benchmark-prompt-successor-measured-execution.mjs");
     const { buildSuccessorComparisonPolicy, buildSuccessorComparisonFromProvenance } = await import("./ask-benchmark-prompt-successor-report.mjs");
     const configFile = resolve(root, "benchmarks/prompt-successor-execution.config.json");
     const rawConfig = read(configFile);
@@ -94,7 +96,7 @@ async function worker(contextPath) {
     const env = { HOME: home, ASK_SUCCESSOR_FAKE_CAPTURE: capture, ASK_SUCCESSOR_FAKE_MODE: "success" };
     const runtime = { adapter: "codex", cli_version: "0.153.4", executable_digest: hash(readFileSync(agentBin)), node_version: process.version,
       os: process.platform, arch: process.arch, model: nativeFile.model, provider_model_revision: { status: "unknown", value: null }, reasoning_effort: "high",
-      authentication_mode: "api_key", configuration_digest: hash(readFileSync(runtimeConfigPath)), sandbox: "workspace-write", approval_policy: "never", agent_network: "disabled", provider_network: "provider_only", timeout_ms: 900000 };
+      authentication_mode: "chatgpt_subscription", configuration_digest: hash(readFileSync(runtimeConfigPath)), sandbox: "workspace-write", approval_policy: "never", agent_network: "disabled", provider_network: "provider_only", timeout_ms: 900000 };
     const manifestPath = resolve(root, "scripts/test-fixtures/generated-successor-scoring/manifest.json");
     const manifest = read(manifestPath);
     const preparation = buildPromptSuccessorPreparation({ parent, runtime, implementation, seed: "synthetic-successor-scoring-v1",
@@ -135,7 +137,7 @@ async function worker(contextPath) {
               effective_command_digest: native.effective_command_digest, environment_snapshot_digest: native.environment_snapshot_digest };
           }) };
         const scope = buildSuccessorSourceScope({ preparation, promptRole: role, runInstanceId: experimentRun, source });
-        roles[role] = { execution, scope, native };
+        roles[role] = { execution, scope, expectedScopeDigest: scope.scope_digest, runtimeConfigPath, agentBin, native };
       }
       assert.notEqual(roles.current_prompt.native.run_instance_id, roles.prompt_v2.native.run_instance_id);
     });
@@ -144,27 +146,63 @@ async function worker(contextPath) {
         const { root: _root, ...execution } = role.execution;
         return [name, { scope: role.scope, expectedScopeDigest: role.scope.scope_digest, execution }];
       })) });
+    const measuredSources = Object.fromEntries(Object.entries(roles).map(([name, role]) => {
+      const { root: _root, ...execution } = role.execution;
+      return [name, { scope: role.scope, expectedScopeDigest: role.scope.scope_digest, execution, runtimeConfigPath, agentBin }];
+    }));
+    let measuredAuthority;
+    const measuredJournalPath = resolve(work, "measured-journal.json");
+    await check("issue291 measured authority binds exact host/runtime and both native sources", () => {
+      measuredAuthority = openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, root });
+      assert.ok(measuredAuthority);
+    });
+    await check("durable global claim survives a pre-spawn failure and recovery never retries", async () => {
+      const preregistrationPath = resolve(root, "benchmarks/prompt-v2-preregistration.json");
+      const original = readFileSync(preregistrationPath);
+      try {
+        writeFileSync(preregistrationPath, Buffer.concat([original, Buffer.from(" ")]));
+        await assert.rejects(() => environment(env, () => executeNextMeasuredSuccessorCase({
+          authority: measuredAuthority, preparation, sources: measuredSources, journalPath: measuredJournalPath, root,
+        })));
+        assert.equal(read(resolve(work, "measured-journal.json.lock")).automatic_retry_authorized, false);
+      } finally {
+        writeFileSync(preregistrationPath, original);
+      }
+      const recovered = await recoverMeasuredSuccessorSession({
+        authority: measuredAuthority, preparation, sources: measuredSources, journalPath: measuredJournalPath, root,
+      });
+      assert.equal(recovered.retry_performed, false);
+      assert.equal(recovered.collection.terminal_count, 0);
+      assert.equal(recovered.collection.next_case_id, preparation.cases[0].case_id);
+    });
     await check("collection preflight reopens the two exact native runs without authorizing execution", async () => {
       const inspected = await inspectSuccessorCollectionControl(collectionInputs());
       assert.equal(inspected.control.terminal_count, 0);
       assert.equal(inspected.control.next_case_id, preparation.cases[0].case_id);
       assert.equal(inspected.execution_authorized, false);
-      await assert.rejects(() => inspectSuccessorCollectionControl({ preparation: null, sources: null, accessMode: "measured" }), { code: "SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED" });
+      await assert.rejects(() => inspectSuccessorCollectionControl({ preparation, sources: collectionInputs().sources, accessMode: "measured", root }), { code: "SUCCESSOR_MEASURED_AUTHORITY_REQUIRED" });
     });
-    await check("28 compiled-fake executions preserve canonical request and terminal identities", async () => {
+    await check("28 measured-launch claims preserve global order, durable journal and canonical terminal identities", async () => {
       for (const target of preparation.cases) {
-        const role = roles[target.prompt_role]; const binding = role.scope.source.bindings.find(b => b.successor_case_id === target.case_id);
-        const input = await openSuccessorPromptInput({ preparation, scope: role.scope, expectedScopeDigest: role.scope.scope_digest, caseId: target.case_id, root });
-        const output = environment(env, () => executePortfolio({ ...role.execution, adapter: "codex", runtimeConfigPath, agentBin,
-          caseId: binding.source_case_id, maxCases: 1, retryFailed: false, successorPromptInput: input }));
-        assert.deepEqual(output.outcomes, [{ case_id: binding.source_case_id, status: "completed" }]); record.synthetic_native_attempts++;
+        const step = await environment(env, () => executeNextMeasuredSuccessorCase({
+          authority: measuredAuthority, preparation, sources: measuredSources, journalPath: measuredJournalPath, root,
+        }));
+        assert.equal(step.case_id, target.case_id);
+        assert.equal(step.prompt_role, target.prompt_role);
+        assert.equal(step.automatic_retry_performed, false);
+        assert.equal(step.journal.durable_global_sequence_verified, true);
+        record.synthetic_native_attempts++;
         if (record.synthetic_native_attempts === 1) {
-          const resumed = await inspectSuccessorCollectionControl(collectionInputs());
-          assert.equal(resumed.control.terminal_count, 1);
-          assert.equal(resumed.control.total_tokens.value, 120);
-          assert.equal(resumed.control.next_case_id, preparation.cases[1].case_id);
+          assert.equal(step.collection.terminal_count, 1);
+          assert.equal(step.collection.total_tokens.value, 120);
+          assert.equal(step.collection.next_case_id, preparation.cases[1].case_id);
         }
       }
+      const finalJournal = read(journalPath);
+      assert.equal(finalJournal.terminal_count, 28);
+      assert.equal(finalJournal.status, "collected");
+      assert.equal(finalJournal.next_case_id, null);
+      assert.equal(finalJournal.automatic_retries, 0);
       for (const role of Object.values(roles)) {
         const actual = inspectVerifiedPortfolioExecution(role.execution);
         const completed = actual.cases.filter(c => c.state.status === "completed"); assert.equal(completed.length, 14);
@@ -244,12 +282,29 @@ async function worker(contextPath) {
         assert.equal(proof.scoring_input_manifest_digest, manifest.manifest_digest);
       });
     }
-    await check("two genuine opaque handles produce a report, never synthetic adoption", () => {
+    await check("opaque synthetic and measured provenance produce distinct bounded reports", async () => {
       const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
       const report = buildSuccessorComparisonFromProvenance({ preparation, policy, sources: handles });
       assert.equal(report.analysis.prompt_outcome, "insufficient_evidence");
       assert.equal(report.measured_decision_authorized, false); assert.equal(report.mutation_authorized, false);
-      assert.equal(report.sources.length, 2); write(resolve(work, "synthetic-report.json"), report); record.report_digest = report.report_digest;
+      assert.equal(report.sources.length, 2); write(resolve(work, "synthetic-report.json"), report);
+      const measuredHandles = {};
+      for (const role of ["current_prompt", "prompt_v2"]) {
+        measuredHandles[role] = await verifySuccessorSourceProvenance({
+          ...sources[role], accessMode: "measured", measuredAuthority,
+        });
+        const proof = inspectSuccessorProvenance(measuredHandles[role]);
+        assert.equal(proof.access_mode, "measured");
+        assert.equal(proof.comparison_eligible, true);
+      }
+      const measuredReport = buildSuccessorComparisonFromProvenance({ preparation, policy, sources: measuredHandles });
+      assert.equal(measuredReport.kind, "prompt_successor_measured_comparison_report");
+      assert.equal(measuredReport.evidence_kind, "measured_reverified_provenance");
+      assert.equal(measuredReport.analysis.prompt_outcome, "insufficient_evidence");
+      assert.equal(measuredReport.measured_decision_authorized, true);
+      assert.equal(measuredReport.mutation_authorized, false);
+      write(resolve(work, "measured-report.json"), measuredReport);
+      record.report_digest = measuredReport.report_digest;
       const otherPreparation = buildPromptSuccessorPreparation({ parent, runtime, implementation, seed: "synthetic-other-experiment",
         changeReason: "Negative transplant test.", scoringInputManifestDigest: manifest.manifest_digest });
       assert.throws(() => buildSuccessorComparisonFromProvenance({ preparation: otherPreparation,
@@ -275,7 +330,7 @@ async function worker(contextPath) {
       finally { writeFileSync(path, before); }
     });
     record.final_revision = git(root, "rev-parse", "HEAD"); record.final_status = git(root, "status", "--porcelain");
-    assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, ""); record.completed = true;
+    assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, ""); assert.equal(record.checks.length, 14); record.completed = true;
   } finally {
     const evidencePath = resolve(work, "scoring-verification.json"); write(evidencePath, record); console.log(`Evidence: ${evidencePath}`);
   }

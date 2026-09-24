@@ -7,13 +7,19 @@ is recorded in the PR. The old #291 source
 
 ## Delivery status and merge gate
 
-This is a **partial implementation**, not a merge-ready measured bridge. It
-adds native usage capture, collection stop-policy calculation and read-only
-native collection inspection to the preparation contract and workflow. It does
-not yet implement a measured launcher, durable global execution journal/resume,
-measured provenance access, or the measured report gate. The existing result/provenance
-entrypoints still reject any access mode other than `synthetic_only`; do not
-remove that guard to make the draft appear executable.
+This change now contains the measured bridge implementation required before a
+real #291 run: issue-bound host/runtime authority, one-at-a-time measured launch,
+a durable global claim/journal, crash reconciliation without retry, measured
+result/provenance access, and a measured report gate over the existing #197
+evaluator/admission/scorer path. The authority is an in-process opaque handle
+created only after the exact native runs and current host/runtime are reopened
+and checked against Issue #291's frozen source and authentication contract.
+Serializable flags or copied digests cannot create it.
+
+This implementation does **not** execute the real experiment. A new result-blind
+freeze against the eventual merged source, target-host preflight and the 28 real
+Codex calls remain separate operator actions after merge/review. Portfolio
+mutation remains forbidden.
 
 A green `Check measured successor preparation` run proves only its named
 synthetic compatibility, source packaging and deterministic fake-process checks. The source archive is an input for
@@ -35,13 +41,11 @@ artifact directory is created. These tests do not invoke a model or evaluator.
 node --test scripts/test-ask-benchmark-prompt-successor-workflow.mjs
 ```
 
-Before this PR is ready to merge, the implementation and verification must cover
-all invariants below, including the separately authorized measured entrypoint,
-actual runner/evaluator/admission/scoring linkage, ordered no-retry execution,
-stop/resume rules, and measured-only report provenance. Deterministic fake-process
-proof is required here; real trials and the new result-blind experiment freeze
-remain separate work after a suitable source is merged. Keeping this status
-explicit does not satisfy any of those implementation requirements.
+Before this PR is ready to merge, deterministic fake-process verification must
+cover the measured entrypoint, actual runner/evaluator/admission/scoring linkage,
+ordered no-retry execution, stop/resume rules and measured-only report
+provenance. Real trials and the new result-blind experiment freeze remain
+separate work after a suitable source is merged.
 
 ## Implemented collection prerequisites
 
@@ -89,8 +93,10 @@ a native timeout stops even when the measured duration alone is below 900,000 ms
 A zero-exit deliverable failure remains an ordinary terminal result, not a retry.
 Pending/active cases cannot carry terminal process facts. Older projections must
 be recomputed from native evidence, not defaulted to a successful process.
-This conservative process boundary does not diagnose subscription exhaustion or
-implement the still-missing provider classifier, measured launcher or journal.
+This conservative process boundary deliberately does not infer a provider-specific
+billing diagnosis from protected output. The measured launcher treats every
+nonzero/timeout/uncertain native provider outcome as a hard stop, which includes
+subscription/provider exhaustion without relying on untrusted error text.
 The native integration fixture exercises a complete usage turn plus exit 7,
 reopens both role runs, and checks that exactly one terminal trial is retained
 while the other 27 remain unclaimed. No provider or evaluator is called.
@@ -99,9 +105,10 @@ while the other 27 remain unclaimed. No provider or evaluator is called.
 actual #197 run/adapter/request/result/commit/workspace evidence, matching the
 pre-result role scopes and frozen Prompt delivery, and checking the closure
 again after the read. It rejects excluded-case execution and multiple attempts.
-It does not trust an editable progress counter or total. This entrypoint still
-requires `synthetic_only`; measured access is rejected before reading inputs.
-Its result explicitly denies execution, measured-decision and mutation authority.
+It does not trust an editable progress counter or total. Synthetic access remains the default. Measured collection access additionally
+requires the opaque Issue #291 authority handle; copied serialized evidence is
+insufficient. The collection inspector itself never launches a trial and never
+authorizes Portfolio mutation.
 
 Native collection inspection version `1.2.0` separately records
 `terminal_request_bindings`. A request durably bound to the frozen Prompt remains
@@ -123,13 +130,33 @@ The native tests crash the existing runner immediately before and after request
 publication, invoke its real recovery, and verify both binding states and the
 unchanged no-retry and synthetic-only boundaries.
 
-**Remaining boundary:** a terminal prefix is not proof of global execution
-order, durable crash recovery, independent operator approval, or host/provider
-readiness. `durable_global_sequence_verified` remains false. The missing measured
-launcher must enforce this policy before an atomic next claim and implement the
-durable cross-role journal/lock; these read-only helpers do not do so. A real
-provider usage-limit classification and the private evaluator/admission/report
-integration are also still required. `PR303-M1` therefore remains unresolved.
+## Measured authority, launcher and durable global sequence
+
+`openSuccessorMeasuredAuthority` reopens both native role runs on the current
+Node 24 host, checks the exact implementation, Issue #291 frozen predecessor
+source/tree, ChatGPT-subscription authentication class, runtime, command,
+materialization and paired source identities, then returns an opaque in-process
+capability. The capability cannot be reconstructed from JSON.
+
+`executeNextMeasuredSuccessorCase` acquires one durable global claim before
+opening Prompt bytes or calling the existing #197 runner. It rederives collection
+state from native evidence, launches only the exact next preregistered case with
+`maxCases=1` and `retryFailed=false`, reopens terminal evidence, persists a
+fsync-backed journal snapshot, then releases the claim. Cross-role order is
+therefore both prevented concurrently and reverified after every terminal case.
+
+If the process dies or an exception occurs after the global claim, the claim is
+left in place. `recoverMeasuredSuccessorSession` reopens the native case; a
+pre-spawn failure is released only after proving the case is still pending, and
+an active stale native claim is passed to the existing committed recovery path.
+Recovered interruptions remain terminal and stopped; recovery never launches or
+retries the case.
+
+Measured result/provenance access is enabled only through that opaque authority.
+The existing #197 normalized-result, evaluator authority, frozen admission and
+raw engineering score validators are still the only result path. A measured
+comparison report can be built only from two opaque measured provenance handles;
+it authorizes one bounded Prompt outcome, never Portfolio mutation.
 
 The committed C fake now emits synthetic 100-input/20-output/80-cached usage.
 The native execution/normalization and 28-case scoring integration tests check
@@ -169,9 +196,9 @@ that legacy gap without changing terminal evidence. A dangling symlink or a
 filesystem error is not evidence that the workspace is absent. Foreign or
 mismatched ownership remains a hard stop; recovery must not delete it.
 
-These local cleanup checks do not prove global cross-role ordering or authorize
-measured execution. The separately reviewed measured launcher/journal and
-actual evaluator/admission/report integration remain required by PR303-M1.
+These local cleanup checks are consumed by the measured global launcher. A
+global claim is not released until the native attempt is terminal/reconciled and
+the measured journal snapshot is durable.
 
 ## Goal and authority boundary
 
