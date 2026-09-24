@@ -82,7 +82,7 @@ test("typed provider usage-limit evidence stops before another measured claim", 
   cases[0].process_outcome = "exit_nonzero";
   cases[0].usage = captureSuccessorUsage({
     status: 1,
-    stdout: '{"type":"turn.started"}\\n{"type":"turn.failed","error":{"codex_error_info":"usage_limit_exceeded","message":"private provider text"}}\\n',
+    stdout: '{"type":"turn.started"}\n{"type":"turn.failed","error":{"codex_error_info":"usage_limit_exceeded","message":"private provider text"}}\n',
   });
   const result = evaluate(cases);
   assert.equal(result.status, "stopped");
