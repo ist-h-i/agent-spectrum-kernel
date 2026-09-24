@@ -11,10 +11,13 @@ This change now contains the measured bridge implementation required before a
 real #291 run: issue-bound host/runtime authority, one-at-a-time measured launch,
 a durable global claim/journal, crash reconciliation without retry, measured
 result/provenance access, and a measured report gate over the existing #197
-evaluator/admission/scorer path. The authority is an in-process opaque handle
-created only after the exact native runs and current host/runtime are reopened
-and checked against Issue #291's frozen source and authentication contract.
-Serializable flags or copied digests cannot create it.
+evaluator/admission/scorer path. The authority is exposed as an in-process opaque handle, but its exact
+pre-result source/runtime evidence is first sealed into one durable,
+content-digested authority record beside the paired native runs. The record can
+be created only while every native case is still pending. After a controller
+restart, the opaque handle can be reopened only by revalidating that exact
+durable freeze; a new late authority cannot be minted from already observed
+results. Serializable flags or copied digests alone cannot create it.
 
 This implementation does **not** execute the real experiment. A new result-blind
 freeze against the eventual merged source, target-host preflight and the 28 real
@@ -157,8 +160,9 @@ subsequent claim must match that journal and the reverified native prefix before
 execution. Cross-role order is therefore prevented concurrently and durably
 reverified after every terminal case.
 
-If the process dies or an exception occurs after the global claim, the claim is
-left in place. `recoverMeasuredSuccessorSession` reopens the native case; a
+If the controller or process dies after the global claim, the claim is left in
+place. A replacement controller first reopens the durable pre-result authority
+record, then `recoverMeasuredSuccessorSession` reconciles the native case. A
 pre-spawn failure is released only after proving the case is still pending, and
 an active stale native claim is passed to the existing committed recovery path.
 Recovered interruptions remain terminal and stopped; recovery never launches or
@@ -226,8 +230,11 @@ calculation must not mint measured execution or decision authority.
 
 Use the existing #276/#277/#278 identities and CAS. An execution journal is not
 another Asset/Portfolio/Evolution lifecycle. The report never authorizes mutation.
-A new result-blind successor freeze against the eventual merge SHA is required;
-this implementation task does not create that freeze or execute model calls.
+The measured authority path creates the result-blind freeze against the exact
+runtime checkout when a real session is initialized; this PR does not initialize
+that real session or execute model calls. The eventual post-merge run must create
+its own authority record before trial 1, so PR/test evidence cannot be reused as
+the production freeze.
 
 ## Invariants to verify
 

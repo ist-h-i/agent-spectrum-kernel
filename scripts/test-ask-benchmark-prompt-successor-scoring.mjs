@@ -239,7 +239,6 @@ async function worker(contextPath) {
         const scope = buildSuccessorSourceScope({ preparation, promptRole: role, runInstanceId: crashRun, source });
         crashRoles[role] = { execution, scope, expectedScopeDigest: scope.scope_digest, runtimeConfigPath, agentBin, native };
       }
-      const crashAuthority = openSuccessorMeasuredAuthority({ preparation, sources: crashRoles, root });
       const crashContextPath = resolve(crashRoot, "context.json");
       write(crashContextPath, { preparation, sources: crashRoles, root });
       const child = spawnSync(process.execPath, ["--input-type=module", "-e", `
@@ -255,6 +254,7 @@ async function worker(contextPath) {
       });
       assert.equal(child.error, undefined, child.error?.message);
       assert.equal(child.status, 86, child.stderr || child.stdout);
+      const crashAuthority = openSuccessorMeasuredAuthority({ preparation, sources: crashRoles, root });
       const recovered = await recoverMeasuredSuccessorSession({
         authority: crashAuthority, preparation, sources: crashRoles, root,
       });
