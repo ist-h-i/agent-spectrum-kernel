@@ -184,8 +184,9 @@ async function worker(contextPath) {
       const providerRoot = resolve(work, "provider-limit"); mkdirSync(providerRoot);
       const providerRun = randomUUID(); const providerRoles = {};
       for (const role of ["current_prompt", "prompt_v2"]) {
-        const execution = { ...shared, runDir: resolve(providerRoot, `run-${role}`) };
-        const native = environment(env, () => prepareSuccessorPortfolioSource({ ...execution, runtimeConfigPath, agentBin, preparation }));
+        const nativeExecution = { ...shared, runDir: resolve(providerRoot, `run-${role}`) };
+        const native = environment(env, () => prepareSuccessorPortfolioSource({ ...nativeExecution, runtimeConfigPath, agentBin, preparation }));
+        const { root: _providerExecutionRoot, ...execution } = nativeExecution;
         const source = {
           plan_id: native.plan_id, plan_digest: native.plan_digest, run_instance_id: native.run_instance_id,
           repository_revision: native.repository_revision, runtime_identity_digest: native.runtime_identity_digest,
@@ -199,7 +200,7 @@ async function worker(contextPath) {
           }),
         };
         const scope = buildSuccessorSourceScope({ preparation, promptRole: role, runInstanceId: providerRun, source });
-        providerRoles[role] = { execution, scope, expectedScopeDigest: scope.scope_digest, runtimeConfigPath, agentBin, native };
+        providerRoles[role] = { execution, scope, expectedScopeDigest: scope.scope_digest, runtimeConfigPath, agentBin };
       }
       const providerAuthority = openSuccessorMeasuredAuthority({ preparation, sources: providerRoles, root });
       const step = await asyncEnvironment({ ...env, ASK_SUCCESSOR_FAKE_MODE: "provider-limit" }, () => executeNextMeasuredSuccessorCase({
@@ -222,8 +223,9 @@ async function worker(contextPath) {
       const crashRoot = resolve(work, "measured-crash"); mkdirSync(crashRoot);
       const crashRun = randomUUID(); const crashRoles = {};
       for (const role of ["current_prompt", "prompt_v2"]) {
-        const execution = { ...shared, runDir: resolve(crashRoot, `run-${role}`) };
-        const native = environment(env, () => prepareSuccessorPortfolioSource({ ...execution, runtimeConfigPath, agentBin, preparation }));
+        const nativeExecution = { ...shared, runDir: resolve(crashRoot, `run-${role}`) };
+        const native = environment(env, () => prepareSuccessorPortfolioSource({ ...nativeExecution, runtimeConfigPath, agentBin, preparation }));
+        const { root: _crashExecutionRoot, ...execution } = nativeExecution;
         const source = {
           plan_id: native.plan_id, plan_digest: native.plan_digest, run_instance_id: native.run_instance_id,
           repository_revision: native.repository_revision, runtime_identity_digest: native.runtime_identity_digest,
@@ -237,7 +239,7 @@ async function worker(contextPath) {
           }),
         };
         const scope = buildSuccessorSourceScope({ preparation, promptRole: role, runInstanceId: crashRun, source });
-        crashRoles[role] = { execution, scope, expectedScopeDigest: scope.scope_digest, runtimeConfigPath, agentBin, native };
+        crashRoles[role] = { execution, scope, expectedScopeDigest: scope.scope_digest, runtimeConfigPath, agentBin };
       }
       const crashContextPath = resolve(crashRoot, "context.json");
       write(crashContextPath, { preparation, sources: crashRoles, root });
