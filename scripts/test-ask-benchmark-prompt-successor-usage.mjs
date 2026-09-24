@@ -90,3 +90,20 @@ test("validator rejects forged totals, source changes, extra fields and typed-un
 test("missing process output is typed unknown and legacy result absence is not zero", () => {
   allUnknown(captureSuccessorUsage(null));
 });
+
+for (const [name, raw] of [
+  ["invalid UTF-8 inside a JSON string", Buffer.concat([Buffer.from('{"type":"turn.started"}\n{"type":"item.completed","item":{"text":"'), Buffer.from([0xff]), Buffer.from('"}}\n{"type":"turn.completed","usage":{"input_tokens":100,"output_tokens":20}}\n')])],
+  ["truncated multibyte sequence", Buffer.concat([Buffer.from(stream()), Buffer.from([0xe3, 0x81])])],
+]) test(`original bytes reject ${name} without changing their identity`, () => {
+  const value = capture(raw); allUnknown(value);
+  assert.equal(value.metrics.total_tokens.reason, "stream_invalid");
+  assert.deepEqual(value.source_stdout, { bytes: raw.length, sha256: createHash("sha256").update(raw).digest("hex") });
+  validateSuccessorUsage(value, { stdout: value.source_stdout });
+});
+
+test("valid non-ASCII process bytes retain exact identity and observable usage", () => {
+  const raw = Buffer.from(stream(undefined, [{ type: "item.completed", item: { type: "agent_message", text: "日本語・é・😀・�" } }]));
+  const value = capture(raw);
+  assert.equal(value.metrics.total_tokens.value, 120);
+  assert.deepEqual(value.source_stdout, { bytes: raw.length, sha256: createHash("sha256").update(raw).digest("hex") });
+});

@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
   const char *directory = getenv("ASK_SUCCESSOR_FAKE_CAPTURE");
   const char *mode = getenv("ASK_SUCCESSOR_FAKE_MODE");
   if (!directory || !mode || argc < 3 || strcmp(argv[1], "exec") || strcmp(argv[argc - 1], "-")) return 64;
-  if (strcmp(mode, "success") && strcmp(mode, "failure") && strcmp(mode, "residual") && strcmp(mode, "timeout")) return 64;
+  if (strcmp(mode, "success") && strcmp(mode, "failure") && strcmp(mode, "residual") && strcmp(mode, "timeout") && strcmp(mode, "invalid-utf8")) return 64;
   const char *output = NULL;
   for (int i = 2; i < argc - 1; ++i) {
     const char *arg = argv[i];
@@ -135,6 +135,12 @@ int main(int argc, char **argv) {
   const char *json = "{\"task_type\":\"implementation\",\"decision\":\"not_applicable\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"complete\",\"route\":null,\"summary\":\"Synthetic native transport fixture. No model or evaluator.\"}\n";
   write_all(fd, json, strlen(json)); close(fd);
   puts("{\"type\":\"turn.started\"}");
+  if (!strcmp(mode, "invalid-utf8")) {
+    fputs("{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"", stdout);
+    fputc(0xff, stdout);
+    puts("\"}}");
+    fputc(0xff, stderr); fputc(0xfe, stderr); fputc('\n', stderr);
+  }
   puts("{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":100,\"cached_input_tokens\":80,\"output_tokens\":20}}");
   return 0;
 }

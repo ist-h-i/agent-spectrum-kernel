@@ -299,6 +299,38 @@ await test("F3: successor input traverses the real native runner without a provi
       assert.throws(() => s.invoke(() => executePortfolio({ ...args, successorPromptInput: handle })));
       assert.equal(nativeCaptureIds(captures).length, count);
     });
+    await check("invalid native UTF-8 remains unknown usage and retains the exact process byte identity", async () => {
+      const s = scenario("invalid-utf8"); const prep = prepare(s);
+      const role = prepareRole(s, prep, "current_prompt", randomUUID());
+      const target = targetFor(prep, "current_prompt", "implementation");
+      const args = argsFor(role, target, await input(role, target));
+      const before = nativeCaptureIds(captures);
+      const result = s.invoke(() => executePortfolio(args));
+      assert.deepEqual(result.outcomes, [{ case_id: args.caseId, status: "completed" }]);
+      nativeCapture(captures, before);
+      const actual = observed(role, args.caseId).attempt;
+      const expectedStdout = Buffer.concat([
+        Buffer.from('{"type":"turn.started"}\n{"type":"item.completed","item":{"type":"agent_message","text":"'),
+        Buffer.from([0xff]),
+        Buffer.from('"}}\n{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":80,"output_tokens":20}}\n'),
+      ]);
+      const expectedStderr = Buffer.from([0xff, 0xfe, 0x0a]);
+      for (const [name, bytes] of [["stdout", expectedStdout], ["stderr", expectedStderr]]) {
+        assert.deepEqual(actual.result[name], { bytes: bytes.length, sha256: hash(bytes).slice(7) });
+      }
+      const usage = actual.result.successor_usage;
+      assert.deepEqual(usage.source_stdout, actual.result.stdout);
+      assert.deepEqual(usage.metrics.total_tokens, { status: "unknown", value: null, reason: "stream_invalid" });
+      for (const metric of Object.values(usage.metrics)) assert.equal(metric.status, "unknown");
+      assert.equal(actual.commit.result_sha256, actual.evidence.result_digest);
+      const outputPath = resolve(s.directory, "normalized");
+      normalizePortfolioExecution({ ...role.execution, outputPath });
+      const verified = verifyNormalizedPortfolioResults({ ...role.execution, outputPath });
+      const row = json(resolve(verified.generationPath, verified.manifest.inventory[0].path));
+      for (const name of ["input_tokens", "output_tokens", "cached_tokens"]) {
+        assert.deepEqual(row.telemetry[name], { status: "unknown", value: null, reason: "stream_invalid" });
+      }
+    });
     await check("a residual descendant is terminated and invalidates successor terminal-workspace evidence", async () => {
       const s = scenario("residual"); const prep = prepare(s); const role = prepareRole(s, prep, "current_prompt", randomUUID());
       const target = targetFor(prep, "current_prompt", "implementation"); const args = argsFor(role, target, await input(role, target));
@@ -338,7 +370,7 @@ await test("F3: successor input traverses the real native runner without a provi
   } finally {
     evidence.final_status = git("status", "--porcelain", "--untracked-files=normal");
     evidence.final_revision = git("rev-parse", "HEAD");
-    evidence.completed = evidence.checks.length === 10 && evidence.checks.every((entry) => entry.status === "pass");
+    evidence.completed = evidence.checks.length === 11 && evidence.checks.every((entry) => entry.status === "pass");
     writeFileSync(resolve(work, "verification.json"), `${JSON.stringify(evidence, null, 2)}\n`, { flag: "wx" });
     t.diagnostic(`Evidence: ${resolve(work, "verification.json")}`);
     assert.equal(evidence.final_status, "", "test must not mutate the candidate");

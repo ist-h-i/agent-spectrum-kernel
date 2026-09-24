@@ -52,6 +52,11 @@ SHA-256; the existing terminal commit binds the whole result. Ordinary execution
 and historical attempt result `1.2.0` stay supported without inventing usage.
 The existing normalizer carries verified counts into its typed telemetry.
 
+The contained process boundary retains stdout and stderr as bytes. Hashes and
+byte counts therefore identify the original process output, not text silently
+repaired by UTF-8 replacement. Malformed UTF-8 cannot become known usage; valid
+non-ASCII output remains supported. No raw stream is made durable by this change.
+
 The parser recognizes one complete Codex exec JSONL turn and safe nonnegative
 integer input/output counts. Cached input is a subset, not an extra cost;
 reasoning output is not added a second time. Missing cached counts remain

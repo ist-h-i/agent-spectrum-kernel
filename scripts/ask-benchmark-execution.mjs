@@ -1048,7 +1048,9 @@ function terminateResidualAgentProcessGroup(pid) {
 }
 
 function executeContainedAgent(executable, args, options) {
-  const result = spawnSync(executable, args, { ...options, detached: process.platform !== "win32" });
+  // Keep original stdout/stderr bytes until evidence hashing and usage parsing.
+  // Decoding here would silently replace malformed UTF-8 before either check.
+  const result = spawnSync(executable, args, { ...options, encoding: null, detached: process.platform !== "win32" });
   return { ...result, workspace_descendants_detected: terminateResidualAgentProcessGroup(result.pid) };
 }
 
@@ -1061,7 +1063,6 @@ function executeAgent({ root, runtime, executable, workspace, outputTemporary, c
     try {
       return executeContainedAgent(executable, materializeCommand(root, command, runtime, outputTemporary), {
         cwd: workspace,
-        encoding: "utf8",
         input: task,
         env: { ...environment, CODEX_HOME: codexHome },
         timeout: runtime.case_timeout_ms,
@@ -1074,7 +1075,6 @@ function executeAgent({ root, runtime, executable, workspace, outputTemporary, c
   const args = materializeCommand(root, command, runtime, outputTemporary);
   return executeContainedAgent(executable, args, {
     cwd: workspace,
-    encoding: "utf8",
     env: environment,
     timeout: runtime.case_timeout_ms,
     maxBuffer: MAX_PROCESS_OUTPUT_BYTES,

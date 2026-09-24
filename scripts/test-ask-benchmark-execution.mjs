@@ -189,6 +189,10 @@ case "\${FAKE_SHELL_MODE:-bash}" in
   malformed) event_command="/bin/bash -lc 'node workspace-test.mjs" ;;
 esac
 if [ "${adapter}" = "codex" ]; then printf '{"type":"item.started","item":{"type":"command_execution","id":"fixture-command","command":"%s"}}\\n' "$event_command"; fi
+if [ "\${FAKE_EVENT_MODE:-complete}" = "raw_utf8" ]; then
+  printf '{"type":"item.completed","item":{"type":"agent_message","text":"\\377"}}\\n'
+  printf '\\377\\376\\n' >&2
+fi
 if [ "\${FAKE_FAIL:-}" = "1" ]; then
   if [ "${adapter}" = "codex" ]; then printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"%s","status":"failed","exit_code":12,"aggregated_output":"fixture failed"}}\\n' "$event_command"; printf '%s\\n' '{"type":"turn.completed"}'; fi
   exit 12
@@ -501,6 +505,33 @@ try {
   }
   assert.deepEqual([...noOpByCondition.keys()].sort(), ["adaptive_ask", "full_ask", "kernel_only", "plain"], "no-op projection comparison must cover all four conditions");
   assert.equal(new Set([...noOpByCondition.values()].map(({ authority }) => authority.terminal_candidate_tree_digest)).size, 1, "managed projection residue must not alter the no-op terminal candidate digest");
+  // Exercise the actual process/terminal-evidence boundary with invalid UTF-8.
+  // A decoded/re-encoded stream has a different identity and is not raw evidence.
+  for (const adapter of ["codex", "claude"]) {
+    const rawRun = resolve(work, `raw-utf8-${adapter}`);
+    const rawCase = plan.cases.find((entry) => entry.adapter_track === adapter && entry.condition === "full_ask");
+    const rawCommon = ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", rawRun];
+    run(["execute-portfolio", ...rawCommon, "--adapter", adapter, "--runtime-config", adapter === "codex" ? codexRuntime : claudeRuntime,
+      "--agent-bin", adapter === "codex" ? codexBin : claudeBin, "--case-id", rawCase.case_id], { env: { ...env, FAKE_EVENT_MODE: "raw_utf8" } });
+    const attemptRoot = resolve(rawRun, "cases", rawCase.case_id, "attempts", "0001");
+    const result = JSON.parse(readFileSync(resolve(attemptRoot, "result.json"), "utf8"));
+    const commandEvidence = JSON.parse(readFileSync(resolve(attemptRoot, "command-evidence.json"), "utf8"));
+    const eventCommand = "/bin/bash -lc 'node workspace-test.mjs'";
+    const prefix = adapter === "codex" ? JSON.stringify({ type: "item.started", item: { type: "command_execution", id: "fixture-command", command: eventCommand } }) + "\n" : "";
+    const suffix = adapter === "codex" ? JSON.stringify({ type: "item.completed", item: { type: "command_execution", id: "fixture-command", command: eventCommand, status: "completed", exit_code: 0, aggregated_output: "fixture passed" } }) + '\n{"type":"turn.completed"}\n' : "";
+    const expectedStdout = Buffer.concat([Buffer.from(prefix + '{"type":"item.completed","item":{"type":"agent_message","text":"'),
+      Buffer.from([0xff]), Buffer.from('"}}\n' + suffix)]);
+    const expectedStderr = Buffer.from([0xff, 0xfe, 0x0a]);
+    for (const [stream, bytes] of [["stdout", expectedStdout], ["stderr", expectedStderr]]) {
+      assert.deepEqual(result[stream], { bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") },
+        `${adapter} ${stream} must bind original process bytes, not UTF-8 replacement characters`);
+    }
+    assert.deepEqual(commandEvidence.stream, { bytes: expectedStdout.length, digest: `sha256:${result.stdout.sha256}` });
+    assert.equal(result.schema_version, "1.2.0", "ordinary execution retains the legacy result format");
+    assert.equal(Object.hasOwn(result, "successor_usage"), false);
+    assertCaseStatus(rawCommon, rawCase.case_id, result.status, "raw byte evidence must reverify without mutation");
+  }
+
   const noOpNormalizedRoot = resolve(work, "no-op-normalized");
   run(["normalize-execution", ...common, "--output", noOpNormalizedRoot]);
   const noOpGeneration = resolve(noOpNormalizedRoot, "generations", readdirSync(resolve(noOpNormalizedRoot, "generations"))[0]);
