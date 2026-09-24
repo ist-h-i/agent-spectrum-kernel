@@ -162,7 +162,7 @@ async function worker(contextPath) {
       measuredJournalPath = successorMeasuredJournalPath(measuredAuthority, { preparation, sources: measuredSources });
       assert.ok(measuredAuthority); assert.ok(measuredJournalPath.startsWith(work));
     });
-    await check("issue291 measured authority rejects a self-consistent substituted predecessor", async () => {
+    await check("issue291 measured authority rejects a self-consistent substituted predecessor and scopes", async () => {
       const forgedParent = structuredClone(parent);
       forgedParent.preregistration_digest = canonicalDigest({ synthetic_forgery: "issue291-predecessor" });
       const forgedPreparation = buildPromptSuccessorPreparation({
@@ -173,8 +173,19 @@ async function worker(contextPath) {
         changeReason: "Negative authority-boundary test; no model call.",
         scoringInputManifestDigest: manifest.manifest_digest,
       });
+      const forgedRun = randomUUID();
+      const forgedSources = Object.fromEntries(Object.entries(measuredSources).map(([role, value]) => {
+        const source = structuredClone(value.scope.source);
+        const targets = forgedPreparation.cases.filter(c => c.prompt_role === role);
+        source.bindings = source.bindings.map((binding, index) => ({
+          ...binding,
+          successor_case_id: targets[index].case_id,
+        }));
+        const scope = buildSuccessorSourceScope({ preparation: forgedPreparation, promptRole: role, runInstanceId: forgedRun, source });
+        return [role, { ...value, scope, expectedScopeDigest: scope.scope_digest }];
+      }));
       await assert.rejects(
-        () => openSuccessorMeasuredAuthority({ preparation: forgedPreparation, sources: measuredSources, root }),
+        () => openSuccessorMeasuredAuthority({ preparation: forgedPreparation, sources: forgedSources, root }),
         { code: "SUCCESSOR_IDENTITY_MISMATCH" },
       );
     });
