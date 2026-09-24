@@ -107,7 +107,7 @@ export async function inspectSuccessorCollectionControl({ preparation, sources, 
     terminal_request_bindings: preparation.cases.filter(({ case_id }) => requestBindings.has(case_id))
       .map(({ case_id }) => ({ case_id, status: requestBindings.get(case_id) })),
     native_closures: Object.fromEntries(Object.entries(inspections).map(([role, value]) => [role, closure(value)])),
-    native_evidence_reverified: true, durable_global_sequence_verified: accessMode === "measured",
+    native_evidence_reverified: true, durable_global_sequence_verified: false,
     execution_authorized: false, measured_decision_authorized: false, mutation_authorized: false };
   return { ...base, inspection_digest: canonicalDigest(base) };
 }
