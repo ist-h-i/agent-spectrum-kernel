@@ -24,6 +24,7 @@ function overlaps(a, b) {
  */
 export async function inspectSuccessorCollectionControl({ preparation, sources, accessMode, measuredAuthority, root = ROOT }) {
   if (!["synthetic_only", "measured"].includes(accessMode)) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "collection access mode");
+  if (accessMode === "measured" && !measuredAuthority) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "measured authority");
   ({ preparation, sources } = structuredClone({ preparation, sources }));
   successorExact(resolve(root), ROOT, "loaded collection root");
   if (accessMode === "measured") {

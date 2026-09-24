@@ -52,6 +52,7 @@ export async function verifySuccessorSourceProvenance({
   accessMode, measuredAuthority, root = ROOT,
 }) {
   if (!["synthetic_only", "measured"].includes(accessMode)) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "provenance access mode");
+  if (accessMode === "measured" && !measuredAuthority) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "measured authority");
   // Snapshot data, but retain the identity of the opaque scoring-input capability.
   ({ preparation, scope, source, execution, evaluatorOptionsByCase } = structuredClone({
     preparation, scope, source, execution, evaluatorOptionsByCase,

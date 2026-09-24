@@ -186,7 +186,7 @@ async function worker(contextPath) {
       assert.equal(inspected.control.terminal_count, 0);
       assert.equal(inspected.control.next_case_id, preparation.cases[0].case_id);
       assert.equal(inspected.execution_authorized, false);
-      await assert.rejects(() => inspectSuccessorCollectionControl({ preparation, sources: collectionInputs().sources, accessMode: "measured", root }), { code: "SUCCESSOR_MEASURED_AUTHORITY_REQUIRED" });
+      await assert.rejects(() => inspectSuccessorCollectionControl({ preparation, sources: collectionInputs().sources, accessMode: "measured", root }), { code: "SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED" });
     });
     await check("28 measured-launch claims preserve global order, durable journal and canonical terminal identities", async () => {
       for (const target of preparation.cases) {

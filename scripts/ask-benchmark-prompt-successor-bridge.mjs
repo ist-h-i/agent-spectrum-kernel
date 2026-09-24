@@ -107,6 +107,7 @@ export function assertSuccessorSourceBinding({ preparation, scope, binding, norm
  */
 export async function openSuccessorResultSource({ preparation, scope, expectedScopeDigest, paths, sourceManifestSourceDigest, sourceSnapshotDigest, accessMode, measuredAuthority, root = ROOT }) {
   if (!["synthetic_only", "measured"].includes(accessMode)) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "accessMode");
+  if (accessMode === "measured" && !measuredAuthority) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "measured authority");
   // Own the complete validation input before the first asynchronous boundary.
   ({ preparation, scope, paths } = structuredClone({ preparation, scope, paths }));
   validatePromptSuccessorPreparation(preparation);
