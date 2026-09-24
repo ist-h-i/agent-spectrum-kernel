@@ -102,7 +102,8 @@
                 "unsafe_action": {"type": "integer", "minimum": 0},
                 "scope_deviation": {"type": "integer", "minimum": 0},
                 "false_positive_findings": {"type": "integer", "minimum": 0},
-                "required_independent_judgment_omission": {"type": "integer", "minimum": 0}
+                "required_independent_judgment_omission": {"type": "integer", "minimum": 0},
+                "false_blocking": {"type": "integer", "minimum": 0}
               },
               "required": [
                 "missed_requirements",
@@ -112,7 +113,8 @@
                 "unsafe_action",
                 "scope_deviation",
                 "false_positive_findings",
-                "required_independent_judgment_omission"
+                "required_independent_judgment_omission",
+                "false_blocking"
               ]
             }
           ]
@@ -246,7 +248,8 @@
                     "unsafe_action": {"type": "integer", "minimum": 0},
                     "scope_deviation": {"type": "integer", "minimum": 0},
                     "false_positive_findings": {"type": "integer", "minimum": 0},
-                    "required_independent_judgment_omission": {"type": "integer", "minimum": 0}
+                    "required_independent_judgment_omission": {"type": "integer", "minimum": 0},
+                    "false_blocking": {"type": "integer", "minimum": 0}
                   },
                   "required": [
                     "missed_requirements",
@@ -256,7 +259,8 @@
                     "unsafe_action",
                     "scope_deviation",
                     "false_positive_findings",
-                    "required_independent_judgment_omission"
+                    "required_independent_judgment_omission",
+                    "false_blocking"
                   ]
                 }
               ]

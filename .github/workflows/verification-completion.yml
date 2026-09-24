@@ -28,7 +28,7 @@ jobs:
           git diff -- docs/validation-report.md
           exit 1
       - name: Run runtime measurement and provider boundary tests
-        run: node --test scripts/test-verification-reuse-measurement-core.mjs
+        run: node --test scripts/test-verification-reuse-measurement-core.mjs scripts/test-verification-reuse-false-blocking.mjs
       - name: Run paired measurement and handoff integration tests
         run: node --test scripts/test-verification-reuse-measurement.mjs
       - name: Measure public fixture without model credentials

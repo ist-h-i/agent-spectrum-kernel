@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 export const QUALITY_KEYS = Object.freeze([
   "missed_requirements", "missed_blockers", "stale_evidence_acceptance",
   "false_completion", "unsafe_action", "scope_deviation", "false_positive_findings",
-  "required_independent_judgment_omission",
+  "required_independent_judgment_omission", "false_blocking",
 ]);
 export const TOKEN_KEYS = Object.freeze(["input_tokens", "cached_tokens", "output_tokens"]);
 export const digest = (value) => `sha256:${createHash("sha256").update(JSON.stringify(value)).digest("hex")}`;
@@ -100,6 +100,9 @@ export function assessReview({ request, result, expectedFindings, coverageStatus
   counts.stale_evidence_acceptance = !executionCovered && coverageStatus === "covered" ? 1 : 0;
   const shouldBlock = expectedFindings.length > 0 || counts.missed_requirements > 0 || counts.required_independent_judgment_omission > 0 || !executionCovered;
   counts.false_completion = shouldBlock && coverageStatus === "covered" ? 1 : 0;
+  // Safe, fully reviewed fixture revisions must remain completable. A reasonless
+  // block is a decision error, not a fabricated false-positive finding.
+  counts.false_blocking = !shouldBlock && (result.decision === "block" || coverageStatus !== "covered") ? 1 : 0;
   return { status: Object.values(counts).some((value) => value > 0) ? "fail" : "pass", counts };
 }
 

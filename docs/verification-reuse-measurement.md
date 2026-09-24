@@ -62,7 +62,9 @@ Short subprocess measurements have startup, cache, filesystem and scheduler nois
 
 ## Quality, handoff and current facts
 
-Required outcomes: missed requirements, missed blocker, stale deterministic evidence acceptance, false completion, unsafe action, scope deviation, false-positive findings and omitted independent judgment. The known fixture oracle and explicit path/obligation/judgment inventories determine these outcomes; they are not a model-generated overall score. A detected safety violation with other unavailable dimensions remains a failure, not eight invented zeroes.
+Required outcomes: missed requirements, missed blocker, stale deterministic evidence acceptance, false completion, unsafe action, scope deviation, false-positive findings, omitted independent judgment and false blocking. The known fixture oracle and explicit path/obligation/judgment inventories determine these outcomes; they are not a model-generated overall score. A detected safety violation with other unavailable dimensions remains a failure, not nine invented zeroes.
+
+`false_blocking` counts a fully reviewed, deterministically covered, oracle-safe fixture revision that is blocked by the review decision or final coverage. A reasonless `block` is a decision error, not an invented false-positive finding. Expected blockers, missing obligations/judgments and uncovered execution still require blocking; missing reviews remain unavailable. The counter is required in both row and summary quality records. Pre-review candidate artifacts without this counter are historical evidence, not current-schema results.
 
 Any quality failure makes the bounded decision `harmful` even if work was reduced. A complete, quality-passing fixture with reduced work can be `bounded benefit`; no measured improvement is `neutral`; incomplete/provider-missing quality is `insufficient evidence`. The issue decision remains insufficient until separate live/real-adapter/production-quality closure evidence exists. No opaque aggregate score is added.
 
@@ -76,6 +78,7 @@ Use the repository-supported Node 24 runtime. Core tests also run on the availab
 
 ```bash
 node --test scripts/test-verification-reuse-measurement-core.mjs
+node --test scripts/test-verification-reuse-false-blocking.mjs
 node --test scripts/test-verification-reuse-measurement.mjs
 node scripts/verification-reuse-measurement.mjs \
   --provider fixture --repetitions 2 --output /tmp/ask-reuse-fixture-new-run
@@ -104,12 +107,13 @@ The CLI makes no silent model fallback. Invalid pins/options, a dirty implementa
 Artifact: `ASK-274-runtime-reuse-measurement-v1`.
 Upstream: #274, PRs #279/#297/#302, `docs/verification-reuse-completion-contract.md`, `docs/adapter-capability-matrix.md`, Metrics Event privacy/native-unit meanings.
 
-Change boundary: four new pilot/runtime/measurement modules, two test modules, one result schema, this document, and focused workflow extensions. Existing CAS, exact/scoped engines, completion policy/schema, managed adapters, #275, frozen benchmarks and production action paths are unchanged.
+Change boundary: four new pilot/runtime/measurement modules, three test modules, one result schema, this document, and focused workflow extensions. Existing CAS, exact/scoped engines, completion policy/schema, managed adapters, #275, frozen benchmarks and production action paths are unchanged.
 
 Required candidate checks:
 
 ```bash
 node --test scripts/test-verification-reuse-measurement-core.mjs
+node --test scripts/test-verification-reuse-false-blocking.mjs
 node --test scripts/test-verification-reuse-measurement.mjs
 node --test scripts/test-verification-decision-core.mjs
 node --test scripts/test-verification-reuse-completion.mjs
@@ -119,6 +123,6 @@ node scripts/validate-repo.mjs
 git diff --check origin/main...HEAD
 ```
 
-The unchanged exact/scoped/completion suites cover unrelated/affected changes, unknown dependencies, gate/runtime/toolchain invalidation, unchanged/changed semantic surfaces, independent judgment, stale/missing external state, developer self-approval rejection, repository/target/adapter transplant and evidence tampering. The new tests cover real A/B/C count comparison, initial acquisition, explicit fixture/native distinction, model failures/timeouts, unavailable tokens, partial measurement, quality regression, durable output/privacy and repeat-native-count reproducibility.
+The unchanged exact/scoped/completion suites cover unrelated/affected changes, unknown dependencies, gate/runtime/toolchain invalidation, unchanged/changed semantic surfaces, independent judgment, stale/missing external state, developer self-approval rejection, repository/target/adapter transplant and evidence tampering. The new tests cover real A/B/C count comparison, initial acquisition, explicit fixture/native distinction, model failures/timeouts, unavailable tokens, partial measurement, quality regression (including unjustified blocking and its paired-run stop), durable output/privacy and repeat-native-count reproducibility.
 
 The PR validation record, not this command list, states which checks actually passed on its head. Implementation self-review is not independent GitHub or human approval. Remaining risks are completeness of declared dependencies, truthful trusted provider/actor mapping, unverified installed runtime behavior, toy-fixture representativeness and unmeasured real model quality/work. Keep Issue #274 open until those applicable closure conditions have evidence.
