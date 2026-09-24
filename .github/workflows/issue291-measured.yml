@@ -56,6 +56,21 @@ jobs:
           path: ${{ runner.temp }}/ask291-source
           retention-days: 1
           if-no-files-found: error
+      - name: Preserve exact Node runtime for local native verification
+        run: |
+          : "${RUNNER_TEMP:?Runner temp directory is required}"
+          mkdir -p "$RUNNER_TEMP/ask291-node24"
+          node_bin="$(node -p 'process.execPath')"
+          cp -- "$node_bin" "$RUNNER_TEMP/ask291-node24/node"
+          cp -- "$(dirname "$node_bin")/../LICENSE" "$RUNNER_TEMP/ask291-node24/LICENSE"
+          node --version > "$RUNNER_TEMP/ask291-node24/version.txt"
+          (cd "$RUNNER_TEMP/ask291-node24" && sha256sum node LICENSE version.txt > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ask291-node24-runtime
+          path: ${{ runner.temp }}/ask291-node24
+          retention-days: 1
+          if-no-files-found: error
       # These are existing synthetic compatibility tests, not measured-bridge
       # implementation tests or authority for a real experiment.
       - name: Validate existing synthetic successor boundaries
