@@ -14,7 +14,7 @@ import {
   reportPortfolioAggregateResult,
   verifyPortfolioAggregateResult,
 } from "./ask-benchmark-portfolio-aggregate-result-v2.mjs";
-import { computeClassificationRecordDigest, validateAggregateClassificationRecordSources, validateAggregateLineageRecordSources, verifyPortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
+import { computeClassificationRecordDigest, computeLineageRecordDigest, validateAggregateClassificationRecordSources, validateAggregateLineageRecordSources, verifyPortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { computeEvolutionArtifactInventoryDigest } from "./evolution-loop.mjs";
 
 // Closed-file fixtures follow test-ask-benchmark-portfolio-result-set.mjs.
@@ -99,7 +99,7 @@ function normalizedRecord(adapter, condition, repetition, config = {}) {
 }
 function buildNormalizedRoot(target, config = {}) {
   const revision = config.sourceRevision ?? REVISION;
-  const records = ADAPTERS.flatMap((adapter) => CONDITIONS.flatMap((condition) => Array.from({ length: REPETITIONS }, (_, index) => normalizedRecord(adapter, condition, index + 1, config))));
+  const records = (config.fixtures ?? [config.fixture]).flatMap((fixture) => ADAPTERS.flatMap((adapter) => CONDITIONS.flatMap((condition) => Array.from({ length: REPETITIONS }, (_, index) => normalizedRecord(adapter, condition, index + 1, { ...config, fixture })))));
   records.sort((a, b) => ADAPTERS.indexOf(a.lineage.adapter_track) - ADAPTERS.indexOf(b.lineage.adapter_track) || a.lineage.case_id.localeCompare(b.lineage.case_id));
   const source_snapshot = {
     adapter_identities: [...ADAPTERS].sort().map((adapter) => ({ adapter, runtime_identity_digest: digest(`runtime:${adapter}`) })),
@@ -207,8 +207,8 @@ function buildFileInputs(root, target, authorities, config = {}) {
   writeJson(sourcePath, { ...source, manifest_digest: computeEngineeringResultSourceManifestDigest(source) });
   return { root, normalizedResultsPath: normalizedRoot, sourceSnapshotDigest: normalized.sourceSnapshotDigest, engineeringResultsPath: resultRoot, sourceManifestPath: sourcePath, sourceManifestSourceDigest: digest(readFileSync(sourcePath)), adapter };
 }
-function classificationOptions(authorityRoot, authorities, excluded, fixtureId = FIXTURE, adapter = "codex") {
-  const name = excluded ? "excluded" : "eligible";
+function classificationOptions(authorityRoot, authorities, excluded, fixtureId = FIXTURE, adapter = "codex", unique = false) {
+  const name = `${unique ? `${fixtureId}-` : ""}${excluded ? "excluded" : "eligible"}`;
   const path = `classification/${name}.json`;
   const record = {
     classification_record_id: `classification-v2-files-${name}`, classification_record_schema_path: "benchmarks/schemas/portfolio-classification-record.schema.json", classification_record_path: path,
@@ -222,29 +222,45 @@ function classificationOptions(authorityRoot, authorities, excluded, fixtureId =
 
 // Prepare only fixed identities/classification inputs. collect() is deliberately
 // separate so tests can pin an Evolution experiment before creating result files.
-export function prepareAggregateV2FileFixture({ root, target, fixtureId = FIXTURE, adapter = "codex", sourceRevision = REVISION, excluded = false }) {
+export function prepareAggregateV2FileFixture({ root, target, fixtureId = FIXTURE, adapter = "codex", sourceRevision = REVISION, excluded = false, fixtureIds = [fixtureId], withLineage = false, excludedFixtureIds = [], comparisonView = "adaptive_vs_kernel" }) {
   const authorities = verifyPortfolioPolicyArtifacts({ root });
-  const fixture = authorities.verified_catalog.fixtures.find(({ fixture_id }) => fixture_id === fixtureId);
-  assert.ok(fixture, "synthetic aggregate fixture must exist in the frozen public catalog");
+  const fixtures = [...fixtureIds].sort().map((id) => authorities.verified_catalog.fixtures.find(({ fixture_id }) => fixture_id === id));
+  assert.ok(fixtures.length > 0 && fixtures.every(Boolean), "synthetic aggregate fixtures must exist in the frozen public catalog");
+  const fixture = fixtures[0];
+  assert.ok(fixtures.every((entry) => entry.suite === fixture.suite && entry.task_class === fixture.task_class), "synthetic fixtures must share the original B1 group");
   const authorityRoot = resolve(target, "classification-authority");
-  const classification = classificationOptions(authorityRoot, authorities, excluded, fixtureId, adapter);
+  const parts = fixtures.map(({ fixture_id }) => classificationOptions(authorityRoot, authorities, excluded || excludedFixtureIds.includes(fixture_id), fixture_id, adapter, fixtures.length > 1));
+  const classification = { aggregateAuthorityRoot: authorityRoot, classificationRecordPaths: parts.flatMap((entry) => entry.classificationRecordPaths), lineageRecordPaths: [], immutableArtifactDigests: Object.assign({}, ...parts.map((entry) => entry.immutableArtifactDigests)) };
+  if (withLineage) for (const { fixture_id } of fixtures) {
+    const path = `lineage/${fixture_id}.json`;
+    const record = {
+      lineage_record_id: `lineage-synthetic-${fixture_id}`, lineage_record_schema_path: "benchmarks/schemas/portfolio-lineage-record.schema.json", lineage_record_path: path,
+      fixture_id, catalog_digest: authorities.verified_catalog.catalog_digest, policy_manifest_digest: authorities.verified_policy_manifest.manifest_digest,
+      lineage_policy_digest: authorities.verified_lineage_policy.policy_digest, source_type: "two_repository_occurrences", source_reference_ids: [`synthetic-source-${fixture_id}`],
+      review_status: "reviewed", frequency_band: "low", frequency_evidence_ids: [`synthetic-frequency-${fixture_id}`], frequency_reviewer_record_id: `synthetic-frequency-review-${fixture_id}`,
+      impact_band: "medium", impact_evidence_ids: [`synthetic-impact-${fixture_id}`], impact_reviewer_record_id: `synthetic-impact-review-${fixture_id}`, lineage_revision: 1,
+    };
+    writeJson(resolve(authorityRoot, path), { ...record, lineage_record_digest: computeLineageRecordDigest(record) });
+    classification.lineageRecordPaths.push(path);
+    classification.immutableArtifactDigests[path] = digest(readFileSync(resolve(authorityRoot, path)));
+  }
   const classificationRecords = validateAggregateClassificationRecordSources({
     catalog: authorities.verified_catalog, policyManifest: authorities.verified_policy_manifest,
-    expectedFixtureIds: [fixtureId], adapterTrack: adapter, recordPaths: classification.classificationRecordPaths,
+    expectedFixtureIds: fixtures.map(({ fixture_id }) => fixture_id), adapterTrack: adapter, recordPaths: classification.classificationRecordPaths,
     artifactRoot: authorityRoot, immutableArtifactDigests: classification.immutableArtifactDigests,
   }).references;
   const lineageRecords = validateAggregateLineageRecordSources({
     scoringPolicy: authorities.verified_scoring_policy, lineagePolicy: authorities.verified_lineage_policy,
     catalog: authorities.verified_catalog, policyManifest: authorities.verified_policy_manifest,
-    expectedFixtureIds: [fixtureId], suite: fixture.suite, recordPaths: [],
+    expectedFixtureIds: fixtures.map(({ fixture_id }) => fixture_id), suite: fixture.suite, recordPaths: classification.lineageRecordPaths,
     artifactRoot: authorityRoot, immutableArtifactDigests: classification.immutableArtifactDigests,
   }).references;
   const execution = {
     source_revision: sourceRevision, plan_id: PLAN, plan_digest: PLAN_DIGEST, run_instance_id: RUN,
     adapter_track: adapter, runtime_identity_digest: digest(`runtime:${adapter}`),
     materialization_manifest_digest: digest("synthetic-materialization"), selection_state_digest: digest("synthetic-selection-state"),
-    group: { comparison_view: "adaptive_vs_kernel", suite: fixture.suite, task_class: fixture.task_class },
-    fixtures: [{ fixture_id: fixtureId, fixture_input_digest: digest(`fixture:${fixtureId}`), expected_repetition_count: REPETITIONS }],
+    group: { comparison_view: comparisonView, suite: fixture.suite, task_class: fixture.task_class },
+    fixtures: fixtures.map(({ fixture_id }) => ({ fixture_id, fixture_input_digest: digest(`fixture:${fixture_id}`), expected_repetition_count: REPETITIONS })),
     catalog_digest: authorities.verified_catalog.catalog_digest, policy_manifest_digest: authorities.verified_policy_manifest.manifest_digest,
     scoring_policy_digest: authorities.verified_scoring_policy.policy_digest,
     classification_records: classificationRecords, lineage_records: lineageRecords,
@@ -252,12 +268,12 @@ export function prepareAggregateV2FileFixture({ root, target, fixtureId = FIXTUR
   return {
     execution: freezeJson(execution),
     collect({ mutateNormalized = null, mutateEngineering = null } = {}) {
-      const inputs = buildFileInputs(root, target, authorities, { fixture, adapter, sourceRevision, mutateNormalized, mutateEngineering });
+      const inputs = buildFileInputs(root, target, authorities, { fixtures, adapter, sourceRevision, mutateNormalized, mutateEngineering });
       const options = {
         ...inputs, ...classification,
         resultSetPath: resolve(target, "result-set.json"), repetitionReportPath: resolve(target, "repetition.json"),
         comparisonReportPath: resolve(target, "paired.json"), aggregateResultPath: resolve(target, "aggregate.json"),
-        comparisonView: "adaptive_vs_kernel", suite: fixture.suite, taskClass: fixture.task_class,
+        comparisonView, suite: fixture.suite, taskClass: fixture.task_class,
       };
       collectEngineeringResults({ ...inputs, outputPath: options.resultSetPath });
       reportEngineeringResultRepetitions({ ...inputs, inputPath: options.resultSetPath, outputPath: options.repetitionReportPath });

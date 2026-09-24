@@ -121,6 +121,19 @@ function viewDetails(context, fixtures, dimension, viewName) {
     insufficient_evidence_reasons: reasons,
   };
 }
+// Per-view safety reconstruction for additive population contracts. The original
+// report below continues to retain safety across ALL expected fixtures.
+export function portfolioConsumerSafetyInventory(verifiedAggregate, { fixtureIds, root = ROOT } = {}) {
+  const context = portfolioAggregateEvolutionContext(verifiedAggregate, { root });
+  if (!Array.isArray(fixtureIds) || new Set(fixtureIds).size !== fixtureIds.length
+    || fixtureIds.some((id) => !context.aggregate.expected_fixture_ids.includes(id))
+    || stableCanonicalJson(fixtureIds) !== stableCanonicalJson([...fixtureIds].sort((a, b) => a.localeCompare(b)))) {
+    throw new Error("safety population must be an ordered unique subset of verified expected fixtures");
+  }
+  const fixtures = selectedFixtures(context).filter(({ fixture_id }) => fixtureIds.includes(fixture_id));
+  return freeze(Object.fromEntries(["baseline", "comparison"].map((role) => [role, safetySurface(fixtures, context.aggregate.comparison_view, role)])));
+}
+
 export function computePortfolioConsumerReportDigest(value) {
   const base = clone(value); delete base.consumer_report_digest;
   return canonicalDigest(base);

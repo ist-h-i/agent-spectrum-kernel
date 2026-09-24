@@ -3,6 +3,7 @@ import { canonicalDigest, readContentAddressedJson, stableCanonicalJson } from "
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { portfolioAggregateEvolutionContext, verifyPortfolioAggregateResult } from "./ask-benchmark-portfolio-aggregate-result-v2.mjs";
 import { buildPortfolioConsumerReport } from "./ask-benchmark-portfolio-consumer-report.mjs";
+import { verifyHighImpactSensitivityReport, highImpactSensitivityEvidenceIdentity } from "./ask-benchmark-portfolio-high-impact-sensitivity.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { computeEvolutionArtifactInventoryDigest, deriveEvolutionRecommendation, verifyEvolutionExperiment } from "./evolution-loop.mjs";
 
@@ -22,16 +23,18 @@ function freeze(value) {
 // projection in an Evolution experiment. Building a digest does not establish
 // chronology or trust: the consumer separately requires that exact experiment
 // object digest from the caller's pre-result trust context.
-export function buildPortfolioEvolutionProjection({ roles, execution, root = ROOT }) {
+export function buildPortfolioEvolutionProjection({ roles, execution, highImpactRegistrationObjectDigest = null, root = ROOT }) {
   const binding = { roles: structuredClone(roles), execution: structuredClone(execution) };
   assertBenchmarkSchemaInstance(binding, { schemaPath: resolve(root, PORTFOLIO_EVOLUTION_BINDING_SCHEMA), label: "portfolio Evolution execution binding" });
   const ids = execution.fixtures.map(({ fixture_id }) => fixture_id);
   if (new Set(ids).size !== ids.length || !equal(ids, [...ids].sort((a, b) => a.localeCompare(b)))) throw new Error("execution binding fixtures must be unique and canonically ordered");
   if (!equal(execution.classification_records.map(({ fixture_id }) => fixture_id), ids)) throw new Error("execution binding classification inventory must exactly cover the planned fixtures");
+  if (highImpactRegistrationObjectDigest !== null && (typeof highImpactRegistrationObjectDigest !== "string" || !/^sha256:[a-f0-9]{64}$/u.test(highImpactRegistrationObjectDigest))) throw new Error("high-impact projection requires an exact registration object digest");
+  const sensitivityBinding = highImpactRegistrationObjectDigest === null ? {} : { high_impact_registration_object_digest: highImpactRegistrationObjectDigest };
   return freeze({
     mode: "fixed_b1_exact", baseline_condition: "kernel_only", challenger_condition: "adaptive_ask",
     mapping_digest: canonicalDigest(B1_MAPPING),
-    projection_evidence_digest: canonicalDigest({ mapping: B1_MAPPING, ...binding }),
+    projection_evidence_digest: canonicalDigest({ mapping: B1_MAPPING, ...binding, ...sensitivityBinding }),
   });
 }
 
@@ -122,7 +125,7 @@ function descriptiveEvidence({ context, report, experiment, evaluationAuthority 
 export function verifyPortfolioEvolutionEvidence({
   aggregateOptions, storeRoot, experimentObjectDigest, trustedExperimentObjectDigests = [],
   trustedExperimentAuthorities = [], trustedAssetAuthorityContexts = [], trustedPortfolioAuthorityContexts = [], trustedHighImpactApprovalGrants = [],
-  evaluationAuthority,
+  evaluationAuthority, highImpactRegistrationObjectDigest = null, highImpactReportObjectDigest = null, trustedHighImpactRegistrationObjectDigests = [],
 }) {
   if (!Array.isArray(trustedExperimentObjectDigests) || !trustedExperimentObjectDigests.includes(experimentObjectDigest)) throw new Error("an exact independently pinned pre-result experiment object digest is required");
   const verifiedExperiment = verifyEvolutionExperiment({ storeRoot, experimentObjectDigest, trustedExperimentAuthorities, trustedAssetAuthorityContexts, trustedPortfolioAuthorityContexts, trustedHighImpactApprovalGrants });
@@ -146,15 +149,21 @@ export function verifyPortfolioEvolutionEvidence({
   const normalized = verifyNormalizedPortfolioResults({ root, outputPath: aggregateOptions.normalizedResultsPath, sourceSnapshotDigest: aggregateOptions.sourceSnapshotDigest });
   const execution = actualExecution(context, normalized.manifest);
   assertScope(experiment, execution);
-  const projection = buildPortfolioEvolutionProjection({ roles: experiment.roles, execution, root });
+  if ((highImpactRegistrationObjectDigest === null) !== (highImpactReportObjectDigest === null)) throw new Error("high-impact consumption requires both registration and report objects");
+  const projection = buildPortfolioEvolutionProjection({ roles: experiment.roles, execution, highImpactRegistrationObjectDigest, root });
   if (!equal(projection, experiment.projection)) throw new Error("aggregate execution/Asset/Portfolio/selection binding differs from the pinned pre-result projection");
   const report = buildPortfolioConsumerReport({ verifiedAggregate, root });
+  const highImpact = highImpactRegistrationObjectDigest === null ? null : verifyHighImpactSensitivityReport({
+    root, storeRoot, verifiedAggregate, objectDigest: highImpactReportObjectDigest,
+    registrationObjectDigest: highImpactRegistrationObjectDigest, trustedRegistrationObjectDigests: trustedHighImpactRegistrationObjectDigests,
+  });
   const { evidence, unavailableArtifacts } = descriptiveEvidence({ context, report, experiment, evaluationAuthority });
   const recommendation = deriveEvolutionRecommendation({ experiment, evidence });
   if (report.safety_inventory.comparison.requirement_blocker_observed && ["expand", "retain"].includes(recommendation.recommendation)) throw new Error("a witnessed requirement blocker cannot be hidden by an aggregate recommendation");
   return freeze({
     report, execution_binding: execution, experiment_object_digest: experimentObjectDigest,
     experiment_digest: experiment.experiment_digest, evidence, recommendation, unavailable_artifacts: unavailableArtifacts,
+    ...(highImpact === null ? {} : { high_impact_sensitivity: { identity: highImpactSensitivityEvidenceIdentity(highImpact), verified_report: highImpact } }),
     authority_implied: false,
   });
 }
