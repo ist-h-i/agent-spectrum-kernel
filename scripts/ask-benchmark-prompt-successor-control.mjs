@@ -23,6 +23,26 @@ export function classifySuccessorProcessOutcome(result) {
   return result.exit_code === 0 ? "exit_zero" : "exit_nonzero";
 }
 
+/** Classify the request binding only after native terminal evidence verification.
+ * Recovery without a durable request records an interruption, not delivered
+ * Prompt bytes. This pure classification confers no execution/result authority.
+ */
+export function classifySuccessorRequestBinding({ projection, expectedProjection, result }) {
+  if (projection?.status === "recovered_interruption") {
+    successorExact(projection, { status: "recovered_interruption", selected_skills: [], inventory: [],
+      source_digests: [], projection_fingerprint: null, capability_downgrades: [] }, "recovered request projection");
+    successorExact({ schema_version: result?.schema_version, status: result?.status,
+      failure_kind: result?.failure_kind, exit_code: result?.exit_code,
+      duration_ms: result?.duration_ms, final_output: result?.final_output },
+    { schema_version: "1.2.0", status: "interrupted", failure_kind: "stale_claim_recovered",
+      exit_code: null, duration_ms: null, final_output: null }, "recovered request terminal facts");
+    if ("successor_usage" in result) reject("recovered request cannot contain successor usage");
+    return "unavailable";
+  }
+  successorExact(projection, expectedProjection, "collection actual Prompt delivery");
+  return "verified";
+}
+
 /**
  * Pure protocol/usage calculation, NOT an execution or measured-result grant.
  * The native inspector supplies these records by reopening #197 evidence. No

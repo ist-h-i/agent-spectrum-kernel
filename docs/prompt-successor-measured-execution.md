@@ -103,6 +103,26 @@ It does not trust an editable progress counter or total. This entrypoint still
 requires `synthetic_only`; measured access is rejected before reading inputs.
 Its result explicitly denies execution, measured-decision and mutation authority.
 
+Native collection inspection version `1.2.0` separately records
+`terminal_request_bindings`. A request durably bound to the frozen Prompt remains
+`verified`, which proves the request binding, not provider receipt. If the
+existing runner recovers an interruption before a durable request exists, its
+exact empty `recovered_interruption` projection is `unavailable`. That exception
+requires the existing `1.2.0` interrupted/stale-recovery result with no exit,
+duration, final output or successor usage. Any partial, substituted or
+contradictory projection still fails closed. Completed results cannot use this
+exception.
+
+A recovered trial stays in the 28-case inventory as one `interrupted` terminal
+case with unknown telemetry and no next claim. Inspection must not fail merely
+because the durable request binding is unavailable, nor infer that the trial
+was never started. It does not recreate a Prompt binding, rewrite terminal
+evidence or retry the trial. Control output remains version `1.1.0`; the added
+binding evidence belongs to the native inspection, not execution authorization.
+The native tests crash the existing runner immediately before and after request
+publication, invoke its real recovery, and verify both binding states and the
+unchanged no-retry and synthetic-only boundaries.
+
 **Remaining boundary:** a terminal prefix is not proof of global execution
 order, durable crash recovery, independent operator approval, or host/provider
 readiness. `durable_global_sequence_verified` remains false. The missing measured

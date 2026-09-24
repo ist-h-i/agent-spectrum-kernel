@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { syntheticPreparation, syntheticDigest } from "./test-prompt-successor-fixtures.mjs";
 import { captureSuccessorUsage } from "./ask-benchmark-prompt-successor-usage.mjs";
-import { classifySuccessorProcessOutcome, evaluateSuccessorCollection } from "./ask-benchmark-prompt-successor-control.mjs";
+import { classifySuccessorProcessOutcome, classifySuccessorRequestBinding, evaluateSuccessorCollection } from "./ask-benchmark-prompt-successor-control.mjs";
 
 const preparation = syntheticPreparation();
 function usage(total) {
@@ -175,4 +175,55 @@ test("native process projection uses exit and failure evidence, not known usage 
   assert.equal(result.status, "stopped");
   assert.deepEqual(result.stop_reasons, ["native_process_failed"]);
   assert.equal(result.total_tokens.value, 120);
+});
+
+function requestBindingFixture() {
+  return {
+    projection: { status: "recovered_interruption", selected_skills: [], inventory: [],
+      source_digests: [], projection_fingerprint: null, capability_downgrades: [] },
+    expectedProjection: { status: "materialized", selected_skills: [], inventory: [],
+      source_digests: [{ path: "successor/stdin-binding", sha256: syntheticDigest("binding") }],
+      projection_fingerprint: syntheticDigest("binding"), capability_downgrades: [] },
+    result: { schema_version: "1.2.0", status: "interrupted", failure_kind: "stale_claim_recovered",
+      exit_code: null, duration_ms: null, final_output: null },
+  };
+}
+
+test("recovered interruption without a durable request retains one stopped unknown case, not a delivered Prompt", () => {
+  assert.equal(classifySuccessorRequestBinding(requestBindingFixture()), "unavailable");
+  const cases = records(1);
+  Object.assign(cases[0], { status: "interrupted", process_outcome: "unknown", duration_ms: null,
+    workspace_evidence: "unavailable", usage: null });
+  const result = evaluate(cases);
+  assert.equal(result.status, "stopped"); assert.equal(result.next_case_id, null);
+  assert.equal(result.terminal_count, 1); assert.equal(result.pending_count, 27);
+  assert.deepEqual(result.total_tokens, { status: "unknown", value: null, reason: "trial_usage_unavailable" });
+  assert.ok(result.stop_reasons.includes("execution_uncertain"));
+  for (const key of ["execution_authorized", "measured_decision_authorized", "mutation_authorized"]) assert.equal(result[key], false);
+});
+
+test("a recovered interruption with the exact durable request retains only its verified request binding", () => {
+  const input = requestBindingFixture(); input.projection = structuredClone(input.expectedProjection);
+  assert.equal(classifySuccessorRequestBinding(input), "verified");
+  assert.equal(classifySuccessorProcessOutcome(input.result), "unknown", "request evidence does not prove process completion");
+});
+
+for (const [name, mutate] of [
+  ["completed result", i => { i.result.status = "completed"; }],
+  ["ordinary failure", i => { i.result.status = "failed"; }],
+  ["different recovery cause", i => { i.result.failure_kind = "agent_failure"; }],
+  ["known process exit", i => { i.result.exit_code = 0; }],
+  ["known duration", i => { i.result.duration_ms = 10; }],
+  ["output evidence", i => { i.result.final_output = {}; }],
+  ["usage receipt", i => { i.result.successor_usage = usage(120); }],
+  ["empty usage field", i => { i.result.successor_usage = null; }],
+  ["different result version", i => { i.result.schema_version = "1.3.0"; }],
+  ["partial projection", i => { i.projection.source_digests = i.expectedProjection.source_digests; }],
+  ["fabricated fingerprint", i => { i.projection.projection_fingerprint = syntheticDigest("forged"); }],
+  ["unknown projection field", i => { i.projection.verified = true; }],
+  ["ordinary empty projection", i => { i.projection.status = "materialized"; }],
+  ["mismatched materialized binding", i => { i.projection = structuredClone(i.expectedProjection); i.projection.projection_fingerprint = syntheticDigest("other-case"); }],
+]) test(`missing request binding cannot conceal ${name}`, () => {
+  const input = requestBindingFixture(); mutate(input);
+  assert.throws(() => classifySuccessorRequestBinding(input));
 });

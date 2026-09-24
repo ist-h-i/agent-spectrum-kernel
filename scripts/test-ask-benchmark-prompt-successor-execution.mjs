@@ -10,7 +10,7 @@ import { buildPortfolioPlan } from "./ask-benchmark-plan.mjs";
 import { canonicalDigest, materializePortfolio } from "./ask-benchmark-materialize.mjs";
 import { sealAdaptiveSelection } from "./ask-benchmark-selection.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
-import { prepareSuccessorPortfolioSource, executePortfolio, inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
+import { prepareSuccessorPortfolioSource, executePortfolio, inspectVerifiedPortfolioExecution, recoverPortfolioCase } from "./ask-benchmark-execution.mjs";
 import { normalizePortfolioExecution, verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { buildPromptSuccessorPreparation, buildSuccessorSourceScope } from "./ask-benchmark-prompt-successor.mjs";
 import { readSuccessorParent, readSuccessorImplementationIdentity } from "./ask-benchmark-prompt-successor-repository.mjs";
@@ -102,7 +102,7 @@ function independentStdin(preparation, target, task) {
   return Buffer.concat([template.subarray(0, index), task, template.subarray(index + marker.length)]);
 }
 
-await test("F3: successor input traverses the real native runner without a provider", { timeout: 600000 }, async (t) => {
+await test("F3: successor input traverses the real native runner without a provider", { timeout: 900000 }, async (t) => {
   assert.equal(process.versions.node.split(".")[0], "24", "requires Node 24; wrong runtime is a failure, not a skip");
   assert.ok(["darwin", "linux"].includes(process.platform), "POSIX native-process test; Windows needs a separate process-control test");
   assert.equal(git("status", "--porcelain", "--untracked-files=normal"), "", "commit the candidate before this test; do not bypass cleanliness");
@@ -307,9 +307,10 @@ await test("F3: successor input traverses the real native runner without a provi
         return [name, { scope: value.scope, expectedScopeDigest: value.scope.scope_digest, execution }];
       }));
       const inspection = await inspectSuccessorCollectionControl({ preparation: prep, sources, accessMode: "synthetic_only", root });
-      assert.equal(inspection.schema_version, "1.1.0");
+      assert.equal(inspection.schema_version, "1.2.0");
       assert.equal(inspection.native_evidence_reverified, true);
       assert.equal(inspection.durable_global_sequence_verified, false);
+      assert.deepEqual(inspection.terminal_request_bindings, [{ case_id: target.case_id, status: "verified" }]);
       const control = inspection.control;
       assert.equal(control.schema_version, "1.1.0");
       assert.equal(control.status, "stopped"); assert.equal(control.next_case_id, null);
@@ -322,6 +323,68 @@ await test("F3: successor input traverses the real native runner without a provi
       for (const record of [inspection, control]) for (const key of ["execution_authorized", "measured_decision_authorized", "mutation_authorized"]) assert.equal(record[key], false);
       assert.equal(nativeCaptureIds(captures).length, before.length + 1, "read-only inspection must not start or retry a process");
       assert.equal(observed(role, args.caseId).record.attempts.length, 1);
+    });
+    for (const [faultName, bindingStatus] of [
+      ["after_workspace_created", "unavailable"], ["after_request_published", "verified"],
+    ]) await check(`recovery at ${faultName} preserves a stopped case and ${bindingStatus} request binding`, async () => {
+      const s = scenario(`interruption-${faultName}`); const prep = prepare(s); const run = randomUUID();
+      const paired = Object.fromEntries(["current_prompt", "prompt_v2"].map(name => [name, prepareRole(s, prep, name, run)]));
+      const target = prep.cases[0]; const role = paired[target.prompt_role];
+      const nativeCase = role.scope.source.bindings.find(binding => binding.successor_case_id === target.case_id).source_case_id;
+      const childInputPath = resolve(s.directory, "child-input.json");
+      writeJson(childInputPath, { preparation: prep, scope: role.scope, expectedScopeDigest: role.scope.scope_digest,
+        successorCaseId: target.case_id, execution: role.execution, runtimeConfigPath: s.runtimeConfigPath, agentBin, nativeCase });
+      const before = nativeCaptureIds(captures);
+      // Use the real runner's existing crash hook in a child. No test callback
+      // substitutes the native inspector, recovery, or request binding verifier.
+      const child = spawnSync(process.execPath, ["--input-type=module", "-e", `
+        import { readFileSync } from "node:fs";
+        import { openSuccessorPromptInput } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-delivery.mjs", import.meta.url).href)};
+        import { executePortfolio } from ${JSON.stringify(new URL("./ask-benchmark-execution.mjs", import.meta.url).href)};
+        const i = JSON.parse(readFileSync(process.argv[1], "utf8"));
+        const handle = await openSuccessorPromptInput({ preparation: i.preparation, scope: i.scope,
+          expectedScopeDigest: i.expectedScopeDigest, caseId: i.successorCaseId, root: i.execution.root });
+        executePortfolio({ ...i.execution, adapter: "codex", runtimeConfigPath: i.runtimeConfigPath,
+          agentBin: i.agentBin, caseId: i.nativeCase, maxCases: 1, retryFailed: false, successorPromptInput: handle });
+      `, childInputPath], { encoding: "utf8", timeout: 120000, maxBuffer: 4 * 1024 * 1024,
+        env: { ...process.env, ...s.environment, ASK_BENCHMARK_FAULT: faultName, ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+      assert.equal(child.error, undefined, child.error?.message);
+      assert.equal(child.status, 86, child.stderr || child.stdout);
+      assert.deepEqual(nativeCaptureIds(captures), before, "the explicit crash occurs before fake process execution");
+      const caseRoot = resolve(role.execution.runDir, "cases", nativeCase);
+      const attemptRoot = resolve(caseRoot, "attempts", "0001");
+      assert.equal(existsSync(resolve(attemptRoot, "request.json")), bindingStatus === "verified");
+      const claim = json(resolve(caseRoot, "claim", "claim.json"));
+      assert.deepEqual(recoverPortfolioCase({ root, runDir: role.execution.runDir, caseId: nativeCase,
+        claimId: claim.claim_id, reason: "Synthetic pre-process crash recovery; no provider call." }),
+      { case_id: nativeCase, status: "interrupted" });
+      const actual = observed(role, nativeCase).attempt;
+      assert.equal(actual.result.schema_version, "1.2.0");
+      assert.equal(actual.result.status, "interrupted"); assert.equal(actual.result.failure_kind, "stale_claim_recovered");
+      assert.equal(actual.result.successor_usage, undefined); assert.equal(actual.result.exit_code, null);
+      const retained = ["request.json", "result.json", "commit.json"].map(name => hash(readFileSync(resolve(attemptRoot, name))));
+      const sources = Object.fromEntries(Object.entries(paired).map(([name, value]) => {
+        const { root: ignoredRoot, ...execution } = value.execution; assert.equal(ignoredRoot, root);
+        return [name, { scope: value.scope, expectedScopeDigest: value.scope.scope_digest, execution }];
+      }));
+      const inspection = await inspectSuccessorCollectionControl({ preparation: prep, sources, accessMode: "synthetic_only", root });
+      const control = inspection.control;
+      assert.equal(inspection.schema_version, "1.2.0");
+      assert.deepEqual(inspection.terminal_request_bindings, [{ case_id: target.case_id, status: bindingStatus }]);
+      assert.equal(control.status, "stopped"); assert.equal(control.next_case_id, null);
+      assert.equal(control.terminal_count, 1); assert.equal(control.pending_count, 27);
+      assert.equal(control.cases[0].status, "interrupted"); assert.equal(control.cases[0].process_outcome, "unknown");
+      assert.equal(control.cases[0].result_digest, actual.evidence.result_digest);
+      assert.deepEqual(control.total_tokens, { status: "unknown", value: null, reason: "trial_usage_unavailable" });
+      for (const reason of ["execution_uncertain", "native_process_uncertain", "duration_unavailable", "trial_usage_unavailable", "workspace_evidence_unavailable"]) assert.ok(control.stop_reasons.includes(reason));
+      for (const record of [inspection, control]) for (const key of ["execution_authorized", "measured_decision_authorized", "mutation_authorized"]) assert.equal(record[key], false);
+      assert.equal(inspection.durable_global_sequence_verified, false);
+      assert.throws(() => s.invoke(() => executePortfolio(argsFor(role, target, {}))), /SUCCESSOR_UNVERIFIED_PROMPT_SOURCE/u);
+      const fresh = await input(role, target);
+      assert.throws(() => s.invoke(() => executePortfolio(argsFor(role, target, fresh))), /cannot be silently retried/u);
+      assert.deepEqual(nativeCaptureIds(captures), before, "recovery, inspection and a fresh handle must not retry the case");
+      assert.deepEqual(["request.json", "result.json", "commit.json"].map(name => hash(readFileSync(resolve(attemptRoot, name)))), retained);
+      assert.equal(readdirSync(resolve(caseRoot, "attempts")).length, 1);
     });
     await check("a failing native fake stays failed, keeps terminal evidence and cannot be silently retried", async () => {
       const s = scenario("failure"); const prep = prepare(s); const role = prepareRole(s, prep, "current_prompt", randomUUID());
@@ -408,7 +471,7 @@ await test("F3: successor input traverses the real native runner without a provi
   } finally {
     evidence.final_status = git("status", "--porcelain", "--untracked-files=normal");
     evidence.final_revision = git("rev-parse", "HEAD");
-    evidence.completed = evidence.checks.length === 12 && evidence.checks.every((entry) => entry.status === "pass");
+    evidence.completed = evidence.checks.length === 14 && evidence.checks.every((entry) => entry.status === "pass");
     writeFileSync(resolve(work, "verification.json"), `${JSON.stringify(evidence, null, 2)}\n`, { flag: "wx" });
     t.diagnostic(`Evidence: ${resolve(work, "verification.json")}`);
     assert.equal(evidence.final_status, "", "test must not mutate the candidate");
