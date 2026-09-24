@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -163,16 +163,15 @@ async function worker(contextPath) {
       assert.ok(measuredAuthority);
     });
     await check("durable global claim survives a pre-spawn failure and recovery never retries", async () => {
-      const preregistrationPath = resolve(root, "benchmarks/prompt-v2-preregistration.json");
-      const original = readFileSync(preregistrationPath);
+      const hiddenAgent = resolve(work, "codex-temporarily-unavailable");
+      renameSync(agentBin, hiddenAgent);
       try {
-        writeFileSync(preregistrationPath, Buffer.concat([original, Buffer.from(" ")]));
         await assert.rejects(() => asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
           authority: measuredAuthority, preparation, sources: measuredSources, journalPath: measuredJournalPath, root,
         })));
         assert.equal(read(resolve(work, "measured-journal.json.lock")).automatic_retry_authorized, false);
       } finally {
-        writeFileSync(preregistrationPath, original);
+        renameSync(hiddenAgent, agentBin);
       }
       const recovered = await recoverMeasuredSuccessorSession({
         authority: measuredAuthority, preparation, sources: measuredSources, journalPath: measuredJournalPath, root,
