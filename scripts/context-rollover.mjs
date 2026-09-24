@@ -70,7 +70,7 @@ export function prepareContextRollover(options) {
   if (decision.status !== "checkpoint_required") return { ...decision, state_valid: true, restart_package: null };
   // The existing publisher checks real Git bytes, DAG/control state and #274 refs,
   // validates output locations, writes CAS and reopens it. No second snapshot engine.
-  const saved = persistSessionCheckpoint({ ...options, rolloverReason: options.operatorRequest ? "operator_request" : "context_pressure" });
+  const saved = persistSessionCheckpoint({ ...options, rolloverReason: decision.trigger_reasons.includes("operator_request") ? "operator_request" : "context_pressure" });
   const resume = validateSessionResume({ ...options, checkpointDigest: saved.checkpointDigest });
   if (!resume.state_valid) fail("CHECKPOINT_INVALID");
   const scopeDigest = scopeFor(resume.restart_package);

@@ -543,3 +543,81 @@ test("native observer without launch timestamp cannot claim whole-process wall t
   observer.ingest({ type: "turn.started" }, 101); observer.ingest({ type: "turn.completed", usage: { input_tokens: 1, cached_input_tokens: 0, output_tokens: 1 } }, 200);
   assert.equal(observer.finish({ nowMs: 201, completeCapture: true }).counters.wall_time_ms.value, null);
 });
+
+for (const operatorEnabled of [false, true]) test(`checkpoint reason uses the accepted operator trigger (${operatorEnabled})`, () => {
+  const o = setup(); o.operatorRequest = true; o.policy.operator_request_enabled = operatorEnabled;
+  const result = prepareContextRollover(o);
+  assert.equal(result.status, "context_rollover_required");
+  assert.deepEqual(result.binding.trigger_reasons, operatorEnabled ? ["runtime_steps", "operator_request"] : ["runtime_steps"]);
+  assert.equal(stored(o, result.binding.checkpoint_digest).rollover_reason, operatorEnabled ? "operator_request" : "context_pressure");
+});
+
+test("evaluation accepts the exact snapshot HEAD after the plan integration base", async () => {
+  const { o, protocol, runs } = evaluationFixture();
+  const planBase = protocol.source_revision;
+  // Keep the tree identical to prove that commit identity, not just bytes, binds.
+  git(o.repositoryRoot, "commit", "--allow-empty", "-m", "descendant execution revision");
+  protocol.source_revision = git(o.repositoryRoot, "rev-parse", "HEAD");
+  assert.notEqual(protocol.source_revision, planBase);
+  const pd = canonicalDigest(protocol);
+  for (const run of runs) { run.source_revision = protocol.source_revision; run.protocol_digest = pd; }
+  freezeRolloverEvaluation({ storeRoot: o.storeRoot, protocol, policy: o.policy });
+  claimRolloverEvaluationRun({ storeRoot: o.storeRoot, protocolDigest: pd, condition: "baseline", repetition: 1 });
+  recordRolloverEvaluationRun({ storeRoot: o.storeRoot, protocolDigest: pd, run: runs[0] });
+  claimRolloverEvaluationRun({ storeRoot: o.storeRoot, protocolDigest: pd, condition: "rollover", repetition: 1 });
+  const rollover = await executeContextRollover(o, nativeAdapter(o).adapter);
+  assert.equal(rollover.status, "continuation_started");
+  const snapshot = stored(o, rollover.binding.snapshot_digest);
+  assert.equal(snapshot.integration_base.commit, planBase);
+  assert.equal(snapshot.repository.head, protocol.source_revision);
+  runs[1].rollover_receipt_digests = [rollover.receipt_digest];
+  recordRolloverEvaluationRun({ storeRoot: o.storeRoot, protocolDigest: pd, run: runs[1] });
+  assert.equal(evaluateStoredRolloverRuns({ storeRoot: o.storeRoot, protocolDigest: pd }).recommendation, "retain");
+});
+
+test("evaluation rejects a different snapshot HEAD even when its plan base matches", async () => {
+  const { o, protocol, runs } = evaluationFixture(), pd = canonicalDigest(protocol);
+  freezeRolloverEvaluation({ storeRoot: o.storeRoot, protocol, policy: o.policy });
+  claimRolloverEvaluationRun({ storeRoot: o.storeRoot, protocolDigest: pd, condition: "baseline", repetition: 1 });
+  recordRolloverEvaluationRun({ storeRoot: o.storeRoot, protocolDigest: pd, run: runs[0] });
+  claimRolloverEvaluationRun({ storeRoot: o.storeRoot, protocolDigest: pd, condition: "rollover", repetition: 1 });
+  git(o.repositoryRoot, "commit", "--allow-empty", "-m", "different execution revision");
+  const rollover = await executeContextRollover(o, nativeAdapter(o).adapter);
+  assert.equal(rollover.status, "continuation_started");
+  const snapshot = stored(o, rollover.binding.snapshot_digest);
+  assert.equal(snapshot.integration_base.commit, protocol.source_revision);
+  assert.notEqual(snapshot.repository.head, protocol.source_revision);
+  runs[1].rollover_receipt_digests = [rollover.receipt_digest];
+  assert.throws(() => recordRolloverEvaluationRun({ storeRoot: o.storeRoot, protocolDigest: pd, run: runs[1] }), /EVALUATION_RECEIPT_TRANSPLANT/);
+  // Also exercise reopening an externally supplied slot; recording is not the
+  // only boundary that must reject this otherwise schema-valid transplant.
+  const runDigest = putContentAddressedJson({ storeRoot: o.storeRoot, artifact: runs[1] }).digest;
+  writeFileSync(resolve(o.storeRoot, "rollover-evaluation", protocol.protocol_id, "rollover-1.json"), JSON.stringify({ run_digest: runDigest }));
+  assert.throws(() => evaluateStoredRolloverRuns({ storeRoot: o.storeRoot, protocolDigest: pd }), /EVALUATION_RECEIPT_TRANSPLANT/);
+});
+
+for (const key of ["rework", "resume_failures", "integration_conflicts"]) {
+  test(`partial ${key} excess stops evaluation instead of hiding known harm as unknown`, () => {
+    const { protocol, runs } = evaluationFixture();
+    runs[1].observation.counters[key] = observedCounter(1, "count", "runner", "partial");
+    const report = evaluateRolloverRuns(protocol, runs);
+    assert.equal(report.recommendation, "stop");
+    assert.ok(report.reasons.includes(`GUARDRAIL_REGRESSION:${key}`));
+    assert.ok(report.reasons.includes(`GUARDRAIL_COUNTER_UNAVAILABLE:${key}`));
+    assert.equal(report.comparisons[0].metrics[key].delta, null);
+    runs[0].observation.counters[key].coverage = "partial";
+    assert.equal(evaluateRolloverRuns(protocol, runs).recommendation, "insufficient_evidence", "an incomplete baseline must not invent a regression");
+  });
+  for (const coverage of ["unavailable", "partial"]) test(`${coverage} ${key} blocks the next run before a pair is complete`, () => {
+    const { o, protocol, runs } = evaluationFixture(), pd = canonicalDigest(protocol);
+    runs[0].observation.counters[key] = coverage === "unavailable" ? unavailableCounter("count") : observedCounter(0, "count", "runner", "partial");
+    freezeRolloverEvaluation({ storeRoot: o.storeRoot, protocol, policy: o.policy });
+    claimRolloverEvaluationRun({ storeRoot: o.storeRoot, protocolDigest: pd, condition: "baseline", repetition: 1 });
+    recordRolloverEvaluationRun({ storeRoot: o.storeRoot, protocolDigest: pd, run: runs[0] });
+    const report = evaluateStoredRolloverRuns({ storeRoot: o.storeRoot, protocolDigest: pd });
+    assert.equal(report.recommendation, "insufficient_evidence");
+    assert.ok(report.reasons.includes(`GUARDRAIL_COUNTER_UNAVAILABLE:${key}`));
+    assert.throws(() => claimRolloverEvaluationRun({ storeRoot: o.storeRoot, protocolDigest: pd, condition: "rollover", repetition: 1 }), /EVALUATION_STOP_BEFORE_NEXT_RUN/);
+    assert.equal(existsSync(resolve(o.storeRoot, "rollover-evaluation", protocol.protocol_id, "claim-rollover-1.json")), false);
+  });
+}

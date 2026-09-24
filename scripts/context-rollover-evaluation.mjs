@@ -7,6 +7,7 @@ import { assertRolloverArtifact, completeCounter, COUNTER_UNITS } from "./contex
 
 const SCHEMA = resolve(dirname(fileURLToPath(import.meta.url)), "../schemas/rollover-evaluation.schema.json");
 export const QUALITY_COUNTERS = Object.freeze(["requirements_missed", "blockers_missed", "unsafe_attempts", "unsupported_completion_claims", "scope_deviations", "rework"]);
+const GUARDRAIL_COUNTERS = Object.freeze(["rework", "resume_failures", "integration_conflicts"]);
 const check = (value, kind) => assertRolloverArtifact(value, kind, SCHEMA);
 const equalSet = (a, b) => canonicalDigest([...a].sort()) === canonicalDigest([...b].sort());
 const fail = (code) => { throw new Error(code); };
@@ -42,7 +43,7 @@ function validateReceipts(storeRoot, protocol, run) {
   for (const digest of run.rollover_receipt_digests) {
     const { binding, snapshot } = inspectRolloverReceipt({ storeRoot, receiptDigest: digest });
     if (binding.policy_digest !== protocol.policy_digest || binding.runtime_policy_digest !== protocol.runtime_policy_digest ||
-        binding.scope_digest !== protocol.rollover_scope_digest || snapshot.integration_base?.commit !== protocol.source_revision) fail("EVALUATION_RECEIPT_TRANSPLANT");
+        binding.scope_digest !== protocol.rollover_scope_digest || snapshot.repository?.head !== protocol.source_revision) fail("EVALUATION_RECEIPT_TRANSPLANT");
   }
 }
 /** Claim BEFORE the external runner starts, in frozen alternating condition order.
@@ -62,7 +63,7 @@ export function claimRolloverEvaluationRun({ storeRoot, protocolDigest, conditio
   }
   if (previous.length) {
     const report = evaluateRolloverRuns(protocol, previous);
-    if (report.recommendation === "stop" || report.reasons.some(reason => /^(QUALITY_UNAVAILABLE|BUDGET_UNAVAILABLE|VERIFICATION_COVERAGE_UNAVAILABLE|ROLLOVER_EXECUTION_RECEIPT_MISSING)/.test(reason))) fail("EVALUATION_STOP_BEFORE_NEXT_RUN");
+    if (report.recommendation === "stop" || report.reasons.some(reason => /^(QUALITY_UNAVAILABLE|BUDGET_UNAVAILABLE|VERIFICATION_COVERAGE_UNAVAILABLE|ROLLOVER_EXECUTION_RECEIPT_MISSING|GUARDRAIL_COUNTER_UNAVAILABLE)/.test(reason))) fail("EVALUATION_STOP_BEFORE_NEXT_RUN");
   }
   const result = writeCanonicalJsonNoReplace({ outputPath: resolve(experimentPath(storeRoot, protocol), `claim-${condition}-${repetition}.json`), artifact: { protocol_digest: protocolDigest, condition, repetition } });
   if (!result.created) fail("EVALUATION_RUN_ALREADY_CLAIMED");
@@ -103,6 +104,11 @@ export function evaluateRolloverRuns(protocol, runs) {
       // Known adverse observations dominate unknown efficiency or other quality.
       if (c.status === "observed" && key !== "rework" && c.value > 0) stop.push(`QUALITY_FAILURE:${key}`);
     }
+    // Required safety observations must be complete before the next run, even
+    // when the opposite condition has not yet produced a matched pair.
+    for (const key of GUARDRAIL_COUNTERS) {
+      if (!completeCounter(run.observation.counters[key])) missing.push(`GUARDRAIL_COUNTER_UNAVAILABLE:${key}`);
+    }
     const coverage = run.verification_coverage;
     if (coverage.status !== "observed") missing.push("VERIFICATION_COVERAGE_UNAVAILABLE");
     else if (!equalSet(coverage.required_gate_refs, protocol.required_gate_refs) || !equalSet(coverage.verified_gate_refs, protocol.required_gate_refs)) stop.push("VERIFICATION_COVERAGE_LOST");
@@ -133,10 +139,10 @@ export function evaluateRolloverRuns(protocol, runs) {
       else if (metric.delta > metric.baseline.value * protocol.maximum_secondary_regression) revise.push(`SECONDARY_REGRESSION:${key}`);
     }
     // Native rework/conflict/failure counts cannot be traded for faster time.
-    for (const key of ["rework", "resume_failures", "integration_conflicts"]) {
+    for (const key of GUARDRAIL_COUNTERS) {
       const m = metrics[key];
-      if (m.delta === null) missing.push(`GUARDRAIL_COUNTER_UNAVAILABLE:${key}`);
-      else if (m.delta > 0) stop.push(`GUARDRAIL_REGRESSION:${key}`);
+      // Partial capture is a lower bound: a known excess already proves harm.
+      if (completeCounter(m.baseline) && m.rollover.status === "observed" && m.rollover.value > m.baseline.value) stop.push(`GUARDRAIL_REGRESSION:${key}`);
     }
     comparisons.push({ repetition, metrics });
   }
