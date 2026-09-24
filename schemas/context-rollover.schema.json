@@ -1,0 +1,726 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/context-rollover.schema.json",
+  "title": "ASK adapter-neutral context rollover contracts",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/policy"
+    },
+    {
+      "$ref": "#/$defs/observation"
+    },
+    {
+      "$ref": "#/$defs/binding"
+    },
+    {
+      "$ref": "#/$defs/receipt"
+    }
+  ],
+  "$defs": {
+    "identity": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "digest"
+          ],
+          "properties": {
+            "status": {
+              "const": "observed"
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "digest"
+          ],
+          "properties": {
+            "status": {
+              "const": "unavailable"
+            },
+            "digest": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    },
+    "msCounter": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "unit",
+            "source",
+            "coverage"
+          ],
+          "properties": {
+            "status": {
+              "const": "observed"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "unit": {
+              "const": "ms"
+            },
+            "source": {
+              "enum": [
+                "runtime",
+                "runner",
+                "operator"
+              ]
+            },
+            "coverage": {
+              "enum": [
+                "complete",
+                "partial"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "unit",
+            "source",
+            "coverage"
+          ],
+          "properties": {
+            "status": {
+              "const": "unavailable"
+            },
+            "value": {
+              "type": "null"
+            },
+            "unit": {
+              "const": "ms"
+            },
+            "source": {
+              "const": "unavailable"
+            },
+            "coverage": {
+              "const": "unavailable"
+            }
+          }
+        }
+      ]
+    },
+    "tokensCounter": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "unit",
+            "source",
+            "coverage"
+          ],
+          "properties": {
+            "status": {
+              "const": "observed"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "unit": {
+              "const": "tokens"
+            },
+            "source": {
+              "enum": [
+                "runtime",
+                "runner",
+                "operator"
+              ]
+            },
+            "coverage": {
+              "enum": [
+                "complete",
+                "partial"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "unit",
+            "source",
+            "coverage"
+          ],
+          "properties": {
+            "status": {
+              "const": "unavailable"
+            },
+            "value": {
+              "type": "null"
+            },
+            "unit": {
+              "const": "tokens"
+            },
+            "source": {
+              "const": "unavailable"
+            },
+            "coverage": {
+              "const": "unavailable"
+            }
+          }
+        }
+      ]
+    },
+    "countCounter": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "unit",
+            "source",
+            "coverage"
+          ],
+          "properties": {
+            "status": {
+              "const": "observed"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "unit": {
+              "const": "count"
+            },
+            "source": {
+              "enum": [
+                "runtime",
+                "runner",
+                "operator"
+              ]
+            },
+            "coverage": {
+              "enum": [
+                "complete",
+                "partial"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "unit",
+            "source",
+            "coverage"
+          ],
+          "properties": {
+            "status": {
+              "const": "unavailable"
+            },
+            "value": {
+              "type": "null"
+            },
+            "unit": {
+              "const": "count"
+            },
+            "source": {
+              "const": "unavailable"
+            },
+            "coverage": {
+              "const": "unavailable"
+            }
+          }
+        }
+      ]
+    },
+    "counters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_ms",
+        "model_steps",
+        "runtime_steps",
+        "cached_input_tokens",
+        "uncached_input_tokens",
+        "output_tokens",
+        "context_compactions",
+        "tool_wait_ms",
+        "repository_orientation_rounds",
+        "verification_attempts",
+        "integration_conflicts",
+        "resume_failures",
+        "silent_gap_count_over_60s",
+        "required_human_decisions",
+        "rework"
+      ],
+      "properties": {
+        "wall_time_ms": {
+          "$ref": "#/$defs/msCounter"
+        },
+        "model_steps": {
+          "$ref": "#/$defs/countCounter"
+        },
+        "runtime_steps": {
+          "$ref": "#/$defs/countCounter"
+        },
+        "cached_input_tokens": {
+          "$ref": "#/$defs/tokensCounter"
+        },
+        "uncached_input_tokens": {
+          "$ref": "#/$defs/tokensCounter"
+        },
+        "output_tokens": {
+          "$ref": "#/$defs/tokensCounter"
+        },
+        "context_compactions": {
+          "$ref": "#/$defs/countCounter"
+        },
+        "tool_wait_ms": {
+          "$ref": "#/$defs/msCounter"
+        },
+        "repository_orientation_rounds": {
+          "$ref": "#/$defs/countCounter"
+        },
+        "verification_attempts": {
+          "$ref": "#/$defs/countCounter"
+        },
+        "integration_conflicts": {
+          "$ref": "#/$defs/countCounter"
+        },
+        "resume_failures": {
+          "$ref": "#/$defs/countCounter"
+        },
+        "silent_gap_count_over_60s": {
+          "$ref": "#/$defs/countCounter"
+        },
+        "required_human_decisions": {
+          "$ref": "#/$defs/countCounter"
+        },
+        "rework": {
+          "$ref": "#/$defs/countCounter"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_kind",
+        "schema_version",
+        "policy_id",
+        "revision",
+        "enabled",
+        "thresholds",
+        "operator_request_enabled",
+        "maximum_rollovers",
+        "minimum_runtime_steps_between_rollovers",
+        "runtime_timeout_ms",
+        "telemetry_enabled"
+      ],
+      "properties": {
+        "artifact_kind": {
+          "const": "ask_context_rollover_policy"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "policy_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "model_steps",
+            "runtime_steps",
+            "uncached_input_tokens",
+            "context_compactions",
+            "wall_time_ms",
+            "repository_orientation_rounds"
+          ],
+          "properties": {
+            "model_steps": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "runtime_steps": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "uncached_input_tokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "context_compactions": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "wall_time_ms": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "repository_orientation_rounds": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "operator_request_enabled": {
+          "type": "boolean"
+        },
+        "maximum_rollovers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "minimum_runtime_steps_between_rollovers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "runtime_timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300000
+        },
+        "telemetry_enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_kind",
+        "schema_version",
+        "adapter_id",
+        "runtime_policy_digest",
+        "process_identity",
+        "session_identity",
+        "counters",
+        "rework_reason_counts"
+      ],
+      "properties": {
+        "artifact_kind": {
+          "const": "ask_runtime_observation"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "adapter_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$"
+        },
+        "runtime_policy_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "process_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "session_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "counters": {
+          "$ref": "#/$defs/counters"
+        },
+        "rework_reason_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requirements",
+            "verification",
+            "integration",
+            "context_loss",
+            "other"
+          ],
+          "properties": {
+            "requirements": {
+              "$ref": "#/$defs/countCounter"
+            },
+            "verification": {
+              "$ref": "#/$defs/countCounter"
+            },
+            "integration": {
+              "$ref": "#/$defs/countCounter"
+            },
+            "context_loss": {
+              "$ref": "#/$defs/countCounter"
+            },
+            "other": {
+              "$ref": "#/$defs/countCounter"
+            }
+          }
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_kind",
+        "schema_version",
+        "adapter_id",
+        "policy_digest",
+        "policy_id",
+        "policy_revision",
+        "runtime_policy_digest",
+        "source_process_identity",
+        "source_session_identity",
+        "checkpoint_digest",
+        "snapshot_digest",
+        "restart_package_digest",
+        "continuation_digest",
+        "scope_digest",
+        "sequence",
+        "previous_receipt_digest",
+        "trigger_reasons",
+        "observation_digest"
+      ],
+      "properties": {
+        "artifact_kind": {
+          "const": "ask_context_rollover_binding"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "adapter_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$"
+        },
+        "policy_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "policy_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$"
+        },
+        "policy_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "runtime_policy_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "source_process_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "source_session_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "checkpoint_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "snapshot_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "restart_package_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "continuation_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "scope_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "previous_receipt_digest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trigger_reasons": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "model_steps",
+              "runtime_steps",
+              "uncached_input_tokens",
+              "context_compactions",
+              "wall_time_ms",
+              "repository_orientation_rounds",
+              "operator_request"
+            ]
+          }
+        },
+        "observation_digest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_kind",
+        "schema_version",
+        "binding_digest",
+        "scope_digest",
+        "sequence",
+        "authorization_digest",
+        "target_process_identity",
+        "target_session_identity",
+        "input_digest",
+        "turn_identity",
+        "status"
+      ],
+      "properties": {
+        "artifact_kind": {
+          "const": "ask_context_rollover_receipt"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "binding_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "scope_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "authorization_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "target_process_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "target_session_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "input_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "turn_identity": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "status": {
+          "const": "continuation_started"
+        }
+      }
+    }
+  }
+}

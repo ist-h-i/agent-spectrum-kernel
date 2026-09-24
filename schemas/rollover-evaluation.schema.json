@@ -1,0 +1,397 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/rollover-evaluation.schema.json",
+  "title": "ASK matched context rollover evaluation inputs",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/protocol"
+    },
+    {
+      "$ref": "#/$defs/run"
+    }
+  ],
+  "$defs": {
+    "countCounter": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "unit",
+            "source",
+            "coverage"
+          ],
+          "properties": {
+            "status": {
+              "const": "observed"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "unit": {
+              "const": "count"
+            },
+            "source": {
+              "enum": [
+                "runtime",
+                "runner",
+                "operator"
+              ]
+            },
+            "coverage": {
+              "enum": [
+                "complete",
+                "partial"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "unit",
+            "source",
+            "coverage"
+          ],
+          "properties": {
+            "status": {
+              "const": "unavailable"
+            },
+            "value": {
+              "type": "null"
+            },
+            "unit": {
+              "const": "count"
+            },
+            "source": {
+              "const": "unavailable"
+            },
+            "coverage": {
+              "const": "unavailable"
+            }
+          }
+        }
+      ]
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_kind",
+        "schema_version",
+        "protocol_id",
+        "revision",
+        "policy_digest",
+        "rollover_scope_digest",
+        "source_revision",
+        "task_digest",
+        "runtime_policy_digest",
+        "repetitions",
+        "primary_metric",
+        "secondary_metrics",
+        "minimum_relative_reduction",
+        "maximum_secondary_regression",
+        "maximum_run_wall_time_ms",
+        "maximum_run_uncached_tokens",
+        "maximum_run_human_decisions",
+        "required_gate_refs"
+      ],
+      "properties": {
+        "artifact_kind": {
+          "const": "ask_rollover_evaluation_protocol"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "protocol_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "policy_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "rollover_scope_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "task_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "runtime_policy_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "repetitions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "primary_metric": {
+          "enum": [
+            "wall_time_ms",
+            "model_steps",
+            "runtime_steps",
+            "cached_input_tokens",
+            "uncached_input_tokens",
+            "output_tokens",
+            "context_compactions",
+            "tool_wait_ms",
+            "repository_orientation_rounds",
+            "verification_attempts",
+            "integration_conflicts",
+            "resume_failures",
+            "silent_gap_count_over_60s",
+            "required_human_decisions",
+            "rework"
+          ]
+        },
+        "secondary_metrics": {
+          "type": "array",
+          "maxItems": 15,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "wall_time_ms",
+              "model_steps",
+              "runtime_steps",
+              "cached_input_tokens",
+              "uncached_input_tokens",
+              "output_tokens",
+              "context_compactions",
+              "tool_wait_ms",
+              "repository_orientation_rounds",
+              "verification_attempts",
+              "integration_conflicts",
+              "resume_failures",
+              "silent_gap_count_over_60s",
+              "required_human_decisions",
+              "rework"
+            ]
+          }
+        },
+        "minimum_relative_reduction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "maximum_secondary_regression": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_run_wall_time_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maximum_run_uncached_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maximum_run_human_decisions": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "required_gate_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_kind",
+        "schema_version",
+        "protocol_digest",
+        "run_id",
+        "condition",
+        "repetition",
+        "source_revision",
+        "task_digest",
+        "evidence_scope",
+        "terminal_status",
+        "observation",
+        "quality",
+        "verification_coverage",
+        "rollover_receipt_digests"
+      ],
+      "properties": {
+        "artifact_kind": {
+          "const": "ask_rollover_evaluation_run"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "protocol_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "condition": {
+          "enum": [
+            "baseline",
+            "rollover"
+          ]
+        },
+        "repetition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "task_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "evidence_scope": {
+          "enum": [
+            "deterministic_fixture",
+            "measured"
+          ]
+        },
+        "terminal_status": {
+          "enum": [
+            "completed",
+            "failed",
+            "stopped"
+          ]
+        },
+        "observation": {
+          "$ref": "context-rollover.schema.json#/$defs/observation"
+        },
+        "quality": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requirements_missed",
+            "blockers_missed",
+            "unsafe_attempts",
+            "unsupported_completion_claims",
+            "scope_deviations",
+            "rework"
+          ],
+          "properties": {
+            "requirements_missed": {
+              "$ref": "#/$defs/countCounter"
+            },
+            "blockers_missed": {
+              "$ref": "#/$defs/countCounter"
+            },
+            "unsafe_attempts": {
+              "$ref": "#/$defs/countCounter"
+            },
+            "unsupported_completion_claims": {
+              "$ref": "#/$defs/countCounter"
+            },
+            "scope_deviations": {
+              "$ref": "#/$defs/countCounter"
+            },
+            "rework": {
+              "$ref": "#/$defs/countCounter"
+            }
+          }
+        },
+        "verification_coverage": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "required_gate_refs",
+                "verified_gate_refs"
+              ],
+              "properties": {
+                "status": {
+                  "const": "observed"
+                },
+                "required_gate_refs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 128,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  }
+                },
+                "verified_gate_refs": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "required_gate_refs",
+                "verified_gate_refs"
+              ],
+              "properties": {
+                "status": {
+                  "const": "unavailable"
+                },
+                "required_gate_refs": {
+                  "type": "null"
+                },
+                "verified_gate_refs": {
+                  "type": "null"
+                }
+              }
+            }
+          ]
+        },
+        "rollover_receipt_digests": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  }
+}
