@@ -1,0 +1,38 @@
+name: Validate context rollover pilot
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  context-rollover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - name: Test runtime boundary and matched evaluation
+        run: node --test scripts/test-context-rollover.mjs
+      - name: Preserve checkpoint and admission authority
+        run: |
+          node scripts/test-session-checkpoint.mjs
+          node scripts/test-epic-admission-work-package-plan.mjs
+      - name: Preserve evidence and current coverage boundaries
+        run: |
+          node scripts/test-verification-evidence.mjs
+          node scripts/test-verification-scoped-reuse.mjs
+          node --test scripts/test-verification-reuse-completion.mjs
+      - name: Validate schemas and repository
+        run: |
+          node scripts/test-json-schema-validation.mjs
+          node scripts/validate-repo.mjs
+      - name: Check whitespace
+        run: git diff --check "origin/${{ github.base_ref }}...HEAD"
