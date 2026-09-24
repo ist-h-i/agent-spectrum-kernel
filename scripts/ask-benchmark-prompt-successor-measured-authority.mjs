@@ -8,7 +8,7 @@ import {
 } from "./content-addressed-store.mjs";
 import { validatePromptSuccessorPreparation, validateSuccessorSourceScope, successorClosed, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
 import { assertSuccessorAdapterFacts } from "./ask-benchmark-prompt-successor-delivery.mjs";
-import { readSuccessorImplementationIdentity } from "./ask-benchmark-prompt-successor-repository.mjs";
+import { validateSuccessorFromRepository } from "./ask-benchmark-prompt-successor-repository.mjs";
 import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -133,11 +133,10 @@ function authorityEvidence({ preparation, sources }) {
   };
 }
 
-export function openSuccessorMeasuredAuthority({ preparation, sources, root = ROOT }) {
+export async function openSuccessorMeasuredAuthority({ preparation, sources, root = ROOT }) {
   ({ preparation, sources } = structuredClone({ preparation, sources }));
   successorExact(resolve(root), ROOT, "measured authority root");
-  validatePromptSuccessorPreparation(preparation);
-  successorExact(readSuccessorImplementationIdentity(root), preparation.implementation, "measured implementation");
+  await validateSuccessorFromRepository(preparation, { root });
   successorExact(preparation.runtime.authentication_mode, ISSUE_291_MEASURED_AUTHORITY.authentication_mode, "issue291 authentication class");
   successorExact(preparation.runtime.timeout_ms, ISSUE_291_MEASURED_AUTHORITY.timeout_ms, "issue291 timeout");
   successorExact(preparation.expected_case_count, ISSUE_291_MEASURED_AUTHORITY.planned_trials, "issue291 trial count");

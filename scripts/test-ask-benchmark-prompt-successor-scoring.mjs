@@ -157,10 +157,26 @@ async function worker(contextPath) {
       return [name, { scope: role.scope, expectedScopeDigest: role.scope.scope_digest, execution, runtimeConfigPath, agentBin }];
     }));
     let measuredAuthority; let measuredJournalPath;
-    await check("issue291 measured authority binds exact host/runtime and both native sources", () => {
-      measuredAuthority = openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, root });
+    await check("issue291 measured authority binds exact host/runtime and both native sources", async () => {
+      measuredAuthority = await openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, root });
       measuredJournalPath = successorMeasuredJournalPath(measuredAuthority, { preparation, sources: measuredSources });
       assert.ok(measuredAuthority); assert.ok(measuredJournalPath.startsWith(work));
+    });
+    await check("issue291 measured authority rejects a self-consistent substituted predecessor", async () => {
+      const forgedParent = structuredClone(parent);
+      forgedParent.preregistration_digest = canonicalDigest({ synthetic_forgery: "issue291-predecessor" });
+      const forgedPreparation = buildPromptSuccessorPreparation({
+        parent: forgedParent,
+        runtime,
+        implementation,
+        seed: "synthetic-successor-scoring-forged-parent",
+        changeReason: "Negative authority-boundary test; no model call.",
+        scoringInputManifestDigest: manifest.manifest_digest,
+      });
+      await assert.rejects(
+        () => openSuccessorMeasuredAuthority({ preparation: forgedPreparation, sources: measuredSources, root }),
+        { code: "SUCCESSOR_IDENTITY_MISMATCH" },
+      );
     });
     await check("durable global claim survives a pre-spawn failure and recovery never retries", async () => {
       const hiddenAgent = resolve(work, "codex-temporarily-unavailable");
@@ -202,7 +218,7 @@ async function worker(contextPath) {
         const scope = buildSuccessorSourceScope({ preparation, promptRole: role, runInstanceId: providerRun, source });
         providerRoles[role] = { execution, scope, expectedScopeDigest: scope.scope_digest, runtimeConfigPath, agentBin };
       }
-      const providerAuthority = openSuccessorMeasuredAuthority({ preparation, sources: providerRoles, root });
+      const providerAuthority = await openSuccessorMeasuredAuthority({ preparation, sources: providerRoles, root });
       const step = await asyncEnvironment({ ...env, ASK_SUCCESSOR_FAKE_MODE: "provider-limit" }, () => executeNextMeasuredSuccessorCase({
         authority: providerAuthority, preparation, sources: providerRoles, root,
       }));
@@ -248,7 +264,7 @@ async function worker(contextPath) {
         import { openSuccessorMeasuredAuthority } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-measured-authority.mjs", import.meta.url).href)};
         import { executeNextMeasuredSuccessorCase } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-measured-execution.mjs", import.meta.url).href)};
         const i = JSON.parse(readFileSync(process.argv[1], "utf8"));
-        const authority = openSuccessorMeasuredAuthority({ preparation: i.preparation, sources: i.sources, root: i.root });
+        const authority = await openSuccessorMeasuredAuthority({ preparation: i.preparation, sources: i.sources, root: i.root });
         await executeNextMeasuredSuccessorCase({ authority, preparation: i.preparation, sources: i.sources, root: i.root });
       `, crashContextPath], {
         cwd: root, encoding: "utf8", timeout: 120000, maxBuffer: 4 * 1024 * 1024,
@@ -256,7 +272,7 @@ async function worker(contextPath) {
       });
       assert.equal(child.error, undefined, child.error?.message);
       assert.equal(child.status, 86, child.stderr || child.stdout);
-      const crashAuthority = openSuccessorMeasuredAuthority({ preparation, sources: crashRoles, root });
+      const crashAuthority = await openSuccessorMeasuredAuthority({ preparation, sources: crashRoles, root });
       const recovered = await recoverMeasuredSuccessorSession({
         authority: crashAuthority, preparation, sources: crashRoles, root,
       });
