@@ -32,8 +32,6 @@ export function openSuccessorMeasuredAuthority({ preparation, sources, root = RO
   successorExact(resolve(root), ROOT, "measured authority root");
   validatePromptSuccessorPreparation(preparation);
   successorExact(readSuccessorImplementationIdentity(root), preparation.implementation, "measured implementation");
-  successorExact(preparation.predecessor.source_revision, ISSUE_291_MEASURED_AUTHORITY.source_revision, "issue291 source revision");
-  successorExact(preparation.predecessor.source_tree, ISSUE_291_MEASURED_AUTHORITY.source_tree, "issue291 source tree");
   successorExact(preparation.runtime.authentication_mode, ISSUE_291_MEASURED_AUTHORITY.authentication_mode, "issue291 authentication class");
   successorExact(preparation.runtime.timeout_ms, ISSUE_291_MEASURED_AUTHORITY.timeout_ms, "issue291 timeout");
   successorExact(preparation.expected_case_count, ISSUE_291_MEASURED_AUTHORITY.planned_trials, "issue291 trial count");
@@ -68,6 +66,15 @@ export function openSuccessorMeasuredAuthority({ preparation, sources, root = RO
     kind: "prompt_successor_measured_authority",
     authority_source: "github_issue_291_frozen_contract",
     issue: ISSUE_291_MEASURED_AUTHORITY.issue,
+    original_issue_source: {
+      revision: ISSUE_291_MEASURED_AUTHORITY.source_revision,
+      tree: ISSUE_291_MEASURED_AUTHORITY.source_tree,
+      role: "historical_frozen_measurement_source_not_runtime_authority",
+    },
+    preregistration_source: {
+      revision: preparation.predecessor.source_revision,
+      tree: preparation.predecessor.source_tree,
+    },
     preparation_digest: preparation.preparation_digest,
     implementation: structuredClone(preparation.implementation),
     experiment_run_instance_id: sources.current_prompt.scope.run_instance_id,
