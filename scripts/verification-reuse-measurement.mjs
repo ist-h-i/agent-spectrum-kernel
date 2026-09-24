@@ -92,7 +92,7 @@ export async function runMeasurement({ provider = "unavailable", repetitions = 2
     initial_acquisition: "included_in_each_condition", model_retries: 0, maximum_review_invocations: repetitions * 6,
     stop_conditions: ["gate_failure", "provider_failure", "quality_regression", "identity_drift", "unknown_or_unbounded_review"],
     production_mutation: false, raw_payload_persistence: false, upstream_model_request_count: "unavailable_from_codex_jsonl" };
-  const planDigest = digest(plan);
+  const planDigest = canonicalDigest(plan);
   const persist = (name, artifact) => {
     if (!outputDirectory) return;
     mkdirSync(resolve(outputDirectory), { recursive: true });
@@ -179,7 +179,7 @@ export async function runMeasurement({ provider = "unavailable", repetitions = 2
             quality, canonical_coverage_status: coverage.status, evaluation_coverage_status: evaluatedCoverage,
             authorizes_action: coverage.authorizes_action, historical_state_is_current: coverage.historical_state_is_current,
             request: request ? { request_digest: request.request_digest, paths: request.paths, obligation_refs: request.obligations.map((entry) => entry.ref), judgment_refs: request.judgment_refs } : null,
-            review_result: skip ? null : review.result, prior_baseline_digest: skip ? digest(baselines[condition]) : null,
+            review_result: skip ? null : review.result, prior_baseline_digest: skip ? canonicalDigest(baselines[condition]) : null,
             provider_status: skip ? "not_dispatched" : review.status, provider_reason: skip ? null : (review.reason ?? null),
             upstream_model_requests: unavailable("not_exposed_by_native_runtime"),
             gate_dispositions: before.dispositions,

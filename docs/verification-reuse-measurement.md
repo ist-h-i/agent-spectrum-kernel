@@ -50,6 +50,8 @@ The current in-process review-state provider is read-only, exact-target/plan/req
 
 The versioned output is `ask_verification_reuse_measurement`, schema version `1.0.0`, validated by `schemas/verification-reuse-measurement.schema.json`.
 
+Durable references use the existing CAS `canonicalDigest()`: `plan_digest` hashes every frozen plan field except `plan_digest` itself, and `prior_baseline_digest` hashes the referenced A-row `review_result`. These digests survive canonical JSON persistence and object-key reordering; changing a plan field changes its digest. Artifacts from candidates that used insertion-order JSON hashing are historical, not replayable current-reference evidence.
+
 - `baseline` and `reuse` contain required gates, exact/scoped reuse, rerun-required/blocked counts, actual deterministic execution attempts, review dispatches, AI-review invocations, token classes, elapsed measurements, current judgments and quality outcomes.
 - `delta` uses **reuse minus baseline** in native units. Negative gate/request/token/time deltas mean less work. An incomplete paired run has unavailable deltas, never a savings claim from fewer recorded cells.
 - Gate dispositions and per-execution evidence/duration references are retained without raw command output. Every telemetry value is an explicit `{status, value, reason}` measurement. A known no-dispatch cell may record zero. An absent or failed provider, missing token field or partial sum is not converted to zero. Partial-run counts describe only recorded cells, not inferred full-run totals.

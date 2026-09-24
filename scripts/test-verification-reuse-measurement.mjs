@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { canonicalDigest } from "./content-addressed-store.mjs";
 import { validateJsonSchema } from "./execution-envelope.mjs";
 import { fixtureReview, runMeasurement } from "./verification-reuse-measurement.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -48,12 +49,22 @@ test("two counterbalanced A/B/C comparisons execute real gates, preserve coverag
     }
   }
   const plan = JSON.parse(readFileSync(join(outputDirectory, "plan.json"), "utf8"));
+  const { plan_digest: planDigest, ...planBody } = plan;
+  assert.equal(planDigest, canonicalDigest(planBody));
+  assert.equal(result.plan_digest, planDigest);
+  assert.equal(planDigest, canonicalDigest(Object.fromEntries(Object.entries(planBody).reverse())));
+  assert.notEqual(planDigest, canonicalDigest({ ...planBody, repetitions: planBody.repetitions + 1 }));
   assert.deepEqual(plan.condition_orders, [["baseline", "reuse"], ["reuse", "baseline"]]);
   assert.equal(plan.initial_acquisition, "included_in_each_condition");
   assert.match(plan.source_revision, /^[a-f0-9]{40}$/u); assert.match(plan.source_git_tree, /^[a-f0-9]{40}$/u);
   assert.equal(plan.source_worktree_clean, true);
   assert.equal(readdirSync(outputDirectory).length, 14);
-  assert.deepEqual(JSON.parse(readFileSync(join(outputDirectory, "result.json"), "utf8")), result);
+  const persistedResult = JSON.parse(readFileSync(join(outputDirectory, "result.json"), "utf8"));
+  assert.deepEqual(persistedResult, result);
+  for (const row of persistedResult.rows.filter((entry) => entry.prior_baseline_digest !== null)) {
+    const baseline = JSON.parse(readFileSync(join(outputDirectory, `row-${row.repetition}-A-${row.condition}.json`), "utf8"));
+    assert.equal(row.prior_baseline_digest, canonicalDigest(baseline.review_result));
+  }
   for (const file of readdirSync(outputDirectory)) {
     const text = readFileSync(join(outputDirectory, file), "utf8");
     assert.ok(!text.includes("export const withinLimit"));
