@@ -32,6 +32,8 @@ test("two counterbalanced A/B/C comparisons execute real gates, preserve coverag
   assert.equal(result.issue_decision, "insufficient evidence");
   for (const row of result.rows) {
     assert.equal(row.handoff.deterministic_reusable, 2);
+    assert.equal(row.execution_receipts.length, row.deterministic_gate_executions);
+    assert.equal(row.gate_dispositions.length, row.required_gate_count);
     assert.equal(row.handoff.extra_executions, 0); assert.equal(row.handoff.approval_promoted, false);
     assert.equal(row.blocked_uncovered, 0); assert.equal(row.quality.status, "pass");
     if (row.revision === "C") {
@@ -48,6 +50,8 @@ test("two counterbalanced A/B/C comparisons execute real gates, preserve coverag
   const plan = JSON.parse(readFileSync(join(outputDirectory, "plan.json"), "utf8"));
   assert.deepEqual(plan.condition_orders, [["baseline", "reuse"], ["reuse", "baseline"]]);
   assert.equal(plan.initial_acquisition, "included_in_each_condition");
+  assert.match(plan.source_revision, /^[a-f0-9]{40}$/u); assert.match(plan.source_git_tree, /^[a-f0-9]{40}$/u);
+  assert.equal(plan.source_worktree_clean, true);
   assert.equal(readdirSync(outputDirectory).length, 14);
   assert.deepEqual(JSON.parse(readFileSync(join(outputDirectory, "result.json"), "utf8")), result);
   for (const file of readdirSync(outputDirectory)) {

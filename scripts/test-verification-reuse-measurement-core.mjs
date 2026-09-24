@@ -107,6 +107,8 @@ test("native provider errors, wrong targets, tools, partial streams and invalid 
     stream(pass(), { input_tokens: 1, cached_input_tokens: 2 }), stream(pass(), { input_tokens: -1 }),
     stream() + '\n{"type":"error","message":"private error"}',
     stream() + '\n{"type":"unknown.future.event"}',
+    stream().replace('"input_tokens":123', '"input_tokens":0,"input_tokens":123'),
+    stream().replace('\\"decision\\":\\"pass\\"', '\\"decision\\":\\"block\\",\\"decision\\":\\"pass\\"'),
   ]) assert.throws(() => parseCodexReviewStream(text, request));
   assert.throws(() => parseCodexReviewStream(stream() + '\n{"type":"item.completed","item":{"type":"command_execution"}}', request), (error) => error.code === "unsafe_action");
 });
@@ -132,7 +134,7 @@ test("pinned native adapter is executable with an explicitly fake binary; metada
   const binary = join(parent, "fake-codex");
   writeFileSync(binary, `#!${process.execPath}\nimport fs from 'node:fs';
 if(process.argv.includes('--version')){console.log('codex-cli 1.0.0');process.exit(0)}
-if(!process.argv.includes('--ephemeral')||!process.argv.includes('--output-schema'))process.exit(3);
+if(!process.argv.includes('--ephemeral')||!process.argv.includes('--output-schema')||!process.argv.includes('features.apps=false')||!process.argv.includes('features.shell_snapshot=false'))process.exit(3);
 const input=fs.readFileSync(0,'utf8').trim().split('\\n');const r=JSON.parse(input.at(-1));
 const result={request_digest:r.request_digest,target_revision:r.target_revision,reviewed_paths:r.paths,reviewed_obligations:r.obligations.map(x=>x.ref),judgment_refs:r.judgment_refs,findings:[],decision:'pass'};
 console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:JSON.stringify(result)}}));

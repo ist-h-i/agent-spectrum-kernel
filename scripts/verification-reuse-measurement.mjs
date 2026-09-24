@@ -11,7 +11,7 @@ import { summarizeVerificationWork } from "./verification-decision-core.mjs";
 import { currentRuntimeIdentity } from "./verification-scoped-reuse.mjs";
 import { assessReview, compareConditions, digest, observed, summarizeCondition, TOKEN_KEYS, unavailable, validateReview } from "./verification-reuse-measurement-core.mjs";
 import { codexIdentity, runCodexReview } from "./verification-review-runtime.mjs";
-import { createMeasurementFixture, MATERIAL, OBLIGATIONS, REVISIONS, REVIEW_ACTOR } from "./verification-reuse-measurement-fixture.mjs";
+import { createMeasurementFixture, git, MATERIAL, OBLIGATIONS, REVISIONS, REVIEW_ACTOR } from "./verification-reuse-measurement-fixture.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const noUsage = () => Object.fromEntries(TOKEN_KEYS.map((key) => [key, unavailable("no_live_model_telemetry")]));
@@ -75,8 +75,15 @@ export async function runMeasurement({ provider = "unavailable", repetitions = 2
     if (!binary || !version || !model) throw new Error("live run requires binary, version and model pins");
     runtime = { status: "observed", ...codexIdentity(binary, version), model, reasoning_effort: "medium" };
   }
+  const sourceRevision = git(ROOT, ["rev-parse", "HEAD"]);
+  const sourceTree = git(ROOT, ["rev-parse", "HEAD^{tree}"]);
+  const checkSource = () => {
+    if (git(ROOT, ["rev-parse", "HEAD"]) !== sourceRevision || git(ROOT, ["status", "--porcelain=v1", "--untracked-files=all"])) throw new Error("implementation identity drift");
+  };
+  checkSource();
   const sources = ["verification-reuse-measurement.mjs", "verification-reuse-measurement-core.mjs", "verification-review-runtime.mjs", "verification-reuse-measurement-fixture.mjs"];
   const plan = { schema_version: "1.0.0", program: "ask_verification_reuse_run_plan", provider, runtime,
+    source_revision: sourceRevision, source_git_tree: sourceTree, source_worktree_clean: true,
     repetitions, independent_judgment_each_revision: independent,
     condition_orders: Array.from({ length: repetitions }, (_, index) => index % 2 ? ["reuse", "baseline"] : ["baseline", "reuse"]),
     scenario_digest: digest({ material: MATERIAL, revisions: REVISIONS, obligations: OBLIGATIONS }),
@@ -154,6 +161,7 @@ export async function runMeasurement({ provider = "unavailable", repetitions = 2
           const metrics = summarizeVerificationWork({ dispositions: before.dispositions, events,
             requiredJudgmentRefs: before.review_request.required_judgment_refs });
           const transfer = await handoff(f, condition, prepared);
+          checkSource();
           const elapsed = Math.max(0, Math.round(performance.now() - started)) + (revision.name === "A" ? acquisitionTime[condition] : 0);
           const row = {
             repetition: repetition + 1, revision: revision.name, condition, review_mode: mode,
@@ -173,7 +181,11 @@ export async function runMeasurement({ provider = "unavailable", repetitions = 2
             request: request ? { request_digest: request.request_digest, paths: request.paths, obligation_refs: request.obligations.map((entry) => entry.ref), judgment_refs: request.judgment_refs } : null,
             review_result: skip ? null : review.result, prior_baseline_digest: skip ? digest(baselines[condition]) : null,
             provider_status: skip ? "not_dispatched" : review.status, provider_reason: skip ? null : (review.reason ?? null),
-            upstream_model_requests: unavailable("not_exposed_by_native_runtime"), handoff: transfer,
+            upstream_model_requests: unavailable("not_exposed_by_native_runtime"),
+            gate_dispositions: before.dispositions,
+            execution_receipts: executions.map((entry) => ({ gate_id: entry.event.gate_id, status: entry.event.status,
+              evidence_id: entry.evidence.evidence_id, evidence_digest: entry.evidence.evidence_digest, duration_ms: entry.duration_ms })),
+            handoff: transfer,
           };
           rows.push(row);
           persist(`row-${repetition + 1}-${revision.name}-${condition}.json`, row);

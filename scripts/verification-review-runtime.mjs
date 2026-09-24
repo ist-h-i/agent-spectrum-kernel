@@ -4,6 +4,7 @@ import { lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, 
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { performance } from "node:perf_hooks";
+import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { digest, observed, reviewOutputSchema, unavailable, validateReview } from "./verification-reuse-measurement-core.mjs";
 
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -24,7 +25,7 @@ export function parseCodexReviewStream(text, request) {
   if (typeof text !== "string" || Buffer.byteLength(text) > MAX_BYTES) throw new Error("runtime output exceeded bound");
   const lines = text.split("\n").filter((line) => line.trim());
   if (lines.length > 4096) throw new Error("runtime event count exceeded bound");
-  const events = lines.map((line) => JSON.parse(line));
+  const events = lines.map((line) => parseJsonRejectDuplicateKeys(line, "native review event"));
   if (events.some((event) => !event || typeof event.type !== "string" || ["error", "turn.failed"].includes(event.type))) throw new Error("runtime failed");
   const prohibited = ["command_execution", "file_change", "mcp_tool_call", "web_search", "collab_tool_call"];
   if (events.some((event) => event.item && prohibited.includes(event.item.type))) {
@@ -42,7 +43,7 @@ export function parseCodexReviewStream(text, request) {
   }
   if (measurements.input_tokens.status === "observed" && measurements.cached_tokens.status === "observed"
     && measurements.cached_tokens.value > measurements.input_tokens.value) throw new Error("invalid cached token subset");
-  return { result: validateReview(JSON.parse(messages[0].item.text), request), usage: measurements,
+  return { result: validateReview(parseJsonRejectDuplicateKeys(messages[0].item.text, "native structured review"), request), usage: measurements,
     usage_digest: digest(measurements), model_review_invocations: observed(1, "completed_codex_review_invocation"),
     // A Codex turn can contain several model HTTP calls/retries. JSONL does not count those.
     upstream_model_requests: unavailable("not_exposed_by_codex_jsonl") };
@@ -102,7 +103,11 @@ export async function runCodexReview({ binary, identity, model, request, apiKey,
     const args = ["exec", "--ephemeral", "--json", "--sandbox", "read-only", "--skip-git-repo-check",
       "--model", model, "--output-schema", schemaPath,
       "-c", 'model_reasoning_effort="medium"', "-c", 'web_search="disabled"',
-      "-c", 'history.persistence="none"', "-c", "features.shell_tool=false", "-c", "features.multi_agent=false", "-"];
+      "-c", 'history.persistence="none"', "-c", 'approval_policy="never"',
+      "-c", "features.shell_tool=false", "-c", "features.unified_exec=false", "-c", "features.shell_snapshot=false",
+      "-c", "features.multi_agent=false", "-c", "agents.enabled=false", "-c", "features.apps=false",
+      "-c", "features.remote_plugin=false", "-c", "features.hooks=false", "-c", "features.goals=false",
+      "-c", "features.memories=false", "-c", "analytics.enabled=false", "-"];
     const processResult = await captureProcess(realpathSync(binary), args, { cwd: workspace,
       env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: home, CODEX_HOME: home, TMPDIR: parent,
         LANG: "C.UTF-8", CODEX_API_KEY: apiKey }, input, timeoutMs });

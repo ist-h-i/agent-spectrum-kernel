@@ -19,6 +19,14 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "24"
+      - name: Validate repository consistency before fixture suites
+        run: |
+          if node scripts/validate-repo.mjs; then
+            exit 0
+          fi
+          node scripts/validate-repo.mjs --write-report
+          git diff -- docs/validation-report.md
+          exit 1
       - name: Run runtime measurement and provider boundary tests
         run: node --test scripts/test-verification-reuse-measurement-core.mjs
       - name: Run paired measurement and handoff integration tests
