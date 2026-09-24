@@ -1,0 +1,370 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-spectrum-kernel.dev/schemas/verification-reuse-measurement.schema.json",
+  "title": "Verification reuse measurement 1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "program": {"const": "ask_verification_reuse_measurement"},
+    "plan_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "provider": {"enum": ["fixture", "unavailable", "codex"]},
+    "complete": {"type": "boolean"},
+    "stop_reason": {"type": ["string", "null"]},
+    "expected_cells": {"type": "integer", "minimum": 0},
+    "observed_cells": {"type": "integer", "minimum": 0},
+    "baseline": {"$ref": "#/$defs/summary"},
+    "reuse": {"$ref": "#/$defs/summary"},
+    "delta": {"$ref": "#/$defs/delta"},
+    "issue_decision": {"const": "insufficient evidence"},
+    "issue_close_eligible": {"const": false},
+    "claim_scope": {"enum": ["bounded_public_fixture_native_codex", "deterministic_fixture_only"]},
+    "unmeasured": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "rows": {"type": "array", "maxItems": 30, "items": {"$ref": "#/$defs/row"}},
+    "count_scope": {"const": "recorded_cells_only"}
+  },
+  "required": [
+    "schema_version",
+    "program",
+    "plan_digest",
+    "provider",
+    "complete",
+    "stop_reason",
+    "expected_cells",
+    "observed_cells",
+    "baseline",
+    "reuse",
+    "delta",
+    "issue_decision",
+    "issue_close_eligible",
+    "claim_scope",
+    "unmeasured",
+    "rows",
+    "count_scope"
+  ],
+  "$defs": {
+    "measurement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {"const": "observed"},
+            "value": {"type": "integer", "minimum": 0},
+            "reason": {"type": "string", "minLength": 1}
+          },
+          "required": ["status", "value", "reason"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {"const": "unavailable"},
+            "value": {"type": "null"},
+            "reason": {"type": "string", "minLength": 1}
+          },
+          "required": ["status", "value", "reason"]
+        }
+      ]
+    },
+    "deltaMeasurement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {"status": {"const": "observed"}, "value": {"type": "integer"}},
+          "required": ["status", "value"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {"status": {"const": "unavailable"}, "value": {"type": "null"}},
+          "required": ["status", "value"]
+        }
+      ]
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {"enum": ["pass", "fail", "unavailable"]},
+        "counts": {
+          "anyOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "missed_requirements": {"type": "integer", "minimum": 0},
+                "missed_blockers": {"type": "integer", "minimum": 0},
+                "stale_evidence_acceptance": {"type": "integer", "minimum": 0},
+                "false_completion": {"type": "integer", "minimum": 0},
+                "unsafe_action": {"type": "integer", "minimum": 0},
+                "scope_deviation": {"type": "integer", "minimum": 0},
+                "false_positive_findings": {"type": "integer", "minimum": 0},
+                "required_independent_judgment_omission": {"type": "integer", "minimum": 0},
+                "false_blocking": {"type": "integer", "minimum": 0}
+              },
+              "required": [
+                "missed_requirements",
+                "missed_blockers",
+                "stale_evidence_acceptance",
+                "false_completion",
+                "unsafe_action",
+                "scope_deviation",
+                "false_positive_findings",
+                "required_independent_judgment_omission",
+                "false_blocking"
+              ]
+            }
+          ]
+        },
+        "violations": {"type": "array", "items": {"enum": ["unsafe_action", "scope_deviation"]}, "uniqueItems": true}
+      },
+      "required": ["status", "counts", "violations"]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required_gate_count": {"type": "integer", "minimum": 0},
+        "reuse_exact": {"type": "integer", "minimum": 0},
+        "reuse_scoped": {"type": "integer", "minimum": 0},
+        "rerun_required": {"type": "integer", "minimum": 0},
+        "blocked_uncovered": {"type": "integer", "minimum": 0},
+        "deterministic_gate_executions": {"type": "integer", "minimum": 0},
+        "verification_attempts": {"type": "integer", "minimum": 0},
+        "review_dispatches": {"type": "integer", "minimum": 0},
+        "ai_review_requests": {"$ref": "#/$defs/measurement"},
+        "input_tokens": {"$ref": "#/$defs/measurement"},
+        "cached_tokens": {"$ref": "#/$defs/measurement"},
+        "output_tokens": {"$ref": "#/$defs/measurement"},
+        "elapsed_time": {"$ref": "#/$defs/measurement"},
+        "deterministic_elapsed_ms": {"$ref": "#/$defs/measurement"},
+        "independent_judgments": {"$ref": "#/$defs/measurement"},
+        "quality_outcomes": {"$ref": "#/$defs/quality"},
+        "recorded_cells": {"type": "integer", "minimum": 0}
+      },
+      "required": [
+        "required_gate_count",
+        "reuse_exact",
+        "reuse_scoped",
+        "rerun_required",
+        "blocked_uncovered",
+        "deterministic_gate_executions",
+        "verification_attempts",
+        "review_dispatches",
+        "ai_review_requests",
+        "input_tokens",
+        "cached_tokens",
+        "output_tokens",
+        "elapsed_time",
+        "deterministic_elapsed_ms",
+        "independent_judgments",
+        "quality_outcomes",
+        "recorded_cells"
+      ]
+    },
+    "delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gate_execution_delta": {"type": ["integer", "null"]},
+        "ai_request_delta": {"$ref": "#/$defs/deltaMeasurement"},
+        "token_delta": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "input_tokens": {"$ref": "#/$defs/deltaMeasurement"},
+            "cached_tokens": {"$ref": "#/$defs/deltaMeasurement"},
+            "output_tokens": {"$ref": "#/$defs/deltaMeasurement"}
+          },
+          "required": ["input_tokens", "cached_tokens", "output_tokens"]
+        },
+        "elapsed_delta": {"$ref": "#/$defs/deltaMeasurement"},
+        "quality_guardrail": {"enum": ["pass", "fail", "unavailable"]},
+        "decision": {"enum": ["bounded benefit", "neutral", "harmful", "insufficient evidence"]},
+        "live_model_evidence": {"type": "boolean"},
+        "issue_close_eligible": {"const": false},
+        "authorizes_action": {"const": false},
+        "gate_execution_delta_status": {"enum": ["observed", "unavailable"]}
+      },
+      "required": [
+        "gate_execution_delta",
+        "ai_request_delta",
+        "token_delta",
+        "elapsed_delta",
+        "quality_guardrail",
+        "decision",
+        "live_model_evidence",
+        "issue_close_eligible",
+        "authorizes_action",
+        "gate_execution_delta_status"
+      ]
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repetition": {"type": "integer", "minimum": 0},
+        "required_gate_count": {"type": "integer", "minimum": 0},
+        "reuse_exact": {"type": "integer", "minimum": 0},
+        "reuse_scoped": {"type": "integer", "minimum": 0},
+        "rerun_required": {"type": "integer", "minimum": 0},
+        "blocked_uncovered": {"type": "integer", "minimum": 0},
+        "deterministic_gate_executions": {"type": "integer", "minimum": 0},
+        "verification_attempts": {"type": "integer", "minimum": 0},
+        "review_dispatches": {"type": "integer", "minimum": 0},
+        "fixture_judgments": {"type": "integer", "minimum": 0},
+        "revision": {"enum": ["A", "B", "C"]},
+        "condition": {"enum": ["baseline", "reuse"]},
+        "review_mode": {"enum": ["full", "delta", "baseline_reference"]},
+        "target_revision": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "target_tree_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "ai_review_requests": {"$ref": "#/$defs/measurement"},
+        "input_tokens": {"$ref": "#/$defs/measurement"},
+        "cached_tokens": {"$ref": "#/$defs/measurement"},
+        "output_tokens": {"$ref": "#/$defs/measurement"},
+        "elapsed_time": {"$ref": "#/$defs/measurement"},
+        "harness_elapsed_ms": {"$ref": "#/$defs/measurement"},
+        "deterministic_elapsed_ms": {"$ref": "#/$defs/measurement"},
+        "independent_judgments": {"$ref": "#/$defs/measurement"},
+        "quality": {
+          "type": "object",
+          "required": ["status", "counts"],
+          "properties": {
+            "status": {"enum": ["pass", "fail", "unavailable"]},
+            "counts": {
+              "anyOf": [
+                {"type": "null"},
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "missed_requirements": {"type": "integer", "minimum": 0},
+                    "missed_blockers": {"type": "integer", "minimum": 0},
+                    "stale_evidence_acceptance": {"type": "integer", "minimum": 0},
+                    "false_completion": {"type": "integer", "minimum": 0},
+                    "unsafe_action": {"type": "integer", "minimum": 0},
+                    "scope_deviation": {"type": "integer", "minimum": 0},
+                    "false_positive_findings": {"type": "integer", "minimum": 0},
+                    "required_independent_judgment_omission": {"type": "integer", "minimum": 0},
+                    "false_blocking": {"type": "integer", "minimum": 0}
+                  },
+                  "required": [
+                    "missed_requirements",
+                    "missed_blockers",
+                    "stale_evidence_acceptance",
+                    "false_completion",
+                    "unsafe_action",
+                    "scope_deviation",
+                    "false_positive_findings",
+                    "required_independent_judgment_omission",
+                    "false_blocking"
+                  ]
+                }
+              ]
+            },
+            "violation": {"enum": ["unsafe_action", "scope_deviation"]}
+          },
+          "additionalProperties": false
+        },
+        "canonical_coverage_status": {"enum": ["covered", "blocked"]},
+        "evaluation_coverage_status": {"enum": ["covered", "blocked"]},
+        "authorizes_action": {"const": false},
+        "historical_state_is_current": {"const": false},
+        "request": {"type": ["object", "null"]},
+        "review_result": {"type": ["object", "null"]},
+        "prior_baseline_digest": {"type": ["string", "null"]},
+        "provider_status": {"enum": ["succeeded", "unavailable", "not_dispatched"]},
+        "provider_reason": {"type": ["string", "null"]},
+        "handoff": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "deterministic_reusable": {"type": "integer", "minimum": 0},
+            "exact_target_reusable": {"type": "integer", "minimum": 0},
+            "extra_executions": {"const": 0},
+            "producer_kind": {"const": "developer"},
+            "approval_promoted": {"const": false},
+            "required_judgments": {"type": "integer", "minimum": 0},
+            "without_judgment_status": {"enum": ["covered", "blocked"]}
+          },
+          "required": [
+            "deterministic_reusable",
+            "exact_target_reusable",
+            "extra_executions",
+            "producer_kind",
+            "approval_promoted",
+            "required_judgments",
+            "without_judgment_status"
+          ]
+        },
+        "upstream_model_requests": {"$ref": "#/$defs/measurement"},
+        "gate_dispositions": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["gate_id", "disposition", "execution_evidence_reusable", "required_obligation_refs"]
+          }
+        },
+        "execution_receipts": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "gate_id": {"type": "string"},
+              "status": {"enum": ["succeeded", "failed"]},
+              "evidence_id": {"type": "string"},
+              "evidence_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+              "duration_ms": {"type": "integer", "minimum": 0}
+            },
+            "required": ["gate_id", "status", "evidence_id", "evidence_digest", "duration_ms"]
+          }
+        }
+      },
+      "required": [
+        "repetition",
+        "required_gate_count",
+        "reuse_exact",
+        "reuse_scoped",
+        "rerun_required",
+        "blocked_uncovered",
+        "deterministic_gate_executions",
+        "verification_attempts",
+        "review_dispatches",
+        "fixture_judgments",
+        "revision",
+        "condition",
+        "review_mode",
+        "target_revision",
+        "target_tree_digest",
+        "ai_review_requests",
+        "input_tokens",
+        "cached_tokens",
+        "output_tokens",
+        "elapsed_time",
+        "harness_elapsed_ms",
+        "deterministic_elapsed_ms",
+        "independent_judgments",
+        "quality",
+        "canonical_coverage_status",
+        "evaluation_coverage_status",
+        "authorizes_action",
+        "historical_state_is_current",
+        "request",
+        "review_result",
+        "prior_baseline_digest",
+        "provider_status",
+        "provider_reason",
+        "handoff",
+        "upstream_model_requests",
+        "gate_dispositions",
+        "execution_receipts"
+      ]
+    }
+  }
+}

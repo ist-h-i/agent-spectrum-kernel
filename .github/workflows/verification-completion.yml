@@ -19,6 +19,30 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "24"
+      - name: Validate repository consistency before fixture suites
+        run: |
+          if node scripts/validate-repo.mjs; then
+            exit 0
+          fi
+          node scripts/validate-repo.mjs --write-report
+          git diff -- docs/validation-report.md
+          exit 1
+      - name: Run runtime measurement and provider boundary tests
+        run: node --test scripts/test-verification-reuse-measurement-core.mjs scripts/test-verification-reuse-false-blocking.mjs
+      - name: Run paired measurement and handoff integration tests
+        run: node --test scripts/test-verification-reuse-measurement.mjs
+      - name: Measure public fixture without model credentials
+        run: |
+          node scripts/verification-reuse-measurement.mjs --provider fixture --repetitions 2 --output "$RUNNER_TEMP/verification-reuse-measurement" > /dev/null
+          node -e 'const fs=require("node:fs"); const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/verification-reuse-measurement/result.json")); console.log(JSON.stringify({head:process.env.GITHUB_SHA,baseline:r.baseline,reuse:r.reuse,delta:r.delta,complete:r.complete,issue_decision:r.issue_decision}));'
+      - name: Retain bounded measurement JSON only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-reuse-measurement
+          path: ${{ runner.temp }}/verification-reuse-measurement/*.json
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Run decision-point protocol and accounting tests
         run: node --test scripts/test-verification-decision-core.mjs
       - name: Run real-Git multirevision and completion tests
