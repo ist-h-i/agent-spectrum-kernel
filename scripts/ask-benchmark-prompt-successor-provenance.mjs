@@ -49,10 +49,10 @@ export function assertSuccessorAttemptProvenance({ normalized, engineering, atte
  */
 export async function verifySuccessorSourceProvenance({
   preparation, scope, expectedScopeDigest, source, execution, evaluatorOptionsByCase, scoringInputs,
-  accessMode, measuredAuthority, root = ROOT,
+  accessMode, measuredAuthority, measuredCompletion, root = ROOT,
 }) {
   if (!["synthetic_only", "measured"].includes(accessMode)) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "provenance access mode");
-  if (accessMode === "measured" && !measuredAuthority) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "measured authority");
+  if (accessMode === "measured" && (!measuredAuthority || !measuredCompletion)) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "measured authority and completed collection");
   // Snapshot data, but retain the identity of the opaque scoring-input capability.
   ({ preparation, scope, source, execution, evaluatorOptionsByCase } = structuredClone({
     preparation, scope, source, execution, evaluatorOptionsByCase,
@@ -73,11 +73,14 @@ export async function verifySuccessorSourceProvenance({
     import("./ask-benchmark-portfolio-score.mjs"),
     import("./ask-benchmark-admission-decision.mjs"),
   ]);
+  let measuredCollectionDigest = null;
   if (accessMode === "measured") {
     const { assertSuccessorMeasuredSourceAuthority } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
+    const { assertSuccessorMeasuredCompletion } = await import("./ask-benchmark-prompt-successor-measured-execution.mjs");
     assertSuccessorMeasuredSourceAuthority(measuredAuthority, { preparation, scope });
+    measuredCollectionDigest = canonicalDigest(assertSuccessorMeasuredCompletion(measuredCompletion, { authority: measuredAuthority, preparation, scope }));
   }
-  const stored = await openSuccessorResultSource({ preparation, scope, expectedScopeDigest, ...source, accessMode, measuredAuthority, root });
+  const stored = await openSuccessorResultSource({ preparation, scope, expectedScopeDigest, ...source, accessMode, measuredAuthority, measuredCompletion, root });
   // Unlike the saved-snapshot reader, this checks the actual native execution
   // files, run/adapter identity, requests, command evidence and terminal commits.
   const inspect = () => runner.inspectVerifiedPortfolioExecution({ ...execution, root });
@@ -162,7 +165,9 @@ export async function verifySuccessorSourceProvenance({
     native_materialization_manifest_digest: first.materialization.manifestDigest,
     execution_closure_digest: closure(first), execution_source_reverified: true,
     evaluator_authority_reverified: true, raw_score_rederived_by_existing_197: true,
-    runner_stdin_binding_reverified: true, provider_prompt_receipt_verified: false, comparison_eligible: accessMode === "measured", mutation_authorized: false,
+    runner_stdin_binding_reverified: true, provider_prompt_receipt_verified: false,
+    measured_collection_verified: accessMode === "measured", measured_collection_digest: measuredCollectionDigest,
+    comparison_eligible: accessMode === "measured", mutation_authorized: false,
     entries: rows.map(({ case_id, engineering, execution_evidence }) => ({ case_id, engineering_result_digest: engineering.engineering_result_digest, request_digest: execution_evidence.request_digest })),
   };
   // Keep remaining delivery/metric/admission gates explicit. Provenance closure

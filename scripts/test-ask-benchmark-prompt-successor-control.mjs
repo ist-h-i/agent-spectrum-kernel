@@ -76,6 +76,22 @@ test("unknown telemetry is never summed as zero, and blocks the next claim", () 
   assert.ok(result.stop_reasons.includes("trial_usage_unavailable"));
 });
 
+test("typed provider usage-limit evidence stops before another measured claim", () => {
+  const cases = records(1);
+  cases[0].status = "failed";
+  cases[0].process_outcome = "exit_nonzero";
+  cases[0].usage = captureSuccessorUsage({
+    status: 1,
+    stdout: '{"type":"turn.started"}\\n{"type":"turn.failed","error":{"codex_error_info":"usage_limit_exceeded","message":"private provider text"}}\\n',
+  });
+  const result = evaluate(cases);
+  assert.equal(result.status, "stopped");
+  assert.equal(result.next_case_id, null);
+  assert.ok(result.stop_reasons.includes("provider_usage_limit"));
+  assert.ok(result.stop_reasons.includes("native_process_failed"));
+  assert.deepEqual(cases[0].usage.provider_stop, { status: "detected", reason: "subscription_usage_limit" });
+});
+
 test("zero-exit deliverable failure remains terminal and is not retried when usage and workspace evidence are known", () => {
   const cases = records(1); cases[0].status = "failed";
   const result = evaluate(cases);

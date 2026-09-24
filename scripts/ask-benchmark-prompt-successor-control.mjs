@@ -89,6 +89,7 @@ export function evaluateSuccessorCollection(options) {
     if (item.duration_ms === null) stops.add("duration_unavailable");
     else if (item.duration_ms >= SUCCESSOR_STOP_POLICY.timeout_ms) stops.add("timeout_boundary");
     if (item.usage !== null) validateSuccessorUsage(item.usage);
+    if (item.usage?.provider_stop?.status === "detected") stops.add("provider_usage_limit");
     const total = item.usage?.metrics.total_tokens;
     if (!total || total.status !== "known") {
       unknownUsage = true; stops.add("trial_usage_unavailable");

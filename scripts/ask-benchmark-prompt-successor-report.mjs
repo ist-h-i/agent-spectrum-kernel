@@ -1,6 +1,6 @@
 import { canonicalDigest, stableCanonicalJson } from "./content-addressed-store.mjs";
 import {
-  validatePromptSuccessorPreparation, successorClosed, successorExact, successorFail,
+  validatePromptSuccessorPreparation, successorClosed, successorDigest, successorExact, successorFail,
 } from "./ask-benchmark-prompt-successor.mjs";
 import { inspectSuccessorProvenance, readSuccessorProvenanceRows } from "./ask-benchmark-prompt-successor-provenance.mjs";
 
@@ -230,7 +230,11 @@ export function buildSuccessorComparisonFromProvenance({ preparation, policy, so
     if (!["synthetic_only", "measured"].includes(source.access_mode)) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "report access mode");
     if (reportAccessMode === null) reportAccessMode = source.access_mode;
     else successorExact(source.access_mode, reportAccessMode, "paired report access mode");
-    successorExact(source.comparison_eligible, source.access_mode === "measured", "report comparison eligibility");
+    const measured = source.access_mode === "measured";
+    successorExact(source.measured_collection_verified, measured, "report measured collection gate");
+    successorExact(source.measured_collection_digest === null, !measured, "report measured collection digest");
+    if (measured) successorDigest(source.measured_collection_digest, "report measured collection digest");
+    successorExact(source.comparison_eligible, measured, "report comparison eligibility");
     evidence.push({ prompt_role: role, provenance_digest: canonicalDigest(source), source: clone(source) });
     rows.push(...readSuccessorProvenanceRows(sources[role]).map(({ case_id, engineering }) => ({ case_id, engineering })));
   }

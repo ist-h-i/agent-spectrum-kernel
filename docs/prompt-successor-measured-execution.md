@@ -43,9 +43,9 @@ node --test scripts/test-ask-benchmark-prompt-successor-workflow.mjs
 
 Before this PR is ready to merge, deterministic fake-process verification must
 cover the measured entrypoint, actual runner/evaluator/admission/scoring linkage,
-ordered no-retry execution, stop/resume rules and measured-only report
-provenance. Real trials and the new result-blind experiment freeze remain
-separate work after a suitable source is merged.
+ordered no-retry execution, stop/resume rules, provider-limit stopping and the
+measured-only result gate. Real trials and the new result-blind experiment freeze
+remain separate work after a suitable source is merged.
 
 ## Implemented collection prerequisites
 
@@ -72,8 +72,13 @@ text, thread IDs, credentials or provider error messages. This is runtime
 observation, not provider billing or host-isolation attestation.
 
 Protocol reference: [Codex non-interactive JSONL output](https://developers.openai.com/codex/noninteractive).
-The parser revision is `codex-exec-jsonl-usage-v1`; unsupported output remains
-unknown rather than being guessed compatible.
+New captures use parser revision `codex-exec-jsonl-usage-v2`; verified v1
+receipts remain readable. v2 also records a bounded `provider_stop`
+classification. Only top-level terminal error events are inspected: a typed or
+narrowly recognized subscription usage-limit/rate-limit signal becomes
+`detected`; unrelated or unsupported terminal errors remain `unknown`.
+Agent-message content is never scanned for this classification and raw provider
+error text is not persisted.
 
 `evaluateSuccessorCollection` validates the exact ordered 28-case inventory,
 single attempts and a terminal prefix. It calculates the fixed 250,000-token
@@ -93,11 +98,12 @@ a native timeout stops even when the measured duration alone is below 900,000 ms
 A zero-exit deliverable failure remains an ordinary terminal result, not a retry.
 Pending/active cases cannot carry terminal process facts. Older projections must
 be recomputed from native evidence, not defaulted to a successful process.
-This conservative process boundary deliberately does not infer a provider-specific
-billing diagnosis from protected output. The measured launcher treats every
-nonzero/timeout/uncertain native provider outcome as a hard stop, which includes
-subscription/provider exhaustion without relying on untrusted error text.
-The native integration fixture exercises a complete usage turn plus exit 7,
+The process boundary remains conservative: every nonzero/timeout/uncertain
+outcome stops, and v2 additionally records `provider_usage_limit` only when a
+bounded top-level Codex terminal error identifies subscription/rate limiting.
+An unrecognized provider failure remains stopped as a generic native failure
+rather than being guessed into a provider category. The native integration
+fixture exercises a complete usage turn plus exit 7,
 reopens both role runs, and checks that exactly one terminal trial is retained
 while the other 27 remain unclaimed. No provider or evaluator is called.
 
@@ -140,12 +146,16 @@ original Issue #291 source revision remains historical experiment provenance; it
 is not substituted for the preregistration source or the implementation revision
 needed to run this bridge. The capability cannot be reconstructed from JSON.
 
-`executeNextMeasuredSuccessorCase` acquires one durable global claim before
-opening Prompt bytes or calling the existing #197 runner. It rederives collection
-state from native evidence, launches only the exact next preregistered case with
-`maxCases=1` and `retryFailed=false`, reopens terminal evidence, persists a
-fsync-backed journal snapshot, then releases the claim. Cross-role order is
-therefore both prevented concurrently and reverified after every terminal case.
+`executeNextMeasuredSuccessorCase` derives one canonical journal path from the
+two native run roots; callers cannot choose a second journal path to bypass the
+global lock. It acquires one durable claim before opening Prompt bytes or calling
+the existing #197 runner, launches only the exact next preregistered case with
+`maxCases=1` and `retryFailed=false`, then reopens terminal evidence.
+The fsync-backed journal records the ordered terminal prefix, each claim's
+pre/post collection-control digests, and request/result/commit digests. Each
+subsequent claim must match that journal and the reverified native prefix before
+execution. Cross-role order is therefore prevented concurrently and durably
+reverified after every terminal case.
 
 If the process dies or an exception occurs after the global claim, the claim is
 left in place. `recoverMeasuredSuccessorSession` reopens the native case; a
@@ -154,11 +164,15 @@ an active stale native claim is passed to the existing committed recovery path.
 Recovered interruptions remain terminal and stopped; recovery never launches or
 retries the case.
 
-Measured result/provenance access is enabled only through that opaque authority.
-The existing #197 normalized-result, evaluator authority, frozen admission and
-raw engineering score validators are still the only result path. A measured
-comparison report can be built only from two opaque measured provenance handles;
-it authorizes one bounded Prompt outcome, never Portfolio mutation.
+Measured result/provenance access requires two opaque capabilities: the
+pre-result measured authority and a collection-completion handle produced only
+after the canonical journal and native evidence agree on all 28 terminal cases,
+zero pending cases, no stop reasons, and verified request bindings. Authority
+alone cannot open measured results. The existing #197 normalized-result,
+evaluator authority, frozen admission and raw engineering score validators are
+still the only result path. A measured comparison report can be built only from
+two opaque measured provenance handles carrying that completion proof; it
+authorizes one bounded Prompt outcome, never Portfolio mutation.
 
 The committed C fake now emits synthetic 100-input/20-output/80-cached usage.
 The native execution/normalization and 28-case scoring integration tests check
@@ -228,9 +242,11 @@ this implementation task does not create that freeze or execute model calls.
 - Enforce the 900,000 ms timeout; warn at 250,000 tokens/trial and 3,000,000
   cumulative; retain a completed trial at or above 5,000,000 and stop before the
   next trial. Unknown telemetry is not zero.
-- Open private evaluation only after collection under the existing protected
-  evaluator contract. An envelope or matching evaluator digest is not formal
-  evaluator execution. Pending admission cannot become scoring-ready.
+- Open private evaluation only after the durable global journal and native
+  collection agree on all 28 terminal cases under the existing protected
+  evaluator contract. An authority handle without the opaque completion proof,
+  an envelope or a matching evaluator digest is insufficient. Pending admission
+  cannot become scoring-ready.
 - Use frozen thresholds and the existing comparison arithmetic. Only verified
   measured provenance may enter the measured report gate; all other calculations
   remain diagnostics. Missing evidence yields `insufficient_evidence`.

@@ -25,7 +25,9 @@ test("captures bounded native JSONL usage, retaining cached tokens without doubl
   assert.equal(value.metrics.cached_tokens.value, 80);
   assert.equal(value.metrics.total_tokens.value, 120);
   assert.deepEqual(value.source_stdout, { bytes: Buffer.byteLength(stdout), sha256: createHash("sha256").update(stdout).digest("hex") });
-  assert.equal(value.parser_revision, "codex-exec-jsonl-usage-v1");
+  assert.equal(value.schema_version, "1.1.0");
+  assert.equal(value.parser_revision, "codex-exec-jsonl-usage-v2");
+  assert.deepEqual(value.provider_stop, { status: "not_detected", reason: null });
   validateSuccessorUsage(value, { stdout: value.source_stdout });
   assert.equal(JSON.stringify(value).includes("synthetic-thread"), false, "no thread IDs or raw model text are persisted");
 });
@@ -70,6 +72,59 @@ for (const [name, stdout] of [
 test("bounded unknown extensions are tolerated, but do not count reasoning twice", () => {
   const value = capture(stream({ input_tokens: 100, output_tokens: 20, cached_input_tokens: 80, reasoning_output_tokens: 10 }));
   assert.equal(value.metrics.total_tokens.value, 120);
+});
+
+test("top-level subscription usage-limit failure is typed without persisting provider text", () => {
+  const stdout = [
+    JSON.stringify({ type: "thread.started", thread_id: "private-thread" }),
+    JSON.stringify({ type: "turn.started" }),
+    JSON.stringify({ type: "error", message: "You've hit your usage limit. Try again later." }),
+    JSON.stringify({ type: "turn.failed", error: { codex_error_info: "usage_limit_exceeded", message: "private provider detail" } }),
+    "",
+  ].join("\n");
+  const value = capture(stdout, { status: 1 });
+  allUnknown(value);
+  assert.deepEqual(value.provider_stop, { status: "detected", reason: "subscription_usage_limit" });
+  assert.equal(JSON.stringify(value).includes("usage limit"), false);
+  assert.equal(JSON.stringify(value).includes("private provider detail"), false);
+  validateSuccessorUsage(value, { stdout: value.source_stdout });
+});
+
+test("top-level provider rate-limit failure is typed, while unrelated local budget failure stays unknown", () => {
+  const rate = [
+    '{"type":"turn.started"}',
+    '{"type":"turn.failed","error":{"code":"rate_limit_exceeded","message":"Too many requests"}}',
+    "",
+  ].join("\n");
+  assert.deepEqual(capture(rate, { status: 1 }).provider_stop, { status: "detected", reason: "provider_rate_limit" });
+  const local = [
+    '{"type":"turn.started"}',
+    '{"type":"error","message":"shared rollout token budget exhausted"}',
+    '{"type":"turn.failed","error":{"message":"shared rollout token budget exhausted"}}',
+    "",
+  ].join("\n");
+  assert.deepEqual(capture(local, { status: 1 }).provider_stop, { status: "unknown", reason: "terminal_failure_unclassified" });
+});
+
+test("agent message text cannot manufacture provider-limit evidence", () => {
+  const stdout = [
+    '{"type":"turn.started"}',
+    JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "You've hit your usage limit" } }),
+    '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1,"cached_input_tokens":0}}',
+    "",
+  ].join("\n");
+  assert.deepEqual(capture(stdout).provider_stop, { status: "not_detected", reason: null });
+});
+
+test("legacy v1 usage receipts remain semantically valid", () => {
+  const current = capture(stream());
+  const legacy = {
+    schema_version: "1.0.0",
+    parser_revision: "codex-exec-jsonl-usage-v1",
+    source_stdout: current.source_stdout,
+    metrics: current.metrics,
+  };
+  assert.equal(validateSuccessorUsage(legacy, { stdout: current.source_stdout }), legacy);
 });
 
 test("validator rejects forged totals, source changes, extra fields and typed-unknown values", () => {

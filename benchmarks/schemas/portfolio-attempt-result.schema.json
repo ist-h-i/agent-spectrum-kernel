@@ -136,9 +136,10 @@
       "type": "object", "additionalProperties": false,
       "required": ["schema_version", "parser_revision", "source_stdout", "metrics"],
       "properties": {
-        "schema_version": { "const": "1.0.0" },
-        "parser_revision": { "const": "codex-exec-jsonl-usage-v1" },
+        "schema_version": { "enum": ["1.0.0", "1.1.0"] },
+        "parser_revision": { "enum": ["codex-exec-jsonl-usage-v1", "codex-exec-jsonl-usage-v2"] },
         "source_stdout": { "$ref": "#/$defs/stream" },
+        "provider_stop": { "$ref": "#/$defs/providerStop" },
         "metrics": {
           "type": "object", "additionalProperties": false,
           "required": ["input_tokens", "output_tokens", "cached_tokens", "total_tokens"],
@@ -149,7 +150,18 @@
             "total_tokens": { "$ref": "#/$defs/usageMetric" }
           }
         }
-      }
+      },
+      "allOf": [{
+        "if": { "properties": { "schema_version": { "const": "1.1.0" } }, "required": ["schema_version"] },
+        "then": {
+          "required": ["provider_stop"],
+          "properties": { "parser_revision": { "const": "codex-exec-jsonl-usage-v2" } }
+        },
+        "else": {
+          "not": { "required": ["provider_stop"] },
+          "properties": { "parser_revision": { "const": "codex-exec-jsonl-usage-v1" } }
+        }
+      }]
     },
     "usageMetric": {
       "type": "object", "additionalProperties": false, "required": ["status", "value", "reason"],
@@ -163,6 +175,27 @@
         "then": { "properties": { "value": { "type": "integer" }, "reason": { "type": "null" } } },
         "else": { "properties": { "value": { "type": "null" }, "reason": { "type": "string" } } }
       }]
+    },
+    "providerStop": {
+      "type": "object", "additionalProperties": false, "required": ["status", "reason"],
+      "properties": {
+        "status": { "enum": ["not_detected", "detected", "unknown"] },
+        "reason": { "enum": [null, "subscription_usage_limit", "provider_rate_limit", "process_incomplete", "stream_invalid", "terminal_failure_unclassified"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "not_detected" } }, "required": ["status"] },
+          "then": { "properties": { "reason": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "detected" } }, "required": ["status"] },
+          "then": { "properties": { "reason": { "enum": ["subscription_usage_limit", "provider_rate_limit"] } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "unknown" } }, "required": ["status"] },
+          "then": { "properties": { "reason": { "enum": ["process_incomplete", "stream_invalid", "terminal_failure_unclassified"] } } }
+        }
+      ]
     },
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "fileIdentity": {

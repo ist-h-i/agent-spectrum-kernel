@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalDigest } from "./content-addressed-store.mjs";
 import { validatePromptSuccessorPreparation, validateSuccessorSourceScope, successorClosed, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
@@ -27,6 +27,13 @@ function sourceClosure(source) {
   });
 }
 
+function journalPathForSources(sources) {
+  const currentParent = resolve(dirname(resolve(sources.current_prompt.execution.runDir)));
+  const candidateParent = resolve(dirname(resolve(sources.prompt_v2.execution.runDir)));
+  successorExact(candidateParent, currentParent, "measured paired run parent");
+  return resolve(currentParent, `.ask-successor-issue291-${sources.current_prompt.scope.run_instance_id}.journal.json`);
+}
+
 export function openSuccessorMeasuredAuthority({ preparation, sources, root = ROOT }) {
   ({ preparation, sources } = structuredClone({ preparation, sources }));
   successorExact(resolve(root), ROOT, "measured authority root");
@@ -43,6 +50,9 @@ export function openSuccessorMeasuredAuthority({ preparation, sources, root = RO
     validateSuccessorSourceScope(source.scope, preparation, source.expectedScopeDigest);
     successorExact(source.scope.prompt_role, role, "measured source role");
     const actual = inspectVerifiedPortfolioExecution({ ...source.execution, root });
+    if (actual.cases.some((entry) => entry.state.status !== "pending" || entry.state.attempt_count !== 0 || entry.attempts.length !== 0)) {
+      successorFail("SUCCESSOR_MEASURED_AUTHORITY_LATE", "measured authority must be sealed before the first native attempt");
+    }
     successorExact(actual.identity.run_instance_id, source.scope.source.run_instance_id, "measured native run");
     successorExact(actual.identity.repository_revision, preparation.implementation.revision, "measured repository revision");
     successorExact(actual.plan.plan_id, source.scope.source.plan_id, "measured plan");
@@ -79,6 +89,7 @@ export function openSuccessorMeasuredAuthority({ preparation, sources, root = RO
     implementation: structuredClone(preparation.implementation),
     experiment_run_instance_id: sources.current_prompt.scope.run_instance_id,
     source_closures: Object.fromEntries(Object.entries(sources).map(([role, value]) => [role, sourceClosure(value)])),
+    journal_path_digest: canonicalDigest({ path: journalPathForSources(sources) }),
     exact_host_runtime_verified: true,
     exact_native_sources_verified: true,
     ordered_execution_authorized: true,
@@ -107,6 +118,13 @@ export function assertSuccessorMeasuredAuthority(handle, { preparation, sources 
     successorExact(sourceClosure(sources[role]), value.evidence.source_closures[role], `measured authority ${role} source`);
   }
   return structuredClone(value.evidence);
+}
+
+export function successorMeasuredJournalPath(handle, { preparation, sources }) {
+  const evidence = assertSuccessorMeasuredAuthority(handle, { preparation, sources });
+  const path = journalPathForSources(sources);
+  successorExact(canonicalDigest({ path }), evidence.journal_path_digest, "measured journal path");
+  return path;
 }
 
 export function assertSuccessorMeasuredSourceAuthority(handle, { preparation, scope }) {
