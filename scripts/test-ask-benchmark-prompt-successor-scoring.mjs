@@ -30,6 +30,12 @@ function environment(values, callback) {
   try { return callback(); }
   finally { for (const [k,v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } }
 }
+async function asyncEnvironment(values, callback) {
+  const saved = Object.fromEntries(Object.keys(values).map(k => [k, process.env[k]]));
+  for (const [k,v] of Object.entries(values)) process.env[k] = v;
+  try { return await callback(); }
+  finally { for (const [k,v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } }
+}
 function selection(record, plan) {
   const item = plan.cases.find(c => c.case_id === record.case_id);
   return { task_class: item.task_class, observed_signals: ["cross-file contract"], selected_mechanisms: ["repository-orientation"],
@@ -161,7 +167,7 @@ async function worker(contextPath) {
       const original = readFileSync(preregistrationPath);
       try {
         writeFileSync(preregistrationPath, Buffer.concat([original, Buffer.from(" ")]));
-        await assert.rejects(() => environment(env, () => executeNextMeasuredSuccessorCase({
+        await assert.rejects(() => asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
           authority: measuredAuthority, preparation, sources: measuredSources, journalPath: measuredJournalPath, root,
         })));
         assert.equal(read(resolve(work, "measured-journal.json.lock")).automatic_retry_authorized, false);
@@ -184,7 +190,7 @@ async function worker(contextPath) {
     });
     await check("28 measured-launch claims preserve global order, durable journal and canonical terminal identities", async () => {
       for (const target of preparation.cases) {
-        const step = await environment(env, () => executeNextMeasuredSuccessorCase({
+        const step = await asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
           authority: measuredAuthority, preparation, sources: measuredSources, journalPath: measuredJournalPath, root,
         }));
         assert.equal(step.case_id, target.case_id);

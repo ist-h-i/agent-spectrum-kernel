@@ -101,7 +101,7 @@ export async function inspectSuccessorCollectionControl({ preparation, sources, 
     successorExact(closure(inspectVerifiedPortfolioExecution({ ...sources[role].execution, root })), closure(inspections[role]), "collection changed during read");
   }
   successorExact(readSuccessorImplementationIdentity(root), preparation.implementation, "collection source after read");
-  const base = { schema_version: "1.3.0", kind: "prompt_successor_native_collection_inspection", access_mode: accessMode,
+  const base = { schema_version: "1.2.0", kind: "prompt_successor_native_collection_inspection", access_mode: accessMode,
     preparation_digest: preparation.preparation_digest, control,
     terminal_request_bindings: preparation.cases.filter(({ case_id }) => requestBindings.has(case_id))
       .map(({ case_id }) => ({ case_id, status: requestBindings.get(case_id) })),

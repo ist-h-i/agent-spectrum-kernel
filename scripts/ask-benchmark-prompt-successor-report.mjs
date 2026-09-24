@@ -237,7 +237,7 @@ export function buildSuccessorComparisonFromProvenance({ preparation, policy, so
   validateSuccessorProvenancePair(evidence[0].source, evidence[1].source);
   const analysis = calculateSuccessorComparison({ preparation, policy, rows });
   const measured = reportAccessMode === "measured";
-  const base = { schema_version: "1.1.0", kind: measured ? "prompt_successor_measured_comparison_report" : "prompt_successor_synthetic_comparison_report",
+  const base = { schema_version: measured ? "1.1.0" : "1.0.0", kind: measured ? "prompt_successor_measured_comparison_report" : "prompt_successor_synthetic_comparison_report",
     preparation_digest: preparation.preparation_digest, policy_digest: policy.policy_digest, sources: evidence,
     analysis, evidence_kind: measured ? "measured_reverified_provenance" : "synthetic_integration_only",
     measured_decision_authorized: measured, mutation_authorized: false };
