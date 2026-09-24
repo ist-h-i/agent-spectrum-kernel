@@ -8,6 +8,7 @@ on:
       - 'scripts/ask-benchmark-normalized-results.mjs'
       - 'scripts/test-fixtures/prompt-successor-fake-codex.c'
       - 'benchmarks/schemas/portfolio-attempt-result.schema.json'
+      - 'benchmarks/schemas/portfolio-run-identity.schema.json'
       - 'docs/prompt-successor-measured-execution.md'
       - '.github/workflows/issue291-measured.yml'
 

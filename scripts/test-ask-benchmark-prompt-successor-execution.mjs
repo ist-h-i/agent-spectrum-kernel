@@ -240,6 +240,8 @@ await test("F3: successor input traverses the real native runner without a provi
         assert.equal(attempt.result.terminal_workspace_authority_availability, "captured");
         assert.ok(attempt.terminalWorkspaceAuthority);
         assert.equal(existsSync(cwd), false, "runner's temporary workspace is gone");
+        assert.equal(existsSync(resolve(realpathSync(tmpdir()), attempt.request.claim.workspace_parent)), false, "successor completion removes the whole owned workspace root before releasing its claim");
+        assert.equal(existsSync(resolve(role.execution.runDir, "cases", nativeCase, "claim")), false, "successor completion releases only the reconciled claim");
         assert.equal(existsSync(codexHome), false, "runner's isolated fake home is gone");
         const count = nativeCaptureIds(captures).length;
         assert.throws(() => success.invoke(() => executePortfolio(args)), { code: "SUCCESSOR_UNVERIFIED_PROMPT_SOURCE" });

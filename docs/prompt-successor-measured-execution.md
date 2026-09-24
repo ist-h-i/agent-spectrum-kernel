@@ -108,6 +108,36 @@ node --test scripts/test-ask-benchmark-prompt-successor-execution.mjs
 node --test scripts/test-ask-benchmark-prompt-successor-scoring.mjs
 ```
 
+## Terminal cleanup barrier
+
+New native run identities use schema `1.1.0` and bind the canonical temporary
+root's path, device and inode through one digest. Recovery rejects a different
+`TMPDIR` or directory replacement instead of searching a new root and calling
+that absence a successful cleanup. The root digest is also carried in the
+existing workspace parent name, so the request/terminal-commit chain binds it;
+editing only the run header cannot redirect cleanup. Device/inode values use
+exact integer metadata. No absolute private path is persisted.
+The `1.0.0` schema remains readable, but an old unbound identity cannot authorize
+automatic cleanup or be silently upgraded; it requires separately established
+root evidence. Original artifacts remain unchanged.
+
+The shared #197 runner retains the existing claim until the owned temporary
+workspace root has been removed. A cleanup failure or an interruption after
+terminal publication leaves a recovery barrier; it does not rewrite the completed
+result as a different outcome. Explicit committed recovery validates the same
+request/result/commit and workspace ownership before cleanup, then releases the
+claim. Recovery never starts another trial.
+
+Normal execution inspection also rejects an older terminal attempt whose claim
+was already released but whose private root remains. Explicit recovery can close
+that legacy gap without changing terminal evidence. A dangling symlink or a
+filesystem error is not evidence that the workspace is absent. Foreign or
+mismatched ownership remains a hard stop; recovery must not delete it.
+
+These local cleanup checks do not prove global cross-role ordering or authorize
+measured execution. The separately reviewed measured launcher/journal and
+actual evaluator/admission/report integration remain required by PR303-M1.
+
 ## Goal and authority boundary
 
 Provide a separately authorized, exact-source launcher over the existing #197

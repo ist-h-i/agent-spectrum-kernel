@@ -32,6 +32,7 @@ const sourceSession = pinSourceSession(ROOT, [
   "scripts/ask-benchmark-prompt-successor-collection.mjs",
   "scripts/ask-benchmark-normalized-results.mjs",
   "benchmarks/schemas/portfolio-attempt-result.schema.json",
+  "benchmarks/schemas/portfolio-run-identity.schema.json",
   "scripts/ask-benchmark-prompt-successor-native.mjs",
   "scripts/ask-benchmark-source-session.mjs",
   "scripts/ask-benchmark.mjs"

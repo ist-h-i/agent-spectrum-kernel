@@ -21,6 +21,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, parse, relative, resolve, sep } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { assertNoSymlinkPathSegments } from "./content-addressed-store.mjs";
 import { captureSuccessorUsage, validateSuccessorUsage } from "./ask-benchmark-prompt-successor-usage.mjs";
 import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
 import { assertTrackedRepositoryMatchesHead, canonicalDigest, stableCanonicalJson, validateMaterializedPortfolio } from "./ask-benchmark-materialize.mjs";
@@ -81,6 +82,9 @@ const SHELL_CAPABILITY_UNAVAILABLE_CODES = new Set(["unsupported_shell"]);
 const MAX_COMMAND_EVIDENCE_FILE_BYTES = MAX_PROCESS_OUTPUT_BYTES + (2 * 1024 * 1024);
 
 class RuntimeIntegrityError extends Error {}
+
+// A published terminal result must survive an incomplete cleanup unchanged.
+class TerminalCleanupError extends Error {}
 
 class RuntimeContractError extends Error {
   constructor(reason, executable) {
@@ -558,9 +562,26 @@ function loadSelections({ root, config, planPath, materializedPath, selectionSta
   return { selections, stateDigest: `sha256:${fileDigest(indexPath)}` };
 }
 
+// Bind the actual filesystem root, not only its environment-variable spelling.
+// A changed TMPDIR or a same-path directory replacement cannot prove that an
+// earlier attempt's private workspace disappeared.
+function workspaceRootIdentity() {
+  assertNoSymlinkPathSegments(TEMP_ROOT, "execution workspace root");
+  const status = lstatSync(TEMP_ROOT, { bigint: true });
+  if (!status.isDirectory()) throw new Error("execution workspace root is not a directory");
+  return canonicalDigest({ canonical_path: realpathSync(TEMP_ROOT), device: String(status.dev), inode: String(status.ino) });
+}
+
+function assertWorkspaceRootIdentity(identity) {
+  if (identity.schema_version !== "1.1.0" || identity.workspace_root_identity !== workspaceRootIdentity()) {
+    throw new TerminalCleanupError("execution workspace root identity is missing or changed; cleanup cannot be inferred");
+  }
+}
+
 function runIdentity({ root, plan, materialized, selections, repositoryRevision, config }) {
   return {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
+    workspace_root_identity: workspaceRootIdentity(),
     program: "adaptive_ask_portfolio_execution",
     plan: { id: plan.plan_id, digest: canonicalDigest(plan) },
     materialization: {
@@ -835,12 +856,23 @@ function workspaceOwnership(claim, runIdentity) {
   };
 }
 
+function lstatWorkspaceIfPresent(path) {
+  try { return lstatSync(path); }
+  catch (error) {
+    // existsSync follows symlinks and also hides errors other than absence.
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 function assertEphemeralWorkspaceOwnership(claim, runIdentity) {
+  assertWorkspaceRootIdentity(runIdentity);
   if (!WORKSPACE_PARENT_PATTERN.test(claim.workspace_parent ?? "")) throw new Error("claim workspace parent is invalid");
   const parent = assertInside(TEMP_ROOT, resolve(TEMP_ROOT, claim.workspace_parent), "claim workspace parent");
-  assertNoSymlinkSegments(parent, "claim workspace parent");
-  if (!existsSync(parent)) return null;
-  if (!lstatSync(parent).isDirectory() || lstatSync(parent).isSymbolicLink()) throw new Error("claim workspace parent is not a real directory");
+  assertNoSymlinkPathSegments(parent, "claim workspace parent", { allowMissingLeaf: true });
+  const status = lstatWorkspaceIfPresent(parent);
+  if (status === null) return null;
+  if (!status.isDirectory() || status.isSymbolicLink()) throw new Error("claim workspace parent is not a real directory");
   const markerPath = assertInside(parent, resolve(parent, WORKSPACE_OWNERSHIP_FILE), "claim workspace ownership marker");
   assertNoSymlinkSegments(markerPath, "claim workspace ownership marker");
   if (!existsSync(markerPath) || !lstatSync(markerPath).isFile()) throw new Error("claim workspace ownership marker is missing or invalid");
@@ -853,7 +885,9 @@ function acquireClaim({ root, context, entry, attempt, runtime, adapter }) {
   const directory = claimPath(context.runDir, entry.case_id);
   const staging = claimStagingPath(context.runDir, entry.case_id, claimId);
   const workspaceToken = randomUUID();
-  const workspaceParentPath = mkdtempSync(resolve(TEMP_ROOT, "ask-portfolio-workspaces-"));
+  // Carry the root identity in the existing committed workspace name. The run
+  // header alone must not be enough to redirect cleanup to a different root.
+  const workspaceParentPath = mkdtempSync(resolve(TEMP_ROOT, `ask-portfolio-workspaces-${workspaceRootIdentity().slice("sha256:".length)}-`));
   chmodSync(workspaceParentPath, 0o700);
   const workspaceParent = basename(workspaceParentPath);
   mkdirSync(staging, { recursive: false });
@@ -921,23 +955,35 @@ function nextAttempt(runDir, entry) {
 
 function ephemeralWorkspacePath(claim) {
   if (!WORKSPACE_PARENT_PATTERN.test(claim.workspace_parent ?? "")) throw new Error("claim workspace parent is invalid");
+  if (!claim.workspace_parent.startsWith(`ask-portfolio-workspaces-${workspaceRootIdentity().slice("sha256:".length)}-`)) {
+    throw new TerminalCleanupError("claim workspace root identity is missing or changed; cleanup cannot be inferred");
+  }
   assertClaimId(claim.workspace_token);
   const parent = assertInside(TEMP_ROOT, resolve(TEMP_ROOT, claim.workspace_parent), "claim workspace parent");
   const path = assertInside(parent, resolve(parent, claim.workspace_token), "claim workspace");
-  assertNoSymlinkSegments(path, "claim workspace");
+  assertNoSymlinkPathSegments(path, "claim workspace", { allowMissingLeaf: true });
   return path;
 }
 
+function assertTerminalWorkspaceCleanup(request) {
+  const parent = dirname(ephemeralWorkspacePath(request.claim));
+  if (lstatWorkspaceIfPresent(parent) !== null) {
+    throw new TerminalCleanupError(`${request.case_id} terminal workspace cleanup is unresolved; explicit recovery is required`);
+  }
+}
+
 function removeEphemeralWorkspace(claim, runIdentity) {
+  assertWorkspaceRootIdentity(runIdentity);
   const workspace = ephemeralWorkspacePath(claim);
   const parent = dirname(workspace);
-  if (!existsSync(parent)) return;
+  if (lstatWorkspaceIfPresent(parent) === null) return;
   assertEphemeralWorkspaceOwnership(claim, runIdentity);
-  if (existsSync(workspace)) rmSync(workspace, { recursive: true, force: true });
-  if (existsSync(parent)) {
-    assertNoSymlinkSegments(parent, "claim workspace parent");
+  if (lstatWorkspaceIfPresent(workspace) !== null) rmSync(workspace, { recursive: true, force: true });
+  // Recheck ownership before removing the parent, including its marker.
+  if (assertEphemeralWorkspaceOwnership(claim, runIdentity) !== null) {
     rmSync(parent, { recursive: true, force: true });
   }
+  if (lstatWorkspaceIfPresent(parent) !== null) throw new TerminalCleanupError("claim workspace parent remains after cleanup");
 }
 
 function copyWorkspace({ materializedRoot, record, claim, runIdentity }) {
@@ -1252,6 +1298,31 @@ function requestClaimRecord(claim) {
   };
 }
 
+function claimFromVerifiedRequest(root, request) {
+  const claim = {
+    schema_version: "1.1.0",
+    run_instance_id: request.run_instance_id,
+    claim_id: request.claim.id,
+    case_id: request.case_id,
+    attempt: request.attempt,
+    adapter: request.adapter,
+    condition: request.condition,
+    worker_id: request.claim.worker_id,
+    pid: request.claim.pid,
+    acquired_at: request.claim.acquired_at,
+    lease_expires_at: request.claim.lease_expires_at,
+    workspace_parent: request.claim.workspace_parent,
+    workspace_token: request.claim.workspace_token,
+    input_identity: request.input_identity,
+    selection: request.selection,
+    runtime_identity_digest: request.agent.runtime_identity_digest,
+    effective_command_digest: request.agent.effective_command_digest,
+    environment_snapshot_digest: request.agent.environment_snapshot_digest,
+  };
+  validate(root, claim, CLAIM_SCHEMA_PATH, `${request.case_id} recovered claim`);
+  return claim;
+}
+
 function requestRecord({ entry, attempt, claim, projection }) {
   return {
     schema_version: "1.1.0",
@@ -1441,6 +1512,13 @@ function completeCase({ root, runDir, entry, state, claim, attempt, attemptRoot,
   validate(root, terminalState, CASE_STATE_SCHEMA_PATH, `${entry.case_id} terminal state`);
   writeCaseState(runDir, entry, terminalState);
   fault("after_state_published");
+  // Retain this attempt's claim until its private workspace is gone. Terminal
+  // publication alone must not be treated as successful cleanup by callers.
+  const identity = readJson(runIdentityPath(runDir));
+  validate(root, identity, RUN_IDENTITY_SCHEMA_PATH, "terminal cleanup run identity");
+  try { removeEphemeralWorkspace(claim, identity); }
+  catch (error) { throw new TerminalCleanupError("terminal evidence retained; workspace cleanup is unresolved", { cause: error }); }
+  fault("after_workspace_cleanup");
   releaseClaim(root, runDir, entry.case_id, claim.claim_id);
   return terminalState;
 }
@@ -1578,7 +1656,7 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
 }
 
 function validateTerminalAttempt({ root, context, entry, attempt }) {
-  return validateTerminalAttemptEvidence({
+  const verified = validateTerminalAttemptEvidence({
     root,
     runDir: context.runDir,
     runIdentity: context.identity,
@@ -1588,6 +1666,10 @@ function validateTerminalAttempt({ root, context, entry, attempt }) {
     expectedSelection: selectionIdentityFor(context, entry),
     materializedRecord: context.materialized.casesById.get(entry.case_id),
   });
+  // Also detect the legacy release-before-cleanup gap. Recovery deliberately
+  // uses the lower-level evidence verifier so it can reconcile the owned root.
+  assertTerminalWorkspaceCleanup(verified.request);
+  return verified;
 }
 
 function validateTerminalCase({ root, context, entry, state }) {
@@ -1781,7 +1863,7 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, commandEvidence: sealedCommandEvidence.reference, status: "completed", processResult, finalOutput, terminalWorkspaceAuthority, successorUsage: context.successorPromptInput !== null }), finalSource: temporaryOutput });
     return "completed";
   } catch (error) {
-    if (error instanceof RuntimeIntegrityError) throw error;
+    if (error instanceof RuntimeIntegrityError || error instanceof TerminalCleanupError) throw error;
     const message = error instanceof Error ? error.message : String(error);
     const invalid = /Adaptive selection|projection|materialized source|selection changed|command evidence invalid|terminal workspace/u.test(message);
     const temporaryOutput = ephemeralRoot ? resolve(ephemeralRoot, "agent-final.json") : null;
@@ -2127,6 +2209,9 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
   const identityPath = runIdentityPath(run);
   const identity = readJson(identityPath);
   validate(root, identity, RUN_IDENTITY_SCHEMA_PATH, "run identity");
+  // Legacy unbound roots remain readable schema values, not permission to infer
+  // absence or delete a workspace under the caller's current temporary root.
+  assertWorkspaceRootIdentity(identity);
   const stateFile = statePath(run, caseId);
   if (!existsSync(stateFile)) throw new Error(`case state is missing: ${caseId}`);
   let state = readJson(stateFile);
@@ -2144,7 +2229,11 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
       const commit = readJson(resolve(attemptRootPath(run, caseId, state.terminal_attempt), "commit.json"));
       validate(root, commit, ATTEMPT_COMMIT_SCHEMA_PATH, `${caseId} terminal commit`);
       if (commit.claim_id !== claimId) throw new Error("claim ID does not match the terminal commit");
-      assertCommittedRecoveryEvidence({ root, run, state, commit });
+      const verified = assertCommittedRecoveryEvidence({ root, run, state, commit });
+      // Older writers could release the claim before removing its workspace.
+      // Reconstruct only from fully reverified evidence and check the ownership
+      // marker; do not re-run a trial or rewrite any terminal artifacts.
+      removeEphemeralWorkspace(claimFromVerifiedRequest(root, verified.request), identity);
       return { case_id: caseId, status: state.status };
     }
     if (state.status !== "active" || state.active_claim_id !== claimId) throw new Error("claim ID does not match the active claim");
@@ -2156,26 +2245,7 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     const request = readJson(requestPath);
     validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${caseId} recovery request`);
     if (request.claim.id !== claimId || !claimIsExpired({ lease_expires_at: request.claim.lease_expires_at })) throw new Error("lost claim evidence is not expired or does not match");
-    const recoveredClaim = {
-      schema_version: "1.1.0",
-      run_instance_id: request.run_instance_id,
-      claim_id: request.claim.id,
-      case_id: request.case_id,
-      attempt: request.attempt,
-      adapter: request.adapter,
-      condition: request.condition,
-      worker_id: request.claim.worker_id,
-      pid: request.claim.pid,
-      acquired_at: request.claim.acquired_at,
-      lease_expires_at: request.claim.lease_expires_at,
-      workspace_parent: request.claim.workspace_parent,
-      workspace_token: request.claim.workspace_token,
-      input_identity: request.input_identity,
-      selection: request.selection,
-      runtime_identity_digest: request.agent.runtime_identity_digest,
-      effective_command_digest: request.agent.effective_command_digest,
-      environment_snapshot_digest: request.agent.environment_snapshot_digest,
-    };
+    const recoveredClaim = claimFromVerifiedRequest(root, request);
     assertEphemeralWorkspaceOwnership(recoveredClaim, identity);
     const entry = { case_id: caseId, adapter_track: state.adapter, condition: state.condition };
     const terminalWorkspaceAuthority = recoverTerminalWorkspaceAuthorityPublication({ root, attemptRoot, entry, claim: recoveredClaim });
@@ -2196,8 +2266,9 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     validate(root, commit, ATTEMPT_COMMIT_SCHEMA_PATH, `${caseId} terminal commit`);
     if (commit.claim_id !== claimId) throw new Error("claim ID does not match the terminal commit");
     assertCommittedRecoveryEvidence({ root, run, state, commit, claim });
-    releaseClaim(root, run, caseId, claimId);
     removeEphemeralWorkspace(claim, identity);
+    fault("after_workspace_cleanup");
+    releaseClaim(root, run, caseId, claimId);
     return { case_id: caseId, status: state.status };
   }
   if (publishedBeforeState) {

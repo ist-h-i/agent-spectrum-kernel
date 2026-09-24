@@ -5,7 +5,8 @@
   "additionalProperties": false,
   "required": ["schema_version", "run_instance_id", "program", "plan", "materialization", "repository_revision", "runner", "config", "case_namespace", "selection_state_digest", "output_schema_digest"],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
+    "schema_version": { "enum": ["1.0.0", "1.1.0"] },
+    "workspace_root_identity": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "run_instance_id": { "type": "string", "format": "uuid" },
     "program": { "const": "adaptive_ask_portfolio_execution" },
     "plan": {
@@ -48,5 +49,10 @@
     "case_namespace": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "selection_state_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "output_schema_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
-  }
+  },
+  "allOf": [{
+    "if": { "properties": { "schema_version": { "const": "1.1.0" } }, "required": ["schema_version"] },
+    "then": { "required": ["workspace_root_identity"] },
+    "else": { "not": { "required": ["workspace_root_identity"] } }
+  }]
 }
