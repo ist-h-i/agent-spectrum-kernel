@@ -360,19 +360,29 @@ export async function recoverMeasuredSuccessorSession({
   successorExact(binding?.source_case_id, claim.native_case_id, "recovery native case");
   const nativeClaimPath = resolve(source.execution.runDir, "cases", claim.native_case_id, "claim", "claim.json");
   if ((beforeJournal?.journal_digest ?? null) !== claim.pre_journal_digest) {
-    // The terminal journal may have been committed by this controller or by
-    // a peer with the same deterministic claim before this controller stopped.
-    // Reverify the native collection and exact claim entry before unlocking.
-    successorExact(beforeJournal?.entries.length, claim.pre_entry_count + 1, "recovery committed entry count");
+    // A peer may have committed this deterministic claim and later cases
+    // before the delayed controller acquired its lock. Reverify the entire
+    // native collection and the claim's exact position before unlocking.
+    if (!Number.isSafeInteger(claim.pre_entry_count) || claim.pre_entry_count < 0 ||
+      !beforeJournal || beforeJournal.entries.length <= claim.pre_entry_count) {
+      successorFail("SUCCESSOR_MEASURED_JOURNAL_DIVERGED", "recovery committed entry count");
+    }
     const after = await inspect(authority, preparation, sources, root);
     validateJournalAgainstInspection(beforeJournal, authority, preparation, sources, after);
-    const prior = { control: { terminal_count: claim.pre_entry_count, control_digest: claim.pre_collection_digest } };
-    successorExact(beforeJournal.entries.at(-1), terminalEntry({ preparation, sources, claim, before: prior, after }), "recovery committed claim entry");
+    const committed = beforeJournal.entries[claim.pre_entry_count];
+    successorExact(committed.case_id, claim.case_id, "recovery committed case");
+    successorExact(committed.native_case_id, claim.native_case_id, "recovery committed native case");
+    successorExact(committed.global_claim_digest, claim.claim_digest, "recovery committed claim digest");
+    successorExact(committed.pre_collection_digest, claim.pre_collection_digest, "recovery committed pre-control");
+    if (beforeJournal.entries.length === claim.pre_entry_count + 1) {
+      const prior = { control: { terminal_count: claim.pre_entry_count, control_digest: claim.pre_collection_digest } };
+      successorExact(committed, terminalEntry({ preparation, sources, claim, before: prior, after }), "recovery committed claim entry");
+    }
     if (existsSync(nativeClaimPath)) successorFail("SUCCESSOR_UNCERTAIN_EXECUTION", "recovery committed native claim");
     releaseLock(lockPath);
     return {
       recovered_case_id: target.case_id,
-      native_status: beforeJournal.entries.at(-1).status,
+      native_status: committed.status,
       collection: structuredClone(after.control),
       journal: beforeJournal,
       retry_performed: false,

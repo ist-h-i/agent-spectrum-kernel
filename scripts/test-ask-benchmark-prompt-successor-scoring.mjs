@@ -404,6 +404,13 @@ async function worker(contextPath) {
         const nativeCase = role.scope.source.bindings.find(b => b.successor_case_id === target.case_id).source_case_id;
         const actual = inspectVerifiedPortfolioExecution(role.execution).cases.find(c => c.entry.case_id === nativeCase);
         assert.equal(actual.attempts.length, 1);
+        const nextTarget = preparation.cases[2];
+        const nextStep = await asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
+          authority: measuredAuthority, preparation, sources: measuredSources, root,
+        }));
+        assert.equal(nextStep.case_id, nextTarget.case_id);
+        assert.equal(nextStep.collection.terminal_count, 3);
+        record.synthetic_native_attempts++;
         const staleClaim = {
           schema_version: "1.1.0", kind: "prompt_successor_measured_claim",
           authority_digest: priorJournal.authority_digest, preparation_digest: preparation.preparation_digest,
@@ -415,7 +422,9 @@ async function worker(contextPath) {
         write(`${measuredJournalPath}.lock`, { ...staleClaim, claim_digest: canonicalDigest(staleClaim) });
         const recovered = await recoverMeasuredSuccessorSession({ authority: measuredAuthority, preparation, sources: measuredSources, root });
         assert.equal(recovered.retry_performed, false);
-        assert.equal(recovered.collection.terminal_count, 2);
+        assert.equal(recovered.recovered_case_id, target.case_id);
+        assert.equal(recovered.native_status, "completed");
+        assert.equal(recovered.collection.terminal_count, 3);
         assert.equal(existsSync(`${measuredJournalPath}.lock`), false);
         assert.equal(read(measuredJournalPath).journal_digest, recovered.journal.journal_digest);
       } finally {
@@ -428,7 +437,7 @@ async function worker(contextPath) {
       }
     });
     await check("28 measured-launch claims preserve global order, durable journal and canonical terminal identities", async () => {
-      for (const target of preparation.cases.slice(2)) {
+      for (const target of preparation.cases.slice(3)) {
         const step = await asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
           authority: measuredAuthority, preparation, sources: measuredSources, root,
         }));
