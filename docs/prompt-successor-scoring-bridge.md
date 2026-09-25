@@ -1,6 +1,6 @@
 # Successor calibration scoring connection
 
-Scope: PR #290 / #289, before any separately authorized #235 measured run.
+Scope: PR #290 / #289 and the #291 calibration authority connection, before any separately authorized #291 measured run.
 Status: implementation and synthetic tests authored; exact submitted-revision
 execution evidence must be recorded separately. This document grants no approval.
 
@@ -26,6 +26,17 @@ The shared mapping is closed to these four pairs, their original task classes an
 their original lookup behavior. The existing #197 planner's config digest binds
 the mapping; the materializer verifies the same frozen input bytes. This is not
 an assertion that a calibration input is valid primary product evidence.
+
+For these four catalog identities, evaluator authority binds the unchanged
+`benchmarks/fixtures/checkpoint-b2/input-manifest.json` bytes and the matching
+old source entry. Its evidence map, verification command contract, requirement
+record, and evaluator authority manifest remain under the catalog identity.
+The shared manifest's raw SHA-256 is fixed at
+`e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d`.
+Ordinary fixtures continue to use their per-fixture input manifest and entry.
+The admitted-fixture public invariance check uses the original source workspace
+and successor execution config for calibration while preserving the primary
+fixture checks. This connection does not create admission or a private oracle.
 
 Historical #234, its CAS, input manifest and physical source fixtures are not
 modified. Previous successor 1.0 preparation/results are not relabeled as 1.1.
@@ -170,11 +181,11 @@ Do not rerun a long suite merely to publish a checkpoint.
 ## Remaining real-run gates
 
 The four real requirement/evaluator packages and their actual review/admission
-references are not supplied by these tests. Complete that input work under #289,
+references are not supplied by these tests. Track that input work under #291,
 then verify a scoring-ready path using those exact approved authorities. Keep
 private evaluator execution, public-envelope reconstruction, approval and model
 measurement as separate evidence claims. Required host controls, runtime-bound
 Portfolio/Evolution selection, usage collection, explicit execution/result-access
-permission and budget remain before #235. Independent review of the final source
+permission and budget remain before #291 measurement. Independent review of the final source
 and proof remains required. Neither this document nor the test changes a default
 Portfolio, closes an Issue, makes the PR Ready, or grants merge permission.

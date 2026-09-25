@@ -32,6 +32,7 @@ import { materializeVerifiedTerminalCandidate } from "./ask-benchmark-terminal-c
 import { deriveTerminalCandidateInventory, terminalWorkspaceInventoryDigest } from "./ask-benchmark-terminal-workspace.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { computeVerificationCommandContractDigest } from "./ask-benchmark-command-evidence.mjs";
+import { CALIBRATION_INPUT_MANIFEST_PATH, CALIBRATION_INPUT_MANIFEST_SHA256, CALIBRATION_SOURCE_BINDINGS, calibrationSourceIdForFixture } from "./ask-benchmark-calibration-source.mjs";
 import {
   computeFinalAdmissionRecordDigest,
   resolveRequirementAdmissionBindingDigest,
@@ -394,7 +395,7 @@ export function evaluatorAuthorityPathsForFixture(fixtureId) {
   if (typeof fixtureId !== "string" || !/^[a-z0-9][a-z0-9-]*$/u.test(fixtureId)) throw new Error("evaluator authority fixture ID is invalid");
   const fixtureRoot = `benchmarks/fixtures/checkpoint-b2/${fixtureId}`;
   const bindingPaths = [
-    `${fixtureRoot}/input-manifest.json`,
+    calibrationSourceIdForFixture(fixtureId) ? CALIBRATION_INPUT_MANIFEST_PATH : `${fixtureRoot}/input-manifest.json`,
     `${fixtureRoot}/evidence-map.json`,
     `${fixtureRoot}/verification-command-contract.json`,
     `${fixtureRoot}/requirement-record.json`,
@@ -418,6 +419,13 @@ function resolveEvaluatorAuthorityLayout({ buffers, fixtureId = null } = {}) {
   const resolvedFixtureId = fixtureId ?? (manifestFixtureIds.length === 1 ? manifestFixtureIds[0] : null);
   const layout = evaluatorAuthorityPathsForFixture(resolvedFixtureId);
   if (layout.bindingPaths.some((path) => !buffers.has(path))) throw new Error("evaluator authority binding path inventory has an omission");
+  const calibrationSourceId = calibrationSourceIdForFixture(resolvedFixtureId);
+  if (calibrationSourceId) {
+    if (buffers.size !== layout.bindingPaths.length) throw new Error("evaluator authority calibration binding path inventory has an addition");
+    if (rawByteDigest(buffers.get(CALIBRATION_INPUT_MANIFEST_PATH)) !== `sha256:${CALIBRATION_INPUT_MANIFEST_SHA256}`) throw new Error("evaluator authority calibration input manifest digest changed");
+    const expectedSourceIds = CALIBRATION_SOURCE_BINDINGS.map(([, sourceId]) => sourceId).sort();
+    if (stableCanonicalJson(manifestFixtureIds.sort()) !== stableCanonicalJson(expectedSourceIds)) throw new Error("evaluator authority calibration input manifest entries changed");
+  }
   return { ...layout, input };
 }
 
@@ -447,7 +455,7 @@ export function deriveEvaluatorAuthorityManifest({ buffers, evaluatorRevision, f
   const evidence = values.get(evidencePath);
   const command = values.get(commandPath);
   const requirement = values.get(requirementPath);
-  const fixtureEntry = input.fixtures?.[layout.fixtureId];
+  const fixtureEntry = input.fixtures?.[calibrationSourceIdForFixture(layout.fixtureId) ?? layout.fixtureId];
   if (!fixtureEntry) throw new Error("evaluator authority input manifest is missing the fixture entry");
   if (evidence.fixture_id !== layout.fixtureId || command.fixture_id !== layout.fixtureId || requirement.fixture_id !== layout.fixtureId) throw new Error("evaluator authority fixture identity is inconsistent");
   if (command.contract_digest !== computeVerificationCommandContractDigest(command)) throw new Error("evaluator authority verification command contract digest is invalid");

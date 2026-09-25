@@ -9,6 +9,7 @@ import {
   ADMISSION_DECISION_OVERLAY_ROOT,
   resolveRepositoryAdmissionDecision,
 } from "./ask-benchmark-admission-decision.mjs";
+import { CALIBRATION_INPUT_MANIFEST_PATH, assertSuccessorCalibrationConfig, resolvePortfolioFixtureSource } from "./ask-benchmark-calibration-source.mjs";
 import { validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
 import {
   evaluatorAuthorityPathsForFixture,
@@ -38,6 +39,7 @@ import {
 const DEFAULT_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FIXTURE_ROOT = "benchmarks/fixtures/checkpoint-b2";
 const CONFIG_PATH = "benchmarks/adaptive-portfolio.config.json";
+const SUCCESSOR_CONFIG_PATH = "benchmarks/prompt-successor-execution.config.json";
 const CATALOG_PATH = "benchmarks/portfolio-catalog.json";
 const POLICY_MANIFEST_PATH = "benchmarks/portfolio-policy-manifest.json";
 const ADMISSION_POLICY_PATH = "benchmarks/portfolio-admission-policy.json";
@@ -133,7 +135,7 @@ function visibleInputInventory(root, fixtureRoot) {
   });
 }
 
-function semanticDigestForArtifact(name, value, fixtureId) {
+function semanticDigestForArtifact(name, value, fixtureId, sourceId = fixtureId) {
   const field = {
     requirement_record: "requirement_record_digest",
     output_contract: "output_contract_digest",
@@ -146,7 +148,7 @@ function semanticDigestForArtifact(name, value, fixtureId) {
     admission_review: "review_package_digest",
   }[name];
   if (field) return value[field];
-  if (name === "input_manifest") return canonicalDigest(value.fixtures?.[fixtureId]);
+  if (name === "input_manifest") return canonicalDigest(value.fixtures?.[sourceId]);
   return canonicalDigest(value);
 }
 
@@ -163,7 +165,7 @@ function validateHistoricalSourceIdentity({ root, fixtureId, identity, evaluator
   assertDigest(identity.dependency_graph.graph_digest, canonicalDigest(withoutField(identity.dependency_graph, "graph_digest")), `${fixtureId} evaluator dependency graph`);
 }
 
-function validateSourceFreezeCandidate({ root, repositoryRevision, fixtureId, reference, admission }) {
+function validateSourceFreezeCandidate({ root, repositoryRevision, fixtureId, sourceId, reference, admission }) {
   const path = `${FIXTURE_ROOT}/${fixtureId}/source-freeze-candidate.json`;
   if (!trackedPaths(root, repositoryRevision, path).includes(path)) return null;
   const candidate = readTrackedJson(root, repositoryRevision, path).value;
@@ -173,7 +175,7 @@ function validateSourceFreezeCandidate({ root, repositoryRevision, fixtureId, re
   for (const [name, binding] of Object.entries(candidate.public_bindings ?? {})) {
     const source = readTrackedJson(root, repositoryRevision, binding.path);
     assertDigest(binding.raw_sha256, source.raw, `${fixtureId} source-freeze ${name} raw identity`);
-    assertDigest(binding.semantic_digest, semanticDigestForArtifact(name, source.value, fixtureId), `${fixtureId} source-freeze ${name} semantic identity`);
+    assertDigest(binding.semantic_digest, semanticDigestForArtifact(name, source.value, fixtureId, sourceId), `${fixtureId} source-freeze ${name} semantic identity`);
   }
   assertEqual(candidate.evaluator_private_binding, {
     evaluator_revision: reference.evaluator_revision,
@@ -240,12 +242,58 @@ export function discoverAdmittedFixtureIds({ root = DEFAULT_ROOT, repositoryRevi
   return [...admitted].sort(compareAscii);
 }
 
-function validateFixture({ root, repositoryRevision, fixtureId, config, catalogSource, policyManifestSource, scoringPolicySource, admissionPolicy }) {
+export function validateAdmittedFixtureInputBinding({ root, fixtureId, catalogFixture, runtimeFixture, metadata, inputSource }) {
+  if (!catalogFixture || !runtimeFixture) throw new Error(`${fixtureId} admitted fixture is missing canonical catalog or runtime registration`);
+  const calibration = catalogFixture.fixture_role === "calibration";
+  if (calibration !== (catalogFixture.suite === "calibration") || calibration !== (catalogFixture.aggregate_eligible === false)) {
+    throw new Error(`${fixtureId} catalog calibration/aggregate identity drift`);
+  }
+  if (runtimeFixture.id !== fixtureId || metadata.fixture_id !== fixtureId) throw new Error(`${fixtureId} fixture identity drift`);
+  if (metadata.metadata_digest !== canonicalDigest(withoutField(metadata, "metadata_digest"))) throw new Error(`${fixtureId} metadata identity drift`);
+  for (const field of ["suite", "task_class", "difficulty", "repetitions", "aggregate_eligible"]) {
+    if (runtimeFixture[field] !== catalogFixture[field] || (field !== "aggregate_eligible" && metadata[field] !== catalogFixture[field])) {
+      throw new Error(`${fixtureId} ${field} catalog/runtime identity drift`);
+    }
+  }
+  if (metadata.fixture_role !== catalogFixture.fixture_role) throw new Error(`${fixtureId} metadata role identity drift`);
+  const sourceId = calibration ? resolvePortfolioFixtureSource(runtimeFixture) : fixtureId;
+  const expectedInputPath = calibration ? CALIBRATION_INPUT_MANIFEST_PATH : `${FIXTURE_ROOT}/${fixtureId}/input-manifest.json`;
+  if (runtimeFixture.input_manifest_path !== expectedInputPath || inputSource.path !== expectedInputPath) {
+    throw new Error(`${fixtureId} input manifest path identity drift`);
+  }
+  const entries = inputSource.value.fixtures;
+  if (!entries?.[sourceId] || (!calibration && Object.keys(entries).length !== 1)) throw new Error(`${fixtureId} input manifest fixture identity drift`);
+  assertEqual(entries[sourceId].files, visibleInputInventory(root, `${FIXTURE_ROOT}/${sourceId}`), `${fixtureId} task/workspace input inventory`);
+  assertDigest(runtimeFixture.input_manifest_sha256, inputSource.raw.slice("sha256:".length), `${fixtureId} runtime input identity`);
+  return sourceId;
+}
+
+export function validateDiscoveredAdmittedCalibrationInputBindings({ root = DEFAULT_ROOT, repositoryRevision = "HEAD" } = {}) {
+  repositoryRevision = git(root, ["rev-parse", repositoryRevision]).trim();
+  const catalog = readTrackedJson(root, repositoryRevision, CATALOG_PATH).value;
+  const fixtureIds = discoverAdmittedFixtureIds({ root, repositoryRevision });
+  const calibrationIds = fixtureIds.filter((fixtureId) => catalog.fixtures.find(({ fixture_id: id }) => id === fixtureId)?.fixture_role === "calibration");
+  const successorConfig = calibrationIds.length > 0 ? readTrackedJson(root, repositoryRevision, SUCCESSOR_CONFIG_PATH).value : null;
+  if (successorConfig) {
+    const sharedInput = readTrackedJson(root, repositoryRevision, CALIBRATION_INPUT_MANIFEST_PATH);
+    assertSuccessorCalibrationConfig(successorConfig, { inputManifestDigest: sharedInput.raw.slice("sha256:".length) });
+  }
+  for (const fixtureId of calibrationIds) {
+    const catalogFixture = catalog.fixtures.find(({ fixture_id: id }) => id === fixtureId);
+    const runtimeFixture = successorConfig.fixtures.find(({ id }) => id === fixtureId);
+    const metadata = readTrackedJson(root, repositoryRevision, `${FIXTURE_ROOT}/${fixtureId}/metadata.json`).value;
+    const inputSource = readTrackedJson(root, repositoryRevision, CALIBRATION_INPUT_MANIFEST_PATH);
+    validateAdmittedFixtureInputBinding({ root, fixtureId, catalogFixture, runtimeFixture, metadata, inputSource });
+  }
+  return calibrationIds;
+}
+
+function validateFixture({ root, repositoryRevision, fixtureId, config, successorConfig, catalogSource, policyManifestSource, scoringPolicySource, admissionPolicy }) {
   const catalog = catalogSource.value;
   const scoringPolicy = scoringPolicySource.value;
   const fixtureRoot = `${FIXTURE_ROOT}/${fixtureId}`;
   const paths = {
-    input: `${fixtureRoot}/input-manifest.json`,
+    input: catalog.fixtures.find(({ fixture_id: id }) => id === fixtureId)?.fixture_role === "calibration" ? CALIBRATION_INPUT_MANIFEST_PATH : `${fixtureRoot}/input-manifest.json`,
     admission: `${fixtureRoot}/final-admission-record.json`,
     requirement: `${fixtureRoot}/requirement-record.json`,
     output: `${fixtureRoot}/output-contract.json`,
@@ -262,20 +310,12 @@ function validateFixture({ root, repositoryRevision, fixtureId, config, catalogS
   }
 
   const catalogFixture = catalog.fixtures.find(({ fixture_id: id }) => id === fixtureId);
-  const runtimeFixture = config.fixtures.find(({ id }) => id === fixtureId);
-  if (!catalogFixture || !runtimeFixture) throw new Error(`${fixtureId} admitted fixture is missing canonical catalog or runtime registration`);
-  for (const field of ["suite", "task_class", "difficulty", "repetitions"]) {
-    if (runtimeFixture[field] !== catalogFixture[field] || metadata[field] !== catalogFixture[field]) throw new Error(`${fixtureId} ${field} catalog/runtime identity drift`);
-  }
-  if (metadata.fixture_id !== fixtureId || metadata.metadata_digest !== canonicalDigest(withoutField(metadata, "metadata_digest"))) throw new Error(`${fixtureId} metadata identity drift`);
+  const runtimeFixture = (catalogFixture?.fixture_role === "calibration" ? successorConfig : config).fixtures.find(({ id }) => id === fixtureId);
+  const sourceId = validateAdmittedFixtureInputBinding({ root, fixtureId, catalogFixture, runtimeFixture, metadata, inputSource: sources.input });
   for (const record of [admission, requirement, output]) assertDigest(record.catalog_digest, catalog.catalog_digest, `${fixtureId} catalog identity`);
   for (const record of [requirement, output]) assertDigest(record.policy_manifest_digest, policyManifestSource.value.manifest_digest, `${fixtureId} policy manifest identity`);
   assertDigest(requirement.scoring_policy_digest, scoringPolicy.policy_digest, `${fixtureId} scoring policy identity`);
 
-  const manifestFixture = input.fixtures?.[fixtureId];
-  if (!manifestFixture || Object.keys(input.fixtures).length !== 1) throw new Error(`${fixtureId} input manifest fixture identity drift`);
-  assertEqual(manifestFixture.files, visibleInputInventory(root, fixtureRoot), `${fixtureId} task/workspace input inventory`);
-  assertDigest(runtimeFixture.input_manifest_sha256, sources.input.raw.slice("sha256:".length), `${fixtureId} runtime input identity`);
   assertDigest(admission.input_manifest_digest, sources.input.raw, `${fixtureId} admission input identity`);
   assertDigest(reference.fixture_input_digest, sources.input.raw, `${fixtureId} evaluator input identity`);
   assertDigest(freeze.fixture_input_digest, sources.input.raw, `${fixtureId} scoring freeze input identity`);
@@ -328,14 +368,16 @@ function validateFixture({ root, repositoryRevision, fixtureId, config, catalogS
     assertDigest(binding.semantic_digest, semantic, `${fixtureId} scoring freeze ${field} semantic identity`);
   }
 
-  const candidateDigest = validateSourceFreezeCandidate({ root, repositoryRevision, fixtureId, reference, admission });
+  const candidateDigest = validateSourceFreezeCandidate({ root, repositoryRevision, fixtureId, sourceId, reference, admission });
   const resolved = resolveRepositoryAdmissionDecision({ root, repositoryRevision, fixtureId });
   if (resolved) {
     if (admission.admission_status === "admission_pending" && candidateDigest) validateHistoricalDecisionProjection({ root, fixtureId, resolved });
     else validateDecisionProjection({ fixtureId, resolved, admissionSource: sources.admission, requirementSource: sources.requirement, freezeSource: sources.freeze, reference });
   }
   const admissionState = resolvePortfolioExecutionAdmission({ root, repositoryRevision, fixture: runtimeFixture });
-  if (resolved?.decision.decision_status === "admitted") {
+  if (catalogFixture.fixture_role === "calibration") {
+    if (admissionState.effective_admission_status !== "calibration_only" || admissionState.execution_eligible !== true) throw new Error(`${fixtureId} calibration execution classification drift`);
+  } else if (resolved?.decision.decision_status === "admitted") {
     if (admissionState.effective_admission_status !== "review_evidence_missing" || admissionState.execution_eligible !== false) throw new Error(`${fixtureId} missing external review evidence did not remain fail-closed`);
   } else if (!admissionState.execution_eligible) throw new Error(`${fixtureId} legacy admitted authority is not execution eligible`);
 
@@ -422,7 +464,14 @@ export function validatePublicAdmittedFixtureInvariance({ root = DEFAULT_ROOT, r
   validatePortfolioPolicyArtifacts({ root });
   const fixtureIds = discoverAdmittedFixtureIds({ root, repositoryRevision });
   if (fixtureIds.length === 0) throw new Error("canonical repository authority contains no admitted fixtures");
-  const fixtures = fixtureIds.map((fixtureId) => validateFixture({ root, repositoryRevision, fixtureId, config: configSource.value, catalogSource, policyManifestSource, scoringPolicySource, admissionPolicy: admissionPolicySource.value }));
+  const calibrationIds = fixtureIds.filter((fixtureId) => catalogSource.value.fixtures.find(({ fixture_id: id }) => id === fixtureId)?.fixture_role === "calibration");
+  if (calibrationIds.length > 0) assertEqual(validateDiscoveredAdmittedCalibrationInputBindings({ root, repositoryRevision }), calibrationIds, "admitted calibration input binding coverage");
+  const successorConfigSource = calibrationIds.length > 0 ? readTrackedJson(root, repositoryRevision, SUCCESSOR_CONFIG_PATH) : null;
+  if (successorConfigSource) {
+    const sharedInputSource = readTrackedJson(root, repositoryRevision, CALIBRATION_INPUT_MANIFEST_PATH);
+    assertSuccessorCalibrationConfig(successorConfigSource.value, { inputManifestDigest: sharedInputSource.raw.slice("sha256:".length) });
+  }
+  const fixtures = fixtureIds.map((fixtureId) => validateFixture({ root, repositoryRevision, fixtureId, config: configSource.value, successorConfig: successorConfigSource?.value, catalogSource, policyManifestSource, scoringPolicySource, admissionPolicy: admissionPolicySource.value }));
 
   const config = { ...configSource.value, _configPath: resolve(root, CONFIG_PATH), _protocolPath: resolve(root, configSource.value.protocol_path) };
   const firstPlan = buildPortfolioPlan({ root, config, repositoryRevision, seed: "issue-249-public-invariance" });
@@ -430,7 +479,14 @@ export function validatePublicAdmittedFixtureInvariance({ root = DEFAULT_ROOT, r
   assertEqual(firstPlan, secondPlan, "public fail-closed portfolio plan determinism");
   const overlayIds = new Set(fixtures.filter(({ public_execution_status }) => public_execution_status === "review_evidence_missing").map(({ fixture_id }) => fixture_id));
   if (firstPlan.cases.some(({ fixture_id: fixtureId }) => overlayIds.has(fixtureId))) throw new Error("public portfolio plan admitted a fixture without exact external review evidence");
-  validatePortfolioCaseIdentity({ root, config, plan: firstPlan, fixtureIds: fixtures.filter(({ public_execution_status: status }) => status !== "review_evidence_missing").map(({ fixture_id }) => fixture_id) });
+  const primaryIds = fixtures.filter(({ fixture_id, public_execution_status: status }) => status !== "review_evidence_missing" && catalogSource.value.fixtures.find(({ fixture_id: id }) => id === fixture_id).fixture_role === "primary").map(({ fixture_id }) => fixture_id);
+  validatePortfolioCaseIdentity({ root, config, plan: firstPlan, fixtureIds: primaryIds });
+  if (calibrationIds.length > 0) {
+    const successorConfig = { ...successorConfigSource.value, _configPath: resolve(root, SUCCESSOR_CONFIG_PATH), _protocolPath: resolve(root, successorConfigSource.value.protocol_path) };
+    const successorPlan = buildPortfolioPlan({ root, config: successorConfig, repositoryRevision, seed: "issue-249-public-invariance" });
+    if (successorPlan.cases.some(({ aggregate_eligible }) => aggregate_eligible !== false)) throw new Error("calibration cases entered the primary aggregate");
+    validatePortfolioCaseIdentity({ root, config: successorConfig, plan: successorPlan, fixtureIds: calibrationIds });
+  }
   return Object.freeze({ fixture_ids: fixtureIds, fixtures, public_invariance: "pass", private_semantics: "not_supplied", public_case_count: firstPlan.cases.length });
 }
 
@@ -465,6 +521,10 @@ export function validateActualPrivateAdmittedFixtureSemantics({ root = DEFAULT_R
   repositoryRevision = git(root, ["rev-parse", repositoryRevision]).trim();
   const publicResult = validatePublicAdmittedFixtureInvariance({ root, repositoryRevision });
   const discovered = new Set(publicResult.fixture_ids);
+  const catalog = readTrackedJson(root, repositoryRevision, CATALOG_PATH).value;
+  if ([...discovered].some((fixtureId) => catalog.fixtures.find(({ fixture_id: id }) => id === fixtureId)?.fixture_role === "calibration")) {
+    throw new Error("actual-private calibration admission requires a separate execution admission contract");
+  }
   const evidence = readExecutionAdmissionEvidenceManifest(evidenceManifestPath);
   const supplied = new Set([...Object.keys(evidence), ...Object.keys(privateRoots), ...Object.keys(privateCaseRoots)]);
   for (const fixtureId of supplied) if (!discovered.has(fixtureId)) throw new Error(`actual-private invariance contains a non-admitted fixture: ${fixtureId}`);

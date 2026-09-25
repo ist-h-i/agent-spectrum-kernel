@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -11,6 +11,8 @@ import { basename, resolve } from "node:path";
 import {
   discoverAdmittedFixtureIds,
   validateActualPrivateAdmittedFixtureSemantics,
+  validateAdmittedFixtureInputBinding,
+  validateDiscoveredAdmittedCalibrationInputBindings,
   validatePortfolioCaseIdentity,
   validatePublicAdmittedFixtureInvariance,
 } from "./ask-benchmark-admitted-fixture-invariance.mjs";
@@ -267,6 +269,78 @@ test("partial and stale external review evidence remain fail-closed", () => {
 });
 
 const CONFIG_PATH_FOR_TEST = "benchmarks/adaptive-portfolio.config.json";
+
+test("admitted calibration inputs use the four sealed source entries and catalog identity", () => {
+  const catalog = readJson(resolve(ROOT, "benchmarks/portfolio-catalog.json"));
+  const config = readJson(resolve(ROOT, "benchmarks/prompt-successor-execution.config.json"));
+  const sharedPath = "benchmarks/fixtures/checkpoint-b2/input-manifest.json";
+  const sharedBytes = readFileSync(resolve(ROOT, sharedPath));
+  const inputSource = { path: sharedPath, value: JSON.parse(sharedBytes), raw: digestBytes(sharedBytes) };
+  for (const runtimeFixture of config.fixtures) {
+    const fixtureId = runtimeFixture.id;
+    const catalogFixture = catalog.fixtures.find(({ fixture_id }) => fixture_id === fixtureId);
+    const metadata = {
+      fixture_id: fixtureId,
+      fixture_role: catalogFixture.fixture_role,
+      suite: catalogFixture.suite,
+      task_class: catalogFixture.task_class,
+      difficulty: catalogFixture.difficulty,
+      repetitions: catalogFixture.repetitions,
+    };
+    metadata.metadata_digest = canonicalDigest(metadata);
+    assert.equal(validateAdmittedFixtureInputBinding({ root: ROOT, fixtureId, catalogFixture, runtimeFixture, metadata, inputSource }), runtimeFixture.source_fixture_id);
+    for (const [mutation, expected] of [
+      [{ ...runtimeFixture, source_fixture_id: config.fixtures.find(({ id }) => id !== fixtureId).source_fixture_id }, /calibration source binding/u],
+      [{ ...runtimeFixture, aggregate_eligible: true }, /aggregate.*identity drift|calibration source binding/u],
+      [{ ...runtimeFixture, input_manifest_path: `benchmarks/fixtures/checkpoint-b2/${fixtureId}/input-manifest.json` }, /input manifest path/u],
+    ]) {
+      assert.throws(() => validateAdmittedFixtureInputBinding({ root: ROOT, fixtureId, catalogFixture, runtimeFixture: mutation, metadata, inputSource }), expected);
+    }
+    assert.throws(() => validateAdmittedFixtureInputBinding({ root: ROOT, fixtureId, catalogFixture, runtimeFixture, metadata: { ...metadata, fixture_id: runtimeFixture.source_fixture_id }, inputSource }), /fixture identity/u);
+    assert.throws(() => validateAdmittedFixtureInputBinding({ root: ROOT, fixtureId, catalogFixture, runtimeFixture, metadata, inputSource: { ...inputSource, value: { fixtures: { ...inputSource.value.fixtures, [runtimeFixture.source_fixture_id]: inputSource.value.fixtures[config.fixtures.find(({ id }) => id !== fixtureId).source_fixture_id] } } } }), /task\/workspace input inventory/u);
+  }
+});
+
+test("primary admitted input binding retains its fixture-local manifest and single entry", () => {
+  const fixtureId = "mp-ci-evidence-gap";
+  const catalogFixture = readJson(resolve(ROOT, "benchmarks/portfolio-catalog.json")).fixtures.find(({ fixture_id }) => fixture_id === fixtureId);
+  const runtimeFixture = readJson(resolve(ROOT, CONFIG_PATH_FOR_TEST)).fixtures.find(({ id }) => id === fixtureId);
+  const metadata = readJson(resolve(ROOT, `benchmarks/fixtures/checkpoint-b2/${fixtureId}/metadata.json`));
+  const path = runtimeFixture.input_manifest_path;
+  const bytes = readFileSync(resolve(ROOT, path));
+  const inputSource = { path, value: JSON.parse(bytes), raw: digestBytes(bytes) };
+  assert.equal(validateAdmittedFixtureInputBinding({ root: ROOT, fixtureId, catalogFixture, runtimeFixture, metadata, inputSource }), fixtureId);
+  assert.throws(() => validateAdmittedFixtureInputBinding({ root: ROOT, fixtureId, catalogFixture, runtimeFixture, metadata, inputSource: { ...inputSource, value: { fixtures: { ...inputSource.value.fixtures, stray: {} } } } }), /input manifest fixture identity/u);
+});
+
+test("a synthetic admitted calibration record is discovered and its source input is checked", () => withClone((root) => {
+  const fixtureId = "cal-session-refresh";
+  const catalogFixture = readJson(resolve(root, "benchmarks/portfolio-catalog.json")).fixtures.find(({ fixture_id }) => fixture_id === fixtureId);
+  const fixtureRoot = resolve(root, `benchmarks/fixtures/checkpoint-b2/${fixtureId}`);
+  mkdirSync(fixtureRoot, { recursive: true });
+  writeJson(resolve(fixtureRoot, "final-admission-record.json"), { fixture_id: fixtureId, admission_status: "admitted" });
+  const metadata = {
+    fixture_id: fixtureId,
+    fixture_role: catalogFixture.fixture_role,
+    suite: catalogFixture.suite,
+    task_class: catalogFixture.task_class,
+    difficulty: catalogFixture.difficulty,
+    repetitions: catalogFixture.repetitions,
+  };
+  metadata.metadata_digest = canonicalDigest(metadata);
+  const metadataPath = resolve(fixtureRoot, "metadata.json");
+  writeJson(metadataPath, metadata);
+  let revision = commitMutation(root, "synthetic calibration discovery only");
+  assert.ok(discoverAdmittedFixtureIds({ root, repositoryRevision: revision }).includes(fixtureId));
+  assert.deepEqual(validateDiscoveredAdmittedCalibrationInputBindings({ root, repositoryRevision: revision }), [fixtureId]);
+  assert.throws(() => validatePublicAdmittedFixtureInvariance({ root, repositoryRevision: revision }), /requirement-record\.json/u);
+
+  metadata.task_class = "implementation";
+  metadata.metadata_digest = canonicalDigest(Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== "metadata_digest")));
+  writeJson(metadataPath, metadata);
+  revision = commitMutation(root, "synthetic calibration metadata mismatch");
+  assert.throws(() => validateDiscoveredAdmittedCalibrationInputBindings({ root, repositoryRevision: revision }), /task_class catalog\/runtime identity drift/u);
+}));
 
 test("actual-private invariance rejects an incomplete admitted-fixture evidence inventory", () => {
   const repositoryRevision = git(ROOT, ["rev-parse", "HEAD"]);
