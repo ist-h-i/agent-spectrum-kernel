@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { createServer, connect } from "node:net";
 import {
   closeSync, existsSync, fsyncSync, linkSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync,
   renameSync, unlinkSync, writeFileSync, writeSync,
@@ -18,6 +19,50 @@ import { executePortfolio, inspectVerifiedPortfolioExecution, recoverPortfolioCa
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const MAX_JOURNAL_BYTES = 4 * 1024 * 1024;
 const completionHandles = new WeakMap();
+const OWNER_SOCKET_PREFIX = "/tmp/ask-successor-owner-";
+
+async function openOwnerSocket() {
+  const path = `${OWNER_SOCKET_PREFIX}${randomUUID()}.sock`;
+  const server = createServer((socket) => socket.end());
+  try {
+    await new Promise((resolveListen, rejectListen) => {
+      server.once("error", rejectListen);
+      server.listen(path, () => {
+        server.removeListener("error", rejectListen);
+        resolveListen();
+      });
+    });
+    return { path, server };
+  } catch (error) {
+    if (server.listening) server.close();
+    throw error;
+  }
+}
+
+async function closeOwnerSocket(owner) {
+  await new Promise((resolveClose, rejectClose) => owner.server.close((error) => error ? rejectClose(error) : resolveClose()));
+}
+
+function validateOwnerSocket(path) {
+  if (typeof path !== "string" || !path.startsWith(OWNER_SOCKET_PREFIX) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.sock$/i.test(path.slice(OWNER_SOCKET_PREFIX.length))) {
+    successorFail("SUCCESSOR_MEASURED_OWNER_INVALID", "owner socket path");
+  }
+}
+
+async function ownerSocketAlive(path) {
+  validateOwnerSocket(path);
+  return new Promise((resolveAlive, rejectAlive) => {
+    const socket = connect(path);
+    socket.once("connect", () => { socket.destroy(); resolveAlive(true); });
+    socket.once("error", (error) => {
+      socket.destroy();
+      if (["ENOENT", "ECONNREFUSED"].includes(error?.code)) resolveAlive(false);
+      else rejectAlive(error);
+    });
+    socket.setTimeout(10000, () => { socket.destroy(); resolveAlive(true); });
+  });
+}
 
 function measuredSources(sources) {
   return Object.fromEntries(Object.entries(sources).map(([role, source]) => [role, {
@@ -211,12 +256,12 @@ function terminalEntry({ preparation, sources, claim, before, after }) {
   return { ...body, entry_digest: canonicalDigest(body) };
 }
 
-function lockRecord(authority, preparation, caseId, role, nativeCaseId, beforeDigest, journal) {
+function lockRecord(authority, preparation, caseId, role, nativeCaseId, beforeDigest, journal, ownerSocket) {
   const body = {
-    schema_version: "1.2.0",
+    schema_version: "1.3.0",
     kind: "prompt_successor_measured_claim",
     claim_id: randomUUID(),
-    owner_pid: process.pid,
+    owner_socket: ownerSocket,
     authority_digest: canonicalDigest(inspectSuccessorMeasuredAuthority(authority)),
     preparation_digest: preparation.preparation_digest,
     case_id: caseId,
@@ -250,17 +295,17 @@ function acquireLock(path, record) {
 function readLock(path) {
   const value = readJsonBounded(path, "measured claim", 64 * 1024);
   successorClosed(value, [
-    "schema_version", "kind", "claim_id", "owner_pid", "authority_digest", "preparation_digest", "case_id", "prompt_role",
+    "schema_version", "kind", "claim_id", "owner_socket", "authority_digest", "preparation_digest", "case_id", "prompt_role",
     "native_case_id", "pre_collection_digest", "pre_journal_digest", "pre_entry_count",
     "automatic_retry_authorized", "claim_digest",
   ], "measured claim");
   const { claim_digest: digest, ...body } = value;
-  successorExact(value.schema_version, "1.2.0", "measured claim version");
+  successorExact(value.schema_version, "1.3.0", "measured claim version");
   successorExact(value.kind, "prompt_successor_measured_claim", "measured claim kind");
   if (typeof value.claim_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.claim_id)) {
     successorFail("SUCCESSOR_MEASURED_CLAIM_INVALID", "claim generation");
   }
-  if (!Number.isSafeInteger(value.owner_pid) || value.owner_pid < 1) successorFail("SUCCESSOR_MEASURED_CLAIM_INVALID", "claim owner pid");
+  validateOwnerSocket(value.owner_socket);
   successorExact(canonicalDigest(body), digest, "measured claim digest");
   successorExact(value.automatic_retry_authorized, false, "measured claim retry");
   successorDigest(value.pre_collection_digest, "measured claim pre-collection");
@@ -274,36 +319,8 @@ function releaseLock(path) {
   try { fsyncSync(directory); } finally { closeSync(directory); }
 }
 
-function processAlive(pid) {
-  try { process.kill(pid, 0); return true; }
-  catch (error) {
-    if (error?.code === "ESRCH") return false;
-    if (error?.code === "EPERM") return true;
-    throw error;
-  }
-}
-
-function abandonedClaimPath(lockPath, claim) {
-  return `${lockPath}.abandoned-${claim.claim_id}`;
-}
-
-function abandonClaim(lockPath, claim) {
-  writeDurableExclusiveJson(abandonedClaimPath(lockPath, claim), {
-    schema_version: "1.0.0", kind: "prompt_successor_abandoned_claim",
-    claim_id: claim.claim_id, claim_digest: claim.claim_digest,
-  });
-}
-
-function claimCanBeRecovered(lockPath, claim) {
-  if (!processAlive(claim.owner_pid)) return;
-  const path = abandonedClaimPath(lockPath, claim);
-  if (!existsSync(path)) successorFail("SUCCESSOR_MEASURED_EXECUTION_ACTIVE", "live claim owner");
-  const value = readJsonBounded(path, "abandoned measured claim", 4096);
-  successorClosed(value, ["schema_version", "kind", "claim_id", "claim_digest"], "abandoned measured claim");
-  successorExact(value.schema_version, "1.0.0", "abandoned claim version");
-  successorExact(value.kind, "prompt_successor_abandoned_claim", "abandoned claim kind");
-  successorExact(value.claim_id, claim.claim_id, "abandoned claim generation");
-  successorExact(value.claim_digest, claim.claim_digest, "abandoned claim digest");
+async function claimCanBeRecovered(claim) {
+  if (await ownerSocketAlive(claim.owner_socket)) successorFail("SUCCESSOR_MEASURED_EXECUTION_ACTIVE", "live claim owner");
 }
 
 function recoveryEpochPath(lockPath, claim, epoch) {
@@ -312,18 +329,18 @@ function recoveryEpochPath(lockPath, claim, epoch) {
 
 function readRecoveryEpoch(path, claim, epoch) {
   const value = readJsonBounded(path, "measured recovery owner", 4096);
-  successorClosed(value, ["schema_version", "kind", "claim_id", "epoch", "pid", "owner_token", "owner_digest"], "measured recovery owner");
+  successorClosed(value, ["schema_version", "kind", "claim_id", "epoch", "owner_socket", "owner_token", "owner_digest"], "measured recovery owner");
   const { owner_digest: digest, ...body } = value;
-  successorExact(value.schema_version, "1.0.0", "measured recovery owner version");
+  successorExact(value.schema_version, "1.1.0", "measured recovery owner version");
   successorExact(value.kind, "prompt_successor_recovery_owner", "measured recovery owner kind");
   successorExact(value.claim_id, claim.claim_id, "measured recovery claim generation");
   successorExact(value.epoch, epoch, "measured recovery epoch");
-  if (!Number.isSafeInteger(value.pid) || value.pid < 1) successorFail("SUCCESSOR_MEASURED_RECOVERY_INVALID", "recovery owner pid");
+  validateOwnerSocket(value.owner_socket);
   successorExact(canonicalDigest(body), digest, "measured recovery owner digest");
   return value;
 }
 
-function acquireRecoveryEpoch(lockPath, claim) {
+async function acquireRecoveryEpoch(lockPath, claim) {
   const prefix = `${basename(lockPath)}.recovery-${claim.claim_id}-`;
   const epochs = readdirSync(dirname(lockPath)).flatMap((name) => {
     if (!name.startsWith(prefix)) return [];
@@ -341,23 +358,25 @@ function acquireRecoveryEpoch(lockPath, claim) {
       const done = readJsonBounded(donePath, "measured recovery completion", 4096);
       successorClosed(done, ["owner_digest"], "measured recovery completion");
       successorExact(done.owner_digest, owner.owner_digest, "measured recovery completion owner");
-    } else if (processAlive(owner.pid)) {
+    } else if (await ownerSocketAlive(owner.owner_socket)) {
       successorFail("SUCCESSOR_MEASURED_RECOVERY_LOCKED", "live recovery owner");
     }
   }
   const epoch = last + 1;
   if (!Number.isSafeInteger(epoch)) successorFail("SUCCESSOR_MEASURED_RECOVERY_INVALID", "recovery epoch overflow");
+  const lease = await openOwnerSocket();
   const body = {
-    schema_version: "1.0.0", kind: "prompt_successor_recovery_owner",
-    claim_id: claim.claim_id, epoch, pid: process.pid, owner_token: randomUUID(),
+    schema_version: "1.1.0", kind: "prompt_successor_recovery_owner",
+    claim_id: claim.claim_id, epoch, owner_socket: lease.path, owner_token: randomUUID(),
   };
   const path = recoveryEpochPath(lockPath, claim, epoch);
   try { writeDurableExclusiveJson(path, { ...body, owner_digest: canonicalDigest(body) }); }
   catch (error) {
+    await closeOwnerSocket(lease);
     if (error?.code === "EEXIST") successorFail("SUCCESSOR_MEASURED_RECOVERY_LOCKED", "concurrent recovery owner");
     throw error;
   }
-  return { path, owner_digest: canonicalDigest(body) };
+  return { path, owner_digest: canonicalDigest(body), lease };
 }
 
 function finishRecoveryEpoch(owner) {
@@ -393,67 +412,71 @@ export async function executeNextMeasuredSuccessorCase({
   const source = sources[target.prompt_role];
   const binding = source.scope.source.bindings.find((entry) => entry.successor_case_id === target.case_id);
   if (!binding) successorFail("SUCCESSOR_CASE_MISSING", "measured native binding");
-  const claim = lockRecord(authority, preparation, target.case_id, target.prompt_role, binding.source_case_id, before.control.control_digest, previousJournal);
-  if (process.env.ASK_BENCHMARK_FAULT === "before_measured_lock_pause") {
-    writeSync(2, "MEASURED_BEFORE_LOCK\n");
-    process.kill(process.pid, "SIGSTOP");
-  }
-  acquireLock(lockPath, claim);
+  const lease = await openOwnerSocket();
   try {
-    const lockedJournal = readJournalBase(journal, authority, preparation);
-    // A controller can release the global lock after a native change only after
-    // publishing that change to this journal. The native prefix was inspected
-    // above; an unchanged journal under our lock keeps that inspection current.
-    if ((lockedJournal?.journal_digest ?? null) !== (previousJournal?.journal_digest ?? null)) {
-      successorFail("SUCCESSOR_MEASURED_STALE_CLAIM", "journal changed before global claim");
+    const claim = lockRecord(authority, preparation, target.case_id, target.prompt_role, binding.source_case_id, before.control.control_digest, previousJournal, lease.path);
+    if (process.env.ASK_BENCHMARK_FAULT === "before_measured_lock_pause") {
+      writeSync(2, "MEASURED_BEFORE_LOCK\n");
+      process.kill(process.pid, "SIGSTOP");
     }
-  } catch (error) {
-    // This controller has not opened the Prompt or entered the native runner.
-    releaseLock(lockPath);
-    throw error;
-  }
-  try {
-    const prompt = await openSuccessorPromptInput({
-      preparation,
-      scope: source.scope,
-      expectedScopeDigest: source.expectedScopeDigest,
-      caseId: target.case_id,
-      root,
-    });
-    const output = executePortfolio({
-      ...source.execution,
-      root,
-      adapter: "codex",
-      runtimeConfigPath: source.runtimeConfigPath,
-      agentBin: source.agentBin,
-      caseId: binding.source_case_id,
-      maxCases: 1,
-      retryFailed: false,
-      successorPromptInput: prompt,
-    });
-    const after = await inspect(authority, preparation, sources, root);
-    successorExact(after.control.terminal_count, before.control.terminal_count + 1, "one measured terminal case per claim");
-    const nextEntries = [...entries, terminalEntry({ preparation, sources, claim, before, after })];
-    writeDurableJson(journal, journalSnapshot(authority, after, nextEntries));
-    if (process.env.ASK_BENCHMARK_FAULT === "after_measured_journal_published") process.exit(86);
-    releaseLock(lockPath);
-    return {
-      case_id: target.case_id,
-      prompt_role: target.prompt_role,
-      native_case_id: binding.source_case_id,
-      outcome: structuredClone(output),
-      collection: structuredClone(after.control),
-      journal: readJournalBase(journal, authority, preparation),
-      model_call_authorized_by_issue_291: true,
-      automatic_retry_performed: false,
-      portfolio_mutation_authorized: false,
-    };
-  } catch (error) {
-    // A crash/exception after the durable global claim leaves the claim in place.
-    // Recovery reopens native evidence and either journals the one terminal attempt
-    // or releases an unstarted claim. It never starts the case again.
-    if (existsSync(lockPath)) abandonClaim(lockPath, claim);
-    throw error;
+    acquireLock(lockPath, claim);
+    try {
+      const lockedJournal = readJournalBase(journal, authority, preparation);
+      // A controller can release the global lock after a native change only after
+      // publishing that change to this journal. The native prefix was inspected
+      // above; an unchanged journal under our lock keeps that inspection current.
+      if ((lockedJournal?.journal_digest ?? null) !== (previousJournal?.journal_digest ?? null)) {
+        successorFail("SUCCESSOR_MEASURED_STALE_CLAIM", "journal changed before global claim");
+      }
+    } catch (error) {
+      // This controller has not opened the Prompt or entered the native runner.
+      releaseLock(lockPath);
+      throw error;
+    }
+    try {
+      const prompt = await openSuccessorPromptInput({
+        preparation,
+        scope: source.scope,
+        expectedScopeDigest: source.expectedScopeDigest,
+        caseId: target.case_id,
+        root,
+      });
+      const output = executePortfolio({
+        ...source.execution,
+        root,
+        adapter: "codex",
+        runtimeConfigPath: source.runtimeConfigPath,
+        agentBin: source.agentBin,
+        caseId: binding.source_case_id,
+        maxCases: 1,
+        retryFailed: false,
+        successorPromptInput: prompt,
+      });
+      const after = await inspect(authority, preparation, sources, root);
+      successorExact(after.control.terminal_count, before.control.terminal_count + 1, "one measured terminal case per claim");
+      const nextEntries = [...entries, terminalEntry({ preparation, sources, claim, before, after })];
+      writeDurableJson(journal, journalSnapshot(authority, after, nextEntries));
+      if (process.env.ASK_BENCHMARK_FAULT === "after_measured_journal_published") process.exit(86);
+      releaseLock(lockPath);
+      return {
+        case_id: target.case_id,
+        prompt_role: target.prompt_role,
+        native_case_id: binding.source_case_id,
+        outcome: structuredClone(output),
+        collection: structuredClone(after.control),
+        journal: readJournalBase(journal, authority, preparation),
+        model_call_authorized_by_issue_291: true,
+        automatic_retry_performed: false,
+        portfolio_mutation_authorized: false,
+      };
+    } catch (error) {
+      // A crash/exception after the durable global claim leaves the claim in place.
+      // Recovery reopens native evidence and either journals the one terminal attempt
+      // or releases an unstarted claim. It never starts the case again.
+      throw error;
+    }
+  } finally {
+    await closeOwnerSocket(lease);
   }
 }
 
@@ -465,8 +488,8 @@ export async function recoverMeasuredSuccessorSession({
   const lockPath = `${journal}.lock`;
   if (!existsSync(lockPath)) successorFail("SUCCESSOR_MEASURED_RECOVERY_NOT_REQUIRED", "durable global claim");
   const claim = readLock(lockPath);
-  claimCanBeRecovered(lockPath, claim);
-  const owner = acquireRecoveryEpoch(lockPath, claim);
+  await claimCanBeRecovered(claim);
+  const owner = await acquireRecoveryEpoch(lockPath, claim);
   try {
     if (!existsSync(lockPath)) successorFail("SUCCESSOR_MEASURED_RECOVERY_NOT_REQUIRED", "durable global claim changed");
     successorExact(readLock(lockPath).claim_id, claim.claim_id, "recovery owned claim generation");
@@ -583,7 +606,8 @@ export async function recoverMeasuredSuccessorSession({
       portfolio_mutation_authorized: false,
     };
   } finally {
-    finishRecoveryEpoch(owner);
+    try { finishRecoveryEpoch(owner); }
+    finally { await closeOwnerSocket(owner.lease); }
   }
 }
 

@@ -175,9 +175,10 @@ an active stale native claim is passed to the existing committed recovery path.
 Recovered interruptions remain terminal and stopped; recovery never launches or
 retries the case.
 
-Each global claim has a unique generation and process owner. A live executor
-must explicitly leave its claim for recovery after an exception; a dead owner
-can be recovered without that marker. Recovery owners acquire append-only,
+Each global claim has a unique generation and a process-owned local socket.
+The socket closes after a normal return or caught exception and when a process
+dies; a live executor's socket excludes recovery without relying on a reusable
+numeric PID. Recovery owners acquire append-only,
 claim-specific epochs atomically before inspecting or changing the journal or
 global claim. Another live recovery owner blocks; a dead owner can be superseded
 without deleting its epoch. Before changing state, the new owner rechecks that

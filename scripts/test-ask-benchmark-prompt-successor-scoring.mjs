@@ -563,8 +563,8 @@ async function worker(contextPath) {
         assert.equal(nextStep.collection.terminal_count, 3);
         record.synthetic_native_attempts++;
         const staleClaim = {
-          schema_version: "1.2.0", kind: "prompt_successor_measured_claim",
-          claim_id: randomUUID(), owner_pid: process.pid,
+          schema_version: "1.3.0", kind: "prompt_successor_measured_claim",
+          claim_id: randomUUID(), owner_socket: `/tmp/ask-successor-owner-${randomUUID()}.sock`,
           authority_digest: priorJournal.authority_digest, preparation_digest: preparation.preparation_digest,
           case_id: target.case_id, prompt_role: target.prompt_role, native_case_id: nativeCase,
           pre_collection_digest: priorJournal.collection_control_digest,
@@ -573,10 +573,6 @@ async function worker(contextPath) {
         };
         const staleClaimDigest = canonicalDigest(staleClaim);
         write(`${measuredJournalPath}.lock`, { ...staleClaim, claim_digest: staleClaimDigest });
-        write(`${measuredJournalPath}.lock.abandoned-${staleClaim.claim_id}`, {
-          schema_version: "1.0.0", kind: "prompt_successor_abandoned_claim",
-          claim_id: staleClaim.claim_id, claim_digest: staleClaimDigest,
-        });
         const recovered = await recoverMeasuredSuccessorSession({ authority: measuredAuthority, preparation, sources: measuredSources, root });
         assert.equal(recovered.retry_performed, false);
         assert.equal(recovered.recovered_case_id, target.case_id);
