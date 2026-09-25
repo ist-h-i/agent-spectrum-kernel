@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
       const char *value = argv[++i];
       if (!strcmp(arg, "--model") && strcmp(value, "synthetic-native-fake-not-a-service")) return 64;
       if (!strcmp(arg, "--sandbox") && strcmp(value, "workspace-write")) return 64;
-      if (!strcmp(arg, "-c") && strcmp(value, "model_reasoning_effort=\"high\"") && strcmp(value, "approval_policy=\"never\"") && strcmp(value, "sandbox_workspace_write.network_access=false")) return 64;
+      if (!strcmp(arg, "-c") && strcmp(value, "model_reasoning_effort=\"medium\"") && strcmp(value, "approval_policy=\"never\"") && strcmp(value, "sandbox_workspace_write.network_access=false")) return 64;
       if (!strcmp(arg, "--output-last-message")) { if (output) return 64; output = value; }
       continue;
     }

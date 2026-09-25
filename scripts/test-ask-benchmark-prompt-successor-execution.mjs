@@ -60,7 +60,7 @@ function selectionInput(record, plan) {
 function nativeConfig(timeoutMs = 900000) {
   return {
     schema_version: "1.2.0", adapter: "codex", availability: "available", unavailable_reason: null,
-    expected_executable_version: "codex-cli 0.153.4", model: "synthetic-native-fake-not-a-service", reasoning_effort: "high",
+    expected_executable_version: "codex-cli 0.153.4", model: "synthetic-native-fake-not-a-service", reasoning_effort: "medium",
     case_timeout_ms: timeoutMs, sandbox_policy: "workspace-write", permission_policy: "never",
     executor: { id: "successor-native-fake", version: "1.0.0" },
     environment_allowlist: ["HOME", "ASK_SUCCESSOR_FAKE_CAPTURE", "ASK_SUCCESSOR_FAKE_MODE"], environment_value_allowlist: [],
@@ -165,7 +165,7 @@ await test("F3: successor input traverses the real native runner without a provi
       const environment = { HOME: home, ASK_SUCCESSOR_FAKE_CAPTURE: captures, ASK_SUCCESSOR_FAKE_MODE: mode };
       const runtime = { adapter: "codex", cli_version: "0.153.4", executable_digest: nativeDigest, node_version: process.version,
         os: process.platform, arch: process.arch, model: runtimeFile.model, provider_model_revision: { status: "unknown", value: null },
-        reasoning_effort: "high", authentication_mode: "api_key", configuration_digest: hash(readFileSync(runtimeConfigPath)),
+        reasoning_effort: "medium", authentication_mode: "api_key", configuration_digest: hash(readFileSync(runtimeConfigPath)),
         sandbox: "workspace-write", approval_policy: "never", agent_network: "disabled", provider_network: "provider_only", timeout_ms: timeoutMs };
       // "api_key" above is a synthetic closed-enum value, NOT an observed login.
       // The fake HOME is empty and no credential environment variable is inherited.

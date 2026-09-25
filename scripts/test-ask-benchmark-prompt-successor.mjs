@@ -55,7 +55,7 @@ for (const [label, mutate] of [
   ["Claude success", (p) => { p.decision_scope.adapter = "claude"; }], ["unknown field", (p) => { p.raw_prompt = "not allowed"; }],
   ["wrong parent hash", (p) => { p.predecessor.preregistration_digest = d("other"); }],
 ]) test(`preparation rejects ${label}`, () => { const p = clone(prep); mutate(p); rejected(() => validatePromptSuccessorPreparation(p)); });
-for (const [field, value] of [["cli_version", "latest"], ["cli_version", 153], ["model", "model-latest"], ["model", "--model=other"], ["node_version", "v22.16.0"], ["authentication_mode", "unknown"], ["sandbox", "danger-full-access"], ["approval_policy", "on-request"], ["agent_network", "enabled"], ["timeout_ms", 0], ["provider_model_revision", { status: "known", value: null }]]) {
+for (const [field, value] of [["cli_version", "latest"], ["cli_version", 153], ["model", "model-latest"], ["model", "--model=other"], ["reasoning_effort", "high"], ["node_version", "v22.16.0"], ["authentication_mode", "unknown"], ["sandbox", "danger-full-access"], ["approval_policy", "on-request"], ["agent_network", "enabled"], ["timeout_ms", 0], ["provider_model_revision", { status: "known", value: null }]]) {
   test(`runtime rejects unsafe/unresolved ${field}=${JSON.stringify(value)}`, () => { const r = syntheticRuntime(); r[field] = value; rejected(() => validateSuccessorRuntime(r)); });
 }
 test("source scope supports native plan ID distinct from plan content digest", () => { const s = syntheticScope(prep); assert.notEqual(s.source.plan_id, `plan-${s.source.plan_digest.slice(7)}`); validateSuccessorSourceScope(s, prep, s.scope_digest); });
@@ -124,6 +124,8 @@ test("proposed argv is explicit, carries no permission and never invokes a runti
   const spec = proposeSuccessorInvocation(prep, prep.cases[0].case_id, "/isolated/workspace");
   assert.equal(spec.argv.at(-1), "-"); assert.equal(spec.model_call_authorized, false); assert.equal(spec.effective_isolation_verified, false);
   assert.ok(spec.argv.includes("sandbox_workspace_write.network_access=false"));
+  assert.ok(spec.argv.includes('model_reasoning_effort="medium"'));
+  assert.ok(!spec.argv.includes('model_reasoning_effort="high"'));
   assert.equal(spec.timeout_ms, 900000);
   rejected(() => proposeSuccessorInvocation(prep, prep.cases[0].case_id, "/safe/../unsafe"));
   for (const authority of [undefined, true, { approved: true }]) assert.throws(() => assertSuccessorLaunchAllowed(authority), { code: "SUCCESSOR_PREPARATION_ONLY" });

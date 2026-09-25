@@ -272,7 +272,7 @@ the production freeze.
 ## Invariants to verify
 
 - Bind exact source commit/tree, experiment, selected Prompt bytes, runtime,
-  executable, model, reasoning, config, authentication class, policy and roots.
+  executable, model, medium reasoning, config, authentication class, policy and roots.
 - Represent the 28 preregistered cases in order, with no retry, duplicate,
   replacement, historical transplant or unexecuted four-condition completion.
 - Use the existing native runner and its actual request/result/workspace proofs.

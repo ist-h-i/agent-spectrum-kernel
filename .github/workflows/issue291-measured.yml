@@ -75,7 +75,7 @@ jobs:
       # implementation tests or authority for a real experiment.
       - name: Validate existing synthetic successor boundaries
         run: |
-          node --test scripts/test-ask-benchmark-prompt-successor.mjs scripts/test-ask-benchmark-prompt-successor-report.mjs scripts/test-ask-benchmark-prompt-successor-input-guards.mjs
+          node --test scripts/test-ask-benchmark-prompt-successor.mjs scripts/test-ask-benchmark-prompt-successor-report.mjs scripts/test-ask-benchmark-prompt-successor-input-guards.mjs scripts/test-ask-benchmark-prompt-successor-fake.mjs
       - name: Verify preparation workflow packaging
         run: node --test scripts/test-ask-benchmark-prompt-successor-workflow.mjs
       - name: Verify successor usage and collection control

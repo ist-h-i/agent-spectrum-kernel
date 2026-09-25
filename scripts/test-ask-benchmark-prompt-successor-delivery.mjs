@@ -94,7 +94,7 @@ test("declared runtime cannot be replaced by a different valid-looking native di
   const command = successorEffectiveCommand({ argv: ["exec", "-"], task_transport: "stdin", output_transport: "file", output_schema_digest: null });
   const identity = {
     adapter: "codex", availability: "available", model: runtime.model,
-    reasoning_effort: "high", sandbox_policy: "workspace-write", permission_policy: "never", case_timeout_ms: 900000,
+    reasoning_effort: "medium", sandbox_policy: "workspace-write", permission_policy: "never", case_timeout_ms: 900000,
     executable: { executable_basename: "codex", observed_version: runtime.cli_version, executable_sha256: runtime.executable_digest.slice(7) },
     runtime_config_sha256: runtime.configuration_digest.slice(7), effective_command: command,
     effective_command_digest: canonicalDigest(command),
