@@ -303,6 +303,7 @@ export async function executeNextMeasuredSuccessorCase({
     successorExact(after.control.terminal_count, before.control.terminal_count + 1, "one measured terminal case per claim");
     const nextEntries = [...entries, terminalEntry({ preparation, sources, claim, before, after })];
     writeDurableJson(journal, journalSnapshot(authority, after, nextEntries));
+    if (process.env.ASK_BENCHMARK_FAULT === "after_measured_journal_published") process.exit(86);
     releaseLock(lockPath);
     return {
       case_id: target.case_id,
@@ -334,13 +335,6 @@ export async function recoverMeasuredSuccessorSession({
   successorExact(claim.authority_digest, canonicalDigest(inspectSuccessorMeasuredAuthority(authority)), "recovery authority");
   successorExact(claim.preparation_digest, preparation.preparation_digest, "recovery preparation");
   const beforeJournal = readJournalBase(journal, authority, preparation);
-  successorExact(beforeJournal?.journal_digest ?? null, claim.pre_journal_digest, "recovery pre-journal");
-  successorExact(beforeJournal?.entries.length ?? 0, claim.pre_entry_count, "recovery pre-entry count");
-  if (beforeJournal !== null) {
-    successorExact(claim.pre_collection_digest, beforeJournal.collection_control_digest, "recovery pre-control");
-  } else {
-    successorExact(claim.pre_entry_count, 0, "recovery initial entry count");
-  }
   const target = preparation.cases.find((entry) => entry.case_id === claim.case_id);
   if (!target) successorFail("SUCCESSOR_CASE_MISSING", "recovery case");
   successorExact(target.prompt_role, claim.prompt_role, "recovery role");
@@ -348,6 +342,32 @@ export async function recoverMeasuredSuccessorSession({
   const binding = source.scope.source.bindings.find((entry) => entry.successor_case_id === target.case_id);
   successorExact(binding?.source_case_id, claim.native_case_id, "recovery native case");
   const nativeClaimPath = resolve(source.execution.runDir, "cases", claim.native_case_id, "claim", "claim.json");
+  if ((beforeJournal?.journal_digest ?? null) !== claim.pre_journal_digest) {
+    // The terminal journal may have been committed just before the controller
+    // stopped. Reverify the whole native collection and the exact claim entry
+    // before removing its lock; never touch or repeat the completed native case.
+    successorExact(beforeJournal?.entries.length, claim.pre_entry_count + 1, "recovery committed entry count");
+    const after = await inspect(authority, preparation, sources, root);
+    validateJournalAgainstInspection(beforeJournal, authority, preparation, sources, after);
+    const prior = { control: { terminal_count: claim.pre_entry_count, control_digest: claim.pre_collection_digest } };
+    successorExact(beforeJournal.entries.at(-1), terminalEntry({ preparation, sources, claim, before: prior, after }), "recovery committed claim entry");
+    if (existsSync(nativeClaimPath)) successorFail("SUCCESSOR_UNCERTAIN_EXECUTION", "recovery committed native claim");
+    releaseLock(lockPath);
+    return {
+      recovered_case_id: target.case_id,
+      native_status: beforeJournal.entries.at(-1).status,
+      collection: structuredClone(after.control),
+      journal: beforeJournal,
+      retry_performed: false,
+      portfolio_mutation_authorized: false,
+    };
+  }
+  successorExact(beforeJournal?.entries.length ?? 0, claim.pre_entry_count, "recovery pre-entry count");
+  if (beforeJournal !== null) {
+    successorExact(claim.pre_collection_digest, beforeJournal.collection_control_digest, "recovery pre-control");
+  } else {
+    successorExact(claim.pre_entry_count, 0, "recovery initial entry count");
+  }
   if (existsSync(nativeClaimPath)) {
     const nativeClaim = parseJsonRejectDuplicateKeys(readFileSync(nativeClaimPath), "native recovery claim");
     recoverPortfolioCase({

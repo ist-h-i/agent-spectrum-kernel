@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -202,7 +202,7 @@ async function worker(contextPath) {
         await assert.rejects(() => asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
           authority: measuredAuthority, preparation, sources: measuredSources, root,
         })));
-        assert.equal(read(resolve(work, "measured-journal.json.lock")).automatic_retry_authorized, false);
+        assert.equal(read(`${measuredJournalPath}.lock`).automatic_retry_authorized, false);
       } finally {
         renameSync(hiddenAgent, agentBin);
       }
@@ -316,8 +316,42 @@ async function worker(contextPath) {
       assert.equal(inspected.execution_authorized, false);
       await assert.rejects(() => inspectSuccessorCollectionControl({ preparation, sources: collectionInputs().sources, accessMode: "measured", root }), { code: "SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED" });
     });
+    await check("controller restart reconciles a committed measured journal without repeating the trial", async () => {
+      const contextPath = resolve(work, "committed-journal-crash-context.json");
+      write(contextPath, { preparation, sources: measuredSources, root, manifestPath });
+      const child = spawnSync(process.execPath, ["--input-type=module", "-e", `
+        import { readFileSync } from "node:fs";
+        import { openSuccessorMeasuredAuthority } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-measured-authority.mjs", import.meta.url).href)};
+        import { openSuccessorScoringInputs } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-scoring-inputs.mjs", import.meta.url).href)};
+        import { executeNextMeasuredSuccessorCase } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-measured-execution.mjs", import.meta.url).href)};
+        const i = JSON.parse(readFileSync(process.argv[1], "utf8"));
+        const scoringInputs = await openSuccessorScoringInputs({ preparation: i.preparation, manifestPath: i.manifestPath, root: i.root });
+        const authority = await openSuccessorMeasuredAuthority({ preparation: i.preparation, sources: i.sources, scoringInputs, root: i.root });
+        await executeNextMeasuredSuccessorCase({ authority, preparation: i.preparation, sources: i.sources, root: i.root });
+      `, contextPath], {
+        cwd: root, encoding: "utf8", timeout: 120000, maxBuffer: 4 * 1024 * 1024,
+        env: { ...process.env, ...env, ASK_BENCHMARK_FAULT: "after_measured_journal_published" },
+      });
+      assert.equal(child.error, undefined, child.error?.message);
+      assert.equal(child.status, 86, child.stderr || child.stdout);
+      assert.equal(read(`${measuredJournalPath}.lock`).automatic_retry_authorized, false);
+      assert.equal(read(measuredJournalPath).terminal_count, 1);
+      measuredAuthority = await openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, scoringInputs, root });
+      const recovered = await recoverMeasuredSuccessorSession({ authority: measuredAuthority, preparation, sources: measuredSources, root });
+      assert.equal(recovered.retry_performed, false);
+      assert.equal(recovered.native_status, "completed");
+      assert.equal(recovered.collection.terminal_count, 1);
+      assert.equal(recovered.collection.total_tokens.value, 120);
+      assert.equal(recovered.collection.next_case_id, preparation.cases[1].case_id);
+      assert.equal(existsSync(`${measuredJournalPath}.lock`), false);
+      const first = preparation.cases[0]; const role = roles[first.prompt_role];
+      const nativeCase = role.scope.source.bindings.find(b => b.successor_case_id === first.case_id).source_case_id;
+      const actual = inspectVerifiedPortfolioExecution(role.execution).cases.find(c => c.entry.case_id === nativeCase);
+      assert.equal(actual.attempts.length, 1);
+      record.synthetic_native_attempts++;
+    });
     await check("28 measured-launch claims preserve global order, durable journal and canonical terminal identities", async () => {
-      for (const target of preparation.cases) {
+      for (const target of preparation.cases.slice(1)) {
         const step = await asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
           authority: measuredAuthority, preparation, sources: measuredSources, root,
         }));
@@ -326,11 +360,6 @@ async function worker(contextPath) {
         assert.equal(step.automatic_retry_performed, false);
         assert.equal(step.journal.durable_global_sequence_verified, true);
         record.synthetic_native_attempts++;
-        if (record.synthetic_native_attempts === 1) {
-          assert.equal(step.collection.terminal_count, 1);
-          assert.equal(step.collection.total_tokens.value, 120);
-          assert.equal(step.collection.next_case_id, preparation.cases[1].case_id);
-        }
       }
       const finalJournal = read(measuredJournalPath);
       assert.equal(finalJournal.terminal_count, 28);
@@ -473,7 +502,7 @@ async function worker(contextPath) {
       finally { writeFileSync(path, before); }
     });
     record.final_revision = git(root, "rev-parse", "HEAD"); record.final_status = git(root, "status", "--porcelain");
-    assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, ""); assert.equal(record.checks.length, 16); record.completed = true;
+    assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, ""); assert.equal(record.checks.length, 17); record.completed = true;
   } finally {
     const evidencePath = resolve(work, "scoring-verification.json"); write(evidencePath, record); console.log(`Evidence: ${evidencePath}`);
   }
