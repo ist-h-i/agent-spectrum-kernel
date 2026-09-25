@@ -302,7 +302,7 @@ async function worker(contextPath) {
       assert.ok(recovered.collection.stop_reasons.includes("execution_uncertain"));
       const first = preparation.cases[0]; const role = crashRoles[first.prompt_role];
       const nativeCase = role.scope.source.bindings.find(b => b.successor_case_id === first.case_id).source_case_id;
-      const actual = inspectVerifiedPortfolioExecution(role.execution).cases.find(c => c.entry.case_id === nativeCase);
+      const actual = inspectVerifiedPortfolioExecution({ ...role.execution, root }).cases.find(c => c.entry.case_id === nativeCase);
       assert.equal(actual.attempts.length, 1);
       assert.equal(actual.state.status, "interrupted");
       await assert.rejects(() => asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
