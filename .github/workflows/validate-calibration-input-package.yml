@@ -6,6 +6,9 @@ on:
       - '.github/workflows/validate-calibration-input-package.yml'
       - 'scripts/ask-benchmark-calibration-input-package.mjs'
       - 'scripts/test-ask-benchmark-calibration-input-package.mjs'
+      - 'scripts/test-prompt-successor-scoring-fixtures.mjs'
+      - 'scripts/ask-benchmark-prompt-successor-scoring-inputs.mjs'
+      - 'scripts/ask-benchmark-admitted-fixture-invariance.mjs'
       - 'scripts/ask-benchmark-calibration-source.mjs'
       - 'scripts/ask-benchmark-atomic-publication.mjs'
       - 'scripts/ask-benchmark-duplicate-key-json.mjs'
@@ -22,6 +25,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: '24'
