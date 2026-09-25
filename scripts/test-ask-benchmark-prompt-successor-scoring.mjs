@@ -632,13 +632,14 @@ async function worker(contextPath) {
         };
         const staleClaimDigest = canonicalDigest(staleClaim);
         write(`${measuredJournalPath}.lock`, { ...staleClaim, claim_digest: staleClaimDigest });
-        const recovered = await recoverMeasuredSuccessorSession({ authority: measuredAuthority, preparation, sources: measuredSources, root });
-        assert.equal(recovered.retry_performed, false);
-        assert.equal(recovered.recovered_case_id, target.case_id);
-        assert.equal(recovered.native_status, "completed");
-        assert.equal(recovered.collection.terminal_count, 3);
-        assert.equal(existsSync(`${measuredJournalPath}.lock`), false);
-        assert.equal(read(measuredJournalPath).journal_digest, recovered.journal.journal_digest);
+        // A new claim generation cannot impersonate the claim committed at
+        // this journal position, even if every other old prefix field agrees.
+        await assert.rejects(() => recoverMeasuredSuccessorSession({
+          authority: measuredAuthority, preparation, sources: measuredSources, root,
+        }), { code: "SUCCESSOR_IDENTITY_MISMATCH", path: "recovery committed claim digest" });
+        assert.equal(read(`${measuredJournalPath}.lock`).claim_id, staleClaim.claim_id);
+        assert.equal(read(measuredJournalPath).terminal_count, 3);
+        renameSync(`${measuredJournalPath}.lock`, resolve(work, "rejected-stale-measured-claim.json"));
       } finally {
         clearTimeout(watchdog);
         clearTimeout(exitWatchdog);
