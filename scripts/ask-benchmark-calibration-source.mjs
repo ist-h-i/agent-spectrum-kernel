@@ -7,6 +7,12 @@ export const CALIBRATION_SOURCE_BINDINGS = Object.freeze([
   Object.freeze(["cal-atomic-rule-batch", "impl-rule-batch-medium-hard", "implementation", 3]),
   Object.freeze(["cal-concurrent-transfer", "impl-transfer-hard", "implementation", 5]),
 ]);
+export const CALIBRATION_INPUT_MANIFEST_PATH = "benchmarks/fixtures/checkpoint-b2/input-manifest.json";
+export const CALIBRATION_INPUT_MANIFEST_SHA256 = "e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d";
+
+export function calibrationSourceIdForFixture(fixtureId) {
+  return CALIBRATION_SOURCE_BINDINGS.find(([id]) => id === fixtureId)?.[1] ?? null;
+}
 
 export function resolvePortfolioFixtureSource(fixture) {
   if (!Object.hasOwn(fixture, "source_fixture_id")) return fixture.id;
@@ -30,10 +36,11 @@ export function assertSuccessorCalibrationConfig(config, { inputManifestDigest }
       throw new Error("successor calibration inventory or ordering changed");
     }
     resolvePortfolioFixtureSource(fixture);
-    if (inputManifestDigest !== undefined && fixture.input_manifest_sha256 !== inputManifestDigest) {
+    if (fixture.input_manifest_sha256 !== CALIBRATION_INPUT_MANIFEST_SHA256
+        || (inputManifestDigest !== undefined && fixture.input_manifest_sha256 !== inputManifestDigest)) {
       throw new Error("successor calibration input manifest changed");
     }
-    if (fixture.input_manifest_path !== "benchmarks/fixtures/checkpoint-b2/input-manifest.json"
+    if (fixture.input_manifest_path !== CALIBRATION_INPUT_MANIFEST_PATH
         || config.fixture_root !== "benchmarks/fixtures/checkpoint-b2") {
       throw new Error("successor calibration source is outside the registered input set");
     }
