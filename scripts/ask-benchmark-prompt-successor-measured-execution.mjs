@@ -360,19 +360,14 @@ export async function recoverMeasuredSuccessorSession({
   successorExact(binding?.source_case_id, claim.native_case_id, "recovery native case");
   const nativeClaimPath = resolve(source.execution.runDir, "cases", claim.native_case_id, "claim", "claim.json");
   if ((beforeJournal?.journal_digest ?? null) !== claim.pre_journal_digest) {
-    // Either this controller stopped after committing its terminal entry, or
-    // it acquired an obsolete lock after another controller committed that case.
-    // In both cases the journal and native terminal must agree before unlock.
+    // The terminal journal may have been committed by this controller or by
+    // a peer with the same deterministic claim before this controller stopped.
+    // Reverify the native collection and exact claim entry before unlocking.
     successorExact(beforeJournal?.entries.length, claim.pre_entry_count + 1, "recovery committed entry count");
     const after = await inspect(authority, preparation, sources, root);
     validateJournalAgainstInspection(beforeJournal, authority, preparation, sources, after);
-    const committed = beforeJournal.entries.at(-1);
-    successorExact(committed.case_id, claim.case_id, "recovery committed case");
-    successorExact(committed.pre_collection_digest, claim.pre_collection_digest, "recovery committed pre-control");
-    if (committed.global_claim_digest === claim.claim_digest) {
-      const prior = { control: { terminal_count: claim.pre_entry_count, control_digest: claim.pre_collection_digest } };
-      successorExact(committed, terminalEntry({ preparation, sources, claim, before: prior, after }), "recovery committed claim entry");
-    }
+    const prior = { control: { terminal_count: claim.pre_entry_count, control_digest: claim.pre_collection_digest } };
+    successorExact(beforeJournal.entries.at(-1), terminalEntry({ preparation, sources, claim, before: prior, after }), "recovery committed claim entry");
     if (existsSync(nativeClaimPath)) successorFail("SUCCESSOR_UNCERTAIN_EXECUTION", "recovery committed native claim");
     releaseLock(lockPath);
     return {
