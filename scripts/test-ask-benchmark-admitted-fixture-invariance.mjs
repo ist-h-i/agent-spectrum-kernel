@@ -10,6 +10,7 @@ import { basename, resolve } from "node:path";
 
 import {
   discoverAdmittedFixtureIds,
+  partitionAdmittedFixtureIdsForPrivateSemantics,
   validateActualPrivateAdmittedFixtureSemantics,
   validateAdmittedFixtureInputBinding,
   validateDiscoveredAdmittedCalibrationInputBindings,
@@ -341,6 +342,15 @@ test("a synthetic admitted calibration record is discovered and its source input
   revision = commitMutation(root, "synthetic calibration metadata mismatch");
   assert.throws(() => validateDiscoveredAdmittedCalibrationInputBindings({ root, repositoryRevision: revision }), /task_class catalog\/runtime identity drift/u);
 }));
+
+test("an admitted calibration fixture does not suppress primary private semantic coverage", () => {
+  const catalog = readJson(resolve(ROOT, "benchmarks/portfolio-catalog.json"));
+  const primaryIds = discoverAdmittedFixtureIds({ root: ROOT, repositoryRevision: "HEAD" });
+  const scope = partitionAdmittedFixtureIdsForPrivateSemantics({ fixtureIds: [...primaryIds, "cal-session-refresh"], catalog });
+  assert.deepEqual(scope.primary, primaryIds);
+  assert.deepEqual(scope.calibration, ["cal-session-refresh"]);
+  assert.throws(() => partitionAdmittedFixtureIdsForPrivateSemantics({ fixtureIds: [...primaryIds, "unknown-fixture"], catalog }), /no canonical role/u);
+});
 
 test("actual-private invariance rejects an incomplete admitted-fixture evidence inventory", () => {
   const repositoryRevision = git(ROOT, ["rev-parse", "HEAD"]);

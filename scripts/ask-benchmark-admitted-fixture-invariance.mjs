@@ -490,6 +490,18 @@ export function validatePublicAdmittedFixtureInvariance({ root = DEFAULT_ROOT, r
   return Object.freeze({ fixture_ids: fixtureIds, fixtures, public_invariance: "pass", private_semantics: "not_supplied", public_case_count: firstPlan.cases.length });
 }
 
+export function partitionAdmittedFixtureIdsForPrivateSemantics({ fixtureIds, catalog }) {
+  const primary = [];
+  const calibration = [];
+  for (const fixtureId of fixtureIds) {
+    const role = catalog.fixtures.find(({ fixture_id: id }) => id === fixtureId)?.fixture_role;
+    if (role === "primary") primary.push(fixtureId);
+    else if (role === "calibration") calibration.push(fixtureId);
+    else throw new Error(`${fixtureId} admitted fixture has no canonical role`);
+  }
+  return { primary, calibration };
+}
+
 function parseMapping(value, label) {
   const separator = value.indexOf("=");
   if (separator < 1 || separator === value.length - 1) throw new Error(`${label} must use fixture-id=/absolute/path`);
@@ -520,13 +532,12 @@ export function validateActualPrivateAdmittedFixtureSemantics({ root = DEFAULT_R
   if (!evidenceManifestPath || !privateRoots || Object.keys(privateRoots).length === 0) throw new Error("actual-private invariance requires exact external review evidence and at least one private root");
   repositoryRevision = git(root, ["rev-parse", repositoryRevision]).trim();
   const publicResult = validatePublicAdmittedFixtureInvariance({ root, repositoryRevision });
-  const discovered = new Set(publicResult.fixture_ids);
   const catalog = readTrackedJson(root, repositoryRevision, CATALOG_PATH).value;
-  if ([...discovered].some((fixtureId) => catalog.fixtures.find(({ fixture_id: id }) => id === fixtureId)?.fixture_role === "calibration")) {
-    throw new Error("actual-private calibration admission requires a separate execution admission contract");
-  }
+  const scope = partitionAdmittedFixtureIdsForPrivateSemantics({ fixtureIds: publicResult.fixture_ids, catalog });
+  const discovered = new Set(scope.primary);
   const evidence = readExecutionAdmissionEvidenceManifest(evidenceManifestPath);
   const supplied = new Set([...Object.keys(evidence), ...Object.keys(privateRoots), ...Object.keys(privateCaseRoots)]);
+  for (const fixtureId of scope.calibration) if (supplied.has(fixtureId)) throw new Error(`${fixtureId} actual-private calibration admission requires a separate execution admission contract`);
   for (const fixtureId of supplied) if (!discovered.has(fixtureId)) throw new Error(`actual-private invariance contains a non-admitted fixture: ${fixtureId}`);
   for (const fixtureId of discovered) if (!evidence[fixtureId] || !privateRoots[fixtureId]) throw new Error(`${fixtureId} actual-private invariance evidence is partial`);
   for (const fixtureId of supplied) {
