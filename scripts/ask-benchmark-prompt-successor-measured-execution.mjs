@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import {
-  closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync,
+  closeSync, existsSync, fsyncSync, linkSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync,
   renameSync, unlinkSync, writeFileSync, writeSync,
 } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { basename, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalDigest, parseJsonRejectDuplicateKeys, stableCanonicalJson, assertNoSymlinkPathSegments } from "./content-addressed-store.mjs";
 import { successorClosed, successorDigest, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
@@ -56,6 +56,25 @@ function writeDurableJson(path, value) {
   renameSync(temp, path);
   const directory = openSync(parent, "r");
   try { fsyncSync(directory); } finally { closeSync(directory); }
+}
+
+function writeDurableExclusiveJson(path, value) {
+  const parent = dirname(path);
+  const temp = `${path}.tmp-${randomUUID()}`;
+  const fd = openSync(temp, "wx", 0o600);
+  try {
+    writeFileSync(fd, `${stableCanonicalJson(value)}\n`);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  try {
+    linkSync(temp, path);
+    const directory = openSync(parent, "r");
+    try { fsyncSync(directory); } finally { closeSync(directory); }
+  } finally {
+    unlinkSync(temp);
+  }
 }
 
 function readJsonBounded(path, label, maxBytes = MAX_JOURNAL_BYTES) {
@@ -194,8 +213,10 @@ function terminalEntry({ preparation, sources, claim, before, after }) {
 
 function lockRecord(authority, preparation, caseId, role, nativeCaseId, beforeDigest, journal) {
   const body = {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     kind: "prompt_successor_measured_claim",
+    claim_id: randomUUID(),
+    owner_pid: process.pid,
     authority_digest: canonicalDigest(inspectSuccessorMeasuredAuthority(authority)),
     preparation_digest: preparation.preparation_digest,
     case_id: caseId,
@@ -229,13 +250,17 @@ function acquireLock(path, record) {
 function readLock(path) {
   const value = readJsonBounded(path, "measured claim", 64 * 1024);
   successorClosed(value, [
-    "schema_version", "kind", "authority_digest", "preparation_digest", "case_id", "prompt_role",
+    "schema_version", "kind", "claim_id", "owner_pid", "authority_digest", "preparation_digest", "case_id", "prompt_role",
     "native_case_id", "pre_collection_digest", "pre_journal_digest", "pre_entry_count",
     "automatic_retry_authorized", "claim_digest",
   ], "measured claim");
   const { claim_digest: digest, ...body } = value;
-  successorExact(value.schema_version, "1.1.0", "measured claim version");
+  successorExact(value.schema_version, "1.2.0", "measured claim version");
   successorExact(value.kind, "prompt_successor_measured_claim", "measured claim kind");
+  if (typeof value.claim_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.claim_id)) {
+    successorFail("SUCCESSOR_MEASURED_CLAIM_INVALID", "claim generation");
+  }
+  if (!Number.isSafeInteger(value.owner_pid) || value.owner_pid < 1) successorFail("SUCCESSOR_MEASURED_CLAIM_INVALID", "claim owner pid");
   successorExact(canonicalDigest(body), digest, "measured claim digest");
   successorExact(value.automatic_retry_authorized, false, "measured claim retry");
   successorDigest(value.pre_collection_digest, "measured claim pre-collection");
@@ -247,6 +272,96 @@ function releaseLock(path) {
   unlinkSync(path);
   const directory = openSync(dirname(path), "r");
   try { fsyncSync(directory); } finally { closeSync(directory); }
+}
+
+function processAlive(pid) {
+  try { process.kill(pid, 0); return true; }
+  catch (error) {
+    if (error?.code === "ESRCH") return false;
+    if (error?.code === "EPERM") return true;
+    throw error;
+  }
+}
+
+function abandonedClaimPath(lockPath, claim) {
+  return `${lockPath}.abandoned-${claim.claim_id}`;
+}
+
+function abandonClaim(lockPath, claim) {
+  writeDurableExclusiveJson(abandonedClaimPath(lockPath, claim), {
+    schema_version: "1.0.0", kind: "prompt_successor_abandoned_claim",
+    claim_id: claim.claim_id, claim_digest: claim.claim_digest,
+  });
+}
+
+function claimCanBeRecovered(lockPath, claim) {
+  if (!processAlive(claim.owner_pid)) return;
+  const path = abandonedClaimPath(lockPath, claim);
+  if (!existsSync(path)) successorFail("SUCCESSOR_MEASURED_EXECUTION_ACTIVE", "live claim owner");
+  const value = readJsonBounded(path, "abandoned measured claim", 4096);
+  successorClosed(value, ["schema_version", "kind", "claim_id", "claim_digest"], "abandoned measured claim");
+  successorExact(value.schema_version, "1.0.0", "abandoned claim version");
+  successorExact(value.kind, "prompt_successor_abandoned_claim", "abandoned claim kind");
+  successorExact(value.claim_id, claim.claim_id, "abandoned claim generation");
+  successorExact(value.claim_digest, claim.claim_digest, "abandoned claim digest");
+}
+
+function recoveryEpochPath(lockPath, claim, epoch) {
+  return `${lockPath}.recovery-${claim.claim_id}-${epoch}.json`;
+}
+
+function readRecoveryEpoch(path, claim, epoch) {
+  const value = readJsonBounded(path, "measured recovery owner", 4096);
+  successorClosed(value, ["schema_version", "kind", "claim_id", "epoch", "pid", "owner_token", "owner_digest"], "measured recovery owner");
+  const { owner_digest: digest, ...body } = value;
+  successorExact(value.schema_version, "1.0.0", "measured recovery owner version");
+  successorExact(value.kind, "prompt_successor_recovery_owner", "measured recovery owner kind");
+  successorExact(value.claim_id, claim.claim_id, "measured recovery claim generation");
+  successorExact(value.epoch, epoch, "measured recovery epoch");
+  if (!Number.isSafeInteger(value.pid) || value.pid < 1) successorFail("SUCCESSOR_MEASURED_RECOVERY_INVALID", "recovery owner pid");
+  successorExact(canonicalDigest(body), digest, "measured recovery owner digest");
+  return value;
+}
+
+function acquireRecoveryEpoch(lockPath, claim) {
+  const prefix = `${basename(lockPath)}.recovery-${claim.claim_id}-`;
+  const epochs = readdirSync(dirname(lockPath)).flatMap((name) => {
+    if (!name.startsWith(prefix)) return [];
+    const suffix = name.slice(prefix.length);
+    if (!/^[1-9][0-9]*\.json$/.test(suffix)) return [];
+    const epoch = Number(suffix.slice(0, -5));
+    return Number.isSafeInteger(epoch) ? [epoch] : [];
+  });
+  const last = epochs.length ? Math.max(...epochs) : 0;
+  if (last) {
+    const path = recoveryEpochPath(lockPath, claim, last);
+    const owner = readRecoveryEpoch(path, claim, last);
+    const donePath = `${path}.done`;
+    if (existsSync(donePath)) {
+      const done = readJsonBounded(donePath, "measured recovery completion", 4096);
+      successorClosed(done, ["owner_digest"], "measured recovery completion");
+      successorExact(done.owner_digest, owner.owner_digest, "measured recovery completion owner");
+    } else if (processAlive(owner.pid)) {
+      successorFail("SUCCESSOR_MEASURED_RECOVERY_LOCKED", "live recovery owner");
+    }
+  }
+  const epoch = last + 1;
+  if (!Number.isSafeInteger(epoch)) successorFail("SUCCESSOR_MEASURED_RECOVERY_INVALID", "recovery epoch overflow");
+  const body = {
+    schema_version: "1.0.0", kind: "prompt_successor_recovery_owner",
+    claim_id: claim.claim_id, epoch, pid: process.pid, owner_token: randomUUID(),
+  };
+  const path = recoveryEpochPath(lockPath, claim, epoch);
+  try { writeDurableExclusiveJson(path, { ...body, owner_digest: canonicalDigest(body) }); }
+  catch (error) {
+    if (error?.code === "EEXIST") successorFail("SUCCESSOR_MEASURED_RECOVERY_LOCKED", "concurrent recovery owner");
+    throw error;
+  }
+  return { path, owner_digest: canonicalDigest(body) };
+}
+
+function finishRecoveryEpoch(owner) {
+  writeDurableExclusiveJson(`${owner.path}.done`, { owner_digest: owner.owner_digest });
 }
 
 async function inspect(authority, preparation, sources, root) {
@@ -337,6 +452,7 @@ export async function executeNextMeasuredSuccessorCase({
     // A crash/exception after the durable global claim leaves the claim in place.
     // Recovery reopens native evidence and either journals the one terminal attempt
     // or releases an unstarted claim. It never starts the case again.
+    if (existsSync(lockPath)) abandonClaim(lockPath, claim);
     throw error;
   }
 }
@@ -349,89 +465,126 @@ export async function recoverMeasuredSuccessorSession({
   const lockPath = `${journal}.lock`;
   if (!existsSync(lockPath)) successorFail("SUCCESSOR_MEASURED_RECOVERY_NOT_REQUIRED", "durable global claim");
   const claim = readLock(lockPath);
-  successorExact(claim.authority_digest, canonicalDigest(inspectSuccessorMeasuredAuthority(authority)), "recovery authority");
-  successorExact(claim.preparation_digest, preparation.preparation_digest, "recovery preparation");
-  const beforeJournal = readJournalBase(journal, authority, preparation);
-  const target = preparation.cases.find((entry) => entry.case_id === claim.case_id);
-  if (!target) successorFail("SUCCESSOR_CASE_MISSING", "recovery case");
-  successorExact(target.prompt_role, claim.prompt_role, "recovery role");
-  const source = sources[target.prompt_role];
-  const binding = source.scope.source.bindings.find((entry) => entry.successor_case_id === target.case_id);
-  successorExact(binding?.source_case_id, claim.native_case_id, "recovery native case");
-  const nativeClaimPath = resolve(source.execution.runDir, "cases", claim.native_case_id, "claim", "claim.json");
-  if ((beforeJournal?.journal_digest ?? null) !== claim.pre_journal_digest) {
-    // A peer may have committed this deterministic claim and later cases
-    // before the delayed controller acquired its lock. Reverify the entire
-    // native collection and the claim's exact position before unlocking.
-    if (!Number.isSafeInteger(claim.pre_entry_count) || claim.pre_entry_count < 0 ||
-      !beforeJournal || beforeJournal.entries.length <= claim.pre_entry_count) {
-      successorFail("SUCCESSOR_MEASURED_JOURNAL_DIVERGED", "recovery committed entry count");
+  claimCanBeRecovered(lockPath, claim);
+  const owner = acquireRecoveryEpoch(lockPath, claim);
+  try {
+    if (!existsSync(lockPath)) successorFail("SUCCESSOR_MEASURED_RECOVERY_NOT_REQUIRED", "durable global claim changed");
+    successorExact(readLock(lockPath).claim_id, claim.claim_id, "recovery owned claim generation");
+    successorExact(claim.authority_digest, canonicalDigest(inspectSuccessorMeasuredAuthority(authority)), "recovery authority");
+    successorExact(claim.preparation_digest, preparation.preparation_digest, "recovery preparation");
+    const beforeJournal = readJournalBase(journal, authority, preparation);
+    const target = preparation.cases.find((entry) => entry.case_id === claim.case_id);
+    if (!target) successorFail("SUCCESSOR_CASE_MISSING", "recovery case");
+    successorExact(target.prompt_role, claim.prompt_role, "recovery role");
+    const source = sources[target.prompt_role];
+    const binding = source.scope.source.bindings.find((entry) => entry.successor_case_id === target.case_id);
+    successorExact(binding?.source_case_id, claim.native_case_id, "recovery native case");
+    const nativeClaimPath = resolve(source.execution.runDir, "cases", claim.native_case_id, "claim", "claim.json");
+    if ((beforeJournal?.journal_digest ?? null) !== claim.pre_journal_digest) {
+      if (claim.pre_journal_digest === null && claim.pre_entry_count === 0 && beforeJournal?.entries.length === 0) {
+        // An unstarted first claim can publish an empty journal before its lock
+        // is removed. Reopen the exact native prefix before completing that
+        // interrupted recovery; an empty file alone is not completion proof.
+        const after = await inspect(authority, preparation, sources, root);
+        validateJournalAgainstInspection(beforeJournal, authority, preparation, sources, after);
+        successorExact(beforeJournal, journalSnapshot(authority, after, []), "recovery published empty journal");
+        successorExact(after.control.control_digest, claim.pre_collection_digest, "recovery empty pre-control");
+        successorExact(after.control.next_case_id, claim.case_id, "recovery empty next case");
+        successorExact(after.control.status, "ready_for_authorized_claim", "recovery empty collection status");
+        const actual = inspectVerifiedPortfolioExecution({ ...source.execution, root });
+        const current = actual.cases.find((entry) => entry.entry.case_id === claim.native_case_id);
+        if (!current) successorFail("SUCCESSOR_CASE_MISSING", "recovery empty native execution");
+        successorExact(current.state.status, "pending", "recovery empty native status");
+        successorExact(current.attempts.length, 0, "recovery empty native attempts");
+        if (existsSync(nativeClaimPath)) successorFail("SUCCESSOR_UNCERTAIN_EXECUTION", "recovery empty native claim");
+        releaseLock(lockPath);
+        return {
+          recovered_case_id: target.case_id, native_status: "pending",
+          collection: structuredClone(after.control), journal: beforeJournal,
+          retry_performed: false, portfolio_mutation_authorized: false,
+        };
+      }
+      // A peer may have committed this deterministic claim and later cases
+      // before the delayed controller acquired its lock. Reverify the entire
+      // native collection and the claim's exact position before unlocking.
+      if (!Number.isSafeInteger(claim.pre_entry_count) || claim.pre_entry_count < 0 ||
+        !beforeJournal || beforeJournal.entries.length <= claim.pre_entry_count) {
+        successorFail("SUCCESSOR_MEASURED_JOURNAL_DIVERGED", "recovery committed entry count");
+      }
+      const after = await inspect(authority, preparation, sources, root);
+      validateJournalAgainstInspection(beforeJournal, authority, preparation, sources, after);
+      const committed = beforeJournal.entries[claim.pre_entry_count];
+      successorExact(committed.case_id, claim.case_id, "recovery committed case");
+      successorExact(committed.native_case_id, claim.native_case_id, "recovery committed native case");
+      successorExact(committed.global_claim_digest, claim.claim_digest, "recovery committed claim digest");
+      successorExact(committed.pre_collection_digest, claim.pre_collection_digest, "recovery committed pre-control");
+      if (beforeJournal.entries.length === claim.pre_entry_count + 1) {
+        const prior = { control: { terminal_count: claim.pre_entry_count, control_digest: claim.pre_collection_digest } };
+        successorExact(committed, terminalEntry({ preparation, sources, claim, before: prior, after }), "recovery committed claim entry");
+      }
+      if (existsSync(nativeClaimPath)) successorFail("SUCCESSOR_UNCERTAIN_EXECUTION", "recovery committed native claim");
+      releaseLock(lockPath);
+      return {
+        recovered_case_id: target.case_id,
+        native_status: committed.status,
+        collection: structuredClone(after.control),
+        journal: beforeJournal,
+        retry_performed: false,
+        portfolio_mutation_authorized: false,
+      };
+    }
+    successorExact(beforeJournal?.entries.length ?? 0, claim.pre_entry_count, "recovery pre-entry count");
+    if (beforeJournal !== null) {
+      successorExact(claim.pre_collection_digest, beforeJournal.collection_control_digest, "recovery pre-control");
+    } else {
+      successorExact(claim.pre_entry_count, 0, "recovery initial entry count");
+    }
+    if (existsSync(nativeClaimPath)) {
+      const nativeClaim = parseJsonRejectDuplicateKeys(readFileSync(nativeClaimPath), "native recovery claim");
+      recoverPortfolioCase({
+        root,
+        runDir: source.execution.runDir,
+        caseId: claim.native_case_id,
+        claimId: nativeClaim.claim_id,
+        reason: "Issue #291 measured recovery: preserve the interrupted trial and never retry it.",
+      });
+    }
+    const actual = inspectVerifiedPortfolioExecution({ ...source.execution, root });
+    const current = actual.cases.find((entry) => entry.entry.case_id === claim.native_case_id);
+    if (!current) successorFail("SUCCESSOR_CASE_MISSING", "recovery native execution");
+    if (!["pending", "completed", "failed", "unavailable", "interrupted", "invalid"].includes(current.state.status)) {
+      successorFail("SUCCESSOR_UNCERTAIN_EXECUTION", "recovery native status");
     }
     const after = await inspect(authority, preparation, sources, root);
-    validateJournalAgainstInspection(beforeJournal, authority, preparation, sources, after);
-    const committed = beforeJournal.entries[claim.pre_entry_count];
-    successorExact(committed.case_id, claim.case_id, "recovery committed case");
-    successorExact(committed.native_case_id, claim.native_case_id, "recovery committed native case");
-    successorExact(committed.global_claim_digest, claim.claim_digest, "recovery committed claim digest");
-    successorExact(committed.pre_collection_digest, claim.pre_collection_digest, "recovery committed pre-control");
-    if (beforeJournal.entries.length === claim.pre_entry_count + 1) {
-      const prior = { control: { terminal_count: claim.pre_entry_count, control_digest: claim.pre_collection_digest } };
-      successorExact(committed, terminalEntry({ preparation, sources, claim, before: prior, after }), "recovery committed claim entry");
+    if (process.env.ASK_BENCHMARK_FAULT === "before_measured_recovery_journal_pause") {
+      writeSync(2, "MEASURED_BEFORE_RECOVERY_JOURNAL\n");
+      process.kill(process.pid, "SIGSTOP");
     }
-    if (existsSync(nativeClaimPath)) successorFail("SUCCESSOR_UNCERTAIN_EXECUTION", "recovery committed native claim");
+    const entries = validateJournalAgainstInspection(beforeJournal, authority, preparation, sources, after, { allowOneUnjournaledTerminal: true });
+    const delta = after.control.terminal_count - entries.length;
+    if (![0, 1].includes(delta)) successorFail("SUCCESSOR_MEASURED_JOURNAL_DIVERGED", "recovery terminal delta");
+    let nextEntries = entries;
+    if (delta === 1) {
+      const before = { control: { ...after.control, terminal_count: entries.length, control_digest: claim.pre_collection_digest } };
+      nextEntries = [...entries, terminalEntry({ preparation, sources, claim, before, after })];
+    } else {
+      successorExact(current.state.status, "pending", "recovery without terminal evidence");
+    }
+    const published = journalSnapshot(authority, after, nextEntries);
+    writeDurableJson(journal, published);
+    if (process.env.ASK_BENCHMARK_FAULT === "after_measured_recovery_journal_published") process.exit(86);
     releaseLock(lockPath);
     return {
       recovered_case_id: target.case_id,
-      native_status: committed.status,
+      native_status: current.state.status,
       collection: structuredClone(after.control),
-      journal: beforeJournal,
+      journal: published,
       retry_performed: false,
       portfolio_mutation_authorized: false,
     };
+  } finally {
+    finishRecoveryEpoch(owner);
   }
-  successorExact(beforeJournal?.entries.length ?? 0, claim.pre_entry_count, "recovery pre-entry count");
-  if (beforeJournal !== null) {
-    successorExact(claim.pre_collection_digest, beforeJournal.collection_control_digest, "recovery pre-control");
-  } else {
-    successorExact(claim.pre_entry_count, 0, "recovery initial entry count");
-  }
-  if (existsSync(nativeClaimPath)) {
-    const nativeClaim = parseJsonRejectDuplicateKeys(readFileSync(nativeClaimPath), "native recovery claim");
-    recoverPortfolioCase({
-      root,
-      runDir: source.execution.runDir,
-      caseId: claim.native_case_id,
-      claimId: nativeClaim.claim_id,
-      reason: "Issue #291 measured recovery: preserve the interrupted trial and never retry it.",
-    });
-  }
-  const actual = inspectVerifiedPortfolioExecution({ ...source.execution, root });
-  const current = actual.cases.find((entry) => entry.entry.case_id === claim.native_case_id);
-  if (!current) successorFail("SUCCESSOR_CASE_MISSING", "recovery native execution");
-  if (!["pending", "completed", "failed", "unavailable", "interrupted", "invalid"].includes(current.state.status)) {
-    successorFail("SUCCESSOR_UNCERTAIN_EXECUTION", "recovery native status");
-  }
-  const after = await inspect(authority, preparation, sources, root);
-  const entries = validateJournalAgainstInspection(beforeJournal, authority, preparation, sources, after, { allowOneUnjournaledTerminal: true });
-  const delta = after.control.terminal_count - entries.length;
-  if (![0, 1].includes(delta)) successorFail("SUCCESSOR_MEASURED_JOURNAL_DIVERGED", "recovery terminal delta");
-  let nextEntries = entries;
-  if (delta === 1) {
-    const before = { control: { ...after.control, terminal_count: entries.length, control_digest: claim.pre_collection_digest } };
-    nextEntries = [...entries, terminalEntry({ preparation, sources, claim, before, after })];
-  } else {
-    successorExact(current.state.status, "pending", "recovery without terminal evidence");
-  }
-  writeDurableJson(journal, journalSnapshot(authority, after, nextEntries));
-  releaseLock(lockPath);
-  return {
-    recovered_case_id: target.case_id,
-    native_status: current.state.status,
-    collection: structuredClone(after.control),
-    journal: readJournalBase(journal, authority, preparation),
-    retry_performed: false,
-    portfolio_mutation_authorized: false,
-  };
 }
 
 export async function verifyMeasuredSuccessorCollection({

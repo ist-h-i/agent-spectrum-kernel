@@ -175,6 +175,17 @@ an active stale native claim is passed to the existing committed recovery path.
 Recovered interruptions remain terminal and stopped; recovery never launches or
 retries the case.
 
+Each global claim has a unique generation and process owner. A live executor
+must explicitly leave its claim for recovery after an exception; a dead owner
+can be recovered without that marker. Recovery owners acquire append-only,
+claim-specific epochs atomically before inspecting or changing the journal or
+global claim. Another live recovery owner blocks; a dead owner can be superseded
+without deleting its epoch. Before changing state, the new owner rechecks that
+the same claim generation still exists. Recovery publishes its completion only
+after its last journal/claim mutation. The initial empty journal is also a
+recoverable published state: the next owner must reverify the unchanged native
+prefix and zero native attempts before releasing that claim.
+
 Measured result/provenance access requires two opaque capabilities: the
 pre-result measured authority and a collection-completion handle produced only
 after the canonical journal and native evidence agree on all 28 terminal cases,

@@ -213,6 +213,157 @@ async function worker(contextPath) {
       assert.equal(recovered.collection.terminal_count, 0);
       assert.equal(recovered.collection.next_case_id, preparation.cases[0].case_id);
     });
+    async function recoveryFixture(label) {
+      const fixtureRoot = resolve(work, label); mkdirSync(fixtureRoot);
+      const fixtureRun = randomUUID(); const fixtureSources = {};
+      for (const role of ["current_prompt", "prompt_v2"]) {
+        const nativeExecution = { ...shared, runDir: resolve(fixtureRoot, `run-${role}`) };
+        const native = environment(env, () => prepareSuccessorPortfolioSource({ ...nativeExecution, runtimeConfigPath, agentBin, preparation }));
+        const { root: _executionRoot, ...execution } = nativeExecution;
+        const source = {
+          plan_id: native.plan_id, plan_digest: native.plan_digest, run_instance_id: native.run_instance_id,
+          repository_revision: native.repository_revision, runtime_identity_digest: native.runtime_identity_digest,
+          materialization_manifest_digest: native.materialization_manifest_digest,
+          bindings: preparation.cases.filter(c => c.prompt_role === role).map(target => {
+            const item = native.cases.find(c => c.fixture_id === target.fixture_id && c.repetition === target.repetition); assert.ok(item);
+            return {
+              successor_case_id: target.case_id, source_case_id: item.case_id, fixture_input_digest: item.fixture_input_digest,
+              effective_command_digest: native.effective_command_digest, environment_snapshot_digest: native.environment_snapshot_digest,
+            };
+          }),
+        };
+        const scope = buildSuccessorSourceScope({ preparation, promptRole: role, runInstanceId: fixtureRun, source });
+        fixtureSources[role] = { execution, scope, expectedScopeDigest: scope.scope_digest, runtimeConfigPath, agentBin };
+      }
+      const authority = await openSuccessorMeasuredAuthority({ preparation, sources: fixtureSources, scoringInputs, root });
+      const journalPath = successorMeasuredJournalPath(authority, { preparation, sources: fixtureSources });
+      const contextPath = resolve(fixtureRoot, "recovery-context.json");
+      write(contextPath, { preparation, sources: fixtureSources, root, manifestPath });
+      return { sources: fixtureSources, authority, journalPath, contextPath };
+    }
+    async function claimBeforeNativeSpawn(fixture) {
+      const hiddenAgent = resolve(work, "codex-temporarily-unavailable");
+      renameSync(agentBin, hiddenAgent);
+      try {
+        await assert.rejects(() => asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
+          authority: fixture.authority, preparation, sources: fixture.sources, root,
+        })));
+      } finally {
+        renameSync(hiddenAgent, agentBin);
+      }
+      const claim = read(`${fixture.journalPath}.lock`);
+      assert.equal(claim.automatic_retry_authorized, false);
+      assert.ok(claim.claim_id);
+      return claim;
+    }
+    const recoveryChildCode = `
+      import { readFileSync } from "node:fs";
+      import { openSuccessorMeasuredAuthority } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-measured-authority.mjs", import.meta.url).href)};
+      import { openSuccessorScoringInputs } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-scoring-inputs.mjs", import.meta.url).href)};
+      import { recoverMeasuredSuccessorSession } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-measured-execution.mjs", import.meta.url).href)};
+      const i = JSON.parse(readFileSync(process.argv[1], "utf8"));
+      const scoringInputs = await openSuccessorScoringInputs({ preparation: i.preparation, manifestPath: i.manifestPath, root: i.root });
+      const authority = await openSuccessorMeasuredAuthority({ preparation: i.preparation, sources: i.sources, scoringInputs, root: i.root });
+      await recoverMeasuredSuccessorSession({ authority, preparation: i.preparation, sources: i.sources, root: i.root });
+    `;
+    await check("two recoveries cannot erase a newer measured claim", async () => {
+      const fixture = await recoveryFixture("concurrent-recovery");
+      const firstClaim = await claimBeforeNativeSpawn(fixture);
+      assert.equal(firstClaim.pre_journal_digest, null);
+      const child = spawn(process.execPath, ["--input-type=module", "-e", recoveryChildCode, fixture.contextPath], {
+        cwd: root, env: { ...process.env, ...env, ASK_BENCHMARK_FAULT: "before_measured_recovery_journal_pause" },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let stderr = "";
+      let readyResolve; let readyReject;
+      const ready = new Promise((resolve, reject) => { readyResolve = resolve; readyReject = reject; });
+      const exited = new Promise(resolve => child.once("exit", (code, signal) => resolve({ code, signal })));
+      child.stderr.on("data", chunk => {
+        stderr += chunk;
+        if (stderr.includes("MEASURED_BEFORE_RECOVERY_JOURNAL\n")) readyResolve();
+      });
+      child.once("error", readyReject);
+      child.once("exit", (code, signal) => readyReject(new Error(`recovery exited before journal barrier: ${code}/${signal}: ${stderr}`)));
+      const watchdog = setTimeout(() => readyReject(new Error(`recovery did not reach journal barrier: ${stderr}`)), 600000);
+      let exitWatchdog;
+      try {
+        await ready;
+        await assert.rejects(() => recoverMeasuredSuccessorSession({
+          authority: fixture.authority, preparation, sources: fixture.sources, root,
+        }), { code: "SUCCESSOR_MEASURED_RECOVERY_LOCKED" });
+        await assert.rejects(() => asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
+          authority: fixture.authority, preparation, sources: fixture.sources, root,
+        })), { code: "SUCCESSOR_MEASURED_SESSION_LOCKED" });
+        assert.equal(read(`${fixture.journalPath}.lock`).claim_id, firstClaim.claim_id);
+        child.kill("SIGCONT");
+        const result = await Promise.race([exited, new Promise((_, reject) => {
+          exitWatchdog = setTimeout(() => reject(new Error(`recovery did not exit: ${stderr}`)), 600000);
+        })]);
+        assert.deepEqual(result, { code: 0, signal: null }, stderr);
+        assert.equal(existsSync(`${fixture.journalPath}.lock`), false);
+        assert.equal(read(fixture.journalPath).terminal_count, 0);
+        const nextClaim = await claimBeforeNativeSpawn(fixture);
+        assert.notEqual(nextClaim.claim_id, firstClaim.claim_id);
+        assert.notEqual(nextClaim.claim_digest, firstClaim.claim_digest);
+        assert.equal(read(`${fixture.journalPath}.lock`).claim_id, nextClaim.claim_id);
+        const recovered = await recoverMeasuredSuccessorSession({
+          authority: fixture.authority, preparation, sources: fixture.sources, root,
+        });
+        assert.equal(recovered.retry_performed, false);
+        assert.equal(recovered.collection.terminal_count, 0);
+        assert.equal(existsSync(`${fixture.journalPath}.lock`), false);
+        for (const source of Object.values(fixture.sources)) {
+          const native = inspectVerifiedPortfolioExecution({ ...source.execution, root });
+          assert.ok(native.cases.every(c => c.attempts.length === 0));
+        }
+      } finally {
+        clearTimeout(watchdog);
+        clearTimeout(exitWatchdog);
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill("SIGCONT");
+          child.kill("SIGTERM");
+        }
+      }
+    });
+    await check("recovery resumes after an empty measured journal is durably published", async () => {
+      const fixture = await recoveryFixture("empty-journal-recovery");
+      const claim = await claimBeforeNativeSpawn(fixture);
+      assert.equal(claim.pre_journal_digest, null);
+      const child = spawnSync(process.execPath, ["--input-type=module", "-e", recoveryChildCode, fixture.contextPath], {
+        cwd: root, encoding: "utf8", timeout: 600000, maxBuffer: 4 * 1024 * 1024,
+        env: { ...process.env, ...env, ASK_BENCHMARK_FAULT: "after_measured_recovery_journal_published" },
+      });
+      assert.equal(child.error, undefined, child.error?.message);
+      assert.equal(child.status, 86, child.stderr || child.stdout);
+      assert.equal(read(fixture.journalPath).terminal_count, 0);
+      assert.equal(read(fixture.journalPath).entries.length, 0);
+      assert.equal(read(`${fixture.journalPath}.lock`).claim_id, claim.claim_id);
+      const publishedJournal = readFileSync(fixture.journalPath);
+      const alteredJournal = JSON.parse(publishedJournal);
+      alteredJournal.next_case_id = preparation.cases[1].case_id;
+      const { journal_digest: _publishedDigest, ...alteredBody } = alteredJournal;
+      alteredJournal.journal_digest = canonicalDigest(alteredBody);
+      try {
+        writeFileSync(fixture.journalPath, `${JSON.stringify(alteredJournal, null, 2)}\n`);
+        await assert.rejects(() => recoverMeasuredSuccessorSession({
+          authority: fixture.authority, preparation, sources: fixture.sources, root,
+        }), { code: "SUCCESSOR_IDENTITY_MISMATCH", path: "measured journal next case" });
+        assert.equal(read(`${fixture.journalPath}.lock`).claim_id, claim.claim_id);
+      } finally {
+        writeFileSync(fixture.journalPath, publishedJournal);
+      }
+      const recovered = await recoverMeasuredSuccessorSession({
+        authority: fixture.authority, preparation, sources: fixture.sources, root,
+      });
+      assert.equal(recovered.retry_performed, false);
+      assert.equal(recovered.collection.terminal_count, 0);
+      assert.equal(recovered.journal.entries.length, 0);
+      assert.equal(existsSync(`${fixture.journalPath}.lock`), false);
+      for (const source of Object.values(fixture.sources)) {
+        const native = inspectVerifiedPortfolioExecution({ ...source.execution, root });
+        assert.ok(native.cases.every(c => c.attempts.length === 0));
+      }
+    });
     await check("typed provider usage limit preserves the failed trial and blocks the next global claim", async () => {
       const providerRoot = resolve(work, "provider-limit"); mkdirSync(providerRoot);
       const providerRun = randomUUID(); const providerRoles = {};
@@ -412,14 +563,20 @@ async function worker(contextPath) {
         assert.equal(nextStep.collection.terminal_count, 3);
         record.synthetic_native_attempts++;
         const staleClaim = {
-          schema_version: "1.1.0", kind: "prompt_successor_measured_claim",
+          schema_version: "1.2.0", kind: "prompt_successor_measured_claim",
+          claim_id: randomUUID(), owner_pid: process.pid,
           authority_digest: priorJournal.authority_digest, preparation_digest: preparation.preparation_digest,
           case_id: target.case_id, prompt_role: target.prompt_role, native_case_id: nativeCase,
           pre_collection_digest: priorJournal.collection_control_digest,
           pre_journal_digest: priorJournal.journal_digest, pre_entry_count: priorJournal.entries.length,
           automatic_retry_authorized: false,
         };
-        write(`${measuredJournalPath}.lock`, { ...staleClaim, claim_digest: canonicalDigest(staleClaim) });
+        const staleClaimDigest = canonicalDigest(staleClaim);
+        write(`${measuredJournalPath}.lock`, { ...staleClaim, claim_digest: staleClaimDigest });
+        write(`${measuredJournalPath}.lock.abandoned-${staleClaim.claim_id}`, {
+          schema_version: "1.0.0", kind: "prompt_successor_abandoned_claim",
+          claim_id: staleClaim.claim_id, claim_digest: staleClaimDigest,
+        });
         const recovered = await recoverMeasuredSuccessorSession({ authority: measuredAuthority, preparation, sources: measuredSources, root });
         assert.equal(recovered.retry_performed, false);
         assert.equal(recovered.recovered_case_id, target.case_id);
@@ -588,7 +745,7 @@ async function worker(contextPath) {
       finally { writeFileSync(path, before); }
     });
     record.final_revision = git(root, "rev-parse", "HEAD"); record.final_status = git(root, "status", "--porcelain");
-    assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, ""); assert.equal(record.checks.length, 20); record.completed = true;
+    assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, ""); assert.equal(record.checks.length, 22); record.completed = true;
   } finally {
     const evidencePath = resolve(work, "scoring-verification.json"); write(evidencePath, record); console.log(`Evidence: ${evidencePath}`);
   }
