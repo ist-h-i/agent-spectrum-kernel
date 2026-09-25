@@ -266,6 +266,16 @@ async function worker(contextPath) {
       const authority = await openSuccessorMeasuredAuthority({ preparation: i.preparation, sources: i.sources, scoringInputs, root: i.root });
       await recoverMeasuredSuccessorSession({ authority, preparation: i.preparation, sources: i.sources, root: i.root });
     `;
+    const executionChildCode = `
+      import { readFileSync } from "node:fs";
+      import { openSuccessorMeasuredAuthority } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-measured-authority.mjs", import.meta.url).href)};
+      import { openSuccessorScoringInputs } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-scoring-inputs.mjs", import.meta.url).href)};
+      import { executeNextMeasuredSuccessorCase } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-measured-execution.mjs", import.meta.url).href)};
+      const i = JSON.parse(readFileSync(process.argv[1], "utf8"));
+      const scoringInputs = await openSuccessorScoringInputs({ preparation: i.preparation, manifestPath: i.manifestPath, root: i.root });
+      const authority = await openSuccessorMeasuredAuthority({ preparation: i.preparation, sources: i.sources, scoringInputs, root: i.root });
+      await executeNextMeasuredSuccessorCase({ authority, preparation: i.preparation, sources: i.sources, root: i.root });
+    `;
     await check("two recoveries cannot erase a newer measured claim", async () => {
       const fixture = await recoveryFixture("concurrent-recovery");
       const firstClaim = await claimBeforeNativeSpawn(fixture);
@@ -362,6 +372,55 @@ async function worker(contextPath) {
       for (const source of Object.values(fixture.sources)) {
         const native = inspectVerifiedPortfolioExecution({ ...source.execution, root });
         assert.ok(native.cases.every(c => c.attempts.length === 0));
+      }
+    });
+    await check("a live measured claim cannot be recovered until its controller exits", async () => {
+      const fixture = await recoveryFixture("live-execution-recovery");
+      const child = spawn(process.execPath, ["--input-type=module", "-e", executionChildCode, fixture.contextPath], {
+        cwd: root, env: { ...process.env, ...env, ASK_BENCHMARK_FAULT: "after_measured_lock_pause" },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let stderr = "";
+      let readyResolve; let readyReject;
+      const ready = new Promise((resolve, reject) => { readyResolve = resolve; readyReject = reject; });
+      const exited = new Promise(resolve => child.once("exit", (code, signal) => resolve({ code, signal })));
+      child.stderr.on("data", chunk => {
+        stderr += chunk;
+        if (stderr.includes("MEASURED_AFTER_LOCK\n")) readyResolve();
+      });
+      child.once("error", readyReject);
+      child.once("exit", (code, signal) => readyReject(new Error(`measured controller exited before lock barrier: ${code}/${signal}: ${stderr}`)));
+      const watchdog = setTimeout(() => readyReject(new Error(`measured controller did not reach lock barrier: ${stderr}`)), 600000);
+      let exitWatchdog;
+      try {
+        await ready;
+        const claim = read(`${fixture.journalPath}.lock`);
+        assert.equal(claim.pre_journal_digest, null);
+        assert.equal(claim.automatic_retry_authorized, false);
+        await assert.rejects(() => recoverMeasuredSuccessorSession({
+          authority: fixture.authority, preparation, sources: fixture.sources, root,
+        }), { code: "SUCCESSOR_MEASURED_EXECUTION_ACTIVE" });
+        assert.equal(read(`${fixture.journalPath}.lock`).claim_id, claim.claim_id);
+        assert.equal(child.kill("SIGKILL"), true);
+        const result = await Promise.race([exited, new Promise((_, reject) => {
+          exitWatchdog = setTimeout(() => reject(new Error(`measured controller did not exit: ${stderr}`)), 600000);
+        })]);
+        assert.deepEqual(result, { code: null, signal: "SIGKILL" }, stderr);
+        const recovered = await recoverMeasuredSuccessorSession({
+          authority: fixture.authority, preparation, sources: fixture.sources, root,
+        });
+        assert.equal(recovered.retry_performed, false);
+        assert.equal(recovered.collection.terminal_count, 0);
+        assert.equal(recovered.collection.next_case_id, preparation.cases[0].case_id);
+        assert.equal(existsSync(`${fixture.journalPath}.lock`), false);
+        for (const source of Object.values(fixture.sources)) {
+          const native = inspectVerifiedPortfolioExecution({ ...source.execution, root });
+          assert.ok(native.cases.every(c => c.attempts.length === 0));
+        }
+      } finally {
+        clearTimeout(watchdog);
+        clearTimeout(exitWatchdog);
+        if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
       }
     });
     await check("typed provider usage limit preserves the failed trial and blocks the next global claim", async () => {
@@ -741,7 +800,7 @@ async function worker(contextPath) {
       finally { writeFileSync(path, before); }
     });
     record.final_revision = git(root, "rev-parse", "HEAD"); record.final_status = git(root, "status", "--porcelain");
-    assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, ""); assert.equal(record.checks.length, 22); record.completed = true;
+    assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, ""); assert.equal(record.checks.length, 23); record.completed = true;
   } finally {
     const evidencePath = resolve(work, "scoring-verification.json"); write(evidencePath, record); console.log(`Evidence: ${evidencePath}`);
   }

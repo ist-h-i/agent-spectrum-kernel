@@ -420,6 +420,10 @@ export async function executeNextMeasuredSuccessorCase({
       process.kill(process.pid, "SIGSTOP");
     }
     acquireLock(lockPath, claim);
+    if (process.env.ASK_BENCHMARK_FAULT === "after_measured_lock_pause") {
+      writeSync(2, "MEASURED_AFTER_LOCK\n");
+      process.kill(process.pid, "SIGSTOP");
+    }
     try {
       const lockedJournal = readJournalBase(journal, authority, preparation);
       // A controller can release the global lock after a native change only after
