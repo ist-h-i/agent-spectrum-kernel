@@ -59,7 +59,7 @@ export function validateSuccessorRuntime(value) {
   successorClosed(value.provider_model_revision, ["status", "value"], "runtime.provider_model_revision");
   if (value.provider_model_revision.status === "known") token(value.provider_model_revision.value, "runtime.provider_model_revision.value");
   else successorExact(value.provider_model_revision, { status: "unknown", value: null }, "runtime.provider_model_revision");
-  successorExact(value.reasoning_effort, "high", "runtime.reasoning_effort");
+  successorExact(value.reasoning_effort, "medium", "runtime.reasoning_effort");
   if (!["api_key", "chatgpt_subscription"].includes(value.authentication_mode)) successorFail("SUCCESSOR_AUTH_CLASS_REQUIRED", "runtime.authentication_mode");
   for (const [key, expected] of Object.entries({ sandbox: "workspace-write", approval_policy: "never", agent_network: "disabled", provider_network: "provider_only", timeout_ms: 900000 })) successorExact(value[key], expected, `runtime.${key}`);
   return value;
@@ -251,7 +251,7 @@ export function proposeSuccessorInvocation(preparation, caseId, workspace) {
   return {
     preparation_digest: preparation.preparation_digest, case_id: entry.case_id,
     executable_digest: preparation.runtime.executable_digest,
-    argv: ["exec", "--json", "--ephemeral", "--sandbox", "workspace-write", "-c", 'approval_policy="never"', "-c", "sandbox_workspace_write.network_access=false", "-c", 'model_reasoning_effort="high"', "--model", preparation.runtime.model, "--cd", workspace, "-"],
+    argv: ["exec", "--json", "--ephemeral", "--sandbox", "workspace-write", "-c", 'approval_policy="never"', "-c", "sandbox_workspace_write.network_access=false", "-c", 'model_reasoning_effort="medium"', "--model", preparation.runtime.model, "--cd", workspace, "-"],
     stdin_contract: "exact_source_prompt_plus_agent_visible_task",
     timeout_ms: preparation.runtime.timeout_ms,
     effective_isolation_verified: false, model_call_authorized: false,

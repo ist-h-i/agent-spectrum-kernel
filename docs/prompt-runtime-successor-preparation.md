@@ -113,7 +113,7 @@ is not persistent scheduler/timeout infrastructure; native runner durability and
 cancellation must still be checked on the host.
 
 Proposed invocation is `exec --json --ephemeral`, explicit model, `workspace-write`,
-approval never, agent command network disabled, high reasoning and stdin input.
+approval never, agent command network disabled, medium reasoning and stdin input.
 It is a proposal only. Confirm the exact CLI's `--help` and actual input/config
 loading. Provider API transport and command-execution network policy are separate.
 No local config string proves effective isolation or backend usability. Timeout is

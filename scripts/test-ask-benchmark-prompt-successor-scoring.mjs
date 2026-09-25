@@ -90,7 +90,7 @@ async function worker(contextPath) {
     run(compiler, ["-std=c11", "-Wall", "-Wextra", "-Werror", "-O0", resolve(root, "scripts/test-fixtures/prompt-successor-fake-codex.c"), "-o", agentBin]);
     const nativeFile = {
       schema_version: "1.2.0", adapter: "codex", availability: "available", unavailable_reason: null,
-      expected_executable_version: "codex-cli 0.153.4", model: "synthetic-native-fake-not-a-service", reasoning_effort: "high",
+      expected_executable_version: "codex-cli 0.153.4", model: "synthetic-native-fake-not-a-service", reasoning_effort: "medium",
       case_timeout_ms: 900000, sandbox_policy: "workspace-write", permission_policy: "never",
       executor: { id: "successor-native-fake", version: "1.0.0" },
       environment_allowlist: ["HOME", "ASK_SUCCESSOR_FAKE_CAPTURE", "ASK_SUCCESSOR_FAKE_MODE"], environment_value_allowlist: [], thermal_state: "cold", claude_cli: null,
@@ -101,7 +101,7 @@ async function worker(contextPath) {
     const home = resolve(work, "empty-home"); const capture = resolve(work, "captures"); mkdirSync(home); mkdirSync(capture);
     const env = { HOME: home, ASK_SUCCESSOR_FAKE_CAPTURE: capture, ASK_SUCCESSOR_FAKE_MODE: "success" };
     const runtime = { adapter: "codex", cli_version: "0.153.4", executable_digest: hash(readFileSync(agentBin)), node_version: process.version,
-      os: process.platform, arch: process.arch, model: nativeFile.model, provider_model_revision: { status: "unknown", value: null }, reasoning_effort: "high",
+      os: process.platform, arch: process.arch, model: nativeFile.model, provider_model_revision: { status: "unknown", value: null }, reasoning_effort: "medium",
       authentication_mode: "chatgpt_subscription", configuration_digest: hash(readFileSync(runtimeConfigPath)), sandbox: "workspace-write", approval_policy: "never", agent_network: "disabled", provider_network: "provider_only", timeout_ms: 900000 };
     const manifestPath = resolve(root, "scripts/test-fixtures/generated-successor-scoring/manifest.json");
     const manifest = read(manifestPath);
