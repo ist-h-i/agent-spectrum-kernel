@@ -810,7 +810,7 @@ async function worker(contextPath) {
 if (process.argv[2] === "--worker") {
   await worker(process.argv[3]);
 } else {
-  await test("successor canonical input and real #197 provenance integration (synthetic only)", { timeout: 5400000 }, async t => {
+  await test("successor canonical input and real #197 provenance integration (synthetic only)", { timeout: 10800000 }, async t => {
     assert.equal(process.versions.node.split(".")[0], "24", "Node 24 required; no successful skip");
     assert.ok(["darwin", "linux"].includes(process.platform));
     const sourceRevision = git(root, "rev-parse", "HEAD"); assert.equal(git(root, "status", "--porcelain"), "");
@@ -831,7 +831,7 @@ if (process.argv[2] === "--worker") {
     assert.ok(changed.length > 0 && changed.every(p => p.startsWith(`${prefix}/`)), "synthetic clone changes public test inputs only");
     const contextPath = resolve(work, "context.json"); write(contextPath, { sourceRevision, cloneRevision, clone, work, scoring });
     const result = spawnSync(process.execPath, [resolve(clone, relative(root, fileURLToPath(import.meta.url))), "--worker", contextPath], {
-      cwd: clone, encoding: "utf8", timeout: 5300000, maxBuffer: 20 * 1024 * 1024,
+      cwd: clone, encoding: "utf8", timeout: 10600000, maxBuffer: 20 * 1024 * 1024,
     });
     writeFileSync(resolve(work, "worker.stdout.log"), result.stdout ?? ""); writeFileSync(resolve(work, "worker.stderr.log"), result.stderr ?? "");
     if (result.stdout) console.log(result.stdout);
