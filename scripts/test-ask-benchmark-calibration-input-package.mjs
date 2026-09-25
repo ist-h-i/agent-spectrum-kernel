@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
+import { createSuccessorSyntheticAdmittedCalibrationPackages } from "./test-prompt-successor-scoring-fixtures.mjs";
 import {
   CALIBRATION_PACKAGE_INPUT_PATHS, inspectCalibrationInputPackage, parseCalibrationInputPackageArgs,
 } from "./ask-benchmark-calibration-input-package.mjs";
@@ -264,3 +265,87 @@ test("case aliases cannot bypass a registered worktree boundary", t => repositor
   assert.equal(existsSync(output), false);
   for (const checkout of [root, linked]) assert.equal(git(checkout, "status", "--porcelain"), "");
 }, { sources: true }));
+
+test("synthetic admitted public packages assemble and reopen through the real successor consumer", () => {
+  const parent = mkdtempSync(resolve(realpathSync(tmpdir()), "ask-calibration-positive-integration-"));
+  const clone = resolve(parent, "checkout");
+  try {
+    const sourceRevision = git(ROOT, "rev-parse", "HEAD");
+    git(ROOT, "clone", "--no-hardlinks", "--no-checkout", ROOT, clone);
+    git(clone, "checkout", "--detach", sourceRevision);
+    git(clone, "config", "user.name", "Calibration Positive Integration");
+    git(clone, "config", "user.email", "synthetic@example.invalid");
+    git(clone, "config", "core.hooksPath", "/dev/null");
+
+    const generated = createSuccessorSyntheticAdmittedCalibrationPackages({ root: clone, revision: sourceRevision });
+    assert.deepEqual(generated.fixtures.map(({ fixture_id, source_fixture_id }) => [fixture_id, source_fixture_id]),
+      CALIBRATION_SOURCE_BINDINGS.map(([fixtureId, sourceId]) => [fixtureId, sourceId]));
+    const fixturePaths = CALIBRATION_SOURCE_BINDINGS.map(([fixtureId]) => `benchmarks/fixtures/checkpoint-b2/${fixtureId}`);
+    git(clone, "add", "--", ...fixturePaths);
+    git(clone, "-c", "commit.gpgsign=false", "commit", "-qm", "test-only admitted calibration public authority");
+    const packageRevision = git(clone, "rev-parse", "HEAD");
+    assert.equal(git(clone, "rev-parse", "HEAD^"), sourceRevision);
+    assert.equal(git(clone, "status", "--porcelain"), "");
+
+    const output = resolve(parent, "assembled-scoring-input-manifest.json");
+    const assembled = cli(clone, "assemble", "--output", output);
+    assert.equal(assembled.error, undefined);
+    assert.equal(assembled.status, 0, assembled.stderr || assembled.stdout);
+    assert.equal(assembled.stderr, "");
+    assert.equal(existsSync(output), true);
+    const report = JSON.parse(assembled.stdout);
+    assert.equal(report.source.revision, packageRevision);
+    assert.equal(report.public_content_verified, true);
+    assert.equal(report.private_bundle_verified, false);
+    assert.equal(report.creates_admission, false);
+    assert.equal(report.measured_execution_authorized, false);
+    assert.equal(report.created, true);
+
+    const worker = `
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+const root = process.env.ASK_SYNTHETIC_CALIBRATION_ROOT;
+const manifestPath = process.env.ASK_SYNTHETIC_CALIBRATION_MANIFEST;
+const load = path => import(pathToFileURL(resolve(root, path)).href);
+const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const { prepareSuccessorFromRepository } = await load("scripts/ask-benchmark-prompt-successor-repository.mjs");
+const { syntheticRuntime } = await load("scripts/test-prompt-successor-fixtures.mjs");
+const { openSuccessorScoringInputs, inspectSuccessorScoringInputs } = await load("scripts/ask-benchmark-prompt-successor-scoring-inputs.mjs");
+const preparation = await prepareSuccessorFromRepository({
+  root,
+  runtime: syntheticRuntime(),
+  seed: "synthetic-admitted-calibration-package",
+  changeReason: "Synthetic public assembly and reopen regression only; no measured execution authority.",
+  scoringInputManifestDigest: manifest.manifest_digest,
+});
+const handle = await openSuccessorScoringInputs({ preparation, manifestPath, root });
+process.stdout.write(JSON.stringify({
+  preparation_implementation: preparation.implementation,
+  inspection: inspectSuccessorScoringInputs(handle, preparation),
+}));
+`;
+    const reopened = spawnSync(process.execPath, ["--input-type=module", "--eval", worker], {
+      cwd: clone, encoding: "utf8", timeout: 240000, maxBuffer: 20 * 1024 * 1024,
+      env: {
+        ...process.env,
+        GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0",
+        ASK_SYNTHETIC_CALIBRATION_ROOT: clone, ASK_SYNTHETIC_CALIBRATION_MANIFEST: output,
+      },
+    });
+    assert.equal(reopened.error, undefined, reopened.error?.message);
+    assert.equal(reopened.status, 0, reopened.stderr || reopened.stdout);
+    assert.equal(reopened.stderr, "");
+    const reopenedEvidence = JSON.parse(reopened.stdout);
+    assert.equal(reopenedEvidence.preparation_implementation.revision, packageRevision);
+    assert.equal(reopenedEvidence.inspection.manifest_digest, report.manifest_digest);
+    assert.deepEqual(reopenedEvidence.inspection.fixtures.map(({ fixture_id, source_fixture_id, admission_status }) => [fixture_id, source_fixture_id, admission_status]),
+      CALIBRATION_SOURCE_BINDINGS.map(([fixtureId, sourceId]) => [fixtureId, sourceId, "admitted"]));
+    assert.equal(reopenedEvidence.inspection.private_bundle_verified, false);
+    assert.equal(reopenedEvidence.inspection.creates_admission, false);
+    assert.equal(reopenedEvidence.inspection.measured_execution_authorized, false);
+    assert.equal(git(clone, "status", "--porcelain"), "");
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
