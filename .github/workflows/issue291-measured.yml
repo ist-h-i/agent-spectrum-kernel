@@ -1,0 +1,91 @@
+name: Check measured successor preparation
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/*successor*'
+      - 'scripts/ask-benchmark-execution.mjs'
+      - 'scripts/ask-benchmark-normalized-results.mjs'
+      - 'scripts/test-fixtures/prompt-successor-fake-codex.c'
+      - 'benchmarks/schemas/portfolio-attempt-result.schema.json'
+      - 'benchmarks/schemas/portfolio-run-identity.schema.json'
+      - 'docs/prompt-successor-measured-execution.md'
+      - '.github/workflows/issue291-measured.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      EXPECTED_CHECKOUT_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Preserve exact preparation source for local verification
+        run: |
+          : "${PR_BASE_SHA:?PR base SHA is required}"
+          : "${PR_HEAD_SHA:?PR head SHA is required}"
+          : "${EXPECTED_CHECKOUT_SHA:?Checkout SHA is required}"
+          : "${RUNNER_TEMP:?Runner temp directory is required}"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_CHECKOUT_SHA"
+          git merge-base --is-ancestor "$PR_BASE_SHA" HEAD
+          git merge-base --is-ancestor "$PR_HEAD_SHA" HEAD
+          mkdir -p "$RUNNER_TEMP/ask291-source"
+          # Preserve the tested ancestry, not unrelated local or remote refs.
+          git bundle create "$RUNNER_TEMP/ask291-source/source.bundle" HEAD
+          # Keep the original two-line checkout commit/tree format.
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/ask291-source/identity.txt"
+          {
+            printf 'evidence_scope=preparation_only\n'
+            printf 'pr_base_commit=%s\n' "$PR_BASE_SHA"
+            printf 'pr_base_tree=%s\n' "$(git rev-parse "$PR_BASE_SHA^{tree}")"
+            printf 'pr_head_commit=%s\n' "$PR_HEAD_SHA"
+            printf 'pr_head_tree=%s\n' "$(git rev-parse "$PR_HEAD_SHA^{tree}")"
+          } > "$RUNNER_TEMP/ask291-source/pr-context.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ask291-public-source
+          path: ${{ runner.temp }}/ask291-source
+          retention-days: 1
+          if-no-files-found: error
+      - name: Preserve exact Node runtime for local native verification
+        run: |
+          : "${RUNNER_TEMP:?Runner temp directory is required}"
+          mkdir -p "$RUNNER_TEMP/ask291-node24"
+          node_bin="$(node -p 'process.execPath')"
+          cp -- "$node_bin" "$RUNNER_TEMP/ask291-node24/node"
+          cp -- "$(dirname "$node_bin")/../LICENSE" "$RUNNER_TEMP/ask291-node24/LICENSE"
+          node --version > "$RUNNER_TEMP/ask291-node24/version.txt"
+          (cd "$RUNNER_TEMP/ask291-node24" && sha256sum node LICENSE version.txt > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ask291-node24-runtime
+          path: ${{ runner.temp }}/ask291-node24
+          retention-days: 1
+          if-no-files-found: error
+      # These are existing synthetic compatibility tests, not measured-bridge
+      # implementation tests or authority for a real experiment.
+      - name: Validate existing synthetic successor boundaries
+        run: |
+          node --test scripts/test-ask-benchmark-prompt-successor.mjs scripts/test-ask-benchmark-prompt-successor-report.mjs scripts/test-ask-benchmark-prompt-successor-input-guards.mjs
+      - name: Verify preparation workflow packaging
+        run: node --test scripts/test-ask-benchmark-prompt-successor-workflow.mjs
+      - name: Verify successor usage and collection control
+        run: node --test scripts/test-ask-benchmark-prompt-successor-usage.mjs scripts/test-ask-benchmark-prompt-successor-control.mjs
+      - name: Verify measured recovery state transitions
+        run: node --test scripts/test-ask-benchmark-prompt-successor-measured-recovery.mjs
+      - name: Verify native successor transport and normalized usage
+        run: node --test scripts/test-ask-benchmark-prompt-successor-execution.mjs
+      - name: Verify native collection and existing scoring boundaries
+        run: node --test scripts/test-ask-benchmark-prompt-successor-scoring.mjs
+      - name: Check exact PR whitespace
+        run: |
+          git diff --check "$PR_BASE_SHA...$PR_HEAD_SHA"

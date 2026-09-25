@@ -105,12 +105,19 @@ export function assertSuccessorSourceBinding({ preparation, scope, binding, norm
  * This preparation surface accepts synthetic test evidence only. A measured-reader
  * authority/entrypoint belongs to the later, separately authorized #235 run.
  */
-export async function openSuccessorResultSource({ preparation, scope, expectedScopeDigest, paths, sourceManifestSourceDigest, sourceSnapshotDigest, accessMode, root = ROOT }) {
-  if (accessMode !== "synthetic_only") successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "accessMode");
+export async function openSuccessorResultSource({ preparation, scope, expectedScopeDigest, paths, sourceManifestSourceDigest, sourceSnapshotDigest, accessMode, measuredAuthority, measuredCompletion, root = ROOT }) {
+  if (!["synthetic_only", "measured"].includes(accessMode)) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "accessMode");
+  if (accessMode === "measured" && (!measuredAuthority || !measuredCompletion)) successorFail("SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED", "measured authority and completed collection");
   // Own the complete validation input before the first asynchronous boundary.
   ({ preparation, scope, paths } = structuredClone({ preparation, scope, paths }));
   validatePromptSuccessorPreparation(preparation);
   validateSuccessorSourceScope(scope, preparation, expectedScopeDigest);
+  if (accessMode === "measured") {
+    const { assertSuccessorMeasuredSourceAuthority } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
+    const { assertSuccessorMeasuredCompletion } = await import("./ask-benchmark-prompt-successor-measured-execution.mjs");
+    assertSuccessorMeasuredSourceAuthority(measuredAuthority, { preparation, scope });
+    assertSuccessorMeasuredCompletion(measuredCompletion, { authority: measuredAuthority, preparation, scope });
+  }
   successorClosed(paths, ["normalizedResultsPath", "engineeringResultsPath", "sourceManifestPath"], "paths");
   successorDigest(sourceManifestSourceDigest, "approved source manifest digest");
   successorDigest(sourceSnapshotDigest, "source snapshot digest");
@@ -194,7 +201,7 @@ export async function openSuccessorResultSource({ preparation, scope, expectedSc
   const after = normalizer.verifyNormalizedPortfolioResults({ root, outputPath: paths.normalizedResultsPath, sourceSnapshotDigest });
   successorExact(after.manifest.normalized_run_digest, manifest.normalized_run_digest, "normalized generation changed");
   const evidence = {
-    kind: "prompt_successor_scoped_source", access_mode: "synthetic_only",
+    kind: "prompt_successor_scoped_source", access_mode: accessMode,
     preparation_digest: preparation.preparation_digest, scope_digest: scope.scope_digest,
     run_instance_id: scope.run_instance_id, prompt_role: scope.prompt_role,
     source_snapshot_digest: sourceSnapshotDigest, source_manifest_digest: source.digest,

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
@@ -191,6 +191,10 @@ case "\${FAKE_SHELL_MODE:-bash}" in
   malformed) event_command="/bin/bash -lc 'node workspace-test.mjs" ;;
 esac
 if [ "${adapter}" = "codex" ]; then printf '{"type":"item.started","item":{"type":"command_execution","id":"fixture-command","command":"%s"}}\\n' "$event_command"; fi
+if [ "\${FAKE_EVENT_MODE:-complete}" = "raw_utf8" ]; then
+  printf '{"type":"item.completed","item":{"type":"agent_message","text":"\\377"}}\\n'
+  printf '\\377\\376\\n' >&2
+fi
 if [ "\${FAKE_FAIL:-}" = "1" ]; then
   if [ "${adapter}" = "codex" ]; then printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"%s","status":"failed","exit_code":12,"aggregated_output":"fixture failed"}}\\n' "$event_command"; printf '%s\\n' '{"type":"turn.completed"}'; fi
   exit 12
@@ -528,6 +532,33 @@ try {
   }
   assert.deepEqual([...noOpByCondition.keys()].sort(), ["adaptive_ask", "full_ask", "kernel_only", "plain"], "no-op projection comparison must cover all four conditions");
   assert.equal(new Set([...noOpByCondition.values()].map(({ authority }) => authority.terminal_candidate_tree_digest)).size, 1, "managed projection residue must not alter the no-op terminal candidate digest");
+  // Exercise the actual process/terminal-evidence boundary with invalid UTF-8.
+  // A decoded/re-encoded stream has a different identity and is not raw evidence.
+  for (const adapter of ["codex", "claude"]) {
+    const rawRun = resolve(work, `raw-utf8-${adapter}`);
+    const rawCase = plan.cases.find((entry) => entry.adapter_track === adapter && entry.condition === "full_ask");
+    const rawCommon = ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", rawRun];
+    run(["execute-portfolio", ...rawCommon, "--adapter", adapter, "--runtime-config", adapter === "codex" ? codexRuntime : claudeRuntime,
+      "--agent-bin", adapter === "codex" ? codexBin : claudeBin, "--case-id", rawCase.case_id], { env: { ...env, FAKE_EVENT_MODE: "raw_utf8" } });
+    const attemptRoot = resolve(rawRun, "cases", rawCase.case_id, "attempts", "0001");
+    const result = JSON.parse(readFileSync(resolve(attemptRoot, "result.json"), "utf8"));
+    const commandEvidence = JSON.parse(readFileSync(resolve(attemptRoot, "command-evidence.json"), "utf8"));
+    const eventCommand = "/bin/bash -lc 'node workspace-test.mjs'";
+    const prefix = adapter === "codex" ? JSON.stringify({ type: "item.started", item: { type: "command_execution", id: "fixture-command", command: eventCommand } }) + "\n" : "";
+    const suffix = adapter === "codex" ? JSON.stringify({ type: "item.completed", item: { type: "command_execution", id: "fixture-command", command: eventCommand, status: "completed", exit_code: 0, aggregated_output: "fixture passed" } }) + '\n{"type":"turn.completed"}\n' : "";
+    const expectedStdout = Buffer.concat([Buffer.from(prefix + '{"type":"item.completed","item":{"type":"agent_message","text":"'),
+      Buffer.from([0xff]), Buffer.from('"}}\n' + suffix)]);
+    const expectedStderr = Buffer.from([0xff, 0xfe, 0x0a]);
+    for (const [stream, bytes] of [["stdout", expectedStdout], ["stderr", expectedStderr]]) {
+      assert.deepEqual(result[stream], { bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") },
+        `${adapter} ${stream} must bind original process bytes, not UTF-8 replacement characters`);
+    }
+    assert.deepEqual(commandEvidence.stream, { bytes: expectedStdout.length, digest: `sha256:${result.stdout.sha256}` });
+    assert.equal(result.schema_version, "1.2.0", "ordinary execution retains the legacy result format");
+    assert.equal(Object.hasOwn(result, "successor_usage"), false);
+    assertCaseStatus(rawCommon, rawCase.case_id, result.status, "raw byte evidence must reverify without mutation");
+  }
+
   const noOpNormalizedRoot = resolve(work, "no-op-normalized");
   run(["normalize-execution", ...common, "--output", noOpNormalizedRoot]);
   const noOpGeneration = resolve(noOpNormalizedRoot, "generations", readdirSync(resolve(noOpNormalizedRoot, "generations"))[0]);
@@ -646,7 +677,7 @@ try {
       symlinkSync(replacementTarget, race.parent);
     }), /symlink|changed/u, `${name} replacement after parent inspection must fail closed`);
     assert.deepEqual(readdirSync(race.outside), ["sentinel"], `${name} replacement must not write into the foreign target`);
-    rmSync(race.parent);
+    unlinkSync(race.parent);
     rmSync(moved, { recursive: true, force: true });
     rmSync(race.outside, { recursive: true, force: true });
   }
@@ -1247,7 +1278,7 @@ exit 64
   symlinkSync(symlinkSentinel, symlinkWorkspace);
   run(["recover-case", "--run-dir", symlinkWorkspaceRun, "--case-id", recoveryCase.case_id, "--claim-id", symlinkClaim.claim_id, "--reason", "symlink boundary"], { expectedStatus: 1 });
   assert.equal(readFileSync(sentinelFile, "utf8"), "keep\n", "ephemeral symlink recovery must not delete the symlink target");
-  rmSync(symlinkWorkspace, { force: true });
+  unlinkSync(symlinkWorkspace);
   run(["recover-case", "--run-dir", symlinkWorkspaceRun, "--case-id", recoveryCase.case_id, "--claim-id", symlinkClaim.claim_id, "--reason", "symlink removed"]);
 
   const ownershipCase = codexCases[6];
@@ -1430,6 +1461,130 @@ exit 64
   });
   run(["recover-case", "--run-dir", stateFaultRun, "--case-id", stateFaultCase.case_id, "--claim-id", stateFaultClaim.claim_id, "--reason", "state boundary fault"]);
   assert.equal(existsSync(resolve(stateFaultRun, "cases", stateFaultCase.case_id, "claim")), false, "state-before-release recovery must remove the exact stale claim");
+
+  // A terminal commit is not proof that its private workspace was removed.
+  // Exercise recovery failures with real filesystem entries, not a fake callback.
+  function committedCleanupFixture(name, faultName = "after_state_published") {
+    const cleanupRun = resolve(work, name);
+    const cleanupCommon = ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", cleanupRun];
+    run(["execute-portfolio", ...cleanupCommon, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", stateFaultCase.case_id],
+      { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: faultName, ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+    const caseRoot = resolve(cleanupRun, "cases", stateFaultCase.case_id);
+    const claimDirectory = resolve(caseRoot, "claim");
+    const claimBytes = readFileSync(resolve(claimDirectory, "claim.json"));
+    const claim = JSON.parse(claimBytes);
+    const parent = resolve(realpathSync(tmpdir()), claim.workspace_parent);
+    const attemptRoot = resolve(caseRoot, "attempts", claim.attempt);
+    const recoverArgs = ["recover-case", "--run-dir", cleanupRun, "--case-id", stateFaultCase.case_id, "--claim-id", claim.claim_id, "--reason", "test committed cleanup barrier"];
+    return { cleanupRun, cleanupCommon, caseRoot, claimDirectory, claimBytes, claim, parent, attemptRoot, recoverArgs };
+  }
+
+  const cleanupRejected = committedCleanupFixture("committed-cleanup-rejected");
+  try {
+    const before = directorySnapshot(cleanupRejected.attemptRoot);
+    const stateBefore = readFileSync(resolve(cleanupRejected.caseRoot, "state.json"));
+    const logBefore = readFileSync(logPath);
+    const identityPath = resolve(cleanupRejected.cleanupRun, "run-identity.json");
+    const identityBytes = readFileSync(identityPath);
+    const runIdentity = JSON.parse(identityBytes);
+    assert.equal(runIdentity.schema_version, "1.1.0");
+    assert.match(runIdentity.workspace_root_identity, /^sha256:[a-f0-9]{64}$/u);
+    const differentTempRoot = resolve(work, "different-cleanup-root"); mkdirSync(differentTempRoot);
+    const differentRoot = run(cleanupRejected.recoverArgs, { expectedStatus: 1, env: { TMPDIR: differentTempRoot, TMP: differentTempRoot, TEMP: differentTempRoot } });
+    assert.match(differentRoot.stderr || differentRoot.stdout, /workspace root identity/u);
+    assert.deepEqual(readFileSync(resolve(cleanupRejected.claimDirectory, "claim.json")), cleanupRejected.claimBytes);
+    assert.equal(existsSync(cleanupRejected.parent), true, "a changed temporary root cannot prove cleanup");
+    run(["verify-execution", ...cleanupRejected.cleanupCommon], { expectedStatus: 1, env: { TMPDIR: differentTempRoot, TMP: differentTempRoot, TEMP: differentTempRoot } });
+    // The run header alone is editable. Its root binding must also be sealed
+    // into the existing request/commit chain before it can direct cleanup.
+    const alternateRootStatus = statSync(differentTempRoot, { bigint: true });
+    const alternateRootIdentity = canonicalDigest({ canonical_path: realpathSync(differentTempRoot), device: String(alternateRootStatus.dev), inode: String(alternateRootStatus.ino) });
+    writeJson(identityPath, { ...runIdentity, workspace_root_identity: alternateRootIdentity });
+    const redirected = run(cleanupRejected.recoverArgs, { expectedStatus: 1, env: { TMPDIR: differentTempRoot, TMP: differentTempRoot, TEMP: differentTempRoot } });
+    assert.match(redirected.stderr || redirected.stdout, /workspace root identity/u);
+    assert.deepEqual(readFileSync(resolve(cleanupRejected.claimDirectory, "claim.json")), cleanupRejected.claimBytes);
+    assert.equal(existsSync(cleanupRejected.parent), true, "editing a header cannot redirect a committed claim's cleanup");
+    assert.deepEqual(directorySnapshot(cleanupRejected.attemptRoot), before);
+    writeFileSync(identityPath, identityBytes);
+    // Do not silently upgrade an old run's missing root binding during recovery.
+    const { workspace_root_identity: _workspaceRoot, ...legacyIdentity } = runIdentity;
+    writeJson(identityPath, { ...legacyIdentity, schema_version: "1.0.0" });
+    const legacyRejected = run(cleanupRejected.recoverArgs, { expectedStatus: 1 });
+    assert.match(legacyRejected.stderr || legacyRejected.stdout, /workspace root identity/u);
+    assert.deepEqual(readFileSync(resolve(cleanupRejected.claimDirectory, "claim.json")), cleanupRejected.claimBytes);
+    assert.deepEqual(directorySnapshot(cleanupRejected.attemptRoot), before);
+    assert.equal(existsSync(cleanupRejected.parent), true);
+    writeFileSync(identityPath, identityBytes);
+    const tokenRoot = resolve(cleanupRejected.parent, cleanupRejected.claim.workspace_token);
+    const savedWorkspace = resolve(cleanupRejected.parent, "saved-workspace");
+    const foreign = resolve(work, "cleanup-foreign-workspace");
+    mkdirSync(foreign); writeFileSync(resolve(foreign, "sentinel"), "not owned by this run\n");
+    renameSync(tokenRoot, savedWorkspace); symlinkSync(foreign, tokenRoot, "dir");
+    const rejected = run(cleanupRejected.recoverArgs, { expectedStatus: 1 });
+    assert.match(rejected.stderr || rejected.stdout, /symlink/u);
+    assert.equal(existsSync(cleanupRejected.claimDirectory), true, "failed committed cleanup must retain its durable claim barrier");
+    assert.deepEqual(readFileSync(resolve(cleanupRejected.claimDirectory, "claim.json")), cleanupRejected.claimBytes);
+    assert.deepEqual(directorySnapshot(cleanupRejected.attemptRoot), before, "cleanup failure must not rewrite terminal evidence");
+    assert.deepEqual(readFileSync(resolve(cleanupRejected.caseRoot, "state.json")), stateBefore);
+    assert.equal(readFileSync(resolve(foreign, "sentinel"), "utf8"), "not owned by this run\n");
+    assertCaseStatus(cleanupRejected.cleanupCommon, stateFaultCase.case_id, "invalid", "unresolved committed cleanup must not pass normal inspection");
+    unlinkSync(tokenRoot); renameSync(savedWorkspace, tokenRoot);
+    run(cleanupRejected.recoverArgs);
+    assert.equal(existsSync(cleanupRejected.parent), false);
+    assert.equal(existsSync(cleanupRejected.claimDirectory), false);
+    assert.deepEqual(directorySnapshot(cleanupRejected.attemptRoot), before);
+    assert.deepEqual(readFileSync(logPath), logBefore, "cleanup recovery cannot re-execute the agent");
+    assertCaseStatus(cleanupRejected.cleanupCommon, stateFaultCase.case_id, "completed");
+  } finally { rmSync(cleanupRejected.parent, { recursive: true, force: true }); }
+
+  const legacyCleanup = committedCleanupFixture("legacy-release-before-cleanup");
+  try {
+    // Recreate the exact old crash gap: terminal state and artifacts are intact,
+    // but the claim was already released while its owned private root remains.
+    rmSync(legacyCleanup.claimDirectory, { recursive: true });
+    const before = directorySnapshot(legacyCleanup.attemptRoot);
+    const stateBefore = readFileSync(resolve(legacyCleanup.caseRoot, "state.json"));
+    const logBefore = readFileSync(logPath);
+    assertCaseStatus(legacyCleanup.cleanupCommon, stateFaultCase.case_id, "invalid", "a released claim cannot conceal residual workspace state");
+    const output = resolve(work, "legacy-cleanup-must-not-normalize");
+    run(["normalize-execution", ...legacyCleanup.cleanupCommon, "--output", output], { expectedStatus: 1 });
+    assert.equal(existsSync(output), false, "unresolved cleanup must not create normalized result evidence");
+    const marker = resolve(legacyCleanup.parent, "ownership.json");
+    const markerBefore = readFileSync(marker);
+    writeJson(marker, { ...JSON.parse(markerBefore), claim_id: "00000000-0000-4000-8000-000000000000" });
+    run(legacyCleanup.recoverArgs, { expectedStatus: 1 });
+    assert.equal(existsSync(legacyCleanup.parent), true, "a mismatched ownership marker must not be removed");
+    assert.deepEqual(directorySnapshot(legacyCleanup.attemptRoot), before);
+    writeFileSync(marker, markerBefore);
+    run(legacyCleanup.recoverArgs);
+    assert.equal(existsSync(legacyCleanup.parent), false, "legacy terminal recovery removes only its verified owned root");
+    assert.deepEqual(directorySnapshot(legacyCleanup.attemptRoot), before);
+    assert.deepEqual(readFileSync(resolve(legacyCleanup.caseRoot, "state.json")), stateBefore);
+    run(legacyCleanup.recoverArgs);
+    assert.deepEqual(readFileSync(logPath), logBefore, "repeated terminal recovery must not run another trial");
+    assertCaseStatus(legacyCleanup.cleanupCommon, stateFaultCase.case_id, "completed");
+    // existsSync is false for a dangling symlink. It must not prove absence.
+    symlinkSync(resolve(work, "missing-cleanup-target"), legacyCleanup.parent, "dir");
+    assertCaseStatus(legacyCleanup.cleanupCommon, stateFaultCase.case_id, "invalid", "dangling workspace parents remain unresolved cleanup");
+    run(legacyCleanup.recoverArgs, { expectedStatus: 1 });
+    assert.deepEqual(directorySnapshot(legacyCleanup.attemptRoot), before);
+    unlinkSync(legacyCleanup.parent);
+    assertCaseStatus(legacyCleanup.cleanupCommon, stateFaultCase.case_id, "completed");
+  } finally { rmSync(legacyCleanup.parent, { recursive: true, force: true }); }
+
+  const cleanedBeforeRelease = committedCleanupFixture("cleaned-before-claim-release", "after_workspace_cleanup");
+  try {
+    const before = directorySnapshot(cleanedBeforeRelease.attemptRoot);
+    const logBefore = readFileSync(logPath);
+    assert.equal(existsSync(cleanedBeforeRelease.parent), false, "cleanup precedes claim release");
+    assert.equal(existsSync(cleanedBeforeRelease.claimDirectory), true, "interruption after cleanup leaves a recovery barrier");
+    assertCaseStatus(cleanedBeforeRelease.cleanupCommon, stateFaultCase.case_id, "invalid");
+    run(cleanedBeforeRelease.recoverArgs);
+    assert.equal(existsSync(cleanedBeforeRelease.claimDirectory), false);
+    assert.deepEqual(directorySnapshot(cleanedBeforeRelease.attemptRoot), before);
+    assert.deepEqual(readFileSync(logPath), logBefore);
+    assertCaseStatus(cleanedBeforeRelease.cleanupCommon, stateFaultCase.case_id, "completed");
+  } finally { rmSync(cleanedBeforeRelease.parent, { recursive: true, force: true }); }
 
   const cleanupBaseline = ephemeralInventory();
   const failureRun = resolve(work, "failure-cleanup-run");
@@ -1766,6 +1921,10 @@ exit 64
   assertSchemaInvalid({ ...validTerminalState, status: "active", active_claim_id: null, terminal_attempt: null }, "portfolio-case-state.schema.json", "active state conditionals must require a bound claim");
   assertSchemaInvalid({ ...validTerminalState, terminal_attempt: null }, "portfolio-case-state.schema.json", "terminal state conditionals must require a terminal attempt");
   assertSchemaInvalid({ ...sourceRunIdentity, run_instance_id: "not-a-uuid" }, "portfolio-run-identity.schema.json", "run identity schema must enforce UUID format");
+  const { workspace_root_identity: _rootIdentity, ...unboundRunIdentity } = sourceRunIdentity;
+  assertSchemaInvalid(unboundRunIdentity, "portfolio-run-identity.schema.json", "new run identity requires a workspace root binding");
+  assertSchemaInvalid({ ...sourceRunIdentity, schema_version: "1.0.0" }, "portfolio-run-identity.schema.json", "legacy run identity cannot carry an unversioned new field");
+  assert.equal(validateJsonSchema({ ...unboundRunIdentity, schema_version: "1.0.0" }, { schemaPath: resolve(root, "benchmarks/schemas/portfolio-run-identity.schema.json") }).length, 0, "legacy schema stays readable without inventing cleanup authority");
   assertSchemaInvalid({ ...recoveryClaim, claim_id: "not-a-uuid" }, "portfolio-claim.schema.json", "claim schema must enforce UUID format");
 
   const adaptiveRequest = JSON.parse(readFileSync(resolve(runDir, "cases", adaptiveCodexCase.case_id, "attempts", "0001", "request.json"), "utf8"));
