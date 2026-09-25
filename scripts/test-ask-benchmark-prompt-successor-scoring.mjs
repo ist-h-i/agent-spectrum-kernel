@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHash, randomUUID } from "node:crypto";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, relative } from "node:path";
@@ -350,8 +350,85 @@ async function worker(contextPath) {
       assert.equal(actual.attempts.length, 1);
       record.synthetic_native_attempts++;
     });
+    await check("a delayed controller cannot claim a stale native prefix after another controller commits", async () => {
+      const contextPath = resolve(work, "stale-controller-context.json");
+      write(contextPath, { preparation, sources: measuredSources, root, manifestPath });
+      const child = spawn(process.execPath, ["--input-type=module", "-e", `
+        import { readFileSync } from "node:fs";
+        import { openSuccessorMeasuredAuthority } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-measured-authority.mjs", import.meta.url).href)};
+        import { openSuccessorScoringInputs } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-scoring-inputs.mjs", import.meta.url).href)};
+        import { executeNextMeasuredSuccessorCase } from ${JSON.stringify(new URL("./ask-benchmark-prompt-successor-measured-execution.mjs", import.meta.url).href)};
+        const i = JSON.parse(readFileSync(process.argv[1], "utf8"));
+        const scoringInputs = await openSuccessorScoringInputs({ preparation: i.preparation, manifestPath: i.manifestPath, root: i.root });
+        const authority = await openSuccessorMeasuredAuthority({ preparation: i.preparation, sources: i.sources, scoringInputs, root: i.root });
+        try {
+          await executeNextMeasuredSuccessorCase({ authority, preparation: i.preparation, sources: i.sources, root: i.root });
+        } catch (error) {
+          if (error.code === "SUCCESSOR_MEASURED_STALE_CLAIM") process.exit(23);
+          throw error;
+        }
+      `, contextPath], {
+        cwd: root, env: { ...process.env, ...env, ASK_BENCHMARK_FAULT: "before_measured_lock_pause" },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let stderr = "";
+      let readyResolve; let readyReject;
+      const ready = new Promise((resolve, reject) => { readyResolve = resolve; readyReject = reject; });
+      const exited = new Promise(resolve => child.once("exit", (code, signal) => resolve({ code, signal })));
+      child.stderr.on("data", chunk => {
+        stderr += chunk;
+        if (stderr.includes("MEASURED_BEFORE_LOCK\n")) readyResolve();
+      });
+      child.once("error", readyReject);
+      child.once("exit", (code, signal) => readyReject(new Error(`stale controller exited before lock barrier: ${code}/${signal}: ${stderr}`)));
+      const watchdog = setTimeout(() => readyReject(new Error(`stale controller did not reach lock barrier: ${stderr}`)), 600000);
+      let exitWatchdog;
+      try {
+        await ready;
+        const priorJournal = read(measuredJournalPath);
+        const target = preparation.cases[1];
+        const step = await asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
+          authority: measuredAuthority, preparation, sources: measuredSources, root,
+        }));
+        assert.equal(step.case_id, target.case_id);
+        assert.equal(step.collection.terminal_count, 2);
+        record.synthetic_native_attempts++;
+        child.kill("SIGCONT");
+        const result = await Promise.race([exited, new Promise((_, reject) => {
+          exitWatchdog = setTimeout(() => reject(new Error(`stale controller did not exit: ${stderr}`)), 600000);
+        })]);
+        assert.deepEqual(result, { code: 23, signal: null }, stderr);
+        assert.equal(read(measuredJournalPath).terminal_count, 2);
+        assert.equal(existsSync(`${measuredJournalPath}.lock`), false);
+        const role = roles[target.prompt_role];
+        const nativeCase = role.scope.source.bindings.find(b => b.successor_case_id === target.case_id).source_case_id;
+        const actual = inspectVerifiedPortfolioExecution(role.execution).cases.find(c => c.entry.case_id === nativeCase);
+        assert.equal(actual.attempts.length, 1);
+        const staleClaim = {
+          schema_version: "1.1.0", kind: "prompt_successor_measured_claim",
+          authority_digest: priorJournal.authority_digest, preparation_digest: preparation.preparation_digest,
+          case_id: target.case_id, prompt_role: target.prompt_role, native_case_id: nativeCase,
+          pre_collection_digest: priorJournal.collection_control_digest,
+          pre_journal_digest: priorJournal.journal_digest, pre_entry_count: priorJournal.entries.length,
+          automatic_retry_authorized: false,
+        };
+        write(`${measuredJournalPath}.lock`, { ...staleClaim, claim_digest: canonicalDigest(staleClaim) });
+        const recovered = await recoverMeasuredSuccessorSession({ authority: measuredAuthority, preparation, sources: measuredSources, root });
+        assert.equal(recovered.retry_performed, false);
+        assert.equal(recovered.collection.terminal_count, 2);
+        assert.equal(existsSync(`${measuredJournalPath}.lock`), false);
+        assert.equal(read(measuredJournalPath).journal_digest, recovered.journal.journal_digest);
+      } finally {
+        clearTimeout(watchdog);
+        clearTimeout(exitWatchdog);
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill("SIGCONT");
+          child.kill("SIGTERM");
+        }
+      }
+    });
     await check("28 measured-launch claims preserve global order, durable journal and canonical terminal identities", async () => {
-      for (const target of preparation.cases.slice(1)) {
+      for (const target of preparation.cases.slice(2)) {
         const step = await asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
           authority: measuredAuthority, preparation, sources: measuredSources, root,
         }));
@@ -502,7 +579,7 @@ async function worker(contextPath) {
       finally { writeFileSync(path, before); }
     });
     record.final_revision = git(root, "rev-parse", "HEAD"); record.final_status = git(root, "status", "--porcelain");
-    assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, ""); assert.equal(record.checks.length, 19); record.completed = true;
+    assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, ""); assert.equal(record.checks.length, 20); record.completed = true;
   } finally {
     const evidencePath = resolve(work, "scoring-verification.json"); write(evidencePath, record); console.log(`Evidence: ${evidencePath}`);
   }

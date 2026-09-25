@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync,
-  renameSync, unlinkSync, writeFileSync,
+  renameSync, unlinkSync, writeFileSync, writeSync,
 } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -279,7 +279,24 @@ export async function executeNextMeasuredSuccessorCase({
   const binding = source.scope.source.bindings.find((entry) => entry.successor_case_id === target.case_id);
   if (!binding) successorFail("SUCCESSOR_CASE_MISSING", "measured native binding");
   const claim = lockRecord(authority, preparation, target.case_id, target.prompt_role, binding.source_case_id, before.control.control_digest, previousJournal);
+  if (process.env.ASK_BENCHMARK_FAULT === "before_measured_lock_pause") {
+    writeSync(2, "MEASURED_BEFORE_LOCK\n");
+    process.kill(process.pid, "SIGSTOP");
+  }
   acquireLock(lockPath, claim);
+  try {
+    const lockedJournal = readJournalBase(journal, authority, preparation);
+    // A controller can release the global lock after a native change only after
+    // publishing that change to this journal. The native prefix was inspected
+    // above; an unchanged journal under our lock keeps that inspection current.
+    if ((lockedJournal?.journal_digest ?? null) !== (previousJournal?.journal_digest ?? null)) {
+      successorFail("SUCCESSOR_MEASURED_STALE_CLAIM", "journal changed before global claim");
+    }
+  } catch (error) {
+    // This controller has not opened the Prompt or entered the native runner.
+    releaseLock(lockPath);
+    throw error;
+  }
   try {
     const prompt = await openSuccessorPromptInput({
       preparation,
@@ -343,14 +360,19 @@ export async function recoverMeasuredSuccessorSession({
   successorExact(binding?.source_case_id, claim.native_case_id, "recovery native case");
   const nativeClaimPath = resolve(source.execution.runDir, "cases", claim.native_case_id, "claim", "claim.json");
   if ((beforeJournal?.journal_digest ?? null) !== claim.pre_journal_digest) {
-    // The terminal journal may have been committed just before the controller
-    // stopped. Reverify the whole native collection and the exact claim entry
-    // before removing its lock; never touch or repeat the completed native case.
+    // Either this controller stopped after committing its terminal entry, or
+    // it acquired an obsolete lock after another controller committed that case.
+    // In both cases the journal and native terminal must agree before unlock.
     successorExact(beforeJournal?.entries.length, claim.pre_entry_count + 1, "recovery committed entry count");
     const after = await inspect(authority, preparation, sources, root);
     validateJournalAgainstInspection(beforeJournal, authority, preparation, sources, after);
-    const prior = { control: { terminal_count: claim.pre_entry_count, control_digest: claim.pre_collection_digest } };
-    successorExact(beforeJournal.entries.at(-1), terminalEntry({ preparation, sources, claim, before: prior, after }), "recovery committed claim entry");
+    const committed = beforeJournal.entries.at(-1);
+    successorExact(committed.case_id, claim.case_id, "recovery committed case");
+    successorExact(committed.pre_collection_digest, claim.pre_collection_digest, "recovery committed pre-control");
+    if (committed.global_claim_digest === claim.claim_digest) {
+      const prior = { control: { terminal_count: claim.pre_entry_count, control_digest: claim.pre_collection_digest } };
+      successorExact(committed, terminalEntry({ preparation, sources, claim, before: prior, after }), "recovery committed claim entry");
+    }
     if (existsSync(nativeClaimPath)) successorFail("SUCCESSOR_UNCERTAIN_EXECUTION", "recovery committed native claim");
     releaseLock(lockPath);
     return {
