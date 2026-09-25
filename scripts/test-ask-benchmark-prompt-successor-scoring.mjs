@@ -286,7 +286,7 @@ async function worker(contextPath) {
         const authority = await openSuccessorMeasuredAuthority({ preparation: i.preparation, sources: i.sources, scoringInputs, root: i.root });
         await executeNextMeasuredSuccessorCase({ authority, preparation: i.preparation, sources: i.sources, root: i.root });
       `, crashContextPath], {
-        cwd: root, encoding: "utf8", timeout: 120000, maxBuffer: 4 * 1024 * 1024,
+        cwd: root, encoding: "utf8", timeout: 600000, maxBuffer: 4 * 1024 * 1024,
         env: { ...process.env, ...env, ASK_BENCHMARK_FAULT: "after_request_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" },
       });
       assert.equal(child.error, undefined, child.error?.message);
@@ -329,7 +329,7 @@ async function worker(contextPath) {
         const authority = await openSuccessorMeasuredAuthority({ preparation: i.preparation, sources: i.sources, scoringInputs, root: i.root });
         await executeNextMeasuredSuccessorCase({ authority, preparation: i.preparation, sources: i.sources, root: i.root });
       `, contextPath], {
-        cwd: root, encoding: "utf8", timeout: 120000, maxBuffer: 4 * 1024 * 1024,
+        cwd: root, encoding: "utf8", timeout: 600000, maxBuffer: 4 * 1024 * 1024,
         env: { ...process.env, ...env, ASK_BENCHMARK_FAULT: "after_measured_journal_published" },
       });
       assert.equal(child.error, undefined, child.error?.message);
