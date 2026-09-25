@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import { lstatSync, realpathSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertAtomicOutputAbsent } from "./ask-benchmark-atomic-publication.mjs";
 import { readStableJsonFile } from "./ask-benchmark-duplicate-key-json.mjs";
@@ -137,12 +137,28 @@ function assertUnchanged(before) {
 }
 function outputDestination(outputPath) {
   if (typeof outputPath !== "string" || !isAbsolute(outputPath)) reject("CALIBRATION_PACKAGE_OUTPUT_REJECTED");
-  const absolute = resolve(outputPath);
   try {
-    const protectedRoots = [ROOT,
+    // Reject symlinks before canonicalizing the existing parent. Comparing real
+    // paths also closes case aliases on case-insensitive filesystems.
+    const checked = assertAtomicOutputAbsent(resolve(outputPath), "package output");
+    const absolute = resolve(realpathSync(dirname(checked)), basename(checked));
+    // A linked checkout and its primary/sibling worktrees share one repository.
+    // NUL-delimited porcelain preserves spaces and newlines in registered paths.
+    const worktrees = git(ROOT, ["worktree", "list", "--porcelain", "-z"])
+      .split("\0").filter(field => field.startsWith("worktree ")).map(field => field.slice(9));
+    if (!worktrees.length || worktrees.some(path => !isAbsolute(path))) reject("CALIBRATION_PACKAGE_OUTPUT_REJECTED");
+    const protectedRoots = [ROOT, ...worktrees,
       resolve(ROOT, git(ROOT, ["rev-parse", "--absolute-git-dir"]).trim()),
       resolve(ROOT, git(ROOT, ["rev-parse", "--git-common-dir"]).trim())];
-    for (const protectedRoot of protectedRoots) {
+    for (const root of protectedRoots) {
+      let protectedRoot;
+      try { protectedRoot = realpathSync(root); }
+      catch (error) {
+        // A stale/prunable worktree registration need not make external output
+        // impossible; retain its lexical boundary without following a symlink.
+        if (error.code !== "ENOENT") throw error;
+        protectedRoot = resolve(root);
+      }
       const path = relative(protectedRoot, absolute);
       if (path === "" || (!path.startsWith(`..${sep}`) && path !== ".." && !isAbsolute(path))) {
         reject("CALIBRATION_PACKAGE_OUTPUT_REJECTED");
@@ -217,7 +233,7 @@ export async function assembleCalibrationInputPackage(options = {}) {
     same(readSuccessorImplementationIdentity(ROOT), implementation, "CALIBRATION_PACKAGE_SOURCE_CHANGED");
     // No destination is created on validation failure. Existing files are not
     // replaced, even with equal-looking or conflicting caller-supplied content.
-    assertAtomicOutputAbsent(output, "package output");
+    same(outputDestination(output), output, "CALIBRATION_PACKAGE_OUTPUT_REJECTED");
     const published = writeCanonicalJsonNoReplace({ outputPath: output, artifact: manifest, label: "calibration public input manifest" });
     return { source: implementation, manifest_digest: manifest.manifest_digest,
       public_content_verified: true, private_bundle_verified: false,

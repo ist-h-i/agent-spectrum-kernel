@@ -219,3 +219,46 @@ test("unknown CLI arguments do not echo the caller's private path", () => reposi
   assert.equal(JSON.parse(result.stderr).code, "CALIBRATION_PACKAGE_ARGUMENTS_REJECTED");
   assert.ok(!result.stderr.includes(secretPath));
 }, { sources: true }));
+
+for (const direction of ["linked-to-primary", "primary-to-linked", "linked-to-sibling"]) {
+  test(`assembly rejects ${direction} worktree output before inspecting inputs`, () => repository((root, parent) => {
+    const linked = resolve(parent, "linked");
+    const sibling = resolve(parent, "sibling with spaces\nand newline");
+    git(root, "worktree", "add", "-q", "-b", "test-linked", linked);
+    git(root, "worktree", "add", "-q", "-b", "test-sibling", sibling);
+    const source = direction === "primary-to-linked" ? root : linked;
+    const target = direction === "linked-to-primary" ? root : direction === "primary-to-linked" ? linked : sibling;
+    const output = resolve(target, "package-output.json");
+    const result = cli(source, "assemble", "--output", output);
+    assert.equal(result.error, undefined); assert.equal(result.status, 1); assert.equal(result.stdout, "");
+    assert.equal(JSON.parse(result.stderr).code, "CALIBRATION_PACKAGE_OUTPUT_REJECTED");
+    assert.equal(existsSync(output), false);
+    assert.ok(!result.stderr.includes(target));
+    for (const checkout of [root, linked, sibling]) assert.equal(git(checkout, "status", "--porcelain"), "");
+  }, { sources: true }));
+}
+test("a similarly prefixed external directory remains a valid output boundary", () => repository((root, parent) => {
+  const linked = resolve(parent, "linked");
+  git(root, "worktree", "add", "-q", "-b", "test-linked", linked);
+  const evidence = resolve(parent, "linked-evidence"); mkdirSync(evidence);
+  const output = resolve(evidence, "manifest.json");
+  const result = cli(linked, "assemble", "--output", output);
+  assert.equal(result.error, undefined); assert.equal(result.status, 1);
+  // Passing the output guard is not positive scoring-chain validation.
+  assert.equal(JSON.parse(result.stderr).code, "CALIBRATION_PACKAGE_INPUTS_INCOMPLETE");
+  assert.equal(existsSync(output), false);
+  for (const checkout of [root, linked]) assert.equal(git(checkout, "status", "--porcelain"), "");
+}, { sources: true }));
+test("case aliases cannot bypass a registered worktree boundary", t => repository((root, parent) => {
+  const linked = resolve(parent, "linked");
+  git(root, "worktree", "add", "-q", "-b", "test-linked", linked);
+  const alias = resolve(parent, "REPOSITORY");
+  if (!existsSync(alias)) { t.skip("requires a case-insensitive filesystem"); return; }
+  assert.equal(realpathSync(alias), realpathSync(root));
+  const output = resolve(alias, "package-output.json");
+  const result = cli(linked, "assemble", "--output", output);
+  assert.equal(result.error, undefined); assert.equal(result.status, 1);
+  assert.equal(JSON.parse(result.stderr).code, "CALIBRATION_PACKAGE_OUTPUT_REJECTED");
+  assert.equal(existsSync(output), false);
+  for (const checkout of [root, linked]) assert.equal(git(checkout, "status", "--porcelain"), "");
+}, { sources: true }));
