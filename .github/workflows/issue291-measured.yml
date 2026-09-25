@@ -80,6 +80,8 @@ jobs:
         run: node --test scripts/test-ask-benchmark-prompt-successor-workflow.mjs
       - name: Verify successor usage and collection control
         run: node --test scripts/test-ask-benchmark-prompt-successor-usage.mjs scripts/test-ask-benchmark-prompt-successor-control.mjs
+      - name: Verify measured recovery state transitions
+        run: node --test scripts/test-ask-benchmark-prompt-successor-measured-recovery.mjs
       - name: Verify native successor transport and normalized usage
         run: node --test scripts/test-ask-benchmark-prompt-successor-execution.mjs
       - name: Verify native collection and existing scoring boundaries

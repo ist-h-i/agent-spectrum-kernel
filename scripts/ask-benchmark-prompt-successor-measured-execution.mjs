@@ -21,6 +21,10 @@ const MAX_JOURNAL_BYTES = 4 * 1024 * 1024;
 const completionHandles = new WeakMap();
 const OWNER_SOCKET_PREFIX = "/tmp/ask-successor-owner-";
 
+function faultEnabled(name) {
+  return process.env.ASK_BENCHMARK_FAULT?.split(",").includes(name) ?? false;
+}
+
 async function openOwnerSocket() {
   const path = `${OWNER_SOCKET_PREFIX}${randomUUID()}.sock`;
   const server = createServer((socket) => socket.end());
@@ -275,25 +279,29 @@ function lockRecord(authority, preparation, caseId, role, nativeCaseId, beforeDi
   return { ...body, claim_digest: canonicalDigest(body) };
 }
 
+function reservationRecord(authority, preparation, ownerSocket) {
+  const body = {
+    schema_version: "1.0.0",
+    kind: "prompt_successor_measured_reservation",
+    claim_id: randomUUID(),
+    owner_socket: ownerSocket,
+    authority_digest: canonicalDigest(inspectSuccessorMeasuredAuthority(authority)),
+    preparation_digest: preparation.preparation_digest,
+  };
+  return { ...body, reservation_digest: canonicalDigest(body) };
+}
+
 function acquireLock(path, record) {
-  let fd;
-  try { fd = openSync(path, "wx", 0o600); }
+  // Publish only complete, fsynced bytes. A crash while writing the temporary
+  // file must not leave an unreadable lock in the recovery path.
+  try { writeDurableExclusiveJson(path, record); }
   catch (error) {
     if (error?.code === "EEXIST") successorFail("SUCCESSOR_MEASURED_SESSION_LOCKED", "durable global claim");
     throw error;
   }
-  try {
-    writeFileSync(fd, `${stableCanonicalJson(record)}\n`);
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
-  }
-  const directory = openSync(dirname(path), "r");
-  try { fsyncSync(directory); } finally { closeSync(directory); }
 }
 
-function readLock(path) {
-  const value = readJsonBounded(path, "measured claim", 64 * 1024);
+function readLock(value) {
   successorClosed(value, [
     "schema_version", "kind", "claim_id", "owner_socket", "authority_digest", "preparation_digest", "case_id", "prompt_role",
     "native_case_id", "pre_collection_digest", "pre_journal_digest", "pre_entry_count",
@@ -311,6 +319,29 @@ function readLock(path) {
   successorDigest(value.pre_collection_digest, "measured claim pre-collection");
   if (value.pre_journal_digest !== null) successorDigest(value.pre_journal_digest, "measured claim pre-journal");
   return value;
+}
+
+function readReservation(value) {
+  successorClosed(value, [
+    "schema_version", "kind", "claim_id", "owner_socket", "authority_digest",
+    "preparation_digest", "reservation_digest",
+  ], "measured reservation");
+  const { reservation_digest: digest, ...body } = value;
+  successorExact(value.schema_version, "1.0.0", "measured reservation version");
+  successorExact(value.kind, "prompt_successor_measured_reservation", "measured reservation kind");
+  if (typeof value.claim_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.claim_id)) {
+    successorFail("SUCCESSOR_MEASURED_CLAIM_INVALID", "reservation generation");
+  }
+  validateOwnerSocket(value.owner_socket);
+  successorExact(canonicalDigest(body), digest, "measured reservation digest");
+  successorDigest(value.authority_digest, "measured reservation authority");
+  successorDigest(value.preparation_digest, "measured reservation preparation");
+  return value;
+}
+
+function readRecoveryLock(path) {
+  const value = readJsonBounded(path, "measured claim", 64 * 1024);
+  return value.kind === "prompt_successor_measured_reservation" ? readReservation(value) : readLock(value);
 }
 
 function releaseLock(path) {
@@ -414,28 +445,33 @@ export async function executeNextMeasuredSuccessorCase({
   if (!binding) successorFail("SUCCESSOR_CASE_MISSING", "measured native binding");
   const lease = await openOwnerSocket();
   try {
-    const claim = lockRecord(authority, preparation, target.case_id, target.prompt_role, binding.source_case_id, before.control.control_digest, previousJournal, lease.path);
-    if (process.env.ASK_BENCHMARK_FAULT === "before_measured_lock_pause") {
+    const reservation = reservationRecord(authority, preparation, lease.path);
+    if (faultEnabled("before_measured_lock_pause")) {
       writeSync(2, "MEASURED_BEFORE_LOCK\n");
       process.kill(process.pid, "SIGSTOP");
     }
-    acquireLock(lockPath, claim);
-    if (process.env.ASK_BENCHMARK_FAULT === "after_measured_lock_pause") {
-      writeSync(2, "MEASURED_AFTER_LOCK\n");
+    acquireLock(lockPath, reservation);
+    if (faultEnabled("after_measured_provisional_lock_pause")) {
+      writeSync(2, "MEASURED_AFTER_PROVISIONAL_LOCK\n");
       process.kill(process.pid, "SIGSTOP");
     }
     try {
       const lockedJournal = readJournalBase(journal, authority, preparation);
-      // A controller can release the global lock after a native change only after
-      // publishing that change to this journal. The native prefix was inspected
-      // above; an unchanged journal under our lock keeps that inspection current.
+      // The reservation cannot start native work. Only an unchanged journal
+      // permits promotion to an execution claim under this exclusive lock.
       if ((lockedJournal?.journal_digest ?? null) !== (previousJournal?.journal_digest ?? null)) {
         successorFail("SUCCESSOR_MEASURED_STALE_CLAIM", "journal changed before global claim");
       }
     } catch (error) {
-      // This controller has not opened the Prompt or entered the native runner.
+      // This controller has not published an execution claim or entered native.
       releaseLock(lockPath);
       throw error;
+    }
+    const claim = lockRecord(authority, preparation, target.case_id, target.prompt_role, binding.source_case_id, before.control.control_digest, previousJournal, lease.path);
+    writeDurableJson(lockPath, claim);
+    if (process.env.ASK_BENCHMARK_FAULT === "after_measured_lock_pause") {
+      writeSync(2, "MEASURED_AFTER_LOCK\n");
+      process.kill(process.pid, "SIGSTOP");
     }
     try {
       const prompt = await openSuccessorPromptInput({
@@ -491,15 +527,36 @@ export async function recoverMeasuredSuccessorSession({
   const journal = canonicalJournalPath(authority, preparation, sources);
   const lockPath = `${journal}.lock`;
   if (!existsSync(lockPath)) successorFail("SUCCESSOR_MEASURED_RECOVERY_NOT_REQUIRED", "durable global claim");
-  const claim = readLock(lockPath);
+  const claim = readRecoveryLock(lockPath);
   await claimCanBeRecovered(claim);
   const owner = await acquireRecoveryEpoch(lockPath, claim);
   try {
     if (!existsSync(lockPath)) successorFail("SUCCESSOR_MEASURED_RECOVERY_NOT_REQUIRED", "durable global claim changed");
-    successorExact(readLock(lockPath).claim_id, claim.claim_id, "recovery owned claim generation");
+    successorExact(readRecoveryLock(lockPath), claim, "recovery owned claim generation");
     successorExact(claim.authority_digest, canonicalDigest(inspectSuccessorMeasuredAuthority(authority)), "recovery authority");
     successorExact(claim.preparation_digest, preparation.preparation_digest, "recovery preparation");
     const beforeJournal = readJournalBase(journal, authority, preparation);
+    if (claim.kind === "prompt_successor_measured_reservation") {
+      // Only the final claim can open Prompt bytes or enter the native runner.
+      // A dead reservation has no claimed case, even if another controller
+      // advanced the journal before this reservation acquired the lock.
+      const after = await inspect(authority, preparation, sources, root);
+      validateJournalAgainstInspection(beforeJournal, authority, preparation, sources, after);
+      for (const pending of after.control.cases.slice(after.control.terminal_count)) {
+        successorExact(pending.status, "pending", "recovery reserved native prefix");
+      }
+      successorExact(readRecoveryLock(lockPath), claim, "recovery reserved claim generation");
+      if (faultEnabled("before_measured_reservation_release_pause")) {
+        writeSync(2, "MEASURED_BEFORE_RESERVATION_RELEASE\n");
+        process.kill(process.pid, "SIGSTOP");
+      }
+      releaseLock(lockPath);
+      return {
+        recovered_case_id: null, native_status: "not_started",
+        collection: structuredClone(after.control), journal: beforeJournal,
+        retry_performed: false, portfolio_mutation_authorized: false,
+      };
+    }
     const target = preparation.cases.find((entry) => entry.case_id === claim.case_id);
     if (!target) successorFail("SUCCESSOR_CASE_MISSING", "recovery case");
     successorExact(target.prompt_role, claim.prompt_role, "recovery role");

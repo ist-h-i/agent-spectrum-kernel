@@ -158,8 +158,13 @@ experiment and avoids a caller-selected coordination path.
 
 `executeNextMeasuredSuccessorCase` derives one canonical journal path from the
 two native run roots; callers cannot choose a second journal path to bypass the
-global lock. It acquires one durable claim before opening Prompt bytes or calling
-the existing #197 runner, launches only the exact next preregistered case with
+global lock. It first publishes a complete, durable reservation under that lock.
+The reservation has no case and cannot open Prompt bytes or call the native
+runner. The controller rechecks the journal while holding the lock and atomically
+promotes the reservation to a unique execution claim only if the snapshot is
+current. A stale snapshot releases only its reservation. The final claim
+precedes Prompt access and the existing #197 runner, which launches only the
+exact next preregistered case with
 `maxCases=1` and `retryFailed=false`, then reopens terminal evidence.
 The fsync-backed journal records the ordered terminal prefix, each global claim
 digest, pre/post collection-control digests, and request/result/commit digests. Each
@@ -187,6 +192,14 @@ after its last journal/claim mutation. The initial empty journal is also a
 recoverable published state: the next owner must reverify the unchanged native
 prefix and zero native attempts before releasing that claim.
 
+A dead reservation is recovered under the same owner socket and epoch exclusion.
+Recovery verifies its exact generation, authority and preparation, then reopens
+the current journal and native prefix. Only a fully journaled prefix with pending
+unclaimed cases permits release. It neither writes the journal nor calls native.
+A second interruption before reservation release repeats the same verification.
+Final execution claims retain strict committed-claim digest matching: a different
+claim generation cannot impersonate a committed terminal entry.
+
 Measured result/provenance access requires two opaque capabilities: the
 pre-result measured authority and a collection-completion handle produced only
 after the canonical journal and native evidence agree on all 28 terminal cases,
@@ -205,6 +218,7 @@ measurement or effective-model/provider claim follows from those numbers.
 
 ```sh
 node --test scripts/test-ask-benchmark-prompt-successor-usage.mjs scripts/test-ask-benchmark-prompt-successor-control.mjs
+node --test scripts/test-ask-benchmark-prompt-successor-measured-recovery.mjs
 node --test scripts/test-ask-benchmark-prompt-successor-execution.mjs
 node --test scripts/test-ask-benchmark-prompt-successor-scoring.mjs
 ```
