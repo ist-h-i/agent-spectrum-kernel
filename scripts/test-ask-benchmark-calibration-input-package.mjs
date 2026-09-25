@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -254,7 +254,9 @@ test("case aliases cannot bypass a registered worktree boundary", t => repositor
   git(root, "worktree", "add", "-q", "-b", "test-linked", linked);
   const alias = resolve(parent, "REPOSITORY");
   if (!existsSync(alias)) { t.skip("requires a case-insensitive filesystem"); return; }
-  assert.equal(realpathSync(alias), realpathSync(root));
+  const actual = lstatSync(root, { bigint: true });
+  const aliased = lstatSync(alias, { bigint: true });
+  assert.deepEqual([aliased.dev, aliased.ino], [actual.dev, actual.ino]);
   const output = resolve(alias, "package-output.json");
   const result = cli(linked, "assemble", "--output", output);
   assert.equal(result.error, undefined); assert.equal(result.status, 1);

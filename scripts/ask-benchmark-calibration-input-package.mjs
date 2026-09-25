@@ -138,10 +138,15 @@ function assertUnchanged(before) {
 function outputDestination(outputPath) {
   if (typeof outputPath !== "string" || !isAbsolute(outputPath)) reject("CALIBRATION_PACKAGE_OUTPUT_REJECTED");
   try {
-    // Reject symlinks before canonicalizing the existing parent. Comparing real
-    // paths also closes case aliases on case-insensitive filesystems.
+    // Reject symlinks before resolving the existing parent. realpath does not
+    // normalize casing, so compare directory identities as well as path names.
     const checked = assertAtomicOutputAbsent(resolve(outputPath), "package output");
     const absolute = resolve(realpathSync(dirname(checked)), basename(checked));
+    const ancestorIdentities = [];
+    for (let directory = dirname(absolute); ; directory = dirname(directory)) {
+      ancestorIdentities.push(lstatSync(directory, { bigint: true }));
+      if (dirname(directory) === directory) break;
+    }
     // A linked checkout and its primary/sibling worktrees share one repository.
     // NUL-delimited porcelain preserves spaces and newlines in registered paths.
     const worktrees = git(ROOT, ["worktree", "list", "--porcelain", "-z"])
@@ -152,13 +157,19 @@ function outputDestination(outputPath) {
       resolve(ROOT, git(ROOT, ["rev-parse", "--git-common-dir"]).trim())];
     for (const root of protectedRoots) {
       let protectedRoot;
-      try { protectedRoot = realpathSync(root); }
+      let protectedIdentity;
+      try {
+        protectedRoot = realpathSync(root);
+        protectedIdentity = lstatSync(protectedRoot, { bigint: true });
+      }
       catch (error) {
         // A stale/prunable worktree registration need not make external output
         // impossible; retain its lexical boundary without following a symlink.
         if (error.code !== "ENOENT") throw error;
         protectedRoot = resolve(root);
       }
+      if (protectedIdentity && ancestorIdentities.some(({ dev, ino }) =>
+        dev === protectedIdentity.dev && ino === protectedIdentity.ino)) reject("CALIBRATION_PACKAGE_OUTPUT_REJECTED");
       const path = relative(protectedRoot, absolute);
       if (path === "" || (!path.startsWith(`..${sep}`) && path !== ".." && !isAbsolute(path))) {
         reject("CALIBRATION_PACKAGE_OUTPUT_REJECTED");
