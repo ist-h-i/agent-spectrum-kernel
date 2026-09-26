@@ -290,6 +290,12 @@ test("synthetic admitted public packages assemble and reopen through the real su
     git(clone, "config", "core.hooksPath", "/dev/null");
     const sourceRevision = pinPublicImplementationInClone(clone);
 
+    // The isolated clone may already contain the formal calibration packages.
+    // Replace only those clone-local test targets with synthetic authorities.
+    for (const [fixtureId] of CALIBRATION_SOURCE_BINDINGS) {
+      rmSync(resolve(clone, "benchmarks/fixtures/checkpoint-b2", fixtureId), { recursive: true, force: true });
+    }
+
     const generated = createSuccessorSyntheticAdmittedCalibrationPackages({ root: clone, revision: sourceRevision });
     assert.deepEqual(generated.fixtures.map(({ fixture_id, source_fixture_id }) => [fixture_id, source_fixture_id]),
       CALIBRATION_SOURCE_BINDINGS.map(([fixtureId, sourceId]) => [fixtureId, sourceId]));
@@ -374,6 +380,9 @@ test("synthetic pending public packages pin repository overlays before reopening
     git(clone, "config", "user.email", "synthetic@example.invalid");
     git(clone, "config", "core.hooksPath", "/dev/null");
     const sourceRevision = pinPublicImplementationInClone(clone);
+    for (const [fixtureId] of CALIBRATION_SOURCE_BINDINGS) {
+      rmSync(resolve(clone, "benchmarks/fixtures/checkpoint-b2", fixtureId), { recursive: true, force: true });
+    }
     createSuccessorSyntheticAdmittedCalibrationPackages({ root: clone, revision: sourceRevision, admissionStatus: "admission_pending" });
     const fixturePaths = CALIBRATION_SOURCE_BINDINGS.map(([fixtureId]) => `benchmarks/fixtures/checkpoint-b2/${fixtureId}`);
     git(clone, "add", "--", ...fixturePaths);
