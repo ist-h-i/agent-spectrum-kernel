@@ -10,6 +10,7 @@ import { validatePromptSuccessorPreparation, validateSuccessorSourceScope, succe
 import { assertSuccessorAdapterFacts } from "./ask-benchmark-prompt-successor-delivery.mjs";
 import { validateSuccessorFromRepository } from "./ask-benchmark-prompt-successor-repository.mjs";
 import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
+import { assertCalibrationExecutionAdmission, assertCalibrationResultRoot, calibratedEffectiveAdmission } from "./ask-benchmark-calibration-execution-admission.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const handles = new WeakMap();
@@ -99,7 +100,7 @@ function validateNativeSourceAtFreeze({ role, source, preparation, root }) {
   return actual;
 }
 
-function authorityEvidence({ preparation, sources, scoringIdentity }) {
+function authorityEvidence({ preparation, sources, scoringIdentity, calibrationAdmissionEvidence }) {
   const authorityPath = authorityPathForSources(sources);
   return {
     schema_version: "1.1.0",
@@ -118,6 +119,7 @@ function authorityEvidence({ preparation, sources, scoringIdentity }) {
     preparation_digest: preparation.preparation_digest,
     implementation: structuredClone(preparation.implementation),
     scoring_input_identity: structuredClone(scoringIdentity),
+    calibration_execution_admission: structuredClone(calibrationAdmissionEvidence),
     scoring_inputs_verified_at_freeze: true,
     experiment_run_instance_id: sources.current_prompt.scope.run_instance_id,
     source_closures: Object.fromEntries(Object.entries(sources).map(([role, value]) => [role, sourceClosure(value)])),
@@ -135,7 +137,7 @@ function authorityEvidence({ preparation, sources, scoringIdentity }) {
   };
 }
 
-export async function openSuccessorMeasuredAuthority({ preparation, sources, scoringInputs, root = ROOT }) {
+export async function openSuccessorMeasuredAuthority({ preparation, sources, scoringInputs, calibrationAdmission, root = ROOT }) {
   ({ preparation, sources } = structuredClone({ preparation, sources }));
   successorExact(resolve(root), ROOT, "measured authority root");
   await validateSuccessorFromRepository(preparation, { root });
@@ -169,13 +171,19 @@ export async function openSuccessorMeasuredAuthority({ preparation, sources, sco
 
   const recordPath = authorityPathForSources(sources);
   const hadRecord = existsSync(recordPath);
+  const admissionEvidence = assertCalibrationExecutionAdmission(calibrationAdmission, {
+    preparation, sources, scoringInputs, requirePreflight: !hadRecord,
+  });
+  if (scoringIdentity.fixtures.some((entry) => entry.admission_overlay === null || entry.effective_admission_status !== "review_evidence_missing")) {
+    successorFail("SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION", "measured freeze requires four pinned reviewed overlay candidates");
+  }
   if (!hadRecord) {
     const current = validateNativeSourceAtFreeze({ role: "current_prompt", source: sources.current_prompt, preparation, root });
     const candidate = validateNativeSourceAtFreeze({ role: "prompt_v2", source: sources.prompt_v2, preparation, root });
     if (current.identity.run_instance_id === candidate.identity.run_instance_id) successorFail("SUCCESSOR_NATIVE_RUN_COLLISION", "measured native runs");
   }
 
-  const baseEvidence = authorityEvidence({ preparation, sources, scoringIdentity });
+  const baseEvidence = authorityEvidence({ preparation, sources, scoringIdentity, calibrationAdmissionEvidence: admissionEvidence });
   const body = { schema_version: "1.0.0", kind: "prompt_successor_measured_authority_freeze", evidence: baseEvidence };
   const expectedRecord = { ...body, record_digest: canonicalDigest(body) };
   if (!hadRecord) writeAuthorityRecordOnce(recordPath, expectedRecord);
@@ -190,6 +198,9 @@ export async function openSuccessorMeasuredAuthority({ preparation, sources, sco
     recordPath,
     recordDigest: record.record_digest,
     preparation_digest: preparation.preparation_digest,
+    preparation: structuredClone(preparation),
+    scoringInputs,
+    calibrationAdmission,
     sources: structuredClone(sources),
   });
   return handle;
@@ -201,7 +212,25 @@ function found(handle) {
   const record = readAuthorityRecord(value.recordPath);
   successorExact(record.record_digest, value.recordDigest, "measured authority persisted record");
   successorExact(record.evidence, value.baseEvidence, "measured authority persisted evidence");
+  successorExact(assertCalibrationExecutionAdmission(value.calibrationAdmission, {
+    preparation: value.preparation, sources: value.sources, scoringInputs: value.scoringInputs,
+  }), value.evidence.calibration_execution_admission, "measured authority private execution admission drift");
   return value;
+}
+
+/** #197's verified overlay, rederived from the pinned external review bytes. */
+export function successorMeasuredEffectiveAdmission(handle, fixtureId, { preparation, scope, normalizedResultsPath }) {
+  validatePromptSuccessorPreparation(preparation);
+  const value = found(handle);
+  successorExact(value.preparation_digest, preparation.preparation_digest, "measured effective admission preparation");
+  const role = scope?.prompt_role;
+  if (!Object.hasOwn(value.sources, role)) successorFail("SUCCESSOR_ROLE_INVALID", "measured effective admission scope");
+  successorExact(scope.scope_digest, value.sources[role].scope.scope_digest, "measured effective admission source scope");
+  const context = { preparation: value.preparation, sources: value.sources, scoringInputs: value.scoringInputs };
+  assertCalibrationResultRoot(value.calibrationAdmission, role, normalizedResultsPath, context);
+  return calibratedEffectiveAdmission(value.calibrationAdmission, fixtureId, {
+    ...context,
+  });
 }
 
 export function assertSuccessorMeasuredAuthority(handle, { preparation, sources }) {
