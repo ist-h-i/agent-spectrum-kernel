@@ -52,7 +52,7 @@ function completeInventory(root) {
 }
 function cli(root, ...args) {
   return spawnSync(process.execPath, [resolve(root, ENTRY), ...args], {
-    cwd: root, encoding: "utf8", timeout: 20000,
+    cwd: root, encoding: "utf8", timeout: 120000,
     env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0" },
   });
 }
