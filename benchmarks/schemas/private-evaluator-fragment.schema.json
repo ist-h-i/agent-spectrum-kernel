@@ -15,7 +15,6 @@
     "evidence_correctness",
     "under_processing",
     "over_processing",
-    "result_profile",
     "scoring_ready"
   ],
   "properties": {
@@ -38,9 +37,13 @@
   },
   "allOf": [
     {
-      "if": { "properties": { "evaluation_status": { "const": "manual_review_required" } }, "required": ["evaluation_status"] },
-      "then": { "properties": { "classification": { "type": "null" } } },
-      "else": { "required": ["classification"] }
+      "if": { "required": ["result_profile"] },
+      "then": {
+        "if": { "properties": { "evaluation_status": { "const": "manual_review_required" } }, "required": ["evaluation_status"] },
+        "then": { "properties": { "classification": { "type": "null" } } },
+        "else": { "required": ["classification"] }
+      },
+      "else": { "not": { "required": ["classification"] } }
     }
   ],
   "$defs": {

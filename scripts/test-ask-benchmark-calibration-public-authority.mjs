@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { validateRequirementRecordContract } from "./ask-benchmark-scoring-contract.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
-import { CALIBRATION_REQUIREMENTS, calibrationPublicSource, buildCalibrationEvidenceAuthority, buildCalibrationRequirementRecord, buildCalibrationCommandContract, validateCalibrationPrivateMutationAuthority, buildPendingCalibrationCandidate, buildPendingCalibrationPublicArtifacts } from "./ask-benchmark-calibration-public-authority.mjs";
+import { CALIBRATION_REQUIREMENTS, calibrationPublicSource, buildCalibrationEvidenceAuthority, buildCalibrationRequirementRecord, buildCalibrationCommandContract, validateCalibrationPrivateMutationAuthority, buildPendingCalibrationCandidate, buildPendingCalibrationPublicArtifacts, buildCalibrationEquivalenceAuthority, assertCalibrationPrivateAssets, calibrationOutputKind } from "./ask-benchmark-calibration-public-authority.mjs";
 
 test("four calibration descriptors close against frozen source inputs and full private mutation digests", () => {
   const before = readFileSync("benchmarks/fixtures/checkpoint-b2/input-manifest.json");
@@ -65,4 +66,60 @@ test("public requirements close against real scoring schema; synthetic candidate
   }
   assert.throws(() => buildPendingCalibrationCandidate({ fixtureId: "cal-session-refresh", privateAuthority: {} }), /complete private calibration candidate/u);
   assert.throws(() => buildPendingCalibrationPublicArtifacts({ admissionBase: { admission_status: "admission_pending" }, bundle: { review: { status: "pending" } } }), /verified pending candidate authority/u);
+});
+
+test("private mutation and equivalence bytes close to manifest role, path, size, and digest", () => {
+  const source = calibrationPublicSource({ fixtureId: "cal-concurrent-transfer" });
+  const mutationBytes = Buffer.from(JSON.stringify(buildCalibrationEvidenceAuthority(source).mutationAsset));
+  const equivalenceBytes = Buffer.from(JSON.stringify(buildCalibrationEquivalenceAuthority(source)));
+  const asset = (role, path, bytes) => ({ role, path, bytes: bytes.length, sha256: "sha256:" + createHash("sha256").update(bytes).digest("hex") });
+  const bundle = { asset_inventory: [
+    asset("evidence_removal_mutations", "evidence-removal-mutations.json", mutationBytes),
+    asset("equivalent_solution_rules", "equivalent-solutions.json", equivalenceBytes),
+  ] };
+  const input = { bundle, mutationBytes, equivalenceBytes };
+  const verified = assertCalibrationPrivateAssets(source, input);
+  assert.deepEqual(Object.keys(verified).sort(), ["equivalence", "equivalence_digest", "mutation", "mutation_digest"].sort());
+  assert.equal(JSON.stringify(verified).includes("remove_paths"), false);
+  assert.throws(() => assertCalibrationPrivateAssets(source, { ...input, mutationBytes: undefined }), /actual private calibration asset bytes/u);
+  assert.throws(() => assertCalibrationPrivateAssets(source, { ...input, mutationBytes: Buffer.from("{}") }), /byte identity drift/u);
+  const wrongRole = structuredClone(bundle);
+  wrongRole.asset_inventory[0].role = "oracle";
+  assert.throws(() => assertCalibrationPrivateAssets(source, { ...input, bundle: wrongRole }), /role or path/u);
+  const wrongPath = structuredClone(bundle);
+  wrongPath.asset_inventory[0].path = "other.json";
+  assert.throws(() => assertCalibrationPrivateAssets(source, { ...input, bundle: wrongPath }), /role or path/u);
+  const transplanted = calibrationPublicSource({ fixtureId: "cal-atomic-rule-batch" });
+  assert.throws(() => assertCalibrationPrivateAssets(transplanted, input), /semantics differ/u);
+  const duplicateKey = Buffer.from('{"fixture_id":"cal-concurrent-transfer","fixture_id":"cal-concurrent-transfer","mutations":[]}');
+  const duplicateBundle = structuredClone(bundle);
+  duplicateBundle.asset_inventory[0] = asset("evidence_removal_mutations", "evidence-removal-mutations.json", duplicateKey);
+  assert.throws(() => assertCalibrationPrivateAssets(source, { bundle: duplicateBundle, mutationBytes: duplicateKey, equivalenceBytes }), /duplicate JSON object key/u);
+  const drift = Buffer.from(JSON.stringify({ fixture_id: source.fixtureId, mutations: [] }));
+  const altered = structuredClone(bundle);
+  altered.asset_inventory[0] = asset("evidence_removal_mutations", "evidence-removal-mutations.json", drift);
+  assert.throws(() => assertCalibrationPrivateAssets(source, { bundle: altered, mutationBytes: drift, equivalenceBytes }), /semantics differ/u);
+});
+
+test("fixture scope is task-specific and implementation output is not findings", () => {
+  for (const fixtureId of ["cal-session-refresh", "cal-export-lease"]) {
+    const source = calibrationPublicSource({ fixtureId });
+    const scope = buildCalibrationEvidenceAuthority(source).evidenceMap.scope_boundary_authority;
+    assert.deepEqual(scope.allowed_candidate_paths, []);
+    assert.deepEqual(scope.required_candidate_paths, []);
+    assert.ok(scope.protected_candidate_paths.includes("workspace/package.json"));
+    assert.deepEqual(calibrationOutputKind(source), { declares_findings: true, output_contract_type: "findings_producing" });
+  }
+  for (const [fixtureId, expectedService, forbidden] of [
+    ["cal-atomic-rule-batch", "workspace/src/rule-service.mjs", "workspace/docs/rule-batches.md"],
+    ["cal-concurrent-transfer", "workspace/src/transfer-service.mjs", "workspace/src/serial-executor.mjs"],
+  ]) {
+    const source = calibrationPublicSource({ fixtureId });
+    const scope = buildCalibrationEvidenceAuthority(source).evidenceMap.scope_boundary_authority;
+    assert.ok(scope.allowed_candidate_paths.includes(expectedService));
+    assert.ok(scope.required_candidate_paths.includes(expectedService));
+    assert.ok(scope.protected_candidate_paths.includes(forbidden));
+    for (const path of ["workspace/package.json", forbidden]) assert.equal(scope.allowed_candidate_paths.includes(path), false);
+    assert.deepEqual(calibrationOutputKind(source), { declares_findings: false, output_contract_type: "implementation_producing" });
+  }
 });

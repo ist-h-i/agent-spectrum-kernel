@@ -2588,12 +2588,23 @@ function fragmentEnvelopeView(fragment) {
   };
 }
 
-export function validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy, requirementRecord, normalizedResult }) {
+export function validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy, requirementRecord, normalizedResult, outputContract, freezeManifest }) {
   assertBenchmarkSchemaInstance(fragment, { schemaPath: resolve(root, PRIVATE_EVALUATOR_FRAGMENT_SCHEMA_PATH), label: "private evaluator result fragment" });
   if (fragment.scoring_ready !== false) throw new Error("private evaluator fragment must remain scoring-ineligible");
   const envelopeView = fragmentEnvelopeView(fragment);
   validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult: envelopeView, normalizedResult });
-  validateBinaryScopeVerificationResult({ evaluatorResult: envelopeView, requirementRecord, normalizedResult });
+  if ((outputContract === undefined) !== (freezeManifest === undefined)) throw new Error("private fragment requires both bound output and freeze authorities");
+  if (outputContract !== undefined && (outputContract.fixture_id !== normalizedResult?.lineage?.fixture_id || freezeManifest.fixture_id !== normalizedResult?.lineage?.fixture_id)) throw new Error("private fragment public authority fixture binding drift");
+  // Direct legacy callers retain the binary contract. The generic path is available only
+  // through an explicit, matching public authority for a calibration fixture.
+  if (outputContract === undefined || outputContract.result_profile !== undefined || freezeManifest.result_profile !== undefined) {
+    if (outputContract !== undefined && stableCanonicalJson(outputContract.result_profile) !== stableCanonicalJson(freezeManifest.result_profile)) throw new Error("private fragment public result profile binding drift");
+    if (outputContract !== undefined && stableCanonicalJson(fragment.result_profile) !== stableCanonicalJson(outputContract.result_profile)) throw new Error("private fragment result profile differs from public authority");
+    validateBinaryScopeVerificationResult({ evaluatorResult: envelopeView, requirementRecord, normalizedResult });
+  } else {
+    if (normalizedResult?.lineage?.suite !== "calibration" || !calibrationSourceIdForFixture(normalizedResult.lineage.fixture_id)) throw new Error("profile-free private fragment requires a bound calibration fixture");
+    if (Object.hasOwn(fragment, "result_profile") || Object.hasOwn(fragment, "classification")) throw new Error("profile-free calibration fragment must not contain binary profile or classification");
+  }
   return structuredClone(fragment);
 }
 
@@ -2641,6 +2652,8 @@ export function adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment, author
     scoringPolicy: authority.scoringPolicy,
     requirementRecord: authority.requirementRecord,
     normalizedResult: normalized,
+    outputContract: authority.outputContract,
+    freezeManifest: authority.freezeManifest,
   });
   const lineage = normalized.lineage;
   const manifest = authority.bundleManifest;
@@ -2678,7 +2691,7 @@ export function adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment, author
     evaluation_digest: "sha256:" + "0".repeat(64),
     evaluation_status: validated.evaluation_status,
     requirement_results: structuredClone(validated.requirement_results),
-    result_profile: structuredClone(validated.result_profile),
+    ...(validated.result_profile === undefined ? {} : { result_profile: structuredClone(validated.result_profile) }),
     ...(validated.classification === undefined ? {} : { classification: validated.classification }),
     quality: fragmentObservation(validated, "verification_correctness", "fail"),
     safety: fragmentObservation(validated, "evidence_correctness", "fail"),
@@ -3178,7 +3191,7 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   if (stableCanonicalJson(evidence.repositoryDiffArtifact) !== stableCanonicalJson(originalWorkspaceAuthority.repositoryDiffArtifact)) throw new Error("persisted repository diff artifact does not match the child pre-execution authority");
   const persistedRepositoryDiffEntry = [...evidence.artifacts.values()].find(({ entry }) => entry.kind === "repository_diff");
   if (!persistedRepositoryDiffEntry || persistedRepositoryDiffEntry.read.rawByteDigest !== rawByteDigest(originalWorkspaceAuthority.repositoryDiffBytes) || Buffer.compare(persistedRepositoryDiffEntry.read.bytes, originalWorkspaceAuthority.repositoryDiffBytes) !== 0) throw new Error("persisted repository diff artifact bytes do not match the child pre-execution authority");
-  const validatedFragment = validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy: scoringInputs.scoringPolicy, requirementRecord: scoringInputs.requirementRecord, normalizedResult: normalized });
+  const validatedFragment = validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy: scoringInputs.scoringPolicy, requirementRecord: scoringInputs.requirementRecord, normalizedResult: normalized, outputContract: scoringInputs.outputContract, freezeManifest: scoringInputs.freezeManifest });
   const execution = {
     evaluatorRevision: bundle.manifest.evaluator_revision,
     runner: {

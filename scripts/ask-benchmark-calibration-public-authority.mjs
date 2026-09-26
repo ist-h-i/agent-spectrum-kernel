@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
+import { parseJsonRejectDuplicateKeys } from "./ask-benchmark-duplicate-key-json.mjs";
 import { CALIBRATION_INPUT_MANIFEST_PATH, CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
 import { computeRequirementDigest, computeRequirementRecordDigest, computeRequirementSetDigest, computeFinalAdmissionRequirementAuthorityDigest, computeFinalAdmissionRecordDigest, computeOutputContractDigest, computeScoringInputFreezeManifestDigest, resolveRequirementAdmissionBindingDigest, computePolicyManifestDigest, computeScoringPolicyDigest } from "./ask-benchmark-scoring-contract.mjs";
 import { computeCommandContractDigest, computeVerificationCommandContractDigest, logicalCommandDigest, renderedEventCommandDigest, validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
@@ -17,6 +18,18 @@ const mapId = id => id + "-basis";
 const mutationId = id => "remove-" + id + "-basis";
 const equivalenceId = id => "equivalent-" + id;
 const VERIFIED_PENDING_CANDIDATES = new WeakMap();
+const PRIVATE_ASSET_PATHS = Object.freeze({
+  evidence_removal_mutations: "evidence-removal-mutations.json",
+  equivalent_solution_rules: "equivalent-solutions.json",
+});
+const IMPLEMENTATION_ALLOWED = Object.freeze({
+  "cal-atomic-rule-batch": ["workspace/src/errors.mjs", "workspace/src/index.mjs", "workspace/src/rule-service.mjs", "workspace/src/rule-store.mjs", "workspace/src/validation.mjs", "workspace/test/rule-service.test.mjs"],
+  "cal-concurrent-transfer": ["workspace/src/account-store.mjs", "workspace/src/errors.mjs", "workspace/src/index.mjs", "workspace/src/transfer-service.mjs", "workspace/src/validation.mjs", "workspace/test/transfer-service.test.mjs"],
+});
+const IMPLEMENTATION_REQUIRED = Object.freeze({
+  "cal-atomic-rule-batch": ["workspace/src/index.mjs", "workspace/src/rule-service.mjs", "workspace/test/rule-service.test.mjs"],
+  "cal-concurrent-transfer": ["workspace/src/index.mjs", "workspace/src/transfer-service.mjs", "workspace/test/transfer-service.test.mjs"],
+});
 
 // Public scoring semantics refer only to the frozen agent-visible source.
 // Private evaluator rules and answer-bearing material are authored separately.
@@ -65,8 +78,14 @@ export function calibrationPublicSource({ root = ROOT, fixtureId }) {
 }
 
 export function buildCalibrationEvidenceAuthority(source) {
-  const scopeBase = { allowed_candidate_paths: source.visiblePaths.filter(path => path.startsWith("workspace/")),
-    required_candidate_paths: [], protected_candidate_paths: ["task.md"],
+  const allowed = IMPLEMENTATION_ALLOWED[source.fixtureId] ?? [];
+  const required = IMPLEMENTATION_REQUIRED[source.fixtureId] ?? [];
+  if (allowed.some(path => !source.visiblePaths.includes(path)) || required.some(path => !allowed.includes(path))) {
+    throw new Error("calibration candidate scope differs from frozen source input");
+  }
+  const scopeBase = { allowed_candidate_paths: allowed,
+    required_candidate_paths: required,
+    protected_candidate_paths: source.visiblePaths.filter(path => !allowed.includes(path)),
     unmanaged_additions: "forbidden", unmanaged_deletions: "forbidden" };
   const maps = source.requirements.map(([id, , paths]) => ({ evidence_map_id: mapId(id), agent_visible_paths: paths }));
   const mutations = source.requirements.map(([id, , paths]) => {
@@ -132,20 +151,31 @@ export function buildCalibrationEquivalenceAuthority(source) {
   return { fixture_id: source.fixtureId, rules };
 }
 
-export function assertCalibrationPrivateAssets(source, { mutationAsset, equivalenceAsset }) {
+function verifyPrivateAssetBytes(bundle, role, bytes, expectedValue) {
+  if (!Buffer.isBuffer(bytes) && !(bytes instanceof Uint8Array)) throw new Error("actual private calibration asset bytes are required");
+  const inventory = bundle.asset_inventory.filter(asset => asset.role === role);
+  if (inventory.length !== 1 || inventory[0].path !== PRIVATE_ASSET_PATHS[role]) throw new Error("private calibration asset role or path is invalid");
+  const actual = Buffer.from(bytes);
+  if (inventory[0].bytes !== actual.length || inventory[0].sha256 !== sha256(actual)) throw new Error("private calibration asset byte identity drift");
+  const parsed = parseJsonRejectDuplicateKeys(actual, "private calibration asset");
+  if (stableCanonicalJson(parsed) !== stableCanonicalJson(expectedValue)) throw new Error("private calibration asset semantics differ from frozen public requirements");
+  return { role, path: inventory[0].path, bytes: actual.length, sha256: inventory[0].sha256 };
+}
+
+export function assertCalibrationPrivateAssets(source, { bundle, mutationBytes, equivalenceBytes }) {
   const expectedMutation = buildCalibrationEvidenceAuthority(source).mutationAsset;
   const expectedEquivalence = buildCalibrationEquivalenceAuthority(source);
-  if (canonicalDigest(mutationAsset) !== canonicalDigest(expectedMutation)) throw new Error("calibration private mutation authority differs from frozen public scoring semantics");
-  if (canonicalDigest(equivalenceAsset) !== canonicalDigest(expectedEquivalence)) throw new Error("calibration private equivalence authority differs from frozen public scoring semantics");
-  return { mutation_digest: canonicalDigest(expectedMutation), equivalence_digest: canonicalDigest(expectedEquivalence) };
+  const mutation = verifyPrivateAssetBytes(bundle, "evidence_removal_mutations", mutationBytes, expectedMutation);
+  const equivalence = verifyPrivateAssetBytes(bundle, "equivalent_solution_rules", equivalenceBytes, expectedEquivalence);
+  return { mutation_digest: canonicalDigest(expectedMutation), equivalence_digest: canonicalDigest(expectedEquivalence), mutation, equivalence };
 }
 
 export function buildPendingCalibrationCandidate({ root = ROOT, fixtureId, privateAuthority }) {
   // The reviewed promotion contract is intentionally separate. This builder
   // cannot turn pending inputs into an admitted scoring authority.
   const source = calibrationPublicSource({ root, fixtureId });
-  const { bundle, independenceStatement, mutationAsset, equivalenceAsset } = privateAuthority ?? {};
-  if (!bundle || !independenceStatement || !mutationAsset || !equivalenceAsset) throw new Error("complete private calibration candidate is required");
+  const { bundle, independenceStatement, mutationBytes, equivalenceBytes } = privateAuthority ?? {};
+  if (!bundle || !independenceStatement || !mutationBytes || !equivalenceBytes) throw new Error("complete private calibration candidate is required");
   assertBenchmarkSchemaInstance(bundle, { schemaPath: resolve(root, "benchmarks/schemas/private-evaluator-bundle.schema.json"), label: "private calibration bundle" });
   if (bundle.evaluator_bundle_id !== computeEvaluatorBundleId(bundle) || bundle.evaluator_bundle_digest !== computeEvaluatorBundleDigest(bundle)) throw new Error("private calibration bundle identity drift");
   if (bundle.fixture_identity.fixture_id !== fixtureId || bundle.fixture_identity.suite !== "calibration"
@@ -155,7 +185,7 @@ export function buildPendingCalibrationCandidate({ root = ROOT, fixtureId, priva
     expectedRevision: bundle.evaluator_revision, expectedGeneratorSourceDigest: bundle.generator.source_digest,
     label: "calibration evaluator source identity" });
   validateIndependenceStatement({ statement: independenceStatement, manifest: bundle, root });
-  const privateDigests = assertCalibrationPrivateAssets(source, { mutationAsset, equivalenceAsset });
+  const privateDigests = assertCalibrationPrivateAssets(source, { bundle, mutationBytes, equivalenceBytes });
   const catalog = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-catalog.json")));
   const policy = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-policy-manifest.json")));
   const scoring = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-scoring-policy.json")));
@@ -174,7 +204,7 @@ export function buildPendingCalibrationCandidate({ root = ROOT, fixtureId, priva
     evaluator_byte_count: bundle.asset_inventory.reduce((sum, asset) => sum + asset.bytes, 0),
     evaluator_requirement_count: source.requirements.length,
     evidence_map_ids: evidenceMap.maps.map(entry => entry.evidence_map_id),
-    mutation_set_ids: mutationAsset.mutations.map(entry => entry.mutation_id),
+    mutation_set_ids: buildCalibrationEvidenceAuthority(source).mutationAsset.mutations.map(entry => entry.mutation_id),
     reviewer_record_id: "review-" + fixtureId + "-pending", admission_revision: 1,
     admission_status: "admission_pending", evaluator_source_identity: bundle.evaluator_source_identity,
   };
@@ -246,7 +276,7 @@ export function buildPendingCalibrationPublicArtifacts(candidate) {
     verification_command_contract_digest: command.contract_digest,
     scope_boundary_authority_path: root + "/evidence-map.json",
     scope_boundary_authority_digest: evidenceMap.scope_boundary_authority.authority_digest,
-    declares_findings: true, ...authorityBinding,
+    declares_findings: calibrationOutputKind(source).declares_findings, ...authorityBinding,
   };
   const output = { ...outputBase, output_contract_digest: computeOutputContractDigest(outputBase) };
   const outputPath = put("output-contract.json", output);
@@ -260,7 +290,7 @@ export function buildPendingCalibrationPublicArtifacts(candidate) {
     difficulty: catalogFixture.difficulty, repetitions: catalogFixture.repetitions,
     risk_boundary: catalogFixture.risk_boundary, capability_families: catalogFixture.capability_families,
     evidence_topologies: catalogFixture.evidence_topologies, outcome_dimensions: catalogFixture.outcome_dimensions,
-    output_contract_type: "findings_producing", requirement_record_id: requirement.requirement_record_id,
+    output_contract_type: calibrationOutputKind(source).output_contract_type, requirement_record_id: requirement.requirement_record_id,
     output_contract_id: output.output_contract_id, evaluator_bundle_id: bundle.evaluator_bundle_id,
     evaluator_bundle_digest: bundle.evaluator_bundle_digest, evaluator_byte_count: admission.evaluator_byte_count,
     review_status: "pending_independent_review", measured_execution_performed: false,
@@ -287,4 +317,10 @@ export function buildPendingCalibrationPublicArtifacts(candidate) {
   const freeze = { ...base, manifest_digest: computeScoringInputFreezeManifestDigest(base) };
   put("scoring-input-freeze-manifest.json", freeze);
   return { documents, admission, requirement, reference, output, manifest, freeze, metadata };
+}
+
+export function calibrationOutputKind(source) {
+  if (!CALIBRATION_REQUIREMENTS[source?.fixtureId]) throw new Error("unknown calibration fixture");
+  const review = ["cal-session-refresh", "cal-export-lease"].includes(source.fixtureId);
+  return { declares_findings: review, output_contract_type: review ? "findings_producing" : "implementation_producing" };
 }
