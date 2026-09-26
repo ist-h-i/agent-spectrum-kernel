@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "cal-export-lease",
+  "fixture_role": "calibration",
+  "suite": "calibration",
+  "task_class": "review",
+  "domain": "backend_api",
+  "difficulty": "hard",
+  "repetitions": 3,
+  "risk_boundary": "none",
+  "capability_families": [
+    "review_precision",
+    "state_consistency"
+  ],
+  "evidence_topologies": [
+    "api_contract_and_callers",
+    "review_diff_and_tests"
+  ],
+  "outcome_dimensions": [
+    "reliability",
+    "review_precision"
+  ],
+  "output_contract_type": "findings_producing",
+  "requirement_record_id": "requirement-record-cal-export-lease",
+  "output_contract_id": "output-contract-cal-export-lease",
+  "evaluator_bundle_id": "evaluator-5f248e2502158f26c864f7b8dd69f2e0d041c135167373a41bd8938df51123b7",
+  "evaluator_bundle_digest": "sha256:3111305e3eee8edbbb04bf8488be2008c15f8b14aed97334456db9d6c231947a",
+  "evaluator_byte_count": 23045,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:e42692ed375b88df54642cfbe12c25a9ffc0aa30fb6cf5e6b58b6c9fcd96099d"
+}

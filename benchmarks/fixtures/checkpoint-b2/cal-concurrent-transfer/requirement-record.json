@@ -1,0 +1,86 @@
+{
+  "requirement_record_id": "requirement-record-cal-concurrent-transfer",
+  "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+  "requirement_record_path": "benchmarks/fixtures/checkpoint-b2/cal-concurrent-transfer/requirement-record.json",
+  "fixture_id": "cal-concurrent-transfer",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+  "admission_record_digest": "sha256:b620e8fa7ac0c4fc8184e81f5270830f6434d9070a3b7c803a760b662167c40f",
+  "requirements": [
+    {
+      "requirement_id": "atomic-transfer-and-audit",
+      "requirement_kind": "weighted",
+      "max_points": 4,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "atomic-transfer-and-audit-basis"
+      ],
+      "mutation_ids": [
+        "remove-atomic-transfer-and-audit-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-atomic-transfer-and-audit"
+      ],
+      "finding_group_id": "atomic-transfer-and-audit-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:a1945627721c28e167c4b51fd35f9d27605ec6566b57b1f9a36dab75b63a9d93"
+    },
+    {
+      "requirement_id": "concurrent-idempotency",
+      "requirement_kind": "weighted",
+      "max_points": 3,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "concurrent-idempotency-basis"
+      ],
+      "mutation_ids": [
+        "remove-concurrent-idempotency-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-concurrent-idempotency"
+      ],
+      "finding_group_id": "concurrent-idempotency-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:e15bc25122bc0ba73ba16a1541914ac0d97c7aecc2d19c7a18326b8e88bb194d"
+    },
+    {
+      "requirement_id": "strict-contract-and-isolation",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "strict-contract-and-isolation-basis"
+      ],
+      "mutation_ids": [
+        "remove-strict-contract-and-isolation-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-strict-contract-and-isolation"
+      ],
+      "finding_group_id": "strict-contract-and-isolation-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:74191299aa94d2bfd5933f90a16111d2a7c8127cf2f2f43ae6f7253407fec147"
+    },
+    {
+      "requirement_id": "verification-quality",
+      "requirement_kind": "weighted",
+      "max_points": 1,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "verification-quality-basis"
+      ],
+      "mutation_ids": [
+        "remove-verification-quality-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-verification-quality"
+      ],
+      "finding_group_id": "verification-quality-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:9f0815aab2de28f71b8adc6c6035bae04fbdb48d906aa5001483ce4f621fd2c0"
+    }
+  ],
+  "requirement_set_digest": "sha256:62ef2a25dca103b47e0760d82f520d90c6b2c1ea3a8cab9b081a9c269fbee359",
+  "requirement_record_digest": "sha256:b91c80c9676f120d64cd187022a752dbaddbd50cd9611d019fc0a45bc820ca55"
+}

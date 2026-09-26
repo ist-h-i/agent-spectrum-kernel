@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "cal-concurrent-transfer",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/src/account-store.mjs",
+      "workspace/src/errors.mjs",
+      "workspace/src/index.mjs",
+      "workspace/src/transfer-service.mjs",
+      "workspace/src/validation.mjs",
+      "workspace/test/transfer-service.test.mjs"
+    ],
+    "required_candidate_paths": [
+      "workspace/src/index.mjs",
+      "workspace/src/transfer-service.mjs"
+    ],
+    "allowed_new_candidate_path_prefixes": [
+      "workspace/test/"
+    ],
+    "required_changed_candidate_path_prefixes": [
+      "workspace/test/"
+    ],
+    "protected_candidate_paths": [
+      "task.md",
+      "workspace/docs/transfer.schema.json",
+      "workspace/docs/transfers.md",
+      "workspace/package.json",
+      "workspace/src/serial-executor.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "authority_digest": "sha256:53b70ef89ad6692ecd1e6c052199a52f9c59f2014f85b7266440bc1693e33b7c"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "atomic-transfer-and-audit-basis",
+      "agent_visible_paths": [
+        "workspace/docs/transfers.md",
+        "workspace/src/account-store.mjs",
+        "workspace/src/transfer-service.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "concurrent-idempotency-basis",
+      "agent_visible_paths": [
+        "workspace/src/serial-executor.mjs",
+        "workspace/src/transfer-service.mjs",
+        "workspace/test/transfer-service.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "strict-contract-and-isolation-basis",
+      "agent_visible_paths": [
+        "workspace/docs/transfer.schema.json",
+        "workspace/src/validation.mjs",
+        "workspace/src/index.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "verification-quality-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/test/transfer-service.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-atomic-transfer-and-audit-basis",
+      "target_evidence_map_id": "atomic-transfer-and-audit-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:df8a7e0e9ec66d5dc610353df0a785c159b4cbe908cb04f81d5ced02abcf0226"
+    },
+    {
+      "mutation_id": "remove-concurrent-idempotency-basis",
+      "target_evidence_map_id": "concurrent-idempotency-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:0a5cecbda6a46d774fd28a3662872d590b78a1b4cc5ef1572fcad1c094ae0a93"
+    },
+    {
+      "mutation_id": "remove-strict-contract-and-isolation-basis",
+      "target_evidence_map_id": "strict-contract-and-isolation-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:9346c5aaf02359b6919080272dad1a40006184ba46dd3049dfa216f8ed4c44a5"
+    },
+    {
+      "mutation_id": "remove-verification-quality-basis",
+      "target_evidence_map_id": "verification-quality-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:299558235917afa78b28aec842e95540a743eddcc05d7c940d1d1c8ba5db7124"
+    }
+  ]
+}

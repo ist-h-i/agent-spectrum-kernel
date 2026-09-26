@@ -1,0 +1,97 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "cal-atomic-rule-batch",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/src/errors.mjs",
+      "workspace/src/index.mjs",
+      "workspace/src/rule-service.mjs",
+      "workspace/src/rule-store.mjs",
+      "workspace/src/validation.mjs",
+      "workspace/test/rule-service.test.mjs"
+    ],
+    "required_candidate_paths": [
+      "workspace/src/index.mjs",
+      "workspace/src/rule-service.mjs"
+    ],
+    "allowed_new_candidate_path_prefixes": [
+      "workspace/test/"
+    ],
+    "required_changed_candidate_path_prefixes": [
+      "workspace/test/"
+    ],
+    "protected_candidate_paths": [
+      "task.md",
+      "workspace/docs/rule-batch.schema.json",
+      "workspace/docs/rule-batches.md",
+      "workspace/package.json"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "authority_digest": "sha256:61f77a13e27370481e0cd7b9e7551c67e64a70988b09c829fbb1b82d002bf19e"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "atomic-state-and-version-basis",
+      "agent_visible_paths": [
+        "workspace/docs/rule-batches.md",
+        "workspace/src/rule-store.mjs",
+        "workspace/src/rule-service.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "strict-input-and-canonicalization-basis",
+      "agent_visible_paths": [
+        "workspace/docs/rule-batch.schema.json",
+        "workspace/src/validation.mjs",
+        "workspace/src/errors.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "idempotency-and-isolation-basis",
+      "agent_visible_paths": [
+        "workspace/src/rule-service.mjs",
+        "workspace/src/rule-store.mjs",
+        "workspace/src/index.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "verification-quality-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/test/rule-service.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-atomic-state-and-version-basis",
+      "target_evidence_map_id": "atomic-state-and-version-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:dba1283ff99654992308ec18667d139a441d57aad8331746a7d6cce2b2d6a539"
+    },
+    {
+      "mutation_id": "remove-strict-input-and-canonicalization-basis",
+      "target_evidence_map_id": "strict-input-and-canonicalization-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:e298cd55bfb61597d9b13f6b5fbd7260e57e3cffa6df545c655127d9a27af941"
+    },
+    {
+      "mutation_id": "remove-idempotency-and-isolation-basis",
+      "target_evidence_map_id": "idempotency-and-isolation-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:56e69edeb2928e4e54115139e3546d0694b5c13a09c0e6171293320b2830aded"
+    },
+    {
+      "mutation_id": "remove-verification-quality-basis",
+      "target_evidence_map_id": "verification-quality-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:27ef981b2abd36e6f005b1f5b5f8dcc05b76d27bfe06de12d1ecc5b25b98f857"
+    }
+  ]
+}

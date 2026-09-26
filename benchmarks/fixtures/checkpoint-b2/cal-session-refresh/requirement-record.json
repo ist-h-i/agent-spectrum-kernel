@@ -1,0 +1,86 @@
+{
+  "requirement_record_id": "requirement-record-cal-session-refresh",
+  "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+  "requirement_record_path": "benchmarks/fixtures/checkpoint-b2/cal-session-refresh/requirement-record.json",
+  "fixture_id": "cal-session-refresh",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+  "admission_record_digest": "sha256:edd1d1eb2340b30ccec5c93418303f311d47c2a0f57413642e95972579d050bf",
+  "requirements": [
+    {
+      "requirement_id": "rotation-atomicity",
+      "requirement_kind": "weighted",
+      "max_points": 4,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "rotation-atomicity-basis"
+      ],
+      "mutation_ids": [
+        "remove-rotation-atomicity-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-rotation-atomicity"
+      ],
+      "finding_group_id": "rotation-atomicity-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:df3628ac0d18abce41b6c39cd0cb6beabf400993a17a2c88643d215127b3a40a"
+    },
+    {
+      "requirement_id": "current-account-authority",
+      "requirement_kind": "weighted",
+      "max_points": 3,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "current-account-authority-basis"
+      ],
+      "mutation_ids": [
+        "remove-current-account-authority-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-current-account-authority"
+      ],
+      "finding_group_id": "current-account-authority-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:66cf0c95e1dcff67a79f20b9fe206f8cb3b805cd1ce5e8cdf9f6b51fe8dd7377"
+    },
+    {
+      "requirement_id": "expiry-and-recovery",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "expiry-and-recovery-basis"
+      ],
+      "mutation_ids": [
+        "remove-expiry-and-recovery-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-expiry-and-recovery"
+      ],
+      "finding_group_id": "expiry-and-recovery-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:878acd3b8868b30128f5fb39ad46088a54733bd76215420a763f678d03faed54"
+    },
+    {
+      "requirement_id": "review-evidence",
+      "requirement_kind": "weighted",
+      "max_points": 1,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "review-evidence-basis"
+      ],
+      "mutation_ids": [
+        "remove-review-evidence-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-review-evidence"
+      ],
+      "finding_group_id": "review-evidence-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:29a7d3a4f3e9daf4eb88ccc77fcdb5247f41e167d74ec19ff3d8b8bfb1a4385a"
+    }
+  ],
+  "requirement_set_digest": "sha256:e1e8baa8e952bf7b05d6b6a4d7e2ee5c658b8099da53532ef4c98aba4160ebf4",
+  "requirement_record_digest": "sha256:b04a818818a263b0bb283aa7bca7bf5ab2c9b9a68f4c6908099a29065ce6052a"
+}

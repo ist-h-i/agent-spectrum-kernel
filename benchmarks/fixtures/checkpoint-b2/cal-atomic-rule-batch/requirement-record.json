@@ -1,0 +1,86 @@
+{
+  "requirement_record_id": "requirement-record-cal-atomic-rule-batch",
+  "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+  "requirement_record_path": "benchmarks/fixtures/checkpoint-b2/cal-atomic-rule-batch/requirement-record.json",
+  "fixture_id": "cal-atomic-rule-batch",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+  "admission_record_digest": "sha256:5830f97ac7405a9db8ecafe16809112add04a4374cb67a7e49305f713d39662b",
+  "requirements": [
+    {
+      "requirement_id": "atomic-state-and-version",
+      "requirement_kind": "weighted",
+      "max_points": 4,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "atomic-state-and-version-basis"
+      ],
+      "mutation_ids": [
+        "remove-atomic-state-and-version-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-atomic-state-and-version"
+      ],
+      "finding_group_id": "atomic-state-and-version-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:490068790e652e357815e9582d500d541df96e00c7dfed20831898ffa024d6b6"
+    },
+    {
+      "requirement_id": "strict-input-and-canonicalization",
+      "requirement_kind": "weighted",
+      "max_points": 3,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "strict-input-and-canonicalization-basis"
+      ],
+      "mutation_ids": [
+        "remove-strict-input-and-canonicalization-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-strict-input-and-canonicalization"
+      ],
+      "finding_group_id": "strict-input-and-canonicalization-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:9c24ae3ab68523950350c6554853a97e76841243b997a33c97c320463a7fefd8"
+    },
+    {
+      "requirement_id": "idempotency-and-isolation",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "idempotency-and-isolation-basis"
+      ],
+      "mutation_ids": [
+        "remove-idempotency-and-isolation-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-idempotency-and-isolation"
+      ],
+      "finding_group_id": "idempotency-and-isolation-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:92ac6bf83ad108ceca49bfaa6ad117843888f51875de48d43bc7c37db2ce31f0"
+    },
+    {
+      "requirement_id": "verification-quality",
+      "requirement_kind": "weighted",
+      "max_points": 1,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "verification-quality-basis"
+      ],
+      "mutation_ids": [
+        "remove-verification-quality-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-verification-quality"
+      ],
+      "finding_group_id": "verification-quality-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:9f0815aab2de28f71b8adc6c6035bae04fbdb48d906aa5001483ce4f621fd2c0"
+    }
+  ],
+  "requirement_set_digest": "sha256:31f92d3aecf0ad60ae126a798b7fe8e7015366792048f65579130a9229ac5b4c",
+  "requirement_record_digest": "sha256:92f4d4a0ef19175e44fafb2762695f368f5bdac7426d041e4c8347d7e0ca8bf5"
+}

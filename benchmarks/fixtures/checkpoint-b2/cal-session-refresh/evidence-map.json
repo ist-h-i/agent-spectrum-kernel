@@ -1,0 +1,96 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "cal-session-refresh",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [],
+    "required_candidate_paths": [],
+    "allowed_new_candidate_path_prefixes": [],
+    "required_changed_candidate_path_prefixes": [],
+    "protected_candidate_paths": [
+      "task.md",
+      "workspace/docs/session.schema.json",
+      "workspace/docs/sessions.md",
+      "workspace/package.json",
+      "workspace/pr.diff",
+      "workspace/src/account-store.mjs",
+      "workspace/src/auth-service.mjs",
+      "workspace/src/errors.mjs",
+      "workspace/src/http-handlers.mjs",
+      "workspace/src/session-store.mjs",
+      "workspace/src/tokens.mjs",
+      "workspace/test/auth-service.test.mjs",
+      "workspace/test/http-handlers.test.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "authority_digest": "sha256:6094e8449ecf1edb4d50aafb966bf328731641ef71a2a6717310c0dc2a26dc18"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "rotation-atomicity-basis",
+      "agent_visible_paths": [
+        "workspace/docs/sessions.md",
+        "workspace/src/auth-service.mjs",
+        "workspace/src/session-store.mjs",
+        "workspace/test/auth-service.test.mjs",
+        "workspace/pr.diff"
+      ]
+    },
+    {
+      "evidence_map_id": "current-account-authority-basis",
+      "agent_visible_paths": [
+        "workspace/docs/session.schema.json",
+        "workspace/src/account-store.mjs",
+        "workspace/src/http-handlers.mjs",
+        "workspace/pr.diff"
+      ]
+    },
+    {
+      "evidence_map_id": "expiry-and-recovery-basis",
+      "agent_visible_paths": [
+        "workspace/src/tokens.mjs",
+        "workspace/src/errors.mjs",
+        "workspace/test/http-handlers.test.mjs",
+        "workspace/pr.diff"
+      ]
+    },
+    {
+      "evidence_map_id": "review-evidence-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/pr.diff",
+        "workspace/package.json"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-rotation-atomicity-basis",
+      "target_evidence_map_id": "rotation-atomicity-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:090000bbcf436f9dc05962a0e8026b63888783a6222ca547e7b07f700d6d8d63"
+    },
+    {
+      "mutation_id": "remove-current-account-authority-basis",
+      "target_evidence_map_id": "current-account-authority-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:9fa7f454e4a91a359c5a289bd0d868effdde8860f04059af41f4adac48bc6107"
+    },
+    {
+      "mutation_id": "remove-expiry-and-recovery-basis",
+      "target_evidence_map_id": "expiry-and-recovery-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:9928997af88eef1b615b2aa5fee1eda80d4ff91111a4daafc040d898c906cb07"
+    },
+    {
+      "mutation_id": "remove-review-evidence-basis",
+      "target_evidence_map_id": "review-evidence-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:07287dd3150f40a992b1cd497696ce091cda1ffceb64352db977e4146ea38c34"
+    }
+  ]
+}
