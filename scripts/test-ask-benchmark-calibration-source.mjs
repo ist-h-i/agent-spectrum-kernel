@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { CALIBRATION_INPUT_MANIFEST_SHA256, CALIBRATION_SOURCE_BINDINGS, resolvePortfolioFixtureSource, assertSuccessorCalibrationConfig } from "./ask-benchmark-calibration-source.mjs";
 import { computeVerificationCommandContractDigest } from "./ask-benchmark-command-evidence.mjs";
-import { deriveEvaluatorAuthorityManifest, evaluatorAuthorityPathsForFixture, validateEvaluatorAuthorityManifest } from "./ask-benchmark-evaluator-boundary.mjs";
+import { computeIndependenceStatementDigest, deriveEvaluatorAuthorityManifest, evaluatorAuthorityPathsForFixture, validateEvaluatorAuthorityManifest, validateIndependenceStatement } from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { computeRequirementRecordDigest, computeRequirementSetDigest } from "./ask-benchmark-scoring-contract.mjs";
 
@@ -124,4 +124,44 @@ test("ordinary evaluator authority retains per-fixture input and catalog entry",
   const manifest = deriveEvaluatorAuthorityManifest({ buffers, evaluatorRevision });
   assert.equal(manifest.file_inventory[0].path, inputPath);
   assert.deepEqual(validateEvaluatorAuthorityManifest({ manifest, buffers, evaluatorRevision, root }), manifest);
+});
+
+function calibrationIndependence(fixtureId, sourcePath = sharedInputPath) {
+  const bytes = readFileSync(resolve(root, sourcePath));
+  const generator = { id: "calibration-test-generator", version: "1", source_digest: sharedInputDigest };
+  const base = {
+    schema_version: "1.1.0", fixture_id: fixtureId, generator_role_identity: generator,
+    generation_date: "2026-09-26", generation_revision: "b".repeat(40),
+    frozen_candidate_input: { public_source_path: sourcePath,
+      raw_byte_digest: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+      digest: canonicalDigest(JSON.parse(bytes)) },
+    source_classification: ["frozen_agent_visible_fixture"],
+    excluded_source_classification: ["public_answer_sources"],
+    measured_output_used: false, measured_result_used: false,
+    author_scratch: { used: false, scope: "test", contamination_assessment: { state: "not_used", evidence_basis: "test" } },
+    contaminated_issues_193_196_as_oracle_source: { state: "not_used", evidence_basis: "test" },
+    issue_194_body_used: { state: "not_used", evidence_basis: "test" },
+    issue_194_edit_history_used: { state: "not_used", evidence_basis: "test" },
+    issue_194_legacy_answer_structure_used: { state: "not_used", evidence_basis: "test" },
+  };
+  const statement = { ...base, statement_digest: computeIndependenceStatementDigest(base) };
+  const manifest = { fixture_identity: { fixture_id: fixtureId }, generator,
+    evaluator_revision: base.generation_revision,
+    input_identity: { fixture_input_digest: statement.frozen_candidate_input.raw_byte_digest },
+    independence: { statement_digest: statement.statement_digest,
+      public_answer_sources_used: false, generated_without_agent_output: true,
+      measured_agent_access_allowed: false } };
+  return { statement, manifest };
+}
+
+for (const [fixtureId] of CALIBRATION_SOURCE_BINDINGS) {
+  test(`${fixtureId} private independence binds the shared source entry`, () => {
+    const pair = calibrationIndependence(fixtureId);
+    assert.equal(validateIndependenceStatement({ ...pair, root }).fixture_id, fixtureId);
+  });
+}
+
+test("calibration private independence rejects another public source path", () => {
+  const pair = calibrationIndependence("cal-session-refresh", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json");
+  assert.throws(() => validateIndependenceStatement({ ...pair, root }), /calibration input source path mismatch/u);
 });

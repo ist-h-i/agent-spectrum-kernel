@@ -2477,7 +2477,11 @@ export function validateIndependenceStatement({ statement, manifest, root = null
     const source = readJsonArtifact(sourcePath, "private independence frozen public source", { publicArtifact: true });
     if (rawByteDigest(source.bytes) !== statement.frozen_candidate_input.raw_byte_digest) throw new Error("private independence frozen public source raw-byte digest drift");
     if (canonicalDigest(source.value) !== statement.frozen_candidate_input.digest) throw new Error("private independence frozen public source semantic digest drift");
-    const fixture = source.value.fixtures?.[manifest.fixture_identity.fixture_id];
+    const calibrationSourceId = calibrationSourceIdForFixture(manifest.fixture_identity.fixture_id);
+    if (calibrationSourceId && statement.frozen_candidate_input.public_source_path !== CALIBRATION_INPUT_MANIFEST_PATH) {
+      throw new Error("private independence calibration input source path mismatch");
+    }
+    const fixture = source.value.fixtures?.[calibrationSourceId ?? manifest.fixture_identity.fixture_id];
     if (!fixture) throw new Error("private independence frozen public source fixture binding is missing");
   }
   if (statement.measured_output_used !== false || statement.measured_result_used !== false) throw new Error("private independence statement must exclude measured evidence");
