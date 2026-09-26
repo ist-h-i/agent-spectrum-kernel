@@ -456,10 +456,7 @@ await test("F3: successor input traverses the real native runner without a provi
     await check("the same contained-runner timeout path rejects a hanging native fake (ordinary-path control)", () => {
       // Deliberately ordinary path: do not weaken the successor's frozen 900000ms
       // contract to shorten this test or claim we waited for its full deadline.
-      // CI can spend over a second in source/run setup before the child reaches
-      // its stdin capture. Keep the control short relative to 900000ms while
-      // giving the native child time to start on a loaded runner.
-      const s = scenario("timeout", 15000); const nativeCase = plan.cases.find((entry) => entry.adapter_track === "codex" && entry.condition === "full_ask").case_id;
+      const s = scenario("timeout", 1200); const nativeCase = plan.cases.find((entry) => entry.adapter_track === "codex" && entry.condition === "full_ask").case_id;
       const execution = { ...common, runDir: resolve(s.directory, "ordinary-control") };
       const before = nativeCaptureIds(captures);
       const result = s.invoke(() => executePortfolio({ ...execution, adapter: "codex", runtimeConfigPath: s.runtimeConfigPath, agentBin, caseId: nativeCase, maxCases: 1 }));
@@ -471,7 +468,7 @@ await test("F3: successor input traverses the real native runner without a provi
       assert.ok(actual.terminalWorkspaceAuthority);
       const pid = Number(readFileSync(resolve(captures, `${capture.id}.child`), "utf8").trim());
       assertTerminatedChild(pid, "timeout"); assert.equal(existsSync(capture.meta[0]), false);
-      evidence.timeout_limit = { observed_path: "shared_runner_ordinary_control", observed_timeout_ms: 15000, successor_deadline_ms: 900000, successor_full_deadline_elapsed: false };
+      evidence.timeout_limit = { observed_path: "shared_runner_ordinary_control", observed_timeout_ms: 1200, successor_deadline_ms: 900000, successor_full_deadline_elapsed: false };
     });
   } finally {
     evidence.final_status = git("status", "--porcelain", "--untracked-files=normal");

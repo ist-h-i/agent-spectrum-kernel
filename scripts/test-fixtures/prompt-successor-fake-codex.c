@@ -89,7 +89,9 @@ int main(int argc, char **argv) {
       if (i + 1 >= argc - 1) return 64;
       const char *value = argv[++i];
       if (!strcmp(arg, "--model") && strcmp(value, "synthetic-native-fake-not-a-service")) return 64;
-      if (!strcmp(arg, "--sandbox")) return 64;
+      /* The ordinary contained-runner timeout control still uses the legacy
+       * workspace-write flag. Successor sessions use the explicit profile. */
+      if (!strcmp(arg, "--sandbox") && (strcmp(mode, "timeout") || strcmp(value, "workspace-write"))) return 64;
       if (!strcmp(arg, "-c") && strcmp(value, "model_reasoning_effort=\"medium\"") && strcmp(value, "approval_policy=\"never\"")
           && strcmp(value, "default_permissions=\"ask_issue291\"") && strcmp(value, "permissions.ask_issue291.extends=\":workspace\"")
           && strcmp(value, "permissions.ask_issue291.network.enabled=false")
