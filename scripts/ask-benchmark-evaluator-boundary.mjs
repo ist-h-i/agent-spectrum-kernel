@@ -60,6 +60,8 @@ const AUTHORITY_JSON_STRINGIFY = JSON.stringify;
 const AUTHORITY_NODE_EXECUTABLE = process.execPath;
 const ORIGINAL_EXECUTION_AUTHORITIES = new WeakMap();
 const PRODUCTION_EXECUTION_AUTHORITIES = new WeakMap();
+const VERIFIED_FINAL_OUTPUT_EVIDENCE_PATH = "verified-agent-final.json";
+const MAX_VERIFIED_FINAL_OUTPUT_BYTES = 1024 * 1024;
 
 export const EVALUATOR_REFERENCE_SCHEMA_PATH = "benchmarks/schemas/evaluator-reference.schema.json";
 export const PRIVATE_EVALUATOR_BUNDLE_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-bundle.schema.json";
@@ -2075,6 +2077,54 @@ function materializeVerifiedFrozenAuthorityWorkspace({ evaluationRoot, source })
   return materialized;
 }
 
+function verifiedFinalOutputBytesForPrivateEvaluation({ root, runDir, normalized, execution }) {
+  const lineage = normalized?.lineage;
+  if (!lineage || lineage.run_instance_id !== execution.run_instance_id || lineage.case_id !== execution.case_id || lineage.attempt !== execution.attempt) {
+    throw new Error("private final output lineage differs from verified terminal execution");
+  }
+  const expectedDigest = lineage.final_output_digest;
+  const expectedBytes = lineage.final_output_bytes;
+  if (expectedDigest === null && expectedBytes === null) return null;
+  if (!/^sha256:[a-f0-9]{64}$/u.test(expectedDigest ?? "") || !Number.isInteger(expectedBytes) || expectedBytes < 1 || expectedBytes > MAX_VERIFIED_FINAL_OUTPUT_BYTES) {
+    throw new Error("private final output normalized identity is invalid");
+  }
+  const runRoot = assertRealDirectory(runDir, "private final output run root");
+  const relativePath = `cases/${lineage.case_id}/attempts/${lineage.attempt}/final.json`;
+  const finalPath = resolveAuthorityArtifactPath(runRoot, relativePath, "private final output source");
+  const final = readStableFile(finalPath, "private final output source", MAX_VERIFIED_FINAL_OUTPUT_BYTES, { allowEmpty: false });
+  validateSealedPrivateFinalOutputEvidence({
+    root, normalized,
+    candidateAuthority: { kind: "verified_terminal_candidate", run_instance_id: execution.run_instance_id, case_id: execution.case_id, attempt: execution.attempt },
+    evidenceBuffers: new Map([[VERIFIED_FINAL_OUTPUT_EVIDENCE_PATH, final.bytes]]),
+  });
+  return final.bytes;
+}
+
+export function validateSealedPrivateFinalOutputEvidence({ root, normalized, candidateAuthority, evidenceBuffers }) {
+  if (candidateAuthority?.kind !== "verified_terminal_candidate") return;
+  for (const field of ["run_instance_id", "case_id", "attempt"]) {
+    if (candidateAuthority[field] !== normalized?.lineage?.[field]) throw new Error("sealed private final output lineage differs from candidate authority");
+  }
+  const finalBytes = evidenceBuffers?.get(VERIFIED_FINAL_OUTPUT_EVIDENCE_PATH);
+  const expectedDigest = normalized?.lineage?.final_output_digest;
+  const expectedBytes = normalized?.lineage?.final_output_bytes;
+  if (expectedDigest === null && expectedBytes === null) {
+    if (finalBytes !== undefined) throw new Error("sealed private final output is present without normalized authority");
+    return;
+  }
+  if (!/^sha256:[a-f0-9]{64}$/u.test(expectedDigest ?? "") || !Number.isInteger(expectedBytes) || expectedBytes < 1 || expectedBytes > MAX_VERIFIED_FINAL_OUTPUT_BYTES) {
+    throw new Error("sealed private final output normalized identity is invalid");
+  }
+  if (!Buffer.isBuffer(finalBytes) || finalBytes.length !== expectedBytes || rawByteDigest(finalBytes) !== expectedDigest) {
+    throw new Error("sealed private final output differs from normalized authority");
+  }
+  assertNoDuplicateJsonObjectKeys(finalBytes.toString("utf8"), "sealed private final output");
+  let finalValue;
+  try { finalValue = JSON.parse(finalBytes.toString("utf8")); }
+  catch { throw new Error("sealed private final output is invalid JSON"); }
+  assertBenchmarkSchemaInstance(finalValue, { schemaPath: resolve(root, "benchmarks/schemas/agent-output.schema.json"), label: "sealed private final output" });
+}
+
 export function createProductionSealedEvaluatorExecution(options = {}) {
   for (const forbidden of ["candidateWorkspace", "candidateMutator", "evaluationInputRoot", "normalizedResult", "caseId", "attempt"]) {
     if (Object.hasOwn(options, forbidden)) throw new Error(`production sealed evaluator rejects caller-supplied ${forbidden}`);
@@ -2105,6 +2155,15 @@ export function createProductionSealedEvaluatorExecution(options = {}) {
     candidate_authority: terminal.binding,
   };
   writeFileSync(resolve(evidenceRoot, "verified-terminal-evaluation-input.json"), `${AUTHORITY_JSON_STRINGIFY(evidence, null, 2)}\n`, { flag: "wx", mode: 0o400 });
+  const finalOutputBytes = verifiedFinalOutputBytesForPrivateEvaluation({
+    root: options.root,
+    runDir: options.runDir,
+    normalized: materialized.verified_authority.normalized_result,
+    execution: materialized.verified_authority.execution,
+  });
+  if (finalOutputBytes !== null) {
+    writeFileSync(resolve(evidenceRoot, VERIFIED_FINAL_OUTPUT_EVIDENCE_PATH), finalOutputBytes, { flag: "wx", mode: 0o400 });
+  }
   const execution = createSealedEvaluatorExecutionFromWorkspaceSources({
     root: options.root,
     privateEvaluationRoot: evaluationRoot,
@@ -3106,6 +3165,10 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const frozenInventory = readStableWorkspaceInventory(sealedFrozenWorkspace, "sealed frozen workspace");
   const candidateInventory = readStableWorkspaceInventory(sealedCandidateWorkspace, "sealed candidate workspace");
   const evidenceInventory = readStableWorkspaceInventory(sealedEvaluationInputRoot, "sealed evaluation-input evidence root");
+  validateSealedPrivateFinalOutputEvidence({
+    root, normalized, candidateAuthority: record.candidate_authority,
+    evidenceBuffers: evidenceInventory.buffers,
+  });
   const originalWorkspaceAuthorityInventory = readStableWorkspaceInventory(sealedOriginalWorkspaceAuthorityRoot, "sealed original workspace authority root");
   if (record.frozen_workspace_sealed_inventory_digest !== frozenInventory.digest || record.candidate_workspace_sealed_inventory_digest !== candidateInventory.digest || record.evaluation_input_evidence_sealed_inventory_digest !== evidenceInventory.digest || record.frozen_workspace_sealed_runtime_digest !== frozenInventory.runtimeDigest || record.candidate_workspace_sealed_runtime_digest !== candidateInventory.runtimeDigest || record.evaluation_input_evidence_sealed_runtime_digest !== evidenceInventory.runtimeDigest) throw new Error("sealed private evaluation workspace identity is inconsistent");
   if (!evidence.repositoryDiffArtifact || evidence.repositoryDiffArtifact.frozen_workspace_tree_digest !== originalFrozenInventory.digest || evidence.repositoryDiffArtifact.candidate_workspace_tree_digest !== originalCandidateInventory.digest || stableCanonicalJson(evidence.repositoryDiffArtifact.candidate_authority) !== stableCanonicalJson(record.candidate_authority)) throw new Error("repository diff workspace authority does not match the original workspace inventory");

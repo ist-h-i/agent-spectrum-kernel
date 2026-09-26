@@ -80,6 +80,13 @@ function assertDigest(actual, expected, label) {
   if (actual !== expected) throw new Error(`${label} drift: expected ${expected}, observed ${actual}`);
 }
 
+export function assertAdmittedFixtureResultProfile({ fixtureId, fixtureRole, outputProfile, freezeProfile }) {
+  if (fixtureRole === "calibration" && outputProfile === undefined && freezeProfile === undefined) return;
+  if (!outputProfile || !freezeProfile) throw new Error(`${fixtureId} result profile identity drift`);
+  assertEqual(freezeProfile, outputProfile, `${fixtureId} result profile identity`);
+  assertDigest(freezeProfile.digest, computeResultProfileDigest({ name: freezeProfile.name }), `${fixtureId} result profile digest`);
+}
+
 function git(root, args, options = {}) {
   return execFileSync("git", ["-C", root, ...args], { encoding: options.encoding ?? "utf8", maxBuffer: 32 * 1024 * 1024 });
 }
@@ -328,8 +335,12 @@ function validateFixture({ root, repositoryRevision, fixtureId, config, successo
   assertDigest(output.output_contract_digest, computeOutputContractDigest(output), `${fixtureId} output contract`);
   assertDigest(reference.public_metadata_digest, canonicalDigest(withoutField(reference, "public_metadata_digest")), `${fixtureId} evaluator reference`);
   assertDigest(freeze.manifest_digest, computeScoringInputFreezeManifestDigest(freeze), `${fixtureId} scoring freeze`);
-  assertEqual(freeze.result_profile, output.result_profile, `${fixtureId} result profile identity`);
-  assertDigest(freeze.result_profile.digest, computeResultProfileDigest({ name: freeze.result_profile.name }), `${fixtureId} result profile digest`);
+  assertAdmittedFixtureResultProfile({
+    fixtureId,
+    fixtureRole: catalogFixture.fixture_role,
+    outputProfile: output.result_profile,
+    freezeProfile: freeze.result_profile,
+  });
   validateVerificationCommandContract(command, { root });
 
   const layout = evaluatorAuthorityPathsForFixture(fixtureId);

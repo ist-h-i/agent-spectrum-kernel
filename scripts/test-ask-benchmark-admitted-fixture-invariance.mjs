@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { basename, resolve } from "node:path";
 
 import {
+  assertAdmittedFixtureResultProfile,
   discoverAdmittedFixtureIds,
   partitionAdmittedFixtureIdsForPrivateSemantics,
   validateActualPrivateAdmittedFixtureSemantics,
@@ -25,6 +26,7 @@ import {
   resolveRepositoryAdmissionDecision,
 } from "./ask-benchmark-admission-decision.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import { computeResultProfileDigest } from "./ask-benchmark-scoring-contract.mjs";
 import { buildPortfolioPlan, resolvePortfolioExecutionAdmission } from "./ask-benchmark-plan.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -95,6 +97,15 @@ function resealDecision(decision) {
   next.decision_digest = computeAdmissionDecisionDigest(next);
   return next;
 }
+
+test("calibration admits paired absent result profiles without weakening primary or mismatch checks", () => {
+  const fixtureId = "cal-session-refresh";
+  assert.equal(assertAdmittedFixtureResultProfile({ fixtureId, fixtureRole: "calibration" }), undefined);
+  assert.throws(() => assertAdmittedFixtureResultProfile({ fixtureId, fixtureRole: "primary" }), /result profile identity drift/u);
+  const profile = { name: "binary_scope_verification", digest: computeResultProfileDigest() };
+  assert.throws(() => assertAdmittedFixtureResultProfile({ fixtureId, fixtureRole: "calibration", outputProfile: profile }), /result profile identity drift/u);
+  assert.throws(() => assertAdmittedFixtureResultProfile({ fixtureId, fixtureRole: "calibration", freezeProfile: profile }), /result profile identity drift/u);
+});
 
 test("public invariance discovers every repository-admitted fixture", () => {
   const fixtureIds = discoverAdmittedFixtureIds({ root: ROOT, repositoryRevision: "HEAD" });
