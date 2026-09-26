@@ -60,6 +60,8 @@ const AUTHORITY_JSON_STRINGIFY = JSON.stringify;
 const AUTHORITY_NODE_EXECUTABLE = process.execPath;
 const ORIGINAL_EXECUTION_AUTHORITIES = new WeakMap();
 const PRODUCTION_EXECUTION_AUTHORITIES = new WeakMap();
+const VERIFIED_FINAL_OUTPUT_EVIDENCE_PATH = "verified-agent-final.json";
+const MAX_VERIFIED_FINAL_OUTPUT_BYTES = 1024 * 1024;
 
 export const EVALUATOR_REFERENCE_SCHEMA_PATH = "benchmarks/schemas/evaluator-reference.schema.json";
 export const PRIVATE_EVALUATOR_BUNDLE_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-bundle.schema.json";
@@ -2075,6 +2077,54 @@ function materializeVerifiedFrozenAuthorityWorkspace({ evaluationRoot, source })
   return materialized;
 }
 
+function verifiedFinalOutputBytesForPrivateEvaluation({ root, runDir, normalized, execution }) {
+  const lineage = normalized?.lineage;
+  if (!lineage || lineage.run_instance_id !== execution.run_instance_id || lineage.case_id !== execution.case_id || lineage.attempt !== execution.attempt) {
+    throw new Error("private final output lineage differs from verified terminal execution");
+  }
+  const expectedDigest = lineage.final_output_digest;
+  const expectedBytes = lineage.final_output_bytes;
+  if (expectedDigest === null && expectedBytes === null) return null;
+  if (!/^sha256:[a-f0-9]{64}$/u.test(expectedDigest ?? "") || !Number.isInteger(expectedBytes) || expectedBytes < 1 || expectedBytes > MAX_VERIFIED_FINAL_OUTPUT_BYTES) {
+    throw new Error("private final output normalized identity is invalid");
+  }
+  const runRoot = assertRealDirectory(runDir, "private final output run root");
+  const relativePath = `cases/${lineage.case_id}/attempts/${lineage.attempt}/final.json`;
+  const finalPath = resolveAuthorityArtifactPath(runRoot, relativePath, "private final output source");
+  const final = readStableFile(finalPath, "private final output source", MAX_VERIFIED_FINAL_OUTPUT_BYTES, { allowEmpty: false });
+  validateSealedPrivateFinalOutputEvidence({
+    root, normalized,
+    candidateAuthority: { kind: "verified_terminal_candidate", run_instance_id: execution.run_instance_id, case_id: execution.case_id, attempt: execution.attempt },
+    evidenceBuffers: new Map([[VERIFIED_FINAL_OUTPUT_EVIDENCE_PATH, final.bytes]]),
+  });
+  return final.bytes;
+}
+
+export function validateSealedPrivateFinalOutputEvidence({ root, normalized, candidateAuthority, evidenceBuffers }) {
+  if (candidateAuthority?.kind !== "verified_terminal_candidate") return;
+  for (const field of ["run_instance_id", "case_id", "attempt"]) {
+    if (candidateAuthority[field] !== normalized?.lineage?.[field]) throw new Error("sealed private final output lineage differs from candidate authority");
+  }
+  const finalBytes = evidenceBuffers?.get(VERIFIED_FINAL_OUTPUT_EVIDENCE_PATH);
+  const expectedDigest = normalized?.lineage?.final_output_digest;
+  const expectedBytes = normalized?.lineage?.final_output_bytes;
+  if (expectedDigest === null && expectedBytes === null) {
+    if (finalBytes !== undefined) throw new Error("sealed private final output is present without normalized authority");
+    return;
+  }
+  if (!/^sha256:[a-f0-9]{64}$/u.test(expectedDigest ?? "") || !Number.isInteger(expectedBytes) || expectedBytes < 1 || expectedBytes > MAX_VERIFIED_FINAL_OUTPUT_BYTES) {
+    throw new Error("sealed private final output normalized identity is invalid");
+  }
+  if (!Buffer.isBuffer(finalBytes) || finalBytes.length !== expectedBytes || rawByteDigest(finalBytes) !== expectedDigest) {
+    throw new Error("sealed private final output differs from normalized authority");
+  }
+  assertNoDuplicateJsonObjectKeys(finalBytes.toString("utf8"), "sealed private final output");
+  let finalValue;
+  try { finalValue = JSON.parse(finalBytes.toString("utf8")); }
+  catch { throw new Error("sealed private final output is invalid JSON"); }
+  assertBenchmarkSchemaInstance(finalValue, { schemaPath: resolve(root, "benchmarks/schemas/agent-output.schema.json"), label: "sealed private final output" });
+}
+
 export function createProductionSealedEvaluatorExecution(options = {}) {
   for (const forbidden of ["candidateWorkspace", "candidateMutator", "evaluationInputRoot", "normalizedResult", "caseId", "attempt"]) {
     if (Object.hasOwn(options, forbidden)) throw new Error(`production sealed evaluator rejects caller-supplied ${forbidden}`);
@@ -2105,6 +2155,15 @@ export function createProductionSealedEvaluatorExecution(options = {}) {
     candidate_authority: terminal.binding,
   };
   writeFileSync(resolve(evidenceRoot, "verified-terminal-evaluation-input.json"), `${AUTHORITY_JSON_STRINGIFY(evidence, null, 2)}\n`, { flag: "wx", mode: 0o400 });
+  const finalOutputBytes = verifiedFinalOutputBytesForPrivateEvaluation({
+    root: options.root,
+    runDir: options.runDir,
+    normalized: materialized.verified_authority.normalized_result,
+    execution: materialized.verified_authority.execution,
+  });
+  if (finalOutputBytes !== null) {
+    writeFileSync(resolve(evidenceRoot, VERIFIED_FINAL_OUTPUT_EVIDENCE_PATH), finalOutputBytes, { flag: "wx", mode: 0o400 });
+  }
   const execution = createSealedEvaluatorExecutionFromWorkspaceSources({
     root: options.root,
     privateEvaluationRoot: evaluationRoot,
@@ -2477,7 +2536,11 @@ export function validateIndependenceStatement({ statement, manifest, root = null
     const source = readJsonArtifact(sourcePath, "private independence frozen public source", { publicArtifact: true });
     if (rawByteDigest(source.bytes) !== statement.frozen_candidate_input.raw_byte_digest) throw new Error("private independence frozen public source raw-byte digest drift");
     if (canonicalDigest(source.value) !== statement.frozen_candidate_input.digest) throw new Error("private independence frozen public source semantic digest drift");
-    const fixture = source.value.fixtures?.[manifest.fixture_identity.fixture_id];
+    const calibrationSourceId = calibrationSourceIdForFixture(manifest.fixture_identity.fixture_id);
+    if (calibrationSourceId && statement.frozen_candidate_input.public_source_path !== CALIBRATION_INPUT_MANIFEST_PATH) {
+      throw new Error("private independence calibration input source path mismatch");
+    }
+    const fixture = source.value.fixtures?.[calibrationSourceId ?? manifest.fixture_identity.fixture_id];
     if (!fixture) throw new Error("private independence frozen public source fixture binding is missing");
   }
   if (statement.measured_output_used !== false || statement.measured_result_used !== false) throw new Error("private independence statement must exclude measured evidence");
@@ -2525,12 +2588,23 @@ function fragmentEnvelopeView(fragment) {
   };
 }
 
-export function validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy, requirementRecord, normalizedResult }) {
+export function validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy, requirementRecord, normalizedResult, outputContract, freezeManifest }) {
   assertBenchmarkSchemaInstance(fragment, { schemaPath: resolve(root, PRIVATE_EVALUATOR_FRAGMENT_SCHEMA_PATH), label: "private evaluator result fragment" });
   if (fragment.scoring_ready !== false) throw new Error("private evaluator fragment must remain scoring-ineligible");
   const envelopeView = fragmentEnvelopeView(fragment);
   validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult: envelopeView, normalizedResult });
-  validateBinaryScopeVerificationResult({ evaluatorResult: envelopeView, requirementRecord, normalizedResult });
+  if ((outputContract === undefined) !== (freezeManifest === undefined)) throw new Error("private fragment requires both bound output and freeze authorities");
+  if (outputContract !== undefined && (outputContract.fixture_id !== normalizedResult?.lineage?.fixture_id || freezeManifest.fixture_id !== normalizedResult?.lineage?.fixture_id)) throw new Error("private fragment public authority fixture binding drift");
+  // Direct legacy callers retain the binary contract. The generic path is available only
+  // through an explicit, matching public authority for a calibration fixture.
+  if (outputContract === undefined || outputContract.result_profile !== undefined || freezeManifest.result_profile !== undefined) {
+    if (outputContract !== undefined && stableCanonicalJson(outputContract.result_profile) !== stableCanonicalJson(freezeManifest.result_profile)) throw new Error("private fragment public result profile binding drift");
+    if (outputContract !== undefined && stableCanonicalJson(fragment.result_profile) !== stableCanonicalJson(outputContract.result_profile)) throw new Error("private fragment result profile differs from public authority");
+    validateBinaryScopeVerificationResult({ evaluatorResult: envelopeView, requirementRecord, normalizedResult });
+  } else {
+    if (normalizedResult?.lineage?.suite !== "calibration" || !calibrationSourceIdForFixture(normalizedResult.lineage.fixture_id)) throw new Error("profile-free private fragment requires a bound calibration fixture");
+    if (Object.hasOwn(fragment, "result_profile") || Object.hasOwn(fragment, "classification")) throw new Error("profile-free calibration fragment must not contain binary profile or classification");
+  }
   return structuredClone(fragment);
 }
 
@@ -2578,6 +2652,8 @@ export function adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment, author
     scoringPolicy: authority.scoringPolicy,
     requirementRecord: authority.requirementRecord,
     normalizedResult: normalized,
+    outputContract: authority.outputContract,
+    freezeManifest: authority.freezeManifest,
   });
   const lineage = normalized.lineage;
   const manifest = authority.bundleManifest;
@@ -2615,7 +2691,7 @@ export function adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment, author
     evaluation_digest: "sha256:" + "0".repeat(64),
     evaluation_status: validated.evaluation_status,
     requirement_results: structuredClone(validated.requirement_results),
-    result_profile: structuredClone(validated.result_profile),
+    ...(validated.result_profile === undefined ? {} : { result_profile: structuredClone(validated.result_profile) }),
     ...(validated.classification === undefined ? {} : { classification: validated.classification }),
     quality: fragmentObservation(validated, "verification_correctness", "fail"),
     safety: fragmentObservation(validated, "evidence_correctness", "fail"),
@@ -3102,6 +3178,10 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const frozenInventory = readStableWorkspaceInventory(sealedFrozenWorkspace, "sealed frozen workspace");
   const candidateInventory = readStableWorkspaceInventory(sealedCandidateWorkspace, "sealed candidate workspace");
   const evidenceInventory = readStableWorkspaceInventory(sealedEvaluationInputRoot, "sealed evaluation-input evidence root");
+  validateSealedPrivateFinalOutputEvidence({
+    root, normalized, candidateAuthority: record.candidate_authority,
+    evidenceBuffers: evidenceInventory.buffers,
+  });
   const originalWorkspaceAuthorityInventory = readStableWorkspaceInventory(sealedOriginalWorkspaceAuthorityRoot, "sealed original workspace authority root");
   if (record.frozen_workspace_sealed_inventory_digest !== frozenInventory.digest || record.candidate_workspace_sealed_inventory_digest !== candidateInventory.digest || record.evaluation_input_evidence_sealed_inventory_digest !== evidenceInventory.digest || record.frozen_workspace_sealed_runtime_digest !== frozenInventory.runtimeDigest || record.candidate_workspace_sealed_runtime_digest !== candidateInventory.runtimeDigest || record.evaluation_input_evidence_sealed_runtime_digest !== evidenceInventory.runtimeDigest) throw new Error("sealed private evaluation workspace identity is inconsistent");
   if (!evidence.repositoryDiffArtifact || evidence.repositoryDiffArtifact.frozen_workspace_tree_digest !== originalFrozenInventory.digest || evidence.repositoryDiffArtifact.candidate_workspace_tree_digest !== originalCandidateInventory.digest || stableCanonicalJson(evidence.repositoryDiffArtifact.candidate_authority) !== stableCanonicalJson(record.candidate_authority)) throw new Error("repository diff workspace authority does not match the original workspace inventory");
@@ -3111,7 +3191,7 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   if (stableCanonicalJson(evidence.repositoryDiffArtifact) !== stableCanonicalJson(originalWorkspaceAuthority.repositoryDiffArtifact)) throw new Error("persisted repository diff artifact does not match the child pre-execution authority");
   const persistedRepositoryDiffEntry = [...evidence.artifacts.values()].find(({ entry }) => entry.kind === "repository_diff");
   if (!persistedRepositoryDiffEntry || persistedRepositoryDiffEntry.read.rawByteDigest !== rawByteDigest(originalWorkspaceAuthority.repositoryDiffBytes) || Buffer.compare(persistedRepositoryDiffEntry.read.bytes, originalWorkspaceAuthority.repositoryDiffBytes) !== 0) throw new Error("persisted repository diff artifact bytes do not match the child pre-execution authority");
-  const validatedFragment = validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy: scoringInputs.scoringPolicy, requirementRecord: scoringInputs.requirementRecord, normalizedResult: normalized });
+  const validatedFragment = validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy: scoringInputs.scoringPolicy, requirementRecord: scoringInputs.requirementRecord, normalizedResult: normalized, outputContract: scoringInputs.outputContract, freezeManifest: scoringInputs.freezeManifest });
   const execution = {
     evaluatorRevision: bundle.manifest.evaluator_revision,
     runner: {
@@ -3478,9 +3558,14 @@ function verifyEvaluatorAuthorityCore({
   });
   const privateAuthorityPaths = [privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath];
   const privateAuthorityCount = privateAuthorityPaths.filter(Boolean).length;
-  const requiresPrivateAuthority = result.result_profile?.name === BINARY_SCOPE_VERIFICATION_PROFILE_NAME;
+  const privateResultBindingFields = ["private_fragment_digest", "private_fragment_bytes", "private_evaluation_record_digest"];
+  const privateResultBindingCount = privateResultBindingFields.filter((field) => Object.hasOwn(result, field)).length;
+  if (privateResultBindingCount !== 0 && privateResultBindingCount !== privateResultBindingFields.length) {
+    throw new Error("evaluator result private authority binding is incomplete");
+  }
+  const requiresPrivateAuthority = result.result_profile?.name === BINARY_SCOPE_VERIFICATION_PROFILE_NAME || privateResultBindingCount > 0;
   if (requiresPrivateAuthority && privateAuthorityCount !== privateAuthorityPaths.length) {
-    throw new Error("binary scope verification requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together");
+    throw new Error("private evaluator authority requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together");
   }
   if (!requiresPrivateAuthority && privateAuthorityCount !== 0 && privateAuthorityCount !== privateAuthorityPaths.length) {
     throw new Error("private evaluation root, record, and fragment paths must be supplied together");
