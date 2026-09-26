@@ -110,8 +110,13 @@ function assertPinnedAdmissionOverlay(root, preparation, entry, validated) {
   const overlay = entry.admission_overlay;
   if (overlay === null) {
     if (current) successorFail("SUCCESSOR_SCORING_ADMISSION_DRIFT", "unbound repository admission overlay");
-    successorExact(validated.admissionRecord.admission_status, "admitted", "frozen admitted scoring authority");
-    return { effective_admission_status: "admitted", overlay_decision_status: null };
+    const status = validated.admissionRecord.admission_status;
+    if (!["admitted", "admission_pending"].includes(status)) {
+      successorFail("SUCCESSOR_SCORING_ADMISSION_STATUS", "frozen scoring authority");
+    }
+    // Public inspection remains available for the existing synthetic pending
+    // contract. It does not promote pending inputs to measured admission.
+    return { effective_admission_status: status, overlay_decision_status: null };
   }
   if (!current) successorFail("SUCCESSOR_SCORING_ADMISSION_DRIFT", "missing repository admission overlay");
   const overlayPath = resolve(root, current.path);
