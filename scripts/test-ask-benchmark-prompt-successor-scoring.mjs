@@ -88,10 +88,13 @@ async function worker(contextPath, { pendingAdmissionRegression = false } = {}) 
     const compiler = process.platform === "darwin" ? "/usr/bin/clang" : "cc";
     const agentBin = resolve(work, "codex");
     run(compiler, ["-std=c11", "-Wall", "-Wextra", "-Werror", "-O0", resolve(root, "scripts/test-fixtures/prompt-successor-fake-codex.c"), "-o", agentBin]);
+    const privateDenyRoot = resolve(work, "synthetic-private");
+    assert.ok(existsSync(privateDenyRoot), "the disposable private test root must exist before native setup");
     const nativeFile = {
       schema_version: "1.2.0", adapter: "codex", availability: "available", unavailable_reason: null,
       expected_executable_version: "codex-cli 0.153.4", model: "synthetic-native-fake-not-a-service", reasoning_effort: "medium",
       case_timeout_ms: 900000, sandbox_policy: "workspace-write", permission_policy: "never",
+      successor_private_evaluator_root: privateDenyRoot,
       executor: { id: "successor-native-fake", version: "1.0.0" },
       environment_allowlist: ["HOME", "ASK_SUCCESSOR_FAKE_CAPTURE", "ASK_SUCCESSOR_FAKE_MODE"], environment_value_allowlist: [], thermal_state: "cold", claude_cli: null,
       command_evidence: { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.3.0",
