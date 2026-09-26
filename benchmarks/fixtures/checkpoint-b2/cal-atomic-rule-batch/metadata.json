@@ -23,10 +23,10 @@
   "output_contract_type": "implementation_producing",
   "requirement_record_id": "requirement-record-cal-atomic-rule-batch",
   "output_contract_id": "output-contract-cal-atomic-rule-batch",
-  "evaluator_bundle_id": "evaluator-a5cfb80f66e1f42f805f8fc07d35825c174acd8659e162b851475648d3dc3db6",
-  "evaluator_bundle_digest": "sha256:dc2823aa07a135da05bd60fb97dc339facee775a3d705f81d49e859db602b06f",
-  "evaluator_byte_count": 36220,
+  "evaluator_bundle_id": "evaluator-afb0c5761311c3cafb8e89a367b9e02ec403ea5534c0f1f7ced82c6a4c59ae26",
+  "evaluator_bundle_digest": "sha256:86edd32192e254c66c4bcd5ad61b893d0d142513fe6d1f1e669947df4c3c2714",
+  "evaluator_byte_count": 35476,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:68517d2f4278d7da1c90481b99cdaacf87a69d16814c4131d9a5b0421b8bdc7c"
+  "metadata_digest": "sha256:00d461356276cc2c74b7366e96c9f03550a6af52fb9fa61cf4cf76566403599d"
 }

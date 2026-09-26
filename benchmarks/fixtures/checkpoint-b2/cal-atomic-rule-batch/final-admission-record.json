@@ -3,9 +3,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "input_manifest_digest": "sha256:e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
   "evaluator_reference_schema": "benchmarks/schemas/evaluator-reference.schema.json",
-  "evaluator_bundle_id": "evaluator-a5cfb80f66e1f42f805f8fc07d35825c174acd8659e162b851475648d3dc3db6",
-  "evaluator_bundle_digest": "sha256:dc2823aa07a135da05bd60fb97dc339facee775a3d705f81d49e859db602b06f",
-  "evaluator_byte_count": 36220,
+  "evaluator_bundle_id": "evaluator-afb0c5761311c3cafb8e89a367b9e02ec403ea5534c0f1f7ced82c6a4c59ae26",
+  "evaluator_bundle_digest": "sha256:86edd32192e254c66c4bcd5ad61b893d0d142513fe6d1f1e669947df4c3c2714",
+  "evaluator_byte_count": 35476,
   "evaluator_requirement_count": 4,
   "evidence_map_ids": [
     "atomic-state-and-version-basis",
@@ -23,9 +23,9 @@
   "admission_revision": 1,
   "admission_status": "admission_pending",
   "evaluator_source_identity": {
-    "base_git_revision": "2d705601b82bb8f4532f0b586de3090887d39996",
-    "source_tree_digest": "sha256:9e8afd6dcf00632b0a585a22ad8229a56165b9a4802d77935d84a77caca23561",
-    "generator_source_digest": "sha256:0c888b4a1a37b5d911bd65cbf23c09fd5a69286187352afa81949401750c2055",
+    "base_git_revision": "d8518e2ca2ecc8eb37f15db5b518cf8913148728",
+    "source_tree_digest": "sha256:368f78a9536ae02e40a899c32a87188fbce25690aeb9010f28d750efa6e09eef",
+    "generator_source_digest": "sha256:f6f3e66a4c4645780e9e283991ee7fa045b42bb52c9b456f8c4f70b2d70672dc",
     "source_files": [
       {
         "path": "benchmarks/schemas/evaluation-input-failure-artifact.schema.json",
@@ -164,8 +164,8 @@
       },
       {
         "path": "scripts/ask-benchmark-execution.mjs",
-        "bytes": 139193,
-        "sha256": "sha256:d78c9d492d03bc26a2a50058cf84bf38c12f3bf56d5d2ae21f020c48101f3aa0"
+        "bytes": 140487,
+        "sha256": "sha256:4263ee0aaf947280ee98bf1c0ee7857d7390a8ba7548053d4bb070c88726e019"
       },
       {
         "path": "scripts/ask-benchmark-materialize.mjs",
@@ -199,8 +199,8 @@
       },
       {
         "path": "scripts/ask-benchmark-prompt-successor-delivery.mjs",
-        "bytes": 16630,
-        "sha256": "sha256:c2bd6c5105d877d0ac1fc5062aeae3522c0e30f7c90730e045123387948338b6"
+        "bytes": 19400,
+        "sha256": "sha256:c020f42fcc418fa97ffce6728680689e23419127471e0c7f8a847c46cddf39ff"
       },
       {
         "path": "scripts/ask-benchmark-prompt-successor-native.mjs",
@@ -219,8 +219,8 @@
       },
       {
         "path": "scripts/ask-benchmark-prompt-successor.mjs",
-        "bytes": 18642,
-        "sha256": "sha256:1053110e86ccea072ee3bb31b3100e22732c8d99539c44fada21e48af65f0eea"
+        "bytes": 19186,
+        "sha256": "sha256:0508d381255fe6fa05bff18345bb579db7fac617f19f2b93e955a01c29c1baaa"
       },
       {
         "path": "scripts/ask-benchmark-prompt-v2.mjs",
@@ -565,11 +565,11 @@
         },
         {
           "path": "scripts/ask-benchmark-execution.mjs",
-          "bytes": 139193,
-          "sha256": "sha256:d78c9d492d03bc26a2a50058cf84bf38c12f3bf56d5d2ae21f020c48101f3aa0",
+          "bytes": 140487,
+          "sha256": "sha256:4263ee0aaf947280ee98bf1c0ee7857d7390a8ba7548053d4bb070c88726e019",
           "file_type": "module",
-          "base_git_revision_bytes": 139193,
-          "base_git_revision_sha256": "sha256:d78c9d492d03bc26a2a50058cf84bf38c12f3bf56d5d2ae21f020c48101f3aa0"
+          "base_git_revision_bytes": 140487,
+          "base_git_revision_sha256": "sha256:4263ee0aaf947280ee98bf1c0ee7857d7390a8ba7548053d4bb070c88726e019"
         },
         {
           "path": "scripts/ask-benchmark-materialize.mjs",
@@ -621,11 +621,11 @@
         },
         {
           "path": "scripts/ask-benchmark-prompt-successor-delivery.mjs",
-          "bytes": 16630,
-          "sha256": "sha256:c2bd6c5105d877d0ac1fc5062aeae3522c0e30f7c90730e045123387948338b6",
+          "bytes": 19400,
+          "sha256": "sha256:c020f42fcc418fa97ffce6728680689e23419127471e0c7f8a847c46cddf39ff",
           "file_type": "module",
-          "base_git_revision_bytes": 16630,
-          "base_git_revision_sha256": "sha256:c2bd6c5105d877d0ac1fc5062aeae3522c0e30f7c90730e045123387948338b6"
+          "base_git_revision_bytes": 19400,
+          "base_git_revision_sha256": "sha256:c020f42fcc418fa97ffce6728680689e23419127471e0c7f8a847c46cddf39ff"
         },
         {
           "path": "scripts/ask-benchmark-prompt-successor-native.mjs",
@@ -653,11 +653,11 @@
         },
         {
           "path": "scripts/ask-benchmark-prompt-successor.mjs",
-          "bytes": 18642,
-          "sha256": "sha256:1053110e86ccea072ee3bb31b3100e22732c8d99539c44fada21e48af65f0eea",
+          "bytes": 19186,
+          "sha256": "sha256:0508d381255fe6fa05bff18345bb579db7fac617f19f2b93e955a01c29c1baaa",
           "file_type": "module",
-          "base_git_revision_bytes": 18642,
-          "base_git_revision_sha256": "sha256:1053110e86ccea072ee3bb31b3100e22732c8d99539c44fada21e48af65f0eea"
+          "base_git_revision_bytes": 19186,
+          "base_git_revision_sha256": "sha256:0508d381255fe6fa05bff18345bb579db7fac617f19f2b93e955a01c29c1baaa"
         },
         {
           "path": "scripts/ask-benchmark-prompt-v2.mjs",
@@ -2146,12 +2146,12 @@
           "edge_digest": "sha256:fcf204b41c88a10c4472521944cf77249f50b57b79e2c4ea0ffbac00398cb24a"
         }
       ],
-      "graph_digest": "sha256:5fd1f8232c761bcfd748cdf6746fe2ffe46d03c9dbe67e46e6f4ae0d7488e23d"
+      "graph_digest": "sha256:3127e1bb3952e18ac8c754dcc51968b0777f8129886d0fc0e671509d293a8155"
     }
   },
-  "requirement_authority_digest": "sha256:5830f97ac7405a9db8ecafe16809112add04a4374cb67a7e49305f713d39662b",
+  "requirement_authority_digest": "sha256:3fcbe660bad2ebe9ba237c2857626144e727e779cdc977c2f5770a2e7d89b9dd",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/cal-atomic-rule-batch/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:cee50bbb1ca4bac3bb67ef69be76f2535f4fd4a751adc04858f38825fb72f39c",
-  "evaluator_authority_manifest_digest": "sha256:9b0e42f8718d78b3415e638821e2dc96a82fbf918b102b4c4e0603a11c2b98b5",
-  "admission_digest": "sha256:07e3ef78894a3cd4fae8ad60f496aba62038bce2067894b8a3ce1acfd95386a1"
+  "evaluator_authority_manifest_raw_sha256": "sha256:d6d99f17ffc843a213b2a021d7d595accc248f1fd7b136ec4885a6cac645bb2c",
+  "evaluator_authority_manifest_digest": "sha256:29c3e9cfabb3d3d1773a3a7336c8cff835093be2818238a47e08a9a2c63e73af",
+  "admission_digest": "sha256:50e67823dd9a699e90734ed6841d63df02bb68fb90bc97bad861e775af1614c3"
 }
