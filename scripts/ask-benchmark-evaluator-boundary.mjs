@@ -3558,9 +3558,14 @@ function verifyEvaluatorAuthorityCore({
   });
   const privateAuthorityPaths = [privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath];
   const privateAuthorityCount = privateAuthorityPaths.filter(Boolean).length;
-  const requiresPrivateAuthority = result.result_profile?.name === BINARY_SCOPE_VERIFICATION_PROFILE_NAME;
+  const privateResultBindingFields = ["private_fragment_digest", "private_fragment_bytes", "private_evaluation_record_digest"];
+  const privateResultBindingCount = privateResultBindingFields.filter((field) => Object.hasOwn(result, field)).length;
+  if (privateResultBindingCount !== 0 && privateResultBindingCount !== privateResultBindingFields.length) {
+    throw new Error("evaluator result private authority binding is incomplete");
+  }
+  const requiresPrivateAuthority = result.result_profile?.name === BINARY_SCOPE_VERIFICATION_PROFILE_NAME || privateResultBindingCount > 0;
   if (requiresPrivateAuthority && privateAuthorityCount !== privateAuthorityPaths.length) {
-    throw new Error("binary scope verification requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together");
+    throw new Error("private evaluator authority requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together");
   }
   if (!requiresPrivateAuthority && privateAuthorityCount !== 0 && privateAuthorityCount !== privateAuthorityPaths.length) {
     throw new Error("private evaluation root, record, and fragment paths must be supplied together");
