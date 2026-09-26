@@ -37,7 +37,7 @@ for (const effort of ["medium", "high"]) test(`compiled successor fake ${effort 
   const command = successorEffectiveCommand(effectiveCommand(root, {
     adapter: runtime.adapter, availability: "available", model: "synthetic-native-fake-not-a-service",
     reasoning_effort: effort, permission_policy: runtime.approval_policy, sandbox_policy: runtime.sandbox,
-  }));
+  }), { privateEvaluatorRoot: resolve(work, "private-evaluator") });
   const output = resolve(directory, "output.json");
   const argv = command.argv.map((arg) => arg.replaceAll("{output}", output)
     .replaceAll("{output_schema}", resolve(root, "benchmarks/schemas/agent-output.schema.json")));

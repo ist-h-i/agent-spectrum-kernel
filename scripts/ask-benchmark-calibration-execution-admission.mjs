@@ -8,6 +8,7 @@ import { CALIBRATION_INPUT_MANIFEST_SHA256, CALIBRATION_SOURCE_BINDINGS } from "
 import { inspectSuccessorScoringInputs, successorScoringOptions } from "./ask-benchmark-prompt-successor-scoring-inputs.mjs";
 import { validatePromptSuccessorPreparation, successorClosed, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
 import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
+import { assertSuccessorProfileCommand } from "./ask-benchmark-prompt-successor-delivery.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { verifyPortfolioScoringInputs, verifyPrivateEvaluatorBundle, verifyPublicEvaluatorReference, computeEvaluatorBundleId, computeEvaluatorBundleDigest, validateEvaluatorSourceIdentity, validateIndependenceStatement } from "./ask-benchmark-evaluator-boundary.mjs";
 import { resolveRepositoryAdmissionDecision, resolveEffectiveAdmissionAuthorityFromRepositoryOverlayFiles, computeEffectiveAdmissionAuthorityDigest } from "./ask-benchmark-admission-decision.mjs";
@@ -225,12 +226,30 @@ function staticClosure({ preparation, sources, scoringInputs, admissionSourcesBy
   successorExact(scoring.manifest_digest, preparation.scoring_input_manifest_digest, "preparation scoring identity");
   assertCalibrationScoringAdmissionCandidate(scoring);
   const sourceIdentity = preparation.implementation;
+  const denyRoots = ROLES.map(role => {
+    const source = sources[role];
+    const config = rawJson(resolve(source.runtimeConfigPath), "private-isolated runtime config");
+    successorExact(config.digest, preparation.runtime.configuration_digest, "frozen native config bytes");
+    const denyRoot = directory(config.value.successor_private_evaluator_root, "private evaluator deny root");
+    const native = inspectVerifiedPortfolioExecution({ ...source.execution, root });
+    const adapter = native.adapter_identities.get("codex");
+    if (!adapter) fail("native Codex identity is missing");
+    successorExact(assertSuccessorProfileCommand(adapter.effective_command, denyRoot), denyRoot, "native private deny rule");
+    if (inside(denyRoot, resolve(source.execution.runDir)) || inside(denyRoot, resolve(normalizedRoots[role]))) {
+      fail("private deny root overlaps a run or result root");
+    }
+    return denyRoot;
+  });
+  successorExact(denyRoots[0], denyRoots[1], "paired private evaluator deny root");
   const fixtures = [];
   const effectiveAuthorities = new Map();
   for (const [fixtureId, sourceId] of CALIBRATION_SOURCE_BINDINGS) {
     const score = scoring.fixtures.find(item => item.fixture_id === fixtureId);
     const entry = admissionSourcesByFixture[fixtureId];
     exactKeys(entry, ["privateRoot", "manifestPath", "reviewAuthorityPath", "reviewAuthoritySourceDigest", "reviewArchivePath"], `${fixtureId} private admission sources`);
+    if (!inside(denyRoots[0], directory(entry.privateRoot, "private evaluator root"))) {
+      fail(`${fixtureId} private evaluator is outside the native deny rule`);
+    }
     externalFile(root, entry.reviewAuthorityPath, "independent review authority");
     externalFile(root, entry.reviewArchivePath, "independent review archive");
     const options = successorScoringOptions(scoringInputs, preparation, fixtureId);
@@ -302,6 +321,7 @@ function staticClosure({ preparation, sources, scoringInputs, admissionSourcesBy
     scoring_input_manifest_digest: scoring.manifest_digest,
     execution_config_digest: scoring.execution_config_digest,
     runtime_identity_digest: canonicalDigest(preparation.runtime),
+    private_deny_root_identity_digest: canonicalDigest({ path: denyRoots[0] }),
     experiment_run_instance_id: sources.current_prompt.scope.run_instance_id,
     source_scope_digests: Object.fromEntries(ROLES.map(role => [role, sources[role].scope.scope_digest])),
     run_root_identity_digest: canonicalDigest(ROLES.map(role => resolve(sources[role].execution.runDir))),

@@ -77,21 +77,30 @@ test("provenance entrypoint refuses measured data access before importing a veri
   for (const mode of [undefined, "measured", "approved", true]) await assert.rejects(() => verifySuccessorSourceProvenance({ accessMode: mode }), { code: "SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED" });
 });
 
-test("successor network argument is explicit and does not modify the ordinary command", async () => {
-  const { successorEffectiveCommand } = await import("./ask-benchmark-prompt-successor-delivery.mjs");
-  const native = { argv: ["exec", "--model", "synthetic-model", "-"], task_transport: "stdin", output_transport: "file", output_schema_digest: null };
+test("successor profile denies private reads and network without modifying ordinary command", async () => {
+  const { successorEffectiveCommand, assertSuccessorProfileCommand } = await import("./ask-benchmark-prompt-successor-delivery.mjs");
+  const privateEvaluatorRoot = "/private/tmp/synthetic-private-evaluator";
+  const native = { argv: ["exec", "--model", "synthetic-model", "--sandbox", "workspace-write", "-"], task_transport: "stdin", output_transport: "file", output_schema_digest: null };
   const before = structuredClone(native);
-  const proposed = successorEffectiveCommand(native);
+  const proposed = successorEffectiveCommand(native, { privateEvaluatorRoot });
   assert.deepEqual(native, before);
-  assert.deepEqual(proposed.argv.slice(-3), ["-c", "sandbox_workspace_write.network_access=false", "-"]);
-  assert.throws(() => successorEffectiveCommand(proposed));
-  assert.throws(() => successorEffectiveCommand({ ...native, task_transport: "file" }));
+  assert.equal(proposed.argv.includes("--sandbox"), false);
+  assert.equal(assertSuccessorProfileCommand(proposed, privateEvaluatorRoot), privateEvaluatorRoot);
+  assert.deepEqual(proposed.argv.slice(-3), ["-c", "permissions.ask_issue291.network.enabled=false", "-"]);
+  assert.throws(() => successorEffectiveCommand(proposed, { privateEvaluatorRoot }));
+  assert.throws(() => successorEffectiveCommand({ ...native, task_transport: "file" }, { privateEvaluatorRoot }));
+  assert.throws(() => successorEffectiveCommand(native));
+  for (const value of ["permissions.ask_issue291.network.enabled=true", "default_permissions=\"other\""]) {
+    const forged = structuredClone(proposed);
+    forged.argv.splice(-1, 0, "-c", value);
+    assert.throws(() => assertSuccessorProfileCommand(forged));
+  }
 });
 
 test("declared runtime cannot be replaced by a different valid-looking native digest", async () => {
   const { assertSuccessorAdapterFacts, successorEffectiveCommand } = await import("./ask-benchmark-prompt-successor-delivery.mjs");
   const runtime = syntheticPreparation().runtime;
-  const command = successorEffectiveCommand({ argv: ["exec", "-"], task_transport: "stdin", output_transport: "file", output_schema_digest: null });
+  const command = successorEffectiveCommand({ argv: ["exec", "--sandbox", "workspace-write", "-"], task_transport: "stdin", output_transport: "file", output_schema_digest: null }, { privateEvaluatorRoot: "/private/tmp/synthetic-private-evaluator" });
   const identity = {
     adapter: "codex", availability: "available", model: runtime.model,
     reasoning_effort: "medium", sandbox_policy: "workspace-write", permission_policy: "never", case_timeout_ms: 900000,
