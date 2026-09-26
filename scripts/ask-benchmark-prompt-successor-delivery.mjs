@@ -229,14 +229,11 @@ export function assertSuccessorProfileCommand(command, expectedPrivateRoot = nul
   try { root = privateRoot(JSON.parse(match[1])); }
   catch { successorFail("SUCCESSOR_PRIVATE_ROOT_INVALID", "profile deny rule"); }
   if (expectedPrivateRoot !== null) successorExact(root, privateRoot(expectedPrivateRoot), "profile private evaluator root");
-  for (const expected of profileSettings(root)) if (settings.filter(value => value === expected).length !== 1) {
+  const required = [...profileSettings(root), 'model_reasoning_effort="medium"', 'approval_policy="never"'];
+  for (const expected of required) if (settings.filter(value => value === expected).length !== 1) {
     successorFail("SUCCESSOR_PROFILE_COMMAND_INVALID", "profile setting");
   }
-  if (settings.some(value => value.startsWith("default_permissions=")
-    || value.startsWith(`permissions.${PROFILE}.`)) && settings.filter(value => value.startsWith("default_permissions=")
-      || value.startsWith(`permissions.${PROFILE}.`)).length !== 4) {
-    successorFail("SUCCESSOR_PROFILE_COMMAND_INVALID", "conflicting profile setting");
-  }
+  if (settings.length !== required.length) successorFail("SUCCESSOR_PROFILE_COMMAND_INVALID", "conflicting profile setting");
   return root;
 }
 

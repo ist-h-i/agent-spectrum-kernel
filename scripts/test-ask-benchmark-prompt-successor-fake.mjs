@@ -34,6 +34,14 @@ for (const effort of ["medium", "high"]) test(`compiled successor fake ${effort 
   mkdirSync(home, { recursive: true }); mkdirSync(captures);
   const runtime = syntheticRuntime();
   assert.equal(runtime.reasoning_effort, "medium");
+  if (effort === "high") {
+    assert.throws(() => successorEffectiveCommand(effectiveCommand(root, {
+      adapter: runtime.adapter, availability: "available", model: "synthetic-native-fake-not-a-service",
+      reasoning_effort: effort, permission_policy: runtime.approval_policy, sandbox_policy: runtime.sandbox,
+    }), { privateEvaluatorRoot: resolve(work, "private-evaluator") }), { code: "SUCCESSOR_PROFILE_COMMAND_INVALID" });
+    assert.deepEqual(readdirSync(captures), [], "high effort is rejected before the native fake is invoked");
+    return;
+  }
   const command = successorEffectiveCommand(effectiveCommand(root, {
     adapter: runtime.adapter, availability: "available", model: "synthetic-native-fake-not-a-service",
     reasoning_effort: effort, permission_policy: runtime.approval_policy, sandbox_policy: runtime.sandbox,

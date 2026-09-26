@@ -80,7 +80,7 @@ test("provenance entrypoint refuses measured data access before importing a veri
 test("successor profile denies private reads and network without modifying ordinary command", async () => {
   const { successorEffectiveCommand, assertSuccessorProfileCommand } = await import("./ask-benchmark-prompt-successor-delivery.mjs");
   const privateEvaluatorRoot = "/private/tmp/synthetic-private-evaluator";
-  const native = { argv: ["exec", "--model", "synthetic-model", "--sandbox", "workspace-write", "-"], task_transport: "stdin", output_transport: "file", output_schema_digest: null };
+  const native = { argv: ["exec", "--model", "synthetic-model", "-c", 'model_reasoning_effort="medium"', "-c", 'approval_policy="never"', "--sandbox", "workspace-write", "-"], task_transport: "stdin", output_transport: "file", output_schema_digest: null };
   const before = structuredClone(native);
   const proposed = successorEffectiveCommand(native, { privateEvaluatorRoot });
   assert.deepEqual(native, before);
@@ -100,7 +100,7 @@ test("successor profile denies private reads and network without modifying ordin
 test("declared runtime cannot be replaced by a different valid-looking native digest", async () => {
   const { assertSuccessorAdapterFacts, successorEffectiveCommand } = await import("./ask-benchmark-prompt-successor-delivery.mjs");
   const runtime = syntheticPreparation().runtime;
-  const command = successorEffectiveCommand({ argv: ["exec", "--sandbox", "workspace-write", "-"], task_transport: "stdin", output_transport: "file", output_schema_digest: null }, { privateEvaluatorRoot: "/private/tmp/synthetic-private-evaluator" });
+  const command = successorEffectiveCommand({ argv: ["exec", "-c", 'model_reasoning_effort="medium"', "-c", 'approval_policy="never"', "--sandbox", "workspace-write", "-"], task_transport: "stdin", output_transport: "file", output_schema_digest: null }, { privateEvaluatorRoot: "/private/tmp/synthetic-private-evaluator" });
   const identity = {
     adapter: "codex", availability: "available", model: runtime.model,
     reasoning_effort: "medium", sandbox_policy: "workspace-write", permission_policy: "never", case_timeout_ms: 900000,
