@@ -329,6 +329,9 @@ test("a synthetic admitted calibration record is discovered and its source input
   const fixtureId = "cal-session-refresh";
   const catalogFixture = readJson(resolve(root, "benchmarks/portfolio-catalog.json")).fixtures.find(({ fixture_id }) => fixture_id === fixtureId);
   const fixtureRoot = resolve(root, `benchmarks/fixtures/checkpoint-b2/${fixtureId}`);
+  // Build the partial synthetic record in this disposable clone without the
+  // formal public package's other files changing the intended first failure.
+  rmSync(fixtureRoot, { recursive: true, force: true });
   mkdirSync(fixtureRoot, { recursive: true });
   writeJson(resolve(fixtureRoot, "final-admission-record.json"), { fixture_id: fixtureId, admission_status: "admitted" });
   const metadata = {
