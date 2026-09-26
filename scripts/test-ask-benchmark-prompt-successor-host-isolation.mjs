@@ -9,11 +9,20 @@ import { test } from "node:test";
 import { canonicalDigest } from "./content-addressed-store.mjs";
 import { effectiveCommand } from "./ask-benchmark-execution.mjs";
 import { successorEffectiveCommand } from "./ask-benchmark-prompt-successor-delivery.mjs";
-import { probeSuccessorPrivateRootDeny } from "./ask-benchmark-prompt-successor-host-isolation.mjs";
+import { assertSuccessorHostIsolationReady, probeSuccessorPrivateRootDeny } from "./ask-benchmark-prompt-successor-host-isolation.mjs";
 
 const root = realpathSync(resolve(fileURLToPath(new URL("..", import.meta.url))));
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const nativeBin = process.env.ASK_ISSUE291_NATIVE_CODEX;
+
+test("a model-free sandbox probe cannot authorize an unobserved exec session", () => {
+  const probe = { model_calls: 0, allowed_control_observed: true,
+    private_read_denied_observed: true, exec_session_policy_observed: false };
+  assert.throws(() => assertSuccessorHostIsolationReady({ current_prompt: probe, prompt_v2: probe }),
+    { code: "SUCCESSOR_HOST_ISOLATION_REQUIRED" });
+  assert.throws(() => assertSuccessorHostIsolationReady({ current_prompt: { ...probe, exec_session_policy_observed: true } }),
+    { code: "SUCCESSOR_HOST_ISOLATION_REQUIRED" });
+});
 
 test("native profile probe binds exact binary, config, command, host and denies private read-open", {
   skip: process.platform !== "darwin" || !nativeBin ? "set ASK_ISSUE291_NATIVE_CODEX to the local native Codex executable" : false,

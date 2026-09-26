@@ -155,10 +155,11 @@ For calibration execution, a new freeze and every reopen require a model-free
 native `codex sandbox -P ask_issue291` probe. It checks the exact executable,
 runtime config, role command, environment snapshot and admitted private-manifest
 path, then observes a permitted control command and a denied private read-open.
-The resulting evidence is sealed in the measured authority record. This probe
-does not observe the effective policy inside a `codex exec` model session or
-establish the provider's effective model identity; those remain target-host
-preflight requirements before trial 1.
+The probe alone cannot open the measured authority: it does not observe the
+effective policy inside a `codex exec` model session or establish the
+provider's effective model identity. The freeze rejects this unverified state
+before writing an authority record. Both remain target-host preflight
+requirements before trial 1.
 
 The two native role run directories must share one verified parent directory;
 that parent is the only location used for the durable authority record, journal

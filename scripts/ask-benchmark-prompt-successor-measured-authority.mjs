@@ -11,7 +11,7 @@ import { assertSuccessorAdapterFacts } from "./ask-benchmark-prompt-successor-de
 import { validateSuccessorFromRepository } from "./ask-benchmark-prompt-successor-repository.mjs";
 import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
 import { assertCalibrationExecutionAdmission, assertCalibrationResultRoot, calibratedEffectiveAdmission } from "./ask-benchmark-calibration-execution-admission.mjs";
-import { probeSuccessorPrivateRootDeny } from "./ask-benchmark-prompt-successor-host-isolation.mjs";
+import { assertSuccessorHostIsolationReady, probeSuccessorPrivateRootDeny } from "./ask-benchmark-prompt-successor-host-isolation.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const handles = new WeakMap();
@@ -193,6 +193,7 @@ export async function openSuccessorMeasuredAuthority({ preparation, sources, sco
     probeSuccessorPrivateRootDeny({ root, source: sources[role], runtime: preparation.runtime,
       privateManifestPath: hostIsolationProbePath, expectedManifestPathDigest: manifestPathDigest }),
   ]));
+  assertSuccessorHostIsolationReady(hostIsolationProbes);
 
   const baseEvidence = authorityEvidence({ preparation, sources, scoringIdentity,
     calibrationAdmissionEvidence: admissionEvidence, hostIsolationProbes });

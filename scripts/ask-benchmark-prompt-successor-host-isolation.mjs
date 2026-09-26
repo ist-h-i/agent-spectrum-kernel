@@ -131,3 +131,15 @@ export function probeSuccessorPrivateRootDeny({ root, source, runtime, privateMa
   };
   return { ...evidence, probe_digest: canonicalDigest(evidence) };
 }
+
+/** A sandbox subcommand probe cannot authorize an unobserved exec session. */
+export function assertSuccessorHostIsolationReady(probes) {
+  for (const role of ["current_prompt", "prompt_v2"]) {
+    const probe = probes?.[role];
+    if (probe?.model_calls !== 0 || probe?.allowed_control_observed !== true
+      || probe?.private_read_denied_observed !== true || probe?.exec_session_policy_observed !== true) {
+      successorFail("SUCCESSOR_HOST_ISOLATION_REQUIRED", `${role} exec-session isolation is unverified`);
+    }
+  }
+  return true;
+}
