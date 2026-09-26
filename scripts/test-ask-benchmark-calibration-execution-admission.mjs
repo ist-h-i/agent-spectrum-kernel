@@ -21,8 +21,10 @@ function createInventory(t) {
     writeFileSync(resolve(runDir, "run-identity.json"), "{}\n");
     writeFileSync(resolve(runDir, "cases", "case-a", "state.json"), "{}\n");
     const result = resolve(base, `normalized-${role}`);
-    mkdirSync(result);
+    const baseline = resolve(result, 'generations', `snapshot-${'a'.repeat(64)}`);
+    mkdirSync(baseline, { recursive: true });
     writeFileSync(resolve(result, "normalized-results-root.json"), "{}\n");
+    writeFileSync(resolve(baseline, "normalized-run.json"), "{}\n");
     sources[role] = { execution: { runDir }, scope: { run_instance_id: "synthetic-unstarted" } };
     normalizedRoots[role] = result;
   }
@@ -42,6 +44,20 @@ test("result-blind inventory guard accepts only empty unstarted roots", t => {
   });
   writeFileSync(resolve(input.normalizedRoots.current_prompt, "orphan-model-output.txt"), "never read me\n");
   assert.throws(() => inspectCalibrationUnstartedInventories(input), { code: "SUCCESSOR_IDENTITY_MISMATCH" });
+});
+
+test("marker-only and a second pre-result generation cannot masquerade as an empty collection", t => {
+  const input = createInventory(t);
+  const generations = resolve(input.normalizedRoots.current_prompt, 'generations');
+  rmSync(generations, { recursive: true });
+  assert.throws(() => inspectCalibrationUnstartedInventories(input), { code: "SUCCESSOR_IDENTITY_MISMATCH" });
+  const first = resolve(generations, `snapshot-${'a'.repeat(64)}`);
+  const second = resolve(generations, `snapshot-${'b'.repeat(64)}`);
+  mkdirSync(first, { recursive: true });
+  mkdirSync(second);
+  writeFileSync(resolve(first, 'normalized-run.json'), '{}\n');
+  writeFileSync(resolve(second, 'normalized-run.json'), '{}\n');
+  assert.throws(() => inspectCalibrationUnstartedInventories(input), { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION" });
 });
 
 test("run guard rejects claims, attempts and orphan output before byte scanning", t => {

@@ -8,6 +8,7 @@ import { CALIBRATION_INPUT_MANIFEST_SHA256, CALIBRATION_SOURCE_BINDINGS } from "
 import { inspectSuccessorScoringInputs, successorScoringOptions } from "./ask-benchmark-prompt-successor-scoring-inputs.mjs";
 import { validatePromptSuccessorPreparation, successorClosed, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
 import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
+import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { verifyPortfolioScoringInputs, verifyPrivateEvaluatorBundle, verifyPublicEvaluatorReference, computeEvaluatorBundleId, computeEvaluatorBundleDigest, validateEvaluatorSourceIdentity, validateIndependenceStatement } from "./ask-benchmark-evaluator-boundary.mjs";
 import { resolveRepositoryAdmissionDecision, resolveEffectiveAdmissionAuthorityFromRepositoryOverlayFiles, computeEffectiveAdmissionAuthorityDigest } from "./ask-benchmark-admission-decision.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
@@ -94,8 +95,17 @@ function assertUnstartedRunInventory(runDir) {
 }
 function assertEmptyResultRoot(path) {
   directory(path, "normalized result root");
-  successorExact(readdirSync(path), ["normalized-results-root.json"], "pre-result normalized result inventory");
+  // A root containing only the marker cannot be advanced by the normalizer.
+  // The baseline is the normalizer's real zero-attempt collection, published
+  // before admission and containing no normalized case result bytes.
+  successorExact(readdirSync(path).sort(), ["generations", "normalized-results-root.json"], "pre-result normalized result inventory");
   regular(resolve(path, "normalized-results-root.json"), "normalized result marker");
+  const generations = directory(resolve(path, "generations"), "normalized generations root");
+  const names = readdirSync(generations);
+  if (names.length !== 1 || !/^snapshot-[a-f0-9]{64}$/u.test(names[0])) fail("pre-result normalized collection requires one baseline generation");
+  const baseline = directory(resolve(generations, names[0]), "normalized baseline generation");
+  successorExact(readdirSync(baseline), ["normalized-run.json"], "pre-result normalized baseline inventory");
+  regular(resolve(baseline, "normalized-run.json"), "normalized baseline manifest");
 }
 /** Inventory-only guard. Its return value is never an admission capability. */
 export function inspectCalibrationUnstartedInventories({ sources, normalizedRoots }) {
@@ -126,6 +136,12 @@ function preflightNative({ preparation, sources, normalizedRoots, root }) {
     successorExact(actual.identity.repository_revision, preparation.implementation.revision, "native execution source commit");
     successorExact(actual.identity.plan.digest, source.scope.source.plan_digest, "native execution plan");
     successorExact(actual.identity.run_instance_id, source.scope.source.run_instance_id, "native run identity");
+    const baseline = verifyNormalizedPortfolioResults({ root, ...source.execution, outputPath: normalizedRoots[role] });
+    successorExact(baseline.manifest.inventory, [], "pre-result normalized case result inventory");
+    successorExact(baseline.manifest.cases.length, actual.cases.length, "pre-result normalized case count");
+    if (baseline.manifest.cases.some(item => item.status !== "pending" || item.attempt_count !== 0 || item.normalized_attempts.length !== 0)) {
+      fail("pre-result normalized collection contains a started case");
+    }
     native[role] = {
       run_instance_id: actual.identity.run_instance_id,
       plan_id: actual.plan.plan_id,
