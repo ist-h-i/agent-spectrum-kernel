@@ -11,6 +11,7 @@ import { assertSuccessorAdapterFacts } from "./ask-benchmark-prompt-successor-de
 import { validateSuccessorFromRepository } from "./ask-benchmark-prompt-successor-repository.mjs";
 import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
 import { assertCalibrationExecutionAdmission, assertCalibrationResultRoot, calibratedEffectiveAdmission } from "./ask-benchmark-calibration-execution-admission.mjs";
+import { probeSuccessorPrivateRootDeny } from "./ask-benchmark-prompt-successor-host-isolation.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const handles = new WeakMap();
@@ -100,7 +101,7 @@ function validateNativeSourceAtFreeze({ role, source, preparation, root }) {
   return actual;
 }
 
-function authorityEvidence({ preparation, sources, scoringIdentity, calibrationAdmissionEvidence }) {
+function authorityEvidence({ preparation, sources, scoringIdentity, calibrationAdmissionEvidence, hostIsolationProbes }) {
   const authorityPath = authorityPathForSources(sources);
   return {
     schema_version: "1.1.0",
@@ -120,6 +121,7 @@ function authorityEvidence({ preparation, sources, scoringIdentity, calibrationA
     implementation: structuredClone(preparation.implementation),
     scoring_input_identity: structuredClone(scoringIdentity),
     calibration_execution_admission: structuredClone(calibrationAdmissionEvidence),
+    host_isolation_probes: structuredClone(hostIsolationProbes),
     scoring_inputs_verified_at_freeze: true,
     experiment_run_instance_id: sources.current_prompt.scope.run_instance_id,
     source_closures: Object.fromEntries(Object.entries(sources).map(([role, value]) => [role, sourceClosure(value)])),
@@ -137,7 +139,7 @@ function authorityEvidence({ preparation, sources, scoringIdentity, calibrationA
   };
 }
 
-export async function openSuccessorMeasuredAuthority({ preparation, sources, scoringInputs, calibrationAdmission, root = ROOT }) {
+export async function openSuccessorMeasuredAuthority({ preparation, sources, scoringInputs, calibrationAdmission, hostIsolationProbePath, root = ROOT }) {
   ({ preparation, sources } = structuredClone({ preparation, sources }));
   successorExact(resolve(root), ROOT, "measured authority root");
   await validateSuccessorFromRepository(preparation, { root });
@@ -183,7 +185,17 @@ export async function openSuccessorMeasuredAuthority({ preparation, sources, sco
     if (current.identity.run_instance_id === candidate.identity.run_instance_id) successorFail("SUCCESSOR_NATIVE_RUN_COLLISION", "measured native runs");
   }
 
-  const baseEvidence = authorityEvidence({ preparation, sources, scoringIdentity, calibrationAdmissionEvidence: admissionEvidence });
+  const manifestPathDigest = admissionEvidence.fixtures[0]?.private_manifest_path_digest;
+  if (!manifestPathDigest || typeof hostIsolationProbePath !== "string") {
+    successorFail("SUCCESSOR_HOST_ISOLATION_REQUIRED", "admitted private manifest path for native deny probe");
+  }
+  const hostIsolationProbes = Object.fromEntries(["current_prompt", "prompt_v2"].map(role => [role,
+    probeSuccessorPrivateRootDeny({ root, source: sources[role], runtime: preparation.runtime,
+      privateManifestPath: hostIsolationProbePath, expectedManifestPathDigest: manifestPathDigest }),
+  ]));
+
+  const baseEvidence = authorityEvidence({ preparation, sources, scoringIdentity,
+    calibrationAdmissionEvidence: admissionEvidence, hostIsolationProbes });
   const body = { schema_version: "1.0.0", kind: "prompt_successor_measured_authority_freeze", evidence: baseEvidence };
   const expectedRecord = { ...body, record_digest: canonicalDigest(body) };
   if (!hadRecord) writeAuthorityRecordOnce(recordPath, expectedRecord);

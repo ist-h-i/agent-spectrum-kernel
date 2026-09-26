@@ -151,6 +151,15 @@ original Issue #291 source revision remains historical experiment provenance; it
 is not substituted for the preregistration source or the implementation revision
 needed to run this bridge. The capability cannot be reconstructed from JSON.
 
+For calibration execution, a new freeze and every reopen require a model-free
+native `codex sandbox -P ask_issue291` probe. It checks the exact executable,
+runtime config, role command, environment snapshot and admitted private-manifest
+path, then observes a permitted control command and a denied private read-open.
+The resulting evidence is sealed in the measured authority record. This probe
+does not observe the effective policy inside a `codex exec` model session or
+establish the provider's effective model identity; those remain target-host
+preflight requirements before trial 1.
+
 The two native role run directories must share one verified parent directory;
 that parent is the only location used for the durable authority record, journal
 and global claim. This makes the cross-role lock namespace unique for the
