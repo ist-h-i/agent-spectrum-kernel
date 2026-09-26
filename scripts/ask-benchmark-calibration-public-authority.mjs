@@ -27,8 +27,12 @@ const IMPLEMENTATION_ALLOWED = Object.freeze({
   "cal-concurrent-transfer": ["workspace/src/account-store.mjs", "workspace/src/errors.mjs", "workspace/src/index.mjs", "workspace/src/transfer-service.mjs", "workspace/src/validation.mjs", "workspace/test/transfer-service.test.mjs"],
 });
 const IMPLEMENTATION_REQUIRED = Object.freeze({
-  "cal-atomic-rule-batch": ["workspace/src/index.mjs", "workspace/src/rule-service.mjs", "workspace/test/rule-service.test.mjs"],
-  "cal-concurrent-transfer": ["workspace/src/index.mjs", "workspace/src/transfer-service.mjs", "workspace/test/transfer-service.test.mjs"],
+  "cal-atomic-rule-batch": ["workspace/src/index.mjs", "workspace/src/rule-service.mjs"],
+  "cal-concurrent-transfer": ["workspace/src/index.mjs", "workspace/src/transfer-service.mjs"],
+});
+const IMPLEMENTATION_NEW_PATH_PREFIXES = Object.freeze({
+  "cal-atomic-rule-batch": ["workspace/test/"],
+  "cal-concurrent-transfer": ["workspace/test/"],
 });
 
 // Public scoring semantics refer only to the frozen agent-visible source.
@@ -80,17 +84,22 @@ export function calibrationPublicSource({ root = ROOT, fixtureId }) {
 export function buildCalibrationEvidenceAuthority(source) {
   const allowed = IMPLEMENTATION_ALLOWED[source.fixtureId] ?? [];
   const required = IMPLEMENTATION_REQUIRED[source.fixtureId] ?? [];
+  const newPathPrefixes = IMPLEMENTATION_NEW_PATH_PREFIXES[source.fixtureId] ?? [];
   if (allowed.some(path => !source.visiblePaths.includes(path)) || required.some(path => !allowed.includes(path))) {
     throw new Error("calibration candidate scope differs from frozen source input");
   }
   const scopeBase = { allowed_candidate_paths: allowed,
     required_candidate_paths: required,
+    allowed_new_candidate_path_prefixes: newPathPrefixes,
+    required_changed_candidate_path_prefixes: newPathPrefixes,
     protected_candidate_paths: source.visiblePaths.filter(path => !allowed.includes(path)),
     unmanaged_additions: "forbidden", unmanaged_deletions: "forbidden" };
   const maps = source.requirements.map(([id, , paths]) => ({ evidence_map_id: mapId(id), agent_visible_paths: paths }));
+  // Evidence removal is pending: other visible files can still reveal a defect.
+  // No admitted authority may promote this ambiguous claim without review proof.
   const mutations = source.requirements.map(([id, , paths]) => {
     const base = { mutation_id: mutationId(id), requirement_id: id, target_evidence_map_id: mapId(id),
-      remove_paths: paths, expected_recoverability_state: "not_recoverable", expected_admission_result: "fail" };
+      remove_paths: paths, expected_recoverability_state: "ambiguous", expected_admission_result: "fail" };
     return { ...base, mutation_digest: canonicalDigest(base) };
   });
   const evidenceMap = { schema_version: "1.0.0", fixture_id: source.fixtureId,
@@ -98,6 +107,43 @@ export function buildCalibrationEvidenceAuthority(source) {
     mutation_contracts: mutations.map(({ mutation_id, target_evidence_map_id, expected_recoverability_state, expected_admission_result, mutation_digest }) =>
       ({ mutation_id, target_evidence_map_id, expected_recoverability_state, expected_admission_result, mutation_digest })) };
   return { evidenceMap, mutationAsset: { fixture_id: source.fixtureId, mutations } };
+}
+
+// Pure pre-result scope consumer for normalized candidate change entries.
+// A private runner must call this before treating the scope as admitted.
+export function validateCalibrationCandidateChangedPaths(source, changes) {
+  if (!Array.isArray(changes)) throw new Error("calibration changed-path entries are required");
+  const scope = buildCalibrationEvidenceAuthority(source).evidenceMap.scope_boundary_authority;
+  const allowed = new Set(scope.allowed_candidate_paths);
+  const required = new Set(scope.required_candidate_paths);
+  const visible = new Set(source.visiblePaths);
+  const seen = new Set();
+  const requiredPrefixes = new Set(scope.required_changed_candidate_path_prefixes);
+  for (const entry of changes) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)
+        || Object.keys(entry).sort().join(",") !== "operation,path") {
+      throw new Error("invalid calibration changed-path entry");
+    }
+    const { path, operation } = entry;
+    if (typeof path !== "string" || !path.startsWith("workspace/") || path.includes("\\") || path.includes("\0")
+        || path.split("/").some(segment => !segment || segment === "." || segment === "..") || seen.has(path)) {
+      throw new Error("invalid calibration changed path");
+    }
+    seen.add(path);
+    if (operation === "modify" && allowed.has(path)) {
+      required.delete(path);
+      for (const prefix of requiredPrefixes) if (path.startsWith(prefix)) requiredPrefixes.delete(prefix);
+    } else if (operation === "add" && !visible.has(path)
+        && scope.allowed_new_candidate_path_prefixes.some(prefix => path.startsWith(prefix) && path.length > prefix.length)) {
+      for (const prefix of requiredPrefixes) if (path.startsWith(prefix)) requiredPrefixes.delete(prefix);
+      continue;
+    } else {
+      throw new Error("calibration candidate change exceeds frozen scope");
+    }
+  }
+  if (required.size) throw new Error("calibration candidate misses required changed paths");
+  if (requiredPrefixes.size) throw new Error("calibration candidate misses required changed-path prefix");
+  return true;
 }
 
 export function buildCalibrationRequirementRecord(source, { catalogDigest, policyManifestDigest, scoringPolicyDigest, admissionRequirementDigest }) {

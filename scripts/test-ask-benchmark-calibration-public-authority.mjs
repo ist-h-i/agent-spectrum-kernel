@@ -6,7 +6,7 @@ import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { validateRequirementRecordContract } from "./ask-benchmark-scoring-contract.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
-import { CALIBRATION_REQUIREMENTS, calibrationPublicSource, buildCalibrationEvidenceAuthority, buildCalibrationRequirementRecord, buildCalibrationCommandContract, validateCalibrationPrivateMutationAuthority, buildPendingCalibrationCandidate, buildPendingCalibrationPublicArtifacts, buildCalibrationEquivalenceAuthority, assertCalibrationPrivateAssets, calibrationOutputKind } from "./ask-benchmark-calibration-public-authority.mjs";
+import { CALIBRATION_REQUIREMENTS, calibrationPublicSource, buildCalibrationEvidenceAuthority, validateCalibrationCandidateChangedPaths, buildCalibrationRequirementRecord, buildCalibrationCommandContract, validateCalibrationPrivateMutationAuthority, buildPendingCalibrationCandidate, buildPendingCalibrationPublicArtifacts, buildCalibrationEquivalenceAuthority, assertCalibrationPrivateAssets, calibrationOutputKind } from "./ask-benchmark-calibration-public-authority.mjs";
 
 test("four calibration descriptors close against frozen source inputs and full private mutation digests", () => {
   const before = readFileSync("benchmarks/fixtures/checkpoint-b2/input-manifest.json");
@@ -20,11 +20,16 @@ test("four calibration descriptors close against frozen source inputs and full p
     const mutated = structuredClone(mutationAsset);
     mutated.mutations[0].remove_paths = ["task.md"];
     assert.throws(() => validateCalibrationPrivateMutationAuthority(source, mutated), /differs from frozen public requirement evidence/u);
+    const unsupportedPromotion = structuredClone(mutationAsset);
+    unsupportedPromotion.mutations[0].expected_recoverability_state = "not_recoverable";
+    assert.throws(() => validateCalibrationPrivateMutationAuthority(source, unsupportedPromotion), /differs from frozen public requirement evidence/u);
     assert.equal(evidenceMap.maps.length, 4);
     assert.equal(mutationAsset.mutations.length, 4);
     for (const [index, mutation] of mutationAsset.mutations.entries()) {
       const { mutation_digest, ...fullBase } = mutation;
       assert.equal(mutation_digest, canonicalDigest(fullBase));
+      assert.equal(mutation.expected_recoverability_state, "ambiguous");
+      assert.equal(evidenceMap.mutation_contracts[index].expected_recoverability_state, "ambiguous");
       assert.equal(evidenceMap.mutation_contracts[index].mutation_digest, mutation_digest);
       assert.equal(evidenceMap.mutation_contracts[index].requirement_id, undefined);
       assert.deepEqual(mutation.remove_paths, evidenceMap.maps[index].agent_visible_paths);
@@ -107,6 +112,9 @@ test("fixture scope is task-specific and implementation output is not findings",
     const scope = buildCalibrationEvidenceAuthority(source).evidenceMap.scope_boundary_authority;
     assert.deepEqual(scope.allowed_candidate_paths, []);
     assert.deepEqual(scope.required_candidate_paths, []);
+    assert.deepEqual(scope.allowed_new_candidate_path_prefixes, []);
+    assert.deepEqual(scope.required_changed_candidate_path_prefixes, []);
+    assert.equal(validateCalibrationCandidateChangedPaths(source, []), true);
     assert.ok(scope.protected_candidate_paths.includes("workspace/package.json"));
     assert.deepEqual(calibrationOutputKind(source), { declares_findings: true, output_contract_type: "findings_producing" });
   }
@@ -118,8 +126,47 @@ test("fixture scope is task-specific and implementation output is not findings",
     const scope = buildCalibrationEvidenceAuthority(source).evidenceMap.scope_boundary_authority;
     assert.ok(scope.allowed_candidate_paths.includes(expectedService));
     assert.ok(scope.required_candidate_paths.includes(expectedService));
+    assert.ok(scope.allowed_new_candidate_path_prefixes.includes("workspace/test/"));
+    assert.ok(scope.required_changed_candidate_path_prefixes.includes("workspace/test/"));
+    assert.equal(scope.required_candidate_paths.some(path => path.startsWith("workspace/test/")), false);
     assert.ok(scope.protected_candidate_paths.includes(forbidden));
     for (const path of ["workspace/package.json", forbidden]) assert.equal(scope.allowed_candidate_paths.includes(path), false);
     assert.deepEqual(calibrationOutputKind(source), { declares_findings: false, output_contract_type: "implementation_producing" });
   }
+});
+
+test("calibration change scope permits new tests and rejects unmanaged changes", () => {
+  for (const [fixtureId, service, existingTest] of [
+    ["cal-atomic-rule-batch", "rule-service", "rule-service.test.mjs"],
+    ["cal-concurrent-transfer", "transfer-service", "transfer-service.test.mjs"],
+  ]) {
+    const source = calibrationPublicSource({ fixtureId });
+    const required = ["workspace/src/index.mjs", `workspace/src/${service}.mjs`]
+      .map(path => ({ path, operation: "modify" }));
+    assert.throws(() => validateCalibrationCandidateChangedPaths(source, required), /misses required changed-path prefix/u);
+    assert.equal(validateCalibrationCandidateChangedPaths(source, [...required,
+      { path: `workspace/test/${service}-new.test.mjs`, operation: "add" },
+      { path: `workspace/test/nested/${service}.test.mjs`, operation: "add" },
+      { path: `workspace/test/${existingTest}`, operation: "modify" }]), true);
+    for (const entry of [
+      { path: "workspace/package.json", operation: "modify" },
+      { path: "workspace/docs/new.md", operation: "add" },
+      { path: "workspace/src/new-module.mjs", operation: "add" },
+      { path: "workspace/src/serial-executor.mjs", operation: "modify" },
+      { path: "workspace/test/../src/new-module.mjs", operation: "add" },
+      { path: "workspace/test/./new.test.mjs", operation: "add" },
+      { path: "workspace/test//new.test.mjs", operation: "add" },
+      { path: "workspace/test\\new.test.mjs", operation: "add" },
+      { path: "workspace/test/", operation: "add" },
+      { path: `workspace/test/${existingTest}`, operation: "add" },
+      { path: `workspace/test/${existingTest}`, operation: "delete" },
+    ]) {
+      assert.throws(() => validateCalibrationCandidateChangedPaths(source, [...required, entry]), /calibration (candidate change exceeds frozen scope|changed path)/u);
+    }
+    assert.throws(() => validateCalibrationCandidateChangedPaths(source, [required[0]]), /misses required changed paths/u);
+    assert.throws(() => validateCalibrationCandidateChangedPaths(source, [...required, required[0]]), /invalid calibration changed path/u);
+  }
+  const review = calibrationPublicSource({ fixtureId: "cal-session-refresh" });
+  assert.throws(() => validateCalibrationCandidateChangedPaths(review,
+    [{ path: "workspace/test/new.test.mjs", operation: "add" }]), /exceeds frozen scope/u);
 });
