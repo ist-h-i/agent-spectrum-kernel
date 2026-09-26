@@ -45,7 +45,7 @@ for (const effort of ["medium", "high"]) test(`compiled successor fake ${effort 
   const input = Buffer.from("Synthetic offline fixture contract; no model or evaluator.\n");
   const result = spawnSync(executable, argv, {
     cwd: directory, env: { HOME: home, ASK_SUCCESSOR_FAKE_CAPTURE: captures, ASK_SUCCESSOR_FAKE_MODE: "success" },
-    input, timeout: 5000, maxBuffer: 1024 * 1024,
+    input: effort === "medium" ? input : undefined, timeout: 5000, maxBuffer: 1024 * 1024,
   });
   assert.equal(result.error, undefined, result.error?.message);
   assert.equal(result.status, effort === "medium" ? 0 : 64, result.stderr.toString());
