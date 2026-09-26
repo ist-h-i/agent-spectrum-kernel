@@ -126,8 +126,9 @@ export function buildCalibrationEvidenceAuthority(source) {
     unmanaged_additions: "forbidden", unmanaged_deletions: "forbidden" };
   const maps = source.requirements.map(([id, , paths]) => ({ evidence_map_id: mapId(id), agent_visible_paths: paths }));
   // The declaration is intentionally honest about surviving visible evidence.
-  // A recoverable mutation is a fixture-admission failure under the frozen
-  // portfolio policy, and must not be silently treated as a successful test.
+  // A recoverable mutation is a failed sensitivity check when that gate applies.
+  // The frozen admission policy scopes that gate to scored primary fixtures;
+  // calibration review must assess requirement recoverability separately.
   const removals = CALIBRATION_MUTATION_REMOVALS[source.fixtureId];
   if (removals?.length !== source.requirements.length) throw new Error("calibration mutation declaration is incomplete");
   const mutations = source.requirements.map(([id, , paths], index) => {
