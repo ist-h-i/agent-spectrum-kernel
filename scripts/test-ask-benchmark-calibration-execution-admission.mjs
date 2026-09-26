@@ -6,6 +6,7 @@ import test from "node:test";
 import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
 import {
   assertCalibrationExecutionAdmission, assertCalibrationScoringAdmissionCandidate,
+  assertCalibrationPrivateIsolationPaths,
   inspectCalibrationExecutionAdmission, inspectCalibrationUnstartedInventories,
   openCalibrationExecutionAdmission, reopenCalibrationExecutionAdmission,
 } from "./ask-benchmark-calibration-execution-admission.mjs";
@@ -91,6 +92,29 @@ test("candidate shape rejects wrong fixture, source, missing overlay and late st
     const value = candidate(); mutate(value);
     assert.throws(() => assertCalibrationScoringAdmissionCandidate(value), { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION" });
   }
+});
+
+test("private bundle and independent review files must all be under the native deny root", t => {
+  const base = realpathSync(mkdtempSync(resolve(tmpdir(), "ask291-isolation-paths-")));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const root = resolve(base, "repository");
+  const denyRoot = resolve(base, "private-authority");
+  const privateRoot = resolve(denyRoot, "cal-session-refresh");
+  const reviewAuthorityPath = resolve(denyRoot, "review-authority.json");
+  const reviewArchivePath = resolve(denyRoot, "review-archive.json");
+  mkdirSync(root); mkdirSync(privateRoot, { recursive: true });
+  writeFileSync(reviewAuthorityPath, "{}\n"); writeFileSync(reviewArchivePath, "{}\n");
+  const entry = { root, denyRoot, privateRoot, reviewAuthorityPath, reviewArchivePath };
+  assert.deepEqual(assertCalibrationPrivateIsolationPaths(entry), {
+    kind: "calibration_private_isolation_inspection", creates_admission: false,
+  });
+  const outside = resolve(base, "review-outside.json"); writeFileSync(outside, "{}\n");
+  for (const field of ["reviewAuthorityPath", "reviewArchivePath"]) {
+    assert.throws(() => assertCalibrationPrivateIsolationPaths({ ...entry, [field]: outside }),
+      { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION" });
+  }
+  assert.throws(() => assertCalibrationPrivateIsolationPaths({ ...entry, privateRoot: root }),
+    { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION" });
 });
 
 test("opaque admission cannot be forged or reopened from a claimed digest", t => {

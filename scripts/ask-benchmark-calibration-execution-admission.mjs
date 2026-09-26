@@ -216,6 +216,21 @@ export function assertCalibrationScoringAdmissionCandidate(scoring) {
   return { kind: "calibration_scoring_candidate_inspection", creates_admission: false };
 }
 
+/** All answer-bearing and review authority must share the native deny root. */
+export function assertCalibrationPrivateIsolationPaths({ root, denyRoot, privateRoot, reviewAuthorityPath, reviewArchivePath }) {
+  const denied = directory(denyRoot, "private evaluator deny root");
+  const assets = directory(privateRoot, "private evaluator root");
+  if (!inside(denied, assets)) fail("private evaluator is outside the native deny rule");
+  for (const [path, label] of [
+    [reviewAuthorityPath, "independent review authority"],
+    [reviewArchivePath, "independent review archive"],
+  ]) {
+    const external = realpathSync(externalFile(root, path, label));
+    if (!inside(denied, external)) fail(`${label} is outside the native deny rule`);
+  }
+  return { kind: "calibration_private_isolation_inspection", creates_admission: false };
+}
+
 function staticClosure({ preparation, sources, scoringInputs, admissionSourcesByFixture, normalizedRoots, root }) {
   validatePromptSuccessorPreparation(preparation);
   successorExact(resolve(root), ROOT, "calibration admission repository");
@@ -247,11 +262,7 @@ function staticClosure({ preparation, sources, scoringInputs, admissionSourcesBy
     const score = scoring.fixtures.find(item => item.fixture_id === fixtureId);
     const entry = admissionSourcesByFixture[fixtureId];
     exactKeys(entry, ["privateRoot", "manifestPath", "reviewAuthorityPath", "reviewAuthoritySourceDigest", "reviewArchivePath"], `${fixtureId} private admission sources`);
-    if (!inside(denyRoots[0], directory(entry.privateRoot, "private evaluator root"))) {
-      fail(`${fixtureId} private evaluator is outside the native deny rule`);
-    }
-    externalFile(root, entry.reviewAuthorityPath, "independent review authority");
-    externalFile(root, entry.reviewArchivePath, "independent review archive");
+    assertCalibrationPrivateIsolationPaths({ root, denyRoot: denyRoots[0], ...entry });
     const options = successorScoringOptions(scoringInputs, preparation, fixtureId);
     const { scoringInputFreezeManifestPath: freezeManifestPath, scoringInputFreezeManifestSourceDigest: freezeManifestSourceDigest, ...paths } = options;
     const publicInputs = verifyPortfolioScoringInputs({ ...paths, freezeManifestPath, freezeManifestSourceDigest });
