@@ -6,14 +6,14 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/cal-concurrent-transfer/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:85cb9d4fa5a965946d0e7f4fa6abd3dfd924fce83a0861a1455eb0b0e1f752ee",
+  "evaluator_public_reference_digest": "sha256:c0274e4bae4a72be3aaa6a218c208e658940b4c184ca38445270c75ab3447e74",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/cal-concurrent-transfer/verification-command-contract.json",
   "verification_command_contract_digest": "sha256:6eef93b221d31034f5b71be721d224a36438097ab32d2176fcb8637629dafa2c",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/cal-concurrent-transfer/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:53b70ef89ad6692ecd1e6c052199a52f9c59f2014f85b7266440bc1693e33b7c",
   "declares_findings": false,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/cal-concurrent-transfer/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:66a4ffa1d2543646d47c59ae98c39d7f9320512c3c6869616dd2eceedcb48a5e",
-  "evaluator_authority_manifest_digest": "sha256:eb930e93ed008573cf7909d3fa0fcb53e8d5650d68a30dcc87aa9d5d6f959941",
-  "output_contract_digest": "sha256:480125e7d5c32de63baa1a47bf3d074b46828067caeb879735036dca78d23650"
+  "evaluator_authority_manifest_raw_sha256": "sha256:b769812f195d55285035cf937ef16ef59575bd60d1ad336d3843ec7da7343f6a",
+  "evaluator_authority_manifest_digest": "sha256:560fa07d4f510cafd31374d65923e737c9057ea57cc116b429bd2b4ec5d3b567",
+  "output_contract_digest": "sha256:49af3ebaf1d58c797bf9a59081afc37ff37b73b0ecfa1bccb82809bf68d4b57a"
 }

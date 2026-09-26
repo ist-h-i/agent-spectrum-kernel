@@ -3,9 +3,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "input_manifest_digest": "sha256:e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
   "evaluator_reference_schema": "benchmarks/schemas/evaluator-reference.schema.json",
-  "evaluator_bundle_id": "evaluator-4ff0f6ec91b119ab22c3eb4e1aaac512a02b3e81db37051631e868d5a11f050e",
-  "evaluator_bundle_digest": "sha256:b0999751cb32344c864b45b16d4be36434644615e9da830f252caaac38afa133",
-  "evaluator_byte_count": 23047,
+  "evaluator_bundle_id": "evaluator-4ed9ae654324f13822799f459501011490cc70b9b82608eb276fd15ae4b00d01",
+  "evaluator_bundle_digest": "sha256:1f3397c1795e8cf206c7cf1356ea4b76f42ec56372ddef9eb642e83eef04420b",
+  "evaluator_byte_count": 111266,
   "evaluator_requirement_count": 4,
   "evidence_map_ids": [
     "lease-ownership-and-claim-basis",
@@ -23,9 +23,9 @@
   "admission_revision": 1,
   "admission_status": "admission_pending",
   "evaluator_source_identity": {
-    "base_git_revision": "d8518e2ca2ecc8eb37f15db5b518cf8913148728",
+    "base_git_revision": "d86d76455cea685436464565d08b1039f97b25dd",
     "source_tree_digest": "sha256:368f78a9536ae02e40a899c32a87188fbce25690aeb9010f28d750efa6e09eef",
-    "generator_source_digest": "sha256:f6f3e66a4c4645780e9e283991ee7fa045b42bb52c9b456f8c4f70b2d70672dc",
+    "generator_source_digest": "sha256:6a8faa9946d84f4836c4e576989ccd1d6a2f95b507e6504ccbd6a37ebf0ac492",
     "source_files": [
       {
         "path": "benchmarks/schemas/evaluation-input-failure-artifact.schema.json",
@@ -2149,9 +2149,9 @@
       "graph_digest": "sha256:3127e1bb3952e18ac8c754dcc51968b0777f8129886d0fc0e671509d293a8155"
     }
   },
-  "requirement_authority_digest": "sha256:9f0c3c7423af1fbe7c41f87736b44f5a3b4456532fa7145cd1d19f5994527d8d",
+  "requirement_authority_digest": "sha256:f4ba8fbb002ef7ae07391bc86b07617666bf1ae8ff5e8dacc567621f418243cd",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/cal-export-lease/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:2c09b04d6265be81be2ad7a5a86c313331baf724cc67dcebd475762eb8088ed4",
-  "evaluator_authority_manifest_digest": "sha256:9804c4a3877041b795763ce2b780dc852dd2f1c5207285917394f0e13dad636b",
-  "admission_digest": "sha256:478a1364a56ed0ab1817524fe7575620359ad856cdddf6d84a12d957060bff98"
+  "evaluator_authority_manifest_raw_sha256": "sha256:b600b6c03b6b61c1989298415527bee48984d367328d0c9f83333d59e429e5ba",
+  "evaluator_authority_manifest_digest": "sha256:478277dfe13ad0e83cd2c802344cb7f2361d472eb9406110bbd7b2302d7433ff",
+  "admission_digest": "sha256:9240cb1f6cd08b4053df732399220f3c9a4a3787790a0e8ea9c05570f1823089"
 }
