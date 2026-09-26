@@ -311,6 +311,7 @@ if (process.argv[2] === "--synthetic-admission-worker") {
     const sourceRevision = git(root, "rev-parse", "HEAD");
     assert.equal(git(root, "status", "--porcelain"), "", "run this integration from a committed source snapshot");
     const work = mkdtempSync(resolve(realpathSync(tmpdir()), "ask291-synthetic-admission-"));
+    t.after(() => rmSync(work, { recursive: true, force: true }));
     t.diagnostic("Synthetic admission integration uses a disposable clone and external test assets.");
     const clone = resolve(work, "checkout");
     command("git", ["-c", "core.hooksPath=/dev/null", "clone", "--no-hardlinks", "--no-checkout", root, clone]);
