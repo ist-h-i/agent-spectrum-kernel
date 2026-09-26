@@ -926,6 +926,19 @@ try {
     normalizedResultsPath: normalizedResults,
     publicArtifactRoot,
   };
+  const privateBoundResultPath = resolve(work, "private-bound-profile-free-evaluator-result.json");
+  const privateBoundResult = evaluatorResultFor(completedCodex, normalized.sourceSnapshotDigest, manifest, reference, scoringInputs, "completed");
+  privateBoundResult.private_fragment_digest = digest("private-bound-fragment");
+  privateBoundResult.private_fragment_bytes = 64;
+  privateBoundResult.private_evaluation_record_digest = digest("private-bound-record");
+  closeResult(privateBoundResult);
+  writeJson(privateBoundResultPath, privateBoundResult);
+  assert.throws(
+    () => verifyEvaluatorAuthority({ ...baseOptions, resultPath: privateBoundResultPath }),
+    /private evaluator authority requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together/u,
+    "profile-free evaluator results that claim private authority must verify the durable private record",
+  );
+
   const completedBoundary = verifyEvaluatorBoundary(baseOptions);
   assert.equal(completedBoundary.scoringReady, true, "completed evaluation with closed requirement coverage must be scoring-ready");
   assert.equal(verifyEvaluatorBoundary({ ...baseOptions, resultPath: resultPaths.get("manual") }).scoringReady, false, "manual-review evaluation must not be scoring-ready");
