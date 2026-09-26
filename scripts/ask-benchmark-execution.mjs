@@ -19,7 +19,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, parse, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, parse, relative, resolve, sep } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { assertNoSymlinkPathSegments } from "./content-addressed-store.mjs";
 import { captureSuccessorUsage, validateSuccessorUsage } from "./ask-benchmark-prompt-successor-usage.mjs";
@@ -48,7 +48,7 @@ import {
 } from "./ask-benchmark-terminal-workspace.mjs";
 import {
   assertSuccessorInputRun, prepareSuccessorInputForAttempt, successorInputProjection,
-  successorRuntimeForInput, successorEffectiveCommand, assertSuccessorAdapterFacts, assertSuccessorExecutableDescriptor,
+  successorRuntimeForInput, successorEffectiveCommand, assertSuccessorProfileCommand, assertSuccessorAdapterFacts, assertSuccessorExecutableDescriptor,
   assertSuccessorVersionOutput,
 } from "./ask-benchmark-prompt-successor-delivery.mjs";
 
@@ -317,6 +317,7 @@ function readRuntimeConfig(root, path, adapter) {
     throw new Error("unavailable runtime config requires unavailable_reason");
   }
   if (adapter === "codex" && value.claude_cli !== null) throw new Error("Codex runtime config must not provide a Claude CLI contract");
+  if (value.successor_private_evaluator_root !== undefined && adapter !== "codex") throw new Error("private evaluator root is Codex successor-only");
   const capture = value.command_evidence;
   if (capture.support === "supported" && (capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || capture.shell_capability.support_status !== "supported" || capture.shell_capability.family !== "posix_bash" || capture.shell_capability.executable !== "/bin/bash" || stableCanonicalJson(capture.shell_capability.envelope_arguments) !== stableCanonicalJson(["-lc"]) || capture.shell_capability.authority_source !== "codex_exec_jsonl_command_rendering" || capture.shell_capability.probe_status !== "runtime_event_required" || capture.shell_capability.downgrade_reason !== null)) throw new Error("supported command evidence requires runtime event shell authority");
   if (capture.support !== "supported" && (capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null || capture.shell_capability.support_status !== capture.support || capture.shell_capability.family !== null || capture.shell_capability.executable !== null || capture.shell_capability.envelope_arguments !== null || capture.shell_capability.authority_source !== "none" || capture.shell_capability.downgrade_reason === null)) throw new Error("unavailable command evidence shell capability is inconsistent");
@@ -324,6 +325,22 @@ function readRuntimeConfig(root, path, adapter) {
   if (adapter === "claude" && value.availability === "available") validateClaudeCommandTemplate(value);
   if (value.environment_value_allowlist.some((key) => !value.environment_allowlist.includes(key))) throw new Error("environment value allowlist must be a subset of environment allowlist");
   return { value, digest: sha256(bytes) };
+}
+
+function successorPrivateRoot(root, runtime) {
+  const path = runtime.successor_private_evaluator_root;
+  if (typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path || path === "/"
+    || !existsSync(path) || !lstatSync(path).isDirectory()) throw new Error("successor requires an existing absolute private evaluator deny root");
+  assertNoSymlinkSegments(path, "private evaluator deny root");
+  const repository = realpathSync(root);
+  const canonical = realpathSync(path);
+  const offset = relative(repository, canonical);
+  const reverse = relative(canonical, repository);
+  const overlaps = value => value === "" || (value !== ".." && !value.startsWith(`..${sep}`) && !isAbsolute(value));
+  if (overlaps(offset) || overlaps(reverse)) {
+    throw new Error("private evaluator deny root overlaps the repository");
+  }
+  return canonical;
 }
 
 function placeholderCount(command, placeholder) {
@@ -713,7 +730,10 @@ function readAdapterIdentity(root, runDir, adapter) {
   if (capture.support !== "supported" && (capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null || capture.evidence_level !== "unavailable" || capture.shell_capability.support_status !== capture.support || capture.shell_capability.family !== null || capture.shell_capability.executable !== null || capture.shell_capability.envelope_arguments !== null || capture.shell_capability.authority_source !== "none" || capture.shell_capability.downgrade_reason === null)) throw new Error(`${adapter} unsupported command evidence identity is inconsistent`);
   if (identity.availability === "available" && adapter === "codex") {
     const argv = identity.effective_command.argv;
-    if (!argv.includes("--ephemeral") || !argv.includes("--ignore-user-config") || !argv.includes("--ignore-rules") || !argv.includes("--skip-git-repo-check") || !argv.includes("--json") || argv[argv.indexOf("--sandbox") + 1] !== identity.sandbox_policy || !argv.includes(`approval_policy=\"${identity.permission_policy}\"`) || argv[argv.indexOf("--output-schema") + 1] !== "{output_schema}") throw new Error("Codex effective command does not enforce its runtime policy");
+    if (!argv.includes("--ephemeral") || !argv.includes("--ignore-user-config") || !argv.includes("--ignore-rules") || !argv.includes("--skip-git-repo-check") || !argv.includes("--json") || !argv.includes(`approval_policy=\"${identity.permission_policy}\"`) || argv[argv.indexOf("--output-schema") + 1] !== "{output_schema}") throw new Error("Codex effective command does not enforce its runtime policy");
+    if (argv.includes("--sandbox")) {
+      if (argv[argv.indexOf("--sandbox") + 1] !== identity.sandbox_policy) throw new Error("Codex legacy sandbox policy drift");
+    } else assertSuccessorProfileCommand(identity.effective_command);
   }
   if (identity.availability === "available" && adapter === "claude") {
     const argv = identity.effective_command.argv;
@@ -725,7 +745,7 @@ function readAdapterIdentity(root, runDir, adapter) {
 function ensureAdapterIdentity({ root, runDir, plan, adapter, runtimeConfig, verifiedExecutable, environmentSnapshot, successorRuntime = null }) {
   let effectiveRuntime = runtimeConfig.value;
   let command = effectiveCommand(root, effectiveRuntime);
-  if (successorRuntime !== null) command = successorEffectiveCommand(command);
+  if (successorRuntime !== null) command = successorEffectiveCommand(command, { privateEvaluatorRoot: successorPrivateRoot(root, effectiveRuntime) });
   let executable = null;
   let availabilityEvidence = null;
   if (effectiveRuntime.availability === "available") {

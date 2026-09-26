@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/evaluator-authority-manifest.schema.json",
+  "program": "adaptive_ask_evaluator_authority_manifest",
+  "fixture_id": "cal-export-lease",
+  "evaluator_revision": "22d0bf9bb69110e0ed17f0591ef16036f67bbd0f",
+  "file_inventory": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
+      "bytes": 9110,
+      "raw_sha256": "sha256:e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
+      "semantic_digest": "sha256:568cdafab9030cce94bafbca0a3b9685b994f2b457fb64264168da08efc8f5a4",
+      "authority_role": "fixture_input",
+      "fixture_input_identity": "sha256:e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
+      "semantic_fixture_entry_digest": "sha256:568cdafab9030cce94bafbca0a3b9685b994f2b457fb64264168da08efc8f5a4"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/cal-export-lease/evidence-map.json",
+      "bytes": 3268,
+      "raw_sha256": "sha256:140c92810a1adba1cdc26d1f54ba8380fd48f0411ea5746ccc697b77d29a2f19",
+      "semantic_digest": "sha256:303e5e8698bdd6634f67dfcdd28e8261063a95c44390af876f188668c7ad2543",
+      "authority_role": "evidence_map",
+      "evidence_map_set_digest": "sha256:dfda89b0c414761ec9c77e8f7713956fc20c4f36163ad4fa390a252585fdf423",
+      "requirement_ids": [
+        "lease-ownership-and-claim",
+        "tenant-authorization",
+        "retry-state-machine",
+        "review-evidence"
+      ],
+      "evidence_map_ids": [
+        "lease-ownership-and-claim-basis",
+        "tenant-authorization-basis",
+        "retry-state-machine-basis",
+        "review-evidence-basis"
+      ],
+      "requirement_map_closure_digest": "sha256:125a1051536490b78717009be017f92af64be3d7cbdbfb014e8501abd5098b46"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/cal-export-lease/verification-command-contract.json",
+      "bytes": 1237,
+      "raw_sha256": "sha256:7bf159e777e58a52c406b62be300fd48934f3da793914144d224ed4ae1e49d47",
+      "semantic_digest": "sha256:59b382070611fd17e6daa3814e16f2a7113f77fe3cb5e6ba6705f84ee96e8f4a",
+      "authority_role": "verification_command_contract",
+      "contract_digest": "sha256:59b382070611fd17e6daa3814e16f2a7113f77fe3cb5e6ba6705f84ee96e8f4a",
+      "command_inventory_digest": "sha256:e51fd89e401086f98b0602ac22da8ecf3d23e55e18495fcf0e757877ebe8ca75"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/cal-export-lease/requirement-record.json",
+      "bytes": 3355,
+      "raw_sha256": "sha256:0c455e3200f5556a6c33044b25b7bd02b5491c2a3c7130db40c0f8e6d9b71c83",
+      "semantic_digest": "sha256:e13359275e64fce9982936ca5185628a08bd1523b6975f8e2e02769910c72e32",
+      "authority_role": "requirement_record",
+      "requirement_record_digest": "sha256:e13359275e64fce9982936ca5185628a08bd1523b6975f8e2e02769910c72e32",
+      "requirement_set_digest": "sha256:22b6a89caaae4df7d9b8508ea9f0fddb01d7f918312020138bfffbeeb0baff7c"
+    }
+  ],
+  "manifest_digest": "sha256:3ec924d09bd9327d862783facf0b82947133608a123bda45af2c89a12a9ab827"
+}

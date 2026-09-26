@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "cal-atomic-rule-batch",
+  "fixture_role": "calibration",
+  "suite": "calibration",
+  "task_class": "implementation",
+  "domain": "backend_api",
+  "difficulty": "medium-hard",
+  "repetitions": 3,
+  "risk_boundary": "data_integrity",
+  "capability_families": [
+    "contract_design",
+    "state_consistency"
+  ],
+  "evidence_topologies": [
+    "cross_file_contract",
+    "implementation_and_tests"
+  ],
+  "outcome_dimensions": [
+    "behavioral_consistency",
+    "regression_prevention"
+  ],
+  "output_contract_type": "implementation_producing",
+  "requirement_record_id": "requirement-record-cal-atomic-rule-batch",
+  "output_contract_id": "output-contract-cal-atomic-rule-batch",
+  "evaluator_bundle_id": "evaluator-4785d90755183ec1570ef67629f8fc601e086cf5dc11e81b4993e90dd480c9a8",
+  "evaluator_bundle_digest": "sha256:e674ddf54ff134b2e525e73cedde2100f1ae51eaf13201cd27194fd926dfb8ee",
+  "evaluator_byte_count": 125280,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:4e394e1ac2cf09db4d965d43f5946b8d50f5eecfc03a43bbeb3a7a44b57c65ef"
+}

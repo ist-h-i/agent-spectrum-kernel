@@ -121,13 +121,15 @@ test("terminal states preserve failure/unknown boundary and reject run transplan
   const bad = clone(state); bad.cases[3].status = "completed"; bad.cases[3].result_digest = d("bad"); rejected(() => validateSuccessorResumeState(bad, prep));
 });
 test("proposed argv is explicit, carries no permission and never invokes a runtime", () => {
-  const spec = proposeSuccessorInvocation(prep, prep.cases[0].case_id, "/isolated/workspace");
+  const spec = proposeSuccessorInvocation(prep, prep.cases[0].case_id, "/isolated/workspace", "/private/tmp/synthetic-evaluator");
   assert.equal(spec.argv.at(-1), "-"); assert.equal(spec.model_call_authorized, false); assert.equal(spec.effective_isolation_verified, false);
-  assert.ok(spec.argv.includes("sandbox_workspace_write.network_access=false"));
+  assert.ok(spec.argv.includes("permissions.ask_issue291.network.enabled=false"));
+  assert.ok(!spec.argv.includes("--sandbox"));
   assert.ok(spec.argv.includes('model_reasoning_effort="medium"'));
   assert.ok(!spec.argv.includes('model_reasoning_effort="high"'));
   assert.equal(spec.timeout_ms, 900000);
-  rejected(() => proposeSuccessorInvocation(prep, prep.cases[0].case_id, "/safe/../unsafe"));
+  rejected(() => proposeSuccessorInvocation(prep, prep.cases[0].case_id, "/safe/../unsafe", "/private/tmp/synthetic-evaluator"));
+  rejected(() => proposeSuccessorInvocation(prep, prep.cases[0].case_id, "/isolated/workspace"));
   for (const authority of [undefined, true, { approved: true }]) assert.throws(() => assertSuccessorLaunchAllowed(authority), { code: "SUCCESSOR_PREPARATION_ONLY" });
 });
 test("strict JSON rejects duplicate runtime fields", () => { rejected(() => parseJsonRejectDuplicateKeys('{"model":"a","model":"b"}')); });

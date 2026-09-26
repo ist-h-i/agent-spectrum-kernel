@@ -31,6 +31,7 @@
     "reasoning_effort": { "type": "string", "minLength": 1 },
     "case_timeout_ms": { "type": "integer", "minimum": 1 },
     "sandbox_policy": { "type": "string", "minLength": 1 },
+    "successor_private_evaluator_root": { "type": "string", "minLength": 2 },
     "permission_policy": { "type": "string", "minLength": 1 },
     "executor": {
       "type": "object",

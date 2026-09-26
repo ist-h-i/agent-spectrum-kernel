@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/*successor*'
+      - 'scripts/*calibration-execution-admission*'
       - 'scripts/ask-benchmark-execution.mjs'
       - 'scripts/ask-benchmark-normalized-results.mjs'
       - 'scripts/test-fixtures/prompt-successor-fake-codex.c'
@@ -82,6 +83,8 @@ jobs:
         run: node --test scripts/test-ask-benchmark-prompt-successor-usage.mjs scripts/test-ask-benchmark-prompt-successor-control.mjs
       - name: Verify measured recovery state transitions
         run: node --test scripts/test-ask-benchmark-prompt-successor-measured-recovery.mjs
+      - name: Verify calibration execution admission boundaries
+        run: node --test scripts/test-ask-benchmark-calibration-execution-admission.mjs scripts/test-ask-benchmark-prompt-successor-host-isolation.mjs
       - name: Verify native successor transport and normalized usage
         run: node --test scripts/test-ask-benchmark-prompt-successor-execution.mjs
       - name: Verify native collection and existing scoring boundaries

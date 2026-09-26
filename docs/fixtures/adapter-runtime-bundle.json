@@ -825,7 +825,7 @@
       "measured_execution_performed": false,
       "private_evaluator_included": false,
       "validator_path": "scripts/ask-benchmark-mn-build-option-update.mjs",
-      "validator_file_sha256": "d51640759283df4171b685fbb349caee18e97496928a3498f41a707c2c4e47da",
+      "validator_file_sha256": "fa8a329bec41f465e764a31686ef07aa0d4506d2840b9501db5099faa06679d7",
       "focused_test_path": "scripts/test-ask-benchmark-mn-build-option-update.mjs",
       "focused_test_file_sha256": "d417ffb06d366d5e569d37abd0105104cee52b222f0946b8ac5f74c337f4f928"
     }

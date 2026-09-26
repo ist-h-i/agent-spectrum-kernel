@@ -1,0 +1,99 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "cal-atomic-rule-batch",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/src/errors.mjs",
+      "workspace/src/index.mjs",
+      "workspace/src/rule-service.mjs",
+      "workspace/src/rule-store.mjs",
+      "workspace/src/validation.mjs",
+      "workspace/test/rule-service.test.mjs"
+    ],
+    "required_candidate_paths": [
+      "workspace/src/index.mjs",
+      "workspace/src/rule-service.mjs"
+    ],
+    "allowed_new_candidate_path_prefixes": [
+      "workspace/test/"
+    ],
+    "required_changed_candidate_path_prefixes": [
+      "workspace/test/"
+    ],
+    "protected_candidate_paths": [
+      "task.md",
+      "workspace/docs/rule-batch.schema.json",
+      "workspace/docs/rule-batches.md",
+      "workspace/package.json"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "authority_digest": "sha256:61f77a13e27370481e0cd7b9e7551c67e64a70988b09c829fbb1b82d002bf19e"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "atomic-state-and-version-basis",
+      "agent_visible_paths": [
+        "workspace/docs/rule-batches.md",
+        "workspace/src/rule-store.mjs",
+        "workspace/src/rule-service.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "strict-input-and-canonicalization-basis",
+      "agent_visible_paths": [
+        "workspace/docs/rule-batch.schema.json",
+        "workspace/src/validation.mjs",
+        "workspace/src/errors.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "idempotency-and-isolation-basis",
+      "agent_visible_paths": [
+        "workspace/docs/rule-batch.schema.json",
+        "workspace/src/rule-service.mjs",
+        "workspace/src/rule-store.mjs",
+        "workspace/src/index.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "verification-quality-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/docs/rule-batches.md",
+        "workspace/package.json",
+        "workspace/test/rule-service.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-atomic-state-and-version-basis",
+      "target_evidence_map_id": "atomic-state-and-version-basis",
+      "expected_recoverability_state": "recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:3cf007b458a23e7e8d346cbea6740eb81c19e062703e2b6a0fc885c1b2e04e2e"
+    },
+    {
+      "mutation_id": "remove-strict-input-and-canonicalization-basis",
+      "target_evidence_map_id": "strict-input-and-canonicalization-basis",
+      "expected_recoverability_state": "recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:f3aa063dc35b3eaa820404bea1ecceb56c439305b7cecf379d8a97bcd616bf06"
+    },
+    {
+      "mutation_id": "remove-idempotency-and-isolation-basis",
+      "target_evidence_map_id": "idempotency-and-isolation-basis",
+      "expected_recoverability_state": "recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:039c2508eaf50393a082ae2504fea12f3b2e8e5e74a5f2ad76232c99cb7c36b5"
+    },
+    {
+      "mutation_id": "remove-verification-quality-basis",
+      "target_evidence_map_id": "verification-quality-basis",
+      "expected_recoverability_state": "recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:c382c1c55f61cb9c2826caef333a517ed87184ac8f718df892fc89dd17e1debd"
+    }
+  ]
+}

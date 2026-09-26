@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import test from "node:test";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { validateRequirementRecordContract } from "./ask-benchmark-scoring-contract.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { validateMutationAuthority } from "./ask-benchmark-mn-build-option-update.mjs";
 import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
 import { CALIBRATION_REQUIREMENTS, calibrationPublicSource, buildCalibrationEvidenceAuthority, validateCalibrationCandidateChangedPaths, buildCalibrationRequirementRecord, buildCalibrationCommandContract, validateCalibrationPrivateMutationAuthority, buildPendingCalibrationCandidate, buildPendingCalibrationPublicArtifacts, buildCalibrationEquivalenceAuthority, assertCalibrationPrivateAssets, calibrationOutputKind } from "./ask-benchmark-calibration-public-authority.mjs";
 
@@ -21,19 +25,22 @@ test("four calibration descriptors close against frozen source inputs and full p
     mutated.mutations[0].remove_paths = ["task.md"];
     assert.throws(() => validateCalibrationPrivateMutationAuthority(source, mutated), /differs from frozen public requirement evidence/u);
     const unsupportedPromotion = structuredClone(mutationAsset);
-    unsupportedPromotion.mutations[0].expected_recoverability_state = "not_recoverable";
+    unsupportedPromotion.mutations[0].expected_recoverability_state = "ambiguous";
     assert.throws(() => validateCalibrationPrivateMutationAuthority(source, unsupportedPromotion), /differs from frozen public requirement evidence/u);
     assert.equal(evidenceMap.maps.length, 4);
     assert.equal(mutationAsset.mutations.length, 4);
     for (const [index, mutation] of mutationAsset.mutations.entries()) {
       const { mutation_digest, ...fullBase } = mutation;
       assert.equal(mutation_digest, canonicalDigest(fullBase));
-      assert.equal(mutation.expected_recoverability_state, "ambiguous");
-      assert.equal(evidenceMap.mutation_contracts[index].expected_recoverability_state, "ambiguous");
+      assert.equal(mutation.expected_recoverability_state, "recoverable");
+      assert.equal(evidenceMap.mutation_contracts[index].expected_recoverability_state, "recoverable");
       assert.equal(evidenceMap.mutation_contracts[index].mutation_digest, mutation_digest);
       assert.equal(evidenceMap.mutation_contracts[index].requirement_id, undefined);
-      assert.deepEqual(mutation.remove_paths, evidenceMap.maps[index].agent_visible_paths);
+      assert.ok(mutation.remove_paths.length < evidenceMap.maps[index].agent_visible_paths.length);
+      assert.ok(mutation.remove_paths.every(path => evidenceMap.maps[index].agent_visible_paths.includes(path)));
       assert.ok(mutation.remove_paths.every(path => source.visiblePaths.includes(path)));
+      assert.ok(mutation.remove_paths.every(path => path.startsWith("workspace/docs/")
+        || path.startsWith("workspace/test/") || path === "workspace/pr.diff"));
       assert.notEqual(mutation_digest, canonicalDigest(evidenceMap.mutation_contracts[index]));
     }
     const command = buildCalibrationCommandContract(source);
@@ -43,6 +50,21 @@ test("four calibration descriptors close against frozen source inputs and full p
       catalogDigest: canonicalDigest("catalog"), policyManifestDigest: canonicalDigest("policy"),
       scoringPolicyDigest: canonicalDigest("scoring"), admissionRequirementDigest: canonicalDigest("admission"),
     });
+    const sourceInput = JSON.parse(before).fixtures[sourceId];
+    assert.ok(sourceInput);
+    assert.deepEqual(validateMutationAuthority({ requirementRecord: record,
+      admissionRecord: { mutation_set_ids: mutationAsset.mutations.map(({ mutation_id }) => mutation_id) },
+      evidenceMapArtifact: evidenceMap, inputManifestRecord: sourceInput, mutationAsset }),
+      { mutationIds: mutationAsset.mutations.map(({ mutation_id }) => mutation_id) });
+    if (["cal-session-refresh", "cal-export-lease"].includes(fixtureId)) {
+      for (const map of evidenceMap.maps.slice(0, 3)) assert.ok(map.agent_visible_paths.includes("workspace/pr.diff"));
+    } else {
+      for (const mutation of mutationAsset.mutations) {
+        assert.equal(mutation.remove_paths.includes("task.md"), false);
+        assert.equal(mutation.remove_paths.includes("workspace/package.json"), false);
+        assert.equal(mutation.remove_paths.some(path => path.startsWith("workspace/src/")), false);
+      }
+    }
     assert.equal(record.requirements.length, 4);
     assert.deepEqual(record.requirements.map(({ evidence_map_ids }) => evidence_map_ids[0]), evidenceMap.maps.map(({ evidence_map_id }) => evidence_map_id));
     assert.deepEqual(record.requirements.map(({ mutation_ids }) => mutation_ids[0]), mutationAsset.mutations.map(({ mutation_id }) => mutation_id));
@@ -53,6 +75,67 @@ test("four calibration descriptors close against frozen source inputs and full p
 
 test("unregistered fixture cannot acquire a public authority descriptor", () => {
   assert.throws(() => calibrationPublicSource({ fixtureId: "cal-unknown" }), /unknown calibration fixture/u);
+});
+
+test("recoverable calibration mutations require surviving mapped evidence and targeted removals", () => {
+  const source = calibrationPublicSource({ fixtureId: "cal-session-refresh" });
+  const { evidenceMap, mutationAsset } = buildCalibrationEvidenceAuthority(source);
+  const record = buildCalibrationRequirementRecord(source, {
+    catalogDigest: canonicalDigest("catalog"), policyManifestDigest: canonicalDigest("policy"),
+    scoringPolicyDigest: canonicalDigest("scoring"), admissionRequirementDigest: canonicalDigest("admission"),
+  });
+  const input = JSON.parse(readFileSync("benchmarks/fixtures/checkpoint-b2/input-manifest.json")).fixtures[source.sourceId];
+  const validate = (mutations, map = evidenceMap) => validateMutationAuthority({
+    requirementRecord: record,
+    admissionRecord: { mutation_set_ids: mutations.mutations.map(({ mutation_id }) => mutation_id) },
+    evidenceMapArtifact: map, inputManifestRecord: input, mutationAsset: mutations,
+  });
+  const noRecovery = structuredClone(mutationAsset);
+  noRecovery.mutations[0].remove_paths = [...evidenceMap.maps[0].agent_visible_paths];
+  const { mutation_digest: _oldDigest, ...noRecoveryBase } = noRecovery.mutations[0];
+  noRecovery.mutations[0].mutation_digest = canonicalDigest(noRecoveryBase);
+  assert.throws(() => validate(noRecovery), /no mapped recovery evidence/u);
+  const falseNotRecoverable = structuredClone(mutationAsset);
+  falseNotRecoverable.mutations[0].expected_recoverability_state = "not_recoverable";
+  const { mutation_digest: _falseDigest, ...falseBase } = falseNotRecoverable.mutations[0];
+  falseNotRecoverable.mutations[0].mutation_digest = canonicalDigest(falseBase);
+  assert.throws(() => validate(falseNotRecoverable), /inventory does not exactly match/u);
+  const unsupported = structuredClone(mutationAsset);
+  unsupported.mutations[0].expected_recoverability_state = "ambiguous";
+  const { mutation_digest: _unsupportedDigest, ...unsupportedBase } = unsupported.mutations[0];
+  unsupported.mutations[0].mutation_digest = canonicalDigest(unsupportedBase);
+  assert.throws(() => validate(unsupported), /unsupported by path evidence/u);
+  const unmapped = structuredClone(mutationAsset);
+  unmapped.mutations[0].remove_paths = ["workspace/src/account-store.mjs"];
+  const { mutation_digest: _otherDigest, ...unmappedBase } = unmapped.mutations[0];
+  unmapped.mutations[0].mutation_digest = canonicalDigest(unmappedBase);
+  assert.throws(() => validate(unmapped), /outside its target map/u);
+});
+
+test("declared removals keep each source workspace test runner loadable", () => {
+  const scratch = mkdtempSync(resolve(tmpdir(), "ask-calibration-mutations-"));
+  const childEnv = { ...process.env };
+  delete childEnv.NODE_TEST_CONTEXT;
+  try {
+    for (const [fixtureId, sourceId, taskClass] of CALIBRATION_SOURCE_BINDINGS) {
+      const source = calibrationPublicSource({ fixtureId });
+      const { mutationAsset } = buildCalibrationEvidenceAuthority(source);
+      for (const [index, mutation] of mutationAsset.mutations.entries()) {
+        const copy = resolve(scratch, `${fixtureId}-${index}`);
+        cpSync(resolve("benchmarks/fixtures/checkpoint-b2", sourceId), copy, { recursive: true });
+        for (const path of mutation.remove_paths) rmSync(resolve(copy, path));
+        const run = spawnSync("npm", ["test"], { cwd: resolve(copy, "workspace"), encoding: "utf8", env: childEnv });
+        const output = `${run.stdout ?? ""}\n${run.stderr ?? ""}`;
+        assert.match(output, /tests [1-9]/u, `${fixtureId}: visible tests did not load after ${mutation.mutation_id}`);
+        assert.doesNotMatch(output, /ERR_MODULE_NOT_FOUND|Could not find|MODULE_NOT_FOUND/u,
+          `${fixtureId}: mutation broke test discovery or module startup`);
+        if (taskClass === "review") assert.equal(run.status, 0, `${fixtureId}: visible review tests failed after ${mutation.mutation_id}`);
+        else assert.match(output, /Not implemented/u, `${fixtureId}: source implementation baseline changed unexpectedly`);
+      }
+    }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 });
 
 test("public requirements close against real scoring schema; synthetic candidate cannot publish", () => {

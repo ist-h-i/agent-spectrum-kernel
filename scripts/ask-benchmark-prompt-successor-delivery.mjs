@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { resolve, posix } from "node:path";
+import { isAbsolute, resolve, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   canonicalDigest, readStableBytes, parseJsonRejectDuplicateKeys,
@@ -182,11 +182,7 @@ export function assertSuccessorAdapterFacts(runtime, identity, { checkHost = fal
   successorExact(`sha256:${identity.runtime_config_sha256}`, runtime.configuration_digest, "native config bytes");
   successorExact(identity.effective_command.task_transport, "stdin", "native stdin transport");
   successorExact(canonicalDigest(identity.effective_command), identity.effective_command_digest, "native command digest");
-  const args = identity.effective_command.argv;
-  if (!Array.isArray(args) || args.at(-1) !== "-"
-    || args.filter((value) => value === "sandbox_workspace_write.network_access=false").length !== 1) {
-    successorFail("SUCCESSOR_NETWORK_COMMAND_MISSING", "native command");
-  }
+  assertSuccessorProfileCommand(identity.effective_command);
   if (checkHost) {
     successorExact(process.version.replace(/^v/u, ""), runtime.node_version.replace(/^v/u, ""), "native Node version");
     successorExact(process.platform, runtime.os, "native OS");
@@ -196,11 +192,65 @@ export function assertSuccessorAdapterFacts(runtime, identity, { checkHost = fal
   // subscription credentials or effective OS sandbox enforcement.
 }
 
-/** Add the successor's explicit policy without changing ordinary native commands. */
-export function successorEffectiveCommand(command) {
+const PROFILE = "ask_issue291";
+function privateRoot(value) {
+  if (typeof value !== "string" || !isAbsolute(value) || resolve(value) !== value || value === "/" || value.includes("\0")) {
+    successorFail("SUCCESSOR_PRIVATE_ROOT_INVALID", "private evaluator deny root");
+  }
+  return value;
+}
+function profileSettings(root) {
+  return [
+    `default_permissions="${PROFILE}"`,
+    `permissions.${PROFILE}.extends=":workspace"`,
+    `permissions.${PROFILE}.filesystem={ ${JSON.stringify(root)} = "deny" }`,
+    `permissions.${PROFILE}.network.enabled=false`,
+  ];
+}
+
+/** The exact successor CLI policy; no --sandbox may override this profile. */
+export function assertSuccessorProfileCommand(command, expectedPrivateRoot = null) {
+  const argv = command?.argv;
+  if (command?.task_transport !== "stdin" || !Array.isArray(argv) || argv.at(-1) !== "-"
+    || argv.includes("--sandbox") || argv.some(part => typeof part !== "string"
+      || part.startsWith("sandbox_mode=") || part.startsWith("sandbox_workspace_write."))) {
+    successorFail("SUCCESSOR_PROFILE_COMMAND_INVALID", "native command");
+  }
+  const settings = [];
+  for (let index = 0; index < argv.length; index++) if (argv[index] === "-c") {
+    if (index + 1 >= argv.length - 1) successorFail("SUCCESSOR_PROFILE_COMMAND_INVALID", "config argument");
+    settings.push(argv[++index]);
+  }
+  const rootSetting = settings.filter(value => value.startsWith(`permissions.${PROFILE}.filesystem=`));
+  if (rootSetting.length !== 1) successorFail("SUCCESSOR_PRIVATE_ROOT_INVALID", "profile deny rule");
+  const match = /^permissions\.ask_issue291\.filesystem=\{ ("(?:[^"\\]|\\.)+") = "deny" \}$/u.exec(rootSetting[0]);
+  if (!match) successorFail("SUCCESSOR_PRIVATE_ROOT_INVALID", "profile deny rule");
+  let root;
+  try { root = privateRoot(JSON.parse(match[1])); }
+  catch { successorFail("SUCCESSOR_PRIVATE_ROOT_INVALID", "profile deny rule"); }
+  if (expectedPrivateRoot !== null) successorExact(root, privateRoot(expectedPrivateRoot), "profile private evaluator root");
+  const required = [...profileSettings(root), 'model_reasoning_effort="medium"', 'approval_policy="never"'];
+  for (const expected of required) if (settings.filter(value => value === expected).length !== 1) {
+    successorFail("SUCCESSOR_PROFILE_COMMAND_INVALID", "profile setting");
+  }
+  if (settings.length !== required.length) successorFail("SUCCESSOR_PROFILE_COMMAND_INVALID", "conflicting profile setting");
+  return root;
+}
+
+/** Replace the legacy --sandbox setting only for the measured successor. */
+export function successorEffectiveCommand(command, { privateEvaluatorRoot } = {}) {
+  const root = privateRoot(privateEvaluatorRoot);
   if (command.task_transport !== "stdin" || command.argv.at(-1) !== "-") successorFail("SUCCESSOR_COMMAND_TRANSPORT", "native command");
-  if (command.argv.some((value) => value.includes("sandbox_workspace_write.network_access"))) successorFail("SUCCESSOR_COMMAND_CONFLICT", "network override");
-  return { ...copy(command), argv: [...command.argv.slice(0, -1), "-c", "sandbox_workspace_write.network_access=false", "-"] };
+  const sandbox = command.argv.indexOf("--sandbox");
+  if (sandbox < 0 || command.argv[sandbox + 1] !== "workspace-write" || command.argv.lastIndexOf("--sandbox") !== sandbox
+    || command.argv.some(value => typeof value !== "string" || value.startsWith("default_permissions=")
+      || value.startsWith("permissions.") || value.startsWith("sandbox_workspace_write."))) {
+    successorFail("SUCCESSOR_COMMAND_CONFLICT", "legacy or duplicate policy");
+  }
+  const argv = [...command.argv.slice(0, sandbox), ...command.argv.slice(sandbox + 2, -1)];
+  const result = { ...copy(command), argv: [...argv, ...profileSettings(root).flatMap(value => ["-c", value]), "-"] };
+  assertSuccessorProfileCommand(result, root);
+  return result;
 }
 
 /** Runner checks these immutable mappings before creating a run or spawning. */

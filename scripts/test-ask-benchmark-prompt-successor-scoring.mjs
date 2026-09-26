@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,7 +47,7 @@ function selection(record, plan) {
       renderer_version: record.projection_evidence.renderer_version, projection_fingerprint: record.projection_evidence.projection_fingerprint } };
 }
 
-async function worker(contextPath) {
+async function worker(contextPath, { pendingAdmissionRegression = false } = {}) {
   const context = read(contextPath);
   assert.equal(root, realpathSync(context.clone), "worker runs only in its isolated local clone");
   assert.equal(git(root, "rev-parse", "HEAD"), context.cloneRevision);
@@ -60,7 +60,7 @@ async function worker(contextPath) {
     declared_activity: { evidence_kind: "expected_not_instrumented", expected_provider_calls: 0,
       expected_measured_result_reads: 0, expected_private_evaluator_process_calls: 0 },
     synthetic_native_attempts: 0, checks: [], completed: false,
-    limits: "Synthetic legacy-profile evaluator envelopes and pending admission; no real evaluator approval, token measurement or adoption evidence." };
+    limits: "Synthetic pending admission only; no real evaluator approval, token measurement or adoption evidence. The former 28 fake-trial positive path is tracked as a TODO until a synthetic private/review admission fixture exists." };
   const check = async (name, fn) => { await fn(); record.checks.push({ name, status: "pass" }); console.log(`PASS ${name}`); };
   try {
     const { buildPortfolioPlan } = await import("./ask-benchmark-plan.mjs");
@@ -88,10 +88,13 @@ async function worker(contextPath) {
     const compiler = process.platform === "darwin" ? "/usr/bin/clang" : "cc";
     const agentBin = resolve(work, "codex");
     run(compiler, ["-std=c11", "-Wall", "-Wextra", "-Werror", "-O0", resolve(root, "scripts/test-fixtures/prompt-successor-fake-codex.c"), "-o", agentBin]);
+    const privateDenyRoot = resolve(work, "synthetic-private");
+    assert.ok(existsSync(privateDenyRoot), "the disposable private test root must exist before native setup");
     const nativeFile = {
       schema_version: "1.2.0", adapter: "codex", availability: "available", unavailable_reason: null,
       expected_executable_version: "codex-cli 0.153.4", model: "synthetic-native-fake-not-a-service", reasoning_effort: "medium",
       case_timeout_ms: 900000, sandbox_policy: "workspace-write", permission_policy: "never",
+      successor_private_evaluator_root: privateDenyRoot,
       executor: { id: "successor-native-fake", version: "1.0.0" },
       environment_allowlist: ["HOME", "ASK_SUCCESSOR_FAKE_CAPTURE", "ASK_SUCCESSOR_FAKE_MODE"], environment_value_allowlist: [], thermal_state: "cold", claude_cli: null,
       command_evidence: { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.3.0",
@@ -156,6 +159,29 @@ async function worker(contextPath) {
       const { root: _root, ...execution } = role.execution;
       return [name, { scope: role.scope, expectedScopeDigest: role.scope.scope_digest, execution, runtimeConfigPath, agentBin }];
     }));
+    if (pendingAdmissionRegression) {
+      await check("pending public inputs cannot create measured authority without private execution admission", async () => {
+        await assert.rejects(() => openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, scoringInputs, root }),
+          { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION", path: "opaque admission handle is required" });
+        await assert.rejects(() => openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, scoringInputs,
+          calibrationAdmission: { kind: "calibration_execution_admission_handle" }, root }),
+          { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION", path: "opaque admission handle is required" });
+        await assert.rejects(() => openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, root }),
+          { code: "SUCCESSOR_UNVERIFIED_SCORING_INPUTS" });
+      });
+      await check("rejected admission leaves native cases unclaimed and no measured freeze or journal", () => {
+        for (const role of Object.values(roles)) {
+          const native = inspectVerifiedPortfolioExecution({ ...role.execution, root });
+          assert.ok(native.cases.length > 0);
+          assert.ok(native.cases.every(item => item.state.status === "pending" && item.state.attempt_count === 0 && item.attempts.length === 0));
+        }
+        assert.deepEqual(readdirSync(work).filter(name => name.startsWith(".ask-successor-issue291-")), []);
+      });
+      record.final_revision = git(root, "rev-parse", "HEAD"); record.final_status = git(root, "status", "--porcelain");
+      assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, "");
+      assert.equal(record.checks.length, 5); record.completed = true;
+      return;
+    }
     let measuredAuthority; let measuredJournalPath;
     await check("issue291 measured authority binds exact host/runtime and both native sources", async () => {
       measuredAuthority = await openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, scoringInputs, root });
@@ -808,9 +834,10 @@ async function worker(contextPath) {
 }
 
 if (process.argv[2] === "--worker") {
-  await worker(process.argv[3]);
+  await worker(process.argv[3], { pendingAdmissionRegression: process.argv[4] === "--pending-admission-regression" });
 } else {
-  await test("successor canonical input and real #197 provenance integration (synthetic only)", { timeout: 10800000 }, async t => {
+  test.todo("28 fake-trial measured scoring positive requires a synthetic private bundle and independent review bound by the calibration execution-admission contract");
+  await test("pending synthetic public inputs reject measured freeze without calibration execution admission", { timeout: 10800000 }, async t => {
     assert.equal(process.versions.node.split(".")[0], "24", "Node 24 required; no successful skip");
     assert.ok(["darwin", "linux"].includes(process.platform));
     const sourceRevision = git(root, "rev-parse", "HEAD"); assert.equal(git(root, "status", "--porcelain"), "");
@@ -830,14 +857,15 @@ if (process.argv[2] === "--worker") {
     const changed = git(clone, "diff", "--name-only", sourceRevision, cloneRevision).split("\n");
     assert.ok(changed.length > 0 && changed.every(p => p.startsWith(`${prefix}/`)), "synthetic clone changes public test inputs only");
     const contextPath = resolve(work, "context.json"); write(contextPath, { sourceRevision, cloneRevision, clone, work, scoring });
-    const result = spawnSync(process.execPath, [resolve(clone, relative(root, fileURLToPath(import.meta.url))), "--worker", contextPath], {
+    const result = spawnSync(process.execPath, [resolve(clone, relative(root, fileURLToPath(import.meta.url))), "--worker", contextPath, "--pending-admission-regression"], {
       cwd: clone, encoding: "utf8", timeout: 10600000, maxBuffer: 20 * 1024 * 1024,
     });
     writeFileSync(resolve(work, "worker.stdout.log"), result.stdout ?? ""); writeFileSync(resolve(work, "worker.stderr.log"), result.stderr ?? "");
     if (result.stdout) console.log(result.stdout);
     assert.equal(git(root, "rev-parse", "HEAD"), sourceRevision); assert.equal(git(root, "status", "--porcelain"), "");
     assert.equal(result.error, undefined, result.error?.message); assert.equal(result.status, 0, result.stderr || result.stdout);
-    const proof = read(resolve(work, "scoring-verification.json")); assert.equal(proof.completed, true); assert.equal(proof.synthetic_native_attempts, 28);
+    const proof = read(resolve(work, "scoring-verification.json")); assert.equal(proof.completed, true); assert.equal(proof.synthetic_native_attempts, 0);
+    assert.equal(proof.checks.length, 5);
     assert.deepEqual(proof.declared_activity, { evidence_kind: "expected_not_instrumented", expected_provider_calls: 0,
       expected_measured_result_reads: 0, expected_private_evaluator_process_calls: 0 });
     for (const key of ["provider_calls", "measured_result_reads", "private_evaluator_process_calls"]) assert.equal(Object.hasOwn(proof, key), false);

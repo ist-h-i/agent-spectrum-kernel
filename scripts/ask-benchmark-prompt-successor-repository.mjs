@@ -16,6 +16,8 @@ const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const sourceSession = pinSourceSession(ROOT, [
   "scripts/ask-benchmark-calibration-source.mjs",
   "scripts/ask-benchmark-prompt-successor-scoring-inputs.mjs",
+  "scripts/ask-benchmark-admission-decision.mjs",
+  "scripts/ask-benchmark-admitted-fixture-invariance.mjs",
   "scripts/ask-benchmark-materialize.mjs",
   "scripts/ask-benchmark-evaluator-boundary.mjs",
   "benchmarks/schemas/portfolio-config.schema.json",
@@ -31,6 +33,7 @@ const sourceSession = pinSourceSession(ROOT, [
   "scripts/ask-benchmark-prompt-successor-control.mjs",
   "scripts/ask-benchmark-prompt-successor-collection.mjs",
   "scripts/ask-benchmark-prompt-successor-measured-authority.mjs",
+  "scripts/ask-benchmark-calibration-execution-admission.mjs",
   "scripts/ask-benchmark-prompt-successor-measured-execution.mjs",
   "scripts/ask-benchmark-normalized-results.mjs",
   "benchmarks/schemas/portfolio-attempt-result.schema.json",

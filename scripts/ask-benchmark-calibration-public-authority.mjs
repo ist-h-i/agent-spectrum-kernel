@@ -34,33 +34,63 @@ const IMPLEMENTATION_NEW_PATH_PREFIXES = Object.freeze({
   "cal-atomic-rule-batch": ["workspace/test/"],
   "cal-concurrent-transfer": ["workspace/test/"],
 });
+// These mutations remove one relevant input while retaining the task and the
+// modules needed to run the visible workspace. Their surviving evidence makes
+// them recoverable; a reviewer must not promote them as successful sensitivity
+// mutations merely because all paths in a smaller map were deleted.
+const CALIBRATION_MUTATION_REMOVALS = Object.freeze({
+  "cal-session-refresh": [
+    ["workspace/docs/sessions.md"],
+    ["workspace/docs/session.schema.json"],
+    ["workspace/test/http-handlers.test.mjs"],
+    ["workspace/pr.diff"],
+  ],
+  "cal-export-lease": [
+    ["workspace/docs/export-jobs.md"],
+    ["workspace/docs/job.schema.json"],
+    ["workspace/test/job-store.test.mjs"],
+    ["workspace/pr.diff"],
+  ],
+  "cal-atomic-rule-batch": [
+    ["workspace/docs/rule-batches.md"],
+    ["workspace/docs/rule-batch.schema.json"],
+    ["workspace/docs/rule-batch.schema.json"],
+    ["workspace/docs/rule-batches.md"],
+  ],
+  "cal-concurrent-transfer": [
+    ["workspace/docs/transfers.md"],
+    ["workspace/docs/transfers.md"],
+    ["workspace/docs/transfer.schema.json"],
+    ["workspace/docs/transfer.schema.json"],
+  ],
+});
 
 // Public scoring semantics refer only to the frozen agent-visible source.
 // Private evaluator rules and answer-bearing material are authored separately.
 export const CALIBRATION_REQUIREMENTS = Object.freeze({
   "cal-session-refresh": [
-    ["rotation-atomicity", 4, ["workspace/docs/sessions.md", "workspace/src/auth-service.mjs", "workspace/src/session-store.mjs", "workspace/test/auth-service.test.mjs"]],
-    ["current-account-authority", 3, ["workspace/docs/session.schema.json", "workspace/src/account-store.mjs", "workspace/src/http-handlers.mjs"]],
-    ["expiry-and-recovery", 2, ["workspace/src/tokens.mjs", "workspace/src/errors.mjs", "workspace/test/http-handlers.test.mjs"]],
+    ["rotation-atomicity", 4, ["workspace/docs/sessions.md", "workspace/src/auth-service.mjs", "workspace/src/session-store.mjs", "workspace/test/auth-service.test.mjs", "workspace/pr.diff"]],
+    ["current-account-authority", 3, ["workspace/docs/session.schema.json", "workspace/src/account-store.mjs", "workspace/src/http-handlers.mjs", "workspace/pr.diff"]],
+    ["expiry-and-recovery", 2, ["workspace/src/tokens.mjs", "workspace/src/errors.mjs", "workspace/test/http-handlers.test.mjs", "workspace/pr.diff"]],
     ["review-evidence", 1, ["task.md", "workspace/pr.diff", "workspace/package.json"]],
   ],
   "cal-export-lease": [
-    ["lease-ownership-and-claim", 4, ["workspace/docs/export-jobs.md", "workspace/src/export-service.mjs", "workspace/src/job-store.mjs"]],
-    ["tenant-authorization", 3, ["workspace/docs/job.schema.json", "workspace/src/http-handlers.mjs", "workspace/test/export-service.test.mjs"]],
-    ["retry-state-machine", 2, ["workspace/src/retry-policy.mjs", "workspace/src/errors.mjs", "workspace/test/job-store.test.mjs"]],
+    ["lease-ownership-and-claim", 4, ["workspace/docs/export-jobs.md", "workspace/src/export-service.mjs", "workspace/src/job-store.mjs", "workspace/pr.diff"]],
+    ["tenant-authorization", 3, ["workspace/docs/job.schema.json", "workspace/src/http-handlers.mjs", "workspace/test/export-service.test.mjs", "workspace/pr.diff"]],
+    ["retry-state-machine", 2, ["workspace/src/retry-policy.mjs", "workspace/src/errors.mjs", "workspace/test/job-store.test.mjs", "workspace/pr.diff"]],
     ["review-evidence", 1, ["task.md", "workspace/pr.diff", "workspace/package.json"]],
   ],
   "cal-atomic-rule-batch": [
     ["atomic-state-and-version", 4, ["workspace/docs/rule-batches.md", "workspace/src/rule-store.mjs", "workspace/src/rule-service.mjs"]],
     ["strict-input-and-canonicalization", 3, ["workspace/docs/rule-batch.schema.json", "workspace/src/validation.mjs", "workspace/src/errors.mjs"]],
-    ["idempotency-and-isolation", 2, ["workspace/src/rule-service.mjs", "workspace/src/rule-store.mjs", "workspace/src/index.mjs"]],
-    ["verification-quality", 1, ["task.md", "workspace/package.json", "workspace/test/rule-service.test.mjs"]],
+    ["idempotency-and-isolation", 2, ["workspace/docs/rule-batch.schema.json", "workspace/src/rule-service.mjs", "workspace/src/rule-store.mjs", "workspace/src/index.mjs"]],
+    ["verification-quality", 1, ["task.md", "workspace/docs/rule-batches.md", "workspace/package.json", "workspace/test/rule-service.test.mjs"]],
   ],
   "cal-concurrent-transfer": [
     ["atomic-transfer-and-audit", 4, ["workspace/docs/transfers.md", "workspace/src/account-store.mjs", "workspace/src/transfer-service.mjs"]],
-    ["concurrent-idempotency", 3, ["workspace/src/serial-executor.mjs", "workspace/src/transfer-service.mjs", "workspace/test/transfer-service.test.mjs"]],
+    ["concurrent-idempotency", 3, ["workspace/docs/transfers.md", "workspace/src/serial-executor.mjs", "workspace/src/transfer-service.mjs", "workspace/test/transfer-service.test.mjs"]],
     ["strict-contract-and-isolation", 2, ["workspace/docs/transfer.schema.json", "workspace/src/validation.mjs", "workspace/src/index.mjs"]],
-    ["verification-quality", 1, ["task.md", "workspace/package.json", "workspace/test/transfer-service.test.mjs"]],
+    ["verification-quality", 1, ["task.md", "workspace/docs/transfer.schema.json", "workspace/package.json", "workspace/test/transfer-service.test.mjs"]],
   ],
 });
 
@@ -95,11 +125,21 @@ export function buildCalibrationEvidenceAuthority(source) {
     protected_candidate_paths: source.visiblePaths.filter(path => !allowed.includes(path)),
     unmanaged_additions: "forbidden", unmanaged_deletions: "forbidden" };
   const maps = source.requirements.map(([id, , paths]) => ({ evidence_map_id: mapId(id), agent_visible_paths: paths }));
-  // Evidence removal is pending: other visible files can still reveal a defect.
-  // No admitted authority may promote this ambiguous claim without review proof.
-  const mutations = source.requirements.map(([id, , paths]) => {
+  // The declaration is intentionally honest about surviving visible evidence.
+  // A recoverable mutation is a failed sensitivity check when that gate applies.
+  // The frozen admission policy scopes that gate to scored primary fixtures;
+  // calibration review must assess requirement recoverability separately.
+  const removals = CALIBRATION_MUTATION_REMOVALS[source.fixtureId];
+  if (removals?.length !== source.requirements.length) throw new Error("calibration mutation declaration is incomplete");
+  const mutations = source.requirements.map(([id, , paths], index) => {
+    const removePaths = removals[index];
+    if (!removePaths?.length || removePaths.length >= paths.length
+        || new Set(removePaths).size !== removePaths.length
+        || removePaths.some(path => !paths.includes(path))) {
+      throw new Error("calibration mutation removal is not a targeted subset of its visible evidence");
+    }
     const base = { mutation_id: mutationId(id), requirement_id: id, target_evidence_map_id: mapId(id),
-      remove_paths: paths, expected_recoverability_state: "ambiguous", expected_admission_result: "fail" };
+      remove_paths: removePaths, expected_recoverability_state: "recoverable", expected_admission_result: "fail" };
     return { ...base, mutation_digest: canonicalDigest(base) };
   });
   const evidenceMap = { schema_version: "1.0.0", fixture_id: source.fixtureId,

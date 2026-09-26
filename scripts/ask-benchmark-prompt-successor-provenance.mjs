@@ -74,10 +74,16 @@ export async function verifySuccessorSourceProvenance({
     import("./ask-benchmark-admission-decision.mjs"),
   ]);
   let measuredCollectionDigest = null;
+  let measuredEffectiveAdmission = null;
   if (accessMode === "measured") {
-    const { assertSuccessorMeasuredSourceAuthority } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
+    const { assertSuccessorMeasuredSourceAuthority, successorMeasuredEffectiveAdmission } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
     const { assertSuccessorMeasuredCompletion } = await import("./ask-benchmark-prompt-successor-measured-execution.mjs");
     assertSuccessorMeasuredSourceAuthority(measuredAuthority, { preparation, scope });
+    // Close every fixture's review and private admission before opening a result.
+    measuredEffectiveAdmission = new Map(preparation.predecessor.fixtures.map(({ fixture_id }) => [fixture_id,
+      successorMeasuredEffectiveAdmission(measuredAuthority, fixture_id, {
+        preparation, scope, normalizedResultsPath: source.paths.normalizedResultsPath,
+      })]));
     measuredCollectionDigest = canonicalDigest(assertSuccessorMeasuredCompletion(measuredCompletion, { authority: measuredAuthority, preparation, scope }));
   }
   const stored = await openSuccessorResultSource({ preparation, scope, expectedScopeDigest, ...source, accessMode, measuredAuthority, measuredCompletion, root });
@@ -133,13 +139,15 @@ export async function verifySuccessorSourceProvenance({
     // Mirror #197's admission-resolution boundary; do not fabricate its private
     // verified-authority handle or infer admission from the result's status.
     const inputs = derived.scoringInputs;
-    // The preparation-1.1 manifest binds only the frozen admission record.
-    // An otherwise valid later overlay is not this experiment's pinned authority.
-    const effectiveAdmissionAuthority = admission.resolveEffectiveAdmissionAuthority({
-      frozenAdmissionRecord: inputs.admissionRecord,
-      requirementRecord: inputs.requirementRecord,
-      evaluatorReference: inputs.evaluatorReference, root,
-    });
+    // Measured admission comes only from the pre-result frozen review binding.
+    // The per-case options remain unable to add a late overlay.
+    const effectiveAdmissionAuthority = accessMode === "measured"
+      ? measuredEffectiveAdmission.get(target.fixture_id)
+      : admission.resolveEffectiveAdmissionAuthority({
+        frozenAdmissionRecord: inputs.admissionRecord,
+        requirementRecord: inputs.requirementRecord,
+        evaluatorReference: inputs.evaluatorReference, root,
+      });
     // Existing #197 raw scoring remains the only score calculation.
     const rebuilt = scorer.buildPortfolioEngineeringResult({ ...derived, effectiveAdmissionAuthority }, { root });
     successorExact(rebuilt, saved.engineering, "rederived complete engineering result");

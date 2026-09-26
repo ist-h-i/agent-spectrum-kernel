@@ -1,0 +1,86 @@
+{
+  "requirement_record_id": "requirement-record-cal-export-lease",
+  "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+  "requirement_record_path": "benchmarks/fixtures/checkpoint-b2/cal-export-lease/requirement-record.json",
+  "fixture_id": "cal-export-lease",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+  "admission_record_digest": "sha256:d5eec48ffe0064206da2bd6fff71fbed8e9459de0fcab3ec6587787120635fb7",
+  "requirements": [
+    {
+      "requirement_id": "lease-ownership-and-claim",
+      "requirement_kind": "weighted",
+      "max_points": 4,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "lease-ownership-and-claim-basis"
+      ],
+      "mutation_ids": [
+        "remove-lease-ownership-and-claim-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-lease-ownership-and-claim"
+      ],
+      "finding_group_id": "lease-ownership-and-claim-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:3e6b4bbb9e88da5928f560f848e95458e8f9f0e0196151076d8c8520a0444130"
+    },
+    {
+      "requirement_id": "tenant-authorization",
+      "requirement_kind": "weighted",
+      "max_points": 3,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "tenant-authorization-basis"
+      ],
+      "mutation_ids": [
+        "remove-tenant-authorization-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-tenant-authorization"
+      ],
+      "finding_group_id": "tenant-authorization-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:ef514e4da4e182515ee4aa4c47f5a7d2f7e07470a679e692b32041740f7ee92b"
+    },
+    {
+      "requirement_id": "retry-state-machine",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "retry-state-machine-basis"
+      ],
+      "mutation_ids": [
+        "remove-retry-state-machine-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-retry-state-machine"
+      ],
+      "finding_group_id": "retry-state-machine-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:1564d8ebae4c583fae7d98d8ba5fdb4744885c7dde699165946360e4152f48a2"
+    },
+    {
+      "requirement_id": "review-evidence",
+      "requirement_kind": "weighted",
+      "max_points": 1,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "review-evidence-basis"
+      ],
+      "mutation_ids": [
+        "remove-review-evidence-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-review-evidence"
+      ],
+      "finding_group_id": "review-evidence-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:29a7d3a4f3e9daf4eb88ccc77fcdb5247f41e167d74ec19ff3d8b8bfb1a4385a"
+    }
+  ],
+  "requirement_set_digest": "sha256:22b6a89caaae4df7d9b8508ea9f0fddb01d7f918312020138bfffbeeb0baff7c",
+  "requirement_record_digest": "sha256:e13359275e64fce9982936ca5185628a08bd1523b6975f8e2e02769910c72e32"
+}
