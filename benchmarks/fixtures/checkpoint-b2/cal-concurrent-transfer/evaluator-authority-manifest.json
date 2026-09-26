@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/evaluator-authority-manifest.schema.json",
   "program": "adaptive_ask_evaluator_authority_manifest",
   "fixture_id": "cal-concurrent-transfer",
-  "evaluator_revision": "d86d76455cea685436464565d08b1039f97b25dd",
+  "evaluator_revision": "22d0bf9bb69110e0ed17f0591ef16036f67bbd0f",
   "file_inventory": [
     {
       "path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
@@ -16,11 +16,11 @@
     },
     {
       "path": "benchmarks/fixtures/checkpoint-b2/cal-concurrent-transfer/evidence-map.json",
-      "bytes": 3406,
-      "raw_sha256": "sha256:4e19d1127ee070e0d826b7ec24578768d60753d1d6eaf84867540226fd54a514",
-      "semantic_digest": "sha256:3fc2c690b9bb613378769e0b726e74ec15b204939336378c5443ab125a9e3e19",
+      "bytes": 3476,
+      "raw_sha256": "sha256:0f300e9c8833e8ebe909e189b8e6766c134f61bc7508b667fa26eb78e7d453bc",
+      "semantic_digest": "sha256:8e4c084dab00f1ffa1afdb3a320b53153608b671d27c51f2dc8830504bf4db8a",
       "authority_role": "evidence_map",
-      "evidence_map_set_digest": "sha256:b3be5e6d473e35d4f53fc6d896f40dc618452b7ace448b5bd3b33ad160d362b0",
+      "evidence_map_set_digest": "sha256:9c67c0b524815d0a6aa919faadf7cb2bce14c8336ccb63cfaa0ca5ce754ef917",
       "requirement_ids": [
         "atomic-transfer-and-audit",
         "concurrent-idempotency",
@@ -47,12 +47,12 @@
     {
       "path": "benchmarks/fixtures/checkpoint-b2/cal-concurrent-transfer/requirement-record.json",
       "bytes": 3481,
-      "raw_sha256": "sha256:e70a189d7400e69e93aaf3fc1b0ffc5ec23e760dad2374e47283b752ea4610c7",
-      "semantic_digest": "sha256:9e8bf17aab5758a24546f111dc0d7b4f438cbf5d3080ebea4edc7a24f4b21677",
+      "raw_sha256": "sha256:636f274357c0801714cc2eef4283b90b621974cd51cbfebdc9916225b1c286a8",
+      "semantic_digest": "sha256:ade3e890977cdd0e7072f737190fb1d498a524460cea4bb3a17f090967e76c4d",
       "authority_role": "requirement_record",
-      "requirement_record_digest": "sha256:9e8bf17aab5758a24546f111dc0d7b4f438cbf5d3080ebea4edc7a24f4b21677",
+      "requirement_record_digest": "sha256:ade3e890977cdd0e7072f737190fb1d498a524460cea4bb3a17f090967e76c4d",
       "requirement_set_digest": "sha256:62ef2a25dca103b47e0760d82f520d90c6b2c1ea3a8cab9b081a9c269fbee359"
     }
   ],
-  "manifest_digest": "sha256:560fa07d4f510cafd31374d65923e737c9057ea57cc116b429bd2b4ec5d3b567"
+  "manifest_digest": "sha256:c68ee2af7754017beea6457fcb9e688603dab807e0e6dc798961b822bf302fe7"
 }

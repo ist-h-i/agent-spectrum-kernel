@@ -67,30 +67,30 @@
     {
       "mutation_id": "remove-rotation-atomicity-basis",
       "target_evidence_map_id": "rotation-atomicity-basis",
-      "expected_recoverability_state": "not_recoverable",
+      "expected_recoverability_state": "recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:090000bbcf436f9dc05962a0e8026b63888783a6222ca547e7b07f700d6d8d63"
+      "mutation_digest": "sha256:8b1a844e75886e27e49f3a3154f272b9ef59bd84d99f4b65181268e85a88ba0b"
     },
     {
       "mutation_id": "remove-current-account-authority-basis",
       "target_evidence_map_id": "current-account-authority-basis",
-      "expected_recoverability_state": "not_recoverable",
+      "expected_recoverability_state": "recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:9fa7f454e4a91a359c5a289bd0d868effdde8860f04059af41f4adac48bc6107"
+      "mutation_digest": "sha256:bd150ecc7a7d908d412d6a35535024f35a6a152d06acbff8e498e9330ca56874"
     },
     {
       "mutation_id": "remove-expiry-and-recovery-basis",
       "target_evidence_map_id": "expiry-and-recovery-basis",
-      "expected_recoverability_state": "not_recoverable",
+      "expected_recoverability_state": "recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:9928997af88eef1b615b2aa5fee1eda80d4ff91111a4daafc040d898c906cb07"
+      "mutation_digest": "sha256:bc29cfa418d418e3901e0e2896243fd530c71e53607703e3f7daa46f841b846b"
     },
     {
       "mutation_id": "remove-review-evidence-basis",
       "target_evidence_map_id": "review-evidence-basis",
-      "expected_recoverability_state": "not_recoverable",
+      "expected_recoverability_state": "recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:07287dd3150f40a992b1cd497696ce091cda1ffceb64352db977e4146ea38c34"
+      "mutation_digest": "sha256:2d713fcf2987b6dda063e893b8ae0fe9a3835ccc346b5c9b3e51db729adf4211"
     }
   ]
 }

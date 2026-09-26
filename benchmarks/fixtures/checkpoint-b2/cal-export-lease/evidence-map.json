@@ -65,30 +65,30 @@
     {
       "mutation_id": "remove-lease-ownership-and-claim-basis",
       "target_evidence_map_id": "lease-ownership-and-claim-basis",
-      "expected_recoverability_state": "not_recoverable",
+      "expected_recoverability_state": "recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:4be6acef636bd765f4863de51bf023a92564c4df81aef6086b1eef640ff7d25e"
+      "mutation_digest": "sha256:a1d882b756388f1ef2d109484591284f7717440974f78125c53edc68b088dd44"
     },
     {
       "mutation_id": "remove-tenant-authorization-basis",
       "target_evidence_map_id": "tenant-authorization-basis",
-      "expected_recoverability_state": "not_recoverable",
+      "expected_recoverability_state": "recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:e426367556380276b1ae6c77fa4f6e65aea7dd6dc348bab47acaf5dcacc31c66"
+      "mutation_digest": "sha256:7bdfee44a776a9185d63588be2d381198d7046b4f1a905e3f6b9bcb7b893f95d"
     },
     {
       "mutation_id": "remove-retry-state-machine-basis",
       "target_evidence_map_id": "retry-state-machine-basis",
-      "expected_recoverability_state": "not_recoverable",
+      "expected_recoverability_state": "recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:89e7c0702deb2a4356aad8e742e570102753e7b2b96d9a823227869669193c43"
+      "mutation_digest": "sha256:7d8ab926e731af78cbf915b48d6a022b2a94a56bc3a4e9152a30ea0516a83f01"
     },
     {
       "mutation_id": "remove-review-evidence-basis",
       "target_evidence_map_id": "review-evidence-basis",
-      "expected_recoverability_state": "not_recoverable",
+      "expected_recoverability_state": "recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:07287dd3150f40a992b1cd497696ce091cda1ffceb64352db977e4146ea38c34"
+      "mutation_digest": "sha256:2d713fcf2987b6dda063e893b8ae0fe9a3835ccc346b5c9b3e51db729adf4211"
     }
   ]
 }

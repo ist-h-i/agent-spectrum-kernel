@@ -43,6 +43,7 @@
     {
       "evidence_map_id": "concurrent-idempotency-basis",
       "agent_visible_paths": [
+        "workspace/docs/transfers.md",
         "workspace/src/serial-executor.mjs",
         "workspace/src/transfer-service.mjs",
         "workspace/test/transfer-service.test.mjs"
@@ -60,6 +61,7 @@
       "evidence_map_id": "verification-quality-basis",
       "agent_visible_paths": [
         "task.md",
+        "workspace/docs/transfer.schema.json",
         "workspace/package.json",
         "workspace/test/transfer-service.test.mjs"
       ]
@@ -69,30 +71,30 @@
     {
       "mutation_id": "remove-atomic-transfer-and-audit-basis",
       "target_evidence_map_id": "atomic-transfer-and-audit-basis",
-      "expected_recoverability_state": "not_recoverable",
+      "expected_recoverability_state": "recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:df8a7e0e9ec66d5dc610353df0a785c159b4cbe908cb04f81d5ced02abcf0226"
+      "mutation_digest": "sha256:3cc9aeb20b0c2a1ea7280173f39200b93001a4ad20918d08dca43a8d3c3c28f1"
     },
     {
       "mutation_id": "remove-concurrent-idempotency-basis",
       "target_evidence_map_id": "concurrent-idempotency-basis",
-      "expected_recoverability_state": "not_recoverable",
+      "expected_recoverability_state": "recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:0a5cecbda6a46d774fd28a3662872d590b78a1b4cc5ef1572fcad1c094ae0a93"
+      "mutation_digest": "sha256:9a1f3cfb4b5c0b4323a0f58dd7d8e4f866338fc7de3f64ac765be8233ebbb1c2"
     },
     {
       "mutation_id": "remove-strict-contract-and-isolation-basis",
       "target_evidence_map_id": "strict-contract-and-isolation-basis",
-      "expected_recoverability_state": "not_recoverable",
+      "expected_recoverability_state": "recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:9346c5aaf02359b6919080272dad1a40006184ba46dd3049dfa216f8ed4c44a5"
+      "mutation_digest": "sha256:27e0a846e39100f1b1aadf07b9d9ff3ae6f5e0ec3f6d27ca8ff4deac3212e09d"
     },
     {
       "mutation_id": "remove-verification-quality-basis",
       "target_evidence_map_id": "verification-quality-basis",
-      "expected_recoverability_state": "not_recoverable",
+      "expected_recoverability_state": "recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:299558235917afa78b28aec842e95540a743eddcc05d7c940d1d1c8ba5db7124"
+      "mutation_digest": "sha256:ed72529cef3073d835ac3675e288816af98f467ec977a41f5b6b7c4e1ba6d5e7"
     }
   ]
 }

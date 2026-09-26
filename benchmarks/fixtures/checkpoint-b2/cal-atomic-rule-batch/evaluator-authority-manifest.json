@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/evaluator-authority-manifest.schema.json",
   "program": "adaptive_ask_evaluator_authority_manifest",
   "fixture_id": "cal-atomic-rule-batch",
-  "evaluator_revision": "d86d76455cea685436464565d08b1039f97b25dd",
+  "evaluator_revision": "22d0bf9bb69110e0ed17f0591ef16036f67bbd0f",
   "file_inventory": [
     {
       "path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
@@ -16,11 +16,11 @@
     },
     {
       "path": "benchmarks/fixtures/checkpoint-b2/cal-atomic-rule-batch/evidence-map.json",
-      "bytes": 3338,
-      "raw_sha256": "sha256:0299bfc6fbe1cbf0b4dcdc0d35ac505a129d961585efa54edcf7a0ec770fc8e2",
-      "semantic_digest": "sha256:77589a649aa6bf219db5755664423d05d69f980159cfa29af2427093317673ed",
+      "bytes": 3413,
+      "raw_sha256": "sha256:c9b72cc0f557ca6172306c5079dc1884544a71aadbb6410b005a2a281bc1df94",
+      "semantic_digest": "sha256:567df76176cd30ab9df4b2799172df5361c01121f40ad66f4b79cb54b526c06e",
       "authority_role": "evidence_map",
-      "evidence_map_set_digest": "sha256:2c64b79d02d38421b57821c52e6889c80f8fce19b286b96293c42914de5579b5",
+      "evidence_map_set_digest": "sha256:493030fdef5456ec23f9f45127b47dffa90f55628b5d80f25b721b56220d852b",
       "requirement_ids": [
         "atomic-state-and-version",
         "strict-input-and-canonicalization",
@@ -47,12 +47,12 @@
     {
       "path": "benchmarks/fixtures/checkpoint-b2/cal-atomic-rule-batch/requirement-record.json",
       "bytes": 3505,
-      "raw_sha256": "sha256:c01a85ad09018f62dedb865c86fd72374bb6279aaea652de698b52b7270b09af",
-      "semantic_digest": "sha256:734a67b8d3c6a320111cea31817aa44e09715b8036dc9d9a22107dbdb26b628d",
+      "raw_sha256": "sha256:68b5507e3318ee4664b38f1d0b3f8a9248cbc37fd383750378cb32ab89d1fe83",
+      "semantic_digest": "sha256:db42da379180051c56fe5d81f2eed4e7550c514da6919d3b5fb3a8f6908baeb3",
       "authority_role": "requirement_record",
-      "requirement_record_digest": "sha256:734a67b8d3c6a320111cea31817aa44e09715b8036dc9d9a22107dbdb26b628d",
+      "requirement_record_digest": "sha256:db42da379180051c56fe5d81f2eed4e7550c514da6919d3b5fb3a8f6908baeb3",
       "requirement_set_digest": "sha256:31f92d3aecf0ad60ae126a798b7fe8e7015366792048f65579130a9229ac5b4c"
     }
   ],
-  "manifest_digest": "sha256:0cfb2a3022fd75ba78190c03ba5bc92d3de77d43443c3bb7df5af9c64940108a"
+  "manifest_digest": "sha256:7cbd6f7dd5d220d782a5fb1dad1f247cbff4d2056995331beb4e6a0c9b679659"
 }
