@@ -47,12 +47,12 @@
     {
       "path": "benchmarks/fixtures/checkpoint-b2/cal-atomic-rule-batch/requirement-record.json",
       "bytes": 3505,
-      "raw_sha256": "sha256:68b5507e3318ee4664b38f1d0b3f8a9248cbc37fd383750378cb32ab89d1fe83",
-      "semantic_digest": "sha256:db42da379180051c56fe5d81f2eed4e7550c514da6919d3b5fb3a8f6908baeb3",
+      "raw_sha256": "sha256:613a3914db6b848688ebdc93dc717649e12535f84af2379dd73ddfe136a1b7b8",
+      "semantic_digest": "sha256:8f775b3b663c4ba90654594ee472b1cedc9e72c16e2a49edf7c4d1f0eed2d37b",
       "authority_role": "requirement_record",
-      "requirement_record_digest": "sha256:db42da379180051c56fe5d81f2eed4e7550c514da6919d3b5fb3a8f6908baeb3",
+      "requirement_record_digest": "sha256:8f775b3b663c4ba90654594ee472b1cedc9e72c16e2a49edf7c4d1f0eed2d37b",
       "requirement_set_digest": "sha256:31f92d3aecf0ad60ae126a798b7fe8e7015366792048f65579130a9229ac5b4c"
     }
   ],
-  "manifest_digest": "sha256:7cbd6f7dd5d220d782a5fb1dad1f247cbff4d2056995331beb4e6a0c9b679659"
+  "manifest_digest": "sha256:d3e749551e5b8b817601b7931059cca1a3d7a50f50cbdf4d803e5aa588b3a7c5"
 }

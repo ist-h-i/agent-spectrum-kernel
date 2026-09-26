@@ -47,12 +47,12 @@
     {
       "path": "benchmarks/fixtures/checkpoint-b2/cal-concurrent-transfer/requirement-record.json",
       "bytes": 3481,
-      "raw_sha256": "sha256:636f274357c0801714cc2eef4283b90b621974cd51cbfebdc9916225b1c286a8",
-      "semantic_digest": "sha256:ade3e890977cdd0e7072f737190fb1d498a524460cea4bb3a17f090967e76c4d",
+      "raw_sha256": "sha256:ce7ab2463f64c1b6deaec290a2f72d15037f1d526eab8080400c4d81d64e1456",
+      "semantic_digest": "sha256:33aed625f1145c4d5ea1438526629b4f4108ee32bfe78edb091969c419d22295",
       "authority_role": "requirement_record",
-      "requirement_record_digest": "sha256:ade3e890977cdd0e7072f737190fb1d498a524460cea4bb3a17f090967e76c4d",
+      "requirement_record_digest": "sha256:33aed625f1145c4d5ea1438526629b4f4108ee32bfe78edb091969c419d22295",
       "requirement_set_digest": "sha256:62ef2a25dca103b47e0760d82f520d90c6b2c1ea3a8cab9b081a9c269fbee359"
     }
   ],
-  "manifest_digest": "sha256:c68ee2af7754017beea6457fcb9e688603dab807e0e6dc798961b822bf302fe7"
+  "manifest_digest": "sha256:ad9c79d1d7928cd88855ff5a3d24644fb84601e37f621bc277f2ce3b81b5261a"
 }
