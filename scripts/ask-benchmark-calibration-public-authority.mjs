@@ -109,8 +109,8 @@ export function buildCalibrationEvidenceAuthority(source) {
   return { evidenceMap, mutationAsset: { fixture_id: source.fixtureId, mutations } };
 }
 
-// Pure pre-result scope consumer for normalized candidate change entries.
-// A private runner must call this before treating the scope as admitted.
+// Frozen scope policy to apply to normalized candidate changes at evaluation time.
+// This check cannot itself create pre-result admission authority.
 export function validateCalibrationCandidateChangedPaths(source, changes) {
   if (!Array.isArray(changes)) throw new Error("calibration changed-path entries are required");
   const scope = buildCalibrationEvidenceAuthority(source).evidenceMap.scope_boundary_authority;
