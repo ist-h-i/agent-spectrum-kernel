@@ -39,15 +39,15 @@ const IMPLEMENTATION_NEW_PATH_PREFIXES = Object.freeze({
 // Private evaluator rules and answer-bearing material are authored separately.
 export const CALIBRATION_REQUIREMENTS = Object.freeze({
   "cal-session-refresh": [
-    ["rotation-atomicity", 4, ["workspace/docs/sessions.md", "workspace/src/auth-service.mjs", "workspace/src/session-store.mjs", "workspace/test/auth-service.test.mjs"]],
-    ["current-account-authority", 3, ["workspace/docs/session.schema.json", "workspace/src/account-store.mjs", "workspace/src/http-handlers.mjs"]],
-    ["expiry-and-recovery", 2, ["workspace/src/tokens.mjs", "workspace/src/errors.mjs", "workspace/test/http-handlers.test.mjs"]],
+    ["rotation-atomicity", 4, ["workspace/docs/sessions.md", "workspace/src/auth-service.mjs", "workspace/src/session-store.mjs", "workspace/test/auth-service.test.mjs", "workspace/pr.diff"]],
+    ["current-account-authority", 3, ["workspace/docs/session.schema.json", "workspace/src/account-store.mjs", "workspace/src/http-handlers.mjs", "workspace/pr.diff"]],
+    ["expiry-and-recovery", 2, ["workspace/src/tokens.mjs", "workspace/src/errors.mjs", "workspace/test/http-handlers.test.mjs", "workspace/pr.diff"]],
     ["review-evidence", 1, ["task.md", "workspace/pr.diff", "workspace/package.json"]],
   ],
   "cal-export-lease": [
-    ["lease-ownership-and-claim", 4, ["workspace/docs/export-jobs.md", "workspace/src/export-service.mjs", "workspace/src/job-store.mjs"]],
-    ["tenant-authorization", 3, ["workspace/docs/job.schema.json", "workspace/src/http-handlers.mjs", "workspace/test/export-service.test.mjs"]],
-    ["retry-state-machine", 2, ["workspace/src/retry-policy.mjs", "workspace/src/errors.mjs", "workspace/test/job-store.test.mjs"]],
+    ["lease-ownership-and-claim", 4, ["workspace/docs/export-jobs.md", "workspace/src/export-service.mjs", "workspace/src/job-store.mjs", "workspace/pr.diff"]],
+    ["tenant-authorization", 3, ["workspace/docs/job.schema.json", "workspace/src/http-handlers.mjs", "workspace/test/export-service.test.mjs", "workspace/pr.diff"]],
+    ["retry-state-machine", 2, ["workspace/src/retry-policy.mjs", "workspace/src/errors.mjs", "workspace/test/job-store.test.mjs", "workspace/pr.diff"]],
     ["review-evidence", 1, ["task.md", "workspace/pr.diff", "workspace/package.json"]],
   ],
   "cal-atomic-rule-batch": [
@@ -95,11 +95,12 @@ export function buildCalibrationEvidenceAuthority(source) {
     protected_candidate_paths: source.visiblePaths.filter(path => !allowed.includes(path)),
     unmanaged_additions: "forbidden", unmanaged_deletions: "forbidden" };
   const maps = source.requirements.map(([id, , paths]) => ({ evidence_map_id: mapId(id), agent_visible_paths: paths }));
-  // Evidence removal is pending: other visible files can still reveal a defect.
-  // No admitted authority may promote this ambiguous claim without review proof.
+  // Include the changed diff in review-task evidence maps so deleting one
+  // source file cannot leave an equivalent changed-code view in the mutation.
+  // Independent semantic review must still assess each map before admission.
   const mutations = source.requirements.map(([id, , paths]) => {
     const base = { mutation_id: mutationId(id), requirement_id: id, target_evidence_map_id: mapId(id),
-      remove_paths: paths, expected_recoverability_state: "ambiguous", expected_admission_result: "fail" };
+      remove_paths: paths, expected_recoverability_state: "not_recoverable", expected_admission_result: "fail" };
     return { ...base, mutation_digest: canonicalDigest(base) };
   });
   const evidenceMap = { schema_version: "1.0.0", fixture_id: source.fixtureId,

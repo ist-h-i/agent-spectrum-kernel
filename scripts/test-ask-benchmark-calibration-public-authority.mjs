@@ -5,6 +5,7 @@ import test from "node:test";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { validateRequirementRecordContract } from "./ask-benchmark-scoring-contract.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { validateMutationAuthority } from "./ask-benchmark-mn-build-option-update.mjs";
 import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
 import { CALIBRATION_REQUIREMENTS, calibrationPublicSource, buildCalibrationEvidenceAuthority, validateCalibrationCandidateChangedPaths, buildCalibrationRequirementRecord, buildCalibrationCommandContract, validateCalibrationPrivateMutationAuthority, buildPendingCalibrationCandidate, buildPendingCalibrationPublicArtifacts, buildCalibrationEquivalenceAuthority, assertCalibrationPrivateAssets, calibrationOutputKind } from "./ask-benchmark-calibration-public-authority.mjs";
 
@@ -21,15 +22,15 @@ test("four calibration descriptors close against frozen source inputs and full p
     mutated.mutations[0].remove_paths = ["task.md"];
     assert.throws(() => validateCalibrationPrivateMutationAuthority(source, mutated), /differs from frozen public requirement evidence/u);
     const unsupportedPromotion = structuredClone(mutationAsset);
-    unsupportedPromotion.mutations[0].expected_recoverability_state = "not_recoverable";
+    unsupportedPromotion.mutations[0].expected_recoverability_state = "ambiguous";
     assert.throws(() => validateCalibrationPrivateMutationAuthority(source, unsupportedPromotion), /differs from frozen public requirement evidence/u);
     assert.equal(evidenceMap.maps.length, 4);
     assert.equal(mutationAsset.mutations.length, 4);
     for (const [index, mutation] of mutationAsset.mutations.entries()) {
       const { mutation_digest, ...fullBase } = mutation;
       assert.equal(mutation_digest, canonicalDigest(fullBase));
-      assert.equal(mutation.expected_recoverability_state, "ambiguous");
-      assert.equal(evidenceMap.mutation_contracts[index].expected_recoverability_state, "ambiguous");
+      assert.equal(mutation.expected_recoverability_state, "not_recoverable");
+      assert.equal(evidenceMap.mutation_contracts[index].expected_recoverability_state, "not_recoverable");
       assert.equal(evidenceMap.mutation_contracts[index].mutation_digest, mutation_digest);
       assert.equal(evidenceMap.mutation_contracts[index].requirement_id, undefined);
       assert.deepEqual(mutation.remove_paths, evidenceMap.maps[index].agent_visible_paths);
@@ -43,6 +44,15 @@ test("four calibration descriptors close against frozen source inputs and full p
       catalogDigest: canonicalDigest("catalog"), policyManifestDigest: canonicalDigest("policy"),
       scoringPolicyDigest: canonicalDigest("scoring"), admissionRequirementDigest: canonicalDigest("admission"),
     });
+    const sourceInput = JSON.parse(before).fixtures[sourceId];
+    assert.ok(sourceInput);
+    assert.deepEqual(validateMutationAuthority({ requirementRecord: record,
+      admissionRecord: { mutation_set_ids: mutationAsset.mutations.map(({ mutation_id }) => mutation_id) },
+      evidenceMapArtifact: evidenceMap, inputManifestRecord: sourceInput, mutationAsset }),
+      { mutationIds: mutationAsset.mutations.map(({ mutation_id }) => mutation_id) });
+    if (["cal-session-refresh", "cal-export-lease"].includes(fixtureId)) {
+      for (const map of evidenceMap.maps.slice(0, 3)) assert.ok(map.agent_visible_paths.includes("workspace/pr.diff"));
+    }
     assert.equal(record.requirements.length, 4);
     assert.deepEqual(record.requirements.map(({ evidence_map_ids }) => evidence_map_ids[0]), evidenceMap.maps.map(({ evidence_map_id }) => evidence_map_id));
     assert.deepEqual(record.requirements.map(({ mutation_ids }) => mutation_ids[0]), mutationAsset.mutations.map(({ mutation_id }) => mutation_id));

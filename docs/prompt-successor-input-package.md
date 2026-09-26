@@ -9,14 +9,18 @@ it did not create their requirement records, private evaluators or admission.
 `ask-benchmark-calibration-input-package.mjs` removes manual path and hash assembly
 once the public packages exist. It inventories all four packages in one read-only
 check, then uses the existing #197 validators and successor manifest builder to
-assemble their exact public references. It is not a new scorer, admission path,
-private-evaluator verifier, or measured-run preflight replacement.
+assemble their exact public references. The canonical scoring manifest also
+binds a fixture's repository-managed admission decision path, raw byte identity,
+decision digest, and revision when its frozen admission remains pending. This is
+not a new scorer, private-evaluator verifier, or measured-run preflight replacement.
 
 The two operations have deliberately different meanings:
 
 - `inspect`: report committed input availability, not semantic validity.
-- `assemble`: validate admitted public input chains and write the existing
-  `prompt_successor_scoring_input_manifest` in its canonical byte form.
+- `assemble`: validate public input chains and write the existing
+  `prompt_successor_scoring_input_manifest` in its canonical byte form. A
+  pending frozen admission requires a committed admitted repository decision;
+  exact external review evidence remains a separate execution gate.
 
 Neither operation reads private assets or starts a model, evaluator, trial,
 selection, run journal, admission review, or result-blind execution freeze.
@@ -73,8 +77,9 @@ but meaningless JSON remains `present_not_validated`, with no approval claim.
 
 ## Assemble only after real public authority is ready
 
-The public records must have been reviewed, committed, and admitted through an
-actually supported frozen authority contract. Run from a clean checkout; the
+The public records must be committed with a supported frozen authority and,
+for a pending frozen admission, a repository-managed admitted decision. The
+independent review authority remains a separate required input. Run from a clean checkout; the
 implementation is pinned when the module loads. Restart after changing HEAD.
 The output's parent directory must already exist and must not traverse a symlink.
 Use a fresh absolute file path outside both the repository and its Git metadata:
@@ -85,8 +90,9 @@ node scripts/ask-benchmark-calibration-input-package.mjs assemble \
 ```
 
 Assembly fails before publication if any input is missing or not committed,
-changed from its Git bytes, invalid under the existing contracts, not admitted,
-or inconsistent with the historical common inputs. It performs the existing
+changed from its Git bytes, invalid under the existing contracts, lacks an
+admitted repository decision for a pending frozen record, or is inconsistent
+with the historical common inputs. It performs the existing
 public admitted-fixture invariance checks, including primary-fixture checks.
 It rechecks the input bytes and loaded source identity before writing.
 
@@ -96,12 +102,22 @@ it atomically; existing outputs are never overwritten. Use the manifest's actual
 semantic digest in the existing successor preparation. Do not reuse an earlier
 preparation after its bound input identities change.
 
-**Preparation 1.1 does not bind admission decision overlays.** This command
-therefore rejects any repository overlay for a calibration fixture. It does not
-ignore an overlay, flatten it into a legacy record, edit an admission status, or
-accept a late per-case approval. If the real reviewed packages require overlays,
-first implement and review a successor pre-result contract that binds them.
-Changing `admission_pending` to `admitted` by hand is not a workaround.
+The scoring-input manifest carries a required `admission_overlay` field for each
+fixture. It is `null` only for a legacy frozen `admitted` record with no
+repository overlay. For a pending frozen record, it pins the repository decision
+path, raw digest and byte count, decision digest, and revision. Its canonical
+digest is bound by Preparation 1.1 before results can be read. Reopening the
+manifest resolves the decision from the exact implementation revision and
+checks the current bytes again. A later or transplanted decision cannot replace
+the pinned identity.
+
+The public decision alone does not establish effective admission. The external
+review authority and archive bytes, private evaluator, and runtime identity
+are checked by the separate calibration execution-admission contract before the
+measured authority freeze. Public inspection reports `review_evidence_missing`
+for an overlay until that gate passes. Per-case caller-supplied admission paths
+remain forbidden. Changing `admission_pending` to `admitted` by hand is not a
+workaround.
 
 A successful command reports `public_content_verified: true` and
 `private_bundle_verified: false`. This is a public-input assembly result only.

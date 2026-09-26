@@ -122,7 +122,8 @@ export function createSuccessorSyntheticScoringInputs({ root, privateBase, paren
     contexts[fixtureId] = { privateRoot, manifestPath, bundle, reference, admission, requirements, output, freeze,
       freezeRawDigest: fileRef(freezePath).raw_digest, catalogDigest: catalog.catalog_digest, policyDigest: policy.manifest_digest, scoringPolicyDigest: score.policy_digest };
     return { fixture_id: fixtureId, source_fixture_id: sourceId, input_manifest_digest: inputDigest,
-      artifacts: Object.fromEntries(SUCCESSOR_SCORING_INPUT_ROLES.map(role => [role, fileRef(paths[role])])) };
+      artifacts: Object.fromEntries(SUCCESSOR_SCORING_INPUT_ROLES.map(role => [role, fileRef(paths[role])])),
+      admission_overlay: null };
   });
   const manifest = buildSuccessorScoringInputManifest({ parent, executionConfig: fileRef(configPath), fixtures });
   const publicManifestPath = resolve(root, "scripts/test-fixtures/generated-successor-scoring/manifest.json");
@@ -136,8 +137,9 @@ export function createSuccessorSyntheticScoringInputs({ root, privateBase, paren
  * assembler/consumer contract. They are never written to the product branch,
  * contain no private evaluator bytes, and grant no measured-execution authority.
  */
-export function createSuccessorSyntheticAdmittedCalibrationPackages({ root, revision }) {
+export function createSuccessorSyntheticAdmittedCalibrationPackages({ root, revision, admissionStatus = "admitted" }) {
   if (!/^[a-f0-9]{40}$/u.test(revision ?? "")) throw new Error("synthetic admitted calibration revision is invalid");
+  if (!["admitted", "admission_pending"].includes(admissionStatus)) throw new Error("synthetic calibration admission status is invalid");
   const catalogPath = resolve(root, "benchmarks/portfolio-catalog.json");
   const policyPath = resolve(root, "benchmarks/portfolio-policy-manifest.json");
   const scorePath = resolve(root, "benchmarks/portfolio-scoring-policy.json");
@@ -233,7 +235,7 @@ export function createSuccessorSyntheticAdmittedCalibrationPackages({ root, revi
       mutation_set_ids: ["synthetic-mutation"],
       reviewer_record_id: "synthetic-test-review",
       admission_revision: 1,
-      admission_status: "admitted",
+      admission_status: admissionStatus,
       evaluator_source_identity: sourceIdentity,
     };
     const admissionSeed = {

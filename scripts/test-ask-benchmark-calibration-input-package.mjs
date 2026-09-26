@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,12 +7,15 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
+import { computeAdmissionDecisionDigest, computeAdmissionDecisionId } from "./ask-benchmark-admission-decision.mjs";
 import { createSuccessorSyntheticAdmittedCalibrationPackages } from "./test-prompt-successor-scoring-fixtures.mjs";
 import {
   CALIBRATION_PACKAGE_INPUT_PATHS, inspectCalibrationInputPackage, parseCalibrationInputPackageArgs,
 } from "./ask-benchmark-calibration-input-package.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const byteDigest = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+const read = path => JSON.parse(readFileSync(path, "utf8"));
 const ENTRY = "scripts/ask-benchmark-calibration-input-package.mjs";
 const SOURCE_FILES = [ENTRY, "scripts/ask-benchmark-calibration-source.mjs",
   "scripts/ask-benchmark-atomic-publication.mjs", "scripts/ask-benchmark-duplicate-key-json.mjs",
@@ -55,6 +59,14 @@ function cli(root, ...args) {
     cwd: root, encoding: "utf8", timeout: 120000,
     env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0" },
   });
+}
+function pinPublicImplementationInClone(clone) {
+  const paths = ["scripts/ask-benchmark-calibration-input-package.mjs",
+    "scripts/ask-benchmark-prompt-successor-scoring-inputs.mjs", "scripts/ask-benchmark-prompt-successor-repository.mjs"];
+  for (const path of paths) copyFileSync(resolve(ROOT, path), resolve(clone, path));
+  git(clone, "add", "--", ...paths);
+  if (git(clone, "status", "--porcelain")) git(clone, "-c", "commit.gpgsign=false", "commit", "-qm", "test-only current public overlay implementation");
+  return git(clone, "rev-parse", "HEAD");
 }
 function assertNoAuthority(report) {
   assert.equal(report.public_content_verified, false);
@@ -270,12 +282,13 @@ test("synthetic admitted public packages assemble and reopen through the real su
   const parent = mkdtempSync(resolve(realpathSync(tmpdir()), "ask-calibration-positive-integration-"));
   const clone = resolve(parent, "checkout");
   try {
-    const sourceRevision = git(ROOT, "rev-parse", "HEAD");
+    const baseRevision = git(ROOT, "rev-parse", "HEAD");
     git(ROOT, "clone", "--no-hardlinks", "--no-checkout", ROOT, clone);
-    git(clone, "checkout", "--detach", sourceRevision);
+    git(clone, "checkout", "--detach", baseRevision);
     git(clone, "config", "user.name", "Calibration Positive Integration");
     git(clone, "config", "user.email", "synthetic@example.invalid");
     git(clone, "config", "core.hooksPath", "/dev/null");
+    const sourceRevision = pinPublicImplementationInClone(clone);
 
     const generated = createSuccessorSyntheticAdmittedCalibrationPackages({ root: clone, revision: sourceRevision });
     assert.deepEqual(generated.fixtures.map(({ fixture_id, source_fixture_id }) => [fixture_id, source_fixture_id]),
@@ -319,6 +332,7 @@ const preparation = await prepareSuccessorFromRepository({
   changeReason: "Synthetic public assembly and reopen regression only; no measured execution authority.",
   scoringInputManifestDigest: manifest.manifest_digest,
 });
+
 const handle = await openSuccessorScoringInputs({ preparation, manifestPath, root });
 process.stdout.write(JSON.stringify({
   preparation_implementation: preparation.implementation,
@@ -348,4 +362,119 @@ process.stdout.write(JSON.stringify({
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }
+});
+test("synthetic pending public packages pin repository overlays before reopening without private review access", () => {
+  const parent = mkdtempSync(resolve(realpathSync(tmpdir()), "ask-calibration-overlay-integration-"));
+  const clone = resolve(parent, "checkout");
+  try {
+    const baseRevision = git(ROOT, "rev-parse", "HEAD");
+    git(ROOT, "clone", "--no-hardlinks", "--no-checkout", ROOT, clone);
+    git(clone, "checkout", "--detach", baseRevision);
+    git(clone, "config", "user.name", "Calibration Overlay Integration");
+    git(clone, "config", "user.email", "synthetic@example.invalid");
+    git(clone, "config", "core.hooksPath", "/dev/null");
+    const sourceRevision = pinPublicImplementationInClone(clone);
+    createSuccessorSyntheticAdmittedCalibrationPackages({ root: clone, revision: sourceRevision, admissionStatus: "admission_pending" });
+    const fixturePaths = CALIBRATION_SOURCE_BINDINGS.map(([fixtureId]) => `benchmarks/fixtures/checkpoint-b2/${fixtureId}`);
+    git(clone, "add", "--", ...fixturePaths);
+    git(clone, "-c", "commit.gpgsign=false", "commit", "-qm", "test-only pending calibration public authority");
+    const reviewedRevision = git(clone, "rev-parse", "HEAD");
+    for (const [fixtureId] of CALIBRATION_SOURCE_BINDINGS) {
+      const directory = `benchmarks/fixtures/checkpoint-b2/${fixtureId}`;
+      const artifact = file => {
+        const path = `${directory}/${file}`;
+        return { path, value: read(resolve(clone, path)), raw_byte_digest: byteDigest(readFileSync(resolve(clone, path))) };
+      };
+      const admission = artifact("final-admission-record.json");
+      const requirement = artifact("requirement-record.json");
+      const freeze = artifact("scoring-input-freeze-manifest.json");
+      const reference = artifact("evaluator-reference.json");
+      const reviewBytes = Buffer.from(`synthetic review archive for ${fixtureId}\n`);
+      const base = {
+        schema_version: "1.0.0", schema_path: "benchmarks/schemas/portfolio-admission-decision.schema.json",
+        program: "adaptive_ask_portfolio_admission_decision", decision_revision: 1,
+        fixture_id: fixtureId, decision_status: "admitted", review_status: "approved",
+        author_self_approval: false, reviewer_type: "independent_agent",
+        reviewer_record_id: `synthetic-test-${fixtureId}`, reviewer_count: 1,
+        reviewed_at: "2026-01-01T00:00:00.000Z", reviewed_repository: "ist-h-i/agent-spectrum-kernel",
+        reviewed_pull_request: 999999, reviewed_head_revision: reviewedRevision,
+        blocking_finding_count: 0,
+        review_evidence: { archive_sha256: byteDigest(reviewBytes), archive_bytes: reviewBytes.length },
+        evaluator: {
+          evaluator_revision: reference.value.evaluator_revision,
+          evaluator_bundle_id: reference.value.evaluator_bundle_id,
+          evaluator_bundle_digest: reference.value.evaluator_bundle_digest,
+          evaluator_bundle_bytes: admission.value.evaluator_byte_count,
+        },
+        evaluator_public_reference_digest: reference.value.public_metadata_digest,
+        frozen_admission_authority: {
+          path: admission.path, raw_byte_digest: admission.raw_byte_digest,
+          semantic_digest: admission.value.admission_digest,
+          requirement_authority_digest: admission.value.requirement_authority_digest,
+        },
+        frozen_requirement_record: {
+          path: requirement.path, raw_byte_digest: requirement.raw_byte_digest,
+          record_digest: requirement.value.requirement_record_digest,
+          set_digest: requirement.value.requirement_set_digest,
+        },
+        frozen_scoring_input_manifest: {
+          path: freeze.path, raw_byte_digest: freeze.raw_byte_digest,
+          semantic_digest: freeze.value.manifest_digest,
+        },
+      };
+      const decisionWithId = { ...base, decision_id: computeAdmissionDecisionId(base) };
+      const decision = { ...decisionWithId, decision_digest: computeAdmissionDecisionDigest(decisionWithId) };
+      write(clone, `benchmarks/fixtures/admission-decision/${fixtureId}-synthetic-decision.json`, `${JSON.stringify(decision)}\n`);
+    }
+    git(clone, "add", "--", "benchmarks/fixtures/admission-decision");
+    git(clone, "-c", "commit.gpgsign=false", "commit", "-qm", "test-only admission decision overlays");
+    const packageRevision = git(clone, "rev-parse", "HEAD");
+    const output = resolve(parent, "scoring-input-manifest.json");
+    const assembled = cli(clone, "assemble", "--output", output);
+    assert.equal(assembled.error, undefined);
+    assert.equal(assembled.status, 0, assembled.stderr || assembled.stdout);
+    const manifest = read(output);
+    assert.ok(manifest.fixtures.every(entry => entry.admission_overlay?.decision_revision === 1));
+    const worker = `
+import { readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+const root = process.env.ASK_SYNTHETIC_CALIBRATION_ROOT;
+const manifestPath = process.env.ASK_SYNTHETIC_CALIBRATION_MANIFEST;
+const load = path => import(pathToFileURL(resolve(root, path)).href);
+const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const { prepareSuccessorFromRepository } = await load("scripts/ask-benchmark-prompt-successor-repository.mjs");
+const { syntheticRuntime } = await load("scripts/test-prompt-successor-fixtures.mjs");
+const { openSuccessorScoringInputs, inspectSuccessorScoringInputs } = await load("scripts/ask-benchmark-prompt-successor-scoring-inputs.mjs");
+const preparation = await prepareSuccessorFromRepository({ root, runtime: syntheticRuntime(), seed: "synthetic-overlay-calibration-package",
+  changeReason: "Synthetic public overlay binding only; no external review, private evaluator or execution.",
+  scoringInputManifestDigest: manifest.manifest_digest });
+const handle = await openSuccessorScoringInputs({ preparation, manifestPath, root });
+const inspection = inspectSuccessorScoringInputs(handle, preparation);
+const overlayPath = resolve(root, manifest.fixtures[0].admission_overlay.path);
+const original = readFileSync(overlayPath);
+writeFileSync(overlayPath, Buffer.concat([original, Buffer.from(" ")]));
+let driftRejected = false;
+try { inspectSuccessorScoringInputs(handle, preparation); } catch { driftRejected = true; }
+writeFileSync(overlayPath, original);
+if (!driftRejected) throw new Error("post-open admission overlay drift was accepted");
+process.stdout.write(JSON.stringify({ ...inspection, post_open_overlay_drift_rejected: driftRejected }));
+`;
+    const reopened = spawnSync(process.execPath, ["--input-type=module", "--eval", worker], {
+      cwd: clone, encoding: "utf8", timeout: 240000, maxBuffer: 20 * 1024 * 1024,
+      env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0",
+        ASK_SYNTHETIC_CALIBRATION_ROOT: clone, ASK_SYNTHETIC_CALIBRATION_MANIFEST: output },
+    });
+    assert.equal(reopened.error, undefined, reopened.error?.message);
+    assert.equal(reopened.status, 0, reopened.stderr || reopened.stdout);
+    const inspection = JSON.parse(reopened.stdout);
+    assert.equal(inspection.manifest_digest, manifest.manifest_digest);
+    assert.deepEqual(inspection.fixtures.map(entry => [entry.admission_status, entry.effective_admission_status, entry.overlay_decision_status]),
+      CALIBRATION_SOURCE_BINDINGS.map(() => ["admission_pending", "review_evidence_missing", "admitted"]));
+    assert.equal(inspection.private_bundle_verified, false);
+    assert.equal(inspection.measured_execution_authorized, false);
+    assert.equal(inspection.post_open_overlay_drift_rejected, true);
+    assert.equal(git(clone, "rev-parse", "HEAD"), packageRevision);
+    assert.equal(git(clone, "status", "--porcelain"), "");
+  } finally { rmSync(parent, { recursive: true, force: true }); }
 });
