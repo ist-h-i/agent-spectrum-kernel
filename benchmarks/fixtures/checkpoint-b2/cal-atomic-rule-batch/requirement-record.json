@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:0699e1693d0e5730bb3478fb9e5b5792cd465f65e33a2c9b602cd659c3e09b1c",
+  "admission_record_digest": "sha256:1827789b3fa79ae8652df9d5c384c7eb78b20c66665a08d1899ca479db9c18e1",
   "requirements": [
     {
       "requirement_id": "atomic-state-and-version",
@@ -82,5 +82,5 @@
     }
   ],
   "requirement_set_digest": "sha256:31f92d3aecf0ad60ae126a798b7fe8e7015366792048f65579130a9229ac5b4c",
-  "requirement_record_digest": "sha256:58aef8deecebaf5351ad6f908e2af0e4123e7a2db30d034d686ae6f558721d90"
+  "requirement_record_digest": "sha256:3bc9dd9ae1c8f6e1a98fb4ee83d1f3c8833daf81bac99302c7f2805f4e293f89"
 }
