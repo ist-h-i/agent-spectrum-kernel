@@ -3,9 +3,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "input_manifest_digest": "sha256:e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
   "evaluator_reference_schema": "benchmarks/schemas/evaluator-reference.schema.json",
-  "evaluator_bundle_id": "evaluator-580bc4cfd2ff1206613cb612b9c4742959cfbe61705d6b2f40a9600151fe867b",
-  "evaluator_bundle_digest": "sha256:549f2ee6014118f3bf1ada746801799f3ba1837d929b4ced1142445ad912b89d",
-  "evaluator_byte_count": 155238,
+  "evaluator_bundle_id": "evaluator-f14beae62256e56d69d42c98a1e1a641f5fe0cc6686caab8fc4b0f65f1d4237d",
+  "evaluator_bundle_digest": "sha256:6d0f8ba61525c1ca1086385154fec6b4c8f449eb8efe49cb19c5113e562e7d02",
+  "evaluator_byte_count": 156129,
   "evaluator_requirement_count": 4,
   "evidence_map_ids": [
     "lease-ownership-and-claim-basis",
@@ -23,9 +23,9 @@
   "admission_revision": 1,
   "admission_status": "admission_pending",
   "evaluator_source_identity": {
-    "base_git_revision": "d83eb0166717ffcdc87614d06f26dad29cd93b39",
+    "base_git_revision": "b65e73c79449f3930cd78cd1ae44dde638c82f2e",
     "source_tree_digest": "sha256:dc762d7f77a89e428addc89b0a5871f0e8865a018207329cfc02e9688eecbaab",
-    "generator_source_digest": "sha256:a31e4e161174e063d5f392c2898901d21cd7e8dbada658e6b2a647ad96b224d8",
+    "generator_source_digest": "sha256:30f2b8352545760bb2d0f64f7ca9fce20e39f4829e861163c2826dd4ef3378d8",
     "source_files": [
       {
         "path": "benchmarks/schemas/evaluation-input-failure-artifact.schema.json",
@@ -2149,9 +2149,9 @@
       "graph_digest": "sha256:0cc7a555f40167bcdeb7fa4b3059ff49aaf27e3751ed9eec9449c9969b161b54"
     }
   },
-  "requirement_authority_digest": "sha256:b560e3e772641b643cc2e0ffb1472d2c0d64601493e05617ad3cf5837422de77",
+  "requirement_authority_digest": "sha256:6c8e17de12ac9b0da9e67adf24617c5167052f9351d0daf1e6e2b28296632094",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/cal-export-lease/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:25c99f43b6936ad56864ecdace4cf9888e6d7487991e8ad0fd74d6ebd87e4554",
-  "evaluator_authority_manifest_digest": "sha256:4f17adb8ad579729855e832c733346b714975c9d9bea2e868b886a925ece05ed",
-  "admission_digest": "sha256:e642e85faad4e629269dd2aa90d6d32f96a0abcdafca14a4b0955638d8b7e2a4"
+  "evaluator_authority_manifest_raw_sha256": "sha256:18a7d31cc47574c5f63c1a6b8fd236488bc06569283d88f71eb53ca8fbaf01f3",
+  "evaluator_authority_manifest_digest": "sha256:18703a26ee7134d322b18b60ceb1464e42b4b47dd71d862c1a39ea7f32c0a1d3",
+  "admission_digest": "sha256:dc5ab206e54a18dc73ff0e797f2f93f1640af6e0436fca3e514ceb696c7aa491"
 }
