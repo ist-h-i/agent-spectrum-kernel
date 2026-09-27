@@ -417,6 +417,7 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
         const report = buildSuccessorComparisonFromProvenance({ preparation, policy, sources: handles });
         assert.equal(report.kind, "prompt_successor_measured_comparison_report");
         assert.equal(report.analysis.paired.length, 14);
+        assert.deepEqual(report.analysis.missing_evidence, []);
         assert.equal(report.analysis.prompt_outcome, "revise_and_repeat");
         assert.equal(report.mutation_authorized, false);
         record.paired_blocks = report.analysis.paired.length;
