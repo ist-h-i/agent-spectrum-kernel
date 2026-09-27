@@ -98,6 +98,7 @@ function nativeRuntime(spec) {
   for (const [fixture] of CALIBRATION_SOURCE_BINDINGS) {
     const entry = spec.private_admission_sources[fixture];
     if (!inside(privateRoot, realpathSync(entry.privateRoot))
+        || !inside(realpathSync(entry.privateRoot), realpathSync(entry.manifestPath))
         || !inside(privateRoot, realpathSync(entry.reviewAuthorityPath))
         || !inside(privateRoot, realpathSync(entry.reviewArchivePath))) fail(`${fixture} private authority is outside deny root`);
   }
