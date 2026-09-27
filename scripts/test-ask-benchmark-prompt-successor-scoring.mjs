@@ -10,6 +10,7 @@ import { canonicalDigest } from "./content-addressed-store.mjs";
 import { readSuccessorParent, readSuccessorImplementationIdentity } from "./ask-benchmark-prompt-successor-repository.mjs";
 import { createSuccessorSyntheticScoringInputs, syntheticSuccessorEvaluatorEnvelope } from "./test-prompt-successor-scoring-fixtures.mjs";
 import { createIssue291SyntheticPendingPackages, createIssue291SyntheticReviewOverlays } from "./test-fixtures/issue291-synthetic-admission.mjs";
+import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
 
 const root = realpathSync(resolve(fileURLToPath(new URL("..", import.meta.url))));
 const hash = b => `sha256:${createHash("sha256").update(b).digest("hex")}`;
@@ -1130,6 +1131,12 @@ if (process.argv[2] === "--worker") {
     const clone = resolve(work, "checkout");
     run("git", ["-c", "core.hooksPath=/dev/null", "clone", "--no-hardlinks", "--no-checkout", root, clone]);
     git(clone, "checkout", "--detach", sourceRevision);
+    // The disposable clone builds its own synthetic admission lineage. Remove
+    // the four real calibration decisions before committing synthetic inputs.
+    for (const [fixtureId] of CALIBRATION_SOURCE_BINDINGS) {
+      const path = `benchmarks/fixtures/admission-decision/${fixtureId}-admission-decision.json`;
+      if (existsSync(resolve(clone, path))) git(clone, "rm", "--", path);
+    }
     const privateBase = resolve(work, "synthetic-private"); mkdirSync(privateBase);
     const candidates = createIssue291SyntheticPendingPackages({ root: clone, privateBase, revision: sourceRevision });
     git(clone, "add", "--", "benchmarks/fixtures/checkpoint-b2");
