@@ -92,6 +92,9 @@ function nativeRuntime(spec) {
   const login = execFileSync(binary, ["login", "status"], { encoding: "utf8", timeout: 15000 }).trim();
   if (!/^Logged in using ChatGPT(?:\b|$)/u.test(login)) fail("ChatGPT subscription login status");
   const privateRoot = external(native.successor_private_evaluator_root, "private deny root");
+  if (inside(privateRoot, spec.run_root) || inside(spec.run_root, privateRoot)) {
+    fail("measured run and private authority roots overlap");
+  }
   for (const [fixture] of CALIBRATION_SOURCE_BINDINGS) {
     const entry = spec.private_admission_sources[fixture];
     if (!inside(privateRoot, realpathSync(entry.privateRoot))
