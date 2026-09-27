@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,6 +54,18 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
   assert.equal(git(root, "rev-parse", "HEAD"), context.cloneRevision);
   assert.equal(git(root, "status", "--porcelain"), "");
   const work = context.work;
+  const progressPath = resolve(work, "scoring-progress.jsonl");
+  const workerStarted = performance.now();
+  const progress = (event, details = {}) => {
+    if (!positiveAdmission) return;
+    // This test-only log contains state and timing, never prompts or outputs.
+    const line = `${JSON.stringify({ kind: "issue291_synthetic_scoring_progress", event,
+      observed_at: new Date().toISOString(), worker_elapsed_ms: Math.round(performance.now() - workerStarted),
+      ...details })}\n`;
+    const fd = openSync(progressPath, "a", 0o600);
+    try { writeFileSync(fd, line); fsyncSync(fd); }
+    finally { closeSync(fd); }
+  };
   const record = { source_revision: context.sourceRevision, synthetic_clone_revision: context.cloneRevision,
     node: process.version, platform: process.platform, architecture: process.arch,
     // Test-design declarations, not observed counters. No instrumentation is
@@ -68,9 +80,16 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
     limits: "Synthetic contract test only; no real evaluator approval, provider call, token measurement, or adoption evidence." };
   const check = async (name, fn) => {
     const start = performance.now();
-    await fn();
+    progress("check_started", { name });
+    try { await fn(); }
+    catch (error) {
+      progress("check_failed", { name, duration_ms: Math.round(performance.now() - start),
+        error_code: typeof error?.code === "string" ? error.code : null });
+      throw error;
+    }
     const duration_ms = Math.round(performance.now() - start);
     record.checks.push({ name, status: "pass", duration_ms });
+    progress("check_passed", { name, duration_ms });
     console.log(`PASS ${name} (${duration_ms} ms)`);
   };
   try {
@@ -247,17 +266,34 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
         record.synthetic_freeze_digest = (await import("./ask-benchmark-prompt-successor-measured-authority.mjs"))
           .inspectSuccessorMeasuredAuthority(measuredAuthority).authority_record_digest;
       });
+      progress("journal_path_started");
+      const journalPathStarted = performance.now();
       const journalPath = successorMeasuredJournalPath(measuredAuthority, { preparation, sources: measuredSources });
+      progress("journal_path_ready", { duration_ms: Math.round(performance.now() - journalPathStarted) });
       await check("28 fake terminal trials use one ordered no-retry journal", async () => {
         for (const [index, target] of preparation.cases.entries()) {
-          const step = await asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
-            authority: measuredAuthority, preparation, sources: measuredSources, root,
-          }));
-          assert.equal(step.case_id, target.case_id);
-          assert.equal(step.prompt_role, target.prompt_role);
-          assert.equal(step.automatic_retry_performed, false);
-          assert.equal(step.collection.terminal_count, index + 1);
-          record.synthetic_native_attempts++;
+          const trialStarted = performance.now();
+          // Duration includes pre-claim revalidation through terminal publication.
+          progress("fake_trial_step_started", { ordinal: index + 1, prompt_role: target.prompt_role,
+            previous_terminal_count: index });
+          try {
+            const step = await asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
+              authority: measuredAuthority, preparation, sources: measuredSources, root,
+            }));
+            assert.equal(step.case_id, target.case_id);
+            assert.equal(step.prompt_role, target.prompt_role);
+            assert.equal(step.automatic_retry_performed, false);
+            assert.equal(step.collection.terminal_count, index + 1);
+            record.synthetic_native_attempts++;
+            progress("fake_trial_terminal", { ordinal: index + 1, prompt_role: target.prompt_role,
+              terminal_count: step.collection.terminal_count,
+              duration_ms: Math.round(performance.now() - trialStarted) });
+          } catch (error) {
+            progress("fake_trial_step_failed", { ordinal: index + 1, prompt_role: target.prompt_role,
+              duration_ms: Math.round(performance.now() - trialStarted),
+              error_code: typeof error?.code === "string" ? error.code : null });
+            throw error;
+          }
         }
         const journal = read(journalPath);
         assert.equal(journal.terminal_count, 28);
@@ -273,6 +309,7 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
           assert.ok(completed.every(item => item.attempts.length === 1));
         }
         record.terminal_count = 28;
+        progress("fake_inventory_complete", { terminal_count: 28 });
       });
       let measuredCompletion;
       await check("production completion verifies the durable fake collection", async () => {
@@ -1110,6 +1147,9 @@ if (process.argv[2] === "--worker") {
       { cwd: clone, timeout: 600000 });
     const contextPath = resolve(work, "context.json");
     write(contextPath, { sourceRevision, cloneRevision, clone, work, scoringManifestPath, admissionSourcesByFixture });
+    const progressPath = resolve(work, "scoring-progress.jsonl");
+    writeFileSync(progressPath, "", { flag: "wx", mode: 0o600 });
+    t.diagnostic(`Synthetic fake-trial progress while running: ${progressPath}`);
     const result = spawnSync(process.execPath,
       [resolve(clone, relative(root, fileURLToPath(import.meta.url))), "--worker", contextPath, "--synthetic-positive"],
       { cwd: clone, encoding: "utf8", timeout: 10600000, maxBuffer: 20 * 1024 * 1024 });
