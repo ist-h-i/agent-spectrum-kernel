@@ -21,9 +21,10 @@ import { openSuccessorScoringInputs } from "./ask-benchmark-prompt-successor-sco
 import { prepareSuccessorPortfolioSource } from "./ask-benchmark-execution.mjs";
 import { normalizePortfolioExecution } from "./ask-benchmark-normalized-results.mjs";
 import { openCalibrationExecutionAdmission, reopenCalibrationExecutionAdmission,
-  inspectCalibrationExecutionAdmission } from "./ask-benchmark-calibration-execution-admission.mjs";
+  inspectCalibrationExecutionAdmission, inspectCalibrationUnstartedInventories } from "./ask-benchmark-calibration-execution-admission.mjs";
 import { runSuccessorExecDiagnostic } from "./ask-benchmark-prompt-successor-host-diagnostic.mjs";
-import { openSuccessorMeasuredAuthority, inspectSuccessorMeasuredAuthority } from "./ask-benchmark-prompt-successor-measured-authority.mjs";
+import { openSuccessorMeasuredAuthority, inspectSuccessorMeasuredAuthority,
+  successorMeasuredJournalPath } from "./ask-benchmark-prompt-successor-measured-authority.mjs";
 import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -204,6 +205,10 @@ export async function sealIssue291Preflight(specPath) {
     sources: context.sources, scoringInputs, calibrationAdmission: admission, normalizedRoots,
     hostIsolationProbePath, hostExecutionDiagnosticRoot: context.diagnostic_root });
   const freeze = inspectSuccessorMeasuredAuthority(authority);
+  inspectCalibrationUnstartedInventories({ sources: context.sources, normalizedRoots });
+  if (existsSync(successorMeasuredJournalPath(authority, {
+    preparation: context.preparation, sources: context.sources,
+  }))) fail("measured journal appeared before trial 1");
   return { source: context.source, run_instance_id: context.sources.current_prompt.scope.run_instance_id,
     preparation_digest: context.preparation.preparation_digest,
     scoring_manifest_digest: context.preparation.scoring_input_manifest_digest,
