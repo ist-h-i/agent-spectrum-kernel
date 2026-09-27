@@ -242,6 +242,7 @@ async function syntheticAdmissionWorker(contextPath) {
       input: syntheticSelection(item, plan), repositoryRevision: implementation.revision, now: () => "2026-09-22T00:00:00Z" });
   }
   const shared = { root, config, planPath, materializedPath, selectionState };
+  mkdirSync(resolve(work, "native-runs"));
   const experimentRun = randomUUID(); const roles = {};
   for (const role of ["current_prompt", "prompt_v2"]) {
     const execution = { ...shared, runDir: resolve(work, "native-runs", `run-${role}`) };
