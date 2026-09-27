@@ -58,8 +58,12 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
     node: process.version, platform: process.platform, architecture: process.arch,
     // Test-design declarations, not observed counters. No instrumentation is
     // installed at these boundaries; do not cite these values as telemetry.
-    declared_activity: { evidence_kind: "expected_not_instrumented", expected_provider_calls: 0,
-      expected_measured_result_reads: 0, expected_private_evaluator_process_calls: 0 },
+    declared_activity: positiveAdmission
+      ? { evidence_kind: "expected_not_instrumented", expected_provider_calls: 0,
+        expected_real_measured_result_reads: 0, synthetic_result_reads: "not_instrumented",
+        expected_private_evaluator_process_calls: 0 }
+      : { evidence_kind: "expected_not_instrumented", expected_provider_calls: 0,
+        expected_measured_result_reads: 0, expected_private_evaluator_process_calls: 0 },
     synthetic_native_attempts: 0, checks: [], completed: false,
     limits: "Synthetic contract test only; no real evaluator approval, provider call, token measurement, or adoption evidence." };
   const check = async (name, fn) => {
@@ -83,11 +87,11 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
     const { openCalibrationExecutionAdmission, inspectCalibrationExecutionAdmission } = await import("./ask-benchmark-calibration-execution-admission.mjs");
     const { buildPortfolioEngineeringResult } = await import("./ask-benchmark-portfolio-score.mjs");
     const { computeEngineeringResultSourceManifestDigest, validateEngineeringResultSourceManifest } = await import("./ask-benchmark-portfolio-result-set.mjs");
-    const { verifySuccessorSourceProvenance, inspectSuccessorProvenance } = await import("./ask-benchmark-prompt-successor-provenance.mjs");
+    const { verifySuccessorSourceProvenance, inspectSuccessorProvenance, readSuccessorProvenanceRows } = await import("./ask-benchmark-prompt-successor-provenance.mjs");
     const { inspectSuccessorCollectionControl } = await import("./ask-benchmark-prompt-successor-collection.mjs");
     const { openSuccessorMeasuredAuthority, successorMeasuredJournalPath } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
     const { executeNextMeasuredSuccessorCase, recoverMeasuredSuccessorSession, verifyMeasuredSuccessorCollection, inspectSuccessorMeasuredCompletion } = await import("./ask-benchmark-prompt-successor-measured-execution.mjs");
-    const { buildSuccessorComparisonPolicy, buildSuccessorComparisonFromProvenance } = await import("./ask-benchmark-prompt-successor-report.mjs");
+    const { buildSuccessorComparisonPolicy, buildSuccessorComparisonFromProvenance, calculateSuccessorComparison } = await import("./ask-benchmark-prompt-successor-report.mjs");
     const configFile = resolve(root, "benchmarks/prompt-successor-execution.config.json");
     const rawConfig = read(configFile);
     const config = { ...rawConfig, _kind: "portfolio", _configPath: configFile, _protocolPath: resolve(root, rawConfig.protocol_path) };
@@ -140,9 +144,18 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
     const materializedPath = resolve(work, "materialized");
     const materialization = materializePortfolio({ root, config, planPath, outputPath: materializedPath, repositoryRevision: implementation.revision });
     const selectionState = resolve(work, "selection-state");
-    for (const item of materialization.cases.filter(c => c.condition === "adaptive_ask")) {
-      sealAdaptiveSelection({ root, config, planPath, materializedPath, stateDir: selectionState, caseId: item.case_id,
-        input: selection(item, plan), repositoryRevision: implementation.revision, now: () => "2026-09-22T00:00:00Z" });
+    if (positiveAdmission) {
+      const { sealIssue291ExcludedAdaptiveSelections } = await import("./ask-benchmark-issue291-selection.mjs");
+      const excluded = sealIssue291ExcludedAdaptiveSelections({ root, config, planPath, materializedPath,
+        stateDir: selectionState, repositoryRevision: implementation.revision, preparation });
+      assert.equal(excluded.excluded_case_count, 28);
+      assert.equal(excluded.measured_trial_count, 28);
+      record.excluded_selection_state_digest = excluded.selection_state_digest;
+    } else {
+      for (const item of materialization.cases.filter(c => c.condition === "adaptive_ask")) {
+        sealAdaptiveSelection({ root, config, planPath, materializedPath, stateDir: selectionState, caseId: item.case_id,
+          input: selection(item, plan), repositoryRevision: implementation.revision, now: () => "2026-09-22T00:00:00Z" });
+      }
     }
     const shared = { root, config, planPath, materializedPath, selectionState };
     const experimentRun = randomUUID(); const roles = {};
@@ -288,6 +301,7 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
         }];
       }));
       const provenanceSources = {}; const handles = {};
+      let manualComparisonCase;
       for (const roleName of ["current_prompt", "prompt_v2"]) {
         await check(`${roleName}: normalize, verify fake evaluator, compute #197 score, and reverify measured provenance`, async () => {
           const role = roles[roleName];
@@ -320,6 +334,11 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
             assert.equal(engineering.scoring_status, "complete");
             assert.equal(engineering.requirement_score.normalized_requirement_score, outcome === "pass" ? 1 : 0);
             assert.equal(engineering.effective_admission_status, "admitted");
+            if (roleName === "prompt_v2" && !manualComparisonCase) {
+              manualComparisonCase = { result, snapshot, fixtureContext, options,
+                effectiveAdmissionAuthority, scope: role.scope, successorCaseId: binding.successor_case_id,
+                failedEngineering: engineering };
+            }
             const name = `${engineering.engineering_result_id}.json`;
             const outputPath = resolve(engineeringResultsPath, name); write(outputPath, engineering);
             const bytes = readFileSync(outputPath);
@@ -363,15 +382,45 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
         record.paired_blocks = report.analysis.paired.length;
         record.report_digest = report.report_digest;
       });
+      await check("bad model quality remains a scored result while manual evaluator uncertainty remains unscored", () => {
+        assert.ok(manualComparisonCase);
+        assert.equal(manualComparisonCase.failedEngineering.scoring_status, "complete");
+        assert.equal(manualComparisonCase.failedEngineering.requirement_score.normalized_requirement_score, 0);
+        const manualEnvelope = syntheticSuccessorEvaluatorEnvelope({ normalized: manualComparisonCase.result,
+          sourceSnapshotDigest: manualComparisonCase.snapshot, context: manualComparisonCase.fixtureContext,
+          outcome: "manual_review_required" });
+        const manualPath = resolve(work, "synthetic-manual-evaluation.json"); write(manualPath, manualEnvelope);
+        const verified = verifyEvaluatorAuthority({ ...manualComparisonCase.options, resultPath: manualPath });
+        const engineering = buildPortfolioEngineeringResult({ ...verified,
+          effectiveAdmissionAuthority: manualComparisonCase.effectiveAdmissionAuthority }, { root });
+        assert.equal(engineering.scoring_status, "not_scoring_ready");
+        assert.equal(engineering.scoring_reason, "manual_review_required");
+        assert.equal(engineering.requirement_score.normalized_requirement_score, null);
+        const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
+        const rows = Object.values(handles).flatMap(handle => readSuccessorProvenanceRows(handle))
+          .map(row => row.case_id === manualComparisonCase.successorCaseId
+            ? { case_id: row.case_id, engineering } : { case_id: row.case_id, engineering: row.engineering });
+        const incomplete = calculateSuccessorComparison({ preparation, policy, rows });
+        assert.equal(incomplete.prompt_outcome, "insufficient_evidence");
+        assert.equal(incomplete.paired.length, 13);
+      });
       await check("wrong result digest, missing result, and duplicate paired source fail closed", async () => {
         const args = provenanceSources.prompt_v2;
         const first = args.scope.source.bindings[0].successor_case_id;
         const resultPath = args.evaluatorOptionsByCase[first].resultPath;
         const bytes = readFileSync(resultPath);
         try {
-          writeFileSync(resultPath, Buffer.concat([bytes, Buffer.from(" ")]));
+          const forged = JSON.parse(bytes);
+          forged.evaluation_digest = `sha256:${"0".repeat(64)}`;
+          writeFileSync(resultPath, `${JSON.stringify(forged, null, 2)}\n`);
           await assert.rejects(() => verifySuccessorSourceProvenance(args));
         } finally { writeFileSync(resultPath, bytes); }
+        const sourceManifest = read(args.source.paths.sourceManifestPath);
+        const engineeringPath = resolve(args.source.paths.engineeringResultsPath, sourceManifest.inventory[0].path);
+        const heldPath = resolve(work, "missing-engineering-result.json");
+        renameSync(engineeringPath, heldPath);
+        try { await assert.rejects(() => verifySuccessorSourceProvenance(args)); }
+        finally { renameSync(heldPath, engineeringPath); }
         const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
         assert.throws(() => buildSuccessorComparisonFromProvenance({ preparation, policy,
           sources: { current_prompt: handles.current_prompt, prompt_v2: handles.current_prompt } }));

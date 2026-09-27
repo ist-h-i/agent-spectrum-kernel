@@ -71,19 +71,23 @@ static pid_t make_child(const char *directory) {
 }
 /* Synthetic diagnostics mirror the CLI's observable record shape for contract
  * tests. They are not provider, authentication, or actual host-policy proof. */
-static int fake_debug_prompt_input(int argc, char **argv) {
+static const char *fake_private_root(int argc, char **argv, char root[PATH_MAX]) {
   const char *private_root = NULL;
-  char root[PATH_MAX];
-  for (int i = 3; i + 1 < argc; ++i) if (!strcmp(argv[i], "-c")) {
+  for (int i = 2; i + 1 < argc; ++i) if (!strcmp(argv[i], "-c")) {
     const char *setting = argv[++i];
     const char *prefix = "permissions.ask_issue291.filesystem={ \"";
     if (strncmp(setting, prefix, strlen(prefix))) continue;
     const char *start = setting + strlen(prefix);
     const char *end = strchr(start, '"');
-    if (!end || end == start || (size_t)(end - start) >= sizeof root) return 64;
+    if (!end || end == start || (size_t)(end - start) >= PATH_MAX) return NULL;
     memcpy(root, start, (size_t)(end - start)); root[end - start] = '\0';
     private_root = root;
   }
+  return private_root;
+}
+static int fake_debug_prompt_input(int argc, char **argv) {
+  char root[PATH_MAX];
+  const char *private_root = fake_private_root(argc, argv, root);
   if (!private_root) return 64;
   printf("[{\"role\":\"developer\",\"content\":[{\"text\":\"<permissions instructions> `sandbox_mode` is `workspace-write`. Network access is restricted. Approval policy is currently never. - path `%s`\"}]}]\n", private_root);
   return 0;
@@ -100,10 +104,12 @@ static int fake_sandbox_probe(int argc, char **argv) {
   }
   return 64;
 }
-static int fake_diagnostic_session(const char *output) {
+static int fake_diagnostic_session(int argc, char **argv, const char *output) {
   const char *home = getenv("CODEX_HOME");
+  char private_root_buffer[PATH_MAX];
+  const char *private_root = fake_private_root(argc, argv, private_root_buffer);
   char cwd[PATH_MAX], path[PATH_MAX], session_id[80], turn_id[80];
-  if (!home || !getcwd(cwd, sizeof cwd)) return 64;
+  if (!home || !private_root || !getcwd(cwd, sizeof cwd)) return 64;
   if (snprintf(path, sizeof path, "%s/sessions", home) >= (int)sizeof path || mkdir(path, 0700)) return 65;
   if (snprintf(path, sizeof path, "%s/sessions/2026", home) >= (int)sizeof path || mkdir(path, 0700)) return 65;
   if (snprintf(path, sizeof path, "%s/sessions/2026/09", home) >= (int)sizeof path || mkdir(path, 0700)) return 65;
@@ -116,7 +122,7 @@ static int fake_diagnostic_session(const char *output) {
   FILE *session = fdopen(fd, "w");
   if (!session) fail("fake diagnostic session stream");
   fprintf(session, "{\"type\":\"session_meta\",\"payload\":{\"id\":\"%s\",\"cwd\":\"%s\",\"cli_version\":\"0.153.4\",\"model_provider\":\"openai\"}}\n", session_id, cwd);
-  fprintf(session, "{\"type\":\"turn_context\",\"payload\":{\"turn_id\":\"%s\",\"cwd\":\"%s\",\"model\":\"synthetic-native-fake-not-a-service\",\"effort\":\"medium\",\"approval_policy\":\"never\",\"sandbox_policy\":{\"type\":\"workspace-write\",\"network_access\":false},\"permission_profile\":{\"type\":\"managed\"},\"active_permission_profile\":{\"id\":\"ask_issue291\"}}}\n", turn_id, cwd);
+  fprintf(session, "{\"type\":\"turn_context\",\"payload\":{\"turn_id\":\"%s\",\"cwd\":\"%s\",\"model\":\"synthetic-native-fake-not-a-service\",\"effort\":\"medium\",\"approval_policy\":\"never\",\"sandbox_policy\":{\"type\":\"workspace-write\",\"network_access\":false},\"permission_profile\":{\"type\":\"managed\",\"network\":\"restricted\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"path\",\"path\":\"%s\"},\"access\":\"deny\"}]}},\"active_permission_profile\":{\"id\":\"ask_issue291\"}}}\n", turn_id, cwd, private_root);
   if (fclose(session)) fail("fake diagnostic session close");
   fd = open(output, O_WRONLY | O_CREAT | O_EXCL, 0600);
   if (fd < 0) fail("fake diagnostic output");
@@ -187,7 +193,7 @@ int main(int argc, char **argv) {
     write_all(fd, buffer, (size_t)n);
   }
   close(fd);
-  if (diagnostic) return fake_diagnostic_session(output);
+  if (diagnostic) return fake_diagnostic_session(argc, argv, output);
   if (!strcmp(mode, "failure")) { puts("{\"type\":\"turn.completed\"}"); fputs("intentional native fake failure\n", stderr); return 7; }
   if (!strcmp(mode, "timeout")) {
     struct sigaction action; memset(&action, 0, sizeof action);
