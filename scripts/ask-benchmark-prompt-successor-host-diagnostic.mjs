@@ -16,7 +16,7 @@ import { OUTPUT_SCHEMA_PATH, inspectVerifiedPortfolioExecution } from "./ask-ben
 import { assertSuccessorAdapterFacts, assertSuccessorProfileCommand } from "./ask-benchmark-prompt-successor-delivery.mjs";
 import { capturedSuccessorEnvironment, probeSuccessorPrivateRootDeny } from "./ask-benchmark-prompt-successor-host-isolation.mjs";
 import { validateSuccessorFromRepository } from "./ask-benchmark-prompt-successor-repository.mjs";
-import { successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
+import { successorClosed, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const ROLES = ["current_prompt", "prompt_v2"];
@@ -232,6 +232,11 @@ function runNoModelPreflight({ executable, environment, auth, command, privateRo
   symlinkSync(auth, resolve(home, "auth.json"));
   try {
     const env = { ...environment, CODEX_HOME: home };
+    const version = spawnSync(executable, ["--version"], { cwd, env, encoding: "utf8", timeout: 15000, maxBuffer: 16 * 1024 });
+    const versionText = `${version.stdout ?? ""}${version.stderr ?? ""}`.trim();
+    if (version.error || version.signal || version.status !== 0 || versionText !== `codex-cli ${runtime.cli_version}`) {
+      fail("diagnostic native CLI version is unverified");
+    }
     const login = spawnSync(executable, ["login", "status"], { cwd, env, encoding: "utf8", timeout: 15000, maxBuffer: 16 * 1024 });
     const loginStatus = `${login.stdout ?? ""}${login.stderr ?? ""}`.trim();
     if (login.error || login.signal || login.status !== 0 || loginStatus !== "Logged in using ChatGPT") {
@@ -260,7 +265,8 @@ function runNoModelPreflight({ executable, environment, auth, command, privateRo
       || !developer.includes(`- path \`${privateRoot}\``)) {
       fail("native resolved-policy diagnostic lacks required effective controls");
     }
-    return { login_status_digest: hash(Buffer.from(loginStatus)),
+    return { cli_version_output_digest: hash(Buffer.from(versionText)),
+      login_status_digest: hash(Buffer.from(loginStatus)),
       native_exec_help_digest: hash(Buffer.from(helpText)), resolved_policy_digest: hash(Buffer.from(developer)) };
   } finally {
     unlinkAuth(home);
@@ -293,6 +299,7 @@ function expectedPrecall({ preparation, sources, admission, identity, command, p
     diagnostic_namespace_path_digest: canonicalDigest({ path: location }),
     diagnostic_prompt_digest: hash(DIAGNOSTIC_PROMPT),
     output_schema_digest: command.output_schema_digest,
+    cli_version_output_digest: noModel.cli_version_output_digest,
     login_status_digest: noModel.login_status_digest,
     native_exec_help_digest: noModel.native_exec_help_digest,
     resolved_policy_digest: noModel.resolved_policy_digest,
@@ -350,6 +357,14 @@ function readDiagnosticResult(context) {
   const actualPrecall = readJson(resolve(location, "precall.json"), "host diagnostic precall");
   successorExact(actualPrecall, precall, "host diagnostic exact precall binding");
   const result = readJson(resolve(location, "result.json"), "host diagnostic terminal record");
+  successorClosed(result, ["schema_version", "kind", "precall_digest", "status", "process_exit_code",
+    "process_signal", "process_error_code", "residual_process_group_detected", "stdout_digest", "stderr_digest",
+    "output_digest", "session_digest", "session_path_digest", "session_evidence",
+    "diagnostic_exec_invocations", "diagnostic_attempt", "diagnostic_retry_index", "automatic_retries",
+    "diagnostic_model_calls", "result_digest"], "host diagnostic terminal record");
+  successorExact(result.schema_version, "1.0.0", "host diagnostic terminal version");
+  successorExact(result.kind, "successor_host_diagnostic_terminal", "host diagnostic terminal kind");
+  successorClosed(result.diagnostic_model_calls, ["status", "value"], "diagnostic model-call count");
   if (result.status !== "completed") fail("diagnostic invocation is nonterminal or failed; retry is forbidden");
   if (result.process_exit_code !== 0 || result.process_signal !== null || result.process_error_code !== null
     || result.residual_process_group_detected !== false || result.diagnostic_exec_invocations !== 1
@@ -396,6 +411,7 @@ function readDiagnosticResult(context) {
     agent_network: observed.agent_network, provider_network: observed.provider_network,
     active_permission_profile: observed.active_permission_profile,
     executable_digest: precall.executable_digest,
+    cli_version_output_digest: precall.cli_version_output_digest,
     login_status_digest: precall.login_status_digest,
     native_exec_help_digest: precall.native_exec_help_digest,
     resolved_policy_digest: precall.resolved_policy_digest,
