@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:19219e957d0d1b07250cc30dfc5db0d3d0b99457414a4ecfd288f81c4fb0e5e3",
+  "admission_record_digest": "sha256:897ac17ad69f1ea5ce035995d376ee8c7050acfd0593d51a9705b3d1e3c76109",
   "requirements": [
     {
       "requirement_id": "atomic-transfer-and-audit",
@@ -82,5 +82,5 @@
     }
   ],
   "requirement_set_digest": "sha256:62ef2a25dca103b47e0760d82f520d90c6b2c1ea3a8cab9b081a9c269fbee359",
-  "requirement_record_digest": "sha256:41f30d00d954dbb15bd5afc06a368087eb4772d680ad12f2a8c322370a0c64b5"
+  "requirement_record_digest": "sha256:495b9add0ebbe66ed4fc0a23e7511f371ac9a3f858a1db97c75cedda854ce681"
 }
