@@ -19,10 +19,12 @@ restart, the opaque handle can be reopened only by revalidating that exact
 durable freeze; a new late authority cannot be minted from already observed
 results. Serializable flags or copied digests alone cannot create it.
 
-This implementation does **not** execute the real experiment. A new result-blind
-freeze against the eventual merged source, target-host preflight and the 28 real
-Codex calls remain separate operator actions after merge/review. Portfolio
-mutation remains forbidden.
+This implementation does **not** execute the real experiment. The Issue #291
+preflight creates a result-blind freeze for one exact clean source commit and
+tree, after actual target-host and private-authority checks. A later source
+change, including a merge commit, requires a new pre-result freeze before any
+trial can use that changed source. The 28 real Codex calls remain a separate
+operator action. Portfolio mutation remains forbidden.
 
 A green `Check measured successor preparation` run proves only its named
 synthetic compatibility, source packaging and deterministic fake-process checks. The source archive is an input for
@@ -315,6 +317,17 @@ initialize that session or execute a measured model call. The eventual run must 
 its own authority record before trial 1, so PR/test evidence cannot be reused as
 the production freeze.
 
+For Issue #291, the preflight script's `create --spec <absolute-external-spec.json>`
+command creates the unstarted paired namespace and scoring input package.
+Its `seal --spec <same-spec>` command validates the formal private
+admission, performs one separately classified host diagnostic, and seals the
+measured freeze. Its `authority_freeze_digest` is the required independent
+argument to `reopenIssue291ReadyContext(specPath, expectedFreezeDigest)`; the
+reopen path rejects an absent or changed freeze before opening any measured
+terminal result. Neither command claims trial 1. The diagnostic invocation is
+recorded separately from the measured trial inventory and cannot be retried
+inside its reserved namespace.
+
 ## Invariants to verify
 
 - Bind exact source commit/tree, experiment, selected Prompt bytes, runtime,
@@ -340,8 +353,11 @@ the production freeze.
 ## Verification contract
 
 Formal verification is required: this change crosses execution, persistence,
-security and evidence-authority boundaries. Use deterministic local/native fake
-processes, never a model service or an actual private evaluator package.
+security and evidence-authority boundaries. Implementation integration tests use
+deterministic local/native fake processes. The separate Issue #291 preflight
+validates the actual private evaluator packages and, if the model-free checks
+cannot establish effective exec-session policy, uses the authorized diagnostic
+model call outside the measured inventory.
 
 Required evidence includes focused positive and negative tests, unchanged
 synthetic-successor compatibility, native #197 execution/normalization/evaluator
