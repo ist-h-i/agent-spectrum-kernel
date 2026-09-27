@@ -379,7 +379,7 @@ function readDiagnosticResult(context) {
   const outputPath = regular(resolve(location, "output.json"), "host diagnostic structured output");
   const sessionPath = sessionFiles(resolve(location, "codex-home"));
   const stdout = readStableBytes(stdoutPath, "host diagnostic stdout", MAX_EVENT_BYTES);
-  const stderr = readStableBytes(stderrPath, "host diagnostic stderr", MAX_EVENT_BYTES);
+  const stderr = readStableBytes(stderrPath, "host diagnostic stderr", MAX_EVENT_BYTES, { allowEmpty: true });
   const output = readStableBytes(outputPath, "host diagnostic structured output", 1024 * 1024);
   const session = readStableBytes(sessionPath, "host diagnostic session", MAX_SESSION_BYTES);
   successorExact(hash(stdout), result.stdout_digest, "host diagnostic stdout bytes");
