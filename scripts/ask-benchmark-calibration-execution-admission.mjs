@@ -409,10 +409,12 @@ export function calibratedEffectiveAdmission(handle, fixtureId, context) {
 
 /** One live closure proves the frozen evidence, result root, and fixture authority. */
 export function assertCalibrationEffectiveAdmission(handle, fixtureId, role, path, context) {
-  const { value, current } = validatedClosure(handle, context);
+  const value = HANDLES.get(handle);
+  if (!value) fail("opaque admission handle is required");
   if (!ROLES.includes(role)) fail("unknown Prompt role for normalized result root");
   successorExact(resolve(path), resolve(value.input.normalizedRoots[role]), "frozen normalized result root");
   if (!FIXTURE_IDS.includes(fixtureId)) fail("cross-fixture effective admission request");
+  const { current } = validatedClosure(handle, context);
   return { evidence: structuredClone(value.evidence), effectiveAuthority: current.effectiveAuthorities.get(fixtureId) };
 }
 

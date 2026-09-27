@@ -283,21 +283,23 @@ async function syntheticAdmissionWorker(contextPath) {
   const role = "current_prompt";
   const admissionContext = { preparation, sources, scoringInputs };
   const checked = () => assertCalibrationEffectiveAdmission(opened, fixtureId, role, normalizedRoots[role], admissionContext);
-  assert.deepEqual(checked().evidence, evidence);
-  assert.equal(checked().effectiveAuthority.effective_admission_status, "admitted");
-  for (const [label, path] of [
-    ["reviewed public", resolve(root, `benchmarks/fixtures/checkpoint-b2/${fixtureId}/verification-command-contract.json`)],
-    ["private manifest", first.manifestPath],
-    ["independent review", first.reviewAuthorityPath],
-    ["review archive", first.reviewArchivePath],
+  const firstCheck = checked();
+  assert.deepEqual(firstCheck.evidence, evidence);
+  assert.equal(firstCheck.effectiveAuthority.effective_admission_status, "admitted");
+  for (const [label, path, expected] of [
+    ["reviewed public", resolve(root, `benchmarks/fixtures/checkpoint-b2/${fixtureId}/verification-command-contract.json`),
+      /public authority changed after independent review/u],
+    ["private manifest", first.manifestPath, /calibration execution admission drift/u],
+    ["independent review", first.reviewAuthorityPath, /sealed admission review authority raw digest differs/u],
+    ["review archive", first.reviewArchivePath, /external review archive raw identity differs/u],
   ]) {
     const bytes = readFileSync(path);
     try {
       writeFileSync(path, Buffer.concat([bytes, Buffer.from(" ")]));
-      assert.throws(checked, error => typeof error?.code === "string" && error.code !== "ENOENT", `${label} drift must reject a warmed admission`);
+      assert.throws(checked, { message: expected }, `${label} drift must reject a warmed admission`);
     } finally { writeFileSync(path, bytes); }
-    assert.deepEqual(checked().evidence, evidence, `${label} restored admission`);
   }
+  assert.deepEqual(checked().evidence, evidence, "restored bytes reopen the warmed admission");
   assert.throws(() => assertCalibrationEffectiveAdmission(opened, "cal-other", role, normalizedRoots[role], admissionContext),
     { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION" });
   assert.throws(() => assertCalibrationEffectiveAdmission(opened, fixtureId, "other_role", normalizedRoots[role], admissionContext),
