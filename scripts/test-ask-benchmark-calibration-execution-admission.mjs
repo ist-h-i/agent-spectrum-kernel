@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -342,9 +342,11 @@ async function syntheticAdmissionWorker(contextPath) {
   console.log("PASS native run identity drift rejects static reopen without terminal result inspection");
   const selectionIndexPath = resolve(selectionState, "selection-state.json");
   const selectionIndexBytes = readFileSync(selectionIndexPath);
+  const selectionIndexMode = statSync(selectionIndexPath).mode & 0o777;
   const pairedRunIdentityPath = resolve(roles.prompt_v2.execution.runDir, "run-identity.json");
   const pairedRunIdentityBytes = readFileSync(pairedRunIdentityPath);
   try {
+    chmodSync(selectionIndexPath, 0o600);
     const reordered = JSON.parse(selectionIndexBytes);
     reordered.sealed_cases.reverse();
     writeFileSync(selectionIndexPath, `${JSON.stringify(reordered)}\n`);
@@ -359,6 +361,7 @@ async function syntheticAdmissionWorker(contextPath) {
     writeFileSync(runIdentityPath, runIdentityBytes);
     writeFileSync(pairedRunIdentityPath, pairedRunIdentityBytes);
     writeFileSync(selectionIndexPath, selectionIndexBytes);
+    chmodSync(selectionIndexPath, selectionIndexMode);
   }
   console.log("PASS coordinated run and selection index mutation cannot reuse a frozen admission digest");
   // The production guard is used unmodified. A sandbox subcommand observation
