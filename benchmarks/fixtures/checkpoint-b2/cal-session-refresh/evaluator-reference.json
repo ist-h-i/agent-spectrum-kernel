@@ -2,18 +2,18 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-b4e87d7dcb4229b2f11305a4e74e8652f2d67684ce1cea5f1cf8b1da62893016",
-  "evaluator_bundle_digest": "sha256:a84ca7d19febdf8e67c4ccbb8baf52b77a4007e76bb5b75c69981cc1adce654d",
+  "evaluator_bundle_id": "evaluator-bb53a6e8a62aaf810a063e76e92d3a73f5d6c099a6fb929a9bba211b7567aa9a",
+  "evaluator_bundle_digest": "sha256:ba45e7411b4cbeb7255bd6ff33788187ad67191c8925e41908db6df8af7d7131",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "cal-session-refresh",
   "fixture_input_digest": "sha256:e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
   "task_class": "review",
   "suite": "calibration",
-  "evaluator_revision": "88b2e7aa7d4611a4535cf2c4029a9f783aa5c426",
+  "evaluator_revision": "5c9e950aa00cc9e0dcd2821252de4841e270b4de",
   "evaluator_source_identity": {
-    "base_git_revision": "88b2e7aa7d4611a4535cf2c4029a9f783aa5c426",
+    "base_git_revision": "5c9e950aa00cc9e0dcd2821252de4841e270b4de",
     "source_tree_digest": "sha256:dc762d7f77a89e428addc89b0a5871f0e8865a018207329cfc02e9688eecbaab",
-    "generator_source_digest": "sha256:25d0d1bd63e253f1f3980b2b2f806cf953c86dcd4aea3c8bba545ed663444790",
+    "generator_source_digest": "sha256:0a6fa8256166dfe2f5c1a4f872bb7d3f936d47f04ef31af3ddd29e8354b2bdec",
     "source_files": [
       {
         "path": "benchmarks/schemas/evaluation-input-failure-artifact.schema.json",
@@ -2137,12 +2137,12 @@
       "graph_digest": "sha256:0cc7a555f40167bcdeb7fa4b3059ff49aaf27e3751ed9eec9449c9969b161b54"
     }
   },
-  "generator_identity": "sha256:1d51f87fdb8efa2b72e1857e1486344aad3dfc23c2b527c5662d8b32b68429d7",
-  "independence_statement_digest": "sha256:523772ed939f312054f69f7a8eef0d1c45bfcab08d403cfe8ad109f8a26dacf9",
-  "review_record_digest": "sha256:2626ca432df0ab1050da5849437477da20638211f812fef8d1b720e8809c2104",
+  "generator_identity": "sha256:6d71080a4a902b716f89ff6e483b970b42fb3eab36c02fa9b94e0a408d83c1eb",
+  "independence_statement_digest": "sha256:dd84821d63f89f7c1a83576b7a79ab72c5757d7657dcd3b243bccdbece116c1d",
+  "review_record_digest": "sha256:a69f0d9849c1747bd2a399db151b3509a5694282176e3baab1d4750818b693dc",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/cal-session-refresh/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:cdcb33235dce07d7656d9e59771045bc2f187d9d52c0095d1dd701b31e0fb39e",
-  "evaluator_authority_manifest_digest": "sha256:6616c8775f0d44910078e7905165652f5f86b1c54bb505191ecbc2dce2c83253",
+  "evaluator_authority_manifest_raw_sha256": "sha256:a97de65a6529765347167463092a25b1b00e94ec7e0dc8017255466263c8c0e2",
+  "evaluator_authority_manifest_digest": "sha256:07d697c40f0b1004ad2d87954dd5731fa190a24e9a0bfc02ba55ecfae48c5cfe",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:9663fd36efe2cb57a6ade6b86024ad6040e135ca196a1681c404c589154ffbb3"
+  "public_metadata_digest": "sha256:1dbef485633ae13da79a26bff10a1a82e0256c270979bc19eb44a518664fb64c"
 }
