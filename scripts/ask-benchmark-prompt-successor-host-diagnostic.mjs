@@ -228,6 +228,12 @@ function runNoModelPreflight({ executable, environment, auth, command, privateRo
     if (login.error || login.signal || login.status !== 0 || loginStatus !== "Logged in using ChatGPT") {
       fail("diagnostic subscription login status is unverified");
     }
+    const help = spawnSync(executable, ["exec", "--help"], { cwd, env, encoding: "utf8", timeout: 15000, maxBuffer: 64 * 1024 });
+    const helpText = `${help.stdout ?? ""}${help.stderr ?? ""}`;
+    if (help.error || help.signal || help.status !== 0 || !helpText.includes("--ephemeral")
+      || !helpText.includes("Run without persisting session files to disk")) {
+      fail("native CLI does not attest the diagnostic persistence-only argv difference");
+    }
     const args = ["debug", "prompt-input", "-c", `model=${JSON.stringify(runtime.model)}`,
       ...policySettings(command).flatMap(setting => ["-c", setting])];
     const debug = spawnSync(executable, args, { cwd, env, encoding: "utf8", timeout: 15000, maxBuffer: MAX_EVENT_BYTES });
@@ -245,7 +251,8 @@ function runNoModelPreflight({ executable, environment, auth, command, privateRo
       || !developer.includes(`- path \`${privateRoot}\``)) {
       fail("native resolved-policy diagnostic lacks required effective controls");
     }
-    return { login_status_digest: hash(Buffer.from(loginStatus)), resolved_policy_digest: hash(Buffer.from(developer)) };
+    return { login_status_digest: hash(Buffer.from(loginStatus)),
+      native_exec_help_digest: hash(Buffer.from(helpText)), resolved_policy_digest: hash(Buffer.from(developer)) };
   } finally {
     unlinkAuth(home);
     rmSync(home, { recursive: true, force: true });
@@ -278,6 +285,7 @@ function expectedPrecall({ preparation, sources, admission, identity, command, p
     diagnostic_prompt_digest: hash(DIAGNOSTIC_PROMPT),
     output_schema_digest: command.output_schema_digest,
     login_status_digest: noModel.login_status_digest,
+    native_exec_help_digest: noModel.native_exec_help_digest,
     resolved_policy_digest: noModel.resolved_policy_digest,
     planned_diagnostic_exec_invocations: 1, diagnostic_attempt: 1,
     diagnostic_retry_index: 0, automatic_retries: 0,
@@ -380,6 +388,7 @@ function readDiagnosticResult(context) {
     active_permission_profile: observed.active_permission_profile,
     executable_digest: precall.executable_digest,
     login_status_digest: precall.login_status_digest,
+    native_exec_help_digest: precall.native_exec_help_digest,
     resolved_policy_digest: precall.resolved_policy_digest,
     precall_digest: precall.precall_digest, result_digest: result.result_digest,
   };
