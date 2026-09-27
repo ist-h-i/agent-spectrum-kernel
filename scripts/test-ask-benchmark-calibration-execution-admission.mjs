@@ -340,6 +340,22 @@ async function syntheticAdmissionWorker(contextPath) {
       { message: /native scoped run identity/u });
   } finally { writeFileSync(runIdentityPath, runIdentityBytes); }
   console.log("PASS native run identity drift rejects static reopen without terminal result inspection");
+  const selectionIndexPath = resolve(selectionState, "selection-state.json");
+  const selectionIndexBytes = readFileSync(selectionIndexPath);
+  try {
+    const reordered = JSON.parse(selectionIndexBytes);
+    reordered.sealed_cases.reverse();
+    writeFileSync(selectionIndexPath, `${JSON.stringify(reordered)}\n`);
+    const matchedRun = JSON.parse(runIdentityBytes);
+    matchedRun.selection_state_digest = hash(readFileSync(selectionIndexPath));
+    writeFileSync(runIdentityPath, `${JSON.stringify(matchedRun)}\n`);
+    assert.throws(() => reopenCalibrationExecutionAdmission(admissionInput, evidence.admission_digest),
+      { message: /reopened calibration execution admission/u });
+  } finally {
+    writeFileSync(runIdentityPath, runIdentityBytes);
+    writeFileSync(selectionIndexPath, selectionIndexBytes);
+  }
+  console.log("PASS coordinated run and selection index mutation cannot reuse a frozen admission digest");
   // The production guard is used unmodified. A sandbox subcommand observation
   // is insufficient to attest the later exec session, so a real freeze remains
   // unavailable on this fake host. No measured authority is opened here.

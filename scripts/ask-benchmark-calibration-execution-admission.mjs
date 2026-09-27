@@ -252,11 +252,14 @@ function staticClosure({ preparation, sources, scoringInputs, admissionSourcesBy
   successorExact(scoring.manifest_digest, preparation.scoring_input_manifest_digest, "preparation scoring identity");
   assertCalibrationScoringAdmissionCandidate(scoring);
   const sourceIdentity = preparation.implementation;
+  const nativeRunIdentityDigests = {};
+  const nativeSelectionIndexDigests = {};
   const denyRoots = ROLES.map(role => {
     const source = sources[role];
     validateSuccessorSourceScope(source.scope, preparation, source.expectedScopeDigest);
     successorExact(source.scope.prompt_role, role, "calibration source role");
-    const runIdentity = rawJson(resolve(source.execution.runDir, "run-identity.json"), "native run identity").value;
+    const runIdentitySource = rawJson(resolve(source.execution.runDir, "run-identity.json"), "native run identity");
+    const runIdentity = runIdentitySource.value;
     assertBenchmarkSchemaInstance(runIdentity, { schemaPath: resolve(root, "benchmarks/schemas/portfolio-run-identity.schema.json"), label: "calibration native run identity" });
     successorExact(runIdentity.run_instance_id, source.scope.source.run_instance_id, "native scoped run identity");
     successorExact(runIdentity.repository_revision, preparation.implementation.revision, "native scoped repository revision");
@@ -287,6 +290,8 @@ function staticClosure({ preparation, sources, scoringInputs, admissionSourcesBy
     successorExact(selectionIndex.value.materialization_manifest_digest, materialization.digest, "native selection materialization digest");
     successorExact(selectionIndex.value.materialization_output_root_identity,
       materialization.value.output_root_identity, "native selection materialization root");
+    nativeRunIdentityDigests[role] = runIdentitySource.digest;
+    nativeSelectionIndexDigests[role] = selectionIndex.digest;
     const adaptiveCases = plan.cases.filter(item => item.condition === "adaptive_ask");
     successorExact(selectionIndex.value.sealed_cases.map(item => item.case_id).sort(),
       adaptiveCases.map(item => item.case_id).sort(), "native selection case inventory");
@@ -420,6 +425,8 @@ function staticClosure({ preparation, sources, scoringInputs, admissionSourcesBy
     private_deny_root_identity_digest: canonicalDigest({ path: denyRoots[0] }),
     experiment_run_instance_id: sources.current_prompt.scope.run_instance_id,
     source_scope_digests: Object.fromEntries(ROLES.map(role => [role, sources[role].scope.scope_digest])),
+    native_run_identity_source_digests: nativeRunIdentityDigests,
+    native_selection_index_source_digests: nativeSelectionIndexDigests,
     run_root_identity_digest: canonicalDigest(ROLES.map(role => resolve(sources[role].execution.runDir))),
     result_root_identity_digest: canonicalDigest(ROLES.map(role => resolve(normalizedRoots[role]))),
     fixtures, automatic_retry_authorized: false, measured_result_reads_at_admission: 0,
