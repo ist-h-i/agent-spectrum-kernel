@@ -110,6 +110,10 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
     };
     const runtimeConfigPath = resolve(work, "runtime.json"); write(runtimeConfigPath, nativeFile);
     const home = resolve(work, "empty-home"); const capture = resolve(work, "captures"); mkdirSync(home); mkdirSync(capture);
+    if (positiveAdmission) {
+      mkdirSync(resolve(home, ".codex"));
+      write(resolve(home, ".codex", "auth.json"), { synthetic_contract_test_only: true });
+    }
     const env = { HOME: home, ASK_SUCCESSOR_FAKE_CAPTURE: capture, ASK_SUCCESSOR_FAKE_MODE: "success" };
     const runtime = { adapter: "codex", cli_version: "0.153.4", executable_digest: hash(readFileSync(agentBin)), node_version: process.version,
       os: process.platform, arch: process.arch, model: nativeFile.model, provider_model_revision: { status: "unknown", value: null }, reasoning_effort: "medium",
@@ -142,9 +146,11 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
     }
     const shared = { root, config, planPath, materializedPath, selectionState };
     const experimentRun = randomUUID(); const roles = {};
+    const nativeRunBase = positiveAdmission ? resolve(work, "native-runs") : work;
+    if (positiveAdmission) mkdirSync(nativeRunBase);
     await check("both roles map all 14 canonical native cases before any fake execution", () => {
       for (const role of ["current_prompt", "prompt_v2"]) {
-        const execution = { ...shared, runDir: resolve(work, `run-${role}`) };
+        const execution = { ...shared, runDir: resolve(nativeRunBase, `run-${role}`) };
         const native = environment(env, () => prepareSuccessorPortfolioSource({ ...execution, runtimeConfigPath, agentBin, preparation }));
         const source = { plan_id: native.plan_id, plan_digest: native.plan_digest, run_instance_id: native.run_instance_id, repository_revision: native.repository_revision,
           runtime_identity_digest: native.runtime_identity_digest, materialization_manifest_digest: native.materialization_manifest_digest,
@@ -208,10 +214,22 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
         record.synthetic_admission_digest = evidence.admission_digest;
       });
       let measuredAuthority;
+      const hostIsolationProbePath = context.admissionSourcesByFixture[manifest.fixtures[0].fixture_id].manifestPath;
+      const diagnosticRoot = resolve(work, "host-diagnostic"); mkdirSync(diagnosticRoot);
+      await check("the fake native CLI emits one separate non-measured diagnostic session", async () => {
+        const { runSuccessorExecDiagnostic } = await import("./ask-benchmark-prompt-successor-host-diagnostic.mjs");
+        const diagnostic = await asyncEnvironment(env, () => runSuccessorExecDiagnostic({ preparation,
+          sources: measuredSources, scoringInputs, calibrationAdmission, hostIsolationProbePath,
+          diagnosticRoot, normalizedRoots, root }));
+        assert.equal(diagnostic.classification, "diagnostic_preflight_outside_measured_inventory");
+        assert.equal(diagnostic.exec_session_policy_observed, true);
+        assert.equal(diagnostic.measured_trials, 0);
+        record.synthetic_diagnostic_digest = diagnostic.result_digest;
+      });
       await check("result-blind measured freeze binds the synthetic admission and exact fake native sources", async () => {
-        measuredAuthority = await openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, scoringInputs,
-          calibrationAdmission, hostIsolationProbePath: context.admissionSourcesByFixture[manifest.fixtures[0].fixture_id].manifestPath,
-          hostExecutionDiagnosticPath: context.hostExecutionDiagnosticPath, root });
+        measuredAuthority = await asyncEnvironment(env, () => openSuccessorMeasuredAuthority({ preparation,
+          sources: measuredSources, scoringInputs, calibrationAdmission, hostIsolationProbePath,
+          hostExecutionDiagnosticRoot: diagnosticRoot, normalizedRoots, root }));
         assert.ok(measuredAuthority);
         record.synthetic_freeze_digest = (await import("./ask-benchmark-prompt-successor-measured-authority.mjs"))
           .inspectSuccessorMeasuredAuthority(measuredAuthority).authority_record_digest;
