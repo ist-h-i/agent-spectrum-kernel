@@ -1046,6 +1046,8 @@ if (process.argv[2] === "--worker") {
     const result = spawnSync(process.execPath,
       [resolve(clone, relative(root, fileURLToPath(import.meta.url))), "--worker", contextPath, "--synthetic-positive"],
       { cwd: clone, encoding: "utf8", timeout: 10600000, maxBuffer: 20 * 1024 * 1024 });
+    if (result.stdout) console.log(result.stdout);
+    if (result.stderr) console.error(result.stderr);
     assert.equal(result.error, undefined, result.error?.message);
     assert.equal(result.status, 0, result.stderr || result.stdout);
     const proof = read(resolve(work, "scoring-verification.json"));
