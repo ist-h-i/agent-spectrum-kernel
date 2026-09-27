@@ -375,10 +375,18 @@ export function createSuccessorSyntheticAdmittedCalibrationPackages({ root, revi
  * The test never claims this data was produced by a real/private evaluator.
  * Admission remains pending and the report must remain insufficient evidence.
  */
-export function syntheticSuccessorEvaluatorEnvelope({ normalized, sourceSnapshotDigest, context }) {
+export function syntheticSuccessorEvaluatorEnvelope({ normalized, sourceSnapshotDigest, context, outcome = "pass" }) {
+  if (!["pass", "fail", "manual_review_required"].includes(outcome)) throw new Error("unsupported synthetic evaluator observation");
   const l = normalized.lineage; const c = context;
   const ref = [{ kind: "normalized_result", digest: normalized.normalized_result_digest, bytes: null }];
   const observation = () => ({ state: "unknown", evidence_references: [] });
+  const manual = outcome === "manual_review_required";
+  const requirementResults = c.requirements.requirements.map((requirement, index) => {
+    const observed = manual && index === 0 ? "manual_review_required" : manual ? "fail" : outcome;
+    return { requirement_id: requirement.requirement_id, outcome: observed,
+      earned_points: observed === "manual_review_required" ? null : observed === "pass" ? requirement.max_points : 0,
+      matched_equivalence_class_ids: [], finding_ids: [], evidence_references: ref };
+  });
   const value = {
     schema_version: "1.0.0", schema_path: "benchmarks/schemas/evaluator-result-envelope.schema.json", program: "adaptive_ask_evaluator_result",
     scoring_input_freeze_manifest_source_digest: c.freezeRawDigest, scoring_input_freeze_manifest_digest: c.freeze.manifest_digest,
@@ -391,12 +399,12 @@ export function syntheticSuccessorEvaluatorEnvelope({ normalized, sourceSnapshot
     fixture_input_digest: l.fixture_input_digest, case_id: l.case_id, attempt: l.attempt, adapter: l.adapter_track,
     condition: l.condition, repetition: l.repetition, source_snapshot_digest: sourceSnapshotDigest,
     evaluator_bundle_id: c.bundle.evaluator_bundle_id, evaluator_bundle_digest: c.bundle.evaluator_bundle_digest, evaluator_revision: c.bundle.evaluator_revision,
-    evaluation_id: `evaluation-${"0".repeat(32)}`, evaluation_digest: d("pending-digest"), evaluation_status: "completed",
-    requirement_results: [{ requirement_id: c.requirements.requirements[0].requirement_id, outcome: "pass", earned_points: 1,
-      matched_equivalence_class_ids: [], finding_ids: [], evidence_references: ref }],
+    evaluation_id: `evaluation-${"0".repeat(32)}`, evaluation_digest: d("pending-digest"),
+    evaluation_status: manual ? "manual_review_required" : "completed", requirement_results: requirementResults,
     quality: observation(), safety: observation(), findings: [], false_positives: [], scope_deviations: [],
     decision_correctness: observation(), verification_correctness: observation(), evidence_correctness: observation(),
-    approval_correctness: observation(), completion_claim_correctness: observation(), under_processing: observation(), over_processing: observation(),
+    approval_correctness: observation(), completion_claim_correctness: observation(),
+    under_processing: manual ? { state: "manual_review_required", evidence_references: ref } : observation(), over_processing: observation(),
     required_mechanisms: [], unnecessary_mechanisms: [], unsafe_attempted_actions: [],
     evaluator_notes_state: { state: "not_recorded", digest: null, bytes: null },
     privacy: { oracle_content_stored: false, rubric_content_stored: false, hidden_test_content_stored: false, matcher_content_stored: false,
