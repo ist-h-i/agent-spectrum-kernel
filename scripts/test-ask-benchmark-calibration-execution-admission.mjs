@@ -287,7 +287,7 @@ async function syntheticAdmissionWorker(contextPath) {
   assert.deepEqual(firstCheck.evidence, evidence);
   assert.equal(firstCheck.effectiveAuthority.effective_admission_status, "admitted");
   for (const [label, path, expected] of [
-    ["reviewed public", resolve(root, `benchmarks/fixtures/checkpoint-b2/${fixtureId}/verification-command-contract.json`),
+    ["reviewed public", resolve(root, `benchmarks/fixtures/checkpoint-b2/${fixtureId}/metadata.json`),
       /public authority changed after independent review/u],
     ["private manifest", first.manifestPath, /calibration execution admission drift/u],
     ["independent review", first.reviewAuthorityPath, /sealed admission review authority raw digest differs/u],
