@@ -53,14 +53,44 @@ function authorityPathForSources(sources) {
   return resolve(pairedRunParent(sources), `.ask-successor-issue291-${sources.current_prompt.scope.run_instance_id}.authority.json`);
 }
 
-function readAuthorityRecord(path) {
+function namespacePathForSources(sources) {
+  return resolve(pairedRunParent(sources), ".ask-successor-issue291.namespace.json");
+}
+
+function expectedNamespaceRecord(sources) {
+  const body = {
+    schema_version: "1.0.0", kind: "prompt_successor_measured_namespace",
+    experiment_run_instance_id: sources.current_prompt.scope.run_instance_id,
+    source_closures: Object.fromEntries(["current_prompt", "prompt_v2"]
+      .map(role => [role, sourceClosure(sources[role])])),
+  };
+  return { ...body, record_digest: canonicalDigest(body) };
+}
+
+/** A single atomic marker owns the paired native run parent across experiment UUIDs. */
+export function bindSuccessorMeasuredNamespace(sources, { reserve = false } = {}) {
+  successorClosed(sources, ["current_prompt", "prompt_v2"], "measured namespace sources");
+  successorExact(sources.current_prompt.scope.run_instance_id,
+    sources.prompt_v2.scope.run_instance_id, "measured namespace experiment ID");
+  const path = namespacePathForSources(sources);
+  const expected = expectedNamespaceRecord(sources);
+  if (reserve) writeAuthorityRecordOnce(path, expected);
+  if (!existsSync(path)) successorFail("SUCCESSOR_MEASURED_NAMESPACE_REQUIRED", "native run namespace is unreserved");
+  const actual = readAuthorityRecord(path, "prompt_successor_measured_namespace");
+  successorExact(actual, expected, "measured native run namespace ownership");
+  return { path_digest: canonicalDigest({ path }), record_digest: actual.record_digest };
+}
+
+function readAuthorityRecord(path, kind = "prompt_successor_measured_authority_freeze") {
   assertNoSymlinkPathSegments(path, "measured authority record");
   const bytes = readFileSync(path);
   if (bytes.length < 2 || bytes.length > MAX_AUTHORITY_BYTES) successorFail("SUCCESSOR_MEASURED_AUTHORITY_RECORD_INVALID", "authority record size");
   const value = parseJsonRejectDuplicateKeys(bytes, "measured authority record");
-  successorClosed(value, ["schema_version", "kind", "evidence", "record_digest"], "measured authority record");
+  successorClosed(value, kind === "prompt_successor_measured_namespace"
+    ? ["schema_version", "kind", "experiment_run_instance_id", "source_closures", "record_digest"]
+    : ["schema_version", "kind", "evidence", "record_digest"], "measured authority record");
   successorExact(value.schema_version, "1.0.0", "measured authority record version");
-  successorExact(value.kind, "prompt_successor_measured_authority_freeze", "measured authority record kind");
+  successorExact(value.kind, kind, "measured authority record kind");
   const { record_digest: digest, ...body } = value;
   successorExact(canonicalDigest(body), digest, "measured authority record digest");
   return value;
@@ -207,6 +237,7 @@ export async function openSuccessorMeasuredAuthority({ preparation, sources, sco
     calibrationAdmissionEvidence: admissionEvidence, hostIsolationProbes, hostExecutionDiagnostic });
   const body = { schema_version: "1.0.0", kind: "prompt_successor_measured_authority_freeze", evidence: baseEvidence };
   const expectedRecord = { ...body, record_digest: canonicalDigest(body) };
+  bindSuccessorMeasuredNamespace(sources, { reserve: !hadRecord });
   if (!hadRecord) writeAuthorityRecordOnce(recordPath, expectedRecord);
   const record = readAuthorityRecord(recordPath);
   successorExact(record, expectedRecord, "measured authority durable freeze");
@@ -231,6 +262,7 @@ function found(handle, { deferCalibrationAdmission = false } = {}) {
   const value = handles.get(handle);
   if (!value) successorFail("SUCCESSOR_MEASURED_AUTHORITY_REQUIRED", "opaque measured authority");
   const record = readAuthorityRecord(value.recordPath);
+  bindSuccessorMeasuredNamespace(value.sources);
   successorExact(record.record_digest, value.recordDigest, "measured authority persisted record");
   successorExact(record.evidence, value.baseEvidence, "measured authority persisted evidence");
   if (!deferCalibrationAdmission) {

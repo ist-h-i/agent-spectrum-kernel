@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -188,15 +188,40 @@ test("diagnostic rejects provider, model, effort, sandbox, network, approval and
   for (const entries of [[],
     [{ path: { type: "path", path: "/tmp/other" }, access: "deny" }],
     [{ path: { type: "path", path: privateRoot }, access: "read" }],
-    Array(2).fill({ path: { type: "path", path: privateRoot }, access: "deny" })]) {
+    Array(2).fill({ path: { type: "path", path: privateRoot }, access: "deny" }),
+    [{ path: { type: "path", path: privateRoot }, access: "deny" },
+      { path: { type: "path", path: resolve(privateRoot, "another-private.json") }, access: "read" }],
+    [{ path: { type: "path", path: privateRoot }, access: "deny" },
+      { path: { type: "path", path: resolve(privateRoot, "nested") }, access: "write" }],
+    [{ path: { type: "path", path: privateRoot }, access: "deny" },
+      { path: { type: "glob", path: `${privateRoot}/**` }, access: "read" }]]) {
     const rows = structuredClone(sessionRows);
     rows[1].payload.permission_profile.file_system.entries = entries;
     assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, rows)), "exactly one private deny entry required");
   }
+  const unrelated = structuredClone(sessionRows);
+  unrelated[1].payload.permission_profile.file_system.entries.push(
+    { path: { type: "path", path: "/tmp/other" }, access: "read" });
+  assert.equal(parseSuccessorExecSessionEvidence(input(eventRows, unrelated)).active_permission_profile, "ask_issue291");
   const network = structuredClone(sessionRows);
   network[1].payload.permission_profile.network = "open";
   assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, network)));
   const noActiveId = structuredClone(sessionRows);
   delete noActiveId[1].payload.active_permission_profile;
   assert.equal(parseSuccessorExecSessionEvidence(input(eventRows, noActiveId)).active_permission_profile, null);
+});
+
+test("diagnostic rejects a permission grant through a private-root alias", t => {
+  const scratch = mkdtempSync(resolve(tmpdir(), "ask291-diagnostic-alias-"));
+  t.after(() => rmSync(scratch, { recursive: true, force: true }));
+  const denied = resolve(scratch, "denied");
+  const alias = resolve(scratch, "alias");
+  mkdirSync(denied);
+  symlinkSync(denied, alias);
+  const rows = structuredClone(sessionRows);
+  rows[1].payload.permission_profile.file_system.entries = [
+    { path: { type: "path", path: denied }, access: "deny" },
+    { path: { type: "path", path: resolve(alias, "asset.json") }, access: "read" },
+  ];
+  assert.throws(() => parseSuccessorExecSessionEvidence({ ...input(eventRows, rows), privateRoot: denied }));
 });

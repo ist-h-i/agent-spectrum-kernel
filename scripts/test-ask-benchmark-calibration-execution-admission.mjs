@@ -14,6 +14,7 @@ import {
   inspectCalibrationExecutionAdmission, inspectCalibrationUnstartedInventories,
   openCalibrationExecutionAdmission, reopenCalibrationExecutionAdmission,
 } from "./ask-benchmark-calibration-execution-admission.mjs";
+import { bindSuccessorMeasuredNamespace } from "./ask-benchmark-prompt-successor-measured-authority.mjs";
 
 const root = realpathSync(resolve(fileURLToPath(new URL("..", import.meta.url))));
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
@@ -112,6 +113,26 @@ test("run guard rejects claims, attempts and orphan output before byte scanning"
   rmSync(resolve(caseRoot, "claim"), { recursive: true });
   writeFileSync(resolve(caseRoot, "attempts", "0001"), "never read me\n");
   assert.throws(() => inspectCalibrationUnstartedInventories(input), { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION" });
+});
+
+test("one native run pair cannot be frozen under two experiment namespaces", t => {
+  const input = createInventory(t);
+  const sourcesFor = experiment => Object.fromEntries(["current_prompt", "prompt_v2"].map(role => [role, {
+    ...input.sources[role],
+    scope: { run_instance_id: experiment, scope_digest: hash(Buffer.from(`${experiment}:${role}`)) },
+    runtimeConfigPath: resolve(input.base, "runtime-config.json"),
+    agentBin: resolve(input.base, "codex"),
+  }]));
+  const first = sourcesFor(randomUUID());
+  const second = sourcesFor(randomUUID());
+  assert.throws(() => bindSuccessorMeasuredNamespace(first), { code: "SUCCESSOR_MEASURED_NAMESPACE_REQUIRED" });
+  const binding = bindSuccessorMeasuredNamespace(first, { reserve: true });
+  assert.deepEqual(bindSuccessorMeasuredNamespace(first), binding);
+  assert.throws(() => bindSuccessorMeasuredNamespace(second, { reserve: true }),
+    { code: "SUCCESSOR_IDENTITY_MISMATCH" });
+  assert.deepEqual(bindSuccessorMeasuredNamespace(first), binding);
+  assert.throws(() => openCalibrationExecutionAdmission({ ...input, preparation: {}, scoringInputs: {} }),
+    { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION" });
 });
 
 test("candidate shape rejects wrong fixture, source, missing overlay and late status", () => {

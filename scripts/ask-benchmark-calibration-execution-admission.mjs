@@ -135,6 +135,9 @@ function preflightNative({ preparation, sources, normalizedRoots, root }) {
   const experiment = sources.current_prompt.scope.run_instance_id;
   const runParent = resolve(dirname(sources.current_prompt.execution.runDir));
   successorExact(runParent, resolve(dirname(sources.prompt_v2.execution.runDir)), "paired run parent");
+  if (existsSync(resolve(runParent, ".ask-successor-issue291.namespace.json"))) {
+    fail("paired native runs already belong to a measured experiment namespace");
+  }
   for (const extension of ["journal.json", "journal.json.lock", "authority.json"]) {
     if (existsSync(resolve(runParent, `.ask-successor-issue291-${experiment}.${extension}`))) fail("a prior measured journal, claim, or freeze exists");
   }

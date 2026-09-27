@@ -36,6 +36,17 @@ function inside(parent, path) {
   const offset = relative(parent, path);
   return offset === "" || (offset !== ".." && !offset.startsWith(`..${sep}`) && !offset.startsWith("/"));
 }
+function physicalPermissionPath(path) {
+  let ancestor = path;
+  const missing = [];
+  while (!existsSync(ancestor)) {
+    const parent = dirname(ancestor);
+    if (parent === ancestor) fail("filesystem permission path cannot be resolved");
+    missing.unshift(basename(ancestor));
+    ancestor = parent;
+  }
+  return resolve(realpathSync(ancestor), ...missing);
+}
 function directory(path, label) {
   assertNoSymlinkPathSegments(path, label);
   const stat = lstatSync(path);
@@ -159,9 +170,17 @@ export function parseSuccessorExecSessionEvidence({ stdout, session, source, run
   successorExact(context.permission_profile?.file_system?.type, "restricted", "diagnostic effective filesystem policy");
   successorExact(context.permission_profile?.network, "restricted", "diagnostic effective network policy");
   const entries = context.permission_profile?.file_system?.entries;
-  if (!Array.isArray(entries) || entries.filter(entry => entry?.path?.type === "path"
-    && entry.path.path === privateRoot && entry.access === "deny").length !== 1) {
-    fail("diagnostic exec session lacks exact private-root deny rule");
+  if (!Array.isArray(entries) || entries.some(entry => entry?.path?.type !== "path"
+    || typeof entry.path.path !== "string" || resolve(entry.path.path) !== entry.path.path)) {
+    fail("diagnostic exec session has an unsupported filesystem permission entry");
+  }
+  const rootEntries = entries.filter(entry => entry.path.path === privateRoot);
+  const physicalPrivateRoot = physicalPermissionPath(privateRoot);
+  if (rootEntries.length !== 1 || rootEntries[0].access !== "deny"
+    || entries.some(entry => entry.path.path !== privateRoot
+      && (inside(privateRoot, entry.path.path)
+        || inside(physicalPrivateRoot, physicalPermissionPath(entry.path.path))))) {
+    fail("diagnostic exec session lacks an exclusive private-root deny rule");
   }
   if (context.active_permission_profile !== undefined) {
     successorExact(context.active_permission_profile?.id, PROFILE, "diagnostic active permission profile");
