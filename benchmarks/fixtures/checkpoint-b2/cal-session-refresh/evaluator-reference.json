@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-be67c8c07aa1995acee2b495a86a2e6f5b4872b341f91b7cfec703df4f884c08",
-  "evaluator_bundle_digest": "sha256:789c6e200b27a0252e41e017685c83327824a731d978b3dffd59ecf299d743ff",
+  "evaluator_bundle_id": "evaluator-9097b18c28c1dba838cd33119a3ef2ee6ea6e8d1d36b4d95f73b529956e51747",
+  "evaluator_bundle_digest": "sha256:f86bd3cb961860896c6c53f45590e2ad202c16c1e168f31d51ec0eb4e79ca49c",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "cal-session-refresh",
   "fixture_input_digest": "sha256:e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
   "task_class": "review",
   "suite": "calibration",
-  "evaluator_revision": "fe53b04edca623bef347e393e62207e97377a285",
+  "evaluator_revision": "3d94f34f6c1448df7e08206d1725977b8c1304fe",
   "evaluator_source_identity": {
-    "base_git_revision": "fe53b04edca623bef347e393e62207e97377a285",
+    "base_git_revision": "3d94f34f6c1448df7e08206d1725977b8c1304fe",
     "source_tree_digest": "sha256:9de8b2b2e5bfa958f84d3da044accc2820e9b9daba30e81cf7dbf83d95c65987",
     "generator_source_digest": "sha256:2e0660ae6358cbf05ef68fa938a384b07087d1f9e8d261e7f8fb77f115b0ebd6",
     "source_files": [
@@ -2138,11 +2138,11 @@
     }
   },
   "generator_identity": "sha256:2885207150c893bc04ff324f0777508184990ba29d79a0c6b4510b8c41a4bf0b",
-  "independence_statement_digest": "sha256:9a3f904d43d36c530396013159567a50219801f4ed19031ad45417df26c46e36",
-  "review_record_digest": "sha256:4371b4b3dc20a5f4034d6f98a5fa7dba53a56d0c82c90a4948c57fc7a424483b",
+  "independence_statement_digest": "sha256:b105e42e330ca7e5ad72ced7b6119dbac79d0929c3b3cccbe86d9b7c6decf242",
+  "review_record_digest": "sha256:d80cefa9fe886849c5558e667d3363c7e187114ad245f335dcfcbd4532ae387d",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/cal-session-refresh/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:b897883c51c2120039c3b9f8d1193b2077641e0f15f9ada33403c8a91bd9cd04",
-  "evaluator_authority_manifest_digest": "sha256:8ad3cfe3168d4aad61987cc843e22ec73ff5ab47643978620f9dfa237d98194d",
+  "evaluator_authority_manifest_raw_sha256": "sha256:cd0644c316f83d18a31604f22d0067b21dd2c21a57f93fea248e09f06debac56",
+  "evaluator_authority_manifest_digest": "sha256:4f228c7037353d6f0ebc3165fcecbc025b0a08837732be0996f18bd4bb22a04f",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:c5e192ff9bd248e989e02a5b94dc2af9d5866963b943162c4129552a441a9ffd"
+  "public_metadata_digest": "sha256:7aed53728b966376a7d3a0dd993d1d0d139806342eb6584ed2ba44d257a885f2"
 }

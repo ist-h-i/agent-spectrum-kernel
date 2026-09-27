@@ -23,10 +23,10 @@
   "output_contract_type": "implementation_producing",
   "requirement_record_id": "requirement-record-cal-concurrent-transfer",
   "output_contract_id": "output-contract-cal-concurrent-transfer",
-  "evaluator_bundle_id": "evaluator-9ca2813b47298eb49d90a0f47a8e77dd95b5b9a1977a045e336fb11b70d821a6",
-  "evaluator_bundle_digest": "sha256:67b6437ce3a2fc80cd0c86fbe165b0e7e5bd1aaa215f560973011882dc78b9b6",
-  "evaluator_byte_count": 150869,
+  "evaluator_bundle_id": "evaluator-ea6b0b8f52d210c911d9769f1b50d6fe0775c9705f93dd0c4b9b2cdfb13bb106",
+  "evaluator_bundle_digest": "sha256:923ea7737ad972cff22aac1bde35db2d97a7200d4c1ba7fd7450998c0ee6f61e",
+  "evaluator_byte_count": 152744,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:657c1fb133818e602c742e419822c2d105e1e757f36f3b532f0bdf4d1ab2da7b"
+  "metadata_digest": "sha256:3b13bade80fe036d6650d34e004518be265b9875717959b8c090bb6ae6b82d62"
 }
