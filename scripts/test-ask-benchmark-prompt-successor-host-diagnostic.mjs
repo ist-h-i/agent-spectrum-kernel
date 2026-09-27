@@ -19,7 +19,9 @@ const sessionRows = [
   { type: "turn_context", payload: { turn_id: turn, cwd, model: runtime.model,
     effort: "medium", approval_policy: "never",
     sandbox_policy: { type: "workspace-write", network_access: false },
-    permission_profile: { type: "managed" }, active_permission_profile: { id: "ask_issue291" } } },
+    permission_profile: { type: "managed", network: "restricted", file_system: { type: "restricted",
+      entries: [{ path: { type: "path", path: privateRoot }, access: "deny" }] } },
+    active_permission_profile: { id: "ask_issue291" } } },
 ];
 const bytes = rows => Buffer.from(`${rows.map(row => JSON.stringify(row)).join("\n")}\n`);
 const input = (events = eventRows, session = sessionRows) => ({
@@ -71,4 +73,18 @@ test("diagnostic rejects provider, model, effort, sandbox, network, approval and
   }
   assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, sessionRows.slice(0, 1))));
   assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, [...sessionRows, sessionRows[1]])));
+  for (const entries of [[],
+    [{ path: { type: "path", path: "/tmp/other" }, access: "deny" }],
+    [{ path: { type: "path", path: privateRoot }, access: "read" }],
+    Array(2).fill({ path: { type: "path", path: privateRoot }, access: "deny" })]) {
+    const rows = structuredClone(sessionRows);
+    rows[1].payload.permission_profile.file_system.entries = entries;
+    assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, rows)), "exactly one private deny entry required");
+  }
+  const network = structuredClone(sessionRows);
+  network[1].payload.permission_profile.network = "open";
+  assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, network)));
+  const noActiveId = structuredClone(sessionRows);
+  delete noActiveId[1].payload.active_permission_profile;
+  assert.equal(parseSuccessorExecSessionEvidence(input(eventRows, noActiveId)).active_permission_profile, null);
 });

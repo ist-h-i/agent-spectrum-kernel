@@ -118,8 +118,17 @@ export function parseSuccessorExecSessionEvidence({ stdout, session, source, run
   successorExact(context.approval_policy, runtime.approval_policy, "diagnostic resolved approval policy");
   successorExact(context.sandbox_policy?.type, runtime.sandbox, "diagnostic resolved sandbox mode");
   successorExact(context.sandbox_policy?.network_access, false, "diagnostic resolved agent network policy");
-  successorExact(context.active_permission_profile?.id, PROFILE, "diagnostic active permission profile");
   successorExact(context.permission_profile?.type, "managed", "diagnostic permission profile type");
+  successorExact(context.permission_profile?.file_system?.type, "restricted", "diagnostic effective filesystem policy");
+  successorExact(context.permission_profile?.network, "restricted", "diagnostic effective network policy");
+  const entries = context.permission_profile?.file_system?.entries;
+  if (!Array.isArray(entries) || entries.filter(entry => entry?.path?.type === "path"
+    && entry.path.path === privateRoot && entry.access === "deny").length !== 1) {
+    fail("diagnostic exec session lacks exact private-root deny rule");
+  }
+  if (context.active_permission_profile !== undefined) {
+    successorExact(context.active_permission_profile?.id, PROFILE, "diagnostic active permission profile");
+  }
   successorExact(resolve(context.cwd), cwd, "diagnostic turn cwd");
   if (typeof meta.id !== "string" || meta.id.length < 10 || threads[0].thread_id !== meta.id) fail("diagnostic session ID mismatch");
   if (typeof context.turn_id !== "string" || context.turn_id.length < 10) fail("diagnostic turn ID missing");
@@ -127,7 +136,7 @@ export function parseSuccessorExecSessionEvidence({ stdout, session, source, run
     provider: meta.model_provider, model: context.model, reasoning_effort: context.effort,
     approval_policy: context.approval_policy, sandbox: context.sandbox_policy.type,
     agent_network: "disabled", provider_network: runtime.provider_network,
-    active_permission_profile: context.active_permission_profile.id,
+    active_permission_profile: context.active_permission_profile?.id ?? null,
     private_root_path_digest: canonicalDigest({ path: privateRoot }),
     source_runtime_identity_digest: source.scope.source.runtime_identity_digest,
     session_id_digest: canonicalDigest({ session_id: meta.id }),
@@ -215,7 +224,7 @@ function linkedHome(path, auth) {
 }
 function unlinkAuth(path) {
   const link = resolve(path, "auth.json");
-  if (existsSync(link)) rmSync(link);
+  rmSync(link, { force: true });
 }
 function runNoModelPreflight({ executable, environment, auth, command, privateRoot, runtime, cwd }) {
   const home = mkdtempSync(resolve(tmpdir(), "ask-issue291-diagnostic-check-"));
