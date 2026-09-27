@@ -342,17 +342,22 @@ async function syntheticAdmissionWorker(contextPath) {
   console.log("PASS native run identity drift rejects static reopen without terminal result inspection");
   const selectionIndexPath = resolve(selectionState, "selection-state.json");
   const selectionIndexBytes = readFileSync(selectionIndexPath);
+  const pairedRunIdentityPath = resolve(roles.prompt_v2.execution.runDir, "run-identity.json");
+  const pairedRunIdentityBytes = readFileSync(pairedRunIdentityPath);
   try {
     const reordered = JSON.parse(selectionIndexBytes);
     reordered.sealed_cases.reverse();
     writeFileSync(selectionIndexPath, `${JSON.stringify(reordered)}\n`);
-    const matchedRun = JSON.parse(runIdentityBytes);
-    matchedRun.selection_state_digest = hash(readFileSync(selectionIndexPath));
-    writeFileSync(runIdentityPath, `${JSON.stringify(matchedRun)}\n`);
+    for (const [path, bytes] of [[runIdentityPath, runIdentityBytes], [pairedRunIdentityPath, pairedRunIdentityBytes]]) {
+      const matchedRun = JSON.parse(bytes);
+      matchedRun.selection_state_digest = hash(readFileSync(selectionIndexPath));
+      writeFileSync(path, `${JSON.stringify(matchedRun)}\n`);
+    }
     assert.throws(() => reopenCalibrationExecutionAdmission(admissionInput, evidence.admission_digest),
       { message: /reopened calibration execution admission/u });
   } finally {
     writeFileSync(runIdentityPath, runIdentityBytes);
+    writeFileSync(pairedRunIdentityPath, pairedRunIdentityBytes);
     writeFileSync(selectionIndexPath, selectionIndexBytes);
   }
   console.log("PASS coordinated run and selection index mutation cannot reuse a frozen admission digest");
