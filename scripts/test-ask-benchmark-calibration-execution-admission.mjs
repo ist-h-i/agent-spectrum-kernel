@@ -294,10 +294,16 @@ async function syntheticAdmissionWorker(contextPath) {
     ["review archive", first.reviewArchivePath, /external review archive raw identity differs/u],
   ]) {
     const bytes = readFileSync(path);
+    const isolateReviewedByteGuard = label === "reviewed public";
+    if (isolateReviewedByteGuard) git(root, "update-index", "--assume-unchanged", "--", relative(root, path));
     try {
       writeFileSync(path, Buffer.concat([bytes, Buffer.from(" ")]));
+      if (isolateReviewedByteGuard) assert.equal(git(root, "status", "--porcelain"), "", "isolate the reviewed-byte guard from the generic dirty-source guard");
       assert.throws(checked, { message: expected }, `${label} drift must reject a warmed admission`);
-    } finally { writeFileSync(path, bytes); }
+    } finally {
+      writeFileSync(path, bytes);
+      if (isolateReviewedByteGuard) git(root, "update-index", "--no-assume-unchanged", "--", relative(root, path));
+    }
   }
   assert.deepEqual(checked().evidence, evidence, "restored bytes reopen the warmed admission");
   assert.throws(() => assertCalibrationEffectiveAdmission(opened, "cal-other", role, normalizedRoots[role], admissionContext),
