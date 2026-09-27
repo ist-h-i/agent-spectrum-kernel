@@ -123,6 +123,8 @@ static int fake_diagnostic_session(int argc, char **argv, const char *output) {
   if (!session) fail("fake diagnostic session stream");
   fprintf(session, "{\"type\":\"session_meta\",\"payload\":{\"id\":\"%s\",\"cwd\":\"%s\",\"cli_version\":\"0.153.4\",\"model_provider\":\"openai\"}}\n", session_id, cwd);
   fprintf(session, "{\"type\":\"turn_context\",\"payload\":{\"turn_id\":\"%s\",\"cwd\":\"%s\",\"model\":\"synthetic-native-fake-not-a-service\",\"effort\":\"medium\",\"approval_policy\":\"never\",\"sandbox_policy\":{\"type\":\"workspace-write\",\"network_access\":false},\"permission_profile\":{\"type\":\"managed\",\"network\":\"restricted\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"path\",\"path\":\"%s\"},\"access\":\"deny\"}]}},\"active_permission_profile\":{\"id\":\"ask_issue291\"}}}\n", turn_id, cwd, private_root);
+  fprintf(session, "{\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\",\"turn_id\":\"%s\"}}\n", turn_id);
+  fprintf(session, "{\"type\":\"event_msg\",\"payload\":{\"type\":\"task_complete\",\"turn_id\":\"%s\",\"error\":null}}\n", turn_id);
   if (fclose(session)) fail("fake diagnostic session close");
   fd = open(output, O_WRONLY | O_CREAT | O_EXCL, 0600);
   if (fd < 0) fail("fake diagnostic output");

@@ -117,8 +117,8 @@ export function parseSuccessorExecSessionEvidence({ stdout, session, source, run
   const safeSessionEvents = new Set(["user_message", "agent_message", "agent_reasoning",
     "agent_reasoning_raw_content", "token_count", "thread_settings_applied"]);
   const safeCompletedItems = new Set(["UserMessage", "AgentMessage", "Reasoning"]);
-  let sessionStarts = 0, sessionCompletions = 0;
-  for (const row of rows) {
+  let sessionStartIndex = -1, sessionCompleteIndex = -1;
+  for (const [index, row] of rows.entries()) {
     if (row.type === "session_meta" || row.type === "turn_context"
       || ["token_usage_record", "world_state", "security_risk_score"].includes(row.type)) continue;
     const payload = row.payload;
@@ -130,16 +130,23 @@ export function parseSuccessorExecSessionEvidence({ stdout, session, source, run
       if (["item.started", "item.updated", "item_completed", "item_started", "item_updated"].includes(payload?.type)
         && safeCompletedItems.has(payload.item?.type)) continue;
       if (["task_started", "turn_started", "task_complete", "turn_complete"].includes(payload?.type)
-        && (payload.turn_id === undefined || payload.turn_id === context.turn_id)
+        && payload.turn_id === context.turn_id
         && !(["task_complete", "turn_complete"].includes(payload.type) && payload.error != null)) {
-        if (["task_started", "turn_started"].includes(payload.type)) sessionStarts++;
-        else sessionCompletions++;
+        if (["task_started", "turn_started"].includes(payload.type)) {
+          if (sessionStartIndex !== -1) fail("diagnostic session contains multiple start markers");
+          sessionStartIndex = index;
+        } else {
+          if (sessionCompleteIndex !== -1) fail("diagnostic session contains multiple complete markers");
+          sessionCompleteIndex = index;
+        }
         continue;
       }
     }
     fail("diagnostic session contains a tool action or unknown event");
   }
-  if (sessionStarts > 1 || sessionCompletions > 1) fail("diagnostic session contains multiple turn markers");
+  if (sessionStartIndex < 0 || sessionCompleteIndex <= sessionStartIndex) {
+    fail("diagnostic session lacks one ordered completed turn");
+  }
   successorExact(meta.model_provider, "openai", "diagnostic model provider");
   successorExact(meta.cli_version, runtime.cli_version, "diagnostic CLI version");
   successorExact(resolve(meta.cwd), cwd, "diagnostic session cwd");

@@ -22,6 +22,8 @@ const sessionRows = [
     permission_profile: { type: "managed", network: "restricted", file_system: { type: "restricted",
       entries: [{ path: { type: "path", path: privateRoot }, access: "deny" }] } },
     active_permission_profile: { id: "ask_issue291" } } },
+  { type: "event_msg", payload: { type: "task_started", turn_id: turn } },
+  { type: "event_msg", payload: { type: "task_complete", turn_id: turn, error: null } },
 ];
 const bytes = rows => Buffer.from(`${rows.map(row => JSON.stringify(row)).join("\n")}\n`);
 const input = (events = eventRows, session = sessionRows) => ({
@@ -69,8 +71,7 @@ test("diagnostic accepts message items and rejects every tool or unknown item", 
 });
 
 test("diagnostic session rows cannot contradict the tool-free exec JSONL", () => {
-  const ordinaryRows = [...sessionRows,
-    { type: "event_msg", payload: { type: "task_started", turn_id: turn } },
+  const ordinaryRows = [...sessionRows.slice(0, -1),
     { type: "event_msg", payload: { type: "user_message" } },
     { type: "response_item", payload: { type: "reasoning" } },
     { type: "response_item", payload: { type: "message", role: "assistant" } },
@@ -100,6 +101,20 @@ test("diagnostic session rows cannot contradict the tool-free exec JSONL", () =>
   assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, [
     ...ordinaryRows, { type: "unknown_future_row", payload: {} },
   ])), "unknown session row");
+});
+
+test("diagnostic requires one ordered matching start and complete marker in the saved session", () => {
+  for (const rows of [
+    sessionRows.slice(0, 2),
+    sessionRows.filter(row => row.payload?.type !== "task_started"),
+    sessionRows.filter(row => row.payload?.type !== "task_complete"),
+    [...sessionRows, sessionRows[2]],
+    [...sessionRows, sessionRows[3]],
+    [sessionRows[0], sessionRows[1], sessionRows[3], sessionRows[2]],
+    [sessionRows[0], sessionRows[1], { type: "event_msg", payload: { type: "task_started", turn_id: "other" } }, sessionRows[3]],
+    [sessionRows[0], sessionRows[1], sessionRows[2], { type: "event_msg", payload: { type: "task_complete", turn_id: "other", error: null } }],
+    [sessionRows[0], sessionRows[1], sessionRows[2], { type: "event_msg", payload: { type: "task_complete", turn_id: turn, error: { message: "failed" } } }],
+  ]) assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, rows)));
 });
 
 test("diagnostic rejects provider, model, effort, sandbox, network, approval and profile drift", () => {
