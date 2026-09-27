@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url";
 import { assertNoSymlinkPathSegments, canonicalDigest, parseJsonRejectDuplicateKeys, readStableBytes, stableCanonicalJson } from "./content-addressed-store.mjs";
 import { CALIBRATION_INPUT_MANIFEST_SHA256, CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
 import { inspectSuccessorScoringInputs, successorScoringOptions } from "./ask-benchmark-prompt-successor-scoring-inputs.mjs";
-import { validatePromptSuccessorPreparation, successorClosed, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
-import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
-import { assertSuccessorProfileCommand } from "./ask-benchmark-prompt-successor-delivery.mjs";
+import { validatePromptSuccessorPreparation, validateSuccessorSourceScope, successorClosed, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
+import { ADAPTER_IDENTITY_SCHEMA_PATH, effectiveCommand, inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
+import { assertSuccessorAdapterFacts, assertSuccessorProfileCommand, successorEffectiveCommand } from "./ask-benchmark-prompt-successor-delivery.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { verifyPortfolioScoringInputs, verifyPrivateEvaluatorBundle, verifyPublicEvaluatorReference, computeEvaluatorBundleId, computeEvaluatorBundleDigest, validateEvaluatorSourceIdentity, validateIndependenceStatement } from "./ask-benchmark-evaluator-boundary.mjs";
 import { resolveRepositoryAdmissionDecision, resolveEffectiveAdmissionAuthorityFromRepositoryOverlayFiles, computeEffectiveAdmissionAuthorityDigest } from "./ask-benchmark-admission-decision.mjs";
@@ -252,13 +252,28 @@ function staticClosure({ preparation, sources, scoringInputs, admissionSourcesBy
   const sourceIdentity = preparation.implementation;
   const denyRoots = ROLES.map(role => {
     const source = sources[role];
+    validateSuccessorSourceScope(source.scope, preparation, source.expectedScopeDigest);
+    successorExact(source.scope.prompt_role, role, "calibration source role");
     const config = rawJson(resolve(source.runtimeConfigPath), "private-isolated runtime config");
     successorExact(config.digest, preparation.runtime.configuration_digest, "frozen native config bytes");
+    assertBenchmarkSchemaInstance(config.value, { schemaPath: resolve(root, "benchmarks/schemas/portfolio-runtime-config.schema.json"), label: "calibration native runtime config" });
     const denyRoot = directory(config.value.successor_private_evaluator_root, "private evaluator deny root");
-    const native = inspectVerifiedPortfolioExecution({ ...source.execution, root });
-    const adapter = native.adapter_identities.get("codex");
-    if (!adapter) fail("native Codex identity is missing");
+    // Read the original adapter authority directly. The full execution
+    // inspector traverses attempts and terminal result.json on reopen.
+    const adapter = rawJson(resolve(source.execution.runDir, "adapters", "codex.json"), "native Codex identity").value;
+    assertBenchmarkSchemaInstance(adapter, { schemaPath: resolve(root, ADAPTER_IDENTITY_SCHEMA_PATH), label: "calibration native Codex identity" });
+    assertSuccessorAdapterFacts(preparation.runtime, adapter, { checkHost: true });
+    successorExact(canonicalDigest(adapter), source.scope.source.runtime_identity_digest, "native scoped runtime identity");
+    successorExact(adapter.environment_snapshot.digest, canonicalDigest(adapter.environment_snapshot.entries), "native environment snapshot");
+    successorExact(adapter.environment_snapshot.entries.map(entry => entry.name).sort(), [...adapter.environment_allowlist].sort(), "native environment names");
+    successorExact(adapter.effective_command,
+      successorEffectiveCommand(effectiveCommand(root, config.value), { privateEvaluatorRoot: denyRoot }),
+      "native exact effective command");
     successorExact(assertSuccessorProfileCommand(adapter.effective_command, denyRoot), denyRoot, "native private deny rule");
+    for (const binding of source.scope.source.bindings) {
+      successorExact(binding.effective_command_digest, adapter.effective_command_digest, "native scoped command digest");
+      successorExact(binding.environment_snapshot_digest, adapter.environment_snapshot.digest, "native scoped environment digest");
+    }
     if (inside(denyRoot, resolve(source.execution.runDir)) || inside(denyRoot, resolve(normalizedRoots[role]))) {
       fail("private deny root overlaps a run or result root");
     }

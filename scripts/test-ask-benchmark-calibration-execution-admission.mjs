@@ -185,6 +185,9 @@ async function syntheticAdmissionWorker(contextPath) {
   const { sealAdaptiveSelection } = await import("./ask-benchmark-selection.mjs");
   const { buildPromptSuccessorPreparation, buildSuccessorSourceScope } = await import("./ask-benchmark-prompt-successor.mjs");
   const { openSuccessorScoringInputs, inspectSuccessorScoringInputs } = await import("./ask-benchmark-prompt-successor-scoring-inputs.mjs");
+  const { readIssue291SealedFreeze } = await import("./ask-benchmark-issue291-preflight.mjs");
+  const { ISSUE_291_MEASURED_AUTHORITY } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
+  const { canonicalDigest } = await import("./content-addressed-store.mjs");
   const { prepareSuccessorPortfolioSource } = await import("./ask-benchmark-execution.mjs");
   const { normalizePortfolioExecution } = await import("./ask-benchmark-normalized-results.mjs");
   const { assertSuccessorHostIsolationReady } = await import("./ask-benchmark-prompt-successor-host-isolation.mjs");
@@ -241,7 +244,7 @@ async function syntheticAdmissionWorker(contextPath) {
   const shared = { root, config, planPath, materializedPath, selectionState };
   const experimentRun = randomUUID(); const roles = {};
   for (const role of ["current_prompt", "prompt_v2"]) {
-    const execution = { ...shared, runDir: resolve(work, `run-${role}`) };
+    const execution = { ...shared, runDir: resolve(work, "native-runs", `run-${role}`) };
     const native = withEnvironment(env, () => prepareSuccessorPortfolioSource({ ...execution,
       runtimeConfigPath, agentBin, preparation }));
     const source = { plan_id: native.plan_id, plan_digest: native.plan_digest, run_instance_id: native.run_instance_id,
@@ -335,6 +338,55 @@ async function syntheticAdmissionWorker(contextPath) {
     { code: "SUCCESSOR_HOST_ISOLATION_REQUIRED" });
   assert.equal(inspectCalibrationUnstartedInventories({ sources, normalizedRoots }).measured_result_bytes_read, 0);
   console.log("PASS production host-readiness guard rejects missing exec-session proof; no freeze or claim made");
+  // A terminal sentinel is deliberately malformed. Reopening the static
+  // admission and checking a freeze must never parse its bytes.
+  const terminalPath = resolve(roles.current_prompt.execution.runDir, "cases",
+    roles.current_prompt.native.cases[0].case_id, "attempts", "0001", "result.json");
+  mkdirSync(resolve(terminalPath, ".."));
+  writeFileSync(terminalPath, "not terminal JSON\n");
+  assert.deepEqual(inspectCalibrationExecutionAdmission(
+    reopenCalibrationExecutionAdmission(admissionInput, evidence.admission_digest)), evidence);
+  const spec = { run_root: work, runtime_config_path: runtimeConfigPath, agent_bin: agentBin };
+  const preflightContext = { source: implementation, preparation, sources, normalized_roots: normalizedRoots,
+    scoring_manifest_path: context.scoringManifestPath, diagnostic_root: resolve(work, "host-diagnostic") };
+  const experiment = sources.current_prompt.scope.run_instance_id;
+  const freezePath = resolve(work, "native-runs", `.ask-successor-issue291-${experiment}.authority.json`);
+  const sourceClosures = Object.fromEntries(Object.entries(sources).map(([promptRole, source]) => [promptRole,
+    canonicalDigest({ scope_digest: source.scope.scope_digest, run_dir: source.execution.runDir,
+      runtime_config_path: source.runtimeConfigPath, agent_bin: source.agentBin })]));
+  const freezeBody = { schema_version: "1.0.0", kind: "prompt_successor_measured_authority_freeze", evidence: {
+    schema_version: "1.1.0", kind: "prompt_successor_measured_authority",
+    authority_source: "github_issue_291_plus_durable_result_blind_freeze",
+    issue: ISSUE_291_MEASURED_AUTHORITY.issue,
+    original_issue_source: { revision: ISSUE_291_MEASURED_AUTHORITY.source_revision,
+      tree: ISSUE_291_MEASURED_AUTHORITY.source_tree,
+      role: "historical_frozen_measurement_source_not_runtime_authority" },
+    preregistration_source: { revision: preparation.predecessor.source_revision,
+      tree: preparation.predecessor.source_tree },
+    implementation, preparation_digest: preparation.preparation_digest,
+    scoring_input_identity: { manifest_digest: preparation.scoring_input_manifest_digest },
+    calibration_execution_admission: { admission_digest: evidence.admission_digest },
+    experiment_run_instance_id: experiment, source_closures: sourceClosures,
+    authority_record_path_digest: canonicalDigest({ path: freezePath }),
+    journal_path_digest: canonicalDigest({ path: resolve(work, "native-runs", `.ask-successor-issue291-${experiment}.journal.json`) }),
+    sealed_before_first_attempt: true, durable_reopen_authorized: true,
+    exact_host_runtime_verified_at_freeze: true, exact_native_sources_verified_at_freeze: true,
+    ordered_execution_authorized: true, measured_result_access_authorized: true,
+    measured_decision_authorized: true, automatic_retry_authorized: false,
+    portfolio_mutation_authorized: false,
+  } };
+  const sealed = { ...freezeBody, record_digest: canonicalDigest(freezeBody) };
+  write(freezePath, sealed);
+  const freezeInput = { spec, context: preflightContext, expectedFreezeDigest: sealed.record_digest };
+  assert.equal(readIssue291SealedFreeze(freezeInput).admissionDigest, evidence.admission_digest);
+  const changed = structuredClone(sealed);
+  changed.evidence.preparation_digest = `sha256:${"0".repeat(64)}`;
+  changed.record_digest = canonicalDigest({ schema_version: changed.schema_version, kind: changed.kind, evidence: changed.evidence });
+  writeFileSync(freezePath, `${JSON.stringify(changed)}\n`);
+  assert.throws(() => readIssue291SealedFreeze(freezeInput), { message: /seal report authority_freeze_digest/u });
+  assert.throws(() => readIssue291SealedFreeze({ ...freezeInput, expectedFreezeDigest: changed.record_digest }),
+    { message: /measured freeze preparation/u });
+  console.log("PASS sealed freeze requires the external digest and exact preparation before terminal result access");
 }
 
 if (process.argv[2] === "--synthetic-admission-worker") {

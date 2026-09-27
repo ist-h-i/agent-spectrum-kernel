@@ -14,7 +14,8 @@ import { CALIBRATION_SOURCE_BINDINGS, assertSuccessorCalibrationConfig } from ".
 import { buildPortfolioPlan } from "./ask-benchmark-plan.mjs";
 import { materializePortfolio } from "./ask-benchmark-materialize.mjs";
 import { sealIssue291ExcludedAdaptiveSelections } from "./ask-benchmark-issue291-selection.mjs";
-import { buildSuccessorSourceScope, successorClosed, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
+import { buildSuccessorSourceScope, validatePromptSuccessorPreparation, validateSuccessorSourceScope,
+  successorClosed, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
 import { prepareSuccessorFromRepository, readSuccessorImplementationIdentity,
   validateSuccessorFromRepository } from "./ask-benchmark-prompt-successor-repository.mjs";
 import { openSuccessorScoringInputs } from "./ask-benchmark-prompt-successor-scoring-inputs.mjs";
@@ -23,7 +24,7 @@ import { normalizePortfolioExecution } from "./ask-benchmark-normalized-results.
 import { openCalibrationExecutionAdmission, reopenCalibrationExecutionAdmission,
   inspectCalibrationExecutionAdmission, inspectCalibrationUnstartedInventories } from "./ask-benchmark-calibration-execution-admission.mjs";
 import { runSuccessorExecDiagnostic } from "./ask-benchmark-prompt-successor-host-diagnostic.mjs";
-import { openSuccessorMeasuredAuthority, inspectSuccessorMeasuredAuthority,
+import { ISSUE_291_MEASURED_AUTHORITY, openSuccessorMeasuredAuthority, inspectSuccessorMeasuredAuthority,
   successorMeasuredJournalPath } from "./ask-benchmark-prompt-successor-measured-authority.mjs";
 import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
 
@@ -111,6 +112,11 @@ function nativeRuntime(spec) {
     provider_network: "provider_only", timeout_ms: 900000 };
 }
 function contextPath(spec) { return resolve(spec.run_root, "preflight-context.json"); }
+function sourceClosure(source) {
+  return canonicalDigest({ scope_digest: source.scope.scope_digest,
+    run_dir: resolve(source.execution.runDir), runtime_config_path: resolve(source.runtimeConfigPath),
+    agent_bin: resolve(source.agentBin) });
+}
 function loadContext(spec, specDigest) {
   const value = parseJsonRejectDuplicateKeys(readStableBytes(contextPath(spec), "preflight context"), "preflight context");
   successorClosed(value, ["schema_version", "kind", "spec_digest", "source", "preparation",
@@ -120,6 +126,79 @@ function loadContext(spec, specDigest) {
   successorExact(value.spec_digest, specDigest, "preflight spec digest");
   successorExact(value.source, readSuccessorImplementationIdentity(ROOT), "preflight source identity");
   return value;
+}
+
+/** Validate the sealed, independently pinned freeze before any API can inspect terminal results. */
+export function readIssue291SealedFreeze({ spec, context, expectedFreezeDigest }) {
+  if (!/^sha256:[a-f0-9]{64}$/u.test(expectedFreezeDigest ?? "")) fail("seal report authority_freeze_digest is required for reopen");
+  validatePromptSuccessorPreparation(context.preparation);
+  successorExact(context.preparation.implementation, context.source, "preflight preparation source");
+  successorClosed(context.sources, ROLES, "preflight paired sources");
+  successorClosed(context.normalized_roots, ROLES, "preflight normalized roots");
+  successorExact(context.scoring_manifest_path, resolve(spec.run_root, "scoring-input-manifest.json"), "preflight scoring namespace");
+  successorExact(context.diagnostic_root, resolve(spec.run_root, "host-diagnostic"), "preflight diagnostic namespace");
+  const runParent = resolve(spec.run_root, "native-runs");
+  for (const role of ROLES) {
+    const source = context.sources[role];
+    validateSuccessorSourceScope(source.scope, context.preparation, source.expectedScopeDigest);
+    successorExact(source.scope.prompt_role, role, "preflight source role");
+    successorExact(source.scope.source.repository_revision, context.source.revision, "preflight native source revision");
+    successorExact(source.execution.runDir, resolve(runParent, `run-${role}`), "preflight native run namespace");
+    successorExact(source.runtimeConfigPath, spec.runtime_config_path, "preflight native runtime config");
+    successorExact(source.agentBin, spec.agent_bin, "preflight native executable");
+    successorExact(context.normalized_roots[role], resolve(spec.run_root, `normalized-${role}`), "preflight result namespace");
+  }
+  const experiment = context.sources.current_prompt.scope.run_instance_id;
+  successorExact(context.sources.prompt_v2.scope.run_instance_id, experiment, "preflight paired experiment");
+  for (const field of ["plan_id", "plan_digest", "repository_revision", "runtime_identity_digest",
+    "materialization_manifest_digest"]) {
+    successorExact(context.sources.current_prompt.scope.source[field],
+      context.sources.prompt_v2.scope.source[field], `preflight paired ${field}`);
+  }
+  if (context.sources.current_prompt.scope.source.run_instance_id
+      === context.sources.prompt_v2.scope.source.run_instance_id) fail("native run identity collision");
+  const freezePath = resolve(runParent, `.ask-successor-issue291-${experiment}.authority.json`);
+  const freeze = parseJsonRejectDuplicateKeys(readStableBytes(freezePath, "measured authority freeze", 512 * 1024), "measured authority freeze");
+  successorClosed(freeze, ["schema_version", "kind", "evidence", "record_digest"], "measured authority freeze");
+  successorExact(freeze.schema_version, "1.0.0", "measured authority freeze version");
+  successorExact(freeze.kind, "prompt_successor_measured_authority_freeze", "measured authority freeze kind");
+  const { record_digest: recordDigest, ...body } = freeze;
+  successorExact(recordDigest, canonicalDigest(body), "measured authority freeze canonical digest");
+  successorExact(recordDigest, expectedFreezeDigest, "seal report authority_freeze_digest");
+  const evidence = freeze.evidence;
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) fail("measured freeze evidence");
+  successorExact(evidence.schema_version, "1.1.0", "measured freeze evidence version");
+  successorExact(evidence.kind, "prompt_successor_measured_authority", "measured freeze evidence kind");
+  successorExact(evidence.authority_source, "github_issue_291_plus_durable_result_blind_freeze", "measured freeze source of authority");
+  successorExact(evidence.issue, ISSUE_291_MEASURED_AUTHORITY.issue, "measured freeze issue");
+  successorExact(evidence.original_issue_source, {
+    revision: ISSUE_291_MEASURED_AUTHORITY.source_revision, tree: ISSUE_291_MEASURED_AUTHORITY.source_tree,
+    role: "historical_frozen_measurement_source_not_runtime_authority",
+  }, "measured freeze historical source");
+  successorExact(evidence.preregistration_source, {
+    revision: context.preparation.predecessor.source_revision,
+    tree: context.preparation.predecessor.source_tree,
+  }, "measured freeze preregistration source");
+  successorExact(evidence.implementation, context.source, "measured freeze implementation");
+  successorExact(evidence.preparation_digest, context.preparation.preparation_digest, "measured freeze preparation");
+  successorExact(evidence.scoring_input_identity?.manifest_digest,
+    context.preparation.scoring_input_manifest_digest, "measured freeze scoring manifest");
+  successorExact(evidence.experiment_run_instance_id, experiment, "measured freeze experiment");
+  successorExact(evidence.source_closures,
+    Object.fromEntries(ROLES.map(role => [role, sourceClosure(context.sources[role])])), "measured freeze source closures");
+  successorExact(evidence.authority_record_path_digest, canonicalDigest({ path: freezePath }), "measured freeze path");
+  successorExact(evidence.journal_path_digest,
+    canonicalDigest({ path: resolve(runParent, `.ask-successor-issue291-${experiment}.journal.json`) }), "measured journal path");
+  for (const key of ["sealed_before_first_attempt", "durable_reopen_authorized",
+    "exact_host_runtime_verified_at_freeze", "exact_native_sources_verified_at_freeze",
+    "ordered_execution_authorized", "measured_result_access_authorized", "measured_decision_authorized"]) {
+    successorExact(evidence[key], true, `measured freeze ${key}`);
+  }
+  successorExact(evidence.automatic_retry_authorized, false, "measured freeze retry policy");
+  successorExact(evidence.portfolio_mutation_authorized, false, "measured freeze portfolio policy");
+  const admissionDigest = evidence.calibration_execution_admission?.admission_digest;
+  if (!/^sha256:[a-f0-9]{64}$/u.test(admissionDigest ?? "")) fail("sealed calibration admission digest");
+  return { admissionDigest, freezeDigest: recordDigest };
 }
 
 /** No model call, claim, attempt, or measured-result read. An occupied root is never recreated. */
@@ -227,14 +306,10 @@ export async function sealIssue291Preflight(specPath) {
 }
 
 /** Reopen only a previously sealed freeze. This returns the existing opaque handle for a later, separately authorized trial. */
-export async function reopenIssue291ReadyContext(specPath) {
+export async function reopenIssue291ReadyContext(specPath, expectedFreezeDigest) {
   const { spec, digest } = readSpec(specPath);
   const context = loadContext(spec, digest);
-  const freezePath = resolve(spec.run_root, "native-runs",
-    `.ask-successor-issue291-${context.sources.current_prompt.scope.run_instance_id}.authority.json`);
-  const freeze = parseJsonRejectDuplicateKeys(readStableBytes(freezePath, "measured authority freeze"), "measured authority freeze");
-  const admissionDigest = freeze?.evidence?.calibration_execution_admission?.admission_digest;
-  if (!/^sha256:[a-f0-9]{64}$/u.test(admissionDigest ?? "")) fail("sealed calibration admission digest");
+  const { admissionDigest } = readIssue291SealedFreeze({ spec, context, expectedFreezeDigest });
   const scoringInputs = await openSuccessorScoringInputs({ preparation: context.preparation,
     manifestPath: context.scoring_manifest_path, root: ROOT });
   const admission = reopenCalibrationExecutionAdmission({ root: ROOT, preparation: context.preparation,
