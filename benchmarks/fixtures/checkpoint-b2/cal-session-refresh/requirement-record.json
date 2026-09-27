@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:64125b2e7f34649bd0e25d51e26f10dd588145605d41bf311b942b8b7c182444",
+  "admission_record_digest": "sha256:551faaa9ca9736b3265a90d1bdab12fd38121efd50c54e739008d48a5a26e240",
   "requirements": [
     {
       "requirement_id": "rotation-atomicity",
@@ -82,5 +82,5 @@
     }
   ],
   "requirement_set_digest": "sha256:e1e8baa8e952bf7b05d6b6a4d7e2ee5c658b8099da53532ef4c98aba4160ebf4",
-  "requirement_record_digest": "sha256:415e07facc45983e6fb9c0c62f56055516efe5dd8b81ab81ba095b8fb9ced73b"
+  "requirement_record_digest": "sha256:a3451effa973be67061ed6f0bc326cfafafea5a110d10863828d408016eae251"
 }
