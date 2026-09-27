@@ -7,8 +7,10 @@ import { assertNoSymlinkPathSegments, canonicalDigest, parseJsonRejectDuplicateK
 import { CALIBRATION_INPUT_MANIFEST_SHA256, CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
 import { inspectSuccessorScoringInputs, successorScoringOptions } from "./ask-benchmark-prompt-successor-scoring-inputs.mjs";
 import { validatePromptSuccessorPreparation, validateSuccessorSourceScope, successorClosed, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
-import { ADAPTER_IDENTITY_SCHEMA_PATH, effectiveCommand, inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
+import { effectiveCommand, inspectVerifiedPortfolioExecution, readAdapterIdentity } from "./ask-benchmark-execution.mjs";
 import { assertSuccessorAdapterFacts, assertSuccessorProfileCommand, successorEffectiveCommand } from "./ask-benchmark-prompt-successor-delivery.mjs";
+import { MATERIALIZATION_MANIFEST_NAME, MATERIALIZATION_SCHEMA_PATH } from "./ask-benchmark-materialize.mjs";
+import { ADAPTIVE_SELECTION_SCHEMA_PATH, computeSelectionDigest } from "./ask-benchmark-selection.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { verifyPortfolioScoringInputs, verifyPrivateEvaluatorBundle, verifyPublicEvaluatorReference, computeEvaluatorBundleId, computeEvaluatorBundleDigest, validateEvaluatorSourceIdentity, validateIndependenceStatement } from "./ask-benchmark-evaluator-boundary.mjs";
 import { resolveRepositoryAdmissionDecision, resolveEffectiveAdmissionAuthorityFromRepositoryOverlayFiles, computeEffectiveAdmissionAuthorityDigest } from "./ask-benchmark-admission-decision.mjs";
@@ -51,9 +53,9 @@ function externalFile(root, path, label) {
   if (inside(repository, canonical) || inside(canonical, repository)) fail(`${label} must remain outside the repository`);
   return absolute;
 }
-function rawJson(path, label) {
+function rawJson(path, label, maximumBytes = 1024 * 1024) {
   regular(path, label);
-  const bytes = readStableBytes(path, label, 1024 * 1024);
+  const bytes = readStableBytes(path, label, maximumBytes);
   return { bytes, value: parseJsonRejectDuplicateKeys(bytes, label), digest: hash(bytes) };
 }
 function git(root, args, encoding = "utf8") {
@@ -254,14 +256,73 @@ function staticClosure({ preparation, sources, scoringInputs, admissionSourcesBy
     const source = sources[role];
     validateSuccessorSourceScope(source.scope, preparation, source.expectedScopeDigest);
     successorExact(source.scope.prompt_role, role, "calibration source role");
+    const runIdentity = rawJson(resolve(source.execution.runDir, "run-identity.json"), "native run identity").value;
+    assertBenchmarkSchemaInstance(runIdentity, { schemaPath: resolve(root, "benchmarks/schemas/portfolio-run-identity.schema.json"), label: "calibration native run identity" });
+    successorExact(runIdentity.run_instance_id, source.scope.source.run_instance_id, "native scoped run identity");
+    successorExact(runIdentity.repository_revision, preparation.implementation.revision, "native scoped repository revision");
+    successorExact(runIdentity.plan, { id: source.scope.source.plan_id,
+      digest: source.scope.source.plan_digest }, "native scoped plan identity");
+    successorExact(runIdentity.materialization.manifest_digest,
+      source.scope.source.materialization_manifest_digest, "native scoped materialization");
+    const plan = rawJson(resolve(source.execution.planPath), "native execution plan", 16 * 1024 * 1024).value;
+    assertBenchmarkSchemaInstance(plan, { schemaPath: resolve(root, "benchmarks/schemas/execution-plan.schema.json"), label: "calibration execution plan" });
+    successorExact(canonicalDigest(plan), runIdentity.plan.digest, "native live plan digest");
+    successorExact(plan.plan_id, runIdentity.plan.id, "native live plan ID");
+    successorExact(plan.repository_revision, runIdentity.repository_revision, "native live plan source");
+    successorExact(runIdentity.case_namespace, canonicalDigest(plan.cases.map(item => item.case_id)), "native live case namespace");
+    const materialization = rawJson(resolve(source.execution.materializedPath, MATERIALIZATION_MANIFEST_NAME),
+      "native materialization manifest", 16 * 1024 * 1024);
+    assertBenchmarkSchemaInstance(materialization.value, { schemaPath: resolve(root, MATERIALIZATION_SCHEMA_PATH), label: "calibration materialization manifest" });
+    successorExact(materialization.digest, runIdentity.materialization.manifest_digest, "native live materialization digest");
+    successorExact(materialization.value.output_root_identity,
+      runIdentity.materialization.output_root_identity, "native live materialization root");
+    successorExact(materialization.value.plan, { plan_id: plan.plan_id, digest: runIdentity.plan.digest }, "native materialization plan");
+    successorExact(materialization.value.cases.map(item => item.case_id),
+      plan.cases.map(item => item.case_id), "native materialization case inventory");
+    const selectionIndex = rawJson(resolve(source.execution.selectionState, "selection-state.json"), "native selection index");
+    assertBenchmarkSchemaInstance(selectionIndex.value, { schemaPath: resolve(root, "benchmarks/schemas/adaptive-selection-state.schema.json"), label: "calibration selection index" });
+    successorExact(selectionIndex.digest, runIdentity.selection_state_digest, "native live selection index digest");
+    successorExact(selectionIndex.value.plan_id, plan.plan_id, "native selection plan ID");
+    successorExact(selectionIndex.value.plan_digest, runIdentity.plan.digest, "native selection plan digest");
+    successorExact(selectionIndex.value.materialization_manifest_digest, materialization.digest, "native selection materialization digest");
+    successorExact(selectionIndex.value.materialization_output_root_identity,
+      materialization.value.output_root_identity, "native selection materialization root");
+    const adaptiveCases = plan.cases.filter(item => item.condition === "adaptive_ask");
+    successorExact(selectionIndex.value.sealed_cases.map(item => item.case_id).sort(),
+      adaptiveCases.map(item => item.case_id).sort(), "native selection case inventory");
+    const selectionsRoot = directory(resolve(source.execution.selectionState, "selections"), "native selections root");
+    successorExact(readdirSync(selectionsRoot).sort(),
+      adaptiveCases.map(item => `${item.case_id}.json`).sort(), "native selection file inventory");
+    for (const item of selectionIndex.value.sealed_cases) {
+      successorExact(item.selection_path, `selections/${item.case_id}.json`, "native selection path");
+      const selected = rawJson(resolve(selectionsRoot, `${item.case_id}.json`), "native sealed selection").value;
+      assertBenchmarkSchemaInstance(selected, { schemaPath: resolve(root, ADAPTIVE_SELECTION_SCHEMA_PATH), label: "calibration sealed selection" });
+      successorExact(selected.selection_digest.algorithm, "sha256", "native selection algorithm");
+      successorExact(selected.selection_digest.value, computeSelectionDigest(selected), "native selection record digest");
+      successorExact(selected.selection_digest.value, item.selection_digest, "native selection index binding");
+      successorExact(selected.plan_id, plan.plan_id, "native sealed selection plan");
+      successorExact(selected.plan_digest, runIdentity.plan.digest, "native sealed selection plan digest");
+      successorExact(selected.materialization_manifest_digest, materialization.digest, "native sealed selection materialization");
+      const materializedCase = materialization.value.cases.find(entry => entry.case_id === item.case_id);
+      successorExact({ case_id: selected.case_id, block_id: selected.block_id, adapter: selected.adapter,
+        condition: selected.condition, fixture: selected.fixture, repetition: selected.repetition,
+        registered_repetitions: selected.registered_repetitions, frozen_input_digest: selected.frozen_input_digest,
+        condition_projection_digest: selected.condition_projection_digest, projection_fingerprint: selected.projection_fingerprint },
+      { case_id: materializedCase.case_id, block_id: materializedCase.block_id, adapter: materializedCase.adapter,
+        condition: materializedCase.condition, fixture: materializedCase.fixture,
+        repetition: materializedCase.repetition, registered_repetitions: materializedCase.registered_repetitions,
+        frozen_input_digest: materializedCase.frozen_input_digest,
+        condition_projection_digest: materializedCase.condition_projection_digest,
+        projection_fingerprint: materializedCase.projection_evidence.projection_fingerprint },
+      "native sealed selection case binding");
+    }
     const config = rawJson(resolve(source.runtimeConfigPath), "private-isolated runtime config");
     successorExact(config.digest, preparation.runtime.configuration_digest, "frozen native config bytes");
     assertBenchmarkSchemaInstance(config.value, { schemaPath: resolve(root, "benchmarks/schemas/portfolio-runtime-config.schema.json"), label: "calibration native runtime config" });
     const denyRoot = directory(config.value.successor_private_evaluator_root, "private evaluator deny root");
-    // Read the original adapter authority directly. The full execution
-    // inspector traverses attempts and terminal result.json on reopen.
-    const adapter = rawJson(resolve(source.execution.runDir, "adapters", "codex.json"), "native Codex identity").value;
-    assertBenchmarkSchemaInstance(adapter, { schemaPath: resolve(root, ADAPTER_IDENTITY_SCHEMA_PATH), label: "calibration native Codex identity" });
+    // The original adapter reader validates its full authority without
+    // traversing attempts or terminal result.json on reopen.
+    const adapter = readAdapterIdentity(root, source.execution.runDir, "codex");
     assertSuccessorAdapterFacts(preparation.runtime, adapter, { checkHost: true });
     successorExact(canonicalDigest(adapter), source.scope.source.runtime_identity_digest, "native scoped runtime identity");
     successorExact(adapter.environment_snapshot.digest, canonicalDigest(adapter.environment_snapshot.entries), "native environment snapshot");

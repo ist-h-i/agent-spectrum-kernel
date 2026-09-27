@@ -708,7 +708,7 @@ function adapterHasAttempts(runDir, plan, adapter) {
   return plan.cases.some((entry) => entry.adapter_track === adapter && readdirSync(resolve(caseRootPath(runDir, entry.case_id), "attempts")).length > 0);
 }
 
-function readAdapterIdentity(root, runDir, adapter) {
+export function readAdapterIdentity(root, runDir, adapter) {
   const path = adapterIdentityPath(runDir, adapter);
   if (!existsSync(path) || !lstatSync(path).isFile()) throw new Error(`${adapter} runtime identity is missing`);
   const identity = readJson(path);

@@ -185,7 +185,7 @@ async function syntheticAdmissionWorker(contextPath) {
   const { sealAdaptiveSelection } = await import("./ask-benchmark-selection.mjs");
   const { buildPromptSuccessorPreparation, buildSuccessorSourceScope } = await import("./ask-benchmark-prompt-successor.mjs");
   const { openSuccessorScoringInputs, inspectSuccessorScoringInputs } = await import("./ask-benchmark-prompt-successor-scoring-inputs.mjs");
-  const { readIssue291SealedFreeze } = await import("./ask-benchmark-issue291-preflight.mjs");
+  const { readIssue291SealedFreeze, reopenIssue291ReadyContext } = await import("./ask-benchmark-issue291-preflight.mjs");
   const { ISSUE_291_MEASURED_AUTHORITY } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
   const { canonicalDigest } = await import("./content-addressed-store.mjs");
   const { prepareSuccessorPortfolioSource } = await import("./ask-benchmark-execution.mjs");
@@ -330,6 +330,16 @@ async function syntheticAdmissionWorker(contextPath) {
   const reopened = reopenCalibrationExecutionAdmission(admissionInput, evidence.admission_digest);
   assert.deepEqual(inspectCalibrationExecutionAdmission(reopened), evidence);
   console.log("PASS exact admission digest reopens from the same synthetic public/private/review bytes");
+  const runIdentityPath = resolve(roles.current_prompt.execution.runDir, "run-identity.json");
+  const runIdentityBytes = readFileSync(runIdentityPath);
+  try {
+    const changed = JSON.parse(runIdentityBytes);
+    changed.run_instance_id = randomUUID();
+    writeFileSync(runIdentityPath, `${JSON.stringify(changed)}\n`);
+    assert.throws(() => reopenCalibrationExecutionAdmission(admissionInput, evidence.admission_digest),
+      { message: /native scoped run identity/u });
+  } finally { writeFileSync(runIdentityPath, runIdentityBytes); }
+  console.log("PASS native run identity drift rejects static reopen without terminal result inspection");
   // The production guard is used unmodified. A sandbox subcommand observation
   // is insufficient to attest the later exec session, so a real freeze remains
   // unavailable on this fake host. No measured authority is opened here.
@@ -387,6 +397,15 @@ async function syntheticAdmissionWorker(contextPath) {
   assert.throws(() => readIssue291SealedFreeze(freezeInput), { message: /seal report authority_freeze_digest/u });
   assert.throws(() => readIssue291SealedFreeze({ ...freezeInput, expectedFreezeDigest: changed.record_digest }),
     { message: /measured freeze preparation/u });
+  const specPath = resolve(work, "issue291-spec.json");
+  write(specPath, { schema_version: "1.0.0", run_root: work, runtime_config_path: runtimeConfigPath,
+    agent_bin: agentBin, private_admission_sources: context.admissionSourcesByFixture,
+    seed: "synthetic-calibration-admission-v1", plan_seed: "synthetic-calibration-admission-plan" });
+  const contextBody = { schema_version: "1.0.0", kind: "issue291_preflight_context",
+    spec_digest: hash(readFileSync(specPath)), ...preflightContext };
+  write(resolve(work, "preflight-context.json"), { ...contextBody, context_digest: canonicalDigest(contextBody) });
+  await assert.rejects(reopenIssue291ReadyContext(specPath, sealed.record_digest),
+    { message: /seal report authority_freeze_digest/u });
   console.log("PASS sealed freeze requires the external digest and exact preparation before terminal result access");
 }
 
