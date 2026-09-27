@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { parseSuccessorExecSessionEvidence } from "./ask-benchmark-prompt-successor-host-diagnostic.mjs";
+import { effectiveCommand } from "./ask-benchmark-execution.mjs";
+import { successorEffectiveCommand } from "./ask-benchmark-prompt-successor-delivery.mjs";
 
 const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const turn = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -28,6 +35,45 @@ const sessionRows = [
 const bytes = rows => Buffer.from(`${rows.map(row => JSON.stringify(row)).join("\n")}\n`);
 const input = (events = eventRows, session = sessionRows) => ({
   stdout: bytes(events), session: bytes(session), source, runtime, cwd, privateRoot,
+});
+
+test("compiled fake CLI persists a complete diagnostic session accepted by the parser", t => {
+  const root = fileURLToPath(new URL("..", import.meta.url));
+  const work = realpathSync(mkdtempSync(resolve(tmpdir(), "ask291-host-diagnostic-fake-")));
+  t.after(() => rmSync(work, { recursive: true, force: true }));
+  const executable = resolve(work, "codex");
+  const compiler = process.platform === "darwin" ? "/usr/bin/clang" : "cc";
+  const compiled = spawnSync(compiler, ["-std=c11", "-Wall", "-Wextra", "-Werror", "-O0",
+    resolve(root, "scripts/test-fixtures/prompt-successor-fake-codex.c"), "-o", executable],
+  { encoding: "utf8", timeout: 60000, maxBuffer: 1024 * 1024 });
+  assert.equal(compiled.error, undefined, compiled.error?.message);
+  assert.equal(compiled.status, 0, compiled.stderr);
+  const home = resolve(work, "codex-home");
+  const capture = resolve(work, "capture");
+  const denied = resolve(work, "private-denied");
+  for (const path of [home, capture, denied]) mkdirSync(path);
+  const command = successorEffectiveCommand(effectiveCommand(root, {
+    adapter: "codex", availability: "available", model: "synthetic-native-fake-not-a-service",
+    reasoning_effort: "medium", permission_policy: "never", sandbox_policy: "workspace-write",
+  }), { privateEvaluatorRoot: denied });
+  const output = resolve(work, "output.json");
+  const argv = command.argv.filter(value => value !== "--ephemeral").map(value => value
+    .replaceAll("{output_schema}", resolve(root, "benchmarks/schemas/agent-output.schema.json"))
+    .replaceAll("{output}", output));
+  const result = spawnSync(executable, argv, { cwd: work,
+    env: { HOME: home, CODEX_HOME: home, ASK_SUCCESSOR_FAKE_CAPTURE: capture, ASK_SUCCESSOR_FAKE_MODE: "success" },
+    input: Buffer.from("Synthetic diagnostic. No provider or evaluator.\n"), timeout: 5000, maxBuffer: 1024 * 1024 });
+  assert.equal(result.error, undefined, result.error?.message);
+  assert.equal(result.status, 0, result.stderr.toString());
+  const sessionRoot = resolve(home, "sessions/2026/09/27");
+  const files = readdirSync(sessionRoot);
+  assert.equal(files.length, 1);
+  const observed = parseSuccessorExecSessionEvidence({ stdout: result.stdout,
+    session: readFileSync(resolve(sessionRoot, files[0])), source,
+    runtime: { ...runtime, cli_version: "0.153.4", model: "synthetic-native-fake-not-a-service" },
+    cwd: work, privateRoot: denied });
+  assert.equal(observed.turn_completed_count, 1);
+  assert.equal(observed.active_permission_profile, "ask_issue291");
 });
 
 test("CLI JSONL and session context prove one completed diagnostic turn and effective policy", () => {
