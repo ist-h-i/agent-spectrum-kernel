@@ -100,9 +100,13 @@ export function parseSuccessorExecSessionEvidence({ stdout, session, source, run
   const started = events.filter(entry => entry.type === "turn.started");
   const completed = events.filter(entry => entry.type === "turn.completed");
   const threads = events.filter(entry => entry.type === "thread.started");
+  const allowedEvents = new Set(["thread.started", "turn.started", "turn.completed",
+    "item.started", "item.updated", "item.completed"]);
+  const nonToolItems = new Set(["agent_message", "reasoning"]);
   if (threads.length !== 1 || started.length !== 1 || completed.length !== 1
-    || events.some(entry => ["turn.failed", "error"].includes(entry.type)
-      || ["command_execution", "tool_call", "mcp_tool_call"].includes(entry.item?.type))) {
+    || events.some(entry => !allowedEvents.has(entry.type)
+      || (entry.type.startsWith("item.")
+        ? !nonToolItems.has(entry.item?.type) : Object.hasOwn(entry, "item")))) {
     fail("diagnostic exec did not complete one tool-free turn");
   }
   const rows = jsonLines(session, "diagnostic session JSONL");

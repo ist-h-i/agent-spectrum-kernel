@@ -51,6 +51,23 @@ test("diagnostic rejects missing, failed, duplicated and mismatched exec events"
   ]) assert.throws(() => parseSuccessorExecSessionEvidence(input(events)));
 });
 
+test("diagnostic accepts message items and rejects every tool or unknown item", () => {
+  const message = [eventRows[0], eventRows[1],
+    { type: "item.completed", item: { type: "reasoning" } },
+    { type: "item.completed", item: { type: "agent_message", text: "diagnostic only" } }, eventRows[2]];
+  assert.equal(parseSuccessorExecSessionEvidence(input(message)).turn_completed_count, 1);
+  for (const itemType of ["command_execution", "tool_call", "mcp_tool_call", "web_search",
+    "file_change", "image_generation", "unknown_future_item"]) {
+    for (const eventType of ["item.started", "item.updated", "item.completed"]) {
+      const events = [eventRows[0], eventRows[1], { type: eventType, item: { type: itemType } }, eventRows[2]];
+      assert.throws(() => parseSuccessorExecSessionEvidence(input(events)), `${eventType} ${itemType}`);
+    }
+  }
+  assert.throws(() => parseSuccessorExecSessionEvidence(input([
+    eventRows[0], eventRows[1], { type: "unknown.future", item: { type: "agent_message" } }, eventRows[2],
+  ])), "unknown exec event");
+});
+
 test("diagnostic rejects provider, model, effort, sandbox, network, approval and profile drift", () => {
   const mutation = [
     [0, "model_provider", "other"], [0, "cli_version", "0.0.0"],
