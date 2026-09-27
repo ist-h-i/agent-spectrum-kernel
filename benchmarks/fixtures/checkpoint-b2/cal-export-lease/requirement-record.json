@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:7156dde026e59ec04c15f63d906d06effc56e819130f5a993fffcdc2c19f3e26",
+  "admission_record_digest": "sha256:41d9648b42354c1b2620bbc4a97bb10c13f91cdfe3f6541c5ad176f56fc8eb7a",
   "requirements": [
     {
       "requirement_id": "lease-ownership-and-claim",
@@ -82,5 +82,5 @@
     }
   ],
   "requirement_set_digest": "sha256:22b6a89caaae4df7d9b8508ea9f0fddb01d7f918312020138bfffbeeb0baff7c",
-  "requirement_record_digest": "sha256:e48f799768353abfd10d9bb439d71356d270d8ccf50142eb116cc9d72f5bd2d3"
+  "requirement_record_digest": "sha256:0adf20e79d710e454de715337180d066749afdcd95d2133782b0affbcdc9a819"
 }

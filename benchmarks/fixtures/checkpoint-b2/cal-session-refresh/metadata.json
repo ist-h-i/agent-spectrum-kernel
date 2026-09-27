@@ -23,10 +23,10 @@
   "output_contract_type": "findings_producing",
   "requirement_record_id": "requirement-record-cal-session-refresh",
   "output_contract_id": "output-contract-cal-session-refresh",
-  "evaluator_bundle_id": "evaluator-db2c611708232c73caf5040dbbd7c48f4917fe7a927af7921cacde3c71a45ee0",
-  "evaluator_bundle_digest": "sha256:b7e576efb7cc5cfd9e074842afb377ddf954fc9b3e178a1dafbd274bcd40838e",
-  "evaluator_byte_count": 136776,
+  "evaluator_bundle_id": "evaluator-b4e87d7dcb4229b2f11305a4e74e8652f2d67684ce1cea5f1cf8b1da62893016",
+  "evaluator_bundle_digest": "sha256:a84ca7d19febdf8e67c4ccbb8baf52b77a4007e76bb5b75c69981cc1adce654d",
+  "evaluator_byte_count": 146046,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:22b0b0db1e23e7d395b673ee9ae185bed8efcd9774754208a0828d6603b40800"
+  "metadata_digest": "sha256:de1886af3204bad44874d5124933cb068b16d3256b784095ea1346f4d02cbc59"
 }
