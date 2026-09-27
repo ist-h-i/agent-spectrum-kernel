@@ -358,8 +358,10 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
             assert.equal(result.telemetry.output_tokens.value, 20);
             const fixtureContext = fixtureContexts[result.lineage.fixture_id]; assert.ok(fixtureContext);
             const outcome = roleName === "prompt_v2" ? "fail" : "pass";
+            // This positive comparison fixture supplies typed categorical evidence;
+            // the pending-authority regression below keeps its unknown observations.
             const envelope = syntheticSuccessorEvaluatorEnvelope({ normalized: result, sourceSnapshotDigest: snapshot,
-              context: fixtureContext, outcome });
+              context: fixtureContext, outcome, comparisonReady: true });
             const resultPath = resolve(evaluatorDirectory, `${result.normalized_result_id}.json`); write(resultPath, envelope);
             const options = { ...successorScoringOptions(scoringInputs, preparation, result.lineage.fixture_id),
               privateRoot: fixtureContext.privateRoot, manifestPath: fixtureContext.manifestPath, resultPath,

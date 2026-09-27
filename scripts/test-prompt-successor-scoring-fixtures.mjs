@@ -375,12 +375,14 @@ export function createSuccessorSyntheticAdmittedCalibrationPackages({ root, revi
  * The test never claims this data was produced by a real/private evaluator.
  * Admission remains pending and the report must remain insufficient evidence.
  */
-export function syntheticSuccessorEvaluatorEnvelope({ normalized, sourceSnapshotDigest, context, outcome = "pass" }) {
+export function syntheticSuccessorEvaluatorEnvelope({ normalized, sourceSnapshotDigest, context, outcome = "pass", comparisonReady = false }) {
   if (!["pass", "fail", "manual_review_required"].includes(outcome)) throw new Error("unsupported synthetic evaluator observation");
   const l = normalized.lineage; const c = context;
   const ref = [{ kind: "normalized_result", digest: normalized.normalized_result_digest, bytes: null }];
-  const observation = () => ({ state: "unknown", evidence_references: [] });
+  const observation = (state = "unknown") => ({ state, evidence_references: state === "unknown" ? [] : ref });
   const manual = outcome === "manual_review_required";
+  const known = comparisonReady && !manual;
+  const correctness = known ? outcome : "unknown";
   const requirementResults = c.requirements.requirements.map((requirement, index) => {
     const observed = manual && index === 0 ? "manual_review_required" : manual ? "fail" : outcome;
     return { requirement_id: requirement.requirement_id, outcome: observed,
@@ -401,10 +403,11 @@ export function syntheticSuccessorEvaluatorEnvelope({ normalized, sourceSnapshot
     evaluator_bundle_id: c.bundle.evaluator_bundle_id, evaluator_bundle_digest: c.bundle.evaluator_bundle_digest, evaluator_revision: c.bundle.evaluator_revision,
     evaluation_id: `evaluation-${"0".repeat(32)}`, evaluation_digest: d("pending-digest"),
     evaluation_status: manual ? "manual_review_required" : "completed", requirement_results: requirementResults,
-    quality: observation(), safety: observation(), findings: [], false_positives: [], scope_deviations: [],
-    decision_correctness: observation(), verification_correctness: observation(), evidence_correctness: observation(),
-    approval_correctness: observation(), completion_claim_correctness: observation(),
-    under_processing: manual ? { state: "manual_review_required", evidence_references: ref } : observation(), over_processing: observation(),
+    quality: observation(known ? outcome : "unknown"), safety: observation(known ? "pass" : "unknown"), findings: [], false_positives: [], scope_deviations: [],
+    decision_correctness: observation(correctness), verification_correctness: observation(correctness), evidence_correctness: observation(correctness),
+    approval_correctness: observation(correctness), completion_claim_correctness: observation(correctness),
+    under_processing: manual ? { state: "manual_review_required", evidence_references: ref } : observation(known ? "not_detected" : "unknown"),
+    over_processing: observation(known ? "not_detected" : "unknown"),
     required_mechanisms: [], unnecessary_mechanisms: [], unsafe_attempted_actions: [],
     evaluator_notes_state: { state: "not_recorded", digest: null, bytes: null },
     privacy: { oracle_content_stored: false, rubric_content_stored: false, hidden_test_content_stored: false, matcher_content_stored: false,
