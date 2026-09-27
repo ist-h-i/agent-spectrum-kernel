@@ -286,7 +286,8 @@ async function syntheticAdmissionWorker(contextPath) {
     spec_digest: hash(readFileSync(specPath)), ...preflightContext };
   write(resolve(runRoot, "preflight-context.json"), { ...contextBody, context_digest: canonicalDigest(contextBody) });
   await assert.rejects(reopenIssue291ReadyContext(specPath, `sha256:${"f".repeat(64)}`),
-    { code: "ENOENT" }, "synthetic spec and context must pass every pre-freeze check before the expensive admission test");
+    { message: /measured authority freeze does not exist/u },
+    "synthetic spec and context must pass every pre-freeze check before the expensive admission test");
   console.log("PASS production reopen reaches only the absent freeze after synthetic spec and context checks");
   const admissionInput = { preparation, sources, scoringInputs,
     admissionSourcesByFixture: context.admissionSourcesByFixture, normalizedRoots, root };
