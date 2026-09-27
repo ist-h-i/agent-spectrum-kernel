@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-d788da360b60222125e1b043fcacc4d4dd4f1b0f48eadb41377c1bb715d65045",
-  "evaluator_bundle_digest": "sha256:87914298d77e5f30d2acc28d623e4638d0b8c9306045629a52f57581ea3348ec",
+  "evaluator_bundle_id": "evaluator-c00b0085c27ffcea86e9fb01cbd327607f4c0ca457009c684e584257e1e27d5d",
+  "evaluator_bundle_digest": "sha256:01d83f10f8d3efc908b16f0051ac4fef90033fca5ee14d17d93b02dd2e26fa00",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "cal-atomic-rule-batch",
   "fixture_input_digest": "sha256:e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
   "task_class": "implementation",
   "suite": "calibration",
-  "evaluator_revision": "3f631e1cd42e6e839e1c199498231e8b9ecb44f6",
+  "evaluator_revision": "095f8bb8b3ca47e4a65544a55a914fb1695a1a2e",
   "evaluator_source_identity": {
-    "base_git_revision": "3f631e1cd42e6e839e1c199498231e8b9ecb44f6",
+    "base_git_revision": "095f8bb8b3ca47e4a65544a55a914fb1695a1a2e",
     "source_tree_digest": "sha256:129e4d9eb9e9825a19193e7a53d5d20afbe0acd2ce2db62bc48c9b4b909ed3a7",
     "generator_source_digest": "sha256:2e0660ae6358cbf05ef68fa938a384b07087d1f9e8d261e7f8fb77f115b0ebd6",
     "source_files": [
@@ -2138,11 +2138,11 @@
     }
   },
   "generator_identity": "sha256:2885207150c893bc04ff324f0777508184990ba29d79a0c6b4510b8c41a4bf0b",
-  "independence_statement_digest": "sha256:383339d07d5bf510667bb5bf57fb42e5905743ae59b3027c57ee05ff09989bf1",
-  "review_record_digest": "sha256:21cfd7d272bfea423981ead2a2cbcd80d9a287657ead28905874b6cdc9619b07",
+  "independence_statement_digest": "sha256:2a3b535def9b69de97fde1d0aa5ad144ad0c2a02ca84c9582ff0a708a5dc99e3",
+  "review_record_digest": "sha256:3a3dd0c68d3be89e464562bb21d7ede32141c7ec52029db56b935dc8119c39d9",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/cal-atomic-rule-batch/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:13268f976f154fd0f13fe43ef5948a3635e03e99c0c667e08057a4e0912d3ff6",
-  "evaluator_authority_manifest_digest": "sha256:d6b66ec85184bcf90933b8105f0ed31a1f87e165b2fcec782c28ae2870cbe057",
+  "evaluator_authority_manifest_raw_sha256": "sha256:445d3ea01c6844c474fcd2f6c2383cb8a3e79fa33634797b367fec01f87c4f6e",
+  "evaluator_authority_manifest_digest": "sha256:e2ed357aae7a5a0cc89be3195d07f3787a2e3c95118e21224d15202a909c7109",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:f5328bec0891f24445a8fa07b0709d85821671a4a2748304d7531e5f2d1ef449"
+  "public_metadata_digest": "sha256:c4182b921652dcff4e3ad2844a91e239c7b2b43347b8d0d553044d2691e81d71"
 }
