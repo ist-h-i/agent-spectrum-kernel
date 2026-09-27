@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -237,15 +237,17 @@ async function syntheticAdmissionWorker(contextPath) {
   const materialization = materializePortfolio({ root, config, planPath, outputPath: materializedPath,
     repositoryRevision: implementation.revision });
   const selectionState = resolve(work, "selection-state");
+  const runRoot = resolve(work, "issue291-run"); mkdirSync(runRoot);
+  copyFileSync(context.scoringManifestPath, resolve(runRoot, "scoring-input-manifest.json"));
   for (const item of materialization.cases.filter(value => value.condition === "adaptive_ask")) {
     sealAdaptiveSelection({ root, config, planPath, materializedPath, stateDir: selectionState, caseId: item.case_id,
       input: syntheticSelection(item, plan), repositoryRevision: implementation.revision, now: () => "2026-09-22T00:00:00Z" });
   }
   const shared = { root, config, planPath, materializedPath, selectionState };
-  mkdirSync(resolve(work, "native-runs"));
+  mkdirSync(resolve(runRoot, "native-runs"));
   const experimentRun = randomUUID(); const roles = {};
   for (const role of ["current_prompt", "prompt_v2"]) {
-    const execution = { ...shared, runDir: resolve(work, "native-runs", `run-${role}`) };
+    const execution = { ...shared, runDir: resolve(runRoot, "native-runs", `run-${role}`) };
     const native = withEnvironment(env, () => prepareSuccessorPortfolioSource({ ...execution,
       runtimeConfigPath, agentBin, preparation }));
     const source = { plan_id: native.plan_id, plan_digest: native.plan_digest, run_instance_id: native.run_instance_id,
@@ -267,12 +269,25 @@ async function syntheticAdmissionWorker(contextPath) {
       execution, runtimeConfigPath, agentBin }];
   }));
   const normalizedRoots = Object.fromEntries(Object.entries(roles).map(([role, value]) => {
-    const outputPath = resolve(work, `normalized-${role}`);
+    const outputPath = resolve(runRoot, `normalized-${role}`);
     normalizePortfolioExecution({ ...value.execution, outputPath });
     return [role, outputPath];
   }));
   assert.equal(inspectCalibrationUnstartedInventories({ sources, normalizedRoots }).measured_result_bytes_read, 0);
   console.log("PASS two roles retain 28 pending cases and zero attempts");
+  const spec = { run_root: runRoot, runtime_config_path: runtimeConfigPath, agent_bin: agentBin };
+  const preflightContext = { source: implementation, preparation, sources, normalized_roots: normalizedRoots,
+    scoring_manifest_path: resolve(runRoot, "scoring-input-manifest.json"), diagnostic_root: resolve(runRoot, "host-diagnostic") };
+  const specPath = resolve(work, "issue291-spec.json");
+  write(specPath, { schema_version: "1.0.0", ...spec,
+    private_admission_sources: context.admissionSourcesByFixture,
+    seed: "synthetic-calibration-admission-v1", plan_seed: "synthetic-calibration-admission-plan" });
+  const contextBody = { schema_version: "1.0.0", kind: "issue291_preflight_context",
+    spec_digest: hash(readFileSync(specPath)), ...preflightContext };
+  write(resolve(runRoot, "preflight-context.json"), { ...contextBody, context_digest: canonicalDigest(contextBody) });
+  await assert.rejects(reopenIssue291ReadyContext(specPath, `sha256:${"f".repeat(64)}`),
+    { code: "ENOENT" }, "synthetic spec and context must pass every pre-freeze check before the expensive admission test");
+  console.log("PASS production reopen reaches only the absent freeze after synthetic spec and context checks");
   const admissionInput = { preparation, sources, scoringInputs,
     admissionSourcesByFixture: context.admissionSourcesByFixture, normalizedRoots, root };
   const opened = openCalibrationExecutionAdmission(admissionInput);
@@ -381,11 +396,8 @@ async function syntheticAdmissionWorker(contextPath) {
   writeFileSync(terminalPath, "not terminal JSON\n");
   assert.deepEqual(inspectCalibrationExecutionAdmission(
     reopenCalibrationExecutionAdmission(admissionInput, evidence.admission_digest)), evidence);
-  const spec = { run_root: work, runtime_config_path: runtimeConfigPath, agent_bin: agentBin };
-  const preflightContext = { source: implementation, preparation, sources, normalized_roots: normalizedRoots,
-    scoring_manifest_path: context.scoringManifestPath, diagnostic_root: resolve(work, "host-diagnostic") };
   const experiment = sources.current_prompt.scope.run_instance_id;
-  const freezePath = resolve(work, "native-runs", `.ask-successor-issue291-${experiment}.authority.json`);
+  const freezePath = resolve(runRoot, "native-runs", `.ask-successor-issue291-${experiment}.authority.json`);
   const sourceClosures = Object.fromEntries(Object.entries(sources).map(([promptRole, source]) => [promptRole,
     canonicalDigest({ scope_digest: source.scope.scope_digest, run_dir: source.execution.runDir,
       runtime_config_path: source.runtimeConfigPath, agent_bin: source.agentBin })]));
@@ -403,7 +415,7 @@ async function syntheticAdmissionWorker(contextPath) {
     calibration_execution_admission: { admission_digest: evidence.admission_digest },
     experiment_run_instance_id: experiment, source_closures: sourceClosures,
     authority_record_path_digest: canonicalDigest({ path: freezePath }),
-    journal_path_digest: canonicalDigest({ path: resolve(work, "native-runs", `.ask-successor-issue291-${experiment}.journal.json`) }),
+    journal_path_digest: canonicalDigest({ path: resolve(runRoot, "native-runs", `.ask-successor-issue291-${experiment}.journal.json`) }),
     sealed_before_first_attempt: true, durable_reopen_authorized: true,
     exact_host_runtime_verified_at_freeze: true, exact_native_sources_verified_at_freeze: true,
     ordered_execution_authorized: true, measured_result_access_authorized: true,
@@ -421,13 +433,6 @@ async function syntheticAdmissionWorker(contextPath) {
   assert.throws(() => readIssue291SealedFreeze(freezeInput), { message: /seal report authority_freeze_digest/u });
   assert.throws(() => readIssue291SealedFreeze({ ...freezeInput, expectedFreezeDigest: changed.record_digest }),
     { message: /measured freeze preparation/u });
-  const specPath = resolve(work, "issue291-spec.json");
-  write(specPath, { schema_version: "1.0.0", run_root: work, runtime_config_path: runtimeConfigPath,
-    agent_bin: agentBin, private_admission_sources: context.admissionSourcesByFixture,
-    seed: "synthetic-calibration-admission-v1", plan_seed: "synthetic-calibration-admission-plan" });
-  const contextBody = { schema_version: "1.0.0", kind: "issue291_preflight_context",
-    spec_digest: hash(readFileSync(specPath)), ...preflightContext };
-  write(resolve(work, "preflight-context.json"), { ...contextBody, context_digest: canonicalDigest(contextBody) });
   await assert.rejects(reopenIssue291ReadyContext(specPath, sealed.record_digest),
     { message: /seal report authority_freeze_digest/u });
   console.log("PASS sealed freeze requires the external digest and exact preparation before terminal result access");
