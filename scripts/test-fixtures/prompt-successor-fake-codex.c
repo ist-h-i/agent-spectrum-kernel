@@ -133,6 +133,7 @@ int main(int argc, char **argv) {
   }
   if (argc == 3 && strcmp(argv[1], "exec") == 0 && strcmp(argv[2], "--help") == 0) {
     puts("--ephemeral --ignore-user-config --ignore-rules --skip-git-repo-check --json --model --config --sandbox --output-schema --output-last-message");
+    puts("Run without persisting session files to disk");
     return 0;
   }
   if (argc == 3 && !strcmp(argv[1], "login") && !strcmp(argv[2], "status")) {
