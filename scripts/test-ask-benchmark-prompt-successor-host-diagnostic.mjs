@@ -68,6 +68,40 @@ test("diagnostic accepts message items and rejects every tool or unknown item", 
   ])), "unknown exec event");
 });
 
+test("diagnostic session rows cannot contradict the tool-free exec JSONL", () => {
+  const ordinaryRows = [...sessionRows,
+    { type: "event_msg", payload: { type: "task_started", turn_id: turn } },
+    { type: "event_msg", payload: { type: "user_message" } },
+    { type: "response_item", payload: { type: "reasoning" } },
+    { type: "response_item", payload: { type: "message", role: "assistant" } },
+    { type: "event_msg", payload: { type: "token_count" } },
+    { type: "event_msg", payload: { type: "task_complete", turn_id: turn, error: null } }];
+  assert.equal(parseSuccessorExecSessionEvidence(input(eventRows, ordinaryRows)).model, runtime.model);
+  for (const payloadType of ["function_call", "function_call_output", "custom_tool_call",
+    "web_search_call", "file_search_call", "unknown_future_item"]) {
+    assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, [
+      ...ordinaryRows, { type: "response_item", payload: { type: payloadType, name: "functions.exec_command" } },
+    ])), `session ${payloadType}`);
+  }
+  assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, [
+    ...ordinaryRows, { type: "event_msg", payload: { type: "item_completed", item: { type: "CommandExecution" } } },
+  ])), "session tool completion");
+  assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, [
+    ...ordinaryRows, { type: "response_item", payload: { type: "message", role: "tool" } },
+  ])), "tool role message");
+  for (const payload of [
+    { type: "task_complete", turn_id: turn, error: { message: "failed" } },
+    { type: "task_complete", turn_id: "other", error: null },
+    { type: "item_completed", item: { type: "CommandExecution" } },
+    { type: "unknown_future_event" },
+  ]) assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, [
+    ...sessionRows, { type: "event_msg", payload },
+  ])), `session ${payload.type}`);
+  assert.throws(() => parseSuccessorExecSessionEvidence(input(eventRows, [
+    ...ordinaryRows, { type: "unknown_future_row", payload: {} },
+  ])), "unknown session row");
+});
+
 test("diagnostic rejects provider, model, effort, sandbox, network, approval and profile drift", () => {
   const mutation = [
     [0, "model_provider", "other"], [0, "cli_version", "0.0.0"],

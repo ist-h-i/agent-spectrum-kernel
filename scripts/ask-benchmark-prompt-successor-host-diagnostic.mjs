@@ -114,6 +114,32 @@ export function parseSuccessorExecSessionEvidence({ stdout, session, source, run
   const contexts = rows.filter(row => row.type === "turn_context").map(row => row.payload);
   if (metadata.length !== 1 || contexts.length !== 1) fail("diagnostic session metadata or turn context is missing or duplicated");
   const meta = metadata[0], context = contexts[0];
+  const safeSessionEvents = new Set(["user_message", "agent_message", "agent_reasoning",
+    "agent_reasoning_raw_content", "token_count", "thread_settings_applied"]);
+  const safeCompletedItems = new Set(["UserMessage", "AgentMessage", "Reasoning"]);
+  let sessionStarts = 0, sessionCompletions = 0;
+  for (const row of rows) {
+    if (row.type === "session_meta" || row.type === "turn_context"
+      || ["token_usage_record", "world_state", "security_risk_score"].includes(row.type)) continue;
+    const payload = row.payload;
+    if (row.type === "response_item") {
+      if (payload?.type === "reasoning"
+        || (payload?.type === "message" && ["assistant", "user"].includes(payload.role))) continue;
+    } else if (row.type === "event_msg") {
+      if (safeSessionEvents.has(payload?.type)) continue;
+      if (["item.started", "item.updated", "item_completed", "item_started", "item_updated"].includes(payload?.type)
+        && safeCompletedItems.has(payload.item?.type)) continue;
+      if (["task_started", "turn_started", "task_complete", "turn_complete"].includes(payload?.type)
+        && (payload.turn_id === undefined || payload.turn_id === context.turn_id)
+        && !(["task_complete", "turn_complete"].includes(payload.type) && payload.error != null)) {
+        if (["task_started", "turn_started"].includes(payload.type)) sessionStarts++;
+        else sessionCompletions++;
+        continue;
+      }
+    }
+    fail("diagnostic session contains a tool action or unknown event");
+  }
+  if (sessionStarts > 1 || sessionCompletions > 1) fail("diagnostic session contains multiple turn markers");
   successorExact(meta.model_provider, "openai", "diagnostic model provider");
   successorExact(meta.cli_version, runtime.cli_version, "diagnostic CLI version");
   successorExact(resolve(meta.cwd), cwd, "diagnostic session cwd");
