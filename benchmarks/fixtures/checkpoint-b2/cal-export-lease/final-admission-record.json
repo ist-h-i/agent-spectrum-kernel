@@ -3,9 +3,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "input_manifest_digest": "sha256:e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
   "evaluator_reference_schema": "benchmarks/schemas/evaluator-reference.schema.json",
-  "evaluator_bundle_id": "evaluator-d52fca364f8f473c2cc5bb325a10e29a0e001cda68c3180759df7ffbc14cf871",
-  "evaluator_bundle_digest": "sha256:65fdbd7f6f975eae588c5b80afd9589371036e885d95d2ce29263d3a23bec593",
-  "evaluator_byte_count": 128442,
+  "evaluator_bundle_id": "evaluator-b449f6854f10df811e276fd9d5c999a048b14a59439399792704f1d0407ddc64",
+  "evaluator_bundle_digest": "sha256:a035c0febac43d679e07d3114672819e99da0f5cf8327ea49e7bfbbc697fc359",
+  "evaluator_byte_count": 128467,
   "evaluator_requirement_count": 4,
   "evidence_map_ids": [
     "lease-ownership-and-claim-basis",
@@ -23,7 +23,7 @@
   "admission_revision": 1,
   "admission_status": "admission_pending",
   "evaluator_source_identity": {
-    "base_git_revision": "a405fb798085ffbcafcf9a2618e472c1faea7e11",
+    "base_git_revision": "cbf6f2460220304fd10f509cf7c7f0b1174c9532",
     "source_tree_digest": "sha256:9de8b2b2e5bfa958f84d3da044accc2820e9b9daba30e81cf7dbf83d95c65987",
     "generator_source_digest": "sha256:2e0660ae6358cbf05ef68fa938a384b07087d1f9e8d261e7f8fb77f115b0ebd6",
     "source_files": [
@@ -2149,9 +2149,9 @@
       "graph_digest": "sha256:b02f3cfe0258bd0cf88842c2b4ebc738b5515597063e88da56bd134844a65428"
     }
   },
-  "requirement_authority_digest": "sha256:dbef954bc0ff2b8940fedd533a009372757a6c2313308f50d352c294761d9ad0",
+  "requirement_authority_digest": "sha256:7a0d3cd3d25b8f40e246ee9a1fd1d22eafbc026cac3e0a6ae5ec0367957a88c4",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/cal-export-lease/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:bb9d576e12af88cfee55936e00e924b61951b8d798f6baec5eec2e471bf9eb06",
-  "evaluator_authority_manifest_digest": "sha256:e114609ddeca43f1dd0494995009bec1937548e1c2fe37b551d6913cdc8fdbb4",
-  "admission_digest": "sha256:dd1308b3bc114233e8ab252af0acf254a87c5702cb1f8aa363d2ac38bb92aa8d"
+  "evaluator_authority_manifest_raw_sha256": "sha256:245f91aa636162634b2466196b2439324a982512a94093037a6e23905c197ab6",
+  "evaluator_authority_manifest_digest": "sha256:70cb701560c42d19af247877de73aaf4efbddb2f4247dd8c608619908669f455",
+  "admission_digest": "sha256:239cd056612a378c936c833ed88a54ed62a06f9c73543df6e9f5cf9eea598ce6"
 }

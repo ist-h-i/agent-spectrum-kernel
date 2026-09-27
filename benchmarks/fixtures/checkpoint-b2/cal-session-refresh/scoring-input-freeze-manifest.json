@@ -21,24 +21,24 @@
   },
   "admission_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/cal-session-refresh/final-admission-record.json",
-    "raw_byte_digest": "sha256:90daa247d6761bc66df047af183177842f425eac47c58ba805e4d46f82654467",
-    "semantic_digest": "sha256:9dc18a339a951f49f3fe387f4271ab2eaa6820df4524e1ab2d68cfdb8658c0d0"
+    "raw_byte_digest": "sha256:e8d5f2e9a669f1c97d09c1850f96b6cdb4f1094f865cb6b0a8b2152945731bea",
+    "semantic_digest": "sha256:852763c148ce199e797bba42db9dbb665359fd709fe16ade65eef0eb4ceb4b76"
   },
   "requirement_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/cal-session-refresh/requirement-record.json",
-    "raw_byte_digest": "sha256:a08f4953eebbde1559402451795aceca2c5d4f6d42a98f9476b9963382a4138a",
-    "record_digest": "sha256:c8407db3b90a1211670046cd8a94d549627e7952a50e0984bc5cd5e63ea5a6eb",
+    "raw_byte_digest": "sha256:34bf03501610c9a28d7867f4754511cee74a1bae1599a9c6f94cd4e818a66f94",
+    "record_digest": "sha256:0f61e5dad897ec72f39931d9bec79cfeed7fdca3e8b19e730acd72e3c72b075b",
     "set_digest": "sha256:e1e8baa8e952bf7b05d6b6a4d7e2ee5c658b8099da53532ef4c98aba4160ebf4"
   },
   "output_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/cal-session-refresh/output-contract.json",
-    "raw_byte_digest": "sha256:b7ed162fcf5ed7e4d40dc2a6313e6c7b686e1d4a7f01c18a55ef8bb0fa9bff8f",
-    "semantic_digest": "sha256:fe4695c6256e9a2f0c069cad94575cff9727a6389a53d79b1f1fff516c114607"
+    "raw_byte_digest": "sha256:bd16db24682907dbf84daf13be2271da4feff06b30f998d692d9a94d1fcafd9f",
+    "semantic_digest": "sha256:bb8ea6be747c7ddb0a2dc8fe37235b921ba9535a1f2449329e09db999bc2c97b"
   },
   "evaluator_public_reference": {
     "path": "benchmarks/fixtures/checkpoint-b2/cal-session-refresh/evaluator-reference.json",
-    "raw_byte_digest": "sha256:b306967c2d50d34a29eb09715ddc5dba3ccb626f33da68237734d3464eebaa2d",
-    "semantic_digest": "sha256:4aac9a9746213aca31cec32de668394578c894da45e815150350adf19c61e8ac"
+    "raw_byte_digest": "sha256:038ad4fef4d4fa19a86b34b6c4a317fd78468458c05a20a9654e91ddbc9c2589",
+    "semantic_digest": "sha256:799f8481c8c5b2517fab752120d19f7dc4b126a03a08e2445ad2edb84902ee11"
   },
   "verification_command_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/cal-session-refresh/verification-command-contract.json",
@@ -52,9 +52,9 @@
   },
   "evaluator_authority_manifest": {
     "path": "benchmarks/fixtures/checkpoint-b2/cal-session-refresh/evaluator-authority-manifest.json",
-    "raw_byte_digest": "sha256:a85088383c3b07417e92a973705bc41ad907a4c4b764de43466522b4e0ee31e8",
-    "semantic_digest": "sha256:0d7469a4955b79f5a531c17eed0f7ed01de5a534e2eec16fcb8a5addd608928f"
+    "raw_byte_digest": "sha256:7cd007a8da817133ac73e622cd256a905a46c4f54d67793eb3b7f7614f875b06",
+    "semantic_digest": "sha256:c824fb5669074d8093cc0b099eb1d2c2f8a585350f8cab83cbc707cb04282b0d"
   },
   "freeze_revision": "issue-291-calibration-pending-r1",
-  "manifest_digest": "sha256:3f089a62aca89d165ba229dc91d25128dd621108ceab591040090c7a77c97558"
+  "manifest_digest": "sha256:f0e7f9b94f05ff049976c5c44472dbb5cff4d91e523af182df41c79a0544bac8"
 }
