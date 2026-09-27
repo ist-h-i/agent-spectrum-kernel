@@ -9,7 +9,7 @@ import test from "node:test";
 import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
 import { createIssue291SyntheticPendingPackages, createIssue291SyntheticReviewOverlays } from "./test-fixtures/issue291-synthetic-admission.mjs";
 import {
-  assertCalibrationExecutionAdmission, assertCalibrationScoringAdmissionCandidate,
+  assertCalibrationEffectiveAdmission, assertCalibrationExecutionAdmission, assertCalibrationScoringAdmissionCandidate,
   assertCalibrationPrivateIsolationPaths,
   inspectCalibrationExecutionAdmission, inspectCalibrationUnstartedInventories,
   openCalibrationExecutionAdmission, reopenCalibrationExecutionAdmission,
@@ -279,6 +279,32 @@ async function syntheticAdmissionWorker(contextPath) {
   assert.ok(evidence.fixtures.every(item => item.review_status === "approved" && item.independence_status === "verified"));
   console.log("PASS four synthetic private bundles and simulated reviews open an opaque pre-result admission");
   const first = context.admissionSourcesByFixture[CALIBRATION_SOURCE_BINDINGS[0][0]];
+  const fixtureId = CALIBRATION_SOURCE_BINDINGS[0][0];
+  const role = "current_prompt";
+  const admissionContext = { preparation, sources, scoringInputs };
+  const checked = () => assertCalibrationEffectiveAdmission(opened, fixtureId, role, normalizedRoots[role], admissionContext);
+  assert.deepEqual(checked().evidence, evidence);
+  assert.equal(checked().effectiveAuthority.effective_admission_status, "admitted");
+  for (const [label, path] of [
+    ["reviewed public", resolve(root, `benchmarks/fixtures/checkpoint-b2/${fixtureId}/verification-command-contract.json`)],
+    ["private manifest", first.manifestPath],
+    ["independent review", first.reviewAuthorityPath],
+    ["review archive", first.reviewArchivePath],
+  ]) {
+    const bytes = readFileSync(path);
+    try {
+      writeFileSync(path, Buffer.concat([bytes, Buffer.from(" ")]));
+      assert.throws(checked, error => typeof error?.code === "string" && error.code !== "ENOENT", `${label} drift must reject a warmed admission`);
+    } finally { writeFileSync(path, bytes); }
+    assert.deepEqual(checked().evidence, evidence, `${label} restored admission`);
+  }
+  assert.throws(() => assertCalibrationEffectiveAdmission(opened, "cal-other", role, normalizedRoots[role], admissionContext),
+    { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION" });
+  assert.throws(() => assertCalibrationEffectiveAdmission(opened, fixtureId, "other_role", normalizedRoots[role], admissionContext),
+    { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION" });
+  assert.throws(() => assertCalibrationEffectiveAdmission(opened, fixtureId, role, normalizedRoots.prompt_v2, admissionContext),
+    { code: "SUCCESSOR_IDENTITY_MISMATCH" });
+  console.log("PASS warmed admission rejects exact public, private, review, fixture, role, and result-root drift");
   const original = readFileSync(first.manifestPath);
   const drifted = Buffer.from(original.toString("utf8").replace(
     /"evaluator_bundle_digest": "sha256:[a-f0-9]{64}"/u, `"evaluator_bundle_digest": "sha256:${"0".repeat(64)}"`));

@@ -10,7 +10,7 @@ import { validatePromptSuccessorPreparation, validateSuccessorSourceScope, succe
 import { assertSuccessorAdapterFacts } from "./ask-benchmark-prompt-successor-delivery.mjs";
 import { validateSuccessorFromRepository } from "./ask-benchmark-prompt-successor-repository.mjs";
 import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
-import { assertCalibrationExecutionAdmission, assertCalibrationResultRoot, calibratedEffectiveAdmission } from "./ask-benchmark-calibration-execution-admission.mjs";
+import { assertCalibrationEffectiveAdmission, assertCalibrationExecutionAdmission } from "./ask-benchmark-calibration-execution-admission.mjs";
 import { assertSuccessorHostIsolationReady, probeSuccessorPrivateRootDeny } from "./ask-benchmark-prompt-successor-host-isolation.mjs";
 import { openSuccessorExecDiagnostic } from "./ask-benchmark-prompt-successor-host-diagnostic.mjs";
 
@@ -227,31 +227,34 @@ export async function openSuccessorMeasuredAuthority({ preparation, sources, sco
   return handle;
 }
 
-function found(handle) {
+function found(handle, { deferCalibrationAdmission = false } = {}) {
   const value = handles.get(handle);
   if (!value) successorFail("SUCCESSOR_MEASURED_AUTHORITY_REQUIRED", "opaque measured authority");
   const record = readAuthorityRecord(value.recordPath);
   successorExact(record.record_digest, value.recordDigest, "measured authority persisted record");
   successorExact(record.evidence, value.baseEvidence, "measured authority persisted evidence");
-  successorExact(assertCalibrationExecutionAdmission(value.calibrationAdmission, {
-    preparation: value.preparation, sources: value.sources, scoringInputs: value.scoringInputs,
-  }), value.evidence.calibration_execution_admission, "measured authority private execution admission drift");
+  if (!deferCalibrationAdmission) {
+    successorExact(assertCalibrationExecutionAdmission(value.calibrationAdmission, {
+      preparation: value.preparation, sources: value.sources, scoringInputs: value.scoringInputs,
+    }), value.evidence.calibration_execution_admission, "measured authority private execution admission drift");
+  }
   return value;
 }
 
 /** #197's verified overlay, rederived from the pinned external review bytes. */
 export function successorMeasuredEffectiveAdmission(handle, fixtureId, { preparation, scope, normalizedResultsPath }) {
   validatePromptSuccessorPreparation(preparation);
-  const value = found(handle);
+  const value = found(handle, { deferCalibrationAdmission: true });
   successorExact(value.preparation_digest, preparation.preparation_digest, "measured effective admission preparation");
   const role = scope?.prompt_role;
   if (!Object.hasOwn(value.sources, role)) successorFail("SUCCESSOR_ROLE_INVALID", "measured effective admission scope");
   successorExact(scope.scope_digest, value.sources[role].scope.scope_digest, "measured effective admission source scope");
-  const context = { preparation: value.preparation, sources: value.sources, scoringInputs: value.scoringInputs };
-  assertCalibrationResultRoot(value.calibrationAdmission, role, normalizedResultsPath, context);
-  return calibratedEffectiveAdmission(value.calibrationAdmission, fixtureId, {
-    ...context,
-  });
+  const { evidence, effectiveAuthority } = assertCalibrationEffectiveAdmission(
+    value.calibrationAdmission, fixtureId, role, normalizedResultsPath,
+    { preparation: value.preparation, sources: value.sources, scoringInputs: value.scoringInputs },
+  );
+  successorExact(evidence, value.evidence.calibration_execution_admission, "measured authority private execution admission drift");
+  return effectiveAuthority;
 }
 
 export function assertSuccessorMeasuredAuthority(handle, { preparation, sources }) {

@@ -21,6 +21,7 @@ const FIXTURE_IDS = Object.freeze(CALIBRATION_SOURCE_BINDINGS.map(([id]) => id))
 const INPUT_DIGEST = `sha256:${CALIBRATION_INPUT_MANIFEST_SHA256}`;
 const MAX_PRIVATE_BYTES = 256 * 1024 * 1024;
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+const REVIEWED_GIT_BYTES = new Map();
 
 function fail(detail) { successorFail("SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION", detail); }
 function exactKeys(value, keys, label) {
@@ -56,18 +57,26 @@ function rawJson(path, label) {
   return { bytes, value: parseJsonRejectDuplicateKeys(bytes, label), digest: hash(bytes) };
 }
 function git(root, args, encoding = "utf8") {
-  return execFileSync("git", ["-C", root, ...args], { encoding, timeout: 10000, maxBuffer: 4 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
+  return execFileSync("git", ["-C", root, ...args], { encoding, timeout: 10000, maxBuffer: 4 * 1024 * 1024,
+    env: { ...process.env, GIT_NO_REPLACE_OBJECTS: "1" }, stdio: ["ignore", "pipe", "pipe"] });
 }
 function reviewedPublicBytes(root, reviewedHead, paths) {
   if (!/^[a-f0-9]{40}$/u.test(reviewedHead ?? "")) fail("independent review lacks an exact source SHA");
-  git(root, ["cat-file", "-e", `${reviewedHead}^{commit}`]);
-  const tree = git(root, ["rev-parse", `${reviewedHead}^{tree}`]).trim();
-  for (const path of paths) {
-    const current = readStableBytes(resolve(root, path), `reviewed public ${path}`, 1024 * 1024);
-    const reviewed = git(root, ["show", `${reviewedHead}:${path}`], null);
-    if (!current.equals(reviewed)) fail(`public authority changed after independent review: ${path}`);
+  const key = JSON.stringify([resolve(root), reviewedHead, paths]);
+  let reviewed = REVIEWED_GIT_BYTES.get(key);
+  if (!reviewed) {
+    git(root, ["cat-file", "-e", `${reviewedHead}^{commit}`]);
+    const tree = git(root, ["rev-parse", `${reviewedHead}^{tree}`]).trim();
+    reviewed = { tree, files: paths.map(path => git(root, ["show", `${reviewedHead}:${path}`], null)) };
+    // Only object-addressed Git bytes are reusable. The live public files
+    // below must be read and compared on every admission assertion.
+    REVIEWED_GIT_BYTES.set(key, reviewed);
   }
-  return tree;
+  for (const [index, path] of paths.entries()) {
+    const current = readStableBytes(resolve(root, path), `reviewed public ${path}`, 1024 * 1024);
+    if (!current.equals(reviewed.files[index])) fail(`public authority changed after independent review: ${path}`);
+  }
+  return reviewed.tree;
 }
 
 // This inventory uses names and file types only. It must run before an API
@@ -378,25 +387,39 @@ export function reopenCalibrationExecutionAdmission(input, expectedDigest) {
   return createHandle({ ...input, root: input?.root ?? ROOT }, { preflightComplete: false, expectedDigest });
 }
 
-export function assertCalibrationExecutionAdmission(handle, { preparation, sources, scoringInputs, requirePreflight = false } = {}) {
+function validatedClosure(handle, { preparation, sources, scoringInputs, requirePreflight = false } = {}) {
   const value = HANDLES.get(handle);
   if (!value) fail("opaque admission handle is required");
   if (requirePreflight && !value.preflightComplete) fail("a recovery handle cannot create a new freeze");
   const current = staticClosure({ ...value.input, preparation, sources, scoringInputs });
   successorExact(current.evidence, value.evidence, "calibration execution admission drift");
+  return { value, current };
+}
+
+export function assertCalibrationExecutionAdmission(handle, context = {}) {
+  const { value } = validatedClosure(handle, context);
   return structuredClone(value.evidence);
 }
 
 export function calibratedEffectiveAdmission(handle, fixtureId, context) {
-  assertCalibrationExecutionAdmission(handle, context);
+  const { current } = validatedClosure(handle, context);
   if (!FIXTURE_IDS.includes(fixtureId)) fail("cross-fixture effective admission request");
-  return staticClosure({ ...HANDLES.get(handle).input, ...context }).effectiveAuthorities.get(fixtureId);
+  return current.effectiveAuthorities.get(fixtureId);
+}
+
+/** One live closure proves the frozen evidence, result root, and fixture authority. */
+export function assertCalibrationEffectiveAdmission(handle, fixtureId, role, path, context) {
+  const { value, current } = validatedClosure(handle, context);
+  if (!ROLES.includes(role)) fail("unknown Prompt role for normalized result root");
+  successorExact(resolve(path), resolve(value.input.normalizedRoots[role]), "frozen normalized result root");
+  if (!FIXTURE_IDS.includes(fixtureId)) fail("cross-fixture effective admission request");
+  return { evidence: structuredClone(value.evidence), effectiveAuthority: current.effectiveAuthorities.get(fixtureId) };
 }
 
 export function assertCalibrationResultRoot(handle, role, path, context) {
-  assertCalibrationExecutionAdmission(handle, context);
+  const { value } = validatedClosure(handle, context);
   if (!ROLES.includes(role)) fail("unknown Prompt role for normalized result root");
-  successorExact(resolve(path), resolve(HANDLES.get(handle).input.normalizedRoots[role]), "frozen normalized result root");
+  successorExact(resolve(path), resolve(value.input.normalizedRoots[role]), "frozen normalized result root");
 }
 
 export function inspectCalibrationExecutionAdmission(handle) {
