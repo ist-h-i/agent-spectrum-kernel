@@ -2,17 +2,17 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-905d25575443f5c4c06fa38455a5a904e8be341a02d04200de884384dca9dbd5",
-  "evaluator_bundle_digest": "sha256:d34bc09f137207748193eba180691c97532ebf80ae4dc76a75f1f61f1c2f6d31",
+  "evaluator_bundle_id": "evaluator-c5c5347c9f2a221cf475a3ba66905b2049dfcdb553358a1fd84226f577ec45cd",
+  "evaluator_bundle_digest": "sha256:713309d5e1aee6b1cd67e923bfa553ce8b8419d519497b42c4ab8f9ffc715b72",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "cal-session-refresh",
   "fixture_input_digest": "sha256:e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
   "task_class": "review",
   "suite": "calibration",
-  "evaluator_revision": "6bfd048c6d1272eb1cbf2f5fbbfc0ae8fbf715e0",
+  "evaluator_revision": "badee773b93be1c596e0b8ca44f4b9913669b647",
   "evaluator_source_identity": {
-    "base_git_revision": "6bfd048c6d1272eb1cbf2f5fbbfc0ae8fbf715e0",
-    "source_tree_digest": "sha256:368f78a9536ae02e40a899c32a87188fbce25690aeb9010f28d750efa6e09eef",
+    "base_git_revision": "badee773b93be1c596e0b8ca44f4b9913669b647",
+    "source_tree_digest": "sha256:129e4d9eb9e9825a19193e7a53d5d20afbe0acd2ce2db62bc48c9b4b909ed3a7",
     "generator_source_digest": "sha256:2e0660ae6358cbf05ef68fa938a384b07087d1f9e8d261e7f8fb77f115b0ebd6",
     "source_files": [
       {
@@ -277,8 +277,8 @@
       },
       {
         "path": "scripts/content-addressed-store.mjs",
-        "bytes": 15176,
-        "sha256": "sha256:201d5eb4b95a9853d2be2a146351b75d78820ae7fb4ca52795f74f2f9413daed"
+        "bytes": 15222,
+        "sha256": "sha256:4710a24ef5d56ae0b7891bb954f9d908cebcdc4fd84eba93bbace6a2e6f85191"
       },
       {
         "path": "scripts/execution-envelope.mjs",
@@ -753,11 +753,11 @@
         },
         {
           "path": "scripts/content-addressed-store.mjs",
-          "bytes": 15176,
-          "sha256": "sha256:201d5eb4b95a9853d2be2a146351b75d78820ae7fb4ca52795f74f2f9413daed",
+          "bytes": 15222,
+          "sha256": "sha256:4710a24ef5d56ae0b7891bb954f9d908cebcdc4fd84eba93bbace6a2e6f85191",
           "file_type": "module",
-          "base_git_revision_bytes": 15176,
-          "base_git_revision_sha256": "sha256:201d5eb4b95a9853d2be2a146351b75d78820ae7fb4ca52795f74f2f9413daed"
+          "base_git_revision_bytes": 15222,
+          "base_git_revision_sha256": "sha256:4710a24ef5d56ae0b7891bb954f9d908cebcdc4fd84eba93bbace6a2e6f85191"
         },
         {
           "path": "scripts/execution-envelope.mjs",
@@ -2134,15 +2134,15 @@
           "edge_digest": "sha256:fcf204b41c88a10c4472521944cf77249f50b57b79e2c4ea0ffbac00398cb24a"
         }
       ],
-      "graph_digest": "sha256:3127e1bb3952e18ac8c754dcc51968b0777f8129886d0fc0e671509d293a8155"
+      "graph_digest": "sha256:9c5df92af371793537f390077a56a0edf2657a5100b8f7fed35f1d5620a5f815"
     }
   },
   "generator_identity": "sha256:2885207150c893bc04ff324f0777508184990ba29d79a0c6b4510b8c41a4bf0b",
-  "independence_statement_digest": "sha256:d2cc6b2427e17553fd099ceca33db75588c25851dbc2c4a897dba5ec361c1319",
-  "review_record_digest": "sha256:ebb803d403227a2770df70cea38ad005defbadb85523e44592eedbef79ef627b",
+  "independence_statement_digest": "sha256:9392305afe8090498fb99bc78b0cdfc0c7841fb67af26dbe7b58a1d33861c97f",
+  "review_record_digest": "sha256:a1faec3d42015a42b0506a773cdffb4fa9b8b7da6908f8248451c720ed496983",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/cal-session-refresh/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:d84f9eebc1d1db782f81102ee90aef32da4d3accb5ef6344a8046c71b4196ea5",
-  "evaluator_authority_manifest_digest": "sha256:1ec444963439c453e34f2101b38d64846126664a798d535c4d5ad19cb2709eb6",
+  "evaluator_authority_manifest_raw_sha256": "sha256:fc0ca8ca0f30a3ee53f331da7ae3163d8f29f1714f8b27f9591e0e563d20eac7",
+  "evaluator_authority_manifest_digest": "sha256:f6d6454a59e35be051bea32f07423da8cf6aaa2a35c07c4a7498749bff156ac9",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:672b7972940ec5394176c7d994827c3a7ed067d6bb0b0508b987ac518c3af6c5"
+  "public_metadata_digest": "sha256:8fc6e70c212349fa35a909753ed068081b08dea57c41ca6c282f0b72623d5dd3"
 }
