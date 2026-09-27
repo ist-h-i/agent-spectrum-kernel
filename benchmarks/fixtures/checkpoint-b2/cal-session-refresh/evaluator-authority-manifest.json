@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/evaluator-authority-manifest.schema.json",
   "program": "adaptive_ask_evaluator_authority_manifest",
   "fixture_id": "cal-session-refresh",
-  "evaluator_revision": "37cfd566a3bc63d34230432315a3e4c56c3531ad",
+  "evaluator_revision": "8e70c70ab549d3b78d48bf2c9e4e380a196946b8",
   "file_inventory": [
     {
       "path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
@@ -47,12 +47,12 @@
     {
       "path": "benchmarks/fixtures/checkpoint-b2/cal-session-refresh/requirement-record.json",
       "bytes": 3354,
-      "raw_sha256": "sha256:66c03ac7143570432f95b6c0e2cce19b65eee953de6d283d68c45c907c2c8f0e",
-      "semantic_digest": "sha256:c6f0cf8a5612f652e4f224db15aca2f97817b35a62bfdb2ca35fd7e7b53ad5b1",
+      "raw_sha256": "sha256:704bde84af2c0335d79e777cf9b4a62abd115bd6e5809e87e968962b09451da5",
+      "semantic_digest": "sha256:774082bd85abb746bd38779666b4d4148c902b9899ce43587cbd2c6a21bb4c4a",
       "authority_role": "requirement_record",
-      "requirement_record_digest": "sha256:c6f0cf8a5612f652e4f224db15aca2f97817b35a62bfdb2ca35fd7e7b53ad5b1",
+      "requirement_record_digest": "sha256:774082bd85abb746bd38779666b4d4148c902b9899ce43587cbd2c6a21bb4c4a",
       "requirement_set_digest": "sha256:e1e8baa8e952bf7b05d6b6a4d7e2ee5c658b8099da53532ef4c98aba4160ebf4"
     }
   ],
-  "manifest_digest": "sha256:6caaf16ecc0485927d59b7eb080e6a1dc45eef52f232ecce0a4968dcb644da8c"
+  "manifest_digest": "sha256:936cd8bac71ec8cde36aa56d007be56d8eec77c4704d785595ba6fc02f9bd346"
 }
