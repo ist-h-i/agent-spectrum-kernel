@@ -12,6 +12,7 @@ import { validateSuccessorFromRepository } from "./ask-benchmark-prompt-successo
 import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
 import { assertCalibrationExecutionAdmission, assertCalibrationResultRoot, calibratedEffectiveAdmission } from "./ask-benchmark-calibration-execution-admission.mjs";
 import { assertSuccessorHostIsolationReady, probeSuccessorPrivateRootDeny } from "./ask-benchmark-prompt-successor-host-isolation.mjs";
+import { openSuccessorExecDiagnostic } from "./ask-benchmark-prompt-successor-host-diagnostic.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const handles = new WeakMap();
@@ -101,7 +102,7 @@ function validateNativeSourceAtFreeze({ role, source, preparation, root }) {
   return actual;
 }
 
-function authorityEvidence({ preparation, sources, scoringIdentity, calibrationAdmissionEvidence, hostIsolationProbes }) {
+function authorityEvidence({ preparation, sources, scoringIdentity, calibrationAdmissionEvidence, hostIsolationProbes, hostExecutionDiagnostic }) {
   const authorityPath = authorityPathForSources(sources);
   return {
     schema_version: "1.1.0",
@@ -122,6 +123,7 @@ function authorityEvidence({ preparation, sources, scoringIdentity, calibrationA
     scoring_input_identity: structuredClone(scoringIdentity),
     calibration_execution_admission: structuredClone(calibrationAdmissionEvidence),
     host_isolation_probes: structuredClone(hostIsolationProbes),
+    host_execution_diagnostic: structuredClone(hostExecutionDiagnostic),
     scoring_inputs_verified_at_freeze: true,
     experiment_run_instance_id: sources.current_prompt.scope.run_instance_id,
     source_closures: Object.fromEntries(Object.entries(sources).map(([role, value]) => [role, sourceClosure(value)])),
@@ -139,7 +141,7 @@ function authorityEvidence({ preparation, sources, scoringIdentity, calibrationA
   };
 }
 
-export async function openSuccessorMeasuredAuthority({ preparation, sources, scoringInputs, calibrationAdmission, hostIsolationProbePath, root = ROOT }) {
+export async function openSuccessorMeasuredAuthority({ preparation, sources, scoringInputs, calibrationAdmission, normalizedRoots, hostIsolationProbePath, hostExecutionDiagnosticRoot, root = ROOT }) {
   ({ preparation, sources } = structuredClone({ preparation, sources }));
   successorExact(resolve(root), ROOT, "measured authority root");
   await validateSuccessorFromRepository(preparation, { root });
@@ -193,10 +195,16 @@ export async function openSuccessorMeasuredAuthority({ preparation, sources, sco
     probeSuccessorPrivateRootDeny({ root, source: sources[role], runtime: preparation.runtime,
       privateManifestPath: hostIsolationProbePath, expectedManifestPathDigest: manifestPathDigest }),
   ]));
-  assertSuccessorHostIsolationReady(hostIsolationProbes);
+  if (typeof hostExecutionDiagnosticRoot !== "string") {
+    successorFail("SUCCESSOR_HOST_ISOLATION_REQUIRED", "external exec-session diagnostic namespace");
+  }
+  const hostExecutionDiagnostic = await openSuccessorExecDiagnostic({ root, preparation, sources,
+    scoringInputs, calibrationAdmission, normalizedRoots, hostIsolationProbePath,
+    diagnosticRoot: hostExecutionDiagnosticRoot });
+  assertSuccessorHostIsolationReady(hostIsolationProbes, hostExecutionDiagnostic);
 
   const baseEvidence = authorityEvidence({ preparation, sources, scoringIdentity,
-    calibrationAdmissionEvidence: admissionEvidence, hostIsolationProbes });
+    calibrationAdmissionEvidence: admissionEvidence, hostIsolationProbes, hostExecutionDiagnostic });
   const body = { schema_version: "1.0.0", kind: "prompt_successor_measured_authority_freeze", evidence: baseEvidence };
   const expectedRecord = { ...body, record_digest: canonicalDigest(body) };
   if (!hadRecord) writeAuthorityRecordOnce(recordPath, expectedRecord);

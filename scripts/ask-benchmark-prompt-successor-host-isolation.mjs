@@ -27,23 +27,21 @@ function regular(path, label) {
   return realpathSync(path);
 }
 
-function capturedEnvironment(identity) {
+export function capturedSuccessorEnvironment(identity) {
   const values = {};
   const entries = identity.environment_snapshot?.entries;
   if (!Array.isArray(entries)) successorFail("SUCCESSOR_HOST_ISOLATION_INVALID", "native environment snapshot");
   successorExact(canonicalDigest(entries), identity.environment_snapshot.digest, "native environment snapshot digest");
   successorExact(entries.map(entry => entry.name).sort(), [...identity.environment_allowlist].sort(), "native environment names");
   for (const entry of entries) {
-    if (entry.name === "CODEX_HOME") {
-      // The measured runner replaces CODEX_HOME with a fresh isolated home.
-      continue;
-    }
     const current = Object.hasOwn(process.env, entry.name) ? process.env[entry.name] : undefined;
     successorExact(current !== undefined, entry.present, `native environment ${entry.name} presence`);
     if (current !== undefined) {
       successorExact(hash(Buffer.from(current)), entry.digest, `native environment ${entry.name} bytes`);
       successorExact(Buffer.byteLength(current), entry.bytes, `native environment ${entry.name} length`);
-      values[entry.name] = current;
+      // Both the measured runner and host diagnostic replace CODEX_HOME with
+      // a fresh isolated home linked to the same captured authentication.
+      if (entry.name !== "CODEX_HOME") values[entry.name] = current;
     }
   }
   return values;
@@ -98,7 +96,7 @@ export function probeSuccessorPrivateRootDeny({ root, source, runtime, privateMa
   const executableDigest = hash(readFileSync(executable));
   successorExact(executableDigest, runtime.executable_digest, "native executable bytes");
   successorExact(executableDigest, `sha256:${identity.executable.executable_sha256}`, "native adapter executable bytes");
-  const environment = capturedEnvironment(identity);
+  const environment = capturedSuccessorEnvironment(identity);
   const settings = [];
   const argv = identity.effective_command.argv;
   for (let index = 0; index < argv.length; index++) if (argv[index] === "-c") settings.push(argv[++index]);
@@ -132,12 +130,24 @@ export function probeSuccessorPrivateRootDeny({ root, source, runtime, privateMa
   return { ...evidence, probe_digest: canonicalDigest(evidence) };
 }
 
-/** A sandbox subcommand probe cannot authorize an unobserved exec session. */
-export function assertSuccessorHostIsolationReady(probes) {
+/** A sandbox probe must be paired with an independently opened exec session. */
+export function assertSuccessorHostIsolationReady(probes, execSession) {
+  if (execSession?.kind !== "successor_host_exec_diagnostic"
+    || execSession?.exec_session_policy_observed !== true
+    || execSession?.diagnostic_exec_invocations !== 1
+    || execSession?.measured_exec_invocations !== 0
+    || execSession?.measured_claims !== 0
+    || execSession?.automatic_retries !== 0
+    || execSession?.diagnostic_model_calls?.status !== "at_least_one"
+    || execSession?.diagnostic_model_calls?.value !== null) {
+    successorFail("SUCCESSOR_HOST_ISOLATION_REQUIRED", "diagnostic exec-session evidence is unverified");
+  }
   for (const role of ["current_prompt", "prompt_v2"]) {
     const probe = probes?.[role];
     if (probe?.model_calls !== 0 || probe?.allowed_control_observed !== true
-      || probe?.private_read_denied_observed !== true || probe?.exec_session_policy_observed !== true) {
+      || probe?.private_read_denied_observed !== true || probe?.exec_session_policy_observed !== false
+      || typeof execSession?.source_scope_digests?.[role] !== "string"
+      || execSession?.native_probe_digests?.[role] !== probe?.probe_digest) {
       successorFail("SUCCESSOR_HOST_ISOLATION_REQUIRED", `${role} exec-session isolation is unverified`);
     }
   }

@@ -27,6 +27,42 @@ mutation remains forbidden.
 A green `Check measured successor preparation` run proves only its named
 synthetic compatibility, source packaging and deterministic fake-process checks. The source archive is an input for
 reproduction, not proof that tests passed or authority to execute a trial.
+
+## Issue #291 host exec diagnostic boundary
+
+The native `sandbox -P` read-denial probe proves that an explicit permission
+profile can deny the external private evaluator root. It is not an observation
+of an `exec` session. The measured freeze therefore also requires one separately
+classified Codex `exec` diagnostic in an external namespace. Before that CLI
+invocation, `runSuccessorExecDiagnostic` validates the exact clean source,
+reviewed calibration admission, unstarted paired runs, native binary/config/
+command identity, subscription login status, model-visible resolved policy, and
+private-root sandbox denial. It then writes and fsyncs a create-once precall
+record with both role scopes, result roots, the diagnostic namespace, retry zero,
+and measured claims/trials/result reads zero. An existing incomplete namespace
+cannot be retried by the API.
+
+The diagnostic uses the measured command's policy/model/reasoning flags and the
+same captured authentication source as the native runner, linked into an
+isolated `CODEX_HOME`. It omits only `--ephemeral` so the CLI writes a session
+JSONL; both argvs, their digests, and that difference are recorded. The native
+CLI help describes `--ephemeral` as the session-file persistence flag. The
+diagnostic prompt contains no benchmark task or private evaluator content and
+asks for no tool use. The production parser requires one completed, tool-free
+turn and checks actual session metadata and turn context for the OpenAI provider,
+exact model, medium effort, managed private-deny profile, workspace-write,
+network disabled, and approval never. Raw diagnostic output and session data
+remain outside the repository. `openSuccessorExecDiagnostic` rereads their exact
+bytes and the precall/terminal records; caller-supplied JSON cannot create this
+evidence. The measured authority binds its digest and both native sandbox probe
+digests into the durable result-blind freeze.
+
+The diagnostic counts as one Codex `exec` invocation, separate from the 28
+measured trials. The CLI's JSONL does not expose a reliable underlying provider
+request count, so the authority records diagnostic model calls as `at_least_one`
+with an unknown exact value. Measured model calls remain zero before the freeze.
+Configured or CLI-resolved model identity is not a claim about an undisclosed
+provider-side model revision; that revision retains its explicitly unknown status.
 `identity.txt` records the tested checkout commit/tree (normally the PR merge
 commit); `pr-context.txt` separately records the event's exact base/head
 commit/tree and the preparation-only evidence scope. Whitespace validation uses
@@ -274,8 +310,8 @@ calculation must not mint measured execution or decision authority.
 Use the existing #276/#277/#278 identities and CAS. An execution journal is not
 another Asset/Portfolio/Evolution lifecycle. The report never authorizes mutation.
 The measured authority path creates the result-blind freeze against the exact
-runtime checkout when a real session is initialized; this PR does not initialize
-that real session or execute model calls. The eventual post-merge run must create
+runtime checkout when a real session is initialized; the source alone does not
+initialize that session or execute a measured model call. The eventual run must create
 its own authority record before trial 1, so PR/test evidence cannot be reused as
 the production freeze.
 
@@ -316,6 +352,6 @@ assertions or relabel synthetic validation as measured product evidence.
 
 ## Non-goals
 
-No real trials, model calls, measured historical result access, Prompt tuning,
+No real trials, measured model calls, measured historical result access, Prompt tuning,
 threshold/evaluator changes, second scorer/CAS/lifecycle, automatic activation,
 #198 execution, C4 work, merge or issue closure.

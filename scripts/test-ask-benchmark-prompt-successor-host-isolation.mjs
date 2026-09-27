@@ -17,11 +17,21 @@ const nativeBin = process.env.ASK_ISSUE291_NATIVE_CODEX;
 
 test("a model-free sandbox probe cannot authorize an unobserved exec session", () => {
   const probe = { model_calls: 0, allowed_control_observed: true,
-    private_read_denied_observed: true, exec_session_policy_observed: false };
+    private_read_denied_observed: true, exec_session_policy_observed: false, probe_digest: canonicalDigest({ native: true }) };
   assert.throws(() => assertSuccessorHostIsolationReady({ current_prompt: probe, prompt_v2: probe }),
     { code: "SUCCESSOR_HOST_ISOLATION_REQUIRED" });
   assert.throws(() => assertSuccessorHostIsolationReady({ current_prompt: { ...probe, exec_session_policy_observed: true } }),
     { code: "SUCCESSOR_HOST_ISOLATION_REQUIRED" });
+  const diagnostic = { kind: "successor_host_exec_diagnostic", exec_session_policy_observed: true,
+    diagnostic_exec_invocations: 1, measured_exec_invocations: 0,
+    diagnostic_model_calls: { status: "at_least_one", value: null },
+    measured_claims: 0, automatic_retries: 0,
+    source_scope_digests: { current_prompt: canonicalDigest({ role: "current" }), prompt_v2: canonicalDigest({ role: "candidate" }) },
+    native_probe_digests: { current_prompt: probe.probe_digest, prompt_v2: probe.probe_digest } };
+  assert.equal(assertSuccessorHostIsolationReady({ current_prompt: probe, prompt_v2: probe }, diagnostic), true);
+  assert.throws(() => assertSuccessorHostIsolationReady({ current_prompt: probe, prompt_v2: probe },
+    { ...diagnostic, native_probe_digests: { ...diagnostic.native_probe_digests, prompt_v2: canonicalDigest({ drift: true }) } }),
+  { code: "SUCCESSOR_HOST_ISOLATION_REQUIRED" });
 });
 
 test("native profile probe binds exact binary, config, command, host and denies private read-open", {
