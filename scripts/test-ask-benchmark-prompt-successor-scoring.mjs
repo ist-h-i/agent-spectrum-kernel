@@ -13,6 +13,7 @@ import { createIssue291SyntheticPendingPackages, createIssue291SyntheticReviewOv
 import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
 import { buildJudgePacket, createJudgeProtocol, createJudgeRequest, runJudgeSlots } from "./ask-benchmark-llm-judge.mjs";
 import { deriveJudgeResultCandidate, readJudgeTargetManifest, writeJudgeDerivedResult } from "./ask-benchmark-judge-derived-result.mjs";
+import { computeEvaluationDigest, computeEvaluationId } from "./ask-benchmark-evaluator-boundary.mjs";
 
 const root = realpathSync(resolve(fileURLToPath(new URL("..", import.meta.url))));
 const hash = b => `sha256:${createHash("sha256").update(b).digest("hex")}`;
@@ -517,6 +518,54 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
       }
       assert.equal(syntheticJudgeCalls, 24);
       record.synthetic_judge_calls = syntheticJudgeCalls;
+      const reverifyPersistedVariant = async ({ label, successorCaseId, engineering, evaluatorOptions }) => {
+        const original = provenanceSources.prompt_v2;
+        const originalManifest = read(original.source.paths.sourceManifestPath);
+        const originalEntry = originalManifest.inventory.find(item => item.normalized_result_id === engineering.normalized_result_id);
+        assert.ok(originalEntry, `${label}: selected normalized result must be in the frozen source inventory`);
+        assert.equal(original.scope.source.bindings.find(item => item.successor_case_id === successorCaseId)?.source_case_id,
+          engineering.case_id, `${label}: engineering result must belong to the selected source case`);
+        const variantRoot = resolve(work, `persisted-${label}`);
+        const engineeringResultsPath = resolve(variantRoot, "engineering-results");
+        mkdirSync(variantRoot); mkdirSync(engineeringResultsPath);
+        const manifest = structuredClone(originalManifest);
+        const variantEntry = manifest.inventory.find(item => item.normalized_result_id === engineering.normalized_result_id);
+        assert.ok(variantEntry);
+        for (const entry of manifest.inventory) {
+          const path = resolve(engineeringResultsPath, entry.path);
+          const value = entry === variantEntry
+            ? engineering : read(resolve(original.source.paths.engineeringResultsPath, entry.path));
+          write(path, value);
+          const bytes = readFileSync(path);
+          entry.raw_byte_digest = hash(bytes);
+          entry.bytes = bytes.length;
+          if (value === engineering) {
+            for (const key of ["engineering_result_id", "engineering_result_digest", "effective_admission_mode",
+              "effective_admission_status", "frozen_admission_record_digest", "requirement_authority_digest",
+              "admission_decision_digest", "admission_decision_revision", "normalized_result_id",
+              "normalized_result_digest", "case_id", "attempt", "condition", "repetition"]) entry[key] = engineering[key];
+          }
+        }
+        manifest.manifest_digest = computeEngineeringResultSourceManifestDigest(manifest);
+        validateEngineeringResultSourceManifest(manifest, { root });
+        const sourceManifestPath = resolve(variantRoot, "source-manifest.json");
+        write(sourceManifestPath, manifest);
+        const variant = { ...original,
+          source: { ...original.source,
+            paths: { ...original.source.paths, engineeringResultsPath, sourceManifestPath },
+            sourceManifestSourceDigest: hash(readFileSync(sourceManifestPath)) },
+          evaluatorOptionsByCase: { ...original.evaluatorOptionsByCase, [successorCaseId]: evaluatorOptions } };
+        const handle = await verifySuccessorSourceProvenance(variant);
+        const evidence = inspectSuccessorProvenance(handle);
+        assert.equal(evidence.entries.length, 14);
+        assert.equal(evidence.comparison_eligible, true);
+        const persistedRow = readSuccessorProvenanceRows(handle).find(item => item.case_id === successorCaseId);
+        assert.deepEqual(persistedRow?.engineering, engineering);
+        const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
+        const report = buildSuccessorComparisonFromProvenance({ preparation, policy,
+          sources: { current_prompt: handles.current_prompt, prompt_v2: handle } });
+        return { handle, evidence, persistedRow, report };
+      };
       await check("14 paired blocks reach the production comparison without Prompt adoption", () => {
         const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
         const report = buildSuccessorComparisonFromProvenance({ preparation, policy, sources: handles });
@@ -550,13 +599,48 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
         assert.equal(incomplete.prompt_outcome, "insufficient_evidence");
         assert.equal(incomplete.paired.length, 13);
       });
-      await check("one synthetic Judge disagreement closes without human input or a third call", async () => {
+      await check("completed verification failure persists without Judge and reaches paired comparison", async () => {
+        assert.ok(disagreementCase);
+        const { result, snapshot, fixtureContext, options, effectiveAdmissionAuthority, successorCaseId } = disagreementCase;
+        const envelope = syntheticSuccessorEvaluatorEnvelope({ normalized: result,
+          sourceSnapshotDigest: snapshot, context: fixtureContext, outcome: "pass", comparisonReady: true });
+        assert.equal(envelope.verification_correctness.state, "pass");
+        envelope.verification_correctness.state = "fail";
+        envelope.evaluation_id = computeEvaluationId(envelope);
+        envelope.evaluation_digest = computeEvaluationDigest(envelope);
+        const resultPath = resolve(work, "persisted-verification-failure-evaluation.json");
+        write(resultPath, envelope);
+        const original = verifyEvaluatorAuthority({ ...options, resultPath });
+        assert.equal(original.result.evaluation_status, "completed");
+        assert.equal(original.result.verification_correctness.state, "fail");
+        const engineering = buildPortfolioEngineeringResult({ ...original, effectiveAdmissionAuthority }, { root });
+        assert.equal(engineering.scoring_status, "complete");
+        assert.equal(engineering.correctness_observations.verification_correctness.state, "fail");
+        const callsBefore = syntheticJudgeCalls;
+        const evaluatorOptions = { ...provenanceSources.prompt_v2.evaluatorOptionsByCase[successorCaseId], resultPath };
+        delete evaluatorOptions.judge;
+        assert.equal(Object.hasOwn(evaluatorOptions, "judge"), false);
+        const persisted = await reverifyPersistedVariant({ label: "verification-failure", successorCaseId,
+          engineering, evaluatorOptions });
+        assert.equal(syntheticJudgeCalls, callsBefore, "ordinary verified failure must not invoke the Judge");
+        assert.equal(persisted.evidence.entries.find(item => item.case_id === successorCaseId)?.judge_resolution_digest, undefined);
+        assert.equal(persisted.evidence.entries.find(item => item.case_id === successorCaseId)?.judge_non_invocation_reason,
+          "verified_verification_failure");
+        assert.equal(persisted.persistedRow.judge_non_invocation_reason, "verified_verification_failure");
+        assert.equal(persisted.persistedRow.engineering.correctness_observations.verification_correctness.state, "fail");
+        assert.equal(persisted.report.analysis.paired.length, 14);
+        assert.deepEqual(persisted.report.analysis.missing_evidence, []);
+        assert.equal(persisted.report.analysis.prompt_outcome, "revise_and_repeat");
+        assert.ok(persisted.report.analysis.regressions.some(item => item.endsWith(".verification_correctness:fail")));
+      });
+      await check("one synthetic Judge disagreement persists, reopens, and closes without a third call", async () => {
         assert.ok(disagreementCase);
         const { authority, protocol, request, packet, sampleIndex, roleName,
           effectiveAdmissionAuthority, successorCaseId } = disagreementCase;
         const disputedCriterion = protocol.criteria[0].criterion_id;
         let calls = 0;
-        const unresolved = await runJudgeSlots({ storeRoot: resolve(work, "synthetic-judge-disagreement"),
+        const storeRoot = resolve(work, "synthetic-judge-disagreement");
+        const unresolved = await runJudgeSlots({ storeRoot,
           protocol, request, packet, adapter: syntheticJudgeAdapter(packet,
             (slot, id) => slot === "A" && id === disputedCriterion ? "pass" : "fail",
             () => { calls++; }) });
@@ -567,16 +651,21 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
           targetManifest: judgeTargets, expectedRole: roleName, expectedSampleIndex: sampleIndex,
           expectedFreezeDigest: record.synthetic_freeze_digest, expectedAuthorityProfile: "synthetic_only", root });
         assert.equal(derived.result.evaluation_status, "manual_review_required");
+        const derivedResultPath = resolve(work, "persisted-judge-disagreement-derived.json");
+        writeJudgeDerivedResult({ outputPath: derivedResultPath, candidate: derived });
         const engineering = buildPortfolioEngineeringResult({ ...authority, result: derived.result,
           evaluationReady: false, effectiveAdmissionAuthority }, { root });
         assert.equal(engineering.scoring_status, "not_scoring_ready");
-        const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
-        const rows = Object.values(handles).flatMap(handle => readSuccessorProvenanceRows(handle))
-          .map(row => row.case_id === successorCaseId
-            ? { case_id: row.case_id, engineering } : { case_id: row.case_id, engineering: row.engineering });
-        const incomplete = calculateSuccessorComparison({ preparation, policy, rows });
-        assert.equal(incomplete.prompt_outcome, "insufficient_evidence");
-        assert.equal(incomplete.paired.length, 13);
+        const originalOptions = provenanceSources.prompt_v2.evaluatorOptionsByCase[successorCaseId];
+        const persisted = await reverifyPersistedVariant({ label: "judge-disagreement", successorCaseId,
+          engineering, evaluatorOptions: { ...originalOptions,
+            judge: { storeRoot, protocol, request, packet, derivedResultPath } } });
+        assert.equal(calls, 2, "reopening the persisted Judge ledger must not make a third call");
+        assert.equal(persisted.evidence.entries.find(item => item.case_id === successorCaseId)?.judge_resolution_digest,
+          unresolved.resolution.resolution_digest);
+        assert.equal(persisted.persistedRow.engineering.scoring_status, "not_scoring_ready");
+        assert.equal(persisted.report.analysis.prompt_outcome, "insufficient_evidence");
+        assert.equal(persisted.report.analysis.paired.length, 13);
         record.synthetic_judge_disagreement_calls = calls;
       });
       await check("forged private or Judge result, transplanted role, and missing paired source fail closed", async () => {

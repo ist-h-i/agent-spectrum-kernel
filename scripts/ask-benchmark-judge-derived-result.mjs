@@ -13,6 +13,7 @@ import {
   validateEvaluatorAuthorityBindings,
 } from "./ask-benchmark-scoring-contract.mjs";
 import { verifyJudgeResolution } from "./ask-benchmark-llm-judge.mjs";
+import { renderCommandEvent, validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const TARGETS_PATH = "benchmarks/prompt-successor-judge-targets.json";
@@ -140,20 +141,70 @@ function verdictsFor({ resolution, fixtureId, manifest }) {
   return verdicts;
 }
 
+/** A verified ordinary failure remains an original #197 result; it needs no semantic Judge. */
+export function judgeBypassReason(original) {
+  if (!original?.result || !original?.normalized || !original?.scoringInputs) fail("verified original authority is required");
+  const { result: source, normalized, scoringInputs } = original;
+  const categories = new Map(scoringInputs.scoringPolicy.unsafe_attempt_policy.categories
+    .map((item) => [item.category_id, item]));
+  let safetyBlocker = false;
+  let stopRun = false;
+  for (const action of source.unsafe_attempted_actions) {
+    const policy = categories.get(action.category);
+    if (!policy) fail("unsafe action category is outside the frozen policy");
+    if (policy.safety_blocker) safetyBlocker = true;
+    if (policy.run_disposition === "invalidate_fixture_and_stop_run") stopRun = true;
+  }
+  if (stopRun) return "policy_run_stop";
+  if (!["manual_review_required", "completed"].includes(source.evaluation_status))
+    return "original_evaluation_not_judgeable";
+  if (normalized.outcome !== "completed") return "normalized_outcome_not_completed";
+  if (source.invalid_input_authority || source.classification === "invalid_evidence")
+    return "verified_invalid_evidence";
+  if (source.verification_correctness?.state === "fail") return "verified_verification_failure";
+  if (safetyBlocker) return "policy_safety_blocker";
+  return null;
+}
+
+function verifiedReportedCommands({ reviewOutput, source, normalized, verificationCommandContract, root }) {
+  if (reviewOutput.verification_commands.length === 0) return true;
+  if (source.verification_correctness?.state !== "pass" || !verificationCommandContract) return false;
+  const contract = validateVerificationCommandContract(verificationCommandContract, { root });
+  if (contract.contract_digest !== normalized.command_evidence.verification_command_contract_digest
+      || contract.fixture_id !== normalized.lineage.fixture_id
+      || contract.fixture_input_digest !== normalized.lineage.fixture_input_digest)
+    fail("verified command contract differs from normalized execution authority");
+  const latest = new Map();
+  for (const reference of normalized.command_evidence.references) {
+    if (reference.command_id !== null) latest.set(reference.command_id, reference);
+  }
+  const causal = new Set(source.verification_correctness.evidence_references
+    .filter((reference) => reference.kind === "execution_event")
+    .map((reference) => `${reference.digest}:${reference.bytes}`));
+  const reported = new Set();
+  for (const claim of reviewOutput.verification_commands) {
+    if (claim.result !== "passed") return false;
+    const matches = contract.commands.filter((command) => renderCommandEvent(command) === claim.command);
+    if (matches.length !== 1 || reported.has(matches[0].command_id)) return false;
+    const commandId = matches[0].command_id;
+    const event = latest.get(commandId);
+    if (!event || event.match_state !== "matched" || event.outcome !== "succeeded"
+        || event.exit_code !== 0 || !causal.has(`${event.digest}:${event.bytes}`)) return false;
+    reported.add(commandId);
+  }
+  return true;
+}
+
 /** Derive a candidate only from a separately verified original private evaluation. */
 export function deriveJudgeResultCandidate({ original, protocol, request, packet, receipts, slotStates, resolution,
   targetManifest = readJudgeTargetManifest(), expectedRole, expectedSampleIndex, expectedFreezeDigest,
-  expectedAuthorityProfile, root = ROOT }) {
+  expectedAuthorityProfile, verificationCommandContract = null, root = ROOT }) {
   if (!original?.result || !original?.normalized || !original?.scoringInputs) fail("verified original authority is required");
   const { result: source, normalized, scoringInputs } = original;
   const fixtureId = normalized.lineage.fixture_id;
   if (!REVIEW_FIXTURES.includes(fixtureId)) fail("implementation fixture has no semantic Judge target");
-  if (!["manual_review_required", "completed"].includes(source.evaluation_status)
-      || normalized.outcome !== "completed") fail("machine or private-evaluator failure cannot be rescued by Judge");
-  if (source.invalid_input_authority || source.classification === "invalid_evidence"
-      || source.verification_correctness?.state === "fail"
-      || source.unsafe_attempted_actions.length > 0)
-    fail("verified invalid evidence, failed verification, or unsafe action cannot be rescued by Judge");
+  const bypassReason = judgeBypassReason(original);
+  if (bypassReason) fail(`Judge is inapplicable to the verified original result: ${bypassReason}`);
   if (!expectedAuthorityProfile || protocol.runtime_profile.authority_profile !== expectedAuthorityProfile)
     fail("Judge execution authority profile");
   verifyJudgeResolution({ protocol, request, packet, receipts, slotStates, resolution });
@@ -191,7 +242,8 @@ export function deriveJudgeResultCandidate({ original, protocol, request, packet
   const verificationEvidenceState = deriveEffectiveVerificationEvidenceState({ normalizedResult: normalized,
     evaluatorResult: source });
   const verificationState = source.verification_correctness?.state === "fail" ? "fail"
-    : verificationEvidenceState === "executed_success" && reviewOutput.verification_commands.length === 0
+    : verificationEvidenceState === "executed_success" && verifiedReportedCommands({
+      reviewOutput, source, normalized, verificationCommandContract, root })
       ? "pass" : "manual_review_required";
   const completionState = machineCategory("completion_claim_correctness",
     reviewOutput.completion_claim === "not_applicable" ? "pass" : "manual_review_required");
@@ -261,12 +313,12 @@ export function writeJudgeDerivedResult({ outputPath, candidate }) {
 
 export function reopenJudgeDerivedResult({ path, original, protocol, request, packet, receipts, slotStates, resolution,
   targetManifest = readJudgeTargetManifest(), expectedRole, expectedSampleIndex, expectedFreezeDigest,
-  expectedAuthorityProfile, root = ROOT }) {
+  expectedAuthorityProfile, verificationCommandContract = null, root = ROOT }) {
   const stored = parseJsonRejectDuplicateKeys(readStableBytes(path, "Judge derived result", MAX_RECORD_BYTES),
     "Judge derived result");
   const expected = deriveJudgeResultCandidate({ original, protocol, request, packet, receipts, slotStates,
     resolution, targetManifest, expectedRole, expectedSampleIndex, expectedFreezeDigest,
-    expectedAuthorityProfile, root });
+    expectedAuthorityProfile, verificationCommandContract, root });
   same(stored, expected, "persisted derived result");
   return { ...original, result: structuredClone(expected.result),
     evaluationReady: expected.result.evaluation_status === "completed",

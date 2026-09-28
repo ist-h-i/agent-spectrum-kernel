@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { canonicalDigest, readStableBytes } from "./content-addressed-store.mjs";
 import { inspectSuccessorScoringInputs, successorScoringOptions, assertSuccessorScoringExecution, assertSuccessorFrozenAdmissionOptions } from "./ask-benchmark-prompt-successor-scoring-inputs.mjs";
 import { reopenJudgeResolution } from "./ask-benchmark-llm-judge.mjs";
-import { readJudgeTargetManifest, reopenJudgeDerivedResult } from "./ask-benchmark-judge-derived-result.mjs";
+import { judgeBypassReason, readJudgeTargetManifest, reopenJudgeDerivedResult } from "./ask-benchmark-judge-derived-result.mjs";
 import { openSuccessorPromptInput, consumeSuccessorPromptInput, successorInputProjection, assertSuccessorAdapterFacts } from "./ask-benchmark-prompt-successor-delivery.mjs";
 import {
   successorExact, successorClosed, successorFail,
@@ -142,7 +142,14 @@ export async function verifySuccessorSourceProvenance({
     options.sourceSnapshotDigest = source.sourceSnapshotDigest;
     const original = evaluator.verifyEvaluatorAuthority(options);
     const needsJudge = judgeTargets.value.fixtures[target.fixture_id].semantic_requirements.length > 0;
-    if (accessMode === "measured" && needsJudge !== Boolean(judgeInput)) {
+    const judgeSkipReason = needsJudge ? judgeBypassReason(original) : null;
+    if (judgeSkipReason === "policy_run_stop") {
+      successorFail("SUCCESSOR_SAFETY_RUN_STOP", "verified external action requires fixture invalidation and run stop");
+    }
+    if (judgeSkipReason && judgeInput) {
+      successorFail("SUCCESSOR_JUDGE_OUT_OF_SCOPE", "verified non-Judge result has a Judge input");
+    }
+    if (accessMode === "measured" && (needsJudge && !judgeSkipReason) !== Boolean(judgeInput)) {
       successorFail("SUCCESSOR_JUDGE_AUTHORITY_REQUIRED", "fixed semantic Judge inventory");
     }
     if (!needsJudge && judgeInput) successorFail("SUCCESSOR_JUDGE_OUT_OF_SCOPE", "machine-only fixture");
@@ -159,7 +166,8 @@ export async function verifySuccessorSourceProvenance({
         targetManifest: judgeTargets, expectedRole: scope.prompt_role,
         expectedSampleIndex: judgedCaseIdsByFixture.get(target.fixture_id).indexOf(binding.successor_case_id),
         expectedFreezeDigest: measuredFreezeDigest ?? judgeInput.request.private_binding.freeze_digest,
-        expectedAuthorityProfile, root });
+        expectedAuthorityProfile,
+        verificationCommandContract: actual.attempts[0].verificationCommandContract, root });
     }
     successorExact(derived.normalized, saved.normalized, "evaluator normalized authority");
     successorExact(derived.result.evaluation_id, saved.engineering.evaluation_id, "evaluator result identity");
@@ -180,7 +188,8 @@ export async function verifySuccessorSourceProvenance({
     const rebuilt = scorer.buildPortfolioEngineeringResult({ ...derived, effectiveAdmissionAuthority }, { root });
     successorExact(rebuilt, saved.engineering, "rederived complete engineering result");
     rows.push({ case_id: binding.successor_case_id, engineering: structuredClone(rebuilt), normalized: structuredClone(saved.normalized), execution_evidence: structuredClone(actual.attempts[0].evidence), request_projection: structuredClone(actual.attempts[0].request.projection),
-      ...(derived.judgeAuthority ? { judge_authority: structuredClone(derived.judgeAuthority) } : {}) });
+      ...(derived.judgeAuthority ? { judge_authority: structuredClone(derived.judgeAuthority) } : {}),
+      ...(judgeSkipReason ? { judge_non_invocation_reason: judgeSkipReason } : {}) });
   }
   for (const fixture of preparation.predecessor.fixtures) successorScoringOptions(scoringInputs, preparation, fixture.fixture_id);
   const last = inspect();
@@ -205,9 +214,10 @@ export async function verifySuccessorSourceProvenance({
     runner_stdin_binding_reverified: true, provider_prompt_receipt_verified: false,
     measured_collection_verified: accessMode === "measured", measured_collection_digest: measuredCollectionDigest,
     comparison_eligible: accessMode === "measured", mutation_authorized: false,
-    entries: rows.map(({ case_id, engineering, execution_evidence, judge_authority }) => ({ case_id, engineering_result_digest: engineering.engineering_result_digest, request_digest: execution_evidence.request_digest,
+    entries: rows.map(({ case_id, engineering, execution_evidence, judge_authority, judge_non_invocation_reason }) => ({ case_id, engineering_result_digest: engineering.engineering_result_digest, request_digest: execution_evidence.request_digest,
       ...(judge_authority ? { judge_resolution_digest: judge_authority.resolution_digest,
-        judge_derived_result_digest: judge_authority.record_digest } : {}) })),
+        judge_derived_result_digest: judge_authority.record_digest } : {}),
+      ...(judge_non_invocation_reason ? { judge_non_invocation_reason } : {}) })),
   };
   // Keep remaining delivery/metric/admission gates explicit. Provenance closure
   // is not a scoped adoption decision or permission to publish measured results.
