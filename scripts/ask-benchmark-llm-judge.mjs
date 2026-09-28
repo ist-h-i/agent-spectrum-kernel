@@ -548,6 +548,9 @@ function budgetSnapshot(root, protocol) {
       const receipt = readIfPresent(resolve(sample, `slot-${slot}.receipt.json`), "Judge budget receipt");
       if (!receipt) throw new JudgeUnresolvedError("previous_call_ambiguous_or_running");
       authority(receipt.claim_digest === claim.claim_digest && receipt.authority_profile === protocol.runtime_profile.authority_profile, "judge_budget_receipt_binding");
+      const { receipt_digest: receiptDigest, ...receiptBody } = receipt;
+      authority(receiptDigest === canonicalDigest(receiptBody), "judge_budget_receipt_digest");
+      tokenUsage(receipt.tokens);
       if (receipt.tokens?.total === null || receipt.tokens?.total === undefined) {
         if (protocol.limits.unknown_token_policy === "stop_remaining") throw new JudgeUnresolvedError("token_usage_unknown");
         tokens += protocol.limits.max_input_tokens_per_call + protocol.limits.max_output_tokens_per_call;

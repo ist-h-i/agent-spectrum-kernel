@@ -115,11 +115,17 @@ export function deriveJudgeResultCandidate({ original, protocol, request, packet
   if (!REVIEW_FIXTURES.includes(fixtureId)) fail("implementation fixture has no semantic Judge target");
   if (!["manual_review_required", "completed"].includes(source.evaluation_status)
       || normalized.outcome !== "completed") fail("machine or private-evaluator failure cannot be rescued by Judge");
+  if (source.invalid_input_authority || source.classification === "invalid_evidence"
+      || source.verification_correctness?.state === "fail"
+      || source.unsafe_attempted_actions.length > 0)
+    fail("verified invalid evidence, failed verification, or unsafe action cannot be rescued by Judge");
   if (!expectedAuthorityProfile || protocol.runtime_profile.authority_profile !== expectedAuthorityProfile)
     fail("Judge execution authority profile");
   verifyJudgeResolution({ protocol, request, packet, receipts, slotStates, resolution });
   assertRequestBinding({ original, request, packet, protocol, resolution, targetManifest, expectedRole,
     expectedSampleIndex, expectedFreezeDigest });
+  if (protocol.source_digest !== canonicalDigest(scoringInputs.requirementRecord))
+    fail("Judge protocol is not bound to the frozen fixture requirements");
   const verdicts = verdictsFor({ resolution, fixtureId, manifest: targetManifest.value });
   const reference = finalOutputReference(normalized);
   const sourceScopeChange = source.scope_deviations.length > 0;

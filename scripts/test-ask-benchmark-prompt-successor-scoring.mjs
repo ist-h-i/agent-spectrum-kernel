@@ -569,7 +569,7 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
         assert.equal(incomplete.paired.length, 13);
         record.synthetic_judge_disagreement_calls = calls;
       });
-      await check("wrong result digest, missing result, and duplicate paired source fail closed", async () => {
+      await check("forged private or Judge result, transplanted role, and missing paired source fail closed", async () => {
         const args = provenanceSources.prompt_v2;
         const first = args.scope.source.bindings[0].successor_case_id;
         const resultPath = args.evaluatorOptionsByCase[first].resultPath;
@@ -580,6 +580,21 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
           writeFileSync(resultPath, `${JSON.stringify(forged, null, 2)}\n`);
           await assert.rejects(() => verifySuccessorSourceProvenance(args));
         } finally { writeFileSync(resultPath, bytes); }
+        const judgedId = Object.keys(args.evaluatorOptionsByCase)
+          .find(caseId => args.evaluatorOptionsByCase[caseId].judge);
+        assert.ok(judgedId);
+        const judgeInput = args.evaluatorOptionsByCase[judgedId].judge;
+        const derivedBytes = readFileSync(judgeInput.derivedResultPath);
+        try {
+          const forged = JSON.parse(derivedBytes);
+          forged.result.requirement_results[0].earned_points = 999;
+          writeFileSync(judgeInput.derivedResultPath, `${JSON.stringify(forged, null, 2)}\n`);
+          await assert.rejects(() => verifySuccessorSourceProvenance(args));
+        } finally { writeFileSync(judgeInput.derivedResultPath, derivedBytes); }
+        const transplanted = structuredClone(args.evaluatorOptionsByCase);
+        transplanted[judgedId].judge.request.private_binding.prompt_role = "current_prompt";
+        await assert.rejects(() => verifySuccessorSourceProvenance({ ...args,
+          evaluatorOptionsByCase: transplanted }));
         const sourceManifest = read(args.source.paths.sourceManifestPath);
         const engineeringPath = resolve(args.source.paths.engineeringResultsPath, sourceManifest.inventory[0].path);
         const heldPath = resolve(work, "missing-engineering-result.json");

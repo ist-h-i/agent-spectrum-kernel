@@ -17,3 +17,5 @@ This instruction is trusted input to each Judge session. The protocol binds its 
 Runtime must enforce a fresh isolated process and session for each of the fixed A/B slots. Tools, Web, shell, MCP, and additional file access must be disabled by effective runtime controls. A prompt instruction alone does not establish those controls. Missing live runtime evidence leaves qualification unverified.
 
 The code verifies JSON structure, UTF-8, duplicate keys, packet identity, criterion set, document ranges, and quoted bytes. It cannot prove semantic correctness from a citation. Qualification against separately sourced labels remains a distinct gate.
+
+The current ledger accepts only the explicit `synthetic_only` fake adapter. It does not claim a native model invocation. `openSuccessorMeasuredAuthority` rejects a live freeze until a native transport, its observed tool isolation, an authorized qualification set, and a reviewed pre-result binding are implemented. The external ledger and Judge token counts are separate from the 28 measured trials and their efficiency metrics.

@@ -182,6 +182,11 @@ export async function openSuccessorMeasuredAuthority({ preparation, sources, sco
   successorExact(preparation.runtime.authentication_mode, ISSUE_291_MEASURED_AUTHORITY.authentication_mode, "issue291 authentication class");
   successorExact(preparation.runtime.timeout_ms, ISSUE_291_MEASURED_AUTHORITY.timeout_ms, "issue291 timeout");
   successorExact(preparation.expected_case_count, ISSUE_291_MEASURED_AUTHORITY.planned_trials, "issue291 trial count");
+  // The current Judge transport has synthetic-only evidence. A live freeze
+  // must wait for a qualified native Judge profile and its pre-result binding.
+  if (preparation.runtime.model !== "synthetic-native-fake-not-a-service") {
+    successorFail("SUCCESSOR_JUDGE_QUALIFICATION_REQUIRED", "live Judge profile and qualification are not bound");
+  }
   successorClosed(sources, ["current_prompt", "prompt_v2"], "measured sources");
   for (const role of ["current_prompt", "prompt_v2"]) {
     const source = sources[role];
