@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-spectrum-kernel.local/benchmarks/schemas/llm-judge-response.schema.json",
+  "title": "Prompt successor LLM Judge response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "sample_id", "criteria"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "sample_id": { "type": "string", "pattern": "^sample-[a-f0-9]{32}$" },
+    "criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/criterion" }
+    }
+  },
+  "$defs": {
+    "criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterion_id", "verdict", "reason_code", "brief_rationale", "evidence_references", "examined_documents"],
+      "properties": {
+        "criterion_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,95}$" },
+        "verdict": { "enum": ["pass", "fail", "abstain"] },
+        "reason_code": { "enum": ["satisfied", "missing", "contradiction", "incorrect_fact", "insufficient_context", "ambiguous"] },
+        "brief_rationale": { "type": "string", "minLength": 1, "maxLength": 1200 },
+        "evidence_references": {
+          "type": "array",
+          "maxItems": 24,
+          "items": { "$ref": "#/$defs/reference" }
+        },
+        "examined_documents": {
+          "type": "array",
+          "maxItems": 24,
+          "items": { "$ref": "#/$defs/documentId" }
+        }
+      }
+    },
+    "documentId": { "type": "string", "pattern": "^(doc-[0-9]{3}|target-output)$" },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_id", "start_line", "end_line", "quote"],
+      "properties": {
+        "document_id": { "$ref": "#/$defs/documentId" },
+        "start_line": { "type": "integer", "minimum": 1 },
+        "end_line": { "type": "integer", "minimum": 1 },
+        "quote": { "type": "string", "minLength": 1, "maxLength": 1200 }
+      }
+    }
+  }
+}

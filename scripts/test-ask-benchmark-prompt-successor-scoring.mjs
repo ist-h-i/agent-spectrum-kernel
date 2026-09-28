@@ -11,9 +11,12 @@ import { readSuccessorParent, readSuccessorImplementationIdentity } from "./ask-
 import { createSuccessorSyntheticScoringInputs, syntheticSuccessorEvaluatorEnvelope } from "./test-prompt-successor-scoring-fixtures.mjs";
 import { createIssue291SyntheticPendingPackages, createIssue291SyntheticReviewOverlays } from "./test-fixtures/issue291-synthetic-admission.mjs";
 import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
+import { buildJudgePacket, createJudgeProtocol, createJudgeRequest, runJudgeSlots } from "./ask-benchmark-llm-judge.mjs";
+import { deriveJudgeResultCandidate, readJudgeTargetManifest, writeJudgeDerivedResult } from "./ask-benchmark-judge-derived-result.mjs";
 
 const root = realpathSync(resolve(fileURLToPath(new URL("..", import.meta.url))));
 const hash = b => `sha256:${createHash("sha256").update(b).digest("hex")}`;
+const sampleId = value => `sample-${createHash("sha256").update(value).digest("hex").slice(0, 32)}`;
 const read = path => JSON.parse(readFileSync(path, "utf8"));
 const write = (path, value) => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx" });
 const gitEnvironment = () => ({ ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0" });
@@ -47,6 +50,46 @@ function selection(record, plan) {
     lightweight_bypass: { used: false, reason: "Synthetic input selection; Adaptive cases remain pending." },
     projection: { adapter_track: record.adapter, profile: record.projection_evidence.selected_profile, renderer_id: record.projection_evidence.renderer_id,
       renderer_version: record.projection_evidence.renderer_version, projection_fingerprint: record.projection_evidence.projection_fingerprint } };
+}
+
+function syntheticJudgeProtocol({ fixtureId, targetManifest, requirements }) {
+  const target = targetManifest.value.fixtures[fixtureId];
+  const ids = [...target.semantic_requirements, ...target.semantic_observations];
+  return createJudgeProtocol({
+    criteria: ids.map(criterion_id => ({ criterion_id, rubric: `Synthetic-only criterion ${criterion_id}.` })),
+    instructionText: readFileSync(resolve(root, "docs/prompt-successor-llm-judge.md"), "utf8"),
+    sourceDigest: canonicalDigest(requirements), targetManifestDigest: targetManifest.raw_digest,
+    runtimeProfile: { authority_profile: "synthetic_only", provider: "fake", model: "scripted",
+      native_identity_digest: hash(Buffer.from("synthetic-judge-runtime")),
+      runtime_config_digest: hash(Buffer.from(`synthetic-judge-config-${fixtureId}`)),
+      observed_revision: "synthetic-only-v1", transport_kind: "fake_adapter", tools_disabled: true,
+      fresh_process_per_slot: true, workspace_isolated: true, response_format_json: true },
+    limits: { max_packet_bytes: 1024 * 1024, max_response_bytes: 64 * 1024, timeout_ms: 1000,
+      max_input_tokens_per_call: 2000, max_output_tokens_per_call: 2000,
+      max_total_tokens: 24000, max_samples: 6, max_calls: 12, unknown_token_policy: "stop_remaining" },
+  });
+}
+
+function syntheticJudgeAdapter(packet, verdict, observe) {
+  return { kind: "fake_adapter", async invoke({ protocol, slot }) {
+    observe(slot);
+    const quote = packet.documents.at(-1).text.split("\n")[0].slice(0, 100);
+    const response = { schema_version: "1.0.0", sample_id: packet.sample_id,
+      criteria: protocol.criteria.map(({ criterion_id }) => ({ criterion_id,
+        verdict: typeof verdict === "function" ? verdict(slot, criterion_id) : verdict,
+        reason_code: (typeof verdict === "function" ? verdict(slot, criterion_id) : verdict) === "pass" ? "satisfied" : "contradiction",
+        brief_rationale: "Synthetic transport verdict with an existing output citation.",
+        evidence_references: [{ document_id: "target-output", start_line: 1, end_line: 1, quote }],
+        examined_documents: [] })) };
+    return { rawResponseBytes: Buffer.from(JSON.stringify(response)), exitCode: 0, signal: null,
+      timedOut: false, durationMs: 1, tokens: { input: 10, output: 10, total: 20 },
+      runtime: { provider: protocol.runtime_profile.provider, model: protocol.runtime_profile.model,
+        native_identity_digest: protocol.runtime_profile.native_identity_digest,
+        runtime_config_digest: protocol.runtime_profile.runtime_config_digest,
+        observed_revision: protocol.runtime_profile.observed_revision,
+        session_id: `${packet.sample_id}-${slot}`, process_id: slot === "A" ? 1001 : 1002,
+        tools_disabled: true, fresh_process: true, workspace_isolated: true } };
+  } };
 }
 
 async function worker(contextPath, { pendingAdmissionRegression = false, positiveAdmission = false } = {}) {
@@ -338,8 +381,15 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
           scoringPolicyDigest: read(resolve(root, "benchmarks/portfolio-scoring-policy.json")).policy_digest,
         }];
       }));
+      const judgeTargets = readJudgeTargetManifest(root);
+      const judgeProtocols = Object.fromEntries(Object.entries(fixtureContexts)
+        .filter(([fixtureId]) => judgeTargets.value.fixtures[fixtureId].semantic_requirements.length > 0)
+        .map(([fixtureId, fixtureContext]) => [fixtureId, syntheticJudgeProtocol({ fixtureId,
+          targetManifest: judgeTargets, requirements: fixtureContext.requirements })]));
+      const judgeStoreBase = resolve(work, "synthetic-judge-ledger"); mkdirSync(judgeStoreBase);
+      let syntheticJudgeCalls = 0;
       const provenanceSources = {}; const handles = {};
-      let manualComparisonCase;
+      let manualComparisonCase; let disagreementCase;
       for (const roleName of ["current_prompt", "prompt_v2"]) {
         await check(`${roleName}: normalize, verify fake evaluator, compute #197 score, and reverify measured provenance`, async () => {
           const role = roles[roleName];
@@ -360,17 +410,59 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
             const outcome = roleName === "prompt_v2" ? "fail" : "pass";
             // This positive comparison fixture supplies typed categorical evidence;
             // the pending-authority regression below keeps its unknown observations.
+            const needsJudge = Boolean(judgeProtocols[result.lineage.fixture_id]);
             const envelope = syntheticSuccessorEvaluatorEnvelope({ normalized: result, sourceSnapshotDigest: snapshot,
-              context: fixtureContext, outcome, comparisonReady: true });
+              context: fixtureContext, outcome: needsJudge ? "manual_review_required" : outcome,
+              comparisonReady: !needsJudge });
             const resultPath = resolve(evaluatorDirectory, `${result.normalized_result_id}.json`); write(resultPath, envelope);
             const options = { ...successorScoringOptions(scoringInputs, preparation, result.lineage.fixture_id),
               privateRoot: fixtureContext.privateRoot, manifestPath: fixtureContext.manifestPath, resultPath,
               materializedPath, selectionState, runDir: role.execution.runDir, normalizedResultsPath };
             const authority = verifyEvaluatorAuthority(options);
+            let scoredAuthority = authority;
+            let judgeInput;
+            if (needsJudge) {
+              const fixtureId = result.lineage.fixture_id;
+              const protocol = judgeProtocols[fixtureId];
+              const outputBytes = readFileSync(resolve(role.execution.runDir, "cases", binding.source_case_id,
+                "attempts", "0001", "final.json"));
+              const built = buildJudgePacket({ protocol, sampleId: sampleId(binding.successor_case_id),
+                task: "Review this synthetic software result against its fixture requirements.",
+                documents: [{ kind: "source", text: JSON.stringify(fixtureContext.requirements) }],
+                originalOutputBytes: outputBytes, privateMarkers: [result.lineage.run_instance_id, result.lineage.case_id] });
+              const sampleIndex = preparation.cases.filter(item => item.fixture_id === fixtureId)
+                .findIndex(item => item.case_id === binding.successor_case_id);
+              const request = createJudgeRequest({ protocol, packet: built.packet,
+                originalOutputDigest: built.original_output_digest,
+                privateBinding: { fixture_id: fixtureId, prompt_role: roleName,
+                  run_id: result.lineage.run_instance_id, case_id: result.lineage.case_id,
+                  attempt: result.lineage.attempt, sample_index: sampleIndex,
+                  normalized_result_digest: result.normalized_result_digest,
+                  source_snapshot_digest: snapshot, original_evaluation_digest: authority.result.evaluation_digest,
+                  original_output_digest: built.original_output_digest,
+                  freeze_digest: record.synthetic_freeze_digest } });
+              const storeRoot = resolve(judgeStoreBase, fixtureId);
+              const resolved = await runJudgeSlots({ storeRoot, protocol, request, packet: built.packet,
+                adapter: syntheticJudgeAdapter(built.packet, outcome, () => { syntheticJudgeCalls++; }) });
+              const candidate = deriveJudgeResultCandidate({ original: authority, protocol, request,
+                packet: built.packet, receipts: resolved.receipts, slotStates: resolved.slot_states,
+                resolution: resolved.resolution, targetManifest: judgeTargets, expectedRole: roleName,
+                expectedSampleIndex: sampleIndex, expectedFreezeDigest: record.synthetic_freeze_digest,
+                expectedAuthorityProfile: "synthetic_only", root });
+              const derivedResultPath = resolve(evaluatorDirectory, `${result.normalized_result_id}-judge.json`);
+              writeJudgeDerivedResult({ outputPath: derivedResultPath, candidate });
+              judgeInput = { storeRoot, protocol, request, packet: built.packet, derivedResultPath };
+              scoredAuthority = { ...authority, result: candidate.result, evaluationReady: true };
+              if (roleName === "prompt_v2" && !disagreementCase) disagreementCase = {
+                authority, protocol, request, packet: built.packet, storeRoot, sampleIndex,
+                result, snapshot, fixtureContext, options, roleName, successorCaseId: binding.successor_case_id };
+            }
             const effectiveAdmissionAuthority = (await import("./ask-benchmark-prompt-successor-measured-authority.mjs"))
               .successorMeasuredEffectiveAdmission(measuredAuthority, result.lineage.fixture_id,
                 { preparation, scope: role.scope, normalizedResultsPath });
-            const engineering = buildPortfolioEngineeringResult({ ...authority, effectiveAdmissionAuthority }, { root });
+            if (disagreementCase?.successorCaseId === binding.successor_case_id)
+              disagreementCase.effectiveAdmissionAuthority = effectiveAdmissionAuthority;
+            const engineering = buildPortfolioEngineeringResult({ ...scoredAuthority, effectiveAdmissionAuthority }, { root });
             assert.equal(engineering.scoring_status, "complete");
             assert.equal(engineering.requirement_score.normalized_requirement_score, outcome === "pass" ? 1 : 0);
             assert.equal(engineering.effective_admission_status, "admitted");
@@ -387,6 +479,7 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
               ...Object.fromEntries(keys.map(key => [key, engineering[key]])) });
             evaluatorOptionsByCase[binding.successor_case_id] = {
               privateRoot: fixtureContext.privateRoot, manifestPath: fixtureContext.manifestPath, resultPath,
+              ...(judgeInput ? { judge: judgeInput } : {}),
             };
           }
           inventory.sort((a, b) => a.path.localeCompare(b.path));
@@ -412,6 +505,8 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
           assert.equal(proof.scoring_input_manifest_digest, manifest.manifest_digest);
         });
       }
+      assert.equal(syntheticJudgeCalls, 24);
+      record.synthetic_judge_calls = syntheticJudgeCalls;
       await check("14 paired blocks reach the production comparison without Prompt adoption", () => {
         const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
         const report = buildSuccessorComparisonFromProvenance({ preparation, policy, sources: handles });
@@ -444,6 +539,35 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
         const incomplete = calculateSuccessorComparison({ preparation, policy, rows });
         assert.equal(incomplete.prompt_outcome, "insufficient_evidence");
         assert.equal(incomplete.paired.length, 13);
+      });
+      await check("one synthetic Judge disagreement closes without human input or a third call", async () => {
+        assert.ok(disagreementCase);
+        const { authority, protocol, request, packet, sampleIndex, roleName,
+          effectiveAdmissionAuthority, successorCaseId } = disagreementCase;
+        const disputedCriterion = protocol.criteria[0].criterion_id;
+        let calls = 0;
+        const unresolved = await runJudgeSlots({ storeRoot: resolve(work, "synthetic-judge-disagreement"),
+          protocol, request, packet, adapter: syntheticJudgeAdapter(packet,
+            (slot, id) => slot === "A" && id === disputedCriterion ? "pass" : "fail",
+            () => { calls++; }) });
+        assert.equal(calls, 2);
+        assert.equal(unresolved.resolution.criteria.filter(item => item.verdict === "abstain").length, 1);
+        const derived = deriveJudgeResultCandidate({ original: authority, protocol, request, packet,
+          receipts: unresolved.receipts, slotStates: unresolved.slot_states, resolution: unresolved.resolution,
+          targetManifest: judgeTargets, expectedRole: roleName, expectedSampleIndex: sampleIndex,
+          expectedFreezeDigest: record.synthetic_freeze_digest, expectedAuthorityProfile: "synthetic_only", root });
+        assert.equal(derived.result.evaluation_status, "manual_review_required");
+        const engineering = buildPortfolioEngineeringResult({ ...authority, result: derived.result,
+          evaluationReady: false, effectiveAdmissionAuthority }, { root });
+        assert.equal(engineering.scoring_status, "not_scoring_ready");
+        const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
+        const rows = Object.values(handles).flatMap(handle => readSuccessorProvenanceRows(handle))
+          .map(row => row.case_id === successorCaseId
+            ? { case_id: row.case_id, engineering } : { case_id: row.case_id, engineering: row.engineering });
+        const incomplete = calculateSuccessorComparison({ preparation, policy, rows });
+        assert.equal(incomplete.prompt_outcome, "insufficient_evidence");
+        assert.equal(incomplete.paired.length, 13);
+        record.synthetic_judge_disagreement_calls = calls;
       });
       await check("wrong result digest, missing result, and duplicate paired source fail closed", async () => {
         const args = provenanceSources.prompt_v2;
@@ -1065,32 +1189,21 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
         assert.equal(proof.scoring_input_manifest_digest, manifest.manifest_digest);
       });
     }
-    await check("opaque synthetic and measured provenance produce distinct bounded reports", async () => {
+    await check("synthetic provenance stays bounded and measured review requires Judge authority", async () => {
       const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
       const report = buildSuccessorComparisonFromProvenance({ preparation, policy, sources: handles });
       assert.equal(report.analysis.prompt_outcome, "insufficient_evidence");
       assert.equal(report.measured_decision_authorized, false); assert.equal(report.mutation_authorized, false);
       assert.equal(report.sources.length, 2); write(resolve(work, "synthetic-report.json"), report);
-      const measuredHandles = {};
       for (const role of ["current_prompt", "prompt_v2"]) {
         await assert.rejects(() => verifySuccessorSourceProvenance({
           ...sources[role], accessMode: "measured", measuredAuthority,
         }), { code: "SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED" });
-        measuredHandles[role] = await verifySuccessorSourceProvenance({
+        await assert.rejects(() => verifySuccessorSourceProvenance({
           ...sources[role], accessMode: "measured", measuredAuthority, measuredCompletion,
-        });
-        const proof = inspectSuccessorProvenance(measuredHandles[role]);
-        assert.equal(proof.access_mode, "measured");
-        assert.equal(proof.comparison_eligible, true);
+        }), { code: "SUCCESSOR_JUDGE_AUTHORITY_REQUIRED" });
       }
-      const measuredReport = buildSuccessorComparisonFromProvenance({ preparation, policy, sources: measuredHandles });
-      assert.equal(measuredReport.kind, "prompt_successor_measured_comparison_report");
-      assert.equal(measuredReport.evidence_kind, "measured_reverified_provenance");
-      assert.equal(measuredReport.analysis.prompt_outcome, "insufficient_evidence");
-      assert.equal(measuredReport.measured_decision_authorized, true);
-      assert.equal(measuredReport.mutation_authorized, false);
-      write(resolve(work, "measured-report.json"), measuredReport);
-      record.report_digest = measuredReport.report_digest;
+      record.report_digest = report.report_digest;
       const otherPreparation = buildPromptSuccessorPreparation({ parent, runtime, implementation, seed: "synthetic-other-experiment",
         changeReason: "Negative transplant test.", scoringInputManifestDigest: manifest.manifest_digest });
       assert.throws(() => buildSuccessorComparisonFromProvenance({ preparation: otherPreparation,

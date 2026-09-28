@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "kind": "prompt_successor_judge_targets",
+  "fixtures": {
+    "cal-session-refresh": {
+      "semantic_requirements": [
+        "rotation-atomicity",
+        "current-account-authority",
+        "expiry-and-recovery",
+        "review-evidence"
+      ],
+      "semantic_observations": ["evidence-quality", "unsupported-noise"],
+      "machine_observations": ["source-scope-change", "normalized-output-identity"]
+    },
+    "cal-export-lease": {
+      "semantic_requirements": [
+        "lease-ownership-and-claim",
+        "tenant-authorization",
+        "retry-state-machine",
+        "review-evidence"
+      ],
+      "semantic_observations": ["evidence-quality", "unsupported-noise"],
+      "machine_observations": ["source-scope-change", "normalized-output-identity"]
+    },
+    "cal-atomic-rule-batch": {
+      "semantic_requirements": [],
+      "semantic_observations": [],
+      "machine_observations": ["isolated-execution-checks", "command-evidence", "scope-diff"]
+    },
+    "cal-concurrent-transfer": {
+      "semantic_requirements": [],
+      "semantic_observations": [],
+      "machine_observations": ["isolated-execution-checks", "command-evidence", "scope-diff"]
+    }
+  }
+}
