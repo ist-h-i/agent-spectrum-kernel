@@ -347,7 +347,12 @@ function receiptRuntime(profile, observed) {
 function tokenUsage(tokens) {
   closed(tokens, ["input", "output", "total"], "receipt_tokens_shape");
   for (const value of Object.values(tokens)) authority(value === null || (Number.isSafeInteger(value) && value >= 0), "receipt_tokens_value");
-  if (tokens.input !== null && tokens.output !== null && tokens.total !== null) authority(tokens.total >= tokens.input + tokens.output, "receipt_token_total");
+  // Unknown components stay null. Their known counterparts still establish a
+  // lower bound that a reported total must not contradict.
+  if (tokens.total !== null) {
+    const knownMinimum = (tokens.input ?? 0) + (tokens.output ?? 0);
+    authority(tokens.total >= knownMinimum, "receipt_token_total");
+  }
 }
 
 function exceedsPerCallTokenLimit(tokens, limits) {

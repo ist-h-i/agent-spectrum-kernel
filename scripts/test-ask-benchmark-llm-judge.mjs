@@ -432,3 +432,113 @@ for (const limit of [65536, 4 * 1024 * 1024]) {
     assert.equal(calls, 2);
   }));
 }
+
+
+for (const component of ["input", "output"]) {
+  test(`contradictory partial ${component} tokens reject before another Judge call`, async () => {
+    for (const total of [0, 99]) await withRoot(async storeRoot => {
+      const first = fixture({ maxTotalTokens: 300 });
+      const tokens = { input: null, output: null, total, [component]: 100 };
+      let calls = 0;
+      const fake = adapter(first.packet, undefined, () => calls++), invoke = fake.invoke;
+      fake.invoke = async args => ({ ...await invoke(args), tokens });
+      await assert.rejects(runJudgeSlots({ storeRoot, ...first, adapter: fake }),
+        error => error instanceof JudgeAuthorityError && error.code === "receipt_token_total");
+      assert.equal(calls, 1, "the inconsistent A observation must not fund B");
+      const reopened = reopenJudgeResolution({ storeRoot, ...first });
+      assert.equal(reopened.slot_states.A, "ambiguous");
+      assert.equal(reopened.receipts.A, null);
+      assert.equal(reopened.receipts.B, null);
+      await runJudgeSlots({ storeRoot, ...first, adapter: fake });
+      const next = fixture({ sampleIndex: 1, maxTotalTokens: 300 });
+      await runJudgeSlots({ storeRoot, ...next, adapter: adapter(next.packet, undefined, () => calls++) });
+      assert.equal(calls, 1, "replay and later samples must not retry uncertain execution");
+    });
+  });
+}
+
+test("all partial token combinations respect the known-component lower bound without imputing zeros", async t => {
+  let checked = 0;
+  for (const input of [null, 0, 2, 100]) for (const output of [null, 0, 2, 100])
+    for (const total of [null, 0, 1, 2, 99, 100, 199, 200]) await withRoot(async storeRoot => {
+      const first = fixture({ unknownTokenPolicy: "charge_maximum" });
+      const tokens = { input, output, total };
+      const knownMinimum = (input === null ? 0 : input) + (output === null ? 0 : output);
+      const impossible = total !== null && total < knownMinimum;
+      let calls = 0;
+      const fake = adapter(first.packet, undefined, () => calls++), invoke = fake.invoke;
+      fake.invoke = async args => ({ ...await invoke(args), tokens });
+      if (impossible) {
+        await assert.rejects(runJudgeSlots({ storeRoot, ...first, adapter: fake }),
+          error => error instanceof JudgeAuthorityError && error.code === "receipt_token_total", JSON.stringify(tokens));
+        assert.equal(calls, 1);
+      } else {
+        const result = await runJudgeSlots({ storeRoot, ...first, adapter: fake });
+        assert.equal(calls, 2);
+        assert.deepEqual(result.receipts.A.tokens, tokens, "null fields must remain null");
+        assert.deepEqual(result.receipts.B.tokens, tokens);
+        assert.deepEqual(reopenJudgeResolution({ storeRoot, ...first }), result);
+      }
+      checked++;
+    });
+  assert.equal(checked, 128);
+  t.diagnostic(`partial-token combinations checked: ${checked}`);
+});
+
+for (const component of ["input", "output"]) {
+  test(`saved contradictory partial ${component} usage cannot reopen or fund a later claim`, async () => withRoot(async storeRoot => {
+    const first = fixture();
+    await runJudgeSlots({ storeRoot, ...first, adapter: adapter(first.packet) });
+    const ledger = join(storeRoot, "judge/v1", first.protocol.protocol_digest.slice(7));
+    const path = join(ledger, "samples/000000/slot-A.receipt.json");
+    const old = JSON.parse(readFileSync(path));
+    const { receipt_digest: ignored, ...body } = old;
+    body.tokens = { input: null, output: null, total: 0, [component]: 100 };
+    const bytes = Buffer.from(JSON.stringify({ ...body, receipt_digest: canonicalDigest(body) }));
+    writeFileSync(path, bytes);
+    assert.throws(() => reopenJudgeResolution({ storeRoot, ...first }),
+      error => error instanceof JudgeAuthorityError && error.code === "receipt_token_total");
+    const next = fixture({ sampleIndex: 1 });
+    let calls = 0;
+    await assert.rejects(runJudgeSlots({ storeRoot, ...next, adapter: adapter(next.packet, undefined, () => calls++) }),
+      error => error instanceof JudgeAuthorityError && error.code === "receipt_token_total");
+    assert.equal(calls, 0);
+    assert.equal(existsSync(join(ledger, "samples/000001/slot-A.claim.json")), false);
+    assert.deepEqual(readFileSync(path), bytes);
+  }));
+
+  test(`consistent partial ${component} usage remains recorded and consumes the frozen total budget`, async () => withRoot(async storeRoot => {
+    const first = fixture({ maxTotalTokens: 300 });
+    const tokens = { input: null, output: null, total: 100, [component]: 100 };
+    let calls = 0;
+    const fake = adapter(first.packet, undefined, () => calls++), invoke = fake.invoke;
+    fake.invoke = async args => ({ ...await invoke(args), tokens });
+    const result = await runJudgeSlots({ storeRoot, ...first, adapter: fake });
+    assert.equal(calls, 2);
+    assert.deepEqual(result.receipts.A.tokens, tokens);
+    assert.deepEqual(result.receipts.B.tokens, tokens);
+    const next = fixture({ sampleIndex: 1, maxTotalTokens: 300 });
+    const blocked = await runJudgeSlots({ storeRoot, ...next, adapter: adapter(next.packet, undefined, () => calls++) });
+    assert.equal(calls, 2);
+    assert.equal(blocked.slot_states.A, "budget_blocked");
+    assert.equal(blocked.receipts.A, null);
+    assert.deepEqual(reopenJudgeResolution({ storeRoot, ...first }), result);
+  }));
+}
+
+for (const unknownTokenPolicy of ["stop_remaining", "charge_maximum"]) {
+  test(`partial usage with an unknown total preserves ${unknownTokenPolicy}`, async () => withRoot(async storeRoot => {
+    const first = fixture({ unknownTokenPolicy, maxTotalTokens: 500 });
+    const tokens = { input: 5, output: null, total: null };
+    let calls = 0;
+    const fake = adapter(first.packet, undefined, () => calls++), invoke = fake.invoke;
+    fake.invoke = async args => ({ ...await invoke(args), tokens });
+    const result = await runJudgeSlots({ storeRoot, ...first, adapter: fake });
+    assert.deepEqual(result.receipts.A.tokens, tokens);
+    assert.equal(calls, unknownTokenPolicy === "stop_remaining" ? 1 : 2);
+    const before = calls;
+    const next = fixture({ sampleIndex: 1, unknownTokenPolicy, maxTotalTokens: 500 });
+    await runJudgeSlots({ storeRoot, ...next, adapter: adapter(next.packet, undefined, () => calls++) });
+    assert.equal(calls, before);
+  }));
+}

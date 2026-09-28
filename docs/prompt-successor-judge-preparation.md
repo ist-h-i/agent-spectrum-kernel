@@ -73,6 +73,10 @@ false fail, according to the returned verdict. Missing or invalid output is
 never a correct abstention. A budget or global stop before either slot is
 claimed leaves that sample `not_run`; an existing claim without a receipt
 remains `invalid_or_incomplete`, not `not_run`. Both stay in the denominator.
+A known token total must be at least the sum of the known input/output
+components, even when the other component is unknown. Contradictory usage
+rejects receipt publication, reopening and later budget claims. Unknown fields
+remain null; unknown-total handling still follows the frozen protocol policy.
 
 `labelSource.kind = independent_candidate` requires source and review digests,
 but those strings do not authenticate the reviewer. Reports deliberately retain
