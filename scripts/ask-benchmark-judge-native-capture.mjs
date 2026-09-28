@@ -115,7 +115,8 @@ export function inspectNativeJudgeCapture({ protocol, packet, processResult, ses
     && typeof context.turn_id === "string" && context.turn_id.length >= 10, "session_identity");
   check(context.approval_policy === "never" && context.sandbox_policy?.type === "read-only"
     && context.sandbox_policy.network_access === false, "session_policy");
-  let start = -1, complete = -1, finalMessages = 0;
+  const contextIndex = session.indexOf(contexts[0]);
+  let start = -1, complete = -1, finalMessages = 0, finalResponseItems = 0;
   for (const [index, row] of session.entries()) {
     if (["session_meta", "turn_context"].includes(row.type)) continue;
     const value = row.payload;
@@ -124,6 +125,8 @@ export function inspectNativeJudgeCapture({ protocol, packet, processResult, ses
       check(value?.type === "message" && ["user", "assistant"].includes(value.role), "session_tool_or_unknown");
       check(complete === -1, "late_message");
       if (value.role === "assistant") {
+        // A matching string outside this turn is not its response evidence.
+        check(start !== -1 && contextIndex < index && ++finalResponseItems === 1, "session_response_order");
         check(Array.isArray(value.content) && value.content.length === 1
           && value.content[0]?.type === "output_text" && value.content[0].text === finalText, "session_response_mismatch");
       }
@@ -136,12 +139,14 @@ export function inspectNativeJudgeCapture({ protocol, packet, processResult, ses
       check(start !== -1 && complete === -1 && value.turn_id === context.turn_id && value.error == null
         && (value.last_agent_message === undefined || value.last_agent_message === finalText), "session_complete"); complete = index;
     } else if (value.type === "agent_message") {
-      check(start !== -1 && complete === -1 && value.message === finalText && ++finalMessages === 1, "session_final_message");
+      check(start !== -1 && complete === -1 && contextIndex < index
+        && value.message === finalText && ++finalMessages === 1, "session_final_message");
     } else if (["agent_reasoning", "agent_reasoning_raw_content", "user_message"].includes(value.type)) {
       check(complete === -1, "late_message");
     } else check(value.type === "token_count", "session_tool_or_unknown");
   }
-  check(start >= 0 && complete > start && finalMessages === 1 && session.indexOf(contexts[0]) < complete, "session_completion_missing");
+  check(start >= 0 && complete > start && finalMessages === 1 && finalResponseItems === 1
+    && contextIndex < complete, "session_completion_missing");
   const usage = captureSuccessorUsage(processResult);
   const body = { schema_version: "1.0.0", kind: "llm_judge_native_capture_inspection",
     protocol_digest: protocol.protocol_digest, packet_digest: canonicalDigest(packet), expected_context_digest: canonicalDigest(expected),

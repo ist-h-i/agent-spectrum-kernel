@@ -216,3 +216,47 @@ test("fixture binding rejects omitted fixtures, instruction drift, and sample tr
   assert.throws(() => bindJudgeQualificationSet({ inputs: references, expectations: { "cal-session-refresh": { ...expected, instruction_digest: d("other") } }, requireLive: false }));
   assert.throws(() => bindJudgeQualificationSet({ inputs: { "cal-export-lease": references["cal-session-refresh"] }, expectations: { "cal-export-lease": expected }, requireLive: false }));
 });
+
+test("budget-blocked samples with no claim stay not_run, not malformed responses", async t => {
+  const storeRoot = root(t), input = fixture({ maxTotalTokens: 1 });
+  const sealed = sealJudgeQualification({ storeRoot, ...input });
+  let calls = 0;
+  const report = await runJudgeQualification({ storeRoot, planDigest: sealed.plan_digest,
+    adapter: adapter(input.samples, { observe: () => calls++ }) });
+  assert.equal(calls, 0);
+  assert.equal(report.status, "not_run");
+  assert.equal(report.totals.not_run, input.samples.length);
+  assert.equal(report.totals.invalid_or_incomplete, 0);
+  assert.ok(report.rows.every(row => row.slots.A === "budget_blocked" && row.slots.B === "not_started"));
+  assert.deepEqual(reopenJudgeQualification({ storeRoot, planDigest: sealed.plan_digest }), report);
+});
+
+test("one incomplete sample does not reclassify later unstarted samples as invalid output", async t => {
+  const storeRoot = root(t), input = fixture();
+  const sealed = sealJudgeQualification({ storeRoot, ...input });
+  let calls = 0;
+  const report = await runJudgeQualification({ storeRoot, planDigest: sealed.plan_digest,
+    adapter: adapter(input.samples, { observe: () => calls++, mutate: value => ({ ...value,
+      tokens: { input: null, output: null, total: null } }) }) });
+  assert.equal(calls, 1);
+  assert.equal(report.totals.invalid_or_incomplete, 1);
+  assert.equal(report.totals.not_run, input.samples.length - 1);
+  assert.equal(report.all_expected_matched, false);
+});
+
+
+test("an interrupted claimed slot without a receipt never becomes not_run", async t => {
+  const storeRoot = root(t), input = fixture();
+  const sealed = sealJudgeQualification({ storeRoot, ...input });
+  let calls = 0;
+  await assert.rejects(runJudgeQualification({ storeRoot, planDigest: sealed.plan_digest,
+    adapter: adapter(input.samples, { observe: () => calls++, mutate: value => ({ ...value,
+      runtime: { ...value.runtime, observed_revision: "wrong-revision" } }) }) }),
+  hasCode("receipt_runtime_observed_revision"));
+  const report = reopenJudgeQualification({ storeRoot, planDigest: sealed.plan_digest });
+  assert.equal(calls, 1);
+  assert.equal(report.rows[0].slots.A, "ambiguous");
+  assert.equal(report.totals.invalid_or_incomplete, 1);
+  assert.equal(report.totals.not_run, input.samples.length - 1);
+  assert.equal(report.all_expected_matched, false);
+});

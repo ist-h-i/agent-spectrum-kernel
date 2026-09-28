@@ -123,7 +123,13 @@ function sampleResult(storeRoot, plan, sample, index, seenSessions) {
       slots[slot] = "invalid_response";
     }
   }
+  // A block before any claim is an unexecuted sample, not a bad response.
+  // Reserved/started slots remain uncertain even when no receipt was written.
+  const unstarted = ["A", "B"].every(slot => reopened.receipts[slot] === null
+    && ["not_started", "budget_blocked"].includes(reopened.slot_states[slot]));
   const criteria = sample.expected.map(expected => {
+    if (unstarted) return { criterion_id: expected.criterion_id, expected: expected.verdict,
+      verdict: null, outcome: "not_run" };
     const resolved = reopened.resolution.criteria.find(item => item.criterion_id === expected.criterion_id);
     const a = responses.A?.criteria.find(item => item.criterion_id === expected.criterion_id);
     const b = responses.B?.criteria.find(item => item.criterion_id === expected.criterion_id);

@@ -56,7 +56,9 @@ matched and the requested classes were present. It is not a statistically chosen
 accuracy threshold, proof of generalization, or approval of the label meanings.
 A decisive answer where the label is `abstain` is counted as a false pass or
 false fail, according to the returned verdict. Missing or invalid output is
-never a correct abstention.
+never a correct abstention. A budget or global stop before either slot is
+claimed leaves that sample `not_run`; an existing claim without a receipt
+remains `invalid_or_incomplete`, not `not_run`. Both stay in the denominator.
 
 `labelSource.kind = independent_candidate` requires source and review digests,
 but those strings do not authenticate the reviewer. Reports deliberately retain
@@ -97,7 +99,11 @@ No host preflight CLI accepts this as permission to start live measurement.
   read-only/no-network/never-approve policy records and the existing closed Judge
   response parser. Tool or unknown events, contradictory session messages,
   incomplete items, duplicate keys, invalid UTF-8, altered final bytes and
-  incomplete process state are rejected. Usage uses the existing successor
+  incomplete process state are rejected. Exactly one assistant response item
+  and one matching final-message event must occur after the turn starts and
+  after its context, and before completion. A missing, duplicate or pre-turn
+  response item is not accepted. Either ordering of the response item and
+  final-message event is accepted within those boundaries. Usage uses the existing successor
   parser and preserves unknown values.
 
 This parser recognizes an explicitly bounded event shape. It is not verified

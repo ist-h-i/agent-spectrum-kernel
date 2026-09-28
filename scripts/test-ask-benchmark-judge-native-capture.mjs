@@ -137,3 +137,20 @@ test("model-free inspector runs only version/help with an empty credential-free 
   assert.throws(() => inspectNativeJudgeCli({ executable, expectedSha256: d("bad"), expectedVersion: "0.157.1" }));
   assert.throws(() => inspectNativeJudgeCli({ executable, expectedSha256, expectedVersion: "0.157.2" }));
 });
+
+for (const [name, mutate] of [
+  ["assistant output before the turn starts", f => { const [message] = f.session.splice(3, 1); f.session.splice(2, 0, message); }],
+  ["missing assistant response item", f => f.session.splice(3, 1)],
+  ["duplicate assistant response item", f => f.session.splice(4, 0, structuredClone(f.session[3]))],
+  ["turn context after the assistant output", f => { const [context] = f.session.splice(1, 1); f.session.splice(4, 0, context); }],
+]) test(`capture rejects ${name}`, () => {
+  const f = fixture(); mutate(f);
+  assert.throws(() => inspectNativeJudgeCapture(f.input()));
+});
+
+
+test("response item and message event may arrive in either order within the same turn", () => {
+  const f = fixture();
+  [f.session[3], f.session[4]] = [f.session[4], f.session[3]];
+  assert.equal(inspectNativeJudgeCapture(f.input()).capture_shape_verified, true);
+});
