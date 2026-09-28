@@ -43,6 +43,9 @@ binding exists. Sealing and slot reservation use the same ledger lock.
    incomplete responses, and unstarted samples. Reused session IDs, including
    reuse across samples, cannot qualify as a match. PID equality alone across
    samples is not used as a reuse test because an OS can reuse process IDs.
+   A missing sample binding is `not_run` only when no sample evidence remains.
+   Orphaned claim/start/receipt/block files and malformed bindings stop reopening
+   and execution without recreating the binding or making another call.
 4. `bindJudgeQualificationForFreeze(...)` compares exact plan, report, protocol,
    source, runtime-profile and target-manifest identities with saved evidence.
    `bindJudgeQualificationSet(...)` additionally requires every semantic fixture,

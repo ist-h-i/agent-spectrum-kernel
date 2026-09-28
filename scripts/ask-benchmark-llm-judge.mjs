@@ -510,6 +510,23 @@ function readIfPresent(path, label) {
   return existsSync(path) ? readJsonFileStrict(path, label, MAX_LEDGER_BYTES) : null;
 }
 
+// Absence is an unstarted sample only when no execution evidence remains.
+// A lost binding must not hide claims/receipts or be silently reconstructed.
+function readSampleBinding(location) {
+  assertNoSymlinkPathSegments(location.binding, "Judge sample binding", { allowMissingLeaf: true });
+  if (!existsSync(location.binding)) {
+    const entries = existsSync(location.sample) ? readdirSync(location.sample) : [];
+    // Another worker may have published the binding while the directory was read.
+    if (!existsSync(location.binding)) {
+      authority(entries.length === 0, "orphaned_judge_sample_evidence");
+      return null;
+    }
+  }
+  const binding = readJsonFileStrict(location.binding, "Judge sample binding", MAX_LEDGER_BYTES);
+  authority(binding !== null && typeof binding === "object" && !Array.isArray(binding), "stored_sample_binding");
+  return binding;
+}
+
 function checkedSlot(root, protocol, request, packet, slot) {
   const location = paths(root, request, slot);
   const expectedClaim = makeClaim(protocol, request, packet, slot);
@@ -610,15 +627,16 @@ function blockSlot(root, request, slot, reasonCode) {
 }
 
 function storeBindings(storeRoot, root, protocol, request, packet) {
-  for (const artifact of [protocol, packet, request]) putContentAddressedJson({ storeRoot, artifact, digest: canonicalDigest(artifact), maximumBytes: 32 * 1024 * 1024 });
   const location = paths(root, request, "A");
+  readSampleBinding(location);
+  for (const artifact of [protocol, packet, request]) putContentAddressedJson({ storeRoot, artifact, digest: canonicalDigest(artifact), maximumBytes: 32 * 1024 * 1024 });
   const body = { schema_version: "1.0.0", kind: "llm_judge_sample_binding", protocol_digest: protocol.protocol_digest, packet_digest: canonicalDigest(packet), request_digest: request.request_digest };
   writeCanonicalJsonNoReplace({ outputPath: location.binding, artifact: { ...body, binding_digest: canonicalDigest(body) }, label: "Judge sample binding" });
 }
 
 function verifyStoredBindings(storeRoot, root, protocol, request, packet) {
   const location = paths(root, request, "A");
-  const binding = readIfPresent(location.binding, "Judge sample binding");
+  const binding = readSampleBinding(location);
   authority(binding !== null, "missing_judge_sample_binding");
   const { binding_digest: bindingDigest, ...body } = binding;
   authority(bindingDigest === canonicalDigest(body) && body.schema_version === "1.0.0" && body.kind === "llm_judge_sample_binding" && body.protocol_digest === protocol.protocol_digest && body.packet_digest === canonicalDigest(packet) && body.request_digest === request.request_digest, "stored_sample_binding");

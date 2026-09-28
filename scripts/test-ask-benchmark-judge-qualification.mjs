@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, realpathSync, rmSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, mkdirSync, symlinkSync, writeFileSync, readFileSync, readdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { test } from "node:test";
@@ -259,4 +259,51 @@ test("an interrupted claimed slot without a receipt never becomes not_run", asyn
   assert.equal(report.totals.invalid_or_incomplete, 1);
   assert.equal(report.totals.not_run, input.samples.length - 1);
   assert.equal(report.all_expected_matched, false);
+});
+
+
+for (const state of ["completed", "ambiguous", "budget_blocked"]) {
+  test(`orphaned ${state} evidence cannot become not_run or repair its binding`, async t => {
+    const storeRoot = root(t), input = fixture(state === "budget_blocked" ? { maxTotalTokens: 1 } : {});
+    const sealed = sealJudgeQualification({ storeRoot, ...input });
+    let calls = 0;
+    const fake = adapter(input.samples, { observe: () => calls++, mutate: value => state === "ambiguous"
+      ? { ...value, runtime: { ...value.runtime, observed_revision: "wrong-revision" } } : value });
+    const execute = () => runJudgeQualification({ storeRoot, planDigest: sealed.plan_digest, adapter: fake });
+    if (state === "ambiguous") await assert.rejects(execute(), hasCode("receipt_runtime_observed_revision"));
+    else await execute();
+    const sample = resolve(storeRoot, "judge/v1", input.protocol.protocol_digest.slice(7), "samples/000000");
+    const bindingPath = resolve(sample, "request-binding.json");
+    rmSync(bindingPath);
+    const snapshot = () => readdirSync(sample).sort().map(name => [name, readFileSync(resolve(sample, name)).toString("base64")]);
+    const before = snapshot(), callsBefore = calls;
+    assert.ok(before.length > 0);
+    assert.throws(() => reopenJudgeQualification({ storeRoot, planDigest: sealed.plan_digest }),
+      hasCode("orphaned_judge_sample_evidence"));
+    await assert.rejects(execute(), hasCode("orphaned_judge_sample_evidence"));
+    assert.equal(calls, callsBefore);
+    assert.equal(existsSync(bindingPath), false);
+    assert.deepEqual(snapshot(), before);
+  });
+}
+
+test("a null binding is malformed evidence, not an unstarted sample", t => {
+  const storeRoot = root(t), input = fixture(), sealed = sealJudgeQualification({ storeRoot, ...input });
+  const sample = resolve(storeRoot, "judge/v1", input.protocol.protocol_digest.slice(7), "samples/000000");
+  mkdirSync(sample, { recursive: true });
+  writeFileSync(resolve(sample, "request-binding.json"), "null\n");
+  assert.throws(() => reopenJudgeQualification({ storeRoot, planDigest: sealed.plan_digest }),
+    hasCode("stored_sample_binding"));
+});
+
+test("an empty unbound sample namespace stays not_run and can execute once", async t => {
+  const storeRoot = root(t), input = fixture(), sealed = sealJudgeQualification({ storeRoot, ...input });
+  mkdirSync(resolve(storeRoot, "judge/v1", input.protocol.protocol_digest.slice(7), "samples/000000"), { recursive: true });
+  assert.equal(reopenJudgeQualification({ storeRoot, planDigest: sealed.plan_digest }).status, "not_run");
+  let calls = 0;
+  const fake = adapter(input.samples, { observe: () => calls++ });
+  const report = await runJudgeQualification({ storeRoot, planDigest: sealed.plan_digest, adapter: fake });
+  assert.equal(calls, 12); assert.equal(report.all_expected_matched, true);
+  assert.deepEqual(await runJudgeQualification({ storeRoot, planDigest: sealed.plan_digest, adapter: fake }), report);
+  assert.equal(calls, 12);
 });
