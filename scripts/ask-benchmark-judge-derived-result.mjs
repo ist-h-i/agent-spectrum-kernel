@@ -14,6 +14,7 @@ import { verifyJudgeResolution } from "./ask-benchmark-llm-judge.mjs";
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const TARGETS_PATH = "benchmarks/prompt-successor-judge-targets.json";
 const RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result-envelope.schema.json";
+const AGENT_OUTPUT_SCHEMA_PATH = "benchmarks/schemas/agent-output.schema.json";
 const REVIEW_FIXTURES = ["cal-session-refresh", "cal-export-lease"];
 const IMPLEMENTATION_FIXTURES = ["cal-atomic-rule-batch", "cal-concurrent-transfer"];
 const SEMANTIC_OBSERVATIONS = ["evidence-quality", "unsupported-noise"];
@@ -43,6 +44,20 @@ function finalOutputReference(normalized) {
   digest(outputDigest, "normalized final output");
   if (!Number.isInteger(outputBytes) || outputBytes < 1) fail("normalized final output bytes");
   return { kind: "final_output", digest: outputDigest, bytes: outputBytes };
+}
+
+function verifyReviewOutputStructure({ packet, normalized, root }) {
+  const text = packet.documents.at(-1)?.text;
+  if (typeof text !== "string") fail("missing original review output in Judge packet");
+  const bytes = Buffer.from(text, "utf8");
+  if (bytes.length !== normalized.lineage.final_output_bytes
+      || hash(bytes) !== normalized.lineage.final_output_digest)
+    fail("Judge-visible review output differs from normalized final output");
+  const value = parseJsonRejectDuplicateKeys(bytes, "original review output");
+  assertBenchmarkSchemaInstance(value, { schemaPath: resolve(root, AGENT_OUTPUT_SCHEMA_PATH),
+    label: "original review output" });
+  if (value.task_type !== "review" || value.decision === "not_applicable" || value.summary.trim() === "")
+    fail("original output does not satisfy the review structure contract");
 }
 
 /** The fixed public inventory names the semantic fields, never their private rubric. */
@@ -132,6 +147,7 @@ export function deriveJudgeResultCandidate({ original, protocol, request, packet
   verifyJudgeResolution({ protocol, request, packet, receipts, slotStates, resolution });
   assertRequestBinding({ original, request, packet, protocol, resolution, targetManifest, expectedRole,
     expectedSampleIndex, expectedFreezeDigest });
+  verifyReviewOutputStructure({ packet, normalized, root });
   if (protocol.source_digest !== canonicalDigest(scoringInputs.requirementRecord))
     fail("Judge protocol is not bound to the frozen fixture requirements");
   const verdicts = verdictsFor({ resolution, fixtureId, manifest: targetManifest.value });

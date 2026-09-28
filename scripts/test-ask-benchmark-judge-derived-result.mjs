@@ -16,9 +16,12 @@ const fixtureId = "cal-session-refresh";
 const fixtureRoot = resolve(root, "benchmarks/fixtures/checkpoint-b2", fixtureId);
 const rawDigest = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const read = path => JSON.parse(readFileSync(path, "utf8"));
-const outputBytes = Buffer.from("Synthetic review conclusion with a cited source.\n");
+const reviewOutput = { task_type: "review", decision: "approve", findings: [], requirement_status: [],
+  verification_commands: [], completion_claim: "not_applicable", route: null,
+  summary: "Synthetic review conclusion with a cited source." };
+const outputBytes = Buffer.from(`${JSON.stringify(reviewOutput)}\n`);
 
-function originalAuthority() {
+function originalAuthority(finalBytes = outputBytes) {
   const freezePath = resolve(fixtureRoot, "scoring-input-freeze-manifest.json");
   const scoringInputs = {
     freezeManifest: read(freezePath), freezeManifestSourceDigest: rawDigest(readFileSync(freezePath)),
@@ -40,7 +43,7 @@ function originalAuthority() {
       fixture_input_digest: reference.fixture_input_digest,
       case_id: `case-${"3".repeat(16)}-${"4".repeat(16)}`, attempt: "0001",
       adapter_track: "codex", condition: "adaptive_ask", repetition: 1,
-      final_output_digest: rawDigest(outputBytes), final_output_bytes: outputBytes.length },
+      final_output_digest: rawDigest(finalBytes), final_output_bytes: finalBytes.length },
     command_evidence: { references: [], required_command_ids: [], required_alternative_groups: [],
       succeeded_command_ids: [] },
   };
@@ -58,7 +61,7 @@ function originalAuthority() {
   const result = syntheticSuccessorEvaluatorEnvelope({ normalized,
     sourceSnapshotDigest: rawDigest(Buffer.from("synthetic-snapshot")), context,
     outcome: "manual_review_required" });
-  return { normalized, result, scoringInputs };
+  return { normalized, result, scoringInputs, finalBytes };
 }
 
 function refreshEvaluation(result) {
@@ -85,7 +88,7 @@ async function judge(original, verdictFor) {
   });
   const built = buildJudgePacket({ protocol, sampleId: `sample-${"5".repeat(32)}`,
     task: "Review the synthetic software claim.",
-    documents: [{ kind: "source", text: "Synthetic source document.\n" }], originalOutputBytes: outputBytes });
+    documents: [{ kind: "source", text: "Synthetic source document.\n" }], originalOutputBytes: original.finalBytes });
   const freezeDigest = rawDigest(Buffer.from("synthetic-pre-result-freeze"));
   const request = createJudgeRequest({ protocol, packet: built.packet,
     originalOutputDigest: built.original_output_digest,
@@ -108,7 +111,7 @@ async function judge(original, verdictFor) {
             brief_rationale: "Synthetic evidence for a narrow rubric criterion.",
             evidence_references: verdict === "abstain" ? []
               : [{ document_id: "target-output", start_line: 1, end_line: 1,
-                quote: "Synthetic review conclusion" }], examined_documents: [] };
+                quote: built.packet.documents.at(-1).text.split("\n")[0].slice(0, 32) }], examined_documents: [] };
           }) };
         return { rawResponseBytes: Buffer.from(JSON.stringify(response)), exitCode: 0, signal: null,
           timedOut: false, durationMs: 1, tokens: { input: 10, output: 10, total: 20 },
@@ -178,4 +181,14 @@ test("a Judge pass cannot promote an original mixed structural and semantic evid
   assert.equal(derived.result.evaluation_status, "manual_review_required");
   assert.equal(derived.result.evidence_correctness.state, "manual_review_required");
   assert.ok(derived.result.requirement_results.every(item => item.outcome === "pass"));
+});
+
+test("a Judge pass cannot promote malformed or wrong-task original review output", async () => {
+  for (const bytes of [Buffer.from("{\n"),
+    Buffer.from(`${JSON.stringify({ ...reviewOutput, task_type: "implementation" })}\n`),
+    Buffer.from(`${JSON.stringify({ ...reviewOutput, decision: "not_applicable" })}\n`),
+    Buffer.from(`${JSON.stringify({ ...reviewOutput, summary: "" })}\n`)]) {
+    await assert.rejects(judge(originalAuthority(bytes), () => "pass"),
+      /original review output|original output does not satisfy the review structure contract/u);
+  }
 });

@@ -235,25 +235,31 @@ test("live profile rejects fake adapter and unset budgets before a claim", async
 }));
 
 test("auth, provider, and token terminal stops prevent calls for later samples", async () => {
-  for (const stoppedStatus of ["auth_failed", "provider_limit", "token_limit"]) {
+  for (const scenario of ["auth_failed", "provider_limit", "token_limit", "token_limit_and_large_response"]) {
     await withRoot(async (storeRoot) => {
       const first = fixture({ unknownTokenPolicy: "charge_maximum" });
       let firstCalls = 0;
       const terminalAdapter = { kind: "fake_adapter", async invoke(args) {
         firstCalls++;
-        if (stoppedStatus !== "token_limit") {
-          const error = new Error(stoppedStatus);
-          error.code = stoppedStatus === "auth_failed" ? "AUTH_FAILED" : "PROVIDER_LIMIT";
+        if (!scenario.startsWith("token_limit")) {
+          const error = new Error(scenario);
+          error.code = scenario === "auth_failed" ? "AUTH_FAILED" : "PROVIDER_LIMIT";
           throw error;
         }
         const result = await adapter(first.packet).invoke(args);
         result.tokens = { input: 101, output: 14, total: 115 };
+        if (scenario === "token_limit_and_large_response")
+          result.rawResponseBytes = Buffer.alloc(first.protocol.limits.max_response_bytes + 1, 0x78);
         return result;
       } };
       const terminal = await runJudgeSlots({ storeRoot, protocol: first.protocol, request: first.request,
         packet: first.packet, adapter: terminalAdapter });
       assert.equal(firstCalls, 1);
-      assert.equal(terminal.receipts.A.status, stoppedStatus);
+      assert.equal(terminal.receipts.A.status, scenario.startsWith("token_limit") ? "token_limit" : scenario);
+      if (scenario === "token_limit_and_large_response") {
+        assert.equal(terminal.receipts.A.raw_response_base64, null);
+        assert.equal(terminal.receipts.A.raw_response_bytes, first.protocol.limits.max_response_bytes + 1);
+      }
       const next = fixture({ sampleIndex: 1, unknownTokenPolicy: "charge_maximum" });
       let laterCalls = 0;
       const unresolved = await runJudgeSlots({ storeRoot, protocol: next.protocol, request: next.request,

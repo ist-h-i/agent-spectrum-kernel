@@ -240,9 +240,13 @@ int main(int argc, char **argv) {
     return 143;
   }
   if (!strcmp(mode, "residual")) (void)make_child(directory);
+  const char *fake_output_task = getenv("ASK_SUCCESSOR_FAKE_OUTPUT_TASK_TYPE");
+  if (fake_output_task && strcmp(fake_output_task, "review") && strcmp(fake_output_task, "implementation")) return 64;
   fd = open(output, O_WRONLY | O_CREAT | O_EXCL, 0600);
   if (fd < 0) fail("fake output");
-  const char *json = "{\"task_type\":\"implementation\",\"decision\":\"not_applicable\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"complete\",\"route\":null,\"summary\":\"Synthetic native transport fixture. No model or evaluator.\"}\n";
+  const char *json = fake_output_task && !strcmp(fake_output_task, "review")
+    ? "{\"task_type\":\"review\",\"decision\":\"approve\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"not_applicable\",\"route\":null,\"summary\":\"Synthetic review transport fixture. No model or evaluator.\"}\n"
+    : "{\"task_type\":\"implementation\",\"decision\":\"not_applicable\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"complete\",\"route\":null,\"summary\":\"Synthetic native transport fixture. No model or evaluator.\"}\n";
   write_all(fd, json, strlen(json)); close(fd);
   puts("{\"type\":\"turn.started\"}");
   if (!strcmp(mode, "provider-limit")) {

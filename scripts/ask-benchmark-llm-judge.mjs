@@ -374,10 +374,10 @@ function createReceipt({ protocol, request, packet, claim, slot, result, errorCo
     ({ rawResponseBytes: rawBytes, exitCode, signal, timedOut, durationMs, tokens, runtime } = result);
     status = timedOut ? "timeout" : exitCode !== 0 || signal !== null ? "transport_error" : "completed";
     if (status === "completed" && durationMs > protocol.limits.timeout_ms) status = "timeout";
-    if (exceedsPerCallTokenLimit(tokens, protocol.limits)) status = "token_limit";
     if (rawBytes.length > protocol.limits.max_response_bytes) status = "response_too_large";
+    if (exceedsPerCallTokenLimit(tokens, protocol.limits)) status = "token_limit";
   }
-  const savedBytes = status === "response_too_large" ? null : rawBytes;
+  const savedBytes = rawBytes && rawBytes.length > protocol.limits.max_response_bytes ? null : rawBytes;
   const body = {
     schema_version: "1.0.0", kind: "llm_judge_receipt", protocol_digest: protocol.protocol_digest,
     request_digest: request.request_digest, packet_digest: canonicalDigest(packet), claim_digest: claim.claim_digest,
@@ -402,12 +402,17 @@ function verifyReceipt({ protocol, request, packet, receipt, slot }) {
   if (receipt.runtime !== null) receiptRuntime(protocol.runtime_profile, receipt.runtime);
   tokenUsage(receipt.tokens);
   const exceededTokens = exceedsPerCallTokenLimit(receipt.tokens, protocol.limits);
-  if (exceededTokens) authority(["token_limit", "response_too_large"].includes(receipt.status), "receipt_token_limit_status");
+  if (exceededTokens) authority(receipt.status === "token_limit", "receipt_token_limit_status");
   authority(Number.isSafeInteger(receipt.duration_ms) && receipt.duration_ms >= 0 && typeof receipt.timed_out === "boolean", "receipt_execution_shape");
   authority(receipt.exit_code === null || (Number.isSafeInteger(receipt.exit_code) && receipt.exit_code >= 0), "receipt_exit_code");
   authority(receipt.signal === null || typeof receipt.signal === "string", "receipt_signal");
   if (receipt.raw_response_base64 === null) {
-    authority(receipt.raw_response_digest === null && receipt.raw_response_bytes === null || receipt.status === "response_too_large" && typeof receipt.raw_response_digest === "string" && Number.isSafeInteger(receipt.raw_response_bytes), "receipt_raw_absence");
+    const noRaw = receipt.raw_response_digest === null && receipt.raw_response_bytes === null;
+    authority(noRaw ? !["response_too_large", "token_limit"].includes(receipt.status)
+      : ["response_too_large", "token_limit"].includes(receipt.status)
+        && typeof receipt.raw_response_digest === "string"
+        && Number.isSafeInteger(receipt.raw_response_bytes)
+        && receipt.raw_response_bytes > protocol.limits.max_response_bytes, "receipt_raw_absence");
   } else {
     authority(typeof receipt.raw_response_base64 === "string" && /^[A-Za-z0-9+/]*={0,2}$/u.test(receipt.raw_response_base64), "receipt_raw_base64");
     const bytes = Buffer.from(receipt.raw_response_base64, "base64");

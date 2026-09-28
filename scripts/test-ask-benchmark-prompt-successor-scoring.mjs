@@ -321,9 +321,11 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
           progress("fake_trial_step_started", { ordinal: index + 1, prompt_role: target.prompt_role,
             previous_terminal_count: index });
           try {
-            const step = await asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
-              authority: measuredAuthority, preparation, sources: measuredSources, root,
-            }));
+            const fakeOutputTaskType = judgeProtocols[target.fixture_id] ? "review" : "implementation";
+            const step = await asyncEnvironment({ ...env, ASK_SUCCESSOR_FAKE_OUTPUT_TASK_TYPE: fakeOutputTaskType },
+              () => executeNextMeasuredSuccessorCase({
+                authority: measuredAuthority, preparation, sources: measuredSources, root,
+              }));
             assert.equal(step.case_id, target.case_id);
             assert.equal(step.prompt_role, target.prompt_role);
             assert.equal(step.automatic_retry_performed, false);
