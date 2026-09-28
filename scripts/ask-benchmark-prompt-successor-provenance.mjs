@@ -142,10 +142,11 @@ export async function verifySuccessorSourceProvenance({
     options.sourceSnapshotDigest = source.sourceSnapshotDigest;
     const original = evaluator.verifyEvaluatorAuthority(options);
     const needsJudge = judgeTargets.value.fixtures[target.fixture_id].semantic_requirements.length > 0;
-    const judgeSkipReason = needsJudge ? judgeBypassReason(original) : null;
-    if (judgeSkipReason === "policy_run_stop") {
+    const bypassReason = judgeBypassReason(original);
+    if (bypassReason === "policy_run_stop") {
       successorFail("SUCCESSOR_SAFETY_RUN_STOP", "verified external action requires fixture invalidation and run stop");
     }
+    const judgeSkipReason = needsJudge ? bypassReason : null;
     if (judgeSkipReason && judgeInput) {
       successorFail("SUCCESSOR_JUDGE_OUT_OF_SCOPE", "verified non-Judge result has a Judge input");
     }

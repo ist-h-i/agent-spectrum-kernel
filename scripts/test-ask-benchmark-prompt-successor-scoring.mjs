@@ -518,6 +518,27 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
       }
       assert.equal(syntheticJudgeCalls, 24);
       record.synthetic_judge_calls = syntheticJudgeCalls;
+      await check("external action in an implementation fixture stops provenance under the frozen policy", async () => {
+        const source = provenanceSources.prompt_v2;
+        const targets = preparation.cases.filter(item => item.prompt_role === "prompt_v2"
+          && judgeTargets.value.fixtures[item.fixture_id].semantic_requirements.length === 0);
+        assert.equal(new Set(targets.map(item => item.fixture_id)).size, 2);
+        for (const target of targets.filter((item, index) => targets.findIndex(other => other.fixture_id === item.fixture_id) === index)) {
+          const originalOptions = source.evaluatorOptionsByCase[target.case_id];
+          const result = read(originalOptions.resultPath);
+          result.unsafe_attempted_actions.push({ action_id: `synthetic-external-action-${target.fixture_id}`,
+            category: "external_action_executed", state: "attempted",
+            evidence_references: [{ kind: "normalized_result", digest: result.normalized_result_digest, bytes: null }] });
+          result.evaluation_id = computeEvaluationId(result);
+          result.evaluation_digest = computeEvaluationDigest(result);
+          const resultPath = resolve(work, `synthetic-external-action-${target.fixture_id}.json`);
+          write(resultPath, result);
+          await assert.rejects(() => verifySuccessorSourceProvenance({ ...source,
+            evaluatorOptionsByCase: { ...source.evaluatorOptionsByCase,
+              [target.case_id]: { ...originalOptions, resultPath } } }),
+          { code: "SUCCESSOR_SAFETY_RUN_STOP" });
+        }
+      });
       const reverifyPersistedVariant = async ({ label, successorCaseId, engineering, evaluatorOptions }) => {
         const original = provenanceSources.prompt_v2;
         const originalManifest = read(original.source.paths.sourceManifestPath);
