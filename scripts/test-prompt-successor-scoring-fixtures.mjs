@@ -385,7 +385,7 @@ export function syntheticSuccessorEvaluatorEnvelope({ normalized, sourceSnapshot
   const known = comparisonReady && !manual;
   const correctness = known ? outcome : "unknown";
   const verificationEvidenceState = deriveVerificationEvidenceState(normalized);
-  if (known && outcome === "pass" && verificationEvidenceState !== "executed_success")
+  if (known && verificationEvidenceState !== "executed_success")
     throw new Error("synthetic comparison-ready verification requires successful command evidence");
   const requirementResults = c.requirements.requirements.map((requirement, index) => {
     const observed = manual && index === 0 ? "manual_review_required" : manual ? "fail" : outcome;

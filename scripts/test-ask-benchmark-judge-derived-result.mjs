@@ -229,6 +229,9 @@ test("required verification evidence cannot be promoted by an empty review comma
   assert.throws(() => syntheticSuccessorEvaluatorEnvelope({ normalized: original.normalized,
     sourceSnapshotDigest: original.result.source_snapshot_digest, context: original.context,
     comparisonReady: true }), /requires successful command evidence/u);
+  assert.throws(() => syntheticSuccessorEvaluatorEnvelope({ normalized: original.normalized,
+    sourceSnapshotDigest: original.result.source_snapshot_digest, context: original.context,
+    outcome: "fail", comparisonReady: true }), /requires successful command evidence/u);
 });
 
 test("successful required command evidence supplies the causal review reference", async () => {
