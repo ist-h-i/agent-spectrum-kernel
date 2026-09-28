@@ -206,6 +206,8 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
     });
     const plan = buildPortfolioPlan({ root, config, repositoryRevision: implementation.revision, seed: "synthetic-canonical-native-plan" });
     assert.equal(plan.cases.length, 112); assert.ok(plan.cases.every(c => c.fixture_id.startsWith("cal-")));
+    if (positiveAdmission) assert.ok(plan.cases.every(c => c.verification_command_contract?.contract_digest),
+      "positive scoring fixture must bind the existing verification command contracts");
     const planPath = resolve(work, "plan.json"); write(planPath, plan);
     const materializedPath = resolve(work, "materialized");
     const materialization = materializePortfolio({ root, config, planPath, outputPath: materializedPath, repositoryRevision: implementation.revision });
@@ -332,6 +334,11 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
             assert.equal(step.prompt_role, target.prompt_role);
             assert.equal(step.automatic_retry_performed, false);
             assert.equal(step.collection.terminal_count, index + 1);
+            const commandEvidence = read(resolve(roles[target.prompt_role].execution.runDir, "cases",
+              step.native_case_id, "attempts", "0001", "command-evidence.json"));
+            assert.equal(commandEvidence.capture.evidence_level, "executed");
+            assert.equal(commandEvidence.command_event_count, 1);
+            assert.equal(commandEvidence.commands[0].status, "succeeded");
             record.synthetic_native_attempts++;
             progress("fake_trial_terminal", { ordinal: index + 1, prompt_role: target.prompt_role,
               terminal_count: step.collection.terminal_count,
@@ -1271,9 +1278,20 @@ if (process.argv[2] === "--worker") {
       const path = `benchmarks/fixtures/admission-decision/${fixtureId}-admission-decision.json`;
       if (existsSync(resolve(clone, path))) git(clone, "rm", "--", path);
     }
+    // The frozen measurement config has no command-evidence references. Only
+    // this disposable positive test clone binds the existing public contracts,
+    // so its fake command event can prove the scored verification path.
+    const syntheticConfigPath = resolve(clone, "benchmarks/prompt-successor-execution.config.json");
+    const syntheticConfig = read(syntheticConfigPath);
+    for (const fixture of syntheticConfig.fixtures) {
+      assert.equal(fixture.verification_command_contract, undefined);
+      const path = `benchmarks/fixtures/checkpoint-b2/${fixture.id}/verification-command-contract.json`;
+      fixture.verification_command_contract = { path, sha256: hash(readFileSync(resolve(clone, path))).slice(7) };
+    }
+    writeFileSync(syntheticConfigPath, `${JSON.stringify(syntheticConfig, null, 2)}\n`);
     const privateBase = resolve(work, "synthetic-private"); mkdirSync(privateBase);
     const candidates = createIssue291SyntheticPendingPackages({ root: clone, privateBase, revision: sourceRevision });
-    git(clone, "add", "--", "benchmarks/fixtures/checkpoint-b2");
+    git(clone, "add", "--", "benchmarks/fixtures/checkpoint-b2", "benchmarks/prompt-successor-execution.config.json");
     git(clone, "-c", "user.name=ASK synthetic integration", "-c", "user.email=synthetic-test@example.invalid",
       "-c", "commit.gpgsign=false", "commit", "-m", "test-only pending calibration packages");
     const reviewedHead = git(clone, "rev-parse", "HEAD");
