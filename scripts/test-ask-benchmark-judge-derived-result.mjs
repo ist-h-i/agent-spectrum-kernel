@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { canonicalDigest } from "./content-addressed-store.mjs";
-import { computeEvaluationDigest, computeEvaluationId } from "./ask-benchmark-evaluator-boundary.mjs";
+import { computeEvaluationDigest, computeEvaluationId, validateExecutionEventEvidenceReferences } from "./ask-benchmark-evaluator-boundary.mjs";
 import { buildJudgePacket, createJudgeProtocol, createJudgeRequest, runJudgeSlots } from "./ask-benchmark-llm-judge.mjs";
 import { deriveJudgeResultCandidate, readJudgeTargetManifest } from "./ask-benchmark-judge-derived-result.mjs";
 import { syntheticSuccessorEvaluatorEnvelope } from "./test-prompt-successor-scoring-fixtures.mjs";
@@ -61,7 +61,7 @@ function originalAuthority(finalBytes = outputBytes) {
   const result = syntheticSuccessorEvaluatorEnvelope({ normalized,
     sourceSnapshotDigest: rawDigest(Buffer.from("synthetic-snapshot")), context,
     outcome: "manual_review_required" });
-  return { normalized, result, scoringInputs, finalBytes };
+  return { normalized, result, scoringInputs, context, finalBytes };
 }
 
 function refreshEvaluation(result) {
@@ -226,6 +226,9 @@ test("required verification evidence cannot be promoted by an empty review comma
   assert.deepEqual(derived.result.verification_correctness.evidence_references,
     [{ kind: "normalized_result", digest: original.normalized.normalized_result_digest, bytes: null }]);
   assert.ok(derived.result.requirement_results.every(item => item.outcome === "pass"));
+  assert.throws(() => syntheticSuccessorEvaluatorEnvelope({ normalized: original.normalized,
+    sourceSnapshotDigest: original.result.source_snapshot_digest, context: original.context,
+    comparisonReady: true }), /requires successful command evidence/u);
 });
 
 test("successful required command evidence supplies the causal review reference", async () => {
@@ -243,4 +246,10 @@ test("successful required command evidence supplies the causal review reference"
   assert.equal(derived.result.verification_correctness.state, "pass");
   assert.deepEqual(derived.result.verification_correctness.evidence_references,
     [{ kind: "execution_event", digest: execution.digest, bytes: execution.bytes }]);
+  const fixtureEnvelope = syntheticSuccessorEvaluatorEnvelope({ normalized: original.normalized,
+    sourceSnapshotDigest: original.result.source_snapshot_digest, context: original.context,
+    comparisonReady: true });
+  assert.deepEqual(fixtureEnvelope.verification_correctness.evidence_references,
+    derived.result.verification_correctness.evidence_references);
+  validateExecutionEventEvidenceReferences({ normalized: original.normalized, result: fixtureEnvelope });
 });

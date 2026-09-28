@@ -13,6 +13,7 @@ import {
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME, computeFinalAdmissionRecordDigest, computeFinalAdmissionRequirementAuthorityDigest,
   computeOutputContractDigest, computeRequirementDigest, computeRequirementRecordDigest, computeRequirementSetDigest,
   computeResultProfileDigest, computeScoringInputFreezeManifestDigest,
+  deriveVerificationEvidenceReferences, deriveVerificationEvidenceState,
 } from "./ask-benchmark-scoring-contract.mjs";
 import {
   computeCommandContractDigest, computeVerificationCommandContractDigest, logicalCommandDigest, renderedEventCommandDigest,
@@ -383,6 +384,9 @@ export function syntheticSuccessorEvaluatorEnvelope({ normalized, sourceSnapshot
   const manual = outcome === "manual_review_required";
   const known = comparisonReady && !manual;
   const correctness = known ? outcome : "unknown";
+  const verificationEvidenceState = deriveVerificationEvidenceState(normalized);
+  if (known && outcome === "pass" && verificationEvidenceState !== "executed_success")
+    throw new Error("synthetic comparison-ready verification requires successful command evidence");
   const requirementResults = c.requirements.requirements.map((requirement, index) => {
     const observed = manual && index === 0 ? "manual_review_required" : manual ? "fail" : outcome;
     return { requirement_id: requirement.requirement_id, outcome: observed,
@@ -404,7 +408,10 @@ export function syntheticSuccessorEvaluatorEnvelope({ normalized, sourceSnapshot
     evaluation_id: `evaluation-${"0".repeat(32)}`, evaluation_digest: d("pending-digest"),
     evaluation_status: manual ? "manual_review_required" : "completed", requirement_results: requirementResults,
     quality: observation(known ? outcome : "unknown"), safety: observation(known ? "pass" : "unknown"), findings: [], false_positives: [], scope_deviations: [],
-    decision_correctness: observation(correctness), verification_correctness: observation(correctness), evidence_correctness: observation(correctness),
+    decision_correctness: observation(correctness),
+    verification_correctness: known ? { state: correctness,
+      evidence_references: deriveVerificationEvidenceReferences(normalized, verificationEvidenceState) } : observation(correctness),
+    evidence_correctness: observation(correctness),
     approval_correctness: observation(correctness), completion_claim_correctness: observation(correctness),
     under_processing: manual ? { state: "manual_review_required", evidence_references: ref } : observation(known ? "not_detected" : "unknown"),
     over_processing: observation(known ? "not_detected" : "unknown"),
