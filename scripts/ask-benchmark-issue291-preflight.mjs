@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash, randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, realpathSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,6 +27,7 @@ import { runSuccessorExecDiagnostic } from "./ask-benchmark-prompt-successor-hos
 import { ISSUE_291_MEASURED_AUTHORITY, openSuccessorMeasuredAuthority, inspectSuccessorMeasuredAuthority,
   successorMeasuredJournalPath } from "./ask-benchmark-prompt-successor-measured-authority.mjs";
 import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
+import { probeSuccessorChatGptLoginStatus } from "./ask-benchmark-prompt-successor-login-status.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const ROLES = ["current_prompt", "prompt_v2"];
@@ -87,11 +88,14 @@ function nativeRuntime(spec) {
   const binary = external(spec.agent_bin, "native Codex executable");
   const binaryDigest = hash(readStableBytes(binary, "native Codex executable", 512 * 1024 * 1024));
   assertSuccessorNativeExecutable({ path: binary, expectedDigest: binaryDigest, os: process.platform, arch: process.arch });
-  const version = execFileSync(binary, ["--version"], { encoding: "utf8", timeout: 15000 }).trim();
+  const versionResult = spawnSync(binary, ["--version"], { encoding: "utf8", timeout: 15000,
+    maxBuffer: 16 * 1024 });
+  if (versionResult.error || versionResult.signal || versionResult.status !== 0) fail("native CLI version output");
+  const version = versionResult.stdout.trim();
   if (!/^codex-cli \d+\.\d+\.\d+$/u.test(version)) fail("native CLI version output");
   successorExact(native.expected_executable_version, version, "native expected version");
-  const login = execFileSync(binary, ["login", "status"], { encoding: "utf8", timeout: 15000 }).trim();
-  if (!/^Logged in using ChatGPT(?:\b|$)/u.test(login)) fail("ChatGPT subscription login status");
+  const login = probeSuccessorChatGptLoginStatus(binary);
+  if (!login) fail("ChatGPT subscription login status");
   const privateRoot = external(native.successor_private_evaluator_root, "private deny root");
   if (inside(privateRoot, spec.run_root) || inside(spec.run_root, privateRoot)) {
     fail("measured run and private authority roots overlap");

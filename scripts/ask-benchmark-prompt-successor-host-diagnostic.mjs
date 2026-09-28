@@ -17,6 +17,7 @@ import { assertSuccessorAdapterFacts, assertSuccessorProfileCommand } from "./as
 import { capturedSuccessorEnvironment, probeSuccessorPrivateRootDeny } from "./ask-benchmark-prompt-successor-host-isolation.mjs";
 import { validateSuccessorFromRepository } from "./ask-benchmark-prompt-successor-repository.mjs";
 import { successorClosed, successorExact, successorFail } from "./ask-benchmark-prompt-successor.mjs";
+import { probeSuccessorChatGptLoginStatus } from "./ask-benchmark-prompt-successor-login-status.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const ROLES = ["current_prompt", "prompt_v2"];
@@ -282,7 +283,7 @@ function unlinkAuth(path) {
   const link = resolve(path, "auth.json");
   rmSync(link, { force: true });
 }
-function runNoModelPreflight({ executable, environment, auth, command, privateRoot, runtime, cwd }) {
+export function runNoModelPreflight({ executable, environment, auth, command, privateRoot, runtime, cwd }) {
   const home = mkdtempSync(resolve(tmpdir(), "ask-issue291-diagnostic-check-"));
   chmodSync(home, 0o700);
   symlinkSync(auth, resolve(home, "auth.json"));
@@ -293,9 +294,8 @@ function runNoModelPreflight({ executable, environment, auth, command, privateRo
     if (version.error || version.signal || version.status !== 0 || versionText !== `codex-cli ${runtime.cli_version}`) {
       fail("diagnostic native CLI version is unverified");
     }
-    const login = spawnSync(executable, ["login", "status"], { cwd, env, encoding: "utf8", timeout: 15000, maxBuffer: 16 * 1024 });
-    const loginStatus = `${login.stdout ?? ""}${login.stderr ?? ""}`.trim();
-    if (login.error || login.signal || login.status !== 0 || loginStatus !== "Logged in using ChatGPT") {
+    const loginStatus = probeSuccessorChatGptLoginStatus(executable, { cwd, env });
+    if (!loginStatus) {
       fail("diagnostic subscription login status is unverified");
     }
     const help = spawnSync(executable, ["exec", "--help"], { cwd, env, encoding: "utf8", timeout: 15000, maxBuffer: 64 * 1024 });

@@ -145,6 +145,36 @@ int main(int argc, char **argv) {
     return 0;
   }
   if (argc == 3 && !strcmp(argv[1], "login") && !strcmp(argv[2], "status")) {
+    const char *login_mode = getenv("ASK_SUCCESSOR_FAKE_LOGIN_MODE");
+    if (login_mode && !strcmp(login_mode, "stderr")) {
+      fputs("Logged in using ChatGPT\n", stderr); return 0;
+    }
+    if (login_mode && !strcmp(login_mode, "api-key")) { puts("Logged in using an API key"); return 0; }
+    if (login_mode && !strcmp(login_mode, "logged-out")) { fputs("Not logged in\n", stderr); return 0; }
+    if (login_mode && !strcmp(login_mode, "empty")) return 0;
+    if (login_mode && !strcmp(login_mode, "duplicate")) {
+      puts("Logged in using ChatGPT"); fputs("Logged in using ChatGPT\n", stderr); return 0;
+    }
+    if (login_mode && !strcmp(login_mode, "contradiction")) {
+      puts("Logged in using ChatGPT"); fputs("Not logged in\n", stderr); return 0;
+    }
+    if (login_mode && !strcmp(login_mode, "extra")) {
+      puts("Logged in using ChatGPT"); puts("unknown diagnostic"); return 0;
+    }
+    if (login_mode && !strcmp(login_mode, "nonzero")) {
+      fputs("Logged in using ChatGPT\n", stderr); return 7;
+    }
+    if (login_mode && !strcmp(login_mode, "signal")) {
+      fputs("Logged in using ChatGPT\n", stderr); fflush(stderr); raise(SIGTERM); return 70;
+    }
+    if (login_mode && !strcmp(login_mode, "overflow")) {
+      fputs("Logged in using ChatGPT\n", stderr);
+      for (int i = 0; i < 20000; ++i) fputc('x', stderr);
+      return 0;
+    }
+    if (login_mode && !strcmp(login_mode, "invalid-utf8")) {
+      fputs("Logged in using ChatGPT", stderr); fputc(0xff, stderr); return 0;
+    }
     puts("Logged in using ChatGPT"); return 0;
   }
   if (argc >= 3 && !strcmp(argv[1], "debug") && !strcmp(argv[2], "prompt-input")) return fake_debug_prompt_input(argc, argv);
