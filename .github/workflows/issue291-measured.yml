@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'scripts/*successor*'
+      - 'scripts/*judge*'
+      - 'benchmarks/prompt-successor-*.json'
+      - 'docs/prompt-successor-*judge*'
       - 'scripts/*calibration-execution-admission*'
       - 'scripts/ask-benchmark-execution.mjs'
       - 'scripts/ask-benchmark-normalized-results.mjs'
@@ -86,7 +89,7 @@ jobs:
       - name: Verify calibration execution admission boundaries
         run: node --test scripts/test-ask-benchmark-calibration-execution-admission.mjs scripts/test-ask-benchmark-prompt-successor-host-isolation.mjs scripts/test-ask-benchmark-prompt-successor-host-diagnostic.mjs
       - name: Verify login and synthetic Judge authority boundaries
-        run: node --test scripts/test-ask-benchmark-issue291-login.mjs scripts/test-ask-benchmark-llm-judge.mjs scripts/test-ask-benchmark-judge-derived-result.mjs
+        run: node --test scripts/test-ask-benchmark-issue291-login.mjs scripts/test-ask-benchmark-llm-judge.mjs scripts/test-ask-benchmark-judge-derived-result.mjs scripts/test-ask-benchmark-judge-qualification.mjs scripts/test-ask-benchmark-judge-native-capture.mjs
       - name: Verify native successor transport and normalized usage
         run: node --test scripts/test-ask-benchmark-prompt-successor-execution.mjs
       - name: Verify native collection and existing scoring boundaries

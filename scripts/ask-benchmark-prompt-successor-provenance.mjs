@@ -78,10 +78,13 @@ export async function verifySuccessorSourceProvenance({
   let measuredCollectionDigest = null;
   let measuredEffectiveAdmission = null;
   let measuredFreezeDigest = null;
+  let measuredJudgeQualifications = null;
   if (accessMode === "measured") {
     const { assertSuccessorMeasuredSourceAuthority, successorMeasuredEffectiveAdmission } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
     const { assertSuccessorMeasuredCompletion } = await import("./ask-benchmark-prompt-successor-measured-execution.mjs");
-    measuredFreezeDigest = assertSuccessorMeasuredSourceAuthority(measuredAuthority, { preparation, scope }).authority_record_digest;
+    const measuredEvidence = assertSuccessorMeasuredSourceAuthority(measuredAuthority, { preparation, scope });
+    measuredFreezeDigest = measuredEvidence.authority_record_digest;
+    measuredJudgeQualifications = measuredEvidence.judge_qualifications ?? null;
     // Close every fixture's review and private admission before opening a result.
     measuredEffectiveAdmission = new Map(preparation.predecessor.fixtures.map(({ fixture_id }) => [fixture_id,
       successorMeasuredEffectiveAdmission(measuredAuthority, fixture_id, {
@@ -157,6 +160,9 @@ export async function verifySuccessorSourceProvenance({
     let derived = original;
     if (judgeInput) {
       successorClosed(judgeInput, ["storeRoot", "protocol", "request", "packet", "derivedResultPath"], "case Judge authority");
+      if (measuredJudgeQualifications !== null) {
+        successorExact(judgeInput.protocol.protocol_digest, measuredJudgeQualifications[target.fixture_id]?.protocol_digest, "qualified Judge protocol");
+      }
       const reopened = reopenJudgeResolution({ storeRoot: judgeInput.storeRoot,
         protocol: judgeInput.protocol, request: judgeInput.request, packet: judgeInput.packet });
       const expectedAuthorityProfile = preparation.runtime.model === "synthetic-native-fake-not-a-service"

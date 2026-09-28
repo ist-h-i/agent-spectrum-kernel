@@ -591,6 +591,7 @@ function withBudgetLock(root, action) {
 
 function reserveSlot(root, protocol, request, packet, slot) {
   return withBudgetLock(root, () => {
+    assertQualificationRequest(root, protocol, request);
     const current = checkedSlot(root, protocol, request, packet, slot);
     if (current.claim || current.blocked) return false;
     const budget = budgetSnapshot(root, protocol);
@@ -652,6 +653,7 @@ export async function runJudgeSlots({ storeRoot, protocol, request, packet, adap
   authority(adapter && typeof adapter === "object" && typeof adapter.invoke === "function", "judge_adapter_missing");
   authority(adapter.kind === "fake_adapter", "judge_adapter_profile_mismatch");
   const root = ensureExternalRoot(storeRoot, protocol, { create: true });
+  assertQualificationRequest(root, protocol, request);
   storeBindings(storeRoot, root, protocol, request, packet);
   for (const slot of SLOTS) {
     let current = checkedSlot(root, protocol, request, packet, slot);
@@ -685,4 +687,75 @@ export async function runJudgeSlots({ storeRoot, protocol, request, packet, adap
   const reopened = reopenJudgeResolution({ storeRoot, protocol, request, packet });
   putContentAddressedJson({ storeRoot, artifact: reopened.resolution, digest: canonicalDigest(reopened.resolution), maximumBytes: MAX_LEDGER_BYTES });
   return reopened;
+}
+
+
+function qualificationInventory(root, protocol) {
+  const record = readIfPresent(resolve(root, "qualification-binding.json"), "Judge qualification binding");
+  if (record === null) return null;
+  closed(record, ["schema_version", "kind", "protocol_digest", "plan_digest", "requests", "binding_digest"], "qualification_binding_shape");
+  const { binding_digest: bindingDigest, ...body } = record;
+  authority(record.schema_version === "1.0.0" && record.kind === "llm_judge_qualification_binding"
+    && record.protocol_digest === protocol.protocol_digest && bindingDigest === canonicalDigest(body), "qualification_binding_identity");
+  digest(record.plan_digest, "qualification_plan_digest");
+  authority(Array.isArray(record.requests) && record.requests.length === protocol.limits.max_samples, "qualification_inventory_size");
+  const seen = new Set();
+  for (const [index, item] of record.requests.entries()) {
+    closed(item, ["sample_index", "request_digest"], "qualification_request_shape");
+    digest(item.request_digest, "qualification_request_digest");
+    authority(item.sample_index === index && !seen.has(item.request_digest), "qualification_request_inventory");
+    seen.add(item.request_digest);
+  }
+  return record;
+}
+
+function assertQualificationRequest(root, protocol, request) {
+  const record = qualificationInventory(root, protocol);
+  if (record !== null) authority(record.requests[request.private_binding.sample_index]?.request_digest
+    === request.request_digest, "qualification_request_not_frozen");
+}
+
+/** Uses the claim lock: a qualification label inventory cannot be sealed after a call. */
+export function sealJudgeQualificationInventory({ storeRoot, protocol, planBody, requests }) {
+  const planDigest = canonicalDigest(planBody);
+  verifyJudgeProtocol(protocol);
+  digest(planDigest, "qualification_plan_digest");
+  const root = ensureExternalRoot(storeRoot, protocol, { create: true });
+  const body = { schema_version: "1.0.0", kind: "llm_judge_qualification_binding",
+    protocol_digest: protocol.protocol_digest, plan_digest: planDigest, requests };
+  const record = { ...body, binding_digest: canonicalDigest(body) };
+  // Validate before writing, including the complete unique contiguous inventory.
+  authority(Array.isArray(requests) && requests.length === protocol.limits.max_samples, "qualification_inventory_size");
+  const seen = new Set();
+  for (const [index, item] of requests.entries()) {
+    closed(item, ["sample_index", "request_digest"], "qualification_request_shape");
+    digest(item.request_digest, "qualification_request_digest");
+    authority(item.sample_index === index && !seen.has(item.request_digest), "qualification_request_inventory");
+    seen.add(item.request_digest);
+  }
+  authority(Buffer.byteLength(stableCanonicalJson(record)) <= MAX_LEDGER_BYTES, "qualification_binding_too_large");
+  authority(Buffer.byteLength(stableCanonicalJson(planBody)) <= 64 * 1024 * 1024, "qualification_plan_too_large");
+  return withBudgetLock(root, () => {
+    const previous = qualificationInventory(root, protocol);
+    if (previous !== null) {
+      authority(stableCanonicalJson(previous) === stableCanonicalJson(record), "qualification_already_frozen");
+      const saved = readContentAddressedJson({ storeRoot, digest: planDigest, maximumBytes: 64 * 1024 * 1024 });
+      authority(stableCanonicalJson(saved.value) === stableCanonicalJson(planBody), "qualification_plan_reopen");
+      return structuredClone(previous);
+    }
+    const samplesRoot = resolve(root, "samples");
+    assertNoSymlinkPathSegments(samplesRoot, "qualification samples", { allowMissingLeaf: true });
+    authority(!existsSync(samplesRoot) || readdirSync(samplesRoot).length === 0, "qualification_must_precede_calls");
+    putContentAddressedJson({ storeRoot, artifact: planBody, digest: planDigest, maximumBytes: 64 * 1024 * 1024 });
+    writeCanonicalJsonNoReplace({ outputPath: resolve(root, "qualification-binding.json"),
+      artifact: record, label: "Judge qualification binding" });
+    return structuredClone(record);
+  });
+}
+
+export function readJudgeQualificationInventory({ storeRoot, protocol }) {
+  verifyJudgeProtocol(protocol);
+  const record = qualificationInventory(ensureExternalRoot(storeRoot, protocol), protocol);
+  authority(record !== null, "qualification_not_frozen");
+  return structuredClone(record);
 }

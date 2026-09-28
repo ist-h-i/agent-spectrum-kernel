@@ -13,6 +13,7 @@ import { createIssue291SyntheticPendingPackages, createIssue291SyntheticReviewOv
 import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
 import { buildJudgePacket, createJudgeProtocol, createJudgeRequest, runJudgeSlots } from "./ask-benchmark-llm-judge.mjs";
 import { deriveJudgeResultCandidate, readJudgeTargetManifest, writeJudgeDerivedResult } from "./ask-benchmark-judge-derived-result.mjs";
+import { JUDGE_QUALIFICATION_CLASSES, sealJudgeQualification, runJudgeQualification } from "./ask-benchmark-judge-qualification.mjs";
 import { computeEvaluationDigest, computeEvaluationId } from "./ask-benchmark-evaluator-boundary.mjs";
 
 const root = realpathSync(resolve(fileURLToPath(new URL("..", import.meta.url))));
@@ -93,7 +94,7 @@ function syntheticJudgeAdapter(packet, verdict, observe) {
   } };
 }
 
-async function worker(contextPath, { pendingAdmissionRegression = false, positiveAdmission = false } = {}) {
+async function worker(contextPath, { pendingAdmissionRegression = false, positiveAdmission = false, qualificationFreezeOnly = false } = {}) {
   const context = read(contextPath);
   assert.equal(root, realpathSync(context.clone), "worker runs only in its isolated local clone");
   assert.equal(git(root, "rev-parse", "HEAD"), context.cloneRevision);
@@ -296,6 +297,32 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
         assert.equal(evidence.automatic_retry_authorized, false);
         record.synthetic_admission_digest = evidence.admission_digest;
       });
+      const judgeQualifications = {};
+      await check("separate synthetic qualification corpus binds both semantic fixtures before freeze", async () => {
+        const targets = readJudgeTargetManifest(root);
+        let calls = 0;
+        for (const [fixtureId, target] of Object.entries(targets.value.fixtures)) {
+          if (target.semantic_requirements.length === 0) continue;
+          const requirements = read(resolve(root, "benchmarks/fixtures/checkpoint-b2", fixtureId, "requirement-record.json"));
+          const protocol = syntheticJudgeProtocol({ fixtureId, targetManifest: targets, requirements });
+          // These scripted labels exercise persistence, not semantic correctness.
+          const samples = JUDGE_QUALIFICATION_CLASSES.map((case_class, index) => ({ fixture_id: fixtureId, case_class,
+            packet: buildJudgePacket({ protocol, sampleId: sampleId(`qualification-${fixtureId}-${index}`),
+              task: "Synthetic qualification plumbing control only.", documents: [{ kind: "source", text: JSON.stringify(requirements) }],
+              verifiedFacts: [], originalOutputBytes: Buffer.from("Synthetic labelled control, not a measured output.") }).packet,
+            expected: protocol.criteria.map(({ criterion_id }) => ({ criterion_id, verdict: "pass" })) }));
+          const storeRoot = resolve(privateDenyRoot, "synthetic-qualification", fixtureId);
+          const sealed = sealJudgeQualification({ storeRoot, protocol, samples,
+            labelSource: { kind: "synthetic", source_digest: canonicalDigest(samples), review_digest: null } });
+          const report = await runJudgeQualification({ storeRoot, planDigest: sealed.plan_digest,
+            adapter: { kind: "fake_adapter", invoke: input => syntheticJudgeAdapter(input.packet, "pass", () => calls++).invoke(input) } });
+          assert.equal(report.all_expected_matched, true);
+          assert.equal(report.live_qualification_established, false);
+          judgeQualifications[fixtureId] = { storeRoot, planDigest: sealed.plan_digest, reportDigest: report.report_digest };
+        }
+        assert.equal(calls, 24);
+        record.synthetic_qualification_calls = calls;
+      });
       let measuredAuthority;
       const hostIsolationProbePath = context.admissionSourcesByFixture[manifest.fixtures[0].fixture_id].manifestPath;
       const diagnosticRoot = resolve(work, "host-diagnostic"); mkdirSync(diagnosticRoot);
@@ -312,11 +339,47 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
       await check("result-blind measured freeze binds the synthetic admission and exact fake native sources", async () => {
         measuredAuthority = await asyncEnvironment(env, () => openSuccessorMeasuredAuthority({ preparation,
           sources: measuredSources, scoringInputs, calibrationAdmission, hostIsolationProbePath,
-          hostExecutionDiagnosticRoot: diagnosticRoot, normalizedRoots, root }));
+          hostExecutionDiagnosticRoot: diagnosticRoot, normalizedRoots, judgeQualifications, root }));
         assert.ok(measuredAuthority);
         record.synthetic_freeze_digest = (await import("./ask-benchmark-prompt-successor-measured-authority.mjs"))
           .inspectSuccessorMeasuredAuthority(measuredAuthority).authority_record_digest;
       });
+      if (qualificationFreezeOnly) {
+        await check("qualified freeze rejects omitted evidence and drift without a trial claim", async () => {
+          const { inspectSuccessorMeasuredAuthority } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
+          const proof = inspectSuccessorMeasuredAuthority(measuredAuthority);
+          assert.equal(proof.schema_version, "1.2.0");
+          assert.deepEqual(Object.keys(proof.judge_qualifications).sort(), Object.keys(judgeQualifications).sort());
+          const options = { preparation, sources: measuredSources, scoringInputs, calibrationAdmission,
+            hostIsolationProbePath, hostExecutionDiagnosticRoot: diagnosticRoot, normalizedRoots, root };
+          await assert.rejects(() => asyncEnvironment(env, () => openSuccessorMeasuredAuthority(options)),
+            error => error.code === "SUCCESSOR_IDENTITY_MISMATCH");
+          const fixtureId = Object.keys(judgeQualifications)[0];
+          const reference = judgeQualifications[fixtureId];
+          const bindingPath = resolve(reference.storeRoot, "judge/v1", proof.judge_qualifications[fixtureId].protocol_digest.slice(7), "qualification-binding.json");
+          const saved = readFileSync(bindingPath);
+          try {
+            writeFileSync(bindingPath, "{}\n");
+            assert.throws(() => inspectSuccessorMeasuredAuthority(measuredAuthority));
+          } finally { writeFileSync(bindingPath, saved); }
+          assert.deepEqual(inspectSuccessorMeasuredAuthority(measuredAuthority), proof);
+          const reopened = await asyncEnvironment(env, () => openSuccessorMeasuredAuthority({ ...options, judgeQualifications }));
+          assert.deepEqual(inspectSuccessorMeasuredAuthority(reopened), proof);
+          for (const role of Object.values(measuredSources)) {
+            const actual = inspectVerifiedPortfolioExecution({ ...role.execution, root });
+            assert.ok(actual.cases.every(item => item.state.status === "pending" && item.attempts.length === 0));
+          }
+          assert.equal(existsSync(successorMeasuredJournalPath(measuredAuthority, { preparation, sources: measuredSources })), false);
+          record.qualification_bindings = proof.judge_qualifications;
+          record.terminal_count = 0;
+          record.paired_blocks = 0;
+          record.final_revision = git(root, "rev-parse", "HEAD");
+          record.final_status = git(root, "status", "--porcelain");
+          assert.equal(record.final_status, "");
+        });
+        record.completed = true;
+        return;
+      }
       progress("journal_path_started");
       const journalPathStarted = performance.now();
       const journalPath = successorMeasuredJournalPath(measuredAuthority, { preparation, sources: measuredSources });
@@ -1372,9 +1435,11 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
 
 if (process.argv[2] === "--worker") {
   await worker(process.argv[3], { pendingAdmissionRegression: process.argv[4] === "--pending-admission-regression",
-    positiveAdmission: process.argv[4] === "--synthetic-positive" });
+    positiveAdmission: ["--synthetic-positive", "--synthetic-qualification-freeze"].includes(process.argv[4]),
+    qualificationFreezeOnly: process.argv[4] === "--synthetic-qualification-freeze" });
 } else {
-  await test("28 fake trials pass calibration admission, measured provenance, and #197 paired scoring", { timeout: 10800000 }, async t => {
+  const qualificationFreezeOnly = process.argv.includes("--qualification-freeze-only");
+  await test(qualificationFreezeOnly ? "synthetic qualification binds and reopens a pre-trial freeze" : "28 fake trials pass calibration admission, measured provenance, and #197 paired scoring", { timeout: 10800000 }, async t => {
     assert.equal(process.versions.node.split(".")[0], "24", "Node 24 required; no successful skip");
     const sourceRevision = git(root, "rev-parse", "HEAD"); assert.equal(git(root, "status", "--porcelain"), "");
     const work = mkdtempSync(resolve(realpathSync(tmpdir()), "ask-successor-scoring-positive-"));
@@ -1388,17 +1453,13 @@ if (process.argv[2] === "--worker") {
       const path = `benchmarks/fixtures/admission-decision/${fixtureId}-admission-decision.json`;
       if (existsSync(resolve(clone, path))) git(clone, "rm", "--", path);
     }
-    // The frozen measurement config has no command-evidence references. Only
-    // this disposable positive test clone binds the existing public contracts,
-    // so its fake command event can prove the scored verification path.
-    const syntheticConfigPath = resolve(clone, "benchmarks/prompt-successor-execution.config.json");
-    const syntheticConfig = read(syntheticConfigPath);
-    for (const fixture of syntheticConfig.fixtures) {
-      assert.equal(fixture.verification_command_contract, undefined);
+    // Consume the submitted candidate config. Do not repair missing production
+    // command bindings in the test clone or mistake them for formal admission.
+    const submittedConfig = read(resolve(clone, "benchmarks/prompt-successor-execution.config.json"));
+    for (const fixture of submittedConfig.fixtures) {
       const path = `benchmarks/fixtures/checkpoint-b2/${fixture.id}/verification-command-contract.json`;
-      fixture.verification_command_contract = { path, sha256: hash(readFileSync(resolve(clone, path))).slice(7) };
+      assert.deepEqual(fixture.verification_command_contract, { path, sha256: hash(readFileSync(resolve(clone, path))).slice(7) });
     }
-    writeFileSync(syntheticConfigPath, `${JSON.stringify(syntheticConfig, null, 2)}\n`);
     const privateBase = resolve(work, "synthetic-private"); mkdirSync(privateBase);
     const candidates = createIssue291SyntheticPendingPackages({ root: clone, privateBase, revision: sourceRevision });
     git(clone, "add", "--", "benchmarks/fixtures/checkpoint-b2", "benchmarks/prompt-successor-execution.config.json");
@@ -1420,7 +1481,7 @@ if (process.argv[2] === "--worker") {
     writeFileSync(progressPath, "", { flag: "wx", mode: 0o600 });
     t.diagnostic(`Synthetic fake-trial progress while running: ${progressPath}`);
     const result = spawnSync(process.execPath,
-      [resolve(clone, relative(root, fileURLToPath(import.meta.url))), "--worker", contextPath, "--synthetic-positive"],
+      [resolve(clone, relative(root, fileURLToPath(import.meta.url))), "--worker", contextPath, qualificationFreezeOnly ? "--synthetic-qualification-freeze" : "--synthetic-positive"],
       { cwd: clone, encoding: "utf8", timeout: 10600000, maxBuffer: 20 * 1024 * 1024 });
     if (result.stdout) console.log(result.stdout);
     if (result.stderr) console.error(result.stderr);
@@ -1428,15 +1489,17 @@ if (process.argv[2] === "--worker") {
     assert.equal(result.status, 0, result.stderr || result.stdout);
     const proof = read(resolve(work, "scoring-verification.json"));
     assert.equal(proof.completed, true);
-    assert.equal(proof.synthetic_native_attempts, 28);
-    assert.equal(proof.terminal_count, 28);
-    assert.equal(proof.paired_blocks, 14);
+    assert.equal(proof.synthetic_native_attempts, qualificationFreezeOnly ? 0 : 28);
+    assert.equal(proof.terminal_count, qualificationFreezeOnly ? 0 : 28);
+    assert.equal(proof.paired_blocks, qualificationFreezeOnly ? 0 : 14);
+    assert.equal(proof.synthetic_qualification_calls, 24);
     assert.equal(proof.declared_activity.evidence_kind, "expected_not_instrumented");
-    t.diagnostic(`Synthetic scoring proof: ${proof.checks.length} checks, 28 fake attempts, 14 paired blocks`);
+    t.diagnostic(`Synthetic scoring proof: ${proof.checks.length} checks, ${proof.synthetic_native_attempts} fake attempts, ${proof.paired_blocks} paired blocks`);
+    if (qualificationFreezeOnly) console.log(JSON.stringify({ qualification_freeze_proof: proof }));
     assert.equal(git(root, "rev-parse", "HEAD"), sourceRevision);
     assert.equal(git(root, "status", "--porcelain"), "");
   });
-  await test("pending synthetic public inputs reject measured freeze without calibration execution admission", { timeout: 10800000 }, async t => {
+  if (!qualificationFreezeOnly) await test("pending synthetic public inputs reject measured freeze without calibration execution admission", { timeout: 10800000 }, async t => {
     assert.equal(process.versions.node.split(".")[0], "24", "Node 24 required; no successful skip");
     assert.ok(["darwin", "linux"].includes(process.platform));
     const sourceRevision = git(root, "rev-parse", "HEAD"); assert.equal(git(root, "status", "--porcelain"), "");
