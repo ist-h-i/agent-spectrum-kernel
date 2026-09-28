@@ -8,7 +8,10 @@ import {
 import {
   computeEvaluationDigest, computeEvaluationId, validateExecutionEventEvidenceReferences,
 } from "./ask-benchmark-evaluator-boundary.mjs";
-import { validateEvaluatorAuthorityBindings } from "./ask-benchmark-scoring-contract.mjs";
+import {
+  deriveEffectiveVerificationEvidenceReferences, deriveEffectiveVerificationEvidenceState,
+  validateEvaluatorAuthorityBindings,
+} from "./ask-benchmark-scoring-contract.mjs";
 import { verifyJudgeResolution } from "./ask-benchmark-llm-judge.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -185,12 +188,17 @@ export function deriveJudgeResultCandidate({ original, protocol, request, packet
     : source[field]?.state === "pass" && machineValue === "manual_review_required" ? "pass" : machineValue;
   const decisionState = machineCategory("decision_correctness",
     target.expected_review_decisions.includes(reviewOutput.decision) ? "pass" : "fail");
-  const verificationState = machineCategory("verification_correctness",
-    reviewOutput.verification_commands.length === 0 ? "pass" : "manual_review_required");
+  const verificationEvidenceState = deriveEffectiveVerificationEvidenceState({ normalizedResult: normalized,
+    evaluatorResult: source });
+  const verificationState = source.verification_correctness?.state === "fail" ? "fail"
+    : verificationEvidenceState === "executed_success" && reviewOutput.verification_commands.length === 0
+      ? "pass" : "manual_review_required";
   const completionState = machineCategory("completion_claim_correctness",
     reviewOutput.completion_claim === "not_applicable" ? "pass" : "manual_review_required");
   derived.decision_correctness = state(decisionState);
-  derived.verification_correctness = state(verificationState);
+  derived.verification_correctness = { state: verificationState,
+    evidence_references: deriveEffectiveVerificationEvidenceReferences({ normalizedResult: normalized,
+      evaluatorResult: source, state: verificationEvidenceState }) };
   derived.completion_claim_correctness = state(completionState);
   const fixedFields = ["quality"];
   if (new Set(fixedFields.map(field => source[field]?.state)).size !== 1)

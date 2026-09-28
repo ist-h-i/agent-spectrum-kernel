@@ -254,6 +254,14 @@ int main(int argc, char **argv) {
     : "{\"task_type\":\"implementation\",\"decision\":\"not_applicable\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"complete\",\"route\":null,\"summary\":\"Synthetic native transport fixture. No model or evaluator.\"}\n";
   write_all(fd, json, strlen(json)); close(fd);
   puts("{\"type\":\"turn.started\"}");
+  /* Only the explicitly synthetic scoring fixture emits its required fake
+   * command event. It never executes a command or represents a real run. */
+  const char *fake_command_evidence = getenv("ASK_SUCCESSOR_FAKE_COMMAND_EVIDENCE");
+  if (fake_command_evidence) {
+    if (strcmp(fake_command_evidence, "node-version-success")) return 64;
+    puts("{\"type\":\"item.started\",\"item\":{\"type\":\"command_execution\",\"id\":\"synthetic-version\",\"command\":\"node --version\",\"status\":\"in_progress\"}}");
+    puts("{\"type\":\"item.completed\",\"item\":{\"type\":\"command_execution\",\"id\":\"synthetic-version\",\"command\":\"node --version\",\"status\":\"completed\",\"exit_code\":0,\"aggregated_output\":\"synthetic fixture event\"}}");
+  }
   if (!strcmp(mode, "provider-limit")) {
     puts("{\"type\":\"error\",\"message\":\"You've hit your usage limit. Try again later.\"}");
     puts("{\"type\":\"turn.failed\",\"error\":{\"codex_error_info\":\"usage_limit_exceeded\",\"message\":\"synthetic provider limit\"}}");

@@ -212,3 +212,35 @@ test("frozen review decision is machine checked and unverified claims remain non
   assert.equal(unsupportedCompletion.result.completion_claim_correctness.state, "manual_review_required");
   assert.ok(unsupportedCompletion.result.requirement_results.every(item => item.outcome === "pass"));
 });
+
+test("required verification evidence cannot be promoted by an empty review command list", async () => {
+  const original = originalAuthority();
+  original.normalized.command_evidence = {
+    capture_support: "supported", evidence_level: "complete", cwd_unverified_command_count: 0,
+    references: [], required_command_ids: ["visible-fixture-tests"], required_alternative_groups: [],
+    succeeded_command_ids: [],
+  };
+  const derived = await judge(original, () => "pass");
+  assert.equal(derived.result.evaluation_status, "manual_review_required");
+  assert.equal(derived.result.verification_correctness.state, "manual_review_required");
+  assert.deepEqual(derived.result.verification_correctness.evidence_references,
+    [{ kind: "normalized_result", digest: original.normalized.normalized_result_digest, bytes: null }]);
+  assert.ok(derived.result.requirement_results.every(item => item.outcome === "pass"));
+});
+
+test("successful required command evidence supplies the causal review reference", async () => {
+  const original = originalAuthority();
+  const execution = { command_id: "visible-fixture-tests", match_state: "matched",
+    digest: rawDigest(Buffer.from("synthetic-command-event")), bytes: 321,
+    outcome: "succeeded", exit_code: 0 };
+  original.normalized.command_evidence = {
+    capture_support: "supported", evidence_level: "complete", cwd_unverified_command_count: 0,
+    references: [execution], required_command_ids: [execution.command_id], required_alternative_groups: [],
+    succeeded_command_ids: [execution.command_id],
+  };
+  const derived = await judge(original, () => "pass");
+  assert.equal(derived.result.evaluation_status, "completed");
+  assert.equal(derived.result.verification_correctness.state, "pass");
+  assert.deepEqual(derived.result.verification_correctness.evidence_references,
+    [{ kind: "execution_event", digest: execution.digest, bytes: execution.bytes }]);
+});

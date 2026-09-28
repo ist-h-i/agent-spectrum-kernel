@@ -171,7 +171,9 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
       case_timeout_ms: 900000, sandbox_policy: "workspace-write", permission_policy: "never",
       successor_private_evaluator_root: privateDenyRoot,
       executor: { id: "successor-native-fake", version: "1.0.0" },
-      environment_allowlist: ["HOME", "ASK_SUCCESSOR_FAKE_CAPTURE", "ASK_SUCCESSOR_FAKE_MODE"], environment_value_allowlist: [], thermal_state: "cold", claude_cli: null,
+      environment_allowlist: ["HOME", "ASK_SUCCESSOR_FAKE_CAPTURE", "ASK_SUCCESSOR_FAKE_MODE",
+        ...(positiveAdmission ? ["ASK_SUCCESSOR_FAKE_COMMAND_EVIDENCE"] : [])],
+      environment_value_allowlist: [], thermal_state: "cold", claude_cli: null,
       command_evidence: { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.3.0",
         shell_capability: { support_status: "supported", family: "posix_bash", executable: "/bin/bash", envelope_arguments: ["-lc"], authority_source: "codex_exec_jsonl_command_rendering", probe_status: "runtime_event_required", downgrade_reason: null } },
     };
@@ -181,7 +183,8 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
       mkdirSync(resolve(home, ".codex"));
       write(resolve(home, ".codex", "auth.json"), { synthetic_contract_test_only: true });
     }
-    const env = { HOME: home, ASK_SUCCESSOR_FAKE_CAPTURE: capture, ASK_SUCCESSOR_FAKE_MODE: "success" };
+    const env = { HOME: home, ASK_SUCCESSOR_FAKE_CAPTURE: capture, ASK_SUCCESSOR_FAKE_MODE: "success",
+      ...(positiveAdmission ? { ASK_SUCCESSOR_FAKE_COMMAND_EVIDENCE: "node-version-success" } : {}) };
     const runtime = { adapter: "codex", cli_version: "0.153.4", executable_digest: hash(readFileSync(agentBin)), node_version: process.version,
       os: process.platform, arch: process.arch, model: nativeFile.model, provider_model_revision: { status: "unknown", value: null }, reasoning_effort: "medium",
       authentication_mode: "chatgpt_subscription", configuration_digest: hash(readFileSync(runtimeConfigPath)), sandbox: "workspace-write", approval_policy: "never", agent_network: "disabled", provider_network: "provider_only", timeout_ms: 900000 };
