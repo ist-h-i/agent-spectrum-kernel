@@ -57,6 +57,12 @@ binding exists. Sealing and slot reservation use the same ledger lock.
    its exact criterion inventory, current instruction bytes, all six case
    classes, and samples belonging to that fixture.
 
+The protocol's raw response ceiling remains 4 MiB. Receipt storage and reads
+allow the corresponding base64 encoding plus 64 KiB of metadata; the general
+control-record limit is unchanged. In-limit bytes, including invalid response
+JSON, remain exactly replayable. A response exceeding its frozen raw-byte limit
+keeps the existing `response_too_large` disposition without storing its raw bytes.
+
 The default case classes are `paraphrase`, `contradiction`, `missing_content`,
 `unsupported_claim`, `prompt_injection` and `uncertain`. Coverage counts are
 reported even when zero. `all_expected_matched` means only that all frozen labels

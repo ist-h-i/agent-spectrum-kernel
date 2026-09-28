@@ -28,6 +28,10 @@ const SAMPLE_ID = /^sample-[a-f0-9]{32}$/u;
 const ROLE_MARKERS = /\b(?:current_prompt|prompt_v2)\b|\bprompt\s*role\s*:/iu;
 const TERMINAL_STATUSES = new Set(["completed", "timeout", "transport_error", "auth_failed", "provider_limit", "response_too_large", "token_limit"]);
 const MAX_LEDGER_BYTES = 4 * 1024 * 1024;
+const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+// Raw response bytes are persisted as base64 plus bounded receipt metadata.
+// Keep this separate from the smaller control-record storage limit.
+const MAX_RECEIPT_BYTES = 4 * Math.ceil(MAX_RESPONSE_BYTES / 3) + 64 * 1024;
 
 export class JudgeUnresolvedError extends Error {
   constructor(code) {
@@ -124,7 +128,7 @@ function assertRuntimeProfile(profile) {
 function assertLimits(limits) {
   closed(limits, ["max_packet_bytes", "max_response_bytes", "timeout_ms", "max_input_tokens_per_call", "max_output_tokens_per_call", "max_total_tokens", "max_samples", "max_calls", "unknown_token_policy"], "limits_shape");
   positiveInteger(limits.max_packet_bytes, "packet_limit", 32 * 1024 * 1024);
-  positiveInteger(limits.max_response_bytes, "response_limit", 4 * 1024 * 1024);
+  positiveInteger(limits.max_response_bytes, "response_limit", MAX_RESPONSE_BYTES);
   positiveInteger(limits.timeout_ms, "timeout_limit", 3_600_000);
   positiveInteger(limits.max_input_tokens_per_call, "input_token_limit");
   positiveInteger(limits.max_output_tokens_per_call, "output_token_limit");
@@ -506,10 +510,10 @@ function paths(root, request, slot) {
   };
 }
 
-function readIfPresent(path, label) {
+function readIfPresent(path, label, maximumBytes = MAX_LEDGER_BYTES) {
   assertNoSymlinkPathSegments(path, label, { allowMissingLeaf: true });
   if (!existsSync(path)) return null;
-  const record = readJsonFileStrict(path, label, MAX_LEDGER_BYTES);
+  const record = readJsonFileStrict(path, label, maximumBytes);
   authority(record !== null && typeof record === "object" && !Array.isArray(record), "stored_judge_record_shape");
   return record;
 }
@@ -536,7 +540,7 @@ function checkedSlot(root, protocol, request, packet, slot) {
   const expectedClaim = makeClaim(protocol, request, packet, slot);
   const claim = readIfPresent(location.claim, `Judge ${slot} claim`);
   const started = readIfPresent(location.started, `Judge ${slot} start`);
-  const receipt = readIfPresent(location.receipt, `Judge ${slot} receipt`);
+  const receipt = readIfPresent(location.receipt, `Judge ${slot} receipt`, MAX_RECEIPT_BYTES);
   const blocked = readIfPresent(location.blocked, `Judge ${slot} block`);
   authority(!blocked || !claim, "blocked_slot_has_claim");
   if (claim) authority(stableCanonicalJson(claim) === stableCanonicalJson(expectedClaim), "stored_claim_binding");
@@ -718,8 +722,8 @@ export async function runJudgeSlots({ storeRoot, protocol, request, packet, adap
       errorCode = ["AUTH_FAILED", "PROVIDER_LIMIT"].includes(error?.code) ? error.code : "TRANSPORT_ERROR";
     }
     const receipt = createReceipt({ protocol, request, packet, claim: current.claim, slot, result, errorCode });
-    writeCanonicalJsonNoReplace({ outputPath: current.location.receipt, artifact: receipt, label: "Judge slot receipt" });
-    putContentAddressedJson({ storeRoot, artifact: receipt, digest: canonicalDigest(receipt), maximumBytes: MAX_LEDGER_BYTES });
+    writeCanonicalJsonNoReplace({ outputPath: current.location.receipt, artifact: receipt, label: "Judge slot receipt", maximumBytes: MAX_RECEIPT_BYTES });
+    putContentAddressedJson({ storeRoot, artifact: receipt, digest: canonicalDigest(receipt), maximumBytes: MAX_RECEIPT_BYTES });
     if (["auth_failed", "provider_limit", "token_limit"].includes(receipt.status)) break;
   }
   const reopened = reopenJudgeResolution({ storeRoot, protocol, request, packet });
