@@ -273,6 +273,7 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
       return;
     }
     if (positiveAdmission) {
+      const judgeTargets = readJudgeTargetManifest(root);
       const normalizedRoots = Object.fromEntries(Object.entries(roles).map(([role, value]) => {
         const outputPath = resolve(work, `normalized-${role}`);
         normalizePortfolioExecution({ ...value.execution, outputPath });
@@ -321,7 +322,8 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
           progress("fake_trial_step_started", { ordinal: index + 1, prompt_role: target.prompt_role,
             previous_terminal_count: index });
           try {
-            const fakeOutputTaskType = judgeProtocols[target.fixture_id] ? "review" : "implementation";
+            const fakeOutputTaskType = judgeTargets.value.fixtures[target.fixture_id].semantic_requirements.length > 0
+              ? "review" : "implementation";
             const step = await asyncEnvironment({ ...env, ASK_SUCCESSOR_FAKE_OUTPUT_TASK_TYPE: fakeOutputTaskType },
               () => executeNextMeasuredSuccessorCase({
                 authority: measuredAuthority, preparation, sources: measuredSources, root,
@@ -383,7 +385,6 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
           scoringPolicyDigest: read(resolve(root, "benchmarks/portfolio-scoring-policy.json")).policy_digest,
         }];
       }));
-      const judgeTargets = readJudgeTargetManifest(root);
       const judgeProtocols = Object.fromEntries(Object.entries(fixtureContexts)
         .filter(([fixtureId]) => judgeTargets.value.fixtures[fixtureId].semantic_requirements.length > 0)
         .map(([fixtureId, fixtureContext]) => [fixtureId, syntheticJudgeProtocol({ fixtureId,
