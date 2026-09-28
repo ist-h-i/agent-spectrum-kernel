@@ -16,7 +16,7 @@ const fixtureId = "cal-session-refresh";
 const fixtureRoot = resolve(root, "benchmarks/fixtures/checkpoint-b2", fixtureId);
 const rawDigest = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const read = path => JSON.parse(readFileSync(path, "utf8"));
-const reviewOutput = { task_type: "review", decision: "approve", findings: [], requirement_status: [],
+const reviewOutput = { task_type: "review", decision: "request_changes", findings: [], requirement_status: [],
   verification_commands: [], completion_claim: "not_applicable", route: null,
   summary: "Synthetic review conclusion with a cited source." };
 const outputBytes = Buffer.from(`${JSON.stringify(reviewOutput)}\n`);
@@ -138,6 +138,8 @@ test("all agreed review criteria derive a complete result with frozen requiremen
     .map(item => [item.requirement_id, item.max_points]));
   assert.ok(derived.result.requirement_results.every(item => item.earned_points === maximum.get(item.requirement_id)));
   assert.equal(derived.result.evidence_correctness.state, "pass");
+  for (const field of ["decision_correctness", "verification_correctness", "completion_claim_correctness"])
+    assert.equal(derived.result[field].state, "pass");
   assert.equal(derived.result.under_processing.state, "not_detected");
 });
 
@@ -191,4 +193,22 @@ test("a Judge pass cannot promote malformed or wrong-task original review output
     await assert.rejects(judge(originalAuthority(bytes), () => "pass"),
       /original review output|original output does not satisfy the review structure contract/u);
   }
+});
+
+test("frozen review decision is machine checked and unverified claims remain non-scoring", async () => {
+  const output = value => originalAuthority(Buffer.from(`${JSON.stringify({ ...reviewOutput, ...value })}\n`));
+  const wrongDecision = await judge(output({ decision: "approve" }), () => "pass");
+  assert.equal(wrongDecision.result.evaluation_status, "completed");
+  assert.equal(wrongDecision.result.decision_correctness.state, "fail");
+
+  const unverifiedCommand = await judge(output({ verification_commands: [{ command: "synthetic check", result: "passed" }] }),
+    () => "pass");
+  assert.equal(unverifiedCommand.result.evaluation_status, "manual_review_required");
+  assert.equal(unverifiedCommand.result.verification_correctness.state, "manual_review_required");
+  assert.ok(unverifiedCommand.result.requirement_results.every(item => item.outcome === "pass"));
+
+  const unsupportedCompletion = await judge(output({ completion_claim: "complete" }), () => "pass");
+  assert.equal(unsupportedCompletion.result.evaluation_status, "manual_review_required");
+  assert.equal(unsupportedCompletion.result.completion_claim_correctness.state, "manual_review_required");
+  assert.ok(unsupportedCompletion.result.requirement_results.every(item => item.outcome === "pass"));
 });

@@ -215,6 +215,7 @@ int main(int argc, char **argv) {
   close(fd);
   fd = capture_file(directory, "stdin");
   unsigned char buffer[4096]; size_t total = 0;
+  char prompt_prefix[4097]; size_t prefix_bytes = 0;
   for (;;) {
     ssize_t n = read(STDIN_FILENO, buffer, sizeof buffer);
     if (n < 0 && errno == EINTR) continue;
@@ -222,8 +223,12 @@ int main(int argc, char **argv) {
     if (n == 0) break;
     total += (size_t)n;
     if (total > 1048576) { close(fd); return 65; }
+    size_t keep = (size_t)n < sizeof(prompt_prefix) - 1 - prefix_bytes
+      ? (size_t)n : sizeof(prompt_prefix) - 1 - prefix_bytes;
+    memcpy(prompt_prefix + prefix_bytes, buffer, keep); prefix_bytes += keep;
     write_all(fd, buffer, (size_t)n);
   }
+  prompt_prefix[prefix_bytes] = '\0';
   close(fd);
   if (diagnostic) return fake_diagnostic_session(argc, argv, output);
   if (!strcmp(mode, "failure")) { puts("{\"type\":\"turn.completed\"}"); fputs("intentional native fake failure\n", stderr); return 7; }
@@ -240,12 +245,12 @@ int main(int argc, char **argv) {
     return 143;
   }
   if (!strcmp(mode, "residual")) (void)make_child(directory);
-  const char *fake_output_task = getenv("ASK_SUCCESSOR_FAKE_OUTPUT_TASK_TYPE");
-  if (fake_output_task && strcmp(fake_output_task, "review") && strcmp(fake_output_task, "implementation")) return 64;
+  const int fake_review_task = strstr(prompt_prefix, "Entry intent: review.")
+    || strstr(prompt_prefix, "Review entry. Primary contract:");
   fd = open(output, O_WRONLY | O_CREAT | O_EXCL, 0600);
   if (fd < 0) fail("fake output");
-  const char *json = fake_output_task && !strcmp(fake_output_task, "review")
-    ? "{\"task_type\":\"review\",\"decision\":\"approve\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"not_applicable\",\"route\":null,\"summary\":\"Synthetic review transport fixture. No model or evaluator.\"}\n"
+  const char *json = fake_review_task
+    ? "{\"task_type\":\"review\",\"decision\":\"request_changes\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"not_applicable\",\"route\":null,\"summary\":\"Synthetic review transport fixture. No model or evaluator.\"}\n"
     : "{\"task_type\":\"implementation\",\"decision\":\"not_applicable\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"complete\",\"route\":null,\"summary\":\"Synthetic native transport fixture. No model or evaluator.\"}\n";
   write_all(fd, json, strlen(json)); close(fd);
   puts("{\"type\":\"turn.started\"}");

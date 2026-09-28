@@ -355,7 +355,10 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
         || evaluatorResult.requirement_results.some(({ outcome }) => !SCORED_OUTCOMES.has(outcome)))) {
       throw new Error("manual review evaluation requires a manual requirement or verified Judge observation-only profile");
     }
-    const manualObservations = MANUAL_REVIEW_OBSERVATION_FIELDS.map((field) => [field, evaluatorResult[field]]).filter(([, observation]) => observation?.state === "manual_review_required");
+    const manualObservationFields = allowJudgeObservationOnlyManual
+      ? [...MANUAL_REVIEW_OBSERVATION_FIELDS, "completion_claim_correctness"] : MANUAL_REVIEW_OBSERVATION_FIELDS;
+    const manualObservations = manualObservationFields.map((field) => [field, evaluatorResult[field]])
+      .filter(([, observation]) => observation?.state === "manual_review_required");
     if (manualObservations.length === 0) throw new Error("manual review evaluation requires at least one manual_review_required observation");
     if (Object.hasOwn(evaluatorResult, "classification")) throw new Error("manual review evaluation must not contain a normal classification");
     if (Object.hasOwn(evaluatorResult, "invalid_input_authority")) throw new Error("manual review evaluation must not contain invalid_input_authority");

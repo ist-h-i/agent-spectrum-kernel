@@ -22,8 +22,12 @@ const REVIEW_CATEGORY_MAPPING = {
   "evidence-quality": ["safety", "evidence_correctness", "approval_correctness"],
   "unsupported-noise": ["over_processing"],
   "semantic-requirements": ["under_processing"],
-  "fixed-not-applicable": ["quality", "decision_correctness", "verification_correctness", "completion_claim_correctness"],
+  "machine-review-output": ["decision_correctness", "verification_correctness", "completion_claim_correctness"],
+  "fixed-not-applicable": ["quality"],
 };
+const REVIEW_DECISIONS = ["request_changes", "block"];
+const REVIEW_MACHINE_OBSERVATIONS = ["source-scope-change", "normalized-output-identity",
+  "review-decision", "verification-claim", "completion-claim"];
 const PROFILE_NAME = "prompt_successor_judge_derived_v1";
 const MAX_RECORD_BYTES = 2 * 1024 * 1024;
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
@@ -58,6 +62,7 @@ function verifyReviewOutputStructure({ packet, normalized, root }) {
     label: "original review output" });
   if (value.task_type !== "review" || value.decision === "not_applicable" || value.summary.trim() === "")
     fail("original output does not satisfy the review structure contract");
+  return value;
 }
 
 /** The fixed public inventory names the semantic fields, never their private rubric. */
@@ -69,7 +74,7 @@ export function readJudgeTargetManifest(root = ROOT) {
   closed(value.fixtures, [...REVIEW_FIXTURES, ...IMPLEMENTATION_FIXTURES], "Judge target fixtures");
   for (const fixtureId of [...REVIEW_FIXTURES, ...IMPLEMENTATION_FIXTURES]) {
     const target = value.fixtures[fixtureId];
-    closed(target, ["semantic_requirements", "semantic_observations", "semantic_category_mapping", "machine_observations"], `${fixtureId} targets`);
+    closed(target, ["semantic_requirements", "semantic_observations", "semantic_category_mapping", "expected_review_decisions", "machine_observations"], `${fixtureId} targets`);
     for (const key of ["semantic_requirements", "semantic_observations", "machine_observations"]) {
       if (!Array.isArray(target[key]) || target[key].some(item => typeof item !== "string")
           || new Set(target[key]).size !== target[key].length) fail(`${fixtureId} ${key}`);
@@ -84,6 +89,10 @@ export function readJudgeTargetManifest(root = ROOT) {
       `${fixtureId} semantic observations`);
     same(target.semantic_category_mapping, REVIEW_FIXTURES.includes(fixtureId) ? REVIEW_CATEGORY_MAPPING : {},
       `${fixtureId} category mapping`);
+    same(target.expected_review_decisions, REVIEW_FIXTURES.includes(fixtureId) ? REVIEW_DECISIONS : [],
+      `${fixtureId} review decisions`);
+    if (REVIEW_FIXTURES.includes(fixtureId))
+      same(target.machine_observations, REVIEW_MACHINE_OBSERVATIONS, `${fixtureId} machine observations`);
     if (target.machine_observations.length === 0) fail(`${fixtureId} machine observations`);
   }
   return { value, raw_digest: hash(bytes), manifest_digest: canonicalDigest(value) };
@@ -147,7 +156,7 @@ export function deriveJudgeResultCandidate({ original, protocol, request, packet
   verifyJudgeResolution({ protocol, request, packet, receipts, slotStates, resolution });
   assertRequestBinding({ original, request, packet, protocol, resolution, targetManifest, expectedRole,
     expectedSampleIndex, expectedFreezeDigest });
-  verifyReviewOutputStructure({ packet, normalized, root });
+  const reviewOutput = verifyReviewOutputStructure({ packet, normalized, root });
   if (protocol.source_digest !== canonicalDigest(scoringInputs.requirementRecord))
     fail("Judge protocol is not bound to the frozen fixture requirements");
   const verdicts = verdictsFor({ resolution, fixtureId, manifest: targetManifest.value });
@@ -172,7 +181,18 @@ export function deriveJudgeResultCandidate({ original, protocol, request, packet
   const evidenceVerdict = verdicts.get("evidence-quality");
   const noiseVerdict = verdicts.get("unsupported-noise");
   const state = (value) => ({ state: value, evidence_references: [reference] });
-  const fixedFields = ["quality", "decision_correctness", "verification_correctness", "completion_claim_correctness"];
+  const machineCategory = (field, machineValue) => source[field]?.state === "fail" ? "fail"
+    : source[field]?.state === "pass" && machineValue === "manual_review_required" ? "pass" : machineValue;
+  const decisionState = machineCategory("decision_correctness",
+    target.expected_review_decisions.includes(reviewOutput.decision) ? "pass" : "fail");
+  const verificationState = machineCategory("verification_correctness",
+    reviewOutput.verification_commands.length === 0 ? "pass" : "manual_review_required");
+  const completionState = machineCategory("completion_claim_correctness",
+    reviewOutput.completion_claim === "not_applicable" ? "pass" : "manual_review_required");
+  derived.decision_correctness = state(decisionState);
+  derived.verification_correctness = state(verificationState);
+  derived.completion_claim_correctness = state(completionState);
+  const fixedFields = ["quality"];
   if (new Set(fixedFields.map(field => source[field]?.state)).size !== 1)
     fail("fixed review categories disagree in the original private result");
   for (const field of fixedFields) {
@@ -187,7 +207,8 @@ export function deriveJudgeResultCandidate({ original, protocol, request, packet
   // these three fields. A Judge pass cannot erase a definite original failure.
   const contestedEvidence = evidenceVerdict === "pass" && source.evidence_correctness.state === "fail";
   const unresolved = requirementVerdicts.includes("abstain") || evidenceVerdict === "abstain"
-    || noiseVerdict === "abstain" || contestedEvidence;
+    || noiseVerdict === "abstain" || contestedEvidence
+    || verificationState === "manual_review_required" || completionState === "manual_review_required";
   const evidenceState = evidenceVerdict === "abstain" || contestedEvidence ? "manual_review_required"
     : evidenceVerdict === "pass" ? "pass" : "fail";
   for (const field of evidenceFields)
