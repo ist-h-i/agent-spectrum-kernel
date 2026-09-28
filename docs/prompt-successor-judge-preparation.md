@@ -46,6 +46,11 @@ binding exists. Sealing and slot reservation use the same ledger lock.
    A missing sample binding is `not_run` only when no sample evidence remains.
    Orphaned claim/start/receipt/block files and malformed bindings stop reopening
    and execution without recreating the binding or making another call.
+   Before each slot claim, budget accounting revalidates every existing sample's
+   binding, packet bytes and claim/start/receipt chain with the ordinary slot
+   validator. Corrupt evidence in another sample cannot be ignored or counted as
+   zero usage. An ambiguous claim still blocks; an intact receipt with invalid
+   Judge response JSON remains a counted, unresolved outcome, not ledger damage.
 4. `bindJudgeQualificationForFreeze(...)` compares exact plan, report, protocol,
    source, runtime-profile and target-manifest identities with saved evidence.
    `bindJudgeQualificationSet(...)` additionally requires every semantic fixture,

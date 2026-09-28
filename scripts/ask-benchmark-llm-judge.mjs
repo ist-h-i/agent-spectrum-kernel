@@ -507,7 +507,11 @@ function paths(root, request, slot) {
 }
 
 function readIfPresent(path, label) {
-  return existsSync(path) ? readJsonFileStrict(path, label, MAX_LEDGER_BYTES) : null;
+  assertNoSymlinkPathSegments(path, label, { allowMissingLeaf: true });
+  if (!existsSync(path)) return null;
+  const record = readJsonFileStrict(path, label, MAX_LEDGER_BYTES);
+  authority(record !== null && typeof record === "object" && !Array.isArray(record), "stored_judge_record_shape");
+  return record;
 }
 
 // Absence is an unstarted sample only when no execution evidence remains.
@@ -553,35 +557,50 @@ function checkedSlot(root, protocol, request, packet, slot) {
   return { claim, receipt, blocked, state, location };
 }
 
-function budgetSnapshot(root, protocol) {
+// Reuse the ordinary slot validator for every budget contributor. This local
+// reference carries only the binding's request digest and ledger index; it is
+// not a reconstructed request or an execution/qualification authority handle.
+function budgetSample(storeRoot, root, protocol, sampleIndex) {
+  const requestReference = { private_binding: { sample_index: sampleIndex } };
+  const binding = readSampleBinding(paths(root, requestReference, "A"));
+  if (binding === null) return null;
+  closed(binding, ["schema_version", "kind", "protocol_digest", "packet_digest", "request_digest", "binding_digest"], "stored_sample_binding");
+  const { binding_digest: bindingDigest, ...body } = binding;
+  authority(bindingDigest === canonicalDigest(body) && binding.schema_version === "1.0.0"
+    && binding.kind === "llm_judge_sample_binding" && binding.protocol_digest === protocol.protocol_digest, "stored_sample_binding");
+  digest(binding.request_digest, "stored_sample_request_digest");
+  digest(binding.packet_digest, "stored_sample_packet_digest");
+  requestReference.request_digest = binding.request_digest;
+  assertQualificationRequest(root, protocol, requestReference);
+  const packet = readContentAddressedJson({ storeRoot, digest: binding.packet_digest, maximumBytes: 32 * 1024 * 1024 }).value;
+  verifyPacket(protocol, packet);
+  return SLOTS.map(slot => checkedSlot(root, protocol, requestReference, packet, slot));
+}
+
+function budgetSnapshot(storeRoot, root, protocol) {
   const samplesRoot = resolve(root, "samples");
   if (!existsSync(samplesRoot)) return { calls: 0, tokens: 0 };
   assertNoSymlinkPathSegments(samplesRoot, "Judge sample root");
   let calls = 0;
   let tokens = 0;
   for (const entry of readdirSync(samplesRoot, { withFileTypes: true })) {
-    authority(entry.isDirectory() && /^[0-9]{6}$/u.test(entry.name), "judge_sample_directory");
-    const sample = resolve(samplesRoot, entry.name);
-    for (const slot of SLOTS) {
-      const claim = readIfPresent(resolve(sample, `slot-${slot}.claim.json`), "Judge budget claim");
+    authority(entry.isDirectory() && /^[0-9]{6}$/u.test(entry.name)
+      && Number(entry.name) < protocol.limits.max_samples, "judge_sample_directory");
+    const slots = budgetSample(storeRoot, root, protocol, Number(entry.name));
+    if (slots === null) continue; // Genuinely empty, never a lost binding.
+    for (const { claim, receipt } of slots) {
       if (!claim) continue;
-      authority(claim.protocol_digest === protocol.protocol_digest, "judge_budget_protocol_binding");
       calls += 1;
-      const receipt = readIfPresent(resolve(sample, `slot-${slot}.receipt.json`), "Judge budget receipt");
       if (!receipt) throw new JudgeUnresolvedError("previous_call_ambiguous_or_running");
-      authority(receipt.claim_digest === claim.claim_digest && receipt.authority_profile === protocol.runtime_profile.authority_profile, "judge_budget_receipt_binding");
-      const { receipt_digest: receiptDigest, ...receiptBody } = receipt;
-      authority(receiptDigest === canonicalDigest(receiptBody), "judge_budget_receipt_digest");
-      tokenUsage(receipt.tokens);
-      authority(TERMINAL_STATUSES.has(receipt.status), "judge_budget_receipt_status");
+      // Invalid response JSON is a counted terminal result, not corrupt ledger
+      // authority. Only the execution/identity/byte evidence is validated here.
       if (["auth_failed", "provider_limit", "token_limit"].includes(receipt.status))
         throw new JudgeUnresolvedError("judge_global_stop");
-      if (receipt.tokens?.total === null || receipt.tokens?.total === undefined) {
+      if (receipt.tokens.total === null) {
         if (protocol.limits.unknown_token_policy === "stop_remaining") throw new JudgeUnresolvedError("token_usage_unknown");
         tokens += protocol.limits.max_input_tokens_per_call + protocol.limits.max_output_tokens_per_call;
         continue;
       }
-      authority(Number.isSafeInteger(receipt.tokens.total) && receipt.tokens.total >= 0, "judge_budget_token_value");
       tokens += receipt.tokens.total;
     }
   }
@@ -606,12 +625,13 @@ function withBudgetLock(root, action) {
   }
 }
 
-function reserveSlot(root, protocol, request, packet, slot) {
+function reserveSlot(storeRoot, root, protocol, request, packet, slot) {
   return withBudgetLock(root, () => {
     assertQualificationRequest(root, protocol, request);
     const current = checkedSlot(root, protocol, request, packet, slot);
     if (current.claim || current.blocked) return false;
-    const budget = budgetSnapshot(root, protocol);
+    verifyStoredBindings(storeRoot, root, protocol, request, packet);
+    const budget = budgetSnapshot(storeRoot, root, protocol);
     unresolved(budget.calls < protocol.limits.max_calls, "judge_call_limit");
     unresolved(budget.tokens + protocol.limits.max_input_tokens_per_call + protocol.limits.max_output_tokens_per_call <= protocol.limits.max_total_tokens, "judge_token_limit");
     const claim = makeClaim(protocol, request, packet, slot);
@@ -681,7 +701,7 @@ export async function runJudgeSlots({ storeRoot, protocol, request, packet, adap
     }
     if (current.claim || current.blocked) break;
     try {
-      if (!reserveSlot(root, protocol, request, packet, slot)) break;
+      if (!reserveSlot(storeRoot, root, protocol, request, packet, slot)) break;
     } catch (error) {
       if (!(error instanceof JudgeUnresolvedError)) throw error;
       if (error.code !== "budget_locked" && error.code !== "previous_call_ambiguous_or_running") blockSlot(root, request, slot, error.code);

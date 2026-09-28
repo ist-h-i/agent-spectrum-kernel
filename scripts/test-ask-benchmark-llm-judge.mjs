@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { canonicalDigest } from "./content-addressed-store.mjs";
+import { canonicalDigest, contentAddressedObjectPath } from "./content-addressed-store.mjs";
 import {
   JudgeAuthorityError, JudgeUnresolvedError,
   buildJudgePacket, createJudgeProtocol, createJudgeRequest, parseJudgeResponse,
@@ -269,3 +269,96 @@ test("auth, provider, and token terminal stops prevent calls for later samples",
     });
   }
 });
+
+
+const priorLedgerDamage = [
+  ["missing binding", (sample) => rmSync(join(sample, "request-binding.json"))],
+  ["missing claim", (sample) => rmSync(join(sample, "slot-A.claim.json"))],
+  ["missing start", (sample) => rmSync(join(sample, "slot-A.started.json"))],
+  ["null claim", (sample) => writeFileSync(join(sample, "slot-A.claim.json"), "null\n")],
+  ["null start", (sample) => writeFileSync(join(sample, "slot-A.started.json"), "null\n")],
+  ["null receipt", (sample) => writeFileSync(join(sample, "slot-A.receipt.json"), "null\n")],
+  ["changed binding digest", (sample) => {
+    const path = join(sample, "request-binding.json"), value = JSON.parse(readFileSync(path));
+    value.binding_digest = digest("wrong binding"); writeFileSync(path, JSON.stringify(value));
+  }],
+  ["receipt for another request", (sample) => {
+    const path = join(sample, "slot-A.receipt.json"), value = JSON.parse(readFileSync(path));
+    value.request_digest = digest("another request");
+    const { receipt_digest: ignored, ...body } = value;
+    writeFileSync(path, JSON.stringify({ ...body, receipt_digest: canonicalDigest(body) }));
+  }],
+  ["missing packet object", (_sample, storeRoot, first) =>
+    rmSync(contentAddressedObjectPath({ storeRoot, digest: canonicalDigest(first.packet) }))],
+];
+for (const [name, damage] of priorLedgerDamage) {
+  test(`prior sample ${name} stops a later call before claiming`, async () => withRoot(async storeRoot => {
+    const first = fixture();
+    await runJudgeSlots({ storeRoot, ...first, adapter: adapter(first.packet) });
+    const ledger = join(storeRoot, "judge/v1", first.protocol.protocol_digest.slice(7));
+    const sample = join(ledger, "samples/000000");
+    damage(sample, storeRoot, first);
+    const snapshot = () => readdirSync(sample).sort().map(name => [name, readFileSync(join(sample, name)).toString("base64")]);
+    const before = snapshot();
+    // A different packet prevents the next publication from restoring old CAS bytes.
+    const next = fixture({ sampleIndex: 1, output: OUTPUT + "\nAnother synthetic sample." });
+    let calls = 0, failure;
+    try { await runJudgeSlots({ storeRoot, ...next, adapter: adapter(next.packet, undefined, () => calls++) }); }
+    catch (error) { failure = error; }
+    assert.equal(calls, 0, "a damaged previous sample must not permit another adapter call");
+    assert.ok(failure instanceof Error, "authority damage must reject, not become ordinary budget exhaustion");
+    assert.equal(existsSync(join(ledger, "samples/000001/slot-A.claim.json")), false);
+    assert.deepEqual(snapshot(), before, "earlier evidence must not be repaired or overwritten");
+  }));
+}
+
+test("a valid prior unresolved response still permits the next sample under its frozen budget", async () => withRoot(async storeRoot => {
+  const first = fixture();
+  const fake = adapter(first.packet);
+  const invoke = fake.invoke;
+  fake.invoke = async args => ({ ...await invoke(args), rawResponseBytes: Buffer.from("not JSON") });
+  const unresolved = await runJudgeSlots({ storeRoot, ...first, adapter: fake });
+  assert.equal(unresolved.resolution.overall_status, "unresolved");
+  const next = fixture({ sampleIndex: 1 });
+  let calls = 0;
+  const result = await runJudgeSlots({ storeRoot, ...next, adapter: adapter(next.packet, undefined, () => calls++) });
+  assert.equal(calls, 2);
+  assert.equal(result.resolution.overall_status, "resolved");
+  await runJudgeSlots({ storeRoot, ...next, adapter: adapter(next.packet, undefined, () => calls++) });
+  assert.equal(calls, 2, "normal replay still makes no extra call");
+}));
+
+
+for (const file of ["slot-A.receipt.json", "slot-B.receipt.json"]) {
+  test(`missing prior ${file} remains ambiguous and blocks later execution`, async () => withRoot(async storeRoot => {
+    const first = fixture();
+    await runJudgeSlots({ storeRoot, ...first, adapter: adapter(first.packet) });
+    const ledger = join(storeRoot, "judge/v1", first.protocol.protocol_digest.slice(7));
+    rmSync(join(ledger, "samples/000000", file));
+    const next = fixture({ sampleIndex: 1 });
+    let calls = 0;
+    const result = await runJudgeSlots({ storeRoot, ...next, adapter: adapter(next.packet, undefined, () => calls++) });
+    assert.equal(calls, 0);
+    assert.equal(result.resolution.overall_status, "unresolved");
+    assert.equal(result.slot_states.A, "not_started");
+    assert.equal(existsSync(join(ledger, "samples/000001/slot-A.claim.json")), false);
+  }));
+}
+
+test("cross-sample integrity is rechecked between the next sample's A and B calls", async () => withRoot(async storeRoot => {
+  const first = fixture();
+  await runJudgeSlots({ storeRoot, ...first, adapter: adapter(first.packet) });
+  const ledger = join(storeRoot, "judge/v1", first.protocol.protocol_digest.slice(7));
+  const next = fixture({ sampleIndex: 1 });
+  let calls = 0;
+  const fake = adapter(next.packet, undefined, () => calls++), invoke = fake.invoke;
+  fake.invoke = async args => {
+    const result = await invoke(args);
+    rmSync(join(ledger, "samples/000000/slot-A.started.json"), { force: true });
+    return result;
+  };
+  await assert.rejects(runJudgeSlots({ storeRoot, ...next, adapter: fake }), JudgeAuthorityError);
+  assert.equal(calls, 1, "B must not run after prior authority damage is observed");
+  assert.equal(existsSync(join(ledger, "samples/000001/slot-A.receipt.json")), true);
+  assert.equal(existsSync(join(ledger, "samples/000001/slot-B.claim.json")), false);
+}));
