@@ -233,3 +233,33 @@ test("live profile rejects fake adapter and unset budgets before a claim", async
   assert.throws(() => createJudgeProtocol({ criteria: protocol.criteria, instructionText: protocol.instruction_text, sourceDigest: protocol.source_digest, targetManifestDigest: protocol.target_manifest_digest, runtimeProfile: { ...protocol.runtime_profile, model: "" }, limits: protocol.limits }), JudgeAuthorityError);
   assert.throws(() => createJudgeProtocol({ criteria: protocol.criteria, instructionText: protocol.instruction_text, sourceDigest: protocol.source_digest, targetManifestDigest: protocol.target_manifest_digest, runtimeProfile: protocol.runtime_profile, limits: { ...protocol.limits, max_total_tokens: null } }), JudgeAuthorityError);
 }));
+
+test("auth, provider, and token terminal stops prevent calls for later samples", async () => {
+  for (const stoppedStatus of ["auth_failed", "provider_limit", "token_limit"]) {
+    await withRoot(async (storeRoot) => {
+      const first = fixture({ unknownTokenPolicy: "charge_maximum" });
+      let firstCalls = 0;
+      const terminalAdapter = { kind: "fake_adapter", async invoke(args) {
+        firstCalls++;
+        if (stoppedStatus !== "token_limit") {
+          const error = new Error(stoppedStatus);
+          error.code = stoppedStatus === "auth_failed" ? "AUTH_FAILED" : "PROVIDER_LIMIT";
+          throw error;
+        }
+        const result = await adapter(first.packet).invoke(args);
+        result.tokens = { input: 101, output: 14, total: 115 };
+        return result;
+      } };
+      const terminal = await runJudgeSlots({ storeRoot, protocol: first.protocol, request: first.request,
+        packet: first.packet, adapter: terminalAdapter });
+      assert.equal(firstCalls, 1);
+      assert.equal(terminal.receipts.A.status, stoppedStatus);
+      const next = fixture({ sampleIndex: 1, unknownTokenPolicy: "charge_maximum" });
+      let laterCalls = 0;
+      const unresolved = await runJudgeSlots({ storeRoot, protocol: next.protocol, request: next.request,
+        packet: next.packet, adapter: adapter(next.packet, undefined, () => { laterCalls++; }) });
+      assert.equal(laterCalls, 0);
+      assert.equal(unresolved.resolution.overall_status, "unresolved");
+    });
+  }
+});

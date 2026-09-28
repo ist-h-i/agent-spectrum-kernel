@@ -551,6 +551,9 @@ function budgetSnapshot(root, protocol) {
       const { receipt_digest: receiptDigest, ...receiptBody } = receipt;
       authority(receiptDigest === canonicalDigest(receiptBody), "judge_budget_receipt_digest");
       tokenUsage(receipt.tokens);
+      authority(TERMINAL_STATUSES.has(receipt.status), "judge_budget_receipt_status");
+      if (["auth_failed", "provider_limit", "token_limit"].includes(receipt.status))
+        throw new JudgeUnresolvedError("judge_global_stop");
       if (receipt.tokens?.total === null || receipt.tokens?.total === undefined) {
         if (protocol.limits.unknown_token_policy === "stop_remaining") throw new JudgeUnresolvedError("token_usage_unknown");
         tokens += protocol.limits.max_input_tokens_per_call + protocol.limits.max_output_tokens_per_call;

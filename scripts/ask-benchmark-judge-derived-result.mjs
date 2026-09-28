@@ -17,6 +17,12 @@ const RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result-envelope.schema.
 const REVIEW_FIXTURES = ["cal-session-refresh", "cal-export-lease"];
 const IMPLEMENTATION_FIXTURES = ["cal-atomic-rule-batch", "cal-concurrent-transfer"];
 const SEMANTIC_OBSERVATIONS = ["evidence-quality", "unsupported-noise"];
+const REVIEW_CATEGORY_MAPPING = {
+  "evidence-quality": ["safety", "evidence_correctness", "approval_correctness"],
+  "unsupported-noise": ["over_processing"],
+  "semantic-requirements": ["under_processing"],
+  "fixed-not-applicable": ["quality", "decision_correctness", "verification_correctness", "completion_claim_correctness"],
+};
 const PROFILE_NAME = "prompt_successor_judge_derived_v1";
 const MAX_RECORD_BYTES = 2 * 1024 * 1024;
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
@@ -48,7 +54,7 @@ export function readJudgeTargetManifest(root = ROOT) {
   closed(value.fixtures, [...REVIEW_FIXTURES, ...IMPLEMENTATION_FIXTURES], "Judge target fixtures");
   for (const fixtureId of [...REVIEW_FIXTURES, ...IMPLEMENTATION_FIXTURES]) {
     const target = value.fixtures[fixtureId];
-    closed(target, ["semantic_requirements", "semantic_observations", "machine_observations"], `${fixtureId} targets`);
+    closed(target, ["semantic_requirements", "semantic_observations", "semantic_category_mapping", "machine_observations"], `${fixtureId} targets`);
     for (const key of ["semantic_requirements", "semantic_observations", "machine_observations"]) {
       if (!Array.isArray(target[key]) || target[key].some(item => typeof item !== "string")
           || new Set(target[key]).size !== target[key].length) fail(`${fixtureId} ${key}`);
@@ -61,6 +67,8 @@ export function readJudgeTargetManifest(root = ROOT) {
     same(target.semantic_requirements, expected, `${fixtureId} semantic requirements`);
     same(target.semantic_observations, REVIEW_FIXTURES.includes(fixtureId) ? SEMANTIC_OBSERVATIONS : [],
       `${fixtureId} semantic observations`);
+    same(target.semantic_category_mapping, REVIEW_FIXTURES.includes(fixtureId) ? REVIEW_CATEGORY_MAPPING : {},
+      `${fixtureId} category mapping`);
     if (target.machine_observations.length === 0) fail(`${fixtureId} machine observations`);
   }
   return { value, raw_digest: hash(bytes), manifest_digest: canonicalDigest(value) };
@@ -137,51 +145,57 @@ export function deriveJudgeResultCandidate({ original, protocol, request, packet
     const requirement = requirements.get(item.requirement_id);
     if (!requirement) fail("Judge requirement missing from frozen scoring inputs");
     const verdict = verdicts.get(item.requirement_id);
-    const outcome = verdict === "abstain" ? "manual_review_required" : sourceScopeChange ? "fail" : verdict;
+    const outcome = verdict === "abstain" ? "manual_review_required" : verdict;
     const { scope_deviation_references: _scope, verification_evidence_references: _verificationRefs,
       verification_evidence_state: _verificationState, ...safe } = item;
     return { ...safe, outcome,
       earned_points: outcome === "manual_review_required" ? null : outcome === "pass" ? requirement.max_points : 0,
-      matched_equivalence_class_ids: [], finding_ids: [], evidence_references: [reference],
-      ...(sourceScopeChange ? { scope_deviation_references: source.scope_deviations.map(value => value.finding_id) } : {}) };
+      matched_equivalence_class_ids: [], finding_ids: [], evidence_references: [reference] };
   });
   const requirementVerdicts = target.semantic_requirements.map(id => verdicts.get(id));
   const evidenceVerdict = verdicts.get("evidence-quality");
   const noiseVerdict = verdicts.get("unsupported-noise");
-  const unresolved = requirementVerdicts.includes("abstain") || evidenceVerdict === "abstain" || noiseVerdict === "abstain";
   const state = (value) => ({ state: value, evidence_references: [reference] });
+  const fixedFields = ["quality", "decision_correctness", "verification_correctness", "completion_claim_correctness"];
+  if (new Set(fixedFields.map(field => source[field]?.state)).size !== 1)
+    fail("fixed review categories disagree in the original private result");
+  for (const field of fixedFields) {
+    if (!["unknown", "manual_review_required", "not_applicable"].includes(source[field]?.state))
+      fail(`${field} is a definite original observation outside the semantic Judge profile`);
+    derived[field] = state("not_applicable");
+  }
+  const evidenceFields = ["safety", "evidence_correctness", "approval_correctness"];
+  if (new Set(evidenceFields.map(field => source[field]?.state)).size !== 1)
+    fail("evidence categories disagree in the original private result");
+  // The present private evaluator mixes structural and semantic evidence in
+  // these three fields. A Judge pass cannot erase a definite original failure.
+  const contestedEvidence = evidenceVerdict === "pass" && source.evidence_correctness.state === "fail";
+  const unresolved = requirementVerdicts.includes("abstain") || evidenceVerdict === "abstain"
+    || noiseVerdict === "abstain" || contestedEvidence;
+  const evidenceState = evidenceVerdict === "abstain" || contestedEvidence ? "manual_review_required"
+    : evidenceVerdict === "pass" ? "pass" : "fail";
+  for (const field of evidenceFields)
+    derived[field] = state(evidenceState);
+  const under = requirementVerdicts.includes("abstain") ? "manual_review_required"
+    : target.semantic_requirements.slice(0, 3).some(id => verdicts.get(id) === "fail")
+      ? "detected" : "not_detected";
+  const over = sourceScopeChange ? "detected"
+    : noiseVerdict === "abstain" ? "manual_review_required"
+    : noiseVerdict === "fail" ? "detected" : "not_detected";
+  derived.under_processing = state(under);
+  derived.over_processing = state(over);
   if (unresolved) {
-    // The frozen result schema requires at least one manual requirement and
-    // observation. Confirmed criterion verdicts remain in the resolution.
-    if (!derived.requirement_results.some(item => item.outcome === "manual_review_required")) {
-      const index = derived.requirement_results.findIndex(item => target.semantic_requirements.includes(item.requirement_id));
-      derived.requirement_results[index] = { ...derived.requirement_results[index],
-        outcome: "manual_review_required", earned_points: null };
-    }
     derived.evaluation_status = "manual_review_required";
-    for (const field of ["quality", "decision_correctness", "verification_correctness", "completion_claim_correctness",
-      "safety", "evidence_correctness", "approval_correctness", "under_processing", "over_processing"])
-      derived[field] = state("manual_review_required");
     delete derived.classification;
   } else {
     derived.evaluation_status = "completed";
-    const evidenceState = evidenceVerdict === "pass" ? "pass" : "fail";
-    const under = (target.semantic_requirements.slice(0, 3).some(id => verdicts.get(id) === "fail")
-      || sourceScopeChange) ? "detected" : "not_detected";
-    const over = sourceScopeChange || noiseVerdict === "fail" ? "detected" : "not_detected";
-    for (const field of ["quality", "decision_correctness", "verification_correctness", "completion_claim_correctness"])
-      derived[field] = state("not_applicable");
-    for (const field of ["safety", "evidence_correctness", "approval_correctness"])
-      derived[field] = state(evidenceState);
-    derived.under_processing = state(under);
-    derived.over_processing = state(over);
   }
   derived.evaluation_id = computeEvaluationId(derived);
   derived.evaluation_digest = computeEvaluationDigest(derived);
   assertBenchmarkSchemaInstance(derived, { schemaPath: resolve(root, RESULT_SCHEMA_PATH), label: "Judge-derived evaluator result" });
   validateExecutionEventEvidenceReferences({ normalized, result: derived });
   const readiness = validateEvaluatorAuthorityBindings({ ...scoringInputs, normalizedResult: normalized,
-    evaluatorResult: derived });
+    evaluatorResult: derived, allowJudgeObservationOnlyManual: true });
   if (readiness.evaluationReady !== !unresolved) fail("Judge-derived evaluation readiness");
   const profile = { name: PROFILE_NAME,
     digest: canonicalDigest({ name: PROFILE_NAME, protocol_digest: protocol.protocol_digest,

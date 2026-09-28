@@ -10,6 +10,12 @@
         "review-evidence"
       ],
       "semantic_observations": ["evidence-quality", "unsupported-noise"],
+      "semantic_category_mapping": {
+        "evidence-quality": ["safety", "evidence_correctness", "approval_correctness"],
+        "unsupported-noise": ["over_processing"],
+        "semantic-requirements": ["under_processing"],
+        "fixed-not-applicable": ["quality", "decision_correctness", "verification_correctness", "completion_claim_correctness"]
+      },
       "machine_observations": ["source-scope-change", "normalized-output-identity"]
     },
     "cal-export-lease": {
@@ -20,16 +26,24 @@
         "review-evidence"
       ],
       "semantic_observations": ["evidence-quality", "unsupported-noise"],
+      "semantic_category_mapping": {
+        "evidence-quality": ["safety", "evidence_correctness", "approval_correctness"],
+        "unsupported-noise": ["over_processing"],
+        "semantic-requirements": ["under_processing"],
+        "fixed-not-applicable": ["quality", "decision_correctness", "verification_correctness", "completion_claim_correctness"]
+      },
       "machine_observations": ["source-scope-change", "normalized-output-identity"]
     },
     "cal-atomic-rule-batch": {
       "semantic_requirements": [],
       "semantic_observations": [],
+      "semantic_category_mapping": {},
       "machine_observations": ["isolated-execution-checks", "command-evidence", "scope-diff"]
     },
     "cal-concurrent-transfer": {
       "semantic_requirements": [],
       "semantic_observations": [],
+      "semantic_category_mapping": {},
       "machine_observations": ["isolated-execution-checks", "command-evidence", "scope-diff"]
     }
   }
