@@ -258,9 +258,9 @@ int main(int argc, char **argv) {
    * command event. It never executes a command or represents a real run. */
   const char *fake_command_evidence = getenv("ASK_SUCCESSOR_FAKE_COMMAND_EVIDENCE");
   if (fake_command_evidence) {
-    if (strcmp(fake_command_evidence, "node-version-success")) return 64;
-    puts("{\"type\":\"item.started\",\"item\":{\"type\":\"command_execution\",\"id\":\"synthetic-version\",\"command\":\"node --version\",\"status\":\"in_progress\"}}");
-    puts("{\"type\":\"item.completed\",\"item\":{\"type\":\"command_execution\",\"id\":\"synthetic-version\",\"command\":\"node --version\",\"status\":\"completed\",\"exit_code\":0,\"aggregated_output\":\"synthetic fixture event\"}}");
+    if (strcmp(fake_command_evidence, "npm-test-success")) return 64;
+    puts("{\"type\":\"item.started\",\"item\":{\"type\":\"command_execution\",\"id\":\"synthetic-fixture-test\",\"command\":\"npm test\",\"status\":\"in_progress\"}}");
+    puts("{\"type\":\"item.completed\",\"item\":{\"type\":\"command_execution\",\"id\":\"synthetic-fixture-test\",\"command\":\"npm test\",\"status\":\"completed\",\"exit_code\":0,\"aggregated_output\":\"synthetic fixture event\"}}");
   }
   if (!strcmp(mode, "provider-limit")) {
     puts("{\"type\":\"error\",\"message\":\"You've hit your usage limit. Try again later.\"}");

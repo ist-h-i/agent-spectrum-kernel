@@ -184,7 +184,7 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
       write(resolve(home, ".codex", "auth.json"), { synthetic_contract_test_only: true });
     }
     const env = { HOME: home, ASK_SUCCESSOR_FAKE_CAPTURE: capture, ASK_SUCCESSOR_FAKE_MODE: "success",
-      ...(positiveAdmission ? { ASK_SUCCESSOR_FAKE_COMMAND_EVIDENCE: "node-version-success" } : {}) };
+      ...(positiveAdmission ? { ASK_SUCCESSOR_FAKE_COMMAND_EVIDENCE: "npm-test-success" } : {}) };
     const runtime = { adapter: "codex", cli_version: "0.153.4", executable_digest: hash(readFileSync(agentBin)), node_version: process.version,
       os: process.platform, arch: process.arch, model: nativeFile.model, provider_model_revision: { status: "unknown", value: null }, reasoning_effort: "medium",
       authentication_mode: "chatgpt_subscription", configuration_digest: hash(readFileSync(runtimeConfigPath)), sandbox: "workspace-write", approval_policy: "never", agent_network: "disabled", provider_network: "provider_only", timeout_ms: 900000 };
