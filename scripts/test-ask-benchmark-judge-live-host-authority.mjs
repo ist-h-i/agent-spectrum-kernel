@@ -14,7 +14,7 @@ import {
   JUDGE_TOOL_FREE_CLI_SHA256, JUDGE_TOOL_FREE_MODEL,
 } from "./ask-benchmark-judge-tool-free-profile.mjs";
 import {
-  authorizeToolFreeNativeJudgeLaunch, inspectJudgeLiveHostAuthority, openJudgeLiveHostAuthority,
+  bindToolFreeNativeJudgeHostEvidence, inspectJudgeLiveHostAuthority, openJudgeLiveHostAuthority,
 } from "./ask-benchmark-judge-live-host-authority.mjs";
 
 const d = value => canonicalDigest({ value });
@@ -131,7 +131,7 @@ function context(t) {
   return { root, invocationRoot, evidencePath, protocol, plan, body, record };
 }
 
-test("reviewed host evidence opens an opaque qualification-only launch authority", t => {
+test("candidate host evidence binds opaquely but cannot authorize live execution", t => {
   const c = context(t);
   assert.equal(existsSync(c.invocationRoot), false);
   const authority = openJudgeLiveHostAuthority({
@@ -146,15 +146,17 @@ test("reviewed host evidence opens an opaque qualification-only launch authority
   assert.equal(summary.automatic_retries, 0);
   assert.equal(summary.measurement_authorized, false);
 
-  const authorized = authorizeToolFreeNativeJudgeLaunch({
+  const bound = bindToolFreeNativeJudgeHostEvidence({
     protocol: c.protocol, invocationRoot: c.invocationRoot, hostAuthority: authority,
   });
-  assert.equal(authorized.live_execution_authorized, true);
-  assert.deepEqual(authorized.missing_host_evidence, []);
-  assert.equal(authorized.live_host_authority_record_digest, c.record.record_digest);
-  assert.equal(authorized.authorization_scope, "live_qualification_only");
-  assert.equal(authorized.qualification_call_budget, 12);
-  assert.equal(authorized.measurement_authorized, false);
+  assert.equal(bound.host_evidence_candidate_bound, true);
+  assert.equal(bound.live_execution_authorized, false);
+  assert.deepEqual(bound.missing_host_evidence, bound.profile.required_host_evidence);
+  assert.equal(bound.live_host_authority_record_digest, c.record.record_digest);
+  assert.equal(bound.authorization_scope_candidate, "live_qualification_only");
+  assert.equal(bound.qualification_call_budget_candidate, 12);
+  assert.equal(bound.automatic_retries_candidate, 0);
+  assert.equal(bound.measurement_authorized, false);
   assert.equal(existsSync(c.invocationRoot), false);
 
   assert.throws(() => inspectJudgeLiveHostAuthority({ ...authority }, {

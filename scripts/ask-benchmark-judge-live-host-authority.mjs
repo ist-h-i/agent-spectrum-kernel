@@ -170,20 +170,22 @@ export function inspectJudgeLiveHostAuthority(handle, { protocol, invocationRoot
 }
 
 /**
- * Converts reviewed host evidence into an authorized launch plan only.
- * It still does not spawn Codex, read credentials, call a provider, or authorize measurement.
+ * Bind a candidate host-evidence record to the launch plan without granting
+ * execution. The evidence producer/reopener for the observed host controls is
+ * intentionally still missing and must be supplied by the target-host workflow.
  */
-export function authorizeToolFreeNativeJudgeLaunch({ protocol, invocationRoot, hostAuthority }) {
+export function bindToolFreeNativeJudgeHostEvidence({ protocol, invocationRoot, hostAuthority }) {
   const plan = prepareToolFreeNativeJudgeLaunch({ protocol, invocationRoot });
   const authority = inspectJudgeLiveHostAuthority(hostAuthority, { protocol, invocationRoot });
   return {
     ...plan,
-    live_execution_authorized: true,
-    missing_host_evidence: [],
+    host_evidence_candidate_bound: true,
+    live_execution_authorized: false,
+    missing_host_evidence: [...plan.profile.required_host_evidence],
     live_host_authority_record_digest: authority.authority_record_digest,
-    authorization_scope: authority.authorization_scope,
-    qualification_call_budget: authority.max_calls,
-    automatic_retries: authority.automatic_retries,
+    authorization_scope_candidate: authority.authorization_scope,
+    qualification_call_budget_candidate: authority.max_calls,
+    automatic_retries_candidate: authority.automatic_retries,
     measurement_authorized: false,
   };
 }

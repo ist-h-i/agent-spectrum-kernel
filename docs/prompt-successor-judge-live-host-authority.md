@@ -6,9 +6,10 @@ and `FVC-313-JUDGE-TOOL-FREE-INTEGRATION`.
 
 ## Goal
 
-Convert separately produced target-host evidence into an opaque, read-only
-authority that can authorize the existing tool-free Judge launch plan for
-**live qualification only**.
+Bind a separately produced target-host evidence candidate to the exact
+ tool-free Judge launch plan without granting execution. The target-host
+producer/reopener for the underlying observations is still required before
+**live qualification** can be authorized.
 
 This artifact does not execute Codex, read credentials, call a provider, seal
 formal evaluator admission, authorize measured trials, or create a result-blind
@@ -45,18 +46,17 @@ the underlying observation.
 an opaque in-process handle. `inspectJudgeLiveHostAuthority()` rereads and
 revalidates the persisted record on every use.
 
-`authorizeToolFreeNativeJudgeLaunch()` combines that handle with
-`prepareToolFreeNativeJudgeLaunch()`. A successful result changes only these
-preparation fields:
+`bindToolFreeNativeJudgeHostEvidence()` combines that handle with
+`prepareToolFreeNativeJudgeLaunch()`, but deliberately keeps
+`live_execution_authorized=false` and the six `missing_host_evidence` entries.
+It records only that a candidate record is identity-bound, together with its
+record digest and candidate qualification scope/budget/retry values.
 
-- `live_execution_authorized=true`;
-- `missing_host_evidence=[]`;
-- exact host-authority record digest;
-- `authorization_scope=live_qualification_only`;
-- fixed qualification call budget and zero retries.
-
-It keeps `measurement_authorized=false`. It does not create directories,
-spawn a process, load `auth.json`, or invoke a model.
+This distinction is intentional: a structurally valid external JSON record is
+not itself proof that the observations were produced by the required target-host
+probes. The later target-host producer/reopener must rederive those observations
+before any executable capability exists. This layer does not create directories,
+spawn a process, load `auth.json`, invoke a model, or authorize measurement.
 
 ## Why this remains fail-closed
 
@@ -91,7 +91,7 @@ Selected path: `formal_verification_contract`,
 | LH2 | All six live-host requirement classes are present with external evidence digests and required observed values. |
 | LH3 | Credential evidence forbids copied/persisted secret material; qualification authorization is result-blind, bounded, and retry-free. |
 | LH4 | Authority handles are opaque and persisted bytes are reread on every use; mutation or copied handles fail closed. |
-| LH5 | Authorization can only produce a live-qualification launch plan and keeps measurement authority false. |
+| LH5 | Candidate binding never grants live execution or measurement authority; the six host requirements remain open until target-host evidence is rederived. |
 
 Model-free verification:
 
