@@ -167,7 +167,7 @@ test("candidate host evidence binds opaquely but cannot authorize live execution
 test("repository-controlled files cannot be treated as live-host authority", t => {
   const c = context(t);
   assert.throws(() => openJudgeLiveHostAuthority({
-    evidencePath: resolve(import.meta.dirname, "../package.json"),
+    evidencePath: resolve(import.meta.dirname, "../README.md"),
     protocol: c.protocol,
     invocationRoot: c.invocationRoot,
   }), /external_evidence/);
