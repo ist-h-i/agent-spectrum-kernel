@@ -96,11 +96,13 @@ test("saved HTTP bytes and non-secret metadata reopen to the same request inspec
     headers: { "content-type": "" }, body };
   try {
     mkdirSync(resolve(root, "workspace"));
-    saveJson("precall.json", { kind: "judge_tool_free_capture_precall",
+    const validPrecall = { kind: "judge_tool_free_capture_precall",
       cli_version: JUDGE_TOOL_FREE_CLI_VERSION, executable_digest: JUDGE_TOOL_FREE_CLI_SHA256,
       catalog_digest: JUDGE_TOOL_FREE_CATALOG_SHA256, cwd: resolve(root, "workspace"),
       executable: resolve(root, "codex-0.157.1-native"),
-      credential_source: "none", benchmark_input: false, private_evaluator_path_supplied: false });
+      credential_source: "none", benchmark_input: false, private_evaluator_path_supplied: false,
+      workspace_initial_files: [], codex_home_initial_files: [] };
+    saveJson("precall.json", validPrecall);
     const metadata = { kind: "judge_tool_free_http_request", method: request.method,
       path: request.path, remote_address: request.remote_address,
       header_names: ["content-type"], body_sha256: digest };
@@ -112,12 +114,21 @@ test("saved HTTP bytes and non-secret metadata reopen to the same request inspec
         metadata_sha256: `sha256:${createHash("sha256").update(metadataBytes).digest("hex")}` }],
       cli_exit_code: 1, cli_signal: null, cli_cause: null, workspace_final_files: [],
       credential_source: "none", benchmark_workspace_as_child_cwd: false,
+      codex_home_initial_files: [],
       private_evaluator_path_supplied: false,
       inspection: inspectJudgeToolFreeRequest([request]), failure: null };
     saveJson("result.json", validResult);
     writeFileSync(resolve(root, "request-1.bin"), body);
     writeFileSync(resolve(root, "request-1.json"), metadataBytes);
     assert.equal(reopenJudgeToolFreeCapture(root).captured_request_verified, true);
+    for (const field of ["workspace_initial_files", "codex_home_initial_files"]) {
+      saveJson("precall.json", { ...validPrecall, [field]: ["unexpected"] });
+      assert.throws(() => reopenJudgeToolFreeCapture(root));
+      saveJson("precall.json", validPrecall);
+    }
+    saveJson("result.json", { ...validResult, codex_home_initial_files: ["unexpected"] });
+    assert.throws(() => reopenJudgeToolFreeCapture(root));
+    saveJson("result.json", validResult);
     saveJson("result.json", { ...validResult, cli_exit_code: 0, cli_signal: "SIGKILL",
       cli_cause: "timeout", workspace_final_files: ["unexpected"] });
     assert.throws(() => reopenJudgeToolFreeCapture(root));

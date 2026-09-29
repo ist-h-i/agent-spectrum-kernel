@@ -74,6 +74,9 @@ export function reopenJudgeToolFreeCapture(evidenceRoot) {
     "recorded success contradicts CLI termination");
     check(precall.cwd === resolve(evidenceRoot, "workspace")
       && precall.executable === resolve(evidenceRoot, "codex-0.157.1-native")
+      && Array.isArray(precall.workspace_initial_files) && precall.workspace_initial_files.length === 0
+      && Array.isArray(precall.codex_home_initial_files) && precall.codex_home_initial_files.length === 0
+      && Array.isArray(result.codex_home_initial_files) && result.codex_home_initial_files.length === 0
       && Array.isArray(result.workspace_final_files) && result.workspace_final_files.length === 0
       && readdirSync(precall.cwd).length === 0,
     "recorded success contradicts workspace state");
