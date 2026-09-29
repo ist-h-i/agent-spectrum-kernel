@@ -100,22 +100,31 @@ function inputHasTool(value) {
 }
 
 /** Inspect the raw outbound request, not Codex's tool-event transcript. */
-export function inspectJudgeToolFreeRequest(requests) {
+export function inspectJudgeToolFreeRequest(requests, expectedEndpoint) {
   check(Array.isArray(requests) && requests.length === 1, "exactly one outbound request required");
+  const endpoint = new URL(expectedEndpoint);
+  check(endpoint.protocol === "http:" && endpoint.hostname === "127.0.0.1"
+    && /^\d+$/u.test(endpoint.port) && endpoint.pathname === "/v1"
+    && !endpoint.username && !endpoint.password && !endpoint.search && !endpoint.hash,
+  "fixed loopback destination");
   const request = requests[0];
   check(request?.method === "POST" && request.path === "/v1/responses", "Responses endpoint");
   check(request.remote_address === "127.0.0.1" || request.remote_address === "::ffff:127.0.0.1", "loopback peer");
+  check(request.local_address === "127.0.0.1" && request.local_port === Number(endpoint.port)
+    && request.headers?.host === `127.0.0.1:${endpoint.port}`, "actual loopback destination");
   check(Buffer.isBuffer(request.body) && request.body.length > 0 && request.body.length <= 4 * 1024 * 1024, "bounded request body");
   check(!Object.keys(request.headers ?? {}).some(key => key.toLowerCase() === "authorization"), "capture must not receive credentials");
   const body = parseJsonRejectDuplicateKeys(request.body, "outbound Responses request");
   check(body.model === JUDGE_TOOL_FREE_MODEL, "model identity");
+  check(body.reasoning?.effort === "medium", "outbound reasoning effort");
   check(Array.isArray(body.input) && body.input.length > 0, "one synthetic request input");
   check(!Object.hasOwn(body, "tools") || (Array.isArray(body.tools) && body.tools.length === 0), "model-visible tools");
   check(!inputHasTool(body.input), "additional tools in request input");
   return {
     schema_version: "1.0.0", kind: "judge_tool_free_request_capture",
     cli_version: JUDGE_TOOL_FREE_CLI_VERSION, model: body.model,
-    endpoint: request.path, request_count: 1, tool_count: 0,
+    reasoning_effort: body.reasoning.effort,
+    endpoint: `${endpoint.origin}${request.path}`, request_count: 1, tool_count: 0,
     authorization_header_present: false,
     request_sha256: sha256(request.body),
   };

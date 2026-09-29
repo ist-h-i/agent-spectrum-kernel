@@ -43,7 +43,8 @@ These conditions do not constitute syscall-level proof that the CLI never
 read another host path.
 
 The capture saves each bounded request body and a separate non-secret HTTP
-record containing method, path, header names, loopback peer, and body digest.
+record containing method, path, header names, Host, loopback peer, local
+destination address and port, and body digest.
 The result binds each body and record by SHA-256. Run
 `node scripts/ask-benchmark-judge-tool-free-reopen.mjs --evidence-root <absolute-root>`
 to recompute the request inspection from saved bytes. A successful settings
@@ -71,7 +72,7 @@ and stable pre-measurement evidence.
 |---|---|
 | TF1 | Verify exact CLI version and native-image digest, fixed catalog bytes, closed overrides, fresh child environment and empty workspace before launch. |
 | TF2 | Launch exactly one CLI process against a local capture endpoint, with no real-provider credential, no benchmark content, and no private evaluator path. Save precall, process streams, request bytes and terminal result outside the repository. |
-| TF3 | Inspect the actual outbound `POST /v1/responses`: exactly one loopback request, model `gpt-6-sol`, `tools` absent or empty, no additional tool input, and no Authorization header. A setting or tool-free transcript alone does not satisfy this obligation. |
+| TF3 | Inspect the actual outbound `POST /v1/responses`: exactly one loopback request with matching Host and socket destination, model `gpt-6-sol`, `reasoning.effort=medium`, `tools` absent or empty, no additional tool input, and no Authorization header. A setting or tool-free transcript alone does not satisfy this obligation. |
 | TF4 | Preserve failure as failure. Do not convert the candidate profile into live Judge authority, qualification, formal admission, a result-blind freeze or trial 1 from this probe alone. |
 
 Focused source check:

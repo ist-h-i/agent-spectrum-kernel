@@ -120,6 +120,8 @@ async function main() {
         method: request.method, path: request.url, headers: request.headers,
         body: Buffer.concat(chunks),
         remote_address: request.socket.remoteAddress,
+        local_address: request.socket.localAddress,
+        local_port: request.socket.localPort,
       });
       response.writeHead(400, { "content-type": "application/json", connection: "close" });
       response.end('{"error":{"type":"capture_only","message":"local request capture; no model"}}');
@@ -131,9 +133,8 @@ async function main() {
   });
   const address = server.address();
   check(address?.address === "127.0.0.1" && Number.isInteger(address.port), "loopback listener");
-  const overrides = buildJudgeToolFreeOverrides({
-    catalogPath, instructionPath, captureBaseUrl: `http://127.0.0.1:${address.port}/v1`,
-  });
+  const captureBaseUrl = `http://127.0.0.1:${address.port}/v1`;
+  const overrides = buildJudgeToolFreeOverrides({ catalogPath, instructionPath, captureBaseUrl });
   const argv = [
     "exec", "--ignore-user-config", "--ignore-rules", "--ephemeral", "--strict-config",
     "--skip-git-repo-check", "--json", "--model", JUDGE_TOOL_FREE_MODEL,
@@ -152,7 +153,7 @@ async function main() {
     environment_names: Object.keys(env).sort(), credential_source: "none",
     codex_home_initial_files: [], workspace_initial_files: [],
     benchmark_input: false, private_evaluator_path_supplied: false,
-    local_endpoint: `http://127.0.0.1:${address.port}/v1`,
+    local_endpoint: captureBaseUrl,
   }, null, 2) + "\n"));
   let processResult;
   try {
@@ -176,6 +177,8 @@ async function main() {
       schema_version: "1.0.0", kind: "judge_tool_free_http_request",
       method: request.method, path: request.path,
       remote_address: request.remote_address,
+      local_address: request.local_address, local_port: request.local_port,
+      host_header: request.headers.host ?? null,
       header_names: Object.keys(request.headers).sort(),
       body_sha256: sha256(request.body),
     }, null, 2) + "\n");
@@ -188,7 +191,7 @@ async function main() {
     verifyExecutableCopy();
     check(processResult.exit_code !== 0, "capture endpoint must reject completion");
     check(readdirSync(workspace).length === 0, "capture workspace changed");
-    inspection = inspectJudgeToolFreeRequest(requests);
+    inspection = inspectJudgeToolFreeRequest(requests, captureBaseUrl);
   } catch (error) { failure = error.message; }
   const result = {
     schema_version: "1.0.0", kind: "judge_tool_free_capture_result",

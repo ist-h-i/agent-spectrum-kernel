@@ -54,19 +54,25 @@ export function reopenJudgeToolFreeCapture(evidenceRoot) {
       && metadata.body_sha256 === sha256(body)
       && typeof metadata.method === "string" && typeof metadata.path === "string"
       && typeof metadata.remote_address === "string"
+      && typeof metadata.local_address === "string"
+      && Number.isSafeInteger(metadata.local_port)
+      && typeof metadata.host_header === "string"
       && Array.isArray(metadata.header_names)
       && metadata.header_names.every(name => typeof name === "string" && name.length > 0)
       && new Set(metadata.header_names).size === metadata.header_names.length,
     `request ${index} metadata`);
     requests.push({ method: metadata.method, path: metadata.path,
       remote_address: metadata.remote_address,
-      headers: Object.fromEntries(metadata.header_names.map(name => [name, ""])), body });
+      local_address: metadata.local_address, local_port: metadata.local_port,
+      headers: Object.fromEntries(metadata.header_names.map(name => [name,
+        name.toLowerCase() === "host" ? metadata.host_header : ""])), body });
   }
   const actualFiles = readdirSync(evidenceRoot).filter(name => /^request-\d+\.(?:bin|json)$/u.test(name));
   check(actualFiles.length === expectedFiles.size && actualFiles.every(name => expectedFiles.has(name)),
     "request file inventory");
   let inspection = null;
-  try { inspection = inspectJudgeToolFreeRequest(requests); } catch { /* A failed probe is preserved. */ }
+  try { inspection = inspectJudgeToolFreeRequest(requests, precall.local_endpoint); }
+  catch { /* A failed probe is preserved. */ }
   if (result.inspection !== null) {
     check(result.failure === null && inspection !== null, "recorded success without valid request");
     check(Number.isInteger(result.cli_exit_code) && result.cli_exit_code !== 0

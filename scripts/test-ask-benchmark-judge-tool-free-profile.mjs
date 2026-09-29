@@ -13,6 +13,7 @@ import {
 import { reopenJudgeToolFreeCapture } from "./ask-benchmark-judge-tool-free-reopen.mjs";
 
 const catalogPath = resolve(import.meta.dirname, "../benchmarks/prompt-successor-judge-tool-free-catalog.json");
+const captureEndpoint = "http://127.0.0.1:12345/v1";
 
 test("fixed 0.157.1 catalog disables every model-owned tool route", () => {
   const catalog = inspectJudgeToolFreeCatalog(readFileSync(catalogPath));
@@ -65,13 +66,16 @@ test("capture overrides are closed, use a local provider, and disable non-model 
 
 test("outbound request inspection requires exactly one tool-free loopback Responses POST", () => {
   const request = {
-    method: "POST", path: "/v1/responses", headers: { "content-type": "application/json" },
-    remote_address: "127.0.0.1",
-    body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", input: [{ role: "user", content: "synthetic capture" }], tools: [] })),
+    method: "POST", path: "/v1/responses",
+    headers: { "content-type": "application/json", host: "127.0.0.1:12345" },
+    remote_address: "127.0.0.1", local_address: "127.0.0.1", local_port: 12345,
+    body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", reasoning: { effort: "medium" },
+      input: [{ role: "user", content: "synthetic capture" }], tools: [] })),
   };
-  const summary = inspectJudgeToolFreeRequest([request]);
+  const summary = inspectJudgeToolFreeRequest([request], captureEndpoint);
   assert.equal(summary.tool_count, 0);
   assert.equal(summary.model, "gpt-6-sol");
+  assert.equal(summary.reasoning_effort, "medium");
   for (const change of [
     { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", input: [], tools: [{ type: "function", name: "shell" }] })) },
     { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", input: [{ type: "additional_tools", tools: [] }], tools: [] })) },
@@ -80,20 +84,29 @@ test("outbound request inspection requires exactly one tool-free loopback Respon
     { ...request, path: "/v1/models" },
     { ...request, method: "GET" },
     { ...request, remote_address: "198.51.100.1" },
+    { ...request, local_address: "198.51.100.1" },
+    { ...request, local_port: 443 },
+    { ...request, headers: { ...request.headers, host: "api.openai.com" } },
+    { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol",
+      reasoning: { effort: "high" }, input: [{ role: "user", content: "synthetic capture" }], tools: [] })) },
+    { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol",
+      input: [{ role: "user", content: "synthetic capture" }], tools: [] })) },
     { ...request, body: Buffer.from('{"model":"gpt-6-sol","tools":[],"tools":[]}') },
-  ]) assert.throws(() => inspectJudgeToolFreeRequest([change]));
-  assert.throws(() => inspectJudgeToolFreeRequest([]));
-  assert.throws(() => inspectJudgeToolFreeRequest([request, request]));
+  ]) assert.throws(() => inspectJudgeToolFreeRequest([change], captureEndpoint));
+  assert.throws(() => inspectJudgeToolFreeRequest([], captureEndpoint));
+  assert.throws(() => inspectJudgeToolFreeRequest([request, request], captureEndpoint));
+  assert.throws(() => inspectJudgeToolFreeRequest([request], "https://api.openai.com/v1"));
 });
 
 test("saved HTTP bytes and non-secret metadata reopen to the same request inspection", () => {
   const root = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-judge-tool-free-reopen-")));
   const saveJson = (name, value) => writeFileSync(resolve(root, name), JSON.stringify(value) + "\n");
-  const body = Buffer.from(JSON.stringify({ model: "gpt-6-sol",
+  const body = Buffer.from(JSON.stringify({ model: "gpt-6-sol", reasoning: { effort: "medium" },
     input: [{ role: "user", content: "synthetic capture" }], tools: [] }));
   const digest = `sha256:${createHash("sha256").update(body).digest("hex")}`;
   const request = { method: "POST", path: "/v1/responses", remote_address: "127.0.0.1",
-    headers: { "content-type": "" }, body };
+    local_address: "127.0.0.1", local_port: 12345,
+    headers: { "content-type": "", host: "127.0.0.1:12345" }, body };
   try {
     mkdirSync(resolve(root, "workspace"));
     const validPrecall = { kind: "judge_tool_free_capture_precall",
@@ -101,11 +114,13 @@ test("saved HTTP bytes and non-secret metadata reopen to the same request inspec
       catalog_digest: JUDGE_TOOL_FREE_CATALOG_SHA256, cwd: resolve(root, "workspace"),
       executable: resolve(root, "codex-0.157.1-native"),
       credential_source: "none", benchmark_input: false, private_evaluator_path_supplied: false,
-      workspace_initial_files: [], codex_home_initial_files: [] };
+      workspace_initial_files: [], codex_home_initial_files: [], local_endpoint: captureEndpoint };
     saveJson("precall.json", validPrecall);
     const metadata = { kind: "judge_tool_free_http_request", method: request.method,
       path: request.path, remote_address: request.remote_address,
-      header_names: ["content-type"], body_sha256: digest };
+      local_address: request.local_address, local_port: request.local_port,
+      host_header: request.headers.host,
+      header_names: ["content-type", "host"], body_sha256: digest };
     const metadataBytes = Buffer.from(JSON.stringify(metadata) + "\n");
     const validResult = { kind: "judge_tool_free_capture_result",
       cli_version: JUDGE_TOOL_FREE_CLI_VERSION, executable_digest: JUDGE_TOOL_FREE_CLI_SHA256,
@@ -116,7 +131,7 @@ test("saved HTTP bytes and non-secret metadata reopen to the same request inspec
       credential_source: "none", benchmark_workspace_as_child_cwd: false,
       codex_home_initial_files: [],
       private_evaluator_path_supplied: false,
-      inspection: inspectJudgeToolFreeRequest([request]), failure: null };
+      inspection: inspectJudgeToolFreeRequest([request], captureEndpoint), failure: null };
     saveJson("result.json", validResult);
     writeFileSync(resolve(root, "request-1.bin"), body);
     writeFileSync(resolve(root, "request-1.json"), metadataBytes);
