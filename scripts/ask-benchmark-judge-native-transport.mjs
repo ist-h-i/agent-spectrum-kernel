@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync,
+import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync,
   realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,11 @@ import { assertNoSymlinkPathSegments, canonicalDigest, parseJsonRejectDuplicateK
   readStableBytes, stableCanonicalJson, writeCanonicalJsonNoReplace } from "./content-addressed-store.mjs";
 import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
 import { inspectNativeJudgeCapture, inspectNativeJudgeCli } from "./ask-benchmark-judge-native-capture.mjs";
+import {
+  JUDGE_TOOL_FREE_CATALOG_SHA256, JUDGE_TOOL_FREE_CLI_SHA256, JUDGE_TOOL_FREE_CLI_VERSION,
+  JUDGE_TOOL_FREE_BASE_INSTRUCTIONS, JUDGE_TOOL_FREE_MODEL,
+  buildJudgeToolFreeExecutionArgv, inspectJudgeToolFreeCatalog,
+} from "./ask-benchmark-judge-tool-free-profile.mjs";
 import { captureSuccessorUsage } from "./ask-benchmark-prompt-successor-usage.mjs";
 import { JudgeAuthorityError, verifyJudgeProtocol, consumeNativeJudgeInvocation } from "./ask-benchmark-llm-judge.mjs";
 
@@ -17,6 +22,13 @@ const MAX_FILE = 4 * 1024 * 1024;
 const MAX_INPUT = 32 * 1024 * 1024 + 1;
 const DIGEST = /^sha256:[a-f0-9]{64}$/u;
 const handles = new WeakMap();
+const TOOL_FREE_REVISION = "native-capture-tool-free-v1";
+const TOOL_FREE_CATALOG = resolve(ROOT, "benchmarks/prompt-successor-judge-tool-free-catalog.json");
+const LIVE_HOST_REQUIREMENTS = Object.freeze([
+  "reviewed_credential_supply", "authenticated_tool_dispatch_restriction",
+  "provider_only_network", "additional_file_access_restriction",
+  "target_session_capture_origin", "separate_live_invocation_authorization",
+]);
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 function check(ok, code) { if (!ok) throw new JudgeAuthorityError(`native_transport_${code}`); }
 function same(a, b, code) { check(stableCanonicalJson(a) === stableCanonicalJson(b), code); }
@@ -46,7 +58,7 @@ function load(path) {
 }
 
 /** The launch policy is identity input, not proof that a target CLI enforces it. */
-export function nativeJudgeLaunchProfile(cliVersion) {
+function legacyNativeJudgeLaunchProfile(cliVersion) {
   check(typeof cliVersion === "string" && /^\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/u.test(cliVersion), "cli_version");
   return { schema_version: "1.0.0", kind: "llm_judge_native_launch_profile", cli_version: cliVersion,
     adapter_revision: "native-capture-v1", os: process.platform, arch: process.arch, node: process.version,
@@ -55,6 +67,81 @@ export function nativeJudgeLaunchProfile(cliVersion) {
     shell_tool: false, unified_exec: false, view_image: false,
     max_stream_bytes: MAX_STREAM, all_tools_disabled_verified: false };
 }
+
+export function nativeJudgeLaunchProfile(cliVersion) {
+  const legacy = legacyNativeJudgeLaunchProfile(cliVersion);
+  if (cliVersion !== JUDGE_TOOL_FREE_CLI_VERSION) return legacy;
+  const templatePaths = launchPaths("/__ask_judge_invocation__");
+  return { ...legacy, adapter_revision: TOOL_FREE_REVISION,
+    purpose: "tool_free_judge_preparation_only",
+    launch_template_digest: canonicalDigest({ argv: buildJudgeToolFreeExecutionArgv(templatePaths),
+      environment: launchEnvironment(templatePaths) }),
+    catalog_digest: JUDGE_TOOL_FREE_CATALOG_SHA256,
+    target_native_identity_digest: JUDGE_TOOL_FREE_CLI_SHA256,
+    requested_model: JUDGE_TOOL_FREE_MODEL, requested_provider: "openai",
+    live_execution_authorized: false, required_host_evidence: [...LIVE_HOST_REQUIREMENTS] };
+}
+
+function toolFree(profile) { return profile.adapter_revision === TOOL_FREE_REVISION; }
+function launchPaths(root) {
+  const home = resolve(root, "home"), codexHome = resolve(home, ".codex");
+  return { home, codexHome, workspace: resolve(root, "workspace"),
+    instructionPath: resolve(root, "instruction.txt"), schemaPath: resolve(root, "response-schema.json"),
+    responsePath: resolve(root, "final.json"), catalogPath: resolve(root, "model-catalog.json"),
+    configPath: resolve(codexHome, "config.toml"), executablePath: resolve(root, "codex-native") };
+}
+function launchEnvironment({ home, codexHome }) {
+  return { HOME: home, CODEX_HOME: codexHome, XDG_CONFIG_HOME: codexHome,
+    PATH: "/usr/bin:/bin", LANG: "C.UTF-8", NO_COLOR: "1" };
+}
+function launchArgv(profile, protocol, paths) {
+  return toolFree(profile) ? buildJudgeToolFreeExecutionArgv(paths)
+    : ["exec", "--json", "--skip-git-repo-check", "--model", protocol.runtime_profile.model,
+      "--sandbox", "read-only", "--output-schema", paths.schemaPath,
+      "--output-last-message", paths.responsePath, "-"];
+}
+function launchConfig(profile, paths) {
+  if (!toolFree(profile)) return configText(paths.instructionPath);
+  const argv = buildJudgeToolFreeExecutionArgv(paths), settings = [];
+  for (let index = 0; index < argv.length; index++) if (argv[index] === "-c") settings.push(argv[++index]);
+  return settings.join("\n") + "\n";
+}
+
+/** Exact trusted text block, excluding explanatory status prose in the document. */
+export function toolFreeNativeJudgeInstruction() {
+  const text = new TextDecoder("utf-8", { fatal: true }).decode(
+    bytes(resolve(ROOT, "docs/prompt-successor-llm-judge.md"), 64 * 1024));
+  const blocks = [...text.matchAll(/^```text\n([\s\S]*?)^```$/gmu)];
+  check(blocks.length === 1 && blocks[0][1].trim().length > 0, "judge_instruction_source");
+  return blocks[0][1];
+}
+
+/**
+ * Read-only target preparation. The returned plan is NOT an adapter capability.
+ * The compiled-fake integration uses the same argv/files without changing its
+ * fake/scripted protocol identity into a claim about an actual OpenAI model.
+ */
+export function prepareToolFreeNativeJudgeLaunch({ protocol, invocationRoot }) {
+  verifyJudgeProtocol(protocol);
+  external(invocationRoot);
+  const profile = nativeJudgeLaunchProfile(JUDGE_TOOL_FREE_CLI_VERSION);
+  same(protocol.runtime_profile.runtime_config_digest, canonicalDigest(profile), "profile_digest");
+  check(protocol.instruction_text.trim() !== JUDGE_TOOL_FREE_BASE_INSTRUCTIONS, "capture_instruction_not_judge");
+  same(protocol.instruction_text, toolFreeNativeJudgeInstruction(), "judge_instruction_binding");
+  if (protocol.runtime_profile.authority_profile === "live_native") {
+    same(protocol.runtime_profile.provider, "openai", "target_provider");
+    same(protocol.runtime_profile.model, JUDGE_TOOL_FREE_MODEL, "target_model");
+    same(protocol.runtime_profile.native_identity_digest, JUDGE_TOOL_FREE_CLI_SHA256, "target_image");
+  }
+  inspectJudgeToolFreeCatalog(bytes(TOOL_FREE_CATALOG, MAX_FILE));
+  const paths = launchPaths(invocationRoot);
+  return { kind: "llm_judge_tool_free_launch_preparation", protocol_digest: protocol.protocol_digest,
+    profile, paths, argv: launchArgv(profile, protocol, paths),
+    environment: launchEnvironment(paths), instruction_digest: protocol.instruction_digest,
+    response_schema_digest: protocol.response_schema_digest,
+    live_execution_authorized: false, missing_host_evidence: [...LIVE_HOST_REQUIREMENTS] };
+}
+
 function configText(instructionPath) {
   return `approval_policy = "never"\nsandbox_mode = "read-only"\nweb_search = "disabled"\n` +
     `model_reasoning_effort = "medium"\nmodel_instructions_file = ${JSON.stringify(instructionPath)}\n` +
@@ -73,6 +160,13 @@ export function createSyntheticNativeJudgeAdapter({ protocol, executable, cliVer
   check(["linux", "darwin"].includes(process.platform), "platform");
   const profile = nativeJudgeLaunchProfile(cliVersion);
   same(protocol.runtime_profile.runtime_config_digest, canonicalDigest(profile), "profile_digest");
+  if (toolFree(profile)) {
+    // Local TF3 is not authentication/confinement authority. Never run the
+    // pinned target Codex image under the synthetic API, even for --help.
+    check(protocol.runtime_profile.native_identity_digest !== JUDGE_TOOL_FREE_CLI_SHA256,
+      "target_image_requires_live_host_evidence");
+    prepareToolFreeNativeJudgeLaunch({ protocol, invocationRoot: captureRoot });
+  }
   const native = assertSuccessorNativeExecutable({ path: executable,
     expectedDigest: protocol.runtime_profile.native_identity_digest, os: process.platform, arch: process.arch });
   const inspected = inspectNativeJudgeCli({ executable, expectedSha256: native.executable_digest, expectedVersion: cliVersion });
@@ -186,33 +280,43 @@ export async function invokeNativeJudgeAdapter(handle, { protocol, packet, reque
   mkdirSync(dirname(invocationRoot), { recursive: true, mode: 0o700 });
   try { mkdirSync(invocationRoot, { mode: 0o700 }); }
   catch (error) { if (error.code === "EEXIST") throw new JudgeAuthorityError("native_transport_invocation_already_claimed"); throw error; }
-  const workspace = resolve(invocationRoot, "workspace"), home = resolve(invocationRoot, "home"), codexHome = resolve(home, ".codex");
+  const paths = launchPaths(invocationRoot);
+  const { workspace, codexHome, instructionPath, schemaPath, responsePath, configPath, catalogPath } = paths;
   mkdirSync(workspace, { mode: 0o700 }); mkdirSync(codexHome, { recursive: true, mode: 0o700 });
-  const instructionPath = resolve(invocationRoot, "instruction.txt"), schemaPath = resolve(invocationRoot, "response-schema.json");
-  const responsePath = resolve(invocationRoot, "final.json"), configPath = resolve(codexHome, "config.toml");
   const input = Buffer.from(stableCanonicalJson(packet) + "\n");
+  let executable = state.executable;
+  if (toolFree(state.profile)) {
+    prepareToolFreeNativeJudgeLaunch({ protocol, invocationRoot });
+    const catalog = bytes(TOOL_FREE_CATALOG, MAX_FILE);
+    inspectJudgeToolFreeCatalog(catalog);
+    save(catalogPath, catalog);
+    const image = bytes(state.executable, 512 * 1024 * 1024);
+    same(hash(image), state.native.executable_digest, "binary_drift");
+    executable = paths.executablePath;
+    save(executable, image); chmodSync(executable, 0o500);
+  }
   save(instructionPath, Buffer.from(protocol.instruction_text));
   save(schemaPath, Buffer.from(stableCanonicalJson(packet.response_schema) + "\n"));
-  save(configPath, Buffer.from(configText(instructionPath))); save(resolve(invocationRoot, "stdin.bin"), input);
-  const argv = ["exec", "--json", "--skip-git-repo-check", "--model", protocol.runtime_profile.model,
-    "--sandbox", "read-only", "--output-schema", schemaPath, "--output-last-message", responsePath, "-"];
-  const env = { HOME: home, CODEX_HOME: codexHome, XDG_CONFIG_HOME: codexHome, PATH: "/usr/bin:/bin", LANG: "C.UTF-8", NO_COLOR: "1" };
-  const verifyBinary = () => same(assertSuccessorNativeExecutable({ path: state.executable,
+  save(configPath, Buffer.from(launchConfig(state.profile, paths))); save(resolve(invocationRoot, "stdin.bin"), input);
+  const argv = launchArgv(state.profile, protocol, paths), env = launchEnvironment(paths);
+  const verifyBinary = () => same(assertSuccessorNativeExecutable({ path: executable,
     expectedDigest: protocol.runtime_profile.native_identity_digest, os: process.platform, arch: process.arch }), state.native, "binary_drift");
-  verifyBinary();
+  const verifyCatalog = () => { if (toolFree(state.profile)) inspectJudgeToolFreeCatalog(bytes(catalogPath, MAX_FILE)); };
+  verifyBinary(); verifyCatalog();
   const precall = record(resolve(invocationRoot, "precall.json"), { schema_version: "1.0.0", kind: "llm_judge_native_precall",
     protocol_digest: protocol.protocol_digest, request_digest: request.request_digest, packet_digest: canonicalDigest(packet), slot,
-    executable: state.executable, executable_digest: state.native.executable_digest,
+    executable, ...(toolFree(state.profile) ? { source_executable: state.executable } : {}),
+    executable_digest: state.native.executable_digest,
     launch_profile: state.profile, interface_inspection: state.inspected, argv, cwd: workspace, environment: env,
     config_digest: hash(bytes(configPath)), instruction_digest: hash(bytes(instructionPath)),
     schema_digest: hash(bytes(schemaPath)), stdin_digest: hash(input), automatic_retries: 0 });
-  const result = await captureProcess({ executable: state.executable, argv, cwd: workspace, env, input,
+  const result = await captureProcess({ executable, argv, cwd: workspace, env, input,
     timeoutMs: protocol.limits.timeout_ms });
   save(resolve(invocationRoot, "stdout.bin"), result.stdout); save(resolve(invocationRoot, "stderr.bin"), result.stderr);
   let rejection = result.cause ?? result.kill_error;
   let session = null, response = null, inspection = null;
   try {
-    verifyBinary();
+    verifyBinary(); verifyCatalog();
     same(hash(bytes(configPath)), precall.config_digest, "config_drift");
     same(hash(bytes(instructionPath)), precall.instruction_digest, "instruction_drift");
     same(hash(bytes(schemaPath)), precall.schema_digest, "schema_drift");
@@ -262,17 +366,25 @@ export function reopenNativeJudgeCapture({ reference, protocol, packet, request,
     [protocol.protocol_digest, canonicalDigest(packet), request.request_digest, slot], "request_binding");
   same(precall.executable_digest, protocol.runtime_profile.native_identity_digest, "binary_binding");
   same(canonicalDigest(precall.launch_profile), protocol.runtime_profile.runtime_config_digest, "profile_binding");
-  same(precall.launch_profile, nativeJudgeLaunchProfile(precall.launch_profile.cli_version), "launch_profile");
-  const home = resolve(root, "home"), codexHome = resolve(home, ".codex");
-  same(precall.cwd, resolve(root, "workspace"), "workspace_binding");
-  same(precall.environment, { HOME: home, CODEX_HOME: codexHome, XDG_CONFIG_HOME: codexHome,
-    PATH: "/usr/bin:/bin", LANG: "C.UTF-8", NO_COLOR: "1" }, "environment_binding");
-  same(precall.argv, ["exec", "--json", "--skip-git-repo-check", "--model", protocol.runtime_profile.model,
-    "--sandbox", "read-only", "--output-schema", resolve(root, "response-schema.json"),
-    "--output-last-message", resolve(root, "final.json"), "-"], "argv_binding");
-  same(bytes(resolve(root, "instruction.txt")).toString("utf8"), protocol.instruction_text, "instruction_binding");
-  same(bytes(resolve(root, "response-schema.json")).toString("utf8"), stableCanonicalJson(packet.response_schema) + "\n", "schema_binding");
-  same(bytes(resolve(codexHome, "config.toml")).toString("utf8"), configText(resolve(root, "instruction.txt")), "config_binding");
+  // Creation always selects the new 0.157.1 profile. Historical v1 captures
+  // retain their exact old protocol/profile identity and are read-only compatible.
+  const savedProfile = precall.launch_profile.adapter_revision === "native-capture-v1"
+    ? legacyNativeJudgeLaunchProfile(precall.launch_profile.cli_version)
+    : nativeJudgeLaunchProfile(precall.launch_profile.cli_version);
+  same(precall.launch_profile, savedProfile, "launch_profile");
+  const paths = launchPaths(root);
+  same(precall.cwd, paths.workspace, "workspace_binding");
+  same(precall.environment, launchEnvironment(paths), "environment_binding");
+  same(precall.argv, launchArgv(precall.launch_profile, protocol, paths), "argv_binding");
+  same(bytes(paths.instructionPath).toString("utf8"), protocol.instruction_text, "instruction_binding");
+  same(bytes(paths.schemaPath).toString("utf8"), stableCanonicalJson(packet.response_schema) + "\n", "schema_binding");
+  same(bytes(paths.configPath).toString("utf8"), launchConfig(precall.launch_profile, paths), "config_binding");
+  if (toolFree(precall.launch_profile)) {
+    check(protocol.instruction_text.trim() !== JUDGE_TOOL_FREE_BASE_INSTRUCTIONS, "capture_instruction_not_judge");
+    same(precall.executable, paths.executablePath, "snapshot_path");
+    same(hash(bytes(paths.executablePath, 512 * 1024 * 1024)), precall.executable_digest, "snapshot_digest");
+    inspectJudgeToolFreeCatalog(bytes(paths.catalogPath, MAX_FILE));
+  }
   const { inspection_digest: interfaceDigest, ...interfaceBody } = precall.interface_inspection;
   same(canonicalDigest(interfaceBody), interfaceDigest, "interface_digest");
   same(precall.interface_inspection.executable_digest, precall.executable_digest, "interface_executable");

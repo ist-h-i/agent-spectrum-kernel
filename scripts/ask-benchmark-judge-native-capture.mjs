@@ -60,6 +60,7 @@ export function inspectNativeJudgeCli({ executable, expectedSha256, expectedVers
     });
     check(outputs[0].stdout.trim() === `codex-cli ${expectedVersion}`, "version_mismatch");
     const flags = ["--json", "--model", "--sandbox", "--output-schema", "--output-last-message", "--skip-git-repo-check"];
+    if (expectedVersion === "0.157.1") flags.push("--ignore-user-config", "--ignore-rules", "--strict-config");
     const advertised = Object.fromEntries(flags.map(flag => [flag, new RegExp(`${flag}(?:[\\s,=]|$)`, "u").test(outputs[1].stdout)]));
     const body = { schema_version: "1.0.0", kind: "llm_judge_native_interface_inspection",
       executable_digest: expectedSha256, cli_version: expectedVersion, advertised_flags: advertised,

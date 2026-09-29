@@ -142,3 +142,22 @@ export function inspectJudgeToolFreeRequest(requests, expectedEndpoint) {
     request_sha256: sha256(request.body),
   };
 }
+
+/**
+ * Judge execution template, not the one-request TF3 probe. Persistent local
+ * session evidence and the protocol's JSON response schema are required here.
+ * This builder neither supplies credentials nor grants permission to execute.
+ */
+export function buildJudgeToolFreeExecutionArgv({ catalogPath, instructionPath, schemaPath, responsePath }) {
+  const overrides = buildJudgeToolFreeOverrides({ catalogPath, instructionPath });
+  overrides.push(
+    'model_provider="openai"',
+    "model_providers.openai.request_max_retries=0",
+    "model_providers.openai.stream_max_retries=0",
+    "model_providers.openai.supports_websockets=false",
+  );
+  return ["exec", "--ignore-user-config", "--ignore-rules", "--strict-config",
+    "--json", "--skip-git-repo-check", "--model", JUDGE_TOOL_FREE_MODEL,
+    "--output-schema", absolute(schemaPath), "--output-last-message", absolute(responsePath),
+    ...overrides.flatMap(value => ["-c", value]), "-"];
+}

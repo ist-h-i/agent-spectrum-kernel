@@ -168,3 +168,11 @@ the model-visible `tools` array because that array is empty. This is not
 live Judge qualification or formal admission. No actual Judge response,
 private evaluator, result-blind freeze, measured trial, scoring, or merge
 was run; those gates remain closed.
+
+## Native Judge consumer
+
+[The native integration](prompt-successor-judge-tool-free-integration.md) reuses
+this catalog and override builder in the existing A/B capture/receipt path.
+Its output-schema, provider, trusted instruction and session-retention settings
+are different from the TF3 probe. Compiled-fake integration success does not
+extend the historical one-request TF3 proof to that complete live launch.

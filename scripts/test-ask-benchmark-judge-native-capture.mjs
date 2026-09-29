@@ -124,7 +124,7 @@ test("model-free inspector runs only version/help with an empty credential-free 
     if (getchar() != EOF) return 41;
     if (argc == 2 && strcmp(argv[1], "--version") == 0) { puts("codex-cli 0.157.1"); return 0; }
     if (argc == 3 && strcmp(argv[1], "exec") == 0 && strcmp(argv[2], "--help") == 0) {
-      puts("--json --model --sandbox --output-schema --output-last-message --skip-git-repo-check"); return 0; }
+      puts("--json --model --sandbox --output-schema --output-last-message --skip-git-repo-check --ignore-user-config --ignore-rules --strict-config"); return 0; }
     return 42; }\n`);
   const compile = spawnSync("cc", [source, "-o", executable], { encoding: "utf8" });
   assert.equal(compile.status, 0, compile.stderr ?? String(compile.error));

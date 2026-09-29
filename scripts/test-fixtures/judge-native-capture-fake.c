@@ -6,6 +6,10 @@
 #include <sys/stat.h>
 #include <time.h>
 
+#ifndef FAKE_CLI_VERSION
+#define FAKE_CLI_VERSION "0.153.4"
+#endif
+
 /* Native protocol fixture only. It has no provider implementation or auth. */
 static void quote(FILE *f, const char *s) {
   fputc('"',f);
@@ -19,7 +23,7 @@ static int extract(const char *p, const char *key, char *out, size_t size) {
   memcpy(out,value,(size_t)(end-value)); out[end-value]=0; return 1;
 }
 static void session(FILE *f,const char *id,const char *turn,const char *cwd,const char *model,const char *output) {
-  fprintf(f,"{\"type\":\"session_meta\",\"payload\":{\"id\":\"%s\",\"cli_version\":\"0.153.4\",\"model_provider\":\"fake\",\"cwd\":",id);
+  fprintf(f,"{\"type\":\"session_meta\",\"payload\":{\"id\":\"%s\",\"cli_version\":\"" FAKE_CLI_VERSION "\",\"model_provider\":\"fake\",\"cwd\":",id);
   quote(f,cwd); fputs("}}\n{\"type\":\"turn_context\",\"payload\":{\"turn_id\":",f);quote(f,turn);
   fputs(",\"model\":",f);quote(f,model);fputs(",\"effort\":\"medium\",\"cwd\":",f);quote(f,cwd);
   fputs(",\"approval_policy\":\"never\",\"sandbox_policy\":{\"type\":\"read-only\",\"network_access\":false}}}\n",f);
@@ -30,17 +34,70 @@ static void session(FILE *f,const char *id,const char *turn,const char *cwd,cons
 }
 int main(int argc,char **argv) {
   if (getenv("OPENAI_API_KEY") || getenv("CODEX_AUTH_TOKEN") || getenv("CUSTOM_SECRET")) return 90;
-  if (argc==2 && !strcmp(argv[1],"--version")) { puts("codex-cli 0.153.4");return 0; }
+  if (argc==2 && !strcmp(argv[1],"--version")) { puts("codex-cli " FAKE_CLI_VERSION);return 0; }
   if (argc==3 && !strcmp(argv[1],"exec") && !strcmp(argv[2],"--help")) {
-    puts("--json --model --sandbox --output-schema --output-last-message --skip-git-repo-check");return 0;
+    puts("--json --model --sandbox --output-schema --output-last-message --skip-git-repo-check"
+#ifdef TOOL_FREE_PROFILE_TEST
+      " --ignore-user-config --ignore-rules --strict-config"
+#endif
+    );return 0;
   }
+#ifdef TOOL_FREE_PROFILE_TEST
+  /* Exercise the real production-shaped template, then use the same scripted
+   * response fixture. No HTTP client, model provider or credential loader exists.
+   * Session identity stays fake/scripted; gpt-6-sol is only the requested template.
+   */
+  if (argc<16 || strcmp(argv[1],"exec") || strcmp(argv[2],"--ignore-user-config")
+    || strcmp(argv[3],"--ignore-rules") || strcmp(argv[4],"--strict-config")
+    || strcmp(argv[5],"--json") || strcmp(argv[6],"--skip-git-repo-check")
+    || strcmp(argv[7],"--model") || strcmp(argv[8],"gpt-6-sol")
+    || strcmp(argv[9],"--output-schema") || strcmp(argv[11],"--output-last-message")
+    || strcmp(argv[argc-1],"-")) return 111;
+  char catalogPath[8192]={0},instructionPath[8192]={0};
+  int provider=0,retries=0;
+  for(int i=13;i<argc-1;i+=2) {
+    if(i+1>=argc-1 || strcmp(argv[i],"-c"))return 112;
+    const char *v=argv[i+1];
+    if(!strcmp(v,"model_provider=\"openai\""))provider++;
+    if(!strcmp(v,"model_providers.openai.request_max_retries=0")
+      || !strcmp(v,"model_providers.openai.stream_max_retries=0"))retries++;
+    const char *key="model_catalog_json=\"";size_t len=strlen(key);
+    if(!strncmp(v,key,len)) {
+      if(strlen(v)<=len || strlen(v)-len>=sizeof(catalogPath) || v[strlen(v)-1]!='"')return 113;
+      memcpy(catalogPath,v+len,strlen(v)-len-1);
+    }
+    key="model_instructions_file=\"";len=strlen(key);
+    if(!strncmp(v,key,len)) {
+      if(strlen(v)<=len || strlen(v)-len>=sizeof(instructionPath) || v[strlen(v)-1]!='"')return 113;
+      memcpy(instructionPath,v+len,strlen(v)-len-1);
+    }
+  }
+  if(provider!=1 || retries!=2)return 114;
+  char validationBuffer[65536];FILE *checkFile=fopen(catalogPath,"r");if(!checkFile)return 115;
+  size_t checkSize=fread(validationBuffer,1,sizeof(validationBuffer)-1,checkFile);validationBuffer[checkSize]=0;fclose(checkFile);
+  if(!strstr(validationBuffer,"\"shell_type\": \"disabled\"")
+    || !strstr(validationBuffer,"\"apply_patch_tool_type\": null")
+    || !strstr(validationBuffer,"\"tool_mode\": \"direct\""))return 116;
+  checkFile=fopen(instructionPath,"r");if(!checkFile)return 117;
+  checkSize=fread(validationBuffer,1,sizeof(validationBuffer)-1,checkFile);validationBuffer[checkSize]=0;fclose(checkFile);
+  if(checkSize==0 || strstr(validationBuffer,"Judge tool inventory capture only"))return 118;
+  checkFile=fopen(argv[10],"r");if(!checkFile)return 119;fclose(checkFile);
+  char *adapted[]={argv[0],"exec","--json","--skip-git-repo-check","--model","scripted",
+    "--sandbox","read-only","--output-schema",argv[10],"--output-last-message",argv[12],"-"};
+  argv=adapted;argc=13;
+#endif
   if (argc!=13 || strcmp(argv[1],"exec") || strcmp(argv[2],"--json") || strcmp(argv[3],"--skip-git-repo-check")
     || strcmp(argv[4],"--model") || strcmp(argv[5],"scripted") || strcmp(argv[6],"--sandbox")
     || strcmp(argv[7],"read-only") || strcmp(argv[8],"--output-schema") || strcmp(argv[10],"--output-last-message") || strcmp(argv[12],"-")) return 91;
   char cwd[4096],path[8192],config[8192]; if (!getcwd(cwd,sizeof(cwd)) || !getenv("CODEX_HOME") || !getenv("HOME")) return 92;
   snprintf(path,sizeof(path),"%s/config.toml",getenv("CODEX_HOME")); FILE *f=fopen(path,"r"); if (!f) return 93;
   size_t n=fread(config,1,sizeof(config)-1,f); config[n]=0;fclose(f);
+#ifdef TOOL_FREE_PROFILE_TEST
+  if (!strstr(config,"approval_policy=\"never\"") || !strstr(config,"features.shell_tool=false")
+    || !strstr(config,"web_search=\"disabled\""))return 94;
+#else
   if (!strstr(config,"approval_policy = \"never\"") || !strstr(config,"shell_tool = false") || !strstr(config,"web_search = \"disabled\"")) return 94;
+#endif
   snprintf(path,sizeof(path),"%s/auth.json",getenv("CODEX_HOME"));if (!access(path,F_OK)) return 95;
   char *input=calloc(1024*1024,1); if (!input) return 96;
   n=fread(input,1,1024*1024-1,stdin);input[n]=0;

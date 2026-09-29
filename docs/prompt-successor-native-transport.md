@@ -117,3 +117,14 @@ and the measured-authority path checks those locations against every source's
 private deny root. The resulting synthetic freeze requires native captures in
 later provenance rather than accepting a callback-only downgrade. This does not
 create independent label approval or formal private evaluator admission.
+
+## Tool-free integration consumer
+
+The `0.157.1` execution template now consumes the pinned tool-free catalog and
+shared override builder through the existing native A/B pipeline. It uses the
+trusted Judge instruction, not the capture-only `OK` instruction. Native image
+and catalog snapshots are reverified when captured evidence reopens. The
+compiled-fake integration and remaining authenticated-host activation boundary
+are specified in [tool-free integration](prompt-successor-judge-tool-free-integration.md).
+This is not live activation; `synthetic_only`, unknown observed isolation and
+all measured authority gates remain in force.
