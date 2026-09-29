@@ -79,6 +79,12 @@ test("outbound request inspection requires exactly one tool-free loopback Respon
   for (const change of [
     { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", input: [], tools: [{ type: "function", name: "shell" }] })) },
     { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", input: [{ type: "additional_tools", tools: [] }], tools: [] })) },
+    { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", reasoning: { effort: "medium" },
+      input: [{ type: "function_call_output", call_id: "call_1", output: "synthetic result" }], tools: [] })) },
+    { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", reasoning: { effort: "medium" },
+      input: [{ type: "unexpected_tool_result", output: "synthetic result" }], tools: [] })) },
+    { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", reasoning: { effort: "medium" },
+      input: [{ role: "tool", content: "synthetic result" }], tools: [] })) },
     { ...request, body: Buffer.from(JSON.stringify({ model: "other", input: [], tools: [] })) },
     { ...request, headers: { authorization: "Bearer unexpected" } },
     { ...request, path: "/v1/models" },

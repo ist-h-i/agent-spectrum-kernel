@@ -91,12 +91,17 @@ export function buildJudgeToolFreeOverrides({ catalogPath, instructionPath, capt
   return settings.map(([key, value]) => `${key}=${value}`);
 }
 
-function inputHasTool(value) {
-  if (Array.isArray(value)) return value.some(inputHasTool);
+function inputHasUnsupportedPart(value) {
+  if (Array.isArray(value)) return value.some(inputHasUnsupportedPart);
   if (value === null || typeof value !== "object") return false;
-  if (["additional_tools", "tool_definitions", "mcp_servers"].some(key => Object.hasOwn(value, key))) return true;
-  if (["additional_tools", "function_call", "mcp_call", "computer_call", "web_search_call"].includes(value.type)) return true;
-  return Object.values(value).some(inputHasTool);
+  if (["additional_tools", "tool_definitions", "mcp_servers", "call_id", "tool_call_id",
+    "recipient", "namespace", "tool_name", "function_name"]
+    .some(key => Object.hasOwn(value, key))) return true;
+  if (Object.hasOwn(value, "role")
+    && !["user", "developer", "system", "assistant"].includes(value.role)) return true;
+  if (Object.hasOwn(value, "type")
+    && !["message", "input_text", "text", "reasoning"].includes(value.type)) return true;
+  return Object.values(value).some(inputHasUnsupportedPart);
 }
 
 /** Inspect the raw outbound request, not Codex's tool-event transcript. */
@@ -119,7 +124,7 @@ export function inspectJudgeToolFreeRequest(requests, expectedEndpoint) {
   check(body.reasoning?.effort === "medium", "outbound reasoning effort");
   check(Array.isArray(body.input) && body.input.length > 0, "one synthetic request input");
   check(!Object.hasOwn(body, "tools") || (Array.isArray(body.tools) && body.tools.length === 0), "model-visible tools");
-  check(!inputHasTool(body.input), "additional tools in request input");
+  check(!inputHasUnsupportedPart(body.input), "tool or unsupported content in request input");
   return {
     schema_version: "1.0.0", kind: "judge_tool_free_request_capture",
     cli_version: JUDGE_TOOL_FREE_CLI_VERSION, model: body.model,
