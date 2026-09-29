@@ -7,8 +7,9 @@ export const JUDGE_TOOL_FREE_CLI_VERSION = "0.157.1";
 // This candidate is intentionally host-specific until another image is reviewed.
 export const JUDGE_TOOL_FREE_CLI_SHA256 = "sha256:27ceb5f9b957b43a519efe4eaa3816a0bffb0a531a2c89af18840c0a3c016a7d";
 export const JUDGE_TOOL_FREE_MODEL = "gpt-6-sol";
+export const JUDGE_TOOL_FREE_BASE_INSTRUCTIONS = "Judge tool inventory capture only. Return OK.";
 export const JUDGE_TOOL_FREE_STDIN = "Synthetic local request capture. Respond OK without tools.\n";
-export const JUDGE_TOOL_FREE_CATALOG_SHA256 = "sha256:7550345ec820ed7dbd27ad017f53e691828c28b857152c35b064952a7c349e1b";
+export const JUDGE_TOOL_FREE_CATALOG_SHA256 = "sha256:39152b9649b5dd123030823fc5ffa5ba768ca1139af062be85859daff2b17e25";
 
 const sha256 = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 function check(ok, message) {
@@ -27,6 +28,7 @@ export function inspectJudgeToolFreeCatalog(bytes) {
   check(Array.isArray(catalog.models) && catalog.models.length === 1, "one catalog model required");
   const model = catalog.models[0];
   check(model.slug === JUDGE_TOOL_FREE_MODEL && model.shell_type === "disabled"
+    && model.base_instructions === JUDGE_TOOL_FREE_BASE_INSTRUCTIONS
     && model.apply_patch_tool_type === null && model.supports_search_tool === false
     && Array.isArray(model.experimental_supported_tools) && model.experimental_supported_tools.length === 0
     && model.tool_mode === "direct" && model.multi_agent_version === "disabled"

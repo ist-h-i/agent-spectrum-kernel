@@ -11,6 +11,7 @@ import {
 } from "./ask-benchmark-judge-tool-free-profile.mjs";
 
 const sha256 = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+const PRE_BASE_INSTRUCTIONS_CATALOG_SHA256 = "sha256:7550345ec820ed7dbd27ad017f53e691828c28b857152c35b064952a7c349e1b";
 function check(ok, message) { if (!ok) throw new Error(`JUDGE_TOOL_FREE_REOPEN_INVALID: ${message}`); }
 function readRegular(root, name, maximumBytes) {
   return readStableBytes(resolve(root, name), `Judge tool-free ${name}`, maximumBytes);
@@ -31,12 +32,16 @@ export function reopenJudgeToolFreeCapture(evidenceRoot) {
   check(precall.cli_version === JUDGE_TOOL_FREE_CLI_VERSION
     && result.cli_version === JUDGE_TOOL_FREE_CLI_VERSION
     && precall.executable_digest === JUDGE_TOOL_FREE_CLI_SHA256
-    && result.executable_digest === JUDGE_TOOL_FREE_CLI_SHA256
-    && precall.catalog_digest === JUDGE_TOOL_FREE_CATALOG_SHA256
-    && result.catalog_digest === JUDGE_TOOL_FREE_CATALOG_SHA256,
-  "fixed CLI and catalog identity");
+    && result.executable_digest === JUDGE_TOOL_FREE_CLI_SHA256,
+  "fixed CLI identity");
   const count = result.loopback_request_count;
   check(Number.isSafeInteger(count) && count >= 0 && count <= 8, "bounded request count");
+  check(precall.catalog_digest === result.catalog_digest
+    && (precall.catalog_digest === JUDGE_TOOL_FREE_CATALOG_SHA256
+      || (count === 0 && result.inspection === null
+        && precall.catalog_digest === PRE_BASE_INSTRUCTIONS_CATALOG_SHA256))
+    && sha256(readRegular(evidenceRoot, "model-catalog.json", 1024 * 1024)) === precall.catalog_digest,
+  "saved catalog identity");
   const evidence = result.request_evidence ?? (count === 0 ? [] : null);
   check(Array.isArray(evidence) && evidence.length === count, "request evidence inventory");
   const expectedFiles = new Set();

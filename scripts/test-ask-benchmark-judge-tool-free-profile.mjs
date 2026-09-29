@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import {
-  JUDGE_TOOL_FREE_CATALOG_SHA256, JUDGE_TOOL_FREE_CLI_SHA256,
+  JUDGE_TOOL_FREE_BASE_INSTRUCTIONS, JUDGE_TOOL_FREE_CATALOG_SHA256, JUDGE_TOOL_FREE_CLI_SHA256,
   JUDGE_TOOL_FREE_CLI_VERSION, JUDGE_TOOL_FREE_MODEL, JUDGE_TOOL_FREE_STDIN,
   buildJudgeToolFreeOverrides, inspectJudgeToolFreeCatalog,
   inspectJudgeToolFreeRequest,
@@ -27,6 +27,7 @@ test("fixed 0.157.1 catalog disables every model-owned tool route", () => {
   assert.equal(catalog.models.length, 1);
   const model = catalog.models[0];
   assert.equal(model.shell_type, "disabled");
+  assert.equal(model.base_instructions, JUDGE_TOOL_FREE_BASE_INSTRUCTIONS);
   assert.equal(model.apply_patch_tool_type, null);
   assert.equal(model.supports_search_tool, false);
   assert.deepEqual(model.experimental_supported_tools, []);
@@ -125,6 +126,7 @@ test("saved HTTP bytes and non-secret metadata reopen to the same request inspec
     headers: { "content-type": "", host: "127.0.0.1:12345" }, body };
   try {
     mkdirSync(resolve(root, "workspace"));
+    writeFileSync(resolve(root, "model-catalog.json"), readFileSync(catalogPath));
     const validPrecall = { kind: "judge_tool_free_capture_precall",
       cli_version: JUDGE_TOOL_FREE_CLI_VERSION, executable_digest: JUDGE_TOOL_FREE_CLI_SHA256,
       catalog_digest: JUDGE_TOOL_FREE_CATALOG_SHA256, cwd: resolve(root, "workspace"),

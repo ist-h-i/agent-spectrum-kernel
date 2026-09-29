@@ -12,7 +12,10 @@ validator is not part of this Judge call path.
 The checked-in `benchmarks/prompt-successor-judge-tool-free-catalog.json`
 is the complete static catalog for `gpt-6-sol` under `codex-cli 0.157.1`.
 Its raw SHA-256 is
-`7550345ec820ed7dbd27ad017f53e691828c28b857152c35b064952a7c349e1b`.
+`39152b9649b5dd123030823fc5ffa5ba768ca1139af062be85859daff2b17e25`.
+The CLI 0.157.1 catalog parser requires `base_instructions` or
+`model_messages.instructions_template` for every model. This catalog now
+includes the fixed nonempty capture instruction as `base_instructions`.
 It sets `shell_type=disabled`, `apply_patch_tool_type=null`,
 `supports_search_tool=false`, no experimental tools, direct tool mode,
 disabled multi-agent metadata, text-only input, and normal Responses (not
@@ -102,6 +105,30 @@ tool inventory can or cannot be zero.
 
 The local precall, stdout, stderr, and result are saved under the operator's
 private evidence root. No Judge model request, qualification, evaluator
-admission, measured trial, or PR merge occurred. Keep PR #313 Draft. A new,
-separately authorized one-shot capture on the corrected profile, followed by
-independent review, is the next evidence needed for this candidate route.
+admission, measured trial, or PR merge occurred. The subsequent one-shot
+capture is recorded below.
+
+## 2026-09-29 authorized second attempt
+
+The separately authorized one-shot launch used local HEAD `bb37f2c5`, the
+same pinned CLI image, a fresh private home/workspace, and only a loopback
+capture provider. The CLI exited 1 while parsing the fixed catalog because
+`gpt-6-sol` lacked both `base_instructions` and
+`model_messages.instructions_template`. The capture endpoint again received
+**zero requests**. Saved evidence is at the private root
+`/private/tmp/ask-291-tool-free-capture-20260929-2`; the result reopens as a
+failed capture. SHA-256: `precall.json`
+`8974e48a6d12e5aa00c31a9ffb1a33a58eeb8271edda86d2804cf10b0741ab36`,
+`stderr.bin`
+`6b30064a9e76c366a82b6e0ddc253556758ee37f55d732cfe7c6068540377732`,
+`result.json`
+`838bd549a33320d5e0d2d1c9351f1e90feb5d9153b4dc54c6356b877c37f8af4`.
+No outbound request body exists for this attempt, so model, reasoning effort,
+destination, and tool inventory remain **unverified from a real request**.
+
+The catalog now includes the required base instruction and has a new pinned
+digest. The saved second attempt still reopens with its historical digest;
+it is not promoted to success. No third native CLI launch or retry has been
+performed. Keep `BLOCKED_BEFORE_MEASUREMENT /
+TOOL_FREE_REQUEST_VERIFICATION_PENDING`; no live qualification, formal
+admission, result-blind freeze, trial 1, or PR push follows from this attempt.

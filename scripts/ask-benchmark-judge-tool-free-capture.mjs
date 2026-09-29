@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
 import {
   JUDGE_TOOL_FREE_CATALOG_SHA256, JUDGE_TOOL_FREE_CLI_SHA256, JUDGE_TOOL_FREE_CLI_VERSION,
-  JUDGE_TOOL_FREE_MODEL, JUDGE_TOOL_FREE_STDIN,
+  JUDGE_TOOL_FREE_BASE_INSTRUCTIONS, JUDGE_TOOL_FREE_MODEL, JUDGE_TOOL_FREE_STDIN,
   buildJudgeToolFreeOverrides, inspectJudgeToolFreeCatalog, inspectJudgeToolFreeRequest,
 } from "./ask-benchmark-judge-tool-free-profile.mjs";
 import { reopenJudgeToolFreeCapture } from "./ask-benchmark-judge-tool-free-reopen.mjs";
@@ -107,7 +107,7 @@ async function main() {
   const catalogPath = resolve(evidenceRoot, "model-catalog.json");
   const instructionPath = resolve(evidenceRoot, "instruction.txt");
   save(evidenceRoot, "model-catalog.json", catalog);
-  save(evidenceRoot, "instruction.txt", Buffer.from("Judge tool inventory capture only. Return OK.\n"));
+  save(evidenceRoot, "instruction.txt", Buffer.from(`${JUDGE_TOOL_FREE_BASE_INSTRUCTIONS}\n`));
   const requests = [];
   const server = createServer((request, response) => {
     const chunks = []; let length = 0;
