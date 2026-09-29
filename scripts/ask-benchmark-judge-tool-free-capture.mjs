@@ -65,6 +65,52 @@ function processOutput(child, timeoutMs) {
   });
 }
 
+/** A non-forwarding loopback endpoint. Never receives a real provider URL. */
+export async function startJudgeLoopbackCapture() {
+  const requests = [], sockets = new Set();
+  let failure = null, connections = 0, seen = 0;
+  const server = createServer((request, response) => {
+    if (++seen > 8) { failure ??= "request_count_limit"; request.destroy(); return; }
+    const chunks = []; let length = 0, truncated = false;
+    const entry = { method: request.method, path: request.url, headers: request.headers,
+      body: Buffer.alloc(0), complete: false, truncated: false,
+      remote_address: request.socket.remoteAddress,
+      local_address: request.socket.localAddress, local_port: request.socket.localPort };
+    requests.push(entry);
+    const preserve = () => { entry.body = Buffer.concat(chunks); entry.truncated = truncated; };
+    request.on("error", () => { failure ??= "request_stream_error"; preserve(); });
+    request.on("aborted", () => { failure ??= "request_aborted"; preserve(); });
+    request.on("data", chunk => {
+      const remaining = MAX_REQUEST - length;
+      if (remaining > 0) { chunks.push(chunk.subarray(0, remaining)); length += Math.min(chunk.length, remaining); }
+      if (chunk.length > remaining) { truncated = true; failure ??= "request_body_limit"; preserve(); request.destroy(); }
+    });
+    request.on("end", () => {
+      preserve(); entry.complete = true;
+      if (truncated) return;
+      response.writeHead(400, { "content-type": "application/json", connection: "close" });
+      response.end('{"error":{"type":"capture_only","message":"local request capture; no model"}}');
+    });
+  });
+  server.requestTimeout = 10000; server.headersTimeout = 10000;
+  server.on("connection", socket => {
+    connections++;
+    sockets.add(socket); socket.once("close", () => sockets.delete(socket));
+    socket.setTimeout(5000, () => socket.destroy());
+    if (connections > 16) { failure ??= "connection_limit"; socket.destroy(); }
+  });
+  server.on("clientError", (_error, socket) => { failure ??= "http_protocol_error"; socket.destroy(); });
+  await new Promise((ok, no) => { server.once("error", no); server.listen(0, "127.0.0.1", ok); });
+  const address = server.address();
+  return { requests, endpoint: `http://127.0.0.1:${address.port}/v1`, port: address.port,
+    observation: () => ({ failure, connections, requests_seen: seen }),
+    close: async () => {
+      const closed = new Promise(ok => server.close(ok));
+      for (const socket of sockets) socket.destroy();
+      await closed;
+    } };
+}
+
 async function main() {
   check(process.argv.length === 8, "expected --codex-bin, --expected-sha256, and --evidence-root");
   const executable = realpathSync(argument("--codex-bin"));
@@ -108,33 +154,8 @@ async function main() {
   const instructionPath = resolve(evidenceRoot, "instruction.txt");
   save(evidenceRoot, "model-catalog.json", catalog);
   save(evidenceRoot, "instruction.txt", Buffer.from(`${JUDGE_TOOL_FREE_BASE_INSTRUCTIONS}\n`));
-  const requests = [];
-  const server = createServer((request, response) => {
-    const chunks = []; let length = 0;
-    request.on("data", chunk => {
-      length += chunk.length;
-      if (length > MAX_REQUEST) { request.destroy(); return; }
-      chunks.push(chunk);
-    });
-    request.on("end", () => {
-      requests.push({
-        method: request.method, path: request.url, headers: request.headers,
-        body: Buffer.concat(chunks),
-        remote_address: request.socket.remoteAddress,
-        local_address: request.socket.localAddress,
-        local_port: request.socket.localPort,
-      });
-      response.writeHead(400, { "content-type": "application/json", connection: "close" });
-      response.end('{"error":{"type":"capture_only","message":"local request capture; no model"}}');
-    });
-  });
-  await new Promise((resolveListen, rejectListen) => {
-    server.once("error", rejectListen);
-    server.listen(0, "127.0.0.1", resolveListen);
-  });
-  const address = server.address();
-  check(address?.address === "127.0.0.1" && Number.isInteger(address.port), "loopback listener");
-  const captureBaseUrl = `http://127.0.0.1:${address.port}/v1`;
+  const capture = await startJudgeLoopbackCapture();
+  const requests = capture.requests, captureBaseUrl = capture.endpoint;
   const overrides = buildJudgeToolFreeOverrides({ catalogPath, instructionPath, captureBaseUrl });
   const argv = [
     "exec", "--ignore-user-config", "--ignore-rules", "--ephemeral", "--strict-config",
@@ -167,7 +188,7 @@ async function main() {
     child.stdin.end(JUDGE_TOOL_FREE_STDIN);
     processResult = await completion;
   } finally {
-    await new Promise(resolveClose => server.close(resolveClose));
+    await capture.close();
   }
   save(evidenceRoot, "stdout.bin", processResult.stdout);
   save(evidenceRoot, "stderr.bin", processResult.stderr);
@@ -192,6 +213,7 @@ async function main() {
     verifyExecutableCopy();
     check(processResult.exit_code !== 0, "capture endpoint must reject completion");
     check(readdirSync(workspace).length === 0, "capture workspace changed");
+    check(capture.observation().failure === null && requests.every(request => request.complete && !request.truncated), "capture HTTP failure");
     inspection = inspectJudgeToolFreeRequest(requests, captureBaseUrl);
   } catch (error) { failure = error.message; }
   const result = {
@@ -212,7 +234,7 @@ async function main() {
   if (failure !== null) process.exitCode = 1;
 }
 
-main().catch(error => {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error => {
   process.stderr.write(`${error.stack ?? error}\n`);
   process.exitCode = 1;
 });

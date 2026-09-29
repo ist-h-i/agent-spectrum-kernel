@@ -102,3 +102,19 @@ node --test scripts/test-ask-benchmark-judge-live-host-authority.mjs
 Passing this test establishes the authority-binding contract only. It is not
 target-host evidence and does not make PR #313 Ready for merge or Issue #291
 ready for trial 1.
+
+
+## Bootstrap correction (revision-1 candidate records remain non-authorizing)
+
+The `read_only_existing_codex_auth_link` field above is a historical **candidate
+claim**, not enforced write protection. Symlinks can mutate their targets.
+This validator still cannot establish a host observation or issue execution
+permission. Its six-class qualification declaration is not required to start
+a separately authorized, credential-free model-free diagnosis.
+
+[Host bootstrap](prompt-successor-judge-host-bootstrap.md) separates prior
+operator approval from later observations, exercises outer process controls on
+public canaries, and captures the integrated request against a rejecting local
+endpoint. It does not convert that result into this old all-true record or
+an authenticated/qualification capability. Actual credential supply, refresh,
+provider-only egress and live diagnosis remain separate, unimplemented gates.

@@ -94,8 +94,8 @@ export function buildJudgeToolFreeOverrides({ catalogPath, instructionPath, capt
   return settings.map(([key, value]) => `${key}=${value}`);
 }
 
-function textInputOnly(input) {
-  let syntheticUserInputFound = false;
+function textInputOnly(input, expectedText = JUDGE_TOOL_FREE_STDIN) {
+  let syntheticUserInputFound = 0;
   const valid = input.every(item => {
     if (item === null || typeof item !== "object" || Array.isArray(item)) return false;
     if (!Object.keys(item).every(key => ["type", "id", "role", "content"].includes(key))) return false;
@@ -106,14 +106,15 @@ function textInputOnly(input) {
       && Object.keys(part).sort().join("|") === "text|type"
       && part.type === "input_text" && typeof part.text === "string" && part.text.length > 0);
     if (contentValid && item.role === "user"
-      && item.content.some(part => part.text === JUDGE_TOOL_FREE_STDIN)) syntheticUserInputFound = true;
+      && item.content.length === 1 && item.content[0].text === expectedText) syntheticUserInputFound++;
+    else if (item.role === "user") return false;
     return contentValid;
   });
-  return valid && syntheticUserInputFound;
+  return valid && syntheticUserInputFound === 1;
 }
 
 /** Inspect the raw outbound request, not Codex's tool-event transcript. */
-export function inspectJudgeToolFreeRequest(requests, expectedEndpoint) {
+export function inspectJudgeToolFreeRequest(requests, expectedEndpoint, integrated = null) {
   check(Array.isArray(requests) && requests.length === 1, "exactly one outbound request required");
   const endpoint = new URL(expectedEndpoint);
   check(endpoint.protocol === "http:" && endpoint.hostname === "127.0.0.1"
@@ -132,7 +133,18 @@ export function inspectJudgeToolFreeRequest(requests, expectedEndpoint) {
   check(body.reasoning?.effort === "medium", "outbound reasoning effort");
   check(Array.isArray(body.input) && body.input.length > 0, "one synthetic request input");
   check(!Object.hasOwn(body, "tools") || (Array.isArray(body.tools) && body.tools.length === 0), "model-visible tools");
-  check(textInputOnly(body.input), "tool or unsupported content in request input");
+  if (integrated !== null) {
+    check(integrated && Object.keys(integrated).sort().join("|") === "instructionText|responseSchema|stdinText"
+      && typeof integrated.stdinText === "string" && integrated.stdinText.length > 0
+      && typeof integrated.instructionText === "string" && integrated.instructionText.length > 0,
+    "integrated request expectation");
+    check(body.instructions === integrated.instructionText, "integrated instruction bytes");
+    const format = body.text?.format;
+    check(format?.type === "json_schema" && format.strict === true
+      && JSON.stringify(canonicalValue(format.schema)) === JSON.stringify(canonicalValue(integrated.responseSchema)),
+    "integrated response schema");
+  }
+  check(textInputOnly(body.input, integrated?.stdinText), "tool or unsupported content in request input");
   return {
     schema_version: "1.0.0", kind: "judge_tool_free_request_capture",
     cli_version: JUDGE_TOOL_FREE_CLI_VERSION, model: body.model,
@@ -148,9 +160,9 @@ export function inspectJudgeToolFreeRequest(requests, expectedEndpoint) {
  * session evidence and the protocol's JSON response schema are required here.
  * This builder neither supplies credentials nor grants permission to execute.
  */
-export function buildJudgeToolFreeExecutionArgv({ catalogPath, instructionPath, schemaPath, responsePath }) {
-  const overrides = buildJudgeToolFreeOverrides({ catalogPath, instructionPath });
-  overrides.push(
+export function buildJudgeToolFreeExecutionArgv({ catalogPath, instructionPath, schemaPath, responsePath }, captureBaseUrl = null) {
+  const overrides = buildJudgeToolFreeOverrides({ catalogPath, instructionPath, captureBaseUrl });
+  if (captureBaseUrl === null) overrides.push(
     'model_provider="openai"',
     "model_providers.openai.request_max_retries=0",
     "model_providers.openai.stream_max_retries=0",
@@ -160,4 +172,11 @@ export function buildJudgeToolFreeExecutionArgv({ catalogPath, instructionPath, 
     "--json", "--skip-git-repo-check", "--model", JUDGE_TOOL_FREE_MODEL,
     "--output-schema", absolute(schemaPath), "--output-last-message", absolute(responsePath),
     ...overrides.flatMap(value => ["-c", value]), "-"];
+}
+
+// Stable comparison without weakening the exact legacy catalog-byte pin.
+function canonicalValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalValue);
+  if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalValue(value[key])]));
+  return value;
 }
