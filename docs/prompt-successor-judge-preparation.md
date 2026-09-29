@@ -183,3 +183,21 @@ qualification, current private evaluator admission, target-host evidence and a
 new result-blind freeze. The corpus must not use measured outputs as labels.
 Do not delete the live guards merely because the source tests pass. Real model
 calls, evaluator admission, measurement, and merge remain separate actions.
+
+
+## Native subprocess extension
+
+[Native transport contract](prompt-successor-native-transport.md) adds a directly
+spawned **synthetic-native** adapter. It captures its own PID, fixed launch
+configuration and exact bounded streams, then reopens that capture from the
+private store. These references are checked by the existing receipt validator,
+retained in qualification reports and bound through their report digest.
+Qualification freezes that contain native captures require them in result
+provenance; they cannot silently downgrade to a callback-only receipt. Captured
+qualification packets, like labels, must remain within the private deny roots.
+
+The `--qualification-freeze-only` integration now executes 24 compiled-native
+fake Judge calls before the actual synthetic freeze. The full default scoring
+E2E still uses its existing fake adapters. Native receipts deliberately record
+`tools_disabled: null` and `workspace_isolated: null`; requested config values
+are not observed all-tools or OS-isolation proof. Live activation stays blocked.

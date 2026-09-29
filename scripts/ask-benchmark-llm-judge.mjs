@@ -15,6 +15,19 @@ import {
   writeCanonicalJsonNoReplace,
 } from "./content-addressed-store.mjs";
 
+import { assertNativeJudgeAdapter, invokeNativeJudgeAdapter, verifyNativeJudgeReceipt } from "./ask-benchmark-judge-native-transport.mjs";
+
+// The subprocess entry point can consume a permit only minted after this
+// runner has durably started its claim. The permit is not serializable evidence.
+const nativeInvocationPermits = new WeakMap();
+export function consumeNativeJudgeInvocation(permit, { protocol, request, slot }) {
+  const binding = nativeInvocationPermits.get(permit);
+  nativeInvocationPermits.delete(permit);
+  authority(binding !== undefined && binding === canonicalDigest({
+    protocol_digest: protocol.protocol_digest, request_digest: request.request_digest, slot,
+  }), "native_invocation_permit_required");
+}
+
 const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const JUDGE_RESPONSE_SCHEMA_PATH = "benchmarks/schemas/llm-judge-response.schema.json";
 export const JUDGE_INSTRUCTION_PATH = "docs/prompt-successor-llm-judge.md";
@@ -336,12 +349,15 @@ export function parseJudgeResponse({ protocol, packet, rawResponseBytes }) {
   return response;
 }
 
-function receiptRuntime(profile, observed) {
+function receiptRuntime(profile, observed, nativeCapture = null) {
   closed(observed, ["provider", "model", "native_identity_digest", "runtime_config_digest", "observed_revision", "session_id", "process_id", "tools_disabled", "fresh_process", "workspace_isolated"], "receipt_runtime_shape");
   for (const key of ["provider", "model", "native_identity_digest", "runtime_config_digest", "observed_revision"]) authority(observed[key] === profile[key], `receipt_runtime_${key}`);
   nonempty(observed.session_id, "receipt_session_id", 256);
   positiveInteger(observed.process_id, "receipt_process_id");
-  authority(observed.tools_disabled === true && observed.fresh_process === true && observed.workspace_isolated === true, "receipt_runtime_isolation");
+  if (nativeCapture !== null) {
+    authority(profile.authority_profile === "synthetic_only" && observed.tools_disabled === null
+      && observed.fresh_process === true && observed.workspace_isolated === null, "receipt_native_isolation_unknown");
+  } else authority(observed.tools_disabled === true && observed.fresh_process === true && observed.workspace_isolated === true, "receipt_runtime_isolation");
 }
 
 function tokenUsage(tokens) {
@@ -360,7 +376,7 @@ function exceedsPerCallTokenLimit(tokens, limits) {
     || (tokens.output !== null && tokens.output > limits.max_output_tokens_per_call);
 }
 
-function createReceipt({ protocol, request, packet, claim, slot, result, errorCode = null }) {
+function createReceipt({ protocol, request, packet, claim, slot, result, errorCode = null, nativeCapture = null }) {
   let status;
   let runtime = null;
   let rawBytes = null;
@@ -379,7 +395,7 @@ function createReceipt({ protocol, request, packet, claim, slot, result, errorCo
     authority(typeof result.timedOut === "boolean", "adapter_timeout");
     authority(Number.isSafeInteger(result.durationMs) && result.durationMs >= 0, "adapter_duration");
     tokenUsage(result.tokens);
-    receiptRuntime(protocol.runtime_profile, result.runtime);
+    receiptRuntime(protocol.runtime_profile, result.runtime, nativeCapture);
     ({ rawResponseBytes: rawBytes, exitCode, signal, timedOut, durationMs, tokens, runtime } = result);
     status = timedOut ? "timeout" : exitCode !== 0 || signal !== null ? "transport_error" : "completed";
     if (status === "completed" && durationMs > protocol.limits.timeout_ms) status = "timeout";
@@ -395,12 +411,13 @@ function createReceipt({ protocol, request, packet, claim, slot, result, errorCo
     tokens, raw_response_base64: savedBytes?.toString("base64") ?? null,
     raw_response_digest: rawBytes ? rawDigest(rawBytes) : null,
     raw_response_bytes: rawBytes?.length ?? null,
+    ...(nativeCapture === null ? {} : { native_capture: nativeCapture }),
   };
   return { ...body, receipt_digest: canonicalDigest(body) };
 }
 
 function verifyReceipt({ protocol, request, packet, receipt, slot }) {
-  closed(receipt, ["schema_version", "kind", "protocol_digest", "request_digest", "packet_digest", "claim_digest", "slot", "authority_profile", "status", "runtime", "exit_code", "signal", "timed_out", "duration_ms", "tokens", "raw_response_base64", "raw_response_digest", "raw_response_bytes", "receipt_digest"], "receipt_shape");
+  closed(receipt, ["schema_version", "kind", "protocol_digest", "request_digest", "packet_digest", "claim_digest", "slot", "authority_profile", "status", "runtime", "exit_code", "signal", "timed_out", "duration_ms", "tokens", "raw_response_base64", "raw_response_digest", "raw_response_bytes", "receipt_digest", ...(Object.hasOwn(receipt, "native_capture") ? ["native_capture"] : [])], "receipt_shape");
   const { receipt_digest: receiptDigest, ...body } = receipt;
   authority(receiptDigest === canonicalDigest(body), "receipt_digest");
   authority(receipt.schema_version === "1.0.0" && receipt.kind === "llm_judge_receipt", "receipt_version");
@@ -408,7 +425,7 @@ function verifyReceipt({ protocol, request, packet, receipt, slot }) {
   authority(receipt.authority_profile === protocol.runtime_profile.authority_profile, "receipt_authority_profile");
   authority(receipt.claim_digest === makeClaim(protocol, request, packet, slot).claim_digest, "receipt_claim_digest");
   authority(TERMINAL_STATUSES.has(receipt.status), "receipt_status");
-  if (receipt.runtime !== null) receiptRuntime(protocol.runtime_profile, receipt.runtime);
+  if (receipt.runtime !== null) receiptRuntime(protocol.runtime_profile, receipt.runtime, receipt.native_capture ?? null);
   tokenUsage(receipt.tokens);
   const exceededTokens = exceedsPerCallTokenLimit(receipt.tokens, protocol.limits);
   if (exceededTokens) authority(receipt.status === "token_limit", "receipt_token_limit_status");
@@ -432,6 +449,7 @@ function verifyReceipt({ protocol, request, packet, receipt, slot }) {
   if (receipt.status === "timeout") authority(receipt.timed_out || receipt.duration_ms > protocol.limits.timeout_ms, "receipt_timeout_status");
   if (receipt.status === "response_too_large") authority(receipt.raw_response_base64 === null && receipt.raw_response_bytes > protocol.limits.max_response_bytes, "receipt_response_size_status");
   if (receipt.status === "token_limit") authority(exceededTokens, "receipt_token_limit_status");
+  if (Object.hasOwn(receipt, "native_capture")) verifyNativeJudgeReceipt({ reference: receipt.native_capture, protocol, packet, request, slot, receipt });
   return receipt;
 }
 
@@ -603,7 +621,8 @@ function budgetSnapshot(storeRoot, root, protocol) {
       if (!receipt) throw new JudgeUnresolvedError("previous_call_ambiguous_or_running");
       // Invalid response JSON is a counted terminal result, not corrupt ledger
       // authority. Only the execution/identity/byte evidence is validated here.
-      if (["auth_failed", "provider_limit", "token_limit"].includes(receipt.status))
+      if (["auth_failed", "provider_limit", "token_limit"].includes(receipt.status)
+        || (receipt.native_capture && receipt.status === "transport_error"))
         throw new JudgeUnresolvedError("judge_global_stop");
       if (receipt.tokens.total === null) {
         if (protocol.limits.unknown_token_policy === "stop_remaining") throw new JudgeUnresolvedError("token_usage_unknown");
@@ -697,15 +716,20 @@ export async function runJudgeSlots({ storeRoot, protocol, request, packet, adap
   // Enable live execution only with an in-module native runner whose process,
   // configuration, and response capture are observed rather than asserted.
   authority(protocol.runtime_profile.authority_profile === "synthetic_only", "live_native_adapter_unavailable");
-  authority(adapter && typeof adapter === "object" && typeof adapter.invoke === "function", "judge_adapter_missing");
-  authority(adapter.kind === "fake_adapter", "judge_adapter_profile_mismatch");
+  const native = adapter?.kind === "native_capture_adapter";
+  if (native) assertNativeJudgeAdapter(adapter, protocol);
+  else {
+    authority(adapter && typeof adapter === "object" && typeof adapter.invoke === "function", "judge_adapter_missing");
+    authority(adapter.kind === "fake_adapter", "judge_adapter_profile_mismatch");
+  }
   const root = ensureExternalRoot(storeRoot, protocol, { create: true });
   assertQualificationRequest(root, protocol, request);
   storeBindings(storeRoot, root, protocol, request, packet);
   for (const slot of SLOTS) {
     let current = checkedSlot(root, protocol, request, packet, slot);
     if (current.receipt) {
-      if (["auth_failed", "provider_limit", "token_limit"].includes(current.receipt.status)) break;
+      if (["auth_failed", "provider_limit", "token_limit"].includes(current.receipt.status)
+        || (current.receipt.native_capture && current.receipt.status === "transport_error")) break;
       continue;
     }
     if (current.claim || current.blocked) break;
@@ -720,16 +744,30 @@ export async function runJudgeSlots({ storeRoot, protocol, request, packet, adap
     const started = { schema_version: "1.0.0", kind: "llm_judge_started", claim_digest: current.claim.claim_digest };
     writeCanonicalJsonNoReplace({ outputPath: current.location.started, artifact: started, label: "Judge slot start" });
     let result;
-    let errorCode = null;
+    let errorCode = null, nativeCapture = null;
     try {
-      result = await adapter.invoke({ protocol, packet, request, slot });
+      if (native) {
+        const permit = Object.freeze({});
+        nativeInvocationPermits.set(permit, canonicalDigest({
+          protocol_digest: protocol.protocol_digest, request_digest: request.request_digest, slot,
+        }));
+        const captured = await invokeNativeJudgeAdapter(adapter, { protocol, packet, request, slot, permit });
+        ({ nativeCapture, ...result } = captured);
+      } else result = await adapter.invoke({ protocol, packet, request, slot });
     } catch (error) {
+      if (native) {
+        // A pre-capture failure cannot be turned into a completed synthetic
+        // callback receipt. Keep the started claim uncertain and non-retryable.
+        if (!error.nativeCapture) throw error;
+        nativeCapture = error.nativeCapture;
+      }
       errorCode = ["AUTH_FAILED", "PROVIDER_LIMIT"].includes(error?.code) ? error.code : "TRANSPORT_ERROR";
     }
-    const receipt = createReceipt({ protocol, request, packet, claim: current.claim, slot, result, errorCode });
+    const receipt = createReceipt({ protocol, request, packet, claim: current.claim, slot, result, errorCode, nativeCapture });
     writeCanonicalJsonNoReplace({ outputPath: current.location.receipt, artifact: receipt, label: "Judge slot receipt", maximumBytes: MAX_RECEIPT_BYTES });
     putContentAddressedJson({ storeRoot, artifact: receipt, digest: canonicalDigest(receipt), maximumBytes: MAX_RECEIPT_BYTES });
-    if (["auth_failed", "provider_limit", "token_limit"].includes(receipt.status)) break;
+    if (["auth_failed", "provider_limit", "token_limit"].includes(receipt.status)
+      || (receipt.native_capture && receipt.status === "transport_error")) break;
   }
   const reopened = reopenJudgeResolution({ storeRoot, protocol, request, packet });
   putContentAddressedJson({ storeRoot, artifact: reopened.resolution, digest: canonicalDigest(reopened.resolution), maximumBytes: MAX_LEDGER_BYTES });

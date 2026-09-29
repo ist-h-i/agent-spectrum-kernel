@@ -165,6 +165,10 @@ export async function verifySuccessorSourceProvenance({
       }
       const reopened = reopenJudgeResolution({ storeRoot: judgeInput.storeRoot,
         protocol: judgeInput.protocol, request: judgeInput.request, packet: judgeInput.packet });
+      if (measuredJudgeQualifications?.[target.fixture_id]?.native_captures_required === true
+        && !["A", "B"].every(slot => reopened.receipts[slot]?.native_capture)) {
+        successorFail("SUCCESSOR_JUDGE_NATIVE_CAPTURE_REQUIRED", "qualified native transport cannot downgrade to callback evidence");
+      }
       const expectedAuthorityProfile = preparation.runtime.model === "synthetic-native-fake-not-a-service"
         ? "synthetic_only" : "live_native";
       derived = reopenJudgeDerivedResult({ path: judgeInput.derivedResultPath, original,

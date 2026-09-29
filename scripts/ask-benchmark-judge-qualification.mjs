@@ -144,7 +144,11 @@ function sampleResult(storeRoot, plan, sample, index, seenSessions) {
   });
   return { sample_index: index, case_class: sample.case_class, fixture_id: sample.fixture_id,
     session_reuse_detected: reused, resolution_digest: reopened.resolution.resolution_digest,
-    receipt_digests: reopened.resolution.receipt_digests, slots, criteria };
+    receipt_digests: reopened.resolution.receipt_digests, slots, criteria,
+    ...(["A", "B"].some(slot => reopened.receipts[slot]?.native_capture) ? { native_captures:
+      Object.fromEntries(["A", "B"].map(slot => [slot, reopened.receipts[slot]?.native_capture?.capture_digest ?? null])),
+      native_capture_roots: Object.fromEntries(["A", "B"].map(slot => [slot,
+        reopened.receipts[slot]?.native_capture?.invocation_root ?? null])) } : {}) };
 }
 
 /** Read-only rederivation: no provider, adapter, label repair, retry or threshold selection. */
@@ -202,12 +206,16 @@ export function bindJudgeQualificationForFreeze({ storeRoot, planDigest, reportD
   const { report_digest: ignored, ...body } = report;
   same(saved, body, "qualification_saved_report");
   check(report.all_expected_matched, "qualification_not_all_expected_matched");
+  const nativeCapturesRequired = report.rows.some(row => Object.hasOwn(row, "native_captures"));
+  if (nativeCapturesRequired) check(report.rows.every(row => row.native_captures?.A && row.native_captures?.B), "qualification_mixed_capture_inventory");
   if (requireLive) check(report.authority_profile === "live_native" && report.label_review_verified
     && report.live_qualification_established, "qualification_live_authority_missing");
   return { plan_digest: planDigest, report_digest: reportDigest, dataset_digest: report.dataset_digest,
     protocol_digest: protocolDigest, source_digest: sourceDigest, runtime_profile_digest: runtimeProfileDigest,
     target_manifest_digest: targetManifestDigest, authority_profile: report.authority_profile,
-    label_review_verified: report.label_review_verified, live_qualification_established: report.live_qualification_established };
+    label_review_verified: report.label_review_verified, live_qualification_established: report.live_qualification_established,
+    ...(nativeCapturesRequired ? { native_captures_required: true, native_capture_roots:
+      [...new Set(report.rows.flatMap(row => Object.values(row.native_capture_roots)))].sort() } : {}) };
 }
 
 /** Bind every semantic fixture; expectations come from verified public scoring inputs. */

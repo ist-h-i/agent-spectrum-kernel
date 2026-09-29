@@ -14,6 +14,7 @@ import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.
 import { buildJudgePacket, createJudgeProtocol, createJudgeRequest, runJudgeSlots } from "./ask-benchmark-llm-judge.mjs";
 import { deriveJudgeResultCandidate, readJudgeTargetManifest, writeJudgeDerivedResult } from "./ask-benchmark-judge-derived-result.mjs";
 import { JUDGE_QUALIFICATION_CLASSES, sealJudgeQualification, runJudgeQualification } from "./ask-benchmark-judge-qualification.mjs";
+import { createSyntheticNativeJudgeAdapter, nativeJudgeLaunchProfile } from "./ask-benchmark-judge-native-transport.mjs";
 import { computeEvaluationDigest, computeEvaluationId } from "./ask-benchmark-evaluator-boundary.mjs";
 
 const root = realpathSync(resolve(fileURLToPath(new URL("..", import.meta.url))));
@@ -54,7 +55,7 @@ function selection(record, plan) {
       renderer_version: record.projection_evidence.renderer_version, projection_fingerprint: record.projection_evidence.projection_fingerprint } };
 }
 
-function syntheticJudgeProtocol({ fixtureId, targetManifest, requirements }) {
+function syntheticJudgeProtocol({ fixtureId, targetManifest, requirements, nativeExecutable = null }) {
   const target = targetManifest.value.fixtures[fixtureId];
   const ids = [...target.semantic_requirements, ...target.semantic_observations];
   return createJudgeProtocol({
@@ -62,8 +63,8 @@ function syntheticJudgeProtocol({ fixtureId, targetManifest, requirements }) {
     instructionText: readFileSync(resolve(root, "docs/prompt-successor-llm-judge.md"), "utf8"),
     sourceDigest: canonicalDigest(requirements), targetManifestDigest: targetManifest.raw_digest,
     runtimeProfile: { authority_profile: "synthetic_only", provider: "fake", model: "scripted",
-      native_identity_digest: hash(Buffer.from("synthetic-judge-runtime")),
-      runtime_config_digest: hash(Buffer.from(`synthetic-judge-config-${fixtureId}`)),
+      native_identity_digest: nativeExecutable ? hash(readFileSync(nativeExecutable)) : hash(Buffer.from("synthetic-judge-runtime")),
+      runtime_config_digest: nativeExecutable ? canonicalDigest(nativeJudgeLaunchProfile("0.153.4")) : hash(Buffer.from(`synthetic-judge-config-${fixtureId}`)),
       observed_revision: "synthetic-only-v1", transport_kind: "fake_adapter", tools_disabled: true,
       fresh_process_per_slot: true, workspace_isolated: true, response_format_json: true },
     limits: { max_packet_bytes: 1024 * 1024, max_response_bytes: 64 * 1024, timeout_ms: 1000,
@@ -301,10 +302,13 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
       await check("separate synthetic qualification corpus binds both semantic fixtures before freeze", async () => {
         const targets = readJudgeTargetManifest(root);
         let calls = 0;
+        const nativeExecutable = qualificationFreezeOnly ? resolve(work, "native-judge-fake") : null;
+        if (nativeExecutable) run(compiler, ["-std=c11", "-Wall", "-Wextra", "-Werror",
+          resolve(root, "scripts/test-fixtures/judge-native-capture-fake.c"), "-o", nativeExecutable]);
         for (const [fixtureId, target] of Object.entries(targets.value.fixtures)) {
           if (target.semantic_requirements.length === 0) continue;
           const requirements = read(resolve(root, "benchmarks/fixtures/checkpoint-b2", fixtureId, "requirement-record.json"));
-          const protocol = syntheticJudgeProtocol({ fixtureId, targetManifest: targets, requirements });
+          const protocol = syntheticJudgeProtocol({ fixtureId, targetManifest: targets, requirements, nativeExecutable });
           // These scripted labels exercise persistence, not semantic correctness.
           const samples = JUDGE_QUALIFICATION_CLASSES.map((case_class, index) => ({ fixture_id: fixtureId, case_class,
             packet: buildJudgePacket({ protocol, sampleId: sampleId(`qualification-${fixtureId}-${index}`),
@@ -314,8 +318,14 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
           const storeRoot = resolve(privateDenyRoot, "synthetic-qualification", fixtureId);
           const sealed = sealJudgeQualification({ storeRoot, protocol, samples,
             labelSource: { kind: "synthetic", source_digest: canonicalDigest(samples), review_digest: null } });
-          const report = await runJudgeQualification({ storeRoot, planDigest: sealed.plan_digest,
-            adapter: { kind: "fake_adapter", invoke: input => syntheticJudgeAdapter(input.packet, "pass", () => calls++).invoke(input) } });
+          const adapter = nativeExecutable ? createSyntheticNativeJudgeAdapter({ protocol, executable: nativeExecutable,
+            cliVersion: "0.153.4", captureRoot: resolve(privateDenyRoot, "native-qualification-captures", fixtureId) })
+            : { kind: "fake_adapter", invoke: input => syntheticJudgeAdapter(input.packet, "pass", () => calls++).invoke(input) };
+          const report = await runJudgeQualification({ storeRoot, planDigest: sealed.plan_digest, adapter });
+          if (nativeExecutable) {
+            assert.ok(report.rows.every(row => row.native_captures?.A && row.native_captures?.B));
+            calls += report.rows.length * 2;
+          }
           assert.equal(report.all_expected_matched, true);
           assert.equal(report.live_qualification_established, false);
           judgeQualifications[fixtureId] = { storeRoot, planDigest: sealed.plan_digest, reportDigest: report.report_digest };
@@ -350,6 +360,7 @@ async function worker(contextPath, { pendingAdmissionRegression = false, positiv
           const proof = inspectSuccessorMeasuredAuthority(measuredAuthority);
           assert.equal(proof.schema_version, "1.2.0");
           assert.deepEqual(Object.keys(proof.judge_qualifications).sort(), Object.keys(judgeQualifications).sort());
+          assert.ok(Object.values(proof.judge_qualifications).every(binding => binding.native_captures_required === true));
           const options = { preparation, sources: measuredSources, scoringInputs, calibrationAdmission,
             hostIsolationProbePath, hostExecutionDiagnosticRoot: diagnosticRoot, normalizedRoots, root };
           await assert.rejects(() => asyncEnvironment(env, () => openSuccessorMeasuredAuthority(options)),

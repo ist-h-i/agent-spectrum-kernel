@@ -181,12 +181,14 @@ function reverifyJudgeQualifications({ inputs, preparation, sources, scoringInpu
   const targets = readJudgeTargetManifest(root);
   const semantic = Object.entries(targets.value.fixtures).filter(([, target]) => target.semantic_requirements.length > 0);
   successorClosed(inputs, semantic.map(([fixtureId]) => fixtureId), "qualification fixture inputs");
-  // Qualification labels must share the private deny root, not a measured workspace.
+  // Qualification labels and captured packets must share the private deny root.
+  const privateRoots = new Set();
   for (const source of Object.values(sources)) {
     const config = parseJsonRejectDuplicateKeys(readStableBytes(source.runtimeConfigPath, "Judge qualification native config"), "Judge qualification native config");
     if (typeof config.successor_private_evaluator_root !== "string") successorFail("SUCCESSOR_JUDGE_QUALIFICATION_REQUIRED", "private label root");
     assertNoSymlinkPathSegments(config.successor_private_evaluator_root, "qualification private deny root");
     const privateRoot = realpathSync(config.successor_private_evaluator_root);
+    privateRoots.add(privateRoot);
     for (const reference of Object.values(inputs)) {
       successorClosed(reference, ["storeRoot", "planDigest", "reportDigest"], "qualification input reference");
       assertNoSymlinkPathSegments(reference.storeRoot, "qualification store root");
@@ -203,7 +205,16 @@ function reverifyJudgeQualifications({ inputs, preparation, sources, scoringInpu
       instruction_digest: `sha256:${createHash("sha256").update(instruction).digest("hex")}`,
       criterion_ids: [...target.semantic_requirements, ...target.semantic_observations] }];
   }));
-  return bindJudgeQualificationSet({ inputs, expectations, requireLive: preparation.runtime.model !== "synthetic-native-fake-not-a-service" });
+  const bindings = bindJudgeQualificationSet({ inputs, expectations, requireLive: preparation.runtime.model !== "synthetic-native-fake-not-a-service" });
+  for (const binding of Object.values(bindings)) for (const captureRoot of binding.native_capture_roots ?? []) {
+    assertNoSymlinkPathSegments(captureRoot, "qualification native capture");
+    for (const privateRoot of privateRoots) {
+      const offset = relative(privateRoot, realpathSync(captureRoot));
+      if (offset === ".." || offset.startsWith(`..${sep}`) || resolve(privateRoot, offset) !== realpathSync(captureRoot))
+        successorFail("SUCCESSOR_JUDGE_QUALIFICATION_REQUIRED", "native qualification capture outside private deny root");
+    }
+  }
+  return bindings;
 }
 
 export async function openSuccessorMeasuredAuthority({ preparation, sources, scoringInputs, calibrationAdmission, normalizedRoots, hostIsolationProbePath, hostExecutionDiagnosticRoot, judgeQualifications = null, root = ROOT }) {

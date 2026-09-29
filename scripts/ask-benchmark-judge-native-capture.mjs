@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
 import { assertNoSymlinkPathSegments, canonicalDigest, parseJsonRejectDuplicateKeys,
   readStableBytes } from "./content-addressed-store.mjs";
-import { JudgeAuthorityError, parseJudgeResponse, verifyJudgeProtocol } from "./ask-benchmark-llm-judge.mjs";
+import { JudgeAuthorityError, JudgeUnresolvedError, parseJudgeResponse, verifyJudgeProtocol } from "./ask-benchmark-llm-judge.mjs";
 import { captureSuccessorUsage } from "./ask-benchmark-prompt-successor-usage.mjs";
 
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -74,8 +74,9 @@ export function inspectNativeJudgeCli({ executable, expectedSha256, expectedVers
  * Validates captured bytes, NOT their origin. A caller-supplied trace cannot mint
  * a native receipt, prove tools were disabled, or authorize a provider call.
  */
-export function inspectNativeJudgeCapture({ protocol, packet, processResult, sessionBytes, responseBytes, expected }) {
+export function inspectNativeJudgeCapture({ protocol, packet, processResult, sessionBytes, responseBytes, expected, responseMode = "strict" }) {
   verifyJudgeProtocol(protocol); closedExpected(expected);
+  check(["strict", "record_invalid"].includes(responseMode), "response_mode");
   check(expected.provider === protocol.runtime_profile.provider && expected.model === protocol.runtime_profile.model, "protocol_runtime");
   check(processResult?.status === 0 && processResult.signal === null && !processResult.error
     && processResult.workspace_descendants_detected === false, "incomplete_process");
@@ -103,7 +104,7 @@ export function inspectNativeJudgeCapture({ protocol, packet, processResult, ses
   const finalText = finalItems[0].item.text;
   const responseText = exactText(responseBytes, protocol.limits.max_response_bytes);
   check(responseText === finalText || responseText === `${finalText}\n`, "response_bytes_mismatch");
-  const response = parseJudgeResponse({ protocol, packet, rawResponseBytes: responseBytes });
+
   const metas = session.filter(row => row.type === "session_meta");
   const contexts = session.filter(row => row.type === "turn_context");
   check(session[0]?.type === "session_meta" && metas.length === 1 && contexts.length === 1, "session_context");
@@ -147,12 +148,18 @@ export function inspectNativeJudgeCapture({ protocol, packet, processResult, ses
   }
   check(start >= 0 && complete > start && finalMessages === 1 && finalResponseItems === 1
     && contextIndex < complete, "session_completion_missing");
+  let response = null, responseError = null;
+  try { response = parseJudgeResponse({ protocol, packet, rawResponseBytes: responseBytes }); }
+  catch (error) {
+    if (responseMode !== "record_invalid" || !(error instanceof JudgeUnresolvedError)) throw error;
+    responseError = error.code;
+  }
   const usage = captureSuccessorUsage(processResult);
   const body = { schema_version: "1.0.0", kind: "llm_judge_native_capture_inspection",
     protocol_digest: protocol.protocol_digest, packet_digest: canonicalDigest(packet), expected_context_digest: canonicalDigest(expected),
     stdout_digest: hash(processResult.stdout), session_digest: hash(sessionBytes), response_digest: hash(responseBytes),
     session_id_digest: canonicalDigest({ session_id: meta.id }), turn_id_digest: canonicalDigest({ turn_id: context.turn_id }),
-    response, usage, capture_shape_verified: true, observed_tool_events: 0,
+    response, ...(responseMode === "record_invalid" ? { response_error: responseError } : {}), usage, capture_shape_verified: true, observed_tool_events: 0,
     capture_origin_verified: false, tool_isolation_verified: false,
     native_transport_authorized: false, measurement_authorized: false };
   return { ...body, inspection_digest: canonicalDigest(body) };
