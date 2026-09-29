@@ -64,9 +64,9 @@ Source basis: [Codex config](https://github.com/openai/codex/blob/rust-v0.157.1/
 [model metadata](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/protocol/src/openai_models.rs),
 and [tool registration](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/core/src/tools/spec_plan.rs)
 at tag `rust-v0.157.1` (peeled commit
-`36650394c5b38c2990ccf2a3457165ca3e9d9726`). Source inspection is a
-candidate mechanism; the actual outbound request decides whether this exact
-CLI/profile exposed zero tools.
+`36650394c5b38c2990ccf2a3457165ca3e9d9726`). Source inspection alone
+does not establish the effective tool inventory; the saved third capture
+below records the actual outbound request.
 
 ## Formal verification contract
 
@@ -128,7 +128,43 @@ destination, and tool inventory remain **unverified from a real request**.
 
 The catalog now includes the required base instruction and has a new pinned
 digest. The saved second attempt still reopens with its historical digest;
-it is not promoted to success. No third native CLI launch or retry has been
-performed. Keep `BLOCKED_BEFORE_MEASUREMENT /
-TOOL_FREE_REQUEST_VERIFICATION_PENDING`; no live qualification, formal
-admission, result-blind freeze, trial 1, or PR push follows from this attempt.
+it is not promoted to success. The separately authorized third capture is
+recorded below.
+
+## 2026-09-29 authorized TF3 capture
+
+The one-shot capture launched local source HEAD
+`8150280c68c809e1b5981d87e35c8606303ca96b` with the pinned
+`codex-cli 0.157.1` image and catalog digest above. The child had a fresh
+`HOME`, `CODEX_HOME`, and empty workspace; its environment contained no
+credential source. The configured provider was the loopback capture endpoint
+only. The saved result is at the private evidence root
+`/private/tmp/ask-291-tool-free-capture-20260929-3`.
+
+The endpoint captured exactly **one** `POST /v1/responses` request. The
+saved body has `model="gpt-6-sol"`, `reasoning.effort="medium"`, and
+`tools=[]`; the two input items are text-only messages. The saved HTTP
+metadata records Host `127.0.0.1:53422`, local destination
+`127.0.0.1:53422`, loopback peer `127.0.0.1`, and no Authorization header.
+The endpoint returned HTTP 400 without calling a model. The CLI exited 1,
+which is expected for this capture and does not invalidate the saved request.
+
+SHA-256 of the private evidence: `precall.json`
+`ec26358ad81488d161c7e5046e66684e4aac3a1dc429205a3e6b75aa7ee5e4b4`,
+`request-1.bin`
+`aa8ea1f06db005de4486d2d44f6a66d699ad72a171d1c4bbb4e0a383a05e837f`,
+`request-1.json`
+`2a4ba61d8a5a9dd6f5fed48fe1b0b51d25d02015f50320bf779d46218ffb6c32`,
+and `result.json`
+`b4904830df20b5542e6dd25af7362feaebdfbccf7c055034e753017bdce75558`.
+`ask-benchmark-judge-tool-free-reopen.mjs` independently reread the body
+and HTTP metadata and returned `request_count=1`, `tool_count=0`,
+`captured_request_verified=true`, and `failure=null`.
+
+TF3 is **verified for this exact model-free local request**. No named
+function/namespace tools, including shell, `apply_patch`, Web, MCP, apps,
+plugins, multi-agent, image, request-user-input, or tool search, appear in
+the model-visible `tools` array because that array is empty. This is not
+live Judge qualification or formal admission. No actual Judge response,
+private evaluator, result-blind freeze, measured trial, scoring, or merge
+was run; those gates remain closed.
