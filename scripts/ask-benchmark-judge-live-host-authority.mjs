@@ -28,6 +28,8 @@ function authorityPath(path) {
   check(typeof path === "string" && isAbsolute(path) && resolve(path) === path, "path");
   assertNoSymlinkPathSegments(path, "Judge live-host authority");
   const canonical = realpathSync(path);
+  const offset = relative(ROOT, canonical);
+  check(offset === ".." || offset.startsWith(`..${sep}`) || isAbsolute(offset), "external_evidence");
   const stat = lstatSync(canonical);
   check(stat.isFile() && !stat.isSymbolicLink(), "regular_file");
   return canonical;
