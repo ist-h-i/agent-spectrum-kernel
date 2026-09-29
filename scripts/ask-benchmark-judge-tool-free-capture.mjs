@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import {
-  mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync,
+  chmodSync, constants, copyFileSync, mkdirSync, readFileSync, readdirSync,
+  realpathSync, writeFileSync,
 } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -81,6 +82,21 @@ async function main() {
   inspectJudgeToolFreeCatalog(catalog);
   check(sha256(catalog) === JUDGE_TOOL_FREE_CATALOG_SHA256, "catalog identity");
   mkdirSync(evidenceRoot, { mode: 0o700 });
+  // Execute a verified private copy so a concurrent package update cannot
+  // replace the pathname between identity inspection and spawn.
+  const executableCopy = resolve(evidenceRoot, "codex-0.157.1-native");
+  copyFileSync(executable, executableCopy, constants.COPYFILE_EXCL);
+  chmodSync(executableCopy, 0o500);
+  const verifyExecutableCopy = () => {
+    const observed = assertSuccessorNativeExecutable({
+      path: executableCopy, expectedDigest: JUDGE_TOOL_FREE_CLI_SHA256,
+      os: process.platform, arch: process.arch,
+    });
+    check(observed.format === native.format && observed.bytes === native.bytes,
+      "private native image differs from inspected source");
+    return observed;
+  };
+  verifyExecutableCopy();
   const workspace = resolve(evidenceRoot, "workspace");
   const home = resolve(evidenceRoot, "home");
   const codexHome = resolve(evidenceRoot, "codex-home");
@@ -129,7 +145,8 @@ async function main() {
   };
   save(evidenceRoot, "precall.json", Buffer.from(JSON.stringify({
     schema_version: "1.0.0", kind: "judge_tool_free_capture_precall",
-    cli_version: JUDGE_TOOL_FREE_CLI_VERSION, executable, executable_digest: native.executable_digest,
+    cli_version: JUDGE_TOOL_FREE_CLI_VERSION, executable: executableCopy,
+    source_executable: executable, executable_digest: native.executable_digest,
     native_image: { os: native.os, arch: native.arch, format: native.format, bytes: native.bytes },
     catalog_digest: JUDGE_TOOL_FREE_CATALOG_SHA256, argv, cwd: workspace,
     environment_names: Object.keys(env).sort(), credential_source: "none",
@@ -139,7 +156,8 @@ async function main() {
   }, null, 2) + "\n"));
   let processResult;
   try {
-    const child = spawn(executable, argv, {
+    verifyExecutableCopy();
+    const child = spawn(executableCopy, argv, {
       cwd: workspace, env, shell: false, detached: true, stdio: ["pipe", "pipe", "pipe"],
     });
     const completion = processOutput(child, 30000);
@@ -167,6 +185,7 @@ async function main() {
   let inspection = null, failure = null;
   try {
     check(processResult.cause === null && processResult.signal === null, "CLI process completed without timeout or signal");
+    verifyExecutableCopy();
     check(processResult.exit_code !== 0, "capture endpoint must reject completion");
     check(readdirSync(workspace).length === 0, "capture workspace changed");
     inspection = inspectJudgeToolFreeRequest(requests);

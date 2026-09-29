@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -95,22 +95,36 @@ test("saved HTTP bytes and non-secret metadata reopen to the same request inspec
   const request = { method: "POST", path: "/v1/responses", remote_address: "127.0.0.1",
     headers: { "content-type": "" }, body };
   try {
+    mkdirSync(resolve(root, "workspace"));
     saveJson("precall.json", { kind: "judge_tool_free_capture_precall",
       cli_version: JUDGE_TOOL_FREE_CLI_VERSION, executable_digest: JUDGE_TOOL_FREE_CLI_SHA256,
-      catalog_digest: JUDGE_TOOL_FREE_CATALOG_SHA256 });
+      catalog_digest: JUDGE_TOOL_FREE_CATALOG_SHA256, cwd: resolve(root, "workspace"),
+      executable: resolve(root, "codex-0.157.1-native"),
+      credential_source: "none", benchmark_input: false, private_evaluator_path_supplied: false });
     const metadata = { kind: "judge_tool_free_http_request", method: request.method,
       path: request.path, remote_address: request.remote_address,
       header_names: ["content-type"], body_sha256: digest };
     const metadataBytes = Buffer.from(JSON.stringify(metadata) + "\n");
-    saveJson("result.json", { kind: "judge_tool_free_capture_result",
+    const validResult = { kind: "judge_tool_free_capture_result",
       cli_version: JUDGE_TOOL_FREE_CLI_VERSION, executable_digest: JUDGE_TOOL_FREE_CLI_SHA256,
       catalog_digest: JUDGE_TOOL_FREE_CATALOG_SHA256, loopback_request_count: 1,
       request_evidence: [{ body_sha256: digest,
         metadata_sha256: `sha256:${createHash("sha256").update(metadataBytes).digest("hex")}` }],
-      inspection: inspectJudgeToolFreeRequest([request]), failure: null });
+      cli_exit_code: 1, cli_signal: null, cli_cause: null, workspace_final_files: [],
+      credential_source: "none", benchmark_workspace_as_child_cwd: false,
+      private_evaluator_path_supplied: false,
+      inspection: inspectJudgeToolFreeRequest([request]), failure: null };
+    saveJson("result.json", validResult);
     writeFileSync(resolve(root, "request-1.bin"), body);
     writeFileSync(resolve(root, "request-1.json"), metadataBytes);
     assert.equal(reopenJudgeToolFreeCapture(root).captured_request_verified, true);
+    saveJson("result.json", { ...validResult, cli_exit_code: 0, cli_signal: "SIGKILL",
+      cli_cause: "timeout", workspace_final_files: ["unexpected"] });
+    assert.throws(() => reopenJudgeToolFreeCapture(root));
+    saveJson("result.json", validResult);
+    writeFileSync(resolve(root, "workspace/unexpected"), "unexpected");
+    assert.throws(() => reopenJudgeToolFreeCapture(root));
+    rmSync(resolve(root, "workspace/unexpected"));
     saveJson("request-1.json", { kind: "judge_tool_free_http_request", method: "GET",
       path: request.path, remote_address: request.remote_address,
       header_names: ["content-type"], body_sha256: digest });

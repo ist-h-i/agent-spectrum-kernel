@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { readdirSync, realpathSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
+import { parseJsonRejectDuplicateKeys, readStableBytes } from "./content-addressed-store.mjs";
 import {
   JUDGE_TOOL_FREE_CATALOG_SHA256, JUDGE_TOOL_FREE_CLI_SHA256, JUDGE_TOOL_FREE_CLI_VERSION,
   inspectJudgeToolFreeRequest,
@@ -13,10 +13,7 @@ import {
 const sha256 = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 function check(ok, message) { if (!ok) throw new Error(`JUDGE_TOOL_FREE_REOPEN_INVALID: ${message}`); }
 function readRegular(root, name, maximumBytes) {
-  const path = resolve(root, name);
-  const stat = lstatSync(path);
-  check(stat.isFile() && stat.size <= maximumBytes, `regular bounded ${name}`);
-  return readFileSync(path);
+  return readStableBytes(resolve(root, name), `Judge tool-free ${name}`, maximumBytes);
 }
 function readJson(root, name) {
   return parseJsonRejectDuplicateKeys(readRegular(root, name, 1024 * 1024), name);
@@ -72,6 +69,19 @@ export function reopenJudgeToolFreeCapture(evidenceRoot) {
   try { inspection = inspectJudgeToolFreeRequest(requests); } catch { /* A failed probe is preserved. */ }
   if (result.inspection !== null) {
     check(result.failure === null && inspection !== null, "recorded success without valid request");
+    check(Number.isInteger(result.cli_exit_code) && result.cli_exit_code !== 0
+      && result.cli_signal === null && result.cli_cause === null,
+    "recorded success contradicts CLI termination");
+    check(precall.cwd === resolve(evidenceRoot, "workspace")
+      && precall.executable === resolve(evidenceRoot, "codex-0.157.1-native")
+      && Array.isArray(result.workspace_final_files) && result.workspace_final_files.length === 0
+      && readdirSync(precall.cwd).length === 0,
+    "recorded success contradicts workspace state");
+    check(precall.credential_source === "none" && result.credential_source === "none"
+      && precall.benchmark_input === false && precall.private_evaluator_path_supplied === false
+      && result.benchmark_workspace_as_child_cwd === false
+      && result.private_evaluator_path_supplied === false,
+    "recorded success contradicts probe boundary");
     try { assert.deepEqual(result.inspection, inspection); }
     catch { throw new Error("JUDGE_TOOL_FREE_REOPEN_INVALID: inspection differs from saved request"); }
   } else check(result.failure !== null, "recorded failure missing reason");

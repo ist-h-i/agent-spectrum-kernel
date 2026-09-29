@@ -27,6 +27,9 @@ This target-host candidate pins the observed macOS arm64 native image digest
 in source. A caller-supplied digest cannot substitute a different CLI image
 while still labeling the capture as `0.157.1`. Another platform or CLI image
 requires its own reviewed identity binding.
+The probe executes a verified private copy of that native image inside its
+evidence root and verifies the copy again after the process exits. The saved
+precall names both the source and executed image.
 
 The profile builder is
 `scripts/ask-benchmark-judge-tool-free-profile.mjs`. The model-free
@@ -44,7 +47,9 @@ record containing method, path, header names, loopback peer, and body digest.
 The result binds each body and record by SHA-256. Run
 `node scripts/ask-benchmark-judge-tool-free-reopen.mjs --evidence-root <absolute-root>`
 to recompute the request inspection from saved bytes. A successful settings
-parse or tool-free transcript alone is not a request capture.
+parse or tool-free transcript alone is not a request capture. Reopening also
+rejects a purported success when the saved CLI exit, signal, timeout, or
+workspace state contradicts successful capture.
 
 Source basis: [Codex config](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/core/src/config/mod.rs),
 [static model manager](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/model-provider/src/provider.rs),
