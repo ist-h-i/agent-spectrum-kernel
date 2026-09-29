@@ -22,16 +22,29 @@ other version-known tool sources. A fresh `CODEX_HOME`, an empty working
 directory, `--ignore-user-config`, and `--ignore-rules` exclude persisted
 host tool configuration and repository instructions from this probe.
 
+This target-host candidate pins the observed macOS arm64 native image digest
+`27ceb5f9b957b43a519efe4eaa3816a0bffb0a531a2c89af18840c0a3c016a7d`
+in source. A caller-supplied digest cannot substitute a different CLI image
+while still labeling the capture as `0.157.1`. Another platform or CLI image
+requires its own reviewed identity binding.
+
 The profile builder is
 `scripts/ask-benchmark-judge-tool-free-profile.mjs`. The model-free
 capture command is `scripts/ask-benchmark-judge-tool-free-capture.mjs`.
-It requires an exact native-image SHA-256, creates a new evidence directory,
+It requires that fixed native-image SHA-256, creates a new evidence directory,
 passes no credentials, configures a custom Responses provider only at
 `127.0.0.1`, and returns HTTP 400 after saving the outbound request. The
 probe has no benchmark
 input or private evaluator path and runs from an empty disposable workspace.
 These conditions do not constitute syscall-level proof that the CLI never
 read another host path.
+
+The capture saves each bounded request body and a separate non-secret HTTP
+record containing method, path, header names, loopback peer, and body digest.
+The result binds each body and record by SHA-256. Run
+`node scripts/ask-benchmark-judge-tool-free-reopen.mjs --evidence-root <absolute-root>`
+to recompute the request inspection from saved bytes. A successful settings
+parse or tool-free transcript alone is not a request capture.
 
 Source basis: [Codex config](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/core/src/config/mod.rs),
 [static model manager](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/model-provider/src/provider.rs),
@@ -61,7 +74,7 @@ Focused source check:
 A target-host capture additionally requires the pinned native binary and
 an external new evidence root. The capture deliberately ends with a nonzero
 CLI status because its local endpoint rejects inference; the probe succeeds
-only if the saved request passes TF3.
+only if the saved request passes TF3 and the saved evidence reopens.
 
 ## 2026-09-29 observed attempt
 
@@ -70,7 +83,8 @@ One exact `codex-cli 0.157.1` native image (SHA-256
 was started with a fresh `CODEX_HOME` and the loopback provider. The CLI
 exited 1 during configuration loading: `unknown configuration field
 tools.view_image in -c/--config override`. The capture endpoint received
-**zero requests**, so TF3 is **not verified**. The exact-tag config schema
+**zero requests**; the saved result reopens as a failed capture with request
+count zero, so TF3 is **not verified**. The exact-tag config schema
 has `features.view_image` but no `tools.view_image`; the invalid override
 was removed and the source check passes. There has been **no second native
 exec** after this correction. The observed failure does not establish that

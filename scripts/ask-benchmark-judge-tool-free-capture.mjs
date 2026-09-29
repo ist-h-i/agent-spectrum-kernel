@@ -9,9 +9,10 @@ import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
 import {
-  JUDGE_TOOL_FREE_CATALOG_SHA256, JUDGE_TOOL_FREE_CLI_VERSION, JUDGE_TOOL_FREE_MODEL,
+  JUDGE_TOOL_FREE_CATALOG_SHA256, JUDGE_TOOL_FREE_CLI_SHA256, JUDGE_TOOL_FREE_CLI_VERSION, JUDGE_TOOL_FREE_MODEL,
   buildJudgeToolFreeOverrides, inspectJudgeToolFreeCatalog, inspectJudgeToolFreeRequest,
 } from "./ask-benchmark-judge-tool-free-profile.mjs";
+import { reopenJudgeToolFreeCapture } from "./ask-benchmark-judge-tool-free-reopen.mjs";
 
 const REPOSITORY = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const CATALOG = resolve(REPOSITORY, "benchmarks/prompt-successor-judge-tool-free-catalog.json");
@@ -66,6 +67,8 @@ async function main() {
   check(process.argv.length === 8, "expected --codex-bin, --expected-sha256, and --evidence-root");
   const executable = realpathSync(argument("--codex-bin"));
   const expectedDigest = argument("--expected-sha256");
+  check(process.platform === "darwin" && process.arch === "arm64", "candidate native image requires darwin arm64");
+  check(expectedDigest === JUDGE_TOOL_FREE_CLI_SHA256, "expected digest must match fixed 0.157.1 image");
   const requestedRoot = argument("--evidence-root");
   check(isAbsolute(requestedRoot) && resolve(requestedRoot) === requestedRoot, "absolute evidence root");
   const evidenceRoot = resolve(realpathSync(dirname(requestedRoot)), requestedRoot.split(sep).at(-1));
@@ -126,7 +129,8 @@ async function main() {
   };
   save(evidenceRoot, "precall.json", Buffer.from(JSON.stringify({
     schema_version: "1.0.0", kind: "judge_tool_free_capture_precall",
-    cli_version: JUDGE_TOOL_FREE_CLI_VERSION, executable, executable_digest: expectedDigest,
+    cli_version: JUDGE_TOOL_FREE_CLI_VERSION, executable, executable_digest: native.executable_digest,
+    native_image: { os: native.os, arch: native.arch, format: native.format, bytes: native.bytes },
     catalog_digest: JUDGE_TOOL_FREE_CATALOG_SHA256, argv, cwd: workspace,
     environment_names: Object.keys(env).sort(), credential_source: "none",
     codex_home_initial_files: [], workspace_initial_files: [],
@@ -147,15 +151,23 @@ async function main() {
   }
   save(evidenceRoot, "stdout.bin", processResult.stdout);
   save(evidenceRoot, "stderr.bin", processResult.stderr);
+  const requestEvidence = [];
   for (const [index, request] of requests.entries()) {
     save(evidenceRoot, `request-${index + 1}.bin`, request.body);
+    const metadata = Buffer.from(JSON.stringify({
+      schema_version: "1.0.0", kind: "judge_tool_free_http_request",
+      method: request.method, path: request.path,
+      remote_address: request.remote_address,
+      header_names: Object.keys(request.headers).sort(),
+      body_sha256: sha256(request.body),
+    }, null, 2) + "\n");
+    save(evidenceRoot, `request-${index + 1}.json`, metadata);
+    requestEvidence.push({ body_sha256: sha256(request.body), metadata_sha256: sha256(metadata) });
   }
   let inspection = null, failure = null;
   try {
     check(processResult.cause === null && processResult.signal === null, "CLI process completed without timeout or signal");
     check(processResult.exit_code !== 0, "capture endpoint must reject completion");
-    check(requests.every(request => request.remote_address === "127.0.0.1"
-      || request.remote_address === "::ffff:127.0.0.1"), "loopback peer only");
     check(readdirSync(workspace).length === 0, "capture workspace changed");
     inspection = inspectJudgeToolFreeRequest(requests);
   } catch (error) { failure = error.message; }
@@ -165,13 +177,15 @@ async function main() {
     catalog_digest: JUDGE_TOOL_FREE_CATALOG_SHA256,
     cli_exit_code: processResult.exit_code, cli_signal: processResult.signal,
     cli_cause: processResult.cause, loopback_request_count: requests.length,
+    request_evidence: requestEvidence,
     workspace_final_files: readdirSync(workspace),
     codex_home_initial_files: [], credential_source: "none",
     benchmark_workspace_as_child_cwd: false, private_evaluator_path_supplied: false,
     inspection, failure,
   };
   save(evidenceRoot, "result.json", Buffer.from(JSON.stringify(result, null, 2) + "\n"));
-  process.stdout.write(JSON.stringify({ evidence_root: evidenceRoot, ...result }) + "\n");
+  const reopened = reopenJudgeToolFreeCapture(evidenceRoot);
+  process.stdout.write(JSON.stringify({ evidence_root: evidenceRoot, ...result, reopened }) + "\n");
   if (failure !== null) process.exitCode = 1;
 }
 

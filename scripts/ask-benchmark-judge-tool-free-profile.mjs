@@ -3,6 +3,9 @@ import { isAbsolute, resolve } from "node:path";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 
 export const JUDGE_TOOL_FREE_CLI_VERSION = "0.157.1";
+// Observed @openai/codex-darwin-arm64 native image for codex-cli 0.157.1.
+// This candidate is intentionally host-specific until another image is reviewed.
+export const JUDGE_TOOL_FREE_CLI_SHA256 = "sha256:27ceb5f9b957b43a519efe4eaa3816a0bffb0a531a2c89af18840c0a3c016a7d";
 export const JUDGE_TOOL_FREE_MODEL = "gpt-6-sol";
 export const JUDGE_TOOL_FREE_CATALOG_SHA256 = "sha256:7550345ec820ed7dbd27ad017f53e691828c28b857152c35b064952a7c349e1b";
 
@@ -101,6 +104,7 @@ export function inspectJudgeToolFreeRequest(requests) {
   check(Array.isArray(requests) && requests.length === 1, "exactly one outbound request required");
   const request = requests[0];
   check(request?.method === "POST" && request.path === "/v1/responses", "Responses endpoint");
+  check(request.remote_address === "127.0.0.1" || request.remote_address === "::ffff:127.0.0.1", "loopback peer");
   check(Buffer.isBuffer(request.body) && request.body.length > 0 && request.body.length <= 4 * 1024 * 1024, "bounded request body");
   check(!Object.keys(request.headers ?? {}).some(key => key.toLowerCase() === "authorization"), "capture must not receive credentials");
   const body = parseJsonRejectDuplicateKeys(request.body, "outbound Responses request");
