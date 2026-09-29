@@ -58,6 +58,11 @@ profile before adding a live capability. Do not change `synthetic_only` metadata
 to `live_native`, remove a gate, or submit a fake capture as qualification.
 No real model call, auth-file copy or billing action is part of this revision.
 
+The [0.157.1 tool-free candidate](prompt-successor-judge-tool-free-profile.md)
+provides fixed model metadata, closed launch overrides and a local outbound
+request capture probe. Its first native run stopped during config parsing
+without sending a request; zero model-visible tools remains unverified.
+
 
 ## Implementation API
 

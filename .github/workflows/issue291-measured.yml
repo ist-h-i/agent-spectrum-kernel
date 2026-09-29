@@ -15,6 +15,7 @@ on:
       - 'benchmarks/schemas/portfolio-attempt-result.schema.json'
       - 'benchmarks/schemas/portfolio-run-identity.schema.json'
       - 'docs/prompt-successor-measured-execution.md'
+      - 'docs/prompt-successor-judge-tool-free-profile.md'
       - '.github/workflows/issue291-measured.yml'
 
 permissions:
@@ -90,7 +91,7 @@ jobs:
       - name: Verify calibration execution admission boundaries
         run: node --test scripts/test-ask-benchmark-calibration-execution-admission.mjs scripts/test-ask-benchmark-prompt-successor-host-isolation.mjs scripts/test-ask-benchmark-prompt-successor-host-diagnostic.mjs
       - name: Verify login and synthetic Judge authority boundaries
-        run: node --test scripts/test-ask-benchmark-issue291-login.mjs scripts/test-ask-benchmark-llm-judge.mjs scripts/test-ask-benchmark-judge-derived-result.mjs scripts/test-ask-benchmark-judge-qualification.mjs scripts/test-ask-benchmark-judge-native-capture.mjs scripts/test-ask-benchmark-judge-native-transport.mjs
+        run: node --test scripts/test-ask-benchmark-issue291-login.mjs scripts/test-ask-benchmark-llm-judge.mjs scripts/test-ask-benchmark-judge-derived-result.mjs scripts/test-ask-benchmark-judge-qualification.mjs scripts/test-ask-benchmark-judge-native-capture.mjs scripts/test-ask-benchmark-judge-native-transport.mjs scripts/test-ask-benchmark-judge-tool-free-profile.mjs
       - name: Verify native successor transport and normalized usage
         run: node --test scripts/test-ask-benchmark-prompt-successor-execution.mjs
       - name: Verify native collection and existing scoring boundaries
