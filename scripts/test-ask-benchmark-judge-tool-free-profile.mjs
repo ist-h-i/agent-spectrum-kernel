@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { test } from "node:test";
 import {
   JUDGE_TOOL_FREE_CATALOG_SHA256, JUDGE_TOOL_FREE_CLI_SHA256,
-  JUDGE_TOOL_FREE_CLI_VERSION, JUDGE_TOOL_FREE_MODEL,
+  JUDGE_TOOL_FREE_CLI_VERSION, JUDGE_TOOL_FREE_MODEL, JUDGE_TOOL_FREE_STDIN,
   buildJudgeToolFreeOverrides, inspectJudgeToolFreeCatalog,
   inspectJudgeToolFreeRequest,
 } from "./ask-benchmark-judge-tool-free-profile.mjs";
@@ -14,6 +14,10 @@ import { reopenJudgeToolFreeCapture } from "./ask-benchmark-judge-tool-free-reop
 
 const catalogPath = resolve(import.meta.dirname, "../benchmarks/prompt-successor-judge-tool-free-catalog.json");
 const captureEndpoint = "http://127.0.0.1:12345/v1";
+const syntheticInput = [{ type: "message", id: "msg_synthetic", role: "user",
+  content: [{ type: "input_text", text: JUDGE_TOOL_FREE_STDIN }] }];
+const validBody = { model: "gpt-6-sol", reasoning: { effort: "medium" }, input: syntheticInput, tools: [] };
+const encoded = value => Buffer.from(JSON.stringify(value));
 
 test("fixed 0.157.1 catalog disables every model-owned tool route", () => {
   const catalog = inspectJudgeToolFreeCatalog(readFileSync(catalogPath));
@@ -69,23 +73,32 @@ test("outbound request inspection requires exactly one tool-free loopback Respon
     method: "POST", path: "/v1/responses",
     headers: { "content-type": "application/json", host: "127.0.0.1:12345" },
     remote_address: "127.0.0.1", local_address: "127.0.0.1", local_port: 12345,
-    body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", reasoning: { effort: "medium" },
-      input: [{ role: "user", content: "synthetic capture" }], tools: [] })),
+    body: encoded(validBody),
   };
   const summary = inspectJudgeToolFreeRequest([request], captureEndpoint);
   assert.equal(summary.tool_count, 0);
   assert.equal(summary.model, "gpt-6-sol");
   assert.equal(summary.reasoning_effort, "medium");
+  assert.equal(inspectJudgeToolFreeRequest([{ ...request, body: encoded({ ...validBody,
+    input: [{ type: "message", role: "developer",
+      content: [{ type: "input_text", text: "synthetic context" }] }, ...syntheticInput],
+  }) }], captureEndpoint).tool_count, 0);
   for (const change of [
-    { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", input: [], tools: [{ type: "function", name: "shell" }] })) },
-    { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", input: [{ type: "additional_tools", tools: [] }], tools: [] })) },
-    { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", reasoning: { effort: "medium" },
-      input: [{ type: "function_call_output", call_id: "call_1", output: "synthetic result" }], tools: [] })) },
-    { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", reasoning: { effort: "medium" },
-      input: [{ type: "unexpected_tool_result", output: "synthetic result" }], tools: [] })) },
-    { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol", reasoning: { effort: "medium" },
-      input: [{ role: "tool", content: "synthetic result" }], tools: [] })) },
-    { ...request, body: Buffer.from(JSON.stringify({ model: "other", input: [], tools: [] })) },
+    { ...request, body: encoded({ ...validBody, tools: [{ type: "function", name: "shell" }] }) },
+    { ...request, body: encoded({ ...validBody, input: [...syntheticInput, { type: "additional_tools", tools: [] }] }) },
+    { ...request, body: encoded({ ...validBody, input: [...syntheticInput,
+      { type: "function_call_output", call_id: "call_1", output: "synthetic result" }] }) },
+    { ...request, body: encoded({ ...validBody, input: [...syntheticInput,
+      { type: "unexpected_tool_result", output: "synthetic result" }] }) },
+    { ...request, body: encoded({ ...validBody, input: [...syntheticInput,
+      { role: "tool", content: "synthetic result" }] }) },
+    { ...request, body: encoded({ ...validBody, input: [{ ...syntheticInput[0],
+      content: [...syntheticInput[0].content, { output: "tool result" }] }] }) },
+    { ...request, body: encoded({ ...validBody, input: [...syntheticInput,
+      { type: "message", role: "assistant", content: [], tool_calls: [{ function: { name: "shell" } }] }] }) },
+    { ...request, body: encoded({ ...validBody, input: [...syntheticInput, null] }) },
+    { ...request, body: encoded({ ...validBody, input: [] }) },
+    { ...request, body: encoded({ ...validBody, model: "other" }) },
     { ...request, headers: { authorization: "Bearer unexpected" } },
     { ...request, path: "/v1/models" },
     { ...request, method: "GET" },
@@ -93,10 +106,8 @@ test("outbound request inspection requires exactly one tool-free loopback Respon
     { ...request, local_address: "198.51.100.1" },
     { ...request, local_port: 443 },
     { ...request, headers: { ...request.headers, host: "api.openai.com" } },
-    { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol",
-      reasoning: { effort: "high" }, input: [{ role: "user", content: "synthetic capture" }], tools: [] })) },
-    { ...request, body: Buffer.from(JSON.stringify({ model: "gpt-6-sol",
-      input: [{ role: "user", content: "synthetic capture" }], tools: [] })) },
+    { ...request, body: encoded({ ...validBody, reasoning: { effort: "high" } }) },
+    { ...request, body: encoded({ ...validBody, reasoning: undefined }) },
     { ...request, body: Buffer.from('{"model":"gpt-6-sol","tools":[],"tools":[]}') },
   ]) assert.throws(() => inspectJudgeToolFreeRequest([change], captureEndpoint));
   assert.throws(() => inspectJudgeToolFreeRequest([], captureEndpoint));
@@ -107,8 +118,7 @@ test("outbound request inspection requires exactly one tool-free loopback Respon
 test("saved HTTP bytes and non-secret metadata reopen to the same request inspection", () => {
   const root = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-judge-tool-free-reopen-")));
   const saveJson = (name, value) => writeFileSync(resolve(root, name), JSON.stringify(value) + "\n");
-  const body = Buffer.from(JSON.stringify({ model: "gpt-6-sol", reasoning: { effort: "medium" },
-    input: [{ role: "user", content: "synthetic capture" }], tools: [] }));
+  const body = encoded(validBody);
   const digest = `sha256:${createHash("sha256").update(body).digest("hex")}`;
   const request = { method: "POST", path: "/v1/responses", remote_address: "127.0.0.1",
     local_address: "127.0.0.1", local_port: 12345,

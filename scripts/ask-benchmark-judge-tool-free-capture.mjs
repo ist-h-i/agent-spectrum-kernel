@@ -10,7 +10,8 @@ import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
 import {
-  JUDGE_TOOL_FREE_CATALOG_SHA256, JUDGE_TOOL_FREE_CLI_SHA256, JUDGE_TOOL_FREE_CLI_VERSION, JUDGE_TOOL_FREE_MODEL,
+  JUDGE_TOOL_FREE_CATALOG_SHA256, JUDGE_TOOL_FREE_CLI_SHA256, JUDGE_TOOL_FREE_CLI_VERSION,
+  JUDGE_TOOL_FREE_MODEL, JUDGE_TOOL_FREE_STDIN,
   buildJudgeToolFreeOverrides, inspectJudgeToolFreeCatalog, inspectJudgeToolFreeRequest,
 } from "./ask-benchmark-judge-tool-free-profile.mjs";
 import { reopenJudgeToolFreeCapture } from "./ask-benchmark-judge-tool-free-reopen.mjs";
@@ -163,7 +164,7 @@ async function main() {
     });
     const completion = processOutput(child, 30000);
     child.stdin.on("error", () => {});
-    child.stdin.end("Synthetic local request capture. Respond OK without tools.\n");
+    child.stdin.end(JUDGE_TOOL_FREE_STDIN);
     processResult = await completion;
   } finally {
     await new Promise(resolveClose => server.close(resolveClose));

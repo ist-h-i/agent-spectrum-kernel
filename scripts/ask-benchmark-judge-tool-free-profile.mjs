@@ -7,6 +7,7 @@ export const JUDGE_TOOL_FREE_CLI_VERSION = "0.157.1";
 // This candidate is intentionally host-specific until another image is reviewed.
 export const JUDGE_TOOL_FREE_CLI_SHA256 = "sha256:27ceb5f9b957b43a519efe4eaa3816a0bffb0a531a2c89af18840c0a3c016a7d";
 export const JUDGE_TOOL_FREE_MODEL = "gpt-6-sol";
+export const JUDGE_TOOL_FREE_STDIN = "Synthetic local request capture. Respond OK without tools.\n";
 export const JUDGE_TOOL_FREE_CATALOG_SHA256 = "sha256:7550345ec820ed7dbd27ad017f53e691828c28b857152c35b064952a7c349e1b";
 
 const sha256 = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
@@ -91,17 +92,22 @@ export function buildJudgeToolFreeOverrides({ catalogPath, instructionPath, capt
   return settings.map(([key, value]) => `${key}=${value}`);
 }
 
-function inputHasUnsupportedPart(value) {
-  if (Array.isArray(value)) return value.some(inputHasUnsupportedPart);
-  if (value === null || typeof value !== "object") return false;
-  if (["additional_tools", "tool_definitions", "mcp_servers", "call_id", "tool_call_id",
-    "recipient", "namespace", "tool_name", "function_name"]
-    .some(key => Object.hasOwn(value, key))) return true;
-  if (Object.hasOwn(value, "role")
-    && !["user", "developer", "system", "assistant"].includes(value.role)) return true;
-  if (Object.hasOwn(value, "type")
-    && !["message", "input_text", "text", "reasoning"].includes(value.type)) return true;
-  return Object.values(value).some(inputHasUnsupportedPart);
+function textInputOnly(input) {
+  let syntheticUserInputFound = false;
+  const valid = input.every(item => {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) return false;
+    if (!Object.keys(item).every(key => ["type", "id", "role", "content"].includes(key))) return false;
+    if (item.type !== "message" || !["user", "developer"].includes(item.role)) return false;
+    if (item.id !== undefined && (typeof item.id !== "string" || !item.id.startsWith("msg_"))) return false;
+    if (!Array.isArray(item.content) || item.content.length === 0) return false;
+    const contentValid = item.content.every(part => part !== null && typeof part === "object" && !Array.isArray(part)
+      && Object.keys(part).sort().join("|") === "text|type"
+      && part.type === "input_text" && typeof part.text === "string" && part.text.length > 0);
+    if (contentValid && item.role === "user"
+      && item.content.some(part => part.text === JUDGE_TOOL_FREE_STDIN)) syntheticUserInputFound = true;
+    return contentValid;
+  });
+  return valid && syntheticUserInputFound;
 }
 
 /** Inspect the raw outbound request, not Codex's tool-event transcript. */
@@ -124,7 +130,7 @@ export function inspectJudgeToolFreeRequest(requests, expectedEndpoint) {
   check(body.reasoning?.effort === "medium", "outbound reasoning effort");
   check(Array.isArray(body.input) && body.input.length > 0, "one synthetic request input");
   check(!Object.hasOwn(body, "tools") || (Array.isArray(body.tools) && body.tools.length === 0), "model-visible tools");
-  check(!inputHasUnsupportedPart(body.input), "tool or unsupported content in request input");
+  check(textInputOnly(body.input), "tool or unsupported content in request input");
   return {
     schema_version: "1.0.0", kind: "judge_tool_free_request_capture",
     cli_version: JUDGE_TOOL_FREE_CLI_VERSION, model: body.model,

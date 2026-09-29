@@ -51,6 +51,10 @@ to recompute the request inspection from saved bytes. A successful settings
 parse or tool-free transcript alone is not a request capture. Reopening also
 rejects a purported success when the saved CLI exit, signal, timeout, or
 workspace state contradicts successful capture.
+The first-request input inspector permits only text `message` items from
+`developer` or `user` with `input_text` content and requires the exact
+synthetic stdin text. Tool outputs, image content, unknown typed items, and
+untyped extra fields fail closed.
 
 Source basis: [Codex config](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/core/src/config/mod.rs),
 [static model manager](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/model-provider/src/provider.rs),
