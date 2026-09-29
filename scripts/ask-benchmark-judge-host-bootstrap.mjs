@@ -11,7 +11,7 @@ import { assertNoSymlinkPathSegments, canonicalDigest, parseJsonRejectDuplicateK
 import { writeFileSync, fsyncSync } from "node:fs";
 import { buildJudgePacket, createJudgeProtocol, verifyJudgeProtocol } from "./ask-benchmark-llm-judge.mjs";
 import { nativeJudgeLaunchProfile, toolFreeNativeJudgeInstruction } from "./ask-benchmark-judge-native-transport.mjs";
-import { captureJudgeProcess } from "./ask-benchmark-judge-process.mjs";
+import { captureJudgeProcess, judgeProcessStreamFailure } from "./ask-benchmark-judge-process.mjs";
 import { startJudgeLoopbackCapture } from "./ask-benchmark-judge-tool-free-capture.mjs";
 import { buildJudgeToolFreeExecutionArgv, inspectJudgeToolFreeCatalog, inspectJudgeToolFreeRequest,
   JUDGE_TOOL_FREE_CATALOG_SHA256, JUDGE_TOOL_FREE_CLI_SHA256, JUDGE_TOOL_FREE_CLI_VERSION,
@@ -24,7 +24,7 @@ const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const DIGEST = /^sha256:[a-f0-9]{64}$/u;
 const MAX = 20 * 1024 * 1024;
 const CANARY = Buffer.from("public bootstrap canary; never a credential\n");
-const SCENARIOS = ["success", "zero", "multiple", "tools", "authorization", "timeout", "invalid_stream", "tool_event", "unconfined_controls"];
+const SCENARIOS = ["success", "zero", "multiple", "tools", "authorization", "timeout", "invalid_stream", "tool_event", "invalid_tail", "tool_tail", "unconfined_controls"];
 const SOURCES = [
   "scripts/ask-benchmark-judge-host-bootstrap.mjs", "scripts/ask-benchmark-judge-host-controls.mjs",
   "scripts/ask-benchmark-judge-process.mjs", "scripts/ask-benchmark-judge-tool-free-capture.mjs",
@@ -367,6 +367,8 @@ function derive(root, plan, permissionDigest, observation) {
     same(read(resolve(root, "home/.codex/config.toml")).toString(), config.join("\n") + "\n", "config_drift");
     check(readlinkSync(resolve(root, "home/.codex/auth-canary-link")) === resolve(root, "protected-canary.txt"), "canary_link_changed");
     const process = processRead(root, "control");
+    if (process !== null && judgeProcessStreamFailure(read(resolve(root, "control.stdout")), "control") !== null)
+      add("control_event_stream_invalid");
     if (!complete(process) || process.status !== 0) add("control_process_incomplete");
     else try {
       control = inspectJudgeHostControlTrace(read(resolve(root, "control.stdout")), { mode: plan.mode,
@@ -377,6 +379,8 @@ function derive(root, plan, permissionDigest, observation) {
       if (control.verdict !== "passed") add("outer_controls_failed");
     } catch { add("control_trace_invalid"); }
     const captured = processRead(root, "capture");
+    if (captured !== null && judgeProcessStreamFailure(read(resolve(root, "capture.stdout"))) !== null)
+      add("capture_event_stream_invalid");
     if (!complete(captured) || captured.status === 0) add("capture_process_incomplete");
     const requests = observation.requests.map((item, i) => {
       const body = read(resolve(root, `request-${i + 1}.bin`), 4 * 1024 * 1024), meta = readRecord(root, `request-${i + 1}.json`);

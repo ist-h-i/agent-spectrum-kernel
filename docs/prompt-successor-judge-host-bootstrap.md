@@ -1,6 +1,6 @@
 # Model-free Judge host bootstrap
 
-Artifact: `SPEC-313-JUDGE-HOST-BOOTSTRAP`, revision 1.
+Artifact: `SPEC-313-JUDGE-HOST-BOOTSTRAP`, revision 2.
 Upstream: Issue #291; PR #313 at `c24bc0ca`; `SPEC-313-JUDGE-LIVE-HOST-AUTHORITY`
 and `FVC-313-JUDGE-LIVE-HOST-AUTHORITY` revision 1. This implements stage A of the
 reviewed `host-bootstrap-correction.md`, not an authorization for stages B–E.
@@ -52,7 +52,7 @@ under a future reviewed credential design, not trigger writable fallback.
 ## Formal verification contract
 
 Selected path: `formal_verification_contract`,
-`FVC-313-JUDGE-HOST-BOOTSTRAP`, revision 1. Triggers: process/HTTP/persistence and
+`FVC-313-JUDGE-HOST-BOOTSTRAP`, revision 2. Triggers: process/HTTP/persistence and
 security-sensitive permission/authorization boundaries. Existing TF/NT/JI/LH
 obligations are retained.
 
@@ -174,3 +174,21 @@ operation, real diagnostic/qualification, formal admission/freeze or measured
 trial. The next target execution needs its own explicit approval after review;
 no prior one-shot allowance is reused. Failure of the macOS policy or required
 runtime reads means stop and inspect saved evidence, not weaken the controls.
+
+## Final-event framing correction (F313-HB-01)
+
+Revision 2 tightens HB4/HB5 without changing the outer policy, input, permission
+budget or evidence schema. Every nonempty stdout stream must end at a complete
+JSONL frame. The shared process observer rejects an unterminated tail, including
+a tool event or malformed JSON that follows a valid captured HTTP request.
+Bootstrap reopening uses the same event whitelist and framing check on saved
+raw stdout; a rehashed process summary cannot hide that tail or promote it to
+`verified_local`. Empty stdout remains inspectable for a request-only failure;
+it does not independently prove a completed Codex turn.
+
+Regression tests use compiled synthetic HTTP children with a valid one-request
+capture followed by an invalid/tool tail without LF. Both must remain failed,
+retain the request and raw process evidence, and replay without another start.
+The unchanged normal LF-terminated capture must still pass. Historical records
+whose success relied on an unchecked tail are rejected on rederivation rather
+than rewritten, reexecuted or treated as target-host evidence.

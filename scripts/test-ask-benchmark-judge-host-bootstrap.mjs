@@ -10,7 +10,7 @@ import { canonicalDigest } from "./content-addressed-store.mjs";
 import { prepareJudgeHostBootstrap, runJudgeHostBootstrap, reopenJudgeHostBootstrap,
   validateJudgeBootstrapPermission } from "./ask-benchmark-judge-host-bootstrap.mjs";
 import { judgeHostControlPolicy, inspectJudgeHostControlTrace, CONTROL_IDS } from "./ask-benchmark-judge-host-controls.mjs";
-import { captureJudgeProcess } from "./ask-benchmark-judge-process.mjs";
+import { captureJudgeProcess, judgeProcessStreamFailure } from "./ask-benchmark-judge-process.mjs";
 
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 function permissionFor(plan) {
@@ -133,6 +133,19 @@ for (const scenario of ["zero", "multiple", "tools", "authorization", "timeout",
     assert.deepEqual(await runJudgeHostBootstrap(c), result);
   });
 }
+for (const scenario of ["invalid_tail", "tool_tail"]) {
+  test(`${scenario} after a valid request cannot become verified_local`, async t => {
+    const c = context(t, scenario), result = await runJudgeHostBootstrap(c);
+    assert.equal(result.request.request_count, 1);
+    const captured = JSON.parse(readFileSync(resolve(c.evidenceRoot, "capture.json")));
+    assert.equal(result.state, "failed", JSON.stringify({ result, captured }));
+    assert.equal(captured.cause, "incomplete_event_stream");
+    assert.equal(readFileSync(resolve(c.evidenceRoot, "capture.stdout")).at(-1) === 10, false);
+    assert.deepEqual(reopenJudgeHostBootstrap(c), result);
+    assert.deepEqual(await runJudgeHostBootstrap(c), result);
+  });
+}
+
 for (const file of ["request-1.bin", "request-1.json", "control.stdout", "capture.stdout", "model-catalog.json", "instruction.txt", "response-schema.json", "stdin.bin", "outer-policy.sbpl", "home/.codex/config.toml", "codex-native", "control-native", "permission.json", "protected-canary.txt", "forbidden-canary.txt", "scratch/allowed-write"]) {
   test(`tampered ${file} is rejected without executing or repairing`, async t => {
     const c = context(t); await runJudgeHostBootstrap(c);
@@ -175,6 +188,33 @@ test("concurrent controllers reserve only one bootstrap namespace", async t => {
   assert.equal(results.filter(result => result.state === "verified_local").length, 1);
   assert.equal(reopenJudgeHostBootstrap(c).state, "verified_local");
 });
+
+test("raw stdout replay checks framing and the same event whitelist", () => {
+  const error = '{"type":"error","message":"capture only"}';
+  const tool = '{"type":"item.started","item":{"type":"command_execution"}}';
+  assert.equal(judgeProcessStreamFailure(Buffer.alloc(0)), null);
+  assert.equal(judgeProcessStreamFailure(Buffer.from(error + "\n")), null);
+  assert.equal(judgeProcessStreamFailure(Buffer.from(error)), "incomplete_event_stream");
+  assert.equal(judgeProcessStreamFailure(Buffer.from(error + "\n" + tool)), "incomplete_event_stream");
+  assert.equal(judgeProcessStreamFailure(Buffer.from(tool + "\n")), "tool_or_unknown_event");
+  assert.equal(judgeProcessStreamFailure(Buffer.from('{broken\n')), "invalid_event_stream");
+  assert.equal(judgeProcessStreamFailure(Buffer.from('{"type":"error","type":"error"}\n')), "invalid_event_stream");
+  assert.equal(judgeProcessStreamFailure(Buffer.from(error + "\n"), "control"), "tool_or_unknown_event");
+  const control = '{"type":"host_control_result"}';
+  assert.equal(judgeProcessStreamFailure(Buffer.from(control + "\n"), "control"), null);
+  assert.equal(judgeProcessStreamFailure(Buffer.from(control), "control"), "incomplete_event_stream");
+});
+
+for (const scenario of ["invalid_tail", "tool_tail"]) {
+  test(`rehashing ${scenario} process flags cannot hide the raw stream failure`, async t => {
+    const c = context(t, scenario), result = await runJudgeHostBootstrap(c);
+    assert.equal(result.state, "failed");
+    rehash(c.evidenceRoot, "capture.json", body => { body.cause = null; });
+    rehash(c.evidenceRoot, "result.json", body => { body.state = "verified_local"; body.failures = []; });
+    assert.throws(() => reopenJudgeHostBootstrap(c), /result_rederivation/);
+    await assert.rejects(runJudgeHostBootstrap(c), /result_rederivation/);
+  });
+}
 
 test("actual stdin EPIPE cannot be converted into a successful observation", async () => {
   const result = await captureJudgeProcess({ executable: "/bin/true", argv: [], cwd: tmpdir(), env: {}, input: Buffer.alloc(2 * 1024 * 1024, 65), timeoutMs: 3000 });

@@ -68,5 +68,9 @@ int main(int argc, char **argv) {
     char response[4096];(void)read(fd,response,sizeof(response));fclose(out);
   }
   free(body);free(input);free(instructions);free(schema_json);
-  puts("{\"type\":\"error\",\"message\":\"local rejecting endpoint\"}");return 1;
+  puts("{\"type\":\"error\",\"message\":\"local rejecting endpoint\"}");
+  /* These tails follow a fully captured request and deliberately omit LF. */
+  if (!strcmp(SCENARIO, "invalid_tail")) fputs("{broken", stdout);
+  if (!strcmp(SCENARIO, "tool_tail")) fputs("{\"type\":\"item.started\",\"item\":{\"type\":\"command_execution\"}}", stdout);
+  return 1;
 }

@@ -14,6 +14,32 @@ function stopGroup(pid) {
   catch (error) { if (error.code !== "ESRCH") throw error; }
 }
 
+function eventFailure(line, streamProtocol) {
+  try {
+    const event = parseJsonRejectDuplicateKeys(line, "native exec event");
+    const permitted = streamProtocol === "control" ? event.type === "host_control_result"
+      : ["thread.started", "turn.started", "turn.completed", "turn.failed", "error"].includes(event.type)
+        || (["item.started", "item.updated", "item.completed"].includes(event.type)
+          && ["agent_message", "reasoning"].includes(event.item?.type));
+    return permitted ? null : "tool_or_unknown_event";
+  } catch { return "invalid_event_stream"; }
+}
+
+/** Read-only framing/event check, also used when raw process evidence reopens. */
+export function judgeProcessStreamFailure(bytes, streamProtocol = "codex") {
+  if (!["codex", "control"].includes(streamProtocol)) throw new Error("invalid stream protocol");
+  if (!Buffer.isBuffer(bytes)) return "invalid_event_stream";
+  if (bytes.length > MAX_STREAM) return "output_limit";
+  let start = 0, newline;
+  while ((newline = bytes.indexOf(10, start)) !== -1) {
+    const failure = eventFailure(bytes.subarray(start, newline), streamProtocol);
+    if (failure !== null) return failure;
+    start = newline + 1;
+  }
+  // Match the native JSONL contract: no unterminated or unexamined final frame.
+  return start === bytes.length ? null : "incomplete_event_stream";
+}
+
 /** One process, bounded streams, no inherited environment or hidden retry. */
 export async function captureJudgeProcess({ executable, argv, cwd, env, input, timeoutMs, streamProtocol = "codex" }) {
   if (!["codex", "control"].includes(streamProtocol)) throw new Error("invalid stream protocol");
@@ -56,14 +82,12 @@ export async function captureJudgeProcess({ executable, argv, cwd, env, input, t
       let newline;
       while ((newline = carry.indexOf(10)) !== -1) {
         const line = carry.subarray(0, newline); carry = carry.subarray(newline + 1);
-        try {
-          const event = parseJsonRejectDuplicateKeys(line, "native exec event");
-          const permitted = streamProtocol === "control" ? event.type === "host_control_result" : ["thread.started", "turn.started", "turn.completed", "turn.failed", "error"].includes(event.type)
-            || (["item.started", "item.updated", "item.completed"].includes(event.type)
-              && ["agent_message", "reasoning"].includes(event.item?.type));
-          if (!permitted) stop("tool_or_unknown_event");
-        } catch { stop("invalid_event_stream"); }
+        const failure = eventFailure(line, streamProtocol);
+        if (failure !== null) stop(failure);
       }
+    });
+    child.stdout.once("end", () => {
+      if (carry.length > 0) stop("incomplete_event_stream");
     });
     child.once("exit", () => {
       // Descendants that still hold pipes must not keep this promise alive.
