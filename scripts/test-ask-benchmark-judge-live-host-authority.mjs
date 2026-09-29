@@ -162,6 +162,15 @@ test("reviewed host evidence opens an opaque qualification-only launch authority
   }), /opaque_handle_required/);
 });
 
+test("repository-controlled files cannot be treated as live-host authority", t => {
+  const c = context(t);
+  assert.throws(() => openJudgeLiveHostAuthority({
+    evidencePath: resolve(import.meta.dirname, "../package.json"),
+    protocol: c.protocol,
+    invocationRoot: c.invocationRoot,
+  }), /external_evidence/);
+});
+
 test("host authority reopens exact bytes and rejects post-open mutation", t => {
   const c = context(t);
   const authority = openJudgeLiveHostAuthority({

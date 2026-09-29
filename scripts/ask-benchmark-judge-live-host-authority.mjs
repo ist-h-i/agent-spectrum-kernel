@@ -1,5 +1,6 @@
 import { lstatSync, realpathSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   assertNoSymlinkPathSegments, canonicalDigest, parseJsonRejectDuplicateKeys,
   readStableBytes, stableCanonicalJson,
@@ -7,6 +8,7 @@ import {
 import { JudgeAuthorityError, verifyJudgeProtocol } from "./ask-benchmark-llm-judge.mjs";
 import { prepareToolFreeNativeJudgeLaunch } from "./ask-benchmark-judge-native-transport.mjs";
 
+const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const MAX_AUTHORITY_BYTES = 512 * 1024;
 const DIGEST = /^sha256:[a-f0-9]{64}$/u;
 const handles = new WeakMap();
