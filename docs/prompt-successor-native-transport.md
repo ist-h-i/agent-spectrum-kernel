@@ -80,6 +80,11 @@ this detection prevents the tool action from occurring before the event, or
 that a process-group check detects descendants that escape their group. Output
 limit failures record stream truncation explicitly. If termination cannot be
 confirmed, the evidence remains failed and no later Judge call is authorized.
+A failed stdin write, including `EPIPE`, rejects the capture even if the child
+returns zero and emits a complete-looking response. Saved `stdin.bin` records
+intended bytes, not proof that the child read them; a successful pipe write is
+not provider-side receipt attestation. The failed capture remains replayable,
+and neither B nor a later sample may execute under either unknown-token policy.
 A captured native execution failure stops subsequent calls under either unknown-
 token policy; it is not charged as a recoverable ordinary callback failure.
 Successful capture usage is rederived from saved stdout when reopened.

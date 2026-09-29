@@ -14,7 +14,7 @@ import { JUDGE_QUALIFICATION_CLASSES, sealJudgeQualification, runJudgeQualificat
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const d = value => canonicalDigest({ value });
 const source = resolve(import.meta.dirname, "test-fixtures/judge-native-capture-fake.c");
-function context(t, { scenario = "success", count = 1, timeout = 3000, unknownTokenPolicy = "stop_remaining" } = {}) {
+function context(t, { scenario = "success", count = 1, timeout = 3000, unknownTokenPolicy = "stop_remaining", taskPaddingBytes = 0 } = {}) {
   const root = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-native-judge-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const executable = resolve(root, "fake-codex");
@@ -25,12 +25,12 @@ function context(t, { scenario = "success", count = 1, timeout = 3000, unknownTo
     runtimeProfile: { authority_profile: "synthetic_only", provider: "fake", model: "scripted", observed_revision: "synthetic-native-test",
       native_identity_digest: hash(readFileSync(executable)), runtime_config_digest: canonicalDigest(nativeJudgeLaunchProfile("0.153.4")),
       transport_kind: "fake_adapter", tools_disabled: true, fresh_process_per_slot: true, workspace_isolated: true, response_format_json: true },
-    limits: { max_packet_bytes: 65536, max_response_bytes: 65536, timeout_ms: timeout,
+    limits: { max_packet_bytes: Math.max(65536, taskPaddingBytes + 65536), max_response_bytes: 65536, timeout_ms: timeout,
       max_input_tokens_per_call: 100, max_output_tokens_per_call: 100, max_total_tokens: 10000,
       max_samples: count, max_calls: count * 2, unknown_token_policy: unknownTokenPolicy } });
   const samples = Array.from({ length: count }, (_, index) => {
     const packet = buildJudgePacket({ protocol, sampleId: `sample-${index.toString(16).padStart(32,"0")}`,
-      task: `Review native test case:${scenario}.`, documents: [{ kind: "source", text: "The lease is used once." }],
+      task: `Review native test case:${scenario}.` + "x".repeat(taskPaddingBytes), documents: [{ kind: "source", text: "The lease is used once." }],
       originalOutputBytes: Buffer.from("The lease is used once.") });
     const request = createJudgeRequest({ protocol, packet: packet.packet, originalOutputDigest: packet.original_output_digest,
       privateBinding: { fixture_id: "cal-session-refresh", prompt_role: "current_prompt", run_id: "private-run-123",
@@ -221,4 +221,40 @@ test("rehashed capture usage cannot contradict the captured stream", async t => 
   writeFileSync(path, JSON.stringify(captured));
   assert.throws(() => reopenNativeJudgeCapture({ ...input, slot: "A", reference: {
     ...ref, capture_digest: captured.record_digest } }), /usage_rederivation/);
+});
+
+
+for (const unknownTokenPolicy of ["stop_remaining", "charge_maximum"]) {
+  test(`native stdin write failure stops B and later samples under ${unknownTokenPolicy}`, async t => {
+    // This compiled fake reads at most 1 MiB - 1 byte, then emits otherwise valid
+    // output. A 2 MiB trailing task cannot be fully delivered before it exits.
+    const c = context(t, { count: 2, taskPaddingBytes: 2 * 1024 * 1024, unknownTokenPolicy });
+    const input = { ...c, ...c.samples[0] };
+    const result = await runJudgeSlots(input);
+    assert.equal(result.receipts.A.status, "transport_error");
+    assert.equal(result.receipts.B, null);
+    assert.equal(result.resolution.overall_status, "unresolved");
+    const saved = reopenNativeJudgeCapture({ reference: result.receipts.A.native_capture, ...input, slot: "A" });
+    assert.equal(saved.result.rejection, "stdin_error");
+    assert.ok(readFileSync(resolve(result.receipts.A.native_capture.invocation_root, "stdin.bin")).length > 2 * 1024 * 1024);
+    assert.equal(saved.result.measurement_authorized, false);
+    assert.deepEqual(reopenJudgeResolution(input), result);
+    assert.deepEqual(await runJudgeSlots(input), result);
+    assert.equal(existsSync(resolve(c.captureRoot, c.protocol.protocol_digest.slice(7), c.samples[0].request.request_digest.slice(7), "B")), false);
+    const next = await runJudgeSlots({ ...c, ...c.samples[1] });
+    assert.equal(next.receipts.A, null);
+    assert.equal(next.receipts.B, null);
+    assert.equal(next.slot_states.A, "budget_blocked");
+    assert.equal(existsSync(resolve(c.captureRoot, c.protocol.protocol_digest.slice(7), c.samples[1].request.request_digest.slice(7))), false);
+  });
+}
+
+test("large fully delivered native input still completes and replays without a new capture", async t => {
+  const c = context(t, { taskPaddingBytes: 128 * 1024 }), input = { ...c, ...c.samples[0] };
+  const result = await runJudgeSlots(input);
+  assert.equal(result.resolution.overall_status, "resolved");
+  assert.equal(result.receipts.A.status, "completed");
+  assert.equal(result.receipts.B.status, "completed");
+  assert.deepEqual(await runJudgeSlots(input), result);
+  assert.deepEqual(reopenJudgeResolution(input), result);
 });

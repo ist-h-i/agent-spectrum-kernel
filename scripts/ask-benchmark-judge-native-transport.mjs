@@ -145,7 +145,9 @@ async function captureProcess({ executable, argv, cwd, env, input, timeoutMs }) 
     };
     const timer = setTimeout(() => stop("timeout"), timeoutMs);
     child.on("error", error => { cause ??= error.code ?? "spawn_failed"; });
-    child.stdin.on("error", error => { if (error.code !== "EPIPE") stop("stdin_error"); });
+    // Even a zero-exit child can close stdin before receiving the whole packet.
+    // A completion-looking response cannot override a failed input write.
+    child.stdin.on("error", () => stop("stdin_error"));
     for (const name of ["stdout", "stderr"]) child[name].on("data", chunk => {
       const remaining = MAX_STREAM - lengths[name];
       if (remaining > 0) { const kept = chunk.subarray(0, remaining); chunks[name].push(kept); lengths[name] += kept.length; }
