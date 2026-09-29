@@ -60,8 +60,10 @@ No real model call, auth-file copy or billing action is part of this revision.
 
 The [0.157.1 tool-free candidate](prompt-successor-judge-tool-free-profile.md)
 provides fixed model metadata, closed launch overrides and a local outbound
-request capture probe. Its first native run stopped during config parsing
-without sending a request; zero model-visible tools remains unverified.
+request capture probe. The separately authorized third local capture saved one
+`POST /v1/responses` with `tools=[]`, verifying zero model-visible tools for
+that exact model-free probe. Authenticated live Judge transport, qualification,
+and formal admission remain unverified.
 
 
 ## Implementation API
