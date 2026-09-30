@@ -1,11 +1,14 @@
 import { dirname, isAbsolute, resolve } from "node:path";
 import { canonicalDigest, parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 
-export const JUDGE_HOST_POLICY_REVISION = "seatbelt-loopback-bootstrap-v1";
+export const JUDGE_HOST_POLICY_REVISION = "seatbelt-loopback-bootstrap-v2";
 export const JUDGE_HOST_SANDBOX = "/usr/bin/sandbox-exec";
+export const JUDGE_AUTH_CANARY_LINKS = Object.freeze([
+  "home/.codex/auth-canary-link", "home/.codex/auth-canary-unlink-link",
+]);
 export const CONTROL_IDS = Object.freeze([
   "read_allowed", "write_allowed", "read_protected", "read_forbidden",
-  "write_protected", "write_auth_link", "replace_protected", "unlink_protected",
+  "write_protected", "write_auth_link", "replace_protected", "unlink_protected", "replace_auth_link", "unlink_auth_link",
   "connect_allowed", "connect_forbidden",
 ]);
 const allowed = new Set(["read_allowed", "write_allowed", "read_protected", "connect_allowed"]);
@@ -45,7 +48,7 @@ export function judgeHostControlPolicy(root, port) {
 (allow file-write* (require-all
   (require-any (subpath ${p("home")}) (subpath ${p("scratch")}) (literal ${p("final.json")}))
   (require-not (literal ${p("protected-canary.txt")}))
-  (require-not (literal ${p("home/.codex/auth-canary-link")}))))
+  ${JUDGE_AUTH_CANARY_LINKS.map(name => `(require-not (literal ${p(name)}))`).join("\n  ")}))
 (allow file-write-data (literal "/dev/null"))
 (allow network-outbound (remote ip "localhost:${port}"))
 `;

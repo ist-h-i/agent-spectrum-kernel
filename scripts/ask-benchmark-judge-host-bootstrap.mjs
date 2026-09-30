@@ -17,7 +17,7 @@ import { buildJudgeToolFreeExecutionArgv, inspectJudgeToolFreeCatalog, inspectJu
   JUDGE_TOOL_FREE_CATALOG_SHA256, JUDGE_TOOL_FREE_CLI_SHA256, JUDGE_TOOL_FREE_CLI_VERSION,
   JUDGE_TOOL_FREE_MODEL } from "./ask-benchmark-judge-tool-free-profile.mjs";
 import { assertSuccessorNativeExecutable } from "./ask-benchmark-prompt-successor-native.mjs";
-import { JUDGE_HOST_SANDBOX, inspectJudgeHostControlTrace, judgeHostControlPolicy,
+import { JUDGE_HOST_SANDBOX, JUDGE_AUTH_CANARY_LINKS, inspectJudgeHostControlTrace, judgeHostControlPolicy,
   judgeHostControlTemplateDigest } from "./ask-benchmark-judge-host-controls.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -148,7 +148,7 @@ export function prepareJudgeHostBootstrap({ evidenceRoot, mode = "target", codex
   save(evidenceRoot, "model-catalog.json", catalog); save(evidenceRoot, "instruction.txt", Buffer.from(input.protocol.instruction_text));
   save(evidenceRoot, "response-schema.json", Buffer.from(stableCanonicalJson(input.packet.response_schema) + "\n"));
   save(evidenceRoot, "stdin.bin", Buffer.from(stableCanonicalJson(input.packet) + "\n"));
-  const plan = record(evidenceRoot, "plan.json", { schema_version: "1.0.0", kind: "judge_host_bootstrap_plan", evidence_root: evidenceRoot,
+  const plan = record(evidenceRoot, "plan.json", { schema_version: "1.1.0", kind: "judge_host_bootstrap_plan", evidence_root: evidenceRoot,
     purpose: "model_free_host_bootstrap", mode, scenario, nonce, source, host, profile: input.profile, protocol: input.protocol,
     packet: input.packet, template_digest: template(), catalog_digest: JUDGE_TOOL_FREE_CATALOG_SHA256,
     native, probe, sandbox_digest: mode === "target" ? hash(read(resolve(evidenceRoot, "sandbox-image.bin"))) : null,
@@ -161,7 +161,7 @@ function openPlan(evidenceRoot, planDigest) {
   external(evidenceRoot); const plan = readRecord(evidenceRoot, "plan.json");
   same(plan.record_digest, planDigest, "pinned_plan"); same(plan.evidence_root, evidenceRoot, "plan_transplant");
   same(plan.template_digest, template(), "template_changed");
-  check(plan.schema_version === "1.0.0" && plan.kind === "judge_host_bootstrap_plan"
+  check(plan.schema_version === "1.1.0" && plan.kind === "judge_host_bootstrap_plan"
     && plan.purpose === "model_free_host_bootstrap" && ["target", "synthetic"].includes(plan.mode), "plan_kind");
   check(SCENARIOS.includes(plan.scenario) && (plan.mode === "synthetic" || plan.scenario === "success"), "plan_scenario");
   check(/^[a-f0-9-]{36}$/u.test(plan.nonce) && DIGEST.test(plan.source.code_digest), "plan_identity");
@@ -184,6 +184,17 @@ function openPlan(evidenceRoot, planDigest) {
   return plan;
 }
 
+/** Unambiguous UTC only; Date.parse alone normalizes impossible calendar dates. */
+function timestampMillis(value) {
+  check(typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value), "timestamp_syntax");
+  const time = Date.parse(value), canonical = value.includes(".") ? value : value.replace("Z", ".000Z");
+  check(Number.isFinite(time) && new Date(time).toISOString() === canonical, "timestamp_calendar");
+  return time;
+}
+function permissionWindow(value) {
+  return { not_before: timestampMillis(value.not_before), expires_at: timestampMillis(value.expires_at) };
+}
+
 /** Operator approval is supplied independently, not inferred from a result or a hash's syntax. */
 export function validateJudgeBootstrapPermission(value, plan, now = Date.now()) {
   closed(value, ["schema_version", "kind", "purpose", "operator_reference", "plan_digest", "code_digest",
@@ -197,7 +208,7 @@ export function validateJudgeBootstrapPermission(value, plan, now = Date.now()) 
   for (const key of ["input_scope", "credential_source", "network_scope", "max_control_starts", "max_codex_starts", "provider_calls", "automatic_retries"])
     same(value[key], plan[key], `permission_${key}`);
   check(typeof value.not_before === "string" && typeof value.expires_at === "string" && Number.isFinite(now), "permission_time");
-  const start = Date.parse(value.not_before), end = Date.parse(value.expires_at);
+  const { not_before: start, expires_at: end } = permissionWindow(value);
   check(Number.isFinite(start) && Number.isFinite(end) && start < end && start <= now && now < end, "permission_expiry");
   return true;
 }
@@ -218,6 +229,7 @@ function complete(process) {
     && process.cause === null && process.kill_error === null && process.residual_detected === false
     && process.truncated.stdout === false && process.truncated.stderr === false && Number.isInteger(process.status);
 }
+function canaryLinkTarget(path) { try { return readlinkSync(path); } catch { return null; } }
 function fileHash(path) { try { return hash(read(path)); } catch { return null; } }
 async function negativeListener() {
   let connections = 0; const sockets = new Set();
@@ -248,6 +260,8 @@ export async function runJudgeHostBootstrap({ evidenceRoot, planDigest, permissi
   verifyExecutionSource(plan);
   same(plan.host, { os: process.platform, arch: process.arch, node: process.version }, "execution_host_changed");
   if (plan.mode === "target") same(hash(read(JUDGE_HOST_SANDBOX, 16 * 1024 * 1024)), plan.sandbox_digest, "system_sandbox_changed");
+  const reservedAt = Date.now();
+  validateJudgeBootstrapPermission(permission, plan, reservedAt);
   try { mkdirSync(resolve(evidenceRoot, "attempt-claim"), { mode: 0o700 }); }
   catch (error) { if (error.code === "EEXIST") return reopenJudgeHostBootstrap({ evidenceRoot, planDigest, expectedPermissionDigest }); throw error; }
   // The mkdir claim is exclusive even when two controllers have identical
@@ -255,14 +269,15 @@ export async function runJudgeHostBootstrap({ evidenceRoot, planDigest, permissi
   const parentFd = openSync(evidenceRoot, "r");
   try { fsyncSync(parentFd); } finally { closeSync(parentFd); }
   record(evidenceRoot, "started.json", { kind: "judge_bootstrap_start", plan_digest: planDigest,
-    permission_digest: expectedPermissionDigest, started_at: new Date().toISOString() });
+    permission_digest: expectedPermissionDigest, started_at: new Date(reservedAt).toISOString() });
   // From this point, every error consumes this namespace. A crash leaves ambiguous evidence, never an implicit retry.
   let capture = null, negative = null, terminalError = null, precall = null;
   try {
     save(evidenceRoot, "permission.json", permissionBytes);
     for (const name of ["home", "home/.codex", "scratch", "workspace"]) mkdirSync(resolve(evidenceRoot, name), { mode: 0o700 });
     for (const name of ["allowed-read.txt", "protected-canary.txt", "forbidden-canary.txt"]) save(evidenceRoot, name, CANARY);
-    symlinkSync(resolve(evidenceRoot, "protected-canary.txt"), resolve(evidenceRoot, "home/.codex/auth-canary-link"));
+    for (const link of JUDGE_AUTH_CANARY_LINKS)
+      symlinkSync(resolve(evidenceRoot, "protected-canary.txt"), resolve(evidenceRoot, link));
     // Parent read/write opens exclude ordinary permissions/absent files as a reason for a child denial.
     for (const name of ["protected-canary.txt", "forbidden-canary.txt"]) closeSync(openSync(resolve(evidenceRoot, name), "r+"));
     capture = await startJudgeLoopbackCapture(); negative = await negativeListener();
@@ -276,14 +291,14 @@ export async function runJudgeHostBootstrap({ evidenceRoot, planDigest, permissi
       capture_command: command(plan, evidenceRoot, "codex-native", args), policy_digest: hash(read(resolve(evidenceRoot, "outer-policy.sbpl"))),
       parent_canary_access: true, code_digest: plan.source.code_digest });
     const control = await captureJudgeProcess({ ...precall.control_command, env: precall.environment,
-      cwd: resolve(evidenceRoot, "workspace"), input: Buffer.alloc(0), timeoutMs: 5000, streamProtocol: "control" });
+      cwd: resolve(evidenceRoot, "workspace"), input: Buffer.alloc(0), timeoutMs: 5000, streamProtocol: "control", launchWindow: permissionWindow(permission) });
     processRecord(evidenceRoot, "control", control);
-    const unchanged = ["protected-canary.txt", "forbidden-canary.txt"].every(name => fileHash(resolve(evidenceRoot, name)) === hash(CANARY));
+    const unchanged = ["protected-canary.txt", "forbidden-canary.txt"].every(name => fileHash(resolve(evidenceRoot, name)) === hash(CANARY))
+      && JUDGE_AUTH_CANARY_LINKS.every(name => canaryLinkTarget(resolve(evidenceRoot, name)) === resolve(evidenceRoot, "protected-canary.txt"));
     check(complete(control) && control.status === 0, "control_process_failed");
     const controls = inspectJudgeHostControlTrace(control.stdout, { mode: plan.mode,
       deniedConnections: negative.observation().denied_connections, baselineReachable: true, canariesUnchanged: unchanged });
     check(controls.verdict === "passed", "outer_controls_failed");
-    validateJudgeBootstrapPermission(permission, plan); // Expiry between probe and request blocks the latter.
     verifyExecutionSource(plan);
     openPlan(evidenceRoot, planDigest); // Recheck snapshots immediately before the only CLI start.
     same(read(resolve(evidenceRoot, "outer-policy.sbpl")).toString(), judgeHostControlPolicy(evidenceRoot, capture.port), "prelaunch_policy_drift");
@@ -291,7 +306,8 @@ export async function runJudgeHostBootstrap({ evidenceRoot, planDigest, permissi
     if (plan.mode === "target") same(hash(read(JUDGE_HOST_SANDBOX)), plan.sandbox_digest, "system_sandbox_changed");
     const result = await captureJudgeProcess({ ...precall.capture_command, env: precall.environment,
       cwd: resolve(evidenceRoot, "workspace"), input: read(resolve(evidenceRoot, "stdin.bin")),
-      timeoutMs: plan.mode === "synthetic" && plan.scenario === "timeout" ? 100 : 30000 });
+      timeoutMs: plan.mode === "synthetic" && plan.scenario === "timeout" ? 100 : 30000,
+      launchWindow: permissionWindow(permission) });
     processRecord(evidenceRoot, "capture", result);
   } catch (error) { terminalError = String(error.message ?? "bootstrap_failed").slice(0, 1024); }
   finally {
@@ -337,6 +353,7 @@ export async function runJudgeHostBootstrap({ evidenceRoot, planDigest, permissi
   const observation = record(evidenceRoot, "observations.json", { terminal_error: terminalError,
     precall_digest: precall?.record_digest ?? null, requests: requestEvidence, sessions: sessionEvidence, response_digest: responseDigest,
     http: capture?.observation() ?? null, network: negative?.observation() ?? null,
+    link_after: Object.fromEntries(JUDGE_AUTH_CANARY_LINKS.map(name => [name, canaryLinkTarget(resolve(evidenceRoot, name))])),
     canary_after: Object.fromEntries(["protected-canary.txt", "forbidden-canary.txt", "scratch/allowed-write"].map(name => [name, fileHash(resolve(evidenceRoot, name))])),
     workspace_after: existsSync(resolve(evidenceRoot, "workspace")) ? readdirSync(resolve(evidenceRoot, "workspace")).sort() : null });
   const derived = derive(evidenceRoot, plan, expectedPermissionDigest, observation);
@@ -344,13 +361,28 @@ export async function runJudgeHostBootstrap({ evidenceRoot, planDigest, permissi
   return reopenJudgeHostBootstrap({ evidenceRoot, planDigest, expectedPermissionDigest });
 }
 
+function launchEvidenceValid(process, permission, plan, minimumTime) {
+  if (process === null) return false;
+  try {
+    closed(process.launch, ["requested_at", "observed_at", "completed_at"], "launch_shape");
+    const requested = timestampMillis(process.launch.requested_at);
+    const observed = timestampMillis(process.launch.observed_at);
+    const completed = timestampMillis(process.launch.completed_at);
+    check(minimumTime !== null && requested >= minimumTime && requested <= observed && observed <= completed, "launch_order");
+    validateJudgeBootstrapPermission(permission, plan, requested);
+    validateJudgeBootstrapPermission(permission, plan, observed);
+    return true;
+  } catch { return false; }
+}
 function derive(root, plan, permissionDigest, observation) {
   const failures = []; const add = code => failures.push(code);
   const started = readRecord(root, "started.json");
   same(started.plan_digest, plan.record_digest, "started_plan"); same(started.permission_digest, permissionDigest, "started_permission");
-  // Replay checks the historical approval at the historical start, not today's expiry.
+  // Reservation is not process start. Each child also needs valid historical launch observations.
   const approvalBytes = read(resolve(root, "permission.json"), 64 * 1024); same(hash(approvalBytes), permissionDigest, "saved_permission");
-  validateJudgeBootstrapPermission(parseJsonRejectDuplicateKeys(approvalBytes, "saved permission"), plan, Date.parse(started.started_at));
+  const permission = parseJsonRejectDuplicateKeys(approvalBytes, "saved permission");
+  const reservationTime = timestampMillis(started.started_at);
+  validateJudgeBootstrapPermission(permission, plan, reservationTime);
   let control = null, request = null;
   if (observation.terminal_error !== null) add("execution_failed");
   if (observation.precall_digest !== null) {
@@ -365,8 +397,14 @@ function derive(root, plan, permissionDigest, observation) {
     same(policy.toString(), judgeHostControlPolicy(root, Number(endpoint.port)), "policy_reconstruction");
     const config = []; for (let i = 0; i < args.length; i++) if (args[i] === "-c") config.push(args[++i]);
     same(read(resolve(root, "home/.codex/config.toml")).toString(), config.join("\n") + "\n", "config_drift");
-    check(readlinkSync(resolve(root, "home/.codex/auth-canary-link")) === resolve(root, "protected-canary.txt"), "canary_link_changed");
+    same(Object.keys(observation.link_after).sort(), [...JUDGE_AUTH_CANARY_LINKS].sort(), "canary_link_inventory");
+    for (const name of JUDGE_AUTH_CANARY_LINKS)
+      same(canaryLinkTarget(resolve(root, name)), observation.link_after[name], "canary_link_artifact_drift");
+    const linksIntact = JUDGE_AUTH_CANARY_LINKS.every(name => observation.link_after[name] === resolve(root, "protected-canary.txt"));
+    if (!linksIntact) add("canary_link_changed");
     const process = processRead(root, "control");
+    const controlLaunchValid = launchEvidenceValid(process, permission, plan, reservationTime);
+    if (!controlLaunchValid) add("control_launch_unverified");
     if (process !== null && judgeProcessStreamFailure(read(resolve(root, "control.stdout")), "control") !== null)
       add("control_event_stream_invalid");
     if (!complete(process) || process.status !== 0) add("control_process_incomplete");
@@ -374,11 +412,13 @@ function derive(root, plan, permissionDigest, observation) {
       control = inspectJudgeHostControlTrace(read(resolve(root, "control.stdout")), { mode: plan.mode,
         deniedConnections: observation.network?.denied_connections,
         baselineReachable: precall.parent_canary_access === true && observation.network?.baseline_reachable === true,
-        canariesUnchanged: ["protected-canary.txt", "forbidden-canary.txt"].every(name => observation.canary_after[name] === hash(CANARY))
+        canariesUnchanged: linksIntact && ["protected-canary.txt", "forbidden-canary.txt"].every(name => observation.canary_after[name] === hash(CANARY))
           && observation.canary_after["scratch/allowed-write"] === hash(Buffer.from("allowed-write\n")) });
       if (control.verdict !== "passed") add("outer_controls_failed");
     } catch { add("control_trace_invalid"); }
     const captured = processRead(root, "capture");
+    if (!launchEvidenceValid(captured, permission, plan,
+      controlLaunchValid ? timestampMillis(process.launch.completed_at) : null)) add("capture_launch_unverified");
     if (captured !== null && judgeProcessStreamFailure(read(resolve(root, "capture.stdout"))) !== null)
       add("capture_event_stream_invalid");
     if (!complete(captured) || captured.status === 0) add("capture_process_incomplete");

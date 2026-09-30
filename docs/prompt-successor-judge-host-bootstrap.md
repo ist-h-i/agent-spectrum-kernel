@@ -1,6 +1,6 @@
 # Model-free Judge host bootstrap
 
-Artifact: `SPEC-313-JUDGE-HOST-BOOTSTRAP`, revision 2.
+Artifact: `SPEC-313-JUDGE-HOST-BOOTSTRAP`, revision 3.
 Upstream: Issue #291; PR #313 at `c24bc0ca`; `SPEC-313-JUDGE-LIVE-HOST-AUTHORITY`
 and `FVC-313-JUDGE-LIVE-HOST-AUTHORITY` revision 1. This implements stage A of the
 reviewed `host-bootstrap-correction.md`, not an authorization for stages B–E.
@@ -52,7 +52,7 @@ under a future reviewed credential design, not trigger writable fallback.
 ## Formal verification contract
 
 Selected path: `formal_verification_contract`,
-`FVC-313-JUDGE-HOST-BOOTSTRAP`, revision 2. Triggers: process/HTTP/persistence and
+`FVC-313-JUDGE-HOST-BOOTSTRAP`, revision 3. Triggers: process/HTTP/persistence and
 security-sensitive permission/authorization boundaries. Existing TF/NT/JI/LH
 obligations are retained.
 
@@ -90,7 +90,7 @@ provide an external JSON approval with these fields, then independently pass its
 raw SHA-256 to `run`: `schema_version="1.0.0"`,
 `kind="judge_host_bootstrap_permission"`, `purpose="model_free_host_bootstrap"`,
 `operator_reference`, `plan_digest`, `code_digest` from the plan, ISO timestamps
-`not_before` and `expires_at`, `input_scope="public_synthetic_only"`,
+`not_before` and `expires_at` in UTC `YYYY-MM-DDTHH:mm:ss[.sss]Z` form (seconds or exactly three fractional digits), `input_scope="public_synthetic_only"`,
 `credential_source="none"`, `network_scope="loopback_only"`,
 `max_control_starts=1`, `max_codex_starts=1`, `provider_calls=0`,
 `automatic_retries=0`. This document is not that approval. The controller is
@@ -112,7 +112,9 @@ and blocks the Codex start. The filesystem namespace is exclusively reserved
 before either process, including across concurrent controller processes. A
 claimed namespace without a complete terminal record is `ambiguous`; replay
 cannot fill it by starting a replacement process. Replay checks approval validity
-at the saved start rather than invalidating preserved evidence after expiry.
+at each child's saved pre-spawn request and parent-observed spawn event, not
+merely the earlier namespace reservation or today's time. Completion may be after
+expiry: the window limits starts, not an already authorized child's lifetime.
 
 `verified_local` means the saved control outcomes and local request met this
 bootstrap contract. A `synthetic` record never establishes target confinement.
@@ -192,3 +194,58 @@ retain the request and raw process evidence, and replay without another start.
 The unchanged normal LF-terminated capture must still pass. Historical records
 whose success relied on an unchecked tail are rejected on rederivation rather
 than rewritten, reexecuted or treated as target-host evidence.
+
+
+## Independent review corrections (F313-HB-02 / HB-03 / HB-04)
+
+Revision 3 addresses review 5361045447 on `28781878` and supplements HB1, HB2,
+HB4 and HB5. It does not grant target-host permission or enable credentials,
+authenticated diagnosis, qualification or measured execution.
+
+**HB-02: permission at each launch.** The shared process observer accepts an
+optional numeric launch window derived from the independently pinned approval.
+After setup, code/artifact checks and input reads, it samples the wall clock and
+checks the window immediately before `spawn`, with no intervening I/O or await.
+An expired window returns a saved failed observation with null PID and starts no
+child. It also timestamps the parent-observed `spawn` event: if OS spawning or
+parent scheduling crosses expiry, the child is stopped and the result fails.
+This is not a claim of real-time scheduling guarantees or kernel exec timestamps.
+
+Each bootstrap process record now has `launch.requested_at`, `observed_at` and
+`completed_at` (UTC milliseconds). Missing spawn observations remain null, never
+fabricated. Reopening requires a valid requested/observed time within the saved
+approval, chronological request/spawn/completion order, and control completion
+before capture launch. It rederives these checks even if the process cause or
+result summary is rehashed. `started_at` remains a namespace reservation, not a
+substitute for either child launch. Permission expiry during setup or revalidation
+consumes the claimed namespace as a failed diagnostic, not a retry opportunity.
+
+**HB-03: the symlink inode is a separate negative control.** The probe directly
+attempts `rename` over `home/.codex/auth-canary-link` and `unlink` of the independent
+`home/.codex/auth-canary-unlink-link`. A distinct link ensures unexpected rename
+success cannot turn the unlink test into a mere missing-file error. Both paths
+have explicit write exclusions under `seatbelt-loopback-bootstrap-v2`. Each rename
+creates its own disposable source first; source-preparation failure exits the
+probe rather than masquerading as a denied destination syscall. Only EPERM/EACCES
+for the actual negative operations passes, alongside unchanged positive controls.
+
+Both link targets (or null for a removed/non-link path) are saved as partial
+observations. Unexpected mutation produces a failed record instead of discarding
+the evidence. Reopening also detects subsequent link-target drift. Scripted
+negative outcomes are still explicitly synthetic; the unconfined fixture really
+performs both symlink mutations and is rejected before any fake CLI start.
+
+**HB-04: precise timestamps.** Permission dates require the documented UTC format
+and a round trip through ISO serialization. Non-ISO text, missing timezone,
+impossible dates, normalized 24:00, leap seconds and unsupported fractional or
+offset forms are rejected. Real leap dates and inclusive-start/exclusive-end
+boundaries have positive tests. Parsing a date is not evidence of its validity.
+
+Bootstrap plans are version 1.1.0 for the per-child launch/link observation
+contract. Earlier plans/control traces cannot be promoted to revision-3 success;
+they remain historical artifacts to inspect with their corresponding source.
+This does not rewrite them, repeat a target attempt, or revive prior permissions.
+A new target plan and explicit bounded authorization are required after review.
+Native A/B capture callers that do not use a launch window retain their existing
+process-record shape; measured-trial launcher, fixed CLI/catalog, scorer and
+budgets are unchanged.

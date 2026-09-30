@@ -41,23 +41,38 @@ export function judgeProcessStreamFailure(bytes, streamProtocol = "codex") {
 }
 
 /** One process, bounded streams, no inherited environment or hidden retry. */
-export async function captureJudgeProcess({ executable, argv, cwd, env, input, timeoutMs, streamProtocol = "codex" }) {
+export async function captureJudgeProcess({ executable, argv, cwd, env, input, timeoutMs, streamProtocol = "codex", launchWindow = null }) {
   if (!["codex", "control"].includes(streamProtocol)) throw new Error("invalid stream protocol");
+  // This optional window constrains starts only; it does not grant permission.
+  // The bootstrap owns the independently pinned approval and durable claim.
+  if (launchWindow !== null && (Object.keys(launchWindow).sort().join("|") !== "expires_at|not_before"
+    || !Number.isSafeInteger(launchWindow.not_before) || !Number.isSafeInteger(launchWindow.expires_at)
+    || launchWindow.not_before >= launchWindow.expires_at)) throw new Error("invalid launch window");
+  const launch = launchWindow === null ? null : { requested_at: null, observed_at: null, completed_at: null };
+  const withinWindow = time => launchWindow.not_before <= time && time < launchWindow.expires_at;
   const start = performance.now();
   let pid = null, cause = null, residual = false, killError = null;
   const chunks = { stdout: [], stderr: [] }, lengths = { stdout: 0, stderr: 0 };
   const truncated = { stdout: false, stderr: false };
   let carry = Buffer.alloc(0);
   return await new Promise(resolveResult => {
-    let finished = false, graceTimer = null;
+    let finished = false, graceTimer = null, timer = null;
     const finish = (status, signal) => {
       if (finished) return;
       finished = true; clearTimeout(timer); clearTimeout(graceTimer);
-      resolveResult({ pid, status, signal, cause, kill_error: killError, residual_detected: residual,
+      if (launch !== null) launch.completed_at = new Date(Date.now()).toISOString();
+      resolveResult({ ...(launch === null ? {} : { launch }), pid, status, signal, cause, kill_error: killError, residual_detected: residual,
         duration_ms: Math.ceil(performance.now() - start), truncated,
         stdout: Buffer.concat(chunks.stdout), stderr: Buffer.concat(chunks.stderr) });
     };
-    const child = spawn(executable, argv, { cwd, env, shell: false, detached: true, stdio: ["pipe", "pipe", "pipe"] });
+    const options = { cwd, env, shell: false, detached: true, stdio: ["pipe", "pipe", "pipe"] };
+    // No file reads, setup awaits or evidence writes between this check and spawn.
+    if (launch !== null) {
+      const now = Date.now();
+      launch.requested_at = new Date(now).toISOString();
+      if (!withinWindow(now)) { cause = "permission_expired_before_spawn"; finish(null, null); return; }
+    }
+    const child = spawn(executable, argv, options);
     pid = child.pid ?? null;
     const stop = reason => {
       cause ??= reason;
@@ -68,7 +83,15 @@ export async function captureJudgeProcess({ executable, argv, cwd, env, input, t
         finish(null, null);
       }, 1500);
     };
-    const timer = setTimeout(() => stop("timeout"), timeoutMs);
+    timer = setTimeout(() => stop("timeout"), timeoutMs);
+    child.once("spawn", () => {
+      if (launch === null) return;
+      const now = Date.now();
+      launch.observed_at = new Date(now).toISOString();
+      // If OS spawn/parent scheduling crosses the deadline, fail and terminate;
+      // never claim that the before-call timestamp proves the OS start time.
+      if (!withinWindow(now)) stop("permission_expired_at_spawn");
+    });
     child.on("error", error => { cause ??= error.code ?? "spawn_failed"; });
     // Even a zero-exit child can close stdin before receiving the whole packet.
     // A completion-looking response cannot override a failed input write.

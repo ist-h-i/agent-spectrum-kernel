@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import fs from "node:fs";
+import { Server } from "node:net";
+import { syncBuiltinESMExports } from "node:module";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync,
   renameSync, rmSync, writeFileSync } from "node:fs";
@@ -278,3 +281,185 @@ test("bounded HTTP collector preserves failed partial bytes, not a success-shape
     assert.notEqual(capture.observation().failure, null);
   } finally { await capture.close(); }
 });
+
+
+// Codex review 5361045447: exercise the actual launcher with a deterministic
+// wall clock. No production override or target-host allowance is introduced.
+for (const phase of ["control", "capture"]) {
+  test(`permission expiry during ${phase} setup cannot start that child`, async t => {
+    const c = context(t), end = Date.parse(c.permission.expires_at);
+    let now = Date.now(), advanced = false;
+    const clock = t.mock.method(Date, "now", () => now);
+    const originalListen = Server.prototype.listen, originalOpen = fs.openSync;
+    const listener = t.mock.method(Server.prototype, "listen", function (...args) {
+      if (phase === "control") { now = end; advanced = true; }
+      return originalListen.apply(this, args);
+    });
+    const reader = t.mock.method(fs, "openSync", function (path, ...args) {
+      if (phase === "capture" && path === resolve(c.evidenceRoot, "stdin.bin")
+        && existsSync(resolve(c.evidenceRoot, "control.json"))) {
+        now = end; advanced = true;
+      }
+      return originalOpen.call(this, path, ...args);
+    });
+    syncBuiltinESMExports();
+    let result;
+    try { result = await runJudgeHostBootstrap(c); }
+    finally { clock.mock.restore(); listener.mock.restore(); reader.mock.restore(); syncBuiltinESMExports(); }
+    assert.equal(advanced, true);
+    const childPath = resolve(c.evidenceRoot, `${phase}.json`);
+    const child = existsSync(childPath) ? JSON.parse(readFileSync(childPath)) : null;
+    assert.equal(child?.pid ?? null, null, `${phase} started after expiry: ${JSON.stringify(child)}`);
+    assert.equal(result.state, "failed");
+    if (phase === "control") assert.equal(existsSync(resolve(c.evidenceRoot, "capture.json")), false);
+    assert.deepEqual(reopenJudgeHostBootstrap(c), result);
+    assert.deepEqual(await runJudgeHostBootstrap(c), result);
+  });
+}
+
+for (const phase of ["control", "capture"]) {
+  test(`replay rejects ${phase} launch outside permission even with a rehashed process`, async t => {
+    const c = context(t); await runJudgeHostBootstrap(c);
+    rehash(c.evidenceRoot, `${phase}.json`, body => {
+      body.launch = { requested_at: c.permission.expires_at,
+        observed_at: c.permission.expires_at, completed_at: c.permission.expires_at };
+    });
+    assert.throws(() => reopenJudgeHostBootstrap(c));
+    await assert.rejects(runJudgeHostBootstrap(c));
+  });
+}
+
+for (const invalid of ["September 30, 2026 12:00:00 GMT", "2026-02-30T00:00:00Z",
+  "2026-09-30", "2026-09-30T12:00:00", "2026-09-30T24:00:00Z"]) {
+  test(`permission rejects ambiguous or normalized timestamp ${invalid}`, t => {
+    const c = context(t), parsed = Date.parse(invalid);
+    assert.ok(Number.isFinite(parsed), "fixture must reproduce Date.parse permissiveness");
+    const start = { ...c.permission, not_before: invalid,
+      expires_at: new Date(parsed + 60000).toISOString() };
+    assert.throws(() => validateJudgeBootstrapPermission(start, c.plan, parsed));
+    const end = { ...c.permission, not_before: new Date(parsed - 60000).toISOString(), expires_at: invalid };
+    assert.throws(() => validateJudgeBootstrapPermission(end, c.plan, parsed - 1));
+  });
+}
+
+test("symlink replacement and unlink need their own fixed negative probe outcomes", () => {
+  assert.ok(CONTROL_IDS.includes("replace_auth_link"));
+  assert.ok(CONTROL_IDS.includes("unlink_auth_link"));
+});
+
+test("unconfined symlink rename and unlink are executed and rejected independently", async t => {
+  const c = context(t, "unconfined_controls"), result = await runJudgeHostBootstrap(c);
+  const trace = JSON.parse(readFileSync(resolve(c.evidenceRoot, "control.stdout")));
+  for (const id of ["replace_auth_link", "unlink_auth_link"]) {
+    const row = trace.results.find(item => item.id === id);
+    assert.deepEqual(row, { id, ok: true, errno: 0 });
+    assert.ok(result.control.failed_controls.includes(id));
+  }
+  assert.equal(result.state, "failed");
+  assert.equal(existsSync(resolve(c.evidenceRoot, "capture.json")), false);
+  assert.deepEqual(reopenJudgeHostBootstrap(c), result);
+});
+
+// Positive/boundary controls for the stricter timestamp and per-spawn evidence.
+test("canonical UTC permissions accept real leap dates and exact start but exclude expiry", t => {
+  const c = context(t);
+  for (const not_before of ["2024-02-29T00:00:00Z", "2024-02-29T00:00:00.001Z"]) {
+    const start = Date.parse(not_before), expires_at = new Date(start + 1000).toISOString();
+    const permission = { ...c.permission, not_before, expires_at };
+    assert.equal(validateJudgeBootstrapPermission(permission, c.plan, start), true);
+    assert.equal(validateJudgeBootstrapPermission(permission, c.plan, start + 999), true);
+    assert.throws(() => validateJudgeBootstrapPermission(permission, c.plan, start - 1), /permission_expiry/);
+    assert.throws(() => validateJudgeBootstrapPermission(permission, c.plan, start + 1000), /permission_expiry/);
+  }
+  for (const timestamp of ["2026-02-29T00:00:00Z", "2026-04-31T00:00:00Z", "2026-09-30T23:59:60Z",
+    "2026-09-30T00:00:00+09:00", "2026-09-30T00:00:00.0000Z", "2026-09-30T00:00:00Z ", "2026-09-30t00:00:00z"]) {
+    assert.throws(() => validateJudgeBootstrapPermission({ ...c.permission, not_before: timestamp }, c.plan));
+  }
+});
+
+test("each completed child has its own permission-window observation and replay ignores today's expiry", async t => {
+  const c = context(t), outcome = await runJudgeHostBootstrap(c);
+  const control = JSON.parse(readFileSync(resolve(c.evidenceRoot, "control.json")));
+  const capture = JSON.parse(readFileSync(resolve(c.evidenceRoot, "capture.json")));
+  for (const record of [control, capture]) {
+    for (const key of ["requested_at", "observed_at", "completed_at"])
+      assert.equal(new Date(record.launch[key]).toISOString(), record.launch[key]);
+    for (const key of ["requested_at", "observed_at"])
+      assert.equal(validateJudgeBootstrapPermission(c.permission, c.plan, Date.parse(record.launch[key])), true);
+    assert.ok(record.launch.requested_at <= record.launch.observed_at);
+    assert.ok(record.launch.observed_at <= record.launch.completed_at);
+  }
+  assert.ok(control.launch.completed_at <= capture.launch.requested_at);
+  const clock = t.mock.method(Date, "now", () => Date.parse(c.permission.expires_at) + 1);
+  try {
+    assert.deepEqual(reopenJudgeHostBootstrap(c), outcome);
+    assert.deepEqual(await runJudgeHostBootstrap(c), outcome);
+  } finally { clock.mock.restore(); }
+});
+
+for (const damage of ["missing", "before_request", "before_previous_child", "calendar_normalized"]) {
+  test(`replay rejects ${damage} launch evidence instead of accepting the reservation timestamp`, async t => {
+    const c = context(t); await runJudgeHostBootstrap(c);
+    const before = JSON.parse(readFileSync(resolve(c.evidenceRoot, "control.json")));
+    rehash(c.evidenceRoot, "capture.json", body => {
+      if (damage === "missing") delete body.launch;
+      else if (damage === "before_request") body.launch.observed_at = new Date(Date.parse(body.launch.requested_at) - 1).toISOString();
+      else if (damage === "before_previous_child") body.launch.requested_at = new Date(Date.parse(before.launch.requested_at) - 1).toISOString();
+      else body.launch.observed_at = "2026-02-30T00:00:00Z";
+    });
+    assert.throws(() => reopenJudgeHostBootstrap(c), /result_rederivation/);
+    await assert.rejects(runJudgeHostBootstrap(c), /result_rederivation/);
+  });
+}
+
+test("expiry at the OS spawn observation terminates the child and cannot pass", async t => {
+  const cp = (await import("node:child_process")).default;
+  const base = Date.now(), end = base + 1000;
+  let now = base;
+  const clock = t.mock.method(Date, "now", () => now), original = cp.spawn;
+  const launcher = t.mock.method(cp, "spawn", function (...args) {
+    const child = original.apply(this, args); now = end; return child;
+  });
+  syncBuiltinESMExports();
+  let result;
+  try {
+    result = await captureJudgeProcess({ executable: process.execPath,
+      argv: ["-e", "process.stdin.resume();process.stdin.on('end',()=>setTimeout(()=>{},1000))"],
+      env: {}, cwd: tmpdir(), input: Buffer.alloc(0), timeoutMs: 3000,
+      launchWindow: { not_before: base - 1, expires_at: end } });
+  } finally { clock.mock.restore(); launcher.mock.restore(); syncBuiltinESMExports(); }
+  assert.equal(result.cause, "permission_expired_at_spawn");
+  assert.ok(result.pid > 1);
+  assert.equal(result.launch.requested_at, new Date(base).toISOString());
+  assert.equal(result.launch.observed_at, new Date(end).toISOString());
+});
+
+test("symlink syscall success, ENOENT or absent rows never establish a denial", () => {
+  const positives = new Set(["read_allowed", "write_allowed", "read_protected", "connect_allowed"]);
+  const value = { type: "host_control_result", mode: "synthetic", results: CONTROL_IDS.map(id =>
+    ({ id, ok: positives.has(id), errno: positives.has(id) ? 0 : 13 })) };
+  const inspect = trace => inspectJudgeHostControlTrace(Buffer.from(JSON.stringify(trace)), {
+    mode: "synthetic", deniedConnections: 0, baselineReachable: true, canariesUnchanged: true });
+  assert.equal(inspect(value).verdict, "passed");
+  for (const id of ["replace_auth_link", "unlink_auth_link"]) {
+    for (const [ok, errno] of [[true, 0], [false, 2], [false, 0]]) {
+      const bad = structuredClone(value); Object.assign(bad.results.find(row => row.id === id), { ok, errno });
+      assert.ok(inspect(bad).failed_controls.includes(id));
+    }
+    const missing = structuredClone(value); missing.results = missing.results.filter(row => row.id !== id);
+    assert.throws(() => inspect(missing), /probe inventory/);
+  }
+});
+
+for (const link of ["home/.codex/auth-canary-link", "home/.codex/auth-canary-unlink-link"]) {
+  test(`protected ${link} has an exact write exclusion and retained link evidence`, async t => {
+    const c = context(t); const result = await runJudgeHostBootstrap(c);
+    const policy = readFileSync(resolve(c.evidenceRoot, "outer-policy.sbpl"), "utf8");
+    assert.ok(policy.includes(`(require-not (literal ${JSON.stringify(resolve(c.evidenceRoot, link))}))`));
+    const observation = JSON.parse(readFileSync(resolve(c.evidenceRoot, "observations.json")));
+    assert.equal(observation.link_after[link], resolve(c.evidenceRoot, "protected-canary.txt"));
+    rmSync(resolve(c.evidenceRoot, link));
+    assert.throws(() => reopenJudgeHostBootstrap(c), /canary_link_artifact_drift/);
+    assert.equal(result.state, "verified_local");
+  });
+}

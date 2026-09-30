@@ -53,6 +53,34 @@ static void connect_probe(int port, const char *id, int deny) {
   int rc = connect(fd, (struct sockaddr *)&peer, sizeof(peer)), error = errno;
   close(fd); result(id, rc == 0, rc < 0 ? error : 0);
 }
+/* Each rename has its own real writable source. Setup failure exits the probe;
+ * it must not be reported as a successful denial of the destination syscall. */
+static void replace_probe(const char *root, const char *target, const char *id) {
+#ifdef SCRIPTED_DENIALS
+  (void)root; (void)target;
+  result(id, 0, EACCES);
+#else
+  char from[8192], to[8192];
+  if (snprintf(from, sizeof(from), "%s/scratch/%s-source", root, id) >= (int)sizeof(from)
+    || snprintf(to, sizeof(to), "%s/%s", root, target) >= (int)sizeof(to)) exit(2);
+  int fd = open(from, O_WRONLY|O_CREAT|O_EXCL, 0600);
+  if (fd < 0) exit(2);
+  if (write(fd, "public replacement\n", 19) != 19 || close(fd) != 0) exit(2);
+  int rc = rename(from, to), error = errno;
+  result(id, rc == 0, rc < 0 ? error : 0);
+#endif
+}
+static void unlink_probe(const char *root, const char *target, const char *id) {
+#ifdef SCRIPTED_DENIALS
+  (void)root; (void)target;
+  result(id, 0, EACCES);
+#else
+  char path[8192];
+  if (snprintf(path, sizeof(path), "%s/%s", root, target) >= (int)sizeof(path)) exit(2);
+  int rc = unlink(path), error = errno;
+  result(id, rc == 0, rc < 0 ? error : 0);
+#endif
+}
 int main(int argc, char **argv) {
   if (argc != 4) return 2;
   /* Complete the expected empty-input handshake before a fast probe can exit.
@@ -68,16 +96,11 @@ int main(int argc, char **argv) {
   file_probe(root, "forbidden-canary.txt", "read_forbidden", O_RDONLY, 1);
   file_probe(root, "protected-canary.txt", "write_protected", O_WRONLY, 1);
   file_probe(root, "home/.codex/auth-canary-link", "write_auth_link", O_WRONLY, 1);
-#ifdef SCRIPTED_DENIALS
-  result("replace_protected", 0, EACCES);
-  result("unlink_protected", 0, EACCES);
-#else
-  char from[8192], to[8192];
-  snprintf(from, sizeof(from), "%s/scratch/allowed-write", root);
-  snprintf(to, sizeof(to), "%s/protected-canary.txt", root);
-  int rc = rename(from, to), error = errno; result("replace_protected", rc == 0, rc < 0 ? error : 0);
-  rc = unlink(to); error = errno; result("unlink_protected", rc == 0, rc < 0 ? error : 0);
-#endif
+  replace_probe(root, "protected-canary.txt", "replace_protected");
+  unlink_probe(root, "protected-canary.txt", "unlink_protected");
+  /* Distinct links avoid an allowed rename turning the unlink probe into ENOENT. */
+  replace_probe(root, "home/.codex/auth-canary-link", "replace_auth_link");
+  unlink_probe(root, "home/.codex/auth-canary-unlink-link", "unlink_auth_link");
   connect_probe(port, "connect_allowed", 0);
   connect_probe(denied, "connect_forbidden", 1);
   puts("]}"); return 0;
