@@ -12,7 +12,8 @@ import { test } from "node:test";
 import { canonicalDigest } from "./content-addressed-store.mjs";
 import { prepareJudgeHostBootstrap, runJudgeHostBootstrap, reopenJudgeHostBootstrap,
   validateJudgeBootstrapPermission } from "./ask-benchmark-judge-host-bootstrap.mjs";
-import { judgeHostControlPolicy, inspectJudgeHostControlTrace, CONTROL_IDS, JUDGE_HOST_DYLD_CACHE_ROOTS,\n  JUDGE_HOST_EXECUTABLE_MAP_ROOTS, JUDGE_HOST_LOADER_READ_ROOTS, JUDGE_HOST_POLICY_REVISION } from "./ask-benchmark-judge-host-controls.mjs";
+import { judgeHostControlPolicy, inspectJudgeHostControlTrace, CONTROL_IDS, JUDGE_HOST_DYLD_CACHE_ROOTS,
+  JUDGE_HOST_EXECUTABLE_MAP_ROOTS, JUDGE_HOST_LOADER_READ_ROOTS, JUDGE_HOST_POLICY_REVISION } from "./ask-benchmark-judge-host-controls.mjs";
 import { captureJudgeProcess, judgeProcessStreamFailure } from "./ask-benchmark-judge-process.mjs";
 
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
