@@ -45,12 +45,12 @@ int main(int argc,char **argv) {
 #ifdef TOOL_FREE_PROFILE_TEST
   /* Exercise the real production-shaped template, then use the same scripted
    * response fixture. No HTTP client, model provider or credential loader exists.
-   * Session identity stays fake/scripted; gpt-6-sol is only the requested template.
+   * Session identity stays fake/scripted; gpt-6.1-sol is only the requested template.
    */
   if (argc<16 || strcmp(argv[1],"exec") || strcmp(argv[2],"--ignore-user-config")
     || strcmp(argv[3],"--ignore-rules") || strcmp(argv[4],"--strict-config")
     || strcmp(argv[5],"--json") || strcmp(argv[6],"--skip-git-repo-check")
-    || strcmp(argv[7],"--model") || strcmp(argv[8],"gpt-6-sol")
+    || strcmp(argv[7],"--model") || strcmp(argv[8],"gpt-6.1-sol")
     || strcmp(argv[9],"--output-schema") || strcmp(argv[11],"--output-last-message")
     || strcmp(argv[argc-1],"-")) return 111;
   char catalogPath[8192]={0},instructionPath[8192]={0};

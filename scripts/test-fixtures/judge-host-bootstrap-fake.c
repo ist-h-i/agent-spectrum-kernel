@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
   size_t n=fread(input,1,1024*1024-1,stdin);input[n]=0;
   char *instructions=read_file(instruction), *schema_json=read_file(schema);
   FILE *f=tmpfile(); if(!f)return 7;
-  fputs("{\"model\":\"gpt-6-sol\",\"reasoning\":{\"effort\":\"medium\"},\"instructions\":",f);quote(f,instructions);
+  fputs("{\"model\":\"gpt-6.1-sol\",\"reasoning\":{\"effort\":\"medium\"},\"instructions\":",f);quote(f,instructions);
   fputs(",\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":",f);quote(f,input);
   fputs("}]}],\"tools\":",f);fputs(!strcmp(SCENARIO,"tools") ? "[{\"type\":\"function\",\"name\":\"shell\"}]" : "[]",f);
   fputs(",\"text\":{\"format\":{\"type\":\"json_schema\",\"strict\":true,\"name\":\"output\",\"schema\":",f);
