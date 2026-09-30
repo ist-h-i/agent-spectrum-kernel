@@ -87,7 +87,7 @@ is authorized by this integration.
 ## Formal verification contract
 
 Selected path: `formal_verification_contract`,
-`FVC-313-JUDGE-TOOL-FREE-INTEGRATION`, revision 1.
+`FVC-313-JUDGE-TOOL-FREE-INTEGRATION`, revision 2.
 Triggers: cross-module contract, native process execution, persistent evidence
 and security-sensitive launch controls. This supplements, not replaces or
 downgrades, the existing TF/NT proof obligations.

@@ -84,7 +84,7 @@ diagnostic model call, it requires its own explicit execution authorization.
 ## Formal verification contract
 
 Selected path: `formal_verification_contract`,
-`FVC-313-JUDGE-LIVE-HOST-AUTHORITY`, revision 1.
+`FVC-313-JUDGE-LIVE-HOST-AUTHORITY`, revision 2.
 
 | ID | Required evidence |
 |---|---|
