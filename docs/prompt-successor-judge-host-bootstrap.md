@@ -1,6 +1,6 @@
 # Model-free Judge host bootstrap
 
-Artifact: `SPEC-313-JUDGE-HOST-BOOTSTRAP`, revision 3.
+Artifact: `SPEC-313-JUDGE-HOST-BOOTSTRAP`, revision 4.
 Upstream: Issue #291; PR #313 at `c24bc0ca`; `SPEC-313-JUDGE-LIVE-HOST-AUTHORITY`
 and `FVC-313-JUDGE-LIVE-HOST-AUTHORITY` revision 1. This implements stage A of the
 reviewed `host-bootstrap-correction.md`, not an authorization for stages B–E.
@@ -34,7 +34,13 @@ policy allows necessary runtime reads, exact input/image files, disposable
 runtime writes, and TCP to one loopback port only. It does not broadly allow
 `/System`, the user's home, external IPs, DNS, Unix sockets or arbitrary command
 execution. An unavailable runtime read stops the probe; there is no permissive
-fallback. This is a candidate macOS profile until actually tested there.
+fallback. The loader exception is still system-only: it mirrors Codex 0.157.1's
+minimal executable-map/read roots and separately admits the dyld-cache aliases
+needed by macOS, including the target-observed
+`/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld`. It grants
+`file-map-executable` only on those fixed roots plus read/existence access
+there; it does not admit broad `/System`, `/Library`, Preboot, or user-home
+reads. This is a candidate macOS profile until actually tested there.
 
 The control probe has positive read/write/connect controls and negative file
 read/write, symlink-write, rename/unlink and off-allowlist connection probes.
@@ -52,7 +58,7 @@ under a future reviewed credential design, not trigger writable fallback.
 ## Formal verification contract
 
 Selected path: `formal_verification_contract`,
-`FVC-313-JUDGE-HOST-BOOTSTRAP`, revision 3. Triggers: process/HTTP/persistence and
+`FVC-313-JUDGE-HOST-BOOTSTRAP`, revision 4. Triggers: process/HTTP/persistence and
 security-sensitive permission/authorization boundaries. Existing TF/NT/JI/LH
 obligations are retained.
 
@@ -224,7 +230,7 @@ consumes the claimed namespace as a failed diagnostic, not a retry opportunity.
 attempts `rename` over `home/.codex/auth-canary-link` and `unlink` of the independent
 `home/.codex/auth-canary-unlink-link`. A distinct link ensures unexpected rename
 success cannot turn the unlink test into a mere missing-file error. Both paths
-have explicit write exclusions under `seatbelt-loopback-bootstrap-v2`. Each rename
+have explicit write exclusions under `seatbelt-loopback-bootstrap-v3`. Each rename
 creates its own disposable source first; source-preparation failure exits the
 probe rather than masquerading as a denied destination syscall. Only EPERM/EACCES
 for the actual negative operations passes, alongside unchanged positive controls.
@@ -249,3 +255,46 @@ A new target plan and explicit bounded authorization are required after review.
 Native A/B capture callers that do not use a launch window retain their existing
 process-record shape; measured-trial launcher, fixed CLI/catalog, scorer and
 budgets are unchanged.
+
+
+## Stage B loader-startup correction (F313-HB-05)
+
+Revision 4 follows the single authorized target-host Stage B attempt recorded in
+PR comment `5908824443`. The exact revision-3 plan started the fixed control
+process once, which terminated by `SIGABRT` before producing any of the twelve
+control rows. The Codex capture did not start and the rejecting HTTP endpoint saw
+zero requests. Read-only reopening preserved the same failed result. That
+consumed attempt remains historical evidence and is not retryable.
+
+The private crash report places the abort during dyld cache discovery. On the
+target macOS 26.6.2 host the shared cache is physically present below
+`/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld`, while the revision-3
+policy admitted only `/System/Library/dyld`. The same policy also omitted the
+`file-map-executable` operation entirely. Codex 0.157.1's own minimal macOS
+platform defaults separately allow executable mapping for fixed system
+framework/dylib roots, so denying that operation was an avoidable bootstrap
+mismatch even before any Judge request.
+
+Revision 4 therefore changes **only the outer loader policy**:
+
+- policy identity becomes `seatbelt-loopback-bootstrap-v3`;
+- executable mapping is allowed on the fixed system framework/dylib roots used
+  by the pinned Codex platform defaults, plus fixed dyld-cache roots;
+- loader read/existence access is restricted to corresponding system roots;
+- metadata traversal is added for the three known Cryptex dyld-cache aliases;
+- no broad `/System`, `/Library`, `/System/Volumes/Preboot`,
+  `/private/preboot` or user-home subpath allowance is introduced.
+
+The control inventory, public canaries, network allowlist, permission timing,
+once-only claim, no-retry behavior, request inspection and all live/measurement
+authority boundaries are unchanged. Linux synthetic tests can verify only the
+generated policy shape and existing fail-closed behavior; they cannot establish
+that macOS accepts the new loader rules or that AMFI/dyld has no additional
+requirements.
+
+A new target-host attempt, if pursued, requires: an independently reviewed
+revision-4 source, a newly prepared plan/template digest, and a **new explicit
+bounded operator permission**. The consumed revision-3 plan/permission may not be
+reopened into success, repaired, or reused. Failure of the next control process
+must again stop before any Codex capture and must not trigger policy widening or
+a second attempt.

@@ -1,7 +1,40 @@
 import { dirname, isAbsolute, resolve } from "node:path";
 import { canonicalDigest, parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 
-export const JUDGE_HOST_POLICY_REVISION = "seatbelt-loopback-bootstrap-v2";
+export const JUDGE_HOST_POLICY_REVISION = "seatbelt-loopback-bootstrap-v3";
+export const JUDGE_HOST_DYLD_CACHE_ROOTS = Object.freeze([
+  "/System/Library/dyld",
+  "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld",
+  "/private/preboot/Cryptexes/OS/System/Library/dyld",
+  "/System/Cryptexes/OS/System/Library/dyld",
+]);
+export const JUDGE_HOST_EXECUTABLE_MAP_ROOTS = Object.freeze([
+  "/Library/Apple/System/Library/Frameworks",
+  "/Library/Apple/System/Library/PrivateFrameworks",
+  "/Library/Apple/usr/lib",
+  "/System/Library/Extensions",
+  "/System/Library/Frameworks",
+  "/System/Library/PrivateFrameworks",
+  "/System/Library/SubFrameworks",
+  "/System/iOSSupport/System/Library/Frameworks",
+  "/System/iOSSupport/System/Library/PrivateFrameworks",
+  "/System/iOSSupport/System/Library/SubFrameworks",
+  "/usr/lib",
+  ...JUDGE_HOST_DYLD_CACHE_ROOTS,
+]);
+export const JUDGE_HOST_LOADER_READ_ROOTS = Object.freeze([
+  "/Library/Apple/System/Library/Frameworks",
+  "/Library/Apple/System/Library/PrivateFrameworks",
+  "/Library/Apple/usr/lib",
+  "/System/Library/Frameworks",
+  "/System/Library/PrivateFrameworks",
+  "/System/Library/SubFrameworks",
+  "/System/iOSSupport/System/Library/Frameworks",
+  "/System/iOSSupport/System/Library/PrivateFrameworks",
+  "/System/iOSSupport/System/Library/SubFrameworks",
+  "/usr/lib",
+  ...JUDGE_HOST_DYLD_CACHE_ROOTS,
+]);
 export const JUDGE_HOST_SANDBOX = "/usr/bin/sandbox-exec";
 export const JUDGE_AUTH_CANARY_LINKS = Object.freeze([
   "home/.codex/auth-canary-link", "home/.codex/auth-canary-unlink-link",
@@ -30,8 +63,13 @@ export function judgeHostControlPolicy(root, port) {
   const ancestors = new Set(["/usr", "/System", "/System/Library"]);
   for (let next = root; ; next = dirname(next)) { ancestors.add(next); if (next === "/") break; }
   const metadata = [...ancestors].map(value => `(literal ${quoted(value)})`).join(" ");
-  // Dynamic linker/system library reads are not user-data access. Additions need
-  // review; this candidate has no broad /System or user-HOME read fallback.
+  const loaderReads = JUDGE_HOST_LOADER_READ_ROOTS.map(value => `(subpath ${quoted(value)})`).join("\n  ");
+  const loaderMaps = JUDGE_HOST_EXECUTABLE_MAP_ROOTS.map(value => `(subpath ${quoted(value)})`).join("\n  ");
+  const cryptexAncestors = JUDGE_HOST_DYLD_CACHE_ROOTS.slice(1)
+    .map(value => `(path-ancestors ${quoted(value)})`).join("\n  ");
+  // System-loader paths are non-user runtime data. The fixed roots mirror the
+  // 0.157.1 minimal loader map/read inventory and the target-host dyld cache
+  // aliases. Do not replace these with broad /System, /Library or Preboot reads.
   return `(version 1)
 (deny default)
 (allow process-exec (literal ${p("codex-native")}) (literal ${p("control-native")}))
@@ -39,9 +77,14 @@ export function judgeHostControlPolicy(root, port) {
 (allow signal (target same-sandbox))
 (allow process-info* (target same-sandbox))
 (allow sysctl-read)
-(allow file-read-metadata ${metadata} (subpath "/usr/lib") (subpath "/System/Library/dyld") (subpath ${quoted(root)}))
+(allow file-read-metadata file-test-existence ${metadata}
+  ${cryptexAncestors}
+  (subpath ${quoted(root)}))
+(allow file-read* file-test-existence
+  ${loaderReads})
+(allow file-map-executable
+  ${loaderMaps})
 (allow file-read-data
-  (subpath "/usr/lib") (subpath "/System/Library/dyld")
   (literal "/dev/null") (literal "/dev/random") (literal "/dev/urandom")
   ${literals.map(name => `(literal ${p(name)})`).join("\n  ")}
   (subpath ${p("home")}) (subpath ${p("scratch")}) (subpath ${p("workspace")}))

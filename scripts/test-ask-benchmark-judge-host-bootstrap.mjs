@@ -12,7 +12,7 @@ import { test } from "node:test";
 import { canonicalDigest } from "./content-addressed-store.mjs";
 import { prepareJudgeHostBootstrap, runJudgeHostBootstrap, reopenJudgeHostBootstrap,
   validateJudgeBootstrapPermission } from "./ask-benchmark-judge-host-bootstrap.mjs";
-import { judgeHostControlPolicy, inspectJudgeHostControlTrace, CONTROL_IDS } from "./ask-benchmark-judge-host-controls.mjs";
+import { judgeHostControlPolicy, inspectJudgeHostControlTrace, CONTROL_IDS, JUDGE_HOST_DYLD_CACHE_ROOTS,\n  JUDGE_HOST_EXECUTABLE_MAP_ROOTS, JUDGE_HOST_LOADER_READ_ROOTS, JUDGE_HOST_POLICY_REVISION } from "./ask-benchmark-judge-host-controls.mjs";
 import { captureJudgeProcess, judgeProcessStreamFailure } from "./ask-benchmark-judge-process.mjs";
 
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
@@ -97,6 +97,28 @@ test("whole-child policy denies by default and has no broad network/user-data al
   for (const forbidden of ['(allow network-outbound)', '(subpath "/")', '(subpath "/System")', '(allow process-exec)', 'auth.json']) assert.equal(policy.includes(forbidden), false);
   for (const value of [0, -1, 65536, 2.5, "52345"]) assert.throws(() => judgeHostControlPolicy("/private/tmp/test-bootstrap", value));
   assert.throws(() => judgeHostControlPolicy("/tmp/evil\n(allow default)", 23456));
+});
+
+test("loader policy maps fixed system roots and target dyld cache aliases without broad host reads", () => {
+  const policy = judgeHostControlPolicy("/private/tmp/test-bootstrap", 52345);
+  assert.equal(JUDGE_HOST_POLICY_REVISION, "seatbelt-loopback-bootstrap-v3");
+  assert.ok(policy.includes("(allow file-map-executable"));
+  for (const root of JUDGE_HOST_EXECUTABLE_MAP_ROOTS)
+    assert.ok(policy.includes(`(subpath ${JSON.stringify(root)})`), `missing map root ${root}`);
+  for (const root of JUDGE_HOST_LOADER_READ_ROOTS)
+    assert.ok(policy.includes(`(subpath ${JSON.stringify(root)})`), `missing read root ${root}`);
+  for (const root of JUDGE_HOST_DYLD_CACHE_ROOTS.slice(1))
+    assert.ok(policy.includes(`(path-ancestors ${JSON.stringify(root)})`), `missing dyld ancestor traversal ${root}`);
+  for (const broad of ["/System", "/Library", "/System/Volumes/Preboot", "/private/preboot"])
+    assert.equal(policy.includes(`(subpath ${JSON.stringify(broad)})`), false, `broad read root ${broad}`);
+});
+
+test("loader policy includes the macOS 26 Cryptex dyld cache observed by Stage B", () => {
+  const observed = "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld";
+  assert.ok(JUDGE_HOST_DYLD_CACHE_ROOTS.includes(observed));
+  const policy = judgeHostControlPolicy("/private/tmp/test-bootstrap", 52345);
+  assert.ok(policy.includes(`(subpath ${JSON.stringify(observed)})`));
+  assert.ok(policy.includes(`(path-ancestors ${JSON.stringify(observed)})`));
 });
 
 test("all-denied operations, absent canaries and refused TCP cannot pass control verification", () => {
