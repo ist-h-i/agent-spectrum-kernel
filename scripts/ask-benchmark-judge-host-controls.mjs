@@ -1,7 +1,7 @@
 import { dirname, isAbsolute, resolve } from "node:path";
 import { canonicalDigest, parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 
-export const JUDGE_HOST_POLICY_REVISION = "seatbelt-loopback-bootstrap-v3";
+export const JUDGE_HOST_POLICY_REVISION = "seatbelt-loopback-bootstrap-v4";
 export const JUDGE_HOST_DYLD_CACHE_ROOTS = Object.freeze([
   "/System/Library/dyld",
   "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld",
@@ -70,6 +70,9 @@ export function judgeHostControlPolicy(root, port) {
   // System-loader paths are non-user runtime data. The fixed roots mirror the
   // 0.157.1 minimal loader map/read inventory and the target-host dyld cache
   // aliases. Do not replace these with broad /System, /Library or Preboot reads.
+  // macOS 26 libignition opens the root directory itself before locating the
+  // dyld cache. Metadata permission does not admit that open. The separate
+  // literal-only data rule admits / itself, never a recursive root read.
   return `(version 1)
 (deny default)
 (allow process-exec (literal ${p("codex-native")}) (literal ${p("control-native")}))
@@ -84,6 +87,7 @@ export function judgeHostControlPolicy(root, port) {
   ${loaderReads})
 (allow file-map-executable
   ${loaderMaps})
+(allow file-read-data (literal "/"))
 (allow file-read-data
   (literal "/dev/null") (literal "/dev/random") (literal "/dev/urandom")
   ${literals.map(name => `(literal ${p(name)})`).join("\n  ")}

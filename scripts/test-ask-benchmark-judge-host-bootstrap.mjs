@@ -13,7 +13,8 @@ import { canonicalDigest } from "./content-addressed-store.mjs";
 import { prepareJudgeHostBootstrap, runJudgeHostBootstrap, reopenJudgeHostBootstrap,
   validateJudgeBootstrapPermission } from "./ask-benchmark-judge-host-bootstrap.mjs";
 import { judgeHostControlPolicy, inspectJudgeHostControlTrace, CONTROL_IDS, JUDGE_HOST_DYLD_CACHE_ROOTS,
-  JUDGE_HOST_EXECUTABLE_MAP_ROOTS, JUDGE_HOST_LOADER_READ_ROOTS, JUDGE_HOST_POLICY_REVISION } from "./ask-benchmark-judge-host-controls.mjs";
+  JUDGE_HOST_EXECUTABLE_MAP_ROOTS, JUDGE_HOST_LOADER_READ_ROOTS, JUDGE_HOST_POLICY_REVISION,
+  judgeHostControlTemplateDigest } from "./ask-benchmark-judge-host-controls.mjs";
 import { captureJudgeProcess, judgeProcessStreamFailure } from "./ask-benchmark-judge-process.mjs";
 
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
@@ -102,7 +103,7 @@ test("whole-child policy denies by default and has no broad network/user-data al
 
 test("loader policy maps fixed system roots and target dyld cache aliases without broad host reads", () => {
   const policy = judgeHostControlPolicy("/private/tmp/test-bootstrap", 52345);
-  assert.equal(JUDGE_HOST_POLICY_REVISION, "seatbelt-loopback-bootstrap-v3");
+  assert.equal(JUDGE_HOST_POLICY_REVISION, "seatbelt-loopback-bootstrap-v4");
   assert.ok(policy.includes("(allow file-map-executable"));
   for (const root of JUDGE_HOST_EXECUTABLE_MAP_ROOTS)
     assert.ok(policy.includes(`(subpath ${JSON.stringify(root)})`), `missing map root ${root}`);
@@ -120,6 +121,21 @@ test("loader policy includes the macOS 26 Cryptex dyld cache observed by Stage B
   const policy = judgeHostControlPolicy("/private/tmp/test-bootstrap", 52345);
   assert.ok(policy.includes(`(subpath ${JSON.stringify(observed)})`));
   assert.ok(policy.includes(`(path-ancestors ${JSON.stringify(observed)})`));
+});
+
+test("loader root directory open has a literal-only data allowance, never recursive root access", () => {
+  const policy = judgeHostControlPolicy("/private/tmp/test-bootstrap", 52345);
+  assert.ok(policy.includes('(allow file-read-data (literal "/"))\n'));
+  for (const broad of ["/", "/System", "/Library", "/System/Volumes/Preboot", "/private/preboot"])
+    assert.equal(policy.includes(`(subpath ${JSON.stringify(broad)})`), false);
+  assert.equal(policy.includes('(allow file-read* (literal "/"))'), false);
+  assert.equal(policy.includes('(allow file-write* (literal "/"))'), false);
+  assert.equal(policy.includes('(allow file-map-executable (literal "/"))'), false);
+});
+
+test("root directory loader correction invalidates the historical v3 policy template", () => {
+  assert.notEqual(judgeHostControlTemplateDigest(),
+    "sha256:bde04f7c13658e878401373ec1d6f6c2ac28ac2f1ac08a21cd0b5d71e5cb4e98");
 });
 
 test("all-denied operations, absent canaries and refused TCP cannot pass control verification", () => {
@@ -243,7 +259,9 @@ for (const scenario of ["invalid_tail", "tool_tail"]) {
 }
 
 test("actual stdin EPIPE cannot be converted into a successful observation", async () => {
-  const result = await captureJudgeProcess({ executable: "/bin/true", argv: [], cwd: tmpdir(), env: {}, input: Buffer.alloc(2 * 1024 * 1024, 65), timeoutMs: 3000 });
+  // /bin/true is absent on the target Mac. Use the already running Node image
+  // to close stdin without reading, so this test exercises EPIPE, not ENOENT.
+  const result = await captureJudgeProcess({ executable: process.execPath, argv: ["-e", "process.exit(0)"], cwd: tmpdir(), env: {}, input: Buffer.alloc(2 * 1024 * 1024, 65), timeoutMs: 3000 });
   assert.equal(result.cause, "stdin_error");
 });
 

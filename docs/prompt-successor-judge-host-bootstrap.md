@@ -1,6 +1,6 @@
 # Model-free Judge host bootstrap
 
-Artifact: `SPEC-313-JUDGE-HOST-BOOTSTRAP`, revision 5.
+Artifact: `SPEC-313-JUDGE-HOST-BOOTSTRAP`, revision 6 (local correction candidate).
 Upstream: Issue #291; PR #313 at `c24bc0ca`; `SPEC-313-JUDGE-LIVE-HOST-AUTHORITY`
 and `FVC-313-JUDGE-LIVE-HOST-AUTHORITY` revision 2. This implements stage A of the
 reviewed `host-bootstrap-correction.md`, not an authorization for stages B–E.
@@ -58,7 +58,7 @@ under a future reviewed credential design, not trigger writable fallback.
 ## Formal verification contract
 
 Selected path: `formal_verification_contract`,
-`FVC-313-JUDGE-HOST-BOOTSTRAP`, revision 5. Triggers: process/HTTP/persistence and
+`FVC-313-JUDGE-HOST-BOOTSTRAP`, revision 6. Triggers: process/HTTP/persistence and
 security-sensitive permission/authorization boundaries. Existing TF/NT/JI/LH
 obligations are retained.
 
@@ -316,3 +316,49 @@ a new explicit one-shot permission before any process start.
 Historical GPT-6 Sol TF3 and failed Stage-B records remain unchanged evidence of
 what actually ran. They do not satisfy the current GPT-6.1 Sol request
 obligation and are not rewritten.
+
+## Root directory loader correction candidate (F313-HB-09)
+
+Revision 6 is a local candidate after read-only inspection of the latest
+consumed revision-5 failure. No target-host acceptance is claimed.
+
+The saved control PID, launch/completion times and Mach-O UUID match an existing
+crash report. Its faulting thread aborts through `ignition_halt`, `boot_boot`,
+`ignite` and dyld `CacheFinder`, before entering the probe. Static disassembly
+of the matching dyld image places the `boot_boot` return address immediately
+after its root-directory-open failure call to `ignition_halt`. The same PID's
+existing sandbox log records `file-read-data /` denial. The saved allowed-write
+canary is absent; absence alone or empty buffered stdout alone would not prove
+pre-main failure. This conclusion relies on the matched crash and binary branch.
+
+The current candidate changes only the outer policy's loader allowance:
+
+- add `(allow file-read-data (literal "/"))` to admit libignition's opening
+  of the root directory itself;
+- change policy identity to `seatbelt-loopback-bootstrap-v4`, invalidating
+  old policy/plan/permission bindings;
+- retain all recursive read roots, executable-map roots, write exclusions,
+  symlink probes, loopback endpoint, permission window, no-retry rules and
+  live/measurement boundaries.
+
+The root literal is a real read-capability delta: it can expose root directory
+entry names. It does not permit reading descendant files or recursive root
+traversal; those operations remain subject to their existing individual rules.
+This candidate requires security review/approval before target enforcement.
+It changes no host security setting, real credential path, provider endpoint
+or authentication behavior. Source-shape and synthetic tests cannot establish
+that the root allowance is sufficient on macOS or that the captured GPT-6.1
+request succeeds. Another required loader operation must fail and be reviewed,
+not trigger automatic expansion.
+
+HB2 regression obligations: the root data allowance is literal-only; root and
+broad System/Library/Preboot subpath allowances remain absent. HB1/HB5:
+the changed policy template invalidates historical plan bindings. Existing
+HB1-HB6 synthetic tests retain once-only, permission, denial, request and replay
+obligations. The consumed failed evidence remains immutable, with no new target
+prepare/run, control/capture, credentials or provider call in this correction.
+
+The model-free EPIPE regression now uses the running Node image to exit without
+reading stdin. Its previous `/bin/true` fixture is absent on the target Mac and
+tested ENOENT instead of the intended stdin failure. This portability correction
+does not change the production observer or its failure policy.
