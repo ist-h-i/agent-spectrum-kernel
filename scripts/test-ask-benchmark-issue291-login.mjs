@@ -35,7 +35,7 @@ function fixture(t) {
       reviewArchivePath, reviewAuthoritySourceDigest: `sha256:${"a".repeat(64)}` };
   }
   const runtime = { schema_version: "1.2.0", adapter: "codex", availability: "available",
-    unavailable_reason: null, expected_executable_version: "codex-cli 0.153.4", model: "gpt-6-sol",
+    unavailable_reason: null, expected_executable_version: "codex-cli 0.153.4", model: "gpt-6.1-sol",
     reasoning_effort: "medium", case_timeout_ms: 900000, sandbox_policy: "workspace-write",
     permission_policy: "never", successor_private_evaluator_root: privateRoot,
     executor: { id: "successor-native-fake", version: "1.0.0" },

@@ -169,7 +169,7 @@ for (const file of ["model-catalog.json", "codex-native", "instruction.txt", "re
 
 test("live metadata, target image and copied launch plans cannot open a synthetic executable path", async t => {
   const c = context(t), root = resolve(c.root, "never-created");
-  const live = changedProtocol(c.protocol, { authority_profile: "live_native", provider: "openai", model: "gpt-6-sol",
+  const live = changedProtocol(c.protocol, { authority_profile: "live_native", provider: "openai", model: "gpt-6.1-sol",
     transport_kind: "native_cli", native_identity_digest: JUDGE_TOOL_FREE_CLI_SHA256 });
   assert.equal(prepareToolFreeNativeJudgeLaunch({ protocol: live, invocationRoot: root }).live_execution_authorized, false);
   assert.throws(() => createSyntheticNativeJudgeAdapter({ protocol: live, executable: "/never-read", cliVersion: "0.157.1", captureRoot: root }), /live_profile_unverified/);

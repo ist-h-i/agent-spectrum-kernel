@@ -19,6 +19,12 @@ restart, the opaque handle can be reopened only by revalidating that exact
 durable freeze; a new late authority cannot be minted from already observed
 results. Serializable flags or copied digests alone cannot create it.
 
+The current Issue #291 successor runtime model is fixed to
+`gpt-6.1-sol` with `medium` reasoning for both Prompt roles. The preflight
+rejects a runtime config that still names `gpt-6-sol`; changing the model
+changes the runtime identity and therefore requires new result-blind preparation
+and freeze evidence. Historical GPT-6 Sol captures or freezes are not upgraded.
+
 This implementation does **not** execute the real experiment. The Issue #291
 preflight creates a result-blind freeze for one exact clean source commit and
 tree, after actual target-host and private-authority checks. A later source

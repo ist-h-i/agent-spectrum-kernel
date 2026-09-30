@@ -16,14 +16,15 @@ const catalogPath = resolve(import.meta.dirname, "../benchmarks/prompt-successor
 const captureEndpoint = "http://127.0.0.1:12345/v1";
 const syntheticInput = [{ type: "message", id: "msg_synthetic", role: "user",
   content: [{ type: "input_text", text: JUDGE_TOOL_FREE_STDIN }] }];
-const validBody = { model: "gpt-6-sol", reasoning: { effort: "medium" }, input: syntheticInput, tools: [] };
+const validBody = { model: "gpt-6.1-sol", reasoning: { effort: "medium" }, input: syntheticInput, tools: [] };
 const encoded = value => Buffer.from(JSON.stringify(value));
 
 test("fixed 0.157.1 catalog disables every model-owned tool route", () => {
   const catalog = inspectJudgeToolFreeCatalog(readFileSync(catalogPath));
   assert.equal(JUDGE_TOOL_FREE_CLI_VERSION, "0.157.1");
   assert.equal(JUDGE_TOOL_FREE_CLI_SHA256, "sha256:27ceb5f9b957b43a519efe4eaa3816a0bffb0a531a2c89af18840c0a3c016a7d");
-  assert.equal(JUDGE_TOOL_FREE_MODEL, "gpt-6-sol");
+  assert.equal(JUDGE_TOOL_FREE_CATALOG_SHA256, "sha256:2728439a226a7d37c38ff868ccc602d716aaa945bcca8bb0095e4b392157235d");
+  assert.equal(JUDGE_TOOL_FREE_MODEL, "gpt-6.1-sol");
   assert.equal(catalog.models.length, 1);
   const model = catalog.models[0];
   assert.equal(model.shell_type, "disabled");
@@ -78,7 +79,7 @@ test("outbound request inspection requires exactly one tool-free loopback Respon
   };
   const summary = inspectJudgeToolFreeRequest([request], captureEndpoint);
   assert.equal(summary.tool_count, 0);
-  assert.equal(summary.model, "gpt-6-sol");
+  assert.equal(summary.model, "gpt-6.1-sol");
   assert.equal(summary.reasoning_effort, "medium");
   assert.equal(inspectJudgeToolFreeRequest([{ ...request, body: encoded({ ...validBody,
     input: [{ type: "message", role: "developer",
@@ -109,7 +110,7 @@ test("outbound request inspection requires exactly one tool-free loopback Respon
     { ...request, headers: { ...request.headers, host: "api.openai.com" } },
     { ...request, body: encoded({ ...validBody, reasoning: { effort: "high" } }) },
     { ...request, body: encoded({ ...validBody, reasoning: undefined }) },
-    { ...request, body: Buffer.from('{"model":"gpt-6-sol","tools":[],"tools":[]}') },
+    { ...request, body: Buffer.from('{"model":"gpt-6.1-sol","tools":[],"tools":[]}') },
   ]) assert.throws(() => inspectJudgeToolFreeRequest([change], captureEndpoint));
   assert.throws(() => inspectJudgeToolFreeRequest([], captureEndpoint));
   assert.throws(() => inspectJudgeToolFreeRequest([request, request], captureEndpoint));

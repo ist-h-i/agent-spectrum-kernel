@@ -1,8 +1,8 @@
 # Tool-free profile integration into the native Judge pipeline
 
-Artifact: `SPEC-313-JUDGE-TOOL-FREE-INTEGRATION`, revision 1.
+Artifact: `SPEC-313-JUDGE-TOOL-FREE-INTEGRATION`, revision 2.
 Upstream: Issue #291; PR #313 at `9f51a91b`; `SPEC-313-JUDGE-TOOL-FREE` /
-`FVC-313-JUDGE-TOOL-FREE`, revision 1; `SPEC-313-NATIVE-TRANSPORT` /
+`FVC-313-JUDGE-TOOL-FREE`, revision 2; `SPEC-313-NATIVE-TRANSPORT` /
 `FVC-313-NATIVE-TRANSPORT`, revision 1.
 
 ## Behavior delta
@@ -61,7 +61,7 @@ The integration test compiles the existing native C fixture with a `0.157.1`
 interface mode. It validates the production-shaped command, catalog and trusted
 instruction inputs, then emits scripted responses through the same capture,
 receipt, replay and qualification code. It contains no provider implementation
-or credential loader. `gpt-6-sol` / `openai` identify the **requested template**;
+or credential loader. `gpt-6.1-sol` / `openai` identify the **requested template**;
 its protocol and receipts remain **`synthetic_only` / `fake` / `scripted`**.
 Null observed isolation fields remain null. Synthetic matching labels are not
 real semantic qualification or an independently approved label corpus.

@@ -1,6 +1,6 @@
 # Issue #291 Judge tool-free candidate for Codex CLI 0.157.1
 
-Artifact: `SPEC-313-JUDGE-TOOL-FREE`, revision 1. Upstream: Issue #291,
+Artifact: `SPEC-313-JUDGE-TOOL-FREE`, revision 2. Upstream: Issue #291,
 `SPEC-313-NATIVE-TRANSPORT`, and the fixed A/B Judge instruction in
 `docs/prompt-successor-llm-judge.md`. This profile applies to the Judge
 processes only. The 28 measured implementation/review trials have a separate
@@ -10,9 +10,9 @@ validator is not part of this Judge call path.
 ## Fixed launch inputs
 
 The checked-in `benchmarks/prompt-successor-judge-tool-free-catalog.json`
-is the complete static catalog for `gpt-6-sol` under `codex-cli 0.157.1`.
+is the complete static catalog for `gpt-6.1-sol` under `codex-cli 0.157.1`.
 Its raw SHA-256 is
-`39152b9649b5dd123030823fc5ffa5ba768ca1139af062be85859daff2b17e25`.
+`2728439a226a7d37c38ff868ccc602d716aaa945bcca8bb0095e4b392157235d`.
 The CLI 0.157.1 catalog parser requires `base_instructions` or
 `model_messages.instructions_template` for every model. This catalog now
 includes the fixed nonempty capture instruction as `base_instructions`.
@@ -65,13 +65,15 @@ Source basis: [Codex config](https://github.com/openai/codex/blob/rust-v0.157.1/
 and [tool registration](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/core/src/tools/spec_plan.rs)
 at tag `rust-v0.157.1` (peeled commit
 `36650394c5b38c2990ccf2a3457165ca3e9d9726`). Source inspection alone
-does not establish the effective tool inventory; the saved third capture
-below records the actual outbound request.
+does not establish the effective tool inventory. The captures below are
+historical evidence for the former `gpt-6-sol` profile only; the current
+`gpt-6.1-sol` profile requires a new exact request capture before TF3 can be
+claimed for the upgraded model.
 
 ## Formal verification contract
 
 Selected path: `formal_verification_contract`,
-`FVC-313-JUDGE-TOOL-FREE`, revision 1. Triggers: security-sensitive
+`FVC-313-JUDGE-TOOL-FREE`, revision 2. Triggers: security-sensitive
 permission behavior, native process launch, external request boundary,
 and stable pre-measurement evidence.
 
@@ -79,7 +81,7 @@ and stable pre-measurement evidence.
 |---|---|
 | TF1 | Verify exact CLI version and native-image digest, fixed catalog bytes, closed overrides, fresh child environment and empty workspace before launch. |
 | TF2 | Launch exactly one CLI process against a local capture endpoint, with no real-provider credential, no benchmark content, and no private evaluator path. Save precall, process streams, request bytes and terminal result outside the repository. |
-| TF3 | Inspect the actual outbound `POST /v1/responses`: exactly one loopback request with matching Host and socket destination, model `gpt-6-sol`, `reasoning.effort=medium`, `tools` absent or empty, no additional tool input, and no Authorization header. A setting or tool-free transcript alone does not satisfy this obligation. |
+| TF3 | Inspect the actual outbound `POST /v1/responses`: exactly one loopback request with matching Host and socket destination, model `gpt-6.1-sol`, `reasoning.effort=medium`, `tools` absent or empty, no additional tool input, and no Authorization header. A setting or tool-free transcript alone does not satisfy this obligation. |
 | TF4 | Preserve failure as failure. Do not convert the candidate profile into live Judge authority, qualification, formal admission, a result-blind freeze or trial 1 from this probe alone. |
 
 Focused source check:
@@ -88,6 +90,20 @@ A target-host capture additionally requires the pinned native binary and
 an external new evidence root. The capture deliberately ends with a nonzero
 CLI status because its local endpoint rejects inference; the probe succeeds
 only if the saved request passes TF3 and the saved evidence reopens.
+
+## 2026-09-30 current model transition
+
+Issue #291 now fixes both the Judge request and the measured successor runtime to
+`gpt-6.1-sol`. The model slug is part of the launch/request identity, so every
+prior `gpt-6-sol` request, capture, qualification candidate, target plan and
+runtime configuration remains historical evidence only. None can be relabeled,
+reopened into current-model success, or reused as execution authority.
+
+The checked-in catalog bytes and their SHA-256 changed with the model slug. The
+tool-disable metadata and `medium` reasoning contract remain fixed. The next
+target-host bootstrap must prepare a new plan from the upgraded source and, if
+separately authorized, capture a new localhost request whose body names
+`gpt-6.1-sol`.
 
 ## 2026-09-29 observed attempt
 
@@ -135,7 +151,8 @@ recorded below.
 
 The one-shot capture launched local source HEAD
 `8150280c68c809e1b5981d87e35c8606303ca96b` with the pinned
-`codex-cli 0.157.1` image and catalog digest above. The child had a fresh
+`codex-cli 0.157.1` image and historical GPT-6 Sol catalog digest
+`39152b9649b5dd123030823fc5ffa5ba768ca1139af062be85859daff2b17e25`. The child had a fresh
 `HOME`, `CODEX_HOME`, and empty workspace; its environment contained no
 credential source. The configured provider was the loopback capture endpoint
 only. The saved result is at the private evidence root

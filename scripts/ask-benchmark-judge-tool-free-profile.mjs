@@ -6,10 +6,10 @@ export const JUDGE_TOOL_FREE_CLI_VERSION = "0.157.1";
 // Observed @openai/codex-darwin-arm64 native image for codex-cli 0.157.1.
 // This candidate is intentionally host-specific until another image is reviewed.
 export const JUDGE_TOOL_FREE_CLI_SHA256 = "sha256:27ceb5f9b957b43a519efe4eaa3816a0bffb0a531a2c89af18840c0a3c016a7d";
-export const JUDGE_TOOL_FREE_MODEL = "gpt-6-sol";
+export const JUDGE_TOOL_FREE_MODEL = "gpt-6.1-sol";
 export const JUDGE_TOOL_FREE_BASE_INSTRUCTIONS = "Judge tool inventory capture only. Return OK.";
 export const JUDGE_TOOL_FREE_STDIN = "Synthetic local request capture. Respond OK without tools.\n";
-export const JUDGE_TOOL_FREE_CATALOG_SHA256 = "sha256:39152b9649b5dd123030823fc5ffa5ba768ca1139af062be85859daff2b17e25";
+export const JUDGE_TOOL_FREE_CATALOG_SHA256 = "sha256:2728439a226a7d37c38ff868ccc602d716aaa945bcca8bb0095e4b392157235d";
 
 const sha256 = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 function check(ok, message) {

@@ -81,7 +81,7 @@ function nativeRuntime(spec) {
   const bytes = readStableBytes(spec.runtime_config_path, "native runtime config");
   const native = parseJsonRejectDuplicateKeys(bytes, "native runtime config");
   assertBenchmarkSchemaInstance(native, { schemaPath: resolve(ROOT, "benchmarks/schemas/portfolio-runtime-config.schema.json"), label: "Issue 291 native runtime config" });
-  const expected = { adapter: "codex", availability: "available", model: "gpt-6-sol",
+  const expected = { adapter: "codex", availability: "available", model: "gpt-6.1-sol",
     reasoning_effort: "medium", case_timeout_ms: 900000, sandbox_policy: "workspace-write",
     permission_policy: "never" };
   for (const [key, value] of Object.entries(expected)) successorExact(native[key], value, `native config.${key}`);

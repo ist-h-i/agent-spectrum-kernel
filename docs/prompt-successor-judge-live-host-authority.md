@@ -1,6 +1,6 @@
 # Judge live-host authority binding
 
-Artifact: `SPEC-313-JUDGE-LIVE-HOST-AUTHORITY`, revision 1.
+Artifact: `SPEC-313-JUDGE-LIVE-HOST-AUTHORITY`, revision 2.
 Upstream: Issue #291, Draft PR #313, `SPEC-313-JUDGE-TOOL-FREE-INTEGRATION`,
 and `FVC-313-JUDGE-TOOL-FREE-INTEGRATION`.
 
@@ -69,7 +69,7 @@ reviewed workflow and then implement/verify the authenticated native adapter
 that consumes this opaque authority. That task must preserve:
 
 - exact `codex-cli 0.157.1` native-image identity;
-- the fixed `gpt-6-sol` catalog and `medium` reasoning effort;
+- the fixed `gpt-6.1-sol` catalog and `medium` reasoning effort;
 - zero model-visible tool inventory for the exact integrated launch template;
 - no automatic retry;
 - A/B once-only claims;
@@ -77,7 +77,8 @@ that consumes this opaque authority. That task must preserve:
 - no measured-trial authority.
 
 No prior TF3 request may be relabeled as evidence for the changed integrated
-argv. If the target-host workflow needs a new exact request capture or a live
+argv. In particular, the historical `gpt-6-sol` TF3 capture does not satisfy
+the current `gpt-6.1-sol` launch identity. If the target-host workflow needs a new exact request capture or a live
 diagnostic model call, it requires its own explicit execution authorization.
 
 ## Formal verification contract

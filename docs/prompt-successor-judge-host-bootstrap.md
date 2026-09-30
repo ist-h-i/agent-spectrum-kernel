@@ -1,8 +1,8 @@
 # Model-free Judge host bootstrap
 
-Artifact: `SPEC-313-JUDGE-HOST-BOOTSTRAP`, revision 4.
+Artifact: `SPEC-313-JUDGE-HOST-BOOTSTRAP`, revision 5.
 Upstream: Issue #291; PR #313 at `c24bc0ca`; `SPEC-313-JUDGE-LIVE-HOST-AUTHORITY`
-and `FVC-313-JUDGE-LIVE-HOST-AUTHORITY` revision 1. This implements stage A of the
+and `FVC-313-JUDGE-LIVE-HOST-AUTHORITY` revision 2. This implements stage A of the
 reviewed `host-bootstrap-correction.md`, not an authorization for stages B–E.
 
 ## Decision and boundary
@@ -58,7 +58,7 @@ under a future reviewed credential design, not trigger writable fallback.
 ## Formal verification contract
 
 Selected path: `formal_verification_contract`,
-`FVC-313-JUDGE-HOST-BOOTSTRAP`, revision 4. Triggers: process/HTTP/persistence and
+`FVC-313-JUDGE-HOST-BOOTSTRAP`, revision 5. Triggers: process/HTTP/persistence and
 security-sensitive permission/authorization boundaries. Existing TF/NT/JI/LH
 obligations are retained.
 
@@ -298,3 +298,21 @@ bounded operator permission**. The consumed revision-3 plan/permission may not b
 reopened into success, repaired, or reused. Failure of the next control process
 must again stop before any Codex capture and must not trigger policy widening or
 a second attempt.
+
+
+## GPT-6.1 Sol model transition (F313-HB-07)
+
+Revision 5 changes the fixed integrated request model from `gpt-6-sol` to
+`gpt-6.1-sol`. The outer Seatbelt policy remains
+`seatbelt-loopback-bootstrap-v3`; the change is in the tool-free catalog,
+request builder and Issue #291 runtime contract.
+
+Because model identity is hashed into the catalog/profile/plan closure, the
+revision-3/revision-4 GPT-6 Sol plans and permissions are historical only. They
+cannot be reused for a GPT-6.1 Sol run. A future Stage B attempt must prepare a
+new plan from this exact upgraded source, pin the new catalog digest and obtain
+a new explicit one-shot permission before any process start.
+
+Historical GPT-6 Sol TF3 and failed Stage-B records remain unchanged evidence of
+what actually ran. They do not satisfy the current GPT-6.1 Sol request
+obligation and are not rewritten.
