@@ -431,6 +431,11 @@ function resolveEvaluatorAuthorityLayout({ buffers, fixtureId = null } = {}) {
   return { ...layout, input };
 }
 
+function evaluatorAuthorityManifestBindingBuffers(buffers, fixtureId) {
+  const { bindingPaths } = evaluatorAuthorityPathsForFixture(fixtureId);
+  return new Map(bindingPaths.filter((path) => buffers.has(path)).map((path) => [path, buffers.get(path)]));
+}
+
 function jsonValueFromVerifiedBytes(bytes, label) {
   if (!Buffer.isBuffer(bytes) || bytes.length === 0) throw new Error(`${label} verified bytes are missing`);
   const source = bytes.toString("utf8");
@@ -1440,7 +1445,9 @@ export function validateSealedRepositoryAuthorityBytes({
 
   if (descriptor.evaluator_authority_manifest_raw_sha256 !== rawByteDigest(manifestBytes)) throw new Error(`${label} evaluator authority manifest raw binding is invalid`);
   if (descriptor.evaluator_authority_manifest_digest !== manifest.manifest_digest) throw new Error(`${label} evaluator authority manifest semantic binding is invalid`);
-  validateEvaluatorAuthorityManifest({ manifest, buffers, evaluatorRevision: descriptor.evaluator_revision, root: rootForSchema, label: `${label} evaluator authority manifest` });
+  validateEvaluatorAuthorityManifest({ manifest,
+    buffers: evaluatorAuthorityManifestBindingBuffers(buffers, manifest.fixture_id),
+    evaluatorRevision: descriptor.evaluator_revision, root: rootForSchema, label: `${label} evaluator authority manifest` });
 
   if (actualInventory) {
     const actualWithoutDescriptor = actualInventory.filter(({ path }) => path !== EVALUATOR_REPOSITORY_DESCRIPTOR_PATH);
@@ -1485,7 +1492,9 @@ function buildRepositoryAuthoritySource({ root, evaluatorRevision, externalAutho
   }
   if (pathSet.size !== buffers.size) throw new Error(`${label} source authority inventory contains duplicate paths`);
   const evaluatorAuthorityManifest = jsonValueFromVerifiedBytes(buffers.get(anchor.evaluator_authority_manifest_path), `${label} evaluator authority manifest`);
-  validateEvaluatorAuthorityManifest({ manifest: evaluatorAuthorityManifest, buffers, evaluatorRevision, root: repositoryRoot, label: `${label} evaluator authority manifest` });
+  validateEvaluatorAuthorityManifest({ manifest: evaluatorAuthorityManifest,
+    buffers: evaluatorAuthorityManifestBindingBuffers(buffers, evaluatorAuthorityManifest.fixture_id),
+    evaluatorRevision, root: repositoryRoot, label: `${label} evaluator authority manifest` });
   const fileEntries = [...records.values()].sort((left, right) => left.path.localeCompare(right.path));
   const expectedPortableEntries = [...descriptorDirectoryEntries(allPaths), ...fileEntries].sort((left, right) => left.path.localeCompare(right.path));
   const fixtureEntries = fixturePaths.map((path) => records.get(path));

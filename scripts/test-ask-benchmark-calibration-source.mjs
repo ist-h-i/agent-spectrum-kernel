@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { CALIBRATION_INPUT_MANIFEST_SHA256, CALIBRATION_SOURCE_BINDINGS, resolvePortfolioFixtureSource, assertSuccessorCalibrationConfig } from "./ask-benchmark-calibration-source.mjs";
-import { computeVerificationCommandContractDigest } from "./ask-benchmark-command-evidence.mjs";
+import { computeVerificationCommandContractDigest, validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
 import { computeIndependenceStatementDigest, deriveEvaluatorAuthorityManifest, evaluatorAuthorityPathsForFixture, validateEvaluatorAuthorityManifest, validateIndependenceStatement } from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { computeRequirementRecordDigest, computeRequirementSetDigest } from "./ask-benchmark-scoring-contract.mjs";
@@ -164,4 +164,19 @@ for (const [fixtureId] of CALIBRATION_SOURCE_BINDINGS) {
 test("calibration private independence rejects another public source path", () => {
   const pair = calibrationIndependence("cal-session-refresh", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json");
   assert.throws(() => validateIndependenceStatement({ ...pair, root }), /calibration input source path mismatch/u);
+});
+
+
+test("submitted successor config pins all four existing verification command contracts", () => {
+  const config = JSON.parse(readFileSync(resolve(root, "benchmarks/prompt-successor-execution.config.json")));
+  assertSuccessorCalibrationConfig(config, { inputManifestDigest: CALIBRATION_INPUT_MANIFEST_SHA256 });
+  for (const fixture of config.fixtures) {
+    const path = `benchmarks/fixtures/checkpoint-b2/${fixture.id}/verification-command-contract.json`;
+    const bytes = readFileSync(resolve(root, path));
+    assert.deepEqual(fixture.verification_command_contract, { path, sha256: createHash("sha256").update(bytes).digest("hex") });
+    const contract = validateVerificationCommandContract(JSON.parse(bytes), { root });
+    assert.equal(contract.fixture_id, fixture.id);
+    assert.equal(contract.fixture_input_digest, sharedInputDigest);
+    assert.ok(contract.commands.some(command => command.requirement === "required"));
+  }
 });

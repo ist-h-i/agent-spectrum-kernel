@@ -48,7 +48,11 @@
       "aggregate_eligible": false,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
       "input_manifest_sha256": "e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
-      "source_fixture_id": "pr-session-refresh-medium-hard"
+      "source_fixture_id": "pr-session-refresh-medium-hard",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/cal-session-refresh/verification-command-contract.json",
+        "sha256": "24b4171024bd7c87ec55328b4c81fe9fdbadc17a104b4d74c9b243c6bc14ca7b"
+      }
     },
     {
       "id": "cal-export-lease",
@@ -59,7 +63,11 @@
       "aggregate_eligible": false,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
       "input_manifest_sha256": "e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
-      "source_fixture_id": "pr-export-lease-hard"
+      "source_fixture_id": "pr-export-lease-hard",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/cal-export-lease/verification-command-contract.json",
+        "sha256": "7bf159e777e58a52c406b62be300fd48934f3da793914144d224ed4ae1e49d47"
+      }
     },
     {
       "id": "cal-atomic-rule-batch",
@@ -70,7 +78,11 @@
       "aggregate_eligible": false,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
       "input_manifest_sha256": "e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
-      "source_fixture_id": "impl-rule-batch-medium-hard"
+      "source_fixture_id": "impl-rule-batch-medium-hard",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/cal-atomic-rule-batch/verification-command-contract.json",
+        "sha256": "a1369ab1c1a4abf165934efcfeb40888d44ecf72e0c114b3952f1f8f397aff93"
+      }
     },
     {
       "id": "cal-concurrent-transfer",
@@ -81,7 +93,11 @@
       "aggregate_eligible": false,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
       "input_manifest_sha256": "e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
-      "source_fixture_id": "impl-transfer-hard"
+      "source_fixture_id": "impl-transfer-hard",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/cal-concurrent-transfer/verification-command-contract.json",
+        "sha256": "1ca080bea63ff8e7878c00462b133d4b9a51f182b0ae2244f83ddcb99e933dc4"
+      }
     }
   ],
   "ordering": {

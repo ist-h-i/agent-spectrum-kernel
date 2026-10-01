@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "cal-concurrent-transfer",
+  "fixture_role": "calibration",
+  "suite": "calibration",
+  "task_class": "implementation",
+  "domain": "backend_financial",
+  "difficulty": "hard",
+  "repetitions": 5,
+  "risk_boundary": "financial_integrity",
+  "capability_families": [
+    "financial_integrity",
+    "state_consistency"
+  ],
+  "evidence_topologies": [
+    "audit_trail_and_state",
+    "implementation_and_tests"
+  ],
+  "outcome_dimensions": [
+    "auditability",
+    "financial_integrity"
+  ],
+  "output_contract_type": "implementation_producing",
+  "requirement_record_id": "requirement-record-cal-concurrent-transfer",
+  "output_contract_id": "output-contract-cal-concurrent-transfer",
+  "evaluator_bundle_id": "evaluator-7fcdf7f30954ee17b5d341bbf8ff341b7862307902be3a2695380cc22a79e55e",
+  "evaluator_bundle_digest": "sha256:971884c41f41014d552006bf4a511a5a39c46e2daa813248362e464b47babeff",
+  "evaluator_byte_count": 174075,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:13dbf5b5a025d3fe4d772cfb4bd534fc53bc7271d1800d10b7fd593e70e58624"
+}

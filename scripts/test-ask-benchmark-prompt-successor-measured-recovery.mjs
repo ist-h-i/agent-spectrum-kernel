@@ -11,6 +11,8 @@ const targetUrl = new URL("./ask-benchmark-prompt-successor-measured-execution.m
 const testPath = fileURLToPath(import.meta.url);
 const caseIds = ["case-1", "case-2", "case-3", "case-4"];
 const roles = ["current_prompt", "prompt_v2", "current_prompt", "prompt_v2"];
+const experimentId = "synthetic-recovery";
+const journalName = `.ask-successor-issue291-${experimentId}.journal.json`;
 
 function fixture() {
   const dir = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-measured-recovery-")));
@@ -22,7 +24,7 @@ function fixture() {
     cases: caseIds.map((case_id, index) => ({ case_id, prompt_role: roles[index] })),
   };
   const sources = Object.fromEntries(["current_prompt", "prompt_v2"].map((role) => [role, {
-    scope: { source: { bindings: caseIds.flatMap((case_id, index) => roles[index] === role ? [{
+    scope: { run_instance_id: experimentId, source: { bindings: caseIds.flatMap((case_id, index) => roles[index] === role ? [{
       successor_case_id: case_id, source_case_id: `native-${case_id}`,
     }] : []) } },
     expectedScopeDigest: "synthetic",
@@ -33,7 +35,7 @@ function fixture() {
   writeFileSync(resolve(dir, "context.json"), JSON.stringify({
     root, dir, authority: { fixture: "synthetic-measured-recovery" }, preparation, sources,
   }));
-  return { dir, preparation, journal: resolve(dir, "journal.json") };
+  return { dir, preparation, journal: resolve(dir, journalName) };
 }
 
 async function loadController(context) {
@@ -41,6 +43,18 @@ async function loadController(context) {
   const { canonicalDigest } = await import("./content-addressed-store.mjs");
   const statePath = resolve(context.dir, "state.json");
   const state = () => JSON.parse(readFileSync(statePath, "utf8"));
+  const journalPath = resolve(context.dir, journalName);
+  const authorityEvidence = { ...context.authority, journal_path_digest: canonicalDigest({ path: journalPath }) };
+  let authorityChecks = 0;
+  const checkAuthority = () => {
+    authorityChecks += 1;
+    if (Number(process.env.ASK_R3_FAIL_AUTHORITY_CHECK) === authorityChecks) {
+      const error = new Error("synthetic live authority drift");
+      error.code = "TEST_AUTHORITY_DRIFT";
+      throw error;
+    }
+    return structuredClone(authorityEvidence);
+  };
   const control = () => {
     const progress = state();
     const cases = caseIds.map((case_id, index) => {
@@ -60,13 +74,14 @@ async function loadController(context) {
   };
   const synthetic = {
     "./ask-benchmark-prompt-successor-measured-authority.mjs": {
-      assertSuccessorMeasuredAuthority: () => {},
+      assertSuccessorMeasuredAuthority: checkAuthority,
       assertSuccessorMeasuredSourceAuthority: () => {},
-      inspectSuccessorMeasuredAuthority: (authority) => authority,
-      successorMeasuredJournalPath: () => resolve(context.dir, "journal.json"),
+      inspectSuccessorMeasuredAuthority: checkAuthority,
+      successorMeasuredJournalPath: () => { checkAuthority(); return journalPath; },
     },
     "./ask-benchmark-prompt-successor-collection.mjs": {
       inspectSuccessorCollectionControl: async () => {
+        checkAuthority();
         const value = control();
         return { control: value, inspection_digest: canonicalDigest({ control: value }) };
       },
@@ -108,23 +123,25 @@ async function loadController(context) {
   });
   await module.link(moduleFor);
   await module.evaluate();
-  return module.namespace;
+  return { controller: module.namespace, authorityChecks: () => authorityChecks };
 }
 
 async function worker() {
   const context = JSON.parse(readFileSync(resolve(process.env.ASK_R3_FIXTURE_DIR, "context.json"), "utf8"));
-  const controller = await loadController(context);
+  const { controller, authorityChecks } = await loadController(context);
   const options = { authority: context.authority, preparation: context.preparation,
     sources: context.sources, root: context.root };
+  const reportChecks = ["probe", "drift"].includes(process.argv[3]);
   try {
     const result = process.argv[3] === "recover"
       ? await controller.recoverMeasuredSuccessorSession(options)
       : await controller.executeNextMeasuredSuccessorCase(options);
     process.stdout.write(JSON.stringify({ ok: true, case_id: result.case_id ?? result.recovered_case_id,
-      terminal: result.collection.terminal_count, retry: result.retry_performed ?? result.automatic_retry_performed }) + "\n");
+      terminal: result.collection.terminal_count, retry: result.retry_performed ?? result.automatic_retry_performed,
+      ...(reportChecks ? { full_authority_checks: authorityChecks() } : {}) }) + "\n");
   } catch (error) {
     process.stdout.write(JSON.stringify({ ok: false, code: error.code, path: error.path,
-      message: error.message }) + "\n");
+      message: error.message, ...(reportChecks ? { full_authority_checks: authorityChecks() } : {}) }) + "\n");
   }
 }
 
@@ -132,11 +149,11 @@ if (process.argv[2] === "--worker") {
   await worker();
 } else {
   const childArgs = ["--no-warnings", "--experimental-vm-modules", testPath, "--worker"];
-  const envFor = (fixtureDir, fault = "") => ({ ...process.env, ASK_R3_FIXTURE_DIR: fixtureDir,
-    ASK_BENCHMARK_FAULT: fault });
-  const run = (fixtureDir, action, fault = "") => {
+  const envFor = (fixtureDir, fault = "", failAuthorityCheck = "") => ({ ...process.env, ASK_R3_FIXTURE_DIR: fixtureDir,
+    ASK_BENCHMARK_FAULT: fault, ASK_R3_FAIL_AUTHORITY_CHECK: failAuthorityCheck });
+  const run = (fixtureDir, action, fault = "", failAuthorityCheck = "") => {
     const result = spawnSync(process.execPath, [...childArgs, action], {
-      cwd: root, env: envFor(fixtureDir, fault), encoding: "utf8", timeout: 15000,
+      cwd: root, env: envFor(fixtureDir, fault, failAuthorityCheck), encoding: "utf8", timeout: 15000,
     });
     assert.equal(result.error, undefined, result.stderr);
     assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -168,6 +185,45 @@ if (process.argv[2] === "--worker") {
   });
   const exit = (child) => new Promise(resolveExit => child.once("exit", (code, signal) => resolveExit({ code, signal })));
   const snapshot = (fixtureDir) => JSON.parse(readFileSync(resolve(fixtureDir, "state.json"), "utf8"));
+
+  test("one measured claim reopens authority at entry, both inspections, pre-claim, and post-terminal boundaries", () => {
+    const { dir, journal } = fixture();
+    assert.deepEqual(run(dir, "probe"), {
+      ok: true, case_id: "case-1", terminal: 1, retry: false, full_authority_checks: 5,
+    });
+    assert.deepEqual(run(dir, "probe"), {
+      ok: true, case_id: "case-2", terminal: 2, retry: false, full_authority_checks: 5,
+    });
+    assert.equal(JSON.parse(readFileSync(journal, "utf8")).terminal_count, 2);
+    assert.equal(existsSync(`${journal}.lock`), false);
+    assert.deepEqual(snapshot(dir).native_calls, ["native-case-1", "native-case-2"]);
+  });
+
+  test("live authority drift under the reservation rejects claim without changing journal or retrying native work", () => {
+    const { dir, journal } = fixture();
+    assert.deepEqual(run(dir, "execute"), { ok: true, case_id: "case-1", terminal: 1, retry: false });
+    const journalBefore = readFileSync(journal);
+    assert.deepEqual(run(dir, "drift", "", "3"), {
+      ok: false, code: "TEST_AUTHORITY_DRIFT", message: "synthetic live authority drift", full_authority_checks: 3,
+    });
+    assert.deepEqual(readFileSync(journal), journalBefore);
+    assert.equal(existsSync(`${journal}.lock`), false);
+    assert.deepEqual(snapshot(dir).native_calls, ["native-case-1"]);
+  });
+
+  test("live authority drift after native terminal leaves a claim for no-retry recovery", () => {
+    const { dir, journal } = fixture();
+    assert.deepEqual(run(dir, "drift", "", "5"), {
+      ok: false, code: "TEST_AUTHORITY_DRIFT", message: "synthetic live authority drift", full_authority_checks: 5,
+    });
+    assert.equal(existsSync(journal), false);
+    assert.equal(JSON.parse(readFileSync(`${journal}.lock`, "utf8")).kind, "prompt_successor_measured_claim");
+    assert.deepEqual(snapshot(dir).native_calls, ["native-case-1"]);
+    assert.deepEqual(run(dir, "recover"), { ok: true, case_id: "case-1", terminal: 1, retry: false });
+    assert.equal(JSON.parse(readFileSync(journal, "utf8")).terminal_count, 1);
+    assert.equal(existsSync(`${journal}.lock`), false);
+    assert.deepEqual(snapshot(dir).native_calls, ["native-case-1"]);
+  });
 
   test("R3: a killed stale provisional owner cannot rewrite the three-entry journal or retry native work", { timeout: 60000 }, async () => {
     const { dir, journal } = fixture();

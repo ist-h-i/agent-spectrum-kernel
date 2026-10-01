@@ -143,11 +143,11 @@ function canonicalJsonBytes(value) {
   return Buffer.from(`${stableCanonicalJson(value)}\n`, "utf8");
 }
 
-export function readStableBytes(path, label, maximumBytes = DEFAULT_CONTENT_ADDRESSED_OBJECT_MAX_BYTES) {
+export function readStableBytes(path, label, maximumBytes = DEFAULT_CONTENT_ADDRESSED_OBJECT_MAX_BYTES, { allowEmpty = false } = {}) {
   assertNoSymlinkPathSegments(path, label);
   const initial = lstatSync(path);
   if (!initial.isFile()) throw new Error(`${label} must be a regular file`);
-  if (initial.size === 0 || initial.size > maximumBytes) throw new Error(`${label} must be a bounded non-empty file`);
+  if ((!allowEmpty && initial.size === 0) || initial.size > maximumBytes) throw new Error(`${label} must be a bounded non-empty file`);
   const descriptor = openSync(path, "r");
   try {
     const opened = fstatSync(descriptor);

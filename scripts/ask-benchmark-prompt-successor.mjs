@@ -243,15 +243,21 @@ export function finishSuccessorCase(state, preparation, result) {
 }
 
 // A planned invocation is a reviewable proposal, never an effective-host attestation.
-export function proposeSuccessorInvocation(preparation, caseId, workspace) {
+export function proposeSuccessorInvocation(preparation, caseId, workspace, privateEvaluatorRoot) {
   validatePromptSuccessorPreparation(preparation);
   if (typeof workspace !== "string" || !workspace.startsWith("/") || workspace.includes("\0") || workspace.split("/").includes("..")) successorFail("SUCCESSOR_WORKSPACE_INVALID", "workspace");
+  if (typeof privateEvaluatorRoot !== "string" || !privateEvaluatorRoot.startsWith("/") || privateEvaluatorRoot === "/"
+    || privateEvaluatorRoot.includes("\0") || privateEvaluatorRoot.split("/").includes("..")) successorFail("SUCCESSOR_PRIVATE_ROOT_INVALID", "private evaluator root");
   const entry = preparation.cases.find(({ case_id }) => case_id === caseId);
   if (!entry) successorFail("SUCCESSOR_CASE_MISSING", "caseId");
   return {
     preparation_digest: preparation.preparation_digest, case_id: entry.case_id,
     executable_digest: preparation.runtime.executable_digest,
-    argv: ["exec", "--json", "--ephemeral", "--sandbox", "workspace-write", "-c", 'approval_policy="never"', "-c", "sandbox_workspace_write.network_access=false", "-c", 'model_reasoning_effort="medium"', "--model", preparation.runtime.model, "--cd", workspace, "-"],
+    argv: ["exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules", "-c", 'approval_policy="never"',
+      "-c", 'default_permissions="ask_issue291"', "-c", 'permissions.ask_issue291.extends=":workspace"',
+      "-c", `permissions.ask_issue291.filesystem={ ${JSON.stringify(privateEvaluatorRoot)} = "deny" }`,
+      "-c", "permissions.ask_issue291.network.enabled=false", "-c", 'model_reasoning_effort="medium"',
+      "--model", preparation.runtime.model, "--cd", workspace, "-"],
     stdin_contract: "exact_source_prompt_plus_agent_visible_task",
     timeout_ms: preparation.runtime.timeout_ms,
     effective_isolation_verified: false, model_call_authorized: false,

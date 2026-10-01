@@ -8,6 +8,7 @@ import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as url from "node:url";
+import { serialize as v8Serialize, deserialize as v8Deserialize } from "node:v8";
 import * as vm from "node:vm";
 
 const VIRTUAL_ROOT = "/ask-verified-authority";
@@ -28,6 +29,8 @@ const ALLOWED_BUILTINS = new Map([
   ["node:os", os],
   ["node:path", path],
   ["node:url", url],
+  // The private bridge needs byte-exact IPC encoding, not the broader v8 API.
+  ["node:v8", Object.freeze({ serialize: v8Serialize, deserialize: v8Deserialize })],
 ]);
 
 function sha256(bytes) {

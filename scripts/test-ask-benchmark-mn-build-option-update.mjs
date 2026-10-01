@@ -1752,11 +1752,12 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { isolate
   assert.equal(verifiedAuthority.evaluationReady, verifiedResult.scoringReady, `binary evaluation completeness must match the admitted compatibility boundary for ${state}`);
   assert.equal(Object.hasOwn(verifiedAuthority, "scoringReady"), false, `binary evaluator authority must not expose scoring readiness for ${state}`);
   if (standardCompletedSuccess) {
+    const incompletePrivateAuthority = /private evaluator authority requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together/u;
     for (const missingField of ["privateEvaluationRoot", "privateEvaluationRecordPath", "privateFragmentPath"]) {
       const incompleteAuthority = { ...common };
       delete incompleteAuthority[missingField];
-      assert.throws(() => verifyEvaluatorAuthority(incompleteAuthority), /binary scope verification requires .*private-evaluation/u, `binary authority missing ${missingField} must not become evaluation-ready`);
-      assert.throws(() => verifyEvaluatorBoundary(incompleteAuthority), /binary scope verification requires .*private-evaluation/u, `an admitted boundary must not make binary authority missing ${missingField} scoring-ready`);
+      assert.throws(() => verifyEvaluatorAuthority(incompleteAuthority), incompletePrivateAuthority, `binary authority missing ${missingField} must not become evaluation-ready`);
+      assert.throws(() => verifyEvaluatorBoundary(incompleteAuthority), incompletePrivateAuthority, `an admitted boundary must not make binary authority missing ${missingField} scoring-ready`);
       if (missingField === "privateFragmentPath") {
         const overlayRoot = resolve(scoringRoot, "unreachable-overlay-evidence");
         mkdirSync(overlayRoot);
@@ -1772,7 +1773,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { isolate
           admissionReviewAuthorityPath: overlayPaths[1],
           admissionReviewAuthoritySourceDigest: authorityFileDigest(overlayPaths[1]),
           admissionReviewArchivePath: overlayPaths[2],
-        }), /binary scope verification requires .*private-evaluation/u, "overlay scoring must reject incomplete private authority before consuming admission evidence");
+        }), incompletePrivateAuthority, "overlay scoring must reject incomplete private authority before consuming admission evidence");
         removeTree(overlayRoot);
       }
     }

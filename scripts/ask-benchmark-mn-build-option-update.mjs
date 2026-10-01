@@ -213,7 +213,19 @@ export function validateMutationAuthority({ requirementRecord, admissionRecord, 
     assertUniqueIds(mutation.remove_paths, `private mutation ${mutation.mutation_id} remove paths`);
     if (mutation.remove_paths.length === 0) throw new Error(`private mutation ${mutation.mutation_id} remove paths must not be empty`);
     if (mutation.remove_paths.some((path) => !agentVisiblePaths.has(path))) throw new Error(`private mutation ${mutation.mutation_id} removes a non-agent-visible path`);
-    assertExactIdSet(mutation.remove_paths, evidenceMap.agent_visible_paths, `private mutation ${mutation.mutation_id} remove path`);
+    const mappedPaths = new Set(evidenceMap.agent_visible_paths);
+    if (mutation.remove_paths.some(path => !mappedPaths.has(path))) {
+      throw new Error(`private mutation ${mutation.mutation_id} removes evidence outside its target map`);
+    }
+    if (mutation.expected_recoverability_state === "not_recoverable") {
+      assertExactIdSet(mutation.remove_paths, evidenceMap.agent_visible_paths, `private mutation ${mutation.mutation_id} remove path`);
+    } else if (mutation.expected_recoverability_state === "recoverable") {
+      if (mutation.remove_paths.length === mappedPaths.size) {
+        throw new Error(`private mutation ${mutation.mutation_id} has no mapped recovery evidence`);
+      }
+    } else {
+      throw new Error(`private mutation ${mutation.mutation_id} recoverability expectation is unsupported by path evidence`);
+    }
     if (mutation.mutation_digest !== canonicalDigest(withoutField(mutation, "mutation_digest"))) throw new Error(`private mutation ${mutation.mutation_id} digest mismatch`);
     if (mutation.expected_admission_result !== "fail") throw new Error(`private mutation ${mutation.mutation_id} admission expectation is invalid`);
     evaluateEvidenceRemoval({ evidenceMap, removedPaths: mutation.remove_paths, expectedRecoverabilityState: mutation.expected_recoverability_state });

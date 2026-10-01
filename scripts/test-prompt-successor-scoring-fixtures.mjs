@@ -13,6 +13,7 @@ import {
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME, computeFinalAdmissionRecordDigest, computeFinalAdmissionRequirementAuthorityDigest,
   computeOutputContractDigest, computeRequirementDigest, computeRequirementRecordDigest, computeRequirementSetDigest,
   computeResultProfileDigest, computeScoringInputFreezeManifestDigest,
+  deriveVerificationEvidenceReferences, deriveVerificationEvidenceState,
 } from "./ask-benchmark-scoring-contract.mjs";
 import {
   computeCommandContractDigest, computeVerificationCommandContractDigest, logicalCommandDigest, renderedEventCommandDigest,
@@ -122,7 +123,8 @@ export function createSuccessorSyntheticScoringInputs({ root, privateBase, paren
     contexts[fixtureId] = { privateRoot, manifestPath, bundle, reference, admission, requirements, output, freeze,
       freezeRawDigest: fileRef(freezePath).raw_digest, catalogDigest: catalog.catalog_digest, policyDigest: policy.manifest_digest, scoringPolicyDigest: score.policy_digest };
     return { fixture_id: fixtureId, source_fixture_id: sourceId, input_manifest_digest: inputDigest,
-      artifacts: Object.fromEntries(SUCCESSOR_SCORING_INPUT_ROLES.map(role => [role, fileRef(paths[role])])) };
+      artifacts: Object.fromEntries(SUCCESSOR_SCORING_INPUT_ROLES.map(role => [role, fileRef(paths[role])])),
+      admission_overlay: null };
   });
   const manifest = buildSuccessorScoringInputManifest({ parent, executionConfig: fileRef(configPath), fixtures });
   const publicManifestPath = resolve(root, "scripts/test-fixtures/generated-successor-scoring/manifest.json");
@@ -136,8 +138,9 @@ export function createSuccessorSyntheticScoringInputs({ root, privateBase, paren
  * assembler/consumer contract. They are never written to the product branch,
  * contain no private evaluator bytes, and grant no measured-execution authority.
  */
-export function createSuccessorSyntheticAdmittedCalibrationPackages({ root, revision }) {
+export function createSuccessorSyntheticAdmittedCalibrationPackages({ root, revision, admissionStatus = "admitted" }) {
   if (!/^[a-f0-9]{40}$/u.test(revision ?? "")) throw new Error("synthetic admitted calibration revision is invalid");
+  if (!["admitted", "admission_pending"].includes(admissionStatus)) throw new Error("synthetic calibration admission status is invalid");
   const catalogPath = resolve(root, "benchmarks/portfolio-catalog.json");
   const policyPath = resolve(root, "benchmarks/portfolio-policy-manifest.json");
   const scorePath = resolve(root, "benchmarks/portfolio-scoring-policy.json");
@@ -233,7 +236,7 @@ export function createSuccessorSyntheticAdmittedCalibrationPackages({ root, revi
       mutation_set_ids: ["synthetic-mutation"],
       reviewer_record_id: "synthetic-test-review",
       admission_revision: 1,
-      admission_status: "admitted",
+      admission_status: admissionStatus,
       evaluator_source_identity: sourceIdentity,
     };
     const admissionSeed = {
@@ -373,10 +376,23 @@ export function createSuccessorSyntheticAdmittedCalibrationPackages({ root, revi
  * The test never claims this data was produced by a real/private evaluator.
  * Admission remains pending and the report must remain insufficient evidence.
  */
-export function syntheticSuccessorEvaluatorEnvelope({ normalized, sourceSnapshotDigest, context }) {
+export function syntheticSuccessorEvaluatorEnvelope({ normalized, sourceSnapshotDigest, context, outcome = "pass", comparisonReady = false }) {
+  if (!["pass", "fail", "manual_review_required"].includes(outcome)) throw new Error("unsupported synthetic evaluator observation");
   const l = normalized.lineage; const c = context;
   const ref = [{ kind: "normalized_result", digest: normalized.normalized_result_digest, bytes: null }];
-  const observation = () => ({ state: "unknown", evidence_references: [] });
+  const observation = (state = "unknown") => ({ state, evidence_references: state === "unknown" ? [] : ref });
+  const manual = outcome === "manual_review_required";
+  const known = comparisonReady && !manual;
+  const correctness = known ? outcome : "unknown";
+  const verificationEvidenceState = deriveVerificationEvidenceState(normalized);
+  if (known && verificationEvidenceState !== "executed_success")
+    throw new Error("synthetic comparison-ready verification requires successful command evidence");
+  const requirementResults = c.requirements.requirements.map((requirement, index) => {
+    const observed = manual && index === 0 ? "manual_review_required" : manual ? "fail" : outcome;
+    return { requirement_id: requirement.requirement_id, outcome: observed,
+      earned_points: observed === "manual_review_required" ? null : observed === "pass" ? requirement.max_points : 0,
+      matched_equivalence_class_ids: [], finding_ids: [], evidence_references: ref };
+  });
   const value = {
     schema_version: "1.0.0", schema_path: "benchmarks/schemas/evaluator-result-envelope.schema.json", program: "adaptive_ask_evaluator_result",
     scoring_input_freeze_manifest_source_digest: c.freezeRawDigest, scoring_input_freeze_manifest_digest: c.freeze.manifest_digest,
@@ -389,12 +405,16 @@ export function syntheticSuccessorEvaluatorEnvelope({ normalized, sourceSnapshot
     fixture_input_digest: l.fixture_input_digest, case_id: l.case_id, attempt: l.attempt, adapter: l.adapter_track,
     condition: l.condition, repetition: l.repetition, source_snapshot_digest: sourceSnapshotDigest,
     evaluator_bundle_id: c.bundle.evaluator_bundle_id, evaluator_bundle_digest: c.bundle.evaluator_bundle_digest, evaluator_revision: c.bundle.evaluator_revision,
-    evaluation_id: `evaluation-${"0".repeat(32)}`, evaluation_digest: d("pending-digest"), evaluation_status: "completed",
-    requirement_results: [{ requirement_id: c.requirements.requirements[0].requirement_id, outcome: "pass", earned_points: 1,
-      matched_equivalence_class_ids: [], finding_ids: [], evidence_references: ref }],
-    quality: observation(), safety: observation(), findings: [], false_positives: [], scope_deviations: [],
-    decision_correctness: observation(), verification_correctness: observation(), evidence_correctness: observation(),
-    approval_correctness: observation(), completion_claim_correctness: observation(), under_processing: observation(), over_processing: observation(),
+    evaluation_id: `evaluation-${"0".repeat(32)}`, evaluation_digest: d("pending-digest"),
+    evaluation_status: manual ? "manual_review_required" : "completed", requirement_results: requirementResults,
+    quality: observation(known ? outcome : "unknown"), safety: observation(known ? "pass" : "unknown"), findings: [], false_positives: [], scope_deviations: [],
+    decision_correctness: observation(correctness),
+    verification_correctness: known ? { state: correctness,
+      evidence_references: deriveVerificationEvidenceReferences(normalized, verificationEvidenceState) } : observation(correctness),
+    evidence_correctness: observation(correctness),
+    approval_correctness: observation(correctness), completion_claim_correctness: observation(correctness),
+    under_processing: manual ? { state: "manual_review_required", evidence_references: ref } : observation(known ? "not_detected" : "unknown"),
+    over_processing: observation(known ? "not_detected" : "unknown"),
     required_mechanisms: [], unnecessary_mechanisms: [], unsafe_attempted_actions: [],
     evaluator_notes_state: { state: "not_recorded", digest: null, bytes: null },
     privacy: { oracle_content_stored: false, rubric_content_stored: false, hidden_test_content_stored: false, matcher_content_stored: false,

@@ -2,6 +2,8 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalDigest, readStableBytes } from "./content-addressed-store.mjs";
 import { inspectSuccessorScoringInputs, successorScoringOptions, assertSuccessorScoringExecution, assertSuccessorFrozenAdmissionOptions } from "./ask-benchmark-prompt-successor-scoring-inputs.mjs";
+import { reopenJudgeResolution } from "./ask-benchmark-llm-judge.mjs";
+import { judgeBypassReason, readJudgeTargetManifest, reopenJudgeDerivedResult } from "./ask-benchmark-judge-derived-result.mjs";
 import { openSuccessorPromptInput, consumeSuccessorPromptInput, successorInputProjection, assertSuccessorAdapterFacts } from "./ask-benchmark-prompt-successor-delivery.mjs";
 import {
   successorExact, successorClosed, successorFail,
@@ -74,10 +76,20 @@ export async function verifySuccessorSourceProvenance({
     import("./ask-benchmark-admission-decision.mjs"),
   ]);
   let measuredCollectionDigest = null;
+  let measuredEffectiveAdmission = null;
+  let measuredFreezeDigest = null;
+  let measuredJudgeQualifications = null;
   if (accessMode === "measured") {
-    const { assertSuccessorMeasuredSourceAuthority } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
+    const { assertSuccessorMeasuredSourceAuthority, successorMeasuredEffectiveAdmission } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
     const { assertSuccessorMeasuredCompletion } = await import("./ask-benchmark-prompt-successor-measured-execution.mjs");
-    assertSuccessorMeasuredSourceAuthority(measuredAuthority, { preparation, scope });
+    const measuredEvidence = assertSuccessorMeasuredSourceAuthority(measuredAuthority, { preparation, scope });
+    measuredFreezeDigest = measuredEvidence.authority_record_digest;
+    measuredJudgeQualifications = measuredEvidence.judge_qualifications ?? null;
+    // Close every fixture's review and private admission before opening a result.
+    measuredEffectiveAdmission = new Map(preparation.predecessor.fixtures.map(({ fixture_id }) => [fixture_id,
+      successorMeasuredEffectiveAdmission(measuredAuthority, fixture_id, {
+        preparation, scope, normalizedResultsPath: source.paths.normalizedResultsPath,
+      })]));
     measuredCollectionDigest = canonicalDigest(assertSuccessorMeasuredCompletion(measuredCompletion, { authority: measuredAuthority, preparation, scope }));
   }
   const stored = await openSuccessorResultSource({ preparation, scope, expectedScopeDigest, ...source, accessMode, measuredAuthority, measuredCompletion, root });
@@ -95,6 +107,10 @@ export async function verifySuccessorSourceProvenance({
     if (!allowed.has(entry.entry.case_id) && (entry.state.status !== "pending" || entry.attempts.length !== 0)) successorFail("SUCCESSOR_OUT_OF_SCOPE_EXECUTION", "actual execution inventory");
   }
   const rows = [];
+  const judgeTargets = readJudgeTargetManifest(root);
+  const judgedCaseIdsByFixture = new Map(preparation.predecessor.fixtures.map(({ fixture_id }) => [fixture_id,
+    preparation.cases.filter(item => item.fixture_id === fixture_id &&
+      judgeTargets.value.fixtures[fixture_id].semantic_requirements.length > 0).map(item => item.case_id)]));
   for (const binding of scope.source.bindings) {
     const saved = readSuccessorVerifiedEngineeringResult(stored, binding.successor_case_id);
     const actual = first.cases.find((entry) => entry.entry.case_id === binding.source_case_id);
@@ -110,7 +126,8 @@ export async function verifySuccessorSourceProvenance({
       expectedTaskDigest: `sha256:${task.sha256}`,
     });
     successorExact(actual.attempts[0].request.projection, successorInputProjection(delivered.binding), "runner stdin binding");
-    const options = { ...evaluatorOptionsByCase[binding.successor_case_id], root };
+    const { judge: judgeInput, ...originalOptions } = evaluatorOptionsByCase[binding.successor_case_id];
+    const options = { ...originalOptions, root };
     const target = preparation.cases.find(item => item.case_id === binding.successor_case_id);
     const pinnedInputs = successorScoringOptions(scoringInputs, preparation, target.fixture_id);
     for (const [key, value] of Object.entries(pinnedInputs)) {
@@ -126,24 +143,64 @@ export async function verifySuccessorSourceProvenance({
     options.normalizedResultsPath = source.paths.normalizedResultsPath;
     if (options.sourceSnapshotDigest !== undefined) successorExact(options.sourceSnapshotDigest, source.sourceSnapshotDigest, "evaluator snapshot");
     options.sourceSnapshotDigest = source.sourceSnapshotDigest;
-    const derived = evaluator.verifyEvaluatorAuthority(options);
+    const original = evaluator.verifyEvaluatorAuthority(options);
+    const needsJudge = judgeTargets.value.fixtures[target.fixture_id].semantic_requirements.length > 0;
+    const bypassReason = judgeBypassReason(original);
+    if (bypassReason === "policy_run_stop") {
+      successorFail("SUCCESSOR_SAFETY_RUN_STOP", "verified external action requires fixture invalidation and run stop");
+    }
+    const judgeSkipReason = needsJudge ? bypassReason : null;
+    if (judgeSkipReason && judgeInput) {
+      successorFail("SUCCESSOR_JUDGE_OUT_OF_SCOPE", "verified non-Judge result has a Judge input");
+    }
+    if (accessMode === "measured" && (needsJudge && !judgeSkipReason) !== Boolean(judgeInput)) {
+      successorFail("SUCCESSOR_JUDGE_AUTHORITY_REQUIRED", "fixed semantic Judge inventory");
+    }
+    if (!needsJudge && judgeInput) successorFail("SUCCESSOR_JUDGE_OUT_OF_SCOPE", "machine-only fixture");
+    let derived = original;
+    if (judgeInput) {
+      successorClosed(judgeInput, ["storeRoot", "protocol", "request", "packet", "derivedResultPath"], "case Judge authority");
+      if (measuredJudgeQualifications !== null) {
+        successorExact(judgeInput.protocol.protocol_digest, measuredJudgeQualifications[target.fixture_id]?.protocol_digest, "qualified Judge protocol");
+      }
+      const reopened = reopenJudgeResolution({ storeRoot: judgeInput.storeRoot,
+        protocol: judgeInput.protocol, request: judgeInput.request, packet: judgeInput.packet });
+      if (measuredJudgeQualifications?.[target.fixture_id]?.native_captures_required === true
+        && !["A", "B"].every(slot => reopened.receipts[slot]?.native_capture)) {
+        successorFail("SUCCESSOR_JUDGE_NATIVE_CAPTURE_REQUIRED", "qualified native transport cannot downgrade to callback evidence");
+      }
+      const expectedAuthorityProfile = preparation.runtime.model === "synthetic-native-fake-not-a-service"
+        ? "synthetic_only" : "live_native";
+      derived = reopenJudgeDerivedResult({ path: judgeInput.derivedResultPath, original,
+        protocol: judgeInput.protocol, request: judgeInput.request, packet: judgeInput.packet,
+        receipts: reopened.receipts, slotStates: reopened.slot_states, resolution: reopened.resolution,
+        targetManifest: judgeTargets, expectedRole: scope.prompt_role,
+        expectedSampleIndex: judgedCaseIdsByFixture.get(target.fixture_id).indexOf(binding.successor_case_id),
+        expectedFreezeDigest: measuredFreezeDigest ?? judgeInput.request.private_binding.freeze_digest,
+        expectedAuthorityProfile,
+        verificationCommandContract: actual.attempts[0].verificationCommandContract, root });
+    }
     successorExact(derived.normalized, saved.normalized, "evaluator normalized authority");
     successorExact(derived.result.evaluation_id, saved.engineering.evaluation_id, "evaluator result identity");
     successorExact(derived.result.evaluation_digest, saved.engineering.evaluation_digest, "evaluator result digest");
     // Mirror #197's admission-resolution boundary; do not fabricate its private
     // verified-authority handle or infer admission from the result's status.
     const inputs = derived.scoringInputs;
-    // The preparation-1.1 manifest binds only the frozen admission record.
-    // An otherwise valid later overlay is not this experiment's pinned authority.
-    const effectiveAdmissionAuthority = admission.resolveEffectiveAdmissionAuthority({
-      frozenAdmissionRecord: inputs.admissionRecord,
-      requirementRecord: inputs.requirementRecord,
-      evaluatorReference: inputs.evaluatorReference, root,
-    });
+    // Measured admission comes only from the pre-result frozen review binding.
+    // The per-case options remain unable to add a late overlay.
+    const effectiveAdmissionAuthority = accessMode === "measured"
+      ? measuredEffectiveAdmission.get(target.fixture_id)
+      : admission.resolveEffectiveAdmissionAuthority({
+        frozenAdmissionRecord: inputs.admissionRecord,
+        requirementRecord: inputs.requirementRecord,
+        evaluatorReference: inputs.evaluatorReference, root,
+      });
     // Existing #197 raw scoring remains the only score calculation.
     const rebuilt = scorer.buildPortfolioEngineeringResult({ ...derived, effectiveAdmissionAuthority }, { root });
     successorExact(rebuilt, saved.engineering, "rederived complete engineering result");
-    rows.push({ case_id: binding.successor_case_id, engineering: structuredClone(rebuilt), normalized: structuredClone(saved.normalized), execution_evidence: structuredClone(actual.attempts[0].evidence), request_projection: structuredClone(actual.attempts[0].request.projection) });
+    rows.push({ case_id: binding.successor_case_id, engineering: structuredClone(rebuilt), normalized: structuredClone(saved.normalized), execution_evidence: structuredClone(actual.attempts[0].evidence), request_projection: structuredClone(actual.attempts[0].request.projection),
+      ...(derived.judgeAuthority ? { judge_authority: structuredClone(derived.judgeAuthority) } : {}),
+      ...(judgeSkipReason ? { judge_non_invocation_reason: judgeSkipReason } : {}) });
   }
   for (const fixture of preparation.predecessor.fixtures) successorScoringOptions(scoringInputs, preparation, fixture.fixture_id);
   const last = inspect();
@@ -168,7 +225,10 @@ export async function verifySuccessorSourceProvenance({
     runner_stdin_binding_reverified: true, provider_prompt_receipt_verified: false,
     measured_collection_verified: accessMode === "measured", measured_collection_digest: measuredCollectionDigest,
     comparison_eligible: accessMode === "measured", mutation_authorized: false,
-    entries: rows.map(({ case_id, engineering, execution_evidence }) => ({ case_id, engineering_result_digest: engineering.engineering_result_digest, request_digest: execution_evidence.request_digest })),
+    entries: rows.map(({ case_id, engineering, execution_evidence, judge_authority, judge_non_invocation_reason }) => ({ case_id, engineering_result_digest: engineering.engineering_result_digest, request_digest: execution_evidence.request_digest,
+      ...(judge_authority ? { judge_resolution_digest: judge_authority.resolution_digest,
+        judge_derived_result_digest: judge_authority.record_digest } : {}),
+      ...(judge_non_invocation_reason ? { judge_non_invocation_reason } : {}) })),
   };
   // Keep remaining delivery/metric/admission gates explicit. Provenance closure
   // is not a scoped adoption decision or permission to publish measured results.

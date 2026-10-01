@@ -86,8 +86,16 @@ function safeJournalPath(value) {
   return absolute;
 }
 
-function canonicalJournalPath(authority, preparation, sources) {
-  return safeJournalPath(successorMeasuredJournalPath(authority, { preparation, sources }));
+function canonicalJournalPath(authority, preparation, sources, checkedEvidence = null) {
+  if (checkedEvidence === null) return safeJournalPath(successorMeasuredJournalPath(authority, { preparation, sources }));
+  const currentParent = resolve(dirname(resolve(sources.current_prompt.execution.runDir)));
+  const candidateParent = resolve(dirname(resolve(sources.prompt_v2.execution.runDir)));
+  successorExact(candidateParent, currentParent, "measured paired run parent");
+  assertNoSymlinkPathSegments(currentParent, "measured paired run parent");
+  realpathSync(currentParent);
+  const path = resolve(currentParent, `.ask-successor-issue291-${sources.current_prompt.scope.run_instance_id}.journal.json`);
+  successorExact(canonicalDigest({ path }), checkedEvidence.journal_path_digest, "measured journal path");
+  return safeJournalPath(path);
 }
 
 function writeDurableJson(path, value) {
@@ -158,7 +166,7 @@ function validateEntry(entry, index, preparation, sources, control) {
   return entry;
 }
 
-function readJournalBase(path, authority, preparation) {
+function readJournalBase(path, authority, preparation, checkedAuthorityDigest = null) {
   if (!existsSync(path)) return null;
   const value = readJsonBounded(path, "measured journal");
   successorClosed(value, [
@@ -172,7 +180,7 @@ function readJournalBase(path, authority, preparation) {
   successorExact(value.schema_version, "1.1.0", "measured journal version");
   successorExact(value.kind, "prompt_successor_measured_journal", "measured journal kind");
   successorExact(canonicalDigest(body), digest, "measured journal digest");
-  successorExact(value.authority_digest, canonicalDigest(inspectSuccessorMeasuredAuthority(authority)), "measured journal authority");
+  successorExact(value.authority_digest, checkedAuthorityDigest ?? canonicalDigest(inspectSuccessorMeasuredAuthority(authority)), "measured journal authority");
   successorExact(value.preparation_digest, preparation.preparation_digest, "measured journal preparation");
   successorExact(value.automatic_retries, 0, "measured journal retries");
   successorExact(value.durable_global_sequence_verified, true, "measured journal sequence flag");
@@ -210,12 +218,12 @@ function validateJournalAgainstInspection(value, authority, preparation, sources
   return entries;
 }
 
-function journalSnapshot(authority, inspection, entries) {
+function journalSnapshot(authority, inspection, entries, checkedAuthorityDigest = null) {
   const control = inspection.control;
   const body = {
     schema_version: "1.1.0",
     kind: "prompt_successor_measured_journal",
-    authority_digest: canonicalDigest(inspectSuccessorMeasuredAuthority(authority)),
+    authority_digest: checkedAuthorityDigest ?? canonicalDigest(inspectSuccessorMeasuredAuthority(authority)),
     preparation_digest: control.preparation_digest,
     collection_inspection_digest: inspection.inspection_digest,
     collection_control_digest: control.control_digest,
@@ -260,13 +268,13 @@ function terminalEntry({ preparation, sources, claim, before, after }) {
   return { ...body, entry_digest: canonicalDigest(body) };
 }
 
-function lockRecord(authority, preparation, caseId, role, nativeCaseId, beforeDigest, journal, ownerSocket) {
+function lockRecord(authority, preparation, caseId, role, nativeCaseId, beforeDigest, journal, ownerSocket, checkedAuthorityDigest = null) {
   const body = {
     schema_version: "1.3.0",
     kind: "prompt_successor_measured_claim",
     claim_id: randomUUID(),
     owner_socket: ownerSocket,
-    authority_digest: canonicalDigest(inspectSuccessorMeasuredAuthority(authority)),
+    authority_digest: checkedAuthorityDigest ?? canonicalDigest(inspectSuccessorMeasuredAuthority(authority)),
     preparation_digest: preparation.preparation_digest,
     case_id: caseId,
     prompt_role: role,
@@ -279,13 +287,13 @@ function lockRecord(authority, preparation, caseId, role, nativeCaseId, beforeDi
   return { ...body, claim_digest: canonicalDigest(body) };
 }
 
-function reservationRecord(authority, preparation, ownerSocket) {
+function reservationRecord(authority, preparation, ownerSocket, checkedAuthorityDigest = null) {
   const body = {
     schema_version: "1.0.0",
     kind: "prompt_successor_measured_reservation",
     claim_id: randomUUID(),
     owner_socket: ownerSocket,
-    authority_digest: canonicalDigest(inspectSuccessorMeasuredAuthority(authority)),
+    authority_digest: checkedAuthorityDigest ?? canonicalDigest(inspectSuccessorMeasuredAuthority(authority)),
     preparation_digest: preparation.preparation_digest,
   };
   return { ...body, reservation_digest: canonicalDigest(body) };
@@ -427,13 +435,14 @@ async function inspect(authority, preparation, sources, root) {
 export async function executeNextMeasuredSuccessorCase({
   authority, preparation, sources, root = ROOT,
 }) {
-  assertSuccessorMeasuredAuthority(authority, { preparation, sources });
+  const openingEvidence = assertSuccessorMeasuredAuthority(authority, { preparation, sources });
+  const checkedAuthorityDigest = canonicalDigest(openingEvidence);
   successorExact(resolve(root), ROOT, "measured execution root");
-  const journal = canonicalJournalPath(authority, preparation, sources);
+  const journal = canonicalJournalPath(authority, preparation, sources, openingEvidence);
   const lockPath = `${journal}.lock`;
   if (existsSync(lockPath)) successorFail("SUCCESSOR_MEASURED_SESSION_LOCKED", "durable global claim");
   const before = await inspect(authority, preparation, sources, root);
-  const previousJournal = readJournalBase(journal, authority, preparation);
+  const previousJournal = readJournalBase(journal, authority, preparation, checkedAuthorityDigest);
   const entries = validateJournalAgainstInspection(previousJournal, authority, preparation, sources, before);
   if (before.control.status !== "ready_for_authorized_claim" || !before.control.next_case_id) {
     successorFail("SUCCESSOR_MEASURED_STOPPED", before.control.stop_reasons.join(",") || before.control.status);
@@ -445,7 +454,7 @@ export async function executeNextMeasuredSuccessorCase({
   if (!binding) successorFail("SUCCESSOR_CASE_MISSING", "measured native binding");
   const lease = await openOwnerSocket();
   try {
-    const reservation = reservationRecord(authority, preparation, lease.path);
+    const reservation = reservationRecord(authority, preparation, lease.path, checkedAuthorityDigest);
     if (faultEnabled("before_measured_lock_pause")) {
       writeSync(2, "MEASURED_BEFORE_LOCK\n");
       process.kill(process.pid, "SIGSTOP");
@@ -455,19 +464,25 @@ export async function executeNextMeasuredSuccessorCase({
       writeSync(2, "MEASURED_AFTER_PROVISIONAL_LOCK\n");
       process.kill(process.pid, "SIGSTOP");
     }
+    let claim;
     try {
-      const lockedJournal = readJournalBase(journal, authority, preparation);
+      const lockedJournal = readJournalBase(journal, authority, preparation, checkedAuthorityDigest);
       // The reservation cannot start native work. Only an unchanged journal
       // permits promotion to an execution claim under this exclusive lock.
       if ((lockedJournal?.journal_digest ?? null) !== (previousJournal?.journal_digest ?? null)) {
         successorFail("SUCCESSOR_MEASURED_STALE_CLAIM", "journal changed before global claim");
       }
+      claim = lockRecord(authority, preparation, target.case_id, target.prompt_role, binding.source_case_id,
+        before.control.control_digest, previousJournal, lease.path, checkedAuthorityDigest);
+      // Reopen live public/private/review bytes after collection inspection and
+      // under the lock, immediately before this reservation becomes a claim.
+      successorExact(assertSuccessorMeasuredAuthority(authority, { preparation, sources }), openingEvidence,
+        "measured authority before claim");
     } catch (error) {
       // This controller has not published an execution claim or entered native.
       releaseLock(lockPath);
       throw error;
     }
-    const claim = lockRecord(authority, preparation, target.case_id, target.prompt_role, binding.source_case_id, before.control.control_digest, previousJournal, lease.path);
     writeDurableJson(lockPath, claim);
     if (process.env.ASK_BENCHMARK_FAULT === "after_measured_lock_pause") {
       writeSync(2, "MEASURED_AFTER_LOCK\n");
@@ -494,8 +509,12 @@ export async function executeNextMeasuredSuccessorCase({
       });
       const after = await inspect(authority, preparation, sources, root);
       successorExact(after.control.terminal_count, before.control.terminal_count + 1, "one measured terminal case per claim");
+      // The native terminal may have taken arbitrarily long. Reopen authority
+      // again before publishing its journal entry; never reuse claim-time proof.
+      successorExact(assertSuccessorMeasuredAuthority(authority, { preparation, sources }), openingEvidence,
+        "measured authority after terminal");
       const nextEntries = [...entries, terminalEntry({ preparation, sources, claim, before, after })];
-      writeDurableJson(journal, journalSnapshot(authority, after, nextEntries));
+      writeDurableJson(journal, journalSnapshot(authority, after, nextEntries, checkedAuthorityDigest));
       if (process.env.ASK_BENCHMARK_FAULT === "after_measured_journal_published") process.exit(86);
       releaseLock(lockPath);
       return {
@@ -504,7 +523,7 @@ export async function executeNextMeasuredSuccessorCase({
         native_case_id: binding.source_case_id,
         outcome: structuredClone(output),
         collection: structuredClone(after.control),
-        journal: readJournalBase(journal, authority, preparation),
+        journal: readJournalBase(journal, authority, preparation, checkedAuthorityDigest),
         model_call_authorized_by_issue_291: true,
         automatic_retry_performed: false,
         portfolio_mutation_authorized: false,

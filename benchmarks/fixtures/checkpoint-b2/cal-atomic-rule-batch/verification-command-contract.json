@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "cal-atomic-rule-batch",
+  "fixture_input_digest": "sha256:e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
+  "commands": [
+    {
+      "command_id": "visible-fixture-tests",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": [
+        "npm",
+        "test"
+      ],
+      "execution_form": "direct_argv",
+      "shell_family": null,
+      "shell_envelope": null,
+      "canonical_script": null,
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:fbacccff36bb02e606a6db2969807b63d27708cff2b1225ecb76b9aff7c65a4f",
+      "rendered_event_command_digest": "sha256:328e123c63857fd8473bd4bd3581e655b08b7440d7f5d2c31cc375607582f539",
+      "command_contract_digest": "sha256:bca218ecfe68f71918ceb7363d10aa6d8b9bebe8cac7a44c05f95bc2335e17ea"
+    }
+  ],
+  "contract_digest": "sha256:5e3ad4bba40a74327c0db1bdff70f3e89c8635a4870bd431793989a6968b4e7d"
+}

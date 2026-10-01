@@ -57,11 +57,11 @@ function selectionInput(record, plan) {
     },
   };
 }
-function nativeConfig(timeoutMs = 900000) {
+function nativeConfig(privateEvaluatorRoot, timeoutMs = 900000) {
   return {
     schema_version: "1.2.0", adapter: "codex", availability: "available", unavailable_reason: null,
     expected_executable_version: "codex-cli 0.153.4", model: "synthetic-native-fake-not-a-service", reasoning_effort: "medium",
-    case_timeout_ms: timeoutMs, sandbox_policy: "workspace-write", permission_policy: "never",
+    case_timeout_ms: timeoutMs, sandbox_policy: "workspace-write", permission_policy: "never", successor_private_evaluator_root: privateEvaluatorRoot,
     executor: { id: "successor-native-fake", version: "1.0.0" },
     environment_allowlist: ["HOME", "ASK_SUCCESSOR_FAKE_CAPTURE", "ASK_SUCCESSOR_FAKE_MODE"], environment_value_allowlist: [],
     thermal_state: "cold", claude_cli: null,
@@ -161,7 +161,8 @@ await test("F3: successor input traverses the real native runner without a provi
     const common = { root, config, planPath, materializedPath, selectionState };
     const scenario = (mode, timeoutMs = 900000) => {
       const directory = resolve(work, `${mode}-${timeoutMs}`); mkdirSync(directory);
-      const runtimeConfigPath = resolve(directory, "runtime.json"); const runtimeFile = nativeConfig(timeoutMs); writeJson(runtimeConfigPath, runtimeFile);
+      const privateEvaluatorRoot = resolve(work, "private-evaluator"); mkdirSync(privateEvaluatorRoot, { recursive: true });
+      const runtimeConfigPath = resolve(directory, "runtime.json"); const runtimeFile = nativeConfig(privateEvaluatorRoot, timeoutMs); writeJson(runtimeConfigPath, runtimeFile);
       const environment = { HOME: home, ASK_SUCCESSOR_FAKE_CAPTURE: captures, ASK_SUCCESSOR_FAKE_MODE: mode };
       const runtime = { adapter: "codex", cli_version: "0.153.4", executable_digest: nativeDigest, node_version: process.version,
         os: process.platform, arch: process.arch, model: runtimeFile.model, provider_model_revision: { status: "unknown", value: null },
@@ -230,7 +231,8 @@ await test("F3: successor input traverses the real native runner without a provi
         assert.equal(output, resolve(dirname(cwd), "agent-final.json"));
         const identity = inspection.adapter_identities.get("codex");
         assert.deepEqual(capture.argv, identity.effective_command.argv.map((part) => part.replaceAll("{output}", output).replaceAll("{output_schema}", resolve(root, "benchmarks/schemas/agent-output.schema.json"))));
-        assert.equal(capture.argv.filter((arg) => arg === "sandbox_workspace_write.network_access=false").length, 1);
+        assert.equal(capture.argv.filter((arg) => arg === "permissions.ask_issue291.network.enabled=false").length, 1);
+        assert.equal(capture.argv.includes("--sandbox"), false);
         assert.equal(identity.case_timeout_ms, 900000, "successor's unchanged timeout is passed to the real runner");
         assert.deepEqual(attempt.request.projection, successorInputProjection(expected.binding));
         assert.equal(attempt.result.request_sha256, attempt.evidence.request_digest);

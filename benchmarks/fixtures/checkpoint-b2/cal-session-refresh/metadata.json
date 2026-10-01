@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "cal-session-refresh",
+  "fixture_role": "calibration",
+  "suite": "calibration",
+  "task_class": "review",
+  "domain": "security_authorization",
+  "difficulty": "medium-hard",
+  "repetitions": 3,
+  "risk_boundary": "security_boundary",
+  "capability_families": [
+    "authorization_reasoning",
+    "review_precision"
+  ],
+  "evidence_topologies": [
+    "api_contract_and_callers",
+    "review_diff_and_tests"
+  ],
+  "outcome_dimensions": [
+    "authorization_integrity",
+    "review_precision"
+  ],
+  "output_contract_type": "findings_producing",
+  "requirement_record_id": "requirement-record-cal-session-refresh",
+  "output_contract_id": "output-contract-cal-session-refresh",
+  "evaluator_bundle_id": "evaluator-7b0ba990e2eeaa3180dc13239e5d8786605d004d0e02ddc14fe778c572924069",
+  "evaluator_bundle_digest": "sha256:5937437275c72e8deade7da135b94da3d53394fa9592390c56fbdabf6864c4cf",
+  "evaluator_byte_count": 157447,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:40203bd9534baf9278aac017e338e0701efa00816be406669c568a17e201154a"
+}

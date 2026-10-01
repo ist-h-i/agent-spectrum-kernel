@@ -1,0 +1,182 @@
+import { createHash } from "node:crypto";
+import { isAbsolute, resolve } from "node:path";
+import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
+
+export const JUDGE_TOOL_FREE_CLI_VERSION = "0.157.1";
+// Observed @openai/codex-darwin-arm64 native image for codex-cli 0.157.1.
+// This candidate is intentionally host-specific until another image is reviewed.
+export const JUDGE_TOOL_FREE_CLI_SHA256 = "sha256:27ceb5f9b957b43a519efe4eaa3816a0bffb0a531a2c89af18840c0a3c016a7d";
+export const JUDGE_TOOL_FREE_MODEL = "gpt-6.1-sol";
+export const JUDGE_TOOL_FREE_BASE_INSTRUCTIONS = "Judge tool inventory capture only. Return OK.";
+export const JUDGE_TOOL_FREE_STDIN = "Synthetic local request capture. Respond OK without tools.\n";
+export const JUDGE_TOOL_FREE_CATALOG_SHA256 = "sha256:2728439a226a7d37c38ff868ccc602d716aaa945bcca8bb0095e4b392157235d";
+
+const sha256 = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+function check(ok, message) {
+  if (!ok) throw new Error(`JUDGE_TOOL_FREE_PROFILE_INVALID: ${message}`);
+}
+function absolute(path) {
+  check(typeof path === "string" && isAbsolute(path) && resolve(path) === path && !path.includes("\0"), "absolute path required");
+  return path;
+}
+function toml(value) { return JSON.stringify(value); }
+
+/** The checked-in catalog is the complete, static model metadata for this profile. */
+export function inspectJudgeToolFreeCatalog(bytes) {
+  check(Buffer.isBuffer(bytes) && sha256(bytes) === JUDGE_TOOL_FREE_CATALOG_SHA256, "catalog bytes changed");
+  const catalog = parseJsonRejectDuplicateKeys(bytes, "tool-free Judge catalog");
+  check(Array.isArray(catalog.models) && catalog.models.length === 1, "one catalog model required");
+  const model = catalog.models[0];
+  check(model.slug === JUDGE_TOOL_FREE_MODEL && model.shell_type === "disabled"
+    && model.base_instructions === JUDGE_TOOL_FREE_BASE_INSTRUCTIONS
+    && model.apply_patch_tool_type === null && model.supports_search_tool === false
+    && Array.isArray(model.experimental_supported_tools) && model.experimental_supported_tools.length === 0
+    && model.tool_mode === "direct" && model.multi_agent_version === "disabled"
+    && model.use_responses_lite === false && JSON.stringify(model.input_modalities) === '["text"]'
+    && model.include_skills_usage_instructions === false
+    && model.include_plugin_usage_instructions === false
+    && model.include_apps_usage_instructions === false, "tool-free model metadata");
+  return catalog;
+}
+
+/**
+ * Fixed public -c profile for exact CLI 0.157.1. The local provider is accepted
+ * only by the request-capture probe; the production profile has no provider
+ * override and still needs separate credential/host qualification.
+ */
+export function buildJudgeToolFreeOverrides({ catalogPath, instructionPath, captureBaseUrl = null }) {
+  const settings = [
+    ["model", toml(JUDGE_TOOL_FREE_MODEL)],
+    ["model_catalog_json", toml(absolute(catalogPath))],
+    ["model_instructions_file", toml(absolute(instructionPath))],
+    ["model_reasoning_effort", toml("medium")],
+    ["approval_policy", toml("never")],
+    ["sandbox_mode", toml("read-only")],
+    ["web_search", toml("disabled")],
+    ["mcp_servers", "{}"],
+    ["project_doc_max_bytes", "0"],
+    ["check_for_update_on_startup", "false"],
+    ["include_apps_instructions", "false"],
+    ["include_collaboration_mode_instructions", "false"],
+    ["include_environment_context", "false"],
+    ["analytics.enabled", "false"],
+    ["feedback.enabled", "false"],
+    ["agents.enabled", "false"],
+    ["tools.experimental_request_user_input.enabled", "false"],
+    ["tools.update_plan.enabled", "false"],
+  ];
+  for (const feature of [
+    "shell_tool", "unified_exec", "code_mode", "code_mode_only",
+    "view_image", "multi_agent", "multi_agent_v2", "apps", "enable_mcp_apps",
+    "plugins", "remote_plugin", "recommended_plugins", "tool_suggest",
+    "standalone_web_search", "mcp_2026_07_28", "image_generation",
+    "browser_use", "computer_use", "sleep_tool", "current_time_reminder",
+    "send_message_to_user_async", "goals", "memories", "deferred_executor",
+    "request_permissions_tool", "token_budget", "artifact",
+  ]) settings.push([`features.${feature}`, "false"]);
+  if (captureBaseUrl !== null) {
+    const url = new URL(captureBaseUrl);
+    check(url.protocol === "http:" && url.hostname === "127.0.0.1"
+      && /^\d+$/u.test(url.port) && url.pathname === "/v1"
+      && !url.username && !url.password && !url.search && !url.hash,
+    "capture provider must be 127.0.0.1 /v1");
+    settings.push(
+      ["model_provider", toml("capture")],
+      ["model_providers.capture.name", toml("capture")],
+      ["model_providers.capture.base_url", toml(url.href.replace(/\/$/u, ""))],
+      ["model_providers.capture.wire_api", toml("responses")],
+      ["model_providers.capture.requires_openai_auth", "false"],
+      ["model_providers.capture.request_max_retries", "0"],
+      ["model_providers.capture.stream_max_retries", "0"],
+      ["model_providers.capture.supports_websockets", "false"],
+    );
+  }
+  return settings.map(([key, value]) => `${key}=${value}`);
+}
+
+function textInputOnly(input, expectedText = JUDGE_TOOL_FREE_STDIN) {
+  let syntheticUserInputFound = 0;
+  const valid = input.every(item => {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) return false;
+    if (!Object.keys(item).every(key => ["type", "id", "role", "content"].includes(key))) return false;
+    if (item.type !== "message" || !["user", "developer"].includes(item.role)) return false;
+    if (item.id !== undefined && (typeof item.id !== "string" || !item.id.startsWith("msg_"))) return false;
+    if (!Array.isArray(item.content) || item.content.length === 0) return false;
+    const contentValid = item.content.every(part => part !== null && typeof part === "object" && !Array.isArray(part)
+      && Object.keys(part).sort().join("|") === "text|type"
+      && part.type === "input_text" && typeof part.text === "string" && part.text.length > 0);
+    if (contentValid && item.role === "user"
+      && item.content.length === 1 && item.content[0].text === expectedText) syntheticUserInputFound++;
+    else if (item.role === "user") return false;
+    return contentValid;
+  });
+  return valid && syntheticUserInputFound === 1;
+}
+
+/** Inspect the raw outbound request, not Codex's tool-event transcript. */
+export function inspectJudgeToolFreeRequest(requests, expectedEndpoint, integrated = null) {
+  check(Array.isArray(requests) && requests.length === 1, "exactly one outbound request required");
+  const endpoint = new URL(expectedEndpoint);
+  check(endpoint.protocol === "http:" && endpoint.hostname === "127.0.0.1"
+    && /^\d+$/u.test(endpoint.port) && endpoint.pathname === "/v1"
+    && !endpoint.username && !endpoint.password && !endpoint.search && !endpoint.hash,
+  "fixed loopback destination");
+  const request = requests[0];
+  check(request?.method === "POST" && request.path === "/v1/responses", "Responses endpoint");
+  check(request.remote_address === "127.0.0.1" || request.remote_address === "::ffff:127.0.0.1", "loopback peer");
+  check(request.local_address === "127.0.0.1" && request.local_port === Number(endpoint.port)
+    && request.headers?.host === `127.0.0.1:${endpoint.port}`, "actual loopback destination");
+  check(Buffer.isBuffer(request.body) && request.body.length > 0 && request.body.length <= 4 * 1024 * 1024, "bounded request body");
+  check(!Object.keys(request.headers ?? {}).some(key => key.toLowerCase() === "authorization"), "capture must not receive credentials");
+  const body = parseJsonRejectDuplicateKeys(request.body, "outbound Responses request");
+  check(body.model === JUDGE_TOOL_FREE_MODEL, "model identity");
+  check(body.reasoning?.effort === "medium", "outbound reasoning effort");
+  check(Array.isArray(body.input) && body.input.length > 0, "one synthetic request input");
+  check(!Object.hasOwn(body, "tools") || (Array.isArray(body.tools) && body.tools.length === 0), "model-visible tools");
+  if (integrated !== null) {
+    check(integrated && Object.keys(integrated).sort().join("|") === "instructionText|responseSchema|stdinText"
+      && typeof integrated.stdinText === "string" && integrated.stdinText.length > 0
+      && typeof integrated.instructionText === "string" && integrated.instructionText.length > 0,
+    "integrated request expectation");
+    check(body.instructions === integrated.instructionText, "integrated instruction bytes");
+    const format = body.text?.format;
+    check(format?.type === "json_schema" && format.strict === true
+      && JSON.stringify(canonicalValue(format.schema)) === JSON.stringify(canonicalValue(integrated.responseSchema)),
+    "integrated response schema");
+  }
+  check(textInputOnly(body.input, integrated?.stdinText), "tool or unsupported content in request input");
+  return {
+    schema_version: "1.0.0", kind: "judge_tool_free_request_capture",
+    cli_version: JUDGE_TOOL_FREE_CLI_VERSION, model: body.model,
+    reasoning_effort: body.reasoning.effort,
+    endpoint: `${endpoint.origin}${request.path}`, request_count: 1, tool_count: 0,
+    authorization_header_present: false,
+    request_sha256: sha256(request.body),
+  };
+}
+
+/**
+ * Judge execution template, not the one-request TF3 probe. Persistent local
+ * session evidence and the protocol's JSON response schema are required here.
+ * This builder neither supplies credentials nor grants permission to execute.
+ */
+export function buildJudgeToolFreeExecutionArgv({ catalogPath, instructionPath, schemaPath, responsePath }, captureBaseUrl = null) {
+  const overrides = buildJudgeToolFreeOverrides({ catalogPath, instructionPath, captureBaseUrl });
+  if (captureBaseUrl === null) overrides.push(
+    'model_provider="openai"',
+    "model_providers.openai.request_max_retries=0",
+    "model_providers.openai.stream_max_retries=0",
+    "model_providers.openai.supports_websockets=false",
+  );
+  return ["exec", "--ignore-user-config", "--ignore-rules", "--strict-config",
+    "--json", "--skip-git-repo-check", "--model", JUDGE_TOOL_FREE_MODEL,
+    "--output-schema", absolute(schemaPath), "--output-last-message", absolute(responsePath),
+    ...overrides.flatMap(value => ["-c", value]), "-"];
+}
+
+// Stable comparison without weakening the exact legacy catalog-byte pin.
+function canonicalValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalValue);
+  if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalValue(value[key])]));
+  return value;
+}

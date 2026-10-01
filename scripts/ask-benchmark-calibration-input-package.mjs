@@ -45,6 +45,7 @@ const sourceSession = pinSourceSession(ROOT, [
   "scripts/ask-benchmark-calibration-input-package.mjs",
   "scripts/ask-benchmark-calibration-source.mjs",
   "scripts/ask-benchmark-admitted-fixture-invariance.mjs",
+  "scripts/ask-benchmark-admission-decision.mjs",
   "scripts/ask-benchmark-atomic-publication.mjs",
   "scripts/ask-benchmark-duplicate-key-json.mjs",
   "scripts/ask-benchmark-stable-file.mjs",
@@ -218,11 +219,9 @@ export async function assembleCalibrationInputPackage(options = {}) {
     const fixtures = CALIBRATION_SOURCE_BINDINGS.map(([fixture_id, source_fixture_id]) => {
       const directory = `benchmarks/fixtures/checkpoint-b2/${fixture_id}`;
       const paths = Object.fromEntries(SUCCESSOR_SCORING_INPUT_ROLES.map(role => [role, COMMON[role] ?? `${directory}/${FIXTURE_FILES[role]}`]));
-      // Preparation 1.1 binds frozen records, not a later decision overlay.
-      // Refuse overlays rather than ignoring a conflicting or newer decision.
-      if (resolveRepositoryAdmissionDecision({ root: ROOT, repositoryRevision: implementation.revision, fixtureId: fixture_id })) {
-        reject("CALIBRATION_PACKAGE_OVERLAY_UNSUPPORTED", [{ fixture_id }]);
-      }
+      // Bind a repository-managed decision as a public input. This does not
+      // consume the external review authority/archive or grant execution.
+      const decision = resolveRepositoryAdmissionDecision({ root: ROOT, repositoryRevision: implementation.revision, fixtureId: fixture_id });
       const validated = verifyPortfolioScoringInputs({ root: ROOT,
         catalogPath: resolve(ROOT, paths.catalog), policyManifestPath: resolve(ROOT, paths.policy_manifest), scoringPolicyPath: resolve(ROOT, paths.scoring_policy),
         admissionRecordPath: resolve(ROOT, paths.admission_record), requirementRecordPath: resolve(ROOT, paths.requirement_record),
@@ -231,9 +230,22 @@ export async function assembleCalibrationInputPackage(options = {}) {
       });
       if (validated.admissionRecord.fixture_id !== fixture_id || validated.freezeManifest.fixture_id !== fixture_id
           || validated.freezeManifest.fixture_input_digest !== input.rawByteDigest) reject("CALIBRATION_PACKAGE_FIXTURE_MISMATCH", [{ fixture_id }]);
-      if (validated.admissionRecord.admission_status !== "admitted") reject("CALIBRATION_PACKAGE_NOT_ADMITTED", [{ fixture_id }]);
+      if (decision) {
+        if (validated.admissionRecord.admission_status !== "admission_pending"
+            || decision.decision.decision_status !== "admitted"
+            || decision.decision.review_status !== "approved"
+            || decision.decision.author_self_approval !== false
+            || decision.decision.blocking_finding_count !== 0) reject("CALIBRATION_PACKAGE_NOT_ADMITTED", [{ fixture_id }]);
+      } else if (validated.admissionRecord.admission_status !== "admitted") reject("CALIBRATION_PACKAGE_NOT_ADMITTED", [{ fixture_id }]);
+      if (decision) assertNoSymlinkPathSegments(resolve(ROOT, decision.path), "calibration admission overlay");
+      const overlaySource = decision ? readStableJsonFile(resolve(ROOT, decision.path), "calibration admission overlay", MAX_BYTES, { allowEmpty: false }) : null;
+      if (overlaySource && overlaySource.rawByteDigest !== decision.raw_byte_digest) reject("CALIBRATION_PACKAGE_OVERLAY_DRIFT", [{ fixture_id }]);
       return { fixture_id, source_fixture_id, input_manifest_digest: input.rawByteDigest,
-        artifacts: Object.fromEntries(SUCCESSOR_SCORING_INPUT_ROLES.map(role => [role, reference(paths[role])])) };
+        artifacts: Object.fromEntries(SUCCESSOR_SCORING_INPUT_ROLES.map(role => [role, reference(paths[role])])),
+        admission_overlay: decision ? {
+          path: decision.path, raw_digest: decision.raw_byte_digest, bytes: overlaySource.bytes.length,
+          decision_digest: decision.decision.decision_digest, decision_revision: decision.decision.decision_revision,
+        } : null };
     });
     const { validatePublicAdmittedFixtureInvariance } = await import("./ask-benchmark-admitted-fixture-invariance.mjs");
     const invariance = validatePublicAdmittedFixtureInvariance({ root: ROOT, repositoryRevision: implementation.revision });
@@ -242,6 +254,16 @@ export async function assembleCalibrationInputPackage(options = {}) {
     assertUnchanged(before);
     same(sourceSession.assertCurrent(), implementation, "CALIBRATION_PACKAGE_SOURCE_CHANGED");
     same(readSuccessorImplementationIdentity(ROOT), implementation, "CALIBRATION_PACKAGE_SOURCE_CHANGED");
+    for (const { fixture_id, admission_overlay } of fixtures) {
+      const current = resolveRepositoryAdmissionDecision({ root: ROOT, repositoryRevision: implementation.revision, fixtureId: fixture_id });
+      if (admission_overlay === null) {
+        if (current) reject("CALIBRATION_PACKAGE_OVERLAY_DRIFT", [{ fixture_id }]);
+      } else if (!current || current.path !== admission_overlay.path || current.raw_byte_digest !== admission_overlay.raw_digest
+          || current.decision.decision_digest !== admission_overlay.decision_digest
+          || current.decision.decision_revision !== admission_overlay.decision_revision) {
+        reject("CALIBRATION_PACKAGE_OVERLAY_DRIFT", [{ fixture_id }]);
+      }
+    }
     // No destination is created on validation failure. Existing files are not
     // replaced, even with equal-looking or conflicting caller-supplied content.
     same(outputDestination(output), output, "CALIBRATION_PACKAGE_OUTPUT_REJECTED");

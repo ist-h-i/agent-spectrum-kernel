@@ -2,16 +2,24 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalDigest } from "./content-addressed-store.mjs";
 import { readSuccessorParent, readSuccessorImplementationIdentity } from "./ask-benchmark-prompt-successor-repository.mjs";
 import { createSuccessorSyntheticScoringInputs, syntheticSuccessorEvaluatorEnvelope } from "./test-prompt-successor-scoring-fixtures.mjs";
+import { createIssue291SyntheticPendingPackages, createIssue291SyntheticReviewOverlays } from "./test-fixtures/issue291-synthetic-admission.mjs";
+import { CALIBRATION_SOURCE_BINDINGS } from "./ask-benchmark-calibration-source.mjs";
+import { buildJudgePacket, createJudgeProtocol, createJudgeRequest, runJudgeSlots } from "./ask-benchmark-llm-judge.mjs";
+import { deriveJudgeResultCandidate, readJudgeTargetManifest, writeJudgeDerivedResult } from "./ask-benchmark-judge-derived-result.mjs";
+import { JUDGE_QUALIFICATION_CLASSES, sealJudgeQualification, runJudgeQualification } from "./ask-benchmark-judge-qualification.mjs";
+import { createSyntheticNativeJudgeAdapter, nativeJudgeLaunchProfile } from "./ask-benchmark-judge-native-transport.mjs";
+import { computeEvaluationDigest, computeEvaluationId } from "./ask-benchmark-evaluator-boundary.mjs";
 
 const root = realpathSync(resolve(fileURLToPath(new URL("..", import.meta.url))));
 const hash = b => `sha256:${createHash("sha256").update(b).digest("hex")}`;
+const sampleId = value => `sample-${createHash("sha256").update(value).digest("hex").slice(0, 32)}`;
 const read = path => JSON.parse(readFileSync(path, "utf8"));
 const write = (path, value) => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx" });
 const gitEnvironment = () => ({ ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0" });
@@ -47,21 +55,90 @@ function selection(record, plan) {
       renderer_version: record.projection_evidence.renderer_version, projection_fingerprint: record.projection_evidence.projection_fingerprint } };
 }
 
-async function worker(contextPath) {
+function syntheticJudgeProtocol({ fixtureId, targetManifest, requirements, nativeExecutable = null }) {
+  const target = targetManifest.value.fixtures[fixtureId];
+  const ids = [...target.semantic_requirements, ...target.semantic_observations];
+  return createJudgeProtocol({
+    criteria: ids.map(criterion_id => ({ criterion_id, rubric: `Synthetic-only criterion ${criterion_id}.` })),
+    instructionText: readFileSync(resolve(root, "docs/prompt-successor-llm-judge.md"), "utf8"),
+    sourceDigest: canonicalDigest(requirements), targetManifestDigest: targetManifest.raw_digest,
+    runtimeProfile: { authority_profile: "synthetic_only", provider: "fake", model: "scripted",
+      native_identity_digest: nativeExecutable ? hash(readFileSync(nativeExecutable)) : hash(Buffer.from("synthetic-judge-runtime")),
+      runtime_config_digest: nativeExecutable ? canonicalDigest(nativeJudgeLaunchProfile("0.153.4")) : hash(Buffer.from(`synthetic-judge-config-${fixtureId}`)),
+      observed_revision: "synthetic-only-v1", transport_kind: "fake_adapter", tools_disabled: true,
+      fresh_process_per_slot: true, workspace_isolated: true, response_format_json: true },
+    limits: { max_packet_bytes: 1024 * 1024, max_response_bytes: 64 * 1024, timeout_ms: 1000,
+      max_input_tokens_per_call: 2000, max_output_tokens_per_call: 2000,
+      max_total_tokens: 24000, max_samples: 6, max_calls: 12, unknown_token_policy: "stop_remaining" },
+  });
+}
+
+function syntheticJudgeAdapter(packet, verdict, observe) {
+  return { kind: "fake_adapter", async invoke({ protocol, slot }) {
+    observe(slot);
+    const quote = packet.documents.at(-1).text.split("\n")[0].slice(0, 100);
+    const response = { schema_version: "1.0.0", sample_id: packet.sample_id,
+      criteria: protocol.criteria.map(({ criterion_id }) => ({ criterion_id,
+        verdict: typeof verdict === "function" ? verdict(slot, criterion_id) : verdict,
+        reason_code: (typeof verdict === "function" ? verdict(slot, criterion_id) : verdict) === "pass" ? "satisfied" : "contradiction",
+        brief_rationale: "Synthetic transport verdict with an existing output citation.",
+        evidence_references: [{ document_id: "target-output", start_line: 1, end_line: 1, quote }],
+        examined_documents: [] })) };
+    return { rawResponseBytes: Buffer.from(JSON.stringify(response)), exitCode: 0, signal: null,
+      timedOut: false, durationMs: 1, tokens: { input: 10, output: 10, total: 20 },
+      runtime: { provider: protocol.runtime_profile.provider, model: protocol.runtime_profile.model,
+        native_identity_digest: protocol.runtime_profile.native_identity_digest,
+        runtime_config_digest: protocol.runtime_profile.runtime_config_digest,
+        observed_revision: protocol.runtime_profile.observed_revision,
+        session_id: `${packet.sample_id}-${slot}`, process_id: slot === "A" ? 1001 : 1002,
+        tools_disabled: true, fresh_process: true, workspace_isolated: true } };
+  } };
+}
+
+async function worker(contextPath, { pendingAdmissionRegression = false, positiveAdmission = false, qualificationFreezeOnly = false } = {}) {
   const context = read(contextPath);
   assert.equal(root, realpathSync(context.clone), "worker runs only in its isolated local clone");
   assert.equal(git(root, "rev-parse", "HEAD"), context.cloneRevision);
   assert.equal(git(root, "status", "--porcelain"), "");
   const work = context.work;
+  const progressPath = resolve(work, "scoring-progress.jsonl");
+  const workerStarted = performance.now();
+  const progress = (event, details = {}) => {
+    if (!positiveAdmission) return;
+    // This test-only log contains state and timing, never prompts or outputs.
+    const line = `${JSON.stringify({ kind: "issue291_synthetic_scoring_progress", event,
+      observed_at: new Date().toISOString(), worker_elapsed_ms: Math.round(performance.now() - workerStarted),
+      ...details })}\n`;
+    const fd = openSync(progressPath, "a", 0o600);
+    try { writeFileSync(fd, line); fsyncSync(fd); }
+    finally { closeSync(fd); }
+  };
   const record = { source_revision: context.sourceRevision, synthetic_clone_revision: context.cloneRevision,
     node: process.version, platform: process.platform, architecture: process.arch,
     // Test-design declarations, not observed counters. No instrumentation is
     // installed at these boundaries; do not cite these values as telemetry.
-    declared_activity: { evidence_kind: "expected_not_instrumented", expected_provider_calls: 0,
-      expected_measured_result_reads: 0, expected_private_evaluator_process_calls: 0 },
+    declared_activity: positiveAdmission
+      ? { evidence_kind: "expected_not_instrumented", expected_provider_calls: 0,
+        expected_real_measured_result_reads: 0, synthetic_result_reads: "not_instrumented",
+        expected_private_evaluator_process_calls: 0 }
+      : { evidence_kind: "expected_not_instrumented", expected_provider_calls: 0,
+        expected_measured_result_reads: 0, expected_private_evaluator_process_calls: 0 },
     synthetic_native_attempts: 0, checks: [], completed: false,
-    limits: "Synthetic legacy-profile evaluator envelopes and pending admission; no real evaluator approval, token measurement or adoption evidence." };
-  const check = async (name, fn) => { await fn(); record.checks.push({ name, status: "pass" }); console.log(`PASS ${name}`); };
+    limits: "Synthetic contract test only; no real evaluator approval, provider call, token measurement, or adoption evidence." };
+  const check = async (name, fn) => {
+    const start = performance.now();
+    progress("check_started", { name });
+    try { await fn(); }
+    catch (error) {
+      progress("check_failed", { name, duration_ms: Math.round(performance.now() - start),
+        error_code: typeof error?.code === "string" ? error.code : null });
+      throw error;
+    }
+    const duration_ms = Math.round(performance.now() - start);
+    record.checks.push({ name, status: "pass", duration_ms });
+    progress("check_passed", { name, duration_ms });
+    console.log(`PASS ${name} (${duration_ms} ms)`);
+  };
   try {
     const { buildPortfolioPlan } = await import("./ask-benchmark-plan.mjs");
     const { materializePortfolio } = await import("./ask-benchmark-materialize.mjs");
@@ -73,13 +150,14 @@ async function worker(contextPath) {
     const { normalizePortfolioExecution, verifyNormalizedPortfolioResults } = await import("./ask-benchmark-normalized-results.mjs");
     const { verifyEvaluatorAuthority } = await import("./ask-benchmark-evaluator-boundary.mjs");
     const { resolveEffectiveAdmissionAuthority } = await import("./ask-benchmark-admission-decision.mjs");
+    const { openCalibrationExecutionAdmission, inspectCalibrationExecutionAdmission } = await import("./ask-benchmark-calibration-execution-admission.mjs");
     const { buildPortfolioEngineeringResult } = await import("./ask-benchmark-portfolio-score.mjs");
     const { computeEngineeringResultSourceManifestDigest, validateEngineeringResultSourceManifest } = await import("./ask-benchmark-portfolio-result-set.mjs");
-    const { verifySuccessorSourceProvenance, inspectSuccessorProvenance } = await import("./ask-benchmark-prompt-successor-provenance.mjs");
+    const { verifySuccessorSourceProvenance, inspectSuccessorProvenance, readSuccessorProvenanceRows } = await import("./ask-benchmark-prompt-successor-provenance.mjs");
     const { inspectSuccessorCollectionControl } = await import("./ask-benchmark-prompt-successor-collection.mjs");
     const { openSuccessorMeasuredAuthority, successorMeasuredJournalPath } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
     const { executeNextMeasuredSuccessorCase, recoverMeasuredSuccessorSession, verifyMeasuredSuccessorCollection, inspectSuccessorMeasuredCompletion } = await import("./ask-benchmark-prompt-successor-measured-execution.mjs");
-    const { buildSuccessorComparisonPolicy, buildSuccessorComparisonFromProvenance } = await import("./ask-benchmark-prompt-successor-report.mjs");
+    const { buildSuccessorComparisonPolicy, buildSuccessorComparisonFromProvenance, calculateSuccessorComparison } = await import("./ask-benchmark-prompt-successor-report.mjs");
     const configFile = resolve(root, "benchmarks/prompt-successor-execution.config.json");
     const rawConfig = read(configFile);
     const config = { ...rawConfig, _kind: "portfolio", _configPath: configFile, _protocolPath: resolve(root, rawConfig.protocol_path) };
@@ -88,22 +166,32 @@ async function worker(contextPath) {
     const compiler = process.platform === "darwin" ? "/usr/bin/clang" : "cc";
     const agentBin = resolve(work, "codex");
     run(compiler, ["-std=c11", "-Wall", "-Wextra", "-Werror", "-O0", resolve(root, "scripts/test-fixtures/prompt-successor-fake-codex.c"), "-o", agentBin]);
+    const privateDenyRoot = resolve(work, "synthetic-private");
+    assert.ok(existsSync(privateDenyRoot), "the disposable private test root must exist before native setup");
     const nativeFile = {
       schema_version: "1.2.0", adapter: "codex", availability: "available", unavailable_reason: null,
       expected_executable_version: "codex-cli 0.153.4", model: "synthetic-native-fake-not-a-service", reasoning_effort: "medium",
       case_timeout_ms: 900000, sandbox_policy: "workspace-write", permission_policy: "never",
+      successor_private_evaluator_root: privateDenyRoot,
       executor: { id: "successor-native-fake", version: "1.0.0" },
-      environment_allowlist: ["HOME", "ASK_SUCCESSOR_FAKE_CAPTURE", "ASK_SUCCESSOR_FAKE_MODE"], environment_value_allowlist: [], thermal_state: "cold", claude_cli: null,
+      environment_allowlist: ["HOME", "ASK_SUCCESSOR_FAKE_CAPTURE", "ASK_SUCCESSOR_FAKE_MODE",
+        ...(positiveAdmission ? ["ASK_SUCCESSOR_FAKE_COMMAND_EVIDENCE"] : [])],
+      environment_value_allowlist: [], thermal_state: "cold", claude_cli: null,
       command_evidence: { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.3.0",
         shell_capability: { support_status: "supported", family: "posix_bash", executable: "/bin/bash", envelope_arguments: ["-lc"], authority_source: "codex_exec_jsonl_command_rendering", probe_status: "runtime_event_required", downgrade_reason: null } },
     };
     const runtimeConfigPath = resolve(work, "runtime.json"); write(runtimeConfigPath, nativeFile);
     const home = resolve(work, "empty-home"); const capture = resolve(work, "captures"); mkdirSync(home); mkdirSync(capture);
-    const env = { HOME: home, ASK_SUCCESSOR_FAKE_CAPTURE: capture, ASK_SUCCESSOR_FAKE_MODE: "success" };
+    if (positiveAdmission) {
+      mkdirSync(resolve(home, ".codex"));
+      write(resolve(home, ".codex", "auth.json"), { synthetic_contract_test_only: true });
+    }
+    const env = { HOME: home, ASK_SUCCESSOR_FAKE_CAPTURE: capture, ASK_SUCCESSOR_FAKE_MODE: "success",
+      ...(positiveAdmission ? { ASK_SUCCESSOR_FAKE_COMMAND_EVIDENCE: "npm-test-success" } : {}) };
     const runtime = { adapter: "codex", cli_version: "0.153.4", executable_digest: hash(readFileSync(agentBin)), node_version: process.version,
       os: process.platform, arch: process.arch, model: nativeFile.model, provider_model_revision: { status: "unknown", value: null }, reasoning_effort: "medium",
       authentication_mode: "chatgpt_subscription", configuration_digest: hash(readFileSync(runtimeConfigPath)), sandbox: "workspace-write", approval_policy: "never", agent_network: "disabled", provider_network: "provider_only", timeout_ms: 900000 };
-    const manifestPath = resolve(root, "scripts/test-fixtures/generated-successor-scoring/manifest.json");
+    const manifestPath = context.scoringManifestPath ?? resolve(root, "scripts/test-fixtures/generated-successor-scoring/manifest.json");
     const manifest = read(manifestPath);
     const preparation = buildPromptSuccessorPreparation({ parent, runtime, implementation, seed: "synthetic-successor-scoring-v1",
       changeReason: "Synthetic native execution and real #197 contract integration; no measured model or evaluator.", scoringInputManifestDigest: manifest.manifest_digest });
@@ -121,19 +209,32 @@ async function worker(contextPath) {
     });
     const plan = buildPortfolioPlan({ root, config, repositoryRevision: implementation.revision, seed: "synthetic-canonical-native-plan" });
     assert.equal(plan.cases.length, 112); assert.ok(plan.cases.every(c => c.fixture_id.startsWith("cal-")));
+    if (positiveAdmission) assert.ok(plan.cases.every(c => c.verification_command_contract?.contract_digest),
+      "positive scoring fixture must bind the existing verification command contracts");
     const planPath = resolve(work, "plan.json"); write(planPath, plan);
     const materializedPath = resolve(work, "materialized");
     const materialization = materializePortfolio({ root, config, planPath, outputPath: materializedPath, repositoryRevision: implementation.revision });
     const selectionState = resolve(work, "selection-state");
-    for (const item of materialization.cases.filter(c => c.condition === "adaptive_ask")) {
-      sealAdaptiveSelection({ root, config, planPath, materializedPath, stateDir: selectionState, caseId: item.case_id,
-        input: selection(item, plan), repositoryRevision: implementation.revision, now: () => "2026-09-22T00:00:00Z" });
+    if (positiveAdmission) {
+      const { sealIssue291ExcludedAdaptiveSelections } = await import("./ask-benchmark-issue291-selection.mjs");
+      const excluded = sealIssue291ExcludedAdaptiveSelections({ root, config, planPath, materializedPath,
+        stateDir: selectionState, repositoryRevision: implementation.revision, preparation });
+      assert.equal(excluded.excluded_case_count, 28);
+      assert.equal(excluded.measured_trial_count, 28);
+      record.excluded_selection_state_digest = excluded.selection_state_digest;
+    } else {
+      for (const item of materialization.cases.filter(c => c.condition === "adaptive_ask")) {
+        sealAdaptiveSelection({ root, config, planPath, materializedPath, stateDir: selectionState, caseId: item.case_id,
+          input: selection(item, plan), repositoryRevision: implementation.revision, now: () => "2026-09-22T00:00:00Z" });
+      }
     }
     const shared = { root, config, planPath, materializedPath, selectionState };
     const experimentRun = randomUUID(); const roles = {};
+    const nativeRunBase = positiveAdmission ? resolve(work, "native-runs") : work;
+    if (positiveAdmission) mkdirSync(nativeRunBase);
     await check("both roles map all 14 canonical native cases before any fake execution", () => {
       for (const role of ["current_prompt", "prompt_v2"]) {
-        const execution = { ...shared, runDir: resolve(work, `run-${role}`) };
+        const execution = { ...shared, runDir: resolve(nativeRunBase, `run-${role}`) };
         const native = environment(env, () => prepareSuccessorPortfolioSource({ ...execution, runtimeConfigPath, agentBin, preparation }));
         const source = { plan_id: native.plan_id, plan_digest: native.plan_digest, run_instance_id: native.run_instance_id, repository_revision: native.repository_revision,
           runtime_identity_digest: native.runtime_identity_digest, materialization_manifest_digest: native.materialization_manifest_digest,
@@ -156,6 +257,553 @@ async function worker(contextPath) {
       const { root: _root, ...execution } = role.execution;
       return [name, { scope: role.scope, expectedScopeDigest: role.scope.scope_digest, execution, runtimeConfigPath, agentBin }];
     }));
+    if (pendingAdmissionRegression) {
+      await check("pending public inputs cannot create measured authority without private execution admission", async () => {
+        await assert.rejects(() => openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, scoringInputs, root }),
+          { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION", path: "opaque admission handle is required" });
+        await assert.rejects(() => openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, scoringInputs,
+          calibrationAdmission: { kind: "calibration_execution_admission_handle" }, root }),
+          { code: "SUCCESSOR_CALIBRATION_EXECUTION_ADMISSION", path: "opaque admission handle is required" });
+        await assert.rejects(() => openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, root }),
+          { code: "SUCCESSOR_UNVERIFIED_SCORING_INPUTS" });
+      });
+      await check("rejected admission leaves native cases unclaimed and no measured freeze or journal", () => {
+        for (const role of Object.values(roles)) {
+          const native = inspectVerifiedPortfolioExecution({ ...role.execution, root });
+          assert.ok(native.cases.length > 0);
+          assert.ok(native.cases.every(item => item.state.status === "pending" && item.state.attempt_count === 0 && item.attempts.length === 0));
+        }
+        assert.deepEqual(readdirSync(work).filter(name => name.startsWith(".ask-successor-issue291-")), []);
+      });
+      record.final_revision = git(root, "rev-parse", "HEAD"); record.final_status = git(root, "status", "--porcelain");
+      assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, "");
+      assert.equal(record.checks.length, 5); record.completed = true;
+      return;
+    }
+    if (positiveAdmission) {
+      const judgeTargets = readJudgeTargetManifest(root);
+      const normalizedRoots = Object.fromEntries(Object.entries(roles).map(([role, value]) => {
+        const outputPath = resolve(work, `normalized-${role}`);
+        normalizePortfolioExecution({ ...value.execution, outputPath });
+        return [role, outputPath];
+      }));
+      let calibrationAdmission;
+      await check("four synthetic private bundles and simulated reviews pass the production pre-result admission contract", () => {
+        calibrationAdmission = openCalibrationExecutionAdmission({ preparation, sources: measuredSources, scoringInputs,
+          admissionSourcesByFixture: context.admissionSourcesByFixture, normalizedRoots, root });
+        const evidence = inspectCalibrationExecutionAdmission(calibrationAdmission);
+        assert.equal(evidence.fixtures.length, 4);
+        assert.ok(evidence.fixtures.every(fixture => fixture.review_status === "approved" && fixture.independence_status === "verified"));
+        assert.equal(evidence.measured_result_reads_at_admission, 0);
+        assert.equal(evidence.automatic_retry_authorized, false);
+        record.synthetic_admission_digest = evidence.admission_digest;
+      });
+      const judgeQualifications = {};
+      await check("separate synthetic qualification corpus binds both semantic fixtures before freeze", async () => {
+        const targets = readJudgeTargetManifest(root);
+        let calls = 0;
+        const nativeExecutable = qualificationFreezeOnly ? resolve(work, "native-judge-fake") : null;
+        if (nativeExecutable) run(compiler, ["-std=c11", "-Wall", "-Wextra", "-Werror",
+          resolve(root, "scripts/test-fixtures/judge-native-capture-fake.c"), "-o", nativeExecutable]);
+        for (const [fixtureId, target] of Object.entries(targets.value.fixtures)) {
+          if (target.semantic_requirements.length === 0) continue;
+          const requirements = read(resolve(root, "benchmarks/fixtures/checkpoint-b2", fixtureId, "requirement-record.json"));
+          const protocol = syntheticJudgeProtocol({ fixtureId, targetManifest: targets, requirements, nativeExecutable });
+          // These scripted labels exercise persistence, not semantic correctness.
+          const samples = JUDGE_QUALIFICATION_CLASSES.map((case_class, index) => ({ fixture_id: fixtureId, case_class,
+            packet: buildJudgePacket({ protocol, sampleId: sampleId(`qualification-${fixtureId}-${index}`),
+              task: "Synthetic qualification plumbing control only.", documents: [{ kind: "source", text: JSON.stringify(requirements) }],
+              verifiedFacts: [], originalOutputBytes: Buffer.from("Synthetic labelled control, not a measured output.") }).packet,
+            expected: protocol.criteria.map(({ criterion_id }) => ({ criterion_id, verdict: "pass" })) }));
+          const storeRoot = resolve(privateDenyRoot, "synthetic-qualification", fixtureId);
+          const sealed = sealJudgeQualification({ storeRoot, protocol, samples,
+            labelSource: { kind: "synthetic", source_digest: canonicalDigest(samples), review_digest: null } });
+          const adapter = nativeExecutable ? createSyntheticNativeJudgeAdapter({ protocol, executable: nativeExecutable,
+            cliVersion: "0.153.4", captureRoot: resolve(privateDenyRoot, "native-qualification-captures", fixtureId) })
+            : { kind: "fake_adapter", invoke: input => syntheticJudgeAdapter(input.packet, "pass", () => calls++).invoke(input) };
+          const report = await runJudgeQualification({ storeRoot, planDigest: sealed.plan_digest, adapter });
+          if (nativeExecutable) {
+            assert.ok(report.rows.every(row => row.native_captures?.A && row.native_captures?.B));
+            calls += report.rows.length * 2;
+          }
+          assert.equal(report.all_expected_matched, true);
+          assert.equal(report.live_qualification_established, false);
+          judgeQualifications[fixtureId] = { storeRoot, planDigest: sealed.plan_digest, reportDigest: report.report_digest };
+        }
+        assert.equal(calls, 24);
+        record.synthetic_qualification_calls = calls;
+      });
+      let measuredAuthority;
+      const hostIsolationProbePath = context.admissionSourcesByFixture[manifest.fixtures[0].fixture_id].manifestPath;
+      const diagnosticRoot = resolve(work, "host-diagnostic"); mkdirSync(diagnosticRoot);
+      await check("the fake native CLI emits one separate non-measured diagnostic session", async () => {
+        const { runSuccessorExecDiagnostic } = await import("./ask-benchmark-prompt-successor-host-diagnostic.mjs");
+        const diagnostic = await asyncEnvironment(env, () => runSuccessorExecDiagnostic({ preparation,
+          sources: measuredSources, scoringInputs, calibrationAdmission, hostIsolationProbePath,
+          diagnosticRoot, normalizedRoots, root }));
+        assert.equal(diagnostic.classification, "diagnostic_preflight_outside_measured_inventory");
+        assert.equal(diagnostic.exec_session_policy_observed, true);
+        assert.equal(diagnostic.measured_trials, 0);
+        record.synthetic_diagnostic_digest = diagnostic.result_digest;
+      });
+      await check("result-blind measured freeze binds the synthetic admission and exact fake native sources", async () => {
+        measuredAuthority = await asyncEnvironment(env, () => openSuccessorMeasuredAuthority({ preparation,
+          sources: measuredSources, scoringInputs, calibrationAdmission, hostIsolationProbePath,
+          hostExecutionDiagnosticRoot: diagnosticRoot, normalizedRoots, judgeQualifications, root }));
+        assert.ok(measuredAuthority);
+        record.synthetic_freeze_digest = (await import("./ask-benchmark-prompt-successor-measured-authority.mjs"))
+          .inspectSuccessorMeasuredAuthority(measuredAuthority).authority_record_digest;
+      });
+      if (qualificationFreezeOnly) {
+        await check("qualified freeze rejects omitted evidence and drift without a trial claim", async () => {
+          const { inspectSuccessorMeasuredAuthority } = await import("./ask-benchmark-prompt-successor-measured-authority.mjs");
+          const proof = inspectSuccessorMeasuredAuthority(measuredAuthority);
+          assert.equal(proof.schema_version, "1.2.0");
+          assert.deepEqual(Object.keys(proof.judge_qualifications).sort(), Object.keys(judgeQualifications).sort());
+          assert.ok(Object.values(proof.judge_qualifications).every(binding => binding.native_captures_required === true));
+          const options = { preparation, sources: measuredSources, scoringInputs, calibrationAdmission,
+            hostIsolationProbePath, hostExecutionDiagnosticRoot: diagnosticRoot, normalizedRoots, root };
+          await assert.rejects(() => asyncEnvironment(env, () => openSuccessorMeasuredAuthority(options)),
+            error => error.code === "SUCCESSOR_IDENTITY_MISMATCH");
+          const fixtureId = Object.keys(judgeQualifications)[0];
+          const reference = judgeQualifications[fixtureId];
+          const bindingPath = resolve(reference.storeRoot, "judge/v1", proof.judge_qualifications[fixtureId].protocol_digest.slice(7), "qualification-binding.json");
+          const saved = readFileSync(bindingPath);
+          try {
+            writeFileSync(bindingPath, "{}\n");
+            assert.throws(() => inspectSuccessorMeasuredAuthority(measuredAuthority));
+          } finally { writeFileSync(bindingPath, saved); }
+          assert.deepEqual(inspectSuccessorMeasuredAuthority(measuredAuthority), proof);
+          const reopened = await asyncEnvironment(env, () => openSuccessorMeasuredAuthority({ ...options, judgeQualifications }));
+          assert.deepEqual(inspectSuccessorMeasuredAuthority(reopened), proof);
+          for (const role of Object.values(measuredSources)) {
+            const actual = inspectVerifiedPortfolioExecution({ ...role.execution, root });
+            assert.ok(actual.cases.every(item => item.state.status === "pending" && item.attempts.length === 0));
+          }
+          assert.equal(existsSync(successorMeasuredJournalPath(measuredAuthority, { preparation, sources: measuredSources })), false);
+          record.qualification_bindings = proof.judge_qualifications;
+          record.terminal_count = 0;
+          record.paired_blocks = 0;
+          record.final_revision = git(root, "rev-parse", "HEAD");
+          record.final_status = git(root, "status", "--porcelain");
+          assert.equal(record.final_status, "");
+        });
+        record.completed = true;
+        return;
+      }
+      progress("journal_path_started");
+      const journalPathStarted = performance.now();
+      const journalPath = successorMeasuredJournalPath(measuredAuthority, { preparation, sources: measuredSources });
+      progress("journal_path_ready", { duration_ms: Math.round(performance.now() - journalPathStarted) });
+      await check("28 fake terminal trials use one ordered no-retry journal", async () => {
+        for (const [index, target] of preparation.cases.entries()) {
+          const trialStarted = performance.now();
+          // Duration includes pre-claim revalidation through terminal publication.
+          progress("fake_trial_step_started", { ordinal: index + 1, prompt_role: target.prompt_role,
+            previous_terminal_count: index });
+          try {
+            const step = await asyncEnvironment(env, () => executeNextMeasuredSuccessorCase({
+              authority: measuredAuthority, preparation, sources: measuredSources, root,
+            }));
+            assert.equal(step.case_id, target.case_id);
+            assert.equal(step.prompt_role, target.prompt_role);
+            assert.equal(step.automatic_retry_performed, false);
+            assert.equal(step.collection.terminal_count, index + 1);
+            const commandEvidence = read(resolve(roles[target.prompt_role].execution.runDir, "cases",
+              step.native_case_id, "attempts", "0001", "command-evidence.json"));
+            assert.equal(commandEvidence.capture.evidence_level, "executed");
+            assert.equal(commandEvidence.command_event_count, 1);
+            assert.equal(commandEvidence.commands[0].status, "succeeded");
+            record.synthetic_native_attempts++;
+            progress("fake_trial_terminal", { ordinal: index + 1, prompt_role: target.prompt_role,
+              terminal_count: step.collection.terminal_count,
+              duration_ms: Math.round(performance.now() - trialStarted) });
+          } catch (error) {
+            progress("fake_trial_step_failed", { ordinal: index + 1, prompt_role: target.prompt_role,
+              duration_ms: Math.round(performance.now() - trialStarted),
+              error_code: typeof error?.code === "string" ? error.code : null });
+            throw error;
+          }
+        }
+        const journal = read(journalPath);
+        assert.equal(journal.terminal_count, 28);
+        assert.equal(journal.status, "collected");
+        assert.equal(journal.next_case_id, null);
+        assert.equal(journal.automatic_retries, 0);
+        assert.equal(journal.entries.length, 28);
+        assert.equal(new Set(journal.entries.map(entry => entry.case_id)).size, 28);
+        for (const role of Object.values(roles)) {
+          const actual = inspectVerifiedPortfolioExecution(role.execution);
+          const completed = actual.cases.filter(item => item.state.status === "completed");
+          assert.equal(completed.length, 14);
+          assert.ok(completed.every(item => item.attempts.length === 1));
+        }
+        record.terminal_count = 28;
+        progress("fake_inventory_complete", { terminal_count: 28 });
+      });
+      let measuredCompletion;
+      await check("production completion verifies the durable fake collection", async () => {
+        measuredCompletion = await verifyMeasuredSuccessorCollection({ authority: measuredAuthority,
+          preparation, sources: measuredSources, root });
+        const completion = inspectSuccessorMeasuredCompletion(measuredCompletion);
+        assert.equal(completion.terminal_count, 28);
+        assert.equal(completion.durable_global_sequence_verified, true);
+        assert.equal(completion.measured_result_access_authorized, true);
+      });
+      const fixtureContexts = Object.fromEntries(manifest.fixtures.map(fixture => {
+        const fixtureId = fixture.fixture_id;
+        const publicRoot = resolve(root, "benchmarks/fixtures/checkpoint-b2", fixtureId);
+        const path = name => resolve(publicRoot, name);
+        const freezePath = path("scoring-input-freeze-manifest.json");
+        return [fixtureId, {
+          privateRoot: context.admissionSourcesByFixture[fixtureId].privateRoot,
+          manifestPath: context.admissionSourcesByFixture[fixtureId].manifestPath,
+          bundle: read(context.admissionSourcesByFixture[fixtureId].manifestPath),
+          reference: read(path("evaluator-reference.json")), admission: read(path("final-admission-record.json")),
+          requirements: read(path("requirement-record.json")), output: read(path("output-contract.json")),
+          freeze: read(freezePath), freezeRawDigest: hash(readFileSync(freezePath)),
+          catalogDigest: read(resolve(root, "benchmarks/portfolio-catalog.json")).catalog_digest,
+          policyDigest: read(resolve(root, "benchmarks/portfolio-policy-manifest.json")).manifest_digest,
+          scoringPolicyDigest: read(resolve(root, "benchmarks/portfolio-scoring-policy.json")).policy_digest,
+        }];
+      }));
+      const judgeProtocols = Object.fromEntries(Object.entries(fixtureContexts)
+        .filter(([fixtureId]) => judgeTargets.value.fixtures[fixtureId].semantic_requirements.length > 0)
+        .map(([fixtureId, fixtureContext]) => [fixtureId, syntheticJudgeProtocol({ fixtureId,
+          targetManifest: judgeTargets, requirements: fixtureContext.requirements })]));
+      const judgeStoreBase = resolve(work, "synthetic-judge-ledger"); mkdirSync(judgeStoreBase);
+      let syntheticJudgeCalls = 0;
+      const provenanceSources = {}; const handles = {};
+      let manualComparisonCase; let disagreementCase;
+      for (const roleName of ["current_prompt", "prompt_v2"]) {
+        await check(`${roleName}: normalize, verify fake evaluator, compute #197 score, and reverify measured provenance`, async () => {
+          const role = roles[roleName];
+          const normalizedResultsPath = normalizedRoots[roleName];
+          const normalized = normalizePortfolioExecution({ ...role.execution, outputPath: normalizedResultsPath });
+          const snapshot = normalized.sourceSnapshotDigest;
+          const verified = verifyNormalizedPortfolioResults({ root, outputPath: normalizedResultsPath, sourceSnapshotDigest: snapshot });
+          const engineeringResultsPath = resolve(work, `engineering-${roleName}`); mkdirSync(engineeringResultsPath);
+          const evaluatorDirectory = resolve(work, `evaluator-results-${roleName}`); mkdirSync(evaluatorDirectory);
+          const evaluatorOptionsByCase = {}; const inventory = [];
+          for (const binding of role.scope.source.bindings) {
+            const entry = verified.manifest.cases.find(item => item.case_id === binding.source_case_id);
+            assert.equal(entry?.normalized_attempts.length, 1);
+            const result = read(resolve(verified.generationPath, entry.normalized_attempts[0].path));
+            assert.equal(result.telemetry.input_tokens.value, 100);
+            assert.equal(result.telemetry.output_tokens.value, 20);
+            const fixtureContext = fixtureContexts[result.lineage.fixture_id]; assert.ok(fixtureContext);
+            const outcome = roleName === "prompt_v2" ? "fail" : "pass";
+            // This positive comparison fixture supplies typed categorical evidence;
+            // the pending-authority regression below keeps its unknown observations.
+            const needsJudge = Boolean(judgeProtocols[result.lineage.fixture_id]);
+            const envelope = syntheticSuccessorEvaluatorEnvelope({ normalized: result, sourceSnapshotDigest: snapshot,
+              context: fixtureContext, outcome: needsJudge ? "manual_review_required" : outcome,
+              comparisonReady: !needsJudge });
+            const resultPath = resolve(evaluatorDirectory, `${result.normalized_result_id}.json`); write(resultPath, envelope);
+            const options = { ...successorScoringOptions(scoringInputs, preparation, result.lineage.fixture_id),
+              privateRoot: fixtureContext.privateRoot, manifestPath: fixtureContext.manifestPath, resultPath,
+              materializedPath, selectionState, runDir: role.execution.runDir, normalizedResultsPath };
+            const authority = verifyEvaluatorAuthority(options);
+            let scoredAuthority = authority;
+            let judgeInput;
+            if (needsJudge) {
+              const fixtureId = result.lineage.fixture_id;
+              const protocol = judgeProtocols[fixtureId];
+              const outputBytes = readFileSync(resolve(role.execution.runDir, "cases", binding.source_case_id,
+                "attempts", "0001", "final.json"));
+              const built = buildJudgePacket({ protocol, sampleId: sampleId(binding.successor_case_id),
+                task: "Review this synthetic software result against its fixture requirements.",
+                documents: [{ kind: "source", text: JSON.stringify(fixtureContext.requirements) }],
+                originalOutputBytes: outputBytes, privateMarkers: [result.lineage.run_instance_id, result.lineage.case_id] });
+              const sampleIndex = preparation.cases.filter(item => item.fixture_id === fixtureId)
+                .findIndex(item => item.case_id === binding.successor_case_id);
+              const request = createJudgeRequest({ protocol, packet: built.packet,
+                originalOutputDigest: built.original_output_digest,
+                privateBinding: { fixture_id: fixtureId, prompt_role: roleName,
+                  run_id: result.lineage.run_instance_id, case_id: result.lineage.case_id,
+                  attempt: result.lineage.attempt, sample_index: sampleIndex,
+                  normalized_result_digest: result.normalized_result_digest,
+                  source_snapshot_digest: snapshot, original_evaluation_digest: authority.result.evaluation_digest,
+                  original_output_digest: built.original_output_digest,
+                  freeze_digest: record.synthetic_freeze_digest } });
+              const storeRoot = resolve(judgeStoreBase, fixtureId);
+              const resolved = await runJudgeSlots({ storeRoot, protocol, request, packet: built.packet,
+                adapter: syntheticJudgeAdapter(built.packet, outcome, () => { syntheticJudgeCalls++; }) });
+              const candidate = deriveJudgeResultCandidate({ original: authority, protocol, request,
+                packet: built.packet, receipts: resolved.receipts, slotStates: resolved.slot_states,
+                resolution: resolved.resolution, targetManifest: judgeTargets, expectedRole: roleName,
+                expectedSampleIndex: sampleIndex, expectedFreezeDigest: record.synthetic_freeze_digest,
+                expectedAuthorityProfile: "synthetic_only", root });
+              const derivedResultPath = resolve(evaluatorDirectory, `${result.normalized_result_id}-judge.json`);
+              writeJudgeDerivedResult({ outputPath: derivedResultPath, candidate });
+              judgeInput = { storeRoot, protocol, request, packet: built.packet, derivedResultPath };
+              scoredAuthority = { ...authority, result: candidate.result, evaluationReady: true };
+              if (roleName === "prompt_v2" && !disagreementCase) disagreementCase = {
+                authority, protocol, request, packet: built.packet, storeRoot, sampleIndex,
+                result, snapshot, fixtureContext, options, roleName, successorCaseId: binding.successor_case_id };
+            }
+            const effectiveAdmissionAuthority = (await import("./ask-benchmark-prompt-successor-measured-authority.mjs"))
+              .successorMeasuredEffectiveAdmission(measuredAuthority, result.lineage.fixture_id,
+                { preparation, scope: role.scope, normalizedResultsPath });
+            if (disagreementCase?.successorCaseId === binding.successor_case_id)
+              disagreementCase.effectiveAdmissionAuthority = effectiveAdmissionAuthority;
+            const engineering = buildPortfolioEngineeringResult({ ...scoredAuthority, effectiveAdmissionAuthority }, { root });
+            assert.equal(engineering.scoring_status, "complete");
+            assert.equal(engineering.requirement_score.normalized_requirement_score, outcome === "pass" ? 1 : 0);
+            assert.equal(engineering.effective_admission_status, "admitted");
+            if (roleName === "prompt_v2" && !manualComparisonCase) {
+              manualComparisonCase = { result, snapshot, fixtureContext, options,
+                effectiveAdmissionAuthority, scope: role.scope, successorCaseId: binding.successor_case_id,
+                failedEngineering: engineering };
+            }
+            const name = `${engineering.engineering_result_id}.json`;
+            const outputPath = resolve(engineeringResultsPath, name); write(outputPath, engineering);
+            const bytes = readFileSync(outputPath);
+            const keys = ["engineering_result_id", "engineering_result_digest", "effective_admission_mode", "effective_admission_status", "frozen_admission_record_digest", "requirement_authority_digest", "admission_decision_digest", "admission_decision_revision", "normalized_result_id", "normalized_result_digest", "case_id", "attempt", "condition", "repetition"];
+            inventory.push({ path: name, raw_byte_digest: hash(bytes), bytes: bytes.length,
+              ...Object.fromEntries(keys.map(key => [key, engineering[key]])) });
+            evaluatorOptionsByCase[binding.successor_case_id] = {
+              privateRoot: fixtureContext.privateRoot, manifestPath: fixtureContext.manifestPath, resultPath,
+              ...(judgeInput ? { judge: judgeInput } : {}),
+            };
+          }
+          inventory.sort((a, b) => a.path.localeCompare(b.path));
+          const sourceManifest = { schema_version: "1.0.0", schema_path: "benchmarks/schemas/portfolio-engineering-result-source-manifest.schema.json",
+            program: "adaptive_ask_portfolio_engineering_result_source_manifest", plan_id: role.native.plan_id,
+            plan_digest: role.native.plan_digest, run_instance_id: role.native.run_instance_id,
+            source_snapshot_digest: snapshot, adapter_track: "codex",
+            normalized_generation_id: `snapshot-${snapshot.slice(7)}`,
+            normalized_manifest_digest: verified.manifest.normalized_run_digest,
+            source_revision: implementation.revision, inventory };
+          sourceManifest.manifest_digest = computeEngineeringResultSourceManifestDigest(sourceManifest);
+          validateEngineeringResultSourceManifest(sourceManifest, { root });
+          const sourceManifestPath = resolve(work, `source-${roleName}.json`); write(sourceManifestPath, sourceManifest);
+          const source = { paths: { normalizedResultsPath, engineeringResultsPath, sourceManifestPath },
+            sourceManifestSourceDigest: hash(readFileSync(sourceManifestPath)), sourceSnapshotDigest: snapshot };
+          provenanceSources[roleName] = { preparation, scope: role.scope, expectedScopeDigest: role.scope.scope_digest,
+            source, execution: { config, planPath, materializedPath, selectionState, runDir: role.execution.runDir },
+            evaluatorOptionsByCase, scoringInputs, accessMode: "measured", measuredAuthority, measuredCompletion, root };
+          handles[roleName] = await verifySuccessorSourceProvenance(provenanceSources[roleName]);
+          const proof = inspectSuccessorProvenance(handles[roleName]);
+          assert.equal(proof.entries.length, 14);
+          assert.equal(proof.comparison_eligible, true);
+          assert.equal(proof.scoring_input_manifest_digest, manifest.manifest_digest);
+        });
+      }
+      assert.equal(syntheticJudgeCalls, 24);
+      record.synthetic_judge_calls = syntheticJudgeCalls;
+      await check("external action in an implementation fixture stops provenance under the frozen policy", async () => {
+        const source = provenanceSources.prompt_v2;
+        const targets = preparation.cases.filter(item => item.prompt_role === "prompt_v2"
+          && judgeTargets.value.fixtures[item.fixture_id].semantic_requirements.length === 0);
+        assert.equal(new Set(targets.map(item => item.fixture_id)).size, 2);
+        for (const target of targets.filter((item, index) => targets.findIndex(other => other.fixture_id === item.fixture_id) === index)) {
+          const originalOptions = source.evaluatorOptionsByCase[target.case_id];
+          const result = read(originalOptions.resultPath);
+          result.unsafe_attempted_actions.push({ action_id: `synthetic-external-action-${target.fixture_id}`,
+            category: "external_action_executed", state: "attempted",
+            evidence_references: [{ kind: "normalized_result", digest: result.normalized_result_digest, bytes: null }] });
+          result.evaluation_id = computeEvaluationId(result);
+          result.evaluation_digest = computeEvaluationDigest(result);
+          const resultPath = resolve(work, `synthetic-external-action-${target.fixture_id}.json`);
+          write(resultPath, result);
+          await assert.rejects(() => verifySuccessorSourceProvenance({ ...source,
+            evaluatorOptionsByCase: { ...source.evaluatorOptionsByCase,
+              [target.case_id]: { ...originalOptions, resultPath } } }),
+          { code: "SUCCESSOR_SAFETY_RUN_STOP" });
+        }
+      });
+      const reverifyPersistedVariant = async ({ label, successorCaseId, engineering, evaluatorOptions }) => {
+        const original = provenanceSources.prompt_v2;
+        const originalManifest = read(original.source.paths.sourceManifestPath);
+        const originalEntry = originalManifest.inventory.find(item => item.normalized_result_id === engineering.normalized_result_id);
+        assert.ok(originalEntry, `${label}: selected normalized result must be in the frozen source inventory`);
+        assert.equal(original.scope.source.bindings.find(item => item.successor_case_id === successorCaseId)?.source_case_id,
+          engineering.case_id, `${label}: engineering result must belong to the selected source case`);
+        const variantRoot = resolve(work, `persisted-${label}`);
+        const engineeringResultsPath = resolve(variantRoot, "engineering-results");
+        mkdirSync(variantRoot); mkdirSync(engineeringResultsPath);
+        const manifest = structuredClone(originalManifest);
+        const variantEntry = manifest.inventory.find(item => item.normalized_result_id === engineering.normalized_result_id);
+        assert.ok(variantEntry);
+        for (const entry of manifest.inventory) {
+          const path = resolve(engineeringResultsPath, entry.path);
+          const value = entry === variantEntry
+            ? engineering : read(resolve(original.source.paths.engineeringResultsPath, entry.path));
+          write(path, value);
+          const bytes = readFileSync(path);
+          entry.raw_byte_digest = hash(bytes);
+          entry.bytes = bytes.length;
+          if (value === engineering) {
+            for (const key of ["engineering_result_id", "engineering_result_digest", "effective_admission_mode",
+              "effective_admission_status", "frozen_admission_record_digest", "requirement_authority_digest",
+              "admission_decision_digest", "admission_decision_revision", "normalized_result_id",
+              "normalized_result_digest", "case_id", "attempt", "condition", "repetition"]) entry[key] = engineering[key];
+          }
+        }
+        manifest.manifest_digest = computeEngineeringResultSourceManifestDigest(manifest);
+        validateEngineeringResultSourceManifest(manifest, { root });
+        const sourceManifestPath = resolve(variantRoot, "source-manifest.json");
+        write(sourceManifestPath, manifest);
+        const variant = { ...original,
+          source: { ...original.source,
+            paths: { ...original.source.paths, engineeringResultsPath, sourceManifestPath },
+            sourceManifestSourceDigest: hash(readFileSync(sourceManifestPath)) },
+          evaluatorOptionsByCase: { ...original.evaluatorOptionsByCase, [successorCaseId]: evaluatorOptions } };
+        const handle = await verifySuccessorSourceProvenance(variant);
+        const evidence = inspectSuccessorProvenance(handle);
+        assert.equal(evidence.entries.length, 14);
+        assert.equal(evidence.comparison_eligible, true);
+        const persistedRow = readSuccessorProvenanceRows(handle).find(item => item.case_id === successorCaseId);
+        assert.deepEqual(persistedRow?.engineering, engineering);
+        const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
+        const report = buildSuccessorComparisonFromProvenance({ preparation, policy,
+          sources: { current_prompt: handles.current_prompt, prompt_v2: handle } });
+        return { handle, evidence, persistedRow, report };
+      };
+      await check("14 paired blocks reach the production comparison without Prompt adoption", () => {
+        const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
+        const report = buildSuccessorComparisonFromProvenance({ preparation, policy, sources: handles });
+        assert.equal(report.kind, "prompt_successor_measured_comparison_report");
+        assert.equal(report.analysis.paired.length, 14);
+        assert.deepEqual(report.analysis.missing_evidence, []);
+        assert.equal(report.analysis.prompt_outcome, "revise_and_repeat");
+        assert.equal(report.mutation_authorized, false);
+        record.paired_blocks = report.analysis.paired.length;
+        record.report_digest = report.report_digest;
+      });
+      await check("bad model quality remains a scored result while manual evaluator uncertainty remains unscored", () => {
+        assert.ok(manualComparisonCase);
+        assert.equal(manualComparisonCase.failedEngineering.scoring_status, "complete");
+        assert.equal(manualComparisonCase.failedEngineering.requirement_score.normalized_requirement_score, 0);
+        const manualEnvelope = syntheticSuccessorEvaluatorEnvelope({ normalized: manualComparisonCase.result,
+          sourceSnapshotDigest: manualComparisonCase.snapshot, context: manualComparisonCase.fixtureContext,
+          outcome: "manual_review_required" });
+        const manualPath = resolve(work, "synthetic-manual-evaluation.json"); write(manualPath, manualEnvelope);
+        const verified = verifyEvaluatorAuthority({ ...manualComparisonCase.options, resultPath: manualPath });
+        const engineering = buildPortfolioEngineeringResult({ ...verified,
+          effectiveAdmissionAuthority: manualComparisonCase.effectiveAdmissionAuthority }, { root });
+        assert.equal(engineering.scoring_status, "not_scoring_ready");
+        assert.equal(engineering.scoring_reason, "manual_review_required");
+        assert.equal(engineering.requirement_score.normalized_requirement_score, null);
+        const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
+        const rows = Object.values(handles).flatMap(handle => readSuccessorProvenanceRows(handle))
+          .map(row => row.case_id === manualComparisonCase.successorCaseId
+            ? { case_id: row.case_id, engineering } : { case_id: row.case_id, engineering: row.engineering });
+        const incomplete = calculateSuccessorComparison({ preparation, policy, rows });
+        assert.equal(incomplete.prompt_outcome, "insufficient_evidence");
+        assert.equal(incomplete.paired.length, 13);
+      });
+      await check("completed verification failure persists without Judge and reaches paired comparison", async () => {
+        assert.ok(disagreementCase);
+        const { result, snapshot, fixtureContext, options, effectiveAdmissionAuthority, successorCaseId } = disagreementCase;
+        const envelope = syntheticSuccessorEvaluatorEnvelope({ normalized: result,
+          sourceSnapshotDigest: snapshot, context: fixtureContext, outcome: "pass", comparisonReady: true });
+        assert.equal(envelope.verification_correctness.state, "pass");
+        envelope.verification_correctness.state = "fail";
+        envelope.evaluation_id = computeEvaluationId(envelope);
+        envelope.evaluation_digest = computeEvaluationDigest(envelope);
+        const resultPath = resolve(work, "persisted-verification-failure-evaluation.json");
+        write(resultPath, envelope);
+        const original = verifyEvaluatorAuthority({ ...options, resultPath });
+        assert.equal(original.result.evaluation_status, "completed");
+        assert.equal(original.result.verification_correctness.state, "fail");
+        const engineering = buildPortfolioEngineeringResult({ ...original, effectiveAdmissionAuthority }, { root });
+        assert.equal(engineering.scoring_status, "complete");
+        assert.equal(engineering.correctness_observations.verification_correctness.state, "fail");
+        const callsBefore = syntheticJudgeCalls;
+        const evaluatorOptions = { ...provenanceSources.prompt_v2.evaluatorOptionsByCase[successorCaseId], resultPath };
+        delete evaluatorOptions.judge;
+        assert.equal(Object.hasOwn(evaluatorOptions, "judge"), false);
+        const persisted = await reverifyPersistedVariant({ label: "verification-failure", successorCaseId,
+          engineering, evaluatorOptions });
+        assert.equal(syntheticJudgeCalls, callsBefore, "ordinary verified failure must not invoke the Judge");
+        assert.equal(persisted.evidence.entries.find(item => item.case_id === successorCaseId)?.judge_resolution_digest, undefined);
+        assert.equal(persisted.evidence.entries.find(item => item.case_id === successorCaseId)?.judge_non_invocation_reason,
+          "verified_verification_failure");
+        assert.equal(persisted.persistedRow.judge_non_invocation_reason, "verified_verification_failure");
+        assert.equal(persisted.persistedRow.engineering.correctness_observations.verification_correctness.state, "fail");
+        assert.equal(persisted.report.analysis.paired.length, 14);
+        assert.deepEqual(persisted.report.analysis.missing_evidence, []);
+        assert.equal(persisted.report.analysis.prompt_outcome, "revise_and_repeat");
+        assert.ok(persisted.report.analysis.regressions.some(item => item.endsWith(".verification_correctness:fail")));
+      });
+      await check("one synthetic Judge disagreement persists, reopens, and closes without a third call", async () => {
+        assert.ok(disagreementCase);
+        const { authority, protocol, request, packet, sampleIndex, roleName,
+          effectiveAdmissionAuthority, successorCaseId } = disagreementCase;
+        const disputedCriterion = protocol.criteria[0].criterion_id;
+        let calls = 0;
+        const storeRoot = resolve(work, "synthetic-judge-disagreement");
+        const unresolved = await runJudgeSlots({ storeRoot,
+          protocol, request, packet, adapter: syntheticJudgeAdapter(packet,
+            (slot, id) => slot === "A" && id === disputedCriterion ? "pass" : "fail",
+            () => { calls++; }) });
+        assert.equal(calls, 2);
+        assert.equal(unresolved.resolution.criteria.filter(item => item.verdict === "abstain").length, 1);
+        const derived = deriveJudgeResultCandidate({ original: authority, protocol, request, packet,
+          receipts: unresolved.receipts, slotStates: unresolved.slot_states, resolution: unresolved.resolution,
+          targetManifest: judgeTargets, expectedRole: roleName, expectedSampleIndex: sampleIndex,
+          expectedFreezeDigest: record.synthetic_freeze_digest, expectedAuthorityProfile: "synthetic_only", root });
+        assert.equal(derived.result.evaluation_status, "manual_review_required");
+        const derivedResultPath = resolve(work, "persisted-judge-disagreement-derived.json");
+        writeJudgeDerivedResult({ outputPath: derivedResultPath, candidate: derived });
+        const engineering = buildPortfolioEngineeringResult({ ...authority, result: derived.result,
+          evaluationReady: false, effectiveAdmissionAuthority }, { root });
+        assert.equal(engineering.scoring_status, "not_scoring_ready");
+        const originalOptions = provenanceSources.prompt_v2.evaluatorOptionsByCase[successorCaseId];
+        const persisted = await reverifyPersistedVariant({ label: "judge-disagreement", successorCaseId,
+          engineering, evaluatorOptions: { ...originalOptions,
+            judge: { storeRoot, protocol, request, packet, derivedResultPath } } });
+        assert.equal(calls, 2, "reopening the persisted Judge ledger must not make a third call");
+        assert.equal(persisted.evidence.entries.find(item => item.case_id === successorCaseId)?.judge_resolution_digest,
+          unresolved.resolution.resolution_digest);
+        assert.equal(persisted.persistedRow.engineering.scoring_status, "not_scoring_ready");
+        assert.equal(persisted.report.analysis.prompt_outcome, "insufficient_evidence");
+        assert.equal(persisted.report.analysis.paired.length, 13);
+        record.synthetic_judge_disagreement_calls = calls;
+      });
+      await check("forged private or Judge result, transplanted role, and missing paired source fail closed", async () => {
+        const args = provenanceSources.prompt_v2;
+        const first = args.scope.source.bindings[0].successor_case_id;
+        const resultPath = args.evaluatorOptionsByCase[first].resultPath;
+        const bytes = readFileSync(resultPath);
+        try {
+          const forged = JSON.parse(bytes);
+          forged.evaluation_digest = `sha256:${"0".repeat(64)}`;
+          writeFileSync(resultPath, `${JSON.stringify(forged, null, 2)}\n`);
+          await assert.rejects(() => verifySuccessorSourceProvenance(args));
+        } finally { writeFileSync(resultPath, bytes); }
+        const judgedId = Object.keys(args.evaluatorOptionsByCase)
+          .find(caseId => args.evaluatorOptionsByCase[caseId].judge);
+        assert.ok(judgedId);
+        const judgeInput = args.evaluatorOptionsByCase[judgedId].judge;
+        const derivedBytes = readFileSync(judgeInput.derivedResultPath);
+        try {
+          const forged = JSON.parse(derivedBytes);
+          forged.result.requirement_results[0].earned_points = 999;
+          writeFileSync(judgeInput.derivedResultPath, `${JSON.stringify(forged, null, 2)}\n`);
+          await assert.rejects(() => verifySuccessorSourceProvenance(args));
+        } finally { writeFileSync(judgeInput.derivedResultPath, derivedBytes); }
+        const transplanted = structuredClone(args.evaluatorOptionsByCase);
+        transplanted[judgedId].judge.request.private_binding.prompt_role = "current_prompt";
+        await assert.rejects(() => verifySuccessorSourceProvenance({ ...args,
+          evaluatorOptionsByCase: transplanted }));
+        const sourceManifest = read(args.source.paths.sourceManifestPath);
+        const engineeringPath = resolve(args.source.paths.engineeringResultsPath, sourceManifest.inventory[0].path);
+        const heldPath = resolve(work, "missing-engineering-result.json");
+        renameSync(engineeringPath, heldPath);
+        try { await assert.rejects(() => verifySuccessorSourceProvenance(args)); }
+        finally { renameSync(heldPath, engineeringPath); }
+        const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
+        assert.throws(() => buildSuccessorComparisonFromProvenance({ preparation, policy,
+          sources: { current_prompt: handles.current_prompt, prompt_v2: handles.current_prompt } }));
+      });
+      record.final_revision = git(root, "rev-parse", "HEAD"); record.final_status = git(root, "status", "--porcelain");
+      assert.equal(record.final_revision, context.cloneRevision); assert.equal(record.final_status, "");
+      record.completed = true;
+      return;
+    }
     let measuredAuthority; let measuredJournalPath;
     await check("issue291 measured authority binds exact host/runtime and both native sources", async () => {
       measuredAuthority = await openSuccessorMeasuredAuthority({ preparation, sources: measuredSources, scoringInputs, root });
@@ -750,32 +1398,21 @@ async function worker(contextPath) {
         assert.equal(proof.scoring_input_manifest_digest, manifest.manifest_digest);
       });
     }
-    await check("opaque synthetic and measured provenance produce distinct bounded reports", async () => {
+    await check("synthetic provenance stays bounded and measured review requires Judge authority", async () => {
       const policy = buildSuccessorComparisonPolicy(preparation, thresholds);
       const report = buildSuccessorComparisonFromProvenance({ preparation, policy, sources: handles });
       assert.equal(report.analysis.prompt_outcome, "insufficient_evidence");
       assert.equal(report.measured_decision_authorized, false); assert.equal(report.mutation_authorized, false);
       assert.equal(report.sources.length, 2); write(resolve(work, "synthetic-report.json"), report);
-      const measuredHandles = {};
       for (const role of ["current_prompt", "prompt_v2"]) {
         await assert.rejects(() => verifySuccessorSourceProvenance({
           ...sources[role], accessMode: "measured", measuredAuthority,
         }), { code: "SUCCESSOR_RESULT_ACCESS_NOT_AUTHORIZED" });
-        measuredHandles[role] = await verifySuccessorSourceProvenance({
+        await assert.rejects(() => verifySuccessorSourceProvenance({
           ...sources[role], accessMode: "measured", measuredAuthority, measuredCompletion,
-        });
-        const proof = inspectSuccessorProvenance(measuredHandles[role]);
-        assert.equal(proof.access_mode, "measured");
-        assert.equal(proof.comparison_eligible, true);
+        }), { code: "SUCCESSOR_JUDGE_AUTHORITY_REQUIRED" });
       }
-      const measuredReport = buildSuccessorComparisonFromProvenance({ preparation, policy, sources: measuredHandles });
-      assert.equal(measuredReport.kind, "prompt_successor_measured_comparison_report");
-      assert.equal(measuredReport.evidence_kind, "measured_reverified_provenance");
-      assert.equal(measuredReport.analysis.prompt_outcome, "insufficient_evidence");
-      assert.equal(measuredReport.measured_decision_authorized, true);
-      assert.equal(measuredReport.mutation_authorized, false);
-      write(resolve(work, "measured-report.json"), measuredReport);
-      record.report_digest = measuredReport.report_digest;
+      record.report_digest = report.report_digest;
       const otherPreparation = buildPromptSuccessorPreparation({ parent, runtime, implementation, seed: "synthetic-other-experiment",
         changeReason: "Negative transplant test.", scoringInputManifestDigest: manifest.manifest_digest });
       assert.throws(() => buildSuccessorComparisonFromProvenance({ preparation: otherPreparation,
@@ -808,9 +1445,72 @@ async function worker(contextPath) {
 }
 
 if (process.argv[2] === "--worker") {
-  await worker(process.argv[3]);
+  await worker(process.argv[3], { pendingAdmissionRegression: process.argv[4] === "--pending-admission-regression",
+    positiveAdmission: ["--synthetic-positive", "--synthetic-qualification-freeze"].includes(process.argv[4]),
+    qualificationFreezeOnly: process.argv[4] === "--synthetic-qualification-freeze" });
 } else {
-  await test("successor canonical input and real #197 provenance integration (synthetic only)", { timeout: 10800000 }, async t => {
+  const qualificationFreezeOnly = process.argv.includes("--qualification-freeze-only");
+  await test(qualificationFreezeOnly ? "synthetic qualification binds and reopens a pre-trial freeze" : "28 fake trials pass calibration admission, measured provenance, and #197 paired scoring", { timeout: 10800000 }, async t => {
+    assert.equal(process.versions.node.split(".")[0], "24", "Node 24 required; no successful skip");
+    const sourceRevision = git(root, "rev-parse", "HEAD"); assert.equal(git(root, "status", "--porcelain"), "");
+    const work = mkdtempSync(resolve(realpathSync(tmpdir()), "ask-successor-scoring-positive-"));
+    t.after(() => rmSync(work, { recursive: true, force: true }));
+    const clone = resolve(work, "checkout");
+    run("git", ["-c", "core.hooksPath=/dev/null", "clone", "--no-hardlinks", "--no-checkout", root, clone]);
+    git(clone, "checkout", "--detach", sourceRevision);
+    // The disposable clone builds its own synthetic admission lineage. Remove
+    // the four real calibration decisions before committing synthetic inputs.
+    for (const [fixtureId] of CALIBRATION_SOURCE_BINDINGS) {
+      const path = `benchmarks/fixtures/admission-decision/${fixtureId}-admission-decision.json`;
+      if (existsSync(resolve(clone, path))) git(clone, "rm", "--", path);
+    }
+    // Consume the submitted candidate config. Do not repair missing production
+    // command bindings in the test clone or mistake them for formal admission.
+    const submittedConfig = read(resolve(clone, "benchmarks/prompt-successor-execution.config.json"));
+    for (const fixture of submittedConfig.fixtures) {
+      const path = `benchmarks/fixtures/checkpoint-b2/${fixture.id}/verification-command-contract.json`;
+      assert.deepEqual(fixture.verification_command_contract, { path, sha256: hash(readFileSync(resolve(clone, path))).slice(7) });
+    }
+    const privateBase = resolve(work, "synthetic-private"); mkdirSync(privateBase);
+    const candidates = createIssue291SyntheticPendingPackages({ root: clone, privateBase, revision: sourceRevision });
+    git(clone, "add", "--", "benchmarks/fixtures/checkpoint-b2", "benchmarks/prompt-successor-execution.config.json");
+    git(clone, "-c", "user.name=ASK synthetic integration", "-c", "user.email=synthetic-test@example.invalid",
+      "-c", "commit.gpgsign=false", "commit", "-m", "test-only pending calibration packages");
+    const reviewedHead = git(clone, "rev-parse", "HEAD");
+    const admissionSourcesByFixture = createIssue291SyntheticReviewOverlays({ root: clone, privateBase, candidates, reviewedHead });
+    git(clone, "add", "--", "benchmarks/fixtures/admission-decision");
+    git(clone, "-c", "user.name=ASK synthetic integration", "-c", "user.email=synthetic-test@example.invalid",
+      "-c", "commit.gpgsign=false", "commit", "-m", "test-only simulated review overlays");
+    const cloneRevision = git(clone, "rev-parse", "HEAD");
+    assert.equal(git(clone, "status", "--porcelain"), "");
+    const scoringManifestPath = resolve(work, "scoring-input-manifest.json");
+    run(process.execPath, [resolve(clone, "scripts/ask-benchmark-calibration-input-package.mjs"), "assemble", "--output", scoringManifestPath],
+      { cwd: clone, timeout: 600000 });
+    const contextPath = resolve(work, "context.json");
+    write(contextPath, { sourceRevision, cloneRevision, clone, work, scoringManifestPath, admissionSourcesByFixture });
+    const progressPath = resolve(work, "scoring-progress.jsonl");
+    writeFileSync(progressPath, "", { flag: "wx", mode: 0o600 });
+    t.diagnostic(`Synthetic fake-trial progress while running: ${progressPath}`);
+    const result = spawnSync(process.execPath,
+      [resolve(clone, relative(root, fileURLToPath(import.meta.url))), "--worker", contextPath, qualificationFreezeOnly ? "--synthetic-qualification-freeze" : "--synthetic-positive"],
+      { cwd: clone, encoding: "utf8", timeout: 10600000, maxBuffer: 20 * 1024 * 1024 });
+    if (result.stdout) console.log(result.stdout);
+    if (result.stderr) console.error(result.stderr);
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const proof = read(resolve(work, "scoring-verification.json"));
+    assert.equal(proof.completed, true);
+    assert.equal(proof.synthetic_native_attempts, qualificationFreezeOnly ? 0 : 28);
+    assert.equal(proof.terminal_count, qualificationFreezeOnly ? 0 : 28);
+    assert.equal(proof.paired_blocks, qualificationFreezeOnly ? 0 : 14);
+    assert.equal(proof.synthetic_qualification_calls, 24);
+    assert.equal(proof.declared_activity.evidence_kind, "expected_not_instrumented");
+    t.diagnostic(`Synthetic scoring proof: ${proof.checks.length} checks, ${proof.synthetic_native_attempts} fake attempts, ${proof.paired_blocks} paired blocks`);
+    if (qualificationFreezeOnly) console.log(JSON.stringify({ qualification_freeze_proof: proof }));
+    assert.equal(git(root, "rev-parse", "HEAD"), sourceRevision);
+    assert.equal(git(root, "status", "--porcelain"), "");
+  });
+  if (!qualificationFreezeOnly) await test("pending synthetic public inputs reject measured freeze without calibration execution admission", { timeout: 10800000 }, async t => {
     assert.equal(process.versions.node.split(".")[0], "24", "Node 24 required; no successful skip");
     assert.ok(["darwin", "linux"].includes(process.platform));
     const sourceRevision = git(root, "rev-parse", "HEAD"); assert.equal(git(root, "status", "--porcelain"), "");
@@ -830,14 +1530,15 @@ if (process.argv[2] === "--worker") {
     const changed = git(clone, "diff", "--name-only", sourceRevision, cloneRevision).split("\n");
     assert.ok(changed.length > 0 && changed.every(p => p.startsWith(`${prefix}/`)), "synthetic clone changes public test inputs only");
     const contextPath = resolve(work, "context.json"); write(contextPath, { sourceRevision, cloneRevision, clone, work, scoring });
-    const result = spawnSync(process.execPath, [resolve(clone, relative(root, fileURLToPath(import.meta.url))), "--worker", contextPath], {
+    const result = spawnSync(process.execPath, [resolve(clone, relative(root, fileURLToPath(import.meta.url))), "--worker", contextPath, "--pending-admission-regression"], {
       cwd: clone, encoding: "utf8", timeout: 10600000, maxBuffer: 20 * 1024 * 1024,
     });
     writeFileSync(resolve(work, "worker.stdout.log"), result.stdout ?? ""); writeFileSync(resolve(work, "worker.stderr.log"), result.stderr ?? "");
     if (result.stdout) console.log(result.stdout);
     assert.equal(git(root, "rev-parse", "HEAD"), sourceRevision); assert.equal(git(root, "status", "--porcelain"), "");
     assert.equal(result.error, undefined, result.error?.message); assert.equal(result.status, 0, result.stderr || result.stdout);
-    const proof = read(resolve(work, "scoring-verification.json")); assert.equal(proof.completed, true); assert.equal(proof.synthetic_native_attempts, 28);
+    const proof = read(resolve(work, "scoring-verification.json")); assert.equal(proof.completed, true); assert.equal(proof.synthetic_native_attempts, 0);
+    assert.equal(proof.checks.length, 5);
     assert.deepEqual(proof.declared_activity, { evidence_kind: "expected_not_instrumented", expected_provider_calls: 0,
       expected_measured_result_reads: 0, expected_private_evaluator_process_calls: 0 });
     for (const key of ["provider_calls", "measured_result_reads", "private_evaluator_process_calls"]) assert.equal(Object.hasOwn(proof, key), false);

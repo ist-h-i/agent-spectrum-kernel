@@ -4,12 +4,18 @@ on:
   pull_request:
     paths:
       - 'scripts/*successor*'
+      - 'scripts/*judge*'
+      - 'benchmarks/prompt-successor-*.json'
+      - 'docs/prompt-successor-*judge*'
+      - 'scripts/*calibration-execution-admission*'
       - 'scripts/ask-benchmark-execution.mjs'
       - 'scripts/ask-benchmark-normalized-results.mjs'
       - 'scripts/test-fixtures/prompt-successor-fake-codex.c'
+      - 'scripts/test-fixtures/judge-native-capture-fake.c'
       - 'benchmarks/schemas/portfolio-attempt-result.schema.json'
       - 'benchmarks/schemas/portfolio-run-identity.schema.json'
       - 'docs/prompt-successor-measured-execution.md'
+      - 'docs/prompt-successor-judge-tool-free-profile.md'
       - '.github/workflows/issue291-measured.yml'
 
 permissions:
@@ -82,6 +88,10 @@ jobs:
         run: node --test scripts/test-ask-benchmark-prompt-successor-usage.mjs scripts/test-ask-benchmark-prompt-successor-control.mjs
       - name: Verify measured recovery state transitions
         run: node --test scripts/test-ask-benchmark-prompt-successor-measured-recovery.mjs
+      - name: Verify calibration execution admission boundaries
+        run: node --test scripts/test-ask-benchmark-calibration-execution-admission.mjs scripts/test-ask-benchmark-prompt-successor-host-isolation.mjs scripts/test-ask-benchmark-prompt-successor-host-diagnostic.mjs
+      - name: Verify login and synthetic Judge authority boundaries
+        run: node --test scripts/test-ask-benchmark-issue291-login.mjs scripts/test-ask-benchmark-llm-judge.mjs scripts/test-ask-benchmark-judge-derived-result.mjs scripts/test-ask-benchmark-judge-qualification.mjs scripts/test-ask-benchmark-judge-native-capture.mjs scripts/test-ask-benchmark-judge-native-transport.mjs scripts/test-ask-benchmark-judge-tool-free-profile.mjs scripts/test-ask-benchmark-judge-tool-free-integration.mjs scripts/test-ask-benchmark-judge-live-host-authority.mjs scripts/test-ask-benchmark-judge-host-bootstrap.mjs
       - name: Verify native successor transport and normalized usage
         run: node --test scripts/test-ask-benchmark-prompt-successor-execution.mjs
       - name: Verify native collection and existing scoring boundaries

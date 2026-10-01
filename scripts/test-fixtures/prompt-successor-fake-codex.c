@@ -69,14 +69,116 @@ static pid_t make_child(const char *directory) {
   write_all(fd, line, (size_t)count); close(fd);
   return child;
 }
+/* Synthetic diagnostics mirror the CLI's observable record shape for contract
+ * tests. They are not provider, authentication, or actual host-policy proof. */
+static const char *fake_private_root(int argc, char **argv, char root[PATH_MAX]) {
+  const char *private_root = NULL;
+  for (int i = 2; i + 1 < argc; ++i) if (!strcmp(argv[i], "-c")) {
+    const char *setting = argv[++i];
+    const char *prefix = "permissions.ask_issue291.filesystem={ \"";
+    if (strncmp(setting, prefix, strlen(prefix))) continue;
+    const char *start = setting + strlen(prefix);
+    const char *end = strchr(start, '"');
+    if (!end || end == start || (size_t)(end - start) >= PATH_MAX) return NULL;
+    memcpy(root, start, (size_t)(end - start)); root[end - start] = '\0';
+    private_root = root;
+  }
+  return private_root;
+}
+static int fake_debug_prompt_input(int argc, char **argv) {
+  char root[PATH_MAX];
+  const char *private_root = fake_private_root(argc, argv, root);
+  if (!private_root) return 64;
+  printf("[{\"role\":\"developer\",\"content\":[{\"text\":\"<permissions instructions> `sandbox_mode` is `workspace-write`. Network access is restricted. Approval policy is currently never. - path `%s`\"}]}]\n", private_root);
+  return 0;
+}
+static int fake_sandbox_probe(int argc, char **argv) {
+  int separator = -1;
+  for (int i = 2; i < argc; ++i) if (!strcmp(argv[i], "--")) separator = i;
+  if (separator < 0 || separator + 3 >= argc || strcmp(argv[separator + 1], "/bin/sh")
+      || strcmp(argv[separator + 2], "-c")) return 64;
+  const char *script = argv[separator + 3];
+  if (!strcmp(script, "exit 0") && separator + 4 == argc) return 0;
+  if (!strcmp(script, "exec 3< \"$1\"") && separator + 6 == argc) {
+    fputs("Permission denied\n", stderr); return 1;
+  }
+  return 64;
+}
+static int fake_diagnostic_session(int argc, char **argv, const char *output) {
+  const char *home = getenv("CODEX_HOME");
+  char private_root_buffer[PATH_MAX];
+  const char *private_root = fake_private_root(argc, argv, private_root_buffer);
+  char cwd[PATH_MAX], path[PATH_MAX], session_id[80], turn_id[80];
+  if (!home || !private_root || !getcwd(cwd, sizeof cwd)) return 64;
+  if (snprintf(path, sizeof path, "%s/sessions", home) >= (int)sizeof path || mkdir(path, 0700)) return 65;
+  if (snprintf(path, sizeof path, "%s/sessions/2026", home) >= (int)sizeof path || mkdir(path, 0700)) return 65;
+  if (snprintf(path, sizeof path, "%s/sessions/2026/09", home) >= (int)sizeof path || mkdir(path, 0700)) return 65;
+  if (snprintf(path, sizeof path, "%s/sessions/2026/09/27", home) >= (int)sizeof path || mkdir(path, 0700)) return 65;
+  snprintf(session_id, sizeof session_id, "synthetic-session-%ld", (long)getpid());
+  snprintf(turn_id, sizeof turn_id, "synthetic-turn-%ld", (long)getpid());
+  if (snprintf(path, sizeof path, "%s/sessions/2026/09/27/rollout-%ld.jsonl", home, (long)getpid()) >= (int)sizeof path) return 65;
+  int fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+  if (fd < 0) fail("fake diagnostic session");
+  FILE *session = fdopen(fd, "w");
+  if (!session) fail("fake diagnostic session stream");
+  fprintf(session, "{\"type\":\"session_meta\",\"payload\":{\"id\":\"%s\",\"cwd\":\"%s\",\"cli_version\":\"0.153.4\",\"model_provider\":\"openai\"}}\n", session_id, cwd);
+  fprintf(session, "{\"type\":\"turn_context\",\"payload\":{\"turn_id\":\"%s\",\"cwd\":\"%s\",\"model\":\"synthetic-native-fake-not-a-service\",\"effort\":\"medium\",\"approval_policy\":\"never\",\"sandbox_policy\":{\"type\":\"workspace-write\",\"network_access\":false},\"permission_profile\":{\"type\":\"managed\",\"network\":\"restricted\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"path\",\"path\":\"%s\"},\"access\":\"deny\"}]}},\"active_permission_profile\":{\"id\":\"ask_issue291\"}}}\n", turn_id, cwd, private_root);
+  fprintf(session, "{\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\",\"turn_id\":\"%s\"}}\n", turn_id);
+  fprintf(session, "{\"type\":\"event_msg\",\"payload\":{\"type\":\"task_complete\",\"turn_id\":\"%s\",\"error\":null}}\n", turn_id);
+  if (fclose(session)) fail("fake diagnostic session close");
+  fd = open(output, O_WRONLY | O_CREAT | O_EXCL, 0600);
+  if (fd < 0) fail("fake diagnostic output");
+  const char *json = "{\"task_type\":\"review\",\"decision\":\"not_applicable\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"not_applicable\",\"route\":null,\"summary\":\"Synthetic diagnostic only.\"}\n";
+  write_all(fd, json, strlen(json)); close(fd);
+  printf("{\"type\":\"thread.started\",\"thread_id\":\"%s\"}\n", session_id);
+  puts("{\"type\":\"turn.started\"}");
+  puts("{\"type\":\"turn.completed\"}");
+  return 0;
+}
 int main(int argc, char **argv) {
   if (argc == 2 && strcmp(argv[1], "--version") == 0) {
     puts("codex-cli 0.153.4"); return 0;
   }
   if (argc == 3 && strcmp(argv[1], "exec") == 0 && strcmp(argv[2], "--help") == 0) {
     puts("--ephemeral --ignore-user-config --ignore-rules --skip-git-repo-check --json --model --config --sandbox --output-schema --output-last-message");
+    puts("Run without persisting session files to disk");
     return 0;
   }
+  if (argc == 3 && !strcmp(argv[1], "login") && !strcmp(argv[2], "status")) {
+    const char *login_mode = getenv("ASK_SUCCESSOR_FAKE_LOGIN_MODE");
+    if (login_mode && !strcmp(login_mode, "stderr")) {
+      fputs("Logged in using ChatGPT\n", stderr); return 0;
+    }
+    if (login_mode && !strcmp(login_mode, "api-key")) { puts("Logged in using an API key"); return 0; }
+    if (login_mode && !strcmp(login_mode, "logged-out")) { fputs("Not logged in\n", stderr); return 0; }
+    if (login_mode && !strcmp(login_mode, "empty")) return 0;
+    if (login_mode && !strcmp(login_mode, "duplicate")) {
+      puts("Logged in using ChatGPT"); fputs("Logged in using ChatGPT\n", stderr); return 0;
+    }
+    if (login_mode && !strcmp(login_mode, "contradiction")) {
+      puts("Logged in using ChatGPT"); fputs("Not logged in\n", stderr); return 0;
+    }
+    if (login_mode && !strcmp(login_mode, "extra")) {
+      puts("Logged in using ChatGPT"); puts("unknown diagnostic"); return 0;
+    }
+    if (login_mode && !strcmp(login_mode, "nonzero")) {
+      fputs("Logged in using ChatGPT\n", stderr); return 7;
+    }
+    if (login_mode && !strcmp(login_mode, "signal")) {
+      fputs("Logged in using ChatGPT\n", stderr); fflush(stderr); raise(SIGTERM); return 70;
+    }
+    if (login_mode && !strcmp(login_mode, "overflow")) {
+      fputs("Logged in using ChatGPT\n", stderr);
+      for (int i = 0; i < 20000; ++i) fputc('x', stderr);
+      return 0;
+    }
+    if (login_mode && !strcmp(login_mode, "invalid-utf8")) {
+      fputs("Logged in using ChatGPT", stderr); fputc(0xff, stderr); return 0;
+    }
+    puts("Logged in using ChatGPT"); return 0;
+  }
+  if (argc >= 3 && !strcmp(argv[1], "debug") && !strcmp(argv[2], "prompt-input")) return fake_debug_prompt_input(argc, argv);
+  if (argc >= 3 && !strcmp(argv[1], "sandbox") && !strcmp(argv[2], "-P")) return fake_sandbox_probe(argc, argv);
   const char *directory = getenv("ASK_SUCCESSOR_FAKE_CAPTURE");
   const char *mode = getenv("ASK_SUCCESSOR_FAKE_MODE");
   if (!directory || !mode || argc < 3 || strcmp(argv[1], "exec") || strcmp(argv[argc - 1], "-")) return 64;
@@ -89,14 +191,21 @@ int main(int argc, char **argv) {
       if (i + 1 >= argc - 1) return 64;
       const char *value = argv[++i];
       if (!strcmp(arg, "--model") && strcmp(value, "synthetic-native-fake-not-a-service")) return 64;
-      if (!strcmp(arg, "--sandbox") && strcmp(value, "workspace-write")) return 64;
-      if (!strcmp(arg, "-c") && strcmp(value, "model_reasoning_effort=\"medium\"") && strcmp(value, "approval_policy=\"never\"") && strcmp(value, "sandbox_workspace_write.network_access=false")) return 64;
+      /* The ordinary contained-runner timeout control still uses the legacy
+       * workspace-write flag. Successor sessions use the explicit profile. */
+      if (!strcmp(arg, "--sandbox") && (strcmp(mode, "timeout") || strcmp(value, "workspace-write"))) return 64;
+      if (!strcmp(arg, "-c") && strcmp(value, "model_reasoning_effort=\"medium\"") && strcmp(value, "approval_policy=\"never\"")
+          && strcmp(value, "default_permissions=\"ask_issue291\"") && strcmp(value, "permissions.ask_issue291.extends=\":workspace\"")
+          && strcmp(value, "permissions.ask_issue291.network.enabled=false")
+          && strncmp(value, "permissions.ask_issue291.filesystem={ ", 38)) return 64;
       if (!strcmp(arg, "--output-last-message")) { if (output) return 64; output = value; }
       continue;
     }
     return 64;
   }
   if (!output) return 64;
+  int diagnostic = 1;
+  for (int i = 2; i < argc - 1; ++i) if (!strcmp(argv[i], "--ephemeral")) diagnostic = 0;
   int fd = capture_file(directory, "argv");
   for (int i = 1; i < argc; ++i) null_string(fd, argv[i]);
   close(fd);
@@ -106,6 +215,7 @@ int main(int argc, char **argv) {
   close(fd);
   fd = capture_file(directory, "stdin");
   unsigned char buffer[4096]; size_t total = 0;
+  char prompt_prefix[4097]; size_t prefix_bytes = 0;
   for (;;) {
     ssize_t n = read(STDIN_FILENO, buffer, sizeof buffer);
     if (n < 0 && errno == EINTR) continue;
@@ -113,9 +223,14 @@ int main(int argc, char **argv) {
     if (n == 0) break;
     total += (size_t)n;
     if (total > 1048576) { close(fd); return 65; }
+    size_t keep = (size_t)n < sizeof(prompt_prefix) - 1 - prefix_bytes
+      ? (size_t)n : sizeof(prompt_prefix) - 1 - prefix_bytes;
+    memcpy(prompt_prefix + prefix_bytes, buffer, keep); prefix_bytes += keep;
     write_all(fd, buffer, (size_t)n);
   }
+  prompt_prefix[prefix_bytes] = '\0';
   close(fd);
+  if (diagnostic) return fake_diagnostic_session(argc, argv, output);
   if (!strcmp(mode, "failure")) { puts("{\"type\":\"turn.completed\"}"); fputs("intentional native fake failure\n", stderr); return 7; }
   if (!strcmp(mode, "timeout")) {
     struct sigaction action; memset(&action, 0, sizeof action);
@@ -130,11 +245,23 @@ int main(int argc, char **argv) {
     return 143;
   }
   if (!strcmp(mode, "residual")) (void)make_child(directory);
+  const int fake_review_task = strstr(prompt_prefix, "Entry intent: review.")
+    || strstr(prompt_prefix, "Review entry. Primary contract:");
   fd = open(output, O_WRONLY | O_CREAT | O_EXCL, 0600);
   if (fd < 0) fail("fake output");
-  const char *json = "{\"task_type\":\"implementation\",\"decision\":\"not_applicable\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"complete\",\"route\":null,\"summary\":\"Synthetic native transport fixture. No model or evaluator.\"}\n";
+  const char *json = fake_review_task
+    ? "{\"task_type\":\"review\",\"decision\":\"request_changes\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"not_applicable\",\"route\":null,\"summary\":\"Synthetic review transport fixture. No model or evaluator.\"}\n"
+    : "{\"task_type\":\"implementation\",\"decision\":\"not_applicable\",\"findings\":[],\"requirement_status\":[],\"verification_commands\":[],\"completion_claim\":\"complete\",\"route\":null,\"summary\":\"Synthetic native transport fixture. No model or evaluator.\"}\n";
   write_all(fd, json, strlen(json)); close(fd);
   puts("{\"type\":\"turn.started\"}");
+  /* Only the explicitly synthetic scoring fixture emits its required fake
+   * command event. It never executes a command or represents a real run. */
+  const char *fake_command_evidence = getenv("ASK_SUCCESSOR_FAKE_COMMAND_EVIDENCE");
+  if (fake_command_evidence) {
+    if (strcmp(fake_command_evidence, "npm-test-success")) return 64;
+    puts("{\"type\":\"item.started\",\"item\":{\"type\":\"command_execution\",\"id\":\"synthetic-fixture-test\",\"command\":\"npm test\",\"status\":\"in_progress\"}}");
+    puts("{\"type\":\"item.completed\",\"item\":{\"type\":\"command_execution\",\"id\":\"synthetic-fixture-test\",\"command\":\"npm test\",\"status\":\"completed\",\"exit_code\":0,\"aggregated_output\":\"synthetic fixture event\"}}");
+  }
   if (!strcmp(mode, "provider-limit")) {
     puts("{\"type\":\"error\",\"message\":\"You've hit your usage limit. Try again later.\"}");
     puts("{\"type\":\"turn.failed\",\"error\":{\"codex_error_info\":\"usage_limit_exceeded\",\"message\":\"synthetic provider limit\"}}");

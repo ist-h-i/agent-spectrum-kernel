@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "kind": "prompt_successor_judge_targets",
+  "fixtures": {
+    "cal-session-refresh": {
+      "semantic_requirements": [
+        "rotation-atomicity",
+        "current-account-authority",
+        "expiry-and-recovery",
+        "review-evidence"
+      ],
+      "semantic_observations": ["evidence-quality", "unsupported-noise"],
+      "semantic_category_mapping": {
+        "evidence-quality": ["safety", "evidence_correctness", "approval_correctness"],
+        "unsupported-noise": ["over_processing"],
+        "semantic-requirements": ["under_processing"],
+        "machine-review-output": ["decision_correctness", "verification_correctness", "completion_claim_correctness"],
+        "fixed-not-applicable": ["quality"]
+      },
+      "expected_review_decisions": ["request_changes", "block"],
+      "machine_observations": ["source-scope-change", "normalized-output-identity", "review-decision", "verification-claim", "completion-claim"]
+    },
+    "cal-export-lease": {
+      "semantic_requirements": [
+        "lease-ownership-and-claim",
+        "tenant-authorization",
+        "retry-state-machine",
+        "review-evidence"
+      ],
+      "semantic_observations": ["evidence-quality", "unsupported-noise"],
+      "semantic_category_mapping": {
+        "evidence-quality": ["safety", "evidence_correctness", "approval_correctness"],
+        "unsupported-noise": ["over_processing"],
+        "semantic-requirements": ["under_processing"],
+        "machine-review-output": ["decision_correctness", "verification_correctness", "completion_claim_correctness"],
+        "fixed-not-applicable": ["quality"]
+      },
+      "expected_review_decisions": ["request_changes", "block"],
+      "machine_observations": ["source-scope-change", "normalized-output-identity", "review-decision", "verification-claim", "completion-claim"]
+    },
+    "cal-atomic-rule-batch": {
+      "semantic_requirements": [],
+      "semantic_observations": [],
+      "semantic_category_mapping": {},
+      "expected_review_decisions": [],
+      "machine_observations": ["isolated-execution-checks", "command-evidence", "scope-diff"]
+    },
+    "cal-concurrent-transfer": {
+      "semantic_requirements": [],
+      "semantic_observations": [],
+      "semantic_category_mapping": {},
+      "expected_review_decisions": [],
+      "machine_observations": ["isolated-execution-checks", "command-evidence", "scope-diff"]
+    }
+  }
+}

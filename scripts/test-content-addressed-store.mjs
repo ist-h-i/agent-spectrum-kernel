@@ -20,6 +20,7 @@ import {
   contentAddressedObjectPath,
   listContentAddressedJson,
   putContentAddressedJson,
+  readStableBytes,
   readContentAddressedJson,
   readJsonFileStrict,
   stableCanonicalJson,
@@ -130,6 +131,13 @@ async function runTests() {
         /bounded non-empty file/iu,
       );
       assert.deepEqual(readContentAddressedJson({ storeRoot, digest: published.digest, maximumBytes: canonicalBytes }).value, artifact);
+    });
+
+    await test("stable byte reader permits empty diagnostic streams only by opt in", () => {
+      const path = resolve(realpathSync(root), "empty-diagnostic-stderr.txt");
+      writeFileSync(path, Buffer.alloc(0));
+      expectFailure("empty default remains fail closed", () => readStableBytes(path, "empty stderr", 16), /bounded non-empty file/iu);
+      assert.deepEqual(readStableBytes(path, "empty stderr", 16, { allowEmpty: true }), Buffer.alloc(0));
     });
 
     await test("noncanonical stored bytes", () => {

@@ -311,7 +311,8 @@ function assertRequirementOutcome(requirement, observation) {
   if (requirement.requirement_kind === "informational" && earnedPoints !== null && earnedPoints !== 0) throw new Error("informational requirement earned_points must be zero");
 }
 
-export function validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult, normalizedResult = null }) {
+export function validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult, normalizedResult = null,
+  allowJudgeObservationOnlyManual = false }) {
   if (!Array.isArray(evaluatorResult.requirement_results)) throw new Error("evaluator requirement_results must be an array");
   const requirements = new Map(requirementRecord.requirements.map((requirement) => [requirement.requirement_id, requirement]));
   const resultIds = evaluatorResult.requirement_results.map(({ requirement_id }) => requirement_id);
@@ -350,8 +351,14 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
   if (evaluatorResult.evaluation_status === "manual_review_required") {
     if (resultIds.length !== expectedIds.length || expectedIds.some((id) => !resultIds.includes(id))) throw new Error("manual review evaluation must exactly cover the authoritative requirement set");
     const manualResults = evaluatorResult.requirement_results.filter(({ outcome }) => outcome === "manual_review_required");
-    if (manualResults.length === 0) throw new Error("manual review evaluation requires at least one manual_review_required requirement outcome");
-    const manualObservations = MANUAL_REVIEW_OBSERVATION_FIELDS.map((field) => [field, evaluatorResult[field]]).filter(([, observation]) => observation?.state === "manual_review_required");
+    if (manualResults.length === 0 && (!allowJudgeObservationOnlyManual
+        || evaluatorResult.requirement_results.some(({ outcome }) => !SCORED_OUTCOMES.has(outcome)))) {
+      throw new Error("manual review evaluation requires a manual requirement or verified Judge observation-only profile");
+    }
+    const manualObservationFields = allowJudgeObservationOnlyManual
+      ? [...MANUAL_REVIEW_OBSERVATION_FIELDS, "completion_claim_correctness"] : MANUAL_REVIEW_OBSERVATION_FIELDS;
+    const manualObservations = manualObservationFields.map((field) => [field, evaluatorResult[field]])
+      .filter(([, observation]) => observation?.state === "manual_review_required");
     if (manualObservations.length === 0) throw new Error("manual review evaluation requires at least one manual_review_required observation");
     if (Object.hasOwn(evaluatorResult, "classification")) throw new Error("manual review evaluation must not contain a normal classification");
     if (Object.hasOwn(evaluatorResult, "invalid_input_authority")) throw new Error("manual review evaluation must not contain invalid_input_authority");
@@ -639,7 +646,8 @@ export function validateBinaryScopeVerificationProfile({ outputContract, freezeM
   return validateBinaryScopeVerificationResult({ evaluatorResult, requirementRecord, normalizedResult });
 }
 
-export function validateEvaluatorAuthorityBindings({ freezeManifest, freezeManifestSourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult }) {
+export function validateEvaluatorAuthorityBindings({ freezeManifest, freezeManifestSourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult,
+  allowJudgeObservationOnlyManual = false }) {
   assertDigestClosure(policyManifest.manifest_digest, computePolicyManifestDigest(policyManifest), "policy manifest digest");
   assertDigestClosure(scoringPolicy.policy_digest, computeScoringPolicyDigest(scoringPolicy), "scoring policy digest");
   assertDigestClosure(outputContract.output_contract_digest, computeOutputContractDigest(outputContract), "output contract digest");
@@ -676,7 +684,8 @@ export function validateEvaluatorAuthorityBindings({ freezeManifest, freezeManif
     if (evaluatorResult[field] !== value) throw new Error(`evaluator scoring input binding mismatch at ${field}`);
   }
   if (evaluatorReference.fixture_id !== normalizedResult.lineage.fixture_id || evaluatorReference.fixture_input_digest !== normalizedResult.lineage.fixture_input_digest) throw new Error("evaluator public reference fixture or input binding does not match normalized result");
-  const scoring = validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult, normalizedResult });
+  const scoring = validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult, normalizedResult,
+    allowJudgeObservationOnlyManual });
   if (outputContract.result_profile) validateBinaryScopeVerificationProfile({ outputContract, freezeManifest, evaluatorResult, requirementRecord, normalizedResult });
   return scoring;
 }

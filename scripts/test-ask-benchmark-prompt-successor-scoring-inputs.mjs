@@ -22,6 +22,7 @@ function input() {
       fixture_id, source_fixture_id, input_manifest_digest: digest("frozen-inputs"),
       artifacts: Object.fromEntries(SUCCESSOR_SCORING_INPUT_ROLES.map(role => [role,
         structuredClone(shared[role] ?? ref(`synthetic/${fixture_id}/${role}.json`))])),
+      admission_overlay: null,
     })) };
 }
 
@@ -29,6 +30,7 @@ test("public input manifest is deterministic, four-fixture and non-authorizing",
   const args = input(); const before = structuredClone(args);
   const a = buildSuccessorScoringInputManifest(args); const b = buildSuccessorScoringInputManifest(args);
   assert.deepEqual(a, b); assert.deepEqual(args, before);
+  assert.equal(a.schema_version, "1.1.0");
   assert.equal(a.phase, "pre_result"); assert.equal(a.execution_fixture_namespace, "catalog");
   assert.equal(a.creates_admission, false); assert.equal(a.measured_execution_authorized, false);
   validateSuccessorScoringInputManifest(a, args.parent, a.manifest_digest);
@@ -52,8 +54,28 @@ for (const [name, mutate] of [
   ["absolute path", a => { a.executionConfig.path = "/outside/config.json"; }],
   ["parent path", a => { a.executionConfig.path = "../config.json"; }],
   ["backslash path", a => { a.executionConfig.path = "dir\\config.json"; }],
+  ["unbound overlay field", a => { delete a.fixtures[0].admission_overlay; }],
+  ["overlay outside repository authority", a => { a.fixtures[0].admission_overlay = { ...ref("synthetic/overlay.json"), decision_digest: digest("decision"), decision_revision: 1 }; }],
+  ["cross-fixture overlay reuse", a => { const overlay = { ...ref("benchmarks/fixtures/admission-decision/cal-one.json"), decision_digest: digest("decision"), decision_revision: 1 }; a.fixtures[0].admission_overlay = overlay; a.fixtures[1].admission_overlay = structuredClone(overlay); }],
+  ["invalid overlay decision revision", a => { a.fixtures[0].admission_overlay = { ...ref("benchmarks/fixtures/admission-decision/cal-one.json"), decision_digest: digest("decision"), decision_revision: 0 }; }],
+  ["invalid overlay decision digest", a => { a.fixtures[0].admission_overlay = { ...ref("benchmarks/fixtures/admission-decision/cal-one.json"), decision_digest: "unknown", decision_revision: 1 }; }],
 ]) test(`input manifest rejects ${name}`, () => {
   const args = input(); mutate(args); assert.throws(() => buildSuccessorScoringInputManifest(args));
+});
+
+test("repository overlay identity changes the pre-result preparation", () => {
+  const args = input();
+  const before = buildSuccessorScoringInputManifest(args);
+  args.fixtures[0].admission_overlay = {
+    ...ref("benchmarks/fixtures/admission-decision/cal-session-refresh.json"),
+    decision_digest: digest("decision"), decision_revision: 1,
+  };
+  const after = buildSuccessorScoringInputManifest(args);
+  assert.notEqual(before.manifest_digest, after.manifest_digest);
+  const p = syntheticPreparation({ scoringInputManifestDigest: before.manifest_digest });
+  const q = syntheticPreparation({ scoringInputManifestDigest: after.manifest_digest });
+  assert.notEqual(p.preparation_digest, q.preparation_digest);
+  assert.ok(p.cases.every(c => !q.cases.some(d => d.case_id === c.case_id)));
 });
 
 test("changing public input references changes the preparation and every case identity", () => {
