@@ -1,0 +1,103 @@
+{
+  "workspace": "/synthetic/workspaces/plain",
+  "plan": {
+    "model": "gpt-6.1-sol",
+    "reasoning": "medium",
+    "private_root": "/synthetic/evidence",
+    "workspace_root": "/synthetic/workspaces",
+    "command": {
+      "deny_roots": [
+        "/synthetic/evidence",
+        "/synthetic/controller",
+        "/synthetic/workspaces",
+        "/synthetic/signin/auth.json"
+      ]
+    }
+  },
+  "stdout": [
+    {
+      "type": "thread.started",
+      "thread_id": "synthetic-session-01571"
+    }
+  ],
+  "session": [
+    {
+      "type": "session_meta",
+      "payload": {
+        "id": "synthetic-session-01571",
+        "model_provider": "ask_pilot_openai",
+        "cli_version": "0.157.1",
+        "cwd": "/synthetic/workspaces/plain"
+      }
+    },
+    {
+      "type": "turn_context",
+      "payload": {
+        "turn_id": "synthetic-turn-01571",
+        "model": "gpt-6.1-sol",
+        "effort": "medium",
+        "cwd": "/synthetic/workspaces/plain",
+        "approval_policy": "never",
+        "sandbox_policy": {
+          "type": "workspace-write",
+          "network_access": false
+        },
+        "permission_profile": {
+          "type": "managed",
+          "network": "restricted",
+          "file_system": {
+            "type": "restricted",
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/synthetic/evidence"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/synthetic/controller"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/synthetic/workspaces"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/synthetic/signin/auth.json"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/synthetic/workspaces/plain"
+                },
+                "access": "write"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/synthetic/evidence/plain/codex-home/tmp/arg0/codex-arg0Ab12Cd"
+                },
+                "access": "read"
+              }
+            ]
+          }
+        },
+        "active_permission_profile": {
+          "id": "ask_synthetic_pilot",
+          "extends": ":workspace"
+        }
+      }
+    }
+  ]
+}

@@ -45,6 +45,9 @@ jobs:
           diff -u docs/fixtures/adapter-runtime-bundle.json "$RUNNER_TEMP/ask-expected-runtime-bundle.json"
           exit 1
 
+      - name: Run synthetic JSON pilot fake-only regressions
+        run: node --test scripts/test-ask-synthetic-json-pilot.mjs
+
       # Catch bounded aggregate regressions before the long repository suites.
       - name: Run portfolio aggregate v2 component sensitivity tests
         run: node scripts/test-ask-benchmark-portfolio-aggregate-result-v2.mjs
