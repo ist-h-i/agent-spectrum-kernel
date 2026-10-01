@@ -1,7 +1,13 @@
 import { dirname, isAbsolute, resolve } from "node:path";
 import { canonicalDigest, parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 
-export const JUDGE_HOST_POLICY_REVISION = "seatbelt-loopback-bootstrap-v4";
+export const JUDGE_HOST_POLICY_REVISION = "seatbelt-loopback-bootstrap-v5";
+const SYSTEM_CONFIG_METADATA_PATHS = Object.freeze([
+  "/etc", "/private", "/private/etc", "/etc/codex", "/private/etc/codex",
+  "/etc/codex/requirements.toml", "/private/etc/codex/requirements.toml",
+  "/etc/codex/config.toml", "/private/etc/codex/config.toml",
+  "/etc/codex/managed_config.toml", "/private/etc/codex/managed_config.toml",
+]);
 export const JUDGE_HOST_DYLD_CACHE_ROOTS = Object.freeze([
   "/System/Library/dyld",
   "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld",
@@ -70,6 +76,9 @@ export function judgeHostControlPolicy(root, port) {
   // System-loader paths are non-user runtime data. The fixed roots mirror the
   // 0.157.1 minimal loader map/read inventory and the target-host dyld cache
   // aliases. Do not replace these with broad /System, /Library or Preboot reads.
+  // System config paths need ancestor/leaf metadata to distinguish actual
+  // ENOENT from denied resolution. No system config content read is granted;
+  // a present managed file remains fail-closed under its existing data denial.
   // macOS 26 libignition opens the root directory itself before locating the
   // dyld cache. Metadata permission does not admit that open. The separate
   // literal-only data rule admits / itself, never a recursive root read.
@@ -83,6 +92,9 @@ export function judgeHostControlPolicy(root, port) {
 (allow file-read-metadata file-test-existence ${metadata}
   ${cryptexAncestors}
   (subpath ${quoted(root)}))
+(allow file-read-metadata file-test-existence
+  ${SYSTEM_CONFIG_METADATA_PATHS.map(value => `(literal ${quoted(value)})`).join("\n  ")}
+)
 (allow file-read* file-test-existence
   ${loaderReads})
 (allow file-map-executable

@@ -1,6 +1,6 @@
 # Model-free Judge host bootstrap
 
-Artifact: `SPEC-313-JUDGE-HOST-BOOTSTRAP`, revision 6 (local correction candidate).
+Artifact: `SPEC-313-JUDGE-HOST-BOOTSTRAP`, revision 7 (metadata-only correction candidate).
 Upstream: Issue #291; PR #313 at `c24bc0ca`; `SPEC-313-JUDGE-LIVE-HOST-AUTHORITY`
 and `FVC-313-JUDGE-LIVE-HOST-AUTHORITY` revision 2. This implements stage A of the
 reviewed `host-bootstrap-correction.md`, not an authorization for stages B–E.
@@ -58,7 +58,7 @@ under a future reviewed credential design, not trigger writable fallback.
 ## Formal verification contract
 
 Selected path: `formal_verification_contract`,
-`FVC-313-JUDGE-HOST-BOOTSTRAP`, revision 6. Triggers: process/HTTP/persistence and
+`FVC-313-JUDGE-HOST-BOOTSTRAP`, revision 7. Triggers: process/HTTP/persistence and
 security-sensitive permission/authorization boundaries. Existing TF/NT/JI/LH
 obligations are retained.
 
@@ -362,3 +362,56 @@ The model-free EPIPE regression now uses the running Node image to exit without
 reading stdin. Its previous `/bin/true` fixture is absent on the target Mac and
 tested ENOENT instead of the intended stdin failure. This portability correction
 does not change the production observer or its failure policy.
+
+
+## System configuration metadata correction (F313-HB-10)
+
+Revision 7 follows the consumed revision-6 target attempt on exact `6ceb498b`:
+all 12 fixed controls passed; the single conditional CLI exited 1 while loading
+`/etc/codex/requirements.toml`, reporting EPERM; no request was captured. The
+same PID's existing logs show repeated `file-read-metadata /etc` denial, not
+proof of content-read denial at an existing requirements file. The failed
+attempt, successful control evidence and its consumed permission stay immutable.
+
+A later authorized read-only OS/metadata check found DEP/MDM not enrolled,
+no current-user configuration profile, no conventional Codex managed preference
+plist at the two checked locations, and ENOENT for `/etc/codex` and all three
+TOML leaves under both logical and physical spellings. `/etc` is a symlink to
+`private/etc`. These are current host facts, not an all-system-profile audit,
+CoreFoundation forced-value attestation or proof of absence at the earlier
+launch. Codex 0.157.1's official loader skips true NotFound and propagates EPERM;
+masking absent paths with an ancestor denial prevents that ordinary startup.
+
+Policy identity is `seatbelt-loopback-bootstrap-v5`. The entire new capability
+is `file-read-metadata file-test-existence` at these eleven fixed literals:
+
+- `/etc`, `/private`, `/private/etc`, `/etc/codex`, `/private/etc/codex`;
+- `/etc/codex/requirements.toml`, `/private/etc/codex/requirements.toml`;
+- `/etc/codex/config.toml`, `/private/etc/codex/config.toml`;
+- `/etc/codex/managed_config.toml`, `/private/etc/codex/managed_config.toml`.
+
+No system TOML data read, recursive root/etc/home access, directory listing,
+write, network, credentials, MDM override, preferences data or mach-service
+permission is added. The existing literal root data grant is unchanged. Present
+managed files retain their data denial and must cause failure rather than being
+silently replaced, ignored or read under a broader grant. No administrator
+policy is deleted, overridden, fabricated or disabled.
+
+HB2 proof: a new synthetic source-shape regression requires exactly one closed
+metadata-only rule; removing only that rule must recover the independently
+pinned reviewed v4 template digest, proving all other policy bytes unchanged.
+HB1/HB5: new policy/template/source identity invalidates old plans/permissions.
+Existing 12-control and HB1-HB6 synthetic obligations remain unchanged. This
+regression does not prove macOS metadata enforcement or successful request
+capture; no target acceptance is claimed for revision 7.
+
+Before any separately granted successor execution, recheck the applicable
+non-content metadata and enrollment facts. If managed files appear, symlink
+resolution changes, or applicability differs, stop for disposition; do not
+pretend policy is absent or expand the data grant. Independent source/security
+review, exact-head required CI, a new clean source/private root/prepare and a
+new exact plan/code-bound one-shot permission remain necessary. Control<=1;
+capture<=1 only on control pass; failure stops; retries/provider/model calls/
+credential operations remain 0. Source update/metadata permission approval is
+not target execution, credential/qualification/admission/freeze/measurement or
+merge authority.

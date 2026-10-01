@@ -103,7 +103,7 @@ test("whole-child policy denies by default and has no broad network/user-data al
 
 test("loader policy maps fixed system roots and target dyld cache aliases without broad host reads", () => {
   const policy = judgeHostControlPolicy("/private/tmp/test-bootstrap", 52345);
-  assert.equal(JUDGE_HOST_POLICY_REVISION, "seatbelt-loopback-bootstrap-v4");
+  assert.equal(JUDGE_HOST_POLICY_REVISION, "seatbelt-loopback-bootstrap-v5");
   assert.ok(policy.includes("(allow file-map-executable"));
   for (const root of JUDGE_HOST_EXECUTABLE_MAP_ROOTS)
     assert.ok(policy.includes(`(subpath ${JSON.stringify(root)})`), `missing map root ${root}`);
@@ -136,6 +136,23 @@ test("loader root directory open has a literal-only data allowance, never recurs
 test("root directory loader correction invalidates the historical v3 policy template", () => {
   assert.notEqual(judgeHostControlTemplateDigest(),
     "sha256:bde04f7c13658e878401373ec1d6f6c2ac28ac2f1ac08a21cd0b5d71e5cb4e98");
+});
+
+test("system configuration metadata correction is exactly eleven literals and changes no other capability", () => {
+  const literals = ["/etc", "/private", "/private/etc", "/etc/codex", "/private/etc/codex",
+    "/etc/codex/requirements.toml", "/private/etc/codex/requirements.toml",
+    "/etc/codex/config.toml", "/private/etc/codex/config.toml",
+    "/etc/codex/managed_config.toml", "/private/etc/codex/managed_config.toml"];
+  const rule = `(allow file-read-metadata file-test-existence\n  ${literals.map(value => `(literal ${JSON.stringify(value)})`).join("\n  ")}\n)\n`;
+  const policy = judgeHostControlPolicy("/__ask_host_bootstrap__", 12345);
+  assert.ok(policy.includes(rule));
+  assert.equal(policy.split(rule).length, 2, "exactly one metadata-only rule");
+  // Removing only the new rule must recover the exact reviewed v4 template.
+  assert.equal(canonicalDigest({ revision: "seatbelt-loopback-bootstrap-v4", policy: policy.replace(rule, "") }),
+    "sha256:7731c83e59024f762d02eb568e8b226e11e8234342143b3db42e85c060e15738");
+  assert.notEqual(judgeHostControlTemplateDigest(), "sha256:7731c83e59024f762d02eb568e8b226e11e8234342143b3db42e85c060e15738");
+  for (const path of ["/etc", "/private/etc", "/etc/codex", "/private/etc/codex", "/", "/Users"])
+    assert.equal(policy.includes(`(subpath ${JSON.stringify(path)})`), false);
 });
 
 test("all-denied operations, absent canaries and refused TCP cannot pass control verification", () => {
