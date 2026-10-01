@@ -1755,8 +1755,8 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { isolate
     for (const missingField of ["privateEvaluationRoot", "privateEvaluationRecordPath", "privateFragmentPath"]) {
       const incompleteAuthority = { ...common };
       delete incompleteAuthority[missingField];
-      assert.throws(() => verifyEvaluatorAuthority(incompleteAuthority), /binary scope verification requires .*private-evaluation/u, `binary authority missing ${missingField} must not become evaluation-ready`);
-      assert.throws(() => verifyEvaluatorBoundary(incompleteAuthority), /binary scope verification requires .*private-evaluation/u, `an admitted boundary must not make binary authority missing ${missingField} scoring-ready`);
+      assert.throws(() => verifyEvaluatorAuthority(incompleteAuthority), { name: "Error", message: "private evaluator authority requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together" }, `binary authority missing ${missingField} must not become evaluation-ready`);
+      assert.throws(() => verifyEvaluatorBoundary(incompleteAuthority), { name: "Error", message: "private evaluator authority requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together" }, `an admitted boundary must not make binary authority missing ${missingField} scoring-ready`);
       if (missingField === "privateFragmentPath") {
         const overlayRoot = resolve(scoringRoot, "unreachable-overlay-evidence");
         mkdirSync(overlayRoot);
@@ -1772,7 +1772,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { isolate
           admissionReviewAuthorityPath: overlayPaths[1],
           admissionReviewAuthoritySourceDigest: authorityFileDigest(overlayPaths[1]),
           admissionReviewArchivePath: overlayPaths[2],
-        }), /binary scope verification requires .*private-evaluation/u, "overlay scoring must reject incomplete private authority before consuming admission evidence");
+        }), { name: "Error", message: "private evaluator authority requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together" }, "overlay scoring must reject incomplete private authority before consuming admission evidence");
         removeTree(overlayRoot);
       }
     }

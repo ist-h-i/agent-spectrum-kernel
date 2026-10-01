@@ -1093,11 +1093,18 @@ function terminateResidualAgentProcessGroup(pid) {
   throw new Error("terminal workspace residual agent process group could not be terminated");
 }
 
-function executeContainedAgent(executable, args, options) {
+export function executeContainedAgent(executable, args, { recordCleanupFailure = false, ...options }) {
   // Keep original stdout/stderr bytes until evidence hashing and usage parsing.
   // Decoding here would silently replace malformed UTF-8 before either check.
   const result = spawnSync(executable, args, { ...options, encoding: null, detached: process.platform !== "win32" });
-  return { ...result, workspace_descendants_detected: terminateResidualAgentProcessGroup(result.pid) };
+  try {
+    return { ...result, workspace_descendants_detected: terminateResidualAgentProcessGroup(result.pid) };
+  } catch (error) {
+    if (!recordCleanupFailure) throw error;
+    // Callers opting in can persist the original PID, streams and exit evidence
+    // even when cleanup fails. Default callers retain the existing throw.
+    return { ...result, workspace_descendants_detected: true, cleanup_error: true };
+  }
 }
 
 function executeAgent({ root, runtime, executable, workspace, outputTemporary, command, environmentSnapshot, successorStdin = null }) {
