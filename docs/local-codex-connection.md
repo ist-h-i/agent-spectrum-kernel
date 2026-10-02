@@ -1,5 +1,7 @@
 # Local Codex connection implementation (Issue #315)
 
+**Current execution admission: [split probe/evaluation v2](local-codex-admission.md).** The v1 command and blanket home-mode requirements below describe the earlier adapter and are retained as design history. New native execution uses the v2 split phases and metadata conditions; the combined entry is simulation only.
+
 This slice is stacked on Draft #316 (`10a9dbb9d9a2d2039d000f660c2e5c0ae8ead71e`). It implements the execution adapter, then exercises it with an owned Node simulation. **No real Codex command, model request, authentication operation, Windows host or WSL host was exercised.** Implementation availability and execution admission are separate.
 
 ## Shared core and platform boundaries

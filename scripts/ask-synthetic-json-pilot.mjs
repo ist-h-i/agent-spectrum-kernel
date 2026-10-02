@@ -10,6 +10,7 @@ import { captureSuccessorUsage } from "./ask-benchmark-prompt-successor-usage.mj
 import { canonicalDigest, parseJsonRejectDuplicateKeys, writeCanonicalJsonNoReplace } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { closedSessionEntries } from "./ask-local-codex-boundaries.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE = "benchmarks/fixtures/pilot-json-aggregate-001";
@@ -18,7 +19,7 @@ const SCHEMA = "benchmarks/schemas/agent-output.schema.json";
 const FILES = ["AGENTS.md", `${FIXTURE}/task.md`, `${FIXTURE}/input.json`, SCHEMA, FAKE,
   "scripts/ask-synthetic-json-pilot.mjs", "scripts/ask-benchmark-execution.mjs",
   "scripts/ask-benchmark-prompt-successor-delivery.mjs", "scripts/ask-benchmark-prompt-successor-usage.mjs",
-  "scripts/ask-benchmark-stable-file.mjs", "scripts/content-addressed-store.mjs", "scripts/ask-benchmark-schema.mjs"];
+  "scripts/ask-benchmark-stable-file.mjs", "scripts/content-addressed-store.mjs", "scripts/ask-benchmark-schema.mjs", "scripts/ask-local-codex-boundaries.mjs"];
 export const PILOT_LIMITS = Object.freeze({ execs: 2, retry: 0, timeout_ms: 120000,
   max_buffer_bytes: 1048576, answer_bytes: 65536, session_bytes: 4194304, grader_ms: 10000,
   trial_tokens: 30000, cumulative_tokens: 60000, future_control: 1, future_control_ms: 10000 });
@@ -259,7 +260,9 @@ export function parsePilotNativeSession({ stdout, session, plan, workspace, sess
     const runtimeRoot = runtimeEntries[0]?.path.path ?? null;
     if (observedRuntimeRoot !== undefined && observedRuntimeRoot !== runtimeRoot) throw new Error("native runtime read grant changed");
     observedRuntimeRoot = runtimeRoot;
-    for (const root of plan.command.deny_roots) {
+    if (plan.command.closed_read_scope) closedSessionEntries({ entries, workspace, readRoots: plan.command.read_roots,
+      denyRoots: plan.command.deny_roots, runtimeParent });
+    for (const root of plan.command.closed_read_scope ? [] : plan.command.deny_roots) {
       if (entries.filter(entry => entry.path?.type === "path" && entry.path.path === root && entry.access === "deny").length !== 1
         || entries.some(entry => entry.path?.type === "path" && within(root, entry.path.path) && entry.access !== "deny"
           && !(root === plan.workspace_root && within(workspace, entry.path.path))

@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, linkSync, symlinkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { prepareCodexConnection, runCodexConnection, reopenCodexConnection, codexTrialLaunch, codexProbeLaunches, assertConnectionPermissionShape } from "./ask-local-codex.mjs";
+import { prepareCodexConnection, runCodexConnection, reopenCodexConnection, codexTrialLaunch, codexProbeLaunches, assertConnectionPermissionShape,
+  runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime } from "./ask-local-codex.mjs";
+import {inspectExistingCodexHome, classifyDenial, assertCanaryResult, probeSeatbelt, assertNoAclListing} from "./ask-local-codex-boundaries.mjs";
 import { canonicalDigest } from "./content-addressed-store.mjs";
 import { parsePilotNativeSession } from "./ask-synthetic-json-pilot.mjs";
 
@@ -28,7 +30,7 @@ test("owned connection probes and two isolated trials share pilot scoring; reope
   assert.equal(plan.live_ready, false);
   const report = runCodexConnection(privateRoot);
   assert.equal(report.preflight.status, "pass"); assert.equal(report.preflight.evidence_class, "synthetic_only");
-  assert.equal(report.preflight.network_enforcement, "not_probed");
+  assert.equal(report.preflight.network_enforcement, "synthetic_only");
   assert.equal(report.stop, null); assert.equal(report.model_calls, 0); assert.equal(report.credential_operations, 0);
   assert.deepEqual(report.slots.map(s => s.grade.status), ["pass", "pass"]);
   assert.notEqual(report.slots[0].session_id, report.slots[1].session_id);
@@ -55,7 +57,7 @@ test("owned connection probes and two isolated trials share pilot scoring; reope
   }
 });
 for (const [scenario, stop] of [["unknown", "usage_unknown"], ["threshold", "trial_token_threshold"], ["identity", "session_identity_failure"],
-  ["exit", "process_failure"], ["missing-session", "session_identity_failure"], ["provider", "provider_stop"], ["interrupt", "process_failure"]]) {
+  ["exit", "process_failure"], ["missing-session", "session_identity_failure"], ["provider", "provider_stop"], ["interrupt", "process_failure"], ["scope-leak","session_identity_failure"]]) {
   test(`${scenario} preserves the consumed trial and never substitutes/retries`, t => {
     const { privateRoot } = prepared(t, { scenarios: [scenario, "pass"] });
     const report = runCodexConnection(privateRoot);
@@ -138,7 +140,7 @@ test("live plans and historical grants refuse before any launch/claim", t => {
   writeFileSync(join(privateRoot, "connection-digest.json"), JSON.stringify({ digest: canonicalDigest(live) }));
   const before = snapshot(privateRoot);
   for (const permission of [null, { kind: "ask_synthetic_pilot_permission_v1" }, { kind: "ask_local_codex_permission_v1", approval_ref: "consumed-old-grant" }]) {
-    assert.throws(() => runCodexConnection(privateRoot, permission), /fresh exact connection/u);
+    assert.throws(() => runCodexConnection(privateRoot, permission), /fresh exact phase/u);
   }
   assert.deepEqual(snapshot(privateRoot), before);
   const cli = spawnSync(process.execPath, [ENTRY, "simulate", privateRoot], { encoding: "utf8" });
@@ -167,4 +169,85 @@ test("session runtime exception is restricted to an exact declared credential/se
   for (const sessionHome of ["/", "/undeclared", "/synthetic/evidence/../other", "relative"]) {
     assert.throws(() => parsePilotNativeSession({ ...fixture, stdout: encode(fixture.stdout), session: encode(fixture.session), sessionHome }));
   }
+});
+
+test("probe-only produces sealed synthetic admission without evaluation and evaluate does not repeat probes", t=>{
+  const {privateRoot,plan,base,home}=prepared(t);
+  const admission=runCodexProbes(privateRoot);
+  assert.equal(admission.model_calls,0); assert.equal(admission.evidence_class,"synthetic_only");
+  assert.equal(readdirSync(home).includes("sessions"),false);
+  assert.equal(readdirSync(privateRoot).includes("connection-run-claim.json"),false);
+  const before=snapshot(join(privateRoot,"connection-probe"));
+  const probe=codexPhasePermission(plan,"probe","new-probe-approval"),evaluate=codexPhasePermission(plan,"evaluate","new-eval-approval",canonicalDigest(admission));
+  assert.equal(probe.actions.trials,0); assert.equal(probe.actions.existing_home_cli_read_refresh,false);
+  assert.equal(evaluate.actions.probes,0); assert.equal(evaluate.actions.trials,2);
+  assert.notDeepEqual(probe,evaluate);
+  assert.throws(()=>runCodexProbes(privateRoot));
+  const report=evaluateCodexConnection(privateRoot);
+  assert.equal(report.stop,null); assert.deepEqual(snapshot(join(privateRoot,"connection-probe")),before);
+  assert.deepEqual(reopenCodexProbes(privateRoot),admission); assert.deepEqual(reopenCodexConnection(privateRoot),report);
+  const launch=codexTrialLaunch(plan,base,"plain");
+  assert.ok(launch.argv.includes(`sqlite_home=${JSON.stringify(join(privateRoot,"plain/home/sqlite"))}`));
+  assert.ok(launch.argv.includes(`log_dir=${JSON.stringify(join(privateRoot,"plain/home/log"))}`));
+  assert.ok(launch.argv.includes('history.persistence="none"')); assert.ok(launch.argv.includes('memories.generate_memories=false'));
+});
+test("unsealed probe replay is explicit unknown and cannot launch evaluation", t=>{
+  const {privateRoot}=prepared(t),before=snapshot(privateRoot);
+  assert.equal(reopenCodexProbes(privateRoot).evidence_class,"unsealed_unknown");
+  assert.throws(()=>evaluateCodexConnection(privateRoot),/sealed probe/u); assert.deepEqual(snapshot(privateRoot),before);
+});
+test("probe bytes are verified again before any evaluation claim", t=>{
+  const {privateRoot}=prepared(t);runCodexProbes(privateRoot);
+  writeFileSync(join(privateRoot,"connection-probe/check-3/stdout.bin"),"altered\n");
+  assert.throws(()=>evaluateCodexConnection(privateRoot),/binding mismatch/u);
+  assert.equal(readdirSync(privateRoot).includes("connection-run-claim.json"),false);
+});
+for(const probeOutcome of ["network-open","network-unknown","write-open","positive-unknown","extra-keys"]) test(`${probeOutcome} never produces admitted enforcement`,t=>{
+  const {privateRoot}=prepared(t,{probeOutcome}); const report=runCodexConnection(privateRoot);
+  assert.equal(report.stop,"model_free_preflight_failed");assert.equal(report.slots[0].state,"not_started");
+  assert.equal(report.preflight.network_enforcement,"failed_or_unknown"); assert.deepEqual(reopenCodexConnection(privateRoot),report);
+});
+test("closed read policy has root deny, explicit runtime files and no inherited workspace/tmp grant", t=>{
+  const {plan,base}=prepared(t);
+  assert.equal(plan.command.closed_read_scope,true); assert.ok(plan.command.deny_roots.includes("/"));
+  assert.ok(plan.read_roots.includes(base.node.executable)); assert.ok(plan.read_roots.includes(plan.cli.executable));
+  assert.ok(!plan.command.argv.some(x=>x.includes(".extends=")));assert.ok(!plan.read_roots.includes("/tmp"));
+  assert.ok(!plan.read_roots.includes("/etc"));assert.ok(!plan.read_roots.includes("/usr/bin"));assert.ok(!plan.read_roots.includes(plan.codex_home));
+  const profile=probeSeatbelt({readRoots:[base.node.executable],home:"/owned/probe-home",workspace:"/owned/workspace",canaries:[]});
+  assert.match(profile,/deny default/u);assert.match(profile,/localhost/u);assert.match(profile,/com.apple.securityd/u);
+  assert.ok(!profile.includes(plan.codex_home));
+});
+test("refused/timeout/unsupported sockets remain unknown; only permission errors prove denial",()=>{
+  assert.equal(classifyDenial("EPERM"),"pass");assert.equal(classifyDenial("EACCES"),"pass");
+  assert.equal(classifyDenial("CONNECTED"),"fail");for(const code of ["ECONNREFUSED","TIMEOUT","EAFNOSUPPORT","ENOENT"])assert.equal(classifyDenial(code),"unknown");
+  assert.throws(()=>assertCanaryResult({kind:"ask_codex_canary_v1",filesystem:{read:"pass",write:"pass"},network:[]}));
+  assert.throws(()=>assertNoAclListing("-rw-------+ 1 owner group file\n"));
+  assert.doesNotThrow(()=>assertNoAclListing("-rw-------@ 1 owner group file\n"));
+});
+function syntheticHome(t,mode=0o755){
+  const root=mkdtempSync(join(realpathSync(tmpdir()),"ask-owned-metadata-"));t.after(()=>rmSync(root,{recursive:true,force:true}));
+  chmodSync(root,mode);writeFileSync(join(root,"auth.json"),"synthetic-not-a-secret",{mode:0o600});return root;
+}
+test("0755 existing-home metadata can pass without chmod or reading credential bytes",t=>{
+  const home=syntheticHome(t);mkdirSync(join(home,"sessions"),{mode:0o755});
+  writeFileSync(join(home,"sessions/historical.jsonl"),"historical-do-not-copy",{mode:0o644});
+  writeFileSync(join(home,"state_5.sqlite"),"unrelated-old-db",{mode:0o644});
+  const before=lstatSync(home).mode,result=inspectExistingCodexHome(home);
+  assert.equal(result.credential_contents,"not_read");assert.equal(result.chmod,false);assert.equal(lstatSync(home).mode,before);
+});
+for(const mode of [0o644,0o400,0o700])test(`synthetic credential mode ${mode.toString(8)} refuses metadata admission`,t=>{
+  const home=syntheticHome(t);chmodSync(join(home,"auth.json"),mode);assert.throws(()=>inspectExistingCodexHome(home),/metadata/u);
+});
+test("synthetic symlink/hardlink credentials and unsafe log index refuse",t=>{
+  const home=syntheticHome(t),auth=join(home,"auth.json");linkSync(auth,join(home,"owned-hardlink"));assert.throws(()=>inspectExistingCodexHome(home));
+  rmSync(join(home,"owned-hardlink"));rmSync(auth);symlinkSync(join(home,"missing-fixture"),auth);assert.throws(()=>inspectExistingCodexHome(home));
+  rmSync(auth);writeFileSync(auth,"fixture",{mode:0o600});writeFileSync(join(home,"session_index.jsonl"),"fixture",{mode:0o644});assert.throws(()=>inspectExistingCodexHome(home),/session_index/u);
+});
+
+test("admission freshness rejects invalid, future and expired timestamps", () => {
+  const now = Date.parse("2026-10-02T00:00:00Z");
+  assert.equal(freshAdmissionTime("invalid", now), false);
+  assert.equal(freshAdmissionTime("2026-10-02T00:00:01Z", now), false);
+  assert.equal(freshAdmissionTime("2026-10-01T22:59:59Z", now), false);
+  assert.equal(freshAdmissionTime("2026-10-01T23:00:00Z", now), true);
 });

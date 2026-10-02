@@ -5,7 +5,8 @@ A layered intelligence kernel for evidence-based routing, verification, review, 
 For the model-free local eval entry point, platform route decisions and remaining
 live-validation limits, see [Local eval distribution](docs/local-eval-distribution.md).
 The next adapter slice and its unexercised live admission boundary are described in
-[Local Codex connection](docs/local-codex-connection.md).
+[Local Codex connection](docs/local-codex-connection.md) and
+[split probe/evaluation admission](docs/local-codex-admission.md).
 
 AIエージェントが扱う要件・設計・実装・検証・レビュー・知識蓄積の複数スペクトラムを、証拠ベースで接続するKernel。
 

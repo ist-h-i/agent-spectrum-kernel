@@ -11,7 +11,11 @@ if (stage === "probe") {
   else if (condition === "1") process.stdout.write("--ignore-user-config --ignore-rules --json --output-schema --output-last-message --strict-config\n");
   else if (condition === "2") process.stdout.write("--include-managed-config -P -C\n");
   else if (scenario === "control-fail") { process.stderr.write("synthetic control mismatch\n"); process.exitCode = 5; }
-  else process.stdout.write("ASK_PILOT_CANARY_PASS\n");
+  else {
+    const result={kind:"ask_codex_canary_v1", filesystem:{read:"pass",write:scenario==="write-open"?"fail":"pass"}, network:[{host:"127.0.0.1",positive:scenario==="positive-unknown"?"unknown":"pass",denied:scenario==="network-open"?"fail":scenario==="network-unknown"?"unknown":"pass"},{host:"::1",positive:"pass",denied:"pass"}]};
+    if (scenario==="extra-keys") result.unobserved="must-refuse";
+    process.stdout.write(JSON.stringify(result)+"\n");
+  }
 } else {
   if (argv[0] !== "exec" || argv.at(-1) !== "-" || argv.includes("resume") || argv.includes("--ephemeral")
     || process.env.HOME === process.env.CODEX_HOME || !argv.includes("--ignore-user-config")) process.exit(9);
@@ -33,8 +37,10 @@ if (stage === "probe") {
     if (scenario !== "missing-session") {
       const sessions = join(process.env.CODEX_HOME, "sessions"); mkdirSync(sessions, { recursive: true, mode: 0o700 });
       const entries = [...JSON.parse(process.env.CONNECTION_DENIES).map(path => ({ path: { type: "path", path }, access: "deny" })),
+        ...JSON.parse(process.env.CONNECTION_READS).map(path => ({path:{type:"path",path},access:"read"})),
         { path: { type: "path", path: process.cwd() }, access: "write" },
         { path: { type: "path", path: join(process.env.CODEX_HOME, "tmp/arg0/codex-arg0Ab12Cd") }, access: "read" }];
+      if (scenario==="scope-leak") entries.push({path:{type:"path",path:"/personal-unadmitted"},access:"read"});
       const rows = [{ type: "session_meta", payload: { id, cli_version: "0.157.1", model_provider: "ask_pilot_openai", cwd: process.cwd() } },
         { type: "turn_context", payload: { turn_id: `turn-${id}`, cwd: process.cwd(), model: scenario === "identity" ? "wrong-model" : "gpt-6.1-sol", effort: "medium", approval_policy: "never",
           sandbox_policy: { type: "workspace-write", network_access: false }, permission_profile: { type: "managed", network: "restricted", file_system: { type: "restricted", entries } },
