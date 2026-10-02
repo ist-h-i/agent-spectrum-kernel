@@ -1,4 +1,4 @@
-// Invoked only inside the admitted Mac parent guard. Never reads credentials.
+// Ordinary trusted worker launches one model-tool sandbox. Never reads credentials.
 import { openSync, closeSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, createConnection } from "node:net";
 import { spawn } from "node:child_process";
@@ -29,8 +29,8 @@ async function guarded(spec) {
   catch { process.stderr.write("model-tool policy refused\n"); process.exitCode=6; return; }
   const servers = [], endpoints = [];
   try {
-    // Positive filesystem controls in the same outer guard prevent mistaking
-    // the parent's restriction for enforcement by the nested CLI profile.
+    // Positive controls in the ordinary trusted parent distinguish actual
+    // model-tool denial from missing files or unavailable loopback sockets.
     for (const path of spec.canary.deniedReads) { const fd=openSync(path,"r"); closeSync(fd); }
     { const fd=openSync(spec.canary.deniedWrite,"r+"); closeSync(fd); }
     for (const host of ["127.0.0.1", "::1"]) {

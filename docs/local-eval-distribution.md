@@ -5,6 +5,13 @@ Design/implementation `IMP-LOCAL-EVAL-315-1`, revision 1. Upstream: Issue #315
 Issue #291 retains all formal ACs, 14 pairs/28 trials, its budgets and #197
 authority. This document does not admit a formal experiment.
 
+Current execution adapter: [ordinary trusted-CLI lightweight route](local-codex-admission.md)
+in Draft #317, stacked on #316. It uses one model-free tool-sandbox control and
+at most two trials with fresh explicit CLI trust/traffic authority. Strict
+startup-zero-traffic admission is separate/unavailable and is not required by
+ordinary distribution. No guest/VM/Docker implementation or requirement is added.
+This correction is source/mock-only; native real-OS verification remains unmet.
+
 ## Route decision
 
 Choose a shared Node controller/scorer/store with POSIX process-group cleanup

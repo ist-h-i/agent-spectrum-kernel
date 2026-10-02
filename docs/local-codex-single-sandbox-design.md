@@ -1,7 +1,10 @@
-# Non-nested model-free admission design (Issue #315)
+# Strict startup-zero-traffic admission: deferred design history (Issue #315)
 
-Status: design only; no native CLI/probe, VM, network setting or OS permission
-operation performed. The current executable native route is disabled. Runtime
+Status: deferred optional strict design only; no native CLI/probe, VM, network
+setting or OS permission operation performed. Ordinary distribution now uses
+[trusted CLI + one model-tool sandbox](local-codex-admission.md) without requiring
+strict startup-zero-traffic admission. No guest implementation/setup is in scope.
+Only the strict native probe is unavailable. Runtime
 storage separation fixes the evidence/runtime collision in owned fake tests;
 it does not prove a fix for sandbox_apply EPERM.
 
@@ -18,8 +21,10 @@ by that observation alone. Moving HOME does not change this topology.
 [Pinned CLI startup](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/arg0/src/lib.rs)
 creates HOME-scoped helper aliases and can run configuration loading before the
 model-tool sandbox. Its filesystem/network effects cannot be constrained by
-the model-tool profile alone. Simply removing the outer guard would lose the
-approved model-free external-network restriction.
+the model-tool profile alone. Removing the outer guard loses the historical strict external-network restriction.
+Ordinary evaluation explicitly discloses that startup traffic is not guaranteed
+zero and requires fresh trust/traffic authority; it does not inherit the consumed
+strict grant. This stricter condition is not required by Issue #315 distribution.
 
 ## Candidate that avoids nesting
 

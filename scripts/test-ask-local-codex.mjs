@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { prepareCodexConnection, runCodexConnection, reopenCodexConnection, codexTrialLaunch, codexProbeLaunches, assertConnectionPermissionShape,
-  runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime, codexConnectionCommand, codexProbeParentPolicy, assertNativeAdmissionRoute } from "./ask-local-codex.mjs";
+  runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime, codexConnectionCommand, codexProbeParentPolicy, assertNativeAdmissionRoute, codexLightweightPolicy, codexLightweightControlLaunch } from "./ask-local-codex.mjs";
 import {inspectExistingCodexHome, classifyDenial, assertCanaryResult, probeSeatbelt, assertNoAclListing, assertProbeSandboxArgs} from "./ask-local-codex-boundaries.mjs";
 import { canonicalDigest } from "./content-addressed-store.mjs";
 import { parsePilotNativeSession, pilotEvidenceInventory } from "./ask-synthetic-json-pilot.mjs";
@@ -171,7 +171,7 @@ test("session runtime exception is restricted to an exact declared credential/se
   }
 });
 
-test("probe-only produces sealed synthetic admission without evaluation and evaluate does not repeat probes", t=>{
+test("optional strict mock evidence is preserved; ordinary eval owns exactly one control", t=>{
   const {privateRoot,plan,base,home}=prepared(t);
   const admission=runCodexProbes(privateRoot);
   assert.equal(admission.model_calls,0); assert.equal(admission.evidence_class,"synthetic_only");
@@ -180,29 +180,65 @@ test("probe-only produces sealed synthetic admission without evaluation and eval
   assert.equal(readdirSync(home).includes("sessions"),false);
   assert.equal(readdirSync(privateRoot).includes("connection-run-claim.json"),false);
   const before=snapshot(join(privateRoot,"connection-probe"));
-  const probe=codexPhasePermission(plan,"probe","new-probe-approval"),evaluate=codexPhasePermission(plan,"evaluate","new-eval-approval",canonicalDigest(admission));
+  const probe=codexPhasePermission(plan,"probe","new-probe-approval"),evaluate=codexPhasePermission(plan,"evaluate","new-eval-approval");
   assert.equal(probe.actions.trials,0); assert.equal(probe.actions.existing_home_cli_read_refresh,false);
   assert.equal(evaluate.actions.probes,0); assert.equal(evaluate.actions.trials,2);
-  assert.notDeepEqual(probe,evaluate);
+  assert.notDeepEqual(probe,evaluate); assert.equal(evaluate.actions.controls,1);
+  assert.equal(evaluate.kind,"ask_local_codex_lightweight_permission_v1");
+  assert.throws(()=>codexPhasePermission(plan,"evaluate","new-eval-approval",canonicalDigest(admission)),/no strict admission grant/u);
   assert.throws(()=>runCodexProbes(privateRoot));
   const report=evaluateCodexConnection(privateRoot);
-  assert.equal(report.stop,null); assert.deepEqual(snapshot(join(privateRoot,"connection-probe")),before);
+  assert.equal(report.stop,null); assert.equal(report.preflight.outcomes.length,1);
+  assert.deepEqual(snapshot(join(privateRoot,"connection-probe")),before);
   assert.deepEqual(reopenCodexProbes(privateRoot),admission); assert.deepEqual(reopenCodexConnection(privateRoot),report);
   const launch=codexTrialLaunch(plan,base,"plain");
   assert.ok(launch.argv.includes(`sqlite_home=${JSON.stringify(join(plan.runtime.root,"plain/home/sqlite"))}`));
   assert.ok(launch.argv.includes(`log_dir=${JSON.stringify(join(plan.runtime.root,"plain/home/log"))}`));
   assert.ok(launch.argv.includes('history.persistence="none"')); assert.ok(launch.argv.includes('memories.generate_memories=false'));
 });
-test("unsealed probe replay is explicit unknown and cannot launch evaluation", t=>{
-  const {privateRoot}=prepared(t),before=snapshot(privateRoot);
+test("ordinary eval does not require a strict probe or its admission seal", t=>{
+  const {privateRoot}=prepared(t);
   assert.equal(reopenCodexProbes(privateRoot).evidence_class,"unsealed_unknown");
-  assert.throws(()=>evaluateCodexConnection(privateRoot),/sealed probe/u); assert.deepEqual(snapshot(privateRoot),before);
+  const report=evaluateCodexConnection(privateRoot);
+  assert.equal(report.stop,null);assert.equal(report.preflight.outcomes.length,1);
+  assert.equal(readdirSync(privateRoot).includes("probe-claim.json"),false);
+  assert.equal(readdirSync(privateRoot).includes("connection-probe"),false);
+  assert.equal(readdirSync(join(privateRoot,"lightweight-control")).length,3);
 });
-test("probe bytes are verified again before any evaluation claim", t=>{
+test("tampered strict bytes are not authority for ordinary eval and remain unrepaired", t=>{
   const {privateRoot}=prepared(t);runCodexProbes(privateRoot);
   writeFileSync(join(privateRoot,"connection-probe/check-3/stdout.bin"),"altered\n");
-  assert.throws(()=>evaluateCodexConnection(privateRoot),/binding mismatch/u);
+  const before=snapshot(join(privateRoot,"connection-probe"));
+  assert.throws(()=>reopenCodexProbes(privateRoot),/binding mismatch/u);
+  assert.equal(evaluateCodexConnection(privateRoot).stop,null);
+  assert.deepEqual(snapshot(join(privateRoot,"connection-probe")),before);
+  assert.throws(()=>reopenCodexProbes(privateRoot),/binding mismatch/u);
+});
+for(const variant of ["old-strict","network","trust","counts"])test(`ordinary public evaluate rejects ${variant} permission before any claim or process`,t=>{
+  const {privateRoot,plan}=prepared(t),live=structuredClone(plan);live.mode="planned_live";
+  writeFileSync(join(privateRoot,"connection.json"),JSON.stringify(live));
+  writeFileSync(join(privateRoot,"connection-digest.json"),JSON.stringify({digest:canonicalDigest(live)}));
+  writeFileSync(join(live.runtime.root,"runtime-owner.json"),JSON.stringify({kind:"owned_external_runtime_v1",evidence_root:privateRoot,plan_digest:canonicalDigest(live)}));
+  let permission=codexPhasePermission(live,variant==="old-strict" ? "probe" : "evaluate","fresh-owned-negative-fixture");
+  if(variant==="network")permission.actions.openai_model_auth_managed_config_network=false;
+  if(variant==="trust")permission.trusted_cli_policy.cli_host_access="isolated";
+  if(variant==="counts")permission.actions.controls=4;
+  const before=snapshot(privateRoot),runtimeBefore=snapshot(live.runtime.root);
+  assert.throws(()=>evaluateCodexConnection(privateRoot,permission),/fresh exact phase permission/u);
+  assert.deepEqual(snapshot(privateRoot),before);assert.deepEqual(snapshot(live.runtime.root),runtimeBefore);
   assert.equal(readdirSync(privateRoot).includes("connection-run-claim.json"),false);
+});
+test("ordinary control launch has one CLI sandbox and no outer Seatbelt; tool grant stays closed", t=>{
+  const {plan,base}=prepared(t), original=structuredClone(plan.command);
+  const sandboxArgs=codexProbeLaunches(plan,base,[],"lightweight-control")[3].argv;
+  const args=sandboxArgs.slice(0,sandboxArgs.indexOf("--")+1),filesystem=args.find(x=>x.startsWith("permissions.ask_synthetic_pilot.filesystem="));
+  const launch=codexLightweightControlLaunch(plan,base,{sandboxArgs:args,canary:{},filesystem});
+  assert.equal(launch.executable,base.node.executable);assert.equal(launch.argv[1],"guarded");
+  const payload=JSON.parse(launch.argv[2]);assert.equal(payload.cli,plan.cli.executable);assert.equal(payload.argv[0],"sandbox");
+  assert.equal(launch.env.HOME,launch.env.CODEX_HOME);assert.notEqual(launch.env.CODEX_HOME,plan.codex_home);
+  assert.equal(launch.argv.includes("/usr/bin/sandbox-exec"),false);assert.deepEqual(plan.command,original);
+  assert.equal(plan.trusted_cli_policy.cli_startup_external_network,"zero_not_guaranteed");
+  assert.equal(codexPhasePermission(plan,"evaluate","fresh-lightweight-approval").actions.openai_model_auth_managed_config_network,true);
 });
 for(const probeOutcome of ["network-open","network-unknown","write-open","positive-unknown","extra-keys"]) test(`${probeOutcome} never produces admitted enforcement`,t=>{
   const {privateRoot}=prepared(t,{probeOutcome}); const report=runCodexConnection(privateRoot);
@@ -281,12 +317,15 @@ for (const variant of ["missing-command","no-root-deny","broad-read","no-network
   assert.throws(()=>codexTrialLaunch(changed,base,"plain"),/model-tool/u);
   assert.throws(()=>codexProbeLaunches(changed,base,[]),/model-tool/u);
 });
-test("new parent contract is mandatory for execution but saved incomplete replay remains readable", t=>{
+test("strict parent contract gates only strict mock probes, not ordinary evaluation", t=>{
   const {privateRoot,plan}=prepared(t),old=structuredClone(plan);delete old.probe_parent_policy;
   writeFileSync(join(privateRoot,"connection.json"),JSON.stringify(old));
   writeFileSync(join(privateRoot,"connection-digest.json"),JSON.stringify({digest:canonicalDigest(old)}));
+  writeFileSync(join(old.codex_home,"owned-simulation.json"),JSON.stringify({kind:"ask_owned_connection_simulation_v1",root:privateRoot,plan_digest:canonicalDigest(old)}));
+  writeFileSync(join(old.runtime.root,"runtime-owner.json"),JSON.stringify({kind:"owned_external_runtime_v1",evidence_root:privateRoot,plan_digest:canonicalDigest(old)}));
   assert.equal(reopenCodexProbes(privateRoot).evidence_class,"unsealed_unknown");
   const before=snapshot(privateRoot);assert.throws(()=>runCodexProbes(privateRoot),/parent contract/u);assert.deepEqual(snapshot(privateRoot),before);
+  assert.equal(evaluateCodexConnection(privateRoot).stop,null);
 });
 test("nested sandbox entry requires explicit closed filesystem/network profile and managed config",t=>{
   const {plan,base}=prepared(t),launch=codexProbeLaunches(plan,base,[])[3];
@@ -312,6 +351,10 @@ test("failed metadata never reports an exercised filesystem or network canary",t
   const report=runCodexProbes(privateRoot);
   assert.equal(report.outcomes.length,1);assert.equal(report.metadata_compatibility,"failed_or_unknown");
   assert.equal(report.filesystem_enforcement,"not_exercised");assert.equal(report.network_enforcement,"not_exercised");
+  assert.deepEqual(reopenCodexProbes(privateRoot),report);
+  const before=snapshot(join(privateRoot,"connection-probe"));
+  assert.equal(evaluateCodexConnection(privateRoot).stop,null);
+  assert.deepEqual(snapshot(join(privateRoot,"connection-probe")),before);
   assert.deepEqual(reopenCodexProbes(privateRoot),report);
 });
 
@@ -392,10 +435,14 @@ test("historical unsealed plan without runtime binding remains readable but cann
   assert.throws(()=>runCodexProbes(privateRoot));assert.deepEqual(snapshot(privateRoot),before);
 });
 
-test("known nested native route has no executable admission or automatic fallback",()=>{
-  assert.throws(()=>assertNativeAdmissionRoute({mode:"planned_live",host:{platform:"darwin"}}),/nested Seatbelt route/u);
-  assert.throws(()=>assertNativeAdmissionRoute({mode:"planned_live",host:{platform:"linux"}}),/nested Seatbelt route/u);
-  assert.doesNotThrow(()=>assertNativeAdmissionRoute({mode:"simulation"}));
+test("ordinary native evaluation is available while strict admission remains unavailable",()=>{
+  for(const platform of ["darwin","linux"]) {
+    const plan={mode:"planned_live",host:{platform},execution_route:"trusted_cli_lightweight_v1"};
+    plan.trusted_cli_policy=codexLightweightPolicy();
+    assert.doesNotThrow(()=>assertNativeAdmissionRoute(plan,"evaluate"));
+    assert.throws(()=>assertNativeAdmissionRoute(plan,"probe"),/strict native admission unavailable/u);
+    assert.throws(()=>assertNativeAdmissionRoute({...plan,trusted_cli_policy:{}} ,"evaluate"),/trusted CLI contract/u);
+  }
 });
 
 test("historical sealed failed admission without external runtime reopens read-only",t=>{

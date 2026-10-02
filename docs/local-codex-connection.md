@@ -1,6 +1,11 @@
 # Local Codex connection implementation (Issue #315)
 
-**Current execution admission: [split probe/evaluation v2](local-codex-admission.md).** The v1 command and blanket home-mode requirements below describe the earlier adapter and are retained as design history. New plans require the external runtime layout. Native execution is currently disabled pending a reviewed non-nested boundary; split phases and the combined entry are available for owned simulation only.
+**Current route: [ordinary trusted-CLI v2 evaluation](local-codex-admission.md).**
+The v1 command and blanket home-mode requirements below are retained as design
+history. New plans require external runtime, explicit CLI trust/traffic and a
+fresh lightweight permission. The implemented ordinary route has one control
+and two trials; this revision has no actual native execution. Strict native
+probe remains separately unavailable and is not its prerequisite.
 
 This slice is stacked on Draft #316 (`10a9dbb9d9a2d2039d000f660c2e5c0ae8ead71e`). It implements the execution adapter, then exercises it with an owned Node simulation. **No real Codex command, model request, authentication operation, Windows host or WSL host was exercised.** Implementation availability and execution admission are separate.
 
