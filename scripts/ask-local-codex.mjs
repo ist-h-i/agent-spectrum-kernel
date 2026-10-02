@@ -18,6 +18,13 @@ const SELF = "scripts/ask-local-codex.mjs", FAKE = "scripts/test-fixtures/local-
 const WORKER = "scripts/local-codex-probe-worker.mjs";
 const SOURCES = [SELF, FAKE, "scripts/ask-local-eval.mjs", "scripts/ask-local-codex-boundaries.mjs", WORKER];
 const PLAN = "connection.json", REPORT = "connection-report.json";
+export const DECLARED_READ_POLICY = "declared_denies_read_only_v1";
+const BROAD_PLAN = "ask_local_codex_connection_v3";
+const modernPlan = plan => ["ask_local_codex_connection_v2", BROAD_PLAN].includes(plan.kind);
+export const READ_POLICY_RISK = Object.freeze({
+  read_access:"host_reads_except_declared_denies", personal_files:"not_isolated", other_credential_stores:"not_isolated",
+  unlisted_grading_copies:"not_guaranteed_denied", tool_outputs:"may_be_transmitted_to_openai_despite_tool_network_deny",
+  inventory:"operator_assertion_not_discovery", runtime_verification:"not_established_by_simulation" });
 export const CODEX_CONNECTION_VERSION = "0.157.1";
 export const CONNECTION_SCENARIOS = ["pass", "wrong", "malformed", "unknown", "threshold", "exit", "timeout", "identity", "missing-session", "reused-session", "provider", "interrupt", "scope-leak"];
 const hash = value => `sha256:${createHash("sha256").update(value).digest("hex")}`;
@@ -89,19 +96,51 @@ export function assertConnectionPermissionShape(permission) {
     || !exactKeys(permission.admission, ["evidence_class", "source_digest", "cli_image_digest", "host", "network_enforcement", "evidence_ref"])) throw new Error("closed nonsecret connection permission required");
 }
 
-/** Reuse the pilot command; add only the existing session/auth store deny root. */
+/** Closed remains default. Broad read is a separate source/plan-bound opt-in. */
 export function codexConnectionCommand(plan, base) {
   const command = pilotCommand({ privateRoot: base.private_root, controllerRoot: base.controller_root, workspaceRoot: base.workspace_root });
-  const closed = plan.kind === "ask_local_codex_connection_v2";
-  const roots = [...(closed ? ["/"] : []), ...command.deny_roots, plan.codex_home, ...(plan.runtime ? [plan.runtime.root] : [])];
-  const argv = command.argv.filter((value,index,values) => !(closed && (value === 'permissions.ask_synthetic_pilot.extends=":workspace"' || (value === "-c" && values[index+1] === 'permissions.ask_synthetic_pilot.extends=":workspace"'))))
+  const broad = plan.kind === BROAD_PLAN, modern = modernPlan(plan);
+  const roots = [...(modern && !broad ? ["/"] : []), ...command.deny_roots, plan.codex_home,
+    ...(plan.runtime ? [plan.runtime.root] : []), ...(broad ? plan.read_policy.protected_roots.map(x=>x.path) : [])];
+  const argv = command.argv.filter((value,index,values) => !(modern && (value === 'permissions.ask_synthetic_pilot.extends=":workspace"' || (value === "-c" && values[index+1] === 'permissions.ask_synthetic_pilot.extends=":workspace"'))))
     .map(value => value.startsWith("permissions.ask_synthetic_pilot.filesystem=")
-      ? `permissions.ask_synthetic_pilot.filesystem={ ${roots.map(root => `${JSON.stringify(root)} = "deny"`).join(", ")}, ${closed ? plan.read_roots.map(root => `${JSON.stringify(root)} = "read"`).join(", ") + ", " : ""}":workspace_roots" = "write" }` : value);
-  if (closed) argv.splice(argv.length-1,0,...['sqlite_home={sqlite_home}','log_dir={log_dir}','history.persistence="none"','analytics.enabled=false','feedback.enabled=false',
+      ? `permissions.ask_synthetic_pilot.filesystem={ ${roots.map(root => `${JSON.stringify(root)} = "deny"`).join(", ")}, ${modern && !broad ? plan.read_roots.map(root => `${JSON.stringify(root)} = "read"`).join(", ") + ", " : ""}":workspace_roots" = "write" }` : value);
+  if (broad) argv.splice(argv.length-1,0,"-c",'permissions.ask_synthetic_pilot.extends=":read-only"');
+  if (modern) argv.splice(argv.length-1,0,...['sqlite_home={sqlite_home}','log_dir={log_dir}','history.persistence="none"','analytics.enabled=false','feedback.enabled=false',
     'check_for_update_on_startup=false','memories.generate_memories=false','memories.use_memories=false'].flatMap(value=>["-c",value]));
-  return { ...command, argv, deny_roots: roots, ...(closed ? {closed_read_scope:true, read_roots:plan.read_roots} : {}), execution_status: "requires_new_connection_permission" };
+  return { ...command, argv, deny_roots: roots,
+    ...(modern ? broad ? {declared_read_scope:true,read_policy:plan.read_policy} : {closed_read_scope:true, read_roots:plan.read_roots} : {}),
+    execution_status: "requires_new_connection_permission" };
 }
 
+function protectedIdentity(path) {
+  if (typeof path!=="string" || !isAbsolute(path) || resolve(path)!==path || path==="/" || realpathSync(path)!==path) throw new Error("canonical protected root required");
+  const st=lstatSync(path);
+  if (!st.isDirectory() && (!st.isFile() || st.nlink!==1)) throw new Error("regular protected root required");
+  return {dev:st.dev,ino:st.ino,uid:st.uid,type:st.isDirectory()?"directory":"file"};
+}
+function assertReadPolicy(plan, base, current=false) {
+  if (plan.kind !== BROAD_PLAN) {
+    if (plan.read_policy !== undefined) throw new Error("closed plan cannot acquire broad read policy");
+    return;
+  }
+  const policy=plan.read_policy;
+  if (!exactKeys(policy,["kind","risk_acknowledged","protected_roots_complete","protected_roots","risk"])
+    || policy.kind!==DECLARED_READ_POLICY || policy.risk_acknowledged!==true || policy.protected_roots_complete!==true
+    || !same(policy.risk,READ_POLICY_RISK) || !Array.isArray(policy.protected_roots) || policy.protected_roots.length>128
+    || !same(plan.read_roots,[])) throw new Error("explicit declared read policy required");
+  const paths=policy.protected_roots.map(x=>x?.path);
+  if (!same(paths,[...new Set(paths)].sort())) throw new Error("unique sorted protected roots required");
+  for (const entry of policy.protected_roots) {
+    if (!exactKeys(entry,["path","identity"]) || typeof entry.path!=="string" || !isAbsolute(entry.path) || resolve(entry.path)!==entry.path || entry.path==="/"
+      || !exactKeys(entry.identity,["dev","ino","uid","type"]) || !["directory","file"].includes(entry.identity.type)
+      || [entry.identity.dev,entry.identity.ino,entry.identity.uid].some(x=>!Number.isSafeInteger(x)||x<0)) throw new Error("bound protected root metadata required");
+    for (const root of [base.private_root,base.workspace_root,base.controller_root,plan.codex_home,plan.runtime.root])
+      if (within(entry.path,root)||within(root,entry.path)) throw new Error("additional protected root overlaps controlled roots");
+    if ([base.node.executable,plan.cli.executable].some(path=>within(entry.path,path))) throw new Error("protected root denies runtime image");
+    if (current && !same(entry.identity,protectedIdentity(entry.path))) throw new Error("protected root identity drift");
+  }
+}
 /** Sealed in new plans; never reused as a model-tool grant. */
 export function codexProbeParentPolicy(plan) {
   return {kind:"trusted_runtime_parent_v1",read_access:"host_reads_except_existing_codex_home",existing_home_deny:plan.codex_home,
@@ -109,28 +148,35 @@ export function codexProbeParentPolicy(plan) {
     write_access:"owned_probe_home_workspace_literal_canaries_dev_null",network:"loopback_only",keyring_ipc:"securityd_and_security_agent_denied"};
 }
 /** CLI/controller are trusted host processes; only model tools enter the sandbox. */
-export function codexLightweightPolicy() {
+export function codexLightweightPolicy(plan = null) {
   return {kind:"trusted_cli_lightweight_v1",cli_host_access:"ordinary_user_access_trusted",
-    model_tool_policy:"closed_read_manifest_workspace_write_network_denied",
+    model_tool_policy:plan?.kind===BROAD_PLAN ? "declared_denies_read_only_workspace_write_network_denied" : "closed_read_manifest_workspace_write_network_denied",
+    ...(plan?.kind===BROAD_PLAN ? {read_policy:plan.read_policy} : {}),
     control_home:"fresh_empty_external_runtime_no_existing_auth",
     evaluation_home:"existing_file_store_cli_read_refresh_new_session_write",
     cli_startup_external_network:"zero_not_guaranteed",cli_network_enforcement:"no_parent_egress_filter",
     permitted_cli_network:"openai_model_auth_managed_config",model_free_control_calls:1,trials:2,retry:0};
 }
 function assertModelToolBoundary(plan, base) {
-  if (plan.kind !== "ask_local_codex_connection_v2" || !plan.command || !Array.isArray(plan.read_roots)
-    || !same(plan.read_roots,closedReadRoots(plan.host.platform,base.node.executable,plan.cli.executable))
+  assertReadPolicy(plan,base);
+  if (!modernPlan(plan) || !plan.command || !Array.isArray(plan.read_roots)
+    || (plan.kind!==BROAD_PLAN && !same(plan.read_roots,closedReadRoots(plan.host.platform,base.node.executable,plan.cli.executable)))
     || !same(plan.command,codexConnectionCommand(plan,base))) throw new Error("closed model-tool policy required");
 }
 
 /** No Codex subprocess, credential file access, link, copy or auth configuration. */
 export function prepareCodexConnection(descriptor, { simulation = false, scenarios = ["pass", "pass"], probePass = true, probeOutcome = "pass", fakeTimeoutMs = null, host = null } = {}) {
   if (!descriptor || typeof descriptor !== "object" || Array.isArray(descriptor)
-    || Object.keys(descriptor).some(key => !["privateRoot", "workspaceParent", "codexHome", "runtimeRoot", "executable", "imageDigest"].includes(key))) throw new Error("closed connection descriptor required");
+    || Object.keys(descriptor).some(key => !["privateRoot", "workspaceParent", "codexHome", "runtimeRoot", "executable", "imageDigest", "readPolicy"].includes(key))) throw new Error("closed connection descriptor required");
+  const optIn=descriptor.readPolicy;
+  if (optIn!==undefined && (!exactKeys(optIn,["kind","riskAcknowledged","protectedRootsComplete","protectedRoots"])
+    || optIn.kind!==DECLARED_READ_POLICY || optIn.riskAcknowledged!==true || optIn.protectedRootsComplete!==true
+    || !Array.isArray(optIn.protectedRoots) || optIn.protectedRoots.length>128
+    || optIn.protectedRoots.some(x=>typeof x!=="string") || new Set(optIn.protectedRoots).size!==optIn.protectedRoots.length)) throw new Error("explicit broad read risk and complete inventory acknowledgement required");
   if (process.platform === "win32") throw new Error("use Linux Node inside WSL2");
   if (simulation && (descriptor.executable !== undefined || descriptor.imageDigest !== undefined)) throw new Error("simulation cannot bind a native image");
   if (!simulation && (host !== null || fakeTimeoutMs !== null || !same(scenarios, ["pass", "pass"]) || !probePass || probeOutcome!=="pass")) throw new Error("synthetic options forbidden in live plan");
-  if (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail"].includes(probeOutcome)) throw new Error("closed probe scenario required");
+  if (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail","unrelated-read-denied","unrelated-write-open","declared-read-open"].includes(probeOutcome)) throw new Error("closed probe scenario required");
   if (!Array.isArray(scenarios) || scenarios.length !== 2 || scenarios.some(value => !CONNECTION_SCENARIOS.includes(value))) throw new Error("closed simulation scenarios required");
   if (fakeTimeoutMs !== null && (!Number.isInteger(fakeTimeoutMs) || fakeTimeoutMs < 20 || fakeTimeoutMs > PILOT_LIMITS.timeout_ms)) throw new Error("invalid simulation timeout");
   const observed = localPreflight();
@@ -159,13 +205,17 @@ export function prepareCodexConnection(descriptor, { simulation = false, scenari
   const base = readPilotPlan(prepared.privateRoot);
   const runtime = {kind:RUNTIME_LAYOUT, root:runtimeRoot, identity}; runtimeShape(runtime,base,codexHome);
   for (const root of [base.private_root, base.workspace_root]) if (within(root, codexHome) || within(codexHome, root)) throw new Error("overlapping session/evidence/workspace roots");
-  const plan = { kind: "ask_local_codex_connection_v2", mode: simulation ? "simulation" : "planned_live", base_digest: prepared.planDigest,
+  const plan = { kind: optIn ? BROAD_PLAN : "ask_local_codex_connection_v2", mode: simulation ? "simulation" : "planned_live", base_digest: prepared.planDigest,
     source: source(), host: observed.host, route_host: routeHost, route: selected.route, cli: { version: CODEX_CONNECTION_VERSION, executable, image_digest: image.rawByteDigest },
-    codex_home: codexHome, home_identity:homeIdentity, runtime, read_roots:closedReadRoots(observed.host.platform, base.node.executable, executable), auth: "existing_file_store_cli_only_no_controller_credential_operations",
+    codex_home: codexHome, home_identity:homeIdentity, runtime, read_roots:optIn ? [] : closedReadRoots(observed.host.platform, base.node.executable, executable),
+    ...(optIn ? {read_policy:{kind:DECLARED_READ_POLICY,risk_acknowledged:true,protected_roots_complete:true,risk:structuredClone(READ_POLICY_RISK),
+      protected_roots:optIn.protectedRoots.slice().sort().map(path=>({path,identity:protectedIdentity(path)}))}} : {}), auth: "existing_file_store_cli_only_no_controller_credential_operations",
     guard: observed.host.platform === "darwin" ? { executable:"/usr/bin/sandbox-exec", image_digest:hash(bytes("/usr/bin/sandbox-exec")) } : null,
     constraints: structuredClone(PILOT_LIMITS), scenarios, probe_pass: probePass, probe_outcome:probeOutcome, fake_timeout_ms: fakeTimeoutMs,
     live_ready: false, admission: "not_exercised", synthetic_host: host !== null,
-    execution_route:"trusted_cli_lightweight_v1", trusted_cli_policy:codexLightweightPolicy() };
+    execution_route:"trusted_cli_lightweight_v1" };
+  assertReadPolicy(plan,base,true);
+  plan.trusted_cli_policy=codexLightweightPolicy(plan);
   plan.command = codexConnectionCommand(plan, base);
   plan.probe_parent_policy = codexProbeParentPolicy(plan);
   save(join(prepared.privateRoot, PLAN), plan);
@@ -177,7 +227,7 @@ export function prepareCodexConnection(descriptor, { simulation = false, scenari
 
 function readConnection(root, current = false) {
   const base = readPilotPlan(root), plan = read(join(root, PLAN));
-  if (!["ask_local_codex_connection_v1", "ask_local_codex_connection_v2"].includes(plan.kind) || !["simulation", "planned_live"].includes(plan.mode)
+  if (!["ask_local_codex_connection_v1", "ask_local_codex_connection_v2", BROAD_PLAN].includes(plan.kind) || !["simulation", "planned_live"].includes(plan.mode)
     || plan.base_digest !== canonicalDigest(base) || canonicalDigest(plan) !== read(join(root, "connection-digest.json")).digest
     || plan.cli.version !== CODEX_CONNECTION_VERSION || plan.live_ready !== false
     || plan.route !== selectLocalRoute(plan.route_host).route || !selectLocalRoute(plan.route_host).fake_ready
@@ -185,8 +235,9 @@ function readConnection(root, current = false) {
     || plan.scenarios.length !== 2 || plan.scenarios.some(value => !CONNECTION_SCENARIOS.includes(value))
     || (plan.mode === "planned_live" && (plan.synthetic_host || !same(plan.host, plan.route_host)
       || !same(plan.scenarios, ["pass", "pass"]) || !plan.probe_pass || plan.fake_timeout_ms !== null))) throw new Error("connection plan drift");
+  assertReadPolicy(plan,base,current);
   if (current) {
-    if (plan.kind==="ask_local_codex_connection_v2" && (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail"].includes(plan.probe_outcome)
+    if (modernPlan(plan) && (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail","unrelated-read-denied","unrelated-write-open","declared-read-open"].includes(plan.probe_outcome)
       || (plan.mode==="planned_live" && plan.probe_outcome!=="pass"))) throw new Error("probe scenario drift");
     if (plan.mode === "simulation" && plan.cli.executable !== realpathSync(process.execPath)) throw new Error("simulation runtime drift");
     const imageStat = lstatSync(plan.cli.executable);
@@ -195,11 +246,11 @@ function readConnection(root, current = false) {
     assertPilotCurrentSource(base);
     if (!same(plan.source, source()) || !same(plan.host, localPreflight().host)
       || hash(bytes(plan.cli.executable, 256 * 1024 * 1024)) !== plan.cli.image_digest) throw new Error("connection source/host/image drift");
-    if (plan.kind === "ask_local_codex_connection_v2") {
+    if (modernPlan(plan)) {
       assertModelToolBoundary(plan,base);
-      if (plan.execution_route!=="trusted_cli_lightweight_v1" || !same(plan.trusted_cli_policy,codexLightweightPolicy())) throw new Error("fresh trusted CLI contract required");
+      if (plan.execution_route!=="trusted_cli_lightweight_v1" || !same(plan.trusted_cli_policy,codexLightweightPolicy(plan))) throw new Error("fresh trusted CLI contract required");
       if (!same(plan.home_identity, existingHomeRoot(plan.codex_home))
-        || !same(plan.read_roots, closedReadRoots(plan.host.platform, base.node.executable, plan.cli.executable))) throw new Error("home/read scope drift");
+        || (plan.kind!==BROAD_PLAN && !same(plan.read_roots, closedReadRoots(plan.host.platform, base.node.executable, plan.cli.executable)))) throw new Error("home/read scope drift");
     } else ownerDirectory(plan.codex_home);
     if (plan.mode === "simulation" && (!same(read(join(plan.codex_home, "owned-simulation.json")),
       { kind: "ask_owned_connection_simulation_v1", root, plan_digest: canonicalDigest(plan) })
@@ -241,9 +292,9 @@ export function codexProbeLaunches(plan, base, canaries, phase = "connection-pro
 
 /** One trusted worker -> one CLI sandbox -> canary; no outer Seatbelt process. */
 export function codexLightweightControlLaunch(plan,base,{sandboxArgs,canary,filesystem}) {
-  assertModelToolBoundary(plan,base); assertProbeSandboxArgs(sandboxArgs,{filesystem});
+  assertModelToolBoundary(plan,base); assertProbeSandboxArgs(sandboxArgs,{filesystem,declaredRead:plan.kind===BROAD_PLAN});
   const template=codexProbeLaunches(plan,base,[],"lightweight-control")[3];
-  const payload={cli:plan.cli.executable,argv:sandboxArgs,node:base.node.executable,worker:join(ROOT,WORKER),cwd:template.cwd,canary,filesystem};
+  const payload={cli:plan.cli.executable,argv:sandboxArgs,node:base.node.executable,worker:join(ROOT,WORKER),cwd:template.cwd,canary,filesystem,declaredRead:plan.kind===BROAD_PLAN};
   return {...template,executable:base.node.executable,argv:[join(ROOT,WORKER),"guarded",JSON.stringify(payload)]};
 }
 
@@ -256,7 +307,7 @@ function invoke(plan, launch, stage, scenario, condition, root, command) {
   }
   return executeContainedAgent(realpathSync(process.execPath), [join(ROOT, FAKE), stage, scenario, condition, ...argv],
     { ...options, timeout: stage === "exec" ? plan.fake_timeout_ms ?? options.timeout : options.timeout,
-      env: { ...options.env, CONNECTION_EVIDENCE: root, CONNECTION_DENIES: JSON.stringify(command.deny_roots), CONNECTION_READS:JSON.stringify(command.read_roots??[]) }, recordCleanupFailure: true });
+      env: { ...options.env, CONNECTION_EVIDENCE: root, CONNECTION_DENIES: JSON.stringify(command.deny_roots), CONNECTION_READS:JSON.stringify(command.read_roots??[]), CONNECTION_READ_POLICY:plan.kind===BROAD_PLAN ? DECLARED_READ_POLICY : "closed" }, recordCleanupFailure: true });
 }
 
 function checks(plan, base, lightweight = false) {
@@ -269,14 +320,16 @@ function checks(plan, base, lightweight = false) {
   const other = join(base.workspace_root, `${phase}-other-trial-canary`); mkdirSync(other, { mode: 0o700 }); raw(join(other, "private.txt"), "ASK_OTHER_CANARY\n");
   const authCanary=join(root,"synthetic-auth-material.txt"), unrelatedCanary=base.workspace_root+`-${phase}-unrelated-canary.txt`;
   raw(authCanary,"ASK_SYNTHETIC_AUTH_NOT_A_CREDENTIAL\n"); raw(unrelatedCanary,"ASK_UNRELATED_CANARY\n");
-  const deniedReads = [privateFile, join(other, "private.txt"), authCanary, unrelatedCanary], deniedWrite = join(other, "private.txt");
+  const broad=plan.kind===BROAD_PLAN;
+  const declaredCanary=join(root,"declared-copy-canary.txt"); if(broad) raw(declaredCanary,"ASK_DECLARED_COPY_CANARY\n");
+  const deniedReads = [privateFile, join(other, "private.txt"), authCanary, broad ? declaredCanary : unrelatedCanary, ...(broad ? plan.read_policy.protected_roots.map(x=>x.path) : [])], deniedWrite = join(other, "private.txt");
   const launches = codexProbeLaunches(plan, base, [publicFile, ...deniedReads],phase);
   const workerRoots = [WORKER, "scripts/ask-local-codex-boundaries.mjs", "scripts/content-addressed-store.mjs"].map(path => join(ROOT, path));
-  const canary = { publicFile, allowedWrite:join(workspace,"write.txt"), deniedReads, deniedWrite };
+  const canary = { publicFile, allowedWrite:join(workspace,"write.txt"), deniedReads, deniedWrite, ...(broad ? {unrelatedFile:unrelatedCanary} : {}) };
   const sandboxArgs = launches[3].argv.slice(0, launches[3].argv.indexOf("--")+1).map(value => value.startsWith("permissions.ask_synthetic_pilot.filesystem=")
     ? value.replace(', ":workspace_roots"', `, ${workerRoots.map(path=>`${JSON.stringify(path)} = "read"`).join(", ")}, ":workspace_roots"`) : value);
   const filesystem = sandboxArgs.find(value=>value.startsWith("permissions.ask_synthetic_pilot.filesystem="));
-  assertProbeSandboxArgs(sandboxArgs,{filesystem});
+  assertProbeSandboxArgs(sandboxArgs,{filesystem,declaredRead:plan.kind===BROAD_PLAN});
   const profile = lightweight ? null : probeSeatbelt({codexHome:plan.codex_home, home:launches[0].env.HOME, workspace, canaries:[...deniedReads,deniedWrite]});
   const outcomes = [];
   for (const index of lightweight ? [3] : [0,1,2,3]) {
@@ -284,7 +337,7 @@ function checks(plan, base, lightweight = false) {
     let launch = launches[index];
     if (plan.mode === "planned_live") {
       if (!lightweight && (plan.host.platform !== "darwin" || !plan.guard)) throw new Error("real probe parent guard currently Mac only");
-      const payload = {cli:plan.cli.executable, argv:sandboxArgs, node:base.node.executable, worker:join(ROOT,WORKER), cwd:workspace, canary, filesystem};
+      const payload = {cli:plan.cli.executable, argv:sandboxArgs, node:base.node.executable, worker:join(ROOT,WORKER), cwd:workspace, canary, filesystem,declaredRead:broad};
       const child = index === 3 ? [base.node.executable,join(ROOT,WORKER),"guarded",JSON.stringify(payload)] : [launch.executable,...launch.argv];
       launch = lightweight ? codexLightweightControlLaunch(plan,base,{sandboxArgs,canary,filesystem})
         : {...launch, executable:plan.guard.executable, argv:["-p",profile,"--",...child]};
@@ -296,7 +349,7 @@ function checks(plan, base, lightweight = false) {
     const out = Buffer.from(proc.stdout ?? "").toString("utf8");
     const match = index === 0 ? out.trim() === `codex-cli ${CODEX_CONNECTION_VERSION}`
       : index === 1 ? ["--ignore-user-config", "--ignore-rules", "--json", "--output-schema", "--output-last-message", "--strict-config"].every(flag => out.includes(flag))
-      : index === 2 ? ["--include-managed-config", "-P", "-C"].every(flag => out.includes(flag)) : (() => { try { assertCanaryResult(parseJsonRejectDuplicateKeys(out)); return true; } catch { return false; } })();
+      : index === 2 ? ["--include-managed-config", "-P", "-C"].every(flag => out.includes(flag)) : (() => { try { assertCanaryResult(parseJsonRejectDuplicateKeys(out),{declaredRead:broad}); return true; } catch { return false; } })();
     const pass = proc.status === 0 && !proc.error && !proc.signal && !proc.workspace_descendants_detected && !process.output_limited && match && Buffer.from(proc.stderr ?? "").length === 0;
     outcomes.push({ index, status: pass ? "pass" : "fail", process });
     if (!pass) break;
@@ -304,18 +357,18 @@ function checks(plan, base, lightweight = false) {
   if (lightweight) {
     const pass=outcomes.length===1 && outcomes[0].status==="pass", evidence=plan.mode==="simulation" ? "synthetic_only" : "observed_host_control";
     return {kind:"ask_local_codex_lightweight_control_v1",status:pass ? "pass" : "fail",outcomes,evidence_class:evidence,
-      filesystem_enforcement:pass ? (plan.mode==="simulation" ? "synthetic_only" : "observed_closed_read_and_deny_write") : "failed_or_unknown",
+      filesystem_enforcement:pass ? (plan.mode==="simulation" ? "synthetic_only" : (broad ? "observed_declared_denies_read_only_and_deny_write" : "observed_closed_read_and_deny_write")) : "failed_or_unknown",
       network_enforcement:pass ? (plan.mode==="simulation" ? "synthetic_only" : "observed_model_tool_loopback_tcp_v4_v6") : "failed_or_unknown",
-      filesystem_canary_scope:["synthetic_grading_material","other_trial","synthetic_auth_material","unrelated_file"],
+      filesystem_canary_scope:broad ? ["synthetic_grading_material","other_trial","synthetic_auth_material","declared_copy","unrelated_read_allowed_write_denied"] : ["synthetic_grading_material","other_trial","synthetic_auth_material","unrelated_file"],
       cli_startup_external_network:"zero_not_guaranteed",authentication:"not_checked",model_calls:0};
   }
   const metadataPassed = outcomes.length >= 3 && outcomes.slice(0,3).every(x=>x.status === "pass");
-  const canaryStatus = outcomes.length < 4 ? "not_exercised" : outcomes[3].status === "pass" ? (plan.mode === "simulation" ? "synthetic_only" : "observed_closed_read_and_deny_write") : "failed_or_unknown";
+  const canaryStatus = outcomes.length < 4 ? "not_exercised" : outcomes[3].status === "pass" ? (plan.mode === "simulation" ? "synthetic_only" : (broad ? "observed_declared_denies_read_only_and_deny_write" : "observed_closed_read_and_deny_write")) : "failed_or_unknown";
   return { status: outcomes.length === 4 && outcomes.every(x => x.status === "pass") ? "pass" : "fail", outcomes,
     evidence_class: plan.mode === "simulation" ? "synthetic_only" : "observed_host_control",
     metadata_compatibility: metadataPassed ? (plan.mode === "simulation" ? "synthetic_only" : "observed_version_and_flags") : "failed_or_unknown",
     network_enforcement: outcomes.length < 4 ? "not_exercised" : outcomes.every(x=>x.status === "pass") ? (plan.mode === "simulation" ? "synthetic_only" : "observed_loopback_tcp_v4_v6") : "failed_or_unknown",
-    filesystem_enforcement: canaryStatus, filesystem_canary_scope:["synthetic_grading_material","other_trial","synthetic_auth_material","unrelated_file"], authentication: "not_checked", model_calls: 0 };
+    filesystem_enforcement: canaryStatus, filesystem_canary_scope:broad ? ["synthetic_grading_material","other_trial","synthetic_auth_material","declared_copy","unrelated_read_allowed_write_denied"] : ["synthetic_grading_material","other_trial","synthetic_auth_material","unrelated_file"], authentication: "not_checked", model_calls: 0 };
 }
 
 function phaseActions(phase) { return phase === "probe" ? {probes:4,trials:0,retry:0,existing_home_cli_read_refresh:false,external_network:false,loopback:true}
@@ -324,8 +377,8 @@ function phaseActions(phase) { return phase === "probe" ? {probes:4,trials:0,ret
 export function codexPhasePermission(plan, phase, approvalRef, admissionDigest = null) {
   if (!["probe","evaluate"].includes(phase) || typeof approvalRef !== "string" || approvalRef.length < 10) throw new Error("explicit phase/approval reference required");
   if (phase === "evaluate") {
-    if (admissionDigest !== null || plan.execution_route!=="trusted_cli_lightweight_v1" || !same(plan.trusted_cli_policy,codexLightweightPolicy())) throw new Error("fresh lightweight permission requires trusted CLI contract; no strict admission grant");
-    return {kind:"ask_local_codex_lightweight_permission_v1",phase,plan_digest:canonicalDigest(plan),source_digest:canonicalDigest(plan.source),
+    if (!modernPlan(plan) || admissionDigest !== null || plan.execution_route!=="trusted_cli_lightweight_v1" || !same(plan.trusted_cli_policy,codexLightweightPolicy(plan))) throw new Error("fresh lightweight permission requires trusted CLI contract; no strict admission grant");
+    return {kind:plan.kind===BROAD_PLAN ? "ask_local_codex_declared_read_permission_v1" : "ask_local_codex_lightweight_permission_v1",phase,plan_digest:canonicalDigest(plan),source_digest:canonicalDigest(plan.source),
       cli_image_digest:plan.cli.image_digest,command_digest:canonicalDigest(plan.command),route:plan.route,runtime:plan.runtime,
       trusted_cli_policy:plan.trusted_cli_policy,approval_ref:approvalRef,
       actions:{controls:1,probes:0,trials:2,retry:0,existing_home_cli_read_refresh:true,existing_home_new_session_write:true,
@@ -336,7 +389,7 @@ export function codexPhasePermission(plan, phase, approvalRef, admissionDigest =
     ...(plan.runtime ? {runtime:plan.runtime} : {}), actions:phaseActions(phase), approval_ref:approvalRef, admission_digest:admissionDigest};
 }
 function phasePermission(plan, phase, permission, admissionDigest = null) {
-  if (plan.kind !== "ask_local_codex_connection_v2") throw new Error("fresh exact v2 phase plan required");
+  if (!modernPlan(plan)) throw new Error("fresh exact versioned phase plan required");
   if (plan.mode === "simulation") { if (permission !== null) throw new Error("permission cannot promote simulation"); return; }
   if (!permission || !same(permission, codexPhasePermission(plan,phase,permission.approval_ref,admissionDigest))) throw new Error("fresh exact phase permission required");
   assertNativeAdmissionRoute(plan,phase);
@@ -346,7 +399,7 @@ export function assertNativeAdmissionRoute(plan, phase = "probe") {
   if (plan.mode !== "planned_live") return;
   if (phase !== "evaluate") throw new Error("strict native admission unavailable: nested Seatbelt route requires separate redesign");
   if (!["darwin","linux"].includes(plan.host.platform) || plan.execution_route!=="trusted_cli_lightweight_v1"
-    || !same(plan.trusted_cli_policy,codexLightweightPolicy())) throw new Error("fresh trusted CLI contract required");
+    || !same(plan.trusted_cli_policy,codexLightweightPolicy(plan))) throw new Error("fresh trusted CLI contract required");
 }
 const probeInventory = root => Object.fromEntries(Object.entries(pilotEvidenceInventory(root)).filter(([path]) => path.startsWith("connection-probe/") || ["probe-claim.json","probe-permission.json","probe-report.json"].includes(path)));
 export function runCodexProbes(root, permission = null) {
@@ -442,7 +495,7 @@ export function evaluateCodexConnection(root, permission = null) {
   if (plan.mode === "planned_live") save(join(root,"home-metadata-before.json"),inspectExistingCodexHome(plan.codex_home));
   if (permission) save(join(root,"connection-permission.json"),permission);
   save(join(root, "connection-run-claim.json"), { state: "spent", plan_digest: canonicalDigest(plan), permission_digest: permission ? canonicalDigest(permission) : null });
-  const report = { kind: "ask_local_codex_report_v1", mode: plan.mode, plan_digest: canonicalDigest(plan), route: plan.route,
+  const report = { kind: "ask_local_codex_report_v1", ...(plan.kind===BROAD_PLAN ? {read_policy:plan.read_policy} : {}), mode: plan.mode, plan_digest: canonicalDigest(plan), route: plan.route,
     execution_status: "incomplete", retry: 0, model_calls: plan.mode === "simulation" ? 0 : "unobserved",
     credential_operations: plan.mode === "simulation" ? 0 : "cli_read_refresh_unobserved", total_known_tokens: 0, stop: null,
     slots: ["plain", "kernel_only"].map(condition => ({ condition, state: "not_started" })) };
@@ -494,7 +547,8 @@ export function reopenCodexConnection(root) {
   const seal = read(join(root, "evidence-seal.json"));
   if (seal.plan_digest !== canonicalDigest(plan) || !same(seal.files, pilotEvidenceInventory(root))) throw new Error("connection evidence digest mismatch");
   const report = read(join(root, REPORT));
-  if (report.kind !== "ask_local_codex_report_v1" || report.mode !== plan.mode || report.plan_digest !== canonicalDigest(plan)) throw new Error("connection report binding mismatch");
+  if (report.kind !== "ask_local_codex_report_v1" || report.mode !== plan.mode || report.plan_digest !== canonicalDigest(plan)
+    || (plan.kind===BROAD_PLAN && !same(report.read_policy,plan.read_policy))) throw new Error("connection report binding mismatch");
   return report;
 }
 

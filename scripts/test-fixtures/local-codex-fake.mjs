@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 
 const [stage, scenario, condition, ...argv] = process.argv.slice(2);
 const root = process.env.CONNECTION_EVIDENCE;
+const broad=process.env.CONNECTION_READ_POLICY==="declared_denies_read_only_v1";
 writeFileSync(join(root, "received.json"), JSON.stringify({ argv, env: process.env }), { mode: 0o600, flag: "wx" });
 if (stage === "probe") {
   // Reproduce ordinary CLI runtime artifacts without invoking Codex.
@@ -19,6 +20,9 @@ if (stage === "probe") {
   else if (scenario === "control-fail") { process.stderr.write("synthetic control mismatch\n"); process.exitCode = 5; }
   else {
     const result={kind:"ask_codex_canary_v1", filesystem:{read:"pass",write:scenario==="write-open"?"fail":"pass"}, network:[{host:"127.0.0.1",positive:scenario==="positive-unknown"?"unknown":"pass",denied:scenario==="network-open"?"fail":scenario==="network-unknown"?"unknown":"pass"},{host:"::1",positive:"pass",denied:"pass"}]};
+    if(broad) { result.kind="ask_codex_canary_v2";result.filesystem.unrelated_read=scenario==="unrelated-read-denied"?"unknown":"pass";
+      result.filesystem.unrelated_write=scenario==="unrelated-write-open"?"fail":"pass";
+      if(scenario==="declared-read-open")result.filesystem.read="fail"; }
     if (scenario==="extra-keys") result.unobserved="must-refuse";
     process.stdout.write(JSON.stringify(result)+"\n");
   }
@@ -43,6 +47,7 @@ if (stage === "probe") {
     if (scenario !== "missing-session") {
       const sessions = join(process.env.CODEX_HOME, "sessions"); mkdirSync(sessions, { recursive: true, mode: 0o700 });
       const entries = [...JSON.parse(process.env.CONNECTION_DENIES).map(path => ({ path: { type: "path", path }, access: "deny" })),
+        ...(broad ? [{path:{type:"special",value:{kind:"root"}},access:"read"}] : []),
         ...JSON.parse(process.env.CONNECTION_READS).map(path => ({path:{type:"path",path},access:"read"})),
         { path: { type: "path", path: process.cwd() }, access: "write" },
         { path: { type: "path", path: join(process.env.CODEX_HOME, "tmp/arg0/codex-arg0Ab12Cd") }, access: "read" }];

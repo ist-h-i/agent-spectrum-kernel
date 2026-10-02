@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { prepareCodexConnection, runCodexConnection, reopenCodexConnection, codexTrialLaunch, codexProbeLaunches, assertConnectionPermissionShape,
-  runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime, codexConnectionCommand, codexProbeParentPolicy, assertNativeAdmissionRoute, codexLightweightPolicy, codexLightweightControlLaunch } from "./ask-local-codex.mjs";
+  runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime, codexConnectionCommand, codexProbeParentPolicy, assertNativeAdmissionRoute, codexLightweightPolicy, codexLightweightControlLaunch, DECLARED_READ_POLICY, READ_POLICY_RISK } from "./ask-local-codex.mjs";
 import {inspectExistingCodexHome, classifyDenial, assertCanaryResult, probeSeatbelt, assertNoAclListing, assertProbeSandboxArgs} from "./ask-local-codex-boundaries.mjs";
 import { canonicalDigest } from "./content-addressed-store.mjs";
 import { parsePilotNativeSession, pilotEvidenceInventory } from "./ask-synthetic-json-pilot.mjs";
@@ -18,7 +18,11 @@ function prepared(t, options = {}) {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const home = join(dir, "owned-home"), parent = join(dir, "workspaces"), runtimeRoot = join(dir,"runtime");
   mkdirSync(home, { mode: 0o700 }); mkdirSync(parent, { mode: 0o700 }); mkdirSync(runtimeRoot,{mode:0o700});
-  const result = prepareCodexConnection({ privateRoot: join(dir, "evidence"), workspaceParent: parent, codexHome: home, runtimeRoot }, { simulation: true, ...options });
+  const {readPolicy,...simulationOptions}=options;
+  const protectedRoot=join(dir,"old-grading-copy");
+  if(readPolicy===true) { mkdirSync(protectedRoot,{mode:0o700});writeFileSync(join(protectedRoot,"synthetic-answer.txt"),"synthetic",{mode:0o600}); }
+  const selection=readPolicy===true ? {kind:DECLARED_READ_POLICY,riskAcknowledged:true,protectedRootsComplete:true,protectedRoots:[protectedRoot]} : readPolicy;
+  const result = prepareCodexConnection({ ...(selection!==undefined ? {readPolicy:selection} : {}), privateRoot: join(dir, "evidence"), workspaceParent: parent, codexHome: home, runtimeRoot }, { simulation: true, ...simulationOptions });
   return { ...result, home, dir, plan: json(join(result.privateRoot, "connection.json")), base: json(join(result.privateRoot, "plan.json")) };
 }
 function snapshot(root) {
@@ -460,4 +464,101 @@ test("historical sealed failed admission without external runtime reopens read-o
   const before=snapshot(privateRoot);
   assert.deepEqual(reopenCodexProbes(privateRoot),report);
   assert.deepEqual(snapshot(privateRoot),before);
+});
+
+
+test("declared read is explicit opt-in, binds inventory/risk and excludes temporary writes",t=>{
+  const closed=prepared(t), candidate=prepared(t,{readPolicy:true});
+  assert.equal(closed.plan.kind,"ask_local_codex_connection_v2");assert.equal(closed.plan.read_policy,undefined);
+  const {plan,base}=candidate;
+  assert.equal(plan.kind,"ask_local_codex_connection_v3");assert.deepEqual(plan.read_policy.risk,READ_POLICY_RISK);
+  assert.equal(plan.command.declared_read_scope,true);assert.equal(plan.command.closed_read_scope,undefined);
+  assert.deepEqual(plan.read_roots,[]);assert.ok(!plan.command.deny_roots.includes("/"));
+  assert.ok(plan.command.deny_roots.includes(plan.read_policy.protected_roots[0].path));
+  for(const root of [base.controller_root,base.private_root,base.workspace_root,plan.codex_home,plan.runtime.root])assert.ok(plan.command.deny_roots.includes(root));
+  assert.ok(plan.command.argv.includes('permissions.ask_synthetic_pilot.extends=":read-only"'));
+  assert.ok(!plan.command.argv.includes('permissions.ask_synthetic_pilot.extends=":workspace"'));
+  const grant=codexPhasePermission(plan,"evaluate","new-approval-reference");
+  assert.equal(grant.kind,"ask_local_codex_declared_read_permission_v1");
+  assert.deepEqual(grant.trusted_cli_policy.read_policy,plan.read_policy);
+  assert.notEqual(grant.plan_digest,codexPhasePermission(closed.plan,"evaluate","new-approval-reference").plan_digest);
+  const launches=codexProbeLaunches(plan,base,[]),argv=launches[3].argv.slice(0,launches[3].argv.indexOf("--")+1);
+  const filesystem=argv.find(x=>x.startsWith("permissions.ask_synthetic_pilot.filesystem="));
+  assert.doesNotThrow(()=>assertProbeSandboxArgs(argv,{filesystem,declaredRead:true}));
+  assert.throws(()=>assertProbeSandboxArgs(argv,{filesystem}));
+  for(const replacement of [':workspace',':minimal'])assert.throws(()=>assertProbeSandboxArgs(argv.map(x=>x.replace(':read-only',replacement)),{filesystem,declaredRead:true}));
+  assert.throws(()=>assertProbeSandboxArgs(argv.filter(x=>!x.includes('.extends=')),{filesystem,declaredRead:true}));
+});
+for(const readPolicy of [null,{}, {kind:DECLARED_READ_POLICY,riskAcknowledged:false,protectedRootsComplete:true,protectedRoots:[]},
+  {kind:DECLARED_READ_POLICY,riskAcknowledged:true,protectedRootsComplete:false,protectedRoots:[]},
+  {kind:DECLARED_READ_POLICY,riskAcknowledged:true,protectedRootsComplete:true,protectedRoots:["/"]},
+  {kind:DECLARED_READ_POLICY,riskAcknowledged:true,protectedRootsComplete:true,protectedRoots:["relative"]}])test("incomplete/invalid broad selection fails closed",t=>{
+    assert.throws(()=>prepared(t,{readPolicy}));
+});
+test("candidate two-trial simulation and replay retain explicit broad risk without source/runtime reads",t=>{
+  const {privateRoot,plan}=prepared(t,{readPolicy:true});
+  const report=runCodexConnection(privateRoot);
+  assert.equal(report.stop,null);assert.deepEqual(report.slots.map(x=>x.grade.status),["pass","pass"]);
+  assert.equal(report.preflight.evidence_class,"synthetic_only");assert.equal(report.model_calls,0);
+  assert.deepEqual(report.read_policy,plan.read_policy);
+  assert.deepEqual(report.preflight.filesystem_canary_scope,["synthetic_grading_material","other_trial","synthetic_auth_material","declared_copy","unrelated_read_allowed_write_denied"]);
+  const before=snapshot(privateRoot);
+  rmSync(plan.runtime.root,{recursive:true});rmSync(plan.codex_home,{recursive:true});
+  rmSync(plan.read_policy.protected_roots[0].path,{recursive:true});
+  const reopened=JSON.parse(execFileSync(process.execPath,[ENTRY,"reopen",privateRoot],{env:{PATH:""},encoding:"utf8"}));
+  assert.deepEqual(reopened,report);assert.deepEqual(snapshot(privateRoot),before);
+  assert.throws(()=>runCodexConnection(privateRoot));
+});
+for(const probeOutcome of ["unrelated-read-denied","unrelated-write-open","declared-read-open","network-open","network-unknown","write-open","extra-keys"])test(`candidate ${probeOutcome} stops before both trials`,t=>{
+  const {privateRoot}=prepared(t,{readPolicy:true,probeOutcome});
+  const report=runCodexConnection(privateRoot);
+  assert.equal(report.stop,"model_free_preflight_failed");assert.equal(report.retry,0);
+  assert.deepEqual(report.slots.map(x=>x.state),["not_started","not_started"]);
+  assert.deepEqual(reopenCodexConnection(privateRoot),report);
+});
+test("candidate exact session boundary refuses added tmp write, missing root and undeclared read",t=>{
+  const {privateRoot,plan,base}=prepared(t,{readPolicy:true});runCodexConnection(privateRoot);
+  const stdout=readFileSync(join(privateRoot,"plain/stdout.bin"));
+  const original=readFileSync(join(privateRoot,"plain/session.jsonl"),"utf8").trim().split("\n").map(JSON.parse);
+  const parse=rows=>parsePilotNativeSession({stdout,session:Buffer.from(rows.map(x=>JSON.stringify(x)).join("\n")+"\n"),
+    plan:{...base,command:plan.command},workspace:join(base.workspace_root,"plain"),sessionHome:plan.codex_home});
+  assert.doesNotThrow(()=>parse(original));
+  for(const mode of ["tmp-write","no-root","extra-read","removed-deny"]){
+    const rows=structuredClone(original),entries=rows.find(x=>x.type==="turn_context").payload.permission_profile.file_system.entries;
+    if(mode==="tmp-write")entries.push({path:{type:"path",path:"/tmp"},access:"write"});
+    if(mode==="extra-read")entries.push({path:{type:"path",path:"/unexpected"},access:"read"});
+    if(mode==="no-root")entries.splice(entries.findIndex(x=>x.path.type==="special"),1);
+    if(mode==="removed-deny")entries.splice(entries.findIndex(x=>x.path.path===plan.read_policy.protected_roots[0].path),1);
+    assert.throws(()=>parse(rows));
+  }
+});
+test("protected inventory metadata replacement fails before any command",t=>{
+  const {privateRoot,plan}=prepared(t,{readPolicy:true});
+  const root=plan.read_policy.protected_roots[0].path;
+  rmSync(root,{recursive:true});writeFileSync(root,"replacement",{mode:0o600});
+  assert.throws(()=>runCodexConnection(privateRoot),/protected root identity drift/);
+  assert.equal(readdirSync(privateRoot).includes("connection-run-claim.json"),false);
+});
+
+test("closed grant and strict grant cannot promote candidate simulation or match its envelope",t=>{
+  const closed=prepared(t),candidate=prepared(t,{readPolicy:true});
+  const old=codexPhasePermission(closed.plan,"evaluate","old-closed-approval");
+  const strict=codexPhasePermission(candidate.plan,"probe","old-strict-approval");
+  for(const grant of [old,strict]){
+    assert.throws(()=>evaluateCodexConnection(candidate.privateRoot,grant),/permission cannot promote simulation/);
+    assert.equal(readdirSync(candidate.privateRoot).includes("connection-run-claim.json"),false);
+  }
+  const fresh=codexPhasePermission(candidate.plan,"evaluate","new-candidate-approval");
+  assert.notDeepEqual(old,fresh);assert.notDeepEqual(strict,fresh);
+  const changed=structuredClone(candidate.plan);changed.read_policy.risk_acknowledged=false;
+  assert.throws(()=>codexTrialLaunch(changed,candidate.base,"plain"));
+  assert.throws(()=>codexPhasePermission(changed,"evaluate","new-candidate-approval"));
+});
+test("declared root overlapping current workspace or runtime image refuses without execution",t=>{
+  const {plan,base}=prepared(t,{readPolicy:true});
+  for(const path of [base.workspace_root,dirname(base.node.executable),"/"]){
+    const changed=structuredClone(plan);changed.read_policy.protected_roots[0].path=path;
+    changed.command=codexConnectionCommand(changed,base);
+    assert.throws(()=>codexTrialLaunch(changed,base,"plain"));
+  }
 });

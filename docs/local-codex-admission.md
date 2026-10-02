@@ -1,5 +1,15 @@
 # Ordinary trusted-CLI local evaluation (Issue #315)
 
+## Opt-in read policy update
+
+The existing closed manifest remains the default. A separate v3 candidate
+selects official `:read-only` plus workspace write and explicit declared denies.
+It requires risk/inventory acknowledgement and a fresh candidate permission;
+it does not reuse the closed profile's grants or host evidence. See
+[selection, risks and verification contract](local-codex-read-policy.md).
+This update implements and mocks the candidate only, with no real CLI/model
+invocation or host policy application and no claim that it fixes startup aborts.
+
 New v2 plans select `trusted_cli_lightweight_v1`: one model-free model-tool
 sandbox control, then plain and kernel_only once each. This restores #314's
 ordinary trusted CLI + model-tool sandbox approach, while retaining the newer

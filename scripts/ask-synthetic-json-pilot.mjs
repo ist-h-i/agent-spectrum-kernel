@@ -10,7 +10,7 @@ import { captureSuccessorUsage } from "./ask-benchmark-prompt-successor-usage.mj
 import { canonicalDigest, parseJsonRejectDuplicateKeys, writeCanonicalJsonNoReplace } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
-import { closedSessionEntries } from "./ask-local-codex-boundaries.mjs";
+import { closedSessionEntries, declaredSessionEntries } from "./ask-local-codex-boundaries.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE = "benchmarks/fixtures/pilot-json-aggregate-001";
@@ -262,7 +262,8 @@ export function parsePilotNativeSession({ stdout, session, plan, workspace, sess
     observedRuntimeRoot = runtimeRoot;
     if (plan.command.closed_read_scope) closedSessionEntries({ entries, workspace, readRoots: plan.command.read_roots,
       denyRoots: plan.command.deny_roots, runtimeParent });
-    for (const root of plan.command.closed_read_scope ? [] : plan.command.deny_roots) {
+    if (plan.command.declared_read_scope) declaredSessionEntries({entries,workspace,denyRoots:plan.command.deny_roots,runtimeParent});
+    for (const root of plan.command.closed_read_scope || plan.command.declared_read_scope ? [] : plan.command.deny_roots) {
       if (entries.filter(entry => entry.path?.type === "path" && entry.path.path === root && entry.access === "deny").length !== 1
         || entries.some(entry => entry.path?.type === "path" && within(root, entry.path.path) && entry.access !== "deny"
           && !(root === plan.workspace_root && within(workspace, entry.path.path))

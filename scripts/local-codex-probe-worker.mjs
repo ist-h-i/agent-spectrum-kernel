@@ -22,17 +22,25 @@ async function canary(spec) {
   catch (e) { write = classifyDenial(e.code); }
   const network = [];
   for (const endpoint of spec.endpoints) network.push({host: endpoint.host, positive: "pass", denied: classifyDenial(await connect(endpoint))});
-  return {kind: "ask_codex_canary_v1", filesystem: {read, write}, network};
+  const filesystem={read,write};
+  if(spec.unrelatedFile) {
+    try { filesystem.unrelated_read=readFileSync(spec.unrelatedFile,"utf8")==="ASK_UNRELATED_CANARY\n" ? "pass" : "fail"; }
+    catch { filesystem.unrelated_read="unknown"; }
+    try { const fd=openSync(spec.unrelatedFile,"r+"); closeSync(fd); filesystem.unrelated_write="fail"; }
+    catch(e) { filesystem.unrelated_write=classifyDenial(e.code); }
+  }
+  return {kind:spec.unrelatedFile ? "ask_codex_canary_v2" : "ask_codex_canary_v1",filesystem,network};
 }
 async function guarded(spec) {
-  try { assertProbeSandboxArgs(spec.argv,{filesystem:spec.filesystem}); }
+  try { assertProbeSandboxArgs(spec.argv,{filesystem:spec.filesystem,declaredRead:spec.declaredRead===true}); }
   catch { process.stderr.write("model-tool policy refused\n"); process.exitCode=6; return; }
   const servers = [], endpoints = [];
   try {
     // Positive controls in the ordinary trusted parent distinguish actual
     // model-tool denial from missing files or unavailable loopback sockets.
-    for (const path of spec.canary.deniedReads) { const fd=openSync(path,"r"); closeSync(fd); }
+    for (const path of [...spec.canary.deniedReads,...(spec.canary.unrelatedFile ? [spec.canary.unrelatedFile] : [])]) { const fd=openSync(path,"r"); closeSync(fd); }
     { const fd=openSync(spec.canary.deniedWrite,"r+"); closeSync(fd); }
+    if(spec.canary.unrelatedFile) { const fd=openSync(spec.canary.unrelatedFile,"r+");closeSync(fd); }
     for (const host of ["127.0.0.1", "::1"]) {
       const server = createServer(socket => socket.end()); servers.push(server);
       await new Promise((resolve,reject) => { server.once("error", reject); server.listen({host, port:0}, resolve); });

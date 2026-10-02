@@ -61,11 +61,23 @@ export function closedSessionEntries({ entries, workspace, readRoots, denyRoots,
   if (runtime.length > 1 || entries.length !== expected.length + runtime.length
     || canonicalDigest(entries.filter(e => !runtime.includes(e)).sort((a,b) => a.path.path.localeCompare(b.path.path))) !== canonicalDigest(expected.sort((a,b) => a.path.path.localeCompare(b.path.path)))) throw new Error("closed read/write session boundary mismatch");
 }
+/** Exact candidate boundary; no temporary write or undeclared policy entries. */
+export function declaredSessionEntries({entries,workspace,denyRoots,runtimeParent}) {
+  const expected=denyRoots.map(path=>({path:{type:"path",path},access:"deny"})).concat([
+    {path:{type:"special",value:{kind:"root"}},access:"read"},
+    {path:{type:"path",path:workspace},access:"write"}]);
+  const runtime=entries.filter(e=>e.access==="read" && e.path?.type==="path" && typeof e.path.path==="string"
+    && dirname(e.path.path)===runtimeParent && /^codex-arg0[A-Za-z0-9]{6}$/u.test(e.path.path.split("/").at(-1)));
+  const sorted=items=>items.slice().sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  if(runtime.length>1 || entries.length!==expected.length+runtime.length
+    || canonicalDigest(sorted(entries.filter(e=>!runtime.includes(e))))!==canonicalDigest(sorted(expected))) throw new Error("declared read/write session boundary mismatch");
+}
 export function classifyDenial(code) { return ["EPERM", "EACCES"].includes(code) ? "pass" : code === "CONNECTED" ? "fail" : "unknown"; }
-export function assertCanaryResult(result) {
+export function assertCanaryResult(result, {declaredRead = false} = {}) {
   const keys = (obj, names) => obj && typeof obj === "object" && !Array.isArray(obj) && canonicalDigest(Object.keys(obj).sort())===canonicalDigest(names.sort());
-  if (!keys(result,["kind","filesystem","network"]) || !keys(result.filesystem,["read","write"])
-    || result?.kind !== "ask_codex_canary_v1" || result.filesystem?.read !== "pass" || result.filesystem?.write !== "pass"
+  if (!keys(result,["kind","filesystem","network"]) || !keys(result.filesystem,declaredRead ? ["read","write","unrelated_read","unrelated_write"] : ["read","write"])
+    || result?.kind !== (declaredRead ? "ask_codex_canary_v2" : "ask_codex_canary_v1") || result.filesystem?.read !== "pass" || result.filesystem?.write !== "pass"
+    || (declaredRead && (result.filesystem.unrelated_read!=="pass" || result.filesystem.unrelated_write!=="pass"))
     || !Array.isArray(result.network) || result.network.length !== 2 || result.network.some(x => !keys(x,["host","positive","denied"]) || !["127.0.0.1", "::1"].includes(x.host) || x.positive !== "pass" || x.denied !== "pass")
     || new Set(result.network.map(x => x.host)).size !== 2) throw new Error("canary failure/unknown; no real admission");
 }
@@ -88,11 +100,12 @@ export function probeSeatbelt({ codexHome, home, workspace, canaries }) {
 }
 /** Trusted controller supplies the expected, source-bound filesystem string.
  * Refuse malformed/missing policy before worker file/socket/CLI operations. */
-export function assertProbeSandboxArgs(argv, { filesystem } = {}) {
+export function assertProbeSandboxArgs(argv, { filesystem, declaredRead = false } = {}) {
   const refuse = () => { throw new Error("model-tool policy refused"); };
   if (!Array.isArray(argv) || argv.some(x => typeof x !== "string") || argv[0] !== "sandbox" || argv[1] !== "-P"
     || argv[2] !== "ask_synthetic_pilot" || argv[3] !== "--include-managed-config" || argv.at(-1) !== "--"
-    || typeof filesystem !== "string" || !filesystem.startsWith('permissions.ask_synthetic_pilot.filesystem={ "/" = "deny", ')
+    || typeof filesystem !== "string" || !filesystem.startsWith(declaredRead ? 'permissions.ask_synthetic_pilot.filesystem={ ' : 'permissions.ask_synthetic_pilot.filesystem={ "/" = "deny", ')
+    || (declaredRead && filesystem.includes('"/" = "deny"'))
     || !filesystem.endsWith('":workspace_roots" = "write" }')) refuse();
   const settings = new Map(); let index = 4;
   while (argv[index] === "-c") {
@@ -105,5 +118,6 @@ export function assertProbeSandboxArgs(argv, { filesystem } = {}) {
     || settings.get("permissions.ask_synthetic_pilot.filesystem") !== filesystem
     || settings.get("permissions.ask_synthetic_pilot.network.enabled") !== "permissions.ask_synthetic_pilot.network.enabled=false"
     || settings.get("default_permissions") !== 'default_permissions="ask_synthetic_pilot"'
-    || [...settings.keys()].some(key => key.startsWith("permissions.") && !["permissions.ask_synthetic_pilot.filesystem", "permissions.ask_synthetic_pilot.network.enabled"].includes(key))) refuse();
+    || (declaredRead && settings.get("permissions.ask_synthetic_pilot.extends") !== 'permissions.ask_synthetic_pilot.extends=":read-only"')
+    || [...settings.keys()].some(key => key.startsWith("permissions.") && !["permissions.ask_synthetic_pilot.filesystem", "permissions.ask_synthetic_pilot.network.enabled", ...(declaredRead ? ["permissions.ask_synthetic_pilot.extends"] : [])].includes(key))) refuse();
 }
