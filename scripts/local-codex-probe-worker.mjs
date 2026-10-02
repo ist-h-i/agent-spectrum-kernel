@@ -2,6 +2,8 @@
 import { openSync, closeSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, createConnection } from "node:net";
 import { spawn } from "node:child_process";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { classifyDenial, assertProbeSandboxArgs } from "./ask-local-codex-boundaries.mjs";
 
 const connect = ({host, port}) => new Promise(resolve => {
@@ -31,6 +33,19 @@ async function canary(spec) {
   }
   return {kind:spec.unrelatedFile ? "ask_codex_canary_v2" : "ask_codex_canary_v1",filesystem,network};
 }
+// Node resolves script entry points through their ancestors before reading the
+// file. An explicit helper-file read cannot traverse a denied controller root.
+// Inline ESM uses only builtins, retaining every deny without a helper exception.
+export const INLINE_CANARY_MODULE_SOURCE = [
+  'import { openSync, closeSync, readFileSync, writeFileSync } from "node:fs";',
+  'import { createConnection } from "node:net";',
+  classifyDenial.toString(), `const connect = ${connect.toString()};`, canary.toString(),
+  'process.stdout.write(JSON.stringify(await canary(JSON.parse(process.argv[1])))+"\\n");',
+].join("\n");
+export function controlCanaryArguments(spec, endpoints) {
+  return [...spec.argv, spec.node, "--input-type=module", "--eval", INLINE_CANARY_MODULE_SOURCE,
+    JSON.stringify({...spec.canary, endpoints})];
+}
 async function guarded(spec) {
   try { assertProbeSandboxArgs(spec.argv,{filesystem:spec.filesystem,declaredRead:spec.declaredRead===true}); }
   catch { process.stderr.write("model-tool policy refused\n"); process.exitCode=6; return; }
@@ -48,7 +63,7 @@ async function guarded(spec) {
       if (await connect(endpoint) !== "CONNECTED") throw new Error("positive loopback unknown");
       endpoints.push(endpoint);
     }
-    const argv = [...spec.argv, spec.node, spec.worker, "canary", JSON.stringify({...spec.canary, endpoints})];
+    const argv = controlCanaryArguments(spec, endpoints);
     const child = spawn(spec.cli, argv, {env:process.env, cwd:spec.cwd, stdio:["ignore","pipe","pipe"]});
     let count=0;
     for (const stream of [child.stdout,child.stderr]) stream.on("data", data => {
@@ -60,6 +75,8 @@ async function guarded(spec) {
   } catch { process.stderr.write("probe positive/transport unknown\n"); process.exitCode=6; }
   finally { for (const server of servers) server.close(); }
 }
-if (process.argv[2] === "canary") process.stdout.write(JSON.stringify(await canary(JSON.parse(process.argv[3])))+"\n");
-else if (process.argv[2] === "guarded") await guarded(JSON.parse(process.argv[3]));
-else { process.stderr.write("closed probe worker mode required\n"); process.exitCode=2; }
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv[2] === "canary") process.stdout.write(JSON.stringify(await canary(JSON.parse(process.argv[3])))+"\n");
+  else if (process.argv[2] === "guarded") await guarded(JSON.parse(process.argv[3]));
+  else { process.stderr.write("closed probe worker mode required\n"); process.exitCode=2; }
+}

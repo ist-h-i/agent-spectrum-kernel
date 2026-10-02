@@ -5,6 +5,9 @@ import { chmodSync, linkSync, symlinkSync, lstatSync, mkdirSync, mkdtempSync, re
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
+import { EventEmitter } from "node:events";
+import { INLINE_CANARY_MODULE_SOURCE, controlCanaryArguments } from "./local-codex-probe-worker.mjs";
 import { prepareCodexConnection, runCodexConnection, reopenCodexConnection, codexTrialLaunch, codexProbeLaunches, assertConnectionPermissionShape,
   runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime, codexConnectionCommand, codexProbeParentPolicy, assertNativeAdmissionRoute, codexLightweightPolicy, codexLightweightControlLaunch, DECLARED_READ_POLICY, READ_POLICY_RISK } from "./ask-local-codex.mjs";
 import {inspectExistingCodexHome, classifyDenial, assertCanaryResult, probeSeatbelt, assertNoAclListing, assertProbeSandboxArgs, declaredSessionEntries} from "./ask-local-codex-boundaries.mjs";
@@ -12,6 +15,51 @@ import { canonicalDigest } from "./content-addressed-store.mjs";
 import { parsePilotNativeSession, pilotEvidenceInventory } from "./ask-synthetic-json-pilot.mjs";
 
 const ENTRY = join(dirname(fileURLToPath(import.meta.url)), "ask-local-codex.mjs");
+test("inline control avoids a mocked Node denied-ancestor entrypoint lookup without changing denies", t => {
+  const {plan,base,dir}=prepared(t,{readPolicy:true});
+  const controller=join(dir,"denied-controller"), helper=join(controller,"scripts","helper.mjs"), hook=join(dir,"bootstrap-hook.cjs"), log=join(dir,"lookups.log");
+  mkdirSync(join(controller,"scripts"),{recursive:true,mode:0o700});
+  writeFileSync(helper,'process.stdout.write("MOCK_FILE_HELPER");',{mode:0o600});
+  // Development-only bootstrap mock: the helper itself is readable, but Node's
+  // realpath traversal hits the denied ancestor seen in r2. No OS policy applied.
+  writeFileSync(hook,`const fs=require("node:fs"),path=require("node:path"),original=fs.realpathSync;
+fs.realpathSync=function(p,...args){let q=String(p);if(q.startsWith(${JSON.stringify(controller)}+path.sep)){while(q!==path.dirname(q)){fs.appendFileSync(${JSON.stringify(log)},q+"\\n");if(q===${JSON.stringify(controller)}){const e=Error("EPERM: lstat "+q);e.code="EPERM";throw e;}q=path.dirname(q);}}return original.call(this,p,...args);};`,{mode:0o600});
+  const legacy=spawnSync(process.execPath,["--require",hook,helper],{encoding:"utf8"});
+  assert.notEqual(legacy.status,0);assert.match(legacy.stderr,/EPERM: lstat/u);
+  assert.ok(readFileSync(log,"utf8").split("\n").includes(controller));
+  const launch=codexProbeLaunches(plan,base,[],"lightweight-control")[3];
+  const prefix=launch.argv.slice(0,launch.argv.indexOf("--")+1);
+  const child=controlCanaryArguments({argv:prefix,node:base.node.executable,canary:{}},[]);
+  assert.deepEqual(child.slice(0,prefix.length),prefix);
+  assert.deepEqual(child.slice(prefix.length,prefix.length+3),[base.node.executable,"--input-type=module","--eval"]);
+  assert.equal(child[prefix.length+3],INLINE_CANARY_MODULE_SOURCE);
+  assert.deepEqual(JSON.parse(child.at(-1)),{endpoints:[]});
+  assert.ok(!child.includes(helper));assert.ok(!INLINE_CANARY_MODULE_SOURCE.includes("./"));
+  // Exercise Node's real module bootstrap, stopping before the canary body.
+  // All actual canary I/O is tested below against in-memory mocks only.
+  const bootstrap=INLINE_CANARY_MODULE_SOURCE.slice(0,INLINE_CANARY_MODULE_SOURCE.lastIndexOf('process.stdout.write('))+'process.stdout.write("MOCK_INLINE_BOOTSTRAP_PASS:"+process.argv[1]);';
+  const inline=spawnSync(process.execPath,["--require",hook,"--input-type=module","--eval",bootstrap,child.at(-1)],{encoding:"utf8"});
+  assert.equal(inline.status,0,inline.stderr);assert.equal(inline.stdout,"MOCK_INLINE_BOOTSTRAP_PASS:"+child.at(-1));
+  const filesystem=prefix.find(x=>x.startsWith("permissions.ask_synthetic_pilot.filesystem="));
+  assert.ok(!filesystem.includes("local-codex-probe-worker.mjs"));
+  for(const root of [base.controller_root,base.private_root,base.workspace_root,plan.codex_home,plan.runtime.root])assert.ok(plan.command.deny_roots.includes(root));
+});
+test("exact inline module preserves v2 canary outcomes with only in-memory filesystem/socket mocks", async () => {
+  const spec={publicFile:"public",allowedWrite:"write",deniedReads:["private","old-copy"],deniedWrite:"other",unrelatedFile:"unrelated",endpoints:[{host:"127.0.0.1",port:1},{host:"::1",port:2}]};
+  const reads=[],opens=[],writes=[];let output="";
+  const module=INLINE_CANARY_MODULE_SOURCE.replace(/^import .*;\n/gmu,"");
+  await runInNewContext(`(async()=>{${module}})()`,{
+    process:{argv:["node",JSON.stringify(spec)],stdout:{write:x=>{output+=x;}}},
+    readFileSync:p=>{reads.push(p);return p==="public"?"ASK_PUBLIC_CANARY\n":"ASK_UNRELATED_CANARY\n";},
+    writeFileSync:(p,v,o)=>writes.push([p,v,o.flag,o.mode]),
+    openSync:(p,m)=>{opens.push([p,m]);throw Object.assign(Error("mock denied"),{code:"EPERM"});},closeSync:()=>{},
+    createConnection:()=>{const socket=new EventEmitter();socket.destroy=()=>{};socket.setTimeout=()=>{};queueMicrotask(()=>socket.emit("error",{code:"EPERM"}));return socket;},
+  });
+  const result=JSON.parse(output);assertCanaryResult(result,{declaredRead:true});
+  assert.deepEqual(reads,["public","unrelated"]);
+  assert.deepEqual(opens,[["private","r"],["old-copy","r"],["other","r+"],["unrelated","r+"]]);
+  assert.deepEqual(writes,[["write","ASK_WRITE_CANARY\n","wx",0o600]]);
+});
 const json = path => JSON.parse(readFileSync(path, "utf8"));
 function prepared(t, options = {}) {
   const dir = mkdtempSync(join(realpathSync(tmpdir()), "ask-connection-test-"));

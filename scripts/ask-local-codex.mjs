@@ -294,7 +294,7 @@ export function codexProbeLaunches(plan, base, canaries, phase = "connection-pro
 export function codexLightweightControlLaunch(plan,base,{sandboxArgs,canary,filesystem}) {
   assertModelToolBoundary(plan,base); assertProbeSandboxArgs(sandboxArgs,{filesystem,declaredRead:plan.kind===BROAD_PLAN});
   const template=codexProbeLaunches(plan,base,[],"lightweight-control")[3];
-  const payload={cli:plan.cli.executable,argv:sandboxArgs,node:base.node.executable,worker:join(ROOT,WORKER),cwd:template.cwd,canary,filesystem,declaredRead:plan.kind===BROAD_PLAN};
+  const payload={cli:plan.cli.executable,argv:sandboxArgs,node:base.node.executable,cwd:template.cwd,canary,filesystem,declaredRead:plan.kind===BROAD_PLAN};
   return {...template,executable:base.node.executable,argv:[join(ROOT,WORKER),"guarded",JSON.stringify(payload)]};
 }
 
@@ -324,10 +324,8 @@ function checks(plan, base, lightweight = false) {
   const declaredCanary=join(root,"declared-copy-canary.txt"); if(broad) raw(declaredCanary,"ASK_DECLARED_COPY_CANARY\n");
   const deniedReads = [privateFile, join(other, "private.txt"), authCanary, broad ? declaredCanary : unrelatedCanary, ...(broad ? plan.read_policy.protected_roots.map(x=>x.path) : [])], deniedWrite = join(other, "private.txt");
   const launches = codexProbeLaunches(plan, base, [publicFile, ...deniedReads],phase);
-  const workerRoots = [WORKER, "scripts/ask-local-codex-boundaries.mjs", "scripts/content-addressed-store.mjs"].map(path => join(ROOT, path));
   const canary = { publicFile, allowedWrite:join(workspace,"write.txt"), deniedReads, deniedWrite, ...(broad ? {unrelatedFile:unrelatedCanary} : {}) };
-  const sandboxArgs = launches[3].argv.slice(0, launches[3].argv.indexOf("--")+1).map(value => value.startsWith("permissions.ask_synthetic_pilot.filesystem=")
-    ? value.replace(', ":workspace_roots"', `, ${workerRoots.map(path=>`${JSON.stringify(path)} = "read"`).join(", ")}, ":workspace_roots"`) : value);
+  const sandboxArgs = launches[3].argv.slice(0, launches[3].argv.indexOf("--")+1);
   const filesystem = sandboxArgs.find(value=>value.startsWith("permissions.ask_synthetic_pilot.filesystem="));
   assertProbeSandboxArgs(sandboxArgs,{filesystem,declaredRead:plan.kind===BROAD_PLAN});
   const profile = lightweight ? null : probeSeatbelt({codexHome:plan.codex_home, home:launches[0].env.HOME, workspace, canaries:[...deniedReads,deniedWrite]});
@@ -337,7 +335,7 @@ function checks(plan, base, lightweight = false) {
     let launch = launches[index];
     if (plan.mode === "planned_live") {
       if (!lightweight && (plan.host.platform !== "darwin" || !plan.guard)) throw new Error("real probe parent guard currently Mac only");
-      const payload = {cli:plan.cli.executable, argv:sandboxArgs, node:base.node.executable, worker:join(ROOT,WORKER), cwd:workspace, canary, filesystem,declaredRead:broad};
+      const payload = {cli:plan.cli.executable, argv:sandboxArgs, node:base.node.executable, cwd:workspace, canary, filesystem,declaredRead:broad};
       const child = index === 3 ? [base.node.executable,join(ROOT,WORKER),"guarded",JSON.stringify(payload)] : [launch.executable,...launch.argv];
       launch = lightweight ? codexLightweightControlLaunch(plan,base,{sandboxArgs,canary,filesystem})
         : {...launch, executable:plan.guard.executable, argv:["-p",profile,"--",...child]};

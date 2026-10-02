@@ -113,6 +113,37 @@ source and mock evidence; no new real OS smoke/evaluation was run.
 
 ## Implementation evidence and limits
 
+### Inline control bootstrap correction after the approved r2 observation
+
+The approved Mac r2 control at head `ee1e1d00` stopped with exit1 after252ms.
+Saved target Node stderr identifies `resolveMainPath` / `realpath` / `lstat`
+EPERM at the denied controller root. The canary body was not observed; both
+trials remained not_started. Its sealed evidence and consumed grant stay frozen.
+
+An explicit read of a helper file under the controller did not permit Node's
+ancestor lookup. Moving it under the denied external runtime would retain the
+same ancestor problem. The minimal correction keeps the trusted outer worker
+at its source path, but launches the sandbox target as `node --input-type=module
+--eval <source-bound module> <canary-json>`. The inline module imports only Node
+filesystem/network builtins and uses the same canary/denial functions. It needs
+no controller helper entrypoint or relative module dependencies. Control-only
+worker/boundary/content-store file-read exceptions are removed; controller,
+runtime, evidence, authentication, declared old copies and other-trial denies
+and workspace writes remain unchanged. The CLI's separate narrow runtime
+session-helper validation is unchanged.
+
+Implementation ID `issue315-inline-control-implementation`, revision1; upstream
+Issue315, r2 sealed failure and `issue315-read-policy-implementation`.
+Formal Verification ID `issue315-inline-control-verification`, revision1, under
+`ask.verification-proof-policy@1.0.0`: O5 proves the mocked denied-ancestor
+entrypoint failure, builtin-only inline bootstrap/argument transport, unchanged
+deny policy, in-memory canary semantics and existing lifecycle/grant/replay
+regressions. Development bootstrap tests never execute a canary body; complete
+canary behavior uses mocked filesystem/socket functions only. No real CLI,
+sandbox/canary/model/auth or chmod operation is part of this correction.
+Mock results cannot establish real startup improvement or host enforcement;
+those remain Unknown until separately approved new-head/image/plan/grant checks.
+
 - E1 (O1–O4): focused local-codex/local-eval/pilot regression suite passed
   185/185 on the candidate source before commit. Post-commit exact-source
   results and submitted-head CI are recorded in Draft #317's update.
