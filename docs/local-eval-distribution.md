@@ -1,7 +1,7 @@
 # Local eval distribution: route decision and first delivery slice
 
 Design/implementation `IMP-LOCAL-EVAL-315-1`, revision 1. Upstream: Issue #315
-(distribution), merged #314 at `1eb4b4a6a6a0d4e7f2306113bb6237006ccc82b145`.
+(distribution), merged #314 at `1eb4b4a6a0d4e7f2306113bb6237006ccc82b145`.
 Issue #291 retains all formal ACs, 14 pairs/28 trials, its budgets and #197
 authority. This document does not admit a formal experiment.
 
@@ -150,7 +150,7 @@ auth setup/cache change or consumed-grant reuse.
 ## #313 source disposition
 
 Inspected #313 `6d221120f87d1caa56f9cf8b3d596841a913642c` against current main
-`1eb4b4a6a6a0d4e7f2306113bb6237006ccc82b145`. **No bytes are copied from #313
+`1eb4b4a6a0d4e7f2306113bb6237006ccc82b145`. **No bytes are copied from #313
 in this slice.** Source groups remain available and Draft/open.
 
 | Source candidates | Destination/disposition | Dependency/test evidence |
