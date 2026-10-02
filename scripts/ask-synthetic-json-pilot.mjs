@@ -224,7 +224,9 @@ function jsonLines(value, maximumLines = 20000) {
   return lines.map(line => parseJsonRejectDuplicateKeys(line));
 }
 /** Tools are allowed here; Judge's tool-free session parser is not reused. */
-export function parsePilotNativeSession({ stdout, session, plan, workspace }) {
+export function parsePilotNativeSession({ stdout, session, plan, workspace, sessionHome = null }) {
+  if (sessionHome !== null && (typeof sessionHome !== "string" || !isAbsolute(sessionHome)
+    || resolve(sessionHome) !== sessionHome || sessionHome === "/" || !plan.command.deny_roots.includes(sessionHome))) throw new Error("native session home must be an exact declared deny root");
   const events = jsonLines(stdout), rows = jsonLines(session);
   const threads = events.filter(row => row.type === "thread.started");
   const metas = rows.filter(row => row.type === "session_meta").map(row => row.payload);
@@ -236,7 +238,7 @@ export function parsePilotNativeSession({ stdout, session, plan, workspace }) {
   const turns = new Set();
   const condition = ["plain", "kernel_only"].find(name => workspace === join(plan.workspace_root, name));
   if (!condition) throw new Error("native trial workspace identity mismatch");
-  const runtimeParent = join(plan.private_root, condition, "codex-home", "tmp", "arg0");
+  const runtimeParent = join(sessionHome ?? join(plan.private_root, condition, "codex-home"), "tmp", "arg0");
   // Pinned CLI adds its active execve helper directory to the resolved policy.
   // This is a read-only runtime exception, never a general private-root grant.
   const runtimeRead = entry => entry.access === "read" && entry.path?.type === "path"
@@ -261,7 +263,7 @@ export function parsePilotNativeSession({ stdout, session, plan, workspace }) {
       if (entries.filter(entry => entry.path?.type === "path" && entry.path.path === root && entry.access === "deny").length !== 1
         || entries.some(entry => entry.path?.type === "path" && within(root, entry.path.path) && entry.access !== "deny"
           && !(root === plan.workspace_root && within(workspace, entry.path.path))
-          && !(root === plan.private_root && runtimeRead(entry)))) throw new Error("native exclusive deny rule mismatch");
+          && !((root === plan.private_root || root === sessionHome) && runtimeRead(entry)))) throw new Error("native exclusive deny rule mismatch");
     }
     if (!entries.some(entry => entry.path?.type === "path" && entry.path.path === workspace && entry.access === "write")) throw new Error("native workspace write grant missing");
   }
@@ -520,6 +522,13 @@ export function reopenFakePilot(root) {
   if (report.plan_digest !== canonicalDigest(plan) || report.mode !== plan.mode) throw new Error("report binding mismatch");
   return report;
 }
+
+// The distribution adapter reuses the pilot's source, grading, process evidence
+// and seal mechanics. Existing callers and historical reopen remain unchanged.
+export { sourceIdentity as pilotSourceIdentity, assertCurrentSource as assertPilotCurrentSource,
+  readPlan as readPilotPlan, workspaceInventory as pilotWorkspaceInventory,
+  finalFormat as pilotFinalFormat, persistProcess as persistPilotProcess,
+  evidenceInventory as pilotEvidenceInventory };
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
