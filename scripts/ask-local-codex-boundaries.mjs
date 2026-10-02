@@ -68,7 +68,7 @@ export function declaredSessionEntries({entries,workspace,denyRoots,runtimeParen
     {path:{type:"path",path:workspace},access:"write"}]);
   const runtime=entries.filter(e=>e.access==="read" && e.path?.type==="path" && typeof e.path.path==="string"
     && dirname(e.path.path)===runtimeParent && /^codex-arg0[A-Za-z0-9]{6}$/u.test(e.path.path.split("/").at(-1)));
-  const sorted=items=>items.slice().sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  const sorted=items=>items.slice().sort((a,b)=>canonicalDigest(a).localeCompare(canonicalDigest(b)));
   if(runtime.length>1 || entries.length!==expected.length+runtime.length
     || canonicalDigest(sorted(entries.filter(e=>!runtime.includes(e))))!==canonicalDigest(sorted(expected))) throw new Error("declared read/write session boundary mismatch");
 }

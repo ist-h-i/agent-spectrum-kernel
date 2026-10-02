@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { prepareCodexConnection, runCodexConnection, reopenCodexConnection, codexTrialLaunch, codexProbeLaunches, assertConnectionPermissionShape,
   runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime, codexConnectionCommand, codexProbeParentPolicy, assertNativeAdmissionRoute, codexLightweightPolicy, codexLightweightControlLaunch, DECLARED_READ_POLICY, READ_POLICY_RISK } from "./ask-local-codex.mjs";
-import {inspectExistingCodexHome, classifyDenial, assertCanaryResult, probeSeatbelt, assertNoAclListing, assertProbeSandboxArgs} from "./ask-local-codex-boundaries.mjs";
+import {inspectExistingCodexHome, classifyDenial, assertCanaryResult, probeSeatbelt, assertNoAclListing, assertProbeSandboxArgs, declaredSessionEntries} from "./ask-local-codex-boundaries.mjs";
 import { canonicalDigest } from "./content-addressed-store.mjs";
 import { parsePilotNativeSession, pilotEvidenceInventory } from "./ask-synthetic-json-pilot.mjs";
 
@@ -561,4 +561,14 @@ test("declared root overlapping current workspace or runtime image refuses witho
     changed.command=codexConnectionCommand(changed,base);
     assert.throws(()=>codexTrialLaunch(changed,base,"plain"));
   }
+});
+
+test("candidate session comparison ignores object key and entry order",()=>{
+  const workspace="/synthetic/workspace/plain",denyRoots=["/synthetic/private","/synthetic/workspace"];
+  const entries=[{access:"write",path:{path:workspace,type:"path"}},
+    {access:"read",path:{value:{kind:"root"},type:"special"}},
+    ...denyRoots.map(path=>({access:"deny",path:{path,type:"path"}}))];
+  assert.doesNotThrow(()=>declaredSessionEntries({entries,workspace,denyRoots,runtimeParent:"/synthetic/home/tmp/arg0"}));
+  entries.push({access:"write",path:{path:"/tmp",type:"path"}});
+  assert.throws(()=>declaredSessionEntries({entries,workspace,denyRoots,runtimeParent:"/synthetic/home/tmp/arg0"}));
 });
