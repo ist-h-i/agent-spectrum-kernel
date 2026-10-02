@@ -2,7 +2,7 @@
 import { openSync, closeSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, createConnection } from "node:net";
 import { spawn } from "node:child_process";
-import { classifyDenial } from "./ask-local-codex-boundaries.mjs";
+import { classifyDenial, assertProbeSandboxArgs } from "./ask-local-codex-boundaries.mjs";
 
 const connect = ({host, port}) => new Promise(resolve => {
   const socket = createConnection({host, port});
@@ -25,6 +25,8 @@ async function canary(spec) {
   return {kind: "ask_codex_canary_v1", filesystem: {read, write}, network};
 }
 async function guarded(spec) {
+  try { assertProbeSandboxArgs(spec.argv,{filesystem:spec.filesystem}); }
+  catch { process.stderr.write("model-tool policy refused\n"); process.exitCode=6; return; }
   const servers = [], endpoints = [];
   try {
     // Positive filesystem controls in the same outer guard prevent mistaking

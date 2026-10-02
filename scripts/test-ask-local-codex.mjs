@@ -6,8 +6,8 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { prepareCodexConnection, runCodexConnection, reopenCodexConnection, codexTrialLaunch, codexProbeLaunches, assertConnectionPermissionShape,
-  runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime } from "./ask-local-codex.mjs";
-import {inspectExistingCodexHome, classifyDenial, assertCanaryResult, probeSeatbelt, assertNoAclListing} from "./ask-local-codex-boundaries.mjs";
+  runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime, codexConnectionCommand, codexProbeParentPolicy } from "./ask-local-codex.mjs";
+import {inspectExistingCodexHome, classifyDenial, assertCanaryResult, probeSeatbelt, assertNoAclListing, assertProbeSandboxArgs} from "./ask-local-codex-boundaries.mjs";
 import { canonicalDigest } from "./content-addressed-store.mjs";
 import { parsePilotNativeSession } from "./ask-synthetic-json-pilot.mjs";
 
@@ -175,6 +175,8 @@ test("probe-only produces sealed synthetic admission without evaluation and eval
   const {privateRoot,plan,base,home}=prepared(t);
   const admission=runCodexProbes(privateRoot);
   assert.equal(admission.model_calls,0); assert.equal(admission.evidence_class,"synthetic_only");
+  assert.equal(admission.metadata_compatibility,"synthetic_only"); assert.equal(admission.filesystem_enforcement,"synthetic_only");
+  assert.deepEqual(admission.filesystem_canary_scope,["synthetic_grading_material","other_trial","synthetic_auth_material","unrelated_file"]);
   assert.equal(readdirSync(home).includes("sessions"),false);
   assert.equal(readdirSync(privateRoot).includes("connection-run-claim.json"),false);
   const before=snapshot(join(privateRoot,"connection-probe"));
@@ -213,9 +215,11 @@ test("closed read policy has root deny, explicit runtime files and no inherited 
   assert.ok(plan.read_roots.includes(base.node.executable)); assert.ok(plan.read_roots.includes(plan.cli.executable));
   assert.ok(!plan.command.argv.some(x=>x.includes(".extends=")));assert.ok(!plan.read_roots.includes("/tmp"));
   assert.ok(!plan.read_roots.includes("/etc"));assert.ok(!plan.read_roots.includes("/usr/bin"));assert.ok(!plan.read_roots.includes(plan.codex_home));
-  const profile=probeSeatbelt({readRoots:[base.node.executable],home:"/owned/probe-home",workspace:"/owned/workspace",canaries:[]});
+  const profile=probeSeatbelt({codexHome:plan.codex_home,home:"/owned/probe-home",workspace:"/owned/workspace",canaries:[]});
   assert.match(profile,/deny default/u);assert.match(profile,/localhost/u);assert.match(profile,/com.apple.securityd/u);
-  assert.ok(!profile.includes(plan.codex_home));
+  assert.ok(profile.includes(plan.codex_home));
+  assert.ok(profile.includes("(allow file-read*)"));
+  assert.ok(profile.includes(`(deny file-read* (subpath ${JSON.stringify(plan.codex_home)}))`));
 });
 test("refused/timeout/unsupported sockets remain unknown; only permission errors prove denial",()=>{
   assert.equal(classifyDenial("EPERM"),"pass");assert.equal(classifyDenial("EACCES"),"pass");
@@ -250,4 +254,63 @@ test("admission freshness rejects invalid, future and expired timestamps", () =>
   assert.equal(freshAdmissionTime("2026-10-02T00:00:01Z", now), false);
   assert.equal(freshAdmissionTime("2026-10-01T22:59:59Z", now), false);
   assert.equal(freshAdmissionTime("2026-10-01T23:00:00Z", now), true);
+});
+
+
+test("trusted runtime read contract cannot become a model-tool read grant", t => {
+  const {plan,base}=prepared(t);
+  assert.deepEqual(plan.probe_parent_policy,codexProbeParentPolicy(plan));
+  assert.equal(plan.probe_parent_policy.read_access,"host_reads_except_existing_codex_home");
+  assert.ok(!plan.command.read_roots.includes("/"));
+  assert.ok(!plan.command.read_roots.includes(dirname(plan.codex_home)));
+  const before=structuredClone(plan.command);
+  probeSeatbelt({codexHome:plan.codex_home,home:"/private/empty",workspace:"/private/work",canaries:[]});
+  assert.deepEqual(plan.command,before);
+  assert.throws(()=>probeSeatbelt({home:"/private/empty",workspace:"/private/work",canaries:[]}));
+  assert.throws(()=>probeSeatbelt({codexHome:"/",home:"/private/empty",workspace:"/private/work",canaries:[]}));
+  assert.throws(()=>probeSeatbelt({codexHome:"/private",home:"/private/empty",workspace:"/public/work",canaries:[]}));
+});
+for (const variant of ["missing-command","no-root-deny","broad-read","no-network-policy","no-profile","inherited-policy","v1"]) test(`missing/changed model policy ${variant} refuses both launch builders`,t=>{
+  const {plan,base}=prepared(t),changed=structuredClone(plan);
+  if(variant==="missing-command")delete changed.command;
+  else if(variant==="broad-read") {changed.read_roots.push(dirname(plan.codex_home));changed.command=codexConnectionCommand(changed,base);}
+  else if(variant==="v1")changed.kind="ask_local_codex_connection_v1";
+  else if(variant==="no-root-deny")changed.command.argv=changed.command.argv.map(x=>x.replace('"/" = "deny", ',""));
+  else if(variant==="inherited-policy")changed.command.argv.push("-c",'permissions.ask_synthetic_pilot.extends=":workspace"');
+  else changed.command.argv=changed.command.argv.filter(x=>!x.includes(variant==="no-profile"?'default_permissions=':'permissions.ask_synthetic_pilot.network.enabled=false'));
+  assert.throws(()=>codexTrialLaunch(changed,base,"plain"),/model-tool/u);
+  assert.throws(()=>codexProbeLaunches(changed,base,[]),/model-tool/u);
+});
+test("new parent contract is mandatory for execution but saved incomplete replay remains readable", t=>{
+  const {privateRoot,plan}=prepared(t),old=structuredClone(plan);delete old.probe_parent_policy;
+  writeFileSync(join(privateRoot,"connection.json"),JSON.stringify(old));
+  writeFileSync(join(privateRoot,"connection-digest.json"),JSON.stringify({digest:canonicalDigest(old)}));
+  assert.equal(reopenCodexProbes(privateRoot).evidence_class,"unsealed_unknown");
+  const before=snapshot(privateRoot);assert.throws(()=>runCodexProbes(privateRoot),/parent contract/u);assert.deepEqual(snapshot(privateRoot),before);
+});
+test("nested sandbox entry requires explicit closed filesystem/network profile and managed config",t=>{
+  const {plan,base}=prepared(t),launch=codexProbeLaunches(plan,base,[])[3];
+  const argv=launch.argv.slice(0,launch.argv.indexOf("--")+1);
+  const filesystem=argv.find(x=>x.startsWith("permissions.ask_synthetic_pilot.filesystem="));
+  assert.doesNotThrow(()=>assertProbeSandboxArgs(argv,{filesystem}));
+  for(const drop of ["--include-managed-config","-P",filesystem,"permissions.ask_synthetic_pilot.network.enabled=false"])assert.throws(()=>assertProbeSandboxArgs(argv.filter(x=>x!==drop),{filesystem}));
+  assert.throws(()=>assertProbeSandboxArgs(["exec","--", "-"],{filesystem}));
+  assert.throws(()=>assertProbeSandboxArgs(argv,{filesystem:undefined}));
+  for(const key of [" permissions.ask_synthetic_pilot.network.enabled","permissions.ask_synthetic_pilot.network.enabled ",'"permissions".ask_synthetic_pilot.network.enabled',"permissions.ask_synthetic_pilot.extends"]) {
+    const invalid=[...argv.slice(0,-3),"-c",key+"=true",...argv.slice(-3)];
+    assert.throws(()=>assertProbeSandboxArgs(invalid,{filesystem}));
+  }
+  const worker=join(dirname(ENTRY),"local-codex-probe-worker.mjs");
+  const result=spawnSync(process.execPath,[worker,"guarded",JSON.stringify({cli:"/must-not-be-invoked",argv:["--version"],cwd:"/must-not-be-opened",canary:{}})],{encoding:"utf8"});
+  assert.equal(result.status,6);assert.match(result.stderr,/model-tool policy refused/u);assert.equal(result.stdout,"");
+  const invalid=[...argv.slice(0,-3),"-c"," permissions.ask_synthetic_pilot.network.enabled=true",...argv.slice(-3)];
+  const duplicate=spawnSync(process.execPath,[worker,"guarded",JSON.stringify({cli:"/must-not-be-invoked",argv:invalid,filesystem,cwd:"/must-not-be-opened",canary:{}})],{encoding:"utf8"});
+  assert.equal(duplicate.status,6);assert.match(duplicate.stderr,/model-tool policy refused/u);assert.equal(duplicate.stdout,"");
+});
+test("failed metadata never reports an exercised filesystem or network canary",t=>{
+  const {privateRoot}=prepared(t,{probeOutcome:"metadata-fail"});
+  const report=runCodexProbes(privateRoot);
+  assert.equal(report.outcomes.length,1);assert.equal(report.metadata_compatibility,"failed_or_unknown");
+  assert.equal(report.filesystem_enforcement,"not_exercised");assert.equal(report.network_enforcement,"not_exercised");
+  assert.deepEqual(reopenCodexProbes(privateRoot),report);
 });

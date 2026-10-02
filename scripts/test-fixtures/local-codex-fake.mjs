@@ -7,7 +7,8 @@ const [stage, scenario, condition, ...argv] = process.argv.slice(2);
 const root = process.env.CONNECTION_EVIDENCE;
 writeFileSync(join(root, "received.json"), JSON.stringify({ argv, env: process.env }), { mode: 0o600, flag: "wx" });
 if (stage === "probe") {
-  if (condition === "0") process.stdout.write("codex-cli 0.157.1\n");
+  if (condition === "0" && scenario === "metadata-fail") { process.stderr.write("synthetic startup fail\n"); process.exitCode=5; }
+  else if (condition === "0") process.stdout.write("codex-cli 0.157.1\n");
   else if (condition === "1") process.stdout.write("--ignore-user-config --ignore-rules --json --output-schema --output-last-message --strict-config\n");
   else if (condition === "2") process.stdout.write("--include-managed-config -P -C\n");
   else if (scenario === "control-fail") { process.stderr.write("synthetic control mismatch\n"); process.exitCode = 5; }

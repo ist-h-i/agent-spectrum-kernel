@@ -11,7 +11,7 @@ import { executeContainedAgent } from "./ask-benchmark-execution.mjs";
 import { captureSuccessorUsage } from "./ask-benchmark-prompt-successor-usage.mjs";
 import { canonicalDigest, parseJsonRejectDuplicateKeys, writeCanonicalJsonNoReplace } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
-import { inspectExistingCodexHome, inspectSelectedSession, closedReadRoots, noAcl, assertCanaryResult, probeSeatbelt } from "./ask-local-codex-boundaries.mjs";
+import { inspectExistingCodexHome, inspectSelectedSession, closedReadRoots, noAcl, assertCanaryResult, probeSeatbelt, assertProbeSandboxArgs } from "./ask-local-codex-boundaries.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = "scripts/ask-local-codex.mjs", FAKE = "scripts/test-fixtures/local-codex-fake.mjs";
@@ -70,6 +70,17 @@ export function codexConnectionCommand(plan, base) {
   return { ...command, argv, deny_roots: roots, ...(closed ? {closed_read_scope:true, read_roots:plan.read_roots} : {}), execution_status: "requires_new_connection_permission" };
 }
 
+/** Sealed in new plans; never reused as a model-tool grant. */
+export function codexProbeParentPolicy(plan) {
+  return {kind:"trusted_runtime_parent_v1",read_access:"host_reads_except_existing_codex_home",existing_home_deny:plan.codex_home,
+    write_access:"owned_probe_home_workspace_literal_canaries_dev_null",network:"loopback_only",keyring_ipc:"securityd_and_security_agent_denied"};
+}
+function assertModelToolBoundary(plan, base) {
+  if (plan.kind !== "ask_local_codex_connection_v2" || !plan.command || !Array.isArray(plan.read_roots)
+    || !same(plan.read_roots,closedReadRoots(plan.host.platform,base.node.executable,plan.cli.executable))
+    || !same(plan.command,codexConnectionCommand(plan,base))) throw new Error("closed model-tool policy required");
+}
+
 /** No Codex subprocess, credential file access, link, copy or auth configuration. */
 export function prepareCodexConnection(descriptor, { simulation = false, scenarios = ["pass", "pass"], probePass = true, probeOutcome = "pass", fakeTimeoutMs = null, host = null } = {}) {
   if (!descriptor || typeof descriptor !== "object" || Array.isArray(descriptor)
@@ -77,7 +88,7 @@ export function prepareCodexConnection(descriptor, { simulation = false, scenari
   if (process.platform === "win32") throw new Error("use Linux Node inside WSL2");
   if (simulation && (descriptor.executable !== undefined || descriptor.imageDigest !== undefined)) throw new Error("simulation cannot bind a native image");
   if (!simulation && (host !== null || fakeTimeoutMs !== null || !same(scenarios, ["pass", "pass"]) || !probePass || probeOutcome!=="pass")) throw new Error("synthetic options forbidden in live plan");
-  if (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys"].includes(probeOutcome)) throw new Error("closed probe scenario required");
+  if (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail"].includes(probeOutcome)) throw new Error("closed probe scenario required");
   if (!Array.isArray(scenarios) || scenarios.length !== 2 || scenarios.some(value => !CONNECTION_SCENARIOS.includes(value))) throw new Error("closed simulation scenarios required");
   if (fakeTimeoutMs !== null && (!Number.isInteger(fakeTimeoutMs) || fakeTimeoutMs < 20 || fakeTimeoutMs > PILOT_LIMITS.timeout_ms)) throw new Error("invalid simulation timeout");
   const observed = localPreflight();
@@ -108,6 +119,7 @@ export function prepareCodexConnection(descriptor, { simulation = false, scenari
     constraints: structuredClone(PILOT_LIMITS), scenarios, probe_pass: probePass, probe_outcome:probeOutcome, fake_timeout_ms: fakeTimeoutMs,
     live_ready: false, admission: "not_exercised", synthetic_host: host !== null };
   plan.command = codexConnectionCommand(plan, base);
+  plan.probe_parent_policy = codexProbeParentPolicy(plan);
   save(join(prepared.privateRoot, PLAN), plan);
   save(join(prepared.privateRoot, "connection-digest.json"), { digest: canonicalDigest(plan) });
   if (simulation) save(join(codexHome, "owned-simulation.json"), { kind: "ask_owned_connection_simulation_v1", root: prepared.privateRoot, plan_digest: canonicalDigest(plan) });
@@ -125,7 +137,7 @@ function readConnection(root, current = false) {
     || (plan.mode === "planned_live" && (plan.synthetic_host || !same(plan.host, plan.route_host)
       || !same(plan.scenarios, ["pass", "pass"]) || !plan.probe_pass || plan.fake_timeout_ms !== null))) throw new Error("connection plan drift");
   if (current) {
-    if (plan.kind==="ask_local_codex_connection_v2" && (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys"].includes(plan.probe_outcome)
+    if (plan.kind==="ask_local_codex_connection_v2" && (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail"].includes(plan.probe_outcome)
       || (plan.mode==="planned_live" && plan.probe_outcome!=="pass"))) throw new Error("probe scenario drift");
     if (plan.mode === "simulation" && plan.cli.executable !== realpathSync(process.execPath)) throw new Error("simulation runtime drift");
     const imageStat = lstatSync(plan.cli.executable);
@@ -135,6 +147,8 @@ function readConnection(root, current = false) {
     if (!same(plan.source, source()) || !same(plan.host, localPreflight().host)
       || hash(bytes(plan.cli.executable, 256 * 1024 * 1024)) !== plan.cli.image_digest) throw new Error("connection source/host/image drift");
     if (plan.kind === "ask_local_codex_connection_v2") {
+      assertModelToolBoundary(plan,base);
+      if (!plan.probe_parent_policy || !same(plan.probe_parent_policy,codexProbeParentPolicy(plan))) throw new Error("trusted runtime parent contract required");
       if (!same(plan.home_identity, existingHomeRoot(plan.codex_home))
         || !same(plan.read_roots, closedReadRoots(plan.host.platform, base.node.executable, plan.cli.executable))) throw new Error("home/read scope drift");
       if ((plan.host.platform === "darwin" && (!plan.guard || plan.guard.executable!=="/usr/bin/sandbox-exec"))
@@ -150,6 +164,7 @@ function readConnection(root, current = false) {
 
 /** Fresh HOME; existing CODEX_HOME is used only for an approved future trial. */
 export function codexTrialLaunch(plan, base, condition) {
+  assertModelToolBoundary(plan,base);
   if (!["plain", "kernel_only"].includes(condition)) throw new Error("closed trial condition required");
   const evidence = join(base.private_root, condition), workspace = join(base.workspace_root, condition);
   const argv = plan.command.argv.map(value => value === "{output_schema}" ? join(evidence, "output-schema.json") : value === "{output}" ? join(evidence, "final.json")
@@ -163,6 +178,7 @@ export function codexTrialLaunch(plan, base, condition) {
 
 /** CLI picks Seatbelt on Darwin and Landlock on Linux, including WSL2. */
 export function codexProbeLaunches(plan, base, canaries) {
+  assertModelToolBoundary(plan,base);
   const home = join(base.private_root, "connection-probe", "home"), cwd = join(base.workspace_root, "connection-probe");
   const settings = [];
   for (let i = 0; i < plan.command.argv.length; i++) if (plan.command.argv[i] === "-c") settings.push(plan.command.argv[++i].replace("{sqlite_home}",JSON.stringify(join(home,"sqlite"))).replace("{log_dir}",JSON.stringify(join(home,"log"))));
@@ -191,20 +207,24 @@ function checks(plan, base) {
   const publicFile = join(workspace, "public.txt"), privateFile = join(root, "private.txt");
   raw(publicFile, "ASK_PUBLIC_CANARY\n"); raw(privateFile, "ASK_PRIVATE_CANARY\n");
   const other = join(base.workspace_root, "other-trial-canary"); mkdirSync(other, { mode: 0o700 }); raw(join(other, "private.txt"), "ASK_OTHER_CANARY\n");
-  const deniedReads = [privateFile, join(other, "private.txt")], deniedWrite = join(other, "private.txt");
+  const authCanary=join(root,"synthetic-auth-material.txt"), unrelatedCanary=base.workspace_root+"-unrelated-canary.txt";
+  raw(authCanary,"ASK_SYNTHETIC_AUTH_NOT_A_CREDENTIAL\n"); raw(unrelatedCanary,"ASK_UNRELATED_CANARY\n");
+  const deniedReads = [privateFile, join(other, "private.txt"), authCanary, unrelatedCanary], deniedWrite = join(other, "private.txt");
   const launches = codexProbeLaunches(plan, base, [publicFile, ...deniedReads]);
   const workerRoots = [WORKER, "scripts/ask-local-codex-boundaries.mjs", "scripts/content-addressed-store.mjs"].map(path => join(ROOT, path));
   const canary = { publicFile, allowedWrite:join(workspace,"write.txt"), deniedReads, deniedWrite };
   const sandboxArgs = launches[3].argv.slice(0, launches[3].argv.indexOf("--")+1).map(value => value.startsWith("permissions.ask_synthetic_pilot.filesystem=")
     ? value.replace(', ":workspace_roots"', `, ${workerRoots.map(path=>`${JSON.stringify(path)} = "read"`).join(", ")}, ":workspace_roots"`) : value);
-  const profile = probeSeatbelt({readRoots:[...plan.read_roots,...workerRoots], home:launches[0].env.HOME, workspace, canaries:[...deniedReads,deniedWrite]});
+  const filesystem = sandboxArgs.find(value=>value.startsWith("permissions.ask_synthetic_pilot.filesystem="));
+  assertProbeSandboxArgs(sandboxArgs,{filesystem});
+  const profile = probeSeatbelt({codexHome:plan.codex_home, home:launches[0].env.HOME, workspace, canaries:[...deniedReads,deniedWrite]});
   const outcomes = [];
   for (let index = 0; index < launches.length; index++) {
     const slot = join(root, `check-${index}`); mkdirSync(slot, { mode: 0o700 });
     let launch = launches[index];
     if (plan.mode === "planned_live") {
       if (plan.host.platform !== "darwin" || !plan.guard) throw new Error("real probe parent guard currently Mac only");
-      const payload = {cli:plan.cli.executable, argv:sandboxArgs, node:base.node.executable, worker:join(ROOT,WORKER), cwd:workspace, canary};
+      const payload = {cli:plan.cli.executable, argv:sandboxArgs, node:base.node.executable, worker:join(ROOT,WORKER), cwd:workspace, canary, filesystem};
       const child = index === 3 ? [base.node.executable,join(ROOT,WORKER),"guarded",JSON.stringify(payload)] : [launch.executable,...launch.argv];
       launch = {...launch, executable:plan.guard.executable, argv:["-p",profile,"--",...child]};
     }
@@ -220,10 +240,13 @@ function checks(plan, base) {
     outcomes.push({ index, status: pass ? "pass" : "fail", process });
     if (!pass) break;
   }
+  const metadataPassed = outcomes.length >= 3 && outcomes.slice(0,3).every(x=>x.status === "pass");
+  const canaryStatus = outcomes.length < 4 ? "not_exercised" : outcomes[3].status === "pass" ? (plan.mode === "simulation" ? "synthetic_only" : "observed_closed_read_and_deny_write") : "failed_or_unknown";
   return { status: outcomes.length === 4 && outcomes.every(x => x.status === "pass") ? "pass" : "fail", outcomes,
     evidence_class: plan.mode === "simulation" ? "synthetic_only" : "observed_host_control",
-    network_enforcement: outcomes.length === 4 && outcomes.every(x=>x.status === "pass") ? (plan.mode === "simulation" ? "synthetic_only" : "observed_loopback_tcp_v4_v6") : "failed_or_unknown",
-    filesystem_enforcement: "closed_read_and_deny_write_canary", authentication: "not_checked", model_calls: 0 };
+    metadata_compatibility: metadataPassed ? (plan.mode === "simulation" ? "synthetic_only" : "observed_version_and_flags") : "failed_or_unknown",
+    network_enforcement: outcomes.length < 4 ? "not_exercised" : outcomes.every(x=>x.status === "pass") ? (plan.mode === "simulation" ? "synthetic_only" : "observed_loopback_tcp_v4_v6") : "failed_or_unknown",
+    filesystem_enforcement: canaryStatus, filesystem_canary_scope:["synthetic_grading_material","other_trial","synthetic_auth_material","unrelated_file"], authentication: "not_checked", model_calls: 0 };
 }
 
 function phaseActions(phase) { return phase === "probe" ? {probes:4,trials:0,retry:0,existing_home_cli_read_refresh:false,external_network:false,loopback:true}
@@ -232,7 +255,7 @@ function phaseActions(phase) { return phase === "probe" ? {probes:4,trials:0,ret
 export function codexPhasePermission(plan, phase, approvalRef, admissionDigest = null) {
   if (!["probe","evaluate"].includes(phase) || typeof approvalRef !== "string" || approvalRef.length < 10) throw new Error("explicit phase/approval reference required");
   return {kind:"ask_local_codex_phase_permission_v2", phase, plan_digest:canonicalDigest(plan), source_digest:canonicalDigest(plan.source),
-    cli_image_digest:plan.cli.image_digest, command_digest:canonicalDigest(plan.command), route:plan.route, guard:plan.guard,
+    cli_image_digest:plan.cli.image_digest, command_digest:canonicalDigest(plan.command), route:plan.route, guard:plan.guard, probe_parent_policy:plan.probe_parent_policy,
     actions:phaseActions(phase), approval_ref:approvalRef, admission_digest:admissionDigest};
 }
 function phasePermission(plan, phase, permission, admissionDigest = null) {
@@ -248,7 +271,7 @@ export function runCodexProbes(root, permission = null) {
   if (permission) save(join(root,"probe-permission.json"),permission);
   save(join(root,"probe-claim.json"),{state:"spent",plan_digest:canonicalDigest(plan)});
   const report={kind:"ask_local_codex_admission_v2",plan_digest:canonicalDigest(plan),source_digest:canonicalDigest(plan.source),host:plan.host,
-    cli_image_digest:plan.cli.image_digest,command_digest:canonicalDigest(plan.command),guard:plan.guard,phase:"probe",mode:plan.mode,
+    cli_image_digest:plan.cli.image_digest,command_digest:canonicalDigest(plan.command),guard:plan.guard,probe_parent_policy:plan.probe_parent_policy,phase:"probe",mode:plan.mode,
     created_at:new Date().toISOString(),...checks(plan,base)};
   save(join(root,"probe-report.json"),report); save(join(root,"probe-seal.json"),{files:probeInventory(root)}); return report;
 }
@@ -259,6 +282,7 @@ export function reopenCodexProbes(root) {
   if (!same(read(join(root,"probe-seal.json")).files,probeInventory(root)) || report.plan_digest!==canonicalDigest(plan)
     || report.command_digest!==canonicalDigest(plan.command) || report.source_digest!==canonicalDigest(plan.source)
     || report.cli_image_digest!==plan.cli.image_digest || !same(report.host,plan.host) || !same(report.guard,plan.guard)
+    || (plan.probe_parent_policy && !same(report.probe_parent_policy,plan.probe_parent_policy))
     || report.kind!=="ask_local_codex_admission_v2" || report.mode!==plan.mode) throw new Error("probe evidence/admission binding mismatch");
   return report;
 }
@@ -333,6 +357,7 @@ export function evaluateCodexConnection(root, permission = null) {
   phasePermission(plan,"evaluate",permission,canonicalDigest(admission));
   if (plan.mode === "planned_live") {
     if (admission.status !== "pass" || admission.evidence_class !== "observed_host_control" || admission.network_enforcement !== "observed_loopback_tcp_v4_v6"
+      || admission.metadata_compatibility !== "observed_version_and_flags" || admission.filesystem_enforcement !== "observed_closed_read_and_deny_write"
       || !freshAdmissionTime(admission.created_at)) throw new Error("fresh sealed real host admission required");
     save(join(root,"home-metadata-before.json"),inspectExistingCodexHome(plan.codex_home));
   }

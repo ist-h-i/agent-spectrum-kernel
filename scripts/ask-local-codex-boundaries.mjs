@@ -69,14 +69,41 @@ export function assertCanaryResult(result) {
     || !Array.isArray(result.network) || result.network.length !== 2 || result.network.some(x => !keys(x,["host","positive","denied"]) || !["127.0.0.1", "::1"].includes(x.host) || x.positive !== "pass" || x.denied !== "pass")
     || new Set(result.network.map(x => x.host)).size !== 2) throw new Error("canary failure/unknown; no real admission");
 }
-/** Ephemeral Mac parent guard: no real home/config/keyring paths, external IP or DNS.
- * Loopback is intentionally allowed here so the nested CLI policy is tested. */
-export function probeSeatbelt({ readRoots, home, workspace, canaries }) {
+/** Trusted runtime parent, distinct from the nested model-tool policy.
+ * General host reads permit OS loader startup; only the declared existing
+ * CODEX_HOME is denied here. This is not personal-file isolation for the CLI.
+ * Writes stay private; loopback enables positive controls in the parent. */
+export function probeSeatbelt({ codexHome, home, workspace, canaries }) {
+  const paths = [codexHome, home, workspace, ...canaries];
+  if (paths.some(path => typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path || path === "/")
+    || [home, workspace, ...canaries].some(path => path === codexHome || path.startsWith(codexHome + "/"))) throw new Error("separate existing-home parent deny required");
   const literal = path => `(literal ${JSON.stringify(path)})`;
   const subpath = path => `(subpath ${JSON.stringify(path)})`;
   return `(version 1)(deny default)(allow process*)(allow sysctl-read)(allow mach-lookup)(allow file-read-metadata)`
-    + `(allow file-read* ${readRoots.map(path => lstatSync(path).isDirectory() ? subpath(path) : literal(path)).join(" ")} ${subpath(home)} ${subpath(workspace)} ${canaries.map(literal).join(" ")})`
+    + `(allow file-read*)(deny file-read* ${subpath(codexHome)})`
     + `(allow file-write* ${subpath(home)} ${subpath(workspace)} ${canaries.map(literal).join(" ")} ${literal("/dev/null")})`
+    + `(deny file-write* ${subpath(codexHome)})`
     + `(allow network* (local ip "localhost:*") (remote ip "localhost:*"))`
     + `(deny mach-lookup (global-name "com.apple.securityd") (global-name "com.apple.security.agent"))`;
+}
+/** Trusted controller supplies the expected, source-bound filesystem string.
+ * Refuse malformed/missing policy before worker file/socket/CLI operations. */
+export function assertProbeSandboxArgs(argv, { filesystem } = {}) {
+  const refuse = () => { throw new Error("model-tool policy refused"); };
+  if (!Array.isArray(argv) || argv.some(x => typeof x !== "string") || argv[0] !== "sandbox" || argv[1] !== "-P"
+    || argv[2] !== "ask_synthetic_pilot" || argv[3] !== "--include-managed-config" || argv.at(-1) !== "--"
+    || typeof filesystem !== "string" || !filesystem.startsWith('permissions.ask_synthetic_pilot.filesystem={ "/" = "deny", ')
+    || !filesystem.endsWith('":workspace_roots" = "write" }')) refuse();
+  const settings = new Map(); let index = 4;
+  while (argv[index] === "-c") {
+    const value = argv[index + 1]; if (typeof value !== "string" || !value.includes("=")) refuse();
+    const key = value.slice(0, value.indexOf("="));
+    if (!/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/u.test(key) || settings.has(key)) refuse();
+    settings.set(key, value); index += 2;
+  }
+  if (argv[index] !== "-C" || typeof argv[index + 1] !== "string" || !isAbsolute(argv[index + 1]) || index + 2 !== argv.length - 1
+    || settings.get("permissions.ask_synthetic_pilot.filesystem") !== filesystem
+    || settings.get("permissions.ask_synthetic_pilot.network.enabled") !== "permissions.ask_synthetic_pilot.network.enabled=false"
+    || settings.get("default_permissions") !== 'default_permissions="ask_synthetic_pilot"'
+    || [...settings.keys()].some(key => key.startsWith("permissions.") && !["permissions.ask_synthetic_pilot.filesystem", "permissions.ask_synthetic_pilot.network.enabled"].includes(key))) refuse();
 }
