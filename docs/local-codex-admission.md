@@ -1,15 +1,47 @@
 # Split Mac admission and evaluation (Issue #315)
 
-The v2 adapter in Draft #317 implements two separate execution entrances. The
-current correction returns the parent to the trusted CLI/controller contract;
-it changes source only. No native CLI/probe/model/auth/chmod/OS policy operation
-was performed for this correction. A separately authorized previous Mac probe
-on head31129d8 stopped at its first guarded version invocation: 89 ms, SIGABRT,
-empty stdout/stderr. The matched crash stack is dyld/libignition startup; the
-exact denied resource or cause remains unknown. Later canaries and evaluation
-were not run. This correction does **not** establish successful native startup.
-Old sealed evidence stays readable and untouched; consumed permissions cannot
-start this corrected source/plan.
+The v2 adapter in Draft #317 separates preparation, probes, evaluation and
+offline replay. New plans require the `owned_external_runtime_v1` layout.
+The current runtime-storage correction is source/fake-only; it performs no
+native CLI/probe/model/auth/chmod/OS policy operation. **Native admission and
+evaluation are disabled**: the known nested Seatbelt launch cannot be enabled
+by a fresh approval alone. See [the non-nested design](local-codex-single-sandbox-design.md).
+
+The authorized Mac Phase A on head46a815c used four invocations: version/exec
+help/sandbox help passed; the canary failed with exit71 and `sandbox_apply:
+Operation not permitted`. Models/evaluation/retries were zero. CLI helper
+symlinks under evidence caused inventory rejection after the raw report was
+saved; the original record remains incomplete/unsealed. The earlier head31129d8
+version SIGABRT remains a separate historical unknown. Runtime separation does
+not establish an EPERM fix. Old plans/evidence remain readable and untouched;
+consumed permissions cannot start the corrected source/plan.
+
+## External runtime ownership and replay
+
+The descriptor requires `runtimeRoot`: a pre-created empty canonical directory,
+current-user owned, owner-only, without unknown ACLs. Also provide `privateRoot`
+and `workspaceParent`. Runtime must be outside evidence, workspace parent,
+controller and existing CODEX_HOME, with no containment in either direction.
+Preparation binds device/inode/owner, versioned layout and canonical root in
+the plan, writes an exclusive runtime-owner claim bound to the plan digest,
+and adds the root to the closed model-tool deny policy. Runtime is never chmodded
+or reused. Permission and probe report bind the same runtime contract; source/plan
+changes require new authorization, never reuse the consumed Phase A grant.
+
+Probe HOME/CODEX_HOME lives at `runtimeRoot/connection-probe/home`. Trial HOME,
+SQLite and log roots live at `runtimeRoot/{plain,kernel_only}/home`; evaluation
+CODEX_HOME remains the existing separately admitted store. Phase directories
+are exclusively created, preventing runtime reuse. Ordinary CLI helper links
+may exist in runtime; they are never followed/copied into evidence. Evidence
+continues rejecting arbitrary symlinks/hardlinks. Runtime is not model input;
+the existing narrowly checked CLI-helper session exception is unchanged.
+
+Offline replay validates saved plan/report/seal bytes and path/binding shape
+without opening runtime or executing it. Missing, changed or removed runtime
+cannot alter sealed results. Execution validates current runtime identity and
+ownership; replay is not an execution admission. Historical plans lacking the
+layout retain read-only replay but refuse new execution. Old unsealed records
+remain incomplete: this change does not repair or re-seal them.
 
 ## Implemented entrances
 
@@ -86,7 +118,12 @@ The CLI can read and refresh its existing token and persist updated credentials.
 
 ## Evaluation envelope and next actual run
 
-Any next Mac run requires a fresh approval for the corrected parent host-read scope above. The next proposed Mac run is: prepare an exact native v2 plan on the reviewed clean head; authorize one probe phase (four invocations, ten seconds each, one bounded guarded worker with IPv4/IPv6 loopback listeners, models0, retries0); inspect its sealed observed result; resolve the index metadata blocker; then separately authorize one evaluate phase (at most two execs,120 seconds each, retries0, existing-store token read/refresh/writeback and new session writes). Do not start any of these real phases from the current development authorization.
+There is no next runnable Mac plan yet. A non-nested launch boundary with an
+independent model-free external-network restriction must be designed, reviewed
+and implemented before proposing a real probe. The known nested route is
+refused before any phase claim or invocation. Only then can a fresh source/plan
+and separate probe authorization be considered. Existing index0644 remains an
+evaluation blocker; no chmod/auth operation is included in this correction.
 
 The model is `gpt-6.1-sol`, reasoning medium. Per-trial30,000 and cumulative60,000 tokens are post-trial stopping thresholds, not hard billing caps. Unknown usage, provider/process/timeout/identity/scope/privacy failure stops subsequent trials. Incorrect task output is graded separately. Two execs can contain more than two model HTTP requests due to tools; auxiliary authentication/managed-config traffic is not a bounded request count.
 

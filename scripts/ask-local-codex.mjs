@@ -46,6 +46,38 @@ function existingHomeRoot(path) {
 function source() {
   return { pilot: pilotSourceIdentity(), adapter: Object.fromEntries(SOURCES.map(path => [path, hash(bytes(join(ROOT, path)))])) };
 }
+const RUNTIME_LAYOUT = "owned_external_runtime_v1";
+function runtimeShape(runtime, base, codexHome) {
+  if (!exactKeys(runtime, ["kind", "root", "identity"]) || runtime.kind !== RUNTIME_LAYOUT
+    || !exactKeys(runtime.identity, ["dev", "ino", "uid"]) || Object.values(runtime.identity).some(x => !Number.isSafeInteger(x) || x < 0)
+    || typeof runtime.root !== "string" || !isAbsolute(runtime.root) || resolve(runtime.root) !== runtime.root || runtime.root === "/") throw new Error("bound external runtime required");
+  for (const other of [base.private_root, base.workspace_root, base.controller_root, codexHome])
+    if (within(other, runtime.root) || within(runtime.root, other)) throw new Error("separate runtime/evidence/workspace/controller/home required");
+}
+function runtimeIdentity(path) {
+  ownerDirectory(path); noAcl([path]); const s = lstatSync(path);
+  return {dev:s.dev, ino:s.ino, uid:s.uid};
+}
+function currentRuntime(plan, base) {
+  runtimeShape(plan.runtime, base, plan.codex_home);
+  if (!same(runtimeIdentity(plan.runtime.root), plan.runtime.identity)
+    || !same(read(join(plan.runtime.root,"runtime-owner.json")), {kind:RUNTIME_LAYOUT, evidence_root:base.private_root, plan_digest:canonicalDigest(plan)})
+    || readdirSync(plan.runtime.root).some(name => !["runtime-owner.json","connection-probe","plain","kernel_only"].includes(name))) throw new Error("runtime ownership/identity drift");
+  for (const phase of ["connection-probe","plain","kernel_only"]) {
+    const path=join(plan.runtime.root,phase);
+    try { lstatSync(path); } catch(e) { if(e.code==="ENOENT")continue;throw e; }
+    runtimeIdentity(path); runtimeIdentity(join(path,"home"));
+  }
+}
+function runtimeHome(plan, base, phase) {
+  return plan.runtime ? join(plan.runtime.root, phase, "home") : join(base.private_root, phase, "home");
+}
+function createRuntimeHome(plan, base, phase) {
+  currentRuntime(plan, base);
+  const phaseRoot = join(plan.runtime.root, phase);
+  mkdirSync(phaseRoot, {mode:0o700}); // Exclusive: old runtime is never reused.
+  mkdirSync(join(phaseRoot,"home"), {mode:0o700});
+}
 function cleanNativeSource() {
   if (execFileSync("git", ["-C", ROOT, "status", "--porcelain"], { encoding: "utf8", timeout: 10000 }).trim()) throw new Error("native source must be committed and clean");
 }
@@ -61,7 +93,7 @@ export function assertConnectionPermissionShape(permission) {
 export function codexConnectionCommand(plan, base) {
   const command = pilotCommand({ privateRoot: base.private_root, controllerRoot: base.controller_root, workspaceRoot: base.workspace_root });
   const closed = plan.kind === "ask_local_codex_connection_v2";
-  const roots = [...(closed ? ["/"] : []), ...command.deny_roots, plan.codex_home];
+  const roots = [...(closed ? ["/"] : []), ...command.deny_roots, plan.codex_home, ...(plan.runtime ? [plan.runtime.root] : [])];
   const argv = command.argv.filter((value,index,values) => !(closed && (value === 'permissions.ask_synthetic_pilot.extends=":workspace"' || (value === "-c" && values[index+1] === 'permissions.ask_synthetic_pilot.extends=":workspace"'))))
     .map(value => value.startsWith("permissions.ask_synthetic_pilot.filesystem=")
       ? `permissions.ask_synthetic_pilot.filesystem={ ${roots.map(root => `${JSON.stringify(root)} = "deny"`).join(", ")}, ${closed ? plan.read_roots.map(root => `${JSON.stringify(root)} = "read"`).join(", ") + ", " : ""}":workspace_roots" = "write" }` : value);
@@ -73,6 +105,7 @@ export function codexConnectionCommand(plan, base) {
 /** Sealed in new plans; never reused as a model-tool grant. */
 export function codexProbeParentPolicy(plan) {
   return {kind:"trusted_runtime_parent_v1",read_access:"host_reads_except_existing_codex_home",existing_home_deny:plan.codex_home,
+    ...(plan.runtime ? {runtime:plan.runtime} : {}),
     write_access:"owned_probe_home_workspace_literal_canaries_dev_null",network:"loopback_only",keyring_ipc:"securityd_and_security_agent_denied"};
 }
 function assertModelToolBoundary(plan, base) {
@@ -84,7 +117,7 @@ function assertModelToolBoundary(plan, base) {
 /** No Codex subprocess, credential file access, link, copy or auth configuration. */
 export function prepareCodexConnection(descriptor, { simulation = false, scenarios = ["pass", "pass"], probePass = true, probeOutcome = "pass", fakeTimeoutMs = null, host = null } = {}) {
   if (!descriptor || typeof descriptor !== "object" || Array.isArray(descriptor)
-    || Object.keys(descriptor).some(key => !["privateRoot", "workspaceParent", "codexHome", "executable", "imageDigest"].includes(key))) throw new Error("closed connection descriptor required");
+    || Object.keys(descriptor).some(key => !["privateRoot", "workspaceParent", "codexHome", "runtimeRoot", "executable", "imageDigest"].includes(key))) throw new Error("closed connection descriptor required");
   if (process.platform === "win32") throw new Error("use Linux Node inside WSL2");
   if (simulation && (descriptor.executable !== undefined || descriptor.imageDigest !== undefined)) throw new Error("simulation cannot bind a native image");
   if (!simulation && (host !== null || fakeTimeoutMs !== null || !same(scenarios, ["pass", "pass"]) || !probePass || probeOutcome!=="pass")) throw new Error("synthetic options forbidden in live plan");
@@ -105,16 +138,21 @@ export function prepareCodexConnection(descriptor, { simulation = false, scenari
   const executableStat = lstatSync(executable);
   if (within(codexHome, executable) || !executableStat.isFile() || executableStat.nlink !== 1
     || !(executableStat.mode & 0o111) || (executableStat.mode & 0o022)) throw new Error("safe executable metadata required before reading image bytes");
+  const runtimeRoot = ownerDirectory(descriptor.runtimeRoot), identity = runtimeIdentity(runtimeRoot);
+  runtimeShape({kind:RUNTIME_LAYOUT, root:runtimeRoot, identity},
+    {private_root:descriptor.privateRoot, workspace_root:descriptor.workspaceParent ?? dirname(descriptor.privateRoot), controller_root:controllerRoot}, codexHome);
+  if (readdirSync(runtimeRoot).length !== 0) throw new Error("new empty runtime root required; never reused");
   const image = readStableFile(executable, "CLI image", 256 * 1024 * 1024, { allowEmpty: false });
   if (!simulation && (image.rawByteDigest !== descriptor.imageDigest || !(image.evidence.finalPath.mode & 0o111)
     || (image.evidence.finalPath.mode & 0o022))) throw new Error("reviewed executable image identity required");
   if (!simulation) cleanNativeSource();
   const prepared = prepareFakePilot({ privateRoot: descriptor.privateRoot, workspaceParent: descriptor.workspaceParent, controllerRoot });
   const base = readPilotPlan(prepared.privateRoot);
+  const runtime = {kind:RUNTIME_LAYOUT, root:runtimeRoot, identity}; runtimeShape(runtime,base,codexHome);
   for (const root of [base.private_root, base.workspace_root]) if (within(root, codexHome) || within(codexHome, root)) throw new Error("overlapping session/evidence/workspace roots");
   const plan = { kind: "ask_local_codex_connection_v2", mode: simulation ? "simulation" : "planned_live", base_digest: prepared.planDigest,
     source: source(), host: observed.host, route_host: routeHost, route: selected.route, cli: { version: CODEX_CONNECTION_VERSION, executable, image_digest: image.rawByteDigest },
-    codex_home: codexHome, home_identity:homeIdentity, read_roots:closedReadRoots(observed.host.platform, base.node.executable, executable), auth: "existing_file_store_cli_only_no_controller_credential_operations",
+    codex_home: codexHome, home_identity:homeIdentity, runtime, read_roots:closedReadRoots(observed.host.platform, base.node.executable, executable), auth: "existing_file_store_cli_only_no_controller_credential_operations",
     guard: observed.host.platform === "darwin" ? { executable:"/usr/bin/sandbox-exec", image_digest:hash(bytes("/usr/bin/sandbox-exec")) } : null,
     constraints: structuredClone(PILOT_LIMITS), scenarios, probe_pass: probePass, probe_outcome:probeOutcome, fake_timeout_ms: fakeTimeoutMs,
     live_ready: false, admission: "not_exercised", synthetic_host: host !== null };
@@ -122,6 +160,7 @@ export function prepareCodexConnection(descriptor, { simulation = false, scenari
   plan.probe_parent_policy = codexProbeParentPolicy(plan);
   save(join(prepared.privateRoot, PLAN), plan);
   save(join(prepared.privateRoot, "connection-digest.json"), { digest: canonicalDigest(plan) });
+  save(join(runtimeRoot,"runtime-owner.json"), {kind:RUNTIME_LAYOUT, evidence_root:prepared.privateRoot, plan_digest:canonicalDigest(plan)});
   if (simulation) save(join(codexHome, "owned-simulation.json"), { kind: "ask_owned_connection_simulation_v1", root: prepared.privateRoot, plan_digest: canonicalDigest(plan) });
   return { privateRoot: prepared.privateRoot, planDigest: canonicalDigest(plan), mode: plan.mode, live_ready: false };
 }
@@ -158,7 +197,9 @@ function readConnection(root, current = false) {
     if (plan.mode === "simulation" && (!same(read(join(plan.codex_home, "owned-simulation.json")),
       { kind: "ask_owned_connection_simulation_v1", root, plan_digest: canonicalDigest(plan) })
       || readdirSync(plan.codex_home).some(name => !["owned-simulation.json", "sessions"].includes(name)))) throw new Error("owned simulation home drift");
+    currentRuntime(plan,base);
   }
+  if (plan.runtime) runtimeShape(plan.runtime,base,plan.codex_home); // Replay never opens runtime.
   return { base, plan };
 }
 
@@ -167,11 +208,12 @@ export function codexTrialLaunch(plan, base, condition) {
   assertModelToolBoundary(plan,base);
   if (!["plain", "kernel_only"].includes(condition)) throw new Error("closed trial condition required");
   const evidence = join(base.private_root, condition), workspace = join(base.workspace_root, condition);
+  const home = runtimeHome(plan,base,condition);
   const argv = plan.command.argv.map(value => value === "{output_schema}" ? join(evidence, "output-schema.json") : value === "{output}" ? join(evidence, "final.json")
-    : value.replace("{sqlite_home}",JSON.stringify(join(evidence,"home/sqlite"))).replace("{log_dir}",JSON.stringify(join(evidence,"home/log"))));
+    : value.replace("{sqlite_home}",JSON.stringify(join(home,"sqlite"))).replace("{log_dir}",JSON.stringify(join(home,"log"))));
   argv.splice(argv.length - 1, 0, "-C", workspace);
   return { executable: plan.cli.executable, argv, cwd: workspace,
-    env: { HOME: join(evidence, "home"), CODEX_HOME: plan.codex_home, LANG: "C", LC_ALL: "C", TZ: "UTC",
+    env: { HOME: runtimeHome(plan,base,condition), CODEX_HOME: plan.codex_home, LANG: "C", LC_ALL: "C", TZ: "UTC",
       PATH: `${dirname(base.node.executable)}:/usr/bin:/bin:/usr/sbin:/sbin` },
     timeout: PILOT_LIMITS.timeout_ms, killSignal: "SIGKILL", maxBuffer: PILOT_LIMITS.max_buffer_bytes };
 }
@@ -179,7 +221,7 @@ export function codexTrialLaunch(plan, base, condition) {
 /** CLI picks Seatbelt on Darwin and Landlock on Linux, including WSL2. */
 export function codexProbeLaunches(plan, base, canaries) {
   assertModelToolBoundary(plan,base);
-  const home = join(base.private_root, "connection-probe", "home"), cwd = join(base.workspace_root, "connection-probe");
+  const home = runtimeHome(plan,base,"connection-probe"), cwd = join(base.workspace_root, "connection-probe");
   const settings = [];
   for (let i = 0; i < plan.command.argv.length; i++) if (plan.command.argv[i] === "-c") settings.push(plan.command.argv[++i].replace("{sqlite_home}",JSON.stringify(join(home,"sqlite"))).replace("{log_dir}",JSON.stringify(join(home,"log"))));
   const options = { executable: plan.cli.executable, cwd, env: { HOME: home, CODEX_HOME: home, LANG: "C", LC_ALL: "C", TZ: "UTC",
@@ -203,7 +245,8 @@ function invoke(plan, launch, stage, scenario, condition, root, command) {
 
 function checks(plan, base) {
   const root = join(base.private_root, "connection-probe"), workspace = join(base.workspace_root, "connection-probe");
-  mkdirSync(root, { mode: 0o700 }); mkdirSync(join(root, "home"), { mode: 0o700 }); mkdirSync(workspace, { mode: 0o700 });
+  createRuntimeHome(plan,base,"connection-probe");
+  mkdirSync(root, { mode: 0o700 }); mkdirSync(workspace, { mode: 0o700 });
   const publicFile = join(workspace, "public.txt"), privateFile = join(root, "private.txt");
   raw(publicFile, "ASK_PUBLIC_CANARY\n"); raw(privateFile, "ASK_PRIVATE_CANARY\n");
   const other = join(base.workspace_root, "other-trial-canary"); mkdirSync(other, { mode: 0o700 }); raw(join(other, "private.txt"), "ASK_OTHER_CANARY\n");
@@ -256,14 +299,17 @@ export function codexPhasePermission(plan, phase, approvalRef, admissionDigest =
   if (!["probe","evaluate"].includes(phase) || typeof approvalRef !== "string" || approvalRef.length < 10) throw new Error("explicit phase/approval reference required");
   return {kind:"ask_local_codex_phase_permission_v2", phase, plan_digest:canonicalDigest(plan), source_digest:canonicalDigest(plan.source),
     cli_image_digest:plan.cli.image_digest, command_digest:canonicalDigest(plan.command), route:plan.route, guard:plan.guard, probe_parent_policy:plan.probe_parent_policy,
-    actions:phaseActions(phase), approval_ref:approvalRef, admission_digest:admissionDigest};
+    ...(plan.runtime ? {runtime:plan.runtime} : {}), actions:phaseActions(phase), approval_ref:approvalRef, admission_digest:admissionDigest};
 }
 function phasePermission(plan, phase, permission, admissionDigest = null) {
   if (plan.kind !== "ask_local_codex_connection_v2") throw new Error("fresh exact v2 phase plan required");
   if (plan.mode === "simulation") { if (permission !== null) throw new Error("permission cannot promote simulation"); return; }
   if (!permission || !same(permission, codexPhasePermission(plan,phase,permission.approval_ref,admissionDigest))) throw new Error("fresh exact phase permission required");
-  if (plan.host.platform !== "darwin") throw new Error("real parent-guard admission currently Mac only");
-  cleanNativeSource();
+  assertNativeAdmissionRoute(plan);
+}
+/** No automatic fallback or permission exception can enable the known nested route. */
+export function assertNativeAdmissionRoute(plan) {
+  if (plan.mode === "planned_live") throw new Error("native admission unavailable: nested Seatbelt route requires boundary redesign");
 }
 const probeInventory = root => Object.fromEntries(Object.entries(pilotEvidenceInventory(root)).filter(([path]) => path.startsWith("connection-probe/") || ["probe-claim.json","probe-permission.json","probe-report.json"].includes(path)));
 export function runCodexProbes(root, permission = null) {
@@ -271,7 +317,7 @@ export function runCodexProbes(root, permission = null) {
   if (permission) save(join(root,"probe-permission.json"),permission);
   save(join(root,"probe-claim.json"),{state:"spent",plan_digest:canonicalDigest(plan)});
   const report={kind:"ask_local_codex_admission_v2",plan_digest:canonicalDigest(plan),source_digest:canonicalDigest(plan.source),host:plan.host,
-    cli_image_digest:plan.cli.image_digest,command_digest:canonicalDigest(plan.command),guard:plan.guard,probe_parent_policy:plan.probe_parent_policy,phase:"probe",mode:plan.mode,
+    cli_image_digest:plan.cli.image_digest,command_digest:canonicalDigest(plan.command),guard:plan.guard,probe_parent_policy:plan.probe_parent_policy,runtime:plan.runtime,phase:"probe",mode:plan.mode,
     created_at:new Date().toISOString(),...checks(plan,base)};
   save(join(root,"probe-report.json"),report); save(join(root,"probe-seal.json"),{files:probeInventory(root)}); return report;
 }
@@ -283,6 +329,7 @@ export function reopenCodexProbes(root) {
     || report.command_digest!==canonicalDigest(plan.command) || report.source_digest!==canonicalDigest(plan.source)
     || report.cli_image_digest!==plan.cli.image_digest || !same(report.host,plan.host) || !same(report.guard,plan.guard)
     || (plan.probe_parent_policy && !same(report.probe_parent_policy,plan.probe_parent_policy))
+    || (plan.runtime && !same(report.runtime,plan.runtime))
     || report.kind!=="ask_local_codex_admission_v2" || report.mode!==plan.mode) throw new Error("probe evidence/admission binding mismatch");
   return report;
 }
@@ -314,7 +361,8 @@ function sessionBytes(home, stdout, started) {
 /** Reuses strict session/usage/grading; no semantic LLM judge. */
 function trial(plan, base, condition) {
   const root = join(base.private_root, condition), workspace = join(base.workspace_root, condition);
-  mkdirSync(root, { mode: 0o700 }); mkdirSync(join(root, "home"), { mode: 0o700 }); mkdirSync(workspace, { mode: 0o700 });
+  createRuntimeHome(plan,base,condition);
+  mkdirSync(root, { mode: 0o700 }); mkdirSync(workspace, { mode: 0o700 });
   for (const file of ["input.json", "task.md"]) raw(join(workspace, file), bytes(join(ROOT, "benchmarks/fixtures/pilot-json-aggregate-001", file)));
   const seeded = pilotWorkspaceInventory(workspace); save(join(root, "seeded.json"), seeded);
   const task = bytes(join(workspace, "task.md"));

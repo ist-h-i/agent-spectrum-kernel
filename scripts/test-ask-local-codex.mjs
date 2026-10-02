@@ -6,19 +6,19 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { prepareCodexConnection, runCodexConnection, reopenCodexConnection, codexTrialLaunch, codexProbeLaunches, assertConnectionPermissionShape,
-  runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime, codexConnectionCommand, codexProbeParentPolicy } from "./ask-local-codex.mjs";
+  runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime, codexConnectionCommand, codexProbeParentPolicy, assertNativeAdmissionRoute } from "./ask-local-codex.mjs";
 import {inspectExistingCodexHome, classifyDenial, assertCanaryResult, probeSeatbelt, assertNoAclListing, assertProbeSandboxArgs} from "./ask-local-codex-boundaries.mjs";
 import { canonicalDigest } from "./content-addressed-store.mjs";
-import { parsePilotNativeSession } from "./ask-synthetic-json-pilot.mjs";
+import { parsePilotNativeSession, pilotEvidenceInventory } from "./ask-synthetic-json-pilot.mjs";
 
 const ENTRY = join(dirname(fileURLToPath(import.meta.url)), "ask-local-codex.mjs");
 const json = path => JSON.parse(readFileSync(path, "utf8"));
 function prepared(t, options = {}) {
   const dir = mkdtempSync(join(realpathSync(tmpdir()), "ask-connection-test-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const home = join(dir, "owned-home"), parent = join(dir, "workspaces");
-  mkdirSync(home, { mode: 0o700 }); mkdirSync(parent, { mode: 0o700 });
-  const result = prepareCodexConnection({ privateRoot: join(dir, "evidence"), workspaceParent: parent, codexHome: home }, { simulation: true, ...options });
+  const home = join(dir, "owned-home"), parent = join(dir, "workspaces"), runtimeRoot = join(dir,"runtime");
+  mkdirSync(home, { mode: 0o700 }); mkdirSync(parent, { mode: 0o700 }); mkdirSync(runtimeRoot,{mode:0o700});
+  const result = prepareCodexConnection({ privateRoot: join(dir, "evidence"), workspaceParent: parent, codexHome: home, runtimeRoot }, { simulation: true, ...options });
   return { ...result, home, dir, plan: json(join(result.privateRoot, "connection.json")), base: json(join(result.privateRoot, "plan.json")) };
 }
 function snapshot(root) {
@@ -48,7 +48,7 @@ test("owned connection probes and two isolated trials share pilot scoring; reope
   for (const condition of ["plain", "kernel_only"]) {
     const received = json(join(privateRoot, condition, "received.json"));
     assert.equal(received.env.CODEX_HOME, plan.codex_home);
-    assert.equal(received.env.HOME, join(privateRoot, condition, "home"));
+    assert.equal(received.env.HOME, join(plan.runtime.root, condition, "home"));
     assert.equal(received.argv.at(-1), "-");
     assert.equal(received.env.OPENAI_API_KEY, undefined); assert.equal(received.env.NODE_OPTIONS, undefined);
     assert.deepEqual(readdirSync(join(base.workspace_root, condition)).sort(), ["answer.json", "input.json", "task.md"]);
@@ -140,7 +140,7 @@ test("live plans and historical grants refuse before any launch/claim", t => {
   writeFileSync(join(privateRoot, "connection-digest.json"), JSON.stringify({ digest: canonicalDigest(live) }));
   const before = snapshot(privateRoot);
   for (const permission of [null, { kind: "ask_synthetic_pilot_permission_v1" }, { kind: "ask_local_codex_permission_v1", approval_ref: "consumed-old-grant" }]) {
-    assert.throws(() => runCodexConnection(privateRoot, permission), /fresh exact phase/u);
+    assert.throws(() => runCodexConnection(privateRoot, permission), /runtime ownership\/identity drift/u);
   }
   assert.deepEqual(snapshot(privateRoot), before);
   const cli = spawnSync(process.execPath, [ENTRY, "simulate", privateRoot], { encoding: "utf8" });
@@ -189,8 +189,8 @@ test("probe-only produces sealed synthetic admission without evaluation and eval
   assert.equal(report.stop,null); assert.deepEqual(snapshot(join(privateRoot,"connection-probe")),before);
   assert.deepEqual(reopenCodexProbes(privateRoot),admission); assert.deepEqual(reopenCodexConnection(privateRoot),report);
   const launch=codexTrialLaunch(plan,base,"plain");
-  assert.ok(launch.argv.includes(`sqlite_home=${JSON.stringify(join(privateRoot,"plain/home/sqlite"))}`));
-  assert.ok(launch.argv.includes(`log_dir=${JSON.stringify(join(privateRoot,"plain/home/log"))}`));
+  assert.ok(launch.argv.includes(`sqlite_home=${JSON.stringify(join(plan.runtime.root,"plain/home/sqlite"))}`));
+  assert.ok(launch.argv.includes(`log_dir=${JSON.stringify(join(plan.runtime.root,"plain/home/log"))}`));
   assert.ok(launch.argv.includes('history.persistence="none"')); assert.ok(launch.argv.includes('memories.generate_memories=false'));
 });
 test("unsealed probe replay is explicit unknown and cannot launch evaluation", t=>{
@@ -313,4 +313,104 @@ test("failed metadata never reports an exercised filesystem or network canary",t
   assert.equal(report.outcomes.length,1);assert.equal(report.metadata_compatibility,"failed_or_unknown");
   assert.equal(report.filesystem_enforcement,"not_exercised");assert.equal(report.network_enforcement,"not_exercised");
   assert.deepEqual(reopenCodexProbes(privateRoot),report);
+});
+
+test("runtime helper links remain outside evidence and failed probes replay without runtime",t=>{
+  const {privateRoot,plan}=prepared(t,{probePass:false});
+  const permission=codexPhasePermission(plan,"probe","owned-fake-approval-only");
+  assert.deepEqual(permission.runtime,plan.runtime);
+  assert.ok(plan.command.deny_roots.includes(plan.runtime.root));
+  const report=runCodexProbes(privateRoot);
+  assert.equal(report.status,"fail"); assert.equal(report.model_calls,0);
+  const helpers=join(plan.runtime.root,"connection-probe/home/tmp/arg0");
+  assert.equal(readdirSync(helpers).length,4);
+  assert.ok(lstatSync(join(helpers,readdirSync(helpers)[0],"apply_patch")).isSymbolicLink());
+  assert.equal(readdirSync(join(privateRoot,"connection-probe")).includes("home"),false);
+  assert.deepEqual(reopenCodexProbes(privateRoot),report);
+  const before=snapshot(privateRoot);
+  // Remove only the test's owned synthetic runtime; offline replay needs no runtime path.
+  rmSync(plan.runtime.root,{recursive:true});
+  assert.deepEqual(reopenCodexProbes(privateRoot),report);
+  assert.deepEqual(snapshot(privateRoot),before);
+  assert.throws(()=>runCodexProbes(privateRoot)); assert.deepEqual(snapshot(privateRoot),before);
+});
+
+test("completed evaluation replay ignores removed owned runtime but retains strict evidence links",t=>{
+  const {privateRoot,plan}=prepared(t),report=runCodexConnection(privateRoot);
+  assert.equal(report.stop,null);
+  rmSync(plan.runtime.root,{recursive:true});
+  assert.deepEqual(reopenCodexConnection(privateRoot),report);
+  symlinkSync("/never-follow-this-target",join(privateRoot,"injected-runtime-helper"));
+  assert.throws(()=>reopenCodexConnection(privateRoot),/evidence link fault/u);
+});
+
+for(const variant of ["missing","public","symlink","nonempty","evidence","workspace","controller","existing-home"]) test(`runtime descriptor ${variant} refuses before evidence creation`,t=>{
+  const {dir,base,plan}=prepared(t), home=join(dir,"fresh-home"), runtimeRoot=join(dir,"fresh-runtime");
+  mkdirSync(home,{mode:0o700});mkdirSync(runtimeRoot,{mode:0o700});
+  const evidence=join(dir,"fresh-evidence"), workspace=join(dir,"fresh-workspaces");mkdirSync(workspace,{mode:0o700});
+  let selected=runtimeRoot;
+  if(variant==="missing")selected=undefined;
+  else if(variant==="public")chmodSync(runtimeRoot,0o755);
+  else if(variant==="symlink"){selected=join(dir,"runtime-alias");symlinkSync(runtimeRoot,selected);}
+  else if(variant==="nonempty")writeFileSync(join(runtimeRoot,"previous-claim"),"spent",{mode:0o600});
+  else if(variant==="evidence"){mkdirSync(evidence,{mode:0o700});selected=evidence;}
+  else if(variant==="workspace")selected=workspace;
+  else if(variant==="controller")selected=base.controller_root;
+  else if(variant==="existing-home")selected=home;
+  const before=readdirSync(dir).sort();
+  assert.throws(()=>prepareCodexConnection({privateRoot:evidence,workspaceParent:workspace,codexHome:home,runtimeRoot:selected},{simulation:true}));
+  assert.deepEqual(readdirSync(dir).sort(),before);
+  assert.equal(readdirSync(home).length,0);
+  assert.deepEqual(plan.command.deny_roots.includes(plan.runtime.root),true);
+});
+
+test("runtime root ownership claim cannot be reused for another plan",t=>{
+  const {dir,plan}=prepared(t),home=join(dir,"new-home");mkdirSync(home,{mode:0o700});
+  assert.throws(()=>prepareCodexConnection({privateRoot:join(dir,"new-evidence"),workspaceParent:join(dir,"workspaces"),codexHome:home,runtimeRoot:plan.runtime.root},{simulation:true}),/new empty runtime/u);
+});
+
+for(const variant of ["identity","marker","phase-link"])test(`runtime ${variant} drift refuses without a probe invocation`,t=>{
+  const {privateRoot,plan}=prepared(t);
+  if(variant==="identity") {rmSync(plan.runtime.root,{recursive:true});mkdirSync(plan.runtime.root,{mode:0o700});}
+  else if(variant==="marker")writeFileSync(join(plan.runtime.root,"runtime-owner.json"),"{}");
+  else symlinkSync("/never-follow-phase",join(plan.runtime.root,"connection-probe"));
+  const before=snapshot(privateRoot);
+  assert.throws(()=>runCodexProbes(privateRoot));
+  assert.equal(readdirSync(privateRoot).includes("connection-probe"),false);
+  assert.deepEqual(snapshot(privateRoot),before);
+});
+
+test("historical unsealed plan without runtime binding remains readable but cannot execute",t=>{
+  const {privateRoot,plan,base}=prepared(t),old=structuredClone(plan);
+  delete old.runtime; delete old.probe_parent_policy.runtime;
+  old.command=codexConnectionCommand(old,base);
+  writeFileSync(join(privateRoot,"connection.json"),JSON.stringify(old));
+  writeFileSync(join(privateRoot,"connection-digest.json"),JSON.stringify({digest:canonicalDigest(old)}));
+  const before=snapshot(privateRoot);
+  assert.equal(reopenCodexProbes(privateRoot).evidence_class,"unsealed_unknown");
+  assert.equal(reopenCodexConnection(privateRoot).verification,"unsealed_not_verified");
+  assert.throws(()=>runCodexProbes(privateRoot));assert.deepEqual(snapshot(privateRoot),before);
+});
+
+test("known nested native route has no executable admission or automatic fallback",()=>{
+  assert.throws(()=>assertNativeAdmissionRoute({mode:"planned_live",host:{platform:"darwin"}}),/nested Seatbelt route/u);
+  assert.throws(()=>assertNativeAdmissionRoute({mode:"planned_live",host:{platform:"linux"}}),/nested Seatbelt route/u);
+  assert.doesNotThrow(()=>assertNativeAdmissionRoute({mode:"simulation"}));
+});
+
+test("historical sealed failed admission without external runtime reopens read-only",t=>{
+  const {privateRoot,plan,base}=prepared(t),old=structuredClone(plan);
+  delete old.runtime; delete old.probe_parent_policy.runtime;
+  old.command=codexConnectionCommand(old,base);
+  writeFileSync(join(privateRoot,"connection.json"),JSON.stringify(old));
+  writeFileSync(join(privateRoot,"connection-digest.json"),JSON.stringify({digest:canonicalDigest(old)}));
+  const report={kind:"ask_local_codex_admission_v2",mode:old.mode,status:"fail",model_calls:0,retry:0,
+    plan_digest:canonicalDigest(old),source_digest:canonicalDigest(old.source),command_digest:canonicalDigest(old.command),
+    cli_image_digest:old.cli.image_digest,host:old.host,guard:old.guard,probe_parent_policy:old.probe_parent_policy};
+  writeFileSync(join(privateRoot,"probe-report.json"),JSON.stringify(report),{mode:0o600});
+  const files=Object.fromEntries(Object.entries(pilotEvidenceInventory(privateRoot)).filter(([path])=>path==="probe-report.json"));
+  writeFileSync(join(privateRoot,"probe-seal.json"),JSON.stringify({files}),{mode:0o600});
+  const before=snapshot(privateRoot);
+  assert.deepEqual(reopenCodexProbes(privateRoot),report);
+  assert.deepEqual(snapshot(privateRoot),before);
 });

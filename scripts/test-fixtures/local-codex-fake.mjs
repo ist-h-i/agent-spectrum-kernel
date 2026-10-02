@@ -1,5 +1,5 @@
 // Owned simulation only. No native CLI, credential or network operations.
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 
@@ -7,6 +7,11 @@ const [stage, scenario, condition, ...argv] = process.argv.slice(2);
 const root = process.env.CONNECTION_EVIDENCE;
 writeFileSync(join(root, "received.json"), JSON.stringify({ argv, env: process.env }), { mode: 0o600, flag: "wx" });
 if (stage === "probe") {
+  // Reproduce ordinary CLI runtime artifacts without invoking Codex.
+  const runtimeParent = join(process.env.CODEX_HOME,"tmp/arg0");
+  mkdirSync(runtimeParent,{recursive:true,mode:0o700});
+  const helpers = mkdtempSync(join(runtimeParent,"codex-arg0"));
+  for (const name of ["apply_patch","applypatch","codex-execve-wrapper"]) symlinkSync(process.execPath,join(helpers,name));
   if (condition === "0" && scenario === "metadata-fail") { process.stderr.write("synthetic startup fail\n"); process.exitCode=5; }
   else if (condition === "0") process.stdout.write("codex-cli 0.157.1\n");
   else if (condition === "1") process.stdout.write("--ignore-user-config --ignore-rules --json --output-schema --output-last-message --strict-config\n");
