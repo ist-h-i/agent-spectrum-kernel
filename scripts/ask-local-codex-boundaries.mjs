@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { lstatSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -73,14 +74,28 @@ export function declaredSessionEntries({entries,workspace,denyRoots,runtimeParen
     || canonicalDigest(sorted(entries.filter(e=>!runtime.includes(e))))!==canonicalDigest(sorted(expected))) throw new Error("declared read/write session boundary mismatch");
 }
 export function classifyDenial(code) { return ["EPERM", "EACCES"].includes(code) ? "pass" : code === "CONNECTED" ? "fail" : "unknown"; }
-export function assertCanaryResult(result, {declaredRead = false, temporary = false} = {}) {
+export function assertCanaryResult(result, {declaredRead = false, temporary = false, diagnostics = false} = {}) {
   const keys = (obj, names) => obj && typeof obj === "object" && !Array.isArray(obj) && canonicalDigest(Object.keys(obj).sort())===canonicalDigest(names.sort());
-  if (!keys(result,["kind","filesystem","network"]) || !keys(result.filesystem,["read","write",...(declaredRead ? ["unrelated_read","unrelated_write"] : []),...(temporary ? ["temporary"] : [])])
-    || result?.kind !== (temporary ? "ask_codex_canary_v3" : declaredRead ? "ask_codex_canary_v2" : "ask_codex_canary_v1") || result.filesystem?.read !== "pass" || result.filesystem?.write !== "pass"
+  if (!keys(result,["kind","filesystem","network",...(diagnostics?["temporary_diagnostics"]:[])]) || !keys(result.filesystem,["read","write",...(declaredRead ? ["unrelated_read","unrelated_write"] : []),...(temporary ? ["temporary"] : [])])
+    || result?.kind !== (diagnostics ? "ask_codex_canary_v4" : temporary ? "ask_codex_canary_v3" : declaredRead ? "ask_codex_canary_v2" : "ask_codex_canary_v1") || result.filesystem?.read !== "pass" || result.filesystem?.write !== "pass"
     || (temporary && result.filesystem.temporary!=="pass")
     || (declaredRead && (result.filesystem.unrelated_read!=="pass" || result.filesystem.unrelated_write!=="pass"))
     || !Array.isArray(result.network) || result.network.length !== 2 || result.network.some(x => !keys(x,["host","positive","denied"]) || !["127.0.0.1", "::1"].includes(x.host) || x.positive !== "pass" || x.denied !== "pass")
     || new Set(result.network.map(x => x.host)).size !== 2) throw new Error("canary failure/unknown; no real admission");
+  if(diagnostics) {
+    const d=result.temporary_diagnostics,stageNames=["environment","directory","write","read","shell","cleanup"],checkNames=["exit_zero","no_error","no_signal","stdout_matches","stderr_empty"];
+    const stream=value=>keys(value,["bytes","digest"]) && Number.isSafeInteger(value.bytes) && value.bytes>=0 && value.bytes<=256*1024 && /^sha256:[0-9a-f]{64}$/u.test(value.digest);
+    if(!temporary || !keys(d,["stages","failure_stage","error_code","cleanup_error_code","shell"])
+      || !keys(d.stages,stageNames) || stageNames.some(stage=>d.stages[stage]!=="pass")
+      || d.failure_stage!==null || d.error_code!==null || d.cleanup_error_code!==null
+      || !keys(d.shell,["status","error_code","signal","stdout","stderr","checks"])
+      || d.shell.status!==0 || d.shell.error_code!==null || d.shell.signal!==null
+      || !keys(d.shell.checks,checkNames) || checkNames.some(key=>d.shell.checks[key]!==true)
+      || !stream(d.shell.stdout) || !stream(d.shell.stderr)
+      || d.shell.stdout.bytes!==122881 || d.shell.stdout.digest!=="sha256:"+createHash("sha256").update("ASK_TEMP_CANARY".repeat(8192)+"\n").digest("hex")
+      || d.shell.stderr.bytes!==0 || d.shell.stderr.digest!=="sha256:"+createHash("sha256").update("").digest("hex"))
+      throw new Error("canary diagnostics failure/unknown; no real admission");
+  }
 }
 /** Trusted runtime parent, distinct from the nested model-tool policy.
  * General host reads permit OS loader startup; only the declared existing

@@ -1,5 +1,6 @@
 // Owned simulation only. No native CLI, credential or network operations.
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, symlinkSync, unlinkSync, rmdirSync, renameSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 
@@ -23,7 +24,17 @@ if (stage === "probe") {
     if(broad) { result.kind="ask_codex_canary_v2";result.filesystem.unrelated_read=scenario==="unrelated-read-denied"?"unknown":"pass";
       result.filesystem.unrelated_write=scenario==="unrelated-write-open"?"fail":"pass";
       if(scenario==="declared-read-open")result.filesystem.read="fail"; }
-    if(process.env.TMPDIR) {result.kind="ask_codex_canary_v3";result.filesystem.temporary=scenario==="temporary-fail"?"fail":scenario==="temporary-unknown"?"unknown":"pass";}
+    if(process.env.TMPDIR) {
+      result.kind="ask_codex_canary_v4";result.filesystem.temporary=scenario==="temporary-fail"?"fail":scenario==="temporary-unknown"?"unknown":"pass";
+      const stream=value=>({bytes:Buffer.byteLength(value),digest:"sha256:"+createHash("sha256").update(value).digest("hex")});
+      result.temporary_diagnostics={stages:{environment:"pass",directory:"pass",write:"pass",read:"pass",shell:"pass",cleanup:"pass"},failure_stage:null,error_code:null,cleanup_error_code:null,
+        shell:{status:0,error_code:null,signal:null,stdout:stream("ASK_TEMP_CANARY".repeat(8192)+"\n"),stderr:stream(""),checks:{exit_zero:true,no_error:true,no_signal:true,stdout_matches:true,stderr_empty:true}}};
+      if(scenario==="temporary-fail") {result.temporary_diagnostics.stages.shell="fail";result.temporary_diagnostics.failure_stage="shell";result.temporary_diagnostics.shell.status=1;result.temporary_diagnostics.shell.checks.exit_zero=false;}
+      if(scenario==="temporary-unknown") {result.temporary_diagnostics.stages.shell="unknown";result.temporary_diagnostics.failure_stage="shell";result.temporary_diagnostics.error_code="OTHER";result.temporary_diagnostics.shell=null;}
+      if(scenario==="temporary-diagnostics-missing")delete result.temporary_diagnostics;
+      if(scenario==="temporary-diagnostics-inconsistent")result.temporary_diagnostics.shell.stdout.bytes=1;
+      if(scenario==="legacy-temporary") {result.kind="ask_codex_canary_v3";delete result.temporary_diagnostics;}
+    }
     if (scenario==="extra-keys") result.unobserved="must-refuse";
     process.stdout.write(JSON.stringify(result)+"\n");
   }

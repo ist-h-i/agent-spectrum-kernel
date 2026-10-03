@@ -53,3 +53,41 @@ invalid events, completed/incomplete outcomes and saved replay. E7–E9 are focu
 mock regressions; final-source lifecycle/shared/execution tests, independent
 review and exact-head-associated CI are required for implementation completion.
 Real-host improvement is outside that completion claim.
+
+## Bounded shell diagnostics
+
+A normal control-process exit does not prove that a shell started by the control
+succeeded. The new `ask_codex_canary_v4` result adds `temporary_diagnostics`:
+environment, directory creation, file write/read, shell and cleanup stages;
+the failing stage; and closed error-code values. A returned shell result includes
+exit status, a closed error-code/signal value, stdout/stderr UTF-8 byte counts
+and SHA-256 digests, and five separate predicates (exit zero, no error, no signal,
+stdout matches the public fixed payload, stderr empty). Missing shell results
+stay null. Exceptions and cleanup faults retain unknown outcomes. Unexpected
+error codes/signals become `OTHER`; messages, raw output, commands, environment
+values, paths and credentials are never copied into these diagnostic fields.
+Digests describe bounded shell outputs and do not establish their contents.
+
+New controls require the closed v4 shape, all six stages pass, no failure/error,
+all five shell predicates true, and matching public-payload/empty-output lengths
+and digests. Missing, contradictory or additional fields cannot grant admission.
+The one control, 10-second outer/2-second inner limits, protected denies, trial
+budgets and usage stops remain unchanged. Historical v1–v3 validation remains
+explicitly selectable; sealed offline replay does not reinterpret or recompute
+historical canary evidence and never starts new calls.
+
+Implementation Contract: `issue315-canary-diagnostics-implementation@1`, upstream
+`issue315-temporary-timing-implementation@1`. C4 adds closed v4 diagnostic capture
+and admission; C5 adds independent in-memory predicate/stage regressions and
+synthetic lifecycle rejection/replay checks. Formal Verification Contract:
+`issue315-canary-diagnostics-verification@1`, retaining O1–O9 and
+`ask.verification-proof-policy@1.0.0`. O10 requires each shell predicate and each
+pre-shell/cleanup failure to be distinguishable without raw output or exception
+messages. O11 requires strict new admission and retained historical validation
+and offline replay. E10–E11 are mocked inline-code and owned synthetic lifecycle
+tests; final source lifecycle/shared/execution checks, independent review and
+exact-head-associated CI close development evidence. They do not establish any
+real shell/sandbox result, root cause or performance improvement. Existing
+private experiment records are unchanged; no real CLI/control/model/authentication,
+execution permission, host configuration or external private-result publication
+is part of this development slice.

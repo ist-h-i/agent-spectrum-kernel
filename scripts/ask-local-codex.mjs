@@ -177,7 +177,7 @@ export function prepareCodexConnection(descriptor, { simulation = false, scenari
   if (process.platform === "win32") throw new Error("use Linux Node inside WSL2");
   if (simulation && (descriptor.executable !== undefined || descriptor.imageDigest !== undefined)) throw new Error("simulation cannot bind a native image");
   if (!simulation && (host !== null || fakeTimeoutMs !== null || !same(scenarios, ["pass", "pass"]) || !probePass || probeOutcome!=="pass")) throw new Error("synthetic options forbidden in live plan");
-  if (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail","unrelated-read-denied","unrelated-write-open","declared-read-open","temporary-fail","temporary-unknown"].includes(probeOutcome)) throw new Error("closed probe scenario required");
+  if (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail","unrelated-read-denied","unrelated-write-open","declared-read-open","temporary-fail","temporary-unknown","temporary-diagnostics-missing","temporary-diagnostics-inconsistent","legacy-temporary"].includes(probeOutcome)) throw new Error("closed probe scenario required");
   if (!Array.isArray(scenarios) || scenarios.length !== 2 || scenarios.some(value => !CONNECTION_SCENARIOS.includes(value))) throw new Error("closed simulation scenarios required");
   if (fakeTimeoutMs !== null && (!Number.isInteger(fakeTimeoutMs) || fakeTimeoutMs < 20 || fakeTimeoutMs > PILOT_LIMITS.timeout_ms)) throw new Error("invalid simulation timeout");
   const observed = localPreflight();
@@ -238,7 +238,7 @@ function readConnection(root, current = false) {
       || !same(plan.scenarios, ["pass", "pass"]) || !plan.probe_pass || plan.fake_timeout_ms !== null))) throw new Error("connection plan drift");
   assertReadPolicy(plan,base,current);
   if (current) {
-    if (modernPlan(plan) && (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail","unrelated-read-denied","unrelated-write-open","declared-read-open","temporary-fail","temporary-unknown"].includes(plan.probe_outcome)
+    if (modernPlan(plan) && (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail","unrelated-read-denied","unrelated-write-open","declared-read-open","temporary-fail","temporary-unknown","temporary-diagnostics-missing","temporary-diagnostics-inconsistent","legacy-temporary"].includes(plan.probe_outcome)
       || (plan.mode==="planned_live" && plan.probe_outcome!=="pass"))) throw new Error("probe scenario drift");
     if (plan.mode === "simulation" && plan.cli.executable !== realpathSync(process.execPath)) throw new Error("simulation runtime drift");
     const imageStat = lstatSync(plan.cli.executable);
@@ -352,7 +352,7 @@ function checks(plan, base, lightweight = false) {
     const out = Buffer.from(proc.stdout ?? "").toString("utf8");
     const match = index === 0 ? out.trim() === `codex-cli ${CODEX_CONNECTION_VERSION}`
       : index === 1 ? ["--ignore-user-config", "--ignore-rules", "--json", "--output-schema", "--output-last-message", "--strict-config"].every(flag => out.includes(flag))
-      : index === 2 ? ["--include-managed-config", "-P", "-C"].every(flag => out.includes(flag)) : (() => { try { assertCanaryResult(parseJsonRejectDuplicateKeys(out),{declaredRead:broad,temporary:true}); return true; } catch { return false; } })();
+      : index === 2 ? ["--include-managed-config", "-P", "-C"].every(flag => out.includes(flag)) : (() => { try { assertCanaryResult(parseJsonRejectDuplicateKeys(out),{declaredRead:broad,temporary:true,diagnostics:true}); return true; } catch { return false; } })();
     const pass = proc.status === 0 && !proc.error && !proc.signal && !proc.workspace_descendants_detected && !process.output_limited && match && Buffer.from(proc.stderr ?? "").length === 0;
     outcomes.push({ index, status: pass ? "pass" : "fail", process });
     if (!pass) break;
