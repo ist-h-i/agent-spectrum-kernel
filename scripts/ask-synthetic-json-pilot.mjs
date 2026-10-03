@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, readlinkSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, opendirSync, readdirSync, realpathSync, readlinkSync, symlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,7 @@ import { captureSuccessorUsage } from "./ask-benchmark-prompt-successor-usage.mj
 import { canonicalDigest, parseJsonRejectDuplicateKeys, writeCanonicalJsonNoReplace } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { closedSessionEntries, declaredSessionEntries, noAcl } from "./ask-local-codex-boundaries.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE = "benchmarks/fixtures/pilot-json-aggregate-001";
@@ -18,7 +19,7 @@ const SCHEMA = "benchmarks/schemas/agent-output.schema.json";
 const FILES = ["AGENTS.md", `${FIXTURE}/task.md`, `${FIXTURE}/input.json`, SCHEMA, FAKE,
   "scripts/ask-synthetic-json-pilot.mjs", "scripts/ask-benchmark-execution.mjs",
   "scripts/ask-benchmark-prompt-successor-delivery.mjs", "scripts/ask-benchmark-prompt-successor-usage.mjs",
-  "scripts/ask-benchmark-stable-file.mjs", "scripts/content-addressed-store.mjs", "scripts/ask-benchmark-schema.mjs"];
+  "scripts/ask-benchmark-stable-file.mjs", "scripts/content-addressed-store.mjs", "scripts/ask-benchmark-schema.mjs", "scripts/ask-local-codex-boundaries.mjs"];
 export const PILOT_LIMITS = Object.freeze({ execs: 2, retry: 0, timeout_ms: 120000,
   max_buffer_bytes: 1048576, answer_bytes: 65536, session_bytes: 4194304, grader_ms: 10000,
   trial_tokens: 30000, cumulative_tokens: 60000, future_control: 1, future_control_ms: 10000 });
@@ -224,7 +225,9 @@ function jsonLines(value, maximumLines = 20000) {
   return lines.map(line => parseJsonRejectDuplicateKeys(line));
 }
 /** Tools are allowed here; Judge's tool-free session parser is not reused. */
-export function parsePilotNativeSession({ stdout, session, plan, workspace }) {
+export function parsePilotNativeSession({ stdout, session, plan, workspace, sessionHome = null }) {
+  if (sessionHome !== null && (typeof sessionHome !== "string" || !isAbsolute(sessionHome)
+    || resolve(sessionHome) !== sessionHome || sessionHome === "/" || !plan.command.deny_roots.includes(sessionHome))) throw new Error("native session home must be an exact declared deny root");
   const events = jsonLines(stdout), rows = jsonLines(session);
   const threads = events.filter(row => row.type === "thread.started");
   const metas = rows.filter(row => row.type === "session_meta").map(row => row.payload);
@@ -236,7 +239,7 @@ export function parsePilotNativeSession({ stdout, session, plan, workspace }) {
   const turns = new Set();
   const condition = ["plain", "kernel_only"].find(name => workspace === join(plan.workspace_root, name));
   if (!condition) throw new Error("native trial workspace identity mismatch");
-  const runtimeParent = join(plan.private_root, condition, "codex-home", "tmp", "arg0");
+  const runtimeParent = join(sessionHome ?? join(plan.private_root, condition, "codex-home"), "tmp", "arg0");
   // Pinned CLI adds its active execve helper directory to the resolved policy.
   // This is a read-only runtime exception, never a general private-root grant.
   const runtimeRead = entry => entry.access === "read" && entry.path?.type === "path"
@@ -257,11 +260,14 @@ export function parsePilotNativeSession({ stdout, session, plan, workspace }) {
     const runtimeRoot = runtimeEntries[0]?.path.path ?? null;
     if (observedRuntimeRoot !== undefined && observedRuntimeRoot !== runtimeRoot) throw new Error("native runtime read grant changed");
     observedRuntimeRoot = runtimeRoot;
-    for (const root of plan.command.deny_roots) {
+    if (plan.command.closed_read_scope) closedSessionEntries({ entries, workspace, readRoots: plan.command.read_roots,
+      denyRoots: plan.command.deny_roots, runtimeParent });
+    if (plan.command.declared_read_scope) declaredSessionEntries({entries,workspace,denyRoots:plan.command.deny_roots,runtimeParent});
+    for (const root of plan.command.closed_read_scope || plan.command.declared_read_scope ? [] : plan.command.deny_roots) {
       if (entries.filter(entry => entry.path?.type === "path" && entry.path.path === root && entry.access === "deny").length !== 1
         || entries.some(entry => entry.path?.type === "path" && within(root, entry.path.path) && entry.access !== "deny"
           && !(root === plan.workspace_root && within(workspace, entry.path.path))
-          && !(root === plan.private_root && runtimeRead(entry)))) throw new Error("native exclusive deny rule mismatch");
+          && !((root === plan.private_root || root === sessionHome) && runtimeRead(entry)))) throw new Error("native exclusive deny rule mismatch");
     }
     if (!entries.some(entry => entry.path?.type === "path" && entry.path.path === workspace && entry.access === "write")) throw new Error("native workspace write grant missing");
   }
@@ -287,23 +293,34 @@ function nativeSession(home) {
   return bytes(found[0], PILOT_LIMITS.session_bytes);
 }
 
-function workspaceInventory(workspace) {
+function workspaceInventory(workspace, { scratchDirectory = null } = {}) {
   canonicalDirectory(workspace);
+  if (scratchDirectory !== null && scratchDirectory !== ".ask-tmp") throw new Error("closed scratch directory required");
   const names = readdirSync(workspace).sort();
   if (names.length > 32) throw new Error("workspace inventory limit");
   return Object.fromEntries(names.map(name => {
     const path = join(workspace, name), info = lstatSync(path);
     if (info.isSymbolicLink() || (info.isFile() && info.nlink !== 1)) throw new Error("workspace link boundary fault");
+    if (name === scratchDirectory) {
+      canonicalDirectory(path); noAcl([path]);
+      if (info.uid !== process.getuid() || (info.mode & 0o777) !== 0o700) throw new Error("private scratch directory required");
+      const directory = opendirSync(path);
+      try { if (directory.readSync() !== null) throw new Error("scratch leftovers refused"); }
+      finally { directory.closeSync(); }
+      return [name, {type:"scratch",dev:info.dev,ino:info.ino,uid:info.uid,mode:info.mode & 0o777,birthtime_ms:info.birthtimeMs}];
+    }
     if (!info.isFile()) return [name, { type: "other", size: info.size, digest: null }];
     return [name, { type: "file", size: info.size, digest: info.size <= PILOT_LIMITS.answer_bytes ? sha(bytes(path, PILOT_LIMITS.answer_bytes)) : null }];
   }));
 }
 const closed = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && same(Object.keys(value).sort(), [...keys].sort());
-export function gradePilotWorkspace({ workspace, seeded }) {
+export function gradePilotWorkspace({ workspace, seeded, scratchDirectory = null }) {
   const started = Date.now();
   let inventory;
-  try { inventory = workspaceInventory(workspace); }
+  try { inventory = workspaceInventory(workspace, {scratchDirectory}); }
   catch { return { status: "boundary_fault", reason: "workspace_inventory_boundary", P1: null, P2: null, P3: null, inventory: null }; }
+  if (scratchDirectory !== null && (seeded[scratchDirectory]?.type !== "scratch" || !same(inventory[scratchDirectory] ?? null,seeded[scratchDirectory])))
+    return {status:"boundary_fault",reason:"scratch_directory_boundary",P1:null,P2:null,P3:false,inventory};
   const P3 = Object.keys(inventory).every(name => name === "answer.json" || Object.hasOwn(seeded, name))
     && Object.entries(seeded).every(([name, identity]) => same(inventory[name] ?? null, identity));
   let answer = null, P1 = false;
@@ -520,6 +537,13 @@ export function reopenFakePilot(root) {
   if (report.plan_digest !== canonicalDigest(plan) || report.mode !== plan.mode) throw new Error("report binding mismatch");
   return report;
 }
+
+// The distribution adapter reuses the pilot's source, grading, process evidence
+// and seal mechanics. Existing callers and historical reopen remain unchanged.
+export { sourceIdentity as pilotSourceIdentity, assertCurrentSource as assertPilotCurrentSource,
+  readPlan as readPilotPlan, workspaceInventory as pilotWorkspaceInventory,
+  finalFormat as pilotFinalFormat, persistProcess as persistPilotProcess,
+  evidenceInventory as pilotEvidenceInventory };
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
