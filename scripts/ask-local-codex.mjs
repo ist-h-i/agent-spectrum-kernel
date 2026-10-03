@@ -12,11 +12,12 @@ import { captureSuccessorUsage } from "./ask-benchmark-prompt-successor-usage.mj
 import { canonicalDigest, parseJsonRejectDuplicateKeys, writeCanonicalJsonNoReplace } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { inspectExistingCodexHome, inspectSelectedSession, closedReadRoots, noAcl, assertCanaryResult, probeSeatbelt, assertProbeSandboxArgs } from "./ask-local-codex-boundaries.mjs";
+import { codexTrialTiming } from "./ask-local-codex-timing.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = "scripts/ask-local-codex.mjs", FAKE = "scripts/test-fixtures/local-codex-fake.mjs";
 const WORKER = "scripts/local-codex-probe-worker.mjs";
-const SOURCES = [SELF, FAKE, "scripts/ask-local-eval.mjs", "scripts/ask-local-codex-boundaries.mjs", WORKER];
+const SOURCES = [SELF, FAKE, "scripts/ask-local-eval.mjs", "scripts/ask-local-codex-boundaries.mjs", WORKER, "scripts/ask-local-codex-timing.mjs"];
 const PLAN = "connection.json", REPORT = "connection-report.json";
 export const DECLARED_READ_POLICY = "declared_denies_read_only_v1";
 const BROAD_PLAN = "ask_local_codex_connection_v3";
@@ -26,7 +27,7 @@ export const READ_POLICY_RISK = Object.freeze({
   unlisted_grading_copies:"not_guaranteed_denied", tool_outputs:"may_be_transmitted_to_openai_despite_tool_network_deny",
   inventory:"operator_assertion_not_discovery", runtime_verification:"not_established_by_simulation" });
 export const CODEX_CONNECTION_VERSION = "0.157.1";
-export const CONNECTION_SCENARIOS = ["pass", "wrong", "malformed", "unknown", "threshold", "exit", "timeout", "identity", "missing-session", "reused-session", "provider", "interrupt", "scope-leak"];
+export const CONNECTION_SCENARIOS = ["pass", "wrong", "malformed", "unknown", "threshold", "exit", "timeout", "identity", "missing-session", "reused-session", "provider", "interrupt", "scope-leak", "scratch-replaced", "scratch-removed"];
 const hash = value => `sha256:${createHash("sha256").update(value).digest("hex")}`;
 const bytes = (path, max = 1048576) => readStableFile(path, "connection evidence", max).bytes;
 const read = path => parseJsonRejectDuplicateKeys(new TextDecoder("utf-8", { fatal: true }).decode(bytes(path)));
@@ -176,7 +177,7 @@ export function prepareCodexConnection(descriptor, { simulation = false, scenari
   if (process.platform === "win32") throw new Error("use Linux Node inside WSL2");
   if (simulation && (descriptor.executable !== undefined || descriptor.imageDigest !== undefined)) throw new Error("simulation cannot bind a native image");
   if (!simulation && (host !== null || fakeTimeoutMs !== null || !same(scenarios, ["pass", "pass"]) || !probePass || probeOutcome!=="pass")) throw new Error("synthetic options forbidden in live plan");
-  if (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail","unrelated-read-denied","unrelated-write-open","declared-read-open"].includes(probeOutcome)) throw new Error("closed probe scenario required");
+  if (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail","unrelated-read-denied","unrelated-write-open","declared-read-open","temporary-fail","temporary-unknown"].includes(probeOutcome)) throw new Error("closed probe scenario required");
   if (!Array.isArray(scenarios) || scenarios.length !== 2 || scenarios.some(value => !CONNECTION_SCENARIOS.includes(value))) throw new Error("closed simulation scenarios required");
   if (fakeTimeoutMs !== null && (!Number.isInteger(fakeTimeoutMs) || fakeTimeoutMs < 20 || fakeTimeoutMs > PILOT_LIMITS.timeout_ms)) throw new Error("invalid simulation timeout");
   const observed = localPreflight();
@@ -237,7 +238,7 @@ function readConnection(root, current = false) {
       || !same(plan.scenarios, ["pass", "pass"]) || !plan.probe_pass || plan.fake_timeout_ms !== null))) throw new Error("connection plan drift");
   assertReadPolicy(plan,base,current);
   if (current) {
-    if (modernPlan(plan) && (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail","unrelated-read-denied","unrelated-write-open","declared-read-open"].includes(plan.probe_outcome)
+    if (modernPlan(plan) && (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail","unrelated-read-denied","unrelated-write-open","declared-read-open","temporary-fail","temporary-unknown"].includes(plan.probe_outcome)
       || (plan.mode==="planned_live" && plan.probe_outcome!=="pass"))) throw new Error("probe scenario drift");
     if (plan.mode === "simulation" && plan.cli.executable !== realpathSync(process.execPath)) throw new Error("simulation runtime drift");
     const imageStat = lstatSync(plan.cli.executable);
@@ -272,6 +273,7 @@ export function codexTrialLaunch(plan, base, condition) {
   argv.splice(argv.length - 1, 0, "-C", workspace);
   return { executable: plan.cli.executable, argv, cwd: workspace,
     env: { HOME: runtimeHome(plan,base,condition), CODEX_HOME: plan.codex_home, LANG: "C", LC_ALL: "C", TZ: "UTC",
+      TMPDIR:join(workspace,".ask-tmp"),TMP:join(workspace,".ask-tmp"),TEMP:join(workspace,".ask-tmp"),
       PATH: `${dirname(base.node.executable)}:/usr/bin:/bin:/usr/sbin:/sbin` },
     timeout: PILOT_LIMITS.timeout_ms, killSignal: "SIGKILL", maxBuffer: PILOT_LIMITS.max_buffer_bytes };
 }
@@ -284,6 +286,7 @@ export function codexProbeLaunches(plan, base, canaries, phase = "connection-pro
   const settings = [];
   for (let i = 0; i < plan.command.argv.length; i++) if (plan.command.argv[i] === "-c") settings.push(plan.command.argv[++i].replace("{sqlite_home}",JSON.stringify(join(home,"sqlite"))).replace("{log_dir}",JSON.stringify(join(home,"log"))));
   const options = { executable: plan.cli.executable, cwd, env: { HOME: home, CODEX_HOME: home, LANG: "C", LC_ALL: "C", TZ: "UTC",
+    TMPDIR:join(cwd,".ask-tmp"),TMP:join(cwd,".ask-tmp"),TEMP:join(cwd,".ask-tmp"),
     PATH: `${dirname(base.node.executable)}:/usr/bin:/bin:/usr/sbin:/sbin` }, timeout: 10000, killSignal: "SIGKILL", maxBuffer: PILOT_LIMITS.max_buffer_bytes };
   return [["--version"], ["exec", "--help"], ["sandbox", "--help"],
     ["sandbox", "-P", "ask_synthetic_pilot", "--include-managed-config", ...settings.flatMap(value => ["-c", value]),
@@ -315,6 +318,7 @@ function checks(plan, base, lightweight = false) {
   const root = join(base.private_root, phase), workspace = join(base.workspace_root, phase);
   createRuntimeHome(plan,base,phase);
   mkdirSync(root, { mode: 0o700 }); mkdirSync(workspace, { mode: 0o700 });
+  mkdirSync(join(workspace,".ask-tmp"),{mode:0o700});
   const publicFile = join(workspace, "public.txt"), privateFile = join(root, "private.txt");
   raw(publicFile, "ASK_PUBLIC_CANARY\n"); raw(privateFile, "ASK_PRIVATE_CANARY\n");
   const other = join(base.workspace_root, `${phase}-other-trial-canary`); mkdirSync(other, { mode: 0o700 }); raw(join(other, "private.txt"), "ASK_OTHER_CANARY\n");
@@ -324,7 +328,8 @@ function checks(plan, base, lightweight = false) {
   const declaredCanary=join(root,"declared-copy-canary.txt"); if(broad) raw(declaredCanary,"ASK_DECLARED_COPY_CANARY\n");
   const deniedReads = [privateFile, join(other, "private.txt"), authCanary, broad ? declaredCanary : unrelatedCanary, ...(broad ? plan.read_policy.protected_roots.map(x=>x.path) : [])], deniedWrite = join(other, "private.txt");
   const launches = codexProbeLaunches(plan, base, [publicFile, ...deniedReads],phase);
-  const canary = { publicFile, allowedWrite:join(workspace,"write.txt"), deniedReads, deniedWrite, ...(broad ? {unrelatedFile:unrelatedCanary} : {}) };
+  const canary = { publicFile, allowedWrite:join(workspace,"write.txt"), deniedReads, deniedWrite,
+    temporaryDirectory:join(workspace,".ask-tmp"),shell:plan.host.platform === "darwin" ? "/bin/zsh" : "/bin/sh",...(broad ? {unrelatedFile:unrelatedCanary} : {}) };
   const sandboxArgs = launches[3].argv.slice(0, launches[3].argv.indexOf("--")+1);
   const filesystem = sandboxArgs.find(value=>value.startsWith("permissions.ask_synthetic_pilot.filesystem="));
   assertProbeSandboxArgs(sandboxArgs,{filesystem,declaredRead:plan.kind===BROAD_PLAN});
@@ -347,7 +352,7 @@ function checks(plan, base, lightweight = false) {
     const out = Buffer.from(proc.stdout ?? "").toString("utf8");
     const match = index === 0 ? out.trim() === `codex-cli ${CODEX_CONNECTION_VERSION}`
       : index === 1 ? ["--ignore-user-config", "--ignore-rules", "--json", "--output-schema", "--output-last-message", "--strict-config"].every(flag => out.includes(flag))
-      : index === 2 ? ["--include-managed-config", "-P", "-C"].every(flag => out.includes(flag)) : (() => { try { assertCanaryResult(parseJsonRejectDuplicateKeys(out),{declaredRead:broad}); return true; } catch { return false; } })();
+      : index === 2 ? ["--include-managed-config", "-P", "-C"].every(flag => out.includes(flag)) : (() => { try { assertCanaryResult(parseJsonRejectDuplicateKeys(out),{declaredRead:broad,temporary:true}); return true; } catch { return false; } })();
     const pass = proc.status === 0 && !proc.error && !proc.signal && !proc.workspace_descendants_detected && !process.output_limited && match && Buffer.from(proc.stderr ?? "").length === 0;
     outcomes.push({ index, status: pass ? "pass" : "fail", process });
     if (!pass) break;
@@ -461,8 +466,9 @@ function trial(plan, base, condition) {
   const root = join(base.private_root, condition), workspace = join(base.workspace_root, condition);
   createRuntimeHome(plan,base,condition);
   mkdirSync(root, { mode: 0o700 }); mkdirSync(workspace, { mode: 0o700 });
+  mkdirSync(join(workspace,".ask-tmp"),{mode:0o700});
   for (const file of ["input.json", "task.md"]) raw(join(workspace, file), bytes(join(ROOT, "benchmarks/fixtures/pilot-json-aggregate-001", file)));
-  const seeded = pilotWorkspaceInventory(workspace); save(join(root, "seeded.json"), seeded);
+  const seeded = pilotWorkspaceInventory(workspace,{scratchDirectory:".ask-tmp"}); save(join(root, "seeded.json"), seeded);
   const task = bytes(join(workspace, "task.md"));
   const stdin = condition === "plain" ? task : Buffer.concat([bytes(join(ROOT, "AGENTS.md")), Buffer.from("\n"), task, Buffer.from("\n")]);
   raw(join(root, "stdin.txt"), stdin); raw(join(root, "output-schema.json"), bytes(join(ROOT, "benchmarks/schemas/agent-output.schema.json")));
@@ -471,23 +477,29 @@ function trial(plan, base, condition) {
   const started = new Date().toISOString(), index = condition === "plain" ? 0 : 1;
   const proc = invoke(plan, { ...launch, input: stdin }, "exec", plan.scenarios[index], condition, root, plan.command);
   const process = persistPilotProcess(root, proc, started, plan.mode === "simulation" ? plan.fake_timeout_ms ?? launch.timeout : launch.timeout);
-  const usage = captureSuccessorUsage(proc), grade = gradePilotWorkspace({ workspace, seeded });
+  const usage = captureSuccessorUsage(proc), grade = gradePilotWorkspace({ workspace, seeded,scratchDirectory:".ask-tmp" });
   save(join(root, "usage.json"), usage); save(join(root, "grade.json"), grade);
   let identity = null, identityError = null;
+  let selectedSession = null;
   try {
     const session = readCodexTrialSession(plan.codex_home, Buffer.from(proc.stdout ?? ""), started, process.completed);
     raw(join(root, "session.jsonl"), session);
+    selectedSession = session;
     identity = parsePilotNativeSession({ stdout: Buffer.from(proc.stdout ?? ""), session,
       plan: { ...base, command: plan.command }, workspace, sessionHome: plan.codex_home });
   } catch (error) { identityError = error.message; }
   save(join(root, "session-check.json"), { status: identity ? "match" : "mismatch", identity, reason: identityError });
+  let answerMtimeMs = null;
+  try { const info=lstatSync(join(workspace,"answer.json")); if(info.isFile() && info.nlink===1) answerMtimeMs=info.mtimeMs; } catch { /* absent observation */ }
+  const timing=codexTrialTiming({started,completed:process.completed,session:selectedSession,answerMtimeMs});
+  save(join(root,"timing.json"),timing);
   const total = usage.metrics.total_tokens;
   const stop = proc.error || proc.status !== 0 || proc.signal || proc.workspace_descendants_detected || process.output_limited ? "process_failure"
     : !identity ? "session_identity_failure" : grade.status === "boundary_fault" ? "workspace_boundary_fault"
     : usage.provider_stop.status === "detected" ? "provider_stop" : total.status !== "known" ? "usage_unknown"
     : total.value >= PILOT_LIMITS.trial_tokens ? "trial_token_threshold" : null;
   return { condition, state: "completed", process, grade, final_format: pilotFinalFormat(join(root, "final.json")), usage: total,
-    session_id: identity?.session_id ?? null, stop };
+    session_id: identity?.session_id ?? null, timing, stop };
 }
 
 export function freshAdmissionTime(createdAt, now = Date.now()) {

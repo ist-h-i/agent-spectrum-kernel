@@ -1,7 +1,7 @@
 // Ordinary trusted worker launches one model-tool sandbox. Never reads credentials.
-import { openSync, closeSync, readFileSync, writeFileSync } from "node:fs";
+import { openSync, closeSync, readFileSync, writeFileSync, mkdtempSync, unlinkSync, rmdirSync } from "node:fs";
 import { createServer, createConnection } from "node:net";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { classifyDenial, assertProbeSandboxArgs } from "./ask-local-codex-boundaries.mjs";
@@ -25,19 +25,38 @@ async function canary(spec) {
   const network = [];
   for (const endpoint of spec.endpoints) network.push({host: endpoint.host, positive: "pass", denied: classifyDenial(await connect(endpoint))});
   const filesystem={read,write};
+  if (spec.temporaryDirectory) {
+    filesystem.temporary="unknown";
+    let directory = null, file = null;
+    try {
+      if (!["TMPDIR","TMP","TEMP"].every(key=>process.env[key]===spec.temporaryDirectory)) throw new Error("temporary environment mismatch");
+      directory=mkdtempSync(spec.temporaryDirectory+"/canary-"); file=directory+"/roundtrip.txt";
+      writeFileSync(file,"ASK_TEMP_CANARY\n",{flag:"wx",mode:0o600});
+      if (readFileSync(file,"utf8")!=="ASK_TEMP_CANARY\n") throw new Error("temporary roundtrip mismatch");
+      const body="ASK_TEMP_CANARY".repeat(8192)+"\n";
+      const shell=spawnSync(spec.shell,["-c",`cat <<'ASK_TEMP_END'\n${body}ASK_TEMP_END\n`],
+        {env:process.env,encoding:"utf8",timeout:2000,maxBuffer:256*1024});
+      filesystem.temporary=shell.status===0 && !shell.error && !shell.signal && shell.stdout===body && shell.stderr==="" ? "pass" : "fail";
+    } catch { filesystem.temporary="unknown"; }
+    finally {
+      try { if(file)unlinkSync(file); if(directory)rmdirSync(directory); }
+      catch { filesystem.temporary="unknown"; }
+    }
+  }
   if(spec.unrelatedFile) {
     try { filesystem.unrelated_read=readFileSync(spec.unrelatedFile,"utf8")==="ASK_UNRELATED_CANARY\n" ? "pass" : "fail"; }
     catch { filesystem.unrelated_read="unknown"; }
     try { const fd=openSync(spec.unrelatedFile,"r+"); closeSync(fd); filesystem.unrelated_write="fail"; }
     catch(e) { filesystem.unrelated_write=classifyDenial(e.code); }
   }
-  return {kind:spec.unrelatedFile ? "ask_codex_canary_v2" : "ask_codex_canary_v1",filesystem,network};
+  return {kind:spec.temporaryDirectory ? "ask_codex_canary_v3" : spec.unrelatedFile ? "ask_codex_canary_v2" : "ask_codex_canary_v1",filesystem,network};
 }
 // Node resolves script entry points through their ancestors before reading the
 // file. An explicit helper-file read cannot traverse a denied controller root.
 // Inline ESM uses only builtins, retaining every deny without a helper exception.
 export const INLINE_CANARY_MODULE_SOURCE = [
-  'import { openSync, closeSync, readFileSync, writeFileSync } from "node:fs";',
+  'import { openSync, closeSync, readFileSync, writeFileSync, mkdtempSync, unlinkSync, rmdirSync } from "node:fs";',
+  'import { spawnSync } from "node:child_process";',
   'import { createConnection } from "node:net";',
   classifyDenial.toString(), `const connect = ${connect.toString()};`, canary.toString(),
   'process.stdout.write(JSON.stringify(await canary(JSON.parse(process.argv[1])))+"\\n");',

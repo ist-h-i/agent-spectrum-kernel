@@ -73,10 +73,11 @@ export function declaredSessionEntries({entries,workspace,denyRoots,runtimeParen
     || canonicalDigest(sorted(entries.filter(e=>!runtime.includes(e))))!==canonicalDigest(sorted(expected))) throw new Error("declared read/write session boundary mismatch");
 }
 export function classifyDenial(code) { return ["EPERM", "EACCES"].includes(code) ? "pass" : code === "CONNECTED" ? "fail" : "unknown"; }
-export function assertCanaryResult(result, {declaredRead = false} = {}) {
+export function assertCanaryResult(result, {declaredRead = false, temporary = false} = {}) {
   const keys = (obj, names) => obj && typeof obj === "object" && !Array.isArray(obj) && canonicalDigest(Object.keys(obj).sort())===canonicalDigest(names.sort());
-  if (!keys(result,["kind","filesystem","network"]) || !keys(result.filesystem,declaredRead ? ["read","write","unrelated_read","unrelated_write"] : ["read","write"])
-    || result?.kind !== (declaredRead ? "ask_codex_canary_v2" : "ask_codex_canary_v1") || result.filesystem?.read !== "pass" || result.filesystem?.write !== "pass"
+  if (!keys(result,["kind","filesystem","network"]) || !keys(result.filesystem,["read","write",...(declaredRead ? ["unrelated_read","unrelated_write"] : []),...(temporary ? ["temporary"] : [])])
+    || result?.kind !== (temporary ? "ask_codex_canary_v3" : declaredRead ? "ask_codex_canary_v2" : "ask_codex_canary_v1") || result.filesystem?.read !== "pass" || result.filesystem?.write !== "pass"
+    || (temporary && result.filesystem.temporary!=="pass")
     || (declaredRead && (result.filesystem.unrelated_read!=="pass" || result.filesystem.unrelated_write!=="pass"))
     || !Array.isArray(result.network) || result.network.length !== 2 || result.network.some(x => !keys(x,["host","positive","denied"]) || !["127.0.0.1", "::1"].includes(x.host) || x.positive !== "pass" || x.denied !== "pass")
     || new Set(result.network.map(x => x.host)).size !== 2) throw new Error("canary failure/unknown; no real admission");

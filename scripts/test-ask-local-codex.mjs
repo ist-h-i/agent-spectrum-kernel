@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, linkSync, symlinkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, linkSync, symlinkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -12,10 +12,82 @@ import { prepareCodexConnection, runCodexConnection, reopenCodexConnection, code
   runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime, codexConnectionCommand, codexProbeParentPolicy, assertNativeAdmissionRoute, codexLightweightPolicy, codexLightweightControlLaunch, readCodexTrialSession, DECLARED_READ_POLICY, READ_POLICY_RISK } from "./ask-local-codex.mjs";
 import {inspectExistingCodexHome, classifyDenial, assertCanaryResult, probeSeatbelt, assertNoAclListing, assertProbeSandboxArgs, declaredSessionEntries} from "./ask-local-codex-boundaries.mjs";
 import { canonicalDigest } from "./content-addressed-store.mjs";
-import { parsePilotNativeSession, pilotEvidenceInventory } from "./ask-synthetic-json-pilot.mjs";
+import { parsePilotNativeSession, pilotEvidenceInventory, pilotWorkspaceInventory, gradePilotWorkspace } from "./ask-synthetic-json-pilot.mjs";
+import { codexTrialTiming } from "./ask-local-codex-timing.mjs";
 
 const ENTRY = join(dirname(fileURLToPath(import.meta.url)), "ask-local-codex.mjs");
 const TRIAL_THREAD = "00000000-0000-4000-8000-000000000001";
+test("temporary environment stays inside each existing writable workspace",t=>{
+  const {plan,base}=prepared(t);
+  for(const launch of [codexTrialLaunch(plan,base,"plain"),codexTrialLaunch(plan,base,"kernel_only"),codexProbeLaunches(plan,base,[])[3]]) {
+    for(const key of ["TMPDIR","TMP","TEMP"])assert.equal(launch.env[key],join(launch.cwd,".ask-tmp"));
+    assert.equal(launch.env.CODEX_HOME,launch.cwd.endsWith("plain") || launch.cwd.endsWith("kernel_only") ? plan.codex_home : launch.env.HOME);
+  }
+  assert.equal(plan.constraints.timeout_ms,120000);assert.equal(plan.constraints.trial_tokens,30000);assert.equal(plan.constraints.cumulative_tokens,60000);
+});
+for(const variant of ["empty","leftover","link","replacement","removed","mode"])test(`temporary scratch grading rejects unsafe state: ${variant}`,t=>{
+  const {dir}=prepared(t),workspace=join(dir,"scratch-grader"),scratch=join(workspace,".ask-tmp");
+  mkdirSync(workspace,{mode:0o700});mkdirSync(scratch,{mode:0o700});
+  const seeded=pilotWorkspaceInventory(workspace,{scratchDirectory:".ask-tmp"});
+  if(variant==="leftover")writeFileSync(join(scratch,"leftover"),"synthetic",{mode:0o600});
+  if(variant==="link") {rmSync(scratch,{recursive:true});symlinkSync(dir,scratch);}
+  if(variant==="replacement") {const kept=join(dir,"original-scratch");renameSync(scratch,kept);mkdirSync(scratch,{mode:0o700});}
+  if(variant==="removed")rmSync(scratch,{recursive:true});
+  if(variant==="mode")chmodSync(scratch,0o755);
+  const grade=gradePilotWorkspace({workspace,seeded,scratchDirectory:".ask-tmp"});
+  if(variant==="empty") {assert.equal(grade.P3,true);assert.equal(grade.status,"fail");}
+  else assert.notEqual(grade.status,"pass");
+  if(variant!=="empty")assert.equal(grade.status,"boundary_fault");
+  if(variant==="replacement")assert.equal(grade.P3,false);
+});
+for(const scenario of ["scratch-replaced","scratch-removed"])test(`temporary ${scenario} stops before the next trial`,t=>{
+  const {privateRoot}=prepared(t,{scenarios:[scenario,"pass"]});
+  const report=evaluateCodexConnection(privateRoot);
+  assert.equal(report.slots[0].grade.reason,"scratch_directory_boundary");assert.equal(report.stop,"workspace_boundary_fault");
+  assert.equal(report.slots[1].state,"not_started");assert.deepEqual(reopenCodexConnection(privateRoot),report);
+});
+for(const readPolicy of [false,true])for(const probeOutcome of ["temporary-fail","temporary-unknown"])test(`temporary control ${probeOutcome} stops both ${readPolicy?"declared":"closed"} trials`,t=>{
+  const {privateRoot}=prepared(t,{readPolicy:readPolicy?true:undefined,probeOutcome});
+  const report=evaluateCodexConnection(privateRoot);
+  assert.equal(report.stop,"model_free_preflight_failed");assert.deepEqual(report.slots.map(s=>s.state),["not_started","not_started"]);
+  assert.equal(report.preflight.outcomes.length,1);assert.deepEqual(reopenCodexConnection(privateRoot),report);
+});
+for(const outcome of ["pass","denied","unknown","cleanup","env"])test(`temporary inline control uses mocked filesystem and shell: ${outcome}`,async()=>{
+  const temporaryDirectory="/synthetic-workspace/.ask-tmp",spec={publicFile:"public",allowedWrite:"write",deniedReads:["private"],deniedWrite:"other",temporaryDirectory,shell:"/synthetic-shell",endpoints:[{host:"127.0.0.1"},{host:"::1"}]};
+  const env=Object.fromEntries(["TMPDIR","TMP","TEMP"].map(k=>[k,outcome==="env"?"/wrong":temporaryDirectory]));
+  let output="",shellCalls=0;const files=new Map(),removed=[];
+  const module=INLINE_CANARY_MODULE_SOURCE.replace(/^import .*;\n/gmu,"");
+  await runInNewContext(`(async()=>{${module}})()`,{
+    process:{env,argv:["node",JSON.stringify(spec)],stdout:{write:x=>{output+=x;}}},
+    readFileSync:p=>p==="public"?"ASK_PUBLIC_CANARY\n":files.get(p),writeFileSync:(p,v)=>files.set(p,v),
+    openSync:()=>{throw Object.assign(Error("mock denied"),{code:"EPERM"});},closeSync:()=>{},
+    mkdtempSync:p=>p+"unique",unlinkSync:p=>{files.delete(p);removed.push(p);},rmdirSync:p=>{removed.push(p);if(outcome==="cleanup")throw Error("mock cleanup");},
+    spawnSync:(shell,args,options)=>{shellCalls++;assert.equal(shell,spec.shell);assert.equal(options.env,env);assert.match(args[1],/cat <<'ASK_TEMP_END'/u);if(outcome==="unknown")throw Error("mock launch");return {status:outcome==="denied"?1:0,stdout:args[1].split("\n")[1]+"\n",stderr:outcome==="denied"?"mock denied":"",signal:null};},
+    createConnection:()=>{const socket=new EventEmitter();socket.destroy=()=>{};socket.setTimeout=()=>{};queueMicrotask(()=>socket.emit("error",{code:"EPERM"}));return socket;},
+  });
+  const result=JSON.parse(output);
+  if(outcome==="pass")assertCanaryResult(result,{temporary:true});else assert.throws(()=>assertCanaryResult(result,{temporary:true}),/canary failure/u);
+  assert.equal(shellCalls,outcome==="env"?0:1);assert.equal(files.has(temporaryDirectory+"/canary-unique/roundtrip.txt"),false);
+  if(outcome!=="env")assert.equal(removed.length,2);
+});
+test("advisory timing distinguishes answer, final response and complete/incomplete events without contents",()=>{
+  const started="2030-01-01T00:00:00.000Z",completed="2030-01-01T00:00:10.000Z";
+  const row=(ms,type,payload)=>({timestamp:new Date(Date.parse(started)+ms).toISOString(),type,payload});
+  const rows=[row(500,"session_meta",{}),row(700,"event_msg",{type:"task_started"}),row(900,"response_item",{type:"function_call",arguments:"private sentinel"}),row(2000,"response_item",{type:"function_call_output",output:"private sentinel"}),row(3000,"response_item",{type:"message",role:"assistant",phase:"final_answer",content:["private sentinel"]}),row(3500,"event_msg",{type:"task_complete"})];
+  const session=Buffer.from(rows.map(r=>JSON.stringify(r)).join("\n"));
+  const timing=codexTrialTiming({started,completed,session,answerMtimeMs:Date.parse(started)+1800});
+  assert.equal(timing.milestones.first_record.elapsed_ms,500);assert.equal(timing.milestones.answer_file_mtime.elapsed_ms,1800);
+  assert.equal(timing.milestones.final_response.elapsed_ms,3000);assert.equal(timing.milestones.task_complete.elapsed_ms,3500);
+  assert.ok(!JSON.stringify(timing).includes("private sentinel"));
+  const incomplete=codexTrialTiming({started,completed,session:Buffer.from(rows.slice(0,4).map(r=>JSON.stringify(r)).join("\n")),answerMtimeMs:Date.parse(started)+1800});
+  assert.equal(incomplete.milestones.answer_file_mtime.status,"known");assert.equal(incomplete.milestones.final_response.status,"unknown");assert.equal(incomplete.milestones.task_complete.status,"unknown");
+});
+for(const variant of ["absent","invalid-json","invalid-time","outside","backward","oversize"])test(`advisory timing preserves explicit unknown: ${variant}`,()=>{
+  const started="2030-01-01T00:00:00Z",completed=variant==="backward"?"2029-01-01T00:00:00Z":"2030-01-01T00:00:05Z";
+  const session=variant==="absent"?null:variant==="invalid-json"?Buffer.from("{bad"):variant==="oversize"?Buffer.alloc(4*1024*1024+1):Buffer.from(JSON.stringify({timestamp:variant==="outside"?"2030-01-01T00:00:06Z":"bad",type:"event_msg",payload:{type:"task_started"}}));
+  const timing=codexTrialTiming({started,completed,session});
+  assert.equal(timing.milestones.task_started.status,"unknown");assert.equal(timing.milestones.final_response.status,"unknown");
+});
 function sessionSelectionFixture(t, start = Date.now()-1000, end = start+2000) {
   const home=realpathSync(mkdtempSync(join(tmpdir(),"ask-session-select-")));
   t.after(()=>rmSync(home,{recursive:true,force:true}));
@@ -153,8 +225,10 @@ test("owned connection probes and two isolated trials share pilot scoring; reope
     assert.equal(received.env.HOME, join(plan.runtime.root, condition, "home"));
     assert.equal(received.argv.at(-1), "-");
     assert.equal(received.env.OPENAI_API_KEY, undefined); assert.equal(received.env.NODE_OPTIONS, undefined);
-    assert.deepEqual(readdirSync(join(base.workspace_root, condition)).sort(), ["answer.json", "input.json", "task.md"]);
+    assert.deepEqual(readdirSync(join(base.workspace_root, condition)).sort(), [".ask-tmp", "answer.json", "input.json", "task.md"]);
     assert.equal(json(join(privateRoot, condition, "session-check.json")).status, "match");
+    assert.equal(json(join(privateRoot,condition,"timing.json")).milestones.task_started.status,"known");
+    assert.deepEqual(json(join(privateRoot,condition,"timing.json")),report.slots.find(s=>s.condition===condition).timing);
     assert.equal(received.argv.includes("resume"), false);
   }
 });
@@ -192,7 +266,7 @@ test("reused thread/history cannot be admitted as a distinct trial", t => {
 test("trial environment is closed; probes have a fresh empty home and no exec prompt", t => {
   const { plan, base } = prepared(t);
   const plain = codexTrialLaunch(plan, base, "plain"), kernel = codexTrialLaunch(plan, base, "kernel_only");
-  assert.deepEqual(Object.keys(plain.env).sort(), ["CODEX_HOME", "HOME", "LANG", "LC_ALL", "PATH", "TZ"]);
+  assert.deepEqual(Object.keys(plain.env).sort(), ["CODEX_HOME", "HOME", "LANG", "LC_ALL", "PATH", "TEMP", "TMP", "TMPDIR", "TZ"]);
   assert.equal(plain.timeout, kernel.timeout); assert.equal(plain.maxBuffer, kernel.maxBuffer);
   assert.equal(plain.killSignal, "SIGKILL");
   const probes = codexProbeLaunches(plan, base, ["public", "private"]);

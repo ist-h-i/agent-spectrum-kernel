@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, readlinkSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, opendirSync, readdirSync, realpathSync, readlinkSync, symlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -10,7 +10,7 @@ import { captureSuccessorUsage } from "./ask-benchmark-prompt-successor-usage.mj
 import { canonicalDigest, parseJsonRejectDuplicateKeys, writeCanonicalJsonNoReplace } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
-import { closedSessionEntries, declaredSessionEntries } from "./ask-local-codex-boundaries.mjs";
+import { closedSessionEntries, declaredSessionEntries, noAcl } from "./ask-local-codex-boundaries.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE = "benchmarks/fixtures/pilot-json-aggregate-001";
@@ -293,23 +293,34 @@ function nativeSession(home) {
   return bytes(found[0], PILOT_LIMITS.session_bytes);
 }
 
-function workspaceInventory(workspace) {
+function workspaceInventory(workspace, { scratchDirectory = null } = {}) {
   canonicalDirectory(workspace);
+  if (scratchDirectory !== null && scratchDirectory !== ".ask-tmp") throw new Error("closed scratch directory required");
   const names = readdirSync(workspace).sort();
   if (names.length > 32) throw new Error("workspace inventory limit");
   return Object.fromEntries(names.map(name => {
     const path = join(workspace, name), info = lstatSync(path);
     if (info.isSymbolicLink() || (info.isFile() && info.nlink !== 1)) throw new Error("workspace link boundary fault");
+    if (name === scratchDirectory) {
+      canonicalDirectory(path); noAcl([path]);
+      if (info.uid !== process.getuid() || (info.mode & 0o777) !== 0o700) throw new Error("private scratch directory required");
+      const directory = opendirSync(path);
+      try { if (directory.readSync() !== null) throw new Error("scratch leftovers refused"); }
+      finally { directory.closeSync(); }
+      return [name, {type:"scratch",dev:info.dev,ino:info.ino,uid:info.uid,mode:info.mode & 0o777,birthtime_ms:info.birthtimeMs}];
+    }
     if (!info.isFile()) return [name, { type: "other", size: info.size, digest: null }];
     return [name, { type: "file", size: info.size, digest: info.size <= PILOT_LIMITS.answer_bytes ? sha(bytes(path, PILOT_LIMITS.answer_bytes)) : null }];
   }));
 }
 const closed = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && same(Object.keys(value).sort(), [...keys].sort());
-export function gradePilotWorkspace({ workspace, seeded }) {
+export function gradePilotWorkspace({ workspace, seeded, scratchDirectory = null }) {
   const started = Date.now();
   let inventory;
-  try { inventory = workspaceInventory(workspace); }
+  try { inventory = workspaceInventory(workspace, {scratchDirectory}); }
   catch { return { status: "boundary_fault", reason: "workspace_inventory_boundary", P1: null, P2: null, P3: null, inventory: null }; }
+  if (scratchDirectory !== null && (seeded[scratchDirectory]?.type !== "scratch" || !same(inventory[scratchDirectory] ?? null,seeded[scratchDirectory])))
+    return {status:"boundary_fault",reason:"scratch_directory_boundary",P1:null,P2:null,P3:false,inventory};
   const P3 = Object.keys(inventory).every(name => name === "answer.json" || Object.hasOwn(seeded, name))
     && Object.entries(seeded).every(([name, identity]) => same(inventory[name] ?? null, identity));
   let answer = null, P1 = false;

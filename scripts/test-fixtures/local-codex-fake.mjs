@@ -1,5 +1,5 @@
 // Owned simulation only. No native CLI, credential or network operations.
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, symlinkSync, unlinkSync, rmdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 
@@ -23,6 +23,7 @@ if (stage === "probe") {
     if(broad) { result.kind="ask_codex_canary_v2";result.filesystem.unrelated_read=scenario==="unrelated-read-denied"?"unknown":"pass";
       result.filesystem.unrelated_write=scenario==="unrelated-write-open"?"fail":"pass";
       if(scenario==="declared-read-open")result.filesystem.read="fail"; }
+    if(process.env.TMPDIR) {result.kind="ask_codex_canary_v3";result.filesystem.temporary=scenario==="temporary-fail"?"fail":scenario==="temporary-unknown"?"unknown":"pass";}
     if (scenario==="extra-keys") result.unobserved="must-refuse";
     process.stdout.write(JSON.stringify(result)+"\n");
   }
@@ -31,6 +32,13 @@ if (stage === "probe") {
     || process.env.HOME === process.env.CODEX_HOME || !argv.includes("--ignore-user-config")) process.exit(9);
   const stdin = readFileSync(0, "utf8");
   if (!stdin.includes("pilot-json-aggregate-001") || (condition === "kernel_only") !== stdin.includes("Agent Spectrum Kernel")) process.exit(10);
+  if (!["TMPDIR","TMP","TEMP"].every(key=>process.env[key]===join(process.cwd(),".ask-tmp"))) process.exit(11);
+  const temporary=mkdtempSync(join(process.env.TMPDIR,"fake-")),temporaryFile=join(temporary,"roundtrip.txt");
+  writeFileSync(temporaryFile,"owned fake temporary data",{mode:0o600,flag:"wx"});
+  if(readFileSync(temporaryFile,"utf8")!=="owned fake temporary data")process.exit(12);
+  unlinkSync(temporaryFile);rmdirSync(temporary);
+  if(scenario==="scratch-replaced") {renameSync(process.env.TMPDIR,join(process.cwd(),"kept-scratch"));mkdirSync(process.env.TMPDIR,{mode:0o700});}
+  if(scenario==="scratch-removed")rmdirSync(process.env.TMPDIR);
   if (scenario === "timeout") setInterval(() => {}, 1000);
   else if (scenario === "interrupt") process.kill(process.pid, "SIGINT");
   else {
@@ -57,6 +65,11 @@ if (stage === "probe") {
         { type: "turn_context", payload: { turn_id: `turn-${id}`, cwd: process.cwd(), model: scenario === "identity" ? "wrong-model" : "gpt-6.1-sol", effort: "medium", approval_policy: "never",
           sandbox_policy: { type: "workspace-write", network_access: false }, permission_profile: { type: "managed", network: "restricted", file_system: { type: "restricted", entries } },
           active_permission_profile: { id: "ask_synthetic_pilot" } } }];
+      const timestamp=new Date().toISOString();
+      for(const row of rows)row.timestamp=timestamp;
+      rows.push({timestamp,type:"event_msg",payload:{type:"task_started"}},
+        {timestamp,type:"response_item",payload:{type:"message",role:"assistant",phase:"final_answer"}},
+        {timestamp,type:"event_msg",payload:{type:"task_complete"}});
       writeFileSync(join(sessions, `rollout-${stamp.replaceAll(":","-")}-${id}.jsonl`), rows.map(row => JSON.stringify(row)).join("\n") + "\n", { mode: 0o600, flag: "wx" });
     }
     const events = [{ type: "thread.started", thread_id: id }, { type: "turn.started" }];
