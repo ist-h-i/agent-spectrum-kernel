@@ -43,9 +43,10 @@ if (stage === "probe") {
     writeFileSync("answer.json", scenario === "malformed" ? "{bad" : JSON.stringify(answer), { mode: 0o600 });
     const final = { task_type: "implementation", decision: "not_applicable", findings: [], requirement_status: [], verification_commands: [], completion_claim: "complete", route: null, summary: "Owned simulation." };
     writeFileSync(argv[argv.indexOf("--output-last-message") + 1], JSON.stringify(final), { mode: 0o600 });
-    const id = scenario === "reused-session" ? "synthetic-session-plain" : `synthetic-session-${condition.replaceAll("_", "-")}`;
-    if (scenario !== "missing-session") {
-      const sessions = join(process.env.CODEX_HOME, "sessions"); mkdirSync(sessions, { recursive: true, mode: 0o700 });
+    const id = condition === "plain" || scenario === "reused-session" ? "00000000-0000-4000-8000-000000000001" : "00000000-0000-4000-8000-000000000002";
+    if (!["missing-session","reused-session"].includes(scenario)) {
+      const stamp = new Date().toISOString().slice(0,19);
+      const sessions = join(process.env.CODEX_HOME, "sessions", ...stamp.slice(0,10).split("-")); mkdirSync(sessions, { recursive: true, mode: 0o700 });
       const entries = [...JSON.parse(process.env.CONNECTION_DENIES).map(path => ({ path: { type: "path", path }, access: "deny" })),
         ...(broad ? [{path:{type:"special",value:{kind:"root"}},access:"read"}] : []),
         ...JSON.parse(process.env.CONNECTION_READS).map(path => ({path:{type:"path",path},access:"read"})),
@@ -56,7 +57,7 @@ if (stage === "probe") {
         { type: "turn_context", payload: { turn_id: `turn-${id}`, cwd: process.cwd(), model: scenario === "identity" ? "wrong-model" : "gpt-6.1-sol", effort: "medium", approval_policy: "never",
           sandbox_policy: { type: "workspace-write", network_access: false }, permission_profile: { type: "managed", network: "restricted", file_system: { type: "restricted", entries } },
           active_permission_profile: { id: "ask_synthetic_pilot" } } }];
-      writeFileSync(join(sessions, `rollout-${condition}-${id}.jsonl`), rows.map(row => JSON.stringify(row)).join("\n") + "\n", { mode: 0o600, flag: "wx" });
+      writeFileSync(join(sessions, `rollout-${stamp.replaceAll(":","-")}-${id}.jsonl`), rows.map(row => JSON.stringify(row)).join("\n") + "\n", { mode: 0o600, flag: "wx" });
     }
     const events = [{ type: "thread.started", thread_id: id }, { type: "turn.started" }];
     if (scenario === "provider") events.push({ type: "error", code: "usage_limit_exceeded" });

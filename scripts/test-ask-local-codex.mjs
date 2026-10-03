@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, linkSync, symlinkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, linkSync, symlinkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -9,12 +9,62 @@ import { runInNewContext } from "node:vm";
 import { EventEmitter } from "node:events";
 import { INLINE_CANARY_MODULE_SOURCE, controlCanaryArguments } from "./local-codex-probe-worker.mjs";
 import { prepareCodexConnection, runCodexConnection, reopenCodexConnection, codexTrialLaunch, codexProbeLaunches, assertConnectionPermissionShape,
-  runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime, codexConnectionCommand, codexProbeParentPolicy, assertNativeAdmissionRoute, codexLightweightPolicy, codexLightweightControlLaunch, DECLARED_READ_POLICY, READ_POLICY_RISK } from "./ask-local-codex.mjs";
+  runCodexProbes, reopenCodexProbes, evaluateCodexConnection, codexPhasePermission, freshAdmissionTime, codexConnectionCommand, codexProbeParentPolicy, assertNativeAdmissionRoute, codexLightweightPolicy, codexLightweightControlLaunch, readCodexTrialSession, DECLARED_READ_POLICY, READ_POLICY_RISK } from "./ask-local-codex.mjs";
 import {inspectExistingCodexHome, classifyDenial, assertCanaryResult, probeSeatbelt, assertNoAclListing, assertProbeSandboxArgs, declaredSessionEntries} from "./ask-local-codex-boundaries.mjs";
 import { canonicalDigest } from "./content-addressed-store.mjs";
 import { parsePilotNativeSession, pilotEvidenceInventory } from "./ask-synthetic-json-pilot.mjs";
 
 const ENTRY = join(dirname(fileURLToPath(import.meta.url)), "ask-local-codex.mjs");
+const TRIAL_THREAD = "00000000-0000-4000-8000-000000000001";
+function sessionSelectionFixture(t, start = Date.now()-1000, end = start+2000) {
+  const home=realpathSync(mkdtempSync(join(tmpdir(),"ask-session-select-")));
+  t.after(()=>rmSync(home,{recursive:true,force:true}));
+  const stdout=Buffer.from(JSON.stringify({type:"thread.started",thread_id:TRIAL_THREAD})+"\n");
+  const fileAt=(time,id=TRIAL_THREAD)=>{
+    const stamp=new Date(time).toISOString().slice(0,19), path=join(home,"sessions",...stamp.slice(0,10).split("-"),`rollout-${stamp.replaceAll(":","-")}-${id}.jsonl`);
+    mkdirSync(dirname(path),{recursive:true,mode:0o700}); return path;
+  };
+  const select=()=>readCodexTrialSession(home,stdout,new Date(start).toISOString(),new Date(end).toISOString());
+  return {home,stdout,start,end,fileAt,select};
+}
+test("new-session lookup ignores more than4096 historical entries and unrelated links",t=>{
+  const f=sessionSelectionFixture(t), selected=f.fileAt(f.start+1000);
+  writeFileSync(selected,"selected-new-session",{mode:0o600});
+  const old=join(f.home,"sessions","1999");mkdirSync(old,{mode:0o700});
+  for(let i=0;i<4097;i++)writeFileSync(join(old,`old-${i}.jsonl`),"DO_NOT_READ",{mode:0o600});
+  symlinkSync("/unrelated-unreadable-target",join(f.home,"sessions","old-link"));
+  assert.equal(f.select().toString(),"selected-new-session");
+});
+test("UTC session selection spans midnight and requires one candidate",t=>{
+  const start=Date.parse("2026-10-03T23:59:59.500Z"), f=sessionSelectionFixture(t,start,start+2000);
+  const selected=f.fileAt(start+1000);writeFileSync(selected,"after-midnight",{mode:0o600});utimesSync(selected,new Date(start+1000),new Date(start+1000));
+  assert.equal(f.select().toString(),"after-midnight");
+  const second=f.fileAt(start);writeFileSync(second,"ambiguous",{mode:0o600});utimesSync(second,new Date(start+500),new Date(start+500));
+  assert.throws(f.select,/one matching new session/u);
+});
+for(const fault of ["missing","stale","future","symlink","hardlink","nonprivate","ancestor-link","wrong-id"])test(`new-session selection fails closed: ${fault}`,t=>{
+  const f=sessionSelectionFixture(t), selected=f.fileAt(f.start+1000);
+  if(fault!=="missing")writeFileSync(selected,"fixture",{mode:0o600});
+  if(fault==="stale"||fault==="future")utimesSync(selected,new Date(fault==="stale"?f.start-1:f.end+1),new Date(fault==="stale"?f.start-1:f.end+1));
+  if(fault==="symlink"){rmSync(selected);symlinkSync(join(f.home,"target"),selected);}
+  if(fault==="hardlink")linkSync(selected,join(f.home,"copy"));
+  if(fault==="nonprivate")chmodSync(selected,0o644);
+  if(fault==="ancestor-link"){const day=dirname(selected), moved=join(f.home,"moved");mkdirSync(moved,{mode:0o700});rmSync(day,{recursive:true});symlinkSync(moved,day);}
+  if(fault==="wrong-id"){rmSync(selected);writeFileSync(f.fileAt(f.start+1000,"00000000-0000-4000-8000-000000000002"),"other",{mode:0o600});}
+  assert.throws(f.select);
+});
+test("ambiguous or path-injecting stdout identity is refused",t=>{
+  const f=sessionSelectionFixture(t);
+  for(const stdout of [Buffer.concat([f.stdout,f.stdout]),Buffer.from('{"type":"thread.started","thread_id":"../auth.json"}\n'),Buffer.from('{"type":"thread.started","thread_id":"not-a-uuid"}\n')])
+    assert.throws(()=>readCodexTrialSession(f.home,stdout,new Date(f.start).toISOString(),new Date(f.end).toISOString()),/ambiguous thread identity/u);
+  assert.throws(()=>readCodexTrialSession(f.home,f.stdout,"invalid",new Date(f.end).toISOString()),/time window/u);
+  assert.throws(()=>readCodexTrialSession(f.home,f.stdout,new Date(f.end).toISOString(),new Date(f.start).toISOString()),/time window/u);
+});
+test("candidate lookup never widens beyond the120-second launch budget",t=>{
+  const f=sessionSelectionFixture(t,Date.now()-1000,Date.now()+180000);
+  const outside=f.fileAt(f.start+121000);writeFileSync(outside,"out-of-budget",{mode:0o600});utimesSync(outside,new Date(f.start+121000),new Date(f.start+121000));
+  assert.throws(f.select,/one matching new session/u);
+});
 test("inline control avoids a mocked Node denied-ancestor entrypoint lookup without changing denies", t => {
   const {plan,base,dir}=prepared(t,{readPolicy:true});
   const controller=join(dir,"denied-controller"), helper=join(controller,"scripts","helper.mjs"), hook=join(dir,"bootstrap-hook.cjs"), log=join(dir,"lookups.log");

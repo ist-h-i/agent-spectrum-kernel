@@ -423,26 +423,35 @@ export function reopenCodexProbes(root) {
   return report;
 }
 
-function sessionBytes(home, stdout, started) {
+export function readCodexTrialSession(home, stdout, started, completed) {
   const text = new TextDecoder("utf-8", { fatal: true }).decode(stdout);
   const threads = text.trimEnd().split("\n").map(row => parseJsonRejectDuplicateKeys(row)).filter(row => row.type === "thread.started");
   const id = threads[0]?.thread_id;
-  if (threads.length !== 1 || typeof id !== "string" || !/^[A-Za-z0-9-]{10,128}$/u.test(id)) throw new Error("ambiguous thread identity");
-  const found = []; let visited = 0;
-  function walk(path, depth = 0) {
-    if (depth > 5) throw new Error("session nesting limit");
-    for (const name of readdirSync(path)) {
-      if (++visited > 4096) throw new Error("session inventory limit");
-      const file = join(path, name), info = lstatSync(file);
-      if (info.isSymbolicLink()) throw new Error("session link refused");
-      if (info.isDirectory()) walk(file, depth + 1);
-      else if (name.endsWith(`-${id}.jsonl`)) {
-        if (!info.isFile() || info.nlink !== 1 || info.mtimeMs < Date.parse(started)) throw new Error("stale/unsafe session");
-        found.push(file);
-      }
+  if (threads.length !== 1 || typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(id)) throw new Error("ambiguous thread identity");
+  const start = Date.parse(started), end = Date.parse(completed);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) throw new Error("invalid session time window");
+  // The pinned CLI creates local-time YYYY/MM/DD/rollout-<second>-<id>.jsonl.
+  // Trial launch fixes TZ=UTC. Probe exact names only, never list past sessions.
+  const last = Math.min(end, start + PILOT_LIMITS.timeout_ms), found = [], checked = new Set();
+  directory(home);
+  for (let second = Math.floor(start / 1000); second <= Math.floor(last / 1000); second++) {
+    const stamp = new Date(second * 1000).toISOString().slice(0,19), parts = stamp.slice(0,10).split("-");
+    let parent = home, absent = false;
+    for (const part of ["sessions", ...parts]) {
+      parent = join(parent,part);
+      if (checked.has(parent)) continue;
+      let info;
+      try { info=lstatSync(parent); } catch(error) { if(error.code==="ENOENT") { absent=true; break; } throw error; }
+      if (!info.isDirectory() || info.uid!==process.getuid() || (info.mode&0o022)) throw new Error("unsafe session directory");
+      directory(parent); noAcl([parent]); checked.add(parent);
     }
+    if (absent) continue;
+    const file=join(parent,`rollout-${stamp.replaceAll(":","-")}-${id}.jsonl`);
+    let info;
+    try { info=lstatSync(file); } catch(error) { if(error.code==="ENOENT")continue; throw error; }
+    if (!info.isFile() || info.nlink!==1 || info.mtimeMs<start || info.mtimeMs>end) throw new Error("stale/unsafe session");
+    inspectSelectedSession(file); found.push(file);
   }
-  directory(join(home, "sessions")); walk(join(home, "sessions"));
   if (found.length !== 1) throw new Error("one matching new session required");
   inspectSelectedSession(found[0]); return bytes(found[0], PILOT_LIMITS.session_bytes);
 }
@@ -466,7 +475,7 @@ function trial(plan, base, condition) {
   save(join(root, "usage.json"), usage); save(join(root, "grade.json"), grade);
   let identity = null, identityError = null;
   try {
-    const session = sessionBytes(plan.codex_home, Buffer.from(proc.stdout ?? ""), started);
+    const session = readCodexTrialSession(plan.codex_home, Buffer.from(proc.stdout ?? ""), started, process.completed);
     raw(join(root, "session.jsonl"), session);
     identity = parsePilotNativeSession({ stdout: Buffer.from(proc.stdout ?? ""), session,
       plan: { ...base, command: plan.command }, workspace, sessionHome: plan.codex_home });

@@ -144,6 +144,58 @@ sandbox/canary/model/auth or chmod operation is part of this correction.
 Mock results cannot establish real startup improvement or host enforcement;
 those remain Unknown until separately approved new-head/image/plan/grant checks.
 
+### Bounded new-session selection after the approved r3 observation
+
+At unchanged head `3a9dbc35`, the separately approved Mac r3 inline control
+passed (244ms, exit0). One plain trial exited0 with machine grade pass and
+stdout-known usage22944, then stopped at `session_identity_failure`: saved
+reason `session inventory limit`. Kernel was not started, retry0. This is
+not a validated comparison pair. R2/r3 evidence and spent grants remain frozen.
+
+The old selector had the exact stdout `thread.started` ID but recursively
+listed the entire existing session tree, stopping after4096 entries. The
+correction uses the single canonical UUID from stdout and the persisted
+process start/completion window. The existing launch fixes `TZ=UTC`; the
+pinned CLI0.157.1 records new ordinary rollouts under
+`sessions/YYYY/MM/DD/rollout-YYYY-MM-DDTHH-MM-SS-<thread-id>.jsonl`.
+This naming rule comes from the official pinned
+[recorder](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/rollout/src/recorder.rs)
+(`precompute_new_rollout_path`) and
+[filename renderer](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/rollout/src/rollout_file_name.rs).
+The selector directly checks at most121 exact per-second candidates within
+the120-second trial budget, including a UTC date boundary. It never lists
+session directories or reads historical bodies/index/database contents.
+
+Candidate ancestors must be canonical owned non-writable directories without
+ACLs; the one selected file must be regular, single-link, owned0600 without
+ACLs, modified inside the observed process window, and read through the existing
+stable bounded reader. Missing/multiple candidates, malformed/duplicate IDs,
+invalid/backward time, links, unsafe metadata or unsupported filename layout
+fail closed without a fallback scan. Completion beyond the launch timeout
+does not widen the candidate creation window. The existing parser still checks
+session/model/provider/workspace/permission identity before the next trial.
+File metadata and an exact filename are not substitutes for that parser.
+
+The fake CLI now emits UUIDs and the pinned dated layout. Historical sealed
+replay is unchanged: it uses saved session/report bytes, not this live selector.
+No runtime/auth permission changes, dependencies, extra CLI/model calls or new
+runtime grants are part of this correction. Mock passing evidence does not
+establish that the new selector works on this user's actual host.
+
+Implementation ID `issue315-session-selection-implementation`, revision1;
+upstream `issue315-inline-control-implementation@1` and r3 sealed observation.
+Change C1 replaces global discovery with bounded exact-path selection; C2
+updates owned fake fixtures/tests and this explanation. Formal Verification ID
+`issue315-session-selection-verification`, revision1, selected under
+`ask.verification-proof-policy@1.0.0` (privacy/identity boundary and failed
+runtime observation retain formal verification). O6 proves selection independent
+of accumulated history, UTC rollover and fixed budget, unique/fresh/private
+candidate rejection and unchanged lifecycle/session parser/replay checks.
+O1–O5 remain retained upstream obligations; none is relaxed. E6 is the12-test
+focused selection regression; final-head lifecycle/shared tests, independent
+review and equivalent-tree CI are recorded in Draft317 and Issue315. Real
+new-selector admission remains Unknown and requires fresh approval/grant.
+
 - E1 (O1–O4): focused local-codex/local-eval/pilot regression suite passed
   185/185 on the candidate source before commit. Post-commit exact-source
   results and submitted-head CI are recorded in Draft #317's update.
