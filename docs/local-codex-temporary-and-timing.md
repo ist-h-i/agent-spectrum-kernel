@@ -169,3 +169,5 @@ diagnostic compatibility. E14–E15 are inline I/O mocks; final-source lifecycle
 tests, validator, independent review and submitted-head CI complete development
 evidence. Real shell/CLI/control/model runs, grants, host settings and old
 experiment mutation are excluded; actual host effectiveness remains unknown.
+
+New descriptors can separately opt into the [turn-received time budget](local-codex-time-budget.md). Existing advisory timing and old fixed process limits retain their original semantics.

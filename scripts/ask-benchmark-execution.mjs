@@ -1063,7 +1063,7 @@ function materializeCommand(root, command, runtime, outputTemporary) {
     .replaceAll("{permission_policy}", runtime.permission_policy));
 }
 
-function terminateResidualAgentProcessGroup(pid) {
+export function terminateResidualAgentProcessGroup(pid) {
   if (process.platform === "win32" || !Number.isInteger(pid) || pid < 1) return false;
   let present = false;
   try {

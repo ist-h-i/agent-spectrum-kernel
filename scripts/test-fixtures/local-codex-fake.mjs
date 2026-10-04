@@ -80,12 +80,13 @@ if (stage === "probe") {
           active_permission_profile: { id: "ask_synthetic_pilot" } } }];
       const timestamp=new Date().toISOString();
       for(const row of rows)row.timestamp=timestamp;
-      rows.push({timestamp,type:"event_msg",payload:{type:"task_started"}},
+      rows.push({timestamp,type:"event_msg",payload:{type:"task_started",turn_id:scenario==="time-identity"?"wrong-turn":`turn-${id}`}},
         {timestamp,type:"response_item",payload:{type:"message",role:"assistant",phase:"final_answer"}},
         {timestamp,type:"event_msg",payload:{type:"task_complete"}});
       writeFileSync(join(sessions, `rollout-${stamp.replaceAll(":","-")}-${id}.jsonl`), rows.map(row => JSON.stringify(row)).join("\n") + "\n", { mode: 0o600, flag: "wx" });
     }
     const events = [{ type: "thread.started", thread_id: id }, { type: "turn.started" }];
+    if(scenario==="duplicate-start")events.push({type:"turn.started"});
     if (scenario === "provider") events.push({ type: "error", code: "usage_limit_exceeded" });
     else if (scenario !== "unknown") events.push({ type: "turn.completed", usage: { input_tokens: scenario === "threshold" ? 30000 : 100, output_tokens: 20 } });
     process.stdout.write(events.map(event => JSON.stringify(event)).join("\n") + "\n");

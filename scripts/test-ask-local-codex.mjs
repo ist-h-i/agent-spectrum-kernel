@@ -189,11 +189,11 @@ function prepared(t, options = {}) {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const home = join(dir, "owned-home"), parent = join(dir, "workspaces"), runtimeRoot = join(dir,"runtime");
   mkdirSync(home, { mode: 0o700 }); mkdirSync(parent, { mode: 0o700 }); mkdirSync(runtimeRoot,{mode:0o700});
-  const {readPolicy,...simulationOptions}=options;
+  const {readPolicy,timePolicy,...simulationOptions}=options;
   const protectedRoot=join(dir,"old-grading-copy");
   if(readPolicy===true) { mkdirSync(protectedRoot,{mode:0o700});writeFileSync(join(protectedRoot,"synthetic-answer.txt"),"synthetic",{mode:0o600}); }
   const selection=readPolicy===true ? {kind:DECLARED_READ_POLICY,riskAcknowledged:true,protectedRootsComplete:true,protectedRoots:[protectedRoot]} : readPolicy;
-  const result = prepareCodexConnection({ ...(selection!==undefined ? {readPolicy:selection} : {}), privateRoot: join(dir, "evidence"), workspaceParent: parent, codexHome: home, runtimeRoot }, { simulation: true, ...simulationOptions });
+  const result = prepareCodexConnection({ ...(selection!==undefined ? {readPolicy:selection} : {}), ...(timePolicy?{timePolicy}:{}), privateRoot: join(dir, "evidence"), workspaceParent: parent, codexHome: home, runtimeRoot }, { simulation: true, ...simulationOptions });
   return { ...result, home, dir, plan: json(join(result.privateRoot, "connection.json")), base: json(join(result.privateRoot, "plan.json")) };
 }
 function snapshot(root) {
@@ -873,4 +873,35 @@ test("classified v5 requires empty code; legacy v4 validation stays explicit",as
   const legacy=structuredClone(result);legacy.kind="ask_codex_canary_v4";delete legacy.temporary_diagnostics.shell.stderr_classification;
   assertCanaryResult(legacy,{temporary:true,diagnostics:true});
   assert.throws(()=>assertCanaryResult(legacy,{temporary:true,diagnostics:true,stderrClassification:true}),/canary/u);
+});
+
+// New policy simulations use only the owned fake child, never a native CLI/home.
+const {CODEX_TIME_POLICY}=await import("./ask-local-codex-time-budget.mjs");
+for(const broad of [false,true])test(`turn budget opt-in preserves policy and identical replay (broad=${broad})`,async t=>{
+  const {privateRoot,plan,base}=prepared(t,{readPolicy:broad?true:undefined,timePolicy:CODEX_TIME_POLICY});
+  assert.equal(plan.kind,broad?"ask_local_codex_connection_v5":"ask_local_codex_connection_v4");
+  assert.equal(plan.constraints.timeout_ms,240000);
+  assert.deepEqual(codexTrialLaunch(plan,base,"plain").timeout,codexTrialLaunch(plan,base,"kernel_only").timeout);
+  const permission=codexPhasePermission(plan,"evaluate","fresh-synthetic-approval");
+  assert.deepEqual(permission.time_policy,CODEX_TIME_POLICY);
+  const report=await evaluateCodexConnection(privateRoot);
+  assert.equal(report.stop,null);assert.equal(report.retry,0);assert.equal(report.model_calls,0);
+  for(const slot of report.slots) {assert.equal(slot.time_budget.stop,null);assert.equal(slot.time_budget.completion_received,true);assert.equal(slot.grade.status,"pass");}
+  assert.deepEqual(reopenCodexConnection(privateRoot),report);
+  assert.throws(()=>evaluateCodexConnection(privateRoot));
+});
+for(const scenario of ["unknown","identity","time-identity","duplicate-start","timeout","provider","threshold"])test(`turn budget fails closed before kernel: ${scenario}`,async t=>{
+  const {privateRoot}=prepared(t,{timePolicy:CODEX_TIME_POLICY,scenarios:[scenario,"pass"],...(scenario==="timeout"?{fakeTimeoutMs:100}: {})});
+  const report=await evaluateCodexConnection(privateRoot);
+  assert.notEqual(report.stop,null);assert.equal(report.slots[1].state,"not_started");assert.equal(report.retry,0);
+  if(scenario==="timeout")assert.equal(report.slots[0].process.timeout,true);
+  assert.deepEqual(reopenCodexConnection(privateRoot),report);
+});
+test("time policy cannot be widened or attached to a legacy plan",t=>{
+  assert.throws(()=>prepared(t,{timePolicy:{...CODEX_TIME_POLICY,absolute_ms:999999}}),/closed time policy/);
+  const {privateRoot,plan}=prepared(t);
+  plan.time_policy=CODEX_TIME_POLICY;
+  writeFileSync(join(privateRoot,"connection.json"),JSON.stringify(plan));
+  writeFileSync(join(privateRoot,"connection-digest.json"),JSON.stringify({digest:canonicalDigest(plan)}));
+  assert.throws(()=>reopenCodexConnection(privateRoot),/legacy plan cannot acquire/);
 });

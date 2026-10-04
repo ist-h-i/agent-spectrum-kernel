@@ -13,21 +13,26 @@ import { canonicalDigest, parseJsonRejectDuplicateKeys, writeCanonicalJsonNoRepl
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { inspectExistingCodexHome, inspectSelectedSession, closedReadRoots, noAcl, assertCanaryResult, probeSeatbelt, assertProbeSandboxArgs } from "./ask-local-codex-boundaries.mjs";
 import { codexTrialTiming } from "./ask-local-codex-timing.mjs";
+import { CODEX_TIME_POLICY, assertTimePolicy, executeTurnBudgetAgent } from "./ask-local-codex-time-budget.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = "scripts/ask-local-codex.mjs", FAKE = "scripts/test-fixtures/local-codex-fake.mjs";
 const WORKER = "scripts/local-codex-probe-worker.mjs";
-const SOURCES = [SELF, FAKE, "scripts/ask-local-eval.mjs", "scripts/ask-local-codex-boundaries.mjs", WORKER, "scripts/ask-local-codex-timing.mjs"];
+const SOURCES = [SELF, FAKE, "scripts/ask-local-eval.mjs", "scripts/ask-local-codex-boundaries.mjs", WORKER, "scripts/ask-local-codex-timing.mjs", "scripts/ask-local-codex-time-budget.mjs"];
 const PLAN = "connection.json", REPORT = "connection-report.json";
 export const DECLARED_READ_POLICY = "declared_denies_read_only_v1";
 const BROAD_PLAN = "ask_local_codex_connection_v3";
-const modernPlan = plan => ["ask_local_codex_connection_v2", BROAD_PLAN].includes(plan.kind);
+const TIMED_CLOSED = "ask_local_codex_connection_v4", TIMED_BROAD = "ask_local_codex_connection_v5";
+const broadPlan = plan => [BROAD_PLAN, TIMED_BROAD].includes(plan.kind);
+const timedPlan = plan => [TIMED_CLOSED, TIMED_BROAD].includes(plan.kind);
+const modernPlan = plan => ["ask_local_codex_connection_v2", BROAD_PLAN, TIMED_CLOSED, TIMED_BROAD].includes(plan.kind);
+const connectionLimits = plan => ({...PILOT_LIMITS, ...(timedPlan(plan)?{timeout_ms:CODEX_TIME_POLICY.absolute_ms}:{})});
 export const READ_POLICY_RISK = Object.freeze({
   read_access:"host_reads_except_declared_denies", personal_files:"not_isolated", other_credential_stores:"not_isolated",
   unlisted_grading_copies:"not_guaranteed_denied", tool_outputs:"may_be_transmitted_to_openai_despite_tool_network_deny",
   inventory:"operator_assertion_not_discovery", runtime_verification:"not_established_by_simulation" });
 export const CODEX_CONNECTION_VERSION = "0.157.1";
-export const CONNECTION_SCENARIOS = ["pass", "wrong", "malformed", "unknown", "threshold", "exit", "timeout", "identity", "missing-session", "reused-session", "provider", "interrupt", "scope-leak", "scratch-replaced", "scratch-removed"];
+export const CONNECTION_SCENARIOS = ["pass", "wrong", "malformed", "unknown", "threshold", "exit", "timeout", "identity", "missing-session", "reused-session", "provider", "interrupt", "scope-leak", "scratch-replaced", "scratch-removed", "time-identity", "duplicate-start"];
 const hash = value => `sha256:${createHash("sha256").update(value).digest("hex")}`;
 const bytes = (path, max = 1048576) => readStableFile(path, "connection evidence", max).bytes;
 const read = path => parseJsonRejectDuplicateKeys(new TextDecoder("utf-8", { fatal: true }).decode(bytes(path)));
@@ -100,7 +105,7 @@ export function assertConnectionPermissionShape(permission) {
 /** Closed remains default. Broad read is a separate source/plan-bound opt-in. */
 export function codexConnectionCommand(plan, base) {
   const command = pilotCommand({ privateRoot: base.private_root, controllerRoot: base.controller_root, workspaceRoot: base.workspace_root });
-  const broad = plan.kind === BROAD_PLAN, modern = modernPlan(plan);
+  const broad = broadPlan(plan), modern = modernPlan(plan);
   const roots = [...(modern && !broad ? ["/"] : []), ...command.deny_roots, plan.codex_home,
     ...(plan.runtime ? [plan.runtime.root] : []), ...(broad ? plan.read_policy.protected_roots.map(x=>x.path) : [])];
   const argv = command.argv.filter((value,index,values) => !(modern && (value === 'permissions.ask_synthetic_pilot.extends=":workspace"' || (value === "-c" && values[index+1] === 'permissions.ask_synthetic_pilot.extends=":workspace"'))))
@@ -121,7 +126,7 @@ function protectedIdentity(path) {
   return {dev:st.dev,ino:st.ino,uid:st.uid,type:st.isDirectory()?"directory":"file"};
 }
 function assertReadPolicy(plan, base, current=false) {
-  if (plan.kind !== BROAD_PLAN) {
+  if (!broadPlan(plan)) {
     if (plan.read_policy !== undefined) throw new Error("closed plan cannot acquire broad read policy");
     return;
   }
@@ -151,8 +156,8 @@ export function codexProbeParentPolicy(plan) {
 /** CLI/controller are trusted host processes; only model tools enter the sandbox. */
 export function codexLightweightPolicy(plan = null) {
   return {kind:"trusted_cli_lightweight_v1",cli_host_access:"ordinary_user_access_trusted",
-    model_tool_policy:plan?.kind===BROAD_PLAN ? "declared_denies_read_only_workspace_write_network_denied" : "closed_read_manifest_workspace_write_network_denied",
-    ...(plan?.kind===BROAD_PLAN ? {read_policy:plan.read_policy} : {}),
+    model_tool_policy:broadPlan(plan ?? {}) ? "declared_denies_read_only_workspace_write_network_denied" : "closed_read_manifest_workspace_write_network_denied",
+    ...(broadPlan(plan ?? {}) ? {read_policy:plan.read_policy} : {}),
     control_home:"fresh_empty_external_runtime_no_existing_auth",
     evaluation_home:"existing_file_store_cli_read_refresh_new_session_write",
     cli_startup_external_network:"zero_not_guaranteed",cli_network_enforcement:"no_parent_egress_filter",
@@ -161,15 +166,16 @@ export function codexLightweightPolicy(plan = null) {
 function assertModelToolBoundary(plan, base) {
   assertReadPolicy(plan,base);
   if (!modernPlan(plan) || !plan.command || !Array.isArray(plan.read_roots)
-    || (plan.kind!==BROAD_PLAN && !same(plan.read_roots,closedReadRoots(plan.host.platform,base.node.executable,plan.cli.executable)))
+    || (!broadPlan(plan) && !same(plan.read_roots,closedReadRoots(plan.host.platform,base.node.executable,plan.cli.executable)))
     || !same(plan.command,codexConnectionCommand(plan,base))) throw new Error("closed model-tool policy required");
 }
 
 /** No Codex subprocess, credential file access, link, copy or auth configuration. */
 export function prepareCodexConnection(descriptor, { simulation = false, scenarios = ["pass", "pass"], probePass = true, probeOutcome = "pass", fakeTimeoutMs = null, host = null } = {}) {
   if (!descriptor || typeof descriptor !== "object" || Array.isArray(descriptor)
-    || Object.keys(descriptor).some(key => !["privateRoot", "workspaceParent", "codexHome", "runtimeRoot", "executable", "imageDigest", "readPolicy"].includes(key))) throw new Error("closed connection descriptor required");
+    || Object.keys(descriptor).some(key => !["privateRoot", "workspaceParent", "codexHome", "runtimeRoot", "executable", "imageDigest", "readPolicy", "timePolicy"].includes(key))) throw new Error("closed connection descriptor required");
   const optIn=descriptor.readPolicy;
+  if(descriptor.timePolicy!==undefined)assertTimePolicy(descriptor.timePolicy);
   if (optIn!==undefined && (!exactKeys(optIn,["kind","riskAcknowledged","protectedRootsComplete","protectedRoots"])
     || optIn.kind!==DECLARED_READ_POLICY || optIn.riskAcknowledged!==true || optIn.protectedRootsComplete!==true
     || !Array.isArray(optIn.protectedRoots) || optIn.protectedRoots.length>128
@@ -206,13 +212,14 @@ export function prepareCodexConnection(descriptor, { simulation = false, scenari
   const base = readPilotPlan(prepared.privateRoot);
   const runtime = {kind:RUNTIME_LAYOUT, root:runtimeRoot, identity}; runtimeShape(runtime,base,codexHome);
   for (const root of [base.private_root, base.workspace_root]) if (within(root, codexHome) || within(codexHome, root)) throw new Error("overlapping session/evidence/workspace roots");
-  const plan = { kind: optIn ? BROAD_PLAN : "ask_local_codex_connection_v2", mode: simulation ? "simulation" : "planned_live", base_digest: prepared.planDigest,
+  const plan = { kind: descriptor.timePolicy ? optIn ? TIMED_BROAD : TIMED_CLOSED : optIn ? BROAD_PLAN : "ask_local_codex_connection_v2", mode: simulation ? "simulation" : "planned_live", base_digest: prepared.planDigest,
     source: source(), host: observed.host, route_host: routeHost, route: selected.route, cli: { version: CODEX_CONNECTION_VERSION, executable, image_digest: image.rawByteDigest },
     codex_home: codexHome, home_identity:homeIdentity, runtime, read_roots:optIn ? [] : closedReadRoots(observed.host.platform, base.node.executable, executable),
     ...(optIn ? {read_policy:{kind:DECLARED_READ_POLICY,risk_acknowledged:true,protected_roots_complete:true,risk:structuredClone(READ_POLICY_RISK),
       protected_roots:optIn.protectedRoots.slice().sort().map(path=>({path,identity:protectedIdentity(path)}))}} : {}), auth: "existing_file_store_cli_only_no_controller_credential_operations",
     guard: observed.host.platform === "darwin" ? { executable:"/usr/bin/sandbox-exec", image_digest:hash(bytes("/usr/bin/sandbox-exec")) } : null,
-    constraints: structuredClone(PILOT_LIMITS), scenarios, probe_pass: probePass, probe_outcome:probeOutcome, fake_timeout_ms: fakeTimeoutMs,
+    constraints: {...PILOT_LIMITS,...(descriptor.timePolicy?{timeout_ms:CODEX_TIME_POLICY.absolute_ms}:{})},
+    ...(descriptor.timePolicy?{time_policy:structuredClone(CODEX_TIME_POLICY)}:{}), scenarios, probe_pass: probePass, probe_outcome:probeOutcome, fake_timeout_ms: fakeTimeoutMs,
     live_ready: false, admission: "not_exercised", synthetic_host: host !== null,
     execution_route:"trusted_cli_lightweight_v1" };
   assertReadPolicy(plan,base,true);
@@ -228,14 +235,16 @@ export function prepareCodexConnection(descriptor, { simulation = false, scenari
 
 function readConnection(root, current = false) {
   const base = readPilotPlan(root), plan = read(join(root, PLAN));
-  if (!["ask_local_codex_connection_v1", "ask_local_codex_connection_v2", BROAD_PLAN].includes(plan.kind) || !["simulation", "planned_live"].includes(plan.mode)
+  if (!["ask_local_codex_connection_v1", "ask_local_codex_connection_v2", BROAD_PLAN, TIMED_CLOSED, TIMED_BROAD].includes(plan.kind) || !["simulation", "planned_live"].includes(plan.mode)
     || plan.base_digest !== canonicalDigest(base) || canonicalDigest(plan) !== read(join(root, "connection-digest.json")).digest
     || plan.cli.version !== CODEX_CONNECTION_VERSION || plan.live_ready !== false
     || plan.route !== selectLocalRoute(plan.route_host).route || !selectLocalRoute(plan.route_host).fake_ready
-    || !same(plan.constraints, PILOT_LIMITS) || !same(plan.command, codexConnectionCommand(plan, base))
+    || !same(plan.constraints, connectionLimits(plan)) || !same(plan.command, codexConnectionCommand(plan, base))
     || plan.scenarios.length !== 2 || plan.scenarios.some(value => !CONNECTION_SCENARIOS.includes(value))
     || (plan.mode === "planned_live" && (plan.synthetic_host || !same(plan.host, plan.route_host)
       || !same(plan.scenarios, ["pass", "pass"]) || !plan.probe_pass || plan.fake_timeout_ms !== null))) throw new Error("connection plan drift");
+  if(timedPlan(plan))assertTimePolicy(plan.time_policy);
+  else if(plan.time_policy!==undefined)throw new Error("legacy plan cannot acquire time policy");
   assertReadPolicy(plan,base,current);
   if (current) {
     if (modernPlan(plan) && (!["pass","network-open","network-unknown","write-open","positive-unknown","extra-keys","metadata-fail","unrelated-read-denied","unrelated-write-open","declared-read-open","temporary-fail","temporary-unknown","temporary-diagnostics-missing","temporary-diagnostics-inconsistent","legacy-temporary","legacy-diagnostics","stderr-classification-missing"].includes(plan.probe_outcome)
@@ -251,7 +260,7 @@ function readConnection(root, current = false) {
       assertModelToolBoundary(plan,base);
       if (plan.execution_route!=="trusted_cli_lightweight_v1" || !same(plan.trusted_cli_policy,codexLightweightPolicy(plan))) throw new Error("fresh trusted CLI contract required");
       if (!same(plan.home_identity, existingHomeRoot(plan.codex_home))
-        || (plan.kind!==BROAD_PLAN && !same(plan.read_roots, closedReadRoots(plan.host.platform, base.node.executable, plan.cli.executable)))) throw new Error("home/read scope drift");
+        || (!broadPlan(plan) && !same(plan.read_roots, closedReadRoots(plan.host.platform, base.node.executable, plan.cli.executable)))) throw new Error("home/read scope drift");
     } else ownerDirectory(plan.codex_home);
     if (plan.mode === "simulation" && (!same(read(join(plan.codex_home, "owned-simulation.json")),
       { kind: "ask_owned_connection_simulation_v1", root, plan_digest: canonicalDigest(plan) })
@@ -275,7 +284,7 @@ export function codexTrialLaunch(plan, base, condition) {
     env: { HOME: runtimeHome(plan,base,condition), CODEX_HOME: plan.codex_home, LANG: "C", LC_ALL: "C", TZ: "UTC",
       TMPDIR:join(workspace,".ask-tmp"),TMP:join(workspace,".ask-tmp"),TEMP:join(workspace,".ask-tmp"),
       PATH: `${dirname(base.node.executable)}:/usr/bin:/bin:/usr/sbin:/sbin` },
-    timeout: PILOT_LIMITS.timeout_ms, killSignal: "SIGKILL", maxBuffer: PILOT_LIMITS.max_buffer_bytes };
+    timeout: connectionLimits(plan).timeout_ms, killSignal: "SIGKILL", maxBuffer: PILOT_LIMITS.max_buffer_bytes };
 }
 
 /** CLI picks Seatbelt on Darwin and Landlock on Linux, including WSL2. */
@@ -295,14 +304,22 @@ export function codexProbeLaunches(plan, base, canaries, phase = "connection-pro
 
 /** One trusted worker -> one CLI sandbox -> canary; no outer Seatbelt process. */
 export function codexLightweightControlLaunch(plan,base,{sandboxArgs,canary,filesystem}) {
-  assertModelToolBoundary(plan,base); assertProbeSandboxArgs(sandboxArgs,{filesystem,declaredRead:plan.kind===BROAD_PLAN});
+  assertModelToolBoundary(plan,base); assertProbeSandboxArgs(sandboxArgs,{filesystem,declaredRead:broadPlan(plan)});
   const template=codexProbeLaunches(plan,base,[],"lightweight-control")[3];
-  const payload={cli:plan.cli.executable,argv:sandboxArgs,node:base.node.executable,cwd:template.cwd,canary,filesystem,declaredRead:plan.kind===BROAD_PLAN};
+  const payload={cli:plan.cli.executable,argv:sandboxArgs,node:base.node.executable,cwd:template.cwd,canary,filesystem,declaredRead:broadPlan(plan)};
   return {...template,executable:base.node.executable,argv:[join(ROOT,WORKER),"guarded",JSON.stringify(payload)]};
 }
 
 function invoke(plan, launch, stage, scenario, condition, root, command) {
   const { executable, argv, ...options } = launch;
+  if(stage==="exec" && timedPlan(plan)) {
+    const simulated=plan.mode==="simulation";
+    return executeTurnBudgetAgent(simulated?realpathSync(process.execPath):executable,
+      simulated?[join(ROOT,FAKE),stage,scenario,condition,...argv]:argv,
+      {...options,policy:plan.time_policy,simulationAbsoluteMs:simulated?plan.fake_timeout_ms:null,
+        env:simulated?{...options.env,CONNECTION_EVIDENCE:root,CONNECTION_DENIES:JSON.stringify(command.deny_roots),
+          CONNECTION_READS:JSON.stringify(command.read_roots??[]),CONNECTION_READ_POLICY:broadPlan(plan)?DECLARED_READ_POLICY:"closed"}:options.env});
+  }
   if (plan.mode === "planned_live") {
     const previous = process.umask(0o077);
     try { return executeContainedAgent(executable, argv, { ...options, recordCleanupFailure: true }); }
@@ -310,7 +327,7 @@ function invoke(plan, launch, stage, scenario, condition, root, command) {
   }
   return executeContainedAgent(realpathSync(process.execPath), [join(ROOT, FAKE), stage, scenario, condition, ...argv],
     { ...options, timeout: stage === "exec" ? plan.fake_timeout_ms ?? options.timeout : options.timeout,
-      env: { ...options.env, CONNECTION_EVIDENCE: root, CONNECTION_DENIES: JSON.stringify(command.deny_roots), CONNECTION_READS:JSON.stringify(command.read_roots??[]), CONNECTION_READ_POLICY:plan.kind===BROAD_PLAN ? DECLARED_READ_POLICY : "closed" }, recordCleanupFailure: true });
+      env: { ...options.env, CONNECTION_EVIDENCE: root, CONNECTION_DENIES: JSON.stringify(command.deny_roots), CONNECTION_READS:JSON.stringify(command.read_roots??[]), CONNECTION_READ_POLICY:broadPlan(plan) ? DECLARED_READ_POLICY : "closed" }, recordCleanupFailure: true });
 }
 
 function checks(plan, base, lightweight = false) {
@@ -324,7 +341,7 @@ function checks(plan, base, lightweight = false) {
   const other = join(base.workspace_root, `${phase}-other-trial-canary`); mkdirSync(other, { mode: 0o700 }); raw(join(other, "private.txt"), "ASK_OTHER_CANARY\n");
   const authCanary=join(root,"synthetic-auth-material.txt"), unrelatedCanary=base.workspace_root+`-${phase}-unrelated-canary.txt`;
   raw(authCanary,"ASK_SYNTHETIC_AUTH_NOT_A_CREDENTIAL\n"); raw(unrelatedCanary,"ASK_UNRELATED_CANARY\n");
-  const broad=plan.kind===BROAD_PLAN;
+  const broad=broadPlan(plan);
   const declaredCanary=join(root,"declared-copy-canary.txt"); if(broad) raw(declaredCanary,"ASK_DECLARED_COPY_CANARY\n");
   const deniedReads = [privateFile, join(other, "private.txt"), authCanary, broad ? declaredCanary : unrelatedCanary, ...(broad ? plan.read_policy.protected_roots.map(x=>x.path) : [])], deniedWrite = join(other, "private.txt");
   const launches = codexProbeLaunches(plan, base, [publicFile, ...deniedReads],phase);
@@ -332,7 +349,7 @@ function checks(plan, base, lightweight = false) {
     temporaryDirectory:join(workspace,".ask-tmp"),shell:plan.host.platform === "darwin" ? "/bin/zsh" : "/bin/sh",...(broad ? {unrelatedFile:unrelatedCanary} : {}) };
   const sandboxArgs = launches[3].argv.slice(0, launches[3].argv.indexOf("--")+1);
   const filesystem = sandboxArgs.find(value=>value.startsWith("permissions.ask_synthetic_pilot.filesystem="));
-  assertProbeSandboxArgs(sandboxArgs,{filesystem,declaredRead:plan.kind===BROAD_PLAN});
+  assertProbeSandboxArgs(sandboxArgs,{filesystem,declaredRead:broadPlan(plan)});
   const profile = lightweight ? null : probeSeatbelt({codexHome:plan.codex_home, home:launches[0].env.HOME, workspace, canaries:[...deniedReads,deniedWrite]});
   const outcomes = [];
   for (const index of lightweight ? [3] : [0,1,2,3]) {
@@ -380,10 +397,11 @@ function phaseActions(phase) { return phase === "probe" ? {probes:4,trials:0,ret
 export function codexPhasePermission(plan, phase, approvalRef, admissionDigest = null) {
   if (!["probe","evaluate"].includes(phase) || typeof approvalRef !== "string" || approvalRef.length < 10) throw new Error("explicit phase/approval reference required");
   if (phase === "evaluate") {
+    if(timedPlan(plan))assertTimePolicy(plan.time_policy);
     if (!modernPlan(plan) || admissionDigest !== null || plan.execution_route!=="trusted_cli_lightweight_v1" || !same(plan.trusted_cli_policy,codexLightweightPolicy(plan))) throw new Error("fresh lightweight permission requires trusted CLI contract; no strict admission grant");
-    return {kind:plan.kind===BROAD_PLAN ? "ask_local_codex_declared_read_permission_v1" : "ask_local_codex_lightweight_permission_v1",phase,plan_digest:canonicalDigest(plan),source_digest:canonicalDigest(plan.source),
+    return {kind:broadPlan(plan) ? "ask_local_codex_declared_read_permission_v1" : "ask_local_codex_lightweight_permission_v1",phase,plan_digest:canonicalDigest(plan),source_digest:canonicalDigest(plan.source),
       cli_image_digest:plan.cli.image_digest,command_digest:canonicalDigest(plan.command),route:plan.route,runtime:plan.runtime,
-      trusted_cli_policy:plan.trusted_cli_policy,approval_ref:approvalRef,
+      trusted_cli_policy:plan.trusted_cli_policy,...(timedPlan(plan)?{time_policy:plan.time_policy}:{}),approval_ref:approvalRef,
       actions:{controls:1,probes:0,trials:2,retry:0,existing_home_cli_read_refresh:true,existing_home_new_session_write:true,
         cli_startup_external_network_zero:false,openai_model_auth_managed_config_network:true}};
   }
@@ -428,7 +446,7 @@ export function reopenCodexProbes(root) {
   return report;
 }
 
-export function readCodexTrialSession(home, stdout, started, completed) {
+export function readCodexTrialSession(home, stdout, started, completed, maximumMs=PILOT_LIMITS.timeout_ms) {
   const text = new TextDecoder("utf-8", { fatal: true }).decode(stdout);
   const threads = text.trimEnd().split("\n").map(row => parseJsonRejectDuplicateKeys(row)).filter(row => row.type === "thread.started");
   const id = threads[0]?.thread_id;
@@ -437,7 +455,8 @@ export function readCodexTrialSession(home, stdout, started, completed) {
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) throw new Error("invalid session time window");
   // The pinned CLI creates local-time YYYY/MM/DD/rollout-<second>-<id>.jsonl.
   // Trial launch fixes TZ=UTC. Probe exact names only, never list past sessions.
-  const last = Math.min(end, start + PILOT_LIMITS.timeout_ms), found = [], checked = new Set();
+  if(!Number.isSafeInteger(maximumMs)||maximumMs<=0||maximumMs>CODEX_TIME_POLICY.absolute_ms)throw new Error("bounded session window required");
+  const last = Math.min(end, start + maximumMs), found = [], checked = new Set();
   directory(home);
   for (let second = Math.floor(start / 1000); second <= Math.floor(last / 1000); second++) {
     const stamp = new Date(second * 1000).toISOString().slice(0,19), parts = stamp.slice(0,10).split("-");
@@ -475,14 +494,15 @@ function trial(plan, base, condition) {
   const launch = codexTrialLaunch(plan, base, condition);
   save(join(root, "launch.json"), launch); save(join(root, "claim.json"), { state: "spent", plan_digest: canonicalDigest(plan), launch_digest: canonicalDigest(launch) });
   const started = new Date().toISOString(), index = condition === "plain" ? 0 : 1;
-  const proc = invoke(plan, { ...launch, input: stdin }, "exec", plan.scenarios[index], condition, root, plan.command);
+  const invoked = invoke(plan, { ...launch, input: stdin }, "exec", plan.scenarios[index], condition, root, plan.command);
+  const finish = proc => {
   const process = persistPilotProcess(root, proc, started, plan.mode === "simulation" ? plan.fake_timeout_ms ?? launch.timeout : launch.timeout);
   const usage = captureSuccessorUsage(proc), grade = gradePilotWorkspace({ workspace, seeded,scratchDirectory:".ask-tmp" });
   save(join(root, "usage.json"), usage); save(join(root, "grade.json"), grade);
   let identity = null, identityError = null;
   let selectedSession = null;
   try {
-    const session = readCodexTrialSession(plan.codex_home, Buffer.from(proc.stdout ?? ""), started, process.completed);
+    const session = readCodexTrialSession(plan.codex_home, Buffer.from(proc.stdout ?? ""), started, process.completed,connectionLimits(plan).timeout_ms);
     raw(join(root, "session.jsonl"), session);
     selectedSession = session;
     identity = parsePilotNativeSession({ stdout: Buffer.from(proc.stdout ?? ""), session,
@@ -493,13 +513,26 @@ function trial(plan, base, condition) {
   try { const info=lstatSync(join(workspace,"answer.json")); if(info.isFile() && info.nlink===1) answerMtimeMs=info.mtimeMs; } catch { /* absent observation */ }
   const timing=codexTrialTiming({started,completed:process.completed,session:selectedSession,answerMtimeMs});
   save(join(root,"timing.json"),timing);
+  let timeIdentity=true;
+  if(timedPlan(plan)) {
+    save(join(root,"time-budget.json"),proc.time_budget);
+    try {
+      const rows=new TextDecoder("utf-8",{fatal:true}).decode(selectedSession).trimEnd().split("\n").map(parseJsonRejectDuplicateKeys);
+      const starts=rows.filter(x=>x.type==="event_msg"&&x.payload?.type==="task_started");
+      timeIdentity=proc.time_budget?.stop===null && proc.time_budget.completion_received===true
+        && identity?.session_id===canonicalDigest({session_id:proc.time_budget.thread_id}) && starts.length===1
+        && identity.turn_id===canonicalDigest({turn_id:starts[0].payload.turn_id});
+    } catch {timeIdentity=false;}
+  }
   const total = usage.metrics.total_tokens;
   const stop = proc.error || proc.status !== 0 || proc.signal || proc.workspace_descendants_detected || process.output_limited ? "process_failure"
-    : !identity ? "session_identity_failure" : grade.status === "boundary_fault" ? "workspace_boundary_fault"
+    : !identity ? "session_identity_failure" : !timeIdentity ? "time_identity_failure" : grade.status === "boundary_fault" ? "workspace_boundary_fault"
     : usage.provider_stop.status === "detected" ? "provider_stop" : total.status !== "known" ? "usage_unknown"
     : total.value >= PILOT_LIMITS.trial_tokens ? "trial_token_threshold" : null;
   return { condition, state: "completed", process, grade, final_format: pilotFinalFormat(join(root, "final.json")), usage: total,
-    session_id: identity?.session_id ?? null, timing, stop };
+    session_id: identity?.session_id ?? null, timing, ...(timedPlan(plan)?{time_budget:proc.time_budget}:{}), stop };
+  };
+  return invoked instanceof Promise ? invoked.then(finish) : finish(invoked);
 }
 
 export function freshAdmissionTime(createdAt, now = Date.now()) {
@@ -514,7 +547,7 @@ export function evaluateCodexConnection(root, permission = null) {
   if (plan.mode === "planned_live") save(join(root,"home-metadata-before.json"),inspectExistingCodexHome(plan.codex_home));
   if (permission) save(join(root,"connection-permission.json"),permission);
   save(join(root, "connection-run-claim.json"), { state: "spent", plan_digest: canonicalDigest(plan), permission_digest: permission ? canonicalDigest(permission) : null });
-  const report = { kind: "ask_local_codex_report_v1", ...(plan.kind===BROAD_PLAN ? {read_policy:plan.read_policy} : {}), mode: plan.mode, plan_digest: canonicalDigest(plan), route: plan.route,
+  const report = { kind: "ask_local_codex_report_v1", ...(broadPlan(plan) ? {read_policy:plan.read_policy} : {}), mode: plan.mode, plan_digest: canonicalDigest(plan), route: plan.route,
     execution_status: "incomplete", retry: 0, model_calls: plan.mode === "simulation" ? 0 : "unobserved",
     credential_operations: plan.mode === "simulation" ? 0 : "cli_read_refresh_unobserved", total_known_tokens: 0, stop: null,
     slots: ["plain", "kernel_only"].map(condition => ({ condition, state: "not_started" })) };
@@ -522,26 +555,34 @@ export function evaluateCodexConnection(root, permission = null) {
   try { report.preflight = checks(plan,base,true); }
   catch { report.preflight={kind:"ask_local_codex_lightweight_control_v1",status:"fail",evidence_class:"failed_or_unknown",model_calls:0,reason:"control_evidence_or_process_fault"}; }
   report.stop = report.preflight.status === "pass" ? null : "model_free_preflight_failed";
-  for (const [index, slot] of report.slots.entries()) {
-    if (report.stop) break;
-    try {
-      readConnection(root, true);
-      if (plan.mode === "planned_live") inspectExistingCodexHome(plan.codex_home);
-      report.slots[index] = trial(plan, base, slot.condition);
-      const outcome = report.slots[index];
-      if (outcome.session_id && report.slots.slice(0, index).some(prior => prior.session_id === outcome.session_id)) outcome.stop = "session_reused";
-      report.total_known_tokens += outcome.usage.status === "known" ? outcome.usage.value : 0;
-      report.stop = outcome.stop ?? (report.total_known_tokens >= PILOT_LIMITS.cumulative_tokens ? "cumulative_token_threshold" : null);
-      if (plan.mode === "planned_live") {
-        try { save(join(root,`home-metadata-after-${index}.json`),inspectExistingCodexHome(plan.codex_home)); }
-        catch { outcome.home_metadata_status = "failed_or_unknown"; report.stop = "home_metadata_fault"; }
-      }
-    } catch {
-      report.slots[index] = { condition: slot.condition, state: existsSync(join(root, slot.condition, "claim.json")) ? "spent_incomplete" : "not_started", stop: "evidence_or_source_fault" };
-      report.stop = "evidence_or_source_fault";
-    }
-    save(join(root, `connection-checkpoint-${index}.json`), report);
+  function failure(index,slot) {
+    report.slots[index] = {condition:slot.condition,state:existsSync(join(root,slot.condition,"claim.json"))?"spent_incomplete":"not_started",stop:"evidence_or_source_fault"};
+    report.stop="evidence_or_source_fault";
   }
+  function accept(index,outcome) {
+    report.slots[index]=outcome;
+    if(outcome.session_id && report.slots.slice(0,index).some(prior=>prior.session_id===outcome.session_id))outcome.stop="session_reused";
+    report.total_known_tokens+=outcome.usage.status==="known"?outcome.usage.value:0;
+    report.stop=outcome.stop??(report.total_known_tokens>=PILOT_LIMITS.cumulative_tokens?"cumulative_token_threshold":null);
+    if(plan.mode==="planned_live") {
+      try{save(join(root,`home-metadata-after-${index}.json`),inspectExistingCodexHome(plan.codex_home));}
+      catch{outcome.home_metadata_status="failed_or_unknown";report.stop="home_metadata_fault";}
+    }
+  }
+  function advance(index=0) {
+    if(report.stop || index===report.slots.length)return finishReport();
+    const slot=report.slots[index];
+    const next=()=>{save(join(root,`connection-checkpoint-${index}.json`),report);return advance(index+1);};
+    try {
+      readConnection(root,true);
+      if(plan.mode==="planned_live")inspectExistingCodexHome(plan.codex_home);
+      const outcome=trial(plan,base,slot.condition);
+      if(outcome instanceof Promise)return outcome.then(value=>accept(index,value)).catch(()=>failure(index,slot)).then(next);
+      accept(index,outcome);
+    } catch {failure(index,slot);}
+    return next();
+  }
+  function finishReport() {
   report.execution_status = "terminal";
   report.summary = [plan.mode === "simulation" ? "Owned simulation; no Codex/model/auth calls." : "Approved live connection; inspect observed identity and usage.",
     ...report.slots.map(slot => `${slot.condition}: ${slot.state}; grade=${slot.grade?.status ?? "unavailable"}; usage=${slot.usage?.value ?? "unknown"}`),
@@ -549,6 +590,8 @@ export function evaluateCodexConnection(root, permission = null) {
   save(join(root, REPORT), report);
   save(join(root, "evidence-seal.json"), { plan_digest: canonicalDigest(plan), files: pilotEvidenceInventory(root) });
   return report;
+  }
+  return advance();
 }
 
 /** Owned simulation convenience; native evaluation uses its explicit permission entrance. */
@@ -567,7 +610,7 @@ export function reopenCodexConnection(root) {
   if (seal.plan_digest !== canonicalDigest(plan) || !same(seal.files, pilotEvidenceInventory(root))) throw new Error("connection evidence digest mismatch");
   const report = read(join(root, REPORT));
   if (report.kind !== "ask_local_codex_report_v1" || report.mode !== plan.mode || report.plan_digest !== canonicalDigest(plan)
-    || (plan.kind===BROAD_PLAN && !same(report.read_policy,plan.read_policy))) throw new Error("connection report binding mismatch");
+    || (broadPlan(plan) && !same(report.read_policy,plan.read_policy))) throw new Error("connection report binding mismatch");
   return report;
 }
 
@@ -575,7 +618,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const [command, file, ...extra] = process.argv.slice(2);
     if (!file || (extra.length && (!["probe","evaluate"].includes(command) || extra.length!==1))) throw new Error("closed command required");
-    const result = command === "prepare" ? prepareCodexConnection(read(file))
+    const result = await (command === "prepare" ? prepareCodexConnection(read(file))
       : command === "prepare-simulation" ? prepareCodexConnection(read(file), { simulation: true })
       : command === "simulate" && readConnection(file).plan.mode === "simulation" ? runCodexConnection(file)
       : command === "probe" && extra.length===1 ? runCodexProbes(file,read(extra[0]))
@@ -583,7 +626,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       : command === "probe-simulation" && readConnection(file).plan.mode==="simulation" ? runCodexProbes(file)
       : command === "evaluate-simulation" && readConnection(file).plan.mode==="simulation" ? evaluateCodexConnection(file)
       : command === "reopen-probe" ? reopenCodexProbes(file)
-      : command === "reopen" ? reopenCodexConnection(file) : (() => { throw new Error("live CLI execution unavailable"); })();
+      : command === "reopen" ? reopenCodexConnection(file) : (() => { throw new Error("live CLI execution unavailable"); })());
     if (command === "simulate" && result.mode !== "simulation") throw new Error("simulation plan required");
     process.stdout.write(JSON.stringify(result, null, 2) + "\n");
   } catch { process.stderr.write("Codex connection refused or incomplete; evidence preserved.\n"); process.exitCode = 1; }
