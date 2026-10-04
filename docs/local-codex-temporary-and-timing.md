@@ -68,11 +68,11 @@ error codes/signals become `OTHER`; messages, raw output, commands, environment
 values, paths and credentials are never copied into these diagnostic fields.
 Digests describe bounded shell outputs and do not establish their contents.
 
-New controls require the closed v4 shape, all six stages pass, no failure/error,
+New controls require the closed v5 shape described below, all six stages pass, no failure/error,
 all five shell predicates true, and matching public-payload/empty-output lengths
 and digests. Missing, contradictory or additional fields cannot grant admission.
 The one control, 10-second outer/2-second inner limits, protected denies, trial
-budgets and usage stops remain unchanged. Historical v1–v3 validation remains
+budgets and usage stops remain unchanged. Historical v1–v4 validation remains
 explicitly selectable; sealed offline replay does not reinterpret or recompute
 historical canary evidence and never starts new calls.
 
@@ -91,3 +91,39 @@ real shell/sandbox result, root cause or performance improvement. Existing
 private experiment records are unchanged; no real CLI/control/model/authentication,
 execution permission, host configuration or external private-result publication
 is part of this development slice.
+
+
+## Conservative stderr message classification
+
+The current `ask_codex_canary_v5` adds exactly one shell field,
+`stderr_classification`. It records only `empty`,
+`temporary_file_denial_message`, `command_not_found_message`, or `unknown`.
+Classification happens in memory before the raw stderr is discarded. The two
+message classes recognize a complete single C-locale zsh line: inability to
+create a here-document temporary file with permission denied/operation not
+permitted, or command not found for the public `cat` command. An optional numeric
+line label and one final newline are accepted. Paths, other command names,
+additional text/lines, localized or missing output and any ambiguous form return
+`unknown`. No matching captures, raw messages, paths or environment values are
+stored. Existing bounded byte counts/digests remain unchanged.
+
+These labels describe message patterns; they do not prove an OS denial, its
+location or a root cause. Classification never changes the five success checks,
+stage outcomes, shell command, heredoc payload, timeout, permissions or denies.
+A new control requires the exact v5 shape and `stderr_classification: "empty"`
+together with all previous admission conditions. Missing/unknown/malformed,
+contradictory and extra raw fields are rejected. Explicit v4 validation remains
+available without the classification flag; saved replay continues to validate
+sealed historical reports without new calls or reinterpretation.
+
+Implementation `issue315-stderr-classification-implementation@1` references
+`issue315-canary-diagnostics-implementation@1`; C6 adds message recognition and
+strict v5 admission, C7 adds synthetic regressions and saved replay checks.
+Formal Verification `issue315-stderr-classification-verification@1` retains
+upstream O1–O11 and policy `ask.verification-proof-policy@1.0.0`. O12 proves
+conservative closed classification and no raw information in emitted diagnostic
+JSON. O13 proves strict new admission, explicit v4 validation and sealed replay
+compatibility. Evidence is model-free inline I/O mocks, synthetic lifecycle and
+shared tests, repository validation and independent review. This local slice
+makes no real-host, root-cause, performance, CI or merge-readiness claim and
+includes no real calls, old-evidence changes, host/auth changes or publication.

@@ -74,10 +74,11 @@ export function declaredSessionEntries({entries,workspace,denyRoots,runtimeParen
     || canonicalDigest(sorted(entries.filter(e=>!runtime.includes(e))))!==canonicalDigest(sorted(expected))) throw new Error("declared read/write session boundary mismatch");
 }
 export function classifyDenial(code) { return ["EPERM", "EACCES"].includes(code) ? "pass" : code === "CONNECTED" ? "fail" : "unknown"; }
-export function assertCanaryResult(result, {declaredRead = false, temporary = false, diagnostics = false} = {}) {
+export function assertCanaryResult(result, {declaredRead = false, temporary = false, diagnostics = false, stderrClassification = false} = {}) {
+  if(stderrClassification && (!diagnostics || !temporary)) throw new Error("classified canary diagnostics required");
   const keys = (obj, names) => obj && typeof obj === "object" && !Array.isArray(obj) && canonicalDigest(Object.keys(obj).sort())===canonicalDigest(names.sort());
   if (!keys(result,["kind","filesystem","network",...(diagnostics?["temporary_diagnostics"]:[])]) || !keys(result.filesystem,["read","write",...(declaredRead ? ["unrelated_read","unrelated_write"] : []),...(temporary ? ["temporary"] : [])])
-    || result?.kind !== (diagnostics ? "ask_codex_canary_v4" : temporary ? "ask_codex_canary_v3" : declaredRead ? "ask_codex_canary_v2" : "ask_codex_canary_v1") || result.filesystem?.read !== "pass" || result.filesystem?.write !== "pass"
+    || result?.kind !== (stderrClassification ? "ask_codex_canary_v5" : diagnostics ? "ask_codex_canary_v4" : temporary ? "ask_codex_canary_v3" : declaredRead ? "ask_codex_canary_v2" : "ask_codex_canary_v1") || result.filesystem?.read !== "pass" || result.filesystem?.write !== "pass"
     || (temporary && result.filesystem.temporary!=="pass")
     || (declaredRead && (result.filesystem.unrelated_read!=="pass" || result.filesystem.unrelated_write!=="pass"))
     || !Array.isArray(result.network) || result.network.length !== 2 || result.network.some(x => !keys(x,["host","positive","denied"]) || !["127.0.0.1", "::1"].includes(x.host) || x.positive !== "pass" || x.denied !== "pass")
@@ -85,10 +86,11 @@ export function assertCanaryResult(result, {declaredRead = false, temporary = fa
   if(diagnostics) {
     const d=result.temporary_diagnostics,stageNames=["environment","directory","write","read","shell","cleanup"],checkNames=["exit_zero","no_error","no_signal","stdout_matches","stderr_empty"];
     const stream=value=>keys(value,["bytes","digest"]) && Number.isSafeInteger(value.bytes) && value.bytes>=0 && value.bytes<=256*1024 && /^sha256:[0-9a-f]{64}$/u.test(value.digest);
-    if(!temporary || !keys(d,["stages","failure_stage","error_code","cleanup_error_code","shell"])
+    if(!temporary || (stderrClassification && !diagnostics) || !keys(d,["stages","failure_stage","error_code","cleanup_error_code","shell"])
       || !keys(d.stages,stageNames) || stageNames.some(stage=>d.stages[stage]!=="pass")
       || d.failure_stage!==null || d.error_code!==null || d.cleanup_error_code!==null
-      || !keys(d.shell,["status","error_code","signal","stdout","stderr","checks"])
+      || !keys(d.shell,["status","error_code","signal","stdout","stderr","checks",...(stderrClassification?["stderr_classification"]:[])])
+      || (stderrClassification && d.shell.stderr_classification!=="empty")
       || d.shell.status!==0 || d.shell.error_code!==null || d.shell.signal!==null
       || !keys(d.shell.checks,checkNames) || checkNames.some(key=>d.shell.checks[key]!==true)
       || !stream(d.shell.stdout) || !stream(d.shell.stderr)

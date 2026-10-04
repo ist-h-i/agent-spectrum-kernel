@@ -47,7 +47,7 @@ for(const scenario of ["scratch-replaced","scratch-removed"])test(`temporary ${s
   assert.equal(report.slots[0].grade.reason,"scratch_directory_boundary");assert.equal(report.stop,"workspace_boundary_fault");
   assert.equal(report.slots[1].state,"not_started");assert.deepEqual(reopenCodexConnection(privateRoot),report);
 });
-for(const readPolicy of [false,true])for(const probeOutcome of ["temporary-fail","temporary-unknown","temporary-diagnostics-missing","temporary-diagnostics-inconsistent","legacy-temporary"])test(`temporary control ${probeOutcome} stops both ${readPolicy?"declared":"closed"} trials`,t=>{
+for(const readPolicy of [false,true])for(const probeOutcome of ["temporary-fail","temporary-unknown","temporary-diagnostics-missing","temporary-diagnostics-inconsistent","legacy-temporary","legacy-diagnostics","stderr-classification-missing"])test(`temporary control ${probeOutcome} stops both ${readPolicy?"declared":"closed"} trials`,t=>{
   const {privateRoot}=prepared(t,{readPolicy:readPolicy?true:undefined,probeOutcome});
   const report=evaluateCodexConnection(privateRoot);
   assert.equal(report.stop,"model_free_preflight_failed");assert.deepEqual(report.slots.map(s=>s.state),["not_started","not_started"]);
@@ -67,7 +67,7 @@ for(const outcome of ["pass","denied","unknown","cleanup","env"])test(`temporary
     createConnection:()=>{const socket=new EventEmitter();socket.destroy=()=>{};socket.setTimeout=()=>{};queueMicrotask(()=>socket.emit("error",{code:"EPERM"}));return socket;},
   });
   const result=JSON.parse(output);
-  if(outcome==="pass")assertCanaryResult(result,{temporary:true,diagnostics:true});else assert.throws(()=>assertCanaryResult(result,{temporary:true,diagnostics:true}),/canary failure/u);
+  if(outcome==="pass")assertCanaryResult(result,{temporary:true,diagnostics:true,stderrClassification:true});else assert.throws(()=>assertCanaryResult(result,{temporary:true,diagnostics:true,stderrClassification:true}),/canary failure/u);
   assert.equal(shellCalls,outcome==="env"?0:1);assert.equal(files.has(temporaryDirectory+"/canary-unique/roundtrip.txt"),false);
   if(outcome!=="env")assert.equal(removed.length,2);
 });
@@ -746,7 +746,7 @@ test("candidate session comparison ignores object key and entry order",()=>{
   assert.throws(()=>declaredSessionEntries({entries,workspace,denyRoots,runtimeParent:"/synthetic/home/tmp/arg0"}));
 });
 
-async function diagnosticCanary(outcome="pass") {
+async function diagnosticCanary(outcome="pass",stderrValue) {
   const {createHash}=await import("node:crypto");
   const tmp="/synthetic-workspace/.ask-tmp", spec={publicFile:"public",allowedWrite:"write",deniedReads:["private"],deniedWrite:"other",temporaryDirectory:tmp,shell:"/synthetic-shell",endpoints:[{host:"127.0.0.1"},{host:"::1"}]};
   const env=Object.fromEntries(["TMPDIR","TMP","TEMP"].map(k=>[k,outcome==="environment"?"/wrong":tmp]));
@@ -764,7 +764,7 @@ async function diagnosticCanary(outcome="pass") {
       shellCalls++;if(outcome==="shell-throw")throw error();
       return {status:outcome==="exit"?2:0,error:["error","other-error","timeout","buffer"].includes(outcome)?error():undefined,
         signal:outcome==="signal"?"SIGKILL":null,stdout:outcome==="stdout"?secret:outcome==="missing-output"?null:args[1].split("\n")[1]+"\n",
-        stderr:outcome==="stderr"?secret:""};
+        stderr:stderrValue!==undefined?stderrValue:outcome==="stderr"?secret:""};
     },
     createConnection:()=>{const socket=new EventEmitter();socket.destroy=()=>{};socket.setTimeout=()=>{};queueMicrotask(()=>socket.emit("error",{code:"EPERM"}));return socket;},
   });
@@ -772,19 +772,19 @@ async function diagnosticCanary(outcome="pass") {
 }
 for(const [outcome,check] of [["pass",null],["exit","exit_zero"],["error","no_error"],["signal","no_signal"],["stdout","stdout_matches"],["stderr","stderr_empty"],["missing-output","stdout_matches"],["other-error","no_error"],["timeout","no_error"],["buffer","no_error"]])test(`bounded shell diagnostics separate condition: ${outcome}`,async()=>{
   const {result,shellCalls}=await diagnosticCanary(outcome);
-  assert.equal(result.kind,"ask_codex_canary_v4");assert.equal(shellCalls,1);
+  assert.equal(result.kind,"ask_codex_canary_v5");assert.equal(shellCalls,1);
   const d=result.temporary_diagnostics;
   for(const stage of ["environment","directory","write","read","cleanup"])assert.equal(d.stages[stage],"pass");
   assert.equal(d.stages.shell,outcome==="pass"?"pass":"fail");
   if(check)assert.equal(d.shell.checks[check],false);
   if(outcome==="pass"){
-    assertCanaryResult(result,{temporary:true,diagnostics:true});
+    assertCanaryResult(result,{temporary:true,diagnostics:true,stderrClassification:true});
     assert.equal(d.shell.stdout.bytes,122881);assert.match(d.shell.stdout.digest,/^sha256:[0-9a-f]{64}$/u);
     assert.equal(d.shell.stderr.bytes,0);
     for(const mutate of [r=>delete r.temporary_diagnostics,r=>r.temporary_diagnostics.shell.status=2,r=>r.temporary_diagnostics.shell.checks.stdout_matches=false,r=>r.temporary_diagnostics.shell.stderr.raw="secret",r=>r.temporary_diagnostics.shell.stdout.digest="sha256:"+"0".repeat(64),r=>r.temporary_diagnostics.shell.stderr.digest="sha256:"+"0".repeat(64),r=>r.temporary_diagnostics.shell.error_code="SECRET"]){
-      const bad=structuredClone(result);mutate(bad);assert.throws(()=>assertCanaryResult(bad,{temporary:true,diagnostics:true}),/canary/u);
+      const bad=structuredClone(result);mutate(bad);assert.throws(()=>assertCanaryResult(bad,{temporary:true,diagnostics:true,stderrClassification:true}),/canary/u);
     }
-  }else assert.throws(()=>assertCanaryResult(result,{temporary:true,diagnostics:true}),/canary/u);
+  }else assert.throws(()=>assertCanaryResult(result,{temporary:true,diagnostics:true,stderrClassification:true}),/canary/u);
   if(outcome==="other-error")assert.equal(d.shell.error_code,"OTHER");
 });
 for(const outcome of ["environment","directory","write","read","shell-throw","cleanup"])test(`bounded temporary diagnostics identify stage: ${outcome}`,async()=>{
@@ -792,7 +792,7 @@ for(const outcome of ["environment","directory","write","read","shell-throw","cl
   assert.equal(result.filesystem.temporary,"unknown");
   assert.equal(d.failure_stage,outcome==="shell-throw"?"shell":outcome);
   assert.equal(shellCalls,["shell-throw","cleanup"].includes(outcome)?1:0);
-  assert.throws(()=>assertCanaryResult(result,{temporary:true,diagnostics:true}),/canary/u);
+  assert.throws(()=>assertCanaryResult(result,{temporary:true,diagnostics:true,stderrClassification:true}),/canary/u);
 });
 test("legacy canary admission remains explicit while new controls require diagnostics",()=>{
   for(const [kind,declaredRead,temporary] of [["ask_codex_canary_v1",false,false],["ask_codex_canary_v2",true,false],["ask_codex_canary_v3",true,true]]){
@@ -800,4 +800,41 @@ test("legacy canary admission remains explicit while new controls require diagno
     assertCanaryResult(result,{declaredRead,temporary});
     assert.throws(()=>assertCanaryResult(result,{declaredRead,temporary:true,diagnostics:true}),/canary/u);
   }
+});
+
+for(const [stderr,classification] of [
+  ["","empty"],
+  ["zsh:1: can't create temp file for here document: operation not permitted\n","temporary_file_denial_message"],
+  ["zsh: can't create temp file for here document: permission denied\n","temporary_file_denial_message"],
+  ["zsh:1: command not found: cat\n","command_not_found_message"],
+  ["zsh:1: command not found: PRIVATE_PATH_TOKEN_must_not_be_recorded\n","unknown"],
+  ["zsh:1: can't create temp file for here document: permission denied\nextra private content","unknown"],
+  ["zsh:1: permission denied: /private/secret-auth-file\n","unknown"],
+  ["permission denied","unknown"],
+  ["zsh:1: command not found: cat\nzsh:1: can't create temp file for here document: permission denied\n","unknown"],
+  ["zsh:1: command not found: cat\n\n","unknown"],
+  ["zsh:1: command not found: cat\u2028","unknown"],
+  [null,"unknown"],
+])test(`stderr classification closed synthetic case ${classification} ${String(stderr).length}`,async()=>{
+  const {result}=await diagnosticCanary("pass",stderr);
+  assert.equal(result.kind,"ask_codex_canary_v5");
+  assert.equal(result.temporary_diagnostics.shell.stderr_classification,classification);
+  const recorded=JSON.stringify(result);
+  for(const raw of ["/private/secret-auth-file","extra private content","command not found:","can't create temp file"])assert.ok(!recorded.includes(raw));
+  if(stderr!=="")assert.equal(result.filesystem.temporary,"fail");
+});
+test("classified v5 requires empty code; legacy v4 validation stays explicit",async()=>{
+  const {result}=await diagnosticCanary();
+  assertCanaryResult(result,{temporary:true,diagnostics:true,stderrClassification:true});
+  for(const value of [undefined,"unknown","temporary_file_denial_message","command_not_found_message","/private/raw-secret",null,{},false]){
+    const bad=structuredClone(result);
+    if(value===undefined)delete bad.temporary_diagnostics.shell.stderr_classification;
+    else bad.temporary_diagnostics.shell.stderr_classification=value;
+    assert.throws(()=>assertCanaryResult(bad,{temporary:true,diagnostics:true,stderrClassification:true}),/canary/u);
+  }
+  const raw=structuredClone(result);raw.temporary_diagnostics.shell.raw_stderr="/private/raw-secret";
+  assert.throws(()=>assertCanaryResult(raw,{temporary:true,diagnostics:true,stderrClassification:true}),/canary/u);
+  const legacy=structuredClone(result);legacy.kind="ask_codex_canary_v4";delete legacy.temporary_diagnostics.shell.stderr_classification;
+  assertCanaryResult(legacy,{temporary:true,diagnostics:true});
+  assert.throws(()=>assertCanaryResult(legacy,{temporary:true,diagnostics:true,stderrClassification:true}),/canary/u);
 });

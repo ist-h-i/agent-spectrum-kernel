@@ -14,6 +14,15 @@ const connect = ({host, port}) => new Promise(resolve => {
   socket.once("connect", () => done("CONNECTED")); socket.once("error", e => done(e.code));
   socket.setTimeout(1500, () => done("TIMEOUT"));
 });
+// Message recognition only, not proof of an OS denial or a root cause.
+// Match a single complete C-locale message, never persist captures or raw text.
+export function classifyShellStderr(value) {
+  if (value === "") return "empty";
+  if (typeof value !== "string" || value.length > 256 * 1024) return "unknown";
+  if (/^zsh:(?:[0-9]+:)? can't create temp file for here document: (?:permission denied|operation not permitted)\n?(?![\s\S])/u.test(value)) return "temporary_file_denial_message";
+  if (/^zsh:(?:[0-9]+:)? command not found: cat\n?(?![\s\S])/u.test(value)) return "command_not_found_message";
+  return "unknown";
+}
 async function canary(spec) {
   let read = "pass", write = "pass";
   if (readFileSync(spec.publicFile, "utf8") !== "ASK_PUBLIC_CANARY\n") read = "fail";
@@ -52,7 +61,7 @@ async function canary(spec) {
       const checks={exit_zero:shell.status===0,no_error:!shell.error,no_signal:!shell.signal,stdout_matches:shell.stdout===body,stderr_empty:shell.stderr===""};
       temporaryDiagnostics.shell={status:Number.isInteger(shell.status)&&shell.status>=0&&shell.status<=255?shell.status:null,
         error_code:code(shell.error),signal:shell.signal==null?null:signals.includes(shell.signal)?shell.signal:"OTHER",
-        stdout:stream(shell.stdout),stderr:stream(shell.stderr),checks};
+        stdout:stream(shell.stdout),stderr:stream(shell.stderr),stderr_classification:classifyShellStderr(shell.stderr),checks};
       filesystem.temporary=Object.values(checks).every(Boolean) ? "pass" : "fail";
       stages.shell=filesystem.temporary;
       if(filesystem.temporary!=="pass")temporaryDiagnostics.failure_stage="shell";
@@ -75,7 +84,7 @@ async function canary(spec) {
     try { const fd=openSync(spec.unrelatedFile,"r+"); closeSync(fd); filesystem.unrelated_write="fail"; }
     catch(e) { filesystem.unrelated_write=classifyDenial(e.code); }
   }
-  return {kind:spec.temporaryDirectory ? "ask_codex_canary_v4" : spec.unrelatedFile ? "ask_codex_canary_v2" : "ask_codex_canary_v1",filesystem,network,...(temporaryDiagnostics ? {temporary_diagnostics:temporaryDiagnostics} : {})};
+  return {kind:spec.temporaryDirectory ? "ask_codex_canary_v5" : spec.unrelatedFile ? "ask_codex_canary_v2" : "ask_codex_canary_v1",filesystem,network,...(temporaryDiagnostics ? {temporary_diagnostics:temporaryDiagnostics} : {})};
 }
 // Node resolves script entry points through their ancestors before reading the
 // file. An explicit helper-file read cannot traverse a denied controller root.
@@ -86,7 +95,7 @@ export const INLINE_CANARY_MODULE_SOURCE = [
   'import { Buffer } from "node:buffer";',
   'import { spawnSync } from "node:child_process";',
   'import { createConnection } from "node:net";',
-  classifyDenial.toString(), `const connect = ${connect.toString()};`, canary.toString(),
+  classifyDenial.toString(), classifyShellStderr.toString().replace("export ",""), `const connect = ${connect.toString()};`, canary.toString(),
   'process.stdout.write(JSON.stringify(await canary(JSON.parse(process.argv[1])))+"\\n");',
 ].join("\n");
 export function controlCanaryArguments(spec, endpoints) {
