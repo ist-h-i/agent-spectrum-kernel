@@ -15,7 +15,7 @@ const itemTypes=new Set(["agent_message","reasoning","command_execution","file_c
 function startupWarning(item) {
   return item.type==="error" && typeof item.message==="string" && (
     item.message==="Model metadata for `gpt-6.1-sol` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
-    || /^`\[features\]\.memory_tool` is deprecated\. Use `\[features\]\.memories` instead\. \(Enable it with `--enable memories` or `\[features\]\.memories` in config\.toml\. See https:\/\/github\.com\/openai\/codex\/blob\/main\/docs\/config\.md#feature-flags for details\.\)$/u.test(item.message));
+    || /^`\[features\]\.memory_tool` is deprecated\. Use `\[features\]\.memories` instead\. \(Enable it with `--enable memories` or `\[features\]\.memories` in config\.toml\. See https:\/\/(?:github\.com\/openai\/codex\/blob\/main\/docs\/config\.md|developers\.openai\.com\/codex\/config-basic)#feature-flags for details\.\)$/u.test(item.message));
 }
 
 /** Receive-time control, not an authentication/model-readiness attestation. */

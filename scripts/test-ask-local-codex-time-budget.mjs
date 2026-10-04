@@ -7,6 +7,28 @@ import {CODEX_TIME_POLICY,turnBudget,executeTurnBudgetAgent} from "./ask-local-c
 const id="00000000-0000-4000-8000-000000000001";
 const thread={type:"thread.started",thread_id:id},start={type:"turn.started"},done={type:"turn.completed",usage:{input_tokens:10,output_tokens:2}};
 function state(cap=240000){let ms=0;const control=turnBudget({now:()=>ms,absoluteMs:cap});return {control,set:x=>{ms=x;}};}
+const warningUrls=["https://github.com/openai/codex/blob/main/docs/config.md#feature-flags","https://developers.openai.com/codex/config-basic#feature-flags"];
+const memoryWarning=url=>"`[features].memory_tool` is deprecated. Use `[features].memories` instead. (Enable it with `--enable memories` or `[features].memories` in config.toml. See "+url+" for details.)";
+const warningEvent=message=>({type:"item.completed",item:{type:"error",message}});
+for(const url of warningUrls)test(`known memory warning URL permits normal turn: ${url}`,()=>{
+  const {control:c,set}=state();set(81000);c.event(thread);c.event(warningEvent(memoryWarning(url)));
+  assert.equal(c.evidence().stop,null);assert.equal(c.evidence().start_received_ms,null);
+  c.event(start);c.event(done);c.finish();assert.equal(c.evidence().stop,null);assert.equal(c.evidence().start_received_ms,81000);
+});
+for(const message of [
+  memoryWarning("https://example.invalid/config#feature-flags"),
+  memoryWarning(warningUrls[1]+"/extra"),
+  memoryWarning(warningUrls[1]).replace("memory_tool","other_tool"),
+  memoryWarning(warningUrls[1])+"\nProvider unavailable",
+  "Provider unavailable: "+memoryWarning(warningUrls[1]),
+  memoryWarning(warningUrls[1])+"\n",
+])test(`changed or compound memory warning remains fatal: ${JSON.stringify(message)}`,()=>{
+  const {control:c}=state();c.event(thread);c.event(warningEvent(message));assert.equal(c.evidence().stop,"cli_error");
+});
+test("known memory warning cannot mask a later fatal error",()=>{
+  const {control:c}=state();c.event(thread);c.event(warningEvent(memoryWarning(warningUrls[1])));
+  c.event(warningEvent("Provider unavailable"));assert.equal(c.evidence().stop,"cli_error");
+});
 test("startup overhead does not subtract from task budget; cap is absolute",()=>{
   const {control:c,set}=state();set(81000);c.event(thread);c.event(start);
   set(200999);assert.equal(c.evidence().stop,null);set(201000);assert.equal(c.evidence().stop,"task_timeout");
