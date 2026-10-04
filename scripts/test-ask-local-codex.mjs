@@ -765,7 +765,7 @@ async function diagnosticCanary(outcome="pass",stderrValue,{shell="/synthetic-sh
       shellCalls++;if(outcome==="shell-throw")throw error();
       return {status:outcome==="exit"?2:0,error:["error","other-error","timeout","buffer"].includes(outcome)?error():undefined,
         signal:outcome==="signal"?"SIGKILL":null,stdout:outcome==="stdout"?secret:outcome==="missing-output"?null:args[1].split("cat <<'ASK_TEMP_END'\n")[1].split("ASK_TEMP_END\n")[0],
-        stderr:stderrValue!==undefined?stderrValue:outcome==="stderr"?secret:""};
+        stderr:stderrValue!==undefined?stderrValue:outcome==="zsh-prefix-denial"?`${args[2]}:2: can't create temp file for here document: operation not permitted\n`:outcome==="stderr"?secret:""};
     },
     createConnection:()=>{const socket=new EventEmitter();socket.destroy=()=>{};socket.setTimeout=()=>{};queueMicrotask(()=>socket.emit("error",{code:"EPERM"}));return socket;},
   });
@@ -776,7 +776,7 @@ for(const tmp of ["/synthetic workspace/.ask-tmp",'/synthetic-$(`touch BAD`);\'"
   const body="ASK_TEMP_CANARY".repeat(8192)+"\n",directory=tmp+"/canary-unique";
   assert.equal(invocations.length,1);
   const {executable,args,options}=invocations[0];assert.equal(executable,"/bin/zsh");
-  assert.equal(args.length,4);assert.equal(args[0],"-c");assert.equal(args[2],"ask-canary");assert.equal(args[3],directory+"/zsh");
+  assert.equal(args.length,4);assert.equal(args[0],"-c");assert.equal(args[2],"zsh");assert.equal(args[3],directory+"/zsh");
   assert.equal(args[1].slice(0,args[1].indexOf("cat <<")),'TMPPREFIX="$1" || exit 1\n');
   assert.equal(createHash("sha256").update(args[1]).digest("hex"),createHash("sha256").update(`TMPPREFIX="$1" || exit 1\ncat <<'ASK_TEMP_END'\n${body}ASK_TEMP_END\n`).digest("hex"));
   assert.ok(!args[1].includes(tmp));
@@ -791,6 +791,14 @@ test("Linux sh heredoc invocation remains unchanged",async()=>{
   assert.equal(invocations[0].executable,"/bin/sh");
   const args=invocations[0].args;assert.equal(args.length,2);assert.equal(args[0],"-c");
   assert.equal(createHash("sha256").update(args[1]).digest("hex"),createHash("sha256").update(`cat <<'ASK_TEMP_END'\n${"ASK_TEMP_CANARY".repeat(8192)}\nASK_TEMP_END\n`).digest("hex"));
+});
+test("zsh prefix keeps fixed diagnostic name and existing line-number classification",async()=>{
+  // Upstream zsh uses the post-command $0 argument as its diagnostic prefix.
+  const {result,shellCalls,cleanup}=await diagnosticCanary("zsh-prefix-denial",undefined,{shell:"/bin/zsh"});
+  assert.equal(shellCalls,1);assert.equal(cleanup.length,2);
+  assert.equal(result.temporary_diagnostics.shell.stderr_classification,"temporary_file_denial_message");
+  assert.equal(result.filesystem.temporary,"fail");
+  assert.throws(()=>assertCanaryResult(result,{temporary:true,diagnostics:true,stderrClassification:true}),/canary/u);
 });
 for(const outcome of ["exit","timeout","stderr","shell-throw","cleanup"])test(`zsh prefix preserves fail-stop and cleanup: ${outcome}`,async()=>{
   const {result,shellCalls,cleanup}=await diagnosticCanary(outcome,undefined,{shell:"/bin/zsh"});

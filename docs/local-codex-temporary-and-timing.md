@@ -136,6 +136,11 @@ unique `canary-*` directory as a positional argument. An independent checked
 The path is never interpolated into shell code; spaces, quotes, substitutions
 and newlines remain argument data. The `/bin/sh` command is unchanged. This
 applies only to the model-free control shell, not model-generated trial commands.
+The fixed `$0` argument is `zsh`, retaining the existing conservative diagnostic
+name; a new line number does not broaden recognition. Upstream
+[argument processing](https://github.com/zsh-users/zsh/blob/zsh-5.9/Src/init.c)
+and [diagnostic formatting](https://github.com/zsh-users/zsh/blob/zsh-5.9/Src/utils.c)
+show why a custom script name would otherwise change the message prefix.
 
 The [official zsh parameter documentation](https://zsh.sourceforge.io/Doc/Release/Parameters.html#index-TMPPREFIX)
 defines `TMPPREFIX` as a filename prefix, with default `/tmp/zsh`. In upstream

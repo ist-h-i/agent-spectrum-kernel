@@ -59,7 +59,7 @@ async function canary(spec) {
       const heredoc=`cat <<'ASK_TEMP_END'\n${body}ASK_TEMP_END\n`;
       // zsh uses TMPPREFIX for heredocs. Keep paths as argv data, after startup files.
       const shellArgs=spec.shell==="/bin/zsh"
-        ? ["-c",`TMPPREFIX="$1" || exit 1\n${heredoc}`,"ask-canary",directory+"/zsh"]
+        ? ["-c",`TMPPREFIX="$1" || exit 1\n${heredoc}`,"zsh",directory+"/zsh"]
         : ["-c",heredoc];
       const shell=spawnSync(spec.shell,shellArgs,
         {env:process.env,encoding:"utf8",timeout:2000,maxBuffer:256*1024});
