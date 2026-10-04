@@ -56,7 +56,12 @@ async function canary(spec) {
       if (readFileSync(file,"utf8")!=="ASK_TEMP_CANARY\n") throw new Error("temporary roundtrip mismatch");
       stages.read="pass";stage="shell";
       const body="ASK_TEMP_CANARY".repeat(8192)+"\n";
-      const shell=spawnSync(spec.shell,["-c",`cat <<'ASK_TEMP_END'\n${body}ASK_TEMP_END\n`],
+      const heredoc=`cat <<'ASK_TEMP_END'\n${body}ASK_TEMP_END\n`;
+      // zsh uses TMPPREFIX for heredocs. Keep paths as argv data, after startup files.
+      const shellArgs=spec.shell==="/bin/zsh"
+        ? ["-c",`TMPPREFIX="$1" || exit 1\n${heredoc}`,"ask-canary",directory+"/zsh"]
+        : ["-c",heredoc];
+      const shell=spawnSync(spec.shell,shellArgs,
         {env:process.env,encoding:"utf8",timeout:2000,maxBuffer:256*1024});
       const checks={exit_zero:shell.status===0,no_error:!shell.error,no_signal:!shell.signal,stdout_matches:shell.stdout===body,stderr_empty:shell.stderr===""};
       temporaryDiagnostics.shell={status:Number.isInteger(shell.status)&&shell.status>=0&&shell.status<=255?shell.status:null,

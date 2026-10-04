@@ -127,3 +127,40 @@ compatibility. Evidence is model-free inline I/O mocks, synthetic lifecycle and
 shared tests, repository validation and independent review. This local slice
 makes no real-host, root-cause, performance, CI or merge-readiness claim and
 includes no real calls, old-evidence changes, host/auth changes or publication.
+
+## Mac control heredoc prefix
+
+The `/bin/zsh` control branch passes a `zsh` filename prefix inside its existing
+unique `canary-*` directory as a positional argument. An independent checked
+`TMPPREFIX="$1" || exit 1` assignment precedes the unchanged quoted heredoc.
+The path is never interpolated into shell code; spaces, quotes, substitutions
+and newlines remain argument data. The `/bin/sh` command is unchanged. This
+applies only to the model-free control shell, not model-generated trial commands.
+
+The [official zsh parameter documentation](https://zsh.sourceforge.io/Doc/Release/Parameters.html#index-TMPPREFIX)
+defines `TMPPREFIX` as a filename prefix, with default `/tmp/zsh`. In upstream
+[zsh 5.9 heredoc handling](https://github.com/zsh-users/zsh/blob/zsh-5.9/Src/exec.c),
+`getherestr` calls `gettempfile(NULL, ...)`; the
+[temporary-file implementation](https://github.com/zsh-users/zsh/blob/zsh-5.9/Src/utils.c)
+uses `TMPPREFIX`, rather than `TMPDIR`, `TMP` or `TEMP`, on that path. Setting
+the shell parameter in the command after startup files avoids relying solely
+on an imported environment value. This supports the routing choice, but does
+not establish the actual host binary's behavior or repair of a host failure.
+
+Cleanup and all five success predicates remain required. No deny, filesystem
+grant, heredoc payload, diagnostic schema, time limit or retry policy changes.
+Saved v1–v5 records retain explicit validation and sealed replay semantics.
+Mocks inspect generated arguments, shell failure/unknown and cleanup without
+launching a real shell. They cannot verify real Mac, Linux or WSL execution.
+
+Implementation Contract: `issue315-zsh-prefix-implementation@1`, upstream
+`issue315-stderr-classification-implementation@1`; C14 is limited to this zsh
+command generation, synthetic tests and documentation. Formal Verification
+Contract: `issue315-zsh-prefix-verification@1`, retaining O1–O13 and policy
+`ask.verification-proof-policy@1.0.0`. O14 proves positional prefix delivery,
+independent assignment before intact heredoc and unchanged Linux invocation.
+O15 proves failure/unknown rejection, single invocation, cleanup and saved
+diagnostic compatibility. E14–E15 are inline I/O mocks; final-source lifecycle
+tests, validator, independent review and submitted-head CI complete development
+evidence. Real shell/CLI/control/model runs, grants, host settings and old
+experiment mutation are excluded; actual host effectiveness remains unknown.

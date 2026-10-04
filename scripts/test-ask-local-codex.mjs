@@ -746,11 +746,11 @@ test("candidate session comparison ignores object key and entry order",()=>{
   assert.throws(()=>declaredSessionEntries({entries,workspace,denyRoots,runtimeParent:"/synthetic/home/tmp/arg0"}));
 });
 
-async function diagnosticCanary(outcome="pass",stderrValue) {
+async function diagnosticCanary(outcome="pass",stderrValue,{shell="/synthetic-shell",tmp="/synthetic-workspace/.ask-tmp"}={}) {
   const {createHash}=await import("node:crypto");
-  const tmp="/synthetic-workspace/.ask-tmp", spec={publicFile:"public",allowedWrite:"write",deniedReads:["private"],deniedWrite:"other",temporaryDirectory:tmp,shell:"/synthetic-shell",endpoints:[{host:"127.0.0.1"},{host:"::1"}]};
+  const spec={publicFile:"public",allowedWrite:"write",deniedReads:["private"],deniedWrite:"other",temporaryDirectory:tmp,shell,endpoints:[{host:"127.0.0.1"},{host:"::1"}]};
   const env=Object.fromEntries(["TMPDIR","TMP","TEMP"].map(k=>[k,outcome==="environment"?"/wrong":tmp]));
-  const files=new Map();let output="",shellCalls=0;
+  const files=new Map(),invocations=[],cleanup=[];let output="",shellCalls=0;
   const secret="PRIVATE_PATH_TOKEN_must_not_be_recorded";
   const error=()=>Object.assign(Error(secret),{code:outcome==="other-error"?secret:outcome==="timeout"?"ETIMEDOUT":outcome==="buffer"?"ENOBUFS":"EPERM"});
   await runInNewContext(`(async()=>{${INLINE_CANARY_MODULE_SOURCE.replace(/^import .*;\n/gmu,"")}})()`,{
@@ -758,18 +758,46 @@ async function diagnosticCanary(outcome="pass",stderrValue) {
     readFileSync:p=>p==="public"?"ASK_PUBLIC_CANARY\n":outcome==="read"?"wrong":files.get(p),
     writeFileSync:(p,v)=>{if(p.endsWith("roundtrip.txt")&&outcome==="write")throw error();files.set(p,v);},
     mkdtempSync:p=>{if(outcome==="directory")throw error();return p+"unique";},
-    unlinkSync:p=>{files.delete(p);},rmdirSync:()=>{if(outcome==="cleanup")throw error();},
+    unlinkSync:p=>{cleanup.push(["unlink",p]);files.delete(p);},rmdirSync:p=>{cleanup.push(["rmdir",p]);if(outcome==="cleanup")throw error();},
     openSync:()=>{throw error();},closeSync:()=>{},
-    spawnSync:(_shell,args)=>{
+    spawnSync:(executable,args,options)=>{
+      invocations.push({executable,args,options});
       shellCalls++;if(outcome==="shell-throw")throw error();
       return {status:outcome==="exit"?2:0,error:["error","other-error","timeout","buffer"].includes(outcome)?error():undefined,
-        signal:outcome==="signal"?"SIGKILL":null,stdout:outcome==="stdout"?secret:outcome==="missing-output"?null:args[1].split("\n")[1]+"\n",
+        signal:outcome==="signal"?"SIGKILL":null,stdout:outcome==="stdout"?secret:outcome==="missing-output"?null:args[1].split("cat <<'ASK_TEMP_END'\n")[1].split("ASK_TEMP_END\n")[0],
         stderr:stderrValue!==undefined?stderrValue:outcome==="stderr"?secret:""};
     },
     createConnection:()=>{const socket=new EventEmitter();socket.destroy=()=>{};socket.setTimeout=()=>{};queueMicrotask(()=>socket.emit("error",{code:"EPERM"}));return socket;},
   });
-  assert.ok(!output.includes(secret));return {result:JSON.parse(output),shellCalls};
+  assert.ok(!output.includes(secret));return {result:JSON.parse(output),shellCalls,invocations,cleanup,files};
 }
+for(const tmp of ["/synthetic workspace/.ask-tmp",'/synthetic-$(`touch BAD`);\'"\\\nΩ/.ask-tmp'])test(`zsh prefix is positional data inside owned canary directory ${JSON.stringify(tmp)}`,async()=>{
+  const {result,invocations,cleanup,files}=await diagnosticCanary("pass",undefined,{shell:"/bin/zsh",tmp});
+  const body="ASK_TEMP_CANARY".repeat(8192)+"\n",directory=tmp+"/canary-unique";
+  assert.equal(invocations.length,1);
+  const {executable,args,options}=invocations[0];assert.equal(executable,"/bin/zsh");
+  assert.equal(args.length,4);assert.equal(args[0],"-c");assert.equal(args[2],"ask-canary");assert.equal(args[3],directory+"/zsh");
+  assert.equal(args[1].slice(0,args[1].indexOf("cat <<")),'TMPPREFIX="$1" || exit 1\n');
+  assert.equal(createHash("sha256").update(args[1]).digest("hex"),createHash("sha256").update(`TMPPREFIX="$1" || exit 1\ncat <<'ASK_TEMP_END'\n${body}ASK_TEMP_END\n`).digest("hex"));
+  assert.ok(!args[1].includes(tmp));
+  assert.equal(options.timeout,2000);assert.equal(options.maxBuffer,256*1024);
+  for(const key of ["TMPDIR","TMP","TEMP"])assert.equal(options.env[key],tmp);
+  assert.deepEqual(cleanup,[["unlink",directory+"/roundtrip.txt"],["rmdir",directory]]);assert.equal(files.has(directory+"/roundtrip.txt"),false);
+  assertCanaryResult(result,{temporary:true,diagnostics:true,stderrClassification:true});
+  assert.ok(!JSON.stringify(result).includes(tmp));
+});
+test("Linux sh heredoc invocation remains unchanged",async()=>{
+  const {invocations}=await diagnosticCanary("pass",undefined,{shell:"/bin/sh"});
+  assert.equal(invocations[0].executable,"/bin/sh");
+  const args=invocations[0].args;assert.equal(args.length,2);assert.equal(args[0],"-c");
+  assert.equal(createHash("sha256").update(args[1]).digest("hex"),createHash("sha256").update(`cat <<'ASK_TEMP_END'\n${"ASK_TEMP_CANARY".repeat(8192)}\nASK_TEMP_END\n`).digest("hex"));
+});
+for(const outcome of ["exit","timeout","stderr","shell-throw","cleanup"])test(`zsh prefix preserves fail-stop and cleanup: ${outcome}`,async()=>{
+  const {result,shellCalls,cleanup}=await diagnosticCanary(outcome,undefined,{shell:"/bin/zsh"});
+  assert.equal(shellCalls,1);assert.equal(cleanup.length,2);
+  assert.equal(result.filesystem.temporary,["shell-throw","cleanup"].includes(outcome)?"unknown":"fail");
+  assert.throws(()=>assertCanaryResult(result,{temporary:true,diagnostics:true,stderrClassification:true}),/canary/u);
+});
 for(const [outcome,check] of [["pass",null],["exit","exit_zero"],["error","no_error"],["signal","no_signal"],["stdout","stdout_matches"],["stderr","stderr_empty"],["missing-output","stdout_matches"],["other-error","no_error"],["timeout","no_error"],["buffer","no_error"]])test(`bounded shell diagnostics separate condition: ${outcome}`,async()=>{
   const {result,shellCalls}=await diagnosticCanary(outcome);
   assert.equal(result.kind,"ask_codex_canary_v5");assert.equal(shellCalls,1);
