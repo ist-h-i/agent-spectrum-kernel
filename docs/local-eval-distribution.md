@@ -12,6 +12,17 @@ startup-zero-traffic admission is separate/unavailable and is not required by
 ordinary distribution. No guest/VM/Docker implementation or requirement is added.
 This correction is source/mock-only; native real-OS verification remains unmet.
 
+## Current priority: Mac value evidence
+
+The three-OS distribution goal remains unchanged. Linux native, Windows WSL2
+and optional Docker real-host verification are deferred follow-up work while
+[Mac three-condition ASK value screening](mac-kernel-value-screening.md) prepares a bounded
+engineering comparison. Cross-platform setup is not a prerequisite for that
+investigation. The proposed ASKなし/Kernelのみ/Full ASK conditions are not yet implemented by
+the two-slot runner, and do not complete the four-condition ASK portfolio.
+Neither CI nor the fixed JSON pilot establishes practical value.
+#198, #291 and #285/#286 retain their protocols and acceptance criteria.
+
 ## Route decision
 
 Choose a shared Node controller/scorer/store with POSIX process-group cleanup
