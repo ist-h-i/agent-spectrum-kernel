@@ -83,6 +83,13 @@ test("required imports/references fail closed without evaluating packaged module
   writeFileSync(join(root, "AGENTS.md"), 'Read `docs/missing.md`.');
   assert.ok(inspectPackageClosure(root).violations.some(v => v.reason === "instruction_reference_unresolved"));
   assert.ok(inspectPackageClosure(root, ["skills/review-router/SKILL.md"]).violations.some(v => v.reason === "required_asset_missing"));
+  for (const reference of ["file:///definitely-absent-static-test", "/definitely-absent-static-test"]) {
+    writeFileSync(join(root, "AGENTS.md"), `[outside](${reference})`);
+    assert.ok(inspectPackageClosure(root).violations.some(v => v.reason === "reference_escape"));
+  }
+  writeFileSync(join(root, "AGENTS.md"), "[unknown](skill://unknown-package)");
+  assert.ok(inspectPackageClosure(root).violations.some(v => v.reason === "unsupported_reference"));
+  writeFileSync(join(root, "AGENTS.md"), "Read `docs/missing.md`. [external](https://example.com/docs)");
   mkdirSync(join(root, "docs"));
   writeFileSync(join(root, "docs/missing.md"), "Now present.");
   const closed = inspectPackageClosure(root, ["scripts/main.mjs"]);

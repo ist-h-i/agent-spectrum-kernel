@@ -126,7 +126,15 @@ export function inspectPackageClosure(root, requiredPaths = []) {
       }
       for (const m of text.matchAll(/\]\(([^\s)]+)\)/gu)) {
         const ref = m[1].split("#")[0];
-        if (!ref || /^[a-z][a-z0-9+.-]*:/iu.test(ref)) continue;
+        if (!ref || /^(?:https?|mailto):/iu.test(ref)) continue;
+        if (isAbsolute(ref) || /^file:/iu.test(ref)) {
+          violations.push({ path, reference: ref, reason: "reference_escape" });
+          continue;
+        }
+        if (/^[a-z][a-z0-9+.-]*:/iu.test(ref)) {
+          violations.push({ path, reference: ref, reason: "unsupported_reference" });
+          continue;
+        }
         const target = posix.normalize(posix.join(posix.dirname(path), ref));
         references.push({ path, reference: target, kind: "local_markdown_link" });
         if (!safePath(target)) violations.push({ path, reference: ref, reason: "reference_escape" });
