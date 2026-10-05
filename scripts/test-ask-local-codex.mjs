@@ -189,11 +189,11 @@ function prepared(t, options = {}) {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const home = join(dir, "owned-home"), parent = join(dir, "workspaces"), runtimeRoot = join(dir,"runtime");
   mkdirSync(home, { mode: 0o700 }); mkdirSync(parent, { mode: 0o700 }); mkdirSync(runtimeRoot,{mode:0o700});
-  const {readPolicy,timePolicy,...simulationOptions}=options;
+  const {readPolicy,timePolicy,tokenPolicy,...simulationOptions}=options;
   const protectedRoot=join(dir,"old-grading-copy");
   if(readPolicy===true) { mkdirSync(protectedRoot,{mode:0o700});writeFileSync(join(protectedRoot,"synthetic-answer.txt"),"synthetic",{mode:0o600}); }
   const selection=readPolicy===true ? {kind:DECLARED_READ_POLICY,riskAcknowledged:true,protectedRootsComplete:true,protectedRoots:[protectedRoot]} : readPolicy;
-  const result = prepareCodexConnection({ ...(selection!==undefined ? {readPolicy:selection} : {}), ...(timePolicy?{timePolicy}:{}), privateRoot: join(dir, "evidence"), workspaceParent: parent, codexHome: home, runtimeRoot }, { simulation: true, ...simulationOptions });
+  const result = prepareCodexConnection({ ...(selection!==undefined ? {readPolicy:selection} : {}), ...(timePolicy?{timePolicy}:{}), ...(tokenPolicy?{tokenPolicy}:{}), privateRoot: join(dir, "evidence"), workspaceParent: parent, codexHome: home, runtimeRoot }, { simulation: true, ...simulationOptions });
   return { ...result, home, dir, plan: json(join(result.privateRoot, "connection.json")), base: json(join(result.privateRoot, "plan.json")) };
 }
 function snapshot(root) {
@@ -904,4 +904,52 @@ test("time policy cannot be widened or attached to a legacy plan",t=>{
   writeFileSync(join(privateRoot,"connection.json"),JSON.stringify(plan));
   writeFileSync(join(privateRoot,"connection-digest.json"),JSON.stringify({digest:canonicalDigest(plan)}));
   assert.throws(()=>reopenCodexConnection(privateRoot),/legacy plan cannot acquire/);
+});
+
+// Public synthetic budget cases; no private experiment records are fixtures.
+const {CODEX_COMPARISON_TOKEN_POLICY,codexTokenThreshold}=await import("./ask-local-codex.mjs");
+const selectedBudget=()=>({timePolicy:CODEX_TIME_POLICY,tokenPolicy:CODEX_COMPARISON_TOKEN_POLICY});
+for(const broad of [false,true])test(`comparison token budget is explicit and source/permission/replay bound: ${broad}`,async t=>{
+  assert.ok(CODEX_COMPARISON_TOKEN_POLICY);
+  const {privateRoot,plan,base}=prepared(t,{...selectedBudget(),readPolicy:broad?true:undefined,scenarios:["threshold","pass"]});
+  assert.equal(plan.kind,broad?"ask_local_codex_connection_v7":"ask_local_codex_connection_v6");
+  assert.equal(plan.constraints.trial_tokens,50000);assert.equal(plan.constraints.cumulative_tokens,100000);
+  assert.equal(plan.constraints.timeout_ms,240000);assert.equal(plan.constraints.retry,0);
+  const oldShape={...plan,kind:broad?"ask_local_codex_connection_v5":"ask_local_codex_connection_v4"};delete oldShape.token_policy;
+  assert.deepEqual(codexConnectionCommand(plan,base),codexConnectionCommand(oldShape,base));
+  const grant=codexPhasePermission(plan,"evaluate","fresh-synthetic-budget-approval");assert.deepEqual(grant.token_policy,CODEX_COMPARISON_TOKEN_POLICY);
+  const report=await evaluateCodexConnection(privateRoot);assert.equal(report.stop,null);assert.equal(report.slots[1].state,"completed");assert.deepEqual(report.token_policy,CODEX_COMPARISON_TOKEN_POLICY);
+  const before=snapshot(privateRoot);assert.deepEqual(reopenCodexConnection(privateRoot),report);assert.deepEqual(snapshot(privateRoot),before);
+});
+for(const [scenario,total,stop] of [["token-below",49999,null],["token-at",50000,"trial_token_threshold"],["token-over",50001,"trial_token_threshold"],["unknown-usage",null,"usage_unknown"]])test(`comparison token threshold ${scenario}`,async t=>{
+  assert.ok(CODEX_COMPARISON_TOKEN_POLICY);
+  const {privateRoot}=prepared(t,{...selectedBudget(),scenarios:[scenario,"pass"]});const report=await evaluateCodexConnection(privateRoot);
+  assert.equal(report.stop,stop);assert.equal(report.slots[0].usage.value,total);assert.equal(report.slots[1].state,stop?"not_started":"completed");assert.equal(report.retry,0);assert.deepEqual(reopenCodexConnection(privateRoot),report);
+});
+test("comparison cumulative accounting uses the same known totals for both conditions",async t=>{
+  assert.ok(CODEX_COMPARISON_TOKEN_POLICY);
+  const {privateRoot,plan}=prepared(t,{...selectedBudget(),scenarios:["token-below","token-below"]});const report=await evaluateCodexConnection(privateRoot);
+  assert.equal(report.total_known_tokens,99998);assert.equal(report.stop,null);
+  for(const [value,stop] of [[99999,null],[100000,"cumulative_token_threshold"],[100001,"cumulative_token_threshold"]])assert.equal(codexTokenThreshold(plan,value,"cumulative"),stop);
+  assert.throws(()=>codexTokenThreshold(plan,NaN,"cumulative"));assert.throws(()=>codexTokenThreshold(plan,-1,"trial"));assert.throws(()=>codexTokenThreshold(plan,10,"unknown"));
+});
+test("comparison policy is closed, requires time policy and cannot widen a legacy plan",t=>{
+  assert.ok(CODEX_COMPARISON_TOKEN_POLICY);
+  for(const tokenPolicy of [{...CODEX_COMPARISON_TOKEN_POLICY,trial_tokens:999999},{...CODEX_COMPARISON_TOKEN_POLICY,extra:true}])assert.throws(()=>prepared(t,{timePolicy:CODEX_TIME_POLICY,tokenPolicy}),/token policy/);
+  assert.throws(()=>prepared(t,{tokenPolicy:CODEX_COMPARISON_TOKEN_POLICY}),/time policy/);
+  const {privateRoot,plan}=prepared(t,{timePolicy:CODEX_TIME_POLICY});plan.token_policy=CODEX_COMPARISON_TOKEN_POLICY;
+  writeFileSync(join(privateRoot,"connection.json"),JSON.stringify(plan));writeFileSync(join(privateRoot,"connection-digest.json"),JSON.stringify({digest:canonicalDigest(plan)}));
+  assert.throws(()=>reopenCodexConnection(privateRoot),/legacy plan cannot acquire token policy/);
+});
+for(const variant of ["old","missing","changed"])test(`comparison exact permission rejects ${variant} budget before claims`,t=>{
+  assert.ok(CODEX_COMPARISON_TOKEN_POLICY);
+  const {privateRoot,plan}=prepared(t,selectedBudget());plan.mode="planned_live";
+  writeFileSync(join(privateRoot,"connection.json"),JSON.stringify(plan));
+  writeFileSync(join(privateRoot,"connection-digest.json"),JSON.stringify({digest:canonicalDigest(plan)}));
+  writeFileSync(join(plan.runtime.root,"runtime-owner.json"),JSON.stringify({kind:"owned_external_runtime_v1",evidence_root:privateRoot,plan_digest:canonicalDigest(plan)}));
+  let grant=codexPhasePermission(plan,"evaluate","fresh-synthetic-budget-approval");
+  if(variant==="old") {const old={...plan,kind:"ask_local_codex_connection_v4"};delete old.token_policy;grant=codexPhasePermission(old,"evaluate","old-synthetic-budget-approval");}
+  else if(variant==="missing")delete grant.token_policy;
+  else grant.token_policy={...grant.token_policy,trial_tokens:60000};
+  const before=snapshot(privateRoot);assert.throws(()=>evaluateCodexConnection(privateRoot,grant),/fresh exact phase permission/);assert.deepEqual(snapshot(privateRoot),before);
 });

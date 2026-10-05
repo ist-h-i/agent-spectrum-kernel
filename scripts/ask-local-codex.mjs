@@ -23,16 +23,26 @@ const PLAN = "connection.json", REPORT = "connection-report.json";
 export const DECLARED_READ_POLICY = "declared_denies_read_only_v1";
 const BROAD_PLAN = "ask_local_codex_connection_v3";
 const TIMED_CLOSED = "ask_local_codex_connection_v4", TIMED_BROAD = "ask_local_codex_connection_v5";
-const broadPlan = plan => [BROAD_PLAN, TIMED_BROAD].includes(plan.kind);
-const timedPlan = plan => [TIMED_CLOSED, TIMED_BROAD].includes(plan.kind);
-const modernPlan = plan => ["ask_local_codex_connection_v2", BROAD_PLAN, TIMED_CLOSED, TIMED_BROAD].includes(plan.kind);
-const connectionLimits = plan => ({...PILOT_LIMITS, ...(timedPlan(plan)?{timeout_ms:CODEX_TIME_POLICY.absolute_ms}:{})});
+const BUDGET_CLOSED = "ask_local_codex_connection_v6", BUDGET_BROAD = "ask_local_codex_connection_v7";
+export const CODEX_COMPARISON_TOKEN_POLICY = Object.freeze({kind:"codex_comparison_token_budget_v1",trial_tokens:50000,cumulative_tokens:100000,accounting:"input_plus_output_including_cached",enforcement:"post_trial",retry:0});
+const budgetPlan = plan => [BUDGET_CLOSED,BUDGET_BROAD].includes(plan.kind);
+function assertTokenPolicy(policy) {
+  if(!same(policy,CODEX_COMPARISON_TOKEN_POLICY))throw new Error("closed comparison token policy required");
+}
+const broadPlan = plan => [BROAD_PLAN, TIMED_BROAD, BUDGET_BROAD].includes(plan.kind);
+const timedPlan = plan => [TIMED_CLOSED, TIMED_BROAD, BUDGET_CLOSED, BUDGET_BROAD].includes(plan.kind);
+const modernPlan = plan => ["ask_local_codex_connection_v2", BROAD_PLAN, TIMED_CLOSED, TIMED_BROAD, BUDGET_CLOSED, BUDGET_BROAD].includes(plan.kind);
+const connectionLimits = plan => ({...PILOT_LIMITS, ...(timedPlan(plan)?{timeout_ms:CODEX_TIME_POLICY.absolute_ms}:{}), ...(budgetPlan(plan)?{trial_tokens:CODEX_COMPARISON_TOKEN_POLICY.trial_tokens,cumulative_tokens:CODEX_COMPARISON_TOKEN_POLICY.cumulative_tokens}:{})});
+export function codexTokenThreshold(plan,total,scope) {
+  if(!Number.isSafeInteger(total)||total<0||!["trial","cumulative"].includes(scope))throw new Error("known token total and closed scope required");
+  return total>=connectionLimits(plan)[`${scope}_tokens`]?`${scope}_token_threshold`:null;
+}
 export const READ_POLICY_RISK = Object.freeze({
   read_access:"host_reads_except_declared_denies", personal_files:"not_isolated", other_credential_stores:"not_isolated",
   unlisted_grading_copies:"not_guaranteed_denied", tool_outputs:"may_be_transmitted_to_openai_despite_tool_network_deny",
   inventory:"operator_assertion_not_discovery", runtime_verification:"not_established_by_simulation" });
 export const CODEX_CONNECTION_VERSION = "0.157.1";
-export const CONNECTION_SCENARIOS = ["pass", "wrong", "malformed", "unknown", "threshold", "exit", "timeout", "identity", "missing-session", "reused-session", "provider", "interrupt", "scope-leak", "scratch-replaced", "scratch-removed", "time-identity", "duplicate-start"];
+export const CONNECTION_SCENARIOS = ["pass", "wrong", "malformed", "unknown", "threshold", "exit", "timeout", "identity", "missing-session", "reused-session", "provider", "interrupt", "scope-leak", "scratch-replaced", "scratch-removed", "time-identity", "duplicate-start", "token-below", "token-at", "token-over", "unknown-usage"];
 const hash = value => `sha256:${createHash("sha256").update(value).digest("hex")}`;
 const bytes = (path, max = 1048576) => readStableFile(path, "connection evidence", max).bytes;
 const read = path => parseJsonRejectDuplicateKeys(new TextDecoder("utf-8", { fatal: true }).decode(bytes(path)));
@@ -173,9 +183,13 @@ function assertModelToolBoundary(plan, base) {
 /** No Codex subprocess, credential file access, link, copy or auth configuration. */
 export function prepareCodexConnection(descriptor, { simulation = false, scenarios = ["pass", "pass"], probePass = true, probeOutcome = "pass", fakeTimeoutMs = null, host = null } = {}) {
   if (!descriptor || typeof descriptor !== "object" || Array.isArray(descriptor)
-    || Object.keys(descriptor).some(key => !["privateRoot", "workspaceParent", "codexHome", "runtimeRoot", "executable", "imageDigest", "readPolicy", "timePolicy"].includes(key))) throw new Error("closed connection descriptor required");
+    || Object.keys(descriptor).some(key => !["privateRoot", "workspaceParent", "codexHome", "runtimeRoot", "executable", "imageDigest", "readPolicy", "timePolicy", "tokenPolicy"].includes(key))) throw new Error("closed connection descriptor required");
   const optIn=descriptor.readPolicy;
   if(descriptor.timePolicy!==undefined)assertTimePolicy(descriptor.timePolicy);
+  if(descriptor.tokenPolicy!==undefined) {
+    assertTokenPolicy(descriptor.tokenPolicy);
+    if(descriptor.timePolicy===undefined)throw new Error("comparison token policy requires time policy");
+  }
   if (optIn!==undefined && (!exactKeys(optIn,["kind","riskAcknowledged","protectedRootsComplete","protectedRoots"])
     || optIn.kind!==DECLARED_READ_POLICY || optIn.riskAcknowledged!==true || optIn.protectedRootsComplete!==true
     || !Array.isArray(optIn.protectedRoots) || optIn.protectedRoots.length>128
@@ -212,13 +226,14 @@ export function prepareCodexConnection(descriptor, { simulation = false, scenari
   const base = readPilotPlan(prepared.privateRoot);
   const runtime = {kind:RUNTIME_LAYOUT, root:runtimeRoot, identity}; runtimeShape(runtime,base,codexHome);
   for (const root of [base.private_root, base.workspace_root]) if (within(root, codexHome) || within(codexHome, root)) throw new Error("overlapping session/evidence/workspace roots");
-  const plan = { kind: descriptor.timePolicy ? optIn ? TIMED_BROAD : TIMED_CLOSED : optIn ? BROAD_PLAN : "ask_local_codex_connection_v2", mode: simulation ? "simulation" : "planned_live", base_digest: prepared.planDigest,
+  const plan = { kind: descriptor.tokenPolicy ? optIn ? BUDGET_BROAD : BUDGET_CLOSED : descriptor.timePolicy ? optIn ? TIMED_BROAD : TIMED_CLOSED : optIn ? BROAD_PLAN : "ask_local_codex_connection_v2", mode: simulation ? "simulation" : "planned_live", base_digest: prepared.planDigest,
     source: source(), host: observed.host, route_host: routeHost, route: selected.route, cli: { version: CODEX_CONNECTION_VERSION, executable, image_digest: image.rawByteDigest },
     codex_home: codexHome, home_identity:homeIdentity, runtime, read_roots:optIn ? [] : closedReadRoots(observed.host.platform, base.node.executable, executable),
     ...(optIn ? {read_policy:{kind:DECLARED_READ_POLICY,risk_acknowledged:true,protected_roots_complete:true,risk:structuredClone(READ_POLICY_RISK),
       protected_roots:optIn.protectedRoots.slice().sort().map(path=>({path,identity:protectedIdentity(path)}))}} : {}), auth: "existing_file_store_cli_only_no_controller_credential_operations",
     guard: observed.host.platform === "darwin" ? { executable:"/usr/bin/sandbox-exec", image_digest:hash(bytes("/usr/bin/sandbox-exec")) } : null,
-    constraints: {...PILOT_LIMITS,...(descriptor.timePolicy?{timeout_ms:CODEX_TIME_POLICY.absolute_ms}:{})},
+    constraints: {...PILOT_LIMITS,...(descriptor.timePolicy?{timeout_ms:CODEX_TIME_POLICY.absolute_ms}:{}),...(descriptor.tokenPolicy?{trial_tokens:CODEX_COMPARISON_TOKEN_POLICY.trial_tokens,cumulative_tokens:CODEX_COMPARISON_TOKEN_POLICY.cumulative_tokens}:{})},
+    ...(descriptor.tokenPolicy?{token_policy:structuredClone(CODEX_COMPARISON_TOKEN_POLICY)}:{}),
     ...(descriptor.timePolicy?{time_policy:structuredClone(CODEX_TIME_POLICY)}:{}), scenarios, probe_pass: probePass, probe_outcome:probeOutcome, fake_timeout_ms: fakeTimeoutMs,
     live_ready: false, admission: "not_exercised", synthetic_host: host !== null,
     execution_route:"trusted_cli_lightweight_v1" };
@@ -235,7 +250,7 @@ export function prepareCodexConnection(descriptor, { simulation = false, scenari
 
 function readConnection(root, current = false) {
   const base = readPilotPlan(root), plan = read(join(root, PLAN));
-  if (!["ask_local_codex_connection_v1", "ask_local_codex_connection_v2", BROAD_PLAN, TIMED_CLOSED, TIMED_BROAD].includes(plan.kind) || !["simulation", "planned_live"].includes(plan.mode)
+  if (!["ask_local_codex_connection_v1", "ask_local_codex_connection_v2", BROAD_PLAN, TIMED_CLOSED, TIMED_BROAD, BUDGET_CLOSED, BUDGET_BROAD].includes(plan.kind) || !["simulation", "planned_live"].includes(plan.mode)
     || plan.base_digest !== canonicalDigest(base) || canonicalDigest(plan) !== read(join(root, "connection-digest.json")).digest
     || plan.cli.version !== CODEX_CONNECTION_VERSION || plan.live_ready !== false
     || plan.route !== selectLocalRoute(plan.route_host).route || !selectLocalRoute(plan.route_host).fake_ready
@@ -243,6 +258,8 @@ function readConnection(root, current = false) {
     || plan.scenarios.length !== 2 || plan.scenarios.some(value => !CONNECTION_SCENARIOS.includes(value))
     || (plan.mode === "planned_live" && (plan.synthetic_host || !same(plan.host, plan.route_host)
       || !same(plan.scenarios, ["pass", "pass"]) || !plan.probe_pass || plan.fake_timeout_ms !== null))) throw new Error("connection plan drift");
+  if(budgetPlan(plan))assertTokenPolicy(plan.token_policy);
+  else if(plan.token_policy!==undefined)throw new Error("legacy plan cannot acquire token policy");
   if(timedPlan(plan))assertTimePolicy(plan.time_policy);
   else if(plan.time_policy!==undefined)throw new Error("legacy plan cannot acquire time policy");
   assertReadPolicy(plan,base,current);
@@ -398,10 +415,11 @@ export function codexPhasePermission(plan, phase, approvalRef, admissionDigest =
   if (!["probe","evaluate"].includes(phase) || typeof approvalRef !== "string" || approvalRef.length < 10) throw new Error("explicit phase/approval reference required");
   if (phase === "evaluate") {
     if(timedPlan(plan))assertTimePolicy(plan.time_policy);
+    if(budgetPlan(plan))assertTokenPolicy(plan.token_policy);
     if (!modernPlan(plan) || admissionDigest !== null || plan.execution_route!=="trusted_cli_lightweight_v1" || !same(plan.trusted_cli_policy,codexLightweightPolicy(plan))) throw new Error("fresh lightweight permission requires trusted CLI contract; no strict admission grant");
     return {kind:broadPlan(plan) ? "ask_local_codex_declared_read_permission_v1" : "ask_local_codex_lightweight_permission_v1",phase,plan_digest:canonicalDigest(plan),source_digest:canonicalDigest(plan.source),
       cli_image_digest:plan.cli.image_digest,command_digest:canonicalDigest(plan.command),route:plan.route,runtime:plan.runtime,
-      trusted_cli_policy:plan.trusted_cli_policy,...(timedPlan(plan)?{time_policy:plan.time_policy}:{}),approval_ref:approvalRef,
+      trusted_cli_policy:plan.trusted_cli_policy,...(budgetPlan(plan)?{token_policy:plan.token_policy}:{}),...(timedPlan(plan)?{time_policy:plan.time_policy}:{}),approval_ref:approvalRef,
       actions:{controls:1,probes:0,trials:2,retry:0,existing_home_cli_read_refresh:true,existing_home_new_session_write:true,
         cli_startup_external_network_zero:false,openai_model_auth_managed_config_network:true}};
   }
@@ -528,7 +546,7 @@ function trial(plan, base, condition) {
   const stop = proc.error || proc.status !== 0 || proc.signal || proc.workspace_descendants_detected || process.output_limited ? "process_failure"
     : !identity ? "session_identity_failure" : !timeIdentity ? "time_identity_failure" : grade.status === "boundary_fault" ? "workspace_boundary_fault"
     : usage.provider_stop.status === "detected" ? "provider_stop" : total.status !== "known" ? "usage_unknown"
-    : total.value >= PILOT_LIMITS.trial_tokens ? "trial_token_threshold" : null;
+    : codexTokenThreshold(plan,total.value,"trial");
   return { condition, state: "completed", process, grade, final_format: pilotFinalFormat(join(root, "final.json")), usage: total,
     session_id: identity?.session_id ?? null, timing, ...(timedPlan(plan)?{time_budget:proc.time_budget}:{}), stop };
   };
@@ -547,7 +565,7 @@ export function evaluateCodexConnection(root, permission = null) {
   if (plan.mode === "planned_live") save(join(root,"home-metadata-before.json"),inspectExistingCodexHome(plan.codex_home));
   if (permission) save(join(root,"connection-permission.json"),permission);
   save(join(root, "connection-run-claim.json"), { state: "spent", plan_digest: canonicalDigest(plan), permission_digest: permission ? canonicalDigest(permission) : null });
-  const report = { kind: "ask_local_codex_report_v1", ...(broadPlan(plan) ? {read_policy:plan.read_policy} : {}), mode: plan.mode, plan_digest: canonicalDigest(plan), route: plan.route,
+  const report = { kind: "ask_local_codex_report_v1", ...(budgetPlan(plan)?{token_policy:structuredClone(plan.token_policy)}:{}), ...(broadPlan(plan) ? {read_policy:plan.read_policy} : {}), mode: plan.mode, plan_digest: canonicalDigest(plan), route: plan.route,
     execution_status: "incomplete", retry: 0, model_calls: plan.mode === "simulation" ? 0 : "unobserved",
     credential_operations: plan.mode === "simulation" ? 0 : "cli_read_refresh_unobserved", total_known_tokens: 0, stop: null,
     slots: ["plain", "kernel_only"].map(condition => ({ condition, state: "not_started" })) };
@@ -563,7 +581,7 @@ export function evaluateCodexConnection(root, permission = null) {
     report.slots[index]=outcome;
     if(outcome.session_id && report.slots.slice(0,index).some(prior=>prior.session_id===outcome.session_id))outcome.stop="session_reused";
     report.total_known_tokens+=outcome.usage.status==="known"?outcome.usage.value:0;
-    report.stop=outcome.stop??(report.total_known_tokens>=PILOT_LIMITS.cumulative_tokens?"cumulative_token_threshold":null);
+    report.stop=outcome.stop??codexTokenThreshold(plan,report.total_known_tokens,"cumulative");
     if(plan.mode==="planned_live") {
       try{save(join(root,`home-metadata-after-${index}.json`),inspectExistingCodexHome(plan.codex_home));}
       catch{outcome.home_metadata_status="failed_or_unknown";report.stop="home_metadata_fault";}
@@ -610,7 +628,8 @@ export function reopenCodexConnection(root) {
   if (seal.plan_digest !== canonicalDigest(plan) || !same(seal.files, pilotEvidenceInventory(root))) throw new Error("connection evidence digest mismatch");
   const report = read(join(root, REPORT));
   if (report.kind !== "ask_local_codex_report_v1" || report.mode !== plan.mode || report.plan_digest !== canonicalDigest(plan)
-    || (broadPlan(plan) && !same(report.read_policy,plan.read_policy))) throw new Error("connection report binding mismatch");
+    || (broadPlan(plan) && !same(report.read_policy,plan.read_policy))
+    || (budgetPlan(plan)?!same(report.token_policy,plan.token_policy):report.token_policy!==undefined)) throw new Error("connection report binding mismatch");
   return report;
 }
 

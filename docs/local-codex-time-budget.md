@@ -12,7 +12,9 @@ budgets, not latency percentiles, an SLA, a performance improvement or a guarant
 of completion. Startup causes remain unknown. The 240-second limit covers one
 trial process: two trials can consume 480 seconds, separately from the control,
 grading, persistence and residual-process cleanup. Token limits remain post-trial
-checks (30,000 per trial, 60,000 cumulative), so usage can exceed them.
+checks (30,000 per trial, 60,000 cumulative by default), so usage can exceed them.
+New v6/v7 plans may explicitly select the [comparison token policy](local-codex-token-budget.md)
+without changing this time policy or legacy defaults.
 
 ## Start observation and trust
 

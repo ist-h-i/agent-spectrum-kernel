@@ -88,7 +88,8 @@ if (stage === "probe") {
     const events = [{ type: "thread.started", thread_id: id }, { type: "turn.started" }];
     if(scenario==="duplicate-start")events.push({type:"turn.started"});
     if (scenario === "provider") events.push({ type: "error", code: "usage_limit_exceeded" });
-    else if (scenario !== "unknown") events.push({ type: "turn.completed", usage: { input_tokens: scenario === "threshold" ? 30000 : 100, output_tokens: 20 } });
+    else if (scenario === "unknown-usage") events.push({type:"turn.completed",usage:{}});
+    else if (scenario !== "unknown") events.push({ type: "turn.completed", usage: { input_tokens: scenario === "threshold" ? 30000 : ({"token-below":49979,"token-at":49980,"token-over":49981}[scenario] ?? 100), output_tokens: 20 } });
     process.stdout.write(events.map(event => JSON.stringify(event)).join("\n") + "\n");
     if (scenario === "exit") { process.stderr.write("synthetic failure\n"); process.exitCode = 7; }
     if (scenario === "descendant") spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], { stdio: "ignore" });
