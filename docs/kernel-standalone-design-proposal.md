@@ -133,6 +133,14 @@ normal complete extension package, truthful install state and compatible
 projections. Keep the current frozen Full candidate unchanged as history. An
 old Full combined with a new K overlay is prohibited by the proposed comparison.
 
+Future K-core/Full comparison keeps public task inputs, hidden grading boundary,
+user prompt, model/reasoning settings, runtime/permission policy, time and usage
+accounting, retry policy and persistence/replay rules common. Only the declared
+core/extension treatment differs. Any change to a common factor needs a new
+explicit protocol decision; ordinary distribution does not inherit old strict
+Stage B host requirements. Neither a new definition nor static CI verifies real
+Mac/Windows/Linux model execution.
+
 ## Model-free feasibility inspection plan
 
 Before implementation admission, inspect multiple generic task classes, not the
