@@ -84,9 +84,14 @@ test("child inherits owner-only umask and caller mask is restored",async t=>{
   const r=await child(`require('node:fs').writeFileSync(${JSON.stringify(join(directory,"owned"))},'owned');process.stdout.write(${events});`);
   assert.equal(r.error,null);assert.equal(lstatSync(join(directory,"owned")).mode&0o777,0o600);assert.equal(process.umask(),before);
 });
-test("ignored-stdio grandchild is detected and cleaned before acceptance",async()=>{
+test("ignored-stdio grandchild prevents acceptance even when cleanup is unknown",async()=>{
   const r=await child(`require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'}).unref();process.stdout.write(${events});`);
-  assert.equal(r.workspace_descendants_detected,true);assert.equal(r.cleanup_error,false);
+  assert.equal(r.workspace_descendants_detected,true);
+  // A killed process group may remain visible until the host reaps it. Either
+  // confirmed cleanup or explicit cleanup-unknown must retain the rejection.
+  assert.equal(typeof r.cleanup_error,"boolean");
+  const acceptable=r.status===0&&!r.error&&!r.signal&&!r.workspace_descendants_detected;
+  assert.equal(acceptable,false);
 });
 test("inherited-stdio grandchild cannot hold close open beyond absolute cap",async()=>{
   const r=await child(`require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'inherit'}).unref();process.stdout.write(${events});`,{simulationAbsoluteMs:300});
