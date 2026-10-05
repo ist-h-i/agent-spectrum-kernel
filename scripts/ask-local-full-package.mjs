@@ -14,6 +14,8 @@ const CASE = "mp-ci-evidence-gap";
 const FIXTURE = `benchmarks/fixtures/checkpoint-b2/${CASE}`;
 const CANDIDATE = "docs/mac-ask-full-static-inventory.json";
 const CANDIDATE_DIGEST = "sha256:3634c9ef3801067636d990a63f1793c268390ccb4012a1e2f1c4ac2e5b566bed";
+const SUPPLEMENT = "docs/mac-ask-full-reference-supplement.json";
+const SUPPLEMENT_DIGEST = "sha256:466da3374a9d2311a335ebf7113288dccd1d1c25c9a5b9e278f4d03e61a05b5f";
 const RECORD = "controller/static-preparation.json";
 const CONDITIONS = ["plain", "kernel_only", "full_ask"];
 const HELPER_INPUTS = ["scripts/ask-local-full-package.mjs", "scripts/content-addressed-store.mjs", "scripts/ask-benchmark-stable-file.mjs", "scripts/ask-benchmark-atomic-publication.mjs"];
@@ -80,6 +82,20 @@ function distribution() {
     counts: { skills: plan.skills.length, prompts: plan.prompts.length, commands: plan.commands.length },
   } };
 }
+function supplement(complete) {
+  if (!complete) return { assets: [], identity: null };
+  const raw = bytes(SOURCE, SUPPLEMENT);
+  if (digest(raw) !== SUPPLEMENT_DIGEST) refuse("supplement_manifest_drift");
+  const manifest = json(SOURCE, SUPPLEMENT);
+  const roles = new Set(["conditional_context_template", "example_fixture", "runtime_dependency", "contract_schema", "instruction_contract"]);
+  if (manifest.kind !== "ask_full_reference_supplement_v1" || manifest.base_candidate_digest !== CANDIDATE_DIGEST
+    || manifest.assets.length !== 40 || new Set(manifest.assets.map(x => x.path)).size !== 40) refuse("invalid_supplement");
+  for (const asset of manifest.assets) {
+    if (!/^(?:docs|scripts|schemas)\//u.test(asset.path) || !roles.has(asset.role)
+      || asset.disposition !== "include_exact_source_bytes" || digest(bytes(SOURCE, asset.path)) !== asset.digest) refuse("supplement_source_drift");
+  }
+  return { assets: manifest.assets, identity: { manifest: SUPPLEMENT, digest: SUPPLEMENT_DIGEST, assets: 40, disposition: "include_all_classified_references" } };
+}
 function publicInputs() {
   const manifest = json(SOURCE, `${FIXTURE}/input-manifest.json`), fixture = manifest.fixtures?.[CASE];
   if (!fixture || manifest.scope !== "agent-visible task.md + workspace/**" || !Array.isArray(fixture.files)) refuse("invalid_input_manifest");
@@ -108,8 +124,9 @@ export function inspectPackageClosure(root, requiredPaths = []) {
     const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes(root, path));
     if (path.endsWith(".mjs")) {
       if (/\b(?:import\s*\(|require\s*\()|\b(?:from|import)\s*\/[*\/]/u.test(text)) violations.push({ path, reason: "unsupported_import" });
-      for (const m of text.matchAll(/(?:\bfrom\s*|\bimport\s*)["']([^"']+)["']/gu)) {
+      for (const m of text.matchAll(/(?<!["'`])(?:\bfrom\s*|\bimport\s*)["']([^"'\r\n]+)["']/gu)) {
         const spec = m[1];
+        if (spec.includes("\\")) { violations.push({ path, reference: spec, reason: "unsupported_import" }); continue; }
         if (isBuiltin(spec)) continue;
         if (!spec.startsWith(".")) { violations.push({ path, reference: spec, reason: "import_external" }); continue; }
         const target = posix.normalize(posix.join(posix.dirname(path), spec));
@@ -147,12 +164,13 @@ export function inspectPackageClosure(root, requiredPaths = []) {
 }
 
 /** New private roots only. No rollback/deletion or retry after partial failure. */
-export function prepareStaticFullComparison(root) {
+export function prepareStaticFullComparison(root, options = {}) {
+  if (Object.keys(options).some(x => x !== "complete") || (options.complete !== undefined && typeof options.complete !== "boolean")) refuse("invalid_preparation_options");
   if (typeof process.getuid !== "function" || !/^v24\./u.test(process.version)) refuse("unsupported_static_runtime");
   if (typeof root !== "string" || !isAbsolute(root) || resolve(root) !== root || root === "/") refuse("invalid_new_root");
   if (existsSync(root)) refuse("root_exists");
   if (realpathSync(dirname(root)) !== dirname(root) || root.startsWith(`${SOURCE}/`) || SOURCE.startsWith(`${root}/`)) refuse("unsafe_new_root");
-  const { candidate, plan, identity } = distribution(), inputs = publicInputs();
+  const { candidate, plan, identity } = distribution(), inputs = publicInputs(), extra = supplement(options.complete === true);
   const catalog = json(SOURCE, "benchmarks/portfolio-catalog.json");
   // Catalog metadata only; evaluator/oracle/admission artifacts are not read.
   const item = catalog.fixtures.find(f => f.fixture_id === CASE);
@@ -170,7 +188,8 @@ export function prepareStaticFullComparison(root) {
           { cwd: SOURCE, env: { PATH: "" }, timeout: 10000, maxBuffer: LIMIT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
         if (result.error || result.status !== 0 || result.signal) refuse("installer_failed_evidence_preserved");
       }
-      const allowed = new Set([...inputs.keys(), ...candidate.core_sources.map(x => x.path),
+      for (const asset of extra.assets) writeNew(target, asset.path, bytes(SOURCE, asset.path));
+      const allowed = new Set([...extra.assets.map(x => x.path), ...inputs.keys(), ...candidate.core_sources.map(x => x.path),
         ...plan.projectedManagedAssets.map(x => x.path), ".agent-spectrum-kernel/install-state.json", ".agent-spectrum-kernel/codex-install-state.json"]);
       // Compare names against the selected source/renderer boundary before hashing.
       const names = readdirSync(target, { recursive: true, withFileTypes: true }).filter(x => x.isFile())
@@ -182,7 +201,7 @@ export function prepareStaticFullComparison(root) {
   const closure = inspectPackageClosure(join(root, "conditions/full_ask"), plan.requiredAssets);
   const report = { kind: "ask_full_static_preparation_v1", status: closure.violations.length ? "blocked" : "static_prepared",
     static_package_eligible: closure.violations.length === 0, live_ready: false, native_cli_starts: 0, model_calls: 0,
-    distribution: identity, preparation_source: { head: readGitRevision(SOURCE), implementation_digests: helperDigests(), checkout_clean: "not_checked" },
+    distribution: identity, supplement: extra.identity, preparation_source: { head: readGitRevision(SOURCE), implementation_digests: helperDigests(), checkout_clean: "not_checked" },
     task: CASE, task_source: { input_manifest_digest: digest(bytes(SOURCE, `${FIXTURE}/input-manifest.json`)),
       catalog_digest: digest(bytes(SOURCE, "benchmarks/portfolio-catalog.json")) },
     task_inputs: Object.fromEntries([...inputs].map(([p, b]) => [p, fileRecord(b)])),
@@ -207,6 +226,8 @@ export function auditStaticFullComparison(root, expectedDigest) {
     const report = parseJsonRejectDuplicateKeys(new TextDecoder("utf-8", { fatal: true }).decode(raw));
     if (report.kind !== "ask_full_static_preparation_v1" || report.live_ready !== false || report.model_calls !== 0 || report.native_cli_starts !== 0) refuse("invalid_static_record");
     const { identity, plan } = distribution();
+    const extra = supplement(report.supplement !== null && report.supplement !== undefined);
+    if (!equal(report.supplement ?? null, extra.identity)) refuse("supplement_identity_changed");
     if (!equal(report.distribution, identity) || !equal(report.preparation_source.implementation_digests, helperDigests())) refuse("preparation_source_drift");
     const inputs = publicInputs();
     if (!equal(report.task_source, { input_manifest_digest: digest(bytes(SOURCE, `${FIXTURE}/input-manifest.json`)),
@@ -228,8 +249,8 @@ export function auditStaticFullComparison(root, expectedDigest) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const [command, root, expectedDigest, ...extra] = process.argv.slice(2);
-    if (extra.length || !root || !["prepare", "audit"].includes(command) || (command === "prepare" && expectedDigest)) refuse("invalid_arguments");
-    const result = command === "prepare" ? prepareStaticFullComparison(root) : auditStaticFullComparison(root, expectedDigest);
+    if (extra.length || !root || !["prepare", "prepare-complete", "audit"].includes(command) || (command !== "audit" && expectedDigest)) refuse("invalid_arguments");
+    const result = command !== "audit" ? prepareStaticFullComparison(root, { complete: command === "prepare-complete" }) : auditStaticFullComparison(root, expectedDigest);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     if (result.status === "blocked") process.exitCode = 2;
   } catch {

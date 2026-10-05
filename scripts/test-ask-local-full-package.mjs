@@ -79,6 +79,8 @@ test("required imports/references fail closed without evaluating packaged module
   assert.ok(inspectPackageClosure(root).violations.some(v => v.reason === "unsupported_import"));
   writeFileSync(join(root, "scripts/main.mjs"), 'import /* ambiguous syntax */ "./missing.mjs";');
   assert.ok(inspectPackageClosure(root).violations.some(v => v.reason === "unsupported_import"));
+  writeFileSync(join(root, "scripts/main.mjs"), 'if (command === "import") {\n const transfer = readJson(requiredOption(options, "input"));\n}');
+  assert.deepEqual(inspectPackageClosure(root).violations, []);
   writeFileSync(join(root, "scripts/main.mjs"), 'import "node:fs";');
   writeFileSync(join(root, "AGENTS.md"), 'Read `docs/missing.md`.');
   assert.ok(inspectPackageClosure(root).violations.some(v => v.reason === "instruction_reference_unresolved"));
@@ -100,4 +102,21 @@ test("required imports/references fail closed without evaluating packaged module
 test("invalid targets refuse before allocating anything", t => {
   const root = fresh(t);
   for (const target of ["relative", "/", join(root, "missing-parent/new")]) assert.throws(() => prepareStaticFullComparison(target));
+});
+
+test("declared complete Full closes references without waiving base candidate failures", t => {
+  const root = fresh(t);
+  const report = prepareStaticFullComparison(root, { complete: true });
+  assert.equal(report.status, "static_prepared");
+  assert.equal(report.static_package_eligible, true);
+  assert.equal(report.live_ready, false);
+  assert.equal(report.supplement.assets, 40);
+  const full = join(root, "conditions/full_ask");
+  const imports = ["scripts/verification-proof-policy.mjs", "scripts/verification-evidence.mjs"];
+  const smoke = spawnSync(process.execPath, ["--input-type=module", "-e", `await Promise.all(${JSON.stringify(imports.map(p => new URL(`file://${join(full, p)}`).href))}.map(p => import(p)));`],
+    { env: { PATH: "" }, encoding: "utf8", timeout: 10000 });
+  assert.equal(smoke.status, 0, smoke.stderr);
+
+  assert.equal(Object.keys(report.conditions.full_ask.files).length, 212);
+  assert.equal(auditStaticFullComparison(root, report.record_digest).status, "static_prepared");
 });

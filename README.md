@@ -6,6 +6,8 @@ For the model-free local eval entry point, platform route decisions and remainin
 live-validation limits, see [Local eval distribution](docs/local-eval-distribution.md).
 For model-free plain/Kernel/Full package preparation and its admission limits,
 see [Static Full preparation](docs/local-full-static-preparation.md).
+The reference supplement and model-free three-condition protocol are described in
+[Three-condition comparison](docs/local-three-arm-comparison.md).
 The next adapter slice and its unexercised live admission boundary are described in
 [Local Codex connection](docs/local-codex-connection.md) and
 [split probe/evaluation admission](docs/local-codex-admission.md).

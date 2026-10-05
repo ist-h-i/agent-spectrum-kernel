@@ -115,3 +115,10 @@ JSON-pilot regressions (O8); E4 = repository validation, unchanged runtime-bundl
 check and whitespace check (O8). Exact final HEAD, independent review and
 Mac/Ubuntu model-free CI receipts are recorded on the Draft PR. They do not
 replace any real CLI/model/sandbox/WSL/Linux-host measurement or formal #291 AC.
+
+
+The explicit `prepare-complete` follow-on retains this immutable base candidate
+and adds a separately classified, digest-bound reference supplement. See
+[three-condition comparison](local-three-arm-comparison.md) for its additional
+40 assets, bounded closure result and unresolved evaluator/runtime admission.
+The original `prepare` and its historical blocked observation remain unchanged.
