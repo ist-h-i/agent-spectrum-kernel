@@ -26,3 +26,5 @@ jobs:
         run: |
           node scripts/generate-ask-core-bundle.mjs --check
           node --test scripts/test-ask-core-bundle.mjs
+      - name: Mac native adapter proposal and task prequalification (synthetic only)
+        run: node --test scripts/test-ask-core-native-preparation.mjs
