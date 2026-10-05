@@ -110,3 +110,20 @@ Controller source digests include the direct public qualification modules and
 three public fixture bindings. This is bounded local integrity evidence;
 transitive native runtime, eager schema cache identity and evaluator execution
 are not admitted or represented as a frozen execution authority.
+
+## Existing frozen public authority qualification
+
+[Public qualification contract](local-three-arm-qualification.md) describes the
+follow-up without changing conditions or scores. Keep an existing detached
+checkout of the reference's immutable revision outside all task roots, then use:
+
+```sh
+node scripts/ask-local-three-arm.mjs prepare-qualified /canonical/work-area/new-comparison /canonical/public-frozen-checkout
+```
+
+This binds and rechecks the original public evaluator identity at replay. The
+default current-checkout qualifier still refuses source drift. Kernel records
+its canonical missing Skill route as `capability_missing`; no replacement policy
+is installed. Public qualification is not private evaluator or native admission.
+Previously saved protocols belong to their original controller revision; use the
+original checkout to replay them rather than rewriting their digests or evidence.

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { prepareStaticFullComparison, auditStaticFullComparison } from "./ask-local-full-package.mjs";
-import { qualifyThreeArmPublicTask } from "./ask-local-three-arm-qualification.mjs";
+import { qualifyThreeArmPublicTask, qualifyKernelWorkflow } from "./ask-local-three-arm-qualification.mjs";
 
 const SOURCE = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CONDITIONS = ["plain", "kernel_only", "full_ask"];
@@ -63,6 +63,13 @@ function shape(root) {
     }
   }
 }
+function qualificationOptions(root,options){
+  const frozen=options?.frozenSourceRoot;
+  if(!options||Object.keys(options).some(k=>k!=="frozenSourceRoot"))fail("invalid_qualification_options");
+  if(frozen!==undefined&&(typeof frozen!=="string"||!isAbsolute(frozen)||resolve(frozen)!==frozen||realpathSync(frozen)!==frozen
+    ||root===frozen||root.startsWith(`${frozen}/`)||frozen.startsWith(`${root}/`)))fail("invalid_frozen_source_root");
+  return options;
+}
 function reopen(root, expectedDigest) {
   shape(root);
   if (!/^sha256:[a-f0-9]{64}$/u.test(expectedDigest ?? "")) fail("external_protocol_digest_required");
@@ -78,7 +85,9 @@ function reopen(root, expectedDigest) {
   const preparation = auditStaticFullComparison(join(root, "preparation"), plan.preparation.record_digest);
   if (preparation.status !== "static_prepared" || preparation.static_package_eligible !== true
     || !same(preparation, plan.preparation)) fail("preparation_not_eligible");
-  if (!same(qualifyThreeArmPublicTask(SOURCE), plan.task_qualification)) fail("task_qualification_changed");
+  qualificationOptions(root,plan.qualification_options);
+  if (!same(qualifyKernelWorkflow(SOURCE,preparation),plan.kernel_workflow))fail("kernel_workflow_changed");
+  if (!same(qualifyThreeArmPublicTask(SOURCE,plan.qualification_options), plan.task_qualification)) fail("task_qualification_changed");
   return plan;
 }
 
@@ -86,12 +95,13 @@ function reopen(root, expectedDigest) {
 export function prepareThreeArm(root, options = {}) {
   if (options.mode !== undefined && options.mode !== "synthetic") fail("native_execution_not_admitted");
   const orderIndex = options.orderIndex ?? 0, scenarios = options.scenarios ?? ["pass", "pass", "pass"];
-  if (Object.keys(options).some(k => !["mode", "orderIndex", "scenarios"].includes(k)) || !Number.isInteger(orderIndex)
+  if (Object.keys(options).some(k => !["mode", "orderIndex", "scenarios", "frozenSourceRoot"].includes(k)) || !Number.isInteger(orderIndex)
     || orderIndex < 0 || orderIndex >= 6 || !Array.isArray(scenarios) || scenarios.length !== 3
     || scenarios.some(x => !SCENARIOS.has(x))) fail("invalid_protocol_options");
   if (!isAbsolute(root) || resolve(root) !== root || root === "/" || existsSync(root)
     || realpathSync(dirname(root)) !== dirname(root) || root.startsWith(`${SOURCE}/`) || SOURCE.startsWith(`${root}/`)) fail("invalid_new_protocol_root");
   if (typeof process.getuid !== "function" || !/^v24\./u.test(process.version)) fail("unsupported_static_runtime");
+  const qualification_options=qualificationOptions(root,options.frozenSourceRoot===undefined?{}:{frozenSourceRoot:options.frozenSourceRoot});
   mkdirSync(root, { mode: 0o700 });
   const preparation = prepareStaticFullComparison(join(root, "preparation"), { complete: true });
   if (preparation.status !== "static_prepared") fail("preparation_not_eligible");
@@ -99,7 +109,8 @@ export function prepareThreeArm(root, options = {}) {
     protocol_id: randomUUID(), preparation, order: THREE_ARM_ORDERS[orderIndex], scenarios, prompt: PROMPT,
     runtime: { model: "gpt-6.1-sol", effort: "medium", observed_identity: "unknown" }, policy: POLICY,
     common_inputs: preparation.task_inputs, implementation_digests: sourceDigests(),
-    task_qualification: qualifyThreeArmPublicTask(SOURCE), model_calls: 0, native_cli_starts: 0 };
+    qualification_options, kernel_workflow:qualifyKernelWorkflow(SOURCE,preparation),
+    task_qualification: qualifyThreeArmPublicTask(SOURCE,qualification_options), model_calls: 0, native_cli_starts: 0 };
   const protocol_digest = save(root, "control/protocol.json", plan);
   return { ...plan, protocol_digest };
 }
@@ -176,6 +187,7 @@ export function buildNativeThreeArmCandidate(root, protocolDigest, executable) {
   const plan = reopen(root, protocolDigest);
   if (typeof executable !== "string" || !isAbsolute(executable) || resolve(executable) !== executable) fail("invalid_native_executable_candidate");
   return { status: "unadmitted_command_candidate", live_ready: false, model_calls: 0, native_cli_starts: 0,
+    public_evaluator_qualification:plan.task_qualification.public_evaluator_reference,kernel_workflow:plan.kernel_workflow,
     missing: ["native_executable_identity", "private_evaluator_authority", "human_admission_review", "kernel_fair_workflow",
       "sandbox_deny_enforcement", "native_capability_discovery_read_use", "approved_frozen_execution_budget", "new_execution_authorization"],
     launches: plan.order.map(condition => ({ condition, executable, cwd: join(root, "preparation/conditions", condition),
@@ -189,6 +201,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (extra.length || !root) fail("invalid_arguments");
     let result;
     if (command === "prepare" && !protocolDigest && !resultDigest) result = prepareThreeArm(root);
+    else if(command === "prepare-qualified" && protocolDigest && !resultDigest) result=prepareThreeArm(root,{frozenSourceRoot:protocolDigest});
     else if (command === "simulate" && !resultDigest) result = runSyntheticThreeArm(root, protocolDigest);
     else if (command === "replay") result = replayThreeArm(root, protocolDigest, resultDigest);
     else if (command === "run-native") fail("native_execution_not_admitted");
