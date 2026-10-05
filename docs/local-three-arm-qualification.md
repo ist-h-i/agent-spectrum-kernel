@@ -10,7 +10,7 @@ reference, private evaluator, authority seal or grant changes are authorized.
 Formal Verification Contract `FVC-318-QUAL-1` revision 1 retains the formal
 cross-module/persistence proof selected under
 `ask.verification-proof-policy@1.0.0`. O1 requires the existing public reference,
-pinned public reference bytes, source inventory, immutable Git revision and dependency closure to verify with
+pinned public reference bytes, source inventory, immutable Git revision, dependency closure and public fixture/input-digest binding to verify with
 the unchanged generic verifier. O2 refuses current-byte drift, changed frozen
 bytes, missing history, linked/overlapping roots and changed qualification at
 replay. O3 keeps canonical AGENTS bytes, zero Skills, identical public inputs and
@@ -81,3 +81,9 @@ its historical measurements cannot qualify the current missing workflow.
 A task-independent standalone design proposal is in
 [kernel standalone design](kernel-standalone-design-proposal.md). It is pending
 adoption; no new definition or instructions are applied by this implementation.
+
+Public input closure and public source closure are distinct checks. Qualification
+also records whether the reference fixture ID and input digest equal the verified
+common public inputs. Missing or mismatched inputs keep this binding blocked
+even when the historical source itself verifies. This additional check does
+not change any input bytes or score rule.

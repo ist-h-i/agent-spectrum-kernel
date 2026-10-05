@@ -18,6 +18,7 @@ function fixture(t){
 test("existing frozen public source qualifies without resealing or private admission",t=>{
  const {frozen}=fixture(t),q=qualifyThreeArmPublicTask(SOURCE,{frozenSourceRoot:frozen});
  assert.equal(q.public_inputs.status,"verified");
+ assert.equal(q.public_evaluator_task_binding.status,"verified");
  assert.equal(q.current_checkout_evaluator.status,"blocked");
  assert.ok(q.current_checkout_evaluator.drift_paths.includes("benchmarks/schemas/private-evaluator-fragment.schema.json"));
  assert.equal(q.public_evaluator_reference.status,"verified");
@@ -62,4 +63,16 @@ test("changed public reference is refused before its source inventory is followe
  const q=qualifyThreeArmPublicTask(root);
  assert.equal(q.public_evaluator_reference.reason,"pinned_public_reference_refused");
  assert.equal(q.current_checkout_evaluator,undefined);assert.equal(q.live_ready,false);
+});
+
+test("source qualification alone cannot qualify missing task inputs",t=>{
+ const {parent,frozen}=fixture(t),root=join(parent,"reference-only");
+ const relative="benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/evaluator-reference.json";
+ mkdirSync(dirname(join(root,relative)),{recursive:true});
+ writeFileSync(join(root,relative),readFileSync(join(SOURCE,relative)));
+ const q=qualifyThreeArmPublicTask(root,{frozenSourceRoot:frozen});
+ assert.equal(q.public_inputs.status,"blocked");
+ assert.equal(q.public_evaluator_reference.status,"verified");
+ assert.equal(q.public_evaluator_task_binding.status,"blocked");
+ assert.equal(q.live_ready,false);
 });

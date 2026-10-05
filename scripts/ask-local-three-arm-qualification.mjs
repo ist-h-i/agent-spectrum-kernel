@@ -21,7 +21,7 @@ function canonicalRoot(root){
 /** Existing public contracts only. No private bundle, old result, generation or execution. */
 export function qualifyThreeArmPublicTask(root,options={}) {
   const result = { task: "mp-ci-evidence-gap", status: "blocked", live_ready: false,
-    public_inputs: { status: "unknown" }, public_evaluator_reference: { status: "unknown" },
+    public_inputs: { status: "unknown" }, public_evaluator_task_binding:{status:"blocked",reason:"input_reference_binding_unverified"}, public_evaluator_reference: { status: "unknown" },
     private_evaluator: "unknown", human_admission_review: "unknown", kernel_zero_skill_workflow: "unknown",
     actual_cli_capability_use: "unknown", actual_process_denies: "unknown" };
   if(Object.keys(options).some(x=>x!=="frozenSourceRoot"))throw new Error("invalid_qualification_options");
@@ -48,6 +48,10 @@ export function qualifyThreeArmPublicTask(root,options={}) {
       const head=execFileSync("git",["-C",sourceRoot,"rev-parse","HEAD"],{encoding:"utf8",timeout:10000,maxBuffer:1024,stdio:["ignore","pipe","ignore"]}).trim();
       if(head!==ref.evaluator_revision)throw new Error("frozen_source_revision_refused");
     }
+    result.public_evaluator_task_binding=result.public_inputs.status==="verified"
+      &&ref.fixture_id===result.task&&ref.fixture_input_digest===result.public_inputs.input_digest
+      ?{status:"verified",fixture:ref.fixture_id,input_digest:ref.fixture_input_digest}
+      :{status:"blocked",reason:"input_reference_binding_refused"};
     result.public_evaluator_reference = { status: "verified", fixture: ref.fixture_id,
       bundle_digest: ref.evaluator_bundle_digest, source_revision: ref.evaluator_revision,
       source_tree_digest:ref.evaluator_source_identity.source_tree_digest,

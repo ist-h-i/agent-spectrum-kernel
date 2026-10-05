@@ -187,7 +187,8 @@ export function buildNativeThreeArmCandidate(root, protocolDigest, executable) {
   const plan = reopen(root, protocolDigest);
   if (typeof executable !== "string" || !isAbsolute(executable) || resolve(executable) !== executable) fail("invalid_native_executable_candidate");
   return { status: "unadmitted_command_candidate", live_ready: false, model_calls: 0, native_cli_starts: 0,
-    public_evaluator_qualification:plan.task_qualification.public_evaluator_reference,kernel_workflow:plan.kernel_workflow,
+    public_evaluator_qualification:plan.task_qualification.public_evaluator_reference,
+    public_evaluator_task_binding:plan.task_qualification.public_evaluator_task_binding,kernel_workflow:plan.kernel_workflow,
     missing: ["native_executable_identity", "private_evaluator_authority", "human_admission_review", "kernel_fair_workflow",
       "sandbox_deny_enforcement", "native_capability_discovery_read_use", "approved_frozen_execution_budget", "new_execution_authorization"],
     launches: plan.order.map(condition => ({ condition, executable, cwd: join(root, "preparation/conditions", condition),
