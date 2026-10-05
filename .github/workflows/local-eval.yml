@@ -1,0 +1,20 @@
+name: Local eval fake routes
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  fake:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.19.0"
+      - name: Observe host prerequisites without Codex or auth
+        run: node scripts/ask-local-eval.mjs preflight
+      - name: Fake lifecycle and failure regressions (no model calls)
+        run: node --test scripts/test-ask-local-eval.mjs scripts/test-ask-synthetic-json-pilot.mjs

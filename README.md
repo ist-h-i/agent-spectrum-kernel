@@ -2,6 +2,9 @@
 
 A layered intelligence kernel for evidence-based routing, verification, review, and reusable memory in AI coding agents.
 
+For the model-free local eval entry point, platform route decisions and remaining
+live-validation limits, see [Local eval distribution](docs/local-eval-distribution.md).
+
 AIエージェントが扱う要件・設計・実装・検証・レビュー・知識蓄積の複数スペクトラムを、証拠ベースで接続するKernel。
 
 狙いは「AIにたくさん書かせる」ことではなく、AIの開発行動を次の方向へ固定することです。
