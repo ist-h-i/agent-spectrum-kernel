@@ -2,9 +2,8 @@ import { spawn } from "node:child_process";
 import { canonicalDigest, parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { terminateResidualAgentProcessGroup } from "./ask-benchmark-execution.mjs";
 
-export const CODEX_TIME_POLICY = Object.freeze({kind:"codex_turn_received_budget_v1",
-  startup_ms:120000, task_ms:120000, absolute_ms:240000,
-  start_event:"single_thread_then_turn_started_received", clock:"controller_monotonic", retry:0});
+import { CODEX_TIME_POLICY } from "./ask-local-codex-time-policy.mjs";
+export { CODEX_TIME_POLICY } from "./ask-local-codex-time-policy.mjs";
 export function assertTimePolicy(policy) {
   if (canonicalDigest(policy)!==canonicalDigest(CODEX_TIME_POLICY)) throw new Error("closed time policy required");
 }
