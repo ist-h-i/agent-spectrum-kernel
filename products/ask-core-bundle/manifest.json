@@ -1,0 +1,2738 @@
+{
+  "kind": "ask_core_bundle_product_v1",
+  "product": "ask-core-bundle@1.0.0",
+  "design_source": "fb32ac6fbeab387ecbef98ca3a046665c0e29be8",
+  "design_revision": 2,
+  "projection_revision": 1,
+  "core_sources": [
+    {
+      "path": "products/ask-core-bundle/AGENTS.md",
+      "bytes": 12414,
+      "digest": "sha256:ce8f749aa7dccf42dad498c456bdfc3672a1198f55e134d161755106d743ba2c"
+    },
+    {
+      "path": "products/ask-core-bundle/capabilities.json",
+      "bytes": 1794,
+      "digest": "sha256:c2b53ceeb04dddb59b03ccfe048888b427cbd4e40b0601dcdafe78809b869778"
+    },
+    {
+      "path": "docs/claim-evidence-status-contract.md",
+      "bytes": 4636,
+      "digest": "sha256:01696b6087f09c8f98232b0f450cd7bc43fd8f2911880821192549afa6ca843c"
+    },
+    {
+      "path": "schemas/claim-evidence-status.schema.json",
+      "bytes": 3449,
+      "digest": "sha256:be0ad5f23e3eeae32ac80f9e27e05a4dc397c479cd3719692764609569690098"
+    },
+    {
+      "path": "scripts/claim-evidence-status.mjs",
+      "bytes": 9470,
+      "digest": "sha256:fbce689f58b6b74069a6ef2c5d3dd767668bbfc7c1551480c42fc7234d094cf4"
+    },
+    {
+      "path": "docs/verification-proof-policy-contract.md",
+      "bytes": 8386,
+      "digest": "sha256:b1a4d5992ca46691a583b0c749dce817b5069835ea2b066c057c4362815f05ce"
+    },
+    {
+      "path": "schemas/verification-proof-policy.schema.json",
+      "bytes": 12588,
+      "digest": "sha256:22886eaaf4627116aadc3bf6f0955c789f105680c8b139c9bf8e91906823edd9"
+    },
+    {
+      "path": "scripts/verification-proof-policy.mjs",
+      "bytes": 18181,
+      "digest": "sha256:27496f3311b8d0ead6a2d782836b0f537408386edcd2cbd84f54fa63a2971ade"
+    },
+    {
+      "path": "docs/lifecycle-artifact-contract.md",
+      "bytes": 13811,
+      "digest": "sha256:bfee74175220395c680cc56972f30dd684b24106dd4c15f18e1fb30275f6064c"
+    },
+    {
+      "path": "docs/lifecycle-traceability-contract.md",
+      "bytes": 14341,
+      "digest": "sha256:e809b24873ff79af29a965df85865e879d035bea77883ec18f3034196acb2eda"
+    },
+    {
+      "path": "docs/agent-session-state-contract.md",
+      "bytes": 3376,
+      "digest": "sha256:623a46f7eefbe8f5f08b57989b3644a372505ebf54052d2cf8d535e91607a5ff"
+    },
+    {
+      "path": "docs/execution-envelope-contract.md",
+      "bytes": 16425,
+      "digest": "sha256:429fa068c322b4ce59d7fe20fcb4a4541ffb2e250bc12e3cf21859b7fca33e3a"
+    },
+    {
+      "path": "schemas/execution-envelope.schema.json",
+      "bytes": 5050,
+      "digest": "sha256:23708f54ac8f443f2c27c9c478b8b6a653444071e9a4d34aa4adc0fc1baa3492"
+    },
+    {
+      "path": "schemas/execution-envelope-record.schema.json",
+      "bytes": 4676,
+      "digest": "sha256:ca41a93812a1510536272a01046fc69f3fca03c870fcf712c3b548534fdfc6a7"
+    },
+    {
+      "path": "scripts/execution-envelope.mjs",
+      "bytes": 17669,
+      "digest": "sha256:c7272fd30d999562cdc8caf66b648fc36ac237c3fc27131f98042746e1684a17"
+    },
+    {
+      "path": "schemas/review-signal-gate-map.json",
+      "bytes": 5155,
+      "digest": "sha256:9da2bc5d6a87a30c837bade0e9d617991e39a1201d3e41a7949bdb990ab87bf8"
+    },
+    {
+      "path": "docs/review-finding-contract.md",
+      "bytes": 3153,
+      "digest": "sha256:2a668ebfcec6776189a66227d738ac9c48276030ff6c402d27dfab313770e572"
+    },
+    {
+      "path": "schemas/review-finding.schema.json",
+      "bytes": 2705,
+      "digest": "sha256:dc79a584e051fd8a0971ecdc3ebbbe613360f7715c623af0eee194de84b10deb"
+    },
+    {
+      "path": "docs/verification-evidence-contract.md",
+      "bytes": 13478,
+      "digest": "sha256:ff331b1a4113111472ceb681495b07b45c3343be4be26a196d5866aa558fe1a3"
+    },
+    {
+      "path": "docs/adr/0001-verification-evidence-trust-boundary.md",
+      "bytes": 7782,
+      "digest": "sha256:0303ce52ed152ff183ef9be501cae5ace1c668a68fa0ea230994263230b3782e"
+    },
+    {
+      "path": "schemas/verification-evidence.schema.json",
+      "bytes": 12254,
+      "digest": "sha256:cd0d90b2d7adc0856c023da0538c8886e544769286661bba5180fce46ed87590"
+    },
+    {
+      "path": "schemas/verification-reuse-plan.schema.json",
+      "bytes": 11649,
+      "digest": "sha256:9f81c384b789f196252d5c0f23def890bd2d9c838dd132c643857d784d2ab1ff"
+    },
+    {
+      "path": "schemas/verification-evidence-transfer.schema.json",
+      "bytes": 2504,
+      "digest": "sha256:89d6891fcf0453b0ff6e1f568306221f6a54cdedb49f4f39d5c049ec056cc17c"
+    },
+    {
+      "path": "scripts/verification-evidence.mjs",
+      "bytes": 41729,
+      "digest": "sha256:a6761cd3b52bcff5acfbc769e36b7cf5f9b19f103c3b503b4f70870c8df01334"
+    },
+    {
+      "path": "scripts/content-addressed-store.mjs",
+      "bytes": 15176,
+      "digest": "sha256:201d5eb4b95a9853d2be2a146351b75d78820ae7fb4ca52795f74f2f9413daed"
+    },
+    {
+      "path": "scripts/json-schema-validation.mjs",
+      "bytes": 25572,
+      "digest": "sha256:fcfb5083ebc5a151c48ae40574c29cb3a14461642b481a0c8f92602b910b09b7"
+    },
+    {
+      "path": "schemas/metrics-event.schema.json",
+      "bytes": 14163,
+      "digest": "sha256:765fa0116c94d29fe298b575554a41173755fbcf36106144c7174cffe6f3da4d"
+    },
+    {
+      "path": "docs/metrics-event-contract.md",
+      "bytes": 15446,
+      "digest": "sha256:45f03fb1d498b82122ac5f864e88e3b483b37e94062c9689bb60262067faaa9c"
+    },
+    {
+      "path": "scripts/review-route-contract.mjs",
+      "bytes": 10839,
+      "digest": "sha256:75041cf2bbae627f2358b2c8b5c6ef0ee7b7f073eda9b824a129fe9faa6d1dcb"
+    },
+    {
+      "path": "scripts/ask-core-capabilities.mjs",
+      "bytes": 4104,
+      "digest": "sha256:8e978586313159fc63d6c5c4d90da9d72ac6393c1f0855d33a9494b43a955f88"
+    },
+    {
+      "path": "scripts/ask-core-runner-contract.mjs",
+      "bytes": 5890,
+      "digest": "sha256:4989c6543770690b7758e66cb185f09946128b5f8f4286b9429fa2589e51cfc4"
+    },
+    {
+      "path": "schemas/codex-risk-action.schema.json",
+      "bytes": 2252,
+      "digest": "sha256:ef7f3cd48c15f6326f95778af188602a5d5f0519dbad85046773c3f8a94791c5"
+    },
+    {
+      "path": "schemas/codex-risk-approval-request.schema.json",
+      "bytes": 12075,
+      "digest": "sha256:2c5f93979639b6696d8e28e470ab2360f1f4bd9fedbd39f719608dcd0a4e1103"
+    }
+  ],
+  "core_assets": {
+    "AGENTS.md": {
+      "bytes": 12414,
+      "digest": "sha256:ce8f749aa7dccf42dad498c456bdfc3672a1198f55e134d161755106d743ba2c"
+    },
+    "CUSTOM_INSTRUCTIONS.md": {
+      "bytes": 12414,
+      "digest": "sha256:ce8f749aa7dccf42dad498c456bdfc3672a1198f55e134d161755106d743ba2c"
+    },
+    "docs/adr/0001-verification-evidence-trust-boundary.md": {
+      "bytes": 7782,
+      "digest": "sha256:0303ce52ed152ff183ef9be501cae5ace1c668a68fa0ea230994263230b3782e"
+    },
+    "docs/agent-session-state-contract.md": {
+      "bytes": 3376,
+      "digest": "sha256:623a46f7eefbe8f5f08b57989b3644a372505ebf54052d2cf8d535e91607a5ff"
+    },
+    "docs/claim-evidence-status-contract.md": {
+      "bytes": 4753,
+      "digest": "sha256:fee51f8ba1747dcecb84e11d894ec742ba5eeaf23a5be37fdc5a24515cec5926"
+    },
+    "docs/execution-envelope-contract.md": {
+      "bytes": 16425,
+      "digest": "sha256:429fa068c322b4ce59d7fe20fcb4a4541ffb2e250bc12e3cf21859b7fca33e3a"
+    },
+    "docs/lifecycle-artifact-contract.md": {
+      "bytes": 13811,
+      "digest": "sha256:bfee74175220395c680cc56972f30dd684b24106dd4c15f18e1fb30275f6064c"
+    },
+    "docs/lifecycle-traceability-contract.md": {
+      "bytes": 14341,
+      "digest": "sha256:e809b24873ff79af29a965df85865e879d035bea77883ec18f3034196acb2eda"
+    },
+    "docs/metrics-event-contract.md": {
+      "bytes": 15446,
+      "digest": "sha256:45f03fb1d498b82122ac5f864e88e3b483b37e94062c9689bb60262067faaa9c"
+    },
+    "docs/review-finding-contract.md": {
+      "bytes": 3153,
+      "digest": "sha256:2a668ebfcec6776189a66227d738ac9c48276030ff6c402d27dfab313770e572"
+    },
+    "docs/verification-evidence-contract.md": {
+      "bytes": 13478,
+      "digest": "sha256:ff331b1a4113111472ceb681495b07b45c3343be4be26a196d5866aa558fe1a3"
+    },
+    "docs/verification-proof-policy-contract.md": {
+      "bytes": 8386,
+      "digest": "sha256:b1a4d5992ca46691a583b0c749dce817b5069835ea2b066c057c4362815f05ce"
+    },
+    "products/ask-core-bundle/capabilities.json": {
+      "bytes": 1794,
+      "digest": "sha256:c2b53ceeb04dddb59b03ccfe048888b427cbd4e40b0601dcdafe78809b869778"
+    },
+    "schemas/claim-evidence-status.schema.json": {
+      "bytes": 3449,
+      "digest": "sha256:be0ad5f23e3eeae32ac80f9e27e05a4dc397c479cd3719692764609569690098"
+    },
+    "schemas/codex-risk-action.schema.json": {
+      "bytes": 2252,
+      "digest": "sha256:ef7f3cd48c15f6326f95778af188602a5d5f0519dbad85046773c3f8a94791c5"
+    },
+    "schemas/codex-risk-approval-request.schema.json": {
+      "bytes": 12075,
+      "digest": "sha256:2c5f93979639b6696d8e28e470ab2360f1f4bd9fedbd39f719608dcd0a4e1103"
+    },
+    "schemas/execution-envelope-record.schema.json": {
+      "bytes": 4676,
+      "digest": "sha256:ca41a93812a1510536272a01046fc69f3fca03c870fcf712c3b548534fdfc6a7"
+    },
+    "schemas/execution-envelope.schema.json": {
+      "bytes": 5050,
+      "digest": "sha256:23708f54ac8f443f2c27c9c478b8b6a653444071e9a4d34aa4adc0fc1baa3492"
+    },
+    "schemas/metrics-event.schema.json": {
+      "bytes": 14163,
+      "digest": "sha256:765fa0116c94d29fe298b575554a41173755fbcf36106144c7174cffe6f3da4d"
+    },
+    "schemas/review-finding.schema.json": {
+      "bytes": 2705,
+      "digest": "sha256:dc79a584e051fd8a0971ecdc3ebbbe613360f7715c623af0eee194de84b10deb"
+    },
+    "schemas/review-signal-gate-map.json": {
+      "bytes": 5155,
+      "digest": "sha256:9da2bc5d6a87a30c837bade0e9d617991e39a1201d3e41a7949bdb990ab87bf8"
+    },
+    "schemas/verification-evidence-transfer.schema.json": {
+      "bytes": 2504,
+      "digest": "sha256:89d6891fcf0453b0ff6e1f568306221f6a54cdedb49f4f39d5c049ec056cc17c"
+    },
+    "schemas/verification-evidence.schema.json": {
+      "bytes": 12254,
+      "digest": "sha256:cd0d90b2d7adc0856c023da0538c8886e544769286661bba5180fce46ed87590"
+    },
+    "schemas/verification-proof-policy.schema.json": {
+      "bytes": 12588,
+      "digest": "sha256:22886eaaf4627116aadc3bf6f0955c789f105680c8b139c9bf8e91906823edd9"
+    },
+    "schemas/verification-reuse-plan.schema.json": {
+      "bytes": 11649,
+      "digest": "sha256:9f81c384b789f196252d5c0f23def890bd2d9c838dd132c643857d784d2ab1ff"
+    },
+    "scripts/ask-core-capabilities.mjs": {
+      "bytes": 4104,
+      "digest": "sha256:8e978586313159fc63d6c5c4d90da9d72ac6393c1f0855d33a9494b43a955f88"
+    },
+    "scripts/ask-core-runner-contract.mjs": {
+      "bytes": 5890,
+      "digest": "sha256:4989c6543770690b7758e66cb185f09946128b5f8f4286b9429fa2589e51cfc4"
+    },
+    "scripts/claim-evidence-status.mjs": {
+      "bytes": 9470,
+      "digest": "sha256:fbce689f58b6b74069a6ef2c5d3dd767668bbfc7c1551480c42fc7234d094cf4"
+    },
+    "scripts/content-addressed-store.mjs": {
+      "bytes": 15176,
+      "digest": "sha256:201d5eb4b95a9853d2be2a146351b75d78820ae7fb4ca52795f74f2f9413daed"
+    },
+    "scripts/execution-envelope.mjs": {
+      "bytes": 17669,
+      "digest": "sha256:c7272fd30d999562cdc8caf66b648fc36ac237c3fc27131f98042746e1684a17"
+    },
+    "scripts/json-schema-validation.mjs": {
+      "bytes": 25572,
+      "digest": "sha256:fcfb5083ebc5a151c48ae40574c29cb3a14461642b481a0c8f92602b910b09b7"
+    },
+    "scripts/review-route-contract.mjs": {
+      "bytes": 10839,
+      "digest": "sha256:75041cf2bbae627f2358b2c8b5c6ef0ee7b7f073eda9b824a129fe9faa6d1dcb"
+    },
+    "scripts/verification-evidence.mjs": {
+      "bytes": 41729,
+      "digest": "sha256:a6761cd3b52bcff5acfbc769e36b7cf5f9b19f103c3b503b4f70870c8df01334"
+    },
+    "scripts/verification-proof-policy.mjs": {
+      "bytes": 18181,
+      "digest": "sha256:27496f3311b8d0ead6a2d782836b0f537408386edcd2cbd84f54fa63a2971ade"
+    }
+  },
+  "core_closure": {
+    "status": "classified_literal_closure_verified",
+    "edges": [
+      {
+        "from": "AGENTS.md",
+        "target": "schemas/claim-evidence-status.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "AGENTS.md",
+        "target": "docs/lifecycle-artifact-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "AGENTS.md",
+        "target": "docs/lifecycle-traceability-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "AGENTS.md",
+        "target": "docs/verification-proof-policy-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "AGENTS.md",
+        "target": "docs/agent-session-state-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "AGENTS.md",
+        "target": "schemas/review-signal-gate-map.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "AGENTS.md",
+        "target": "docs/review-finding-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "AGENTS.md",
+        "target": "docs/execution-envelope-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/claim-evidence-status-contract.md",
+        "target": "schemas/claim-evidence-status.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/claim-evidence-status.schema.json",
+        "target": "schemas/claim-evidence-status.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/claim-evidence-status.mjs",
+        "target": "schemas/claim-evidence-status.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-proof-policy-contract.md",
+        "target": "schemas/verification-proof-policy.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-proof-policy-contract.md",
+        "target": "scripts/verification-proof-policy.mjs",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-proof-policy-contract.md",
+        "target": "docs/lifecycle-traceability-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-proof-policy-contract.md",
+        "target": "docs/lifecycle-artifact-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-proof-policy-contract.md",
+        "target": "docs/lifecycle-traceability-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-proof-policy-contract.md",
+        "target": "docs/lifecycle-traceability-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/verification-proof-policy.schema.json",
+        "target": "schemas/verification-proof-policy.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/verification-proof-policy.schema.json",
+        "target": "docs/verification-evidence-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/verification-proof-policy.mjs",
+        "target": "schemas/verification-proof-policy.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/verification-proof-policy.mjs",
+        "target": "docs/verification-evidence-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/lifecycle-artifact-contract.md",
+        "target": "docs/lifecycle-traceability-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/lifecycle-artifact-contract.md",
+        "target": "docs/lifecycle-traceability-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/lifecycle-artifact-contract.md",
+        "target": "docs/epic-admission-work-package-plan-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "conditional_extension",
+        "reason": "Opt-in aggregate epic admission is outside ordinary core tasks; require its extension before using it."
+      },
+      {
+        "from": "docs/lifecycle-artifact-contract.md",
+        "target": "schemas/verification-proof-policy.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/lifecycle-artifact-contract.md",
+        "target": "docs/verification-proof-policy-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/lifecycle-artifact-contract.md",
+        "target": "docs/lifecycle-traceability-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/lifecycle-traceability-contract.md",
+        "target": "docs/lifecycle-artifact-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/lifecycle-traceability-contract.md",
+        "target": "docs/verification-proof-policy-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/lifecycle-traceability-contract.md",
+        "target": "schemas/verification-proof-policy.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/lifecycle-traceability-contract.md",
+        "target": "docs/lifecycle-artifact-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/lifecycle-traceability-contract.md",
+        "target": "docs/lifecycle-artifact-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/lifecycle-traceability-contract.md",
+        "target": "docs/fixtures/lifecycle-traceability-chains.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "example_fixture",
+        "reason": "Worked examples are not schema or per-task authority; the normative trace contract is included."
+      },
+      {
+        "from": "docs/agent-session-state-contract.md",
+        "target": "docs/execution-envelope-contract.md",
+        "reference_kind": "local_markdown_link",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/execution-envelope-contract.md",
+        "target": "schemas/execution-envelope.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/execution-envelope-contract.md",
+        "target": "schemas/execution-envelope-record.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/execution-envelope-contract.md",
+        "target": "schemas/execution-envelope-record.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/execution-envelope-contract.md",
+        "target": "docs/lifecycle-traceability-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/execution-envelope.schema.json",
+        "target": "schemas/execution-envelope.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/execution-envelope.schema.json",
+        "target": "docs/metrics-event-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/execution-envelope.schema.json",
+        "target": "schemas/codex-risk-approval-request.schema.json",
+        "reference_kind": "schema_ref",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/execution-envelope.schema.json",
+        "target": "schemas/metrics-event.schema.json",
+        "reference_kind": "schema_ref",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/execution-envelope-record.schema.json",
+        "target": "schemas/execution-envelope-record.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/execution-envelope-record.schema.json",
+        "target": "schemas/execution-envelope.schema.json",
+        "reference_kind": "schema_ref",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/execution-envelope.mjs",
+        "target": "scripts/json-schema-validation.mjs",
+        "reference_kind": "literal_esm_import",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/execution-envelope.mjs",
+        "target": "scripts/json-schema-validation.mjs",
+        "reference_kind": "literal_esm_import",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/execution-envelope.mjs",
+        "target": "schemas/execution-envelope.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/execution-envelope.mjs",
+        "target": "schemas/metrics-event.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/execution-envelope.mjs",
+        "target": "schemas/execution-envelope-record.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/review-signal-gate-map.json",
+        "target": "schemas/review-signal-gate-map.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/review-finding-contract.md",
+        "target": "schemas/review-finding.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/review-finding-contract.md",
+        "target": "schemas/review-signal-gate-map.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/review-finding.schema.json",
+        "target": "schemas/review-finding.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-evidence-contract.md",
+        "target": "schemas/verification-evidence.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-evidence-contract.md",
+        "target": "schemas/verification-reuse-plan.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-evidence-contract.md",
+        "target": "schemas/verification-evidence-transfer.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-evidence-contract.md",
+        "target": "docs/adr/0001-verification-evidence-trust-boundary.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-evidence-contract.md",
+        "target": "scripts/verification-evidence.mjs",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-evidence-contract.md",
+        "target": "scripts/content-addressed-store.mjs",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-evidence-contract.md",
+        "target": "scripts/verification-evidence.mjs",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-evidence-contract.md",
+        "target": "scripts/verification-evidence.mjs",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-evidence-contract.md",
+        "target": "scripts/verification-evidence.mjs",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-evidence-contract.md",
+        "target": "scripts/verification-evidence.mjs",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/verification-evidence-contract.md",
+        "target": "scripts/verification-evidence.mjs",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/adr/0001-verification-evidence-trust-boundary.md",
+        "target": "docs/verification-evidence-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/verification-evidence.schema.json",
+        "target": "schemas/verification-evidence.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/verification-evidence.schema.json",
+        "target": "schemas/verification-evidence.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/verification-reuse-plan.schema.json",
+        "target": "schemas/verification-reuse-plan.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/verification-reuse-plan.schema.json",
+        "target": "schemas/verification-reuse-plan.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/verification-reuse-plan.schema.json",
+        "target": "schemas/verification-reuse-plan.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/verification-evidence-transfer.schema.json",
+        "target": "schemas/verification-evidence-transfer.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/verification-evidence-transfer.schema.json",
+        "target": "schemas/verification-evidence-transfer.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/verification-evidence-transfer.schema.json",
+        "target": "schemas/verification-evidence.schema.json",
+        "reference_kind": "schema_ref",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/verification-evidence.mjs",
+        "target": "scripts/content-addressed-store.mjs",
+        "reference_kind": "literal_esm_import",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/verification-evidence.mjs",
+        "target": "scripts/execution-envelope.mjs",
+        "reference_kind": "literal_esm_import",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/verification-evidence.mjs",
+        "target": "schemas/verification-evidence.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/verification-evidence.mjs",
+        "target": "schemas/verification-evidence-transfer.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/verification-evidence.mjs",
+        "target": "schemas/verification-reuse-plan.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/verification-evidence.mjs",
+        "target": "schemas/verification-reuse-plan.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/verification-evidence.mjs",
+        "target": "schemas/verification-reuse-plan.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/verification-evidence.mjs",
+        "target": "schemas/verification-evidence-transfer.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/metrics-event.schema.json",
+        "target": "schemas/metrics-event.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/metrics-event-contract.md",
+        "target": "schemas/metrics-event.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/metrics-event-contract.md",
+        "target": "schemas/metrics-event.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/metrics-event-contract.md",
+        "target": "scripts/execution-envelope.mjs",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/metrics-event-contract.md",
+        "target": "schemas/review-signal-gate-map.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/metrics-event-contract.md",
+        "target": "docs/ai/skill-adoption-metrics.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "conditional_extension",
+        "reason": "Metrics ledger mutation requires separately selected observability capability; no collector/ledger is enabled in core."
+      },
+      {
+        "from": "docs/metrics-event-contract.md",
+        "target": "schemas/review-signal-gate-map.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "docs/metrics-event-contract.md",
+        "target": "docs/execution-envelope-contract.md",
+        "reference_kind": "local_markdown_link",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/ask-core-capabilities.mjs",
+        "target": "products/ask-core-bundle/capabilities.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/ask-core-capabilities.mjs",
+        "target": "schemas/review-signal-gate-map.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/ask-core-runner-contract.mjs",
+        "target": "scripts/ask-core-capabilities.mjs",
+        "reference_kind": "literal_esm_import",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/ask-core-runner-contract.mjs",
+        "target": "scripts/execution-envelope.mjs",
+        "reference_kind": "literal_esm_import",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/ask-core-runner-contract.mjs",
+        "target": "schemas/review-signal-gate-map.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "scripts/ask-core-runner-contract.mjs",
+        "target": "schemas/review-finding.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/codex-risk-action.schema.json",
+        "target": "schemas/codex-risk-action.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/codex-risk-approval-request.schema.json",
+        "target": "schemas/codex-risk-approval-request.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/codex-risk-approval-request.schema.json",
+        "target": "schemas/codex-risk-action.schema.json",
+        "reference_kind": "schema_ref",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/codex-risk-approval-request.schema.json",
+        "target": "schemas/codex-risk-action.schema.json",
+        "reference_kind": "schema_ref",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/codex-risk-approval-request.schema.json",
+        "target": "schemas/codex-risk-action.schema.json",
+        "reference_kind": "schema_ref",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/codex-risk-approval-request.schema.json",
+        "target": "schemas/codex-risk-action.schema.json",
+        "reference_kind": "schema_ref",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/codex-risk-approval-request.schema.json",
+        "target": "schemas/codex-risk-action.schema.json",
+        "reference_kind": "schema_ref",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/codex-risk-approval-request.schema.json",
+        "target": "schemas/codex-risk-action.schema.json",
+        "reference_kind": "schema_ref",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/codex-risk-approval-request.schema.json",
+        "target": "schemas/codex-risk-action.schema.json",
+        "reference_kind": "schema_ref",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "schemas/codex-risk-approval-request.schema.json",
+        "target": "schemas/codex-risk-action.schema.json",
+        "reference_kind": "schema_ref",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "CUSTOM_INSTRUCTIONS.md",
+        "target": "schemas/claim-evidence-status.schema.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "CUSTOM_INSTRUCTIONS.md",
+        "target": "docs/lifecycle-artifact-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "CUSTOM_INSTRUCTIONS.md",
+        "target": "docs/lifecycle-traceability-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "CUSTOM_INSTRUCTIONS.md",
+        "target": "docs/verification-proof-policy-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "CUSTOM_INSTRUCTIONS.md",
+        "target": "docs/agent-session-state-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "CUSTOM_INSTRUCTIONS.md",
+        "target": "schemas/review-signal-gate-map.json",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "CUSTOM_INSTRUCTIONS.md",
+        "target": "docs/review-finding-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      },
+      {
+        "from": "CUSTOM_INSTRUCTIONS.md",
+        "target": "docs/execution-envelope-contract.md",
+        "reference_kind": "literal_contract_path",
+        "kind": "included",
+        "reason": "Exact core asset"
+      }
+    ],
+    "unverified": [
+      "computed_runtime_io",
+      "model_procedure_use",
+      "managed_native_runtime"
+    ]
+  },
+  "full_sources": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 12249,
+      "digest": "sha256:173b0ae1cbb3a92cb434b60c5d233dbd0e2b68b75be9732818d8b53cbb3b5d6c"
+    },
+    {
+      "path": "CUSTOM_INSTRUCTIONS.md",
+      "bytes": 7421,
+      "digest": "sha256:8461d928f4ffc4dbb3160c2e896370caffbca41953c74373a1bbe5e036355601"
+    },
+    {
+      "path": "adapters/codex/commands/codex-exec.md",
+      "bytes": 5430,
+      "digest": "sha256:da7b0c12160b0b5b5784ae69dc0237e908883a2fc008f3fc62841b8f86c071de"
+    },
+    {
+      "path": "adapters/codex/prompts/skill-handoff.md",
+      "bytes": 490,
+      "digest": "sha256:cecf19f9df85288438f2e6d7b8998f0ae14066a3c5da443520e99484a790cdd1"
+    },
+    {
+      "path": "adapters/codex/prompts/skill-implement.md",
+      "bytes": 761,
+      "digest": "sha256:69305bb3b2a33c0fb2479f045286aeeea4f2e5aa82ac02947db7a06edc95e034"
+    },
+    {
+      "path": "adapters/codex/prompts/skill-investigate.md",
+      "bytes": 571,
+      "digest": "sha256:9a7323440447e72afae43451c6f9106fabfb239c5d38170c994cdd8823beca63"
+    },
+    {
+      "path": "adapters/codex/prompts/skill-review.md",
+      "bytes": 1746,
+      "digest": "sha256:64ff0c302c5268d3040bce29c146e7c61cc848b76acfb3f0d8276936a06fd756"
+    },
+    {
+      "path": "adapters/codex/prompts/skill-verify.md",
+      "bytes": 835,
+      "digest": "sha256:18a90a97a33cb25478ed5f2fca7334bcc4b212c6e206246d8fa7e8e6dd1fbd4c"
+    },
+    {
+      "path": "docs/adapter-conformance-contract.md",
+      "bytes": 11319,
+      "digest": "sha256:5713b561e17fcce4bead3dc2b1c711fcecb5deabebddbcc2f81edfbfbcf7e498"
+    },
+    {
+      "path": "docs/adapter-deployment-governance.md",
+      "bytes": 12319,
+      "digest": "sha256:51b72668cfb53bd0c72e995e5149175f0f3a0434e6a45d8e8c00d34840a494a3"
+    },
+    {
+      "path": "docs/adapter-runtime-boundary-contract.md",
+      "bytes": 24876,
+      "digest": "sha256:a2d424f5de4ec6a6874b66ce92c51a5d8f9f24db2a3793f5f2ca7a550efde07c"
+    },
+    {
+      "path": "docs/adr/0001-verification-evidence-trust-boundary.md",
+      "bytes": 7782,
+      "digest": "sha256:0303ce52ed152ff183ef9be501cae5ace1c668a68fa0ea230994263230b3782e"
+    },
+    {
+      "path": "docs/agent-session-state-contract.md",
+      "bytes": 3376,
+      "digest": "sha256:623a46f7eefbe8f5f08b57989b3644a372505ebf54052d2cf8d535e91607a5ff"
+    },
+    {
+      "path": "docs/ai/adoption-report-template.md",
+      "bytes": 5343,
+      "digest": "sha256:c52667740307d9985c61633fdeb189bf9650bc7706f0aa6306e761cd9c2d1591"
+    },
+    {
+      "path": "docs/ai/architecture-decision-memory.md",
+      "bytes": 4456,
+      "digest": "sha256:4fea91ee201ade0cb69c0e59841c3d0a3707ce7ea6e79f93660f087741ae99c4"
+    },
+    {
+      "path": "docs/ai/documentation-knowledge-ledger.md",
+      "bytes": 4078,
+      "digest": "sha256:69907fe30982de3a9bfbdfbece39dc4489fe95a239379ac910ed2b68d4bb177f"
+    },
+    {
+      "path": "docs/ai/domain-rule-ledger.md",
+      "bytes": 5588,
+      "digest": "sha256:c07740b3cde6106e4912e9be1df3668bd509a9bfeac6332ff9ed2c66a6ce5046"
+    },
+    {
+      "path": "docs/ai/engineering-capability-ledger.md",
+      "bytes": 4853,
+      "digest": "sha256:cc0ccd3441dff31a1fe7d5783fa949aece4005585fa9e20834c38dba53bdd966"
+    },
+    {
+      "path": "docs/ai/engineering-pattern-ledger.md",
+      "bytes": 4289,
+      "digest": "sha256:3a5a8ee093f504bb8f68d08da149a4a75830364a1af5ada30867fc31ffd6b055"
+    },
+    {
+      "path": "docs/ai/implementation-context.md",
+      "bytes": 7251,
+      "digest": "sha256:4f01805634d75b97003db14fe4f1066c4c61d96dde76920c5afdb9313e3f2903"
+    },
+    {
+      "path": "docs/ai/improvement-ledger.md",
+      "bytes": 11451,
+      "digest": "sha256:68efb2cad1efe9e80a7d8f601c973ede4da2c6d2ef33f9a7d91583e9c18672df"
+    },
+    {
+      "path": "docs/ai/review-context.md",
+      "bytes": 5130,
+      "digest": "sha256:33467c3306457594d44b4d5aa577b8b872c9993a3057659b46bf4c5c23552651"
+    },
+    {
+      "path": "docs/ai/review-rule-ledger.md",
+      "bytes": 4043,
+      "digest": "sha256:2e24ed96f47f5b830501df0e266e27143d97b94166443581c6482f1039ba4d61"
+    },
+    {
+      "path": "docs/ai/skill-adoption-metrics.md",
+      "bytes": 6725,
+      "digest": "sha256:98eaf0f94f45f4b145340bee39e790311ffbbe9a43953e4ef7bd3f440e1a009c"
+    },
+    {
+      "path": "docs/ai/verification-pattern-ledger.md",
+      "bytes": 4236,
+      "digest": "sha256:daec1aed44e2b2a9109a28404f6464b38568487ca18bff0a86fd59b709aed2ba"
+    },
+    {
+      "path": "docs/claim-evidence-status-contract.md",
+      "bytes": 4636,
+      "digest": "sha256:01696b6087f09c8f98232b0f450cd7bc43fd8f2911880821192549afa6ca843c"
+    },
+    {
+      "path": "docs/debt-lifecycle-contract.md",
+      "bytes": 4695,
+      "digest": "sha256:e8c625444b9cbd6daab701fc429b47232889cb156fd9e8e0047d354562aa0558"
+    },
+    {
+      "path": "docs/epic-admission-work-package-plan-contract.md",
+      "bytes": 21499,
+      "digest": "sha256:462013302ced3062fb8bd75f407f52f02614201600fabfb6fda8d4ee26262020"
+    },
+    {
+      "path": "docs/execution-envelope-contract.md",
+      "bytes": 16425,
+      "digest": "sha256:429fa068c322b4ce59d7fe20fcb4a4541ffb2e250bc12e3cf21859b7fca33e3a"
+    },
+    {
+      "path": "docs/fixtures/adapter-cross-conformance.json",
+      "bytes": 24374,
+      "digest": "sha256:30d916655371092aa5c780e39a7e4505027828f01c73fc1accd946f43134e2c8"
+    },
+    {
+      "path": "docs/fixtures/issue-275-slice-1-work-package-plan-r1.json",
+      "bytes": 31636,
+      "digest": "sha256:c65c703eb760467289847364d6dcb68c0bcc863ae091a641d892550e3a815437"
+    },
+    {
+      "path": "docs/fixtures/issue-275-slice-1-work-package-plan-r2.json",
+      "bytes": 32862,
+      "digest": "sha256:545a7d08d055c1e99e95d9b49fca4e26021945328865b686febe94b276c275b4"
+    },
+    {
+      "path": "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r1.json",
+      "bytes": 2641,
+      "digest": "sha256:0d1de9f8979799c16fd7ed8ea677e360d74dd3a980a3eab58f73a9e6afb51236"
+    },
+    {
+      "path": "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r2.json",
+      "bytes": 4868,
+      "digest": "sha256:e8d28d9b431d3118563d2db44f8eeeb56851678f3fc9163aeb485b8df3de0d3b"
+    },
+    {
+      "path": "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context.json",
+      "bytes": 4879,
+      "digest": "sha256:d06727b50feda839be0e84fc9843ef4be079fe8c554a7056cbd8ce4ad8373feb"
+    },
+    {
+      "path": "docs/fixtures/issue-275-slice-1-work-package-plan.json",
+      "bytes": 34590,
+      "digest": "sha256:91ab0c7c7a6b0399a6b38e010e1ea900d9d5cd72cb4eb966b3e0d372ca54955d"
+    },
+    {
+      "path": "docs/fixtures/lifecycle-traceability-chains.json",
+      "bytes": 73227,
+      "digest": "sha256:aa7e8352a3258912cae5299bd399643f3af686d3001a37f27c57a827d139d96e"
+    },
+    {
+      "path": "docs/fixtures/skill-effectiveness-outcome-cases.json",
+      "bytes": 18834,
+      "digest": "sha256:82ae9c761d8c8a312c8df2144ec97bd74ef3c7db029e1c92d26613401d6a7f3e"
+    },
+    {
+      "path": "docs/lifecycle-artifact-contract.md",
+      "bytes": 13811,
+      "digest": "sha256:bfee74175220395c680cc56972f30dd684b24106dd4c15f18e1fb30275f6064c"
+    },
+    {
+      "path": "docs/lifecycle-traceability-contract.md",
+      "bytes": 14341,
+      "digest": "sha256:e809b24873ff79af29a965df85865e879d035bea77883ec18f3034196acb2eda"
+    },
+    {
+      "path": "docs/mac-ask-full-reference-supplement.json",
+      "bytes": 10646,
+      "digest": "sha256:466da3374a9d2311a335ebf7113288dccd1d1c25c9a5b9e278f4d03e61a05b5f"
+    },
+    {
+      "path": "docs/mac-ask-full-static-inventory.json",
+      "bytes": 53977,
+      "digest": "sha256:3634c9ef3801067636d990a63f1793c268390ccb4012a1e2f1c4ac2e5b566bed"
+    },
+    {
+      "path": "docs/metrics-event-contract.md",
+      "bytes": 15446,
+      "digest": "sha256:45f03fb1d498b82122ac5f864e88e3b483b37e94062c9689bb60262067faaa9c"
+    },
+    {
+      "path": "docs/observability-runtime-contract.md",
+      "bytes": 7365,
+      "digest": "sha256:12da6ff9390f2c87c5b5bebcbd7a63bf280672557b94c51e30a4000cffbd5db4"
+    },
+    {
+      "path": "docs/operation-automation-contract.md",
+      "bytes": 2867,
+      "digest": "sha256:8cc9da3d016c4075bd4009ead34a697eb1cf32f2dd2204fc39928869737ac64a"
+    },
+    {
+      "path": "docs/project-overlay-template.md",
+      "bytes": 3309,
+      "digest": "sha256:bd35d920e6eb41eb89e78c33e4e40ecd341431ae1a49b864bd615f69673354cb"
+    },
+    {
+      "path": "docs/review-finding-contract.md",
+      "bytes": 3153,
+      "digest": "sha256:2a668ebfcec6776189a66227d738ac9c48276030ff6c402d27dfab313770e572"
+    },
+    {
+      "path": "docs/skill-effectiveness-evaluation-contract.md",
+      "bytes": 6928,
+      "digest": "sha256:f9d97c14d426ed9af5a3b5ac9f684b1e0315a65275fd721fd5a52881fd9ac005"
+    },
+    {
+      "path": "docs/stack-implementation-overlay-contract.md",
+      "bytes": 6063,
+      "digest": "sha256:9aa97f6c6ee9cca41e3b5b8881354c695777bfa7c5aab7eca578ccd729a5be7a"
+    },
+    {
+      "path": "docs/verification-evidence-contract.md",
+      "bytes": 13478,
+      "digest": "sha256:ff331b1a4113111472ceb681495b07b45c3343be4be26a196d5866aa558fe1a3"
+    },
+    {
+      "path": "docs/verification-proof-policy-contract.md",
+      "bytes": 8386,
+      "digest": "sha256:b1a4d5992ca46691a583b0c749dce817b5069835ea2b066c057c4362815f05ce"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 33267,
+      "digest": "sha256:0778bd2710e8a447c53406c43a384fee731c5564c7a6d79ad6683c92bf74656c"
+    },
+    {
+      "path": "schemas/adapter-runtime-event.schema.json",
+      "bytes": 6671,
+      "digest": "sha256:6a460e4dff6c468a59b5f910b167a0ddc23cdedac57ffb58b9d46f57d2e36ac6"
+    },
+    {
+      "path": "schemas/adapter-runtime-evidence.schema.json",
+      "bytes": 3215,
+      "digest": "sha256:2d0d16275189b2248ea756f72acb8b7de9658b575927941355557a16186d074c"
+    },
+    {
+      "path": "schemas/adapter-runtime-profile.schema.json",
+      "bytes": 13999,
+      "digest": "sha256:665ce8b143e77ff5770da3d893b24f5b166dd42e12ffa523df9ec4626b918676"
+    },
+    {
+      "path": "schemas/adoption-report.schema.json",
+      "bytes": 10272,
+      "digest": "sha256:db1712c08952af7bf017cf004e0aad973eba4d5106d26c9104343652645c5fe8"
+    },
+    {
+      "path": "schemas/claim-evidence-status.schema.json",
+      "bytes": 3449,
+      "digest": "sha256:be0ad5f23e3eeae32ac80f9e27e05a4dc397c479cd3719692764609569690098"
+    },
+    {
+      "path": "schemas/codex-risk-action.schema.json",
+      "bytes": 2252,
+      "digest": "sha256:ef7f3cd48c15f6326f95778af188602a5d5f0519dbad85046773c3f8a94791c5"
+    },
+    {
+      "path": "schemas/codex-risk-approval-request.schema.json",
+      "bytes": 12075,
+      "digest": "sha256:2c5f93979639b6696d8e28e470ab2360f1f4bd9fedbd39f719608dcd0a4e1103"
+    },
+    {
+      "path": "schemas/codex-risk-approval.schema.json",
+      "bytes": 713,
+      "digest": "sha256:6ce413128e4e6b64add184453804ec0ac71f4b7f7063912ee13450b557b48b71"
+    },
+    {
+      "path": "schemas/codex-runner-result.schema.json",
+      "bytes": 1854,
+      "digest": "sha256:c23eabab786bcad94a2e5dc75c07eb3199dbbb2198da311e5df3d25edac160f9"
+    },
+    {
+      "path": "schemas/compact-profile-control-map.json",
+      "bytes": 5798,
+      "digest": "sha256:3dc1cbaf148b7236b86a56f065a772c0623d87240a02a0df066fae0f89077f4f"
+    },
+    {
+      "path": "schemas/effectiveness-decision-vocabulary.schema.json",
+      "bytes": 993,
+      "digest": "sha256:74dc6195472de9c0ccdc56208bdca3fdac5a4a66884b542d04eefefe8c9f0648"
+    },
+    {
+      "path": "schemas/epic-admission-decision.schema.json",
+      "bytes": 7398,
+      "digest": "sha256:ccca5e4559a3045335464bd99c41386be012c111a30d65e8d9f3f836c916d555"
+    },
+    {
+      "path": "schemas/epic-admission-policy.schema.json",
+      "bytes": 5628,
+      "digest": "sha256:7b758af1e4ebf3a0a8ceb841b0d6deab8281bd2b402b56c025331a34e45b9a62"
+    },
+    {
+      "path": "schemas/execution-envelope-record.schema.json",
+      "bytes": 4676,
+      "digest": "sha256:ca41a93812a1510536272a01046fc69f3fca03c870fcf712c3b548534fdfc6a7"
+    },
+    {
+      "path": "schemas/execution-envelope.schema.json",
+      "bytes": 5050,
+      "digest": "sha256:23708f54ac8f443f2c27c9c478b8b6a653444071e9a4d34aa4adc0fc1baa3492"
+    },
+    {
+      "path": "schemas/fixed-entry-profile-registry.json",
+      "bytes": 2247,
+      "digest": "sha256:065bf20f6af19d3b9d48ad5680a31033b20997ced1c2913826946209272a830c"
+    },
+    {
+      "path": "schemas/improvement-ledger-entry.schema.json",
+      "bytes": 3804,
+      "digest": "sha256:7fd64d4c4b61d9a4411e2a94a50bc4e4bddfbf98ff4130db9edc8e53658dfd11"
+    },
+    {
+      "path": "schemas/metrics-event.schema.json",
+      "bytes": 14163,
+      "digest": "sha256:765fa0116c94d29fe298b575554a41173755fbcf36106144c7174cffe6f3da4d"
+    },
+    {
+      "path": "schemas/normalized-event-schema-registry.json",
+      "bytes": 391,
+      "digest": "sha256:337a71c2b081a26fb3a29813c275dabb5298a162576c03326e3032248b83c739"
+    },
+    {
+      "path": "schemas/review-finding.schema.json",
+      "bytes": 2705,
+      "digest": "sha256:dc79a584e051fd8a0971ecdc3ebbbe613360f7715c623af0eee194de84b10deb"
+    },
+    {
+      "path": "schemas/review-signal-gate-map.json",
+      "bytes": 5155,
+      "digest": "sha256:9da2bc5d6a87a30c837bade0e9d617991e39a1201d3e41a7949bdb990ab87bf8"
+    },
+    {
+      "path": "schemas/skill-effectiveness-outcome.schema.json",
+      "bytes": 16222,
+      "digest": "sha256:c98f4ca04f2f579df5b37d23e994d71f194087b12b618ec99eb480a8df83bf44"
+    },
+    {
+      "path": "schemas/verification-evidence-transfer.schema.json",
+      "bytes": 2504,
+      "digest": "sha256:89d6891fcf0453b0ff6e1f568306221f6a54cdedb49f4f39d5c049ec056cc17c"
+    },
+    {
+      "path": "schemas/verification-evidence.schema.json",
+      "bytes": 12254,
+      "digest": "sha256:cd0d90b2d7adc0856c023da0538c8886e544769286661bba5180fce46ed87590"
+    },
+    {
+      "path": "schemas/verification-proof-policy.schema.json",
+      "bytes": 12588,
+      "digest": "sha256:22886eaaf4627116aadc3bf6f0955c789f105680c8b139c9bf8e91906823edd9"
+    },
+    {
+      "path": "schemas/verification-reuse-plan.schema.json",
+      "bytes": 11649,
+      "digest": "sha256:9f81c384b789f196252d5c0f23def890bd2d9c838dd132c643857d784d2ab1ff"
+    },
+    {
+      "path": "schemas/work-package-plan-validation-context.schema.json",
+      "bytes": 9254,
+      "digest": "sha256:1686b9162c7387b99624943f475650d253d823f7dd6ad790c0c35dc0f4a79a00"
+    },
+    {
+      "path": "schemas/work-package-plan.schema.json",
+      "bytes": 16855,
+      "digest": "sha256:9715a5c518d498dd91fa53137118c9c5ae1a0e8b61f2fc92d0c705b30b75f343"
+    },
+    {
+      "path": "scripts/adapter-runtime-event.mjs",
+      "bytes": 13459,
+      "digest": "sha256:3e9da33fad3dc8b3156fb5d783164c7d5a2e47947e5d66d9bc36286947778d54"
+    },
+    {
+      "path": "scripts/adapter-runtime-inventory.mjs",
+      "bytes": 6411,
+      "digest": "sha256:b62cb8e263615bca23bc4b2b546a5e0bca3c62929ede2219fbbddcda24c2e4bc"
+    },
+    {
+      "path": "scripts/ai-ledger-refresh.mjs",
+      "bytes": 13240,
+      "digest": "sha256:3172df6aca108b4424c9be18a7833c198f4d10c505b887f2d7ce44cac6e614c8"
+    },
+    {
+      "path": "scripts/ai-metrics-record.mjs",
+      "bytes": 51977,
+      "digest": "sha256:b4535f89b1ff221bf69c4fcb74e1a0be6bee651df7255c580398cca8b3ea3360"
+    },
+    {
+      "path": "scripts/ask-benchmark-atomic-publication.mjs",
+      "bytes": 3179,
+      "digest": "sha256:1227b73efd9bcfe254fa8f448acb9aed5078c8f42fa4273ec1f71ab609fdb67a"
+    },
+    {
+      "path": "scripts/ask-benchmark-stable-file.mjs",
+      "bytes": 4178,
+      "digest": "sha256:09ff7093dc8785c6a36c6723750b8d6afc0b56196521800008ba59bfbe8d2482"
+    },
+    {
+      "path": "scripts/ask-core-bundle-product.mjs",
+      "bytes": 7286,
+      "digest": "sha256:12c48388d2c6c988461d6ffac614d9d5c58ca5c37d848379fec6b30fc21485b1"
+    },
+    {
+      "path": "scripts/ask-core-capabilities.mjs",
+      "bytes": 4104,
+      "digest": "sha256:8e978586313159fc63d6c5c4d90da9d72ac6393c1f0855d33a9494b43a955f88"
+    },
+    {
+      "path": "scripts/ask-sensors.mjs",
+      "bytes": 42892,
+      "digest": "sha256:7da2950d9cfc5407aaa9b0c5fea6dcdf2432d1e22ba72b7b3d474cf5d2e8ddda"
+    },
+    {
+      "path": "scripts/ask-shared.mjs",
+      "bytes": 27871,
+      "digest": "sha256:1728ef69a82a3e9ad4e6ac1afdd0636e023192b4bb0d523ea7a15c3fcf904755"
+    },
+    {
+      "path": "scripts/asset-registry.mjs",
+      "bytes": 48268,
+      "digest": "sha256:c85bdae4b2fc1886fa99f38005ac89a45effa4e5107ee736ecea0b4220c675b7"
+    },
+    {
+      "path": "scripts/claim-evidence-status.mjs",
+      "bytes": 9470,
+      "digest": "sha256:fbce689f58b6b74069a6ef2c5d3dd767668bbfc7c1551480c42fc7234d094cf4"
+    },
+    {
+      "path": "scripts/codex-exec-runner.mjs",
+      "bytes": 66014,
+      "digest": "sha256:3cc8deb5b24444ea244abf0171a5e1ca02504834a8a06af5da90e26cf2a8fc02"
+    },
+    {
+      "path": "scripts/codex-risk-approval.mjs",
+      "bytes": 22202,
+      "digest": "sha256:b2688fb6edd0db1eb95e22d12501f1eb147d02ae7ee48a42ba241c31f969975e"
+    },
+    {
+      "path": "scripts/codex-risk-workspace.mjs",
+      "bytes": 29260,
+      "digest": "sha256:0ce3414fd7d4975da1a5c4375e10487a75f5c813f4b0eb1a49fef2c2bb59b317"
+    },
+    {
+      "path": "scripts/codex-runtime-profile.mjs",
+      "bytes": 7433,
+      "digest": "sha256:a8d7a6b9a4ac2fd8e9e4a07de05dbb35dac813e7279cf22a87f229a4c6aa5af0"
+    },
+    {
+      "path": "scripts/content-addressed-store.mjs",
+      "bytes": 15176,
+      "digest": "sha256:201d5eb4b95a9853d2be2a146351b75d78820ae7fb4ca52795f74f2f9413daed"
+    },
+    {
+      "path": "scripts/execution-envelope.mjs",
+      "bytes": 17669,
+      "digest": "sha256:c7272fd30d999562cdc8caf66b648fc36ac237c3fc27131f98042746e1684a17"
+    },
+    {
+      "path": "scripts/fixed-entry-profile.mjs",
+      "bytes": 17590,
+      "digest": "sha256:e457411c5f436995e27903c33050836087841be8846a28da02df00fa83f4657e"
+    },
+    {
+      "path": "scripts/generate-ask-core-bundle.mjs",
+      "bytes": 3365,
+      "digest": "sha256:3f84762421fbed520f7cc529ccce9151d2d1b5dd45e3d31113a94e079c012c69"
+    },
+    {
+      "path": "scripts/install-ask-core-bundle.mjs",
+      "bytes": 12236,
+      "digest": "sha256:891126edd931e6760bc131550f093a45bd27969ae0f40fe2b3777a87365a31e5"
+    },
+    {
+      "path": "scripts/install-codex-adapter.mjs",
+      "bytes": 65977,
+      "digest": "sha256:7e3d3b0bbf3f2d360a15d9e8fff157f4d003dd66ec5b2776c82fd97c8591a4ad"
+    },
+    {
+      "path": "scripts/install-kernel.mjs",
+      "bytes": 14847,
+      "digest": "sha256:14edcdd098ca3f98b270d405a2748422c80d75584c2f6deff0e2a680fa57dc2f"
+    },
+    {
+      "path": "scripts/installer-lifecycle.mjs",
+      "bytes": 26724,
+      "digest": "sha256:2364e0337e5c511d1532cb8da5defffc3de311cd5cbf246634e86ae2dde8f477"
+    },
+    {
+      "path": "scripts/json-schema-validation.mjs",
+      "bytes": 25572,
+      "digest": "sha256:fcfb5083ebc5a151c48ae40574c29cb3a14461642b481a0c8f92602b910b09b7"
+    },
+    {
+      "path": "scripts/observability-paths.mjs",
+      "bytes": 1418,
+      "digest": "sha256:fad81f5fd713a18c48c9890955a11d6345c337586344c50d9712858717d9790f"
+    },
+    {
+      "path": "scripts/skill-assets.mjs",
+      "bytes": 2252,
+      "digest": "sha256:ff4dc939bfbc714ccd83677510c81c8daffb30bf113394600314ec24ec23283e"
+    },
+    {
+      "path": "scripts/skill-effectiveness-outcome.mjs",
+      "bytes": 27007,
+      "digest": "sha256:8df6c881034ccdcbacbb1c29cde3cbab0a69e230097794331ea177c76e05b1a9"
+    },
+    {
+      "path": "scripts/verification-evidence.mjs",
+      "bytes": 41729,
+      "digest": "sha256:a6761cd3b52bcff5acfbc769e36b7cf5f9b19f103c3b503b4f70870c8df01334"
+    },
+    {
+      "path": "scripts/verification-proof-policy.mjs",
+      "bytes": 18181,
+      "digest": "sha256:27496f3311b8d0ead6a2d782836b0f537408386edcd2cbd84f54fa63a2971ade"
+    },
+    {
+      "path": "skills/adr-review/SKILL.md",
+      "bytes": 2365,
+      "digest": "sha256:ffb3cd15f2c4b95cffb915c7aa824daed2a057522e43d12f65354256b64fddbb"
+    },
+    {
+      "path": "skills/angular-implementation-architecture/SKILL.md",
+      "bytes": 10793,
+      "digest": "sha256:29abfa73ed583a79a153ebf194f9b309683d813048bacc3935919513b9738c1c"
+    },
+    {
+      "path": "skills/application-boundary-architecture/SKILL.md",
+      "bytes": 26931,
+      "digest": "sha256:a941815b36632ea3b70da5dad46fd187259727cd2d66100aa7b3a7d24f3489d1"
+    },
+    {
+      "path": "skills/architecture-decision-memory/SKILL.md",
+      "bytes": 4243,
+      "digest": "sha256:1c642dd75f96511e5e0f29969774e6bc5a28f7bc4c13f3a330832cf11e4cb835"
+    },
+    {
+      "path": "skills/controlled-implementation/SKILL.md",
+      "bytes": 7997,
+      "digest": "sha256:1d2c9aee590a4a90243329d4f4dba0b3a460dbb4cf6e2c792bb40954ac87484a"
+    },
+    {
+      "path": "skills/documentation-knowledge-compiler/SKILL.md",
+      "bytes": 4225,
+      "digest": "sha256:04d941b5346f7c82bf881c7ae7c0884985db2228acbd57f078c42fc0da6233a2"
+    },
+    {
+      "path": "skills/domain-rule-ledger/SKILL.md",
+      "bytes": 4372,
+      "digest": "sha256:f1b9e2f7712d4b445a10fee88eb511f2551e61e7e7a00f662faf2e6937d7526c"
+    },
+    {
+      "path": "skills/doubt-driven-development/SKILL.md",
+      "bytes": 2881,
+      "digest": "sha256:8d4c467a8b99ca0ca1ad82f4005b5d15c8a7592803f5027f0ea8ab918351976e"
+    },
+    {
+      "path": "skills/engineering-capability-evaluation/SKILL.md",
+      "bytes": 4722,
+      "digest": "sha256:52d0de5a2980ab46140f1aabd2822933087691983180298a87912a0cfa96b59d"
+    },
+    {
+      "path": "skills/engineering-pattern-ledger/SKILL.md",
+      "bytes": 5031,
+      "digest": "sha256:2e8b0ae63e2a6da070a01665f73ec0550a1c8a17b31ca5d8d93e519b683b2f81"
+    },
+    {
+      "path": "skills/evidence-ledger/SKILL.md",
+      "bytes": 4406,
+      "digest": "sha256:e5a1b99897887407b96c1cbf367d46e242115e4f7b94fb885af5980e694d6669"
+    },
+    {
+      "path": "skills/grill-design/SKILL.md",
+      "bytes": 2272,
+      "digest": "sha256:0cd3d4f7750af54f757f3bef67c6cbdbe605cb75e18727c9edcbdde8e1b941fd"
+    },
+    {
+      "path": "skills/grill-with-docs/SKILL.md",
+      "bytes": 2364,
+      "digest": "sha256:7546463c3f6fb1f97c130a53657977f27f8e12cd61cfa3f6016c3999e0ceb0a9"
+    },
+    {
+      "path": "skills/handoff-generation/SKILL.md",
+      "bytes": 2928,
+      "digest": "sha256:ec28db665f96563058b2fdc7cc579fa689797b7b804eeea222a9b1970f060a89"
+    },
+    {
+      "path": "skills/implementation-context-generation/SKILL.md",
+      "bytes": 9302,
+      "digest": "sha256:734362bf400489ffca48bf86e5a11227213ca247645825a967efd835a688b05c"
+    },
+    {
+      "path": "skills/improvement-ledger/SKILL.md",
+      "bytes": 11146,
+      "digest": "sha256:8750a9ffad280309171e08785f7549a61ea59a365978092edee6929938e16c04"
+    },
+    {
+      "path": "skills/mr-readme-generation/SKILL.md",
+      "bytes": 6926,
+      "digest": "sha256:a35ed809ebb4f87ec1d9f598567fe1fb3f377641aa37f7b373e83596d6014cb1"
+    },
+    {
+      "path": "skills/next-best-change-finder/SKILL.md",
+      "bytes": 3679,
+      "digest": "sha256:b160d57604b95a7bbbbf6f15ffeb7a12dcff8933e6175fe7850df8cfae6f6de5"
+    },
+    {
+      "path": "skills/operating-mode-router/SKILL.md",
+      "bytes": 9354,
+      "digest": "sha256:0297ce968f0f80d4ee2c8cce493bc3ab14e0dba205aaf0e762a39d1b25d0f8fa"
+    },
+    {
+      "path": "skills/planning-with-files/SKILL.md",
+      "bytes": 2327,
+      "digest": "sha256:270655509ab476a66e47258fbc1c6bbfd41a0a870b1a691e040e5917e0a7cc80"
+    },
+    {
+      "path": "skills/project-adoption-pack-generation/SKILL.md",
+      "bytes": 6152,
+      "digest": "sha256:020cd892cb3f4fbf8361366d4ac9f78ca386420478342ba908133f32ec196f29"
+    },
+    {
+      "path": "skills/refactor-implementation/SKILL.md",
+      "bytes": 7258,
+      "digest": "sha256:4d5b0de56716d54ebf6cbb18f69992e527a4c49c0afa43052af3b2a1eb12c62d"
+    },
+    {
+      "path": "skills/release-readiness-gate/SKILL.md",
+      "bytes": 7961,
+      "digest": "sha256:d8e9f1a5a10f7230f1f4d4ca8348250b600ee1393209dbacbbf773159477a51c"
+    },
+    {
+      "path": "skills/repository-orientation/SKILL.md",
+      "bytes": 3019,
+      "digest": "sha256:d2843dd0832a28a3d8387b6d8796b1df3fb2b9bf63431865f19b3a767b2f2834"
+    },
+    {
+      "path": "skills/requirement-grill/SKILL.md",
+      "bytes": 5533,
+      "digest": "sha256:1dccf6f11705edabc97de7c8e8e20289da6114594742e62a9e2c2e8e2e2fa628"
+    },
+    {
+      "path": "skills/review-adversarial-risk/SKILL.md",
+      "bytes": 5111,
+      "digest": "sha256:d74482857cceed63f73f135ac89a028bf4851d85ca3876c72ef4a2d2e01d22ca"
+    },
+    {
+      "path": "skills/review-ai-quality/SKILL.md",
+      "bytes": 5946,
+      "digest": "sha256:ce48a19cf6d4ae69c3cc57a2715aee9563df62bff81dc3bf8dd06fb4e66a5947"
+    },
+    {
+      "path": "skills/review-architecture-impact/SKILL.md",
+      "bytes": 7038,
+      "digest": "sha256:889fb45fd2136d2770cc22f61b75b24be9f692129aa59aab35a99aece990a902"
+    },
+    {
+      "path": "skills/review-automated-gate/SKILL.md",
+      "bytes": 2783,
+      "digest": "sha256:b89fb5605de1564599ee3758196f2e3a7e121efa940e27627edfdb33ab41b149"
+    },
+    {
+      "path": "skills/review-code-health/SKILL.md",
+      "bytes": 7638,
+      "digest": "sha256:5529c02ac13407f0a77e4d25d92c210b7c6f11e3e4652cbcf164f62ddb10cce9"
+    },
+    {
+      "path": "skills/review-context-generation/SKILL.md",
+      "bytes": 7984,
+      "digest": "sha256:4815151510242b89e42fb7dc9582a9646ab52113008fbed888a23ad57b2561a3"
+    },
+    {
+      "path": "skills/review-domain-impact/SKILL.md",
+      "bytes": 5978,
+      "digest": "sha256:d6ba34ae5d93ff9f8b1ec6ff2c4e3b9efd8558231e83fce4a2ba97e275739897"
+    },
+    {
+      "path": "skills/review-final-merge-gate/SKILL.md",
+      "bytes": 6211,
+      "digest": "sha256:b9736403a1929fa819491621fa7c84edcfb1837a0714bc35ec54cf44f1f1fb04"
+    },
+    {
+      "path": "skills/review-finding-compiler/SKILL.md",
+      "bytes": 4071,
+      "digest": "sha256:17e46919206a5f465a38fc180c3b0569b8c5b56bfbd70bc52bf4a405d742299c"
+    },
+    {
+      "path": "skills/review-output-quality/SKILL.md",
+      "bytes": 7657,
+      "digest": "sha256:a95ccd768cec2f92f041c5f7027900021858a4a3950ee83efe57ec330c56314b"
+    },
+    {
+      "path": "skills/review-router/SKILL.md",
+      "bytes": 7686,
+      "digest": "sha256:b7207c62bcab7a82e3e3bc77a5cc9b15647fa548d4e3da4ed300a9190593b27c"
+    },
+    {
+      "path": "skills/review-to-rule-compiler/SKILL.md",
+      "bytes": 3695,
+      "digest": "sha256:e7298131950c78d8f5f8d9c5cafc4a2269b0a1597de74e4e7d01939f44cd1ba4"
+    },
+    {
+      "path": "skills/risk-gate/SKILL.md",
+      "bytes": 2867,
+      "digest": "sha256:4ff0ef2cbc3f8c0c366526d6f5ddc8ef110c49e13552d2194134b6285e27584a"
+    },
+    {
+      "path": "skills/scope-control/SKILL.md",
+      "bytes": 2234,
+      "digest": "sha256:c9788b51bd5ff843138c80b95f0b340429bfeb44cbdebdd70b3c4ad0004726b2"
+    },
+    {
+      "path": "skills/skill-adoption-metrics/SKILL.md",
+      "bytes": 7982,
+      "digest": "sha256:3d9e5e5afce9d3db2ddc212147c43a774e2790457adc99cee284317d38913d58"
+    },
+    {
+      "path": "skills/skill-effectiveness-evaluation/SKILL.md",
+      "bytes": 11126,
+      "digest": "sha256:3515e62b33c97aa1f8b4dd1c348ee832dc3e39173b1041924e6eef615b5bb32c"
+    },
+    {
+      "path": "skills/skill-router/SKILL.md",
+      "bytes": 18379,
+      "digest": "sha256:27cd80c9e32d092cb9bb62b0ecb67a648f420a132b18787b03bc9b7ef53a3ef4"
+    },
+    {
+      "path": "skills/spec-driven-development/SKILL.md",
+      "bytes": 3543,
+      "digest": "sha256:6ebc4b33f3f93dd487778856dbdbb7456eb1c169f54a94d2a4c320a19efac825"
+    },
+    {
+      "path": "skills/test-first-verification/SKILL.md",
+      "bytes": 8771,
+      "digest": "sha256:e6bc2eeeb4648dd25607667161b45c895748e7c9b6a2723295a8e41a2d6392aa"
+    },
+    {
+      "path": "skills/ui-ux-design/SKILL.md",
+      "bytes": 6199,
+      "digest": "sha256:498af71b77ec6b863f2059b88b1376ca714d48d23da3f22f0c608580ab5f3931"
+    },
+    {
+      "path": "skills/ui-ux-design/references/anti-patterns.md",
+      "bytes": 3092,
+      "digest": "sha256:5d16f954149bb3cd1033e81c1af24d392380fa13ddf4ceeadc2d540be97e72ef"
+    },
+    {
+      "path": "skills/ui-ux-design/references/decision-patterns.md",
+      "bytes": 17245,
+      "digest": "sha256:9991fb6f9b98114238e44f5af83ac93fac1d3a5126caa393fd920421b87c0b78"
+    },
+    {
+      "path": "skills/ui-ux-design/references/principles.md",
+      "bytes": 4171,
+      "digest": "sha256:88e5b04fb38fe4f0a7dff468ea3266a388d3655e2eee79ab329336ecffc552e8"
+    },
+    {
+      "path": "skills/verification-pattern-ledger/SKILL.md",
+      "bytes": 3963,
+      "digest": "sha256:916efacf5540fbe73986d409c3531c519f9fae43d1bae37d0e2c9da06a686832"
+    },
+    {
+      "path": "skills/work-package-compiler/SKILL.md",
+      "bytes": 6375,
+      "digest": "sha256:ebee93b2459f9cbac7205ca229399562fa218f22d54059ee5a35994954bd39f4"
+    }
+  ],
+  "full_assets": {
+    ".agent-spectrum-kernel/codex-install-state.json": {
+      "bytes": 174,
+      "digest": "sha256:2245a2018b43698ef7f53f4df636e2362995191ae7d874d4a1bde193bbae72b5"
+    },
+    ".agent-spectrum-kernel/install-state.json": {
+      "bytes": 174,
+      "digest": "sha256:2245a2018b43698ef7f53f4df636e2362995191ae7d874d4a1bde193bbae72b5"
+    },
+    ".agents/commands/codex-exec.md": {
+      "bytes": 1844,
+      "digest": "sha256:d4887e07e37eba4faaa2c180344ecf33fe548cc50631dbab4b876d87c17e7af4"
+    },
+    ".agents/prompts/skill-handoff.md": {
+      "bytes": 1688,
+      "digest": "sha256:890abd7a17b37fab49e735f0242eb5ea033fbe2fbb54c4c60aafa9df4ce50397"
+    },
+    ".agents/prompts/skill-implement.md": {
+      "bytes": 2326,
+      "digest": "sha256:6d278bc618f18ff964737d8722f72264b7854c3550606d425e23815e8dcf6a31"
+    },
+    ".agents/prompts/skill-investigate.md": {
+      "bytes": 1974,
+      "digest": "sha256:6a6e164d2f57a4ba9d4adaefac21c4b1982289652512f12481f40b6cbd07d45a"
+    },
+    ".agents/prompts/skill-review.md": {
+      "bytes": 2980,
+      "digest": "sha256:f02ceabfa57105b4cae16fcd8329c3099776fce0cdf56202887834f3d0567539"
+    },
+    ".agents/prompts/skill-verify.md": {
+      "bytes": 2043,
+      "digest": "sha256:448c0677e42d0d66f679f304eedde87d8f433659e7826141fd8348e94b0c7feb"
+    },
+    ".agents/skills/adr-review/SKILL.md": {
+      "bytes": 2365,
+      "digest": "sha256:ffb3cd15f2c4b95cffb915c7aa824daed2a057522e43d12f65354256b64fddbb"
+    },
+    ".agents/skills/angular-implementation-architecture/SKILL.md": {
+      "bytes": 10793,
+      "digest": "sha256:29abfa73ed583a79a153ebf194f9b309683d813048bacc3935919513b9738c1c"
+    },
+    ".agents/skills/application-boundary-architecture/SKILL.md": {
+      "bytes": 26931,
+      "digest": "sha256:a941815b36632ea3b70da5dad46fd187259727cd2d66100aa7b3a7d24f3489d1"
+    },
+    ".agents/skills/architecture-decision-memory/SKILL.md": {
+      "bytes": 4243,
+      "digest": "sha256:1c642dd75f96511e5e0f29969774e6bc5a28f7bc4c13f3a330832cf11e4cb835"
+    },
+    ".agents/skills/controlled-implementation/SKILL.md": {
+      "bytes": 7997,
+      "digest": "sha256:1d2c9aee590a4a90243329d4f4dba0b3a460dbb4cf6e2c792bb40954ac87484a"
+    },
+    ".agents/skills/documentation-knowledge-compiler/SKILL.md": {
+      "bytes": 4225,
+      "digest": "sha256:04d941b5346f7c82bf881c7ae7c0884985db2228acbd57f078c42fc0da6233a2"
+    },
+    ".agents/skills/domain-rule-ledger/SKILL.md": {
+      "bytes": 4372,
+      "digest": "sha256:f1b9e2f7712d4b445a10fee88eb511f2551e61e7e7a00f662faf2e6937d7526c"
+    },
+    ".agents/skills/doubt-driven-development/SKILL.md": {
+      "bytes": 2881,
+      "digest": "sha256:8d4c467a8b99ca0ca1ad82f4005b5d15c8a7592803f5027f0ea8ab918351976e"
+    },
+    ".agents/skills/engineering-capability-evaluation/SKILL.md": {
+      "bytes": 4722,
+      "digest": "sha256:52d0de5a2980ab46140f1aabd2822933087691983180298a87912a0cfa96b59d"
+    },
+    ".agents/skills/engineering-pattern-ledger/SKILL.md": {
+      "bytes": 5031,
+      "digest": "sha256:2e8b0ae63e2a6da070a01665f73ec0550a1c8a17b31ca5d8d93e519b683b2f81"
+    },
+    ".agents/skills/evidence-ledger/SKILL.md": {
+      "bytes": 754,
+      "digest": "sha256:afe761f9428a052041073d955742522b8c59a22b485607a81f5d6608771d4e6c"
+    },
+    ".agents/skills/grill-design/SKILL.md": {
+      "bytes": 2272,
+      "digest": "sha256:0cd3d4f7750af54f757f3bef67c6cbdbe605cb75e18727c9edcbdde8e1b941fd"
+    },
+    ".agents/skills/grill-with-docs/SKILL.md": {
+      "bytes": 2364,
+      "digest": "sha256:7546463c3f6fb1f97c130a53657977f27f8e12cd61cfa3f6016c3999e0ceb0a9"
+    },
+    ".agents/skills/handoff-generation/SKILL.md": {
+      "bytes": 2928,
+      "digest": "sha256:ec28db665f96563058b2fdc7cc579fa689797b7b804eeea222a9b1970f060a89"
+    },
+    ".agents/skills/implementation-context-generation/SKILL.md": {
+      "bytes": 9302,
+      "digest": "sha256:734362bf400489ffca48bf86e5a11227213ca247645825a967efd835a688b05c"
+    },
+    ".agents/skills/improvement-ledger/SKILL.md": {
+      "bytes": 11146,
+      "digest": "sha256:8750a9ffad280309171e08785f7549a61ea59a365978092edee6929938e16c04"
+    },
+    ".agents/skills/mr-readme-generation/SKILL.md": {
+      "bytes": 6926,
+      "digest": "sha256:a35ed809ebb4f87ec1d9f598567fe1fb3f377641aa37f7b373e83596d6014cb1"
+    },
+    ".agents/skills/next-best-change-finder/SKILL.md": {
+      "bytes": 3679,
+      "digest": "sha256:b160d57604b95a7bbbbf6f15ffeb7a12dcff8933e6175fe7850df8cfae6f6de5"
+    },
+    ".agents/skills/operating-mode-router/SKILL.md": {
+      "bytes": 9349,
+      "digest": "sha256:ee99a7b7e7d428176cd4a4c7c724a0d94ef68f3e4f924123ac175a60879740ef"
+    },
+    ".agents/skills/planning-with-files/SKILL.md": {
+      "bytes": 2327,
+      "digest": "sha256:270655509ab476a66e47258fbc1c6bbfd41a0a870b1a691e040e5917e0a7cc80"
+    },
+    ".agents/skills/project-adoption-pack-generation/SKILL.md": {
+      "bytes": 6152,
+      "digest": "sha256:020cd892cb3f4fbf8361366d4ac9f78ca386420478342ba908133f32ec196f29"
+    },
+    ".agents/skills/refactor-implementation/SKILL.md": {
+      "bytes": 7258,
+      "digest": "sha256:4d5b0de56716d54ebf6cbb18f69992e527a4c49c0afa43052af3b2a1eb12c62d"
+    },
+    ".agents/skills/release-readiness-gate/SKILL.md": {
+      "bytes": 7961,
+      "digest": "sha256:d8e9f1a5a10f7230f1f4d4ca8348250b600ee1393209dbacbbf773159477a51c"
+    },
+    ".agents/skills/repository-orientation/SKILL.md": {
+      "bytes": 3019,
+      "digest": "sha256:d2843dd0832a28a3d8387b6d8796b1df3fb2b9bf63431865f19b3a767b2f2834"
+    },
+    ".agents/skills/requirement-grill/SKILL.md": {
+      "bytes": 5533,
+      "digest": "sha256:1dccf6f11705edabc97de7c8e8e20289da6114594742e62a9e2c2e8e2e2fa628"
+    },
+    ".agents/skills/review-adversarial-risk/SKILL.md": {
+      "bytes": 5111,
+      "digest": "sha256:d74482857cceed63f73f135ac89a028bf4851d85ca3876c72ef4a2d2e01d22ca"
+    },
+    ".agents/skills/review-ai-quality/SKILL.md": {
+      "bytes": 760,
+      "digest": "sha256:ba02b5627a109a1dc1d6564dd5620b4a619c42803f5666dfdbac3482843b9982"
+    },
+    ".agents/skills/review-architecture-impact/SKILL.md": {
+      "bytes": 7038,
+      "digest": "sha256:889fb45fd2136d2770cc22f61b75b24be9f692129aa59aab35a99aece990a902"
+    },
+    ".agents/skills/review-automated-gate/SKILL.md": {
+      "bytes": 2783,
+      "digest": "sha256:b89fb5605de1564599ee3758196f2e3a7e121efa940e27627edfdb33ab41b149"
+    },
+    ".agents/skills/review-code-health/SKILL.md": {
+      "bytes": 7638,
+      "digest": "sha256:5529c02ac13407f0a77e4d25d92c210b7c6f11e3e4652cbcf164f62ddb10cce9"
+    },
+    ".agents/skills/review-context-generation/SKILL.md": {
+      "bytes": 7984,
+      "digest": "sha256:4815151510242b89e42fb7dc9582a9646ab52113008fbed888a23ad57b2561a3"
+    },
+    ".agents/skills/review-domain-impact/SKILL.md": {
+      "bytes": 5978,
+      "digest": "sha256:d6ba34ae5d93ff9f8b1ec6ff2c4e3b9efd8558231e83fce4a2ba97e275739897"
+    },
+    ".agents/skills/review-final-merge-gate/SKILL.md": {
+      "bytes": 6211,
+      "digest": "sha256:b9736403a1929fa819491621fa7c84edcfb1837a0714bc35ec54cf44f1f1fb04"
+    },
+    ".agents/skills/review-finding-compiler/SKILL.md": {
+      "bytes": 4071,
+      "digest": "sha256:17e46919206a5f465a38fc180c3b0569b8c5b56bfbd70bc52bf4a405d742299c"
+    },
+    ".agents/skills/review-output-quality/SKILL.md": {
+      "bytes": 7657,
+      "digest": "sha256:a95ccd768cec2f92f041c5f7027900021858a4a3950ee83efe57ec330c56314b"
+    },
+    ".agents/skills/review-router/SKILL.md": {
+      "bytes": 7928,
+      "digest": "sha256:018e2775fe7baf137f95bd0d58e0e26534501ccec3676ad403c0095e8ac405ed"
+    },
+    ".agents/skills/review-to-rule-compiler/SKILL.md": {
+      "bytes": 3695,
+      "digest": "sha256:e7298131950c78d8f5f8d9c5cafc4a2269b0a1597de74e4e7d01939f44cd1ba4"
+    },
+    ".agents/skills/risk-gate/SKILL.md": {
+      "bytes": 2867,
+      "digest": "sha256:4ff0ef2cbc3f8c0c366526d6f5ddc8ef110c49e13552d2194134b6285e27584a"
+    },
+    ".agents/skills/scope-control/SKILL.md": {
+      "bytes": 2234,
+      "digest": "sha256:c9788b51bd5ff843138c80b95f0b340429bfeb44cbdebdd70b3c4ad0004726b2"
+    },
+    ".agents/skills/skill-adoption-metrics/SKILL.md": {
+      "bytes": 7982,
+      "digest": "sha256:3d9e5e5afce9d3db2ddc212147c43a774e2790457adc99cee284317d38913d58"
+    },
+    ".agents/skills/skill-effectiveness-evaluation/SKILL.md": {
+      "bytes": 11126,
+      "digest": "sha256:3515e62b33c97aa1f8b4dd1c348ee832dc3e39173b1041924e6eef615b5bb32c"
+    },
+    ".agents/skills/skill-router/SKILL.md": {
+      "bytes": 18374,
+      "digest": "sha256:5891c6dad8a83dc34f4666a47fd89cbd7eae9cf6edb57617a1f8c849d115c640"
+    },
+    ".agents/skills/spec-driven-development/SKILL.md": {
+      "bytes": 3543,
+      "digest": "sha256:6ebc4b33f3f93dd487778856dbdbb7456eb1c169f54a94d2a4c320a19efac825"
+    },
+    ".agents/skills/test-first-verification/SKILL.md": {
+      "bytes": 8771,
+      "digest": "sha256:e6bc2eeeb4648dd25607667161b45c895748e7c9b6a2723295a8e41a2d6392aa"
+    },
+    ".agents/skills/ui-ux-design/references/anti-patterns.md": {
+      "bytes": 3092,
+      "digest": "sha256:5d16f954149bb3cd1033e81c1af24d392380fa13ddf4ceeadc2d540be97e72ef"
+    },
+    ".agents/skills/ui-ux-design/references/decision-patterns.md": {
+      "bytes": 17245,
+      "digest": "sha256:9991fb6f9b98114238e44f5af83ac93fac1d3a5126caa393fd920421b87c0b78"
+    },
+    ".agents/skills/ui-ux-design/references/principles.md": {
+      "bytes": 4171,
+      "digest": "sha256:88e5b04fb38fe4f0a7dff468ea3266a388d3655e2eee79ab329336ecffc552e8"
+    },
+    ".agents/skills/ui-ux-design/SKILL.md": {
+      "bytes": 6199,
+      "digest": "sha256:498af71b77ec6b863f2059b88b1376ca714d48d23da3f22f0c608580ab5f3931"
+    },
+    ".agents/skills/verification-pattern-ledger/SKILL.md": {
+      "bytes": 3963,
+      "digest": "sha256:916efacf5540fbe73986d409c3531c519f9fae43d1bae37d0e2c9da06a686832"
+    },
+    ".agents/skills/work-package-compiler/SKILL.md": {
+      "bytes": 6375,
+      "digest": "sha256:ebee93b2459f9cbac7205ca229399562fa218f22d54059ee5a35994954bd39f4"
+    },
+    "AGENTS.md": {
+      "bytes": 12414,
+      "digest": "sha256:ce8f749aa7dccf42dad498c456bdfc3672a1198f55e134d161755106d743ba2c"
+    },
+    "CUSTOM_INSTRUCTIONS.md": {
+      "bytes": 12414,
+      "digest": "sha256:ce8f749aa7dccf42dad498c456bdfc3672a1198f55e134d161755106d743ba2c"
+    },
+    "docs/adapter-conformance-contract.md": {
+      "bytes": 11319,
+      "digest": "sha256:5713b561e17fcce4bead3dc2b1c711fcecb5deabebddbcc2f81edfbfbcf7e498"
+    },
+    "docs/adapter-deployment-governance.md": {
+      "bytes": 12319,
+      "digest": "sha256:51b72668cfb53bd0c72e995e5149175f0f3a0434e6a45d8e8c00d34840a494a3"
+    },
+    "docs/adr/0001-verification-evidence-trust-boundary.md": {
+      "bytes": 7782,
+      "digest": "sha256:0303ce52ed152ff183ef9be501cae5ace1c668a68fa0ea230994263230b3782e"
+    },
+    "docs/agent-session-state-contract.md": {
+      "bytes": 3376,
+      "digest": "sha256:623a46f7eefbe8f5f08b57989b3644a372505ebf54052d2cf8d535e91607a5ff"
+    },
+    "docs/ai/adoption-report-template.md": {
+      "bytes": 5343,
+      "digest": "sha256:c52667740307d9985c61633fdeb189bf9650bc7706f0aa6306e761cd9c2d1591"
+    },
+    "docs/ai/architecture-decision-memory.md": {
+      "bytes": 4456,
+      "digest": "sha256:4fea91ee201ade0cb69c0e59841c3d0a3707ce7ea6e79f93660f087741ae99c4"
+    },
+    "docs/ai/documentation-knowledge-ledger.md": {
+      "bytes": 4078,
+      "digest": "sha256:69907fe30982de3a9bfbdfbece39dc4489fe95a239379ac910ed2b68d4bb177f"
+    },
+    "docs/ai/domain-rule-ledger.md": {
+      "bytes": 5588,
+      "digest": "sha256:c07740b3cde6106e4912e9be1df3668bd509a9bfeac6332ff9ed2c66a6ce5046"
+    },
+    "docs/ai/engineering-capability-ledger.md": {
+      "bytes": 4853,
+      "digest": "sha256:cc0ccd3441dff31a1fe7d5783fa949aece4005585fa9e20834c38dba53bdd966"
+    },
+    "docs/ai/engineering-pattern-ledger.md": {
+      "bytes": 4289,
+      "digest": "sha256:3a5a8ee093f504bb8f68d08da149a4a75830364a1af5ada30867fc31ffd6b055"
+    },
+    "docs/ai/implementation-context.md": {
+      "bytes": 7251,
+      "digest": "sha256:4f01805634d75b97003db14fe4f1066c4c61d96dde76920c5afdb9313e3f2903"
+    },
+    "docs/ai/improvement-ledger.md": {
+      "bytes": 11451,
+      "digest": "sha256:68efb2cad1efe9e80a7d8f601c973ede4da2c6d2ef33f9a7d91583e9c18672df"
+    },
+    "docs/ai/review-context.md": {
+      "bytes": 5130,
+      "digest": "sha256:33467c3306457594d44b4d5aa577b8b872c9993a3057659b46bf4c5c23552651"
+    },
+    "docs/ai/review-rule-ledger.md": {
+      "bytes": 4043,
+      "digest": "sha256:2e24ed96f47f5b830501df0e266e27143d97b94166443581c6482f1039ba4d61"
+    },
+    "docs/ai/skill-adoption-metrics.md": {
+      "bytes": 6725,
+      "digest": "sha256:98eaf0f94f45f4b145340bee39e790311ffbbe9a43953e4ef7bd3f440e1a009c"
+    },
+    "docs/ai/verification-pattern-ledger.md": {
+      "bytes": 4236,
+      "digest": "sha256:daec1aed44e2b2a9109a28404f6464b38568487ca18bff0a86fd59b709aed2ba"
+    },
+    "docs/claim-evidence-status-contract.md": {
+      "bytes": 4753,
+      "digest": "sha256:fee51f8ba1747dcecb84e11d894ec742ba5eeaf23a5be37fdc5a24515cec5926"
+    },
+    "docs/debt-lifecycle-contract.md": {
+      "bytes": 4695,
+      "digest": "sha256:e8c625444b9cbd6daab701fc429b47232889cb156fd9e8e0047d354562aa0558"
+    },
+    "docs/epic-admission-work-package-plan-contract.md": {
+      "bytes": 21499,
+      "digest": "sha256:462013302ced3062fb8bd75f407f52f02614201600fabfb6fda8d4ee26262020"
+    },
+    "docs/execution-envelope-contract.md": {
+      "bytes": 16425,
+      "digest": "sha256:429fa068c322b4ce59d7fe20fcb4a4541ffb2e250bc12e3cf21859b7fca33e3a"
+    },
+    "docs/fixtures/adapter-cross-conformance.json": {
+      "bytes": 24374,
+      "digest": "sha256:30d916655371092aa5c780e39a7e4505027828f01c73fc1accd946f43134e2c8"
+    },
+    "docs/fixtures/issue-275-slice-1-work-package-plan-r1.json": {
+      "bytes": 31636,
+      "digest": "sha256:c65c703eb760467289847364d6dcb68c0bcc863ae091a641d892550e3a815437"
+    },
+    "docs/fixtures/issue-275-slice-1-work-package-plan-r2.json": {
+      "bytes": 32862,
+      "digest": "sha256:545a7d08d055c1e99e95d9b49fca4e26021945328865b686febe94b276c275b4"
+    },
+    "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r1.json": {
+      "bytes": 2641,
+      "digest": "sha256:0d1de9f8979799c16fd7ed8ea677e360d74dd3a980a3eab58f73a9e6afb51236"
+    },
+    "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r2.json": {
+      "bytes": 4868,
+      "digest": "sha256:e8d28d9b431d3118563d2db44f8eeeb56851678f3fc9163aeb485b8df3de0d3b"
+    },
+    "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context.json": {
+      "bytes": 4879,
+      "digest": "sha256:d06727b50feda839be0e84fc9843ef4be079fe8c554a7056cbd8ce4ad8373feb"
+    },
+    "docs/fixtures/issue-275-slice-1-work-package-plan.json": {
+      "bytes": 34590,
+      "digest": "sha256:91ab0c7c7a6b0399a6b38e010e1ea900d9d5cd72cb4eb966b3e0d372ca54955d"
+    },
+    "docs/fixtures/lifecycle-traceability-chains.json": {
+      "bytes": 73227,
+      "digest": "sha256:aa7e8352a3258912cae5299bd399643f3af686d3001a37f27c57a827d139d96e"
+    },
+    "docs/fixtures/skill-effectiveness-outcome-cases.json": {
+      "bytes": 18834,
+      "digest": "sha256:82ae9c761d8c8a312c8df2144ec97bd74ef3c7db029e1c92d26613401d6a7f3e"
+    },
+    "docs/lifecycle-artifact-contract.md": {
+      "bytes": 13811,
+      "digest": "sha256:bfee74175220395c680cc56972f30dd684b24106dd4c15f18e1fb30275f6064c"
+    },
+    "docs/lifecycle-traceability-contract.md": {
+      "bytes": 14341,
+      "digest": "sha256:e809b24873ff79af29a965df85865e879d035bea77883ec18f3034196acb2eda"
+    },
+    "docs/metrics-event-contract.md": {
+      "bytes": 15446,
+      "digest": "sha256:45f03fb1d498b82122ac5f864e88e3b483b37e94062c9689bb60262067faaa9c"
+    },
+    "docs/observability-runtime-contract.md": {
+      "bytes": 7365,
+      "digest": "sha256:12da6ff9390f2c87c5b5bebcbd7a63bf280672557b94c51e30a4000cffbd5db4"
+    },
+    "docs/operation-automation-contract.md": {
+      "bytes": 2867,
+      "digest": "sha256:8cc9da3d016c4075bd4009ead34a697eb1cf32f2dd2204fc39928869737ac64a"
+    },
+    "docs/project-overlay-template.md": {
+      "bytes": 3309,
+      "digest": "sha256:bd35d920e6eb41eb89e78c33e4e40ecd341431ae1a49b864bd615f69673354cb"
+    },
+    "docs/review-finding-contract.md": {
+      "bytes": 3153,
+      "digest": "sha256:2a668ebfcec6776189a66227d738ac9c48276030ff6c402d27dfab313770e572"
+    },
+    "docs/skill-effectiveness-evaluation-contract.md": {
+      "bytes": 6928,
+      "digest": "sha256:f9d97c14d426ed9af5a3b5ac9f684b1e0315a65275fd721fd5a52881fd9ac005"
+    },
+    "docs/stack-implementation-overlay-contract.md": {
+      "bytes": 6063,
+      "digest": "sha256:9aa97f6c6ee9cca41e3b5b8881354c695777bfa7c5aab7eca578ccd729a5be7a"
+    },
+    "docs/verification-evidence-contract.md": {
+      "bytes": 13478,
+      "digest": "sha256:ff331b1a4113111472ceb681495b07b45c3343be4be26a196d5866aa558fe1a3"
+    },
+    "docs/verification-proof-policy-contract.md": {
+      "bytes": 8386,
+      "digest": "sha256:b1a4d5992ca46691a583b0c749dce817b5069835ea2b066c057c4362815f05ce"
+    },
+    "products/ask-core-bundle/capabilities.json": {
+      "bytes": 1794,
+      "digest": "sha256:c2b53ceeb04dddb59b03ccfe048888b427cbd4e40b0601dcdafe78809b869778"
+    },
+    "schemas/adapter-runtime-event.schema.json": {
+      "bytes": 6671,
+      "digest": "sha256:6a460e4dff6c468a59b5f910b167a0ddc23cdedac57ffb58b9d46f57d2e36ac6"
+    },
+    "schemas/adoption-report.schema.json": {
+      "bytes": 10272,
+      "digest": "sha256:db1712c08952af7bf017cf004e0aad973eba4d5106d26c9104343652645c5fe8"
+    },
+    "schemas/claim-evidence-status.schema.json": {
+      "bytes": 3449,
+      "digest": "sha256:be0ad5f23e3eeae32ac80f9e27e05a4dc397c479cd3719692764609569690098"
+    },
+    "schemas/codex-risk-action.schema.json": {
+      "bytes": 2252,
+      "digest": "sha256:ef7f3cd48c15f6326f95778af188602a5d5f0519dbad85046773c3f8a94791c5"
+    },
+    "schemas/codex-risk-approval-request.schema.json": {
+      "bytes": 12075,
+      "digest": "sha256:2c5f93979639b6696d8e28e470ab2360f1f4bd9fedbd39f719608dcd0a4e1103"
+    },
+    "schemas/codex-risk-approval.schema.json": {
+      "bytes": 713,
+      "digest": "sha256:6ce413128e4e6b64add184453804ec0ac71f4b7f7063912ee13450b557b48b71"
+    },
+    "schemas/compact-profile-control-map.json": {
+      "bytes": 5798,
+      "digest": "sha256:3dc1cbaf148b7236b86a56f065a772c0623d87240a02a0df066fae0f89077f4f"
+    },
+    "schemas/effectiveness-decision-vocabulary.schema.json": {
+      "bytes": 993,
+      "digest": "sha256:74dc6195472de9c0ccdc56208bdca3fdac5a4a66884b542d04eefefe8c9f0648"
+    },
+    "schemas/epic-admission-decision.schema.json": {
+      "bytes": 7398,
+      "digest": "sha256:ccca5e4559a3045335464bd99c41386be012c111a30d65e8d9f3f836c916d555"
+    },
+    "schemas/epic-admission-policy.schema.json": {
+      "bytes": 5628,
+      "digest": "sha256:7b758af1e4ebf3a0a8ceb841b0d6deab8281bd2b402b56c025331a34e45b9a62"
+    },
+    "schemas/execution-envelope-record.schema.json": {
+      "bytes": 4676,
+      "digest": "sha256:ca41a93812a1510536272a01046fc69f3fca03c870fcf712c3b548534fdfc6a7"
+    },
+    "schemas/execution-envelope.schema.json": {
+      "bytes": 5050,
+      "digest": "sha256:23708f54ac8f443f2c27c9c478b8b6a653444071e9a4d34aa4adc0fc1baa3492"
+    },
+    "schemas/fixed-entry-profile-registry.json": {
+      "bytes": 2247,
+      "digest": "sha256:065bf20f6af19d3b9d48ad5680a31033b20997ced1c2913826946209272a830c"
+    },
+    "schemas/improvement-ledger-entry.schema.json": {
+      "bytes": 3804,
+      "digest": "sha256:7fd64d4c4b61d9a4411e2a94a50bc4e4bddfbf98ff4130db9edc8e53658dfd11"
+    },
+    "schemas/metrics-event.schema.json": {
+      "bytes": 14163,
+      "digest": "sha256:765fa0116c94d29fe298b575554a41173755fbcf36106144c7174cffe6f3da4d"
+    },
+    "schemas/normalized-event-schema-registry.json": {
+      "bytes": 391,
+      "digest": "sha256:337a71c2b081a26fb3a29813c275dabb5298a162576c03326e3032248b83c739"
+    },
+    "schemas/review-finding.schema.json": {
+      "bytes": 2705,
+      "digest": "sha256:dc79a584e051fd8a0971ecdc3ebbbe613360f7715c623af0eee194de84b10deb"
+    },
+    "schemas/review-signal-gate-map.json": {
+      "bytes": 5155,
+      "digest": "sha256:9da2bc5d6a87a30c837bade0e9d617991e39a1201d3e41a7949bdb990ab87bf8"
+    },
+    "schemas/skill-effectiveness-outcome.schema.json": {
+      "bytes": 16222,
+      "digest": "sha256:c98f4ca04f2f579df5b37d23e994d71f194087b12b618ec99eb480a8df83bf44"
+    },
+    "schemas/verification-evidence-transfer.schema.json": {
+      "bytes": 2504,
+      "digest": "sha256:89d6891fcf0453b0ff6e1f568306221f6a54cdedb49f4f39d5c049ec056cc17c"
+    },
+    "schemas/verification-evidence.schema.json": {
+      "bytes": 12254,
+      "digest": "sha256:cd0d90b2d7adc0856c023da0538c8886e544769286661bba5180fce46ed87590"
+    },
+    "schemas/verification-proof-policy.schema.json": {
+      "bytes": 12588,
+      "digest": "sha256:22886eaaf4627116aadc3bf6f0955c789f105680c8b139c9bf8e91906823edd9"
+    },
+    "schemas/verification-reuse-plan.schema.json": {
+      "bytes": 11649,
+      "digest": "sha256:9f81c384b789f196252d5c0f23def890bd2d9c838dd132c643857d784d2ab1ff"
+    },
+    "schemas/work-package-plan-validation-context.schema.json": {
+      "bytes": 9254,
+      "digest": "sha256:1686b9162c7387b99624943f475650d253d823f7dd6ad790c0c35dc0f4a79a00"
+    },
+    "schemas/work-package-plan.schema.json": {
+      "bytes": 16855,
+      "digest": "sha256:9715a5c518d498dd91fa53137118c9c5ae1a0e8b61f2fc92d0c705b30b75f343"
+    },
+    "scripts/adapter-runtime-event.mjs": {
+      "bytes": 13459,
+      "digest": "sha256:3e9da33fad3dc8b3156fb5d783164c7d5a2e47947e5d66d9bc36286947778d54"
+    },
+    "scripts/adapter-runtime-event.schema.json": {
+      "bytes": 6671,
+      "digest": "sha256:6a460e4dff6c468a59b5f910b167a0ddc23cdedac57ffb58b9d46f57d2e36ac6"
+    },
+    "scripts/ai-ledger-refresh.mjs": {
+      "bytes": 13240,
+      "digest": "sha256:3172df6aca108b4424c9be18a7833c198f4d10c505b887f2d7ce44cac6e614c8"
+    },
+    "scripts/ai-metrics-record.mjs": {
+      "bytes": 51977,
+      "digest": "sha256:b4535f89b1ff221bf69c4fcb74e1a0be6bee651df7255c580398cca8b3ea3360"
+    },
+    "scripts/ask-core-capabilities.mjs": {
+      "bytes": 4104,
+      "digest": "sha256:8e978586313159fc63d6c5c4d90da9d72ac6393c1f0855d33a9494b43a955f88"
+    },
+    "scripts/ask-core-runner-contract.mjs": {
+      "bytes": 5890,
+      "digest": "sha256:4989c6543770690b7758e66cb185f09946128b5f8f4286b9429fa2589e51cfc4"
+    },
+    "scripts/ask-sensors.mjs": {
+      "bytes": 42892,
+      "digest": "sha256:7da2950d9cfc5407aaa9b0c5fea6dcdf2432d1e22ba72b7b3d474cf5d2e8ddda"
+    },
+    "scripts/ask-shared.mjs": {
+      "bytes": 27871,
+      "digest": "sha256:1728ef69a82a3e9ad4e6ac1afdd0636e023192b4bb0d523ea7a15c3fcf904755"
+    },
+    "scripts/claim-evidence-status.mjs": {
+      "bytes": 9470,
+      "digest": "sha256:fbce689f58b6b74069a6ef2c5d3dd767668bbfc7c1551480c42fc7234d094cf4"
+    },
+    "scripts/codex-exec-runner.mjs": {
+      "bytes": 66014,
+      "digest": "sha256:3cc8deb5b24444ea244abf0171a5e1ca02504834a8a06af5da90e26cf2a8fc02"
+    },
+    "scripts/codex-risk-action.schema.json": {
+      "bytes": 2252,
+      "digest": "sha256:ef7f3cd48c15f6326f95778af188602a5d5f0519dbad85046773c3f8a94791c5"
+    },
+    "scripts/codex-risk-approval-request.schema.json": {
+      "bytes": 12075,
+      "digest": "sha256:2c5f93979639b6696d8e28e470ab2360f1f4bd9fedbd39f719608dcd0a4e1103"
+    },
+    "scripts/codex-risk-approval.mjs": {
+      "bytes": 22202,
+      "digest": "sha256:b2688fb6edd0db1eb95e22d12501f1eb147d02ae7ee48a42ba241c31f969975e"
+    },
+    "scripts/codex-risk-approval.schema.json": {
+      "bytes": 713,
+      "digest": "sha256:6ce413128e4e6b64add184453804ec0ac71f4b7f7063912ee13450b557b48b71"
+    },
+    "scripts/codex-risk-workspace.mjs": {
+      "bytes": 29260,
+      "digest": "sha256:0ce3414fd7d4975da1a5c4375e10487a75f5c813f4b0eb1a49fef2c2bb59b317"
+    },
+    "scripts/codex-runner-result.schema.json": {
+      "bytes": 1854,
+      "digest": "sha256:c23eabab786bcad94a2e5dc75c07eb3199dbbb2198da311e5df3d25edac160f9"
+    },
+    "scripts/content-addressed-store.mjs": {
+      "bytes": 15176,
+      "digest": "sha256:201d5eb4b95a9853d2be2a146351b75d78820ae7fb4ca52795f74f2f9413daed"
+    },
+    "scripts/execution-envelope-record.schema.json": {
+      "bytes": 4676,
+      "digest": "sha256:ca41a93812a1510536272a01046fc69f3fca03c870fcf712c3b548534fdfc6a7"
+    },
+    "scripts/execution-envelope.mjs": {
+      "bytes": 17669,
+      "digest": "sha256:c7272fd30d999562cdc8caf66b648fc36ac237c3fc27131f98042746e1684a17"
+    },
+    "scripts/execution-envelope.schema.json": {
+      "bytes": 5050,
+      "digest": "sha256:23708f54ac8f443f2c27c9c478b8b6a653444071e9a4d34aa4adc0fc1baa3492"
+    },
+    "scripts/json-schema-validation.mjs": {
+      "bytes": 25572,
+      "digest": "sha256:fcfb5083ebc5a151c48ae40574c29cb3a14461642b481a0c8f92602b910b09b7"
+    },
+    "scripts/metrics-event.schema.json": {
+      "bytes": 14163,
+      "digest": "sha256:765fa0116c94d29fe298b575554a41173755fbcf36106144c7174cffe6f3da4d"
+    },
+    "scripts/observability-paths.mjs": {
+      "bytes": 1418,
+      "digest": "sha256:fad81f5fd713a18c48c9890955a11d6345c337586344c50d9712858717d9790f"
+    },
+    "scripts/review-route-contract.mjs": {
+      "bytes": 10839,
+      "digest": "sha256:75041cf2bbae627f2358b2c8b5c6ef0ee7b7f073eda9b824a129fe9faa6d1dcb"
+    },
+    "scripts/skill-effectiveness-outcome.mjs": {
+      "bytes": 27007,
+      "digest": "sha256:8df6c881034ccdcbacbb1c29cde3cbab0a69e230097794331ea177c76e05b1a9"
+    },
+    "scripts/verification-evidence.mjs": {
+      "bytes": 41729,
+      "digest": "sha256:a6761cd3b52bcff5acfbc769e36b7cf5f9b19f103c3b503b4f70870c8df01334"
+    },
+    "scripts/verification-proof-policy.mjs": {
+      "bytes": 18181,
+      "digest": "sha256:27496f3311b8d0ead6a2d782836b0f537408386edcd2cbd84f54fa63a2971ade"
+    },
+    "skills/adr-review/SKILL.md": {
+      "bytes": 2365,
+      "digest": "sha256:ffb3cd15f2c4b95cffb915c7aa824daed2a057522e43d12f65354256b64fddbb"
+    },
+    "skills/angular-implementation-architecture/SKILL.md": {
+      "bytes": 10793,
+      "digest": "sha256:29abfa73ed583a79a153ebf194f9b309683d813048bacc3935919513b9738c1c"
+    },
+    "skills/application-boundary-architecture/SKILL.md": {
+      "bytes": 26931,
+      "digest": "sha256:a941815b36632ea3b70da5dad46fd187259727cd2d66100aa7b3a7d24f3489d1"
+    },
+    "skills/architecture-decision-memory/SKILL.md": {
+      "bytes": 4243,
+      "digest": "sha256:1c642dd75f96511e5e0f29969774e6bc5a28f7bc4c13f3a330832cf11e4cb835"
+    },
+    "skills/controlled-implementation/SKILL.md": {
+      "bytes": 7997,
+      "digest": "sha256:1d2c9aee590a4a90243329d4f4dba0b3a460dbb4cf6e2c792bb40954ac87484a"
+    },
+    "skills/documentation-knowledge-compiler/SKILL.md": {
+      "bytes": 4225,
+      "digest": "sha256:04d941b5346f7c82bf881c7ae7c0884985db2228acbd57f078c42fc0da6233a2"
+    },
+    "skills/domain-rule-ledger/SKILL.md": {
+      "bytes": 4372,
+      "digest": "sha256:f1b9e2f7712d4b445a10fee88eb511f2551e61e7e7a00f662faf2e6937d7526c"
+    },
+    "skills/doubt-driven-development/SKILL.md": {
+      "bytes": 2881,
+      "digest": "sha256:8d4c467a8b99ca0ca1ad82f4005b5d15c8a7592803f5027f0ea8ab918351976e"
+    },
+    "skills/engineering-capability-evaluation/SKILL.md": {
+      "bytes": 4722,
+      "digest": "sha256:52d0de5a2980ab46140f1aabd2822933087691983180298a87912a0cfa96b59d"
+    },
+    "skills/engineering-pattern-ledger/SKILL.md": {
+      "bytes": 5031,
+      "digest": "sha256:2e8b0ae63e2a6da070a01665f73ec0550a1c8a17b31ca5d8d93e519b683b2f81"
+    },
+    "skills/evidence-ledger/SKILL.md": {
+      "bytes": 754,
+      "digest": "sha256:afe761f9428a052041073d955742522b8c59a22b485607a81f5d6608771d4e6c"
+    },
+    "skills/grill-design/SKILL.md": {
+      "bytes": 2272,
+      "digest": "sha256:0cd3d4f7750af54f757f3bef67c6cbdbe605cb75e18727c9edcbdde8e1b941fd"
+    },
+    "skills/grill-with-docs/SKILL.md": {
+      "bytes": 2364,
+      "digest": "sha256:7546463c3f6fb1f97c130a53657977f27f8e12cd61cfa3f6016c3999e0ceb0a9"
+    },
+    "skills/handoff-generation/SKILL.md": {
+      "bytes": 2928,
+      "digest": "sha256:ec28db665f96563058b2fdc7cc579fa689797b7b804eeea222a9b1970f060a89"
+    },
+    "skills/implementation-context-generation/SKILL.md": {
+      "bytes": 9302,
+      "digest": "sha256:734362bf400489ffca48bf86e5a11227213ca247645825a967efd835a688b05c"
+    },
+    "skills/improvement-ledger/SKILL.md": {
+      "bytes": 11146,
+      "digest": "sha256:8750a9ffad280309171e08785f7549a61ea59a365978092edee6929938e16c04"
+    },
+    "skills/mr-readme-generation/SKILL.md": {
+      "bytes": 6926,
+      "digest": "sha256:a35ed809ebb4f87ec1d9f598567fe1fb3f377641aa37f7b373e83596d6014cb1"
+    },
+    "skills/next-best-change-finder/SKILL.md": {
+      "bytes": 3679,
+      "digest": "sha256:b160d57604b95a7bbbbf6f15ffeb7a12dcff8933e6175fe7850df8cfae6f6de5"
+    },
+    "skills/operating-mode-router/SKILL.md": {
+      "bytes": 9349,
+      "digest": "sha256:ee99a7b7e7d428176cd4a4c7c724a0d94ef68f3e4f924123ac175a60879740ef"
+    },
+    "skills/planning-with-files/SKILL.md": {
+      "bytes": 2327,
+      "digest": "sha256:270655509ab476a66e47258fbc1c6bbfd41a0a870b1a691e040e5917e0a7cc80"
+    },
+    "skills/project-adoption-pack-generation/SKILL.md": {
+      "bytes": 6152,
+      "digest": "sha256:020cd892cb3f4fbf8361366d4ac9f78ca386420478342ba908133f32ec196f29"
+    },
+    "skills/refactor-implementation/SKILL.md": {
+      "bytes": 7258,
+      "digest": "sha256:4d5b0de56716d54ebf6cbb18f69992e527a4c49c0afa43052af3b2a1eb12c62d"
+    },
+    "skills/release-readiness-gate/SKILL.md": {
+      "bytes": 7961,
+      "digest": "sha256:d8e9f1a5a10f7230f1f4d4ca8348250b600ee1393209dbacbbf773159477a51c"
+    },
+    "skills/repository-orientation/SKILL.md": {
+      "bytes": 3019,
+      "digest": "sha256:d2843dd0832a28a3d8387b6d8796b1df3fb2b9bf63431865f19b3a767b2f2834"
+    },
+    "skills/requirement-grill/SKILL.md": {
+      "bytes": 5533,
+      "digest": "sha256:1dccf6f11705edabc97de7c8e8e20289da6114594742e62a9e2c2e8e2e2fa628"
+    },
+    "skills/review-adversarial-risk/SKILL.md": {
+      "bytes": 5111,
+      "digest": "sha256:d74482857cceed63f73f135ac89a028bf4851d85ca3876c72ef4a2d2e01d22ca"
+    },
+    "skills/review-ai-quality/SKILL.md": {
+      "bytes": 760,
+      "digest": "sha256:ba02b5627a109a1dc1d6564dd5620b4a619c42803f5666dfdbac3482843b9982"
+    },
+    "skills/review-architecture-impact/SKILL.md": {
+      "bytes": 7038,
+      "digest": "sha256:889fb45fd2136d2770cc22f61b75b24be9f692129aa59aab35a99aece990a902"
+    },
+    "skills/review-automated-gate/SKILL.md": {
+      "bytes": 2783,
+      "digest": "sha256:b89fb5605de1564599ee3758196f2e3a7e121efa940e27627edfdb33ab41b149"
+    },
+    "skills/review-code-health/SKILL.md": {
+      "bytes": 7638,
+      "digest": "sha256:5529c02ac13407f0a77e4d25d92c210b7c6f11e3e4652cbcf164f62ddb10cce9"
+    },
+    "skills/review-context-generation/SKILL.md": {
+      "bytes": 7984,
+      "digest": "sha256:4815151510242b89e42fb7dc9582a9646ab52113008fbed888a23ad57b2561a3"
+    },
+    "skills/review-domain-impact/SKILL.md": {
+      "bytes": 5978,
+      "digest": "sha256:d6ba34ae5d93ff9f8b1ec6ff2c4e3b9efd8558231e83fce4a2ba97e275739897"
+    },
+    "skills/review-final-merge-gate/SKILL.md": {
+      "bytes": 6211,
+      "digest": "sha256:b9736403a1929fa819491621fa7c84edcfb1837a0714bc35ec54cf44f1f1fb04"
+    },
+    "skills/review-finding-compiler/SKILL.md": {
+      "bytes": 4071,
+      "digest": "sha256:17e46919206a5f465a38fc180c3b0569b8c5b56bfbd70bc52bf4a405d742299c"
+    },
+    "skills/review-output-quality/SKILL.md": {
+      "bytes": 7657,
+      "digest": "sha256:a95ccd768cec2f92f041c5f7027900021858a4a3950ee83efe57ec330c56314b"
+    },
+    "skills/review-router/SKILL.md": {
+      "bytes": 7928,
+      "digest": "sha256:018e2775fe7baf137f95bd0d58e0e26534501ccec3676ad403c0095e8ac405ed"
+    },
+    "skills/review-to-rule-compiler/SKILL.md": {
+      "bytes": 3695,
+      "digest": "sha256:e7298131950c78d8f5f8d9c5cafc4a2269b0a1597de74e4e7d01939f44cd1ba4"
+    },
+    "skills/risk-gate/SKILL.md": {
+      "bytes": 2867,
+      "digest": "sha256:4ff0ef2cbc3f8c0c366526d6f5ddc8ef110c49e13552d2194134b6285e27584a"
+    },
+    "skills/scope-control/SKILL.md": {
+      "bytes": 2234,
+      "digest": "sha256:c9788b51bd5ff843138c80b95f0b340429bfeb44cbdebdd70b3c4ad0004726b2"
+    },
+    "skills/skill-adoption-metrics/SKILL.md": {
+      "bytes": 7982,
+      "digest": "sha256:3d9e5e5afce9d3db2ddc212147c43a774e2790457adc99cee284317d38913d58"
+    },
+    "skills/skill-effectiveness-evaluation/SKILL.md": {
+      "bytes": 11126,
+      "digest": "sha256:3515e62b33c97aa1f8b4dd1c348ee832dc3e39173b1041924e6eef615b5bb32c"
+    },
+    "skills/skill-router/SKILL.md": {
+      "bytes": 18374,
+      "digest": "sha256:5891c6dad8a83dc34f4666a47fd89cbd7eae9cf6edb57617a1f8c849d115c640"
+    },
+    "skills/spec-driven-development/SKILL.md": {
+      "bytes": 3543,
+      "digest": "sha256:6ebc4b33f3f93dd487778856dbdbb7456eb1c169f54a94d2a4c320a19efac825"
+    },
+    "skills/test-first-verification/SKILL.md": {
+      "bytes": 8771,
+      "digest": "sha256:e6bc2eeeb4648dd25607667161b45c895748e7c9b6a2723295a8e41a2d6392aa"
+    },
+    "skills/ui-ux-design/references/anti-patterns.md": {
+      "bytes": 3092,
+      "digest": "sha256:5d16f954149bb3cd1033e81c1af24d392380fa13ddf4ceeadc2d540be97e72ef"
+    },
+    "skills/ui-ux-design/references/decision-patterns.md": {
+      "bytes": 17245,
+      "digest": "sha256:9991fb6f9b98114238e44f5af83ac93fac1d3a5126caa393fd920421b87c0b78"
+    },
+    "skills/ui-ux-design/references/principles.md": {
+      "bytes": 4171,
+      "digest": "sha256:88e5b04fb38fe4f0a7dff468ea3266a388d3655e2eee79ab329336ecffc552e8"
+    },
+    "skills/ui-ux-design/SKILL.md": {
+      "bytes": 6199,
+      "digest": "sha256:498af71b77ec6b863f2059b88b1376ca714d48d23da3f22f0c608580ab5f3931"
+    },
+    "skills/verification-pattern-ledger/SKILL.md": {
+      "bytes": 3963,
+      "digest": "sha256:916efacf5540fbe73986d409c3531c519f9fae43d1bae37d0e2c9da06a686832"
+    },
+    "skills/work-package-compiler/SKILL.md": {
+      "bytes": 6375,
+      "digest": "sha256:ebee93b2459f9cbac7205ca229399562fa218f22d54059ee5a35994954bd39f4"
+    }
+  },
+  "full_selection": {
+    "skills": 47,
+    "prompts": 5,
+    "commands": 1
+  },
+  "live_ready": false,
+  "native_execution": "not_admitted",
+  "legacy_product": "unchanged",
+  "source_integrity": "local_frozen_bytes_not_execution_authority"
+}
