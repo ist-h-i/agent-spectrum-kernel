@@ -1,0 +1,249 @@
+{
+  "kind": "ask_full_reference_supplement_v1",
+  "base_candidate": "docs/mac-ask-full-static-inventory.json",
+  "base_candidate_digest": "sha256:3634c9ef3801067636d990a63f1793c268390ccb4012a1e2f1c4ac2e5b566bed",
+  "source_commit": "b68dc5d168f16a495e9f9eea85bbfa863e8abbae",
+  "reason": "Include every unresolved literal reference and its recursive literal import/instruction dependencies. Conditional context and examples remain classified, never executed or promoted to initialized knowledge. No references are waived.",
+  "assets": [
+    {
+      "path": "docs/adapter-deployment-governance.md",
+      "digest": "sha256:51b72668cfb53bd0c72e995e5149175f0f3a0434e6a45d8e8c00d34840a494a3",
+      "role": "instruction_contract",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/adr/0001-verification-evidence-trust-boundary.md",
+      "digest": "sha256:0303ce52ed152ff183ef9be501cae5ace1c668a68fa0ea230994263230b3782e",
+      "role": "instruction_contract",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/ai/adoption-report-template.md",
+      "digest": "sha256:c52667740307d9985c61633fdeb189bf9650bc7706f0aa6306e761cd9c2d1591",
+      "role": "conditional_context_template",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/ai/architecture-decision-memory.md",
+      "digest": "sha256:4fea91ee201ade0cb69c0e59841c3d0a3707ce7ea6e79f93660f087741ae99c4",
+      "role": "conditional_context_template",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/ai/documentation-knowledge-ledger.md",
+      "digest": "sha256:69907fe30982de3a9bfbdfbece39dc4489fe95a239379ac910ed2b68d4bb177f",
+      "role": "conditional_context_template",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/ai/domain-rule-ledger.md",
+      "digest": "sha256:c07740b3cde6106e4912e9be1df3668bd509a9bfeac6332ff9ed2c66a6ce5046",
+      "role": "conditional_context_template",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/ai/engineering-capability-ledger.md",
+      "digest": "sha256:cc0ccd3441dff31a1fe7d5783fa949aece4005585fa9e20834c38dba53bdd966",
+      "role": "conditional_context_template",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/ai/engineering-pattern-ledger.md",
+      "digest": "sha256:3a5a8ee093f504bb8f68d08da149a4a75830364a1af5ada30867fc31ffd6b055",
+      "role": "conditional_context_template",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/ai/implementation-context.md",
+      "digest": "sha256:4f01805634d75b97003db14fe4f1066c4c61d96dde76920c5afdb9313e3f2903",
+      "role": "conditional_context_template",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/ai/improvement-ledger.md",
+      "digest": "sha256:68efb2cad1efe9e80a7d8f601c973ede4da2c6d2ef33f9a7d91583e9c18672df",
+      "role": "conditional_context_template",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/ai/review-context.md",
+      "digest": "sha256:33467c3306457594d44b4d5aa577b8b872c9993a3057659b46bf4c5c23552651",
+      "role": "conditional_context_template",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/ai/review-rule-ledger.md",
+      "digest": "sha256:2e24ed96f47f5b830501df0e266e27143d97b94166443581c6482f1039ba4d61",
+      "role": "conditional_context_template",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/ai/skill-adoption-metrics.md",
+      "digest": "sha256:98eaf0f94f45f4b145340bee39e790311ffbbe9a43953e4ef7bd3f440e1a009c",
+      "role": "conditional_context_template",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/ai/verification-pattern-ledger.md",
+      "digest": "sha256:daec1aed44e2b2a9109a28404f6464b38568487ca18bff0a86fd59b709aed2ba",
+      "role": "conditional_context_template",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/epic-admission-work-package-plan-contract.md",
+      "digest": "sha256:462013302ced3062fb8bd75f407f52f02614201600fabfb6fda8d4ee26262020",
+      "role": "instruction_contract",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/fixtures/adapter-cross-conformance.json",
+      "digest": "sha256:30d916655371092aa5c780e39a7e4505027828f01c73fc1accd946f43134e2c8",
+      "role": "example_fixture",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/fixtures/issue-275-slice-1-work-package-plan-r1.json",
+      "digest": "sha256:c65c703eb760467289847364d6dcb68c0bcc863ae091a641d892550e3a815437",
+      "role": "example_fixture",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/fixtures/issue-275-slice-1-work-package-plan-r2.json",
+      "digest": "sha256:545a7d08d055c1e99e95d9b49fca4e26021945328865b686febe94b276c275b4",
+      "role": "example_fixture",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r1.json",
+      "digest": "sha256:0d1de9f8979799c16fd7ed8ea677e360d74dd3a980a3eab58f73a9e6afb51236",
+      "role": "example_fixture",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r2.json",
+      "digest": "sha256:e8d28d9b431d3118563d2db44f8eeeb56851678f3fc9163aeb485b8df3de0d3b",
+      "role": "example_fixture",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context.json",
+      "digest": "sha256:d06727b50feda839be0e84fc9843ef4be079fe8c554a7056cbd8ce4ad8373feb",
+      "role": "example_fixture",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/fixtures/issue-275-slice-1-work-package-plan.json",
+      "digest": "sha256:91ab0c7c7a6b0399a6b38e010e1ea900d9d5cd72cb4eb966b3e0d372ca54955d",
+      "role": "example_fixture",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/fixtures/lifecycle-traceability-chains.json",
+      "digest": "sha256:aa7e8352a3258912cae5299bd399643f3af686d3001a37f27c57a827d139d96e",
+      "role": "example_fixture",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/fixtures/skill-effectiveness-outcome-cases.json",
+      "digest": "sha256:82ae9c761d8c8a312c8df2144ec97bd74ef3c7db029e1c92d26613401d6a7f3e",
+      "role": "example_fixture",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/project-overlay-template.md",
+      "digest": "sha256:bd35d920e6eb41eb89e78c33e4e40ecd341431ae1a49b864bd615f69673354cb",
+      "role": "instruction_contract",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "docs/verification-evidence-contract.md",
+      "digest": "sha256:ff331b1a4113111472ceb681495b07b45c3343be4be26a196d5866aa558fe1a3",
+      "role": "instruction_contract",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "schemas/adoption-report.schema.json",
+      "digest": "sha256:db1712c08952af7bf017cf004e0aad973eba4d5106d26c9104343652645c5fe8",
+      "role": "contract_schema",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "schemas/epic-admission-decision.schema.json",
+      "digest": "sha256:ccca5e4559a3045335464bd99c41386be012c111a30d65e8d9f3f836c916d555",
+      "role": "contract_schema",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "schemas/epic-admission-policy.schema.json",
+      "digest": "sha256:7b758af1e4ebf3a0a8ceb841b0d6deab8281bd2b402b56c025331a34e45b9a62",
+      "role": "contract_schema",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "schemas/improvement-ledger-entry.schema.json",
+      "digest": "sha256:7fd64d4c4b61d9a4411e2a94a50bc4e4bddfbf98ff4130db9edc8e53658dfd11",
+      "role": "contract_schema",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "schemas/verification-evidence-transfer.schema.json",
+      "digest": "sha256:89d6891fcf0453b0ff6e1f568306221f6a54cdedb49f4f39d5c049ec056cc17c",
+      "role": "contract_schema",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "schemas/verification-evidence.schema.json",
+      "digest": "sha256:cd0d90b2d7adc0856c023da0538c8886e544769286661bba5180fce46ed87590",
+      "role": "contract_schema",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "schemas/verification-reuse-plan.schema.json",
+      "digest": "sha256:9f81c384b789f196252d5c0f23def890bd2d9c838dd132c643857d784d2ab1ff",
+      "role": "contract_schema",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "schemas/work-package-plan-validation-context.schema.json",
+      "digest": "sha256:1686b9162c7387b99624943f475650d253d823f7dd6ad790c0c35dc0f4a79a00",
+      "role": "contract_schema",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "schemas/work-package-plan.schema.json",
+      "digest": "sha256:9715a5c518d498dd91fa53137118c9c5ae1a0e8b61f2fc92d0c705b30b75f343",
+      "role": "contract_schema",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "scripts/ai-ledger-refresh.mjs",
+      "digest": "sha256:3172df6aca108b4424c9be18a7833c198f4d10c505b887f2d7ce44cac6e614c8",
+      "role": "runtime_dependency",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "scripts/ai-metrics-record.mjs",
+      "digest": "sha256:b4535f89b1ff221bf69c4fcb74e1a0be6bee651df7255c580398cca8b3ea3360",
+      "role": "runtime_dependency",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "scripts/content-addressed-store.mjs",
+      "digest": "sha256:201d5eb4b95a9853d2be2a146351b75d78820ae7fb4ca52795f74f2f9413daed",
+      "role": "runtime_dependency",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "scripts/verification-evidence.mjs",
+      "digest": "sha256:a6761cd3b52bcff5acfbc769e36b7cf5f9b19f103c3b503b4f70870c8df01334",
+      "role": "runtime_dependency",
+      "disposition": "include_exact_source_bytes"
+    },
+    {
+      "path": "scripts/verification-proof-policy.mjs",
+      "digest": "sha256:27496f3311b8d0ead6a2d782836b0f537408386edcd2cbd84f54fa63a2971ade",
+      "role": "runtime_dependency",
+      "disposition": "include_exact_source_bytes"
+    }
+  ]
+}
