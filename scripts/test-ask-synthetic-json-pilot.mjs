@@ -195,7 +195,8 @@ for (const scenario of ["deny-mismatch", "positive-fail", "exit", "timeout"]) te
 });
 for (const [scenario, stop] of [["exit", "process_failure"], ["timeout", "process_failure"], ["unknown-usage", "usage_unknown"],
   ["identity-drift", "session_identity_failure"], ["provider-stop", "provider_stop"]]) test(`native-shaped ${scenario} saves first exec and stops`, t => {
-  const { privateRoot } = prepared(t, [scenario, "pass"], { fakeTimeoutMs: scenario === "timeout" ? 150 : null }, prepareNativeSimulation);
+  // The healthy control also receives this synthetic timeout: leave room for Node startup.
+  const { privateRoot } = prepared(t, [scenario, "pass"], { fakeTimeoutMs: scenario === "timeout" ? 1000 : null }, prepareNativeSimulation);
   const report = runNativeSimulation(privateRoot);
   assert.equal(report.control.status, "pass"); assert.equal(report.exec_starts, 1); assert.equal(report.stop, stop);
   assert.equal(report.slots[1].state, "not_started"); assert.equal(report.retry, 0);
