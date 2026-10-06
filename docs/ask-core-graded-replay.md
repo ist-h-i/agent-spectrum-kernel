@@ -1,6 +1,6 @@
 # Core grading compatibility and offline replay
 
-IMP-318-GRADED-1 / FVC-318-GRADED-1, revision 1. Upstream: the adopted
+IMP-318-GRADED-1 / FVC-318-GRADED-1, revision 2. Upstream: the adopted
 Core Bundle definition at e52ad82a and native capture boundary at 46b50288.
 The user authorized new-condition normalization/provenance compatibility on
 2026-10-06. This does not authorize model execution, real-data grading,
@@ -29,6 +29,7 @@ independent of this compatibility work and remains in its old protocol.
 | G4 | Create-once, separate graded evidence capsule retains public scoring inputs and exact results. Capture evidence directories are not extended or rewritten. |
 | G5 | External-digest offline replay checks exact inventory/source/input/result identities and recalculates through the original pure scorer. It does not launch a grader/model or read original private/auth/session roots. |
 | G6 | New-condition success, failure/unknown, condition/task/workspace/source/result tampering and legacy fixtures are tested; independent review and exact-head CI are required. |
+| G7 | The real connected-result contract is normalized without launching processes. Exact task-only terminal snapshots and original public evaluator references are preserved; unresolved sealed authority refuses scoring. |
 
 Synthetic captures and calibration evaluator fixtures prove transport,
 provenance checks, scoring compatibility and offline persistence only. They do
@@ -61,6 +62,53 @@ contract, not a native connection-result normalizer or a real MN grading claim.
 This is the new public grading entrypoint: the unchanged `scoreEvaluatorResult`
 alone does not establish a Core profile around its full calculation lifetime.
 Failures preserve partial new output; there is no overwrite, retry or resume.
+
+## Actual capture normalization and original sealed input connection
+
+`normalizeCoreConnectedResult(connectionRoot, externalDigest, newOutputRoot)`
+accepts the existing `ask_core_connected_result_v1` contract, including native
+captures pending independent validation. It verifies the original offline
+capture and preparation, retains the actual `plain/core/full` conditions,
+capture/plan/task/product/source identities, session and turn identities, usage,
+failure/unknown/not-started states and final-output digests. It reads only the
+declared task files, verifies every byte against the terminal `after.inputs`
+inventory, and saves task-only snapshots in a separate create-once owner-only
+capsule. Workspace drift refuses before allocating that capsule. The original
+connected-result bytes are retained with their independently held raw digest.
+No auth home, CLI image, execution grant or private evaluator is read or issued.
+
+`replayCoreConnectedNormalization(outputRoot, externalDigest)` checks those
+saved snapshots and current public source identities without reading original
+capture, workspace or auth roots. Missing verification-command evidence stays
+`unknown`; a scope check cannot be substituted for an executed test.
+
+`connectCoreNormalizedEvaluator({outputRoot, externalDigest, frozenSourceRoot})`
+connects this normalized capture to the original MN public evaluator reference
+through the existing `verifyPublicEvaluatorReference`. It validates the exact
+original public source closure and inspects its normalized condition contract.
+It does not relabel treatments or manufacture sealed execution provenance.
+
+The current original MN reference fixes revision `ab2ce5fe` and 52 public source
+files, including the normalizer, normalized schema, evaluator boundary and
+terminal-workspace verifier. That original normalized schema supports
+`plain/kernel_only/adaptive_ask/full_ask`; `core/full` are rejected. Moreover,
+connected capture has no original portfolio run/materialization/selection
+authority or sealed verification-command evidence. The production evaluator
+re-verifies these roots before accepting a normalized record. Thus the connector
+returns typed blockers for those missing authorities and unsupported conditions,
+and checks the request's evaluator bundle binding. Private sealed inputs remain
+an unresolved prerequisite; no real data grading was performed.
+
+This closes real capture normalization and the original public reference
+connection, including original public scoring-input freeze verification through
+the existing `verifyPortfolioScoringInputs`, not native scoring readiness. The
+original freeze raw digest, reference, policy, requirements, output contract
+and admission references are verified together; private inputs are not read.
+A separately defined independent
+native compatibility authority must bind the new normalized treatment and its
+terminal snapshot to the fixed evaluator before any original private-input
+read or real grading. The synthetic scoring profile above is never that
+authority. The original reference, policy, sealed source and scorer stay fixed.
 
 ## Remaining evidence and execution proposal
 
