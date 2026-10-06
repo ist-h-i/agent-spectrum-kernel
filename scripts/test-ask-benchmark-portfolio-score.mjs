@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { coreGradingSources, coreGraderInputInventory, coreCalculationDigests, withCoreGradingAuthority, scoreCoreCapture, replayCoreScoredCapture } from "./ask-core-grading-authority.mjs";
+import { coreGradingSources, coreGraderInputInventory, coreCalculationDigests, withCoreGradingAuthority, scoreCoreCapture, replayCoreScoredCapture, scoreControllerBoundCoreCapture, replayControllerBoundCoreCapture } from "./ask-core-grading-authority.mjs";
+import { acceptCoreControllerAttribution } from "./ask-core-controller-attribution.mjs";
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import {
@@ -1035,6 +1036,77 @@ try {
     }
     const verified = verifyEvaluatorAuthority(options);
     assert.equal(verified.normalized.lineage.condition, condition);
+    // Explicitly manufactured attribution fixtures exercise the whole unchanged
+    // verifier/scorer connection, never owner-attested actual host admission.
+    const journal = { kind: "ask_core_controller_scoring_journal_v1", evidence_class: "synthetic_controller_fixture", git_head: REVISION,
+      source_digests: source, product_digest: source["products/ask-core-bundle/manifest.json"], request_digest: digest("synthetic-request"),
+      connection_source_digest: digest("synthetic-connection-source"), connected_normalization_digest: digest("synthetic-normalization"),
+      connected_capture_digest: digest("synthetic-capture"), connected_terminal_task_digest: digest("synthetic-terminal"), public_task_inventory_digest: digest("synthetic-task"),
+      binding: { condition, fixture_id: l.fixture_id, fixture_input_digest: l.fixture_input_digest, normalized_result_id: n.normalized_result_id,
+        normalized_result_digest: n.normalized_result_digest, terminal_workspace_tree_digest: l.terminal_workspace_tree_digest,
+        terminal_workspace_authority_digest: l.terminal_workspace_authority_digest, terminal_workspace_authority_bytes: l.terminal_workspace_authority_bytes,
+        outcome: n.outcome, run_instance_id: l.run_instance_id, case_id: l.case_id, attempt: l.attempt },
+      grader_input_inventory_digest: canonicalDigest(coreGraderInputInventory(options)), evaluator_bundle_digest: e.result.evaluator_bundle_digest,
+      scoring_input_freeze_digest: options.scoringInputFreezeManifestSourceDigest, calculation_digests: coreCalculationDigests(verified),
+      producer_execution_id: "synthetic-producer", producer_context_export_digest: digest("synthetic-producer-export") };
+    function attributionEvidence(record) {
+      const journalBytes = Buffer.from(JSON.stringify(record)), journalDigest = digest(journalBytes);
+      const archive = { kind: "ask_core_controller_scoring_review_v1", journal_digest: journalDigest, git_head: REVISION,
+        producer_execution_id: record.producer_execution_id, producer_context_export_digest: record.producer_context_export_digest,
+        reviewer_execution_id: "synthetic-reviewer", reviewer_context_export_digest: digest("synthetic-reviewer-export"), reviewer_type: "independent_agent",
+        decision: "approved", author_self_approval: false, blocking_findings: 0 };
+      const reviewArchiveBytes = Buffer.from(JSON.stringify(archive)), reviewArchiveDigest = digest(reviewArchiveBytes);
+      const owner = { kind: "ask_core_controller_owner_attestation_v1", decision: "accept_attribution", assurance: "repository_owner_attested_controller_archive",
+        cryptographic_provider_signature_present: false, purpose: "scoring_only_no_execution_permission", evidence_class: record.evidence_class,
+        journal_digest: journalDigest, review_archive_digest: reviewArchiveDigest, producer_context_export_digest: record.producer_context_export_digest,
+        reviewer_context_export_digest: archive.reviewer_context_export_digest };
+      const ownerAttestationBytes = Buffer.from(JSON.stringify(owner));
+      return { journalBytes, journalDigest, reviewArchiveBytes, reviewArchiveDigest, ownerAttestationBytes, ownerAttestationDigest: digest(ownerAttestationBytes), expectedHead: REVISION, expectedSources: source };
+    }
+    const attribution = attributionEvidence(journal), controllerOptions = { ...options, coreControllerGradingContext: acceptCoreControllerAttribution(attribution).token, coreControllerAttributionEvidence: attribution };
+    delete controllerOptions.coreGradingAuthority;
+    const controllerOutput = resolve(c.path, "controller-scored-capsule");
+    assert.throws(() => scoreControllerBoundCoreCapture({ ...controllerOptions, coreControllerGradingContext: {} }, controllerOutput), /opaque/);
+    for (const field of ["run_instance_id", "case_id", "attempt", "condition", "terminal_workspace_tree_digest"]) {
+      const changedJournal = structuredClone(journal);
+      changedJournal.binding[field] = field === "attempt" ? "0002" : field === "condition" ? condition === "core" ? "full" : "core" : field.includes("digest") ? digest("foreign") : "foreign";
+      const ev = attributionEvidence(changedJournal);
+      assert.throws(() => scoreControllerBoundCoreCapture({ ...controllerOptions, coreControllerGradingContext: acceptCoreControllerAttribution(ev).token, coreControllerAttributionEvidence: ev }, controllerOutput));
+    }
+    const fakeNative = attributionEvidence({ ...journal, evidence_class: "native_controller_record" });
+    assert.throws(() => scoreControllerBoundCoreCapture({ ...controllerOptions, coreControllerGradingContext: acceptCoreControllerAttribution(fakeNative).token, coreControllerAttributionEvidence: fakeNative }, controllerOutput));
+    const controllerScored = scoreControllerBoundCoreCapture(controllerOptions, controllerOutput);
+    const controllerReplayOptions = { attributionDigests: { journalDigest: attribution.journalDigest, reviewArchiveDigest: attribution.reviewArchiveDigest, ownerAttestationDigest: attribution.ownerAttestationDigest } };
+    assert.equal(controllerScored.evidence_class, "synthetic_controller_scoring");
+    assert.equal(controllerScored.execution_permission, false); assert.equal(controllerScored.live_ready, false);
+    assert.equal(controllerScored.artifact.condition, condition); assert.equal(controllerScored.artifact.scoring_status, verified.normalized.outcome === "completed" && evaluationStatus === "completed" ? "complete" : "not_scoring_ready");
+    assert.equal(replayControllerBoundCoreCapture(controllerOutput, controllerScored.result_digest, controllerReplayOptions).status, "offline_controller_scored_capture_verified");
+    assert.equal(replayControllerBoundCoreCapture(controllerOutput, controllerScored.result_digest, controllerReplayOptions).evidence_class, "offline_calculation_only");
+    assert.equal(replayControllerBoundCoreCapture(controllerOutput, controllerScored.result_digest).status, "blocked");
+    assert.throws(() => scoreControllerBoundCoreCapture(controllerOptions, controllerOutput), /new_output/);
+    const controllerRecordPath = resolve(controllerOutput, "scored-result.json"), controllerRecordBytes = readFileSync(controllerRecordPath);
+    const controllerCalculationPath = resolve(controllerOutput, "calculation.json"), controllerCalculationBytes = readFileSync(controllerCalculationPath);
+    const changedControllerCalculation = JSON.parse(controllerCalculationBytes); changedControllerCalculation.result.requirement_results[0].earned_points = 0;
+    writeFileSync(controllerCalculationPath, JSON.stringify(changedControllerCalculation) + "\n");
+    const coherentCapsule = JSON.parse(controllerRecordBytes); coherentCapsule.inventory["calculation.json"] = fileDigest(controllerCalculationPath); coherentCapsule.calculation_digests = coreCalculationDigests(changedControllerCalculation);
+    writeFileSync(controllerRecordPath, JSON.stringify(coherentCapsule) + "\n");
+    assert.equal(replayControllerBoundCoreCapture(controllerOutput, fileDigest(controllerRecordPath), controllerReplayOptions).status, "blocked");
+    writeFileSync(controllerCalculationPath, controllerCalculationBytes); writeFileSync(controllerRecordPath, controllerRecordBytes);
+    // Even with coherently rehashed local native labels, original independently
+    // retained attribution pins refuse promotion. Replay never authenticates
+    // native origin even when a caller supplies a different set of owner pins.
+    const nativeReplay = attributionEvidence({ ...journal, evidence_class: "native_controller_record" });
+    const savedAttributionBytes = Object.fromEntries(["journal.json", "review-archive.json", "owner-attestation.json"].map(name => [name, readFileSync(resolve(controllerOutput, name))]));
+    for (const [name,key] of [["journal.json","journalBytes"],["review-archive.json","reviewArchiveBytes"],["owner-attestation.json","ownerAttestationBytes"]]) writeFileSync(resolve(controllerOutput,name), nativeReplay[key]);
+    const promotedRecord = JSON.parse(controllerRecordBytes); promotedRecord.evidence_class = "owner_attested_native_scoring";
+    Object.assign(promotedRecord,{journal_digest:nativeReplay.journalDigest,review_archive_digest:nativeReplay.reviewArchiveDigest,owner_attestation_digest:nativeReplay.ownerAttestationDigest});
+    for (const name of Object.keys(savedAttributionBytes)) promotedRecord.inventory[name] = fileDigest(resolve(controllerOutput,name));
+    writeFileSync(controllerRecordPath, JSON.stringify(promotedRecord) + "\n");
+    assert.equal(replayControllerBoundCoreCapture(controllerOutput, fileDigest(controllerRecordPath), controllerReplayOptions).reason,"controller_scored_external_attribution_changed");
+    const renamedReplay = replayControllerBoundCoreCapture(controllerOutput,fileDigest(controllerRecordPath),{attributionDigests:{journalDigest:nativeReplay.journalDigest,reviewArchiveDigest:nativeReplay.reviewArchiveDigest,ownerAttestationDigest:nativeReplay.ownerAttestationDigest}});
+    assert.equal(renamedReplay.evidence_class,"offline_calculation_only"); assert.equal(renamedReplay.native_origin_status,"not_reauthenticated");
+    for (const [name,bytes] of Object.entries(savedAttributionBytes)) writeFileSync(resolve(controllerOutput,name),bytes);
+    writeFileSync(controllerRecordPath,controllerRecordBytes);
     assert.throws(() => scoreCoreCapture(options, c.runDir), /output_overlap/);
     const output = resolve(c.path, "graded-capsule"), scored = scoreCoreCapture(options, output);
     assert.equal(scored.artifact.condition, condition);
@@ -1091,6 +1163,7 @@ try {
     assert.throws(() => withCoreGradingAuthority(options, () => Promise.resolve()), /async_scope_forbidden/);
     // Offline replay has no dependency on the original private evaluator roots.
     rmSync(c.privateRoot, { recursive: true, force: true });
+    assert.equal(replayControllerBoundCoreCapture(controllerOutput, controllerScored.result_digest, controllerReplayOptions).status, "offline_controller_scored_capture_verified");
     assert.equal(replayCoreScoredCapture(output, scored.result_digest).status, "offline_scored_capture_verified");
     writeFileSync(resolve(output, "extra.json"), "{}\n");
     assert.equal(replayCoreScoredCapture(output, scored.result_digest).status, "blocked");
