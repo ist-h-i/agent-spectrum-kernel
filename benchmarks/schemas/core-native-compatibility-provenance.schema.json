@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Core native compatibility candidate; never an admission authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "status",
+    "reason",
+    "binding_status",
+    "authority_status",
+    "independence_status",
+    "git_head",
+    "producer_execution_id",
+    "reviewer_execution_id",
+    "review_request_digest",
+    "review_archive_digest",
+    "run_digest",
+    "materialization_digest",
+    "selection_digest",
+    "commands_digest",
+    "source_digests",
+    "missing_prerequisites",
+    "scoring_ready",
+    "live_ready",
+    "native_attestation",
+    "model_calls",
+    "grader_process_starts"
+  ],
+  "properties": {
+    "kind": {
+      "const": "ask_core_native_compatibility_provenance_v1"
+    },
+    "status": {
+      "const": "blocked"
+    },
+    "reason": {
+      "const": "trusted_controller_execution_identity_unavailable"
+    },
+    "binding_status": {
+      "const": "saved_capture_and_supplied_record_bindings_verified_not_admission"
+    },
+    "authority_status": {
+      "const": "not_issued"
+    },
+    "independence_status": {
+      "const": "not_verified"
+    },
+    "git_head": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "producer_execution_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$"
+    },
+    "reviewer_execution_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$"
+    },
+    "review_request_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "review_archive_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "run_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "materialization_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "selection_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "commands_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "source_digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scripts/ask-core-native-compatibility-provenance.mjs",
+        "benchmarks/schemas/core-native-compatibility-provenance.schema.json"
+      ],
+      "properties": {
+        "scripts/ask-core-native-compatibility-provenance.mjs": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "benchmarks/schemas/core-native-compatibility-provenance.schema.json": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "missing_prerequisites": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "contains": {
+        "const": "trusted_controller_execution_identity_unavailable"
+      }
+    },
+    "scoring_ready": {
+      "const": false
+    },
+    "live_ready": {
+      "const": false
+    },
+    "native_attestation": {
+      "const": "unknown"
+    },
+    "model_calls": {
+      "const": 0
+    },
+    "grader_process_starts": {
+      "const": 0
+    }
+  }
+}
