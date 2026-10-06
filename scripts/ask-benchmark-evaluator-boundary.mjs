@@ -708,9 +708,12 @@ function lexModule(source, label) {
       if (offset >= source.length) throw new Error(`${label} contains an unterminated comment`);
       advance(); advance(); continue;
     }
-    const previous = tokens.at(-1)?.value;
-    const arrowPrefix = previous === ">" && tokens.at(-2)?.value === "=";
-    const regexPrefix = arrowPrefix || previous === undefined || ["(", "[", "{", "=", ":", ",", ";", "!", "?", "|", "&", "return", "=>"].includes(previous);
+    const previousToken = tokens.at(-1);
+    const previous = previousToken?.value;
+    const beforePrevious = tokens.at(-2);
+    const arrowPrefix = previousToken?.type === "punctuation" && previous === ">" && beforePrevious?.type === "punctuation" && beforePrevious.value === "=";
+    const logicalPrefix = previousToken?.type === "punctuation" && ["|", "&"].includes(previous);
+    const regexPrefix = arrowPrefix || logicalPrefix || previous === undefined || ["(", "[", "{", "=", ":", ",", ";", "!", "?", "return", "=>"].includes(previous);
     if (character === "/" && regexPrefix) {
       advance();
       let inCharacterClass = false;

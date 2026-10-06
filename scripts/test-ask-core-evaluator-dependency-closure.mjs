@@ -39,3 +39,9 @@ test('arrow regex bodies do not conceal subsequent real dependency edges',()=>{
  assert.deepEqual(value.node_inventory.map(n=>n.path),['entry.mjs','nested.mjs']);
  assert.deepEqual(value.edge_inventory.map(e=>[e.kind,e.to]),[['export_from','nested.mjs']]);
 });
+
+for (const literal of ['|', '&', '>']) {
+ test(`division after string ${literal} cannot conceal computed import`,()=>{
+  assert.throws(()=>graph(`export const hidden = ${JSON.stringify(literal)} / import(value) / 2;`),/unsupported computed dynamic import/u);
+ });
+}
