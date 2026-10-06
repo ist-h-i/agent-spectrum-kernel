@@ -709,7 +709,7 @@ function lexModule(source, label) {
       advance(); advance(); continue;
     }
     const previous = tokens.at(-1)?.value;
-    const regexPrefix = previous === undefined || ["(", "[", "{", "=", ":", ",", ";", "!", "?", "return", "=>"].includes(previous);
+    const regexPrefix = previous === undefined || ["(", "[", "{", "=", ":", ",", ";", "!", "?", "|", "&", "return", "=>"].includes(previous);
     if (character === "/" && regexPrefix) {
       advance();
       let inCharacterClass = false;
