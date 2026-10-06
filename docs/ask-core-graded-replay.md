@@ -13,6 +13,7 @@ file is a template; nearby implementations and current checks are the evidence.
 
 The existing requirement weights, formula, scoring policy, private evaluator,
 original schemas, evaluator-reference, and saved legacy results remain fixed.
+The complete raw scorer source file retains its preregistered byte digest.
 New conditions are `plain/core/full`; Core is the adopted K-core, and Full uses
 the same core plus its existing extensions. No condition is relabeled as
 `kernel_only` or `full_ask`. The old canonical Kernel's missing-router stop is
@@ -57,6 +58,8 @@ plus a `coreGradingAuthority` containing a new owner-only authority file, its
 independently retained digest, and a new synthetic capture file. It calls the
 original verifier and scorer. This is a verification-only synthetic capture
 contract, not a native connection-result normalizer or a real MN grading claim.
+This is the new public grading entrypoint: the unchanged `scoreEvaluatorResult`
+alone does not establish a Core profile around its full calculation lifetime.
 Failures preserve partial new output; there is no overwrite, retry or resume.
 
 ## Remaining evidence and execution proposal

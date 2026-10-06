@@ -9,7 +9,6 @@ import {
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { verifyEvaluatorAuthority } from "./ask-benchmark-evaluator-boundary.mjs";
-import { withCoreGradingAuthority } from "./ask-core-grading-authority.mjs";
 
 export const ENGINEERING_RESULT_SCHEMA_PATH = "benchmarks/schemas/portfolio-engineering-result.schema.json";
 
@@ -476,10 +475,6 @@ export function buildPortfolioEngineeringResult(verified, { root = DEFAULT_ROOT 
 }
 
 export function scoreEvaluatorResult(options) {
-  return withCoreGradingAuthority(options, () => scoreEvaluatorResultCore(options));
-}
-
-function scoreEvaluatorResultCore(options) {
   const output = assertOutputBoundary({
     outputPath: options.outputPath,
     privateRoot: options.privateRoot,
