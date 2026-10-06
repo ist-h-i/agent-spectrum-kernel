@@ -138,3 +138,13 @@ Mac/Linux evidence only, not real three-OS support or ASK superiority. Canonical
 zero-Skill Kernel's missing router route still stops; its standalone definition
 requires the user's selected separate future design/approval plan. Core Bundle
 is the distinct opt-in product and does not silently redefine that Kernel.
+
+The connected route denies the parent controller directory (including sibling old
+records), the entire immutable preparation, and all three peer workspaces in
+every stage. The legacy model-free launch builder remains compatible; connection
+and replay require the stronger exact boundaries. A separately digest-bound
+admission receipt declares the private evaluator under controller/evidence deny
+roots and every known answer/result copy under declared denies, with an explicit
+assertion of no other known copies. Outside/unknown copies stop before writes.
+These are code/fixture checks, not proof of effective OS enforcement or actual
+private evaluator independence; no old private evidence is read for these tests.
