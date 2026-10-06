@@ -30,3 +30,5 @@ jobs:
         run: node --test scripts/test-ask-core-native-preparation.mjs
       - name: Fixed synthetic process receiver and protected offline results (no native CLI)
         run: node --test scripts/test-ask-core-native-receiver.mjs
+      - name: Exact authority lifecycle, new-session adapter and scratch integration (synthetic only)
+        run: node --test scripts/test-ask-core-native-boundaries.mjs scripts/test-ask-core-native-connection.mjs

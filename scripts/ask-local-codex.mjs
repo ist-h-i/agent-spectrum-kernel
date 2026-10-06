@@ -464,7 +464,8 @@ export function reopenCodexProbes(root) {
   return report;
 }
 
-export function readCodexTrialSession(home, stdout, started, completed, maximumMs=PILOT_LIMITS.timeout_ms) {
+export function readCodexTrialSession(home, stdout, started, completed, maximumMs=PILOT_LIMITS.timeout_ms, {ownerOnlyAncestors=false,mtimeToleranceMs=0}={}) {
+  if(typeof ownerOnlyAncestors!=="boolean"||![0,1].includes(mtimeToleranceMs))throw new Error("closed session ancestor option required");
   const text = new TextDecoder("utf-8", { fatal: true }).decode(stdout);
   const threads = text.trimEnd().split("\n").map(row => parseJsonRejectDuplicateKeys(row)).filter(row => row.type === "thread.started");
   const id = threads[0]?.thread_id;
@@ -484,14 +485,14 @@ export function readCodexTrialSession(home, stdout, started, completed, maximumM
       if (checked.has(parent)) continue;
       let info;
       try { info=lstatSync(parent); } catch(error) { if(error.code==="ENOENT") { absent=true; break; } throw error; }
-      if (!info.isDirectory() || info.uid!==process.getuid() || (info.mode&0o022)) throw new Error("unsafe session directory");
+      if (!info.isDirectory() || info.uid!==process.getuid() || (info.mode&0o022) || ownerOnlyAncestors&&(info.mode&0o777)!==0o700) throw new Error("unsafe session directory");
       directory(parent); noAcl([parent]); checked.add(parent);
     }
     if (absent) continue;
     const file=join(parent,`rollout-${stamp.replaceAll(":","-")}-${id}.jsonl`);
     let info;
     try { info=lstatSync(file); } catch(error) { if(error.code==="ENOENT")continue; throw error; }
-    if (!info.isFile() || info.nlink!==1 || info.mtimeMs<start || info.mtimeMs>end) throw new Error("stale/unsafe session");
+    if (!info.isFile() || info.nlink!==1 || info.mtimeMs<start-mtimeToleranceMs || info.mtimeMs>end+mtimeToleranceMs) throw new Error("stale/unsafe session");
     inspectSelectedSession(file); found.push(file);
   }
   if (found.length !== 1) throw new Error("one matching new session required");
