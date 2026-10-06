@@ -142,3 +142,32 @@ export function connectCoreNormalizedEvaluator({outputRoot,externalDigest,frozen
    sealed_private_input_status:'unresolved',scoring_ready:false,native_attestation:'unknown',model_calls:0,grader_process_starts:0};
  }catch(e){return {status:'blocked',reason:'original_public_evaluator_source_not_verified',scoring_ready:false,native_attestation:'unknown',model_calls:0,grader_process_starts:0};}
 }
+
+/** Prepare an admission review request, never an authority or trusted issuer
+ * receipt. It accepts only the public/capture inputs of the existing connector. */
+export function buildCoreNativeCompatibilityReview(options){
+ const connection=connectCoreNormalizedEvaluator(options);
+ if(connection.public_source_status!=='verified_original_source_only'||connection.public_scoring_input_status!=='verified_original_freeze_only')return connection;
+ const normalized=replayCoreConnectedNormalization(options.outputRoot,options.externalDigest);
+ if(normalized.status!=='offline_connected_normalization_verified')return normalized;
+ return {kind:'ask_core_native_compatibility_review_request_v1',status:'pending_independent_review',
+  authority_status:'not_issued',independence_status:'not_verified',issuer:null,
+  normalized_capture_digest:options.externalDigest,evidence_class:normalized.evidence_class,
+  connection_digest:normalized.connection_digest,preparation_digest:normalized.preparation_digest,
+  execution_request_digest:normalized.execution_request_digest,product_digest:normalized.product_digest,
+  fixture_id:normalized.fixture_id,fixture_input_digest:normalized.fixture_input_digest,
+  public_task_inventory_digest:normalized.public_task_inventory_digest,
+  evaluator_reference:normalized.evaluator_reference,execution_evaluator_digest:normalized.execution_evaluator_digest,
+  order:normalized.order,conditions:Object.fromEntries(CONDITIONS.map(condition=>{const t=normalized.trials[condition];return [condition,{condition,state:t.state,capture_digest:t.capture_digest??null,terminal_task_inventory_digest:t.terminal_task_inventory_digest??null,command_evidence_status:t.command_evidence?.status??'unknown'}];})),
+  missing_prerequisites:[...connection.reasons,'independent_issuer_and_trust_anchor_not_established'],
+  scoring_ready:false,live_ready:false,native_attestation:'unknown',model_calls:0,grader_process_starts:0};
+}
+
+/** Re-derive the entire request: even a coherently rehashed caller record must
+ * retain all blockers and identities. Digest matching is not issuer admission. */
+export function verifyCoreNativeCompatibilityReview(options,request,externalDigest){
+ const expected=buildCoreNativeCompatibilityReview(options);
+ if(expected.status!=='pending_independent_review')return expected;
+ if(!/^sha256:[a-f0-9]{64}$/u.test(externalDigest??'')||canonicalDigest(request)!==externalDigest||!SAME(request,expected))return {status:'blocked',reason:'native_compatibility_review_request_binding_changed',scoring_ready:false,live_ready:false,model_calls:0,grader_process_starts:0};
+ return {status:'review_request_bindings_verified_not_admission',request_digest:externalDigest,authority_status:'not_issued',independence_status:'not_verified',scoring_ready:false,live_ready:false,native_attestation:'unknown',model_calls:0,grader_process_starts:0};
+}

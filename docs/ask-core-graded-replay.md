@@ -1,6 +1,6 @@
 # Core grading compatibility and offline replay
 
-IMP-318-GRADED-1 / FVC-318-GRADED-1, revision 2. Upstream: the adopted
+IMP-318-GRADED-1 / FVC-318-GRADED-1, revision 3. Upstream: the adopted
 Core Bundle definition at e52ad82a and native capture boundary at 46b50288.
 The user authorized new-condition normalization/provenance compatibility on
 2026-10-06. This does not authorize model execution, real-data grading,
@@ -30,6 +30,7 @@ independent of this compatibility work and remains in its old protocol.
 | G5 | External-digest offline replay checks exact inventory/source/input/result identities and recalculates through the original pure scorer. It does not launch a grader/model or read original private/auth/session roots. |
 | G6 | New-condition success, failure/unknown, condition/task/workspace/source/result tampering and legacy fixtures are tested; independent review and exact-head CI are required. |
 | G7 | The real connected-result contract is normalized without launching processes. Exact task-only terminal snapshots and original public evaluator references are preserved; unresolved sealed authority refuses scoring. |
+| G8 | A non-authority native compatibility review request reuses the verified capture/public-reference connection, preserves all three condition identities and missing prerequisites, and rejects coherent request rehashes that alter those bindings. It never issues admission or execution authority. |
 
 Synthetic captures and calibration evaluator fixtures prove transport,
 provenance checks, scoring compatibility and offline persistence only. They do
@@ -111,6 +112,34 @@ read or real grading. The synthetic scoring profile above is never that
 authority. The original reference, policy, sealed source and scorer stay fixed.
 
 ## Remaining evidence and execution proposal
+
+### Native compatibility work boundary
+
+The already authorized implementation can prepare a review request from the
+verified normalized capsule and original public sealed reference. It can bind
+the new condition identities, product, task, execution request, terminal task
+inventories and original public evaluator/freeze digests, and verify a saved
+request by rederiving it. `buildCoreNativeCompatibilityReview` and
+`verifyCoreNativeCompatibilityReview` do only this. A caller may retain the
+request and its canonical digest separately; these APIs allocate no output,
+issue no authority, accept no private-input path and start no processes.
+Successful verification means the request matches these public/capture inputs.
+It does not verify the independence or truth of a future issuer's statement.
+
+| Remaining boundary | Concrete proposal / decision still required |
+| --- | --- |
+| Issuer and independence | Select a named human/organization responsible for compatibility admission, separate from the model runner and capture producer. Decide who independently checks its evidence and how the external trust anchor is retained. A caller-supplied digest or `issuer` label alone proves neither authority nor independence. No signing credential or trust registry is configured here. |
+| Original run/materialization/selection authority | A separate producer must create fresh records binding run/case/attempt, actual `plain/core/full` identity, original task/freeze, selected candidate, request/raw capture and terminal state. Define a new-condition provenance adapter with explicit owner review. Do not fabricate these records from a completed capture or rewrite original schemas. |
+| Verification-command evidence | Define the allowed commands and observer, then capture exact argv/cwd, source/workspace digests, exit/timeout, stdout/stderr digests and terminal epoch under separate permission. An observed scope check or final model message cannot stand in for command execution. |
+| Original sealed input binding | The private evaluator owner independently checks private input/manifest against the original reference and freeze, establishes task/grader separation and disjoint roots, and issues a digest-bound admission statement. This requires separate private-read authority; no private bytes belong in the review request or model input. |
+| New-condition bridge | Approve an additive compatibility layer binding the actual new normalized condition/terminal authority to the unchanged requirements, scoring policy and evaluator source. Keep legacy validation on the original schemas. Review how the original production evaluator rechecks provenance before admitting this new profile; synthetic authority must remain rejected. |
+| Actual execution | After the above bindings are fixed and independently verified, obtain a fresh bounded execution approval. The proposal below retains post-trial token limits that can overshoot; this implementation and the resume instruction authorize no model, CLI, private grading or grant issuance. |
+
+The review request always has `authority_status: not_issued`,
+`independence_status: not_verified`, `scoring_ready: false` and
+`live_ready: false`. Unknown/missing prerequisites are not inferred from
+successful normalization. It closes preparation of the review request only;
+native compatibility authority and real evaluator admission remain blocked.
 
 Before any real comparison: freeze the final compatibility head and all exact
 source/evaluator/product digests; obtain independently verified original sealed
