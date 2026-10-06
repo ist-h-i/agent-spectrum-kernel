@@ -708,8 +708,12 @@ function lexModule(source, label) {
       if (offset >= source.length) throw new Error(`${label} contains an unterminated comment`);
       advance(); advance(); continue;
     }
-    const previous = tokens.at(-1)?.value;
-    const regexPrefix = previous === undefined || ["(", "[", "{", "=", ":", ",", ";", "!", "?", "return", "=>"].includes(previous);
+    const previousToken = tokens.at(-1);
+    const previous = previousToken?.value;
+    const beforePrevious = tokens.at(-2);
+    const arrowPrefix = previousToken?.type === "punctuation" && previous === ">" && beforePrevious?.type === "punctuation" && beforePrevious.value === "=";
+    const logicalPrefix = previousToken?.type === "punctuation" && ["|", "&"].includes(previous);
+    const regexPrefix = arrowPrefix || logicalPrefix || previous === undefined || ["(", "[", "{", "=", ":", ",", ";", "!", "?", "return", "=>"].includes(previous);
     if (character === "/" && regexPrefix) {
       advance();
       let inCharacterClass = false;
@@ -3440,6 +3444,14 @@ function readScoringInputSources({
       requirementRecord: { path: freezeManifest.requirement_record.path, bytes: Buffer.from(requirementRecordSource.bytes) },
     },
   };
+}
+
+/** Public generated-artifact check. This creates no private evaluator authority. */
+export function verifyPortfolioScoringRootLineage({ materializedPath, selectionState, runDir, normalizedResultsPath }, verified) {
+  const roots = Object.fromEntries(Object.entries({ materializedPath, selectionState, runDir, normalizedResultsPath }).map(([key, path]) => [key, assertRealDirectory(path, `scoring ${key}`)]));
+  const markerPaths = Object.fromEntries(BOUNDARY_MARKERS.map(([key, , marker]) => [key, resolve(roots[key], marker)]));
+  assertBoundaryRootLineage({ markerPaths, canonicalRoots: roots }, verified);
+  return { status: 'original_scoring_root_lineage_verified', execution_permission: false, private_authority: false };
 }
 
 function assertBoundaryRootLineage(bundle, verified) {

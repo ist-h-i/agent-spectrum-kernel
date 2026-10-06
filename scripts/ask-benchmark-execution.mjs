@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
+import { coreProducerInspection } from './ask-core-producer-scope.mjs';
+import { verifyCoreProducedTerminal } from './ask-core-capture-producer.mjs';
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -2001,6 +2003,8 @@ function classificationForCase({ root, context, entry }) {
 }
 
 export function inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir }) {
+  const producer = coreProducerInspection({ root, config, planPath, materializedPath, selectionState, runDir });
+  if (producer) return producer;
   const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, initialize: false });
   assertDirectoryInventory(context.runDir, ["adapters", "cases", RUN_IDENTITY_FILE], "run root");
   const adaptersRoot = resolve(context.runDir, "adapters");
@@ -2022,6 +2026,8 @@ export function inspectVerifiedPortfolioExecution({ root, config, planPath, mate
 }
 
 export function verifyExecutionTerminalWorkspaceAuthority({ root, config, planPath, materializedPath, selectionState, runDir, caseId, attempt }) {
+  const producer = coreProducerInspection({ root, config, planPath, materializedPath, selectionState, runDir });
+  if (producer) return verifyCoreProducedTerminal(producer, { root, runDir, caseId, attempt });
   const inspection = inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir });
   const inspectedCase = inspection.cases.find((item) => item.entry.case_id === caseId);
   if (!inspectedCase) throw new Error("terminal workspace authority case is absent from the verified execution");

@@ -22,6 +22,13 @@ if(p.scenario==='startup_timeout'){setInterval(()=>{},1000);}else{
   if(p.scenario==='extra_directory')mkdirSync('synthetic-extra-directory');
   if(p.scenario==='forbidden_mutation')writeFileSync('task.md','synthetic forbidden mutation');
   if(p.scenario==='allowed_mutation')writeFileSync('workspace/test/session-key.test.mjs','// synthetic scope-only change\n');
+  // Emit the actual Codex command event contract without executing the command.
+  if(['command_success','command_failure','command_declined'].includes(p.scenario)){
+   const contract=JSON.parse(readFileSync(new URL('../../benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/verification-command-contract.json',import.meta.url),'utf8'));
+   const command="/bin/bash -lc '"+contract.commands[0].canonical_script.replaceAll("'", "'\\''")+"'",status=p.scenario==='command_declined'?'declined':p.scenario==='command_failure'?'failed':'completed';
+   event({type:'item.started',item:{id:'synthetic-command-1',type:'command_execution',command,status:'in_progress'}});
+   event({type:'item.completed',item:{id:'synthetic-command-1',type:'command_execution',command,status,exit_code:p.scenario==='command_declined'?null:p.scenario==='command_failure'?1:0,aggregated_output:'synthetic observation only; command not executed\n'}});
+  }
   event({type:'turn.completed',usage:p.scenario==='unknown_usage'?{}:{input_tokens:p.scenario==='token_threshold'?50000:100,output_tokens:1,cached_input_tokens:0}});
   if(p.scenario==='exit_failure')process.exitCode=1;
  }

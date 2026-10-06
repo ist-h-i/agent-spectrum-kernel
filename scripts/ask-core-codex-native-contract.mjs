@@ -1,7 +1,8 @@
 import { posix } from 'node:path';
 import { parseJsonRejectDuplicateKeys,canonicalDigest } from './content-addressed-store.mjs';
 import { captureSuccessorUsage } from './ask-benchmark-prompt-successor-usage.mjs';
-import { turnBudget,CODEX_TIME_POLICY } from './ask-local-codex-time-budget.mjs';
+import { turnBudget } from './ask-local-codex-time-budget.mjs';
+import { CODEX_TIME_POLICY } from './ask-local-codex-time-policy.mjs';
 import { CORE_EXTENSION_SKILLS } from './ask-core-capabilities.mjs';
 export const CORE_NATIVE_POLICY=Object.freeze({kind:'ask_core_mac_native_proposal_v1',model:'gpt-6.1-sol',effort:'medium',cli_version:'0.157.1',provider:'ask_core_openai_no_retry',project_doc_max_bytes:32768,time:CODEX_TIME_POLICY,trial_tokens:50000,cumulative_tokens:150000,accounting:'input_plus_output_including_cached',enforcement:'post_trial',retry:0});
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b);
