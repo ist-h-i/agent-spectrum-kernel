@@ -32,3 +32,7 @@ jobs:
         run: node --test scripts/test-ask-core-native-receiver.mjs
       - name: Exact authority lifecycle, new-session adapter and scratch integration (synthetic only)
         run: node --test scripts/test-ask-core-native-boundaries.mjs scripts/test-ask-core-native-connection.mjs
+      - name: Core condition grading authority and scored offline replay (synthetic only)
+        run: |
+          node scripts/generate-ask-core-grading-schemas.mjs --check
+          node scripts/test-ask-benchmark-portfolio-score.mjs --core-grading-only

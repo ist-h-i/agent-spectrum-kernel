@@ -2,12 +2,13 @@ import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateJsonSchema } from "./execution-envelope.mjs";
+import { coreGradingSchemaPath } from "./ask-core-grading-authority.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ADAPTIVE_SELECTION_SCHEMA_PATH = resolve(ROOT, "benchmarks/schemas/adaptive-selection.schema.json");
 
 export function validateBenchmarkSchemaInstance(value, { schemaPath } = {}) {
-  return validateJsonSchema(value, { schemaPath });
+  return validateJsonSchema(value, { schemaPath: coreGradingSchemaPath(schemaPath) });
 }
 
 export function assertBenchmarkSchemaInstance(value, { schemaPath, label = "benchmark artifact" } = {}) {

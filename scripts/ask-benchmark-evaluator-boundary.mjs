@@ -23,6 +23,7 @@ import { constants as fsConstants } from "node:fs";
 import { basename, dirname, extname, posix, relative, resolve, sep, win32 } from "node:path";
 import { tmpdir } from "node:os";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { withCoreGradingAuthority, assertCoreGradingVerified } from "./ask-core-grading-authority.mjs";
 import { readStableJsonFile } from "./ask-benchmark-duplicate-key-json.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog.mjs";
@@ -3582,7 +3583,7 @@ export function verifyPortfolioScoringInputs(options) {
 }
 
 export function verifyEvaluatorAuthority(options) {
-  return verifyEvaluatorAuthorityCore(options);
+  return withCoreGradingAuthority(options, () => assertCoreGradingVerified(verifyEvaluatorAuthorityCore(options)));
 }
 
 export function verifyEvaluatorResult(options) {
