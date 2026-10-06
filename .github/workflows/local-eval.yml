@@ -40,3 +40,5 @@ jobs:
         run: node --test scripts/test-ask-core-native-compatibility-provenance.mjs
       - name: Owner-attributed controller context boundaries (synthetic only)
         run: node --test scripts/test-ask-core-controller-attribution.mjs scripts/test-ask-core-evaluator-dependency-closure.mjs
+      - name: Saved capture to original normalizer and terminal scoring inputs (synthetic only)
+        run: node --test scripts/test-ask-core-capture-producer.mjs

@@ -17,6 +17,7 @@ import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { projectVerifiedCommandEvidence } from "./ask-benchmark-command-evidence.mjs";
 import { coreGradingConditions } from "./ask-core-grading-authority.mjs";
+import { activeCoreProducer } from './ask-core-producer-scope.mjs';
 
 export const NORMALIZER_VERSION = "1.3.0";
 export const NORMALIZED_RESULT_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-result.schema.json";
@@ -154,7 +155,7 @@ function telemetryFor(attempt, adapterIdentity) {
   const unavailable = runtimeUnavailableEvidence(adapterIdentity, result);
   const unavailableMissing = () => unavailableOrUnknown(outcome);
   const usage = (name) => {
-    const observed = result.successor_usage?.metrics[name];
+    const observed = result.successor_usage?.metrics[name] ?? (activeCoreProducer() ? result.core_capture_usage?.metrics[name] : null);
     if (!observed) return unavailableMissing();
     return observed.status === "known" ? known(observed.value) : missing(observed.status, observed.reason);
   };
@@ -175,7 +176,7 @@ function telemetryFor(attempt, adapterIdentity) {
     runtime_unavailable_reason_code: unavailable.code,
     runtime_unavailable_reason_digest: unavailable.digest,
     runtime_unavailable_reason_bytes: unavailable.bytes,
-    thermal_state: known(portableTelemetryScalar(adapterIdentity.thermal_state, "thermal state")),
+    thermal_state: activeCoreProducer() ? missing("unknown", "thermal_state_not_observed") : known(portableTelemetryScalar(adapterIdentity.thermal_state, "thermal state")),
     model: known(portableTelemetryScalar(adapterIdentity.model, "model")),
     reasoning_effort: known(portableTelemetryScalar(adapterIdentity.reasoning_effort, "reasoning effort")),
     sandbox_policy: known(portableTelemetryScalar(adapterIdentity.sandbox_policy, "sandbox policy")),

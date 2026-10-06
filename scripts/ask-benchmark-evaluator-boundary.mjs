@@ -3446,6 +3446,14 @@ function readScoringInputSources({
   };
 }
 
+/** Public generated-artifact check. This creates no private evaluator authority. */
+export function verifyPortfolioScoringRootLineage({ materializedPath, selectionState, runDir, normalizedResultsPath }, verified) {
+  const roots = Object.fromEntries(Object.entries({ materializedPath, selectionState, runDir, normalizedResultsPath }).map(([key, path]) => [key, assertRealDirectory(path, `scoring ${key}`)]));
+  const markerPaths = Object.fromEntries(BOUNDARY_MARKERS.map(([key, , marker]) => [key, resolve(roots[key], marker)]));
+  assertBoundaryRootLineage({ markerPaths, canonicalRoots: roots }, verified);
+  return { status: 'original_scoring_root_lineage_verified', execution_permission: false, private_authority: false };
+}
+
 function assertBoundaryRootLineage(bundle, verified) {
   const source = verified.manifest.source;
   const materializedPath = bundle.markerPaths.materializedPath;
