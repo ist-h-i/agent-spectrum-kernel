@@ -60,6 +60,15 @@ post-trial stops and can overshoot; they are not spending caps. No restart,
 resume, hidden replacement or retry exists, including interrupted/spawn-failed
 slots. Slot spending precedes spawn; process-group termination/drain stays 2s.
 
+Connection launches must bind the exact other three workspace roots as denies,
+including canary. Otherwise broad declared host reads could expose a preceding
+condition's generated answer/test to later arms. Canonical/disjoint peer paths
+are included in the external launch/request digest; every observed session must
+retain each exact deny without peer read/write/descendant exceptions. Legacy
+model-free proposals remain compatible, but their missing peer boundary cannot
+reach the new production controller. Synthetic tests do not prove actual native
+deny effectiveness; that still needs independently observed real-host controls.
+
 The closed request binds a unique ID, <=1h expiry, one exact ledger/target root,
 Git/source/product/task/evaluator/plan/runtime/roots/launch-map identities,
 independent discovery/permission/admission receipt digests and permitted effects.
@@ -108,7 +117,9 @@ scope; private no-replace persistence; replay cannot promote admission or calls.
 The two new suites cover these contracts and are included in macOS15/Ubuntu24.04
 fake CI, alongside the existing Core/preparation/receiver and legacy suites.
 Independent review fixed raw canary-completion forgery, missing scratch replay
-identity binding, and native final-message inventory/persistence gaps.
+identity binding, and native final-message inventory/persistence gaps. Final
+self-review also found and fixed cross-condition workspace reads; independent
+review confirmed this fairness blocker and its exact peer-deny boundary.
 
 All model-free connection items in the table now have code and synthetic tests.
 No fresh CLI/model/canary was run, real session/auth was read, grant was issued,
