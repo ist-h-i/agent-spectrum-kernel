@@ -18,3 +18,5 @@ jobs:
         run: node scripts/ask-local-eval.mjs preflight
       - name: Fake lifecycle and failure regressions (no model calls)
         run: node --test scripts/test-ask-local-eval.mjs scripts/test-ask-local-codex.mjs scripts/test-ask-local-codex-time-budget.mjs scripts/test-ask-synthetic-json-pilot.mjs
+      - name: Isolated Full materialization and static fail-stop (no Codex)
+        run: node --test scripts/test-ask-local-full-package.mjs
