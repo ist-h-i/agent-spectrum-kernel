@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { coreGradingSources, coreGraderInputInventory, coreCalculationDigests, withCoreGradingAuthority, scoreCoreCapture, replayCoreScoredCapture } from "./ask-core-grading-authority.mjs";
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import {
@@ -10,6 +11,7 @@ import {
   mkdtempSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   readdirSync,
   rmSync,
   symlinkSync,
@@ -55,7 +57,7 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
 const work = mkdtempSync(resolve(root, ".ask-benchmark-portfolio-score-test-"));
-const privateWork = mkdtempSync(resolve(tmpdir(), "ask-private-portfolio-score-test-"));
+const privateWork = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-private-portfolio-score-test-")));
 const FIXTURE_ID = "cal-atomic-rule-batch";
 const REVISION = "b".repeat(40);
 const CASE_ID = "case-0000000000000001-0000000000000011";
@@ -165,7 +167,7 @@ function coverage(cases, values, keyName, selector) {
   });
 }
 
-function buildNormalizedCollection(path, { materialized, selectionState, runDir, outcome = "completed", markerBytes = {} }) {
+function buildNormalizedCollection(path, { materialized, selectionState, runDir, outcome = "completed", markerBytes = {}, coreCondition = null }) {
   const runInstanceId = "00000000-0000-4000-8000-000000000197";
   const materializationMarkerPath = resolve(materialized, "materialization-manifest.json");
   const selectionMarkerPath = resolve(selectionState, "selection-state.json");
@@ -184,17 +186,26 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir,
     materialization_manifest_digest: fileDigest(materializationMarkerPath),
     selection_state_digest: fileDigest(selectionMarkerPath),
   };
+  let terminal = null;
+  if (coreCondition) {
+    const payload = Buffer.from('synthetic calibration candidate; no model or real task\n');
+    const tree = [{ path: 'workspace/candidate.txt', bytes: payload.length, digest: digest(payload) }];
+    const record = { kind: 'ask_core_synthetic_terminal_workspace_v1', files: tree };
+    const bytes = Buffer.from(JSON.stringify(record) + '\n');
+    writeFileSync(resolve(runDir, 'terminal-workspace.json'), bytes);
+    terminal = { digest: digest(bytes), bytes: bytes.length, tree_digest: canonicalDigest(tree) };
+  }
   const evidence = {
     request_digest: digest("score-request"),
     raw_result_digest: digest("score-result"),
     terminal_commit_digest: digest("score-commit"),
     final_output_digest: outcome === "completed" ? digest("score-final") : null,
     final_output_bytes: outcome === "completed" ? 64 : null,
-    terminal_workspace_authority_availability: "unavailable",
+    terminal_workspace_authority_availability: terminal ? "captured" : "unavailable",
     terminal_workspace_authority_support: "supported",
-    terminal_workspace_authority_digest: null,
-    terminal_workspace_tree_digest: null,
-    terminal_workspace_authority_bytes: null,
+    terminal_workspace_authority_digest: terminal?.digest ?? null,
+    terminal_workspace_tree_digest: terminal?.tree_digest ?? null,
+    terminal_workspace_authority_bytes: terminal?.bytes ?? null,
   };
   const normalizedBase = {
     schema_version: "1.3.0",
@@ -216,7 +227,7 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir,
       case_id: CASE_ID,
       attempt: "0001",
       adapter_track: "codex",
-      condition: "plain",
+      condition: coreCondition ?? "plain",
       repetition: 1,
       condition_order_position: 1,
       block_id: BLOCK_ID,
@@ -258,7 +269,7 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir,
   const caseRecord = {
     case_id: CASE_ID,
     adapter_track: "codex",
-    condition: "plain",
+    condition: coreCondition ?? "plain",
     fixture_id: FIXTURE_ID,
     repetition: 1,
     condition_order_position: 1,
@@ -291,7 +302,7 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir,
     active_cases: 0,
     invalid_cases: outcome === "invalid" ? 1 : 0,
     by_adapter: coverage(cases, ADAPTERS, "adapter", (entry) => entry.adapter_track),
-    by_condition: coverage(cases, CONDITIONS, "condition", (entry) => entry.condition),
+    by_condition: coverage(cases, coreCondition ? ["plain", "core", "full"] : CONDITIONS, "condition", (entry) => entry.condition),
     by_status: STATUSES.map((status) => ({ status, count: cases.filter((entry) => entry.status === status).length })),
     missing_case_ids: [],
     invalid_case_ids: outcome === "invalid" ? [CASE_ID] : [],
@@ -663,7 +674,7 @@ function evaluatorResultFor(normalized, sourceSnapshotDigest, manifest, referenc
   return closeResult(result);
 }
 
-function createFixture(name, { normalizedOutcome = "completed", requirements = defaultRequirements(), admissionStatus = "admitted", distinctRequirementAuthority = false, markerBytes = {} } = {}) {
+function createFixture(name, { normalizedOutcome = "completed", requirements = defaultRequirements(), admissionStatus = "admitted", distinctRequirementAuthority = false, markerBytes = {}, coreCondition = null } = {}) {
   const path = resolve(work, name);
   const materialized = resolve(path, "materialized");
   const selectionState = resolve(path, "selection-state");
@@ -671,7 +682,7 @@ function createFixture(name, { normalizedOutcome = "completed", requirements = d
   const normalizedResults = resolve(path, "normalized-results");
   const publicArtifactRoot = resolve(path, "public-artifact");
   for (const directory of [materialized, selectionState, runDir, publicArtifactRoot]) mkdirSync(directory, { recursive: true });
-  const normalized = buildNormalizedCollection(normalizedResults, { materialized, selectionState, runDir, outcome: normalizedOutcome, markerBytes });
+  const normalized = buildNormalizedCollection(normalizedResults, { materialized, selectionState, runDir, outcome: normalizedOutcome, markerBytes, coreCondition });
   const privateRoot = resolve(privateWork, name);
   const { manifest, manifestPath } = createPrivateBundle(privateRoot, normalized.normalized);
   const referencePath = resolve(path, "evaluator-reference.json");
@@ -973,6 +984,119 @@ try {
   const rebuiltLegacy = buildPortfolioEngineeringResult({ ...evaluatorAuthority, effectiveAdmissionAuthority: legacyAuthority }, { root });
   assert.deepEqual(rebuiltLegacy, engineering);
 
+  // New-condition synthetic capture -> unchanged independent verifier/scorer ->
+  // separate persistence -> offline original calculation. No old condition alias.
+  for (const [condition, normalizedOutcome, evaluationStatus] of [
+    ["plain", "completed", "completed"], ["core", "completed", "completed"], ["full", "completed", "completed"],
+    ...["failed", "unavailable", "interrupted", "invalid"].map(outcome => ["core", outcome, "completed"]),
+    ...["invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required"].map(status => ["full", "completed", status]),
+  ]) {
+    const c = createFixture(`core-profile-${condition}-${normalizedOutcome}-${evaluationStatus}`, { coreCondition: condition, normalizedOutcome });
+    const e = writeResult(c, "evaluation", evaluationStatus);
+    const options = { ...legacyVerificationOptions, admissionRecordPath: c.scoringInputs.admissionRecordPath,
+      requirementRecordPath: c.scoringInputs.requirementRecordPath, outputContractPath: c.scoringInputs.outputContractPath,
+      scoringInputFreezeManifestPath: c.scoringInputs.freezeManifestPath, scoringInputFreezeManifestSourceDigest: c.scoringInputs.freezeManifestSourceDigest,
+      referencePath: c.referencePath, privateRoot: c.privateRoot, manifestPath: c.manifestPath, resultPath: e.path,
+      materializedPath: c.materialized, selectionState: c.selectionState, runDir: c.runDir, normalizedResultsPath: c.normalizedResults };
+    assert.throws(() => verifyEvaluatorAuthority(options), /Schema/);
+    const source = coreGradingSources(root), n = c.normalized.normalized, l = n.lineage;
+    const capture = { kind: "ask_core_synthetic_grading_capture_v1", evidence_class: "synthetic_fixture", condition,
+      product_digest: source["products/ask-core-bundle/manifest.json"], fixture_id: l.fixture_id, fixture_input_digest: l.fixture_input_digest,
+      normalized_result_id: n.normalized_result_id, normalized_result_digest: n.normalized_result_digest,
+      terminal_workspace_tree_digest: l.terminal_workspace_tree_digest, terminal_workspace_authority_digest: l.terminal_workspace_authority_digest,
+      terminal_workspace_authority_bytes: l.terminal_workspace_authority_bytes, outcome: n.outcome };
+    const capturePath = resolve(c.path, "new-capture.json"), authorityPath = resolve(c.path, "new-authority.json");
+    const captureBytes = Buffer.from(JSON.stringify(capture) + "\n");
+    writeFileSync(capturePath, captureBytes, { mode: 0o600, flag: "wx" });
+    const authority = { kind: "ask_core_grading_provenance_authority_v1", evidence_class: "synthetic_fixture", capture_digest: digest(captureBytes), capture,
+      grader_input_inventory_digest: canonicalDigest(coreGraderInputInventory(options)), source_digests: source,
+      scoring_input_freeze_source_digest: options.scoringInputFreezeManifestSourceDigest,
+      calculation_digests: coreCalculationDigests({ normalized: n, result: e.result, evaluationReady: evaluationStatus === "completed",
+        scoringInputs: { ...c.scoringInputs, catalog, policyManifest, scoringPolicy, evaluatorReference: c.reference } }) };
+    const authorityBytes = Buffer.from(JSON.stringify(authority) + "\n");
+    writeFileSync(authorityPath, authorityBytes, { mode: 0o600, flag: "wx" });
+    options.coreGradingAuthority = { path: authorityPath, digest: digest(authorityBytes), capturePath };
+    for (const mutation of ["condition", "task", "workspace", "source", "native", "unknown"]) {
+      const bad = JSON.parse(authorityBytes);
+      if (mutation === "condition") bad.capture.condition = condition === "core" ? "full" : "core";
+      if (mutation === "task") bad.capture.fixture_input_digest = digest("foreign-task");
+      if (mutation === "workspace") bad.capture.terminal_workspace_tree_digest = digest("foreign-workspace");
+      if (mutation === "source") bad.source_digests["scripts/ask-core-grading-authority.mjs"] = digest("stale-source");
+      if (mutation === "native") bad.evidence_class = "independently_observed_native";
+      if (mutation === "unknown") bad.capture.outcome = "unknown";
+      const badCapture = Buffer.from(JSON.stringify(bad.capture) + "\n");
+      bad.capture_digest = digest(badCapture);
+      const badAuthority = Buffer.from(JSON.stringify(bad) + "\n");
+      writeFileSync(capturePath, badCapture); writeFileSync(authorityPath, badAuthority);
+      // Even a newly pinned coherent fixture authority cannot transplant the
+      // condition/task/workspace/source or promote itself to native authority.
+      assert.throws(() => verifyEvaluatorAuthority({ ...options, coreGradingAuthority: { ...options.coreGradingAuthority, digest: digest(badAuthority) } }));
+      writeFileSync(capturePath, captureBytes); writeFileSync(authorityPath, authorityBytes);
+    }
+    const verified = verifyEvaluatorAuthority(options);
+    assert.equal(verified.normalized.lineage.condition, condition);
+    assert.throws(() => scoreCoreCapture(options, c.runDir), /output_overlap/);
+    const output = resolve(c.path, "graded-capsule"), scored = scoreCoreCapture(options, output);
+    assert.equal(scored.artifact.condition, condition);
+    if (normalizedOutcome === "completed" && evaluationStatus === "completed") assert.deepEqual(scored.artifact.requirement_score, engineering.requirement_score);
+    else {
+      assert.equal(scored.artifact.scoring_status, "not_scoring_ready");
+      assert.ok(Object.values(scored.artifact.requirement_score).every(value => value === null));
+    }
+    assert.equal(scored.native_admission, false);
+    assert.equal(replayCoreScoredCapture(output, scored.result_digest).status, "offline_scored_capture_verified");
+    const offlineCli = spawnSync(process.execPath, [resolve(root, "scripts/ask-core-scored-replay.mjs"), "replay", output, scored.result_digest], { cwd: root, encoding: "utf8" });
+    assert.equal(offlineCli.status, 0, offlineCli.stderr);
+    assert.equal(JSON.parse(offlineCli.stdout).status, "offline_scored_capture_verified");
+    assert.throws(() => scoreCoreCapture(options, output));
+    assert.equal(replayCoreScoredCapture(output, digest("wrong")).status, "blocked");
+    const replayFile = resolve(output, "scored-result.json"), originalReplayBytes = readFileSync(replayFile);
+    const changed = JSON.parse(originalReplayBytes);
+    changed.condition = condition === "core" ? "full" : "core";
+    writeFileSync(replayFile, JSON.stringify(changed) + "\n");
+    assert.equal(replayCoreScoredCapture(output, fileDigest(replayFile)).status, "blocked");
+    writeFileSync(replayFile, originalReplayBytes);
+    const originalCapture = readFileSync(capturePath);
+    writeFileSync(capturePath, JSON.stringify({ ...capture, outcome: "unknown" }) + "\n");
+    assert.throws(() => verifyEvaluatorAuthority(options), /capture_changed/);
+    writeFileSync(capturePath, originalCapture);
+    const originalResult = readFileSync(e.path);
+    writeFileSync(e.path, JSON.stringify({ ...e.result, condition: "plain" }) + "\n");
+    assert.throws(() => verifyEvaluatorAuthority(options), /grader_input_changed/);
+    writeFileSync(e.path, originalResult);
+    // A rehashed calculation/result/capsule must retain the independently
+    // pinned original calculation authority, even when both scores agree.
+    const calculationPath = resolve(output, "calculation.json"), scorePath = resolve(output, "engineering-result.json");
+    const calculationBytes = readFileSync(calculationPath), scoreBytes = readFileSync(scorePath);
+    const calculation = JSON.parse(calculationBytes);
+    calculation.result.requirement_results[0].earned_points = 0;
+    calculation.result.requirement_results[0].outcome = "fail";
+    writeFileSync(calculationPath, JSON.stringify(calculation) + "\n");
+    const resolved = resolveEffectiveAdmissionAuthority({ frozenAdmissionRecord: calculation.scoringInputs.admissionRecord,
+      requirementRecord: calculation.scoringInputs.requirementRecord, evaluatorReference: calculation.scoringInputs.evaluatorReference, root });
+    const changedScore = withCoreGradingAuthority(options, () => buildPortfolioEngineeringResult({ ...calculation, effectiveAdmissionAuthority: resolved }, { root }));
+    writeFileSync(scorePath, JSON.stringify(changedScore) + "\n");
+    const changedCapsule = JSON.parse(originalReplayBytes);
+    changedCapsule.inventory["calculation.json"] = fileDigest(calculationPath);
+    changedCapsule.inventory["engineering-result.json"] = fileDigest(scorePath);
+    writeFileSync(replayFile, JSON.stringify(changedCapsule) + "\n");
+    assert.equal(replayCoreScoredCapture(output, fileDigest(replayFile)).reason, "core_scored_calculation_authority_changed");
+    writeFileSync(calculationPath, calculationBytes); writeFileSync(scorePath, scoreBytes); writeFileSync(replayFile, originalReplayBytes);
+    // Async descendants lose the temporary schema profile once the scope closes.
+    if (condition !== "plain") {
+      let later;
+      withCoreGradingAuthority(options, () => { later = Promise.resolve().then(() => assert.throws(() => validatePortfolioEngineeringResult(scored.artifact, { root }), /Schema/)); });
+      await later;
+    }
+    assert.throws(() => withCoreGradingAuthority(options, () => Promise.resolve()), /async_scope_forbidden/);
+    // Offline replay has no dependency on the original private evaluator roots.
+    rmSync(c.privateRoot, { recursive: true, force: true });
+    assert.equal(replayCoreScoredCapture(output, scored.result_digest).status, "offline_scored_capture_verified");
+    writeFileSync(resolve(output, "extra.json"), "{}\n");
+    assert.equal(replayCoreScoredCapture(output, scored.result_digest).status, "blocked");
+  }
+
+  if (!process.argv.includes("--core-grading-only")) {
   const pendingFixture = createFixture("pending-overlay-production", { admissionStatus: "admission_pending", distinctRequirementAuthority: true });
   const pendingCompleted = writeResult(pendingFixture, "pending-completed");
   assert.notEqual(pendingFixture.scoringInputs.admissionRecord.admission_digest, pendingFixture.scoringInputs.admissionRecord.requirement_authority_digest);
@@ -1459,7 +1583,8 @@ try {
   assert.deepEqual(unsafeEngineering.safety_blocker.category_ids, ["unauthorized_attempt"]);
   assert.equal(unsafeEngineering.requirement_score.normalized_requirement_score, 4 / 6, "safety blocker must remain separate from the numeric requirement score");
 
-  console.log("ASK benchmark portfolio raw engineering result score tests passed");
+  }
+  console.log(process.argv.includes("--core-grading-only") ? "Core grading capture/scorer/offline replay tests passed (11 outcomes; synthetic only)" : "ASK benchmark portfolio raw engineering result score tests passed");
 } finally {
   rmSync(work, { recursive: true, force: true });
   rmSync(privateWork, { recursive: true, force: true });

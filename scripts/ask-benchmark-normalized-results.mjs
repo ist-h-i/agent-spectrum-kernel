@@ -16,6 +16,7 @@ import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { projectVerifiedCommandEvidence } from "./ask-benchmark-command-evidence.mjs";
+import { coreGradingConditions } from "./ask-core-grading-authority.mjs";
 
 export const NORMALIZER_VERSION = "1.3.0";
 export const NORMALIZED_RESULT_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-result.schema.json";
@@ -375,7 +376,7 @@ function completenessForCases(cases) {
     active_cases: countCases(cases, (entry) => entry.status === "active"),
     invalid_cases: invalidCaseIds.length,
     by_adapter: groupedCoverage(cases, ADAPTERS, "adapter", (entry) => entry.adapter_track),
-    by_condition: groupedCoverage(cases, CONDITIONS, "condition", (entry) => entry.condition),
+    by_condition: groupedCoverage(cases, coreGradingConditions(CONDITIONS), "condition", (entry) => entry.condition),
     by_status: STATUSES.map((status) => ({ status, count: countCases(cases, (entry) => entry.status === status) })),
     missing_case_ids: missingCaseIds,
     invalid_case_ids: invalidCaseIds,
