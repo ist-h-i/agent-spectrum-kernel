@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync, rmSync, existsSync, chmodSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync, rmSync, existsSync, chmodSync, symlinkSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { setup } from './test-helpers-ask-core-producer.mjs';
 import { runCoreNativeConnection } from './ask-core-native-connection.mjs';
 import { normalizeCoreConnectedResult } from './ask-core-connected-normalizer.mjs';
@@ -9,7 +9,8 @@ import { buildCoreDirectControllerRecord, inspectCoreControllerRecords } from '.
 import { produceCoreCaptureArtifacts, verifyCoreCaptureProducer, materializeCoreCaptureCandidate, buildCoreCaptureScoringInputs, createCoreCaptureSealedEvaluatorExecution } from './ask-core-capture-producer.mjs';
 import { withCoreCaptureProducer, activeCoreProducer } from './ask-core-producer-scope.mjs';
 import { coreGradingSchemaPath, assertCoreGradingVerified } from './ask-core-grading-authority.mjs';
-import { digest } from './ask-core-bundle-product.mjs';
+import { digest, sourceBytes } from './ask-core-bundle-product.mjs';
+import { readEvaluatorAuthorityAnchorFromFreeze } from './ask-benchmark-evaluator-boundary.mjs';
 
 function records(head, task, evidenceClass = 'synthetic_fixture', captureDigest = 'sha256:'+'a'.repeat(64), requestDigest = 'sha256:'+'b'.repeat(64)) {
   const producerStdoutBytes = Buffer.from('synthetic producer transcript\n'), reviewerStdoutBytes = Buffer.from('synthetic independent reviewer transcript\n');
@@ -51,7 +52,84 @@ test('saved real-contract-shaped synthetic capture produces original normalizer,
   }
   rmSync(p.input.preparationRoot, { recursive: true }); rmSync(p.input.connectionRoot, { recursive: true }); rmSync(p.input.captureRoot, { recursive: true });
   assert.equal(verifyCoreCaptureProducer(p.options).evidence_class, 'synthetic_fixture');
-  assert.equal(buildCoreCaptureScoringInputs(p.options, { condition: 'core', privateRoot: '/unopened/private-input', privateEvaluationRoot: '/unopened/grader-output', frozenSourceRoot: '/unopened/frozen-source' }).status, 'private_evaluation_artifacts_pending');
+  const fixture = verifyCoreCaptureProducer(p.options).capture.fixture_id;
+  const frozenSourceRoot = join(p.root, 'provided-frozen-source');
+  const freezeManifestRelativePath = `benchmarks/fixtures/checkpoint-b2/${fixture}/scoring-input-freeze-manifest.json`;
+  const freezeManifestPath = join(frozenSourceRoot, freezeManifestRelativePath);
+  mkdirSync(dirname(freezeManifestPath), { recursive: true, mode: 0o700 });
+  writeFileSync(freezeManifestPath, sourceBytes(freezeManifestRelativePath), { flag: 'wx', mode: 0o644 });
+  assert.equal(buildCoreCaptureScoringInputs(p.options, { condition: 'core', privateRoot: '/unopened/private-input', privateEvaluationRoot: '/unopened/grader-output', frozenSourceRoot }).status, 'private_evaluation_artifacts_pending');
+});
+
+test('frozen scorer authorities are all resolved inside the supplied source root, separate from the invocation root', async t => {
+  const p = await produced(t), fixture = verifyCoreCaptureProducer(p.options).capture.fixture_id;
+  const frozenSourceRoot = join(p.root, 'independent-frozen-source');
+  const freezeManifestRelativePath = `benchmarks/fixtures/checkpoint-b2/${fixture}/scoring-input-freeze-manifest.json`;
+  const freezeManifestPath = join(frozenSourceRoot, freezeManifestRelativePath);
+  mkdirSync(dirname(freezeManifestPath), { recursive: true, mode: 0o700 });
+  writeFileSync(freezeManifestPath, sourceBytes(freezeManifestRelativePath), { flag: 'wx', mode: 0o644 });
+  const freeze = JSON.parse(readFileSync(freezeManifestPath, 'utf8'));
+  const input = buildCoreCaptureScoringInputs(p.options, { condition: 'core', frozenSourceRoot });
+  const invocationRoot = p.options.recordRoot;
+  const defaultInput = buildCoreCaptureScoringInputs(p.options, { condition: 'core' });
+  const defaultRoot = verifyCoreCaptureProducer(p.options).executionOptions.root;
+  const defaultFreeze = JSON.parse(sourceBytes(freezeManifestRelativePath).toString('utf8'));
+  assert.notEqual(frozenSourceRoot, invocationRoot);
+  assert.equal(input.privateHelperOptions.root, frozenSourceRoot);
+  assert.equal(input.scorerOptions.root, frozenSourceRoot);
+  assert.equal(input.scorerOptions.scoringInputFreezeManifestPath, freezeManifestPath);
+  assert.equal(input.scorerOptions.referencePath, join(frozenSourceRoot, freeze.evaluator_public_reference.path));
+  assert.equal(defaultInput.privateHelperOptions.root, defaultRoot);
+  assert.equal(defaultInput.scorerOptions.root, defaultRoot);
+  assert.equal(defaultInput.scorerOptions.scoringInputFreezeManifestPath, join(defaultRoot, freezeManifestRelativePath));
+  assert.equal(defaultInput.scorerOptions.referencePath, join(defaultRoot, defaultFreeze.evaluator_public_reference.path));
+  for (const [key, field] of [
+    ['catalogPath', 'catalog'], ['policyManifestPath', 'policy_manifest'], ['scoringPolicyPath', 'scoring_policy'],
+    ['admissionRecordPath', 'admission_record'], ['requirementRecordPath', 'requirement_record'], ['outputContractPath', 'output_contract'],
+  ]) {
+    assert.equal(input.scorerOptions[key], join(frozenSourceRoot, freeze[field].path));
+    assert.equal(defaultInput.scorerOptions[key], join(defaultRoot, defaultFreeze[field].path));
+    assert.ok(input.scorerOptions[key].startsWith(frozenSourceRoot + '/'));
+    assert.ok(!input.scorerOptions[key].startsWith(invocationRoot + '/'));
+  }
+  assert.ok(!input.scorerOptions.referencePath.startsWith(invocationRoot + '/'));
+  assert.ok(!input.scorerOptions.scoringInputFreezeManifestPath.startsWith(invocationRoot + '/'));
+
+  assert.throws(
+    () => buildCoreCaptureScoringInputs(p.options, { condition: 'core', frozenSourceRoot: join(p.root, 'missing-frozen-source') }),
+    /ENOENT/u,
+    'a supplied frozen source root without its public freeze manifest must be refused',
+  );
+  const symlinkSourceRoot = join(p.root, 'symlink-frozen-source');
+  const symlinkManifestPath = join(symlinkSourceRoot, freezeManifestRelativePath);
+  mkdirSync(dirname(symlinkManifestPath), { recursive: true, mode: 0o700 });
+  symlinkSync(freezeManifestPath, symlinkManifestPath);
+  assert.throws(
+    () => buildCoreCaptureScoringInputs(p.options, { condition: 'core', frozenSourceRoot: symlinkSourceRoot }),
+    /core_producer_regular_owned_file_required/u,
+    'a symlinked freeze manifest must be refused during public input assembly',
+  );
+
+  const tamperedFreeze = { ...freeze, freeze_revision: `${freeze.freeze_revision}-tampered` };
+  writeFileSync(freezeManifestPath, JSON.stringify(tamperedFreeze) + '\n');
+  assert.throws(
+    () => readEvaluatorAuthorityAnchorFromFreeze({
+      root: input.scorerOptions.root,
+      freezeManifestPath: input.scorerOptions.scoringInputFreezeManifestPath,
+      freezeManifestSourceDigest: input.scorerOptions.scoringInputFreezeManifestSourceDigest,
+      referencePath: input.scorerOptions.referencePath,
+    }),
+    /raw-byte digest does not match the approved immutable source digest/u,
+    'the downstream public authority anchor must reject a changed freeze manifest against its captured digest',
+  );
+
+  const unsafeFreeze = { ...freeze, catalog: { ...freeze.catalog, path: '../portfolio-catalog.json' } };
+  writeFileSync(freezeManifestPath, JSON.stringify(unsafeFreeze) + '\n');
+  assert.throws(
+    () => buildCoreCaptureScoringInputs(p.options, { condition: 'core', frozenSourceRoot }),
+    /core_capture_producer_refused/u,
+    'a freeze manifest path traversal must be refused',
+  );
 });
 
 for (const [scenario, field] of [['pass', 'unavailable_command_ids'], ['command_failure', 'failed_command_ids'], ['command_declined', 'declined_command_ids']]) {
@@ -59,7 +137,13 @@ for (const [scenario, field] of [['pass', 'unavailable_command_ids'], ['command_
     const p = await produced(t, scenario), input = buildCoreCaptureScoringInputs(p.options, { condition: 'core' });
     assert.deepEqual(input.normalizedResult.command_evidence[field], ['session-key-focused-test']);
     assert.deepEqual(input.normalizedResult.command_evidence.succeeded_command_ids, []);
-    assert.throws(() => createCoreCaptureSealedEvaluatorExecution(p.options, { condition: 'core', privateRoot: '/must-not-open/private', privateEvaluationRoot: '/must-not-open/output', frozenSourceRoot: '/must-not-open/source', manifestPath: '/must-not-open/private/manifest.json' }), /commands_or_outcome_not_verified/);
+    const frozenSourceRoot = join(p.root, 'evidence-refusal-public-source');
+    const fixture = verifyCoreCaptureProducer(p.options).capture.fixture_id;
+    const freezeManifestRelativePath = `benchmarks/fixtures/checkpoint-b2/${fixture}/scoring-input-freeze-manifest.json`;
+    const freezeManifestPath = join(frozenSourceRoot, freezeManifestRelativePath);
+    mkdirSync(dirname(freezeManifestPath), { recursive: true, mode: 0o700 });
+    writeFileSync(freezeManifestPath, sourceBytes(freezeManifestRelativePath), { flag: 'wx', mode: 0o644 });
+    assert.throws(() => createCoreCaptureSealedEvaluatorExecution(p.options, { condition: 'core', privateRoot: '/must-not-open/private', privateEvaluationRoot: '/must-not-open/output', frozenSourceRoot, manifestPath: '/must-not-open/private/manifest.json' }), /commands_or_outcome_not_verified/);
   });
 }
 

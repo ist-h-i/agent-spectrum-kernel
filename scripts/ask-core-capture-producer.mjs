@@ -241,24 +241,27 @@ export function materializeCoreCaptureCandidate(options, { condition, outputPare
 export function buildCoreCaptureScoringInputs(options, { condition, privateRoot = null, privateEvaluationRoot = null, frozenSourceRoot = null, manifestPath = null, resultPath = null, privateEvaluationRecordPath = null, privateFragmentPath = null } = {}) {
   return withCoreCaptureProducer(options, verified => {
     need(CONDITIONS.includes(condition));
+    const privateArtifacts = { manifestPath, resultPath, privateEvaluationRecordPath, privateFragmentPath };
+    for (const v of [privateRoot, privateEvaluationRoot, frozenSourceRoot, ...Object.values(privateArtifacts)]) if (v !== null) need(typeof v === 'string' && resolve(v) === v, 'core_producer_absolute_input_required');
     const normalizedResultsPath = join(resolve(options.recordRoot), 'normalized');
     const normalized = verifyNormalizedPortfolioResults({ ...verified.executionOptions, outputPath: normalizedResultsPath });
     verifyPortfolioScoringRootLineage({ ...verified.executionOptions, normalizedResultsPath }, normalized);
     const entry = normalized.manifest.cases.find(c => c.condition === condition)?.normalized_attempts[0];
     need(entry, 'core_producer_condition_not_started');
     const record = json(read(join(normalized.generationPath, entry.path), 33554432, true));
-    const fixture = verified.capture.fixture_id, base = join(ROOT, 'benchmarks', 'fixtures', 'checkpoint-b2', fixture);
-    const freeze = json(sourceBytes(`benchmarks/fixtures/checkpoint-b2/${fixture}/scoring-input-freeze-manifest.json`));
-    const frozenPaths = Object.fromEntries([['catalogPath','catalog'],['policyManifestPath','policy_manifest'],['scoringPolicyPath','scoring_policy'],['admissionRecordPath','admission_record'],['requirementRecordPath','requirement_record'],['outputContractPath','output_contract']].map(([key,field]) => { need(safePath(freeze[field].path)); return [key, join(ROOT, freeze[field].path)]; }));
+    const fixture = verified.capture.fixture_id, sourceRoot = frozenSourceRoot ?? ROOT;
+    const freezeManifestRelativePath = `benchmarks/fixtures/checkpoint-b2/${fixture}/scoring-input-freeze-manifest.json`;
+    const scoringInputFreezeManifestPath = join(sourceRoot, freezeManifestRelativePath);
+    const freeze = json(read(scoringInputFreezeManifestPath, 1048576, true));
+    const frozenPaths = Object.fromEntries([['catalogPath','catalog'],['policyManifestPath','policy_manifest'],['scoringPolicyPath','scoring_policy'],['admissionRecordPath','admission_record'],['requirementRecordPath','requirement_record'],['outputContractPath','output_contract']].map(([key,field]) => { need(safePath(freeze[field].path)); return [key, join(sourceRoot, freeze[field].path)]; }));
+    need(safePath(freeze.evaluator_public_reference.path));
     const missingInputs = Object.entries({ privateRoot, privateEvaluationRoot, frozenSourceRoot }).filter(([, v]) => v === null).map(([k]) => k);
-    const privateArtifacts = { manifestPath, resultPath, privateEvaluationRecordPath, privateFragmentPath };
-    for (const v of [privateRoot, privateEvaluationRoot, frozenSourceRoot, ...Object.values(privateArtifacts)]) if (v !== null) need(typeof v === 'string' && resolve(v) === v, 'core_producer_absolute_input_required');
     const pendingArtifacts = Object.entries(privateArtifacts).filter(([, value]) => value === null).map(([key]) => key);
     const commandObservations = record.command_evidence;
     const missingObservations = [...(commandObservations.unavailable_command_ids.length ? ['verification_command_execution'] : []), ...(commandObservations.failed_command_ids.length ? ['verification_command_failed'] : []), ...(commandObservations.declined_command_ids.length ? ['verification_command_declined'] : []), ...(commandObservations.required_alternative_groups.some(group => group.satisfaction_state !== 'satisfied') ? ['verification_alternative_group_not_satisfied'] : [])];
     return { kind: 'ask_core_capture_scoring_inputs_v1', status: missingInputs.length ? 'runtime_inputs_missing' : pendingArtifacts.length ? 'private_evaluation_artifacts_pending' : 'assembled_not_executed', evidence_class: verified.evidence_class, condition,
-      privateHelperOptions: { ...verified.executionOptions, root: frozenSourceRoot ?? ROOT, normalizedResultsPath, sourceSnapshotDigest: normalized.manifest.source_snapshot_digest, normalizedResultId: entry.normalized_result_id, privateRoot, privateEvaluationRoot },
-      scorerOptions: { ...verified.executionOptions, ...frozenPaths, ...privateArtifacts, coreCaptureProducer: { ...options }, coreConnectedNormalization: { outputRoot: join(resolve(options.recordRoot), 'capture'), externalDigest: verified.capture.result_digest }, root: frozenSourceRoot ?? ROOT, normalizedResultsPath, sourceSnapshotDigest: normalized.manifest.source_snapshot_digest, referencePath: join(base, 'evaluator-reference.json'), scoringInputFreezeManifestPath: join(base, 'scoring-input-freeze-manifest.json'), scoringInputFreezeManifestSourceDigest: verified.capture.evaluator_reference.scoring_input_freeze_raw_digest, privateRoot, privateEvaluationRoot },
+      privateHelperOptions: { ...verified.executionOptions, root: sourceRoot, normalizedResultsPath, sourceSnapshotDigest: normalized.manifest.source_snapshot_digest, normalizedResultId: entry.normalized_result_id, privateRoot, privateEvaluationRoot },
+      scorerOptions: { ...verified.executionOptions, ...frozenPaths, ...privateArtifacts, coreCaptureProducer: { ...options }, coreConnectedNormalization: { outputRoot: join(resolve(options.recordRoot), 'capture'), externalDigest: verified.capture.result_digest }, root: sourceRoot, normalizedResultsPath, sourceSnapshotDigest: normalized.manifest.source_snapshot_digest, referencePath: join(sourceRoot, freeze.evaluator_public_reference.path), scoringInputFreezeManifestPath, scoringInputFreezeManifestSourceDigest: verified.capture.evaluator_reference.scoring_input_freeze_raw_digest, privateRoot, privateEvaluationRoot },
       normalizedResult: record, missing_inputs: missingInputs, missing_observations: missingObservations,
       pending_private_artifacts: pendingArtifacts,
       original_private_evaluator_compatibility: 'unknown', scoring_ready: false, execution_permission: false, live_ready: false, model_calls: 0, grader_process_starts: 0 };
