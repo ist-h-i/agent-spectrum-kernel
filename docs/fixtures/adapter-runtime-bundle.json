@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "canonical_contract": {
     "revision": "ask-3.0.0",
-    "source_digest": "sha256:f21ecc14dfebfc6a73a5f3283d11161cf92525c2e86023e3206c3bd56d5f52ac",
+    "source_digest": "sha256:da9595cb7707d7f20f9259e31b43a508fd54ba442b914617b440abe949291d6f",
     "source_paths": [
       "AGENTS.md",
       "docs/adapter-runtime-boundary-contract.md",
@@ -88,6 +88,7 @@
       "skills/ui-ux-design/references/anti-patterns.md",
       "skills/ui-ux-design/references/decision-patterns.md",
       "skills/ui-ux-design/references/principles.md",
+      "skills/ui-ux-design/references/ui-capability-contract.md",
       "skills/verification-pattern-ledger/SKILL.md",
       "skills/work-package-compiler/SKILL.md"
     ]
@@ -105,11 +106,11 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "daily",
-          "profile_fingerprint": "sha256:100e992fc5f52d6d04b173ce98758e992f4d1e9fc92e42b33c6bd0aee1d7d457",
-          "canonical_subset_digest": "sha256:c7b4c07c7507f65c0b28fe37ecd0a1914d54f5f5031a742414c4dddf7f990577",
-          "canonical_source_count": 62,
-          "projected_asset_count": 57,
-          "projected_asset_digest": "sha256:cee37dc245c0a655223b0b6c9bfc08b3d3ac88607964676314d15a905908de70",
+          "profile_fingerprint": "sha256:6221c9b4b1ef8fce09ea6cc1d46c027fbd78ae13642f7e5e2ae413374f22e781",
+          "canonical_subset_digest": "sha256:9ee882817f5a6543d80f75e2a52fcc9ecaa49a3973f168631f477099adecae5e",
+          "canonical_source_count": 63,
+          "projected_asset_count": 58,
+          "projected_asset_digest": "sha256:83b2b9d74551208d4dd70b5c679a62219f5dd6ab911318ee043c2e442c55e7c0",
           "projected_asset_counts": {
             "commands": 5,
             "configuration": 1,
@@ -117,7 +118,7 @@
             "runner": 7,
             "runtime_data": 2,
             "schemas": 6,
-            "skills": 35
+            "skills": 36
           },
           "lifecycle_operations": [
             "install",
@@ -131,17 +132,17 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "9",
           "renderer_profile": "daily",
-          "profile_fingerprint": "sha256:e8a435d8c80f62c98c0c1f7e9a082939e2de6e780d5df889a08f2028a7980d28",
-          "canonical_subset_digest": "sha256:917bdadfd31b30589c632ec9d28a5815a463f3ebf6454a0358b90225b80cb398",
-          "canonical_source_count": 67,
-          "projected_asset_count": 58,
-          "projected_asset_digest": "sha256:d2335f377d13e29768064623ef97f8567d68e1b92601d68d1e490ffb8b576dfc",
+          "profile_fingerprint": "sha256:19b653b6229592b0c5cee0b8f81ab15e86f1959f945c95e2f9091acb290212e6",
+          "canonical_subset_digest": "sha256:c6b7791dfa93fce42ff939fd210c3ac17be4b30b95e37245097ccd85a28b6796",
+          "canonical_source_count": 68,
+          "projected_asset_count": 59,
+          "projected_asset_digest": "sha256:417c0053d6aa20989925c955f21ba32bf42ff80b640ce1b99db54a0b1d00211d",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 5,
             "runner": 9,
             "schemas": 8,
-            "skills": 35
+            "skills": 36
           },
           "lifecycle_operations": [
             "install",
@@ -160,11 +161,11 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "organizational",
-          "profile_fingerprint": "sha256:7e9fb6be2832626f67da56d505bbc6ddd1367058cb9a33dfd83a3f6c2bcde37d",
-          "canonical_subset_digest": "sha256:dbdfeaf857fc57d7d7d0ea15c2978621768b7bb98221923aad4e3a1961b88507",
-          "canonical_source_count": 81,
-          "projected_asset_count": 77,
-          "projected_asset_digest": "sha256:6b1554b59bb8c5cc7b6c5ea1213e9410f541cd8ade94bd9411ce1ff8c3582245",
+          "profile_fingerprint": "sha256:c414326c4bda979219a0b43e5f08906b9412d30566a4fbdaa19723c6eca95f23",
+          "canonical_subset_digest": "sha256:2371a8f93746b36eed41a9e330f53f2080631aca979ac214cc66d22a2736e1ed",
+          "canonical_source_count": 82,
+          "projected_asset_count": 78,
+          "projected_asset_digest": "sha256:104eafd829ead12466d01225186d9e5bd35e1b95244f4c8db944bc8081bf6147",
           "projected_asset_counts": {
             "commands": 7,
             "configuration": 4,
@@ -172,7 +173,7 @@
             "runner": 7,
             "runtime_data": 2,
             "schemas": 6,
-            "skills": 50
+            "skills": 51
           },
           "lifecycle_operations": [
             "install",
@@ -186,17 +187,17 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "9",
           "renderer_profile": "organizational",
-          "profile_fingerprint": "sha256:249741b7863ef4695bc156c4aadd97d454e8568c6af862322e9b622a16e49eaf",
-          "canonical_subset_digest": "sha256:f21ecc14dfebfc6a73a5f3283d11161cf92525c2e86023e3206c3bd56d5f52ac",
-          "canonical_source_count": 86,
-          "projected_asset_count": 73,
-          "projected_asset_digest": "sha256:ef0eb9052b4d324a2f2cf66274589b77eff472807ea07af07fa17d07b96f3281",
+          "profile_fingerprint": "sha256:68b217d9bd4646e11b92fa2695ab013ba96a36b426d8968e80ae53ad95eb4730",
+          "canonical_subset_digest": "sha256:da9595cb7707d7f20f9259e31b43a508fd54ba442b914617b440abe949291d6f",
+          "canonical_source_count": 87,
+          "projected_asset_count": 74,
+          "projected_asset_digest": "sha256:1baf43feb470be6769c42e75e797b595620bbc10344ad3183147224731da856c",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 5,
             "runner": 9,
             "schemas": 8,
-            "skills": 50
+            "skills": 51
           },
           "lifecycle_operations": [
             "install",
@@ -215,11 +216,11 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "implementation",
-          "profile_fingerprint": "sha256:8e7a3ee67cba4677d3f5892f0a10b6ccd085576b8b9dbfdf6baceac49b75f6af",
-          "canonical_subset_digest": "sha256:39243754def944663add8fe30c43d34a1f84bd6c0da6a5edee6087c95d8033f4",
-          "canonical_source_count": 43,
-          "projected_asset_count": 40,
-          "projected_asset_digest": "sha256:ee12bc39d0da58c30cad6572850bdd9f4f105d8df9ad00ed3342fa0812d9f0a9",
+          "profile_fingerprint": "sha256:6c9504529cbd74582a6d2a5eab851098c95a79a63d0cf0dc4a64caf8895625b0",
+          "canonical_subset_digest": "sha256:3d84460099c35e7f029013606da49fdbcdbebeb404853dd0bebeafaaa1dada28",
+          "canonical_source_count": 44,
+          "projected_asset_count": 41,
+          "projected_asset_digest": "sha256:edc0fb32ab6fc50b9b90a66802124e9718db1ea67d0d668b7d76b44345f18ed6",
           "projected_asset_counts": {
             "commands": 3,
             "configuration": 1,
@@ -227,7 +228,7 @@
             "runner": 7,
             "runtime_data": 2,
             "schemas": 6,
-            "skills": 20
+            "skills": 21
           },
           "lifecycle_operations": [
             "install",
@@ -241,17 +242,17 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "9",
           "renderer_profile": "implementation",
-          "profile_fingerprint": "sha256:118236dd75a7ba3eed1998aaa82a61b5947fb4b9c241bdf25d6fe8e9e3c29650",
-          "canonical_subset_digest": "sha256:4ef0ba9ec7893502e08e3d830b5d9bf9f78d72843954127045749096c334baf6",
-          "canonical_source_count": 42,
-          "projected_asset_count": 36,
-          "projected_asset_digest": "sha256:ff59bb74efd75f63e15c2ad9d03ae51d516b6560807001d5145fdfd9f8397946",
+          "profile_fingerprint": "sha256:d3a0d586c46e07d15ee2c8c916831fcabcbaccac26d93230230eaa5db8903ff0",
+          "canonical_subset_digest": "sha256:2bfeb977f6db14d4b95d0e6c1f801d6f4f1f7bc58e2d20c65f2cc1b82ed7e960",
+          "canonical_source_count": 43,
+          "projected_asset_count": 37,
+          "projected_asset_digest": "sha256:c3862f9dd1f7871b132fe96290e2db4cad3fc3529f04dd673c1e83b5506d7690",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 3,
             "runner": 9,
             "schemas": 8,
-            "skills": 15
+            "skills": 16
           },
           "lifecycle_operations": [
             "install",
@@ -270,11 +271,11 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "investigation",
-          "profile_fingerprint": "sha256:4f9f514c41639dfa5395a83b643e934e285c93b56bf4ed413cc56be37854e7c3",
-          "canonical_subset_digest": "sha256:16990af00238b8a0a8345519cfd7be14752cd9935eed9f87e83411b8c5ae5d2e",
-          "canonical_source_count": 37,
-          "projected_asset_count": 35,
-          "projected_asset_digest": "sha256:354c319fe15b05e87d968c3f506231ccfb928a937912c5bb61b9def5ae1ca31f",
+          "profile_fingerprint": "sha256:529ec3fca2000e3c07155fd07166d74892e2ba0383247f64f38134db564b2369",
+          "canonical_subset_digest": "sha256:d0823c404d6be20349c4e62436ccfda2d6223ba488df119a3814ba5cb9e9c0de",
+          "canonical_source_count": 38,
+          "projected_asset_count": 36,
+          "projected_asset_digest": "sha256:4c9112da2e584a1c2118e1c4f093c9815ec477f3c27ee160e6dba2ea786a8f56",
           "projected_asset_counts": {
             "commands": 3,
             "configuration": 1,
@@ -282,7 +283,7 @@
             "runner": 7,
             "runtime_data": 2,
             "schemas": 6,
-            "skills": 15
+            "skills": 16
           },
           "lifecycle_operations": [
             "install",
@@ -296,17 +297,17 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "9",
           "renderer_profile": "investigation",
-          "profile_fingerprint": "sha256:92b661ac2fc63fa4a004589bb0359b4dee39eaa58f90a74bf3506b217c30a673",
-          "canonical_subset_digest": "sha256:cf89e72a435d9014480dde85c1388b99990509a1a84b51245d115ddfc14de78c",
-          "canonical_source_count": 39,
-          "projected_asset_count": 34,
-          "projected_asset_digest": "sha256:e46a16afbbd0b01ce917de04fc795f09d4a3244e25558784b17826df30c92602",
+          "profile_fingerprint": "sha256:7d55b1354568636a2d5ca5341a06986bbb47c8df2a5d911d0e78e5c2daee7360",
+          "canonical_subset_digest": "sha256:96faaed614fc0ae1f3f35275aafb95a6ad5847e06a7136dc2a15adf0a35d7d78",
+          "canonical_source_count": 40,
+          "projected_asset_count": 35,
+          "projected_asset_digest": "sha256:742df53a5889eec9a5cfc7302e553c7fba49d48b0602116ec77180c866bfe904",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 3,
             "runner": 9,
             "schemas": 8,
-            "skills": 13
+            "skills": 14
           },
           "lifecycle_operations": [
             "install",
@@ -325,11 +326,11 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "review",
-          "profile_fingerprint": "sha256:2ff2f2137ace5162635a23b3f9c1a11c194975b246b0a84dc754ca3cbe10354f",
-          "canonical_subset_digest": "sha256:40c37c31c90a7155df2377c63c35a3e4ba7cf8b8ef36c3e69f481d4be4f78aaf",
-          "canonical_source_count": 48,
-          "projected_asset_count": 42,
-          "projected_asset_digest": "sha256:59f36ffb18ec43dd3584fc2e01bb1162ccd4191749ba8653951e6326a96e51be",
+          "profile_fingerprint": "sha256:12bbc435288ba8599e1327c8723a60bc813b76015274d8343165b724b1db701a",
+          "canonical_subset_digest": "sha256:d14e224bc801fa30b766d507515ccac0111c18b1d32b9bada0297cbec3805e6d",
+          "canonical_source_count": 49,
+          "projected_asset_count": 43,
+          "projected_asset_digest": "sha256:59f22f81bdbabd70d68f716067b2cb83f96c7a4037096fe1101fa09182732ad5",
           "projected_asset_counts": {
             "commands": 3,
             "configuration": 1,
@@ -337,7 +338,7 @@
             "runner": 7,
             "runtime_data": 2,
             "schemas": 6,
-            "skills": 22
+            "skills": 23
           },
           "lifecycle_operations": [
             "install",
@@ -351,17 +352,17 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "9",
           "renderer_profile": "review",
-          "profile_fingerprint": "sha256:f932ed116c4d2620e79ed2cd8dae5b4c67edcd17d567e3295d3670fa3cbf8192",
-          "canonical_subset_digest": "sha256:57a181742cdb075c3c229425d5b4e35b58be01ba87a2f7a6b5134a99ac02e5cf",
-          "canonical_source_count": 53,
-          "projected_asset_count": 43,
-          "projected_asset_digest": "sha256:b2e25156cd4f430bdb8b51239205c158a1442bb8baaee5ff02cb537f7f27ad7d",
+          "profile_fingerprint": "sha256:911ed42a53b5effcc22f594af113e55265ea4d7023204e476547295f1b5a13e2",
+          "canonical_subset_digest": "sha256:57a7b883eeb84c0a46d12398ac0c00740a8dc93f213ef28e3bfda053156cc182",
+          "canonical_source_count": 54,
+          "projected_asset_count": 44,
+          "projected_asset_digest": "sha256:9a2fdc1eea5fb641f31383473dde0db6ce2e601130381ad33c4f65c47aa7eba2",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 3,
             "runner": 9,
             "schemas": 8,
-            "skills": 22
+            "skills": 23
           },
           "lifecycle_operations": [
             "install",
@@ -380,8 +381,8 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "observability",
-          "profile_fingerprint": "sha256:f1268990ed536d14e4857fe883f188e9e9e5c48d5c5c7d9972de1a58f36bf34b",
-          "canonical_subset_digest": "sha256:746fe9de80cde95012b615910a7a4b7f72374d4122fa6d8db1331bb4c3e40edf",
+          "profile_fingerprint": "sha256:3fbb94699a556966b44b53fb597ee6e10633493f2b7d80249e186b06d84b6a27",
+          "canonical_subset_digest": "sha256:c871a451a24a4028b3ffdfc03dd77befe06ab565c1313d0dd246dac1990b9a5d",
           "canonical_source_count": 40,
           "projected_asset_count": 35,
           "projected_asset_digest": "sha256:1718f57b6770c8c94d869b56d9bce68d977d972c966da44270a510e4a4c2b2c5",
@@ -406,8 +407,8 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "9",
           "renderer_profile": "observability",
-          "profile_fingerprint": "sha256:d9161b8b10b04bb53499067838521dde58fca0b9c77781cdd52698c9618f56b9",
-          "canonical_subset_digest": "sha256:4270e45e5885b74b6406e951f8eff3ddebe7eb4216844283757519956db20662",
+          "profile_fingerprint": "sha256:8328349d4d9a76b89453ee4aec3af0c12fd067abd1f30be06b0ad89bfaa6fea0",
+          "canonical_subset_digest": "sha256:4dc1bf63a92ae5ca868877fd0d05ac3470d1434994cec07536452df0f1c700b1",
           "canonical_source_count": 43,
           "projected_asset_count": 29,
           "projected_asset_digest": "sha256:f7435fc310b4aa3e0f3d1e8d9d41fd341650939b78b996caa673a4653d36c847",
@@ -435,11 +436,11 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "full",
-          "profile_fingerprint": "sha256:aa86ab775c860d026641a7d37681a90eb73ecc21d57f26519713a40625f99b00",
-          "canonical_subset_digest": "sha256:dbdfeaf857fc57d7d7d0ea15c2978621768b7bb98221923aad4e3a1961b88507",
-          "canonical_source_count": 81,
-          "projected_asset_count": 77,
-          "projected_asset_digest": "sha256:6b1554b59bb8c5cc7b6c5ea1213e9410f541cd8ade94bd9411ce1ff8c3582245",
+          "profile_fingerprint": "sha256:3e68d8941a116af52ad11f8986f548b36b1feaf8a4ab16e5d863e825defded6c",
+          "canonical_subset_digest": "sha256:2371a8f93746b36eed41a9e330f53f2080631aca979ac214cc66d22a2736e1ed",
+          "canonical_source_count": 82,
+          "projected_asset_count": 78,
+          "projected_asset_digest": "sha256:104eafd829ead12466d01225186d9e5bd35e1b95244f4c8db944bc8081bf6147",
           "projected_asset_counts": {
             "commands": 7,
             "configuration": 4,
@@ -447,7 +448,7 @@
             "runner": 7,
             "runtime_data": 2,
             "schemas": 6,
-            "skills": 50
+            "skills": 51
           },
           "lifecycle_operations": [
             "install",
@@ -461,17 +462,17 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "9",
           "renderer_profile": "full",
-          "profile_fingerprint": "sha256:7c1a6a3a9629f02e8def2246d5c627d96488f6b681b022ffe952dc348c41a96b",
-          "canonical_subset_digest": "sha256:f21ecc14dfebfc6a73a5f3283d11161cf92525c2e86023e3206c3bd56d5f52ac",
-          "canonical_source_count": 86,
-          "projected_asset_count": 73,
-          "projected_asset_digest": "sha256:ef0eb9052b4d324a2f2cf66274589b77eff472807ea07af07fa17d07b96f3281",
+          "profile_fingerprint": "sha256:53e6f07c0a5eef211289ed5e8fefd8b05a27028e068316c5962c0e8eaeb3bd30",
+          "canonical_subset_digest": "sha256:da9595cb7707d7f20f9259e31b43a508fd54ba442b914617b440abe949291d6f",
+          "canonical_source_count": 87,
+          "projected_asset_count": 74,
+          "projected_asset_digest": "sha256:1baf43feb470be6769c42e75e797b595620bbc10344ad3183147224731da856c",
           "projected_asset_counts": {
             "commands": 1,
             "prompts": 5,
             "runner": 9,
             "schemas": 8,
-            "skills": 50
+            "skills": 51
           },
           "lifecycle_operations": [
             "install",

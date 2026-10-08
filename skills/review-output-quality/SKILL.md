@@ -47,6 +47,7 @@ For an interactive UI target, consume the current task's `UX supplement` when on
 
 2. For interactive UI output, bind findings to applicable harness patterns and evidence.
    - Confirm the observed UI signal that made `ui-ux-design` applicable.
+   - Consume the referenced design contract revision and obligation trace from `skills/ui-ux-design/references/ui-capability-contract.md` when applicable. For implemented UI, require independent actual-screen inspection and interaction evidence from available `ui-review` or an evidenced equivalent; contract/source checks alone leave affected runtime judgments `insufficient_evidence`. Include applicable select trailing-space and table edit-priority/alignment probes. Numeric overall scores never replace acceptance criteria.
    - Trace each UX finding to the applicable pattern, task consequence, and observed artifact/state.
    - Use screenshots/rendered artifacts for static hierarchy, labeling, and visible state only.
    - Require interactive or state evidence for focus/selection transitions, loading, duplicate-action prevention, actual undo, pre-commit cancellation, input retention, scoped retry, recovery, and whole-screen blocking.

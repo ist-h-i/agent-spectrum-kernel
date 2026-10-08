@@ -124,6 +124,7 @@ The user-facing route should describe work steps and stop points without requiri
    - When current evidence contains a user-visible interactive UI signal (screen/form/navigation, focus or selection state, loading/error/success state, reversible or consequential UI action, partial UI failure/retry, or UI language that affects task completion), add `ui-ux-design` as a secondary execution supplement.
    - `ui-ux-design` is never the primary lifecycle route. It supplements the selected requirement, design, implementation, verification, or review workflow and must not replace `requirement-grill`, `grill-design`, `controlled-implementation`, `test-first-verification`, or final review gates.
    - Skip `ui-ux-design` for non-UI work and for output that is purely machine-consumed. Do not load it merely because a repository contains frontend code.
+   - For contract-only, existing-contract build, or direct UI requests, use the portable connection in `skills/ui-ux-design/references/ui-capability-contract.md`. Discover `ui-design`, `ui-contract`, `ui-build`, and `ui-review` (or evidenced project equivalents) only as applicable external capabilities; do not add them to ASK profile prerequisites or replace this primary router. Missing capabilities stop their dependent scope without fabricated invocation or review claims.
    - Record the observed UI signal and the applicable pattern/verification subset; do not invent project users, branding, business priorities, or missing interaction states.
 
 8. Apply project overlay skill selection.
