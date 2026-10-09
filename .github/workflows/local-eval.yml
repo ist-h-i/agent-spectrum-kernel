@@ -20,25 +20,43 @@ jobs:
         run: node scripts/ask-local-eval.mjs preflight
       - name: Fake lifecycle and failure regressions (no model calls)
         run: node --test scripts/test-ask-local-eval.mjs scripts/test-ask-local-codex.mjs scripts/test-ask-local-codex-time-budget.mjs scripts/test-ask-synthetic-json-pilot.mjs
+      - name: Historical context isolation boundaries (current HEAD)
+        run: node --test scripts/test-historical-full-test-root.mjs
+      # Immutable Full/Core products are historical compatibility checks.
+      # Current-HEAD UI distribution stays in Validate repository.
+      - name: Prepare isolated immutable Full test context
+        id: historical
+        run: |
+          node scripts/prepare-historical-full-test-root.mjs "$RUNNER_TEMP/ask-historical-full" > "$RUNNER_TEMP/ask-historical-path"
+          echo "root=$(cat "$RUNNER_TEMP/ask-historical-path")" >> "$GITHUB_OUTPUT"
       - name: Full reference closure and three-arm synthetic protocol (no Codex)
+        working-directory: ${{ steps.historical.outputs.root }}
         run: node --test scripts/test-ask-local-full-package.mjs scripts/test-ask-local-three-arm.mjs scripts/test-ask-local-three-arm-qualification.mjs
       - name: Opt-in shared core, Full projections and offline comparison (no Codex)
+        working-directory: ${{ steps.historical.outputs.root }}
         run: |
           node scripts/generate-ask-core-bundle.mjs --check
           node --test scripts/test-ask-core-bundle.mjs
       - name: Mac native adapter proposal and task prequalification (synthetic only)
+        working-directory: ${{ steps.historical.outputs.root }}
         run: node --test scripts/test-ask-core-native-preparation.mjs
       - name: Fixed synthetic process receiver and protected offline results (no native CLI)
+        working-directory: ${{ steps.historical.outputs.root }}
         run: node --test scripts/test-ask-core-native-receiver.mjs
       - name: Exact authority lifecycle, new-session adapter and scratch integration (synthetic only)
+        working-directory: ${{ steps.historical.outputs.root }}
         run: node --test scripts/test-ask-core-native-boundaries.mjs scripts/test-ask-core-native-connection.mjs
       - name: Core condition grading authority and scored offline replay (synthetic only)
+        working-directory: ${{ steps.historical.outputs.root }}
         run: |
           node scripts/generate-ask-core-grading-schemas.mjs --check
           node scripts/test-ask-benchmark-portfolio-score.mjs --core-grading-only
       - name: Native compatibility record bindings without controller trust (synthetic only)
+        working-directory: ${{ steps.historical.outputs.root }}
         run: node --test scripts/test-ask-core-native-compatibility-provenance.mjs
       - name: Owner-attributed controller context boundaries (synthetic only)
+        working-directory: ${{ steps.historical.outputs.root }}
         run: node --test scripts/test-ask-core-controller-attribution.mjs scripts/test-ask-core-evaluator-dependency-closure.mjs
       - name: Saved capture to original normalizer and terminal scoring inputs (synthetic only)
+        working-directory: ${{ steps.historical.outputs.root }}
         run: node --test scripts/test-ask-core-capture-producer.mjs
