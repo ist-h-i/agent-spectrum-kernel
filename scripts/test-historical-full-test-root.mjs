@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, realpathSync, rmSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -23,4 +24,13 @@ test("historical manifest drift fails before creating a checkout", t => {
   writeFileSync(resolve(root, "docs/mac-ask-full-static-inventory.json"), "{}\n");
   assert.throws(() => historicalSourceEntries(root), /manifest drift/);
   assert.equal(existsSync(resolve(root, "checkout")), false);
+});
+
+test("dirty source refuses before cloning or reading historical manifests", t => {
+  const root = scratch(t);
+  execFileSync("git", ["-C", root, "init", "--quiet"]);
+  writeFileSync(resolve(root, "uncommitted.txt"), "current bytes");
+  const target = resolve(root, "checkout");
+  assert.throws(() => prepareHistoricalFullTestRoot(root, target), /clean source/);
+  assert.equal(existsSync(target), false);
 });

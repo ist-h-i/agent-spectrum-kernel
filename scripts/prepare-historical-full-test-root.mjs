@@ -62,9 +62,15 @@ export function prepareHistoricalFullTestRoot(root, destination) {
   }
   // Recursive reference discovery must see exactly the sealed asset set.
   // Removal is confined to this newly created isolated checkout.
+  const removed = new Set();
   for (const asset of skillAssets(target, selectedSkills)) {
-    if (!entries.has(asset.sourcePath)) rmSync(resolve(target, asset.sourcePath));
+    if (!entries.has(asset.sourcePath)) {
+      removed.add(asset.sourcePath);
+      rmSync(resolve(target, asset.sourcePath));
+    }
   }
+  const changed = git(target, ["diff", "--name-only"]).trim().split("\n").filter(Boolean);
+  assert.ok(changed.every(path => entries.has(path) || removed.has(path)), "unexpected historical context change");
   git(target, ["add", "--", ...entries.keys(), "skills"]);
   git(target, ["-c", "user.name=ASK historical test", "-c", "user.email=synthetic-test@example.invalid",
     "-c", "commit.gpgsign=false", "commit", "--quiet", "--allow-empty", "-m", "test-only immutable Full source context"]);
