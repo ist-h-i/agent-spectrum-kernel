@@ -510,7 +510,7 @@ try {
     }
     const prefix = entry.adapter_track === "codex" ? ".agents/skills/ui-ux-design/" : ".claude/skills/ui-ux-design/";
     const selected = entry.condition === "full_ask" || (entry.condition === "adaptive_ask" && request.projection.status !== "lightweight_bypass");
-    const paths = ["SKILL.md", "references/anti-patterns.md", "references/decision-patterns.md", "references/principles.md"];
+    const paths = ["SKILL.md", "references/anti-patterns.md", "references/decision-patterns.md", "references/principles.md", "references/ui-capability-contract.md"];
     const projected = authority.base_inventory.filter((asset) => asset.file_type === "regular_file" && asset.path.startsWith(prefix));
     assert.deepEqual(projected.map((asset) => asset.path), selected ? paths.map((path) => `${prefix}${path}`) : [], "entries and references must use the terminal contract's exact path order; nonselected Skills stay absent");
     for (const asset of projected) {
