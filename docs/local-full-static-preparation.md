@@ -122,3 +122,16 @@ and adds a separately classified, digest-bound reference supplement. See
 [three-condition comparison](local-three-arm-comparison.md) for its additional
 40 assets, bounded closure result and unresolved evaluator/runtime admission.
 The original `prepare` and its historical blocked observation remain unchanged.
+
+
+## Historical compatibility in CI
+
+The immutable candidate and reference supplement are checked in an isolated
+checkout by `scripts/prepare-historical-full-test-root.mjs`. Their declared
+source revisions and digests remain unchanged. Current test/helper bytes are
+retained, while the sealed source/Skill asset inventory is reconstructed only
+in that new checkout. New reference assets are excluded from that historical
+inventory, not ignored in current delivery. Current-HEAD UI distribution and
+repository consistency checks still run separately. These historical checks
+do not admit current-HEAD Full execution, reseal authority, or measure ASK
+effectiveness. The preparation utility itself makes no model/native calls.

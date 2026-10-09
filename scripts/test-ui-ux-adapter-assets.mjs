@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -10,7 +10,7 @@ import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs } from "./ask-shared.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const refs = ["principles.md", "decision-patterns.md", "anti-patterns.md"];
+const refs = ["principles.md", "decision-patterns.md", "anti-patterns.md", "ui-capability-contract.md"];
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 const definitions = [
   { adapter: "claude", surface: ".claude", plan: buildClaudeProjectionPlan },
@@ -31,7 +31,7 @@ for (const { adapter, surface, plan } of definitions) {
   });
 
   test(`${adapter}: reference install, update, conflict, retain, prune and rollback`, async (t) => {
-    const workspace = mkdtempSync(resolve(tmpdir(), `ask-${adapter}-references-`));
+    const workspace = realpathSync(mkdtempSync(resolve(tmpdir(), `ask-${adapter}-references-`)));
     t.after(() => rmSync(workspace, { recursive: true, force: true }));
     const source = resolve(workspace, "source");
     const target = resolve(workspace, "target");
@@ -87,7 +87,7 @@ for (const { adapter, surface, plan } of definitions) {
 
 
 test("core: UI skill references are installed, retained safely, pruned and rollback-restored", async (t) => {
-  const workspace = mkdtempSync(resolve(tmpdir(), "ask-core-references-"));
+  const workspace = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-core-references-")));
   t.after(() => rmSync(workspace, { recursive: true, force: true }));
   const source = resolve(workspace, "source");
   const target = resolve(workspace, "target");
