@@ -14,6 +14,12 @@ Mac / Codex の導入で得られるものは、プロジェクト内の判断�
 導入後の一件を具体化する [Mac 初回開発受入の準備](docs/first-workflow-mac-codex-ja.md)
 では、公開人工タスク・軽量 bypass 入力・未実行の受入記録をローカルに用意できます。
 
+[利用者 repo の三条件比較手順](docs/user-repository-comparison-mac-codex-ja.md) では、
+指定 commit から P／K／F を準備し、内容確認後の明示的な開始を既存 Codex runner に
+つなぎます。途中の失敗・未開始を含む結果は指定した保存先から再表示できます。
+準備・表示はモデルを起動せず、開発検証は fake runner による合成試験です。
+実モデルの比較は未実行で、人間が内容と正規の権限を確認して開始する別段階です。
+
 [実利用に近い探索的評価](docs/pragmatic-evaluation.md) では、global 設定の不明や
 環境・CLI 版の差を記録し、local ASK 追加なし／Kernelのみ／Full の観測を比較します。
 完全隔離・完全一致は開始条件にせず、既存集計を使うオフライン報告で失敗や unknown も

@@ -20,6 +20,8 @@ jobs:
         run: node scripts/ask-local-eval.mjs preflight
       - name: Fake lifecycle and failure regressions (no model calls)
         run: node --test scripts/test-ask-local-eval.mjs scripts/test-ask-local-codex.mjs scripts/test-ask-local-codex-time-budget.mjs scripts/test-ask-synthetic-json-pilot.mjs
+      - name: User repository comparison preparation and execution (fake runner only)
+        run: node --test scripts/test-ask-user-comparison-prepare.mjs scripts/test-ask-user-comparison.mjs
       - name: Historical context isolation boundaries (current HEAD)
         run: node --test scripts/test-historical-full-test-root.mjs
       # Immutable Full/Core products are historical compatibility checks.

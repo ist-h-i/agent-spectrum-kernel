@@ -6,6 +6,13 @@ that records global unknowns and approximate environments without claiming this
 protocol's equal-runtime/freeze contract or turning its synthetic results into
 measured outcomes. Its offline reporter grants no execution authority.
 
+For a separate exploratory entry from a user's committed repository, see the
+[Mac/Codex user comparison guide](user-repository-comparison-mac-codex-ja.md).
+Its prepare/inspect/start/report commands reuse the existing Codex runner and
+reporter; only an explicit human start requests Codex. That lane was tested with
+fake runners, with real-model comparison unperformed. It does not unlock this
+fixed driver, change frozen evidence, or retry a previously denied launch.
+
 Implementation Contract `IMP-318-THREE-1` revision 1 references
 `DES-MAC-ASK-VALUE-1` revision 2 and `IMP-318-FULL-1` revision 1.
 Changes C1 = declared reference supplement and bounded import scanner correction;
