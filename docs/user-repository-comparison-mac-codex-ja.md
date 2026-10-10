@@ -7,8 +7,8 @@
 確認して開始する別段階です。この開発での一連の検証は fake runner による合成試験で、
 実モデルの比較は未実行です。
 
-初版は Mac／Git／Codex と、追加依存なしで実行できる既存の Node `.mjs` テストを
-対象にします。一般のフレームワークへの自動対応や、任意の課題の意味的な自動採点は
+初版は Mac／Git／Codex と、追加依存なしで実行できる既存の `node:test` 形式の
+`.mjs` テストを対象にします。一般のフレームワークへの自動対応や、任意の課題の意味的な自動採点は
 ありません。仕様は [利用者比較の契約](user-comparison-contract.md)、比較の解釈は
 [探索的評価](pragmatic-evaluation.md) に記載しています。
 
@@ -130,8 +130,11 @@ EOF
 確認したい要件です。`task-tests` は内部のテスト結果に使う予約IDで、指定できません。
 要件に `command` がなければ、自動判定は `unknown` のまま
 残ります。コマンドの成功がその要件を実際に検証するかは、利用者が確認してください。
-実際の独立検証では同じ Node に `--test-reporter=tap` を加え、実行された assertion と
-失敗・中断・skip・todo の件数を確認します。空の実行や未評価のテストは合格にしません。
+独立検証では、準備時に hash を固定した controller の Node reporter を使います。
+TAP ログと、指定した各ファイルの実テスト件数・失敗・中断・skip・todo を確認します。
+空ファイルの実行成功だけでは合格にしません。指定した全ファイルでテストが評価され、
+すべて合格することが必要です。assertion 数は取得しないため `unknown` です。
+テストが要件を十分に検証するかは、利用者がコードと仕様を照合してください。
 検証 JSON は、比較元 commit に含まれない私的な領域に置いてください。
 非公開の正解・採点データ・過去の回答・認証情報を課題や repo に入れないでください。
 
@@ -262,6 +265,8 @@ node scripts/ask-user-comparison.mjs report "$RUN_OUTPUT" --json
 
 JSON は `launch_requested`（起動要求）、`spawn_observed`（ローカル子プロセス開始の
 観測）、`process_completed`（終了の観測）、exit code、失敗理由を分けて残します。
+成果物が欠けた場合も、独立した hash と実行IDで確認できる起動要求・開始観測は
+表示します。確認できない完了・exit code・品質は `unknown` のままです。
 子プロセスの開始観測は、provider のモデル呼出しや課金回数の独立した証明では
 ありません。テストと要件、scope、時間、取得できた input／output／cached tokens、
 実際の model が出力された場合の値、条件差と不明点を確認できます。
@@ -275,9 +280,10 @@ JSON は `launch_requested`（起動要求）、`spawn_observed`（ローカル�
 | --- | --- |
 | `control/plan.json`、`control/plan.digest` | 実行 ID、日時、比較元、課題・検証 hash、設定、各条件の全ファイル hash、Full の定義 |
 | `inputs/prompt.md`、`control/task.md`、`control/verification.json` | 実際の課題入力と共通検証方法 |
+| `control/node-test-reporter.mjs` | hash を固定した独立検証用の Node reporter。モデル入力には含めない |
 | `arms/plain`、`arms/kernel_only`、`arms/full_ask` | 独立した条件別 Git repo と修正内容 |
 | `control/start.json`、`control/end.json` | 開始操作と終了の記録。強制終了時は終了記録がない場合がある |
-| `control/slots/<condition>/` | `request.json`、`spawn.json`、`result.json`、CLI ログ、応答、修正 patch、独立検証ログなど、取得できた証拠 |
+| `control/slots/<condition>/` | `request.json`、`spawn.json` と各 digest、`result.json`、CLI ログ、応答、修正 patch、独立検証ログなど、取得できた証拠 |
 | `verification/<condition>/` | 結果を独立検証した作業コピー |
 
 記録は私的なローカル領域に保存され、自動 upload はありません。認証ファイル、

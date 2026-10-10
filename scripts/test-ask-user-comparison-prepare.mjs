@@ -82,6 +82,10 @@ test("regular uninstalled source prepares exact independent P/K/F baselines with
   assert.equal(result.plan.config.cli_version, null);
   assert.equal(result.plan.config.platform, `${process.platform}/${process.arch}`);
   assert.equal(result.plan.config.node_version, process.version);
+  const reporter = result.plan.verification.reporter;
+  assert.deepEqual(reporter, { path: "control/node-test-reporter.mjs",
+    digest: comparisonHash(readFileSync(join(SOURCE, "scripts/ask-user-comparison-test-reporter.mjs"))), format: "ask_node_file_summary_v1" });
+  assert.ok(readFileSync(join(result.root, reporter.path)).equals(readFileSync(join(SOURCE, "scripts/ask-user-comparison-test-reporter.mjs"))));
   assert.deepEqual(result.plan.policy, { attempts: 1, retries: 0, concurrency: 1 });
   const plain = result.plan.arms.plain, kernel = result.plan.arms.kernel_only, full = result.plan.arms.full_ask;
   for (const arm of [plain, kernel, full]) {
@@ -94,6 +98,9 @@ test("regular uninstalled source prepares exact independent P/K/F baselines with
     assert.equal(readFileSync(join(root, ".agents/skills/my-project/SKILL.md"), "utf8"), readFileSync(join(f.repo, ".agents/skills/my-project/SKILL.md"), "utf8"));
     assert.equal(existsSync(join(root, "task.md")), false);
     assert.equal(existsSync(join(root, "notes/untracked.txt")), false);
+    assert.equal(existsSync(join(root, "control/node-test-reporter.mjs")), false);
+    assert.equal(existsSync(join(root, "scripts/ask-user-comparison-test-reporter.mjs")), false);
+    assert.equal(Object.values(arm.baseline_inventory).some(item => item.digest === reporter.digest), false, "controller reporter must stay outside model copies");
   }
   assert.deepEqual(plain.assets, []);
   assert.equal(readFileSync(join(result.root, plain.path, "AGENTS.md"), "utf8"), "User instructions  \n\n");
@@ -314,6 +321,60 @@ test("post-model inventory refuses credential filenames and hard links before ca
     symlinkSync(f.globalFile, join(f.repo, ".git/config"));
     assert.throws(() => inventoryComparisonGitMetadata(f.repo), /unsafe_git_metadata_file:\.git\/config/u);
   });
+});
+
+test("standalone Git metadata refuses added redirect and alternate controls without running Git", async t => {
+  for (const path of [".git/commondir", ".git/gitdir", ".git/config.worktree", ".git/config.worktree.lock", ".git/common",
+    ".git/worktrees", ".git/modules", ".git/reftable", ".git/shallow", ".git/shallow.lock", ".git/objects/info/alternates",
+    ".git/objects/info/http-alternates", ".git/info/grafts", ".git/info/sparse-checkout"]) await t.test(path, st => {
+    const f = fixture(st); commit(f.repo);
+    write(f.repo, ".git/info/attributes", "* -filter -text -ident -working-tree-encoding\n");
+    inventoryComparisonGitMetadata(f.repo);
+    const beforeSource = inventoryUserTree(f.repo), beforeGlobal = readFileSync(f.globalFile);
+    write(f.repo, path, `${f.parent}/shadow-common\n`);
+    assert.throws(() => inventoryComparisonGitMetadata(f.repo), /unsupported_git_metadata_control:/u, path);
+    assert.deepEqual(inventoryUserTree(f.repo), beforeSource);
+    assert.ok(readFileSync(f.globalFile).equals(beforeGlobal));
+    assert.equal(existsSync(f.fakeLaunch), false);
+  });
+  await t.test("dangling commondir link cannot disappear from the guard", st => {
+    const f = fixture(st); commit(f.repo);
+    write(f.repo, ".git/info/attributes", "* -text\n");
+    symlinkSync(join(f.parent, "nonexistent"), join(f.repo, ".git/commondir"));
+    assert.throws(() => inventoryComparisonGitMetadata(f.repo), /unsupported_git_metadata_control:\.git\/commondir/u);
+  });
+});
+
+test("Git control parent directories and index cannot link outside an independent copy", async t => {
+  for (const path of [".git/info", ".git/refs", ".git/objects", ".git/objects/info", ".git/objects/pack", ".git/objects/aa", ".git/logs"]) await t.test(path, st => {
+    const f = fixture(st); commit(f.repo);
+    write(f.repo, ".git/info/attributes", "* -text\n");
+    const beforeSource = inventoryUserTree(f.repo), beforeGlobal = readFileSync(f.globalFile);
+    rmSync(join(f.repo, path), { force: true, recursive: true });
+    symlinkSync(f.parent, join(f.repo, path));
+    assert.throws(() => inventoryComparisonGitMetadata(f.repo), /unsafe_git_metadata_directory:/u, path);
+    assert.deepEqual(inventoryUserTree(f.repo), beforeSource);
+    assert.ok(readFileSync(f.globalFile).equals(beforeGlobal));
+  });
+  await t.test("index hard link", st => {
+    const f = fixture(st); commit(f.repo);
+    write(f.repo, ".git/info/attributes", "* -text\n");
+    unlinkSync(join(f.repo, ".git/index"));
+    linkSync(f.globalFile, join(f.repo, ".git/index"));
+    assert.throws(() => inventoryComparisonGitMetadata(f.repo), /unsafe_git_metadata_file:\.git\/index/u);
+  });
+});
+
+test("ordinary Git staging changes index, objects and logs without changing control identity", t => {
+  const f = fixture(t); commit(f.repo);
+  write(f.repo, ".git/info/attributes", "* -filter -text -ident -working-tree-encoding\n");
+  const before = inventoryComparisonGitMetadata(f.repo), beforeGlobal = readFileSync(f.globalFile);
+  write(f.repo, "src/value.mjs", "export const value = 2;\n");
+  git(f.repo, ["add", "src/value.mjs"]);
+  write(f.repo, ".git/logs/test-staging-note", "A local, test-owned staging note.\n");
+  assert.deepEqual(inventoryComparisonGitMetadata(f.repo), before);
+  assert.ok(readFileSync(f.globalFile).equals(beforeGlobal));
+  assert.equal(existsSync(f.fakeLaunch), false);
 });
 
 test("nested instruction paths are immutable while their parent source directory stays usable", t => {

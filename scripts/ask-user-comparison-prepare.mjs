@@ -1,7 +1,7 @@
 // Exploratory user-repository preparation. This module never starts Codex.
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { devNull, release } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -92,6 +92,10 @@ export function inventoryComparisonGitMetadata(root) {
   if (!stat.isDirectory() || stat.isSymbolicLink() || (process.getuid && stat.uid !== process.getuid())) fail("unsafe_git_metadata_directory");
   const inventory = {};
   let files = 0, total = 0;
+  function present(path) {
+    try { return lstatSync(join(root, path)); }
+    catch (error) { if (error.code === "ENOENT") return null; throw error; }
+  }
   function regular(path) {
     const info = lstatSync(join(root, path));
     if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || (process.getuid && info.uid !== process.getuid())) fail(`unsafe_git_metadata_file:${path}`);
@@ -109,12 +113,38 @@ export function inventoryComparisonGitMetadata(root) {
       else regular(child);
     }
   }
+  // These arms were initialized as standalone repositories. Additional Git
+  // layouts must never redirect the later diff to unaudited common config,
+  // attributes or object stores. lstat also notices dangling symlinks without
+  // reading their target. Check parent directories before nested controls.
+  // https://git-scm.com/docs/gitrepository-layout
+  for (const path of ["commondir", "gitdir", "config.worktree", "config.worktree.lock", "common",
+    "worktrees", "modules", "reftable", "shallow", "shallow.lock"]) {
+    if (present(`.git/${path}`)) fail(`unsupported_git_metadata_control:.git/${path}`);
+  }
+  directory(".git/objects");
+  directory(".git/objects/info");
+  directory(".git/objects/pack");
+  for (const name of readdirSync(join(gitRoot, "objects"))) {
+    if (/^[a-f0-9]{2}$/u.test(name)) directory(`.git/objects/${name}`);
+  }
+  directory(".git/info");
+  for (const path of [".git/objects/info/alternates", ".git/objects/info/http-alternates", ".git/info/grafts", ".git/info/sparse-checkout"]) {
+    if (present(path)) fail(`unsupported_git_metadata_control:${path}`);
+  }
+  if (present(".git/logs")) directory(".git/logs");
+  // Index bytes and object/log contents can change through ordinary staging.
+  // A link to an outside index still is not part of an independent repository.
+  if (present(".git/index")) {
+    const index = lstatSync(join(gitRoot, "index"));
+    if (!index.isFile() || index.isSymbolicLink() || index.nlink !== 1 || (process.getuid && index.uid !== process.getuid())) fail("unsafe_git_metadata_file:.git/index");
+  }
   regular(".git/config");
   regular(".git/HEAD");
-  if (existsSync(join(gitRoot, "refs"))) directory(".git/refs", true);
-  if (existsSync(join(gitRoot, "packed-refs"))) regular(".git/packed-refs");
-  directory(".git/info");
+  if (present(".git/refs")) directory(".git/refs", true);
+  if (present(".git/packed-refs")) regular(".git/packed-refs");
   regular(".git/info/attributes");
+  if (present(".git/info/exclude")) regular(".git/info/exclude");
   return inventory;
 }
 
@@ -169,11 +199,19 @@ function readCommittedTree(repo, commit) {
 }
 
 function readRegular(path, label, limit = 1024 * 1024) {
-  if (typeof path !== "string" || !isAbsolute(path) || realpathSync(path) !== path || !lstatSync(path).isFile() || lstatSync(path).nlink !== 1) fail(`unsafe_${label}_file`);
+  if (typeof path !== "string" || !isAbsolute(path) || realpathSync(path) !== path) fail(`unsafe_${label}_file`);
+  const before = lstatSync(path);
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1) fail(`unsafe_${label}_file`);
   if (recognizableSecret(basename(path))) fail(`recognizable_secret_file:${label}`);
-  const value = readFileSync(path);
-  if (value.length === 0 || value.length > limit) fail(`invalid_${label}_size`);
-  return value;
+  if (before.size === 0 || before.size > limit) fail(`invalid_${label}_size`);
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const opened = fstatSync(fd);
+    if (!opened.isFile() || opened.nlink !== 1 || opened.dev !== before.dev || opened.ino !== before.ino) fail(`unsafe_${label}_file`);
+    const value = readFileSync(fd), after = fstatSync(fd);
+    if (value.length !== before.size || after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs) fail(`unstable_${label}_file`);
+    return value;
+  } finally { closeSync(fd); }
 }
 
 function parseJson(bytes, label) {
@@ -418,6 +456,7 @@ export function prepareUserComparison(options = {}) {
     fail("verification_recipe_is_committed_model_input_keep_it_external");
   }
   const recipe = validateRecipe(parseJson(verificationBytes, "verification"), original);
+  const reporterBytes = readRegular(join(SOURCE, "scripts/ask-user-comparison-test-reporter.mjs"), "node_test_reporter");
   const testPaths = [...new Set([recipe.command, ...recipe.requirements.filter(item => item.command).map(item => item.command)].flatMap(command => command.slice(2)))];
   for (const mutablePath of mutable) {
     if (testPaths.some(path => mutablePath.endsWith("/") ? path.startsWith(mutablePath) : path === mutablePath)) fail("mutable_scope_overlaps_verification_test");
@@ -430,6 +469,7 @@ export function prepareUserComparison(options = {}) {
   mkdirSync(root, { mode: 0o700 });
   writeNew(root, "control/task.md", taskBytes);
   writeNew(root, "control/verification.json", verificationBytes);
+  writeNew(root, "control/node-test-reporter.mjs", reporterBytes);
   writeNew(root, "inputs/prompt.md", Buffer.from(prompt));
   const arms = {};
   const canonicalBytes = readRegular(join(SOURCE, "AGENTS.md"), "canonical_agents");
@@ -483,7 +523,8 @@ export function prepareUserComparison(options = {}) {
   const plan = { schema_version: 1, kind: "ask_user_comparison_plan_v1", run_id: randomUUID(), created_at: new Date().toISOString(),
     rerun_of: options.rerunOf ?? null, root, source: { repo: options.repo, commit: options.commit, inventory: sourceInventory, digest: comparisonHash(jsonBytes(sourceInventory)) },
     task: { path: "control/task.md", digest: comparisonHash(taskBytes), source_path: options.taskFile },
-    verification: { path: "control/verification.json", digest: comparisonHash(verificationBytes), recipe, source_path: options.verificationFile },
+    verification: { path: "control/verification.json", digest: comparisonHash(verificationBytes), recipe, source_path: options.verificationFile,
+      reporter: { path: "control/node-test-reporter.mjs", digest: comparisonHash(reporterBytes), format: "ask_node_file_summary_v1" } },
     prompt, input: { path: "inputs/prompt.md", digest: comparisonHash(Buffer.from(prompt)), bytes: Buffer.byteLength(prompt) },
     mutable_paths: mutable, config, policy: { attempts: 1, retries: 0, concurrency: 1 }, arms,
     source_installation: { removed_managed_assets: separated.removed, identities: separated.identities,

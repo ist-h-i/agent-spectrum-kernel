@@ -20,17 +20,23 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const relativeSafe = path => typeof path === "string" && !isAbsolute(path) && !path.includes("\\") && !path.includes("\0")
   && path.split("/").every(part => part && part !== "." && part !== "..");
 const evidencePath = (root, arm, file) => join(root, "control", "slots", arm, file);
-const verificationArgv = command => ["--test", "--test-reporter=tap", ...command.slice(2)];
+const verificationArgv = (root, plan, command) => ["--test", `--test-reporter=${join(root, plan.verification.reporter.path)}`, ...command.slice(2)];
 
 function saveNew(path, value) {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   writeFileSync(path, typeof value === "string" || Buffer.isBuffer(value) ? value : serialize(value), { flag: "wx", mode: 0o600 });
 }
 
+function saveLaunchReceipt(root, id, name, value) {
+  const bytes = serialize(value);
+  saveNew(evidencePath(root, id, `${name}.json`), bytes);
+  saveNew(evidencePath(root, id, `${name}.digest`), comparisonHash(bytes));
+}
+
 function saveTerminal(root, plan, id, value) {
   const artifacts = {}, artifactErrors = [];
   const folder = dirname(evidencePath(root, id, "result.json"));
-  for (const name of ["request.json", "spawn.json", "stdout.jsonl", "stderr.log", "last-message.txt", "response.txt", "patch.diff", "changes.json",
+  for (const name of ["request.json", "request.digest", "spawn.json", "spawn.digest", "stdout.jsonl", "stderr.log", "last-message.txt", "response.txt", "patch.diff", "changes.json",
     ...(value.verification?.checks ?? []).map(check => check.log)]) {
     const path = join(folder, name);
     if (existsSync(path)) {
@@ -78,6 +84,8 @@ export function readUserComparisonPlan(output) {
   }
   assert.equal(plan.input.path, "inputs/prompt.md");
   assert.equal(plan.verification.path, "control/verification.json");
+  assert.equal(plan.verification.reporter.path, "control/node-test-reporter.mjs");
+  assert.equal(plan.verification.reporter.format, "ask_node_file_summary_v1");
   if (existsSync(join(root, "control/start.json"))) {
     const started = readJson(join(root, "control/start.json"));
     assert.equal(started.run_id, plan.run_id, "start identity changed");
@@ -101,7 +109,8 @@ export function inspectUserComparison(output) {
   const loaded = readUserComparisonPlan(output), { root, plan } = loaded;
   return { ...loaded, invocations: USER_CONDITIONS.map(id => ({ condition: id, ...userCodexInvocation(root, plan, id),
     capability: plan.arms[id].capability })), verification: { executable: process.execPath,
-    argv: verificationArgv(plan.verification.recipe.command), cwd: "a fresh verification copy for each launched condition",
+    argv: verificationArgv(root, plan, plan.verification.recipe.command), reporter: plan.verification.reporter,
+    cwd: "a fresh verification copy for each launched condition",
     timeout_ms: plan.config.verification_timeout_ms },
   transmission: { input: "same task prompt, committed repository files, condition instructions, ordinary Codex conversation/tool context",
     provider_and_authentication: "inherited ordinary Codex configuration; not inspected by ASK; operator must confirm permission and destination before start",
@@ -170,14 +179,32 @@ export function parseUserCodexTelemetry(stdout) {
   return { metrics, session_id, model, errors, cost: null, request_count: null };
 }
 
-export function inspectNodeVerification(stdout) {
+export function inspectNodeVerification(stdout, expectedFiles = []) {
   const field = name => {
-    const match = new RegExp(`^# ${name} (\\d+)\\s*$`, "mu").exec(String(stdout));
+    const match = [...String(stdout).matchAll(new RegExp(`^# ${name} (\\d+)\\s*$`, "gmu"))].at(-1);
     return match ? Number(match[1]) : null;
   };
-  const counts = { tests: field("tests"), passed: field("pass"), failed: field("fail"), cancelled: field("cancelled"), skipped: field("skipped"), todo: field("todo") };
-  return { ...counts, assertions_observed: counts.tests > 0 && counts.passed === counts.tests && counts.failed === 0
-    && counts.cancelled === 0 && counts.skipped === 0 && counts.todo === 0 };
+  const reported = { tests: field("tests"), passed: field("pass"), failed: field("fail"), cancelled: field("cancelled"), skipped: field("skipped"), todo: field("todo") };
+  const files = [], errors = [], seen = new Set();
+  for (const line of String(stdout).split(/\r?\n/u)) {
+    const match = /^# ASK_NODE_FILE_SUMMARY (.+)$/u.exec(line);
+    if (!match) continue;
+    try {
+      const value = parseJsonRejectDuplicateKeys(match[1]);
+      assert.equal(value.format, "ask_node_file_summary_v1");
+      assert.ok(relativeSafe(value.file) && expectedFiles.includes(value.file) && !seen.has(value.file));
+      assert.equal(typeof value.success, "boolean");
+      assert.deepEqual(Object.keys(value.counts).sort(), ["cancelled", "failed", "passed", "skipped", "tests", "todo"]);
+      assert.ok(Object.values(value.counts).every(count => Number.isSafeInteger(count) && count >= 0));
+      files.push(value); seen.add(value.file);
+    } catch { errors.push("invalid or duplicate Node file summary"); }
+  }
+  const allPassed = counts => counts.tests > 0 && counts.passed === counts.tests && counts.failed === 0
+    && counts.cancelled === 0 && counts.skipped === 0 && counts.todo === 0;
+  const missing = expectedFiles.filter(file => !seen.has(file));
+  return { reported_counts: reported, file_summaries: files, missing_files: missing, errors, assertion_count: null,
+    tests_observed: expectedFiles.length > 0 && missing.length === 0 && errors.length === 0
+      && allPassed(reported) && files.every(file => file.success && allPassed(file.counts)) };
 }
 
 async function verifyCondition(root, plan, condition, signal, execute) {
@@ -189,23 +216,26 @@ async function verifyCondition(root, plan, condition, signal, execute) {
   const results = [];
   for (const [index, check] of checks.entries()) {
     if (signal?.aborted) break;
-    const argv = verificationArgv(check.command);
+    assert.equal(comparisonHash(readStableFile(join(root, plan.verification.reporter.path), "Node test reporter", LIMIT).bytes),
+      plan.verification.reporter.digest, "Node test reporter changed");
+    const argv = verificationArgv(root, plan, check.command);
     const value = await execute({ executable: process.execPath, argv, cwd, input: "",
       timeoutMs: plan.config.verification_timeout_ms, signal,
       env: { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C", GIT_CONFIG_GLOBAL: devNull,
         GIT_CONFIG_SYSTEM: devNull, GIT_CONFIG_NOSYSTEM: "1" } });
     const log = `verification-${index}.log`;
     saveNew(evidencePath(root, condition, log), sanitizeComparisonLog(`${value.stdout ?? ""}\n${value.stderr ?? ""}`));
-    const assertions = inspectNodeVerification(value.stdout ?? "");
-    results.push({ id: check.id, command: [process.execPath, ...argv], cwd, log, assertions,
-      status: value.interrupted ? "interrupted" : value.timedOut ? "timeout" : value.spawnObserved && value.exitCode === 0 && !value.error && !value.cleanupError && !value.outputLimited && assertions.assertions_observed ? "pass" : "fail",
+    const testSummary = inspectNodeVerification(value.stdout ?? "", check.command.slice(2));
+    results.push({ id: check.id, command: [process.execPath, ...argv], cwd, log, test_summary: testSummary,
+      status: value.interrupted ? "interrupted" : value.timedOut ? "timeout" : value.spawnObserved && value.exitCode === 0 && !value.error && !value.cleanupError && !value.outputLimited && testSummary.tests_observed ? "pass" : "fail",
       exit_code: value.exitCode ?? null, duration_ms: value.durationMs ?? null });
     if (value.interrupted || value.timedOut || value.cleanupError) break;
   }
-  return { independent_process: true, common_frozen_recipe: true, checks: results,
+  return { independent_process: true, common_frozen_recipe: true,
+    runtime: { executable: process.execPath, node_version: process.version, reporter_digest: plan.verification.reporter.digest }, checks: results,
     requirements: plan.verification.recipe.requirements.map(item => ({ id: item.id, description: item.description,
       status: item.command ? results.find(result => result.id === item.id)?.status ?? "unknown" : "unknown" })),
-    limitations: ["tests cover their assertions; human/semantic criteria without a command remain unknown", "verification executes repository test code in a fresh copy; this is not a security sandbox"] };
+    limitations: ["Node test-case receipts do not measure assertion count or prove that tests cover the requirement; the operator must check coverage", "human/semantic criteria without a command remain unknown", "verification executes repository test code in a fresh copy; this is not a security sandbox"] };
 }
 
 /** Explicit one-shot start. No resume/retry/alternate launch path exists. */
@@ -219,6 +249,8 @@ export async function startUserComparison(output, confirmedDigest, { signal, run
   assert.equal(readFileSync(join(root, plan.input.path), "utf8"), plan.prompt);
   assert.equal(comparisonHash(readStableFile(join(root, plan.verification.path), "recipe", LIMIT).bytes), plan.verification.digest, "verification changed");
   assert.deepEqual(readJson(join(root, plan.verification.path)), plan.verification.recipe, "verification plan and recipe differ");
+  assert.equal(comparisonHash(readStableFile(join(root, plan.verification.reporter.path), "Node test reporter", LIMIT).bytes),
+    plan.verification.reporter.digest, "Node test reporter changed");
   for (const id of USER_CONDITIONS) {
     assert.deepEqual(inventoryUserTree(join(root, plan.arms[id].path)), plan.arms[id].baseline_inventory, `prepared ${id} changed`);
     assert.deepEqual(inventoryComparisonGitMetadata(join(root, plan.arms[id].path)), plan.arms[id].git_metadata, `prepared ${id} Git metadata changed`);
@@ -238,7 +270,7 @@ export async function startUserComparison(output, confirmedDigest, { signal, run
     }
     const invocation = userCodexInvocation(root, plan, id);
     const conditionStarted = Date.now();
-    saveNew(evidencePath(root, id, "request.json"), { condition: id, requested_at: new Date().toISOString(),
+    saveLaunchReceipt(root, id, "request", { condition: id, run_id: plan.run_id, plan_digest, requested_at: new Date().toISOString(),
       executable: invocation.executable, argv: invocation.argv, cwd: invocation.cwd, prompt_digest: plan.input.digest,
       timeout_ms: invocation.timeoutMs, evidence_kind: plan.config.evidence_kind });
     let value;
@@ -246,7 +278,8 @@ export async function startUserComparison(output, confirmedDigest, { signal, run
       value = await runner({ ...invocation, signal, onSpawn: observed => {
         const pid = typeof observed === "number" ? observed : observed.pid;
         assert.ok(Number.isInteger(pid) && pid > 0, "spawn PID observation required");
-        saveNew(evidencePath(root, id, "spawn.json"), { pid, observed_at: new Date().toISOString() });
+        saveLaunchReceipt(root, id, "spawn", { condition: id, run_id: plan.run_id, plan_digest,
+          evidence_kind: plan.config.evidence_kind, pid, observed_at: new Date().toISOString() });
       } });
     } catch (error) {
       value = { spawnObserved: existsSync(evidencePath(root, id, "spawn.json")) ? true : null, exitCode: null,
@@ -325,6 +358,35 @@ export async function startUserComparison(output, confirmedDigest, { signal, run
   return reportUserComparison(root);
 }
 
+function readLaunchObservations(root, plan, planDigest, id, terminalExpected = false) {
+  const errors = [];
+  function read(name) {
+    const path = evidencePath(root, id, `${name}.json`), digestPath = evidencePath(root, id, `${name}.digest`);
+    if (!existsSync(path) && !existsSync(digestPath)) return undefined;
+    try {
+      const raw = readStableFile(path, "launch receipt", LIMIT).bytes;
+      assert.equal(comparisonHash(raw), readStableFile(digestPath, "launch digest", 256).bytes.toString("utf8"));
+      const value = parseJsonRejectDuplicateKeys(raw.toString("utf8"));
+      assert.equal(value.run_id, plan.run_id); assert.equal(value.plan_digest, planDigest);
+      assert.equal(value.condition, id); assert.equal(value.evidence_kind, plan.config.evidence_kind);
+      return value;
+    } catch (error) { errors.push(`${name}: ${sanitizeComparisonLog(error.message)}`); return null; }
+  }
+  const request = read("request"), spawn = read("spawn");
+  let requested = request === undefined ? terminalExpected ? null : false : null, spawned = null;
+  if (request) {
+    const invocation = userCodexInvocation(root, plan, id);
+    if (request.executable === invocation.executable && same(request.argv, invocation.argv) && request.cwd === invocation.cwd
+      && request.prompt_digest === plan.input.digest && request.timeout_ms === invocation.timeoutMs && Number.isFinite(Date.parse(request.requested_at))) requested = true;
+    else errors.push("request: invocation identity invalid");
+  }
+  if (spawn && Number.isInteger(spawn.pid) && spawn.pid > 0 && Number.isFinite(Date.parse(spawn.observed_at))) spawned = true;
+  else if (spawn) errors.push("spawn: observation invalid");
+  else if (spawn === undefined && requested === false) spawned = false;
+  return { launch_requested: requested, spawn_observed: spawned,
+    process_completed: requested === false && spawned === false ? false : null, exit_code: null, receipt_errors: errors };
+}
+
 export function reportUserComparison(output) {
   const { root, plan, plan_digest } = readUserComparisonPlan(output);
   const slots = USER_CONDITIONS.map(id => {
@@ -344,11 +406,13 @@ export function reportUserComparison(output) {
         }
         return value;
       }
-      catch (error) { return { condition: id, state: "result_missing", outcome: "unknown", reason: `terminal receipt unreadable: ${sanitizeComparisonLog(error.message)}` }; }
+      catch (error) { return { condition: id, state: "result_missing", outcome: "unknown",
+        ...readLaunchObservations(root, plan, plan_digest, id, true),
+        reason: `terminal receipt unreadable: ${sanitizeComparisonLog(error.message)}` }; }
     }
-    const requested = existsSync(evidencePath(root, id, "request.json")), spawned = existsSync(evidencePath(root, id, "spawn.json"));
-    return { condition: id, state: requested ? "incomplete" : "not_started", outcome: "unknown", launch_requested: requested,
-      spawn_observed: spawned ? true : requested ? null : false, process_completed: false, exit_code: null,
+    const observations = readLaunchObservations(root, plan, plan_digest, id);
+    const requested = observations.launch_requested !== false || observations.spawn_observed !== false;
+    return { condition: id, state: requested ? "incomplete" : "not_started", outcome: "unknown", ...observations,
       reason: requested ? "no terminal receipt; still running or interrupted, completion and usage unknown" : "no launch request saved" };
   });
   const notes = { kind: "ask_pragmatic_evaluation_notes_v1", evidence_kind: existsSync(join(root, "control/start.json")) ? plan.config.evidence_kind : "plan",

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
@@ -16,7 +16,7 @@ const git = (repo, args) => {
 };
 function fixture(t, extras = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "ask-user-entry-test-"))), repo = join(root, "source");
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  t.after(() => rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
   mkdirSync(repo); mkdirSync(join(repo, "src")); mkdirSync(join(repo, "test"));
   writeFileSync(join(repo, "src/value.mjs"), "export const value = 0;\n");
   writeFileSync(join(repo, "test/value.test.mjs"), "import test from 'node:test'; import assert from 'node:assert/strict'; import {value} from '../src/value.mjs'; test('value is one',()=>assert.equal(value,1));\n");
@@ -177,10 +177,20 @@ test("telemetry keeps missing values, actual difference and reported failure; sa
   assert.ok(!log.includes("Bearer abc") && !log.includes("sid=abc") && !log.includes("=foo") && !log.includes("sk-abc"));
 });
 
-test("successful exit without executed assertions or with skipped tests cannot certify verification", () => {
-  assert.equal(inspectNodeVerification("").assertions_observed, false);
-  assert.equal(inspectNodeVerification("# tests 1\n# pass 0\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n").assertions_observed, false);
-  assert.equal(inspectNodeVerification("# tests 1\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n").assertions_observed, true);
+test("file-level TAP success requires evaluated summaries for every requested test file", () => {
+  const counts = "# tests 1\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n";
+  const receipt = (file, extra = {}) => `# ASK_NODE_FILE_SUMMARY ${JSON.stringify({ format: "ask_node_file_summary_v1", file, success: true,
+    counts: { tests: 1, passed: 1, failed: 0, cancelled: 0, skipped: 0, todo: 0, ...extra } })}\n`;
+  const path = "test/value.test.mjs", valid = receipt(path) + counts;
+  assert.equal(inspectNodeVerification("", [path]).tests_observed, false);
+  assert.equal(inspectNodeVerification(counts, [path]).tests_observed, false);
+  assert.equal(inspectNodeVerification(valid, [path]).tests_observed, true);
+  assert.equal(inspectNodeVerification(valid, [path]).assertion_count, null);
+  assert.equal(inspectNodeVerification(valid, [path, "test/empty.test.mjs"]).tests_observed, false);
+  assert.equal(inspectNodeVerification(receipt(path, { passed: 0, skipped: 1 }) + counts, [path]).tests_observed, false);
+  assert.equal(inspectNodeVerification(receipt(path, { tests: 0, passed: 0 }) + counts, [path]).tests_observed, false);
+  assert.equal(inspectNodeVerification(receipt(path) + valid, [path]).tests_observed, false);
+  assert.equal(inspectNodeVerification(valid.replace('"tests":1', '"tests":-1'), [path]).tests_observed, false);
 });
 
 test("existing runner exported seam passes exact arguments/cwd/stdin and never invokes Codex in tests", async t => {
@@ -277,6 +287,106 @@ test("a regular file above 16 MiB and an empty file reach independent verificati
     assert.deepEqual(readFileSync(join(p.root, "verification", slot.condition, "asset.bin")), blob);
     assert.equal(readFileSync(join(p.root, "verification", slot.condition, "empty-file")).length, 0);
   }
+});
+
+test("empty, definition-free, skipped and todo Node files cannot certify task quality", async t => {
+  for (const [name, content] of [["empty", ""], ["no definitions", "import 'node:test';\n"],
+    ["empty suite", "import {describe} from 'node:test'; describe('empty suite',()=>{});\n"],
+    ["skip", "import test from 'node:test'; test.skip('not evaluated',()=>{});\n"],
+    ["todo", "import test from 'node:test'; test.todo('not evaluated');\n"]]) {
+    await t.test(name, async st => {
+      const f = fixture(st), path = "test/empty.test.mjs";
+      writeFileSync(join(f.repo, path), content);
+      git(f.repo, ["add", "."]); git(f.repo, ["-c", "user.name=ASK test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "unevaluated tests"]);
+      f.options.commit = git(f.repo, ["rev-parse", "HEAD"]);
+      const command = ["node", "--test", path];
+      writeFileSync(f.options.verificationFile, JSON.stringify({ command,
+        requirements: [{ id: "value-one", description: "The value is one", command }] }));
+      const p = f.prepare(), calls = [], run = fake(calls);
+      const report = await startUserComparison(p.root, p.plan_digest, { runner: async input => {
+        const value = await run(input); writeFileSync(join(input.cwd, "src/value.mjs"), "export const value = 0;\n"); return value;
+      } });
+      assert.equal(calls.length, 1); assert.equal(report.slots[0].state, "verification_failed");
+      assert.equal(report.slots[0].outcome, "fail");
+      assert.ok(report.slots[0].verification.checks.every(check => !check.test_summary.tests_observed));
+      assert.ok(report.slots.slice(1).every(slot => slot.state === "not_started"));
+    });
+  }
+});
+
+test("a passing Node file cannot hide an empty file in a command-backed requirement", async t => {
+  const f = fixture(t), empty = "test/empty.test.mjs";
+  writeFileSync(join(f.repo, empty), "");
+  git(f.repo, ["add", "."]); git(f.repo, ["-c", "user.name=ASK test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "mixed test files"]);
+  f.options.commit = git(f.repo, ["rev-parse", "HEAD"]);
+  writeFileSync(f.options.verificationFile, JSON.stringify({ command: ["node", "--test", "test/value.test.mjs"],
+    requirements: [{ id: "value-one", description: "All requested files evaluate the value", command: ["node", "--test", "test/value.test.mjs", empty] }] }));
+  const p = f.prepare(), report = await startUserComparison(p.root, p.plan_digest, { runner: fake([]) });
+  assert.equal(report.slots[0].verification.checks[0].status, "pass");
+  assert.equal(report.slots[0].verification.checks[1].status, "fail");
+  assert.deepEqual(report.slots[0].verification.checks[1].test_summary.missing_files, [empty]);
+  assert.equal(report.slots[0].outcome, "fail");
+});
+
+test("nested Node suites produce evaluated case receipts and the frozen reporter is bound", async t => {
+  const f = fixture(t);
+  writeFileSync(join(f.repo, "test/value.test.mjs"), "import {describe,it} from 'node:test'; import assert from 'node:assert/strict'; import {value} from '../src/value.mjs'; describe('value API',()=>it('value is one',()=>assert.equal(value,1)));\n");
+  git(f.repo, ["add", "."]); git(f.repo, ["-c", "user.name=ASK test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "nested suite"]);
+  f.options.commit = git(f.repo, ["rev-parse", "HEAD"]);
+  const p = f.prepare(), inspection = inspectUserComparison(p.root);
+  assert.equal(inspection.verification.reporter.digest, p.plan.verification.reporter.digest);
+  assert.ok(inspection.verification.argv.includes(`--test-reporter=${join(p.root, p.plan.verification.reporter.path)}`));
+  const report = await startUserComparison(p.root, p.plan_digest, { runner: fake([]) });
+  assert.ok(report.slots.every(slot => slot.outcome === "pass" && slot.verification.checks.every(check => check.test_summary.tests_observed)));
+  f.options.output = join(f.root, "new-run");
+  const other = f.prepare(), calls = [];
+  writeFileSync(join(other.root, other.plan.verification.reporter.path), "changed reporter\n");
+  await assert.rejects(startUserComparison(other.root, other.plan_digest, { runner: fake(calls) }), /Node test reporter changed/u);
+  assert.equal(calls.length, 0); assert.equal(existsSync(join(other.root, "control/start.json")), false);
+});
+
+test("partial results retain independently bound launch observations without preserving quality", async t => {
+  const f = fixture(t), p = f.prepare();
+  await startUserComparison(p.root, p.plan_digest, { runner: fake([]) });
+  const slot = join(p.root, "control/slots/plain");
+  rmSync(join(slot, "patch.diff"));
+  let result = reportUserComparison(p.root).slots[0];
+  assert.equal(result.state, "result_missing"); assert.equal(result.outcome, "unknown");
+  assert.equal(result.launch_requested, true); assert.equal(result.spawn_observed, true);
+  assert.equal(result.process_completed, null); assert.equal(result.exit_code, null);
+  writeFileSync(join(slot, "spawn.json"), "{}");
+  result = reportUserComparison(p.root).slots[0];
+  assert.equal(result.launch_requested, true); assert.equal(result.spawn_observed, null);
+  writeFileSync(join(slot, "request.json"), "{}");
+  result = reportUserComparison(p.root).slots[0];
+  assert.equal(result.launch_requested, null); assert.equal(result.spawn_observed, null);
+  assert.ok(result.receipt_errors.length === 2);
+});
+
+test("Git common-directory redirects stop before start or controller Git evidence", async t => {
+  await t.test("prepared redirect cannot request a model", async st => {
+    const f = fixture(st), p = f.prepare(), calls = [];
+    writeFileSync(join(p.root, "arms/plain/.git/commondir"), "/unused/local/path\n");
+    await assert.rejects(startUserComparison(p.root, p.plan_digest, { runner: fake(calls) }), /unsupported_git_metadata/u);
+    assert.equal(calls.length, 0); assert.equal(existsSync(join(p.root, "control/start.json")), false);
+  });
+  await t.test("post-model redirect never executes a shadow clean filter", async st => {
+    const f = fixture(st), p = f.prepare(), calls = [], run = fake(calls), sentinel = join(f.root, "filter-called");
+    const report = await startUserComparison(p.root, p.plan_digest, { runner: async input => {
+      const value = await run(input), shadow = join(f.root, "shadow-common");
+      cpSync(join(input.cwd, ".git"), shadow, { recursive: true });
+      writeFileSync(join(input.cwd, "src/filter.mjs"), `import fs from 'node:fs'; fs.appendFileSync(${JSON.stringify(sentinel)},'called\\n'); process.stdout.write(fs.readFileSync(0));\n`);
+      git(input.cwd, ["--git-dir", shadow, "config", "filter.asktest.clean", "node src/filter.mjs"]);
+      writeFileSync(join(shadow, "info/attributes"), "*.mjs filter=asktest\n");
+      writeFileSync(join(input.cwd, ".git/commondir"), `${shadow}\n`);
+      return value;
+    } });
+    assert.equal(calls.length, 1); assert.equal(report.slots[0].state, "runner_failed");
+    assert.notEqual(report.slots[0].outcome, "pass"); assert.match(report.slots[0].reason, /unsupported_git_metadata/u);
+    assert.equal(report.slots[0].patch_ref, null); assert.equal(existsSync(sentinel), false);
+    assert.equal(existsSync(join(p.root, "control/slots/plain/patch.diff")), false);
+    assert.equal(readFileSync(join(f.repo, "src/value.mjs"), "utf8"), "export const value = 0;\n");
+  });
 });
 
 test("CLI inspection/report can reopen from caller output without a known temporary path", t => {
