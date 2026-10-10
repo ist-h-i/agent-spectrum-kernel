@@ -85,7 +85,7 @@ export function readUserComparisonPlan(output) {
   assert.equal(plan.input.path, "inputs/prompt.md");
   assert.equal(plan.verification.path, "control/verification.json");
   assert.equal(plan.verification.reporter.path, "control/node-test-reporter.mjs");
-  assert.equal(plan.verification.reporter.format, "ask_node_file_summary_v1");
+  assert.equal(plan.verification.reporter.format, "ask_node_summary_jsonl_v1");
   if (existsSync(join(root, "control/start.json"))) {
     const started = readJson(join(root, "control/start.json"));
     assert.equal(started.run_id, plan.run_id, "start identity changed");
@@ -180,31 +180,34 @@ export function parseUserCodexTelemetry(stdout) {
 }
 
 export function inspectNodeVerification(stdout, expectedFiles = []) {
-  const field = name => {
-    const match = [...String(stdout).matchAll(new RegExp(`^# ${name} (\\d+)\\s*$`, "gmu"))].at(-1);
-    return match ? Number(match[1]) : null;
-  };
-  const reported = { tests: field("tests"), passed: field("pass"), failed: field("fail"), cancelled: field("cancelled"), skipped: field("skipped"), todo: field("todo") };
+  let reported = { tests: null, passed: null, failed: null, cancelled: null, skipped: null, todo: null }, runSuccess = false, runSeen = false;
   const files = [], errors = [], seen = new Set();
   for (const line of String(stdout).split(/\r?\n/u)) {
-    const match = /^# ASK_NODE_FILE_SUMMARY (.+)$/u.exec(line);
-    if (!match) continue;
+    if (!line) continue;
     try {
-      const value = parseJsonRejectDuplicateKeys(match[1]);
-      assert.equal(value.format, "ask_node_file_summary_v1");
-      assert.ok(relativeSafe(value.file) && expectedFiles.includes(value.file) && !seen.has(value.file));
+      const value = parseJsonRejectDuplicateKeys(line);
+      if (value.format === "ask_node_event_v1") continue;
+      assert.ok(["ask_node_file_summary_v1", "ask_node_run_summary_v1"].includes(value.format));
       assert.equal(typeof value.success, "boolean");
       assert.deepEqual(Object.keys(value.counts).sort(), ["cancelled", "failed", "passed", "skipped", "tests", "todo"]);
       assert.ok(Object.values(value.counts).every(count => Number.isSafeInteger(count) && count >= 0));
-      files.push(value); seen.add(value.file);
-    } catch { errors.push("invalid or duplicate Node file summary"); }
+      if (value.format === "ask_node_file_summary_v1") {
+        assert.deepEqual(Object.keys(value).sort(), ["counts", "file", "format", "success"]);
+        assert.ok(relativeSafe(value.file) && expectedFiles.includes(value.file) && !seen.has(value.file));
+        files.push(value); seen.add(value.file);
+      } else {
+        assert.deepEqual(Object.keys(value).sort(), ["counts", "format", "success"]);
+        assert.ok(!runSeen);
+        reported = value.counts; runSuccess = value.success; runSeen = true;
+      }
+    } catch { errors.push("invalid or duplicate controller Node summary record"); }
   }
   const allPassed = counts => counts.tests > 0 && counts.passed === counts.tests && counts.failed === 0
     && counts.cancelled === 0 && counts.skipped === 0 && counts.todo === 0;
   const missing = expectedFiles.filter(file => !seen.has(file));
   return { reported_counts: reported, file_summaries: files, missing_files: missing, errors, assertion_count: null,
     tests_observed: expectedFiles.length > 0 && missing.length === 0 && errors.length === 0
-      && allPassed(reported) && files.every(file => file.success && allPassed(file.counts)) };
+      && runSeen && runSuccess && allPassed(reported) && files.every(file => file.success && allPassed(file.counts)) };
 }
 
 async function verifyCondition(root, plan, condition, signal, execute) {

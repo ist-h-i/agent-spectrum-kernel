@@ -40,12 +40,16 @@ triggers `state_concurrency_persistence_lifecycle_or_cross_module`,
 Proof obligations:
 
 - O1 (A1/A2): temporary real Git repos, uninstalled/installed/custom/ambiguous
-  ownership, original/global bytes, independent arm configuration and hashes.
+  ownership, original/global bytes, independent arm configuration and hashes;
+  controller Git rejects linked/redirected metadata and object storage while
+  allowing regular local staging and repacking.
 - O2 (A3/A4): fake runner observes exact args/cwd/input; all-success, missing
   capability, denied start, process failure, timeout, interruption, partial
   persistence, no duplicate starts/concurrency/overwrite.
 - O3 (A5): missing result and unknown usage remain explicit, independent tests
   and requirements are separate from self-report, synthetic/observed never pool.
+  Only controller-origin structured Node summaries establish evaluated cases;
+  repository output, empty files, skipped/todo cases and missing files cannot.
 - O4 (A6): executable CLI examples and offline reopening from chosen output.
 - O5: related preparation/runner/report/setup/recovery/release regressions,
   repository validation, generated runtime freshness, whitespace, exact-head CI

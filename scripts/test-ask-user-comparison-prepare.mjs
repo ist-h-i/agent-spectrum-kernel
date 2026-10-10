@@ -84,7 +84,7 @@ test("regular uninstalled source prepares exact independent P/K/F baselines with
   assert.equal(result.plan.config.node_version, process.version);
   const reporter = result.plan.verification.reporter;
   assert.deepEqual(reporter, { path: "control/node-test-reporter.mjs",
-    digest: comparisonHash(readFileSync(join(SOURCE, "scripts/ask-user-comparison-test-reporter.mjs"))), format: "ask_node_file_summary_v1" });
+    digest: comparisonHash(readFileSync(join(SOURCE, "scripts/ask-user-comparison-test-reporter.mjs"))), format: "ask_node_summary_jsonl_v1" });
   assert.ok(readFileSync(join(result.root, reporter.path)).equals(readFileSync(join(SOURCE, "scripts/ask-user-comparison-test-reporter.mjs"))));
   assert.deepEqual(result.plan.policy, { attempts: 1, retries: 0, concurrency: 1 });
   const plain = result.plan.arms.plain, kernel = result.plan.arms.kernel_only, full = result.plan.arms.full_ask;
@@ -365,13 +365,59 @@ test("Git control parent directories and index cannot link outside an independen
   });
 });
 
-test("ordinary Git staging changes index, objects and logs without changing control identity", t => {
+test("mutable Git storage rejects loose, pack, info, index and log leaf links without reading their targets", async t => {
+  const examples = [
+    ["loose object", f => { const id = git(f.repo, ["rev-parse", "HEAD:src/value.mjs"]); return `.git/objects/${id.slice(0, 2)}/${id.slice(2)}`; }],
+    ["pack", () => ".git/objects/pack/pack-test.pack"],
+    ["pack index", () => ".git/objects/pack/pack-test.idx"],
+    ["info child", () => ".git/objects/info/packs"],
+    ["nested info child", () => ".git/objects/info/commit-graphs/test.graph"],
+    ["log child", () => ".git/logs/refs/heads/test-storage"],
+    ["index", () => ".git/index"],
+    ["index lock", () => ".git/index.lock"],
+    ["split index", () => `.git/sharedindex.${"0".repeat(40)}`],
+  ];
+  for (const [label, pathFor] of examples) for (const kind of ["symlink", "dangling symlink", "hard link"]) {
+    await t.test(`${label}: ${kind}`, st => {
+      const f = fixture(st); commit(f.repo);
+      write(f.repo, ".git/info/attributes", "* -filter -text -ident -working-tree-encoding\n");
+      const before = inventoryComparisonGitMetadata(f.repo), beforeSource = inventoryUserTree(f.repo), beforeGlobal = readFileSync(f.globalFile);
+      const path = pathFor(f), target = join(f.repo, path);
+      mkdirSync(dirname(target), { recursive: true });
+      rmSync(target, { force: true });
+      if (kind === "hard link") linkSync(f.globalFile, target);
+      else symlinkSync(kind === "dangling symlink" ? join(f.parent, "nonexistent") : f.globalFile, target);
+      assert.throws(() => inventoryComparisonGitMetadata(f.repo), /unsafe_git_(?:storage_entry|metadata_file):/u, path);
+      assert.deepEqual(inventoryUserTree(f.repo), beforeSource);
+      assert.ok(readFileSync(f.globalFile).equals(beforeGlobal));
+      assert.equal(existsSync(f.fakeLaunch), false);
+      assert.equal(Object.keys(before).some(key => /^\.git\/(?:objects|index|sharedindex|logs)/u.test(key)), false,
+        "mutable storage must not enter the frozen content identity");
+    });
+  }
+});
+
+test("mutable Git storage traversal has a depth limit", t => {
+  const f = fixture(t); commit(f.repo);
+  write(f.repo, ".git/info/attributes", "* -text\n");
+  write(f.repo, `.git/objects/info/${Array(33).fill("nested").join("/")}/entry`, "test-owned storage entry\n");
+  assert.throws(() => inventoryComparisonGitMetadata(f.repo), /git_storage_layout_limit/u);
+  assert.equal(existsSync(f.fakeLaunch), false);
+});
+
+test("ordinary Git staging and repack change index, objects and logs without changing control identity", t => {
   const f = fixture(t); commit(f.repo);
   write(f.repo, ".git/info/attributes", "* -filter -text -ident -working-tree-encoding\n");
   const before = inventoryComparisonGitMetadata(f.repo), beforeGlobal = readFileSync(f.globalFile);
   write(f.repo, "src/value.mjs", "export const value = 2;\n");
   git(f.repo, ["add", "src/value.mjs"]);
   write(f.repo, ".git/logs/test-staging-note", "A local, test-owned staging note.\n");
+  assert.deepEqual(inventoryComparisonGitMetadata(f.repo), before);
+  git(f.repo, ["repack", "-ad"]);
+  assert.ok(readdirSync(join(f.repo, ".git/objects/pack")).some(name => name.endsWith(".pack")));
+  assert.deepEqual(inventoryComparisonGitMetadata(f.repo), before);
+  git(f.repo, ["update-index", "--split-index"]);
+  assert.ok(readdirSync(join(f.repo, ".git")).some(name => name.startsWith("sharedindex.")));
   assert.deepEqual(inventoryComparisonGitMetadata(f.repo), before);
   assert.ok(readFileSync(f.globalFile).equals(beforeGlobal));
   assert.equal(existsSync(f.fakeLaunch), false);

@@ -131,7 +131,8 @@ EOF
 要件に `command` がなければ、自動判定は `unknown` のまま
 残ります。コマンドの成功がその要件を実際に検証するかは、利用者が確認してください。
 独立検証では、準備時に hash を固定した controller の Node reporter を使います。
-TAP ログと、指定した各ファイルの実テスト件数・失敗・中断・skip・todo を確認します。
+reporter が Node の構造化イベントから作る JSONL ログで、指定した各ファイルの実テスト件数・失敗・中断・skip・todo を確認します。
+テストや変更したソースの標準出力・診断文は別種のレコードとして保存し、集計行として読み取りません。
 空ファイルの実行成功だけでは合格にしません。指定した全ファイルでテストが評価され、
 すべて合格することが必要です。assertion 数は取得しないため `unknown` です。
 テストが要件を十分に検証するかは、利用者がコードと仕様を照合してください。
@@ -339,6 +340,9 @@ rootに空でない `AGENTS.override.md` がある構成も、canonical `AGENTS.
 準備の上限です。commit に含まれる `.agents/runs/`、
 `.agent-spectrum-kernel/runtime/`、`ask-runtime/` の過去実行記録も、課題入力への
 混入を避けるため準備時に停止します。これらを自動削除する処理はありません。
+作業コピーのGit管理領域でも、外部を指すcommon directory・object・pack・index・logの
+リンクをGitで読み取る前に拒否します。通常のstaging・repackは許容しますが、
+mutable Git storageは最大10万entries・深さ32に制限し、超過時は停止します。
 対象の build／外部サービス／依存導入／任意フレームワークの採点は
 今回の入口には含めません。
 

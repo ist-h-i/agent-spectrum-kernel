@@ -113,6 +113,23 @@ export function inventoryComparisonGitMetadata(root) {
       else regular(child);
     }
   }
+  // Mutable Git storage has no frozen content hash, but every entry must
+  // remain inside the independent copy. Raw lstat never follows a link or
+  // opens an object/index/log file, including a dangling or hard-linked leaf.
+  let storageEntries = 0;
+  function storage(path, depth = 0) {
+    if (depth > 32 || ++storageEntries > 100000) fail("git_storage_layout_limit");
+    const info = lstatSync(join(root, path));
+    if (info.isSymbolicLink() || (process.getuid && info.uid !== process.getuid())) fail(`unsafe_git_storage_entry:${path}`);
+    if (info.isDirectory()) {
+      const names = readdirSync(join(root, path));
+      if (names.length > 100000 - storageEntries) fail("git_storage_layout_limit");
+      for (const name of names.sort()) {
+        if (!name || /[\\\u0000-\u001f\u007f]/u.test(name) || name === "." || name === "..") fail("unsafe_git_metadata_name");
+        storage(`${path}/${name}`, depth + 1);
+      }
+    } else if (!info.isFile() || info.nlink !== 1) fail(`unsafe_git_storage_entry:${path}`);
+  }
   // These arms were initialized as standalone repositories. Additional Git
   // layouts must never redirect the later diff to unaudited common config,
   // attributes or object stores. lstat also notices dangling symlinks without
@@ -132,12 +149,24 @@ export function inventoryComparisonGitMetadata(root) {
   for (const path of [".git/objects/info/alternates", ".git/objects/info/http-alternates", ".git/info/grafts", ".git/info/sparse-checkout"]) {
     if (present(path)) fail(`unsupported_git_metadata_control:${path}`);
   }
-  if (present(".git/logs")) directory(".git/logs");
+  storage(".git/objects");
+  if (present(".git/logs")) {
+    directory(".git/logs");
+    storage(".git/logs");
+  }
   // Index bytes and object/log contents can change through ordinary staging.
   // A link to an outside index still is not part of an independent repository.
   if (present(".git/index")) {
     const index = lstatSync(join(gitRoot, "index"));
     if (!index.isFile() || index.isSymbolicLink() || index.nlink !== 1 || (process.getuid && index.uid !== process.getuid())) fail("unsafe_git_metadata_file:.git/index");
+    storage(".git/index");
+  }
+  for (const name of readdirSync(gitRoot)) {
+    if (name === "index.lock" || /^sharedindex\.[a-f0-9]{40}(?:\.lock)?$/u.test(name)) {
+      const path = `.git/${name}`, info = lstatSync(join(root, path));
+      if (!info.isFile()) fail(`unsafe_git_storage_entry:${path}`);
+      storage(path);
+    }
   }
   regular(".git/config");
   regular(".git/HEAD");
@@ -524,7 +553,7 @@ export function prepareUserComparison(options = {}) {
     rerun_of: options.rerunOf ?? null, root, source: { repo: options.repo, commit: options.commit, inventory: sourceInventory, digest: comparisonHash(jsonBytes(sourceInventory)) },
     task: { path: "control/task.md", digest: comparisonHash(taskBytes), source_path: options.taskFile },
     verification: { path: "control/verification.json", digest: comparisonHash(verificationBytes), recipe, source_path: options.verificationFile,
-      reporter: { path: "control/node-test-reporter.mjs", digest: comparisonHash(reporterBytes), format: "ask_node_file_summary_v1" } },
+      reporter: { path: "control/node-test-reporter.mjs", digest: comparisonHash(reporterBytes), format: "ask_node_summary_jsonl_v1" } },
     prompt, input: { path: "inputs/prompt.md", digest: comparisonHash(Buffer.from(prompt)), bytes: Buffer.byteLength(prompt) },
     mutable_paths: mutable, config, policy: { attempts: 1, retries: 0, concurrency: 1 }, arms,
     source_installation: { removed_managed_assets: separated.removed, identities: separated.identities,

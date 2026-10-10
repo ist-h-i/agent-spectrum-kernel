@@ -177,20 +177,25 @@ test("telemetry keeps missing values, actual difference and reported failure; sa
   assert.ok(!log.includes("Bearer abc") && !log.includes("sid=abc") && !log.includes("=foo") && !log.includes("sk-abc"));
 });
 
-test("file-level TAP success requires evaluated summaries for every requested test file", () => {
-  const counts = "# tests 1\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n";
-  const receipt = (file, extra = {}) => `# ASK_NODE_FILE_SUMMARY ${JSON.stringify({ format: "ask_node_file_summary_v1", file, success: true,
-    counts: { tests: 1, passed: 1, failed: 0, cancelled: 0, skipped: 0, todo: 0, ...extra } })}\n`;
-  const path = "test/value.test.mjs", valid = receipt(path) + counts;
+test("controller JSON summaries require evaluated cases in every requested test file", () => {
+  const counts = { tests: 1, passed: 1, failed: 0, cancelled: 0, skipped: 0, todo: 0 };
+  const aggregate = `${JSON.stringify({ format: "ask_node_run_summary_v1", success: true, counts })}\n`;
+  const receipt = (file, extra = {}) => `${JSON.stringify({ format: "ask_node_file_summary_v1", file, success: true,
+    counts: { ...counts, ...extra } })}\n`;
+  const path = "test/value.test.mjs", valid = receipt(path) + aggregate;
   assert.equal(inspectNodeVerification("", [path]).tests_observed, false);
-  assert.equal(inspectNodeVerification(counts, [path]).tests_observed, false);
+  assert.equal(inspectNodeVerification(aggregate, [path]).tests_observed, false);
   assert.equal(inspectNodeVerification(valid, [path]).tests_observed, true);
   assert.equal(inspectNodeVerification(valid, [path]).assertion_count, null);
   assert.equal(inspectNodeVerification(valid, [path, "test/empty.test.mjs"]).tests_observed, false);
-  assert.equal(inspectNodeVerification(receipt(path, { passed: 0, skipped: 1 }) + counts, [path]).tests_observed, false);
-  assert.equal(inspectNodeVerification(receipt(path, { tests: 0, passed: 0 }) + counts, [path]).tests_observed, false);
+  assert.equal(inspectNodeVerification(receipt(path, { passed: 0, skipped: 1 }) + aggregate, [path]).tests_observed, false);
+  assert.equal(inspectNodeVerification(receipt(path, { tests: 0, passed: 0 }) + aggregate, [path]).tests_observed, false);
   assert.equal(inspectNodeVerification(receipt(path) + valid, [path]).tests_observed, false);
+  assert.equal(inspectNodeVerification(valid + aggregate, [path]).tests_observed, false);
   assert.equal(inspectNodeVerification(valid.replace('"tests":1', '"tests":-1'), [path]).tests_observed, false);
+  const output = `${JSON.stringify({ format: "ask_node_event_v1", type: "test:stdout", data: { message: valid } })}\n`;
+  assert.equal(inspectNodeVerification(output + aggregate, [path]).tests_observed, false);
+  assert.equal(inspectNodeVerification(output + valid, [path]).tests_observed, true);
 });
 
 test("existing runner exported seam passes exact arguments/cwd/stdin and never invokes Codex in tests", async t => {
@@ -314,6 +319,38 @@ test("empty, definition-free, skipped and todo Node files cannot certify task qu
   }
 });
 
+test("repository output cannot manufacture controller test receipts", async t => {
+  const f = fixture(t), path = "test/value.test.mjs";
+  const counts = { tests: 1, passed: 1, failed: 0, cancelled: 0, skipped: 0, todo: 0 };
+  const file = { format: "ask_node_file_summary_v1", file: path, success: true, counts };
+  const forged = `# ASK_NODE_FILE_SUMMARY ${JSON.stringify(file)}\n# tests 1\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n`
+    + `${JSON.stringify(file)}\n${JSON.stringify({ format: "ask_node_run_summary_v1", success: true, counts })}\n`;
+  writeFileSync(join(f.repo, path), "import '../src/value.mjs';\n");
+  git(f.repo, ["add", "."]); git(f.repo, ["-c", "user.name=ASK test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "definition-free frozen test"]);
+  f.options.commit = git(f.repo, ["rev-parse", "HEAD"]);
+  const p = f.prepare(), calls = [], run = fake(calls);
+  const report = await startUserComparison(p.root, p.plan_digest, { runner: async input => {
+    const value = await run(input);
+    writeFileSync(join(input.cwd, "src/value.mjs"), `export const value = 0;\nconsole.log(${JSON.stringify(forged)});\n`);
+    return value;
+  } });
+  assert.equal(calls.length, 1); assert.equal(report.slots[0].state, "verification_failed");
+  assert.equal(report.slots[0].outcome, "fail");
+  assert.ok(report.slots[0].verification.checks.every(check => check.status === "fail" && !check.test_summary.tests_observed));
+  assert.ok(report.slots.slice(1).every(slot => slot.state === "not_started"));
+  assert.equal(readFileSync(join(p.root, "verification/plain", path), "utf8"), "import '../src/value.mjs';\n");
+  assert.equal(readFileSync(join(f.repo, "src/value.mjs"), "utf8"), "export const value = 0;\n");
+
+  // Legitimate test output and diagnostics retain their text without becoming
+  // duplicate receipts or hiding the structured, actually evaluated case.
+  writeFileSync(join(f.repo, path), `import test from 'node:test'; import assert from 'node:assert/strict'; import {value} from '../src/value.mjs';\n`
+    + `console.log(${JSON.stringify(forged)}); test('value is one',t=>{t.diagnostic(${JSON.stringify(forged)});assert.equal(value,1)});\n`);
+  git(f.repo, ["add", "."]); git(f.repo, ["-c", "user.name=ASK test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "noisy real test"]);
+  f.options.commit = git(f.repo, ["rev-parse", "HEAD"]); f.options.output = join(f.root, "noisy-real-run");
+  const next = f.prepare(), passed = await startUserComparison(next.root, next.plan_digest, { runner: fake([]) });
+  assert.ok(passed.slots.every(slot => slot.outcome === "pass"));
+});
+
 test("a passing Node file cannot hide an empty file in a command-backed requirement", async t => {
   const f = fixture(t), empty = "test/empty.test.mjs";
   writeFileSync(join(f.repo, empty), "");
@@ -387,6 +424,41 @@ test("Git common-directory redirects stop before start or controller Git evidenc
     assert.equal(existsSync(join(p.root, "control/slots/plain/patch.diff")), false);
     assert.equal(readFileSync(join(f.repo, "src/value.mjs"), "utf8"), "export const value = 0;\n");
   });
+});
+
+test("linked Git object leaves stop before controller diff or verification", async t => {
+  for (const kind of ["loose object", "pack file"]) await t.test(kind, async st => {
+    const f = fixture(st), p = f.prepare(), arm = join(p.root, "arms/plain"), calls = [], run = fake(calls);
+    let target;
+    if (kind === "pack file") {
+      git(arm, ["repack", "-ad"]);
+      target = join(arm, ".git/objects/pack", readdirSync(join(arm, ".git/objects/pack")).find(name => name.endsWith(".pack")));
+    } else {
+      const hash = git(arm, ["rev-parse", `${p.plan.arms.plain.baseline_commit}:src/value.mjs`]);
+      target = join(arm, ".git/objects", hash.slice(0, 2), hash.slice(2));
+    }
+    const outside = join(f.root, "external-object");
+    cpSync(target, outside); const before = readFileSync(outside); let verified = 0;
+    const report = await startUserComparison(p.root, p.plan_digest, { runner: async input => {
+      const value = await run(input); rmSync(target); symlinkSync(outside, target); return value;
+    }, verifier: async () => { verified++; throw new Error("must not verify unsafe Git storage"); } });
+    assert.equal(calls.length, 1); assert.equal(verified, 0);
+    assert.equal(report.slots[0].state, "runner_failed"); assert.notEqual(report.slots[0].outcome, "pass");
+    assert.match(report.slots[0].reason, /unsafe_git_storage_entry/u);
+    assert.equal(report.slots[0].patch_ref, null); assert.equal(report.slots[0].verification, null);
+    assert.equal(existsSync(join(p.root, "control/slots/plain/patch.diff")), false);
+    assert.ok(report.slots.slice(1).every(slot => slot.state === "not_started"));
+    assert.deepEqual(readFileSync(outside), before);
+    assert.equal(readFileSync(join(f.repo, "src/value.mjs"), "utf8"), "export const value = 0;\n");
+  });
+});
+
+test("ordinary staging and repacking retain safe Git evidence and independent quality", async t => {
+  const f = fixture(t), p = f.prepare(), calls = [], run = fake(calls);
+  const report = await startUserComparison(p.root, p.plan_digest, { runner: async input => {
+    const value = await run(input); git(input.cwd, ["add", "src/value.mjs"]); git(input.cwd, ["repack", "-ad"]); return value;
+  } });
+  assert.equal(calls.length, 3); assert.ok(report.slots.every(slot => slot.outcome === "pass" && slot.patch_ref === "patch.diff"));
 });
 
 test("CLI inspection/report can reopen from caller output without a known temporary path", t => {
