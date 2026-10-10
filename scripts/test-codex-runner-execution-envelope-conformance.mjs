@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "codex-envelope-conformance-")));
@@ -257,6 +257,17 @@ ${JSON.stringify({
 `;
 
 try {
+  const sourceRunner = resolve(repoRoot, "scripts/codex-exec-runner.mjs");
+  const importedRunner = runNode(["--input-type=module", "--eval", `await import(${JSON.stringify(pathToFileURL(sourceRunner).href)}); console.log("runner-import-only");`]);
+  assertPass("runner import does not execute its CLI", importedRunner);
+  assert.equal(importedRunner.stdout.trim(), "runner-import-only");
+  assert.equal(importedRunner.stderr, "");
+  const linkedRunner = resolve(fixtureRoot, "linked-runner.mjs");
+  symlinkSync(sourceRunner, linkedRunner);
+  const linkedEntry = runNode([linkedRunner, "--unknown-conformance-option"]);
+  assert.equal(linkedEntry.status, 1, "symlink CLI entry must run argument validation rather than silently succeed");
+  assert.match(linkedEntry.stderr, /Unknown argument: --unknown-conformance-option/);
+
   assertPass("core install", runNode([coreInstaller, "--target", target]));
   assertPass("full Codex adapter install", runNode([codexInstaller, "--target", target, "--profile", "full"]));
   for (const runtime of [
