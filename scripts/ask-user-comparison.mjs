@@ -321,12 +321,17 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
     const argv = verificationArgv(root, plan, check.command);
     const request={condition,run_id:plan.run_id,plan_digest:context?.plan_digest,executable:process.execPath,argv,cwd,evidence_kind:plan.config.evidence_kind,requested_at:new Date().toISOString()};
     if(context) { checkpointComparison(context,"verification_intent",{condition,slot:{phase:"verifying",verification_index:index}});saveLaunchReceipt(root,condition,`verification-${index}.request`,request); }
+    // Synchronous receipt persistence may consume the remaining deadline while
+    // its timer cannot run. Recheck immediately before dispatch, without turning
+    // an exhausted deadline into a one-millisecond new process.
+    const dispatchRemaining = remaining();
+    if (signal?.aborted || dispatchRemaining < 1) break;
     const value = await execute({ executable: process.execPath, argv, cwd, input: "",
       onSpawn:context ? observed=>{const pid=typeof observed==="number"?observed:observed.pid; context.active_child=`verification-${index}.spawn`;
         saveLaunchReceipt(root,condition,`verification-${index}.spawn`,{...request,pid,observed_at:new Date().toISOString(),owner:observeComparisonProcess(pid),process_group:true});
         context.active_child=`verification-${index}.spawn`;
         checkpointComparison(context,"verification_running",{condition,slot:{phase:"verifying",verification_index:index}}); } : undefined,
-      timeoutMs: Math.max(1, Math.floor(Math.min(plan.config.verification_timeout_ms, remaining()))), signal,
+      timeoutMs: Math.floor(Math.min(plan.config.verification_timeout_ms, dispatchRemaining)), signal,
       env: { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C", GIT_CONFIG_GLOBAL: devNull,
         GIT_CONFIG_SYSTEM: devNull, GIT_CONFIG_NOSYSTEM: "1" } });
     if (context && value.spawnObserved === true && (value.exitCode != null || value.signal != null) && !value.cleanupError) context.active_child=null;
@@ -503,18 +508,26 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
     const conditionStarted = Date.now();
     saveLaunchReceipt(root, id, "request", { condition: id, run_id: plan.run_id, plan_digest, requested_at: new Date().toISOString(),
       executable: invocation.executable, argv: invocation.argv, cwd: invocation.cwd, prompt_digest: plan.input.digest,
-      timeout_ms: invocation.timeoutMs, evidence_kind: plan.config.evidence_kind });
-    let value;
+      timeout_ms: invocation.timeoutMs, timeout_semantics:"pre-persistence ceiling; dispatch clips to the remaining overall deadline", evidence_kind: plan.config.evidence_kind });
+    let value, modelDispatched=false;
     try {
-      value = await runner({ ...invocation, signal, onOutput: interactionObserver(action=>{interaction??=action;controller.abort();}), onSpawn: observed => {
-        const pid = typeof observed === "number" ? observed : observed.pid;
-        assert.ok(Number.isInteger(pid) && pid > 0, "spawn PID observation required");
-        context.active_child="spawn";
-        saveLaunchReceipt(root, id, "spawn", { condition: id, run_id: plan.run_id, plan_digest,
-          evidence_kind: plan.config.evidence_kind, pid, observed_at: new Date().toISOString(), owner:observeComparisonProcess(pid),process_group:true });
-        context.active_child="spawn";
-        checkpointComparison(context,"model_running",{condition:id,slot:{phase:"model_running"}});
-      } });
+      const dispatchRemaining=remaining();
+      if (signal.aborted || dispatchRemaining<1) {
+        value={spawnObserved:false,exitCode:null,stdout:"",stderr:"",durationMs:0,
+          timedOut:dispatchRemaining<1,interrupted:signal.aborted && dispatchRemaining>=1,error:null};
+      } else {
+        invocation.timeoutMs=Math.floor(Math.min(plan.config.timeout_ms,dispatchRemaining));
+        modelDispatched=true;
+        value = await runner({ ...invocation, signal, onOutput: interactionObserver(action=>{interaction??=action;controller.abort();}), onSpawn: observed => {
+          const pid = typeof observed === "number" ? observed : observed.pid;
+          assert.ok(Number.isInteger(pid) && pid > 0, "spawn PID observation required");
+          context.active_child="spawn";
+          saveLaunchReceipt(root, id, "spawn", { condition: id, run_id: plan.run_id, plan_digest,
+            evidence_kind: plan.config.evidence_kind, pid, timeout_ms:invocation.timeoutMs, observed_at: new Date().toISOString(), owner:observeComparisonProcess(pid),process_group:true });
+          context.active_child="spawn";
+          checkpointComparison(context,"model_running",{condition:id,slot:{phase:"model_running"}});
+        } });
+      }
     } catch (error) {
       value = { spawnObserved: existsSync(evidencePath(root, id, "spawn.json")) ? true : null, exitCode: null,
         error: { code: error.code ?? "RUNNER_ERROR", message: sanitizeComparisonLog(error.message) }, stdout: "", stderr: "" };
@@ -590,6 +603,7 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
       output_limited: value.outputLimited ?? false,
       session_id: telemetry.session_id, actual_model: telemetry.model, configured_model: plan.config.model,
       metrics: { duration_ms: Date.now() - conditionStarted, ...telemetry.metrics }, process_duration_ms: value.durationMs ?? null,
+      process_timeout_ms:modelDispatched?invocation.timeoutMs:null,
       verification_duration_ms: verification && verification.checks.length && verification.checks.every(check => check.duration_ms !== null)
         ? verification.checks.reduce((total, check) => total + check.duration_ms, 0) : null,
       cost: null, request_count: null, usage_lower_bound:telemetry.usage_lower_bound,

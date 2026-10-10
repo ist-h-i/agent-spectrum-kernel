@@ -17,6 +17,18 @@ function nodeRequest(root, script, options = {}) {
   return { executable: process.execPath, argv: ["-e", script], cwd: root, input: "", timeoutMs: 5000, ...options };
 }
 
+for (const [label, input] of [["string", ""], ["buffer", Buffer.alloc(0)]]) {
+  test(`empty ${label} stdin does not write to an exited child after a slow spawn receipt`, async t => {
+    const root = directory(t);
+    const value = await executeCodexSession(nodeRequest(root, "process.stdout.write('finished');", {
+      input, onSpawn: () => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250),
+    }));
+    assert.equal(value.spawnObserved, true); assert.equal(value.exitCode, 0);
+    assert.equal(value.error, null); assert.equal(value.cleanupError, null);
+    assert.equal(value.stdout.toString(), "finished");
+  });
+}
+
 test("output observer validation refuses before spawning any process", async t => {
   const root = directory(t); let starts = 0;
   await assert.rejects(executeCodexSession(nodeRequest(root, "", { onOutput: {} }), () => {

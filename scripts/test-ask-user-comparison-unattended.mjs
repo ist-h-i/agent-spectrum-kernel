@@ -263,6 +263,34 @@ test("overall deadline and token limits are validated before preparing a run", t
   }
 });
 
+for (const stage of ["model", "verification"]) for (const cause of ["deadline", "interrupt"]) {
+  test(`${stage} dispatch rechecks ${cause} after synchronous request persistence`, async t => {
+    const p = fixture(t, { timeoutMs: 100, verificationTimeoutMs: 100, overallTimeoutMs: 10000 }).prepare();
+    const calls = [], controller = new AbortController(), now = Date.now;
+    const request = join(p.root, "control/slots/plain", stage === "model" ? "request.json" : "verification-0.request.json");
+    let verificationCalls = 0;
+    Date.now = () => {
+      const persisted = existsSync(request);
+      if (persisted && cause === "interrupt") controller.abort();
+      return now() + (persisted && cause === "deadline" ? 11000 : 0);
+    };
+    try {
+      const report = await comparison.startUserComparison(p.root, p.plan_digest, {
+        signal: controller.signal, runner: fake(calls),
+        verifier: async () => { verificationCalls++; throw new Error("must not dispatch after deadline or interruption"); },
+      });
+      assert.equal(calls.length, stage === "model" ? 0 : 1);
+      assert.equal(verificationCalls, 0); assert.equal(existsSync(request), true);
+      assert.equal(report.slots[0].spawn_observed, stage !== "model");
+      assert.equal(report.slots[0].state, cause === "deadline" ? "timeout" : "interrupted");
+      assert.equal(report.overall.exit_code, cause === "deadline" ? 6 : 8);
+      assert.ok(report.slots.slice(1).every(slot => slot.state === "not_started"));
+      assert.equal(history(p).snapshot.slots.plain.attempts, 1);
+      assert.ok(invocationReceipts(p.root).length > 0);
+    } finally { Date.now = now; }
+  });
+}
+
 test("elapsed wall time after a saved interruption prevents pending admission without changing deadline", async t => {
   const p = fixture(t, { timeoutMs: 1000, verificationTimeoutMs: 1000, overallTimeoutMs: 10000 }).prepare(), calls = [];
   const controller = new AbortController(), run = fake(calls);

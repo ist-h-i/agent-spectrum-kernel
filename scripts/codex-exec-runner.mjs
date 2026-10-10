@@ -157,7 +157,13 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
       result.spawnObserved = true;
       result.pid = child.pid;
       Promise.resolve().then(() => onSpawn?.({ pid: child.pid })).then(() => {
-        if (!finishing && terminatingAt === null) child.stdin.end(input);
+        if (!finishing && terminatingAt === null) {
+          // A receipt observer can outlive a fast verification child. An empty
+          // chunk still performs a pipe write and can report EPIPE after exit;
+          // no input means closing stdin without writing any chunk.
+          if (Buffer.byteLength(input) === 0) child.stdin.end();
+          else child.stdin.end(input);
+        }
       }).catch(error => { result.error ??= errorRecord(error); terminate(); });
     });
     child.once("exit", (exitCode, exitSignal) => {
