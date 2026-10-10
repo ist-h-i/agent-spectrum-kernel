@@ -1,0 +1,35 @@
+{
+  "purpose": "First Mac engineering workflow acceptance; local/private observation worksheet, not an authority or scorer.",
+  "preparation": null,
+  "installed": null,
+  "activation": {
+    "status": "insufficient_evidence",
+    "profile_selection_authority_ref": null,
+    "enabled_command_or_skill_ref": null,
+    "observed_runtime_load_ref": null,
+    "resolved_execution_permission_ref": null
+  },
+  "execution": {
+    "state": "not_started",
+    "runtime": { "cli_version": null, "cli_image_digest": null, "model": null, "reasoning": null, "provider": null, "session_ref": null },
+    "traffic": { "destination": null, "payload_review_ref": null, "auth_use_and_refresh_permission_ref": null },
+    "limits": { "timeout_seconds": null, "retry_limit": null, "token_stop": null, "hard_cost_cap": null },
+    "usage": { "status": "unknown", "input_tokens": null, "output_tokens": null, "total_tokens": null, "cost": null },
+    "artifacts": { "response_ref": null, "patch_ref": null, "verification_log_ref": null, "verification_exit_status": null, "scope_diff_ref": null }
+  },
+  "bypass": {
+    "state": "not_started",
+    "response_ref": null,
+    "before_after_tree_ref": null,
+    "observed_route_ref": null,
+    "unnecessary_workflow_observation": null,
+    "usage": { "status": "unknown", "total_tokens": null }
+  },
+  "operational": {
+    "status": "insufficient_evidence",
+    "bounded_task_evidence_refs": [],
+    "runtime_health_ref": null,
+    "governance_judgment_ref": null
+  },
+  "comparison": "not_performed; #192/#198 and formal #291 evidence remain required independently"
+}

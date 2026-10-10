@@ -11,6 +11,8 @@ records the current source, evidence and remaining v1.0 gates.
 Mac / Codex の導入で得られるものは、プロジェクト内の判断方針と選択した
 検証・handoff 資料です。実務での動作と成果改善は別の証拠が必要です。
 導入・復旧手順と12月までの目標は上記リンクにまとめています。
+導入後の一件を具体化する [Mac 初回開発受入の準備](docs/first-workflow-mac-codex-ja.md)
+では、公開人工タスク・軽量 bypass 入力・未実行の受入記録をローカルに用意できます。
 
 For the model-free local eval entry point, platform route decisions and remaining
 live-validation limits, see [Local eval distribution](docs/local-eval-distribution.md).
