@@ -5,7 +5,7 @@ import { devNull, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, prepareUserComparison, validateUserRelativePath } from "./ask-user-comparison-prepare.mjs";
+import { COMPARISON_RECORD_BYTE_LIMIT, comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, prepareUserComparison, serializeComparisonPlan, validateUserRelativePath } from "./ask-user-comparison-prepare.mjs";
 import { MANAGED_START, MANAGED_END } from "./installer-lifecycle.mjs";
 
 const SOURCE = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -64,6 +64,26 @@ function outsideManagedBlock(bytes) {
   return Buffer.concat([bytes.subarray(0, start), bytes.subarray(end)]);
 }
 
+test("plan serialization refuses a valid large inventory before advertising an unreadable plan", () => {
+  const inventory = {};
+  for (let index = 0; index < 15000; index++) {
+    const path = validateUserRelativePath(`src/${String(index).padStart(6, "0")}-${"x".repeat(104)}`);
+    assert.equal(Buffer.byteLength(path), 115);
+    inventory[path] = { digest: comparisonHash("x"), bytes: 1, mode: "100644" };
+  }
+  const plan = { source: { inventory }, arms: Object.fromEntries(["plain", "kernel_only", "full_ask"].map(id => [id, { baseline_inventory: inventory }])) };
+  assert.ok(Buffer.byteLength(`${JSON.stringify(plan, null, 2)}\n`) > COMPARISON_RECORD_BYTE_LIMIT);
+  assert.throws(() => serializeComparisonPlan(plan), /comparison_plan_size_limit/u);
+});
+
+test("plan serialization bounds UTF-8 bytes and permits the exact reader byte limit", () => {
+  const overhead = Buffer.byteLength(`${JSON.stringify({ padding: "" }, null, 2)}\n`);
+  const padding = "x".repeat(COMPARISON_RECORD_BYTE_LIMIT - overhead);
+  assert.equal(serializeComparisonPlan({ padding }).length, COMPARISON_RECORD_BYTE_LIMIT);
+  assert.throws(() => serializeComparisonPlan({ padding: `${padding}x` }), /comparison_plan_size_limit/u);
+  assert.throws(() => serializeComparisonPlan({ padding: `${padding.slice(0, -1)}é` }), /comparison_plan_size_limit/u);
+});
+
 test("regular uninstalled source prepares exact independent P/K/F baselines with zero CLI launches", t => {
   const f = fixture(t);
   commit(f.repo);
@@ -96,6 +116,8 @@ test("regular uninstalled source prepares exact independent P/K/F baselines with
     assert.equal(existsSync(join(result.root, arm.baseline_path, ".git")), false);
     assert.equal(git(root, ["rev-parse", "HEAD"]), arm.baseline_commit);
     assert.equal(git(root, ["status", "--porcelain"]), "");
+    assert.equal(git(root, ["config", "--local", "--get", "maintenance.auto"]), "false");
+    assert.equal(git(root, ["config", "--local", "--get", "gc.auto"]), "0");
     assert.deepEqual(inventoryComparisonGitMetadata(root), arm.git_metadata);
     assert.equal(readFileSync(join(root, "src/value.mjs"), "utf8"), "export const value = 1;\n");
     assert.equal(readFileSync(join(root, ".agents/skills/my-project/SKILL.md"), "utf8"), readFileSync(join(f.repo, ".agents/skills/my-project/SKILL.md"), "utf8"));

@@ -361,13 +361,19 @@ rootに空でない `AGENTS.override.md` がある構成も、canonical `AGENTS.
 
 初版は通常の commit 済みファイルだけに対応し、symlink、submodule、認識できる
 秘密ファイルを拒否します。1ファイル32 MiB、commit 全体256 MiB、最大2万ファイルが
-準備の上限です。commit に含まれる `.agents/runs/`、
+準備の上限です。さらに、3条件の資産一覧などを含む準備記録 `control/plan.json` は
+UTF-8で16 MiB以内に制限します。超過時は `comparison_plan_size_limit` で停止し、
+準備完了とは表示しません。途中の私的な出力フォルダが残る場合がありますが、
+開始用のplan・digestは保存されません。再度準備する場合は別の新しい出力先を指定します。
+commit に含まれる `.agents/runs/`、
 `.agent-spectrum-kernel/runtime/`、`ask-runtime/` の過去実行記録も、課題入力への
 混入を避けるため準備時に停止します。これらを自動削除する処理はありません。
 作業コピーのGit管理領域は、外部を指すcommon directoryやファイルのリンクを
 Gitを起動せずに検査します。差分は私的なbaselineと確認済みの変更bytesから
 controller専用コピーで作り、モデル側のindex・object storeをGitで読み取りません。
-通常のstaging・repackは許容しますが、mutable Git storageは最大10万entries・
+新規コピー内だけでGitの自動maintenance／GCを止め、準備中のバックグラウンド整理を
+防ぎます。元repoとグローバルのGit設定は変更しません。
+通常のstaging・明示的なrepackは許容しますが、mutable Git storageは最大10万entries・
 深さ32に制限し、超過時は停止します。準備では三条件の私的baselineも保存するため、
 元repoのファイル量に応じた追加のディスク容量が必要です。
 対象の build／外部サービス／依存導入／任意フレームワークの採点は

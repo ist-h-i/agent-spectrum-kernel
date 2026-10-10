@@ -10,10 +10,10 @@ import { executeCodexSession } from "./codex-exec-runner.mjs";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPragmaticEvaluationReport } from "./ask-pragmatic-evaluation-report.mjs";
-import { comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
+import { COMPARISON_RECORD_BYTE_LIMIT, comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 
 export const USER_CONDITIONS = Object.freeze(["plain", "kernel_only", "full_ask"]);
-const LIMIT = 16 * 1024 * 1024;
+const LIMIT = COMPARISON_RECORD_BYTE_LIMIT;
 const serialize = value => `${JSON.stringify(value, null, 2)}\n`;
 const readJson = path => parseJsonRejectDuplicateKeys(readStableFile(path, "comparison record", LIMIT).bytes.toString("utf8"));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -461,7 +461,7 @@ export function reportUserComparison(output) {
         human_review_minutes: null, rework_minutes: null } })) };
   return { kind: "ask_user_comparison_report_v1", root, run_id: plan.run_id, plan_digest, evidence_kind: notes.evidence_kind,
     source: plan.source, slots, configuration: plan.config, condition_differences: plan.condition_differences, unknowns: plan.unknowns,
-    summary: buildPragmaticEvaluationReport(notes),
+    summary: { ...buildPragmaticEvaluationReport(notes), plain_scope: plan.arms.plain.configuration },
     limitations: ["one task is not general ASK effectiveness, operational success, or v1 completion", "global settings and read isolation are not proven",
       "configured CLI/model labels are declarations unless independently observed; missing usage/cost remain unknown", "synthetic results are development evidence only",
       "patch.diff is a credential-redacted review view and may not apply; an unchanged retained control/patch-workspaces/<condition> copy provides the full local diff"] };
@@ -476,7 +476,7 @@ export function aggregateUserComparisons(outputs) {
     const members = reports.filter(report => report.evidence_kind === evidence_kind);
     const notes = { ...members[0].summary.supplied_notes, planned_blocks: members.map(report => report.run_id),
       trials: members.flatMap(report => report.summary.supplied_notes.trials) };
-    return { evidence_kind, summary: buildPragmaticEvaluationReport(notes) };
+    return { evidence_kind, summary: { ...buildPragmaticEvaluationReport(notes), plain_scope: members[0].summary.plain_scope } };
   }), mixed_evidence_pooled: false };
 }
 

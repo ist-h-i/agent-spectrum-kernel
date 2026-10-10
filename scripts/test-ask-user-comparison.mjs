@@ -186,10 +186,13 @@ test("fake and observed/plan reports stay in separate aggregate groups and dupli
   const next = prepareUserComparison({ ...f.options, output: join(f.root, "unstarted-observed"), evidenceKind: "observed" });
   const value = aggregateUserComparisons([p.root, next.root]);
   assert.equal(value.mixed_evidence_pooled, false); assert.deepEqual(value.groups.map(group => group.evidence_kind), ["synthetic", "plan"]);
+  for (const report of value.reports) assert.equal(report.summary.plain_scope, p.plan.arms.plain.configuration);
+  for (const group of value.groups) assert.equal(group.summary.plain_scope, p.plan.arms.plain.configuration);
   // Simulate future saved observed receipts in this test only; no real model ran.
   writeFileSync(join(next.root, "control/start.json"), JSON.stringify({ run_id: next.plan.run_id, plan_digest: next.plan_digest, evidence_kind: "observed" }));
   const mixed = aggregateUserComparisons([p.root, next.root]);
   assert.deepEqual(mixed.groups.map(group => group.evidence_kind), ["synthetic", "observed"]);
+  for (const group of mixed.groups) assert.equal(group.summary.plain_scope, p.plan.arms.plain.configuration);
   assert.throws(() => aggregateUserComparisons([p.root, p.root]), /duplicate run/u);
 });
 

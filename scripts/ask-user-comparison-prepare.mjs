@@ -17,6 +17,7 @@ const SUPPLEMENT = "docs/mac-ask-full-reference-supplement.json";
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 const FILE_LIMIT = 32 * 1024 * 1024;
 const TREE_LIMIT = 256 * 1024 * 1024;
+export const COMPARISON_RECORD_BYTE_LIMIT = 16 * 1024 * 1024;
 const HASH = /^[a-f0-9]{64}$/u;
 const NAME = /^[a-z0-9][a-z0-9-]*$/u;
 const jsonBytes = value => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
@@ -24,6 +25,12 @@ const fail = reason => { throw new Error(reason); };
 const plainObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
 
 export const comparisonHash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+
+export function serializeComparisonPlan(plan) {
+  const serialized = jsonBytes(plan);
+  if (serialized.length > COMPARISON_RECORD_BYTE_LIMIT) fail("comparison_plan_size_limit:16_MiB");
+  return serialized;
+}
 
 /** Returns the supplied safe, portable project-relative path, or throws. */
 export function validateUserRelativePath(path) {
@@ -412,6 +419,10 @@ export function prepareGitBaseline(root) {
   git(root, ["config", "--local", "core.autocrlf", "false"]);
   git(root, ["config", "--local", "core.filemode", "true"]);
   git(root, ["config", "--local", "core.fsmonitor", "false"]);
+  // Automatic background packing must not race the following inventory.
+  // Only newly owned copies are configured; explicit local repack still works.
+  git(root, ["config", "--local", "maintenance.auto", "false"]);
+  git(root, ["config", "--local", "gc.auto", "0"]);
   // New, local metadata prevents source attributes from normalizing the bytes
   // whose hashes the comparison records; it invokes no source Git filters.
   // .git is intentionally inaccessible through writeNew's project path API.
@@ -589,7 +600,7 @@ export function prepareUserComparison(options = {}) {
       "Non-empty root AGENTS.override.md is unsupported because it takes precedence over K/F's canonical AGENTS.md; the source override is preserved and preparation stops.",
       "Committed .agents/runs, .agent-spectrum-kernel/runtime or ask-runtime records are refused rather than copied into model input or deleted as managed assets.",
       "Preparation uses local Git and current Node installers only; Codex/model launch count is zero.", "One exploratory task cannot prove general ASK effectiveness or operational promotion."] };
-  const serialized = jsonBytes(plan), planDigest = comparisonHash(serialized);
+  const serialized = serializeComparisonPlan(plan), planDigest = comparisonHash(serialized);
   writeNew(root, "control/plan.json", serialized);
   writeNew(root, "control/plan.digest", Buffer.from(`${planDigest}\n`));
   return { plan, plan_digest: planDigest, root };
