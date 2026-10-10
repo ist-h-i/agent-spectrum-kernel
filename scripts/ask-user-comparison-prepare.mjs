@@ -228,12 +228,12 @@ function readCommittedTree(repo, commit) {
   return tree;
 }
 
-function readRegular(path, label, limit = 1024 * 1024) {
+function readRegular(path, label, limit = 1024 * 1024, allowEmpty = false) {
   if (typeof path !== "string" || !isAbsolute(path) || realpathSync(path) !== path) fail(`unsafe_${label}_file`);
   const before = lstatSync(path);
   if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1) fail(`unsafe_${label}_file`);
   if (recognizableSecret(basename(path))) fail(`recognizable_secret_file:${label}`);
-  if (before.size === 0 || before.size > limit) fail(`invalid_${label}_size`);
+  if ((!allowEmpty && before.size === 0) || before.size > limit) fail(`invalid_${label}_size`);
   const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
     const opened = fstatSync(fd);
@@ -546,7 +546,7 @@ export function prepareUserComparison(options = {}) {
     if (JSON.stringify(after) !== JSON.stringify(baseline)) fail("baseline_tree_changed_during_git_preparation");
     const baselinePath = `control/baselines/${id}`;
     for (const [file, entry] of Object.entries(baseline)) {
-      const bytes = readRegular(join(armRoot, file), "private_diff_baseline");
+      const bytes = readRegular(join(armRoot, file), "private_diff_baseline", FILE_LIMIT, true);
       if (comparisonHash(bytes) !== entry.digest) fail("baseline_changed_during_private_capture");
       writeNew(root, `${baselinePath}/${file}`, bytes, entry.mode);
     }
