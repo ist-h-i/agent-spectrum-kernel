@@ -229,7 +229,7 @@ export async function startUserComparison(output, confirmedDigest, { signal, run
     if (stopped || signal?.aborted) break;
     const arm = plan.arms[id];
     if (arm.capability.status === "capability_missing") {
-      saveTerminal(root, plan, id, { condition: id, state: "capability_missing", launch_requested: false, spawn_observed: false,
+      saveTerminal(root, plan, id, { condition: id, plan_digest, state: "capability_missing", launch_requested: false, spawn_observed: false,
         process_completed: false, exit_code: null, reason: `required routes unavailable: ${arm.capability.missing.join(", ")}`,
         outcome: "unknown", metrics: { duration_ms: null, input_tokens: null, output_tokens: null, cached_tokens: null } });
       continue;
@@ -304,7 +304,7 @@ export async function startUserComparison(output, confirmedDigest, { signal, run
     const outcome = scope.status === "fail" || state === "verification_failed" ? "fail"
       : state === "completed" && verification?.checks.length > 0 && verification.checks.every(check => check.status === "pass")
         && verification.requirements.length > 0 && verification.requirements.every(check => check.status === "pass") ? "pass" : "unknown";
-    const terminal = saveTerminal(root, plan, id, { condition: id, state, outcome, reason,
+    const terminal = saveTerminal(root, plan, id, { condition: id, plan_digest, state, outcome, reason,
       launch_requested: true, spawn_observed: value.spawnObserved ?? null,
       process_completed: value.spawnObserved === true && (value.exitCode != null || value.signal != null),
       exit_code: value.exitCode ?? null, signal: value.signal ?? null, completed_at: new Date().toISOString(),
@@ -333,6 +333,7 @@ export function reportUserComparison(output) {
         assert.equal(comparisonHash(raw), readStableFile(evidencePath(root, id, "result.digest"), "terminal digest", 256).bytes.toString("utf8"));
         const value = parseJsonRejectDuplicateKeys(raw.toString("utf8"));
         assert.equal(value.condition, id); assert.equal(value.run_id, plan.run_id); assert.equal(value.evidence_kind, plan.config.evidence_kind);
+        assert.equal(value.plan_digest, plan_digest, "terminal receipt belongs to a different plan");
         assert.ok(["completed", "capability_missing", "permission_denied", "runner_failed", "timeout", "interrupted", "result_missing", "scope_violation", "verification_failed"].includes(value.state));
         assert.ok(["pass", "fail", "unknown"].includes(value.outcome));
         for (const [name, digest] of Object.entries(value.artifacts)) {
