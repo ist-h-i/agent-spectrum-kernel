@@ -255,7 +255,9 @@ async function verifyCondition(root, plan, condition, signal, execute) {
       exit_code: value.exitCode ?? null, duration_ms: value.durationMs ?? null });
     if (value.interrupted || value.timedOut || value.cleanupError) break;
   }
-  return { independent_process: true, common_frozen_recipe: true,
+  return { independent_process: execute === executeCodexSession,
+    execution_origin: execute === executeCodexSession ? "controller_node_process" : "synthetic_injected_verifier",
+    common_frozen_recipe: true,
     runtime: { executable: process.execPath, node_version: process.version, reporter_digest: plan.verification.reporter.digest }, checks: results,
     requirements: plan.verification.recipe.requirements.map(item => ({ id: item.id, description: item.description,
       status: item.command ? results.find(result => result.id === item.id)?.status ?? "unknown" : "unknown" })),
@@ -267,6 +269,8 @@ export async function startUserComparison(output, confirmedDigest, { signal, run
   const { root, plan, plan_digest } = readUserComparisonPlan(output);
   assert.ok(plan.config.evidence_kind === "synthetic" ? runner !== executeCodexSession : runner === executeCodexSession,
     "injected fake runners require synthetic evidence; synthetic plans cannot use the real launcher");
+  assert.ok(plan.config.evidence_kind === "synthetic" || verifier === executeCodexSession,
+    "injected verifiers require synthetic evidence");
   assert.equal(confirmedDigest, plan_digest, "inspect and confirm the exact plan digest before start");
   assert.ok(!existsSync(join(root, "control/start.json")), "this run already consumed its start; use a new output/run ID for another execution");
   assert.equal(comparisonHash(readStableFile(join(root, plan.input.path), "prompt", LIMIT).bytes), plan.input.digest, "prompt changed");

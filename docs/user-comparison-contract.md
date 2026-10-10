@@ -54,6 +54,9 @@ Proof obligations:
   repository output, empty files, skipped/todo cases and missing files cannot.
   Index flags cannot suppress a saved patch, and non-event JSON telemetry cannot
   abort terminal persistence or turn unknown usage into zero.
+  Observed runs reject injected verification before consuming start or launching;
+  synthetic injection is labeled and cannot claim a controller-owned independent
+  verification process.
 - O4 (A6): executable CLI examples and offline reopening from chosen output.
 - O5: related preparation/runner/report/setup/recovery/release regressions,
   repository validation, generated runtime freshness, whitespace, exact-head CI

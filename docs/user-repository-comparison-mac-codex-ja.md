@@ -218,6 +218,9 @@ node scripts/ask-user-comparison.mjs inspect "$RUN_OUTPUT" --json
 実行するため、信頼して実行を許可できるテストを選んでください。検証コピーは
 セキュリティ sandbox ではありません。時間制限はローカルプロセスグループの
 終了処理で、provider 側の取消しや token／費用の厳密な上限を保証しません。
+検証記録の `execution_origin` は通常の入口で `controller_node_process` です。
+合成試験の差替え検証は `synthetic_injected_verifier` として区別し、独立した
+controller プロセスで実行したとは記録しません。実測側への差替えは開始前に拒否します。
 
 ## 6. 人間の操作で開始する
 

@@ -67,6 +67,31 @@ test("prepare/inspect/report start no runner, keep source/custom/global state an
   assert.deepEqual(prepared.plan.policy, { attempts: 1, retries: 0, concurrency: 1 });
 });
 
+test("observed plans reject injected verification before consuming start or requesting a process", async t => {
+  const f = fixture(t, { evidenceKind: "observed" }), p = f.prepare();
+  let verified = 0;
+  // A pre-aborted signal makes this pre-fix regression model-free as well.
+  await assert.rejects(startUserComparison(p.root, p.plan_digest, {
+    signal: AbortSignal.abort(), verifier: async () => { verified++; throw new Error("synthetic verifier"); },
+  }), /injected verifiers require synthetic evidence/u);
+  assert.equal(verified, 0);
+  assert.equal(existsSync(join(p.root, "control/start.json")), false);
+  assert.equal(existsSync(join(p.root, "control/slots/plain/request.json")), false);
+  assert.deepEqual(reportUserComparison(p.root).slots.map(slot => slot.state), ["not_started", "not_started", "not_started"]);
+});
+
+test("synthetic injected verification is recorded with its origin without claiming an independent controller process", async t => {
+  const f = fixture(t), p = f.prepare();
+  const report = await startUserComparison(p.root, p.plan_digest, {
+    runner: fake([]), verifier: invocation => executeCodexSession(invocation),
+  });
+  assert.equal(report.evidence_kind, "synthetic");
+  for (const slot of report.slots) {
+    assert.equal(slot.verification.execution_origin, "synthetic_injected_verifier");
+    assert.equal(slot.verification.independent_process, false);
+  }
+});
+
 test("three fake sessions finish sequentially with patches, actual independent Node tests and unknown costs", async t => {
   const f = fixture(t), p = f.prepare(), calls = [];
   let active = 0, maxActive = 0;
@@ -78,6 +103,7 @@ test("three fake sessions finish sequentially with patches, actual independent N
   assert.ok(report.slots.every(slot => slot.state === "completed" && slot.outcome === "pass"));
   assert.ok(report.slots.every(slot => slot.launch_requested && slot.spawn_observed && slot.process_completed && slot.exit_code === 0));
   assert.ok(report.slots.every(slot => slot.cost === null && slot.request_count === null && slot.verification.independent_process));
+  assert.ok(report.slots.every(slot => slot.verification.execution_origin === "controller_node_process"));
   assert.ok(report.slots.every(slot => slot.verification.checks.every(check => check.status === "pass")));
   assert.match(readFileSync(join(p.root, "control/slots/plain/patch.diff"), "utf8"), /export const value = 1/u);
   assert.ok(report.summary.blocks[0].contrasts[1].differences.some(diff => diff.field === "model"));
