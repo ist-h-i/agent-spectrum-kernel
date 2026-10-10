@@ -3,13 +3,14 @@
 この手順では、利用者の Git リポジトリから独立した P／K／F の作業コピーを準備し、
 同じ課題を通常の Codex CLI で順に実行します。元のリポジトリやグローバル設定は
 変更しません。準備・内容確認・結果表示では Codex やモデルを起動しません。
-**`start` が実行開始の操作です。** 実モデルの利用は、人間が内容と正規の権限を
+**`start` と、未開始条件を継続する `resume` が実行開始の操作です。** 実モデルの利用は、人間が内容と正規の権限を
 確認して開始する別段階です。この開発での一連の検証は fake runner による合成試験で、
 実モデルの比較は未実行です。
 
 初版は Mac／Git／Codex と、追加依存なしで実行できる既存の `node:test` 形式の
 `.mjs` テストを対象にします。一般のフレームワークへの自動対応や、任意の課題の意味的な自動採点は
-ありません。仕様は [利用者比較の契約](user-comparison-contract.md)、比較の解釈は
+ありません。仕様は [利用者比較の契約](user-comparison-contract.md) と
+[無人実行の信頼性契約](unattended-user-comparison-contract.md)、比較の解釈は
 [探索的評価](pragmatic-evaluation.md) に記載しています。
 
 ## 1. 操作する場所と前提
@@ -153,7 +154,8 @@ node scripts/ask-user-comparison.mjs prepare \
   --task-class implementation \
   --global-ask unknown \
   --timeout-ms 600000 \
-  --verification-timeout-ms 60000
+  --verification-timeout-ms 60000 \
+  --overall-timeout-ms 3600000
 ```
 
 準備ではローカルの Node／Git と既存 installer を使い、独立した Git repo を
@@ -194,6 +196,22 @@ K は非 trivial 課題で router 等を必要とします。Skill がなけれ�
 `unknown`／`observed`／`not_observed` です。未観測を完全な不存在の証明にはしません。
 グローバル設定の完全隔離や、全条件の環境の完全一致は要求しません。
 
+`--timeout-ms` は各モデル処理、`--verification-timeout-ms` は各検証コマンド、
+`--overall-timeout-ms` は比較全体のローカル時間上限です。いずれも1〜86400000 msで、
+省略時はそれぞれ600000、60000、3600000 msです。全体時間は最初の `start` から
+数え、中断から `resume` までの停止時間も含みます。再開で期限を延ばしません。
+次の条件を始めるには、モデル処理の上限と、共通テストおよび `command` を持つ全要件の
+検証上限の合計以上の残り時間が必要です。例えば§3の検証方法では2コマンドなので、
+上の設定で開始に必要な残り時間は720000 msです。足りなければ未開始のまま部分結果を保存します。
+終了処理、同期的な証拠の読取り・保存、レポート生成は期限後まで続くことがあります。
+provider側の処理取消し、課金上限、厳密なtoken上限は保証しません。
+
+任意で `--token-budget 100000` のように、次のモデル処理を開始するための使用量予算を
+加えられます。取得済みのinput＋output tokensの既知値の合計を下限として、予算に
+達していれば次の条件を開始しません。cached tokensを別に足しません。取得できない
+値は `unknown` のまま残し、その不明だけでは停止しません。1回の処理が予算を
+超える可能性があり、厳密なtoken・費用上限ではありません。月間残量は調査しません。
+
 ## 5. 内容を確認する
 
 ```sh
@@ -204,7 +222,8 @@ node scripts/ask-user-comparison.mjs inspect "$RUN_OUTPUT" --json
 
 - 元 repo と commit、課題文、検証方法、P／K／F の資産と機能不足。
 - 各条件の実際の executable／引数／cwd／入力、CLI・model・reasoning の宣言。
-- 送信入力の範囲、変更可能範囲、保存先、時間制限、1回ずつ・再試行なし・逐次実行。
+- 送信入力の範囲、変更可能範囲、保存先、条件別・全体の時間制限と開始予約時間、
+  任意の使用量予算、1回ずつ・再試行なし・逐次実行。
 - 残るグローバル設定・実効 model・将来のツール選択に関する不明点。
 
 モデル入力には同じ課題文、指定 commit の repo、条件別の指示、および通常の Codex
@@ -222,10 +241,10 @@ node scripts/ask-user-comparison.mjs inspect "$RUN_OUTPUT" --json
 合成試験の差替え検証は `synthetic_injected_verifier` として区別し、独立した
 controller プロセスで実行したとは記録しません。実測側への差替えは開始前に拒否します。
 
-## 6. 人間の操作で開始する
+## 6. 確認済みの比較を一度の起動で処理する
 
-**以下の `start` だけが既存 Codex runner へ起動を要求します。** 内容確認と必要な
-正規の承認を終えた人間が実行してください。`PLAN_DIGEST` には直前の `inspect` に
+**以下の `start` は既存 Codex runner へ起動を要求します。** 内容確認と必要な
+正規の承認を先に終えてください。`PLAN_DIGEST` には直前の `inspect` に
 表示された `sha256:...` 全体をそのまま代入します。
 
 ```sh
@@ -234,15 +253,45 @@ node scripts/ask-user-comparison.mjs start "$RUN_OUTPUT" --confirm "$PLAN_DIGEST
 ```
 
 P→K→F の順で独立した `codex exec` セッションを使い、各条件は最大1回です。
-同時実行、自動再試行、失敗後の別経路、resume はありません。準備済みの入力や
-作業コピーが変わると起動を拒否します。起動拒否・runner 失敗・timeout・中断・
-検証失敗が起きたら後続条件を開始しません。K の `capability_missing` はその条件を
-未実行として保存し、F の処理へ進みます。
+条件ごとのモデル処理、独立テスト、記録、集計と結果表示まで自動で進みます。
+同時実行・自動再試行・失敗時の別経路はありません。準備済みの入力や、未開始条件の
+作業コピーが変わると起動を拒否します。
 
-`start` は一度だけ使えます。起動前の拒否であっても開始記録を消して再利用しないで
-ください。新しい試行には新しい出力先と実行 ID が必要です。コマンドの exit 0 は
-全条件のプロセス完了、exit 2 は完了以外の条件があることを示し、全要件の受入合格
-を意味しません。controller の入力拒否や記録読取りエラーは exit 1 です。
+| 条件の結果 | 残りの独立した条件 |
+| --- | --- |
+| 課題テストの失敗 `verification_failed` | 失敗を保存して続行する |
+| 処理終了を確認でき、stream保存の切詰めなどで検証が判定不能 `indeterminate` | 不明を保存して独立した残りの条件を続行する。比較全体は成功にしない |
+| 起動要求前のKの機能不足 `capability_missing` | Kを未実行として保存し、Fへ進む。Skillは補わない |
+| 認証・承認・権限の不足 | 理由と必要な対応を保存して停止。入力待ちや別経路による回避はしない |
+| runner異常、結果欠損、scope違反、timeout、中断、記録破損・所有権不明 | 停止し、後続は未開始のまま残す |
+| 全体期限・開始予約時間の不足、既知の使用量予算到達 | 次の条件を開始せず部分結果を保存する |
+
+認証・承認が必要な既知のCLI出力を検出した場合は、その場で停止を要求します。
+入力を代わりに送ったり設定を修復したりしません。CLIが理由を出力せず待機する
+場合もローカル時間上限で停止し、確認できた範囲のtimeoutと部分結果を残します。
+出力のない待機を、確認できていない認証失敗と断定することはありません。
+
+`start` は一度だけ使えます。二重起動や同じ出力への再度の `start` は拒否します。
+開始記録やleaseを消して再利用しないでください。未開始条件の継続には§7の
+`resume`、失敗条件の再試行や次の比較には§8の新しい出力先と実行IDを使います。
+
+`start`／`resume` と、出力先を1つ指定した `report` は `overall.exit_code` を
+返します。`start`／`resume` の正常に扱える終了経路では、機械可読結果・人向けレポート・終了コードを
+新しい呼出IDで保存します。複数出力の `report` は集計の表示成功ならexit 0です。
+
+| 終了コード | 全体状態と必要な確認 |
+| --- | --- |
+| 0 | `completed`：全条件のテストと実行可能な要件が合格。意味的な要件照合や実運用の認定は別 |
+| 2 | `task_failed`：条件の `verification_failed`。課題の失敗であり、ログ保存失敗とは区別する |
+| 3 | `capability_missing`：必要機能が不足。条件の起動要求と不足名を確認する |
+| 4 | `authentication_required`／`permission_denied`：本人が正規の認証・権限・承認手続を確認する |
+| 5 | `runner_failed`／`result_missing`／`scope_violation`：実行や成果の異常を確認する |
+| 6 | `timeout`：条件別または全体の期限、開始予約時間の不足を確認する |
+| 7 | `indeterminate`／`not_started`：未実行、証拠不足、または条件の `execution_unknown`。成功・0にしない |
+| 8 | `interrupted`：中断。未開始条件を継続できるか§7で確認する |
+| 9 | `running`／`execution_blocked`／`ownership_unverified`：二重起動、実行中、または所有権不明。別プロセスを終了しない |
+| 10 | `state_corrupt`／`persistence_failed`：設定・記録の不整合や保存障害。自動再開しない |
+| 11 | `usage_budget_exhausted`：取得できたtoken下限が予算に到達 |
 
 ## 7. 結果を開く・途中で止まった状態を確認する
 
@@ -261,9 +310,11 @@ node scripts/ask-user-comparison.mjs report "$RUN_OUTPUT" --json
 | `not_started` | 起動要求なし。時間・使用量・品質を0や成功にしない |
 | `capability_missing` | 必要な route または CLI がない。不足した名前と起動要求の有無を確認する |
 | `permission_denied` | 起動が権限により拒否された。別経路で回避しない |
+| `authentication_required` | 認証や承認が必要。入力待ちを続けず、正規の手続を人が確認する |
 | `runner_failed`／`timeout`／`interrupted` | 実行失敗・時間制限・中断。理由と部分成果を確認する |
 | `incomplete`／`result_missing` | 完了記録がない、読めない、または保存成果が欠損・不整合。完了や使用量を推測しない |
 | `verification_failed` | 独立したテストが合格しなかった。検証ログを見る |
+| `execution_unknown` | 要求した処理の結果を確認できない。未開始へ戻したり同じ条件を再実行したりしない |
 | `scope_violation` | 変更禁止ファイルへの変更がある。修正差分と scope の違反一覧を確認する |
 | `completed` | CLI プロセスが正常終了した。品質の受入は検証結果と要件照合で別に判断する |
 
@@ -278,6 +329,33 @@ JSON は `launch_requested`（起動要求）、`spawn_observed`（ローカル�
 `process_duration_ms`、各検証の時間は検証記録で別々に確認できます。
 取得できない使用量・費用・request 数は null／`unknown` で、0として集計しません。
 
+### 未開始条件だけを安全に再開する
+
+まず上の `report` と、次のモデルを起動しない確認を行います。
+
+```sh
+node scripts/ask-user-comparison.mjs inspect "$RUN_OUTPUT" --json
+```
+
+実行中のcontrollerや記録された子プロセスが残っている場合、所有権を確認できない
+場合、保存途中の記録・壊れた記録がある場合は、理由付きで再開を拒否します。
+`resume` は過去のPIDや別ジョブのプロセスを終了しません。
+PIDやleaseを手で消して停止確認の代わりにしないでください。
+状態と正規の権限を確認し、同じ課題・base commit・条件・設定に対して、§5で
+人間が確認した同じ `PLAN_DIGEST` を使います。
+
+```sh
+node scripts/ask-user-comparison.mjs resume "$RUN_OUTPUT" --confirm "$PLAN_DIGEST"
+```
+
+完了済み・失敗済み・一度でも起動を要求した条件は再実行しません。結果不明の
+要求済み条件は `execution_unknown` として残し、終了と所有権を確認できた場合に限り、
+まだ要求していない条件を続けます。要求・開始の記録が欠けて安全に確認できなければ
+停止します。再試行は0回のままで、再開によって増えません。全体の期限も最初の
+`start` のままです。期限や設定を変更して再開することはできません。
+旧版の開始記録に回復用の所有権・履歴がなければ、自動的に新方式へ置き換えません。
+新しい出力を準備する前に、旧実行が動いていないことと再度の実行権限を人が確認します。
+
 保存場所は利用者が指定した `RUN_OUTPUT` です。
 
 | 保存先 | 内容 |
@@ -288,9 +366,32 @@ JSON は `launch_requested`（起動要求）、`spawn_observed`（ローカル�
 | `control/baselines/` | 各条件の準備済みファイルの私的なbaseline。hashを固定し、修正差分の比較元に使う |
 | `control/patch-workspaces/` | 差分採取専用のcontrollerコピー。モデル側のGit index・objectを使わず、変更前後の確認済みbytesからpatchを作る |
 | `arms/plain`、`arms/kernel_only`、`arms/full_ask` | 独立した条件別 Git repo と修正内容 |
-| `control/start.json`、`control/end.json` | 開始操作と終了の記録。強制終了時は終了記録がない場合がある |
+| `control/start.json` | 最初の開始操作。完了・中断・再開の経過は実行履歴に保存する |
+| `control/history/` | digestでつながる実行状態の履歴。条件の要求・開始・検証・完了・停止を保存し、保存途中の状態も検出する |
+| `control/leases/` | 排他的なcontroller所有者の世代と終了記録。削除・書換えで起動を強制しない |
+| `control/invocations/<呼出ID>/result.json`、`report.txt`、`exit-code.txt` | start／resume／拒否の各呼出の機械可読結果、人向けレポート、終了コード。過去の呼出を上書きしない |
 | `control/slots/<condition>/` | `request.json`、`spawn.json` と各 digest、`result.json`、CLI ログ、応答、修正 patch、独立検証ログなど、取得できた証拠 |
 | `verification/<condition>/` | 結果を独立検証した作業コピー |
+
+検証ログは `control/slots/<condition>/verification-N.stdout.jsonl` と
+`verification-N.stderr.log` に各10 MiBまで別々に保存し、`verification-N.log` は
+結合した16 MiB以内のレビュー用表示です。`N` は共通テストから始まる0始まりの番号です。
+結合表示を切詰めた場合は本文末尾と `log_metadata.view.truncated` に記録します。
+両streamを完全に保存できた場合は、表示の切詰めだけでテスト成功を失敗にしません。
+stream取得・保存の欠損やredaction後のサイズ超過は別に記録し、
+`full_evidence_available` がfalseなら完全な検証証拠として扱いません。
+終了コード0でも、空のテスト・skip／todoだけ・必要なファイルの実行記録欠損では
+採点できず、`indeterminate`／品質unknownとして残します。実際のテスト終了が
+非0の場合の失敗とは区別します。
+テストの観測結果 `test_result`、取得できた `exit_code`、証拠の判定 `status`、
+各streamの取得・redaction後・保存byte数を区別して確認してください。
+runnerから集約した切詰めフラグしか得られない場合、どちらのstreamが切れたかはunknownです。
+
+強制終了・ディスク障害などでその場のレポートを保存できなかった場合は、次の
+`inspect`／`report` が残った履歴や保存途中の記録から異常を検出します。
+記録を手で正常化せず、保存先・権限・ディスク容量と理由を人が確認してください。
+結果表示はモデルを起動しません。入力が変わった、所有権が不明、記録が壊れた、
+認証・権限が必要、判定不能の場合は、人間の判断が必要です。
 
 `control/slots/<condition>/patch.diff` は、秘密らしい文字列を伏せた**レビュー用の表示**です。
 通常のコード内の文字列も伏せられる場合があり、元のファイルへ適用できる完全な patch
@@ -334,14 +435,15 @@ node scripts/ask-user-comparison.mjs prepare \
   --task "$TASK_FILE" --verification "$VERIFICATION_FILE" \
   --output "$NEXT_OUTPUT" --allow src/ \
   --cli codex --task-class implementation --global-ask unknown \
-  --timeout-ms 600000 --verification-timeout-ms 60000 \
+  --timeout-ms 600000 --verification-timeout-ms 60000 --overall-timeout-ms 3600000 \
   --rerun-of "$PREVIOUS_RUN_ID"
 node scripts/ask-user-comparison.mjs inspect "$NEXT_OUTPUT" --json
 node scripts/ask-user-comparison.mjs report "$RUN_OUTPUT" "$NEXT_OUTPUT" --json
 ```
 
 新しい `start` を選ぶと、完了済み条件も含む新しい三条件の試行になります。
-不足条件だけを旧 ID で再開する機能はありません。課題・設定・検証方法を変更した
+旧IDの `resume` は未開始条件だけを続け、失敗した条件の再試行はしません。
+課題・設定・検証方法を変更した
 場合は、その違いが解釈に影響します。集計は既存の探索的 reporter を使い、
 合成試験・実モデルの観測・未実行 plan を別々に扱います。異なる課題や成功基準も
 一つの品質 score に混ぜません。結果が欠けた条件を隠して比較成功にしません。
@@ -389,3 +491,69 @@ ASK v1 全体の完成を証明しません。Full の設置と、実際の Skil
 旧 r8〜r24 診断、拒否済み Python 起動要求、認証調査を再試行しません。
 以前の外側の承認拒否は Codex／モデル起動0回であり、ASK 本体の失敗実測ではありません。
 この新しい入口の開発完了も、その拒否を解除する根拠にはなりません。
+
+## 10. 確認済みの比較を夜間に一度だけ呼び出す
+
+先に§1〜5を人間が済ませます。夜間の起動も同じ利用者のアカウントと通常の
+Codex環境を使い、正規の認証・承認・送信先・repo共有権限を確認してください。
+端末とスケジューラではPATHや作業ディレクトリが異なることがあるため、準備の
+`--cli` には実在するCodex実行ファイルの絶対パスを指定する運用が確実です。
+Node 24.xの実行ファイル、Gitを含むPATH、ASK checkout、準備済み出力先も
+絶対パスで固定します。承認した比較が終わるまで、そのcheckoutと準備済み入力を変更しません。
+環境変数全体や認証ファイルをログへ書き出す必要はありません。
+
+次は呼出用shell scriptの例です。`/absolute/...` とdigestを本人が確認した値へ
+置き換えて保存します。`PLAN_DIGEST` は§5で表示・確認した値を固定しており、
+起動時に新しいdigestを取得して自己承認する処理はありません。
+
+```sh
+cat > "$COMPARISON_AREA/nightly-start.sh" <<'SH'
+#!/bin/sh
+set -u
+ASK_CHECKOUT='/absolute/path/to/agent-spectrum-kernel'
+NODE_BIN='/absolute/path/to/node'
+RUN_OUTPUT='/absolute/private/ask-comparisons/run-001'
+PLAN_DIGEST='sha256:inspectに表示され本人が確認した64桁のdigest'
+PATH='/absolute/path/containing/git:/usr/bin:/bin:/usr/sbin:/sbin'
+export PATH
+cd "$ASK_CHECKOUT" || exit 10
+LOG_PREFIX="$(mktemp "$RUN_OUTPUT/nightly-call.XXXXXX")" || exit 10
+exec "$NODE_BIN" scripts/ask-user-comparison.mjs start "$RUN_OUTPUT" \
+  --confirm "$PLAN_DIGEST" --json \
+  > "$LOG_PREFIX.stdout.json" 2> "$LOG_PREFIX.stderr.log"
+SH
+chmod 700 "$COMPARISON_AREA/nightly-start.sh"
+sh -n "$COMPARISON_AREA/nightly-start.sh"
+```
+
+`sh -n` は構文確認だけで、モデルを起動しません。スケジューラが一度実行する
+commandは、保存したscriptの絶対パスです。例えば次の呼出は**モデル使用を開始します**。
+この手順ではOSへのスケジュール登録、外部通知、認証や安全設定の変更は行いません。
+
+```sh
+"$COMPARISON_AREA/nightly-start.sh"
+```
+
+scriptの終了コードは§6の比較全体の終了コードです。`nightly-call.*.stdout.json` は
+その呼出の機械可読結果、`nightly-call.*.stderr.log` は入口の診断です。`mktemp` が
+作るsuffixなしのファイルはログ名の予約です。呼出ごとに別名なので二重起動でも
+これらのログを上書きしません。controllerの恒久的な呼出記録は
+`control/invocations/<呼出ID>/`、条件ごとの詳細は `control/slots/<condition>/` に残ります。
+shellの作業ディレクトリやログ作成で失敗した場合、controllerに到達せずexit 10に
+なることがあるため、スケジューラ側の終了状態と保存先も確認してください。
+SIGKILL、電源断、ディスク障害ではその呼出の結果を保存できない場合があります。
+
+同じ出力に対する二重 `start` はexit 9で拒否し、条件を重複起動しません。
+スケジューラ側で失敗時に同じscriptを自動再試行する設定は付けません。
+途中で止まった後は、§7の `report`／`inspect` を読み、所有権・履歴が安全と確認できた
+場合だけ同じdigestの `resume` を使います。毎回の条件別起動や結果の転記は不要です。
+回復のために `start.json`、履歴、lease、条件の起動記録を削除する操作はありません。
+
+同じ課題・設定で次の比較を行う場合も、§8の `prepare --rerun-of` で新しい
+出力先と実行IDを作ります。§5の内容確認を行い、本人が新しいdigestと出力先を
+scriptに設定してから、次の一度の起動を許可します。`resume` は新しい比較や
+失敗条件の再試行の代わりにはなりません。
+
+無人の入口がfake試験で正常に終了することと、実Codex／provider／sandboxでの
+運用成功は別です。実モデル受入は未実行のまま残り、次の段階で、この入口と
+限定した課題・権限・時間／使用量設定を人間が確認して開始します。

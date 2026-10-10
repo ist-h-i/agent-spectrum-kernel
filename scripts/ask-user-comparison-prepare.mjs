@@ -449,7 +449,7 @@ function kernelCapability(inventory, config) {
 
 function validateOptions(options) {
   if (!plainObject(options)) fail("options_object_required");
-  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf"];
+  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf"];
   if (Object.keys(options).some(key => !allowed.includes(key))) fail("unknown_preparation_option");
   for (const name of ["repo", "output"]) if (typeof options[name] !== "string" || !isAbsolute(options[name]) || resolve(options[name]) !== options[name]) fail(`absolute_${name}_required`);
   if (realpathSync(options.repo) !== options.repo || !lstatSync(options.repo).isDirectory()) fail("canonical_repository_root_required");
@@ -460,12 +460,14 @@ function validateOptions(options) {
   }
   const config = { cli_bin: options.cliBin ?? "codex", cli_version: options.cliVersion ?? null, model: options.model ?? null,
     reasoning: options.reasoning ?? null, timeout_ms: options.timeoutMs ?? 600000, verification_timeout_ms: options.verificationTimeoutMs ?? 60000,
+    overall_timeout_ms: options.overallTimeoutMs ?? 3600000, token_budget: options.tokenBudget ?? null,
     task_class: options.taskClass ?? "implementation", global_capabilities: options.globalCapabilities ?? [], global_ask_presence: options.globalAskPresence ?? "unknown",
     evidence_kind: options.evidenceKind ?? "observed", platform: `${process.platform}/${process.arch}`,
     node_version: process.version, os_release: release() };
   if (typeof config.cli_bin !== "string" || !(config.cli_bin === "codex" || isAbsolute(config.cli_bin)) || /[\u0000-\u001f\u007f]/u.test(config.cli_bin)) fail("invalid_cli_binary");
   for (const field of ["cli_version", "model", "reasoning"]) if (config[field] !== null && (typeof config[field] !== "string" || !config[field].trim() || /[\u0000-\u001f\u007f]/u.test(config[field]))) fail(`invalid_${field}`);
-  for (const field of ["timeout_ms", "verification_timeout_ms"]) if (!Number.isSafeInteger(config[field]) || config[field] < 1 || config[field] > 86400000) fail(`invalid_${field}`);
+  for (const field of ["timeout_ms", "verification_timeout_ms", "overall_timeout_ms"]) if (!Number.isSafeInteger(config[field]) || config[field] < 1 || config[field] > 86400000) fail(`invalid_${field}`);
+  if (config.token_budget !== null && (!Number.isSafeInteger(config.token_budget) || config.token_budget < 1)) fail("invalid_token_budget");
   if (!["implementation", "trivial", "review", "investigation"].includes(config.task_class) || !["observed", "synthetic"].includes(config.evidence_kind)
     || !["unknown", "observed", "not_observed"].includes(config.global_ask_presence) || !Array.isArray(config.global_capabilities)
     || config.global_capabilities.some(name => typeof name !== "string" || !NAME.test(name)) || new Set(config.global_capabilities).size !== config.global_capabilities.length) fail("invalid_comparison_configuration");
@@ -576,7 +578,9 @@ export function prepareUserComparison(options = {}) {
     verification: { path: "control/verification.json", digest: comparisonHash(verificationBytes), recipe, source_path: options.verificationFile,
       reporter: { path: "control/node-test-reporter.mjs", digest: comparisonHash(reporterBytes), format: "ask_node_summary_jsonl_v1" } },
     prompt, input: { path: "inputs/prompt.md", digest: comparisonHash(Buffer.from(prompt)), bytes: Buffer.byteLength(prompt) },
-    mutable_paths: mutable, config, policy: { attempts: 1, retries: 0, concurrency: 1 }, arms,
+    mutable_paths: mutable, config, policy: { attempts: 1, retries: 0, concurrency: 1 },
+    execution_protocol: { version: 2, resume: "never_requested_conditions_only", deadline_origin: "first_start_including_downtime",
+      usage_budget_basis: "known_input_plus_output_tokens_lower_bound", unknown_usage_policy: "continue_with_unknown" }, arms,
     source_installation: { removed_managed_assets: separated.removed, identities: separated.identities,
       preserved_custom_agents_digest: comparisonHash(customAgents) },
     full_definition: { name: "live_core_plus_codex_full_with_classified_reference_supplement", profile: "full",
