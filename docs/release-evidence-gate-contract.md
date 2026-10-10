@@ -8,6 +8,12 @@
 
 This contract answers one bounded question: given an exact repository revision, which release claims are supportable by the supplied evidence, and which required release conditions still prevent v1.0 readiness?
 
+[Pragmatic evaluation](pragmatic-evaluation.md) is supplemental observational
+evidence for improvement and bounded value explanations. Unknown global context
+and recorded environment differences are permitted in that lane. This does not
+waive the fixed gates below, complete mandatory #192/#198, reinterpret historical
+results or promote descriptive notes into controlled-outcome evidence.
+
 It does not publish a release, create a tag, contact a provider, execute a benchmark, mutate a Portfolio, approve a release, or turn missing external state into a pass. A successful CLI invocation may return `not_ready`; that is a valid assessment result rather than a command failure.
 
 The release gate consumes existing ASK truth, traceability, verification-evidence, Asset, Portfolio, Evolution, adapter, and review boundaries. It does not create another general workflow engine or evidence store.

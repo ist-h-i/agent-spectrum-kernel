@@ -1,5 +1,11 @@
 # Mac ASK value screening: three conditions before measurement
 
+The fixed revision 2 design below is retained as historical protocol material.
+For the 2026-10-10 user-directed exploratory lane, use
+[pragmatic evaluation](pragmatic-evaluation.md): global context may remain unknown,
+environments need only be brought close where practical, and remaining differences
+are recorded. This does not modify old records, fixed runners or security grants.
+
 Design `DES-MAC-ASK-VALUE-1`, revision 2, 2026-10-05. Supersedes the two-condition
 design at `e88647f0`; no measured records change. Status: **Hypothesis / not
 preregistered, not executable, no measurement authorized**. Inspected code and

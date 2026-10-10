@@ -1,5 +1,10 @@
 # ASK v1 release package — 2026年10月
 
+2026年10月10日の評価方針変更は [探索的評価](pragmatic-evaluation.md) に分離しました。
+global の不明や環境差を記録して改善 cycle を回しますが、下記の source と判定は
+その時点の証拠として保持します。新しい観測だけで必須 #192/#198 や16 gate を
+完了扱いにせず、実利用価値の説明材料と今後の gate 判断を分けます。
+
 判定は **`not_ready`** です。対象は
 [`main@d4ad39ead0f13965aeaf5aa919ef35f830a50e26`](https://github.com/ist-h-i/agent-spectrum-kernel/commit/d4ad39ead0f13965aeaf5aa919ef35f830a50e26)
 と、この revision に対する文書・モデル不要の Mac 導入復旧検証の差分です。

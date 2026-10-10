@@ -1,0 +1,39 @@
+{
+  "kind": "ask_pragmatic_evaluation_notes_v1",
+  "evidence_kind": "plan",
+  "scope": "Exploratory local engineering observations; no measured outcome is present in this template.",
+  "planned_blocks": ["cycle-1"],
+  "global_context": {
+    "ask_presence": "unknown",
+    "change_status": "unknown",
+    "notes": "Record what is known without deleting, moving or editing global settings/Skills. Unknown is permitted as an external factor."
+  },
+  "environment_notes": ["Bring task/model/settings close where practical; record remaining differences and their likely effect or unknown effect."],
+  "trials": [
+    {
+      "block_id": "cycle-1", "condition": "plain", "execution_state": "not_started", "outcome": "unknown",
+      "task_ref": null, "input_ref": null, "success_criteria_ref": null, "local_assets_ref": null,
+      "cli_version": null, "model": null, "reasoning": null, "platform": null, "global_context_ref": null,
+      "quality_notes": "No local ASK assets by design; this is not strict no-ASK when global ASK is present or unknown.",
+      "metrics": { "duration_ms": null, "human_review_minutes": null, "rework_minutes": null, "input_tokens": null, "output_tokens": null, "cached_tokens": null },
+      "stop_reason": null, "evidence_refs": []
+    },
+    {
+      "block_id": "cycle-1", "condition": "kernel_only", "execution_state": "not_started", "outcome": "unknown",
+      "task_ref": null, "input_ref": null, "success_criteria_ref": null, "local_assets_ref": null,
+      "cli_version": null, "model": null, "reasoning": null, "platform": null, "global_context_ref": null,
+      "quality_notes": "Exact canonical AGENTS.md, no added project-local ASK Skills; retain capability_missing instead of rewriting Kernel.",
+      "metrics": { "duration_ms": null, "human_review_minutes": null, "rework_minutes": null, "input_tokens": null, "output_tokens": null, "cached_tokens": null },
+      "stop_reason": null, "evidence_refs": []
+    },
+    {
+      "block_id": "cycle-1", "condition": "full_ask", "execution_state": "not_started", "outcome": "unknown",
+      "task_ref": null, "input_ref": null, "success_criteria_ref": null, "local_assets_ref": null,
+      "cli_version": null, "model": null, "reasoning": null, "platform": null, "global_context_ref": null,
+      "quality_notes": "Actual full distribution/profile and any declared supplement; do not relabel the implementation-only preparation Full.",
+      "metrics": { "duration_ms": null, "human_review_minutes": null, "rework_minutes": null, "input_tokens": null, "output_tokens": null, "cached_tokens": null },
+      "stop_reason": null, "evidence_refs": []
+    }
+  ],
+  "next_improvement": "Undecided until an authorized run has produced inspectable evidence; retain losses, stops and unknowns."
+}

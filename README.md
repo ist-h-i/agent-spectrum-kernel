@@ -14,6 +14,11 @@ Mac / Codex の導入で得られるものは、プロジェクト内の判断�
 導入後の一件を具体化する [Mac 初回開発受入の準備](docs/first-workflow-mac-codex-ja.md)
 では、公開人工タスク・軽量 bypass 入力・未実行の受入記録をローカルに用意できます。
 
+[実利用に近い探索的評価](docs/pragmatic-evaluation.md) では、global 設定の不明や
+環境・CLI 版の差を記録し、local ASK 追加なし／Kernelのみ／Full の観測を比較します。
+完全隔離・完全一致は開始条件にせず、既存集計を使うオフライン報告で失敗や unknown も
+改善へつなげます。実行許可や正式評価・release gate の代わりにはなりません。
+
 For the model-free local eval entry point, platform route decisions and remaining
 live-validation limits, see [Local eval distribution](docs/local-eval-distribution.md).
 For model-free plain/Kernel/Full package preparation and its admission limits,
