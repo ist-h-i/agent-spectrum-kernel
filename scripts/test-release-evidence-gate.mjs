@@ -778,7 +778,23 @@ try {
   assert(current.reason_codes.includes("required_gate_evidence_missing"));
   assert.deepEqual(current.claim_results.find((entry) => entry.claim_id === "ASK-PLATFORM-CLAIM-EVIDENCE-STATUS").reason_codes, []);
 
-  process.stdout.write(`Release evidence gate tests passed: 18 original scenarios + ${reviewRegressionCount} review regressions.\n`);
+  const latestMatrix = JSON.parse(readFileSync(resolve(SCRIPT_ROOT, "docs/fixtures/release-evidence-gate/current-main-d4ad39-claim-matrix.json"), "utf8"));
+  const latestCatalog = JSON.parse(readFileSync(resolve(SCRIPT_ROOT, "docs/fixtures/release-evidence-gate/current-main-d4ad39-evidence.json"), "utf8"));
+  const latest = assessRelease({ matrix: latestMatrix, catalog: latestCatalog, repositoryRoot: SCRIPT_ROOT,
+    sourceRevision: "d4ad39ead0f13965aeaf5aa919ef35f830a50e26" });
+  assert.equal(latest.decision, "not_ready", "model-free packaging cannot complete the v1 release");
+  assert.equal(latest.gate_results.length, 16, "the current projection must retain every existing required gate");
+  for (const gate of ["release.activation_bypass_decisions", "release.benchmark_report_publication",
+    "release.supported_adapter_runtime", "release.guided_setup", "release.clean_install_upgrade", "release.human_approval"]) {
+    assert.equal(latest.gate_results.find((entry) => entry.gate_id === gate).status, "not_ready", `${gate} must not inherit static/synthetic installation proof`);
+  }
+  assert(latest.blockers.includes("release-blocker-192-198-product-evidence"));
+  assert.equal(latestMatrix.claims.find((entry) => entry.claim_id === "ASK-PLATFORM-GUIDED-SETUP").disposition, "unknown");
+  assert.equal(latestMatrix.claims.find((entry) => entry.claim_id === "ASK-PLATFORM-EVALUATION-REPORT-AUTHORITY").disposition, "unknown");
+  const wrongRevision = assessRelease({ matrix: latestMatrix, catalog: latestCatalog, repositoryRoot: SCRIPT_ROOT, sourceRevision: SOURCE });
+  expectNotReady(wrongRevision, "matrix_source_revision_stale");
+
+  process.stdout.write(`Release evidence gate tests passed: 18 original scenarios + ${reviewRegressionCount} review regressions + current-main release boundary.\n`);
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

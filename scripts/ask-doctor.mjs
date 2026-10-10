@@ -15,6 +15,8 @@ import {
   readJsonIfExists,
 } from "./ask-shared.mjs";
 import { DEFAULT_RUNTIME_EVENT_STORE, resolveObservabilityPath } from "./observability-paths.mjs";
+import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
+import { skillAssets } from "./skill-assets.mjs";
 
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
@@ -223,6 +225,21 @@ function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, 
     report.warnings.push(`${label} retained stale managed command projection: ${command}`);
   }
 
+  let currentCodexPrompts = null;
+  if (installerName === "agent-spectrum-codex-adapter") {
+    try {
+      const options = state.projection_plan?.plan_shaping_options ?? {};
+      const projection = buildCodexProjectionPlan({
+        profileName: state.selected_profile,
+        skills: options.skills ?? null,
+        skipPrompts: options.skip_prompts ?? false,
+        skipCommand: options.skip_command ?? false,
+      });
+      currentCodexPrompts = new Map(projection.compactProfileArtifacts.map((artifact) => [artifact.metadata.prompt_name, artifact.content]));
+    } catch {
+      report.failures.push(`${label} current prompt projection could not be verified`);
+    }
+  }
   for (const [managedPath, record] of Object.entries(state.managed_files)) {
     const destination = resolve(target, managedPath);
     if (!existsSync(destination)) {
@@ -238,8 +255,21 @@ function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, 
       report.failures.push(`${label} managed file hash mismatch: ${managedPath}`);
       continue;
     }
-    const sourcePath = sourcePathForManagedRecord(managedPath, record);
-    if (sourcePath && existsSync(sourcePath) && currentHash !== hashFile(sourcePath)) {
+    let sourcePath;
+    try {
+      sourcePath = sourcePathForManagedRecord(managedPath, record);
+    } catch {
+      // A previously installed Skill can be absent from the current checkout.
+      // Its retained target still has to pass the hash check above.
+      const findings = record.kind?.startsWith("stale_") ? report.warnings : report.failures;
+      findings.push(`${label} managed source asset could not be verified: ${managedPath}`);
+      continue;
+    }
+    const renderedPrompt = record.kind === "codex_prompt" ? currentCodexPrompts?.get(record.prompt) : null;
+    if (record.kind === "codex_prompt" && currentCodexPrompts && renderedPrompt === undefined) {
+      report.failures.push(`${label} managed prompt is absent from the current selected projection: ${managedPath}`);
+    } else if ((renderedPrompt != null && currentHash !== hashText(renderedPrompt))
+      || (sourcePath && existsSync(sourcePath) && currentHash !== hashFile(sourcePath))) {
       report.warnings.push(`${label} managed file is stale relative to this ASK checkout: ${managedPath}`);
     }
   }
@@ -276,14 +306,13 @@ function sourcePathForManagedRecord(managedPath, record) {
   if (record.kind === "copy_paste_kernel" && managedPath === "CUSTOM_INSTRUCTIONS.md") {
     return resolve(REPO_ROOT, "CUSTOM_INSTRUCTIONS.md");
   }
-  if ((record.kind === "skill" || record.kind === "stale_skill") && record.skill) {
-    return resolve(REPO_ROOT, "skills", record.skill, "SKILL.md");
-  }
-  if ((record.kind === "codex_skill" || record.kind === "stale_codex_skill") && record.skill) {
-    return resolve(REPO_ROOT, "skills", record.skill, "SKILL.md");
-  }
-  if ((record.kind === "claude_skill" || record.kind === "stale_claude_skill") && record.skill) {
-    return resolve(REPO_ROOT, "skills", record.skill, "SKILL.md");
+  const skillRoots = { skill: "skills", stale_skill: "skills", codex_skill: ".agents/skills", stale_codex_skill: ".agents/skills", claude_skill: ".claude/skills", stale_claude_skill: ".claude/skills" };
+  if (Object.hasOwn(skillRoots, record.kind) && record.skill) {
+    const prefix = `${skillRoots[record.kind]}/${record.skill}/`;
+    if (!managedPath.startsWith(prefix)) return null;
+    const relativeAsset = managedPath.slice(prefix.length);
+    const asset = skillAssets(REPO_ROOT, [record.skill]).find((entry) => entry.relativePath === relativeAsset);
+    return asset ? resolve(REPO_ROOT, asset.sourcePath) : null;
   }
   if (record.kind === "claude_command" && record.command) {
     return resolve(REPO_ROOT, "adapters/claude-code/project/.claude/commands", record.command);
@@ -297,12 +326,10 @@ function sourcePathForManagedRecord(managedPath, record) {
   if (record.kind === "claude_asset" && record.asset) {
     return resolve(REPO_ROOT, record.asset);
   }
-  if (record.kind === "codex_prompt" && record.prompt) {
-    return resolve(REPO_ROOT, "adapters/codex/prompts", record.prompt);
-  }
-  if (record.kind === "stale_codex_prompt" && record.prompt) {
-    return resolve(REPO_ROOT, "adapters/codex/prompts", record.prompt);
-  }
+  // Compact prompts contain generated provenance and expanded controls. Their
+  // freshness is compared with the current renderer above, never raw templates.
+  // Retained stale prompts already have explicit stale-inventory warnings.
+  if (["codex_prompt", "stale_codex_prompt"].includes(record.kind)) return null;
   if ((record.kind === "codex_command" || record.kind === "stale_codex_command") && record.generated === true) {
     return null;
   }

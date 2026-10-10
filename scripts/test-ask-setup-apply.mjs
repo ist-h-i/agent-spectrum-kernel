@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +17,7 @@ import { skillAssets } from "./skill-assets.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtures = [];
 let checks = 0;
-function temp() { const path = mkdtempSync(resolve(tmpdir(), "ask-apply-test-")); fixtures.push(path); return path; }
+function temp() { const path = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-apply-test-"))); fixtures.push(path); return path; }
 function put(root, path, contents) { mkdirSync(dirname(resolve(root, path)), { recursive: true }); writeFileSync(resolve(root, path), contents); }
 function equal(actual, expected, message) { checks += 1; assert.deepEqual(actual, expected, message); }
 function rejects(fn, pattern) { checks += 1; assert.throws(fn, pattern); }
@@ -111,6 +111,8 @@ export async function runSetupApplyUnitTests() {
     }
     put(root, "bad.json", '{"secret":"PRIVATE_TEXT');
     rejects(() => readApplyJson(resolve(root, "bad.json")), /^SetupApplyError: invalid_json_input$/);
+    symlinkSync(root, resolve(outside, "json-alias"));
+    rejects(() => readApplyJson(resolve(outside, "json-alias/bad.json")), /unsafe_json_input/);
     rejects(() => readApplyJson(resolve(root, "link.txt")), /unsafe_json/);
     put(root, SETUP_INSTALLERS.kernel.state + ".in-progress.json", "{}");
     rejects(() => assertNoSetupInProgress(root), /recovery_required/);

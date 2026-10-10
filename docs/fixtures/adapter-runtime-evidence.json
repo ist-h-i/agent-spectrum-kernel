@@ -86,7 +86,7 @@
         "scripts/test-adapter-runtime-event.mjs",
         "scripts/test-claude-metrics-collector.mjs"
       ],
-      "subject_digest": "sha256:2ed2835ab7314a1606ce30406a3578dea906118d7f6d1e16459b744bf46fbe9f",
+      "subject_digest": "sha256:061232728d16ff32f4f4f01189ad1262471c658735af6fd5c7d1fd7a217eb60e",
       "verification": {
         "verifier_path": "scripts/test-claude-metrics-collector.mjs",
         "fixture_id": "claude-canonical-metrics-collector",

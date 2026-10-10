@@ -1,0 +1,87 @@
+{
+  "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+  "observed_at": "2026-10-10",
+  "source_state": "clean detached checkout",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "macos": "26.6.2",
+    "node": "v24.19.0"
+  },
+  "checks": [
+    {
+      "command": "node scripts/validate-repo.mjs",
+      "exit_status": 0,
+      "result": "Repository validation passed: ."
+    },
+    {
+      "command": "node scripts/test-release-evidence-gate.mjs",
+      "exit_status": 0,
+      "result": "Release evidence gate tests passed: 18 original scenarios + 116 review regressions."
+    },
+    {
+      "command": "node scripts/test-verification-evidence.mjs",
+      "exit_status": 0,
+      "result": "Verification evidence exact-reuse tests passed"
+    },
+    {
+      "command": "node scripts/test-verification-scoped-reuse.mjs",
+      "exit_status": 0,
+      "result": "verification scoped reuse tests passed"
+    },
+    {
+      "command": "node scripts/test-epic-admission-work-package-plan.mjs",
+      "exit_status": 0,
+      "result": "Epic admission and Work Package Plan tests passed: 150 cases, plan=WPP-6f1ea8476454bf3f97969d36, digest=sha256:15adac3986e07a1fe230df472180c31cabd7bc1aaee3001e52df15afd0643cdf"
+    },
+    {
+      "command": "node scripts/test-asset-registry.mjs",
+      "exit_status": 0,
+      "result": "asset registry tests passed (70 cases)"
+    },
+    {
+      "command": "node scripts/test-portfolio-manager.mjs",
+      "exit_status": 0,
+      "result": "Portfolio Manager contract tests passed (86 cases)"
+    }
+  ],
+  "modules": [
+    {
+      "path": "schemas/claim-evidence-status.schema.json",
+      "digest": "sha256:be0ad5f23e3eeae32ac80f9e27e05a4dc397c479cd3719692764609569690098"
+    },
+    {
+      "path": "scripts/verification-evidence.mjs",
+      "digest": "sha256:a6761cd3b52bcff5acfbc769e36b7cf5f9b19f103c3b503b4f70870c8df01334"
+    },
+    {
+      "path": "scripts/epic-admission-work-package-plan.mjs",
+      "digest": "sha256:831415bb3cfb13a41baf5d4d13f83a673788a3f92e28c7188d3def175a5f0aaf"
+    },
+    {
+      "path": "scripts/asset-registry.mjs",
+      "digest": "sha256:c85bdae4b2fc1886fa99f38005ac89a45effa4e5107ee736ecea0b4220c675b7"
+    },
+    {
+      "path": "scripts/portfolio-manager.mjs",
+      "digest": "sha256:c812c126b760e3abd28eaede7c62b25acda9fcc53635e3c33e896dd7fb02564e"
+    },
+    {
+      "path": "scripts/evolution-loop.mjs",
+      "digest": "sha256:914dd0709e9ac8d7a0166fa7b4acaedb22736153f3caa4ed9be341b00d7f9bb2"
+    },
+    {
+      "path": "scripts/ask-benchmark-portfolio-consumer-report.mjs",
+      "digest": "sha256:7d7e401f5571d7ab887e7d5e4f9a47d6157ebb4164c041769533ef36bf3aba00"
+    },
+    {
+      "path": "scripts/ask-setup.mjs",
+      "digest": "sha256:4e3465b6c8d0a39f2991bba1e98ee4bfa348a04014b07d95363b378c5ab676ad"
+    }
+  ],
+  "limits": [
+    "Focused static/synthetic contract checks only; no external adapter or provider was launched.",
+    "No activation/bypass measurement, adopting-project evidence, publication permission, or release approval.",
+    "Mac setup and consumer-report temp-path failures, plus doctor false-stale warnings, are candidate fixes; those fixes are not evidence of pristine main success."
+  ]
+}

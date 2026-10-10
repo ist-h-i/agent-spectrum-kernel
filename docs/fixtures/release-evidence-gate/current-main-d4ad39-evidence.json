@@ -1,0 +1,1024 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "schemas/release-evidence-catalog.schema.json",
+  "catalog_id": "release-evidence-catalog-current-main-d4ad39",
+  "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+  "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+  "evidence": [
+    {
+      "evidence_id": "release-evidence-main-platform-claim-evidence-status",
+      "kind": "implementation",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "schemas/claim-evidence-status.schema.json",
+        "digest": "sha256:be0ad5f23e3eeae32ac80f9e27e05a4dc397c479cd3719692764609569690098"
+      },
+      "scope": {
+        "capability": "claim evidence status contract",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-PLATFORM-CLAIM-EVIDENCE-STATUS"
+      ],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-implementation-verification-store",
+      "kind": "implementation",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "scripts/verification-evidence.mjs",
+        "digest": "sha256:a6761cd3b52bcff5acfbc769e36b7cf5f9b19f103c3b503b4f70870c8df01334"
+      },
+      "scope": {
+        "capability": "verification evidence implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-VERIFICATION-STORE"
+      ],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-implementation-epic-admission",
+      "kind": "implementation",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "scripts/epic-admission-work-package-plan.mjs",
+        "digest": "sha256:831415bb3cfb13a41baf5d4d13f83a673788a3f92e28c7188d3def175a5f0aaf"
+      },
+      "scope": {
+        "capability": "epic admission implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-EPIC-ADMISSION"
+      ],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-implementation-asset-registry",
+      "kind": "implementation",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "scripts/asset-registry.mjs",
+        "digest": "sha256:c85bdae4b2fc1886fa99f38005ac89a45effa4e5107ee736ecea0b4220c675b7"
+      },
+      "scope": {
+        "capability": "Asset Registry implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-ASSET-REGISTRY"
+      ],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-implementation-portfolio",
+      "kind": "implementation",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "scripts/portfolio-manager.mjs",
+        "digest": "sha256:c812c126b760e3abd28eaede7c62b25acda9fcc53635e3c33e896dd7fb02564e"
+      },
+      "scope": {
+        "capability": "Portfolio Manager implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-PORTFOLIO"
+      ],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-implementation-evolution",
+      "kind": "implementation",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "scripts/evolution-loop.mjs",
+        "digest": "sha256:914dd0709e9ac8d7a0166fa7b4acaedb22736153f3caa4ed9be341b00d7f9bb2"
+      },
+      "scope": {
+        "capability": "generic Evolution implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-EVOLUTION"
+      ],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-implementation-report",
+      "kind": "implementation",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "scripts/ask-benchmark-portfolio-consumer-report.mjs",
+        "digest": "sha256:7d7e401f5571d7ab887e7d5e4f9a47d6157ebb4164c041769533ef36bf3aba00"
+      },
+      "scope": {
+        "capability": "evaluation/report implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-REPORT"
+      ],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-implementation-setup",
+      "kind": "implementation",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "scripts/ask-setup.mjs",
+        "digest": "sha256:4e3465b6c8d0a39f2991bba1e98ee4bfa348a04014b07d95363b378c5ab676ad"
+      },
+      "scope": {
+        "capability": "local setup CLI implementation",
+        "task_class": null,
+        "adapter_id": "codex",
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-SETUP"
+      ],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-repository-validation",
+      "kind": "static_verification",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-observations.json",
+        "digest": "sha256:8721c6d260203174f501c823df0f24b0f0b869b45632fbefc4b3c1edabce0311"
+      },
+      "scope": {
+        "capability": "repository validation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [
+        "release.repository_validation"
+      ],
+      "claim_ids": [],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Clean main validate-repo exit 0. This does not establish full CI success or candidate validation."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-static-verification-store",
+      "kind": "static_verification",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-observations.json",
+        "digest": "sha256:8721c6d260203174f501c823df0f24b0f0b869b45632fbefc4b3c1edabce0311"
+      },
+      "scope": {
+        "capability": "verification evidence implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [
+        "release.verification_evidence_store"
+      ],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-VERIFICATION-STORE"
+      ],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Focused static/synthetic contract checks executed in the clean d4ad39 checkout; exact commands/results are in the referenced observations.",
+        "No runtime enforcement or effectiveness implication. Epic admission requires runtime_execution under the unchanged release policy."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-static-asset-registry",
+      "kind": "static_verification",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-observations.json",
+        "digest": "sha256:8721c6d260203174f501c823df0f24b0f0b869b45632fbefc4b3c1edabce0311"
+      },
+      "scope": {
+        "capability": "Asset Registry implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [
+        "release.asset_registry"
+      ],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-ASSET-REGISTRY"
+      ],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Focused static/synthetic contract checks executed in the clean d4ad39 checkout; exact commands/results are in the referenced observations.",
+        "No runtime enforcement or effectiveness implication. Epic admission requires runtime_execution under the unchanged release policy."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-static-portfolio",
+      "kind": "static_verification",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-observations.json",
+        "digest": "sha256:8721c6d260203174f501c823df0f24b0f0b869b45632fbefc4b3c1edabce0311"
+      },
+      "scope": {
+        "capability": "Portfolio Manager implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [
+        "release.portfolio_manager"
+      ],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-PORTFOLIO"
+      ],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Focused static/synthetic contract checks executed in the clean d4ad39 checkout; exact commands/results are in the referenced observations.",
+        "No runtime enforcement or effectiveness implication. Epic admission requires runtime_execution under the unchanged release policy."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-static-epic-admission",
+      "kind": "static_verification",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-observations.json",
+        "digest": "sha256:8721c6d260203174f501c823df0f24b0f0b869b45632fbefc4b3c1edabce0311"
+      },
+      "scope": {
+        "capability": "epic admission implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [
+        "release.epic_admission"
+      ],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-EPIC-ADMISSION"
+      ],
+      "related_evidence_refs": [],
+      "authority": {
+        "kind": "producer",
+        "identity_digest": "sha256:2eceb5fddff1ab8efd57dc1d2284911df681d38f7cdfdc0dbaa19a30f36b4735"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Focused static/synthetic contract checks executed in the clean d4ad39 checkout; exact commands/results are in the referenced observations.",
+        "No runtime enforcement or effectiveness implication. Epic admission requires runtime_execution under the unchanged release policy."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-platform-claim-evidence-status",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "claim evidence status contract",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-PLATFORM-CLAIM-EVIDENCE-STATUS"
+      ],
+      "related_evidence_refs": [
+        "release-evidence-main-platform-claim-evidence-status"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-implementation-verification-store",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "verification evidence implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-VERIFICATION-STORE"
+      ],
+      "related_evidence_refs": [
+        "release-evidence-main-implementation-verification-store"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-implementation-epic-admission",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "epic admission implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-EPIC-ADMISSION"
+      ],
+      "related_evidence_refs": [
+        "release-evidence-main-implementation-epic-admission"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-implementation-asset-registry",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "Asset Registry implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-ASSET-REGISTRY"
+      ],
+      "related_evidence_refs": [
+        "release-evidence-main-implementation-asset-registry"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-implementation-portfolio",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "Portfolio Manager implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-PORTFOLIO"
+      ],
+      "related_evidence_refs": [
+        "release-evidence-main-implementation-portfolio"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-implementation-evolution",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "generic Evolution implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-EVOLUTION"
+      ],
+      "related_evidence_refs": [
+        "release-evidence-main-implementation-evolution"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-implementation-report",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "evaluation/report implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-REPORT"
+      ],
+      "related_evidence_refs": [
+        "release-evidence-main-implementation-report"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-implementation-setup",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "local setup CLI implementation",
+        "task_class": null,
+        "adapter_id": "codex",
+        "profile_id": null
+      },
+      "gate_ids": [],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-SETUP"
+      ],
+      "related_evidence_refs": [
+        "release-evidence-main-implementation-setup"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-repository-validation",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "repository validation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [
+        "release.repository_validation"
+      ],
+      "claim_ids": [],
+      "related_evidence_refs": [
+        "release-evidence-main-repository-validation"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-static-verification-store",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "verification evidence implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [
+        "release.verification_evidence_store"
+      ],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-VERIFICATION-STORE"
+      ],
+      "related_evidence_refs": [
+        "release-evidence-main-static-verification-store"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-static-asset-registry",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "Asset Registry implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [
+        "release.asset_registry"
+      ],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-ASSET-REGISTRY"
+      ],
+      "related_evidence_refs": [
+        "release-evidence-main-static-asset-registry"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-static-portfolio",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "Portfolio Manager implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [
+        "release.portfolio_manager"
+      ],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-PORTFOLIO"
+      ],
+      "related_evidence_refs": [
+        "release-evidence-main-static-portfolio"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    },
+    {
+      "evidence_id": "release-evidence-main-review-static-epic-admission",
+      "kind": "independent_review",
+      "status": "passed",
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "artifact": {
+        "path": "docs/fixtures/release-evidence-gate/current-main-d4ad39-independent-review.md",
+        "digest": "sha256:c42da8691722026c7d5810cee5c61699b8b7b96a66e22d3a02752084c053c111"
+      },
+      "scope": {
+        "capability": "epic admission implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "gate_ids": [
+        "release.epic_admission"
+      ],
+      "claim_ids": [
+        "ASK-IMPLEMENTATION-EPIC-ADMISSION"
+      ],
+      "related_evidence_refs": [
+        "release-evidence-main-static-epic-admission"
+      ],
+      "authority": {
+        "kind": "independent_reviewer",
+        "identity_digest": "sha256:953c8d2f13226bb326c0abd6c56f96ef701392ff0c5564189f6a7300431a9ab8"
+      },
+      "guardrails": {
+        "quality": "not_required",
+        "safety": "not_required",
+        "lower_tail": "not_required",
+        "variance": "not_required",
+        "human_effort": "not_applicable",
+        "publication_permission": "not_required"
+      },
+      "limitations": [
+        "Independent review of exact main implementation existence or recorded static/synthetic observations only; no runtime, effectiveness or release approval."
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "blocker_id": "release-blocker-first-workflow-runtime",
+      "status": "open",
+      "description": "#173 local installer scope is closed; #315 first engineering workflow, explicit activation and Operational evidence remain missing.",
+      "evidence_refs": []
+    },
+    {
+      "blocker_id": "release-blocker-192-198-product-evidence",
+      "status": "open",
+      "description": "#192/#198 measured activation/bypass and outcome/report publication remain required; #318 never substitutes for them.",
+      "evidence_refs": []
+    },
+    {
+      "blocker_id": "release-blocker-required-platform-integration",
+      "status": "open",
+      "description": "#274/#275 have merged implementation work, but exact required runtime/coverage projection, real #278/#291 disposition and release-scoped #197 authority evidence remain incomplete.",
+      "evidence_refs": []
+    },
+    {
+      "blocker_id": "release-blocker-distribution-upgrade-runtime",
+      "status": "open",
+      "description": "Supported adapter acceptance, clean-user cross-version upgrade and release-scoped recovery are not established by the candidate artificial Mac smoke.",
+      "evidence_refs": []
+    },
+    {
+      "blocker_id": "release-blocker-final-docs-version-approval",
+      "status": "open",
+      "description": "Final revision claim consistency, semantic version/changelog, migration scope and explicit human release approval are unavailable.",
+      "evidence_refs": []
+    }
+  ],
+  "accepted_risks": []
+}

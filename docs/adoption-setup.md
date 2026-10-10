@@ -2,6 +2,10 @@
 
 `ask-setup` は、ASK を導入する前に対象リポジトリを読み取り、利用可能な profile と adapter capability を確認し、既存 installer が行う変更を事前に計画する CLI です。
 
+Mac / Codex の使い捨て repository で導入・更新・復旧を確認する手順は
+[Mac quickstart](quickstart-mac-codex-ja.md)、現行 main の実装と残る release
+条件は [2026年10月の release package](release-package-2026-10.md) を参照してください。
+
 `inspect / recommend / plan / check / doctor` は対象リポジトリへ書き込みません。明示的な `apply --plan` だけが、検証済みの exact Plan を既存 installer で適用します。実際の Codex / Claude 実行と初回 workflow の Operational 確認は後続範囲です。認可・適用結果・復旧の詳細は [明示承認された計画の適用](adoption-apply.md) を参照してください。
 
 ## できること
