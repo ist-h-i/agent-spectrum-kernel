@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { closeSync, fstatSync, openSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, deriveReviewSignalGateRoute, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, inspectCodexPromptContractBindings, parseCodexCompactProfileHeader, readReviewSignalGateMap } from "./ask-shared.mjs";
 import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
@@ -35,6 +35,136 @@ const MANAGED_CODEX_RUNTIME_FILES = [
 ];
 
 function hashText(value) { return createHash("sha256").update(value).digest("hex"); }
+
+/** One explicit session request; configuration/authentication remain owned by Codex. */
+export async function executeCodexSession({ executable, argv, cwd, input, timeoutMs, signal, onSpawn, env }, spawnProcess = spawn) {
+  if (typeof executable !== "string" || !executable || executable.includes("\0")
+    || !Array.isArray(argv) || argv.some(value => typeof value !== "string" || value.includes("\0"))
+    || typeof cwd !== "string" || !cwd || cwd.includes("\0")
+    || !(typeof input === "string" || Buffer.isBuffer(input))
+    || (env !== undefined && (!env || typeof env !== "object" || Array.isArray(env) || Object.values(env).some(value => typeof value !== "string" || value.includes("\0"))))
+    || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2147483647
+    || (signal !== undefined && (!signal || typeof signal.aborted !== "boolean" || typeof signal.addEventListener !== "function" || typeof signal.removeEventListener !== "function"))
+    || (onSpawn !== undefined && typeof onSpawn !== "function") || typeof spawnProcess !== "function") {
+    throw new Error("a bounded Codex session request requires executable, argv, cwd, input and timeoutMs");
+  }
+  const started = Date.now();
+  const result = { launchRequested: true, spawnObserved: false, pid: null, exitCode: null, signal: null,
+    error: null, timedOut: false, interrupted: false, outputLimited: false, cleanupError: null,
+    stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), durationMs: 0 };
+  const errorRecord = error => ({ code: typeof error?.code === "string" ? error.code : "RUNNER_ERROR", message: String(error?.message ?? error) });
+  if (signal?.aborted) {
+    return { ...result, interrupted: true, error: { code: "ABORT_ERR", message: "session interrupted before spawn" }, durationMs: Date.now() - started };
+  }
+  return await new Promise(resolveResult => {
+    const stdout = [], stderr = [];
+    const limit = 10 * 1024 * 1024;
+    let stdoutBytes = 0, stderrBytes = 0, child, deadline, escalation, shutdownDeadline, terminatingAt = null, finishing = false, rootExited = false, escalated = false, cleanupFailure = null;
+    const groupPresent = () => {
+      if (process.platform === "win32" || !Number.isInteger(child?.pid) || child.pid < 1) return false;
+      try { process.kill(-child.pid, 0); return true; }
+      catch (error) {
+        if (error.code === "ESRCH") return false;
+        cleanupFailure ??= errorRecord(error);
+        return true;
+      }
+    };
+    const killTree = killSignal => {
+      try {
+        if (process.platform !== "win32" && Number.isInteger(child?.pid) && child.pid > 0) process.kill(-child.pid, killSignal);
+        else if (!rootExited) child?.kill(killSignal);
+      } catch (error) {
+        if (error.code !== "ESRCH") cleanupFailure ??= errorRecord(error);
+      }
+    };
+    const escalate = () => { if (!escalated) { escalated = true; killTree("SIGKILL"); } };
+    const terminate = () => {
+      if (terminatingAt !== null) return;
+      terminatingAt = Date.now();
+      killTree("SIGTERM");
+      escalation = setTimeout(escalate, 1000);
+      shutdownDeadline = setTimeout(() => {
+        if (finishing) return;
+        result.cleanupError = cleanupFailure ?? { code: "PROCESS_DID_NOT_CLOSE", message: "session did not close after termination; process state requires attention" };
+        void finish(result.exitCode, result.signal, true);
+      }, 2000);
+    };
+    const interrupt = () => {
+      result.interrupted = true;
+      result.error ??= { code: "ABORT_ERR", message: "session interrupted" };
+      terminate();
+    };
+    const collect = (stream, chunk) => {
+      const bytes = Buffer.from(chunk), used = stream === "stdout" ? stdoutBytes : stderrBytes;
+      const accepted = bytes.subarray(0, Math.max(0, limit - used));
+      if (accepted.length) (stream === "stdout" ? stdout : stderr).push(accepted);
+      if (stream === "stdout") stdoutBytes += accepted.length;
+      else stderrBytes += accepted.length;
+      if (accepted.length !== bytes.length) {
+        result.outputLimited = true;
+        result.error ??= { code: "ENOBUFS", message: "session stream exceeded 10 MiB" };
+        terminate();
+      }
+    };
+    const finish = async (exitCode, exitSignal, forced = false) => {
+      if (finishing) return;
+      finishing = true;
+      clearTimeout(deadline);
+      clearTimeout(shutdownDeadline);
+      signal?.removeEventListener("abort", interrupt);
+      result.exitCode = result.spawnObserved ? exitCode : null;
+      result.signal = exitSignal;
+      if (groupPresent()) {
+        terminate();
+        const remaining = Math.max(0, 1000 - (Date.now() - terminatingAt));
+        if (remaining) await new Promise(resolveWait => setTimeout(resolveWait, remaining));
+        if (groupPresent()) escalate();
+        for (let index = 0; index < 100 && groupPresent(); index += 1) await new Promise(resolveWait => setTimeout(resolveWait, 10));
+        if (groupPresent()) result.cleanupError = cleanupFailure ?? { code: "PROCESS_GROUP_REMAINS", message: "session process group remains after termination" };
+      }
+      clearTimeout(escalation);
+      if (forced) { child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy(); child.unref(); }
+      result.stdout = Buffer.concat(stdout, stdoutBytes);
+      result.stderr = Buffer.concat(stderr, stderrBytes);
+      result.durationMs = Date.now() - started;
+      resolveResult(result);
+    };
+    try {
+      child = spawnProcess(executable, argv, { cwd, shell: false, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"], ...(env === undefined ? {} : { env }) });
+    } catch (error) {
+      result.error = errorRecord(error);
+      result.durationMs = Date.now() - started;
+      resolveResult(result);
+      return;
+    }
+    child.stdout.on("data", chunk => collect("stdout", chunk));
+    child.stderr.on("data", chunk => collect("stderr", chunk));
+    for (const stream of [child.stdin, child.stdout, child.stderr]) stream.on("error", error => { result.error ??= errorRecord(error); terminate(); });
+    child.once("error", error => { result.error ??= errorRecord(error); });
+    child.once("spawn", () => {
+      result.spawnObserved = true;
+      result.pid = child.pid;
+      Promise.resolve().then(() => onSpawn?.({ pid: child.pid })).then(() => {
+        if (!finishing && terminatingAt === null) child.stdin.end(input);
+      }).catch(error => { result.error ??= errorRecord(error); terminate(); });
+    });
+    child.once("exit", (exitCode, exitSignal) => {
+      rootExited = true;
+      result.exitCode = exitCode;
+      result.signal = exitSignal;
+      clearTimeout(deadline);
+      terminate();
+    });
+    child.once("close", (exitCode, exitSignal) => { void finish(exitCode, exitSignal); });
+    signal?.addEventListener("abort", interrupt, { once: true });
+    deadline = setTimeout(() => {
+      result.timedOut = true;
+      result.error ??= { code: "ETIMEDOUT", message: "session exceeded its time limit" };
+      terminate();
+    }, timeoutMs);
+    if (signal?.aborted) interrupt();
+  });
+}
 
 function resolveWithinTarget(target, value, label) {
   if (!value || value.includes("\0") || value.startsWith("/") || value.split(/[\\/]/).includes("..")) throw new Error(`${label} must be a relative path inside target`);
@@ -909,6 +1039,7 @@ function printResult(report, json) {
   }
 }
 
+async function main() {
 try {
   const args = parseArgs(process.argv.slice(2));
   const preflightResult = preflight(args);
@@ -1243,3 +1374,6 @@ try {
   console.error(`codex-exec-runner failed: ${error.message}`);
   process.exit(1);
 }
+}
+
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === RUNNING_RUNNER_PATH) await main();

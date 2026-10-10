@@ -63,7 +63,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -82,7 +82,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -101,7 +101,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -120,7 +120,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -139,7 +139,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -168,7 +168,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -187,7 +187,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "behavior_verified",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -206,7 +206,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -998,7 +998,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -1017,7 +1017,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -1036,7 +1036,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -1055,7 +1055,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -1074,7 +1074,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -1093,7 +1093,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -1112,7 +1112,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -1131,7 +1131,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -1150,7 +1150,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+              "artifact_digest": "sha256:30b3aa5b62c84c5f8195868a36bb6e1df3e71ffe872e64baba7017364c48c180"
             }
           ],
           "limitations": [
@@ -1450,7 +1450,7 @@
             {
               "path": "scripts/codex-exec-runner.mjs",
               "role": "runtime_source",
-              "digest": "sha256:3cc8deb5b24444ea244abf0171a5e1ca02504834a8a06af5da90e26cf2a8fc02"
+              "digest": "sha256:afc8f4b67b0cda8b337f9a523446eefbf1addacdd043d85f50e3a6adf90bb85a"
             },
             {
               "path": "scripts/codex-risk-approval.mjs",
@@ -1559,8 +1559,8 @@
             ],
             "canonical_revision": "ask-3.0.0",
             "canonical_source_digest": "sha256:2bfeb977f6db14d4b95d0e6c1f801d6f4f1f7bc58e2d20c65f2cc1b82ed7e960",
-            "profile_fingerprint": "sha256:d3a0d586c46e07d15ee2c8c916831fcabcbaccac26d93230230eaa5db8903ff0",
-            "rendered_sha256": "sha256:e3d1470f0bc98f47725e1325e2aca1ea984ca4ce1b7dbfbe33a0ed446c6be828",
+            "profile_fingerprint": "sha256:ca06f8a69d3a39edd3482308f675fca212a8bfcdfc91ae4b90b5b1b128877a8c",
+            "rendered_sha256": "sha256:13bea1355d3b4edf49f497fd1ad82b7dda7425551cea47e98a09dfcc653b48d5",
             "rendered_bytes": 2326
           },
           {
@@ -1603,8 +1603,8 @@
             ],
             "canonical_revision": "ask-3.0.0",
             "canonical_source_digest": "sha256:2bfeb977f6db14d4b95d0e6c1f801d6f4f1f7bc58e2d20c65f2cc1b82ed7e960",
-            "profile_fingerprint": "sha256:d3a0d586c46e07d15ee2c8c916831fcabcbaccac26d93230230eaa5db8903ff0",
-            "rendered_sha256": "sha256:78cf2b37a351852adbac93941615762e42e725d99855b3998495145512d5df38",
+            "profile_fingerprint": "sha256:ca06f8a69d3a39edd3482308f675fca212a8bfcdfc91ae4b90b5b1b128877a8c",
+            "rendered_sha256": "sha256:d6f591fea1160a2326c5f4fa48a304ba92242dacd38afaf6f4239285c96c18a6",
             "rendered_bytes": 2043
           },
           {
@@ -1647,8 +1647,8 @@
             ],
             "canonical_revision": "ask-3.0.0",
             "canonical_source_digest": "sha256:2bfeb977f6db14d4b95d0e6c1f801d6f4f1f7bc58e2d20c65f2cc1b82ed7e960",
-            "profile_fingerprint": "sha256:d3a0d586c46e07d15ee2c8c916831fcabcbaccac26d93230230eaa5db8903ff0",
-            "rendered_sha256": "sha256:1c118acdefba664e5d37d41d17f19c78106f17dc674ae8a26459ac509b5cf962",
+            "profile_fingerprint": "sha256:ca06f8a69d3a39edd3482308f675fca212a8bfcdfc91ae4b90b5b1b128877a8c",
+            "rendered_sha256": "sha256:fb9c61c3fcda447230954b080d109813a0e0c2d9cdea12320d1e1a350f72580a",
             "rendered_bytes": 1688
           }
         ]
@@ -1896,7 +1896,7 @@
       "normalized_event_schema_refs": [
         "schemas/adapter-runtime-event.schema.json"
       ],
-      "profile_fingerprint": "sha256:d3a0d586c46e07d15ee2c8c916831fcabcbaccac26d93230230eaa5db8903ff0"
+      "profile_fingerprint": "sha256:ca06f8a69d3a39edd3482308f675fca212a8bfcdfc91ae4b90b5b1b128877a8c"
     }
   ]
 }

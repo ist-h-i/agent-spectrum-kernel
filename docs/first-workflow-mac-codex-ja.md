@@ -1,5 +1,11 @@
 # Mac / Codex で最初の開発タスクを受け入れる準備
 
+利用者自身の Git repo を P／K／F で比較する場合は
+[利用者 repo の三条件比較手順](user-repository-comparison-mac-codex-ja.md) を使います。
+以下の人工 workspace と implementation profile は、その F 条件の Full とは別です。
+新入口の `prepare`／`inspect`／`report` はモデルを起動せず、`start` は人間が内容と
+正規の権限を確認して実行する操作です。この開発で実モデル比較は行っていません。
+
 実務に近い観測を小さく回す新しい方針は [探索的評価](pragmatic-evaluation.md) を
 参照してください。global 設定の不明、環境や CLI 版の違いは記録して解釈を限定し、
 完全隔離や完全一致を研究上の開始条件にしません。下記の preparation と未実行記録は
