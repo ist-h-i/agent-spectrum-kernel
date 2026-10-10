@@ -252,6 +252,33 @@ test("changed Git control metadata stops evidence Git calls, while artifact loss
   const missing = reportUserComparison(q.root); assert.equal(missing.slots[0].state, "result_missing"); assert.equal(missing.slots[0].outcome, "unknown");
 });
 
+test("nested custom instructions remain immutable inside an allowed source directory", async t => {
+  const f = fixture(t), path = join(f.repo, "src/AGENTS.md");
+  writeFileSync(path, "User subdirectory instruction.\n");
+  git(f.repo, ["add", "."]); git(f.repo, ["-c", "user.name=ASK test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "nested instructions"]);
+  f.options.commit = git(f.repo, ["rev-parse", "HEAD"]);
+  const p = f.prepare(), calls = [], run = fake(calls);
+  const report = await startUserComparison(p.root, p.plan_digest, { runner: async input => {
+    const value = await run(input); writeFileSync(join(input.cwd, "src/AGENTS.md"), "changed instructions\n"); return value;
+  } });
+  assert.equal(calls.length, 1); assert.equal(report.slots[0].state, "scope_violation");
+  assert.ok(report.slots[0].scope.violations.includes("src/AGENTS.md")); assert.equal(report.slots[0].outcome, "fail");
+  assert.equal(readFileSync(path, "utf8"), "User subdirectory instruction.\n");
+});
+
+test("a regular file above 16 MiB and an empty file reach independent verification", async t => {
+  const f = fixture(t), blob = Buffer.alloc(17 * 1024 * 1024, 65);
+  writeFileSync(join(f.repo, "asset.bin"), blob); writeFileSync(join(f.repo, "empty-file"), "");
+  git(f.repo, ["add", "."]); git(f.repo, ["-c", "user.name=ASK test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "large regular file"]);
+  f.options.commit = git(f.repo, ["rev-parse", "HEAD"]);
+  const p = f.prepare(), report = await startUserComparison(p.root, p.plan_digest, { runner: fake([]) });
+  assert.ok(report.slots.every(slot => slot.state === "completed" && slot.outcome === "pass"));
+  for (const slot of report.slots) {
+    assert.deepEqual(readFileSync(join(p.root, "verification", slot.condition, "asset.bin")), blob);
+    assert.equal(readFileSync(join(p.root, "verification", slot.condition, "empty-file")).length, 0);
+  }
+});
+
 test("CLI inspection/report can reopen from caller output without a known temporary path", t => {
   const f = fixture(t), p = f.prepare(), script = new URL("./ask-user-comparison.mjs", import.meta.url).pathname;
   const before = readdirSync(join(p.root, "control"));

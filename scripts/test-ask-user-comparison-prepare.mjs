@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { devNull, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, prepareUserComparison, validateUserRelativePath } from "./ask-user-comparison-prepare.mjs";
+import { comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, prepareUserComparison, validateUserRelativePath } from "./ask-user-comparison-prepare.mjs";
 import { MANAGED_START, MANAGED_END } from "./installer-lifecycle.mjs";
 
 const SOURCE = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -314,4 +314,87 @@ test("post-model inventory refuses credential filenames and hard links before ca
     symlinkSync(f.globalFile, join(f.repo, ".git/config"));
     assert.throws(() => inventoryComparisonGitMetadata(f.repo), /unsafe_git_metadata_file:\.git\/config/u);
   });
+});
+
+test("nested instruction paths are immutable while their parent source directory stays usable", t => {
+  const f = fixture(t);
+  write(f.repo, "src/AGENTS.md", "Nested user instructions.\n");
+  write(f.repo, "src/deep/AGENTS.override.md", "Nested override instructions.\n");
+  write(f.repo, "src/CUSTOM_INSTRUCTIONS.md", "Nested custom instructions.\n");
+  commit(f.repo);
+  for (const path of ["AGENTS.md", "AGENTS.override.md", "CUSTOM_INSTRUCTIONS.md", "src/AGENTS.md", "src/deep/AGENTS.override.md",
+    "src/CUSTOM_INSTRUCTIONS.md", ".agents/custom.txt", "src/.agents/custom.txt", "src/.agent-spectrum-kernel/custom.txt", "skills/custom/SKILL.md"]) {
+    assert.equal(isComparisonInstructionPath(path), true, path);
+    assert.throws(() => prepareUserComparison(f.options({ mutablePaths: [path] })), /instruction_assets_are_immutable/u, path);
+  }
+  for (const path of ["src", "src/value.mjs", "src/skills/value.mjs", "src/agents.md", "notes/AGENTS.md.example"]) {
+    assert.equal(isComparisonInstructionPath(path), false, path);
+  }
+  const before = inventoryUserTree(f.repo), prepared = prepareUserComparison(f.options({ mutablePaths: ["src/"] }));
+  for (const arm of Object.values(prepared.plan.arms)) {
+    for (const path of ["src/AGENTS.md", "src/deep/AGENTS.override.md", "src/CUSTOM_INSTRUCTIONS.md"]) {
+      assert.ok(readFileSync(join(prepared.root, arm.path, path)).equals(readFileSync(join(f.repo, path))));
+    }
+  }
+  assert.deepEqual(inventoryUserTree(f.repo), before);
+});
+
+test("a non-empty root override prevents canonical K/F instructions and is preserved on refusal", async t => {
+  await t.test("ordinary override unrelated to ASK is rejected by precedence", st => {
+    const f = fixture(st);
+    write(f.repo, "AGENTS.override.md", "Use the repository's own root instructions.\n");
+    commit(f.repo);
+    const before = inventoryUserTree(f.repo);
+    assert.throws(() => prepareUserComparison(f.options()), /root_agents_override_prevents_canonical_condition/u);
+    assert.deepEqual(inventoryUserTree(f.repo), before);
+    assert.equal(existsSync(join(f.parent, "run")), false);
+    assert.equal(existsSync(f.fakeLaunch), false);
+  });
+  await t.test("empty override does not replace canonical instructions", st => {
+    const f = fixture(st);
+    write(f.repo, "AGENTS.override.md", "");
+    commit(f.repo);
+    const prepared = prepareUserComparison(f.options());
+    for (const arm of Object.values(prepared.plan.arms)) assert.equal(readFileSync(join(prepared.root, arm.path, "AGENTS.override.md")).length, 0);
+  });
+});
+
+test("promisor missing blobs fail before output creation without lazy fetch or source object writes", t => {
+  const f = fixture(t), sourceCommit = commit(f.repo);
+  const missingBlob = git(f.repo, ["rev-parse", `${sourceCommit}:src/value.mjs`]);
+  const bare = join(f.parent, "local-origin.git");
+  git(f.parent, ["clone", "--bare", "--no-hardlinks", "--quiet", "--template=", f.repo, bare]);
+  git(bare, ["config", "uploadpack.allowAnySHA1InWant", "true"]);
+  const sentinel = join(f.parent, "remote-access-sentinel"), uploadPack = join(f.parent, "test-upload-pack.mjs");
+  writeFileSync(uploadPack, `import { appendFileSync } from 'node:fs';\nimport { spawnSync } from 'node:child_process';\nappendFileSync(${JSON.stringify(sentinel)}, 'local upload-pack invoked\\n');\nconst result = spawnSync('git-upload-pack', [process.argv.at(-1)], {stdio:'inherit', shell:false});\nprocess.exitCode = result.status ?? 1;\n`, { mode: 0o700 });
+  const shellLiteral = value => `'${value.replaceAll("'", "'\\''")}'`;
+  git(f.repo, ["config", "remote.origin.url", bare]);
+  git(f.repo, ["config", "remote.origin.uploadpack", `${shellLiteral(process.execPath)} ${shellLiteral(uploadPack)}`]);
+  // Verify the local-only access sentinel is wired, before making the source
+  // partial. This command does not contact a network/auth/provider endpoint.
+  assert.ok(git(f.repo, ["ls-remote", "origin", "HEAD"]).includes(sourceCommit));
+  assert.equal(readFileSync(sentinel, "utf8"), "local upload-pack invoked\n");
+  git(f.repo, ["config", "extensions.partialClone", "origin"]);
+  git(f.repo, ["config", "remote.origin.promisor", "true"]);
+  git(f.repo, ["config", "remote.origin.partialclonefilter", "blob:none"]);
+  unlinkSync(join(f.repo, ".git/objects", missingBlob.slice(0, 2), missingBlob.slice(2)));
+  const objectInventory = () => {
+    const entries = {};
+    function walk(path = "") {
+      for (const name of readdirSync(join(f.repo, ".git/objects", path), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+        const relativePath = path ? `${path}/${name.name}` : name.name;
+        if (name.isDirectory()) walk(relativePath);
+        else entries[relativePath] = comparisonHash(readFileSync(join(f.repo, ".git/objects", relativePath)));
+      }
+    }
+    walk();
+    return entries;
+  };
+  const beforeObjects = objectInventory(), beforeSentinel = readFileSync(sentinel), beforeSource = inventoryUserTree(f.repo);
+  assert.throws(() => prepareUserComparison(f.options({ commit: sourceCommit })), /local_preparation_failed:git/u);
+  assert.deepEqual(objectInventory(), beforeObjects);
+  assert.ok(readFileSync(sentinel).equals(beforeSentinel));
+  assert.deepEqual(inventoryUserTree(f.repo), beforeSource);
+  assert.equal(existsSync(join(f.parent, "run")), false);
+  assert.equal(existsSync(f.fakeLaunch), false);
 });

@@ -35,6 +35,14 @@ export function validateUserRelativePath(path) {
   return path;
 }
 
+/** Instruction surfaces stay read-only even below an allowed source folder. */
+export function isComparisonInstructionPath(path) {
+  validateUserRelativePath(path);
+  const parts = path.split("/");
+  return ["AGENTS.md", "AGENTS.override.md", "CUSTOM_INSTRUCTIONS.md"].includes(parts.at(-1))
+    || parts.some(part => part === ".agents" || part === ".agent-spectrum-kernel") || parts[0] === "skills";
+}
+
 function recognizableSecret(path) {
   const name = basename(path).toLowerCase();
   return name === ".env" || (name.startsWith(".env.") && ![".env.example", ".env.sample", ".env.template"].includes(name))
@@ -115,7 +123,7 @@ export function inventoryComparisonGitMetadata(root) {
 function childEnvironment() {
   return { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C", GIT_CONFIG_GLOBAL: devNull,
     GIT_CONFIG_SYSTEM: devNull, GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: devNull,
-    GIT_OPTIONAL_LOCKS: "0", GIT_NO_REPLACE_OBJECTS: "1" };
+    GIT_OPTIONAL_LOCKS: "0", GIT_NO_REPLACE_OBJECTS: "1", GIT_NO_LAZY_FETCH: "1" };
 }
 
 function localChild(bin, args, cwd, input) {
@@ -129,7 +137,7 @@ function localChild(bin, args, cwd, input) {
 }
 
 function git(repo, args, input) {
-  return localChild("git", ["-c", `core.hooksPath=${devNull}`, "-c", "core.fsmonitor=false", ...args], repo, input);
+  return localChild("git", ["--no-lazy-fetch", "-c", `core.hooksPath=${devNull}`, "-c", "core.fsmonitor=false", ...args], repo, input);
 }
 
 function readCommittedTree(repo, commit) {
@@ -139,7 +147,8 @@ function readCommittedTree(repo, commit) {
   const tree = new Map();
   let total = 0;
   let listing;
-  try { listing = UTF8.decode(git(repo, ["ls-tree", "-rz", "--full-tree", commit])); }
+  const listingBytes = git(repo, ["ls-tree", "-rz", "--full-tree", commit]);
+  try { listing = UTF8.decode(listingBytes); }
   catch { fail("unsupported_non_utf8_git_paths"); }
   for (const entry of listing.split("\0").filter(Boolean)) {
     const match = /^(\d{6}) (\w+) ([a-f0-9]{40})\t(.+)$/u.exec(entry);
@@ -385,7 +394,7 @@ function validateOptions(options) {
   const mutable = options.mutablePaths.map(path => {
     const clean = typeof path === "string" && path.endsWith("/") ? path.slice(0, -1) : path;
     validateUserRelativePath(clean);
-    if (recognizableSecret(clean) || /^(?:AGENTS\.md|CUSTOM_INSTRUCTIONS\.md|\.agents|\.agent-spectrum-kernel|skills)(?:\/|$)/u.test(clean)) fail("instruction_assets_are_immutable");
+    if (recognizableSecret(clean) || isComparisonInstructionPath(clean)) fail("instruction_assets_are_immutable");
     return path;
   });
   if (new Set(mutable).size !== mutable.length) fail("duplicate_mutable_path");
@@ -396,6 +405,12 @@ function validateOptions(options) {
 export function prepareUserComparison(options = {}) {
   const { config, mutable } = validateOptions(options);
   const original = readCommittedTree(options.repo, options.commit);
+  // Codex selects a non-empty AGENTS.override.md before AGENTS.md in the
+  // same directory. Preserving it would hide K/F's canonical root kernel.
+  // https://developers.openai.com/codex/guides/agents-md
+  if (original.has("AGENTS.override.md") && UTF8.decode(original.get("AGENTS.override.md").bytes).trim()) {
+    fail("root_agents_override_prevents_canonical_condition");
+  }
   const taskBytes = readRegular(options.taskFile, "task");
   const taskText = UTF8.decode(taskBytes);
   const verificationBytes = readRegular(options.verificationFile, "verification");
@@ -491,6 +506,7 @@ export function prepareUserComparison(options = {}) {
       "The designated controller verification recipe must not be committed in the source tree, where private descriptions would enter model-visible copies.",
       "Managed separation requires active schema-3 core/Codex state and unchanged recorded hashes; Claude/hooks/partial or ambiguous installs are unsupported.",
       "Bare or embedded canonical AGENTS without managed ownership is refused; ordinary custom ASK mentions are preserved.",
+      "Non-empty root AGENTS.override.md is unsupported because it takes precedence over K/F's canonical AGENTS.md; the source override is preserved and preparation stops.",
       "Committed .agents/runs, .agent-spectrum-kernel/runtime or ask-runtime records are refused rather than copied into model input or deleted as managed assets.",
       "Preparation uses local Git and current Node installers only; Codex/model launch count is zero.", "One exploratory task cannot prove general ASK effectiveness or operational promotion."] };
   const serialized = jsonBytes(plan), planDigest = comparisonHash(serialized);

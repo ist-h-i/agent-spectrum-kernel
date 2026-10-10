@@ -17,6 +17,9 @@
 完全な ASK checkout と Node 24.x、Git を用意します。実行段階では、利用者が普段
 使用している Codex CLI と、その利用に必要な正規の権限・認証が必要です。ASK は
 認証ファイルを調査せず、承認設定やセキュリティ設定を変更しません。
+Git は [`--no-lazy-fetch` 対応版](https://git-scm.com/docs/git)
+を使います。比較元commitのobjectがローカルに不足している場合は、準備を停止します。
+準備からremoteへ取りに行く処理はありません。
 
 以下は ASK checkout のディレクトリで操作します。`/absolute/...` を自分の
 **絶対パス**に置き換えてください。ASK checkout、対象 repo、保存先は別の場所を
@@ -29,6 +32,7 @@ COMPARISON_AREA='/absolute/private/ask-comparisons'
 cd "$ASK_CHECKOUT"
 node --version
 git --version
+git --no-lazy-fetch --version
 mkdir -p "$COMPARISON_AREA"
 git -C "$TARGET_REPO" status --short
 BASE_COMMIT="$(git -C "$TARGET_REPO" rev-parse HEAD)"
@@ -176,6 +180,8 @@ K は非 trivial 課題で router 等を必要とします。Skill がなけれ�
 `--allow` は複数回指定でき、末尾 `/` はそのディレクトリ内、末尾 `/` がない場合は
 そのファイルだけを変更可能にします。指示・ASK 資産と検証テストは変更可能に
 できません。課題種別は `implementation`／`trivial`／`review`／`investigation` です。
+変更可能ディレクトリの内側でも、`AGENTS.md`、`AGENTS.override.md`、
+`CUSTOM_INSTRUCTIONS.md` と `.agents`／`.agent-spectrum-kernel` 配下は保護します。
 
 通常利用する設定が分かる場合は `--cli-version '利用している版'`、
 `--model '利用するmodel名'`、`--reasoning medium` を加えられます。
@@ -317,6 +323,8 @@ ASK 未導入 repo と、所有範囲を確認できる ASK 導入済み repo �
 ファイルは保持します。管理対象の変更、部分導入、古い／曖昧な state、所有対象の
 衝突、Claude／hook 導入は準備時に停止します。利用者独自のファイルを削除して
 成功へ変える処理はありません。
+rootに空でない `AGENTS.override.md` がある構成も、canonical `AGENTS.md`による
+比較条件を維持できないため準備で停止します。利用者のoverrideを削除して続行しません。
 管理記録がなく canonical `AGENTS.md` の本文がそのまま置かれた場合も、所有範囲を
 判断できないため停止します。利用者が文章中でASKに言及しているだけなら保持します。
 

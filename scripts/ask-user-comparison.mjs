@@ -10,7 +10,7 @@ import { executeCodexSession } from "./codex-exec-runner.mjs";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPragmaticEvaluationReport } from "./ask-pragmatic-evaluation-report.mjs";
-import { comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
+import { comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 
 export const USER_CONDITIONS = Object.freeze(["plain", "kernel_only", "full_ask"]);
 const LIMIT = 16 * 1024 * 1024;
@@ -143,7 +143,9 @@ function copyRegularTree(source, destination) {
     assert.ok(relativeSafe(path));
     const target = join(destination, path);
     mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
-    writeFileSync(target, readStableFile(join(source, path), "verification source", LIMIT).bytes,
+    const bytes = readStableFile(join(source, path), "verification source", entry.bytes).bytes;
+    assert.equal(comparisonHash(bytes), entry.digest, "verification source changed after inventory");
+    writeFileSync(target, bytes,
       { flag: "wx", mode: entry.mode === "100755" ? 0o700 : 0o600 });
   }
 }
@@ -276,7 +278,7 @@ export async function startUserComparison(output, confirmedDigest, { signal, run
       const gitChanges = inventoryChanges(arm.git_metadata, inventoryComparisonGitMetadata(invocation.cwd));
       const protectedPaths = new Set(arm.assets.map(asset => asset.path));
       scope = { status: "pass", changed_paths: [...changed, ...gitChanges], violations: [...gitChanges,
-        ...changed.filter(path => !mutable(path, plan.mutable_paths) || protectedPaths.has(path))] };
+        ...changed.filter(path => !mutable(path, plan.mutable_paths) || isComparisonInstructionPath(path) || protectedPaths.has(path))] };
       if (scope.violations.length) scope.status = "fail";
       saveNew(evidencePath(root, id, "changes.json"), { before: arm.baseline_inventory, after: actual, scope });
       if (gitChanges.length === 0) {
