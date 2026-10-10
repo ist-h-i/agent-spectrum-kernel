@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +25,7 @@ const HAS_FULL_SOURCE = existsSync(resolve(REPO_ROOT, "manifest.json"))
   && existsSync(resolve(REPO_ROOT, "scripts/install-codex-adapter.mjs"));
 
 function tempDir(prefix) {
-  return mkdtempSync(resolve(tmpdir(), prefix));
+  return realpathSync(mkdtempSync(resolve(tmpdir(), prefix)));
 }
 
 function runNode(script, args, { expected = [0], cwd = REPO_ROOT } = {}) {

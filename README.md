@@ -2,6 +2,16 @@
 
 A layered intelligence kernel for evidence-based routing, verification, review, and reusable memory in AI coding agents.
 
+For the [Mac/Codex install and recovery quickstart](docs/quickstart-mac-codex-ja.md),
+ASK supplies project-local instructions and selected verification/handoff assets.
+Installation alone proves neither an operational Codex workflow nor improved
+engineering outcomes. The [October release package](docs/release-package-2026-10.md)
+records the current source, evidence and remaining v1.0 gates.
+
+Mac / Codex の導入で得られるものは、プロジェクト内の判断方針と選択した
+検証・handoff 資料です。実務での動作と成果改善は別の証拠が必要です。
+導入・復旧手順と12月までの目標は上記リンクにまとめています。
+
 For the model-free local eval entry point, platform route decisions and remaining
 live-validation limits, see [Local eval distribution](docs/local-eval-distribution.md).
 For model-free plain/Kernel/Full package preparation and its admission limits,

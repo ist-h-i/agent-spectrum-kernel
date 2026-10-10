@@ -114,7 +114,7 @@ An accepted-risk reference is not proof of acceptance by itself. Its review/appr
 
 Acceptance with invalid source, artifact, scope, or independence produces `risk_acceptance_*` reason codes and `not_ready`; the affected risk is not emitted in `accepted_risks`. Other valid accepted risks remain visible. Accepting a risk does not waive required gates, required claims, or open blockers.
 
-## Current repository fixture
+## Historical repository fixture
 
 The checked fixture under `docs/fixtures/release-evidence-gate/` binds `main@756c72b3fba158fbbc33642128bf5ab87097914b`.
 
@@ -133,6 +133,33 @@ node scripts/release-evidence-gate.mjs assess \
 ```
 
 The expected decision is `not_ready`; the CLI emits a deterministic assessment for the same source and inputs.
+
+## Current main projection — 2026-10-10
+
+The historical `756c72` fixtures above are preserved byte-for-byte. They describe
+that revision, not current Issue status. At `main@d4ad39ead0f13965aeaf5aa919ef35f830a50e26`,
+#173 and #197 are closed for their recorded implementation scope; #276/#277
+foundations are complete; #274/#275 contain merged implementation work. Closed
+issues do not supply the still-missing first workflow, real supported-adapter
+runtime, measured #192/#198 activation/bypass, publication, or release approval.
+
+The [October release package](release-package-2026-10.md) connects the new
+`current-main-d4ad39-claim-matrix.json` / `current-main-d4ad39-evidence.json`
+inputs to exact source artifacts and clean-main deterministic observations.
+The candidate Mac smoke is kept separately with its changed source-file hashes;
+it is not transplanted onto pristine main or any future release revision.
+
+```bash
+node scripts/release-evidence-gate.mjs assess \
+  --matrix docs/fixtures/release-evidence-gate/current-main-d4ad39-claim-matrix.json \
+  --evidence docs/fixtures/release-evidence-gate/current-main-d4ad39-evidence.json \
+  --source-revision d4ad39ead0f13965aeaf5aa919ef35f830a50e26 --root .
+```
+
+Expected decision: `not_ready`. All 16 fixed gates remain required. Narrow
+implementation existence and static contract claims do not authorize the
+runtime/outcome claims that remain `unknown`. #318 complements #192/#198 and
+never substitutes for those required measured decisions.
 
 ## Synthetic all-pass example
 

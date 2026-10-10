@@ -1,0 +1,232 @@
+{
+  "base_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+  "observed_at": "2026-10-10",
+  "command": "node scripts/test-release-install-recovery.mjs --json",
+  "exit_status": 0,
+  "candidate_source_files": [
+    {
+      "path": "scripts/ask-doctor.mjs",
+      "digest": "sha256:a0ff1b56429177c2151bdc9ae166883bfd45ef52b346ae7a4a47da7abc1a7f56"
+    },
+    {
+      "path": "scripts/test-release-install-recovery.mjs",
+      "digest": "sha256:cb012513598963e21bc51ae4fbe749b5d42779c206b31c1a78d54d86bc19b821"
+    },
+    {
+      "path": "scripts/test-ask-setup.mjs",
+      "digest": "sha256:ade4345d52dbedea899c555a6d5a8b5eae9479f8ac8288a1e21ef3603ef0ab9b"
+    },
+    {
+      "path": "scripts/test-ask-setup-apply.mjs",
+      "digest": "sha256:78cf6c5be076ad3d6f032029fc8220fafdafebb804aa9f2a1106eedb3156a5cb"
+    },
+    {
+      "path": "scripts/test-ask-setup-apply-integration.mjs",
+      "digest": "sha256:d4aa70a15f8cb84a354e40016ec559825a901ca38c454704414a5b2c85c0a3d3"
+    },
+    {
+      "path": "scripts/test-ask-benchmark-portfolio-consumer-report.mjs",
+      "digest": "sha256:1e3ab2884c5dcc21468550c8f373b0fa6882777efb62602f22dc45962102c8c2"
+    },
+    {
+      "path": "scripts/test-release-evidence-gate.mjs",
+      "digest": "sha256:f2c467ba38ea4f9ec2e7a2a416552ac7137bef6365b0a1fa1223b17ff6955109"
+    },
+    {
+      "path": "docs/fixtures/adapter-runtime-evidence.json",
+      "digest": "sha256:8117bd3ebd97b7cc0f8a1745adeaa2592f5f180dfb1f3ea43898e6dbea154fe0"
+    },
+    {
+      "path": "docs/fixtures/adapter-runtime-profiles.json",
+      "digest": "sha256:7bdf2648e75f15e4886be286224ed45f8c269a002cb42da8e5d0d4a4b9aa09bd"
+    }
+  ],
+  "source_boundary": "Named executable and setup-profile metadata delta above on d4ad39; not pristine main and not final release revision. Documentation and hosted CI are outside this local smoke proof.",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "os_release": "25.6.0",
+    "node": "v24.19.0"
+  },
+  "adapter": "codex",
+  "profiles": [
+    "minimal",
+    "implementation"
+  ],
+  "result": "passed",
+  "steps": [
+    {
+      "command": "node scripts/ask-setup.mjs inspect --target <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs recommend --target <fixture-path> --adapter codex --purpose implementation --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs plan --target <fixture-path> --adapter codex --profile minimal --output <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs check --target <fixture-path> --plan <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs apply --target <fixture-path> --plan <fixture-path> --dry-run --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs apply --target <fixture-path> --plan <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs apply --target <fixture-path> --plan <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs doctor --target <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs plan --target <fixture-path> --adapter codex --profile implementation --output <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs check --target <fixture-path> --plan <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs apply --target <fixture-path> --plan <fixture-path> --dry-run --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs apply --target <fixture-path> --plan <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs doctor --target <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/install-codex-adapter.mjs --target <fixture-path> --rollback --dry-run",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/install-codex-adapter.mjs --target <fixture-path> --rollback",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/install-kernel.mjs --target <fixture-path> --rollback --dry-run",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/install-kernel.mjs --target <fixture-path> --rollback",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs doctor --target <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs doctor --target <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs doctor --target <fixture-path> --json",
+      "exit_status": 1
+    },
+    {
+      "command": "node scripts/ask-setup.mjs doctor --target <fixture-path> --json",
+      "exit_status": 1
+    },
+    {
+      "command": "node scripts/ask-setup.mjs plan --target <fixture-path> --adapter codex --profile minimal --json",
+      "exit_status": 1
+    },
+    {
+      "command": "node scripts/install-codex-adapter.mjs --target <fixture-path> --detach --dry-run",
+      "exit_status": 1
+    },
+    {
+      "command": "node scripts/install-codex-adapter.mjs --target <fixture-path> --detach --dry-run",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/install-codex-adapter.mjs --target <fixture-path> --detach",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/install-kernel.mjs --target <fixture-path> --detach --dry-run",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/install-kernel.mjs --target <fixture-path> --detach",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs plan --target <fixture-path> --adapter codex --profile minimal --output <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs check --target <fixture-path> --plan <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs apply --target <fixture-path> --plan <fixture-path> --dry-run --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/ask-setup.mjs apply --target <fixture-path> --plan <fixture-path> --json",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/install-codex-adapter.mjs --target <fixture-path> --rollback --dry-run",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/install-codex-adapter.mjs --target <fixture-path> --rollback",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/install-kernel.mjs --target <fixture-path> --rollback --dry-run",
+      "exit_status": 0
+    },
+    {
+      "command": "node scripts/install-kernel.mjs --target <fixture-path> --rollback",
+      "exit_status": 0
+    }
+  ],
+  "deployment": {
+    "installed": {
+      "status": "pass",
+      "detail": "managed installation and projection evidence is healthy"
+    },
+    "activated": {
+      "status": "insufficient_evidence",
+      "detail": "requires an explicit project profile/approval artifact; doctor does not infer human activation"
+    },
+    "operational": {
+      "status": "insufficient_evidence",
+      "detail": "requires bounded task evidence and a governance judgment; projection, smoke, and policy keys alone are insufficient"
+    },
+    "note": "Operational requires bounded execution evidence; static projection and caller assertions are insufficient."
+  },
+  "scenarios": [
+    "clean_install",
+    "read_only_checks",
+    "exact_reapply",
+    "same_source_profile_update",
+    "update_rollback",
+    "retained_removed_skill",
+    "drift_refusal",
+    "detach",
+    "fresh_install_rollback",
+    "project_owned_preservation"
+  ],
+  "limits": [
+    "Disposable synthetic Git repositories only; existing local Node installers and doctor.",
+    "No Codex CLI, sandbox/model/provider launch, credentials, global setup, or real project apply.",
+    "No first engineering workflow, activation, operational readiness, cross-version upgrade, or product value proof.",
+    "Rollback/detach cover managed surfaces; initialize-once project state and empty directories may remain."
+  ]
+}

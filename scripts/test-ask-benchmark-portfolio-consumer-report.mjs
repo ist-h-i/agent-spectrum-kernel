@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { putContentAddressedJson } from "./content-addressed-store.mjs";
@@ -8,7 +8,7 @@ import { buildPortfolioConsumerReport, computePortfolioConsumerReportDigest, pub
 import { prepareAggregateV2FileFixture } from "./test-ask-benchmark-portfolio-aggregate-v2-files.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const work = mkdtempSync(resolve(tmpdir(), "ask197-consumer-"));
+const work = realpathSync(mkdtempSync(resolve(tmpdir(), "ask197-consumer-")));
 let count = 0;
 function check(label, action) { action(); count += 1; console.log(`PASS ${label}`); }
 function fixture(name, options = {}, mutations = {}) {

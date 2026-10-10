@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { devNull, tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,7 +37,7 @@ export async function runSetupApplyIntegrationTests() {
   // Unlike the older standalone read-only suite, this test must never silently
   // replace actual installer execution with a partial-checkout simulation.
   assert.ok(existsSync(resolve(ROOT, "manifest.json")), "actual installer integration requires a complete ASK checkout");
-  const parent = mkdtempSync(resolve(tmpdir(), "ask-apply-cli-"));
+  const parent = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-apply-cli-")));
   let scenarios = 0;
   try {
     for (const [adapter, profile] of [["kernel-only", "kernel-only"], ["codex", "minimal"], ["claude-code", "implementation"]]) {

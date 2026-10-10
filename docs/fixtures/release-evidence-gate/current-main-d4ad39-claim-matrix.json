@@ -1,0 +1,389 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "schemas/release-claim-matrix.schema.json",
+  "matrix_id": "release-claim-matrix-current-main-d4ad39",
+  "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+  "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+  "claims": [
+    {
+      "claim_id": "ASK-PLATFORM-CLAIM-EVIDENCE-STATUS",
+      "wording": "ASK defines a canonical repository contract for claim evidence status.",
+      "claim_class": "implementation",
+      "scope": {
+        "capability": "claim evidence status contract",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [
+        "release-evidence-main-platform-claim-evidence-status"
+      ],
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ],
+      "invalid_inference_boundaries": [
+        "Implementation and synthetic tests do not establish live adapter use, adopting-project outcomes, activation/bypass policy, ROI, or release approval."
+      ],
+      "residual_items": [
+        "Retain release-scoped runtime, outcome and approval obligations where required."
+      ],
+      "disposition": "supported",
+      "release_required": false
+    },
+    {
+      "claim_id": "ASK-IMPLEMENTATION-VERIFICATION-STORE",
+      "wording": "ASK contains exact verification-evidence reuse and scoped revalidation implementation and deterministic contract tests.",
+      "claim_class": "implementation",
+      "scope": {
+        "capability": "verification evidence implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [
+        "release-evidence-main-implementation-verification-store",
+        "release-evidence-main-static-verification-store"
+      ],
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ],
+      "invalid_inference_boundaries": [
+        "Implementation and synthetic tests do not establish live adapter use, adopting-project outcomes, activation/bypass policy, ROI, or release approval."
+      ],
+      "residual_items": [
+        "Retain release-scoped runtime, outcome and approval obligations where required."
+      ],
+      "disposition": "supported",
+      "release_required": false
+    },
+    {
+      "claim_id": "ASK-IMPLEMENTATION-EPIC-ADMISSION",
+      "wording": "ASK contains the epic admission and Work Package Plan contract implementation.",
+      "claim_class": "implementation",
+      "scope": {
+        "capability": "epic admission implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [
+        "release-evidence-main-implementation-epic-admission",
+        "release-evidence-main-static-epic-admission"
+      ],
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ],
+      "invalid_inference_boundaries": [
+        "Implementation and synthetic tests do not establish live adapter use, adopting-project outcomes, activation/bypass policy, ROI, or release approval."
+      ],
+      "residual_items": [
+        "Retain release-scoped runtime, outcome and approval obligations where required."
+      ],
+      "disposition": "supported",
+      "release_required": false
+    },
+    {
+      "claim_id": "ASK-IMPLEMENTATION-ASSET-REGISTRY",
+      "wording": "ASK contains the local content-addressed Asset Registry implementation and deterministic contract tests.",
+      "claim_class": "implementation",
+      "scope": {
+        "capability": "Asset Registry implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [
+        "release-evidence-main-implementation-asset-registry",
+        "release-evidence-main-static-asset-registry"
+      ],
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ],
+      "invalid_inference_boundaries": [
+        "Implementation and synthetic tests do not establish live adapter use, adopting-project outcomes, activation/bypass policy, ROI, or release approval."
+      ],
+      "residual_items": [
+        "Retain release-scoped runtime, outcome and approval obligations where required."
+      ],
+      "disposition": "supported",
+      "release_required": false
+    },
+    {
+      "claim_id": "ASK-IMPLEMENTATION-PORTFOLIO",
+      "wording": "ASK contains evidence-conditioned Portfolio selection and lifecycle contract implementation and deterministic tests.",
+      "claim_class": "implementation",
+      "scope": {
+        "capability": "Portfolio Manager implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [
+        "release-evidence-main-implementation-portfolio",
+        "release-evidence-main-static-portfolio"
+      ],
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ],
+      "invalid_inference_boundaries": [
+        "Implementation and synthetic tests do not establish live adapter use, adopting-project outcomes, activation/bypass policy, ROI, or release approval."
+      ],
+      "residual_items": [
+        "Retain release-scoped runtime, outcome and approval obligations where required."
+      ],
+      "disposition": "supported",
+      "release_required": false
+    },
+    {
+      "claim_id": "ASK-IMPLEMENTATION-EVOLUTION",
+      "wording": "ASK contains generic governed candidate lifecycle implementation.",
+      "claim_class": "implementation",
+      "scope": {
+        "capability": "generic Evolution implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [
+        "release-evidence-main-implementation-evolution"
+      ],
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ],
+      "invalid_inference_boundaries": [
+        "Implementation and synthetic tests do not establish live adapter use, adopting-project outcomes, activation/bypass policy, ROI, or release approval."
+      ],
+      "residual_items": [
+        "Retain release-scoped runtime, outcome and approval obligations where required."
+      ],
+      "disposition": "supported",
+      "release_required": false
+    },
+    {
+      "claim_id": "ASK-IMPLEMENTATION-REPORT",
+      "wording": "ASK contains the evaluation/report authority infrastructure completed by #197 / PR #308.",
+      "claim_class": "implementation",
+      "scope": {
+        "capability": "evaluation/report implementation",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [
+        "release-evidence-main-implementation-report"
+      ],
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ],
+      "invalid_inference_boundaries": [
+        "Implementation and synthetic tests do not establish live adapter use, adopting-project outcomes, activation/bypass policy, ROI, or release approval."
+      ],
+      "residual_items": [
+        "Retain release-scoped runtime, outcome and approval obligations where required."
+      ],
+      "disposition": "supported",
+      "release_required": false
+    },
+    {
+      "claim_id": "ASK-IMPLEMENTATION-SETUP",
+      "wording": "ASK contains a local inspect/recommend/plan/check/apply/doctor CLI using the existing project installers.",
+      "claim_class": "implementation",
+      "scope": {
+        "capability": "local setup CLI implementation",
+        "task_class": null,
+        "adapter_id": "codex",
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [
+        "release-evidence-main-implementation-setup"
+      ],
+      "limitations": [
+        "Exact implementation bytes at main d4ad39; evidence strength is implementation existence, not host/runtime/product success."
+      ],
+      "invalid_inference_boundaries": [
+        "Implementation and synthetic tests do not establish live adapter use, adopting-project outcomes, activation/bypass policy, ROI, or release approval."
+      ],
+      "residual_items": [
+        "Retain release-scoped runtime, outcome and approval obligations where required."
+      ],
+      "disposition": "supported",
+      "release_required": false
+    },
+    {
+      "claim_id": "ASK-PLATFORM-GUIDED-SETUP",
+      "wording": "ASK provides the evidence-backed guided setup and first-run verification path required for v1.0 adoption.",
+      "claim_class": "runtime",
+      "scope": {
+        "capability": "guided setup and first-run verification",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [],
+      "limitations": [
+        "#173 is closed for its local installer slice; PR #304 and adoption-setup.md exclude the real first workflow and Operational acceptance."
+      ],
+      "invalid_inference_boundaries": [
+        "Missing evidence stays unknown. Closed issues, synthetic tests, installation and a small screen cannot replace this release requirement."
+      ],
+      "residual_items": [
+        "Obtain compatible #315 bounded first-workflow and applied-contract evidence, separately from local installation."
+      ],
+      "disposition": "unknown",
+      "release_required": true
+    },
+    {
+      "claim_id": "ASK-PLATFORM-EVALUATION-REPORT-AUTHORITY",
+      "wording": "ASK can produce the reusable evaluation/report authority required by the release evidence path.",
+      "claim_class": "runtime",
+      "scope": {
+        "capability": "evaluation and report authority",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [],
+      "limitations": [
+        "#197 / #308 infrastructure is complete; compatible final release-scoped authority evidence is not projected here."
+      ],
+      "invalid_inference_boundaries": [
+        "Missing evidence stays unknown. Closed issues, synthetic tests, installation and a small screen cannot replace this release requirement."
+      ],
+      "residual_items": [
+        "Project the existing report authority into the final release scope; do not reimplement #197."
+      ],
+      "disposition": "unknown",
+      "release_required": true
+    },
+    {
+      "claim_id": "ASK-PLATFORM-ACTIVATION-BYPASS",
+      "wording": "ASK has evidence-bounded task-class decisions for when to activate Adaptive ASK, remain Kernel-only, or bypass ASK.",
+      "claim_class": "controlled_effect",
+      "scope": {
+        "capability": "activation and bypass decisions",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [],
+      "limitations": [
+        "Required #192/#198 measured decisions remain unavailable; #318 is a complementary small screen."
+      ],
+      "invalid_inference_boundaries": [
+        "Missing evidence stays unknown. Closed issues, synthetic tests, installation and a small screen cannot replace this release requirement."
+      ],
+      "residual_items": [
+        "Complete #192/#198 and retain negative, safety, lower-tail, variance, effort/overhead and adapter-separated evidence."
+      ],
+      "disposition": "unknown",
+      "release_required": true
+    },
+    {
+      "claim_id": "ASK-PLATFORM-ADAPTER-RUNTIME",
+      "wording": "The release has bounded workflow and applied-contract runtime evidence for its supported adapter/profile scope.",
+      "claim_class": "runtime",
+      "scope": {
+        "capability": "supported adapter runtime",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [],
+      "limitations": [
+        "Actual Codex/Claude workflow was not run in this task; no adapter parity is inferred."
+      ],
+      "invalid_inference_boundaries": [
+        "Missing evidence stays unknown. Closed issues, synthetic tests, installation and a small screen cannot replace this release requirement."
+      ],
+      "residual_items": [
+        "Capture separately authorized #315 supported runtime acceptance with exact source, adapter, profile and task scope."
+      ],
+      "disposition": "unknown",
+      "release_required": true
+    },
+    {
+      "claim_id": "ASK-PLATFORM-CLEAN-INSTALL-UPGRADE",
+      "wording": "The supported release scope has clean-install and cross-version upgrade evidence.",
+      "claim_class": "runtime",
+      "scope": {
+        "capability": "release clean install and upgrade",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [],
+      "limitations": [
+        "Candidate artificial Mac local smoke is narrower and is not pristine main or cross-version proof."
+      ],
+      "invalid_inference_boundaries": [
+        "Missing evidence stays unknown. Closed issues, synthetic tests, installation and a small screen cannot replace this release requirement."
+      ],
+      "residual_items": [
+        "Bind clean-user install/upgrade/recovery evidence to the final release revision; retain Windows/Linux follow-up."
+      ],
+      "disposition": "unknown",
+      "release_required": true
+    },
+    {
+      "claim_id": "ASK-PLATFORM-PUBLICATION",
+      "wording": "Release-required benchmark reports and publication permissions are explicit and complete.",
+      "claim_class": "controlled_effect",
+      "scope": {
+        "capability": "benchmark/report publication",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [],
+      "limitations": [
+        "#192/#198 outcome/publication evidence is unavailable; no private evaluation or user records are published."
+      ],
+      "invalid_inference_boundaries": [
+        "Missing evidence stays unknown. Closed issues, synthetic tests, installation and a small screen cannot replace this release requirement."
+      ],
+      "residual_items": [
+        "Capture exact public report artifacts and publication state/permission before the release gate is reassessed."
+      ],
+      "disposition": "unknown",
+      "release_required": true
+    },
+    {
+      "claim_id": "ASK-OPTIONAL-OPERATOR-DEPENDENCE",
+      "wording": "ASK reduces avoidable outcome sensitivity to request structuring, manual Asset selection, and managed-environment state within explicitly supported scopes.",
+      "claim_class": "controlled_effect",
+      "scope": {
+        "capability": "operator dependence",
+        "task_class": null,
+        "adapter_id": null,
+        "profile_id": null
+      },
+      "source_revision": "d4ad39ead0f13965aeaf5aa919ef35f830a50e26",
+      "evidence_refs": [],
+      "limitations": [
+        "The optional #285/#286 evidence lane is incomplete."
+      ],
+      "invalid_inference_boundaries": [
+        "This claim cannot imply productivity, ROI, client value, or universal effort reduction."
+      ],
+      "residual_items": [
+        "Keep excluded unless compatible #285/#286 evidence reaches a bounded terminal result."
+      ],
+      "disposition": "excluded",
+      "release_required": false
+    }
+  ]
+}
