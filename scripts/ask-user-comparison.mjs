@@ -463,7 +463,8 @@ export function reportUserComparison(output) {
     source: plan.source, slots, configuration: plan.config, condition_differences: plan.condition_differences, unknowns: plan.unknowns,
     summary: buildPragmaticEvaluationReport(notes),
     limitations: ["one task is not general ASK effectiveness, operational success, or v1 completion", "global settings and read isolation are not proven",
-      "configured CLI/model labels are declarations unless independently observed; missing usage/cost remain unknown", "synthetic results are development evidence only"] };
+      "configured CLI/model labels are declarations unless independently observed; missing usage/cost remain unknown", "synthetic results are development evidence only",
+      "patch.diff is a credential-redacted review view and may not apply; an unchanged retained control/patch-workspaces/<condition> copy provides the full local diff"] };
 }
 
 /** Separate distributions by evidence kind; never pool fake and model observations. */
@@ -505,6 +506,7 @@ function printReport(report) {
     console.log(`  ${contrast.contrast}: ${difference.field} ${JSON.stringify(difference)}`);
   }
   console.log("Unknown usage/cost are not zero. Test pass alone does not verify unassessed requirements. Scope: this task and environment only.");
+  console.log("patch.diff is a redacted review view and may not apply. For the full local diff, see retained control/patch-workspaces/<condition> and the user guide.");
 }
 
 async function main(argv) {

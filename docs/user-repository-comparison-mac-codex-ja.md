@@ -292,6 +292,25 @@ JSON は `launch_requested`（起動要求）、`spawn_observed`（ローカル�
 | `control/slots/<condition>/` | `request.json`、`spawn.json` と各 digest、`result.json`、CLI ログ、応答、修正 patch、独立検証ログなど、取得できた証拠 |
 | `verification/<condition>/` | 結果を独立検証した作業コピー |
 
+`control/slots/<condition>/patch.diff` は、秘密らしい文字列を伏せた**レビュー用の表示**です。
+通常のコード内の文字列も伏せられる場合があり、元のファイルへ適用できる完全な patch
+とは限りません。JSON の `limitations` と通常の結果表示にもこの制限を表示します。
+完全な差分が必要な場合は、変更せずに残してある `control/patch-workspaces/<condition>`
+で、controller が保存した変更前後の bytes を確認します。例えば P の差分は次の
+読み取りコマンドで表示できます。K は `kernel_only`、F は `full_ask` に置き換えます。
+差分を保存できなかった条件ではこのコピーが存在しない場合があるため、`patch_ref` と
+保存先の有無を確認してください。モデル側の `arms/` に対して Git を実行する手順ではありません。
+
+```sh
+GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+  git -c core.hooksPath=/dev/null -c core.fsmonitor=false \
+  -C "$RUN_OUTPUT/control/patch-workspaces/plain" \
+  diff --cached --binary --no-ext-diff --no-textconv --no-renames
+```
+
+この完全な差分には元のコードの文字列が含まれます。私的な場所で確認し、秘密を
+含む出力をログ・記録・外部共有へそのまま転記しないでください。
+
 記録は私的なローカル領域に保存され、自動 upload はありません。認証ファイル、
 トークン、Cookie、Authorization ヘッダー、環境変数全体を収集しません。
 ただし課題・repo・応答・patch 自体に秘密が含まれないことは利用者が確認してください。
