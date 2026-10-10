@@ -1,5 +1,9 @@
 # Mac / Codex の導入・復旧 quickstart
 
+導入後に受け取る開発成果物を確かめる次の一件は
+[初回開発受入の準備](first-workflow-mac-codex-ja.md) にあります。
+公開人工タスクと軽量 bypass 入力を用意する段階までをモデル不要で実行できます。
+
 ASK を導入すると、プロジェクト内に判断方針、選択した Skill、検証・handoff 用の資料が揃います。変更の根拠と未確認事項を明示するための仕組みです。導入だけで成果改善や実務での動作を保証するものではありません。
 
 English claim boundary: ASK installs project-local instructions and selected

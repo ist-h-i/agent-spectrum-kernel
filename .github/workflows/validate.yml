@@ -33,6 +33,9 @@ jobs:
       - name: Run model-free install and recovery release smoke
         run: node scripts/test-release-install-recovery.mjs
 
+      - name: Run public first-workflow preparation regressions
+        run: node --test scripts/test-first-workflow-preparation.mjs
+
       - name: Run UI harness and Skill-reference regressions
         run: |
           node --test scripts/test-codex-skill-reference-preflight.mjs scripts/test-skill-assets.mjs scripts/test-skill-reference-canonical.mjs scripts/test-ui-ux-adapter-assets.mjs docs/fixtures/ui-ux-design/fixture-state.test.mjs scripts/test-prompt-v2-historical-renderer.mjs

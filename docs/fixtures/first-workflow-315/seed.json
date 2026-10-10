@@ -1,0 +1,20 @@
+{
+  "fixture_id": "first-workflow-rule-batch-315",
+  "source_base": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard",
+  "task": "task.md",
+  "workspace_files": [
+    "package.json",
+    "docs/rule-batches.md",
+    "docs/rule-batch.schema.json",
+    "src/errors.mjs",
+    "src/index.mjs",
+    "src/rule-service.mjs",
+    "src/rule-store.mjs",
+    "src/validation.mjs",
+    "test/rule-service.test.mjs"
+  ],
+  "baseline_command": "node --test --test-reporter=tap test/rule-service.test.mjs",
+  "baseline_expected": { "exit_status": 1, "tests": 3, "passed": 2, "failed": 1 },
+  "allowed_result_paths": ["src/errors.mjs", "src/index.mjs", "src/rule-service.mjs", "src/rule-store.mjs", "src/validation.mjs", "test/"],
+  "claim_boundary": "Public engineering rehearsal only; no frozen evaluator, measured benchmark, comparison or release authority."
+}

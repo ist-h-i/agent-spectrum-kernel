@@ -1,5 +1,11 @@
 # Local eval distribution: route decision and first delivery slice
 
+For a concrete public engineering task, lightweight bypass input and pending
+Installed/Activated/Operational worksheet on Mac, see
+[first workflow preparation](first-workflow-mac-codex-ja.md). Its local installer
+and intentionally failing seed-test check prepare inputs only. They are separate
+from the comparison/pilot workflow and do not satisfy this issue's live or OS ACs.
+
 Design/implementation `IMP-LOCAL-EVAL-315-1`, revision 1. Upstream: Issue #315
 (distribution), merged #314 at `1eb4b4a6a0d4e7f2306113bb6237006ccc82b145`.
 Issue #291 retains all formal ACs, 14 pairs/28 trials, its budgets and #197
