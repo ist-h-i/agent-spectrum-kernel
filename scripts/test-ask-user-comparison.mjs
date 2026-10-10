@@ -161,13 +161,14 @@ test("unassessed requirements and unknown usage remain unknown despite tests and
   assert.ok(report.summary.summaries.every(row => row.metrics.input_tokens.unknown_count === 1 && row.metrics.input_tokens.distribution.mean === null));
 });
 
-test("independent failing test yields fail and stops subsequent conditions", async t => {
+test("independent failing test retains fail and continues subsequent independent conditions", async t => {
   const f = fixture(t), p = f.prepare(), calls = [], run = fake(calls);
   const report = await startUserComparison(p.root, p.plan_digest, { runner: async input => {
     const value = await run(input); writeFileSync(join(input.cwd, "src/value.mjs"), "export const value = 2;\n"); return value;
   } });
   assert.equal(report.slots[0].state, "verification_failed"); assert.equal(report.slots[0].outcome, "fail");
-  assert.equal(report.slots[1].state, "not_started");
+  assert.ok(report.slots.slice(1).every(slot=>slot.state === "verification_failed"));
+  assert.equal(report.overall.exit_code,2);
 });
 
 test("plan digest, input, arm drift and second output guards act before launch", async t => {
@@ -269,7 +270,7 @@ test("saved plan and start identity cannot be changed beneath completed receipts
   writeFileSync(path, original);
   const start = join(p.root, "control/start.json"), record = JSON.parse(readFileSync(start)); record.plan_digest = `sha256:${"b".repeat(64)}`;
   writeFileSync(start, JSON.stringify(record));
-  assert.throws(() => reportUserComparison(p.root), /started plan differs/u);
+  const corrupt=reportUserComparison(p.root);assert.equal(corrupt.overall.state,"state_corrupt");assert.match(corrupt.overall.reason,/started plan differs/u);
 });
 
 test("unsafe final artifact still saves a failed terminal receipt and does not start later conditions", async t => {
@@ -341,10 +342,10 @@ test("empty, definition-free, skipped and todo Node files cannot certify task qu
       const report = await startUserComparison(p.root, p.plan_digest, { runner: async input => {
         const value = await run(input); writeFileSync(join(input.cwd, "src/value.mjs"), "export const value = 0;\n"); return value;
       } });
-      assert.equal(calls.length, 1); assert.equal(report.slots[0].state, "verification_failed");
-      assert.equal(report.slots[0].outcome, "fail");
+      assert.equal(calls.length, 3); assert.equal(report.slots[0].state, "indeterminate");
+      assert.equal(report.slots[0].outcome, "unknown");
       assert.ok(report.slots[0].verification.checks.every(check => !check.test_summary.tests_observed));
-      assert.ok(report.slots.slice(1).every(slot => slot.state === "not_started"));
+      assert.ok(report.slots.every(slot => slot.state === "indeterminate" && slot.outcome === "unknown"));
     });
   }
 });
@@ -364,10 +365,10 @@ test("repository output cannot manufacture controller test receipts", async t =>
     writeFileSync(join(input.cwd, "src/value.mjs"), `export const value = 0;\nconsole.log(${JSON.stringify(forged)});\n`);
     return value;
   } });
-  assert.equal(calls.length, 1); assert.equal(report.slots[0].state, "verification_failed");
-  assert.equal(report.slots[0].outcome, "fail");
-  assert.ok(report.slots[0].verification.checks.every(check => check.status === "fail" && !check.test_summary.tests_observed));
-  assert.ok(report.slots.slice(1).every(slot => slot.state === "not_started"));
+  assert.equal(calls.length, 3); assert.equal(report.slots[0].state, "indeterminate");
+  assert.equal(report.slots[0].outcome, "unknown");
+  assert.ok(report.slots[0].verification.checks.every(check => check.status === "unknown" && !check.test_summary.tests_observed));
+  assert.ok(report.slots.every(slot => slot.state === "indeterminate" && slot.outcome === "unknown"));
   assert.equal(readFileSync(join(p.root, "verification/plain", path), "utf8"), "import '../src/value.mjs';\n");
   assert.equal(readFileSync(join(f.repo, "src/value.mjs"), "utf8"), "export const value = 0;\n");
 
@@ -390,9 +391,9 @@ test("a passing Node file cannot hide an empty file in a command-backed requirem
     requirements: [{ id: "value-one", description: "All requested files evaluate the value", command: ["node", "--test", "test/value.test.mjs", empty] }] }));
   const p = f.prepare(), report = await startUserComparison(p.root, p.plan_digest, { runner: fake([]) });
   assert.equal(report.slots[0].verification.checks[0].status, "pass");
-  assert.equal(report.slots[0].verification.checks[1].status, "fail");
+  assert.equal(report.slots[0].verification.checks[1].status, "unknown");
   assert.deepEqual(report.slots[0].verification.checks[1].test_summary.missing_files, [empty]);
-  assert.equal(report.slots[0].outcome, "fail");
+  assert.equal(report.slots[0].outcome, "unknown");
 });
 
 test("nested Node suites produce evaluated case receipts and the frozen reporter is bound", async t => {
@@ -565,7 +566,7 @@ test("CLI inspection/report can reopen from caller output without a known tempor
   const before = readdirSync(join(p.root, "control"));
   for (const command of ["inspect", "report"]) {
     const value = spawnSync(process.execPath, [script, command, p.root, "--json"], { cwd: f.repo, encoding: "utf8", timeout: 10000 });
-    assert.equal(value.status, 0, value.stderr); assert.equal(JSON.parse(value.stdout).plan_digest, p.plan_digest);
+    assert.equal(value.status, command === "report" ? 7 : 0, value.stderr); assert.equal(JSON.parse(value.stdout).plan_digest, p.plan_digest);
   }
   assert.deepEqual(readdirSync(join(p.root, "control")), before);
   assert.equal(readUserComparisonPlan(p.root).plan.run_id, p.plan.run_id);

@@ -37,7 +37,7 @@ const MANAGED_CODEX_RUNTIME_FILES = [
 function hashText(value) { return createHash("sha256").update(value).digest("hex"); }
 
 /** One explicit session request; configuration/authentication remain owned by Codex. */
-export async function executeCodexSession({ executable, argv, cwd, input, timeoutMs, signal, onSpawn, env }, spawnProcess = spawn) {
+export async function executeCodexSession({ executable, argv, cwd, input, timeoutMs, signal, onSpawn, onOutput, env }, spawnProcess = spawn) {
   if (typeof executable !== "string" || !executable || executable.includes("\0")
     || !Array.isArray(argv) || argv.some(value => typeof value !== "string" || value.includes("\0"))
     || typeof cwd !== "string" || !cwd || cwd.includes("\0")
@@ -45,7 +45,7 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
     || (env !== undefined && (!env || typeof env !== "object" || Array.isArray(env) || Object.values(env).some(value => typeof value !== "string" || value.includes("\0"))))
     || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2147483647
     || (signal !== undefined && (!signal || typeof signal.aborted !== "boolean" || typeof signal.addEventListener !== "function" || typeof signal.removeEventListener !== "function"))
-    || (onSpawn !== undefined && typeof onSpawn !== "function") || typeof spawnProcess !== "function") {
+    || (onSpawn !== undefined && typeof onSpawn !== "function") || (onOutput !== undefined && typeof onOutput !== "function") || typeof spawnProcess !== "function") {
     throw new Error("a bounded Codex session request requires executable, argv, cwd, input and timeoutMs");
   }
   const started = Date.now();
@@ -59,7 +59,7 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
   return await new Promise(resolveResult => {
     const stdout = [], stderr = [];
     const limit = 10 * 1024 * 1024;
-    let stdoutBytes = 0, stderrBytes = 0, child, deadline, escalation, shutdownDeadline, terminatingAt = null, finishing = false, rootExited = false, escalated = false, cleanupFailure = null;
+    let stdoutBytes = 0, stderrBytes = 0, child, deadline, escalation, shutdownDeadline, terminatingAt = null, finishing = false, rootExited = false, escalated = false, cleanupFailure = null, observerFailed = false;
     const groupPresent = () => {
       if (process.platform === "win32" || !Number.isInteger(child?.pid) || child.pid < 1) return false;
       try { process.kill(-child.pid, 0); return true; }
@@ -100,6 +100,18 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
       if (accepted.length) (stream === "stdout" ? stdout : stderr).push(accepted);
       if (stream === "stdout") stdoutBytes += accepted.length;
       else stderrBytes += accepted.length;
+      if (accepted.length && onOutput && !observerFailed) {
+        try {
+          // Observation cannot change the retained process bytes or create an
+          // unbounded asynchronous queue. Consume a rejected async result before
+          // refusing it so the observer cannot cause an unhandled rejection.
+          const observed = onOutput({ stream, chunk: Buffer.from(accepted) });
+          if (observed && typeof observed.then === "function") {
+            Promise.resolve(observed).catch(() => {});
+            throw new Error("session output observer must be synchronous");
+          }
+        } catch (error) { observerFailed = true; result.error ??= errorRecord(error); terminate(); }
+      }
       if (accepted.length !== bytes.length) {
         result.outputLimited = true;
         result.error ??= { code: "ENOBUFS", message: "session stream exceeded 10 MiB" };
