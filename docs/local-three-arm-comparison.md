@@ -1,5 +1,11 @@
 # Three-condition comparison protocol
 
+This fixed model-free protocol and its saved evidence remain unchanged.
+[Pragmatic evaluation](pragmatic-evaluation.md) is a separate observational lane
+that records global unknowns and approximate environments without claiming this
+protocol's equal-runtime/freeze contract or turning its synthetic results into
+measured outcomes. Its offline reporter grants no execution authority.
+
 Implementation Contract `IMP-318-THREE-1` revision 1 references
 `DES-MAC-ASK-VALUE-1` revision 2 and `IMP-318-FULL-1` revision 1.
 Changes C1 = declared reference supplement and bounded import scanner correction;

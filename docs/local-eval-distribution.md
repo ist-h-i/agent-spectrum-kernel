@@ -1,5 +1,13 @@
 # Local eval distribution: route decision and first delivery slice
 
+For the current user-directed observational method, see
+[pragmatic evaluation](pragmatic-evaluation.md). It records global context and
+remaining environment/version differences instead of requiring complete isolation
+or equality. The fixed adapter/pilot contracts below and their records are
+preserved; the new offline notes/report path neither launches them nor grants
+native admission. Missing quota confirmation is not a stop under the new user
+direction; credential/traffic/security restrictions still apply.
+
 For a concrete public engineering task, lightweight bypass input and pending
 Installed/Activated/Operational worksheet on Mac, see
 [first workflow preparation](first-workflow-mac-codex-ja.md). Its local installer

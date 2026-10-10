@@ -1,5 +1,11 @@
 # Mac / Codex で最初の開発タスクを受け入れる準備
 
+実務に近い観測を小さく回す新しい方針は [探索的評価](pragmatic-evaluation.md) を
+参照してください。global 設定の不明、環境や CLI 版の違いは記録して解釈を限定し、
+完全隔離や完全一致を研究上の開始条件にしません。下記の preparation と未実行記録は
+そのまま保持します。認証・秘密・送信の安全制限と Installed/Activated/Operational の
+区別は変わりません。
+
 ASK 導入後に、変更範囲・失敗条件・検証結果を追える開発成果物を受け取れるか
 確認するための一件です。実装は公開人工 fixture の atomic rule batch API に
 絞ります。一般の実プロジェクトへの適用、モデル起動、成果改善の比較は含みません。
@@ -105,6 +111,10 @@ timeout/retry/token/cost の許可は未確定です。worksheet の対応欄は
 unknown のままにしています。旧 pilot の許可・閾値を流用せず、これらを一件に
 束縛してから実行可否を判断してください。終了後の token stop は hard cost cap
 ではなく、provider request 数や残り subscription 枠を表しません。
+
+新しい探索的 cycle では実際に選ぶ CLI/model 等を記録し、旧版との一致は要求しません。
+利用者の追加指示により、残量の独立確認不能や月次30%保証の欠如は停止理由から外します。
+これは runtime/traffic の安全確認・実行許可や、reset／追加課金の許可を意味しません。
 
 本準備から Codex CLI、実 sandbox、認証取得、Keychain、モデル、ライブ比較、
 拒否された診断経路は起動しません。host の security 設定を変更する必要もありません。
