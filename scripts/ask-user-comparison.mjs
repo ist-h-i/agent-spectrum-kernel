@@ -2,7 +2,7 @@
 // Exploratory user lane. Fixed experiment drivers and their authority stay separate.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { devNull } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +10,7 @@ import { executeCodexSession } from "./codex-exec-runner.mjs";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPragmaticEvaluationReport } from "./ask-pragmatic-evaluation-report.mjs";
-import { comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
+import { comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 
 export const USER_CONDITIONS = Object.freeze(["plain", "kernel_only", "full_ask"]);
 const LIMIT = 16 * 1024 * 1024;
@@ -80,6 +80,7 @@ export function readUserComparisonPlan(output) {
   assert.deepEqual(plan.policy, { attempts: 1, retries: 0, concurrency: 1 });
   for (const id of USER_CONDITIONS) {
     assert.equal(plan.arms[id].path, `arms/${id}`);
+    assert.equal(plan.arms[id].baseline_path, `control/baselines/${id}`);
     assert.ok(["available", "capability_missing"].includes(plan.arms[id].capability.status));
   }
   assert.equal(plan.input.path, "inputs/prompt.md");
@@ -133,15 +134,34 @@ function git(cwd, argv) {
   return result.stdout;
 }
 
-function capturePatch(cwd, baseline, changes, inventory) {
-  let patch = git(cwd, ["diff", "--no-ext-diff", "--no-textconv", "--binary", baseline, "--"]);
-  for (const path of changes.filter(path => !inventory[path] && existsSync(join(cwd, path)))) {
-    const result = spawnSync("git", ["-c", `core.hooksPath=${devNull}`, "diff", "--no-index", "--no-ext-diff", "--no-textconv", "--binary", "--", devNull, path],
-      { cwd, encoding: "utf8", timeout: 30000, maxBuffer: LIMIT, shell: false,
-        env: { PATH: process.env.PATH, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_SYSTEM: devNull, GIT_CONFIG_NOSYSTEM: "1" } });
-    assert.ok(!result.error && [0, 1].includes(result.status), "new-file diff unavailable");
-    patch += result.stdout;
+function copyInventoryFiles(source, destination, inventory, paths) {
+  for (const path of paths.filter(path => inventory[path])) {
+    assert.ok(relativeSafe(path));
+    const entry = inventory[path], target = join(destination, path);
+    const bytes = readStableFile(join(source, path), "diff source", entry.bytes).bytes;
+    assert.equal(comparisonHash(bytes), entry.digest, "diff source changed after inventory");
+    mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+    writeFileSync(target, bytes, { flag: "wx", mode: entry.mode === "100755" ? 0o700 : 0o600 });
   }
+}
+
+function capturePatch(root, arm, condition, changes, actual) {
+  const baselineRoot = join(root, arm.baseline_path), cwd = join(root, "control/patch-workspaces", condition);
+  assert.deepEqual(inventoryUserTree(baselineRoot), arm.baseline_inventory, "private diff baseline changed");
+  assert.equal(realpathSync(dirname(cwd)), dirname(cwd), "unsafe controller patch directory");
+  mkdirSync(cwd, { mode: 0o700 });
+  copyInventoryFiles(baselineRoot, cwd, arm.baseline_inventory, changes);
+  const baseline = prepareGitBaseline(cwd);
+  // The model's mutable index/object store is never a controller Git input.
+  // Re-materialize actual changed bytes after committing a trusted subset,
+  // including additions, deletions, modes and file/directory transitions.
+  for (const name of readdirSync(cwd)) if (name !== ".git") rmSync(join(cwd, name), { recursive: true });
+  copyInventoryFiles(join(root, arm.path), cwd, actual, changes);
+  git(cwd, ["add", "--force", "--all"]);
+  const options = ["--cached", "--no-ext-diff", "--no-textconv", "--no-renames", baseline, "--"];
+  const recorded = git(cwd, ["diff", "--name-only", "-z", ...options]).split("\0").filter(Boolean).sort();
+  assert.deepEqual(recorded, [...changes].sort(), "patch must cover every inventory change");
+  const patch = git(cwd, ["diff", "--binary", ...options]);
   assert.ok(Buffer.byteLength(patch) <= LIMIT, "patch output limit");
   return sanitizeComparisonLog(patch);
 }
@@ -165,6 +185,7 @@ export function parseUserCodexTelemetry(stdout) {
   for (const line of String(stdout).split(/\r?\n/u)) {
     let event;
     try { event = JSON.parse(line); } catch { continue; }
+    if (event === null || typeof event !== "object" || Array.isArray(event)) continue;
     if (event.type === "thread.started" && typeof event.thread_id === "string") session_id = event.thread_id;
     if (typeof event.model === "string" && /^[a-zA-Z0-9._:/-]{1,160}$/u.test(event.model)) model = event.model;
     if (["error", "turn.failed"].includes(event.type)) errors.push(sanitizeComparisonLog(event.message ?? event.error?.message ?? "Codex reported failure"));
@@ -256,6 +277,7 @@ export async function startUserComparison(output, confirmedDigest, { signal, run
     plan.verification.reporter.digest, "Node test reporter changed");
   for (const id of USER_CONDITIONS) {
     assert.deepEqual(inventoryUserTree(join(root, plan.arms[id].path)), plan.arms[id].baseline_inventory, `prepared ${id} changed`);
+    assert.deepEqual(inventoryUserTree(join(root, plan.arms[id].baseline_path)), plan.arms[id].baseline_inventory, `private ${id} baseline changed`);
     assert.deepEqual(inventoryComparisonGitMetadata(join(root, plan.arms[id].path)), plan.arms[id].git_metadata, `prepared ${id} Git metadata changed`);
   }
   saveNew(join(root, "control/start.json"), { run_id: plan.run_id, plan_digest, requested_at: new Date().toISOString(), controller_pid: process.pid,
@@ -318,7 +340,7 @@ export async function startUserComparison(output, confirmedDigest, { signal, run
       if (scope.violations.length) scope.status = "fail";
       saveNew(evidencePath(root, id, "changes.json"), { before: arm.baseline_inventory, after: actual, scope });
       if (gitChanges.length === 0) {
-        saveNew(evidencePath(root, id, "patch.diff"), capturePatch(invocation.cwd, arm.baseline_commit, changed, arm.baseline_inventory));
+        saveNew(evidencePath(root, id, "patch.diff"), capturePatch(root, arm, id, changed, actual));
         patch_ref = "patch.diff";
       }
       if (state === "completed" && scope.status !== "pass") { state = "scope_violation"; reason = "changes outside the approved task scope or to condition assets"; }

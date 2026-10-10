@@ -91,6 +91,9 @@ test("regular uninstalled source prepares exact independent P/K/F baselines with
   for (const arm of [plain, kernel, full]) {
     const root = join(result.root, arm.path);
     assert.deepEqual(inventoryUserTree(root), arm.baseline_inventory);
+    assert.equal(arm.baseline_path, `control/baselines/${arm.id}`);
+    assert.deepEqual(inventoryUserTree(join(result.root, arm.baseline_path)), arm.baseline_inventory);
+    assert.equal(existsSync(join(result.root, arm.baseline_path, ".git")), false);
     assert.equal(git(root, ["rev-parse", "HEAD"]), arm.baseline_commit);
     assert.equal(git(root, ["status", "--porcelain"]), "");
     assert.deepEqual(inventoryComparisonGitMetadata(root), arm.git_metadata);
@@ -123,6 +126,7 @@ test("regular uninstalled source prepares exact independent P/K/F baselines with
   assert.equal(result.plan.prompt.includes(JSON.stringify(["node", "--test", "test/value.test.mjs"])), true);
   assert.equal(result.plan.unknowns.includes("global_instruction_and_skill_inventory"), true);
   write(join(result.root, plain.path), "src/value.mjs", "export const value = 3;\n");
+  assert.equal(readFileSync(join(result.root, plain.baseline_path, "src/value.mjs"), "utf8"), "export const value = 1;\n");
   assert.equal(readFileSync(join(result.root, kernel.path, "src/value.mjs"), "utf8"), "export const value = 1;\n");
   assert.equal(readFileSync(join(result.root, full.path, "src/value.mjs"), "utf8"), "export const value = 1;\n");
   // Metadata guarding itself runs without Git and cannot affect the source.

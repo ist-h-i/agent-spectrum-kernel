@@ -83,9 +83,10 @@ export function inventoryUserTree(root) {
   return inventory;
 }
 
-/** Guard Git configuration/identity before a post-model Git command reads it.
+/** Guard arm Git configuration/identity without invoking Git.
  * Index/objects/logs can change during ordinary staging and are not control
- * identity. This reads only bounded regular metadata; no Git process starts. */
+ * identity. Controller diffs use private baseline bytes, never the arm's index
+ * or object store. This reads only bounded regular metadata. */
 export function inventoryComparisonGitMetadata(root) {
   if (!isAbsolute(root) || realpathSync(root) !== root || !lstatSync(root).isDirectory()) fail("unsafe_git_metadata_root");
   const gitRoot = join(root, ".git"), stat = lstatSync(gitRoot);
@@ -405,10 +406,11 @@ function appendKernel(userBytes, block) {
   return Buffer.concat([userBytes, userBytes.length ? Buffer.from("\n\n") : Buffer.alloc(0), block]);
 }
 
-function prepareGitBaseline(root) {
+export function prepareGitBaseline(root) {
   git(root, ["-c", "init.defaultBranch=ask-comparison", "init", "--quiet", "--template="]);
   git(root, ["config", "--local", "core.hooksPath", devNull]);
   git(root, ["config", "--local", "core.autocrlf", "false"]);
+  git(root, ["config", "--local", "core.filemode", "true"]);
   git(root, ["config", "--local", "core.fsmonitor", "false"]);
   // New, local metadata prevents source attributes from normalizing the bytes
   // whose hashes the comparison records; it invokes no source Git filters.
@@ -416,7 +418,7 @@ function prepareGitBaseline(root) {
   mkdirSync(join(root, ".git/info"), { mode: 0o700 });
   writeFileSync(join(root, ".git/info/attributes"), "* -filter -text -ident -working-tree-encoding\n", { mode: 0o600 });
   git(root, ["add", "--force", "--all"]);
-  git(root, ["-c", "user.name=ASK user comparison", "-c", "user.email=comparison@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "prepare independent ASK comparison baseline"]);
+  git(root, ["-c", "user.name=ASK user comparison", "-c", "user.email=comparison@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "--allow-empty", "-m", "prepare independent ASK comparison baseline"]);
   return git(root, ["rev-parse", "HEAD"]).toString().trim();
 }
 
@@ -500,6 +502,7 @@ export function prepareUserComparison(options = {}) {
   writeNew(root, "control/verification.json", verificationBytes);
   writeNew(root, "control/node-test-reporter.mjs", reporterBytes);
   writeNew(root, "inputs/prompt.md", Buffer.from(prompt));
+  mkdirSync(join(root, "control/patch-workspaces"), { mode: 0o700 });
   const arms = {};
   const canonicalBytes = readRegular(join(SOURCE, "AGENTS.md"), "canonical_agents");
   const canonicalBlock = Buffer.from(buildAgentsBlock(UTF8.decode(canonicalBytes)));
@@ -541,7 +544,14 @@ export function prepareUserComparison(options = {}) {
     // file is placed inside an arm, even during Git initialization.
     const after = inventoryUserTree(armRoot);
     if (JSON.stringify(after) !== JSON.stringify(baseline)) fail("baseline_tree_changed_during_git_preparation");
-    arms[id] = { id, label, path, baseline_commit: baselineCommit, baseline_inventory: baseline,
+    const baselinePath = `control/baselines/${id}`;
+    for (const [file, entry] of Object.entries(baseline)) {
+      const bytes = readRegular(join(armRoot, file), "private_diff_baseline");
+      if (comparisonHash(bytes) !== entry.digest) fail("baseline_changed_during_private_capture");
+      writeNew(root, `${baselinePath}/${file}`, bytes, entry.mode);
+    }
+    if (JSON.stringify(inventoryUserTree(join(root, baselinePath))) !== JSON.stringify(baseline)) fail("private_baseline_inventory_mismatch");
+    arms[id] = { id, label, path, baseline_path: baselinePath, baseline_commit: baselineCommit, baseline_inventory: baseline,
       baseline_digest: comparisonHash(jsonBytes(baseline)), git_metadata: inventoryComparisonGitMetadata(armRoot), assets,
       capability: id === "kernel_only" ? kernelCapability(baseline, config) : { status: "available", required: [], available: [], missing: [] },
       configuration: id === "plain" ? "No project ASK assets added; preserved custom instructions and global Skills may apply."

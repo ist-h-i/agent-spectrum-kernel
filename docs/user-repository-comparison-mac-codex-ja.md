@@ -282,6 +282,8 @@ JSON は `launch_requested`（起動要求）、`spawn_observed`（ローカル�
 | `control/plan.json`、`control/plan.digest` | 実行 ID、日時、比較元、課題・検証 hash、設定、各条件の全ファイル hash、Full の定義 |
 | `inputs/prompt.md`、`control/task.md`、`control/verification.json` | 実際の課題入力と共通検証方法 |
 | `control/node-test-reporter.mjs` | hash を固定した独立検証用の Node reporter。モデル入力には含めない |
+| `control/baselines/` | 各条件の準備済みファイルの私的なbaseline。hashを固定し、修正差分の比較元に使う |
+| `control/patch-workspaces/` | 差分採取専用のcontrollerコピー。モデル側のGit index・objectを使わず、変更前後の確認済みbytesからpatchを作る |
 | `arms/plain`、`arms/kernel_only`、`arms/full_ask` | 独立した条件別 Git repo と修正内容 |
 | `control/start.json`、`control/end.json` | 開始操作と終了の記録。強制終了時は終了記録がない場合がある |
 | `control/slots/<condition>/` | `request.json`、`spawn.json` と各 digest、`result.json`、CLI ログ、応答、修正 patch、独立検証ログなど、取得できた証拠 |
@@ -340,9 +342,12 @@ rootに空でない `AGENTS.override.md` がある構成も、canonical `AGENTS.
 準備の上限です。commit に含まれる `.agents/runs/`、
 `.agent-spectrum-kernel/runtime/`、`ask-runtime/` の過去実行記録も、課題入力への
 混入を避けるため準備時に停止します。これらを自動削除する処理はありません。
-作業コピーのGit管理領域でも、外部を指すcommon directory・object・pack・index・logの
-リンクをGitで読み取る前に拒否します。通常のstaging・repackは許容しますが、
-mutable Git storageは最大10万entries・深さ32に制限し、超過時は停止します。
+作業コピーのGit管理領域は、外部を指すcommon directoryやファイルのリンクを
+Gitを起動せずに検査します。差分は私的なbaselineと確認済みの変更bytesから
+controller専用コピーで作り、モデル側のindex・object storeをGitで読み取りません。
+通常のstaging・repackは許容しますが、mutable Git storageは最大10万entries・
+深さ32に制限し、超過時は停止します。準備では三条件の私的baselineも保存するため、
+元repoのファイル量に応じた追加のディスク容量が必要です。
 対象の build／外部サービス／依存導入／任意フレームワークの採点は
 今回の入口には含めません。
 

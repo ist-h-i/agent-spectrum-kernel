@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
@@ -169,6 +169,7 @@ test("fake and observed/plan reports stay in separate aggregate groups and dupli
 
 test("telemetry keeps missing values, actual difference and reported failure; sanitizes secrets", () => {
   const unknown = parseUserCodexTelemetry("not JSON\n"); assert.equal(unknown.metrics.input_tokens, null); assert.equal(unknown.cost, null);
+  for (const scalar of ["null", "[]", "true", "1", '"text"']) assert.deepEqual(parseUserCodexTelemetry(`${scalar}\n`), unknown);
   const value = parseUserCodexTelemetry('{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":2}}\n{"type":"turn.failed","error":{"message":"rejected"}}\n');
   assert.equal(value.metrics.cached_tokens, null); assert.deepEqual(value.errors, ["rejected"]);
   const partial = parseUserCodexTelemetry('{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":2,"cached_input_tokens":0}}\n{"type":"turn.completed","usage":{"input_tokens":3}}\n');
@@ -459,6 +460,75 @@ test("ordinary staging and repacking retain safe Git evidence and independent qu
     const value = await run(input); git(input.cwd, ["add", "src/value.mjs"]); git(input.cwd, ["repack", "-ad"]); return value;
   } });
   assert.equal(calls.length, 3); assert.ok(report.slots.every(slot => slot.outcome === "pass" && slot.patch_ref === "patch.diff"));
+});
+
+test("ordinary index flags cannot hide changed bytes from the saved controller patch", async t => {
+  for (const flag of ["--assume-unchanged", "--skip-worktree"]) await t.test(flag, async st => {
+    const f = fixture(st), p = f.prepare(), run = fake([]);
+    const report = await startUserComparison(p.root, p.plan_digest, { runner: async input => {
+      git(input.cwd, ["update-index", flag, "src/value.mjs"]); return run(input);
+    } });
+    assert.ok(report.slots.every(slot => slot.outcome === "pass"));
+    for (const slot of report.slots) {
+      const path = join(p.root, "control/slots", slot.condition, "patch.diff"), patch = readFileSync(path, "utf8");
+      assert.match(patch, /^-export const value = 0;$/mu); assert.match(patch, /^\+export const value = 1;$/mu);
+      git(f.repo, ["apply", "--check", path]);
+      assert.equal(readFileSync(join(p.root, p.plan.arms[slot.condition].baseline_path, "src/value.mjs"), "utf8"), "export const value = 0;\n");
+    }
+    assert.equal(readFileSync(join(f.repo, "src/value.mjs"), "utf8"), "export const value = 0;\n");
+  });
+});
+
+test("controller patches preserve additions, deletions, modes and file-directory transitions", async t => {
+  const f = fixture(t);
+  writeFileSync(join(f.repo, "src/deleted.txt"), "delete this file\n");
+  writeFileSync(join(f.repo, "src/becomes-directory"), "formerly a file\n");
+  mkdirSync(join(f.repo, "src/becomes-file")); writeFileSync(join(f.repo, "src/becomes-file/old.txt"), "formerly a directory\n");
+  writeFileSync(join(f.repo, "src/mode.mjs"), "export const mode = 1;\n");
+  git(f.repo, ["add", "."]); git(f.repo, ["-c", "user.name=ASK test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "patch shapes"]);
+  f.options.commit = git(f.repo, ["rev-parse", "HEAD"]);
+  const p = f.prepare(), run = fake([]);
+  const report = await startUserComparison(p.root, p.plan_digest, { runner: async input => {
+    const value = await run(input);
+    rmSync(join(input.cwd, "src/deleted.txt")); rmSync(join(input.cwd, "src/becomes-directory"));
+    mkdirSync(join(input.cwd, "src/becomes-directory")); writeFileSync(join(input.cwd, "src/becomes-directory/new.txt"), "now a directory\n");
+    rmSync(join(input.cwd, "src/becomes-file"), { recursive: true }); writeFileSync(join(input.cwd, "src/becomes-file"), "now a file\n");
+    writeFileSync(join(input.cwd, "src/new.bin"), Buffer.from([0, 255, 1, 2]));
+    chmodSync(join(input.cwd, "src/mode.mjs"), 0o700); return value;
+  } });
+  assert.ok(report.slots.every(slot => slot.outcome === "pass"));
+  for (const slot of report.slots) {
+    const path = join(p.root, "control/slots", slot.condition, "patch.diff"), patch = readFileSync(path, "utf8");
+    assert.match(patch, /deleted file mode/u); assert.match(patch, /new file mode/u); assert.match(patch, /GIT binary patch/u);
+    assert.match(patch, /old mode 100644\nnew mode 100755/u); git(f.repo, ["apply", "--check", path]);
+  }
+});
+
+test("private baseline drift stops before start or records a failed evidence collection", async t => {
+  await t.test("before start", async st => {
+    const f = fixture(st), p = f.prepare(), calls = [];
+    writeFileSync(join(p.root, p.plan.arms.plain.baseline_path, "src/value.mjs"), "changed baseline\n");
+    await assert.rejects(startUserComparison(p.root, p.plan_digest, { runner: fake(calls) }), /private plain baseline changed/u);
+    assert.equal(calls.length, 0); assert.equal(existsSync(join(p.root, "control/start.json")), false);
+  });
+  await t.test("after request", async st => {
+    const f = fixture(st), p = f.prepare(), calls = [], run = fake(calls);
+    const report = await startUserComparison(p.root, p.plan_digest, { runner: async input => {
+      const value = await run(input);
+      writeFileSync(join(p.root, p.plan.arms.plain.baseline_path, "src/value.mjs"), "changed baseline\n"); return value;
+    } });
+    assert.equal(calls.length, 1); assert.equal(report.slots[0].state, "runner_failed"); assert.equal(report.slots[0].outcome, "unknown");
+    assert.match(report.slots[0].reason, /private diff baseline changed/u); assert.equal(report.slots[0].patch_ref, null);
+    assert.ok(report.slots.slice(1).every(slot => slot.state === "not_started"));
+  });
+});
+
+test("non-event JSON telemetry retains terminal results and unknown usage", async t => {
+  const f = fixture(t), p = f.prepare(), run = fake([]);
+  const report = await startUserComparison(p.root, p.plan_digest, { runner: async input => ({ ...await run(input), stdout: "null\n[]\ntrue\n" }) });
+  assert.ok(report.slots.every(slot => slot.state === "completed" && slot.process_completed && slot.outcome === "pass"));
+  assert.ok(report.slots.every(slot => slot.metrics.input_tokens === null && slot.actual_model === null && slot.session_id === null));
+  assert.equal(reportUserComparison(p.root).slots[0].state, "completed");
 });
 
 test("CLI inspection/report can reopen from caller output without a known temporary path", t => {

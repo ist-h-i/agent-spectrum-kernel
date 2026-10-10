@@ -41,8 +41,10 @@ Proof obligations:
 
 - O1 (A1/A2): temporary real Git repos, uninstalled/installed/custom/ambiguous
   ownership, original/global bytes, independent arm configuration and hashes;
-  controller Git rejects linked/redirected metadata and object storage while
-  allowing regular local staging and repacking.
+  arm metadata is checked without executing Git, while regular local staging
+  and repacking remain allowed. Controller patches use bound private baseline
+  and actual regular-file bytes in a fresh controller Git copy; post-model arm
+  index/object storage is never an input to a controller Git command.
 - O2 (A3/A4): fake runner observes exact args/cwd/input; all-success, missing
   capability, denied start, process failure, timeout, interruption, partial
   persistence, no duplicate starts/concurrency/overwrite.
@@ -50,6 +52,8 @@ Proof obligations:
   and requirements are separate from self-report, synthetic/observed never pool.
   Only controller-origin structured Node summaries establish evaluated cases;
   repository output, empty files, skipped/todo cases and missing files cannot.
+  Index flags cannot suppress a saved patch, and non-event JSON telemetry cannot
+  abort terminal persistence or turn unknown usage into zero.
 - O4 (A6): executable CLI examples and offline reopening from chosen output.
 - O5: related preparation/runner/report/setup/recovery/release regressions,
   repository validation, generated runtime freshness, whitespace, exact-head CI
