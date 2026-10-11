@@ -57,64 +57,69 @@
       "bytes": 7591
     },
     {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/legacy-results.mjs",
+      "digest": "sha256:fbb2d12a13195577229a51bc0be9f3b52959a5c78c40a7a3575e954d89e38ed7",
+      "bytes": 2155
+    },
+    {
       "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/legacy-verifier.v1.2.mjs",
       "digest": "sha256:0b7f9a24053b861e64069fdd107947d10e9544b40e9c943eac1cb959b8c4217c",
       "bytes": 11521
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/legacy.test.mjs",
-      "digest": "sha256:6c8d3418d715076f6fe07b5801542cff9e4cd79a3b8758f33e9d6155da9d088c",
-      "bytes": 2062
+      "digest": "sha256:ff76a0614c519c9d7de6ff600ad7efb3c3dcdd0897f6c9fc64607a3504671f37",
+      "bytes": 118
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r1.test.mjs",
-      "digest": "sha256:cab287c010e9c7481b2a4db79b7851884f2d23a2e704d340570d7e14aaa89d49",
-      "bytes": 232
+      "digest": "sha256:ef4032cb9b98ae9d4ea3da0f1b2a0642e17c0d87022bd48bd83e55e9a348ecdc",
+      "bytes": 326
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r10.test.mjs",
-      "digest": "sha256:ae9cab1988d71396972118e6c4e880424c4c2d5b4ed7ef29ed466f030c6e6b41",
-      "bytes": 234
+      "digest": "sha256:9964b12a62b084a13cbf0461fa3ca50acac2cb77dd9771f46c8a8108f228d8ff",
+      "bytes": 329
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r2.test.mjs",
-      "digest": "sha256:2b6fd439eb51c599ae331b9ab220992c6cbae092aaa9619005725ad0bbcbe47c",
-      "bytes": 232
+      "digest": "sha256:39cb0cc09c8fb239539524a2864b6d268020ea716e0216068fafe3cc77b8b264",
+      "bytes": 326
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r3.test.mjs",
-      "digest": "sha256:1eedc54ee036e094dd7bcba336e25c221283f73ebf0a82b32cab3e84a1336ea2",
-      "bytes": 232
+      "digest": "sha256:e36f1cb5898c7ac291e80018ec8ec6b9604e9a580e0ef64270015c86fa635f03",
+      "bytes": 326
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r4.test.mjs",
-      "digest": "sha256:cad324c3a1af876db7b9fad6fd0b2c10b763d3cb0a4aa10cac975e3c66749cce",
-      "bytes": 232
+      "digest": "sha256:06897de82a33eab71bffe82b32f2bc463a064570becd104723652089024dcf53",
+      "bytes": 326
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r5.test.mjs",
-      "digest": "sha256:f42a7dd21caeb158cf9b71fc85449de0fe8b401a8762d113293870a19b33e2f1",
-      "bytes": 232
+      "digest": "sha256:31b939820e37c572616a036f3e1c0df230a27241920f3e67b6262168d60a8dc6",
+      "bytes": 326
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r6.test.mjs",
-      "digest": "sha256:b1ab06c929bc4b4cbb8c0890ecbda2132ed4c6f941b31f042a0e84086fbd640c",
-      "bytes": 232
+      "digest": "sha256:e6e6654b8f3c1ca7a4dc6c0c15ffb7baa353e083a6fd98510d0f34c4cfe7b464",
+      "bytes": 326
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r7.test.mjs",
-      "digest": "sha256:e04b2861e3a0cb6eb1e95a387a720fd74b33526d524276e510f06bc6f168a31e",
-      "bytes": 232
+      "digest": "sha256:24987366b0e38075b71c15047b5c021c74dd30e29ff3ffe4fd4c011112b5c461",
+      "bytes": 326
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r8.test.mjs",
-      "digest": "sha256:51ded96f8d83853827ef3c71aea9de0e12ed445255471f7f0b7330f1e299b23b",
-      "bytes": 232
+      "digest": "sha256:57641950f2a3eba62415c78f37dd61075688cd10a3ddc5782eea9c9d11f9eeac",
+      "bytes": 326
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r9.test.mjs",
-      "digest": "sha256:dad342e395ec4e637578161f9901ce5ed458620b08d9cbd33098062b9954aa22",
-      "bytes": 232
+      "digest": "sha256:9bf35c35500688546677d504cc622090a98ac1a4c8dde48bf29f09d339b45ec0",
+      "bytes": 326
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/history.json",

@@ -44,9 +44,22 @@ positive reference/mutants. Initialize and commit `source/` as a standalone Git
 repository with normal local Git commands. Record its exact commit externally;
 do not put the commit's own ID into a file in that commit.
 
-Then use the existing [comparison guide](user-repository-comparison-mac-codex-ja.md)
-prepare/inspect commands with that source commit, external task/recipe, and only
-`--allow src/ --allow test/generated/`. Keep fixed `test/fixed/`, original visible
+Create an external `options.json` following the runtime/budget settings in the
+existing [comparison guide](user-repository-comparison-mac-codex-ja.md), with
+`output` naming a new comparison directory and the intended `cliBin`, `model`,
+`reasoning`, `timeoutMs`, `verificationTimeoutMs`, `overallTimeoutMs`, `tokenBudget`
+and `globalAskPresence`. Do not supply repo/commit/task/recipe/scope options;
+the bundle owns them. Then use the bundle-specific model-free preparation:
+
+```sh
+node scripts/ask-rule-batch-bundle.mjs prepare /absolute/private/new-rule-batch-inputs sha256:RECORDED_BUNDLE_DIGEST EXACT_SEED_COMMIT /absolute/private/options.json
+```
+
+This verifies working inputs and **exact committed tree bytes** against the
+external bundle pin before invoking generic preparation. A stale/altered fixed
+test, seed, docs, task, recipe or binding cannot retain this contract identity.
+Generic preparation alone is not proof of bundle association. The bundle-specific
+entry enforces only `src/` and `test/generated/` as mutable. Keep fixed `test/fixed/`, original visible
 tests, docs, binding and package immutable. The plan freezes all input hashes
 and source commit for the three slots. Model-added tests are separate from the
 fixed aggregate and ten requirement commands. A protected-file edit is a scope

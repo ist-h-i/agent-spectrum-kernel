@@ -5,8 +5,8 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, wr
 import { devNull, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BUNDLE_PATH, checkRuleBatchBundle, digest, materializeRuleBatchBundle } from './ask-rule-batch-bundle.mjs';
-import { prepareUserComparison } from './ask-user-comparison-prepare.mjs';
+import { BUNDLE_PATH, checkRuleBatchBundle, digest, materializeRuleBatchBundle,
+  prepareRuleBatchComparison, verifyRuleBatchMaterialization } from './ask-rule-batch-bundle.mjs';
 import { inspectUserComparison, reportUserComparison } from './ask-user-comparison.mjs';
 import { cases } from '../benchmarks/contracts/rule-batch/2.0.0/fixed/cases.mjs';
 
@@ -25,6 +25,11 @@ const child = (bin, args, cwd) => {
   assert.equal(r.error, undefined); assert.equal(r.status, 0, r.stderr || r.stdout); return r.stdout.trim();
 };
 const git = (cwd, args) => child('git', ['-c', `core.hooksPath=${devNull}`, ...args], cwd);
+function commitSource(source) {
+  git(source, ['add', '--all']);
+  git(source, ['-c', 'user.name=ASK bundle test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'test source']);
+  return git(source, ['rev-parse', 'HEAD']);
+}
 
 test('closed bundle and requirement trace are internally consistent', () => {
   const checked = checkRuleBatchBundle();
@@ -89,15 +94,13 @@ test('existing preparation freezes one common public bundle for P/K/F without st
   const root = temp(t), checked = checkRuleBatchBundle();
   const receipt = materializeRuleBatchBundle(join(root, 'materialized'), checked.bundleDigest);
   git(receipt.source, ['init', '--quiet', '--template=']);
-  git(receipt.source, ['add', '--all']);
-  git(receipt.source, ['-c', 'user.name=ASK bundle test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'test seed']);
-  const commit = git(receipt.source, ['rev-parse', 'HEAD']);
+  const commit = commitSource(receipt.source);
+  assert.equal(verifyRuleBatchMaterialization(receipt.output, checked.bundleDigest, commit).source_commit, commit);
   const cli = join(root, 'never-launch.mjs'), launch = join(root, 'unexpected-launch');
   writeFileSync(cli, `#!/usr/bin/env node\nimport fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(launch)}, 'unexpected');\n`, { mode: 0o700 });
-  const options = { repo: receipt.source, commit, taskFile: receipt.taskFile, verificationFile: receipt.verificationFile,
-    output: join(root, 'comparison'), mutablePaths: ['src/', 'test/generated/'], taskClass: 'implementation',
+  const options = { output: join(root, 'comparison'),
     evidenceKind: 'synthetic', cliBin: cli, cliVersion: 'declared-test-version' };
-  const prepared = prepareUserComparison(options);
+  const prepared = prepareRuleBatchComparison(receipt.output, checked.bundleDigest, commit, options);
   const inspected = inspectUserComparison(prepared.root), report = reportUserComparison(prepared.root);
   assert.equal(prepared.plan.source.commit, commit);
   assert.ok(inspected.plan_digest);
@@ -108,6 +111,47 @@ test('existing preparation freezes one common public bundle for P/K/F without st
     assert.deepEqual(readFileSync(join(prepared.root, arm.path, 'test/fixed/cases.mjs')), checked.assets.get(`${BUNDLE_PATH}/fixed/cases.mjs`));
   }
   assert.equal(existsSync(launch), false);
-  assert.throws(() => prepareUserComparison({ ...options, output: join(root, 'bad-scope'), mutablePaths: ['src/', 'test/'] }), /mutable.*verification|verification.*mutable|overlap/);
+  assert.throws(() => prepareRuleBatchComparison(receipt.output, checked.bundleDigest, commit,
+    { ...options, output: join(root, 'bad-scope'), mutablePaths: ['src/', 'test/'] }), /bundle_owned_option_override/);
   assert.equal(digest(readFileSync(receipt.taskFile)), prepared.plan.task.digest);
+
+  // F2: self-declared binding and a newly committed no-op fixed test cannot
+  // masquerade as the reviewed bundle, even when the working copy is restored.
+  const fixed = join(receipt.source, 'test/fixed/r2.test.mjs'), original = readFileSync(fixed);
+  writeFileSync(fixed, "import test from 'node:test'; test('no-op', () => {});\n");
+  const badCommit = commitSource(receipt.source);
+  writeFileSync(fixed, original);
+  assert.throws(() => prepareRuleBatchComparison(receipt.output, checked.bundleDigest, badCommit,
+    { ...options, output: join(root, 'changed-commit') }), /source_commit_asset_mismatch/);
+  assert.equal(existsSync(join(root, 'changed-commit')), false);
+  for (const path of ['task.md', 'verification.json', 'source/docs/rule-batches.md',
+    'source/src/validation.mjs', 'source/contract-binding.json', 'source/test/fixed/r2.test.mjs']) {
+    const absolute = join(receipt.output, path), saved = readFileSync(absolute);
+    writeFileSync(absolute, Buffer.concat([saved, Buffer.from('drift')]));
+    assert.throws(() => verifyRuleBatchMaterialization(receipt.output, checked.bundleDigest, commit), /materialized_asset_mismatch/);
+    writeFileSync(absolute, saved);
+  }
+});
+
+test('per-requirement r2 executes retained historical integer cases (F1)', t => {
+  const root = temp(t), checked = checkRuleBatchBundle();
+  const receipt = materializeRuleBatchBundle(join(root, 'materialized'), checked.bundleDigest);
+  const module = new URL('../benchmarks/contracts/rule-batch/2.0.0/examples/reference.mjs', import.meta.url).href;
+  writeFileSync(join(receipt.source, 'src/index.mjs'), `
+import * as base from ${JSON.stringify(module)};
+export * from ${JSON.stringify(module)};
+export class RuleService extends base.RuleService {
+  applyBatch(request) {
+    if (request?.expectedVersion > Number.MAX_SAFE_INTEGER) throw new base.RuleValidationError('artificial safe-integer cap');
+    return super.applyBatch(request);
+  }
+}
+`);
+  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
+  const r = spawnSync(process.execPath, ['--test', 'test/fixed/r2.test.mjs'],
+    { cwd: receipt.source, env, encoding: 'utf8', timeout: 60000, maxBuffer: 8 * 1024 * 1024 });
+  assert.equal(r.error, undefined);
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /historical-v1.2\/integer-no-schema-maximum-2/);
+  assert.match(r.stdout, /historical-v1.2\/integer-no-schema-maximum-3/);
 });
