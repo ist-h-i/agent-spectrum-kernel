@@ -94,6 +94,9 @@ class MemoryFS {
 
 function sandbox(t) {
   const memory = new MemoryFS(), clock = new Clock(), ownership = [], gitSnapshots = new Map(); let uuid = 0;
+  // The legacy observer reads Linux boot metadata from fs rather than sysctl.
+  // Supply virtual bytes on every host; the single-shot path must never read it.
+  memory.seed('/proc/sys/kernel/random/boot_id', 'fake-boot-identity\n');
   for (const name of ['mkdirSync', 'existsSync', 'realpathSync', 'lstatSync', 'readdirSync', 'openSync', 'closeSync', 'fsyncSync', 'fstatSync', 'readSync', 'readFileSync', 'writeFileSync', 'renameSync', 'rmSync', 'chmodSync']) t.mock.method(fs, name, memory[name]);
   t.mock.method(process, 'getuid', () => 1000);
   t.mock.method(process, 'kill', (pid, signal) => { ownership.push([pid, signal]); assert.equal(signal, 0, 'no numeric terminating signal'); });
