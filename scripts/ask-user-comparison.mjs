@@ -15,7 +15,7 @@ import { acquireComparisonOwner, checkpointComparison, comparisonOwnershipDiagno
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPragmaticEvaluationReport } from "./ask-pragmatic-evaluation-report.mjs";
-import { COMPARISON_RECORD_BYTE_LIMIT, comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
+import { COMPARISON_RECORD_BYTE_LIMIT, comparisonExecutionPolicy, comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, isSingleShotComparison, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 
 export const USER_CONDITIONS = Object.freeze(["plain", "kernel_only", "full_ask"]);
 export const USER_COMPARISON_EXIT_CODES = Object.freeze({ completed: 0, task_failed: 2, capability_missing: 3,
@@ -117,7 +117,8 @@ export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
   assert.equal(plan.kind, "ask_user_comparison_plan_v1");
   assert.equal(plan.root, root, "moving a prepared workspace is unsupported");
   assert.ok(["synthetic", "observed"].includes(plan.config.evidence_kind));
-  assert.deepEqual(plan.policy, { attempts: 1, retries: 0, concurrency: 1 });
+  assert.deepEqual(plan.policy, comparisonExecutionPolicy(plan.policy?.execution_contract));
+  if (isSingleShotComparison(plan)) assert.equal(plan.execution_protocol?.resume, "forbidden", "single-shot protocol must forbid resume");
   assert.deepEqual(Object.keys(plan.arms).sort(), comparisonConditions(plan.config.kernel_condition).sort(), "unknown comparison arm");
   if (plan.config.kernel_condition === KERNEL_PRINCIPLES_ID) validatePrinciplesDefinition(root, plan);
   else assert.equal(plan.kernel_definition, undefined, "legacy condition cannot carry a principles definition");
@@ -165,8 +166,10 @@ export function inspectUserComparison(output) {
   transmission: { input: "same task prompt, committed repository files, condition instructions, ordinary Codex conversation/tool context",
     provider_and_authentication: "inherited ordinary Codex configuration; not inspected by ASK; operator must confirm permission and destination before start",
     unknown: ["future tool-selected context", "resolved provider/model when not reported", "global instructions and configuration"] },
-  start_boundary: "only start/resume with the human-confirmed digest requests Codex; resume never repeats an attempted condition; prepare/inspect/report never start a model",
-  timeout_boundary: "local deadline and process-group limits; synchronous evidence/cleanup/report I/O can finish later; not provider cancellation or a hard token/cost budget" };
+  start_boundary: isSingleShotComparison(plan) ? "explicit start consumes this run once; interruption ends execution; resume and automatic new-ID retries are forbidden"
+    : "only start/resume with the human-confirmed digest requests Codex; resume never repeats an attempted condition; prepare/inspect/report never start a model",
+  timeout_boundary: isSingleShotComparison(plan) ? "local deadline; only the live controller's direct ChildProcess may be signalled before exit/close; no saved-PID recovery; forced parent exit, descendants and provider cancellation are not covered"
+    : "local deadline and process-group limits; synchronous evidence/cleanup/report I/O can finish later; not provider cancellation or a hard token/cost budget" };
 }
 
 function comparisonLimits(plan) {
@@ -175,7 +178,9 @@ function comparisonLimits(plan) {
     condition_admission_reserve_ms: plan.config.timeout_ms + checks * plan.config.verification_timeout_ms,
     deadline_origin: "first_start_including_downtime", token_budget: plan.config.token_budget ?? null,
     usage_basis: "known_input_plus_output_tokens_lower_bound", unknown_usage_policy: "continue_with_unknown",
-    retries: 0, concurrency: 1, limitations: ["synchronous evidence I/O and process cleanup can overshoot the local deadline",
+    retries: 0, concurrency: 1, ...(isSingleShotComparison(plan) ? { execution_contract: plan.policy.execution_contract,
+      resume: "forbidden", termination_scope: "direct_child" } : {}), limitations: ["synchronous evidence I/O and process cleanup can overshoot the local deadline",
+      ...(isSingleShotComparison(plan) ? ["forced controller termination cannot guarantee child/descendant/provider shutdown; saved PIDs are never probed or recovered"] : []),
       "provider cancellation, exact token/cost caps and monthly balance are not guaranteed or inspected"] };
 }
 
@@ -356,14 +361,17 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
     const dispatchRemaining = remaining();
     if (signal?.aborted || dispatchRemaining < 1) break;
     const value = await execute({ executable: process.execPath, argv, cwd, input: "",
+      ...(isSingleShotComparison(plan) ? { terminationScope: "direct_child" } : {}),
       onSpawn:context ? observed=>{const pid=typeof observed==="number"?observed:observed.pid; context.active_child=`verification-${index}.spawn`;
-        saveLaunchReceipt(root,condition,`verification-${index}.spawn`,{...request,pid,observed_at:new Date().toISOString(),owner:observeComparisonProcess(pid),process_group:true});
+        saveLaunchReceipt(root,condition,`verification-${index}.spawn`,{...request,pid,observed_at:new Date().toISOString(),
+          ...(isSingleShotComparison(plan) ? { termination_scope: "direct_child", process_group: false } : { owner:observeComparisonProcess(pid),process_group:true })});
         context.active_child=`verification-${index}.spawn`;
         checkpointComparison(context,"verification_running",{condition,slot:{phase:"verifying",verification_index:index}}); } : undefined,
       timeoutMs: Math.floor(Math.min(plan.config.verification_timeout_ms, dispatchRemaining)), signal,
       env: { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C", GIT_CONFIG_GLOBAL: devNull,
         GIT_CONFIG_SYSTEM: devNull, GIT_CONFIG_NOSYSTEM: "1" } });
-    if (context && value.spawnObserved === true && (value.exitCode != null || value.signal != null) && !value.cleanupError) context.active_child=null;
+    if (context && childEnded(plan, value)) context.active_child=null;
+    if (isSingleShotComparison(plan) && !childEnded(plan, value)) value.cleanupError ??= { code: "CHILD_TERMINATION_UNKNOWN", message: "verification child termination unknown; no later process may start" };
     const log = `verification-${index}.log`;
     const stdoutLog = `verification-${index}.stdout.jsonl`, stderrLog = `verification-${index}.stderr.log`;
     const bounded = boundedVerificationLogs(value.stdout, value.stderr,
@@ -394,7 +402,12 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
 
 const fault = (code, reason) => Object.assign(new Error(reason), { comparisonCode: code });
 const ACTION = "Inspect saved evidence and obtain any required legitimate authorization; do not reset attempted slots. Use a new prepared run for retries or changed settings.";
+const singleShotAction = execution => execution?.start_consumed
+  ? "Inspect retained evidence offline; this run is closed to start/resume. Any new run requires a separate explicit preparation and authorization; no automatic retry."
+  : "No start has been consumed. Inspect and explicitly authorize the first start with the exact digest; resume is forbidden and no automatic start or retry is performed.";
 const stopsComparison = state => !["completed", "verification_failed", "indeterminate", "execution_unknown"].includes(state);
+const childEnded = (plan, value) => !value.cleanupError && (isSingleShotComparison(plan)
+  ? value.terminationConfirmed === true : value.spawnObserved === true && (value.exitCode != null || value.signal != null));
 
 function validateInputs(root, plan) {
   assert.equal(comparisonHash(readStableFile(join(root, plan.input.path), "prompt", LIMIT).bytes), plan.input.digest, "prompt changed");
@@ -460,12 +473,15 @@ export async function resumeUserComparison(output, confirmedDigest, options = {}
 }
 async function executeUserComparison(output, confirmedDigest, { signal: externalSignal, runner = executeCodexSession, verifier = executeCodexSession } = {}, resume) {
   const { root, plan, plan_digest } = readUserComparisonPlan(output);
+  const singleShot = isSingleShotComparison(plan);
+  if (singleShot && resume) throw fault(9, "single-shot contract forbids resume, including never-requested conditions");
   assert.ok(plan.config.evidence_kind === "synthetic" ? runner !== executeCodexSession : runner === executeCodexSession,
     "injected fake runners require synthetic evidence; synthetic plans cannot use the real launcher");
   assert.ok(plan.config.evidence_kind === "synthetic" || verifier === executeCodexSession, "injected verifiers require synthetic evidence");
   assert.equal(confirmedDigest, plan_digest, "inspect and confirm the exact plan digest before start/resume");
   validateInputs(root, plan);
   const audit = inspectComparisonExecution(root, plan, plan_digest);
+  if (singleShot && audit.start_consumed) throw fault(9, "single-shot start consumed or unknown; this run cannot be executed again");
   if (audit.state === "state_corrupt") throw fault(10, audit.reason);
   if (["running", "ownership_unverified"].includes(audit.state)) throw fault(9, audit.reason);
   if (resume) {
@@ -474,7 +490,10 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
     recoveryChecks(root, plan, plan_digest, audit);
   } else {
     if (existsSync(join(root,"control/start.json"))) throw fault(9,"this run already consumed its start; use resume or a new run ID");
-    for (const id of comparisonConditions(plan.config.kernel_condition)) validateArm(root,plan,id,true);
+    for (const id of comparisonConditions(plan.config.kernel_condition)) {
+      validateArm(root,plan,id,true);
+      if (singleShot && pendingEvidence(root,id)) throw fault(10, `single-shot ${id} output already contains evidence; no child will be launched`);
+    }
   }
   const context = acquireComparisonOwner(root, plan, plan_digest, resume);
   context.active_child=null;
@@ -532,7 +551,8 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
         outcome: "unknown", metrics: { duration_ms: null, input_tokens: null, output_tokens: null, cached_tokens: null } });
       continue;
     }
-    const invocation = { ...userCodexInvocation(root, plan, id), timeoutMs: Math.max(1,Math.floor(Math.min(plan.config.timeout_ms,remaining()))) };
+    const invocation = { ...userCodexInvocation(root, plan, id), ...(singleShot ? { terminationScope: "direct_child" } : {}),
+      timeoutMs: Math.max(1,Math.floor(Math.min(plan.config.timeout_ms,remaining()))) };
     checkpointComparison(context,"launch_intent",{condition:id,slot:{phase:"launch_intent",attempts:1}});
     const conditionStarted = Date.now();
     saveLaunchReceipt(root, id, "request", { condition: id, run_id: plan.run_id, plan_digest, requested_at: new Date().toISOString(),
@@ -547,12 +567,14 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
       } else {
         invocation.timeoutMs=Math.floor(Math.min(plan.config.timeout_ms,dispatchRemaining));
         modelDispatched=true;
+        if (singleShot) context.active_child = "launch_request";
         value = await runner({ ...invocation, signal, onOutput: interactionObserver(action=>{interaction??=action;controller.abort();}), onSpawn: observed => {
           const pid = typeof observed === "number" ? observed : observed.pid;
           assert.ok(Number.isInteger(pid) && pid > 0, "spawn PID observation required");
           context.active_child="spawn";
           saveLaunchReceipt(root, id, "spawn", { condition: id, run_id: plan.run_id, plan_digest,
-            evidence_kind: plan.config.evidence_kind, pid, timeout_ms:invocation.timeoutMs, observed_at: new Date().toISOString(), owner:observeComparisonProcess(pid),process_group:true });
+            evidence_kind: plan.config.evidence_kind, pid, timeout_ms:invocation.timeoutMs, observed_at: new Date().toISOString(),
+            ...(singleShot ? { termination_scope: "direct_child", process_group: false } : { owner:observeComparisonProcess(pid),process_group:true }) });
           context.active_child="spawn";
           checkpointComparison(context,"model_running",{condition:id,slot:{phase:"model_running"}});
         } });
@@ -561,7 +583,8 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
       value = { spawnObserved: existsSync(evidencePath(root, id, "spawn.json")) ? true : null, exitCode: null,
         error: { code: error.code ?? "RUNNER_ERROR", message: sanitizeComparisonLog(error.message) }, stdout: "", stderr: "" };
     }
-    if (value.spawnObserved === true && (value.exitCode != null || value.signal != null) && !value.cleanupError) context.active_child=null;
+    if (childEnded(plan, value)) context.active_child=null;
+    if (singleShot && modelDispatched && !childEnded(plan, value)) value.cleanupError ??= { code: "CHILD_TERMINATION_UNKNOWN", message: "model child termination unknown; no later process may start" };
     saveNew(evidencePath(root, id, "stdout.jsonl"), sanitizeComparisonLog(value.stdout ?? ""));
     saveNew(evidencePath(root, id, "stderr.log"), sanitizeComparisonLog(value.stderr ?? ""));
     const telemetry = parseUserCodexTelemetry(value.stdout ?? "");
@@ -578,6 +601,7 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
     }
     let patch_ref = null, scope = { status: "unknown", changed_paths: [], violations: [] }, verification = null;
     try {
+      if (singleShot && context.active_child !== null) throw new Error("mutable workspace evidence deferred: child termination unknown");
       const lastMessage = evidencePath(root, id, "last-message.txt");
       if (existsSync(lastMessage)) {
         const stat = lstatSync(lastMessage);
@@ -637,7 +661,7 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
         ? verification.checks.reduce((total, check) => total + check.duration_ms, 0) : null,
       cost: null, request_count: null, usage_lower_bound:telemetry.usage_lower_bound,
       patch_ref, scope, verification, logs: ["stdout.jsonl", "stderr.log", ...(existsSync(evidencePath(root, id, "response.txt")) ? ["response.txt"] : [])] });
-    if (stopsComparison(terminal.state)) stop(terminal.state,terminal.reason);
+    if (stopsComparison(terminal.state) || (singleShot && context.active_child !== null)) stop(terminal.state,terminal.reason);
   }
     checkpointComparison(context,"invocation_ended");
     releaseComparisonOwner(context);
@@ -714,7 +738,7 @@ export function reportUserComparison(output) {
     return { condition: id, state: requested ? "incomplete" : "not_started", outcome: "unknown", ...observations,
       reason: requested ? "no terminal receipt; still running or interrupted, completion and usage unknown" : "no launch request saved" };
   });
-  let issue=headerError ? {state:"state_corrupt",reason:headerError} : ["state_corrupt","ownership_unverified","running"].includes(execution.state) ? {state:execution.state,reason:execution.reason} : null;
+  let issue=headerError ? {state:"state_corrupt",reason:headerError} : ["state_corrupt","ownership_unverified","running", ...(isSingleShotComparison(plan) ? ["indeterminate"] : [])].includes(execution.state) ? {state:execution.state,reason:execution.reason} : null;
   if (!issue && existsSync(join(root,"control/start.json")) && !execution.history?.snapshot) issue={state:"execution_blocked",reason:"legacy/incomplete start has no recovery checkpoint; automatic resume is unsupported"};
   if (!issue && execution.history?.snapshot) {
     for (const slot of slots) {
@@ -725,6 +749,9 @@ export function reportUserComparison(output) {
       }
       if (state.phase === "pending" && pendingEvidence(root,slot.condition)) {issue={state:"state_corrupt",reason:`pending ${slot.condition} contains unpublished execution evidence`};break;}
       if (!["pending","terminal"].includes(state.phase) && !existsSync(evidencePath(root,slot.condition,"result.json"))) {
+        if (isSingleShotComparison(plan)) {
+          issue={state:"indeterminate",reason:"single-shot attempted condition has no terminal result; start remains consumed, process completion unknown; no saved-PID probe or resume"};break;
+        }
         const folder=dirname(evidencePath(root,slot.condition,"spawn.json"));
         const checks=existsSync(folder)?readdirSync(folder).filter(name=>/^verification-\d+\.request\.json$/u.test(name)).sort((a,b)=>Number(a.split("-")[1].split(".")[0])-Number(b.split("-")[1].split(".")[0])):[];
         const name=checks.length?checks.at(-1).replace(".request.json",".spawn"):"spawn";
@@ -744,7 +771,8 @@ export function reportUserComparison(output) {
   const usageSlots=slots.filter(slot=>slot.launch_requested === true);
   const usageBudget={token_budget:plan.config.token_budget??null,known_tokens_lower_bound:usageSlots.reduce((total,slot)=>Math.min(Number.MAX_SAFE_INTEGER,total+(slot.usage_lower_bound?.known_tokens??0)),0),
     complete:usageSlots.length>0&&usageSlots.every(slot=>slot.usage_lower_bound?.complete===true),unknown_count:usageSlots.filter(slot=>slot.usage_lower_bound?.complete!==true).length,policy:"unknown does not alone prevent admission; reported values are a lower bound, not a hard cap"};
-  const overall={...issue,elapsed_ms:execution.history?.snapshot?Math.max(0,Date.now()-execution.history.snapshot.started_at_ms):null,exit_code:USER_COMPARISON_EXIT_CODES[issue.state]??7,required_action:issue.state === "completed" ? null : ACTION};
+  const overall={...issue,elapsed_ms:execution.history?.snapshot?Math.max(0,Date.now()-execution.history.snapshot.started_at_ms):null,exit_code:USER_COMPARISON_EXIT_CODES[issue.state]??7,required_action:issue.state === "completed" ? null : isSingleShotComparison(plan)
+    ? singleShotAction(execution) : ACTION};
   const notes = { kind: "ask_pragmatic_evaluation_notes_v1", evidence_kind: existsSync(join(root, "control/start.json")) || execution.history?.snapshot || slots.some(slot=>slot.receipt_integrity) ? plan.config.evidence_kind : "plan",
     planned_blocks: [plan.run_id], ...(plan.config.kernel_condition === KERNEL_PRINCIPLES_ID ? { kernel_condition: KERNEL_PRINCIPLES_ID } : {}), global_context: { ask_presence: plan.config.global_ask_presence, change_status: "unknown" },
     next_improvement: "review this task's saved tests, requirements, changes and unknowns before choosing a new run",
@@ -786,7 +814,7 @@ function parseOptions(argv) {
   const options = {}, flags = new Map([["--repo", "repo"], ["--commit", "commit"], ["--task", "taskFile"], ["--verification", "verificationFile"],
     ["--output", "output"], ["--cli", "cliBin"], ["--cli-version", "cliVersion"], ["--model", "model"], ["--reasoning", "reasoning"],
     ["--timeout-ms", "timeoutMs"], ["--verification-timeout-ms", "verificationTimeoutMs"], ["--overall-timeout-ms", "overallTimeoutMs"], ["--token-budget", "tokenBudget"], ["--task-class", "taskClass"],
-    ["--global-ask", "globalAskPresence"], ["--rerun-of", "rerunOf"], ["--kernel-condition", "kernelCondition"]]);
+    ["--global-ask", "globalAskPresence"], ["--rerun-of", "rerunOf"], ["--kernel-condition", "kernelCondition"], ["--execution-contract", "executionContract"]]);
   for (let index = 0; index < argv.length; index++) {
     const flag = argv[index], value = argv[++index];
     assert.ok(value && !value.startsWith("--"), `value required for ${flag}`);
@@ -809,6 +837,7 @@ function formatReport(report) {
   }
   lines.push(`Condition differences:\n${(report.condition_differences??[]).map(value=>`  ${value}`).join("\n")}\nUnknowns:\n${(report.unknowns??[]).map(value=>`  ${value}`).join("\n")}`);
   if(report.limits) lines.push(`Local overall limit: ${report.limits.overall_timeout_ms} ms; elapsed=${report.overall.elapsed_ms??"unknown"}; next-condition reserve=${report.limits.condition_admission_reserve_ms} ms; includes downtime. Provider cancellation/cost caps are not guaranteed.`);
+  if(report.limits?.termination_scope === "direct_child") lines.push("Single-shot: resume forbidden. Only the live controller's direct child is a signal target before exit/close. Forced controller exit, descendants and provider shutdown are not guaranteed; saved PIDs are never recovered.");
   if(report.usage_budget) lines.push(`Token admission budget: ${report.usage_budget.token_budget??"not configured"}; known lower bound=${report.usage_budget.known_tokens_lower_bound}; complete=${report.usage_budget.complete}; unknown conditions=${report.usage_budget.unknown_count}. Unknown usage is not zero.`);
   for(const block of report.summary?.blocks??[]) for(const contrast of block.contrasts) for(const difference of contrast.differences) lines.push(`  ${contrast.contrast}: ${difference.field} ${JSON.stringify(difference)}`);
   lines.push("patch.diff is a redacted review view and may not apply; retained control/patch-workspaces/<condition> contains the full local diff when captured.");
@@ -842,7 +871,8 @@ function failureReport(output,error, { persist = true } = {}) {
       slots:conditions.map(condition=>({condition,state:"incomplete",outcome:"unknown",launch_requested:null,spawn_observed:null,reason:"trusted execution records unavailable"})),
       unknowns:["plan and execution records cannot be validated",...(!conditions.length?["comparison condition set is unknown; no legacy or candidate slots inferred"]:[])],condition_differences:[]};
   }
-  report={...report,overall:comparisonFailureOverall(error)};
+  report={...report,overall:{...comparisonFailureOverall(error), ...(report.limits?.resume === "forbidden"
+    ? { required_action: singleShotAction(report.execution) } : {})}};
   if(!persist) return report;
   if(!trusted) return {...report,report_persistence:"unavailable; output has no validated comparison plan; no files written"};
   try {return persistInvocationReport(report,"refused");}catch {return {...report,report_persistence:"unavailable; inspect retained state after storage/permission repair"};}

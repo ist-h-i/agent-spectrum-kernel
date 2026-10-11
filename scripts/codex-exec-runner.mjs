@@ -37,7 +37,8 @@ const MANAGED_CODEX_RUNTIME_FILES = [
 function hashText(value) { return createHash("sha256").update(value).digest("hex"); }
 
 /** One explicit session request; configuration/authentication remain owned by Codex. */
-export async function executeCodexSession({ executable, argv, cwd, input, timeoutMs, signal, onSpawn, onOutput, env }, spawnProcess = spawn) {
+export async function executeCodexSession({ executable, argv, cwd, input, timeoutMs, signal, onSpawn, onOutput, env, terminationScope = "process_group" }, spawnProcess = spawn,
+  { now = Date.now, setTimer = setTimeout, clearTimer = clearTimeout, platform = process.platform, signalProcess = process.kill } = {}) {
   if (typeof executable !== "string" || !executable || executable.includes("\0")
     || !Array.isArray(argv) || argv.some(value => typeof value !== "string" || value.includes("\0"))
     || typeof cwd !== "string" || !cwd || cwd.includes("\0")
@@ -45,24 +46,26 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
     || (env !== undefined && (!env || typeof env !== "object" || Array.isArray(env) || Object.values(env).some(value => typeof value !== "string" || value.includes("\0"))))
     || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2147483647
     || (signal !== undefined && (!signal || typeof signal.aborted !== "boolean" || typeof signal.addEventListener !== "function" || typeof signal.removeEventListener !== "function"))
+    || !["process_group", "direct_child"].includes(terminationScope)
     || (onSpawn !== undefined && typeof onSpawn !== "function") || (onOutput !== undefined && typeof onOutput !== "function") || typeof spawnProcess !== "function") {
     throw new Error("a bounded Codex session request requires executable, argv, cwd, input and timeoutMs");
   }
-  const started = Date.now();
+  const directChild = terminationScope === "direct_child", started = now();
   const result = { launchRequested: true, spawnObserved: false, pid: null, exitCode: null, signal: null,
     error: null, timedOut: false, interrupted: false, outputLimited: false, cleanupError: null,
     stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), durationMs: 0 };
   const errorRecord = error => ({ code: typeof error?.code === "string" ? error.code : "RUNNER_ERROR", message: String(error?.message ?? error) });
   if (signal?.aborted) {
-    return { ...result, interrupted: true, error: { code: "ABORT_ERR", message: "session interrupted before spawn" }, durationMs: Date.now() - started };
+    return { ...result, interrupted: true, error: { code: "ABORT_ERR", message: "session interrupted before spawn" }, durationMs: now() - started,
+      ...(directChild ? { terminationConfirmed: true } : {}) };
   }
   return await new Promise(resolveResult => {
     const stdout = [], stderr = [];
     const limit = 10 * 1024 * 1024;
     let stdoutBytes = 0, stderrBytes = 0, child, deadline, escalation, shutdownDeadline, terminatingAt = null, finishing = false, rootExited = false, escalated = false, cleanupFailure = null, observerFailed = false;
     const groupPresent = () => {
-      if (process.platform === "win32" || !Number.isInteger(child?.pid) || child.pid < 1) return false;
-      try { process.kill(-child.pid, 0); return true; }
+      if (directChild || platform === "win32" || !Number.isInteger(child?.pid) || child.pid < 1) return false;
+      try { signalProcess(-child.pid, 0); return true; }
       catch (error) {
         if (error.code === "ESRCH") return false;
         cleanupFailure ??= errorRecord(error);
@@ -71,7 +74,12 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
     };
     const killTree = killSignal => {
       try {
-        if (process.platform !== "win32" && Number.isInteger(child?.pid) && child.pid > 0) process.kill(-child.pid, killSignal);
+        if (directChild) {
+          if (!finishing && result.spawnObserved && !rootExited && child.exitCode == null && child.signalCode == null) {
+            if (!child.kill(killSignal)) cleanupFailure ??= { code: "CHILD_SIGNAL_FAILED", message: "direct child signal was not delivered" };
+          }
+        }
+        else if (platform !== "win32" && Number.isInteger(child?.pid) && child.pid > 0) signalProcess(-child.pid, killSignal);
         else if (!rootExited) child?.kill(killSignal);
       } catch (error) {
         if (error.code !== "ESRCH") cleanupFailure ??= errorRecord(error);
@@ -79,22 +87,25 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
     };
     const escalate = () => { if (!escalated) { escalated = true; killTree("SIGKILL"); } };
     const terminate = () => {
+      if (directChild && finishing) return;
       if (terminatingAt !== null) return;
-      terminatingAt = Date.now();
+      terminatingAt = now();
       killTree("SIGTERM");
-      escalation = setTimeout(escalate, 1000);
-      shutdownDeadline = setTimeout(() => {
+      escalation = setTimer(escalate, 1000);
+      shutdownDeadline = setTimer(() => {
         if (finishing) return;
         result.cleanupError = cleanupFailure ?? { code: "PROCESS_DID_NOT_CLOSE", message: "session did not close after termination; process state requires attention" };
         void finish(result.exitCode, result.signal, true);
       }, 2000);
     };
     const interrupt = () => {
+      if (directChild && finishing) return;
       result.interrupted = true;
       result.error ??= { code: "ABORT_ERR", message: "session interrupted" };
       terminate();
     };
     const collect = (stream, chunk) => {
+      if (directChild && finishing) return;
       const bytes = Buffer.from(chunk), used = stream === "stdout" ? stdoutBytes : stderrBytes;
       const accepted = bytes.subarray(0, Math.max(0, limit - used));
       if (accepted.length) (stream === "stdout" ? stdout : stderr).push(accepted);
@@ -121,31 +132,36 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
     const finish = async (exitCode, exitSignal, forced = false) => {
       if (finishing) return;
       finishing = true;
-      clearTimeout(deadline);
-      clearTimeout(shutdownDeadline);
+      clearTimer(deadline);
+      clearTimer(shutdownDeadline);
       signal?.removeEventListener("abort", interrupt);
       result.exitCode = result.spawnObserved ? exitCode : null;
       result.signal = exitSignal;
       if (groupPresent()) {
         terminate();
-        const remaining = Math.max(0, 1000 - (Date.now() - terminatingAt));
-        if (remaining) await new Promise(resolveWait => setTimeout(resolveWait, remaining));
+        const remaining = Math.max(0, 1000 - (now() - terminatingAt));
+        if (remaining) await new Promise(resolveWait => setTimer(resolveWait, remaining));
         if (groupPresent()) escalate();
-        for (let index = 0; index < 100 && groupPresent(); index += 1) await new Promise(resolveWait => setTimeout(resolveWait, 10));
+        for (let index = 0; index < 100 && groupPresent(); index += 1) await new Promise(resolveWait => setTimer(resolveWait, 10));
         if (groupPresent()) result.cleanupError = cleanupFailure ?? { code: "PROCESS_GROUP_REMAINS", message: "session process group remains after termination" };
       }
-      clearTimeout(escalation);
+      clearTimer(escalation);
+      if (directChild) {
+        result.terminationConfirmed = !forced && (!result.spawnObserved || rootExited || exitCode != null || exitSignal != null);
+        result.cleanupError ??= cleanupFailure;
+      }
       if (forced) { child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy(); child.unref(); }
       result.stdout = Buffer.concat(stdout, stdoutBytes);
       result.stderr = Buffer.concat(stderr, stderrBytes);
-      result.durationMs = Date.now() - started;
+      result.durationMs = now() - started;
       resolveResult(result);
     };
     try {
-      child = spawnProcess(executable, argv, { cwd, shell: false, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"], ...(env === undefined ? {} : { env }) });
+      child = spawnProcess(executable, argv, { cwd, shell: false, detached: !directChild && platform !== "win32", stdio: ["pipe", "pipe", "pipe"], ...(env === undefined ? {} : { env }) });
     } catch (error) {
       result.error = errorRecord(error);
-      result.durationMs = Date.now() - started;
+      result.durationMs = now() - started;
+      if (directChild) result.terminationConfirmed = true; // spawn threw: no child was returned
       resolveResult(result);
       return;
     }
@@ -154,8 +170,22 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
     for (const stream of [child.stdin, child.stdout, child.stderr]) stream.on("error", error => { result.error ??= errorRecord(error); terminate(); });
     child.once("error", error => { result.error ??= errorRecord(error); });
     child.once("spawn", () => {
+      if (directChild && finishing) return;
       result.spawnObserved = true;
       result.pid = child.pid;
+      if (directChild) {
+        try {
+          const observed = onSpawn?.({ pid: child.pid });
+          if (observed && typeof observed.then === "function") {
+            Promise.resolve(observed).catch(() => {});
+            throw new Error("direct-child spawn observer must be synchronous");
+          }
+          if (!finishing && !rootExited && terminatingAt === null) {
+            if (Buffer.byteLength(input) === 0) child.stdin.end(); else child.stdin.end(input);
+          } else if (!finishing && terminatingAt !== null) killTree(escalated ? "SIGKILL" : "SIGTERM");
+        } catch (error) { result.error ??= errorRecord(error); terminate(); }
+        return;
+      }
       Promise.resolve().then(() => onSpawn?.({ pid: child.pid })).then(() => {
         if (!finishing && terminatingAt === null) {
           // A receipt observer can outlive a fast verification child. An empty
@@ -170,12 +200,13 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
       rootExited = true;
       result.exitCode = exitCode;
       result.signal = exitSignal;
-      clearTimeout(deadline);
+      clearTimer(deadline);
       terminate();
     });
     child.once("close", (exitCode, exitSignal) => { void finish(exitCode, exitSignal); });
     signal?.addEventListener("abort", interrupt, { once: true });
-    deadline = setTimeout(() => {
+    deadline = setTimer(() => {
+      if (directChild && (finishing || rootExited)) return;
       result.timedOut = true;
       result.error ??= { code: "ETIMEDOUT", message: "session exceeded its time limit" };
       terminate();
