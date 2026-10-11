@@ -11,7 +11,7 @@ import { executeCodexSession } from "./codex-exec-runner.mjs";
 import { buildAgentsBlock } from "./installer-lifecycle.mjs";
 import { comparisonConditions, KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } from "./kernel-principles.mjs";
 import { boundedVerificationLogs } from "./ask-user-comparison-logs.mjs";
-import { acquireComparisonOwner, checkpointComparison, inspectComparisonExecution, observeComparisonProcess, probeComparisonOwner, releaseComparisonOwner } from "./ask-user-comparison-state.mjs";
+import { acquireComparisonOwner, checkpointComparison, comparisonOwnershipDiagnostics, inspectComparisonExecution, observeComparisonProcess, probeComparisonOwner, releaseComparisonOwner } from "./ask-user-comparison-state.mjs";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPragmaticEvaluationReport } from "./ask-pragmatic-evaluation-report.mjs";
@@ -825,6 +825,14 @@ function persistInvocationReport(report, command) {
   renameSync(pending,target);const fd=openSync(parent,"r");try{fsyncSync(fd);}finally{closeSync(fd);}
   return value;
 }
+// Pure failure projection shared with fake-only tests; no execution or storage I/O.
+export function comparisonFailureOverall(error) {
+  const code=error.comparisonCode??10,state=code===9?"execution_blocked":code===10?"state_corrupt":"runner_failed";
+  const diagnostics=comparisonOwnershipDiagnostics(error.ownershipDiagnostics);
+  return {state,exit_code:code,reason:sanitizeComparisonLog(error.message).slice(0,4096),required_action:ACTION,
+    ...(diagnostics.length ? {ownership_diagnostics:diagnostics} : {})};
+}
+
 function failureReport(output,error, { persist = true } = {}) {
   let report, trusted=false;
   try {report=reportUserComparison(output);trusted=true;}catch {
@@ -834,8 +842,7 @@ function failureReport(output,error, { persist = true } = {}) {
       slots:conditions.map(condition=>({condition,state:"incomplete",outcome:"unknown",launch_requested:null,spawn_observed:null,reason:"trusted execution records unavailable"})),
       unknowns:["plan and execution records cannot be validated",...(!conditions.length?["comparison condition set is unknown; no legacy or candidate slots inferred"]:[])],condition_differences:[]};
   }
-  const code=error.comparisonCode??10,state=code===9?"execution_blocked":code===10?"state_corrupt":"runner_failed";
-  report={...report,overall:{state,exit_code:code,reason:sanitizeComparisonLog(error.message).slice(0,4096),required_action:ACTION}};
+  report={...report,overall:comparisonFailureOverall(error)};
   if(!persist) return report;
   if(!trusted) return {...report,report_persistence:"unavailable; output has no validated comparison plan; no files written"};
   try {return persistInvocationReport(report,"refused");}catch {return {...report,report_persistence:"unavailable; inspect retained state after storage/permission repair"};}

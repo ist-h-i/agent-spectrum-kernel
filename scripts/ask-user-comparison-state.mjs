@@ -48,35 +48,90 @@ function bind(value, plan, digest) {
   assert.equal(value.plan_digest, digest, "execution plan changed");
 }
 
-function bootIdentity() {
-  try {
-    if (process.platform === "linux") return readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim();
-    if (process.platform === "darwin") {
-      const value = spawnSync("/usr/sbin/sysctl", ["-n", "kern.boottime"], {
-        encoding: "utf8", timeout: 2000, maxBuffer: 4096, env: { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C" },
-      });
-      if (!value.error && value.status === 0 && value.stdout.trim()) return value.stdout.trim();
+const OWNERSHIP_STAGES = ["boot", "existence", "birth", "existence_recheck", "identity"];
+const OWNERSHIP_REASONS = ["io_error", "timeout", "nonzero_exit", "signal_exit", "empty_output", "unavailable", "missing_identity"];
+const OWNERSHIP_ERROR_CODES = ["EPERM", "EACCES", "ENOENT", "ESRCH", "ETIMEDOUT", "EIO", "ENOBUFS", "EINVAL"];
+const OWNERSHIP_SIGNALS = ["SIGTERM", "SIGKILL", "SIGINT", "SIGABRT", "SIGHUP"];
+
+// Closed projection: never persist command output, error messages or arbitrary fields.
+export function comparisonOwnershipDiagnostics(checks) {
+  if (!Array.isArray(checks)) return [];
+  return checks.slice(0, 5).filter(value => value && OWNERSHIP_STAGES.includes(value.stage)
+    && OWNERSHIP_REASONS.includes(value.reason)).map(value => ({ stage: value.stage, reason: value.reason,
+    ...(OWNERSHIP_ERROR_CODES.includes(value.error_code) ? { error_code: value.error_code } : {}),
+    ...(Number.isInteger(value.exit_status) && value.exit_status >= 0 && value.exit_status <= 255 ? { exit_status: value.exit_status } : {}),
+    ...(OWNERSHIP_SIGNALS.includes(value.signal) ? { signal: value.signal } : {}) }));
+}
+
+/** Required internal I/O boundary for unit tests. No defaults or CLI override. */
+export function createComparisonProcessObserver({ platform, host, readBoot, run, signalZero }) {
+  for (const fn of [host, readBoot, run, signalZero]) assert.equal(typeof fn, "function", "ownership I/O must be explicit");
+  return pid => {
+    const diagnostics = [];
+    const failure = (stage, value, reason = value.error?.code === "ETIMEDOUT" ? "timeout" : value.error ? "io_error"
+      : Number.isInteger(value.status) && value.status !== 0 ? "nonzero_exit"
+        : value.status !== 0 ? value.signal ? "signal_exit" : "unavailable" : "empty_output") => {
+      diagnostics.push(...comparisonOwnershipDiagnostics([{ stage, reason, error_code: value.error?.code,
+        exit_status: value.status, signal: value.signal }]));
+    };
+    const observed = identity => diagnostics.length ? { ...identity, diagnostics } : identity;
+    const bootIdentity = () => {
+      try {
+        if (platform === "linux") {
+          const boot = readBoot().trim();
+          if (!boot) failure("boot", {}, "empty_output");
+          return boot;
+        }
+        if (platform === "darwin") {
+          const value = run("/usr/sbin/sysctl", ["-n", "kern.boottime"]);
+          if (!value.error && value.status === 0 && value.stdout.trim()) return value.stdout.trim();
+          failure("boot", value);
+        } else failure("boot", {}, "unavailable");
+      } catch (value) { failure("boot", { error: value }); }
+      return null;
+    };
+    const identity = { host: host(), platform, boot: bootIdentity(), pid, birth: null, status: "unknown" };
+    if (!Number.isSafeInteger(pid) || pid < 1) {
+      failure("identity", {}, "missing_identity"); return observed(identity);
     }
-  } catch { /* Unavailable ownership is not absent ownership. */ }
-  return null;
+    try { signalZero(pid); }
+    catch (value) {
+      failure("existence", { error: value });
+      return observed({ ...identity, status: value.code === "ESRCH" ? "gone" : "unknown" });
+    }
+    const value = run("/bin/ps", ["-p", String(pid), "-o", "lstart="]);
+    if (!value.error && value.status === 0 && value.stdout.trim() && identity.boot !== null) {
+      return observed({ ...identity, birth: value.stdout.trim(), status: "alive" });
+    }
+    // Successful ps with missing boot must stay unknown; it is not a ps failure.
+    if (value.error || value.status !== 0 || !value.stdout.trim()) failure("birth", value);
+    try { signalZero(pid); }
+    catch (value) {
+      failure("existence_recheck", { error: value });
+      if (value.code === "ESRCH") return observed({ ...identity, status: "gone" });
+    }
+    return observed(identity);
+  };
 }
 
 /** Only signal 0 and bounded read-only local process metadata. No persisted PID
  * is ever passed to a terminating signal by this module or by resume. */
-export function observeComparisonProcess(pid) {
-  const identity = { host: hostname(), platform: process.platform, boot: bootIdentity(), pid, birth: null, status: "unknown" };
-  if (!Number.isSafeInteger(pid) || pid < 1) return identity;
-  try { process.kill(pid, 0); }
-  catch (value) { return { ...identity, status: value.code === "ESRCH" ? "gone" : "unknown" }; }
-  const value = spawnSync("/bin/ps", ["-p", String(pid), "-o", "lstart="], {
+export const observeComparisonProcess = createComparisonProcessObserver({
+  platform: process.platform, host: hostname,
+  readBoot: () => readFileSync("/proc/sys/kernel/random/boot_id", "utf8"),
+  run: (command, argv) => spawnSync(command, argv, {
     encoding: "utf8", timeout: 2000, maxBuffer: 4096, env: { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C" },
-  });
-  if (!value.error && value.status === 0 && value.stdout.trim() && identity.boot !== null) {
-    return { ...identity, birth: value.stdout.trim(), status: "alive" };
+  }),
+  signalZero: pid => process.kill(pid, 0),
+});
+
+export function requireComparisonControllerIdentity(identity) {
+  if (identity.status !== "alive" || !identity.birth || !identity.boot) {
+    const checks = comparisonOwnershipDiagnostics(identity.diagnostics);
+    throw Object.assign(error(9, "current controller ownership unavailable"), {
+      ownershipDiagnostics: checks.length ? checks : [{ stage: "identity", reason: "missing_identity" }],
+    });
   }
-  try { process.kill(pid, 0); }
-  catch (value) { if (value.code === "ESRCH") return { ...identity, status: "gone" }; }
-  return identity;
 }
 
 export function probeComparisonOwner(owner, processGroup = false) {
@@ -204,7 +259,7 @@ export function acquireComparisonOwner(root, plan, digest, resume) {
   if (inspected.history?.pending.length) throw error(10, "uncommitted execution event; manual evidence review required");
   if (!resume && (inspected.owner || inspected.history?.snapshot)) throw error(10, "incomplete initial execution state; cannot silently start again");
   const identity = observeComparisonProcess(process.pid);
-  if (identity.status !== "alive" || !identity.birth || !identity.boot) throw error(9, "current controller ownership unavailable");
+  requireComparisonControllerIdentity(identity);
   const parent = join(root, "control/leases"); directory(parent, true);
   const count = inspected.owner?.sequence ?? 0;
   const sequence = count + 1, path = join(parent, numberName(sequence));
