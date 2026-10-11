@@ -33,4 +33,3 @@ Allowed implementation files:
 Do not modify package.json, docs/, test/fixed/, the original test/rule-service.test.mjs, task.md, or contract-binding.json. Do not add dependencies/new source modules. Fixed evaluation tests are separate from model-added tests.
 
 The fixed tests supplement these inherited ten requirement sentences. Apply the new numerical/ASCII/legacy boundaries in docs/rule-batches.md. This is a prospective task; no previous implementation or result is an authority.
-

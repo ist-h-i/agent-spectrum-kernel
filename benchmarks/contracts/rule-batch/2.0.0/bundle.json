@@ -178,8 +178,8 @@
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/task.md",
-      "digest": "sha256:0a8ec04138c4ecbb96ade22d5245474b8219601682fb3f4308cd9136ccdff724",
-      "bytes": 2357
+      "digest": "sha256:e04e773be08514ad0fd2d1a8538cf3d99d9db0f0e35b323e43153335366cc07d",
+      "bytes": 2356
     },
     {
       "path": "benchmarks/contracts/rule-batch/2.0.0/verification-contract.md",
