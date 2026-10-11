@@ -11,8 +11,22 @@ import { EventEmitter } from 'node:events';
 import { dirname, join, resolve } from 'node:path';
 import { executeCodexSession } from './codex-exec-runner.mjs';
 import { comparisonExecutionPolicy, comparisonHash, inventoryUserTree, inventoryComparisonGitMetadata, prepareUserComparison } from './ask-user-comparison-prepare.mjs';
-import { acquireComparisonOwner, checkpointComparison, inspectComparisonExecution, readComparisonHistory, releaseComparisonOwner } from './ask-user-comparison-state.mjs';
-import { startUserComparison, resumeUserComparison, reportUserComparison, inspectUserComparison, readUserComparisonPlan, aggregateUserComparisons } from './ask-user-comparison.mjs';
+// The legacy observer captures its host function at module initialization.
+// Install fake host bytes before loading it, then restore the global binding;
+// per-test mocks cannot replace a function already captured by that factory.
+const savedHostname = os.hostname;
+let stateModule, comparisonModule;
+try {
+  os.hostname = () => 'fake-host';
+  syncBuiltinESMExports();
+  stateModule = await import('./ask-user-comparison-state.mjs');
+  comparisonModule = await import('./ask-user-comparison.mjs');
+} finally {
+  os.hostname = savedHostname;
+  syncBuiltinESMExports();
+}
+const { acquireComparisonOwner, checkpointComparison, inspectComparisonExecution, observeComparisonProcess, readComparisonHistory, releaseComparisonOwner } = stateModule;
+const { startUserComparison, resumeUserComparison, reportUserComparison, inspectUserComparison, readUserComparisonPlan, aggregateUserComparisons } = comparisonModule;
 
 class Clock {
   at = 1800000000000; next = 1; timers = new Map();
@@ -119,7 +133,12 @@ function sandbox(t) {
     }
     return { status: 0, stdout, stderr: '' };
   });
-  t.mock.method(Date, 'now', clock.now);
+  const RealDate = Date;
+  t.mock.method(globalThis, 'Date', class extends RealDate {
+    constructor(...args) { super(...(args.length ? args : [clock.now()])); }
+    static now = clock.now;
+  });
+  assert.equal(new Date().getTime(), clock.now(), 'receipt timestamps must use the virtual clock');
   t.mock.method(performance, 'now', () => clock.at);
   t.mock.method(globalThis, 'setTimeout', clock.set);
   t.mock.method(globalThis, 'clearTimeout', clock.clear);
@@ -232,6 +251,7 @@ test('single-shot shares scope, verification, logs, receipts, time, usage and ag
   const env = sandbox(t), p = fixture(env), ex = executions(env);
   const report = await start(p, ex);
   assert.equal(report.overall.state, 'completed'); assert.equal(ex.calls.length, 3); assert.equal(ex.checks.length, 6);
+  assert.equal(report.invocation.at, new Date(env.clock.now()).toISOString());
   assert.ok([...ex.calls, ...ex.checks].every(request => request.terminationScope === 'direct_child'));
   assert.equal(new Set(ex.calls.map(request => request.cwd)).size, 3);
   assert.ok(report.slots.every(slot => slot.receipt_integrity === 'valid' && slot.scope.status === 'pass' && slot.patch_ref === 'patch.diff' && slot.metrics.duration_ms !== null && slot.metrics.input_tokens === 3));
@@ -307,7 +327,11 @@ test('new preparation output collision refuses before touching output or launchi
 });
 test('legacy contract keeps ownership and pending-only resume using exclusively fake metadata I/O', async t => {
   const env = sandbox(t), p = fixture(env, { single: false }), ex = executions(env, { interrupt: true });
+  assert.equal(observeComparisonProcess(4242).host, 'fake-host', 'captured observer host must be fake');
   const first = await start(p, ex); assert.equal(first.overall.state, 'interrupted'); assert.equal(ex.calls.length, 1);
+  const owner = JSON.parse(env.memory.readFileSync(join(p.root, 'control/leases/00000001/owner/record.json'), 'utf8'));
+  assert.equal(owner.identity.host, 'fake-host');
+  assert.equal(owner.acquired_at, new Date(env.clock.now()).toISOString());
   assert.ok(env.ownership.length > 0); const next = executions(env);
   const report = await resumeUserComparison(p.root, p.plan_digest, next); assert.equal(next.calls.length, 2);
   assert.ok(next.calls.every(request => request.terminationScope === undefined));
