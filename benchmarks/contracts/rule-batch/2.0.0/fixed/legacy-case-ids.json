@@ -1,0 +1,458 @@
+[
+  {
+    "id": "public-call-and-exported-errors",
+    "requirement": "r1"
+  },
+  {
+    "id": "top-shape-0",
+    "requirement": "r2"
+  },
+  {
+    "id": "top-shape-1",
+    "requirement": "r2"
+  },
+  {
+    "id": "top-shape-2",
+    "requirement": "r2"
+  },
+  {
+    "id": "top-shape-3",
+    "requirement": "r2"
+  },
+  {
+    "id": "top-shape-4",
+    "requirement": "r2"
+  },
+  {
+    "id": "top-shape-5",
+    "requirement": "r2"
+  },
+  {
+    "id": "top-shape-6",
+    "requirement": "r2"
+  },
+  {
+    "id": "top-shape-7",
+    "requirement": "r2"
+  },
+  {
+    "id": "top-shape-8",
+    "requirement": "r2"
+  },
+  {
+    "id": "top-shape-9",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-reject-0",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-reject-1",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-reject-2",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-reject-3",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-reject-4",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-reject-5",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-reject-6",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-reject-7",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-reject-8",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-reject-9",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-accept-0",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-accept-1",
+    "requirement": "r2"
+  },
+  {
+    "id": "requestId-accept-2",
+    "requirement": "r2"
+  },
+  {
+    "id": "version-reject-0",
+    "requirement": "r2"
+  },
+  {
+    "id": "version-reject-1",
+    "requirement": "r2"
+  },
+  {
+    "id": "version-reject-2",
+    "requirement": "r2"
+  },
+  {
+    "id": "version-reject-3",
+    "requirement": "r2"
+  },
+  {
+    "id": "version-reject-4",
+    "requirement": "r2"
+  },
+  {
+    "id": "version-reject-5",
+    "requirement": "r2"
+  },
+  {
+    "id": "version-reject-6",
+    "requirement": "r2"
+  },
+  {
+    "id": "integer-no-schema-maximum-0",
+    "requirement": "r2"
+  },
+  {
+    "id": "integer-no-schema-maximum-1",
+    "requirement": "r2"
+  },
+  {
+    "id": "integer-no-schema-maximum-2",
+    "requirement": "r2"
+  },
+  {
+    "id": "integer-no-schema-maximum-3",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-0",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-1",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-2",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-3",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-4",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-5",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-6",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-7",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-8",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-9",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-10",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-11",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-12",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-13",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-14",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-15",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-reject-16",
+    "requirement": "r2"
+  },
+  {
+    "id": "operations-length-20",
+    "requirement": "r2"
+  },
+  {
+    "id": "canonical-accept-0",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-accept-1",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-accept-2",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-accept-3",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-reject-0",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-reject-1",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-reject-2",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-reject-3",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-reject-4",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-reject-5",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-reject-6",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-reject-7",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-reject-8",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-reject-9",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-reject-10",
+    "requirement": "r3"
+  },
+  {
+    "id": "canonical-reject-11",
+    "requirement": "r3"
+  },
+  {
+    "id": "duplicate-0",
+    "requirement": "r3"
+  },
+  {
+    "id": "duplicate-1",
+    "requirement": "r3"
+  },
+  {
+    "id": "duplicate-2",
+    "requirement": "r3"
+  },
+  {
+    "id": "scalar-accept-0",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-accept-1",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-accept-2",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-accept-3",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-accept-4",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-accept-5",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-accept-6",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-accept-7",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-accept-8",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-accept-9",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-reject-0",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-reject-1",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-reject-2",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-reject-3",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-reject-4",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-reject-5",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-reject-6",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-reject-7",
+    "requirement": "r4"
+  },
+  {
+    "id": "scalar-reject-8",
+    "requirement": "r4"
+  },
+  {
+    "id": "version-mismatch-preserves-state",
+    "requirement": "r5"
+  },
+  {
+    "id": "late-failure-and-id-recovery-0",
+    "requirement": "r5"
+  },
+  {
+    "id": "late-failure-and-id-recovery-1",
+    "requirement": "r5"
+  },
+  {
+    "id": "late-failure-and-id-recovery-2",
+    "requirement": "r5"
+  },
+  {
+    "id": "late-failure-and-id-recovery-3",
+    "requirement": "r5"
+  },
+  {
+    "id": "old-receipt-and-new-id-survive-failure",
+    "requirement": "r5"
+  },
+  {
+    "id": "mixed-batch-one-increment",
+    "requirement": "r6"
+  },
+  {
+    "id": "no-op-batch-increments-once",
+    "requirement": "r6"
+  },
+  {
+    "id": "twenty-sets-one-increment",
+    "requirement": "r6"
+  },
+  {
+    "id": "normalized-replay-before-current-version",
+    "requirement": "r7"
+  },
+  {
+    "id": "changed-normalized-field-0",
+    "requirement": "r7"
+  },
+  {
+    "id": "changed-normalized-field-1",
+    "requirement": "r7"
+  },
+  {
+    "id": "changed-normalized-field-2",
+    "requirement": "r7"
+  },
+  {
+    "id": "changed-normalized-field-3",
+    "requirement": "r7"
+  },
+  {
+    "id": "changed-normalized-field-4",
+    "requirement": "r7"
+  },
+  {
+    "id": "changed-normalized-field-5",
+    "requirement": "r7"
+  },
+  {
+    "id": "changed-normalized-field-6",
+    "requirement": "r7"
+  },
+  {
+    "id": "changed-normalized-field-7",
+    "requirement": "r7"
+  },
+  {
+    "id": "frozen-input-no-mutation",
+    "requirement": "r8"
+  },
+  {
+    "id": "receipt-replay-nested-aliasing",
+    "requirement": "r8"
+  },
+  {
+    "id": "caller-request-after-acceptance-not-retained",
+    "requirement": "r8"
+  },
+  {
+    "id": "exact-receipt-fields-and-lexical-order",
+    "requirement": "r9"
+  },
+  {
+    "id": "legacy-differential-trace",
+    "requirement": "r10"
+  }
+]

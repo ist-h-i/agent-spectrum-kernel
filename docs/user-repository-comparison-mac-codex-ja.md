@@ -13,6 +13,9 @@
 [無人実行の信頼性契約](unattended-user-comparison-contract.md)、比較の解釈は
 [探索的評価](pragmatic-evaluation.md) に記載しています。
 
+rule-batch課題の次回比較には、旧結果と分離した
+[仕様・固定verifier 2.0.0](rule-batch-prospective-comparison.md)を使えます。
+
 ## 1. 操作する場所と前提
 
 完全な ASK checkout と Node 24.x、Git を用意します。実行段階では、利用者が普段

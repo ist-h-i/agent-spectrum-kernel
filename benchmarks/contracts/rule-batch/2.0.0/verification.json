@@ -1,0 +1,100 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "test/fixed/contract.test.mjs",
+    "test/fixed/legacy.test.mjs"
+  ],
+  "requirements": [
+    {
+      "id": "r1",
+      "description": "Public API and exported errors",
+      "command": [
+        "node",
+        "--test",
+        "test/fixed/r1.test.mjs"
+      ]
+    },
+    {
+      "id": "r2",
+      "description": "Schema shape without coercion",
+      "command": [
+        "node",
+        "--test",
+        "test/fixed/r2.test.mjs"
+      ]
+    },
+    {
+      "id": "r3",
+      "description": "Batch raw ASCII then ASCII trim/lower/pattern, distinct canonical keys",
+      "command": [
+        "node",
+        "--test",
+        "test/fixed/r3.test.mjs"
+      ]
+    },
+    {
+      "id": "r4",
+      "description": "Exact scalar types, finite numbers; preserve signed zero",
+      "command": [
+        "node",
+        "--test",
+        "test/fixed/r4.test.mjs"
+      ]
+    },
+    {
+      "id": "r5",
+      "description": "Atomic validation/version/replay, rejection preserves state",
+      "command": [
+        "node",
+        "--test",
+        "test/fixed/r5.test.mjs"
+      ]
+    },
+    {
+      "id": "r6",
+      "description": "set/delete and one increment per new ID, including no-op deletes",
+      "command": [
+        "node",
+        "--test",
+        "test/fixed/r6.test.mjs"
+      ]
+    },
+    {
+      "id": "r7",
+      "description": "Full normalized payload; typed Object.is values; counter zeros equal",
+      "command": [
+        "node",
+        "--test",
+        "test/fixed/r7.test.mjs"
+      ]
+    },
+    {
+      "id": "r8",
+      "description": "Input and output isolated, including cloneable legacy raw store values",
+      "command": [
+        "node",
+        "--test",
+        "test/fixed/r8.test.mjs"
+      ]
+    },
+    {
+      "id": "r9",
+      "description": "Exact receipt snapshot and JavaScript lexical construction",
+      "command": [
+        "node",
+        "--test",
+        "test/fixed/r9.test.mjs"
+      ]
+    },
+    {
+      "id": "r10",
+      "description": "Seed single-rule/direct store compatibility with separate batch boundary",
+      "command": [
+        "node",
+        "--test",
+        "test/fixed/r10.test.mjs"
+      ]
+    }
+  ]
+}

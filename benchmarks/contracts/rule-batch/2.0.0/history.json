@@ -1,0 +1,27 @@
+{
+  "original_run_id": "f37390c0-c168-406d-8823-b02b9e09154d",
+  "posthoc_evaluation_id": "21b2ef0e-93e3-4f5d-bb7c-a4e40c2442c8",
+  "posthoc_verifier_id": "rule-batch-posthoc-v1.2",
+  "posthoc_verifier_digest": "sha256:0b7f9a24053b861e64069fdd107947d10e9544b40e9c943eac1cb959b8c4217c",
+  "original_ask_commit": "1a6227f6d9de37c9cee9b8d8fac88dc73b3d758c",
+  "original_seed_commit": "d84f744aa440ed8ab18bb35e3d5030b5da3c845f",
+  "original_plan_digest": "sha256:b01e23e65a30475aebab5ce2aa9ff77b799b3d1ced13c30cbb1da135993b8ff8",
+  "original_task_digest": "sha256:67d2a1deb9e7e924673c5bed216c55537f7a729e194ccb07d0f344f3c68e9d38",
+  "public_tests": {
+    "P": "3/3",
+    "F": "3/3"
+  },
+  "original_overall_exit_code": 7,
+  "posthoc_cases": {
+    "P": "114/114",
+    "F": "114/114"
+  },
+  "posthoc_requirement_status": {
+    "r1-r6,r8,r9": "pass_within_defined_coverage",
+    "r7": "unknown_signed_zero_identity",
+    "r10": "unknown_unicode_ascii_scope"
+  },
+  "K": "capability_missing_not_started_no_artifact_quality_score",
+  "retrospective_v2_evaluation": "NOT_RUN",
+  "published_private_execution_logs": false
+}
