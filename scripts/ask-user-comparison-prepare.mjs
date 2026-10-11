@@ -9,6 +9,7 @@ import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { buildAgentsBlock, coreImmutableAssetKind, CORE_OWNED_IMMUTABLE_ASSETS, MANAGED_START, MANAGED_END } from "./installer-lifecycle.mjs";
 import { skillAssets } from "./skill-assets.mjs";
+import { comparisonConditions, KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } from "./kernel-principles.mjs";
 
 const SOURCE = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 const CORE_STATE = ".agent-spectrum-kernel/install-state.json";
@@ -449,7 +450,7 @@ function kernelCapability(inventory, config) {
 
 function validateOptions(options) {
   if (!plainObject(options)) fail("options_object_required");
-  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf"];
+  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf", "kernelCondition"];
   if (Object.keys(options).some(key => !allowed.includes(key))) fail("unknown_preparation_option");
   for (const name of ["repo", "output"]) if (typeof options[name] !== "string" || !isAbsolute(options[name]) || resolve(options[name]) !== options[name]) fail(`absolute_${name}_required`);
   if (realpathSync(options.repo) !== options.repo || !lstatSync(options.repo).isDirectory()) fail("canonical_repository_root_required");
@@ -463,7 +464,9 @@ function validateOptions(options) {
     overall_timeout_ms: options.overallTimeoutMs ?? 3600000, token_budget: options.tokenBudget ?? null,
     task_class: options.taskClass ?? "implementation", global_capabilities: options.globalCapabilities ?? [], global_ask_presence: options.globalAskPresence ?? "unknown",
     evidence_kind: options.evidenceKind ?? "observed", platform: `${process.platform}/${process.arch}`,
-    node_version: process.version, os_release: release() };
+    node_version: process.version, os_release: release(),
+    ...(options.kernelCondition === undefined ? {} : { kernel_condition: options.kernelCondition }) };
+  comparisonConditions(config.kernel_condition);
   if (typeof config.cli_bin !== "string" || !(config.cli_bin === "codex" || isAbsolute(config.cli_bin)) || /[\u0000-\u001f\u007f]/u.test(config.cli_bin)) fail("invalid_cli_binary");
   for (const field of ["cli_version", "model", "reasoning"]) if (config[field] !== null && (typeof config[field] !== "string" || !config[field].trim() || /[\u0000-\u001f\u007f]/u.test(config[field]))) fail(`invalid_${field}`);
   for (const field of ["timeout_ms", "verification_timeout_ms", "overall_timeout_ms"]) if (!Number.isSafeInteger(config[field]) || config[field] < 1 || config[field] > 86400000) fail(`invalid_${field}`);
@@ -506,6 +509,9 @@ export function prepareUserComparison(options = {}) {
     if (testPaths.some(path => mutablePath.endsWith("/") ? path.startsWith(mutablePath) : path === mutablePath)) fail("mutable_scope_overlaps_verification_test");
   }
   const distribution = sourceDistribution(), separated = separateManagedAsk(original, distribution);
+  const canonicalBytes = readRegular(join(SOURCE, "AGENTS.md"), "canonical_agents");
+  const principles = config.kernel_condition === KERNEL_PRINCIPLES_ID ? renderKernelPrinciples(canonicalBytes) : null;
+  const rendererBytes = principles ? readRegular(join(SOURCE, "scripts/kernel-principles.mjs"), "principles_renderer") : null;
   for (const path of testPaths) if (!separated.source.has(path)) fail("verification_test_is_managed_ask_asset");
   const root = options.output;
   const publicCommands = [...new Map([recipe.command, ...recipe.requirements.filter(item => item.command).map(item => item.command)].map(command => [JSON.stringify(command), command])).values()];
@@ -517,15 +523,22 @@ export function prepareUserComparison(options = {}) {
   writeNew(root, "inputs/prompt.md", Buffer.from(prompt));
   mkdirSync(join(root, "control/patch-workspaces"), { mode: 0o700 });
   const arms = {};
-  const canonicalBytes = readRegular(join(SOURCE, "AGENTS.md"), "canonical_agents");
   const canonicalBlock = Buffer.from(buildAgentsBlock(UTF8.decode(canonicalBytes)));
   const customAgents = separated.source.get("AGENTS.md")?.bytes ?? Buffer.alloc(0);
-  for (const [id, label] of [["plain", "P"], ["kernel_only", "K"], ["full_ask", "F"]]) {
+  if (principles) {
+    writeNew(root, "control/kernel-principles-source.md", canonicalBytes);
+    writeNew(root, "control/kernel-principles-renderer.mjs", rendererBytes);
+  }
+  for (const id of comparisonConditions(config.kernel_condition)) {
+    const label = id === "plain" ? "P" : id === "full_ask" ? "F" : id === "kernel_only" ? "K" : "K-principles";
     const path = `arms/${id}`, armRoot = join(root, path);
     mkdirSync(armRoot, { recursive: true, mode: 0o700 });
     for (const [file, value] of separated.source) writeNew(armRoot, file, value.bytes, value.mode);
     if (id === "kernel_only") {
       writeFileSync(join(armRoot, "AGENTS.md"), appendKernel(customAgents, canonicalBlock), { mode: 0o600 });
+    }
+    if (id === KERNEL_PRINCIPLES_ID) {
+      writeFileSync(join(armRoot, "AGENTS.md"), appendKernel(customAgents, Buffer.from(buildAgentsBlock(principles.body))), { mode: 0o600 });
     }
     if (id === "full_ask") {
       const steps = [["install-kernel.mjs", ["--merge-agents"]], ["install-codex-adapter.mjs", ["--profile", "full"]]];
@@ -547,11 +560,11 @@ export function prepareUserComparison(options = {}) {
       }
     }
     const baseline = inventoryUserTree(armRoot);
-    const assetPaths = id === "plain" ? [] : id === "kernel_only" ? ["AGENTS.md"]
+    const assetPaths = id === "plain" ? [] : id !== "full_ask" ? ["AGENTS.md"]
       : [...new Set(["AGENTS.md", CORE_STATE, CODEX_STATE, ...distribution.allPaths])].sort();
     const assets = assetPaths.map(file => ({ path: file, ...baseline[file],
-      kind: file === "AGENTS.md" ? "canonical_kernel_with_preserved_custom_instructions" : file.endsWith("install-state.json") ? "install_identity" : "full_ask_asset",
-      origin: distribution.extra.has(file) ? "live_classified_reference_supplement" : id === "kernel_only" ? "canonical_agents" : "live_core_and_codex_full_installers" }));
+      kind: file === "AGENTS.md" ? id === KERNEL_PRINCIPLES_ID ? "generated_principles_with_preserved_custom_instructions" : "canonical_kernel_with_preserved_custom_instructions" : file.endsWith("install-state.json") ? "install_identity" : "full_ask_asset",
+      origin: id === KERNEL_PRINCIPLES_ID ? "canonical_principles_projection" : distribution.extra.has(file) ? "live_classified_reference_supplement" : id === "kernel_only" ? "canonical_agents" : "live_core_and_codex_full_installers" }));
     const baselineCommit = prepareGitBaseline(armRoot);
     // Every regular file belongs in the explicit baseline; no task/controller
     // file is placed inside an arm, even during Git initialization.
@@ -566,9 +579,11 @@ export function prepareUserComparison(options = {}) {
     if (JSON.stringify(inventoryUserTree(join(root, baselinePath))) !== JSON.stringify(baseline)) fail("private_baseline_inventory_mismatch");
     arms[id] = { id, label, path, baseline_path: baselinePath, baseline_commit: baselineCommit, baseline_inventory: baseline,
       baseline_digest: comparisonHash(jsonBytes(baseline)), git_metadata: inventoryComparisonGitMetadata(armRoot), assets,
-      capability: id === "kernel_only" ? kernelCapability(baseline, config) : { status: "available", required: [], available: [], missing: [] },
+      capability: id === "kernel_only" ? kernelCapability(baseline, config) : id === KERNEL_PRINCIPLES_ID
+        ? principlesCapability(canonicalBytes, principles.body, principles.generation, config.task_class) : { status: "available", required: [], available: [], missing: [] },
       configuration: id === "plain" ? "No project ASK assets added; preserved custom instructions and global Skills may apply."
         : id === "kernel_only" ? "Canonical AGENTS only; no ASK Skills added; preserved custom/global capabilities may apply."
+          : id === KERNEL_PRINCIPLES_ID ? "Generated canonical basic principles only; no added ASK Skills or formal protocols; distinct from legacy K and Core Bundle."
           : "Live core plus Codex full and all classified reference-supplement paths; preserved custom/global instructions may apply." };
   }
   const sourceInventory = Object.fromEntries([...original].sort(([a], [b]) => a.localeCompare(b)).map(([path, value]) => [path, record(value.bytes, value.mode)]));
@@ -579,6 +594,10 @@ export function prepareUserComparison(options = {}) {
       reporter: { path: "control/node-test-reporter.mjs", digest: comparisonHash(reporterBytes), format: "ask_node_summary_jsonl_v1" } },
     prompt, input: { path: "inputs/prompt.md", digest: comparisonHash(Buffer.from(prompt)), bytes: Buffer.byteLength(prompt) },
     mutable_paths: mutable, config, policy: { attempts: 1, retries: 0, concurrency: 1 },
+    ...(principles ? { kernel_definition: { generation: principles.generation,
+      source_commit: git(SOURCE, ["rev-parse", "HEAD"]).toString().trim(),
+      canonical_source: { path: "control/kernel-principles-source.md", digest: comparisonHash(canonicalBytes) },
+      renderer_source: { path: "control/kernel-principles-renderer.mjs", digest: comparisonHash(rendererBytes) } } } : {}),
     execution_protocol: { version: 2, resume: "never_requested_conditions_only", deadline_origin: "first_start_including_downtime",
       usage_budget_basis: "known_input_plus_output_tokens_lower_bound", unknown_usage_policy: "continue_with_unknown" }, arms,
     source_installation: { removed_managed_assets: separated.removed, identities: separated.identities,
@@ -593,7 +612,9 @@ export function prepareUserComparison(options = {}) {
         commands: distribution.projection.commands.length, reference_supplement: distribution.extra.size, full_assets: arms.full_ask.assets.length },
       supplement: { path: SUPPLEMENT, digest: distribution.supplementDigest, policy: "classified_paths_only_with_live_source_bytes_and_new_hashes" },
       asset_digest: comparisonHash(jsonBytes(arms.full_ask.assets)) },
-    condition_differences: ["Project ASK assets differ by P/K/F; custom instructions are preserved.", "K missing routes are capability_missing without adding Skills.",
+    condition_differences: [principles ? "Project ASK assets differ by P/K-principles/F; custom instructions are preserved." : "Project ASK assets differ by P/K/F; custom instructions are preserved.", principles
+      ? "K-principles is a distinct basic-principles candidate, not formal ASK protocol parity; F-minus-candidate is a configuration comparison."
+      : "K missing routes are capability_missing without adding Skills.",
       "Separate sequential sessions can retain unknown global/provider/session differences."],
     unknowns: ["future_provider_communication", "global_instruction_and_skill_inventory", "authentication_and_permission_state", "effective_model_if_not_declared", "usage_until_reported_by_runner"],
     limitations: ["Initial target: Mac/Git/Codex; regular committed files only, no symlinks/submodules or recognizable secret files.",

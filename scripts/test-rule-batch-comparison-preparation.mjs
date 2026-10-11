@@ -111,6 +111,16 @@ test('existing preparation freezes one common public bundle for P/K/F without st
     assert.deepEqual(readFileSync(join(prepared.root, arm.path, 'test/fixed/cases.mjs')), checked.assets.get(`${BUNDLE_PATH}/fixed/cases.mjs`));
   }
   assert.equal(existsSync(launch), false);
+  const candidate = prepareRuleBatchComparison(receipt.output, checked.bundleDigest, commit,
+    { ...options, output: join(root, 'principles-comparison'), kernelCondition: 'kernel_principles_v1' });
+  assert.deepEqual(Object.keys(candidate.plan.arms), ['plain', 'kernel_principles_v1', 'full_ask']);
+  assert.equal(candidate.plan.arms.kernel_principles_v1.capability.status, 'available');
+  assert.equal(candidate.plan.task.digest, prepared.plan.task.digest);
+  assert.equal(candidate.plan.verification.digest, prepared.plan.verification.digest);
+  assert.deepEqual(candidate.plan.source.inventory, prepared.plan.source.inventory);
+  assert.deepEqual(candidate.plan.mutable_paths, prepared.plan.mutable_paths);
+  assert.equal(inspectUserComparison(candidate.root).invocations[1].condition, 'kernel_principles_v1');
+  assert.equal(existsSync(launch), false);
   assert.throws(() => prepareRuleBatchComparison(receipt.output, checked.bundleDigest, commit,
     { ...options, output: join(root, 'bad-scope'), mutablePaths: ['src/', 'test/'] }), /bundle_owned_option_override/);
   assert.equal(digest(readFileSync(receipt.taskFile)), prepared.plan.task.digest);

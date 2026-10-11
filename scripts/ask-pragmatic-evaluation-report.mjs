@@ -6,7 +6,7 @@ import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { derivePortfolioDistribution } from "./ask-benchmark-portfolio-repetition-report.mjs";
 
-const CONDITIONS = ["plain", "kernel_only", "full_ask"];
+import { comparisonConditions } from "./kernel-principles.mjs";
 const OUTCOMES = ["pass", "unknown", "fail"];
 const STATES = ["not_started", "completed", "failed", "stopped"];
 const METRICS = ["duration_ms", "human_review_minutes", "rework_minutes", "input_tokens", "output_tokens", "cached_tokens"];
@@ -14,8 +14,8 @@ const CONTEXT = ["task_ref", "input_ref", "success_criteria_ref", "cli_version",
 const clone = value => structuredClone(value);
 const known = value => typeof value === "number" && Number.isFinite(value);
 
-function checkTrial(trial, blocks) {
-  assert.ok(blocks.includes(trial.block_id) && CONDITIONS.includes(trial.condition), "trial must name a planned block and condition");
+function checkTrial(trial, blocks, conditions) {
+  assert.ok(blocks.includes(trial.block_id) && conditions.includes(trial.condition), "trial must name a planned block and condition");
   assert.ok(STATES.includes(trial.execution_state) && OUTCOMES.includes(trial.outcome), "invalid execution state or outcome");
   assert.ok(Array.isArray(trial.evidence_refs) && trial.evidence_refs.every(ref => typeof ref === "string" && ref.length > 0), "evidence_refs must be reference labels");
   assert.ok(typeof trial.local_assets_ref === "string" || trial.local_assets_ref === null, "local_assets_ref must be a label or null");
@@ -63,15 +63,16 @@ export function buildPragmaticEvaluationReport(notes) {
   assert.ok(["unknown", "observed", "not_observed"].includes(notes.global_context?.ask_presence), "global ASK presence must stay explicit");
   assert.ok(["unknown", "observed", "none_observed"].includes(notes.global_context?.change_status), "global change status must stay explicit");
   assert.ok(typeof notes.next_improvement === "string", "next_improvement must retain the operator's next action or undecided note");
+  const conditions = comparisonConditions(notes.kernel_condition);
   const supplied = new Map();
   for (const trial of notes.trials) {
-    checkTrial(trial, notes.planned_blocks);
+    checkTrial(trial, notes.planned_blocks, conditions);
     const key = JSON.stringify([trial.block_id, trial.condition]);
     assert.ok(!supplied.has(key), "duplicate slot; record another attempt under a new block instead of replacing an outcome");
     supplied.set(key, clone(trial));
   }
   const blocks = notes.planned_blocks.map(block_id => {
-    const trials = CONDITIONS.map(condition => supplied.get(JSON.stringify([block_id, condition])) ?? missingTrial(block_id, condition));
+    const trials = conditions.map(condition => supplied.get(JSON.stringify([block_id, condition])) ?? missingTrial(block_id, condition));
     return { block_id, trials, contrasts: [contrast(trials[0], trials[1]), contrast(trials[1], trials[2]), contrast(trials[0], trials[2])] };
   });
   // Keep task/input/rubric strata separate; unknown identities never form a pool.

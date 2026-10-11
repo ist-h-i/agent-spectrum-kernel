@@ -9,6 +9,7 @@ import { comparisonHash, prepareUserComparison } from "./ask-user-comparison-pre
 import * as comparison from "./ask-user-comparison.mjs";
 import { inspectComparisonExecution, observeComparisonProcess, probeComparisonOwner, readComparisonHistory } from "./ask-user-comparison-state.mjs";
 import { executeCodexSession } from "./codex-exec-runner.mjs";
+import { KERNEL_PRINCIPLES_ID } from "./kernel-principles.mjs";
 
 const IDS = ["plain", "kernel_only", "full_ask"];
 function git(repo, argv) {
@@ -56,6 +57,29 @@ function resume(p, options) {
   assert.equal(typeof comparison.resumeUserComparison, "function", "pending-only resume API must exist");
   return comparison.resumeUserComparison(p.root, p.plan_digest, options);
 }
+
+test("K-principles partial checkpoint resumes pending slots with immutable receipts and no retry", async t => {
+  const p = fixture(t, { taskClass: "implementation", kernelCondition: KERNEL_PRINCIPLES_ID }).prepare();
+  const calls = [], controller = new AbortController(), run = fake(calls);
+  const first = await comparison.startUserComparison(p.root, p.plan_digest, { signal: controller.signal,
+    runner: async invocation => { const result = await run(invocation); controller.abort(); return result; } });
+  assert.deepEqual(first.slots.map(slot => slot.condition), ["plain", KERNEL_PRINCIPLES_ID, "full_ask"]);
+  assert.deepEqual(first.slots.map(slot => slot.state), ["interrupted", "not_started", "not_started"]);
+  assert.equal(first.summary.blocks[0].trials[1].outcome, "unknown");
+  const receipt = readFileSync(join(p.root, "control/slots/plain/result.json"));
+  const checkpoint = history(p).snapshot;
+  const final = await resume(p, { runner: fake(calls) });
+  assert.deepEqual(calls.map(call => call.condition), ["plain", KERNEL_PRINCIPLES_ID, "full_ask"]);
+  assert.deepEqual(final.slots.map(slot => slot.state), ["interrupted", "completed", "completed"]);
+  assert.ok(final.slots.every(slot => slot.receipt_integrity === "valid"));
+  assert.deepEqual(readFileSync(join(p.root, "control/slots/plain/result.json")), receipt);
+  assert.equal(history(p).snapshot.started_at_ms, checkpoint.started_at_ms);
+  assert.equal(history(p).snapshot.deadline_at_ms, checkpoint.deadline_at_ms);
+  await resume(p, { runner: fake(calls) }); assert.equal(calls.length, 3);
+  const offline = comparison.reportUserComparison(p.root);
+  assert.equal(offline.slots[1].condition, KERNEL_PRINCIPLES_ID);
+  assert.equal(offline.summary.blocks[0].trials[1].condition, KERNEL_PRINCIPLES_ID);
+});
 async function captureCommand(argv, options) {
   assert.equal(typeof comparison.runUserComparisonCommand, "function", "shared noninteractive CLI entry must exist");
   const stdout = [], stderr = [], log = console.log, error = console.error;
