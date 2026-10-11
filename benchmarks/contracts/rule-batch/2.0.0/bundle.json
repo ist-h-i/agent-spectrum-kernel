@@ -1,0 +1,270 @@
+{
+  "format": "ask.rule-batch-bundle@1.0.0",
+  "contract_id": "ask.rule-batch@2.0.0",
+  "verifier_id": "ask.rule-batch-verifier@2.0.0",
+  "judgment_id": "ask.rule-batch-judgment@2.0.0",
+  "original_source_commit": "1a6227f6d9de37c9cee9b8d8fac88dc73b3d758c",
+  "original_run_id": "f37390c0-c168-406d-8823-b02b9e09154d",
+  "files": [
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/examples/mutants.mjs",
+      "digest": "sha256:49b0bde420e90a7738f8a243f9087443aea335c10062362e71a242a08cfe3056",
+      "bytes": 6100
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/examples/reference.mjs",
+      "digest": "sha256:0a12d47f65b5e709ae1bbdf449c46226b76708d483727b3ba53805a913941fcf",
+      "bytes": 6248
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/cases.mjs",
+      "digest": "sha256:a58bc125d332f9f15835b412f56d15b57ebc0605a14188ca9fc97ee7583d6636",
+      "bytes": 13987
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/contract.test.mjs",
+      "digest": "sha256:970916b41b140a83c39875f9738cdb223c670a5bc83075335e5041d054aa501f",
+      "bytes": 193
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/legacy-baseline/src/errors.mjs",
+      "digest": "sha256:f6dc6160a815dc1335528645da2e409b9c2f0a631bc57f779e5c10bc9d64cdec",
+      "bytes": 455
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/legacy-baseline/src/index.mjs",
+      "digest": "sha256:b684404aa931ac51a96739558e3fa6830066f0910a5410ac40c5fd07ac126d5c",
+      "bytes": 170
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/legacy-baseline/src/rule-service.mjs",
+      "digest": "sha256:7ef339154d45b24df96295d3fc3812e9913945b7f88ee1f13594b46044d5fff8",
+      "bytes": 502
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/legacy-baseline/src/rule-store.mjs",
+      "digest": "sha256:e57341c23abf700bb90dd2b2e33093d6204d8f61452165542f8648bfab8770fa",
+      "bytes": 1000
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/legacy-baseline/src/validation.mjs",
+      "digest": "sha256:9ffdcbc30dd5e19dcec44f9c8fbed368dd873746cefe56d8facfbd9313f03748",
+      "bytes": 730
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/legacy-case-ids.json",
+      "digest": "sha256:6ba172061b05048589c5a5d7dc7ed4a191a7b21745277e10ecfeaa9661b3e0e8",
+      "bytes": 7591
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/legacy-results.mjs",
+      "digest": "sha256:fbb2d12a13195577229a51bc0be9f3b52959a5c78c40a7a3575e954d89e38ed7",
+      "bytes": 2155
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/legacy-verifier.v1.2.mjs",
+      "digest": "sha256:0b7f9a24053b861e64069fdd107947d10e9544b40e9c943eac1cb959b8c4217c",
+      "bytes": 11521
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/legacy.test.mjs",
+      "digest": "sha256:ff76a0614c519c9d7de6ff600ad7efb3c3dcdd0897f6c9fc64607a3504671f37",
+      "bytes": 118
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r1.test.mjs",
+      "digest": "sha256:ef4032cb9b98ae9d4ea3da0f1b2a0642e17c0d87022bd48bd83e55e9a348ecdc",
+      "bytes": 326
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r10.test.mjs",
+      "digest": "sha256:9964b12a62b084a13cbf0461fa3ca50acac2cb77dd9771f46c8a8108f228d8ff",
+      "bytes": 329
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r2.test.mjs",
+      "digest": "sha256:39cb0cc09c8fb239539524a2864b6d268020ea716e0216068fafe3cc77b8b264",
+      "bytes": 326
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r3.test.mjs",
+      "digest": "sha256:e36f1cb5898c7ac291e80018ec8ec6b9604e9a580e0ef64270015c86fa635f03",
+      "bytes": 326
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r4.test.mjs",
+      "digest": "sha256:06897de82a33eab71bffe82b32f2bc463a064570becd104723652089024dcf53",
+      "bytes": 326
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r5.test.mjs",
+      "digest": "sha256:31b939820e37c572616a036f3e1c0df230a27241920f3e67b6262168d60a8dc6",
+      "bytes": 326
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r6.test.mjs",
+      "digest": "sha256:e6e6654b8f3c1ca7a4dc6c0c15ffb7baa353e083a6fd98510d0f34c4cfe7b464",
+      "bytes": 326
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r7.test.mjs",
+      "digest": "sha256:24987366b0e38075b71c15047b5c021c74dd30e29ff3ffe4fd4c011112b5c461",
+      "bytes": 326
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r8.test.mjs",
+      "digest": "sha256:57641950f2a3eba62415c78f37dd61075688cd10a3ddc5782eea9c9d11f9eeac",
+      "bytes": 326
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/fixed/r9.test.mjs",
+      "digest": "sha256:9bf35c35500688546677d504cc622090a98ac1a4c8dde48bf29f09d339b45ec0",
+      "bytes": 326
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/history.json",
+      "digest": "sha256:4dd6d91515fce0f4c47143849e64cee6cccd81ab528216f25da083f92a5b1543",
+      "bytes": 1113
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/requirements.json",
+      "digest": "sha256:7c3397c11340360ba1b76ba1417efc01291f2bffdd61a5c6d97e4a04f88e813e",
+      "bytes": 21127
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/seed/docs/rule-batch.schema.json",
+      "digest": "sha256:f96825608b1524ab0752eddf5112da0a7180b2751addd1a3bfb29ed54083fcf0",
+      "bytes": 924
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/seed/docs/rule-batches.md",
+      "digest": "sha256:b09a65b9e147e96828fb66a92d1a6ba524490a9a05e77dfd3cf4a6edc5f078d7",
+      "bytes": 8879
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/seed/package.json",
+      "digest": "sha256:a5dace66e989ce4aff59cd8e2c2646192a97f02b49505a6f992ffb0871d6570d",
+      "bytes": 173
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/seed/src/errors.mjs",
+      "digest": "sha256:f6dc6160a815dc1335528645da2e409b9c2f0a631bc57f779e5c10bc9d64cdec",
+      "bytes": 455
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/seed/src/index.mjs",
+      "digest": "sha256:b684404aa931ac51a96739558e3fa6830066f0910a5410ac40c5fd07ac126d5c",
+      "bytes": 170
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/seed/src/rule-service.mjs",
+      "digest": "sha256:7ef339154d45b24df96295d3fc3812e9913945b7f88ee1f13594b46044d5fff8",
+      "bytes": 502
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/seed/src/rule-store.mjs",
+      "digest": "sha256:e57341c23abf700bb90dd2b2e33093d6204d8f61452165542f8648bfab8770fa",
+      "bytes": 1000
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/seed/src/validation.mjs",
+      "digest": "sha256:9ffdcbc30dd5e19dcec44f9c8fbed368dd873746cefe56d8facfbd9313f03748",
+      "bytes": 730
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/seed/test/rule-service.test.mjs",
+      "digest": "sha256:9f26362d343a047f869abb85d46b63a7674a7da1096d63feaa7cc500d9d143b4",
+      "bytes": 1064
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/spec.md",
+      "digest": "sha256:b09a65b9e147e96828fb66a92d1a6ba524490a9a05e77dfd3cf4a6edc5f078d7",
+      "bytes": 8879
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/task.md",
+      "digest": "sha256:e04e773be08514ad0fd2d1a8538cf3d99d9db0f0e35b323e43153335366cc07d",
+      "bytes": 2356
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/verification-contract.md",
+      "digest": "sha256:73b038c688def14017a4e395e4c933bd5aa4932f2a08dc977bdffc9386670642",
+      "bytes": 3743
+    },
+    {
+      "path": "benchmarks/contracts/rule-batch/2.0.0/verification.json",
+      "digest": "sha256:3f70f0653105adb23bfe33beaa22b389ab77ac6805a5940722fc829c387206bf",
+      "bytes": 2220
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/evaluator/expected.json",
+      "digest": "sha256:5f61d51e89c456dad7251856c0ae10f3727fd40bdf563b825aad5377880591ec",
+      "bytes": 3463
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/evaluator/hidden-tests.mjs",
+      "digest": "sha256:931056ba985079cc494a54b9898a0f5f278982bde6a8918c14ad1f7519f54525",
+      "bytes": 5572
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/evaluator/reference.patch",
+      "digest": "sha256:9f4032a59a07e3ee444785bed0a48dc3eb14e8ffe30c86a5644939e8f5810b94",
+      "bytes": 7523
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/evaluator/rubric.md",
+      "digest": "sha256:3c0d37ac13d93157d06aa22d1cbec68fe7bb7d27b79d09ef2ea81d912da1f9ac",
+      "bytes": 767
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/task.md",
+      "digest": "sha256:e26c65961b950a0830a58f791ee1e12dae9fd2e4caac35203564a104c11531b1",
+      "bytes": 1893
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/workspace/docs/rule-batch.schema.json",
+      "digest": "sha256:f96825608b1524ab0752eddf5112da0a7180b2751addd1a3bfb29ed54083fcf0",
+      "bytes": 924
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/workspace/docs/rule-batches.md",
+      "digest": "sha256:055595f77b6d31523c0875465c6e96a77a7824963c5e4561c3a904d4077e110f",
+      "bytes": 1276
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/workspace/package.json",
+      "digest": "sha256:a5dace66e989ce4aff59cd8e2c2646192a97f02b49505a6f992ffb0871d6570d",
+      "bytes": 173
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/workspace/src/errors.mjs",
+      "digest": "sha256:f6dc6160a815dc1335528645da2e409b9c2f0a631bc57f779e5c10bc9d64cdec",
+      "bytes": 455
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/workspace/src/index.mjs",
+      "digest": "sha256:b684404aa931ac51a96739558e3fa6830066f0910a5410ac40c5fd07ac126d5c",
+      "bytes": 170
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/workspace/src/rule-service.mjs",
+      "digest": "sha256:7ef339154d45b24df96295d3fc3812e9913945b7f88ee1f13594b46044d5fff8",
+      "bytes": 502
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/workspace/src/rule-store.mjs",
+      "digest": "sha256:e57341c23abf700bb90dd2b2e33093d6204d8f61452165542f8648bfab8770fa",
+      "bytes": 1000
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/workspace/src/validation.mjs",
+      "digest": "sha256:9ffdcbc30dd5e19dcec44f9c8fbed368dd873746cefe56d8facfbd9313f03748",
+      "bytes": 730
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/workspace/test/rule-service.test.mjs",
+      "digest": "sha256:9f26362d343a047f869abb85d46b63a7674a7da1096d63feaa7cc500d9d143b4",
+      "bytes": 1064
+    }
+  ]
+}
