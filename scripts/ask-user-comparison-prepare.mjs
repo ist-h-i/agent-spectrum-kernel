@@ -19,6 +19,13 @@ const UTF8 = new TextDecoder("utf-8", { fatal: true });
 const FILE_LIMIT = 32 * 1024 * 1024;
 const TREE_LIMIT = 256 * 1024 * 1024;
 export const COMPARISON_RECORD_BYTE_LIMIT = 16 * 1024 * 1024;
+export const SINGLE_SHOT_CONTRACT = "single_shot_v1";
+export const isSingleShotComparison = plan => plan.policy?.execution_contract === SINGLE_SHOT_CONTRACT;
+export function comparisonExecutionPolicy(contract) {
+  if (contract !== undefined && contract !== SINGLE_SHOT_CONTRACT) fail("unknown_execution_contract");
+  return { attempts: 1, retries: 0, concurrency: 1, ...(contract === SINGLE_SHOT_CONTRACT
+    ? { execution_contract: contract, resume: "forbidden", termination_scope: "direct_child" } : {}) };
+}
 const HASH = /^[a-f0-9]{64}$/u;
 const NAME = /^[a-z0-9][a-z0-9-]*$/u;
 const jsonBytes = value => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
@@ -450,8 +457,9 @@ function kernelCapability(inventory, config) {
 
 function validateOptions(options) {
   if (!plainObject(options)) fail("options_object_required");
-  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf", "kernelCondition"];
+  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf", "kernelCondition", "executionContract"];
   if (Object.keys(options).some(key => !allowed.includes(key))) fail("unknown_preparation_option");
+  comparisonExecutionPolicy(options.executionContract);
   for (const name of ["repo", "output"]) if (typeof options[name] !== "string" || !isAbsolute(options[name]) || resolve(options[name]) !== options[name]) fail(`absolute_${name}_required`);
   if (realpathSync(options.repo) !== options.repo || !lstatSync(options.repo).isDirectory()) fail("canonical_repository_root_required");
   if (existsSync(options.output)) fail("output_exists_use_new_run_directory");
@@ -593,12 +601,12 @@ export function prepareUserComparison(options = {}) {
     verification: { path: "control/verification.json", digest: comparisonHash(verificationBytes), recipe, source_path: options.verificationFile,
       reporter: { path: "control/node-test-reporter.mjs", digest: comparisonHash(reporterBytes), format: "ask_node_summary_jsonl_v1" } },
     prompt, input: { path: "inputs/prompt.md", digest: comparisonHash(Buffer.from(prompt)), bytes: Buffer.byteLength(prompt) },
-    mutable_paths: mutable, config, policy: { attempts: 1, retries: 0, concurrency: 1 },
+    mutable_paths: mutable, config, policy: comparisonExecutionPolicy(options.executionContract),
     ...(principles ? { kernel_definition: { generation: principles.generation,
       source_commit: git(SOURCE, ["rev-parse", "HEAD"]).toString().trim(),
       canonical_source: { path: "control/kernel-principles-source.md", digest: comparisonHash(canonicalBytes) },
       renderer_source: { path: "control/kernel-principles-renderer.mjs", digest: comparisonHash(rendererBytes) } } } : {}),
-    execution_protocol: { version: 2, resume: "never_requested_conditions_only", deadline_origin: "first_start_including_downtime",
+    execution_protocol: { version: 2, resume: options.executionContract === SINGLE_SHOT_CONTRACT ? "forbidden" : "never_requested_conditions_only", deadline_origin: "first_start_including_downtime",
       usage_budget_basis: "known_input_plus_output_tokens_lower_bound", unknown_usage_policy: "continue_with_unknown" }, arms,
     source_installation: { removed_managed_assets: separated.removed, identities: separated.identities,
       preserved_custom_agents_digest: comparisonHash(customAgents) },

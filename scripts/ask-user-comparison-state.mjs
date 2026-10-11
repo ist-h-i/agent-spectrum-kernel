@@ -7,7 +7,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
-import { COMPARISON_RECORD_BYTE_LIMIT, comparisonHash } from "./ask-user-comparison-prepare.mjs";
+import { COMPARISON_RECORD_BYTE_LIMIT, comparisonHash, isSingleShotComparison } from "./ask-user-comparison-prepare.mjs";
 
 import { comparisonConditions } from "./kernel-principles.mjs";
 const LIMIT = COMPARISON_RECORD_BYTE_LIMIT;
@@ -230,25 +230,42 @@ export function inspectComparisonExecution(root, plan, digest) {
   try {
     const history = readComparisonHistory(root, plan, digest), leases = readLeases(root, plan, digest);
     const owner = leases.at(-1) ?? null;
-    const probe = owner ? owner.released ? { status: "released", reason: "controller relinquished this generation" }
+    const probe = isSingleShotComparison(plan) ? { status: "not_probed", reason: "single-shot execution never probes saved PIDs; unreleased execution remains unknown" }
+      : owner ? owner.released ? { status: "released", reason: "controller relinquished this generation" }
       : probeComparisonOwner(owner.identity) : { status: "none", reason: "no execution owner" };
     const reports=join(root,"control/invocations");
     if(existsSync(reports)) directory(reports);
     const pendingReport=existsSync(reports)&&readdirSync(reports).some(name=>name.startsWith("pending-"));
     const pending = history.pending.length > 0 || pendingReport;
+    if (isSingleShotComparison(plan)) {
+      const consumed = ["start.json", "start.digest", "leases", "history"].some(name => existsSync(join(root, "control", name)));
+      return { kind: "ask_comparison_execution_state_v1", history, owner, probe,
+        start_consumed: consumed, resume_allowed: false,
+        state: pending ? "state_corrupt" : consumed && !owner?.released ? "indeterminate" : "available",
+        reason: pending ? "single-shot execution publication incomplete; start remains consumed"
+          : consumed && !owner?.released ? "single-shot start consumed or unknown; execution completion unavailable; no resume" : probe.reason };
+    }
     return { kind: "ask_comparison_execution_state_v1", history, owner, probe,
       state: pending && probe.status !== "alive" ? "state_corrupt" : pending ? "running"
         : probe.status === "alive" ? "running" : probe.status === "unknown" ? "ownership_unverified" : "available",
       reason: pendingReport ? "an invocation report is not durably published" : pending ? "an execution event is not durably published" : probe.reason };
   } catch (value) {
-    return { kind: "ask_comparison_execution_state_v1", state: "state_corrupt", reason: `execution state corrupt: ${value.message}`, history: null, owner: null, probe: { status: "unknown" } };
+    return { kind: "ask_comparison_execution_state_v1", state: "state_corrupt", reason: `execution state corrupt: ${value.message}`, history: null, owner: null, probe: { status: "unknown" },
+      ...(isSingleShotComparison(plan) ? { start_consumed: true, resume_allowed: false } : {}) };
   }
 }
 
 /** Elect one controller by exclusive creation of the next immutable generation.
  * No lock is unlinked or stolen. A torn generation blocks automatic recovery. */
 export function acquireComparisonOwner(root, plan, digest, resume) {
+  const singleShot = isSingleShotComparison(plan);
+  if (singleShot && resume) throw error(9, "single-shot contract forbids resume, including never-requested conditions");
   directory(join(root, "control"));
+  // The first exclusive generation directory is also the irreversible start
+  // consumption marker. Even an empty/torn directory prohibits a second start.
+  if (singleShot && ["start.json", "start.digest", "leases", "history"].some(name => existsSync(join(root, "control", name)))) {
+    throw error(9, "single-shot start already consumed or unknown; this run cannot be executed again");
+  }
   const start = join(root, "control/start.json"), started = existsSync(start);
   if (!resume && started) throw error(9, "this run already consumed its start; use resume for never-requested conditions or prepare a new run");
   if (resume && !started) throw error(9, "resume requires an existing started run");
@@ -258,13 +275,19 @@ export function acquireComparisonOwner(root, plan, digest, resume) {
   if (resume && !inspected.history?.snapshot) throw error(10, "legacy or incomplete start has no recovery checkpoint; do not repeat its requests");
   if (inspected.history?.pending.length) throw error(10, "uncommitted execution event; manual evidence review required");
   if (!resume && (inspected.owner || inspected.history?.snapshot)) throw error(10, "incomplete initial execution state; cannot silently start again");
-  const identity = observeComparisonProcess(process.pid);
-  requireComparisonControllerIdentity(identity);
+  const identity = singleShot ? null : observeComparisonProcess(process.pid);
+  if (!singleShot) requireComparisonControllerIdentity(identity);
   const parent = join(root, "control/leases"); directory(parent, true);
   const count = inspected.owner?.sequence ?? 0;
   const sequence = count + 1, path = join(parent, numberName(sequence));
   try { mkdirSync(path, { mode: 0o700 }); }
   catch (value) { if (value.code === "EEXIST") throw error(9, "another controller acquired this owner generation"); throw value; }
+  if (singleShot) {
+    // Persist the marker and its parent before any child can be requested.
+    for (const folder of [parent, join(root, "control")]) {
+      const fd = openSync(folder, "r"); try { fsyncSync(fd); } finally { closeSync(fd); }
+    }
+  }
   mkdirSync(join(path, "owner"), { mode: 0o700 });
   const owner = { kind: "ask_comparison_owner_v1", run_id: plan.run_id, plan_digest: digest, sequence,
     lease_id: randomUUID(), identity, acquired_at: new Date().toISOString(), node_version: process.version };
