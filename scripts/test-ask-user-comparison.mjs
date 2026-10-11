@@ -4,10 +4,11 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
+import { comparisonHash, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 import { aggregateUserComparisons, inspectNodeVerification, inspectUserComparison, parseUserCodexTelemetry, readUserComparisonPlan,
   reportUserComparison, sanitizeComparisonLog, startUserComparison, userCodexInvocation } from "./ask-user-comparison.mjs";
 import { executeCodexSession } from "./codex-exec-runner.mjs";
+import { KERNEL_PRINCIPLES_ID, renderKernelPrinciples } from "./kernel-principles.mjs";
 
 const git = (repo, args) => {
   const value = spawnSync("git", ["-c", "core.hooksPath=/dev/null", ...args], { cwd: repo, encoding: "utf8",
@@ -48,6 +49,75 @@ function fake(calls, scenario = "pass") {
       stderr: "" };
   };
 }
+
+test("K-principles uses the generated-only entry while old K and Full remain intact", async t => {
+  const f = fixture(t, { taskClass: "implementation", kernelCondition: KERNEL_PRINCIPLES_ID }), p = f.prepare();
+  const old = prepareUserComparison({ ...f.options, output: join(f.root, "legacy"), kernelCondition: "kernel_only" });
+  const id = KERNEL_PRINCIPLES_ID, arm = p.plan.arms[id];
+  assert.deepEqual(Object.keys(p.plan.arms), ["plain", id, "full_ask"]);
+  assert.equal(arm.label, "K-principles"); assert.equal(arm.capability.status, "available");
+  assert.equal(arm.assets.length, 1); assert.equal(arm.assets[0].path, "AGENTS.md");
+  assert.ok(!Object.keys(arm.baseline_inventory).some(path => path.startsWith(".agents/") || path.startsWith("skills/")));
+  const generated = renderKernelPrinciples(readFileSync(new URL("../AGENTS.md", import.meta.url)));
+  assert.ok(readFileSync(join(p.root, arm.path, "AGENTS.md"), "utf8").includes(generated.body));
+  assert.deepEqual(p.plan.arms.plain.baseline_inventory, old.plan.arms.plain.baseline_inventory);
+  const inventory = plan => plan.arms.full_ask.assets.filter(asset => !asset.path.endsWith("install-state.json"));
+  assert.deepEqual(inventory(p.plan), inventory(old.plan));
+  assert.equal(old.plan.arms.kernel_only.capability.status, "capability_missing");
+  const calls = [], report = await startUserComparison(p.root, p.plan_digest, { runner: fake(calls) });
+  assert.deepEqual(calls.map(call => call.condition), ["plain", id, "full_ask"]);
+  assert.ok(report.slots.every(slot => slot.outcome === "pass" && slot.receipt_integrity === "valid"));
+  assert.equal(report.summary.blocks[0].trials[1].condition, id);
+  const legacyCalls = [], legacy = await startUserComparison(old.root, old.plan_digest, { runner: fake(legacyCalls) });
+  assert.equal(legacy.overall.exit_code, 3); assert.equal(legacy.slots[1].outcome, "unknown");
+  const collection = aggregateUserComparisons([p.root, old.root]);
+  assert.equal(collection.groups.length, 2);
+  assert.ok(collection.groups.every(group => group.summary.blocks.length === 1));
+});
+
+test("K-principles never declares unsupported specialized task classes available", async t => {
+  const f = fixture(t, { taskClass: "review", kernelCondition: KERNEL_PRINCIPLES_ID,
+    globalCapabilities: ["skill-router", "review-router", "review-ai-quality"] }), p = f.prepare(), calls = [];
+  assert.equal(p.plan.arms[KERNEL_PRINCIPLES_ID].capability.status, "capability_missing");
+  const report = await startUserComparison(p.root, p.plan_digest, { runner: fake(calls) });
+  assert.deepEqual(calls.map(call => call.condition), ["plain", "full_ask"]);
+  assert.equal(report.overall.exit_code, 3); assert.equal(report.slots[1].outcome, "unknown");
+  assert.equal(report.slots[1].metrics.duration_ms, null);
+});
+
+test("candidate identity, snapshot and generated assets are checked before fake dispatch", async t => {
+  for (const target of ["source", "renderer", "body", "metadata", "unknown-id", "availability"]) {
+    const f = fixture(t, { taskClass: "implementation", kernelCondition: KERNEL_PRINCIPLES_ID }), p = f.prepare();
+    const planPath = join(p.root, "control/plan.json");
+    if (target === "source") writeFileSync(join(p.root, p.plan.kernel_definition.canonical_source.path), "modified source");
+    if (target === "renderer") writeFileSync(join(p.root, p.plan.kernel_definition.renderer_source.path), "modified renderer");
+    if (target === "body") writeFileSync(join(p.root, p.plan.arms[KERNEL_PRINCIPLES_ID].path, "AGENTS.md"), "modified instructions");
+    if (target === "metadata") p.plan.kernel_definition.generation.dependencies.push("skill-router");
+    if (target === "unknown-id") p.plan.config.kernel_condition = "kernel_principles_v2";
+    if (target === "availability") p.plan.arms[KERNEL_PRINCIPLES_ID].capability.required = [];
+    if (["metadata", "unknown-id", "availability"].includes(target)) {
+      const raw = JSON.stringify(p.plan, null, 2) + "\n";
+      writeFileSync(planPath, raw); writeFileSync(join(p.root, "control/plan.digest"), comparisonHash(raw));
+    }
+    let calls = 0;
+    await assert.rejects(startUserComparison(p.root, readFileSync(join(p.root, "control/plan.digest"), "utf8").trim(), { runner: async () => { calls++; } }));
+    assert.equal(calls, 0, target); assert.equal(existsSync(join(p.root, "control/start.json")), false);
+  }
+});
+
+test("corrupt candidate CLI report never invents a legacy K condition", t => {
+  const p = fixture(t, { kernelCondition: KERNEL_PRINCIPLES_ID }).prepare();
+  writeFileSync(join(p.root, p.plan.kernel_definition.canonical_source.path), "changed source");
+  const before = readdirSync(join(p.root, "control"));
+  const result = spawnSync(process.execPath, [new URL("./ask-user-comparison.mjs", import.meta.url).pathname,
+    "report", p.root, "--json"], { encoding: "utf8" });
+  assert.equal(result.status, 10);
+  const report = JSON.parse(result.stdout);
+  assert.deepEqual(report.slots, []);
+  assert.ok(report.unknowns.includes("comparison condition set is unknown; no legacy or candidate slots inferred"));
+  assert.deepEqual(readdirSync(join(p.root, "control")), before);
+  assert.equal(existsSync(join(p.root, "control/start.json")), false);
+});
 
 test("prepare/inspect/report start no runner, keep source/custom/global state and expose exact launch", t => {
   const f = fixture(t), sourceBefore = git(f.repo, ["status", "--porcelain"]), prepared = f.prepare();

@@ -9,7 +9,7 @@ import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { COMPARISON_RECORD_BYTE_LIMIT, comparisonHash } from "./ask-user-comparison-prepare.mjs";
 
-const IDS = ["plain", "kernel_only", "full_ask"];
+import { comparisonConditions } from "./kernel-principles.mjs";
 const LIMIT = COMPARISON_RECORD_BYTE_LIMIT;
 const NAME = /^\d{8}$/u;
 const PHASES = ["pending", "launch_intent", "model_running", "verifying", "terminal"];
@@ -105,13 +105,13 @@ function validateSnapshot(value, previous, plan, digest, sequence) {
   assert.ok(Number.isSafeInteger(value.started_at_ms) && value.started_at_ms > 0);
   assert.ok(Number.isSafeInteger(value.deadline_at_ms) && value.deadline_at_ms > value.started_at_ms);
   assert.ok(typeof value.lease_id === "string" && value.lease_id.length > 0 && typeof value.event === "string");
-  assert.deepEqual(Object.keys(value.slots).sort(), [...IDS].sort());
+  assert.deepEqual(Object.keys(value.slots).sort(), comparisonConditions(plan.config.kernel_condition).sort());
   if (previous) {
     assert.equal(value.started_at_ms, previous.started_at_ms);
     assert.equal(value.deadline_at_ms, previous.deadline_at_ms);
     assert.ok(value.at_ms >= previous.at_ms, "execution clock moved backwards");
   }
-  for (const id of IDS) {
+  for (const id of comparisonConditions(plan.config.kernel_condition)) {
     const slot = value.slots[id], prior = previous?.slots[id];
     assert.ok(PHASES.includes(slot.phase) && [0, 1].includes(slot.attempts));
     assert.ok(slot.phase !== "pending" || slot.attempts === 0);
@@ -226,10 +226,10 @@ export function checkpointComparison(context, event, changes = {}) {
     sequence: context.history.count + 1, previous_digest: context.history.digest, lease_id: owner.lease_id,
     event, at_ms: now, started_at_ms: prior?.started_at_ms ?? now,
     deadline_at_ms: prior?.deadline_at_ms ?? now + (plan.config.overall_timeout_ms ?? 3600000),
-    slots: prior ? structuredClone(prior.slots) : Object.fromEntries(IDS.map(id => [id, { phase: "pending", attempts: 0 }])),
+    slots: prior ? structuredClone(prior.slots) : Object.fromEntries(comparisonConditions(plan.config.kernel_condition).map(id => [id, { phase: "pending", attempts: 0 }])),
     stop: changes.stop === undefined ? prior?.stop ?? null : changes.stop };
   if (changes.condition) {
-    assert.ok(IDS.includes(changes.condition));
+    assert.ok(comparisonConditions(plan.config.kernel_condition).includes(changes.condition));
     value.slots[changes.condition] = { ...value.slots[changes.condition], ...changes.slot };
   }
   validateSnapshot(value, prior, plan, digest, value.sequence);

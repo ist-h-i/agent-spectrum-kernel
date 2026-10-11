@@ -171,6 +171,15 @@ node scripts/ask-user-comparison.mjs prepare \
 | K／`kernel_only` | canonical `AGENTS.md` の管理ブロックを使い、ASK Skill を追加しない。利用者独自の指示は保持する |
 | F／`full_ask` | この ASK checkout の実際の core と Codex `full` profile、分類済み reference supplement の現在の bytes を使う。利用者独自の指示は保持する |
 
+別の評価候補として、prepare の `--kernel-condition kernel_principles_v1`
+（options.json では `"kernelCondition": "kernel_principles_v1"`）を指定すると、
+中央の条件を K-principles にできます。基本原則だけを正本 AGENTS から生成し、
+ASK Skill や正式な proof・状態保存・Execution Envelope の契約は追加しません。
+未指定なら従来の K のままです。旧 K の定義や未起動結果は変更しません。
+対応する作業範囲、生成・依存検査、解釈の限界は
+[K-principles 比較候補](kernel-principles-comparison.md)を参照してください。
+これは製品化の決定ではなく、Fとの差は構成全体の比較です。
+
 F の定義は `live_core_plus_codex_full_with_classified_reference_supplement` です。
 `control/plan.json` の `full_definition` に ASK 版、source commit、renderer、資産数、
 supplement の参照と hash、資産全体の hash を保存し、各条件の `assets` に実際の

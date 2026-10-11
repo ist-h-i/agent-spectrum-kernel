@@ -8,6 +8,8 @@ import { devNull } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { executeCodexSession } from "./codex-exec-runner.mjs";
+import { buildAgentsBlock } from "./installer-lifecycle.mjs";
+import { comparisonConditions, KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } from "./kernel-principles.mjs";
 import { boundedVerificationLogs } from "./ask-user-comparison-logs.mjs";
 import { acquireComparisonOwner, checkpointComparison, inspectComparisonExecution, observeComparisonProcess, probeComparisonOwner, releaseComparisonOwner } from "./ask-user-comparison-state.mjs";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
@@ -79,6 +81,30 @@ export function sanitizeComparisonLog(value) {
     .replace(/\b(?:sk-[a-zA-Z0-9_-]{12,}|gh[pousr]_[a-zA-Z0-9]{20,})\b/gu, "[REDACTED]");
 }
 
+function validatePrinciplesDefinition(root, plan) {
+  const definition = plan.kernel_definition;
+  assert.equal(definition?.canonical_source?.path, "control/kernel-principles-source.md");
+  assert.equal(definition?.renderer_source?.path, "control/kernel-principles-renderer.mjs");
+  assert.match(definition.source_commit, /^[a-f0-9]{40}$/u);
+  const source = readStableFile(join(root, definition.canonical_source.path), "principles source", LIMIT).bytes;
+  const renderer = readStableFile(join(root, definition.renderer_source.path), "principles renderer", LIMIT).bytes;
+  assert.equal(comparisonHash(source), definition.canonical_source.digest, "principles source snapshot changed");
+  assert.equal(comparisonHash(renderer), definition.renderer_source.digest, "principles renderer snapshot changed");
+  const expected = renderKernelPrinciples(source), arm = plan.arms[KERNEL_PRINCIPLES_ID];
+  assert.equal(arm.label, "K-principles");
+  assert.equal(arm.baseline_path, `control/baselines/${KERNEL_PRINCIPLES_ID}`);
+  const agents = readStableFile(join(root, arm.baseline_path, "AGENTS.md"), "principles baseline", LIMIT).bytes;
+  const block = Buffer.from(buildAgentsBlock(expected.body));
+  assert.ok(agents.length >= block.length && agents.subarray(-block.length).equals(block), "principles baseline does not contain exact generated block");
+  const prefix = agents.subarray(0, agents.length - block.length);
+  assert.ok(!prefix.length || prefix.subarray(-2).equals(Buffer.from("\n\n")), "principles custom boundary changed");
+  assert.equal(comparisonHash(prefix.length ? prefix.subarray(0, -2) : prefix), plan.source_installation.preserved_custom_agents_digest, "principles custom instructions changed");
+  assert.deepEqual(arm.assets, [{ path: "AGENTS.md", ...arm.baseline_inventory["AGENTS.md"],
+    kind: "generated_principles_with_preserved_custom_instructions", origin: "canonical_principles_projection" }]);
+  assert.equal(comparisonHash(agents), arm.baseline_inventory["AGENTS.md"].digest, "principles asset digest changed");
+  assert.deepEqual(arm.capability, principlesCapability(source, expected.body, definition.generation, plan.config.task_class), "principles qualification changed");
+}
+
 export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
   const root = resolve(output);
   assert.equal(realpathSync(root), root, "output must be a canonical directory");
@@ -92,7 +118,10 @@ export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
   assert.equal(plan.root, root, "moving a prepared workspace is unsupported");
   assert.ok(["synthetic", "observed"].includes(plan.config.evidence_kind));
   assert.deepEqual(plan.policy, { attempts: 1, retries: 0, concurrency: 1 });
-  for (const id of USER_CONDITIONS) {
+  assert.deepEqual(Object.keys(plan.arms).sort(), comparisonConditions(plan.config.kernel_condition).sort(), "unknown comparison arm");
+  if (plan.config.kernel_condition === KERNEL_PRINCIPLES_ID) validatePrinciplesDefinition(root, plan);
+  else assert.equal(plan.kernel_definition, undefined, "legacy condition cannot carry a principles definition");
+  for (const id of comparisonConditions(plan.config.kernel_condition)) {
     assert.equal(plan.arms[id].path, `arms/${id}`);
     assert.equal(plan.arms[id].baseline_path, `control/baselines/${id}`);
     assert.ok(["available", "capability_missing"].includes(plan.arms[id].capability.status));
@@ -116,7 +145,7 @@ export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
 }
 
 export function userCodexInvocation(root, plan, condition) {
-  assert.ok(USER_CONDITIONS.includes(condition));
+  assert.ok(comparisonConditions(plan.config.kernel_condition).includes(condition));
   const argv = ["exec", "--sandbox", "workspace-write", "--json", "--output-last-message", evidencePath(root, condition, "last-message.txt")];
   if (plan.config.model !== null) argv.push("--model", plan.config.model);
   if (plan.config.reasoning !== null) argv.push("--config", `model_reasoning_effort=${JSON.stringify(plan.config.reasoning)}`);
@@ -127,7 +156,7 @@ export function userCodexInvocation(root, plan, condition) {
 
 export function inspectUserComparison(output) {
   const loaded = readUserComparisonPlan(output), { root, plan } = loaded;
-  return { ...loaded, invocations: USER_CONDITIONS.map(id => ({ condition: id, ...userCodexInvocation(root, plan, id),
+  return { ...loaded, invocations: comparisonConditions(plan.config.kernel_condition).map(id => ({ condition: id, ...userCodexInvocation(root, plan, id),
     capability: plan.arms[id].capability })), verification: { executable: process.execPath,
     argv: verificationArgv(root, plan, plan.verification.recipe.command), reporter: plan.verification.reporter,
     cwd: "a fresh verification copy for each launched condition",
@@ -386,7 +415,7 @@ function pendingEvidence(root, id) {
 }
 function recoveryChecks(root, plan, digest, audit) {
   const report = reportUserComparison(root);
-  for (const id of USER_CONDITIONS) {
+  for (const id of comparisonConditions(plan.config.kernel_condition)) {
     const saved = audit.history.snapshot.slots[id], slot = report.slots.find(item => item.condition === id);
     validateArm(root, plan, id, saved.phase === "pending");
     if (saved.phase === "pending") {
@@ -445,7 +474,7 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
     recoveryChecks(root, plan, plan_digest, audit);
   } else {
     if (existsSync(join(root,"control/start.json"))) throw fault(9,"this run already consumed its start; use resume or a new run ID");
-    for (const id of USER_CONDITIONS) validateArm(root,plan,id,true);
+    for (const id of comparisonConditions(plan.config.kernel_condition)) validateArm(root,plan,id,true);
   }
   const context = acquireComparisonOwner(root, plan, plan_digest, resume);
   context.active_child=null;
@@ -469,7 +498,7 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
     checkpointComparison(context,resume?"resumed":"initialized",{stop:null});
     if (resume) {
       const previous = reportUserComparison(root);
-      for (const id of USER_CONDITIONS) {
+      for (const id of comparisonConditions(plan.config.kernel_condition)) {
         const saved=context.history.snapshot.slots[id];
         if (["pending","terminal"].includes(saved.phase)) continue;
         if (existsSync(evidencePath(root,id,"result.json"))) {
@@ -486,7 +515,7 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
     timer=setTimeout(()=>{deadlineExpired=true;controller.abort();},Math.max(1,Math.min(2147483647,remaining())));
     const stop=(state,reason)=>{ stopped=true;checkpointComparison(context,"stopped",{stop:{state,reason}}); };
   const sessions = new Set(reportUserComparison(root).slots.map(slot=>slot.session_id).filter(id=>typeof id === "string"));
-  for (const id of USER_CONDITIONS) {
+  for (const id of comparisonConditions(plan.config.kernel_condition)) {
     if (context.history.snapshot.slots[id].phase !== "pending") continue;
     if (stopped) break;
     if (signal.aborted) { stop(deadlineExpired || remaining()<1 ? "timeout" : "interrupted", "comparison interrupted or overall deadline exhausted"); break; }
@@ -659,7 +688,7 @@ export function reportUserComparison(output) {
   }
   const {root,plan,plan_digest}=loaded;
   const execution=inspectComparisonExecution(root,plan,plan_digest);
-  const slots = USER_CONDITIONS.map(id => {
+  const slots = comparisonConditions(plan.config.kernel_condition).map(id => {
     const result = evidencePath(root, id, "result.json");
     if (existsSync(result)) {
       try {
@@ -717,7 +746,7 @@ export function reportUserComparison(output) {
     complete:usageSlots.length>0&&usageSlots.every(slot=>slot.usage_lower_bound?.complete===true),unknown_count:usageSlots.filter(slot=>slot.usage_lower_bound?.complete!==true).length,policy:"unknown does not alone prevent admission; reported values are a lower bound, not a hard cap"};
   const overall={...issue,elapsed_ms:execution.history?.snapshot?Math.max(0,Date.now()-execution.history.snapshot.started_at_ms):null,exit_code:USER_COMPARISON_EXIT_CODES[issue.state]??7,required_action:issue.state === "completed" ? null : ACTION};
   const notes = { kind: "ask_pragmatic_evaluation_notes_v1", evidence_kind: existsSync(join(root, "control/start.json")) || execution.history?.snapshot || slots.some(slot=>slot.receipt_integrity) ? plan.config.evidence_kind : "plan",
-    planned_blocks: [plan.run_id], global_context: { ask_presence: plan.config.global_ask_presence, change_status: "unknown" },
+    planned_blocks: [plan.run_id], ...(plan.config.kernel_condition === KERNEL_PRINCIPLES_ID ? { kernel_condition: KERNEL_PRINCIPLES_ID } : {}), global_context: { ask_presence: plan.config.global_ask_presence, change_status: "unknown" },
     next_improvement: "review this task's saved tests, requirements, changes and unknowns before choosing a new run",
     trials: slots.map(slot => ({ block_id: plan.run_id, condition: slot.condition,
       execution_state: slot.state === "not_started" || (slot.state === "capability_missing" && !slot.launch_requested) ? "not_started"
@@ -743,20 +772,21 @@ export function reportUserComparison(output) {
 export function aggregateUserComparisons(outputs) {
   const reports = outputs.map(reportUserComparison);
   assert.equal(new Set(reports.map(report => report.run_id)).size, reports.length, "duplicate run IDs cannot be counted twice");
-  const kinds = [...new Set(reports.map(report => report.evidence_kind))];
-  return { kind: "ask_user_comparison_collection_v1", reports, groups: kinds.map(evidence_kind => {
-    const members = reports.filter(report => report.evidence_kind === evidence_kind);
+  const kinds = [...new Set(reports.map(report => JSON.stringify([report.evidence_kind, report.configuration.kernel_condition ?? "kernel_only"])))];
+  return { kind: "ask_user_comparison_collection_v1", reports, groups: kinds.map(key => {
+    const [evidence_kind, kernel_condition] = JSON.parse(key);
+    const members = reports.filter(report => report.evidence_kind === evidence_kind && (report.configuration.kernel_condition ?? "kernel_only") === kernel_condition);
     const notes = { ...members[0].summary.supplied_notes, planned_blocks: members.map(report => report.run_id),
       trials: members.flatMap(report => report.summary.supplied_notes.trials) };
-    return { evidence_kind, summary: { ...buildPragmaticEvaluationReport(notes), plain_scope: members[0].summary.plain_scope } };
-  }), mixed_evidence_pooled: false };
+    return { evidence_kind, ...(kernel_condition === KERNEL_PRINCIPLES_ID ? { kernel_condition } : {}), summary: { ...buildPragmaticEvaluationReport(notes), plain_scope: members[0].summary.plain_scope } };
+  }), mixed_evidence_pooled: false, mixed_kernel_conditions_pooled: false };
 }
 
 function parseOptions(argv) {
   const options = {}, flags = new Map([["--repo", "repo"], ["--commit", "commit"], ["--task", "taskFile"], ["--verification", "verificationFile"],
     ["--output", "output"], ["--cli", "cliBin"], ["--cli-version", "cliVersion"], ["--model", "model"], ["--reasoning", "reasoning"],
     ["--timeout-ms", "timeoutMs"], ["--verification-timeout-ms", "verificationTimeoutMs"], ["--overall-timeout-ms", "overallTimeoutMs"], ["--token-budget", "tokenBudget"], ["--task-class", "taskClass"],
-    ["--global-ask", "globalAskPresence"], ["--rerun-of", "rerunOf"]]);
+    ["--global-ask", "globalAskPresence"], ["--rerun-of", "rerunOf"], ["--kernel-condition", "kernelCondition"]]);
   for (let index = 0; index < argv.length; index++) {
     const flag = argv[index], value = argv[++index];
     assert.ok(value && !value.startsWith("--"), `value required for ${flag}`);
@@ -797,8 +827,13 @@ function persistInvocationReport(report, command) {
 }
 function failureReport(output,error, { persist = true } = {}) {
   let report, trusted=false;
-  try {report=reportUserComparison(output);trusted=true;}catch {report={kind:"ask_user_comparison_report_v1",root:resolve(output),run_id:"unknown",evidence_kind:"unknown",source:null,
-    slots:USER_CONDITIONS.map(condition=>({condition,state:"incomplete",outcome:"unknown",launch_requested:null,spawn_observed:null,reason:"trusted records unavailable"})),unknowns:["plan and execution records cannot be validated"],condition_differences:[]};}
+  try {report=reportUserComparison(output);trusted=true;}catch {
+    let conditions=[];
+    try {const {plan}=readUserComparisonPlan(output,{ignoreStart:true});conditions=comparisonConditions(plan.config.kernel_condition);}catch { /* Untrusted condition identity must not become legacy K. */ }
+    report={kind:"ask_user_comparison_report_v1",root:resolve(output),run_id:"unknown",evidence_kind:"unknown",source:null,
+      slots:conditions.map(condition=>({condition,state:"incomplete",outcome:"unknown",launch_requested:null,spawn_observed:null,reason:"trusted execution records unavailable"})),
+      unknowns:["plan and execution records cannot be validated",...(!conditions.length?["comparison condition set is unknown; no legacy or candidate slots inferred"]:[])],condition_differences:[]};
+  }
   const code=error.comparisonCode??10,state=code===9?"execution_blocked":code===10?"state_corrupt":"runner_failed";
   report={...report,overall:{state,exit_code:code,reason:sanitizeComparisonLog(error.message).slice(0,4096),required_action:ACTION}};
   if(!persist) return report;
