@@ -10,7 +10,9 @@ fixtures, in original order, with `plain`, `kernel_principles_v2`, `full_ask`, o
 each. The normal nine-fixture manifest remains unchanged. Parent manifest/start/
 first-child-report/retained first-grade bytes are pinned. The parent's original
 nine IDs, first run ID, and all eight original unstarted block IDs remain in the
-new plan. Original child roots must have no start/digest/leases/history/invocation
+new plan. Grading resources bind a fresh output outside retained evaluation/
+first-grade roots; both factory and direct batch validation reject overlap before
+any writes. Original child roots must have no start/digest/leases/history/invocation
 or slot evidence; partial intent is not unstarted. New child roots and IDs must
 be independent. The parent and completed first fixture are read only.
 

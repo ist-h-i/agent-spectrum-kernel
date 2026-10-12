@@ -205,6 +205,15 @@ export function assertPrimaryContinuationIsolation(continuation, roots) {
   for (const candidate of roots) for (const parentRoot of continuation.parent_roots)
     assert.ok(!overlap(candidate, parentRoot), 'continuation execution/input/source/output overlaps parent');
 }
+export function assertPrimaryContinuationGradingIsolation(continuation, ref) {
+  assert.deepEqual(Object.keys(ref).sort(), ['digest', 'path']); canonical(ref.path); digest(ref.digest);
+  const raw = stable(ref.path); assert.equal(comparisonHash(raw), ref.digest, 'continuation grading resources changed');
+  const resources = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
+  assert.equal(resources.kind, 'ask_primary_grading_resources_v1');
+  assert.ok(isAbsolute(resources.output_root) && resolve(resources.output_root) === resources.output_root);
+  canonical(dirname(resources.output_root));
+  assertPrimaryContinuationIsolation(continuation, [resources.output_root]);
+}
 // An issuance is preparation metadata, never execution authorization. It lives
 // beside the original evaluation, not within it, and is never deleted/replaced.
 const issuanceGrants = new WeakMap();
@@ -240,6 +249,7 @@ function validateManifest(manifest, pending) {
       assert.ok(!continuation.parent_run_ids.includes(block.run_id), 'original child run ID cannot be reused');
       assert.deepEqual(block.grading.scoring_version, manifest.continuation.retained_scoring_version, 'retained scoring version required');
       assertPrimaryContinuationIsolation(continuation, [block.root, block.public_input_root, manifest.root]);
+      if (block.grading.resources) assertPrimaryContinuationGradingIsolation(continuation, block.grading.resources);
     }
   }
   assert.equal(manifest.conditions.length, 3); assert.equal(new Set(manifest.conditions).size, 3);

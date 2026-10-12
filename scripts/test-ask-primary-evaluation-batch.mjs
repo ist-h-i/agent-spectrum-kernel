@@ -371,6 +371,19 @@ test('remaining-eight is one fresh exact 24-slot plan with retained parent evide
       assert.equal(existsSync(output), false);
     }
   });
+  await t.test('grading output under retained parent or grade is rejected before writes', () => {
+    for (const target of [f.parent.blocks[1].root, f.gradePath.replace('/final-posthoc-report.json', '')]) {
+      const output = join(target, 'new-grading'), resources = join(f.fresh.root, 'unsafe-resources.json');
+      writeFileSync(resources, JSON.stringify({ kind: 'ask_primary_grading_resources_v1', output_root: output }));
+      const ref = pinned(resources), options = { output: join(f.fresh.root, 'unused-preparation'), continuation: f.continuation,
+        scoringVersionPath: f.continuation.retained_scoring_version.path, scoringVersionDigest: f.continuation.retained_scoring_version.digest,
+        gradingResourcesPath: ref.path, gradingResourcesDigest: ref.digest };
+      assert.throws(() => preparePrimaryEvaluation(f.fresh.root, options), /overlaps parent/u);
+      const m = f.manifest(value => { value.blocks[0].grading.resources = ref; return value; });
+      assert.throws(() => preparePrimaryEvaluationBatch(m.path, adapters()), /overlaps parent/u);
+      assert.equal(existsSync(output), false); assert.equal(existsSync(options.output), false);
+    }
+  });
   await t.test('no substitution, changed lineage, reused IDs/roots, first replay, or lower budget', () => {
     const edits = [m => m.blocks.reverse(), m => m.blocks.push(f.fresh.blocks[0]), m => m.blocks.pop(),
       m => m.continuation.parent_manifest.digest = hash('changed'), m => m.continuation.parent_run_id = 'wrong',

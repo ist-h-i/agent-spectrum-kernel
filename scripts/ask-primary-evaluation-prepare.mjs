@@ -11,7 +11,7 @@ import { comparisonHash, inventoryUserTree, prepareGitBaseline, prepareUserCompa
 import { createPrimaryEvaluationGradingAdapter, preflightPrimaryEvaluationGrading, PRIMARY_GRADING_PROFILE_ID } from "./ask-primary-evaluation-grading.mjs";
 import { readPrimaryScoringVersion } from "./ask-primary-scoring-version.mjs";
 import { primaryProfileForKernel } from "./ask-primary-evaluation-profile.mjs";
-import { preparePrimaryEvaluationBatch, validatePrimaryRemainingEightContinuation, assertPrimaryContinuationIsolation, reservePrimaryRemainingEightOutput, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_BATCH_LIMITS } from "./ask-primary-evaluation-batch.mjs";
+import { preparePrimaryEvaluationBatch, validatePrimaryRemainingEightContinuation, assertPrimaryContinuationIsolation, assertPrimaryContinuationGradingIsolation, reservePrimaryRemainingEightOutput, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_BATCH_LIMITS } from "./ask-primary-evaluation-batch.mjs";
 
 const SOURCE = fileURLToPath(new URL("../", import.meta.url));
 const read = path => readStableFile(path, "fixed public primary input", 32 * 1024 * 1024).bytes;
@@ -33,6 +33,8 @@ export function preparePrimaryEvaluation(publicParent, options) {
   assert.ok(!output.startsWith(`${publicParent}/`) && !publicParent.startsWith(`${output}/`) && output !== publicParent, "output/input overlap");
   if (continuation) assertPrimaryContinuationIsolation(continuation, [output, publicParent]);
 
+  if (continuation && options.gradingResourcesPath) assertPrimaryContinuationGradingIsolation(continuation,
+    { path: options.gradingResourcesPath, digest: options.gradingResourcesDigest });
   // Validate every selected fixture before creating any preparation output.
   if (scoringVersion) for (const fixtureId of fixtureIds) readPrimaryScoringVersion(scoringVersion, fixtureId);
   const profile = primaryProfileForKernel(options.kernelCondition ?? "kernel_principles_v2");
