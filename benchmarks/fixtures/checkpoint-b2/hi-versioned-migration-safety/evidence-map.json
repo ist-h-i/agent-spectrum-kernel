@@ -1,4 +1,92 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "hi-versioned-migration-safety",
-  "candidate_state": "generation_pending"
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/migration-plan.json"
+    ],
+    "required_candidate_paths": [
+      "workspace/migration-plan.json"
+    ],
+    "protected_candidate_paths": [
+      "workspace/data/mixed-state.json",
+      "workspace/data/rollback-cases.json",
+      "workspace/data/schema-phases.json",
+      "workspace/docs/migration-contract.md",
+      "workspace/package.json",
+      "workspace/plan.schema.json",
+      "workspace/scripts/compatibility.mjs",
+      "workspace/scripts/dry-run.mjs",
+      "workspace/scripts/validate-plan.mjs",
+      "workspace/scripts/validate-shape.mjs",
+      "workspace/test/mixed-version.test.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "unrecognized_candidate_meaning": "manual_review_required",
+    "authority_digest": "sha256:fe8a17801ea9931dcbc5001773f79c94838a2566aa361bf98db1745d3a1848fa"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "versioned-migration-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/data/mixed-state.json",
+        "workspace/data/rollback-cases.json",
+        "workspace/data/schema-phases.json",
+        "workspace/docs/migration-contract.md",
+        "workspace/migration-plan.json",
+        "workspace/package.json",
+        "workspace/plan.schema.json",
+        "workspace/scripts/compatibility.mjs",
+        "workspace/scripts/dry-run.mjs",
+        "workspace/scripts/validate-plan.mjs",
+        "workspace/scripts/validate-shape.mjs",
+        "workspace/test/mixed-version.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "focused-change-boundary",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/docs/migration-contract.md"
+      ]
+    },
+    {
+      "evidence_map_id": "repository-verification-route",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/plan.schema.json",
+        "workspace/scripts/compatibility.mjs",
+        "workspace/scripts/dry-run.mjs",
+        "workspace/scripts/validate-plan.mjs",
+        "workspace/scripts/validate-shape.mjs",
+        "workspace/test/mixed-version.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-migration-evidence",
+      "target_evidence_map_id": "versioned-migration-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:1f81ae83432070269772938c57a7d052e6ca2cdb2ccbb45de5bd47517f84de5f"
+    },
+    {
+      "mutation_id": "remove-focused-scope-evidence",
+      "target_evidence_map_id": "focused-change-boundary",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:7c1727e6f651d7d83767754e9a59523f479c45dc80c3d92ead39bb777dd3dba4"
+    },
+    {
+      "mutation_id": "remove-verification-route",
+      "target_evidence_map_id": "repository-verification-route",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:d78a715fb36caeb119eb6e64b3ba63ccde5d54789e079a64cee16379f32268db"
+    }
+  ]
 }
