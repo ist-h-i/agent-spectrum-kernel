@@ -42,7 +42,7 @@
     {
       "id": "pf-frontend-async-state",
       "suite": "practice_frequency",
-      "task_class": "investigation",
+      "task_class": "investigation_implementation",
       "difficulty": "medium_hard",
       "repetitions": 5,
       "aggregate_eligible": true,
