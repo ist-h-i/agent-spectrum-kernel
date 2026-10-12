@@ -1,4 +1,72 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "mn-schema-field-alignment",
-  "candidate_state": "generation_pending"
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/schemas/member.schema.json",
+      "workspace/test/member-record.test.mjs"
+    ],
+    "required_candidate_paths": [
+      "workspace/schemas/member.schema.json"
+    ],
+    "protected_candidate_paths": [
+      "workspace/package.json",
+      "workspace/spec/member-contract.md",
+      "workspace/spec/schema-alignment-plan.md",
+      "workspace/src/member-import.mjs",
+      "workspace/src/member-export.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "authority_digest": "sha256:c3e85804653d0905b60b8b6511ba9adec1ff9da6143279903ec3c43d30fdd348"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "schema-caller-contract",
+      "agent_visible_paths": [
+        "workspace/spec/member-contract.md",
+        "workspace/spec/schema-alignment-plan.md",
+        "workspace/schemas/member.schema.json",
+        "workspace/src/member-import.mjs",
+        "workspace/src/member-export.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "focused-change-boundary",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/spec/schema-alignment-plan.md"
+      ]
+    },
+    {
+      "evidence_map_id": "repository-verification-route",
+      "agent_visible_paths": [
+        "workspace/package.json",
+        "workspace/test/member-record.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-schema-caller-evidence",
+      "target_evidence_map_id": "schema-caller-contract",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:6a229708deffd9868ce43dd4d217ab6e41c26540c40111c7953a46c3d66d6e66"
+    },
+    {
+      "mutation_id": "remove-focused-scope-evidence",
+      "target_evidence_map_id": "focused-change-boundary",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:94c1aa7e589c84b74bae9aa3113501bc8d814296edacc070bad1f248843daae8"
+    },
+    {
+      "mutation_id": "remove-verification-route",
+      "target_evidence_map_id": "repository-verification-route",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:363cdbc13ca2893c14896a778810dbafb88bb29cbbc0b2e7c1a2723e14b98904"
+    }
+  ]
 }

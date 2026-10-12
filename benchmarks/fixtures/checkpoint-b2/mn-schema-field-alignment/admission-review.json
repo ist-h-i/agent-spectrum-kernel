@@ -1,4 +1,115 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "mn-schema-field-alignment",
-  "candidate_state": "generation_pending"
+  "candidate_input_digest": "sha256:750fd4666e0bd57730794d9a44ece2c6a0441e6cdf47a3ef83cba9ab1f16c9e1",
+  "candidate_evaluator_digest": "sha256:9857b5234c1d59d38d0d0afac249611bdbb439861a8f92f875c2b7429b07dde7",
+  "reviewer_status": "pending_independent_review",
+  "author_self_approval": false,
+  "admission_status": "admission_pending",
+  "fair_paths": {
+    "plain": {
+      "status": "pass",
+      "agent_visible_evidence": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/schemas/member.schema.json",
+        "workspace/spec/member-contract.md",
+        "workspace/spec/schema-alignment-plan.md",
+        "workspace/src/member-export.mjs",
+        "workspace/src/member-import.mjs",
+        "workspace/test/member-record.test.mjs"
+      ]
+    },
+    "kernel_only": {
+      "status": "pass",
+      "agent_visible_evidence": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/schemas/member.schema.json",
+        "workspace/spec/member-contract.md",
+        "workspace/spec/schema-alignment-plan.md",
+        "workspace/src/member-export.mjs",
+        "workspace/src/member-import.mjs",
+        "workspace/test/member-record.test.mjs"
+      ]
+    }
+  },
+  "gates": [
+    {
+      "gate_id": "public_artifact_leakage",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "private_evaluator_boundary",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "requirement_recoverability",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "plain_fair_path",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "kernel_only_fair_path",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "ordinary_engineering_task_wording",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "ask_vocabulary_cue_absence",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "evidence_removal_mutation",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "equivalent_solution_coverage",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "independent_review",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "input_digest_freeze",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "evaluator_digest_freeze",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "suspicious_but_correct_control",
+      "selector_result": "not_applicable",
+      "result": "not_applicable"
+    },
+    {
+      "gate_id": "false_positive_boundary",
+      "selector_result": "not_applicable",
+      "result": "not_applicable"
+    },
+    {
+      "gate_id": "unauthorized_attempt_observability",
+      "selector_result": "not_applicable",
+      "result": "not_applicable"
+    }
+  ],
+  "review_package_digest": "sha256:5f950a33bf034bb94c483661cfa3a9ffe7b8d11f92335f6e20899e8a6f6cdc2d"
 }

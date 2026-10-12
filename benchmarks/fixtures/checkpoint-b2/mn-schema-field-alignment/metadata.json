@@ -1,4 +1,32 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "mn-schema-field-alignment",
-  "candidate_state": "generation_pending"
+  "fixture_role": "primary",
+  "suite": "mechanism_negative",
+  "task_class": "small_feature",
+  "domain": "data_schema",
+  "difficulty": "easy_medium",
+  "repetitions": 3,
+  "risk_boundary": "none",
+  "capability_families": [
+    "focused_implementation",
+    "schema_evolution"
+  ],
+  "evidence_topologies": [
+    "api_contract_and_callers",
+    "schema_and_migration_plan"
+  ],
+  "outcome_dimensions": [
+    "contract_consistency",
+    "scope_discipline"
+  ],
+  "output_contract_type": "implementation_producing",
+  "requirement_record_id": "requirement-record-mn-schema-field-alignment",
+  "output_contract_id": "output-contract-mn-schema-field-alignment",
+  "evaluator_bundle_id": "evaluator-0e5f122cc8401170c47f8453619c4085138567238112f707af6042b095445f1a",
+  "evaluator_bundle_digest": "sha256:9857b5234c1d59d38d0d0afac249611bdbb439861a8f92f875c2b7429b07dde7",
+  "evaluator_byte_count": 386850,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:cb721cb7ece4386f58e841704aa0dc35ef5f12f98457981005e0d897a5f19d3b"
 }
