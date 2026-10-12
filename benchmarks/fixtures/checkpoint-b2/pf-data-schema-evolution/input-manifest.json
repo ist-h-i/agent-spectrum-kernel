@@ -10,7 +10,7 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "c91aaa40e0957eb054c7b39b7506a00c042e545456bbd26f75d12f6b997545b8",
+          "sha256": "824c949a00ae0a5f7539d0280126aa025d468b819e147c36faea2ad2f68f7451",
           "bytes": 1514
         },
         {
@@ -50,8 +50,8 @@
         },
         {
           "path": "workspace/src/schema-contract.mjs",
-          "sha256": "462eac564ffd72f9b8f5d024292bd81d1e0a1dfc0c50b5c7283002a798524f9e",
-          "bytes": 2911
+          "sha256": "08df8a61eaa1ed6ad2fccc5d14311cd7013108fcf25db99863cba3d431953b9a",
+          "bytes": 2923
         },
         {
           "path": "workspace/test/schema-evolution.test.mjs",

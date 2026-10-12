@@ -145,15 +145,15 @@ export function validatePfDataSchemaInputClosure({ root = ROOT } = {}) {
   const fixtureRoot = resolve(root, PF_DATA_SCHEMA_FIXTURE_ROOT);
   const task = readFileSync(resolve(fixtureRoot, "task.md"), "utf8");
   if (FORBIDDEN_TASK_VOCABULARY.test(task)) throw new Error("public task contains benchmark-specific vocabulary");
-  const manifest = readJson(resolve(fixtureRoot, "input-manifest.json"), "pf-api-pagination-default input manifest");
+  const manifest = readJson(resolve(fixtureRoot, "input-manifest.json"), "pf-data-schema input manifest");
   const record = manifest.fixtures?.[PF_DATA_SCHEMA_FIXTURE_ID];
-  if (manifest.scope !== "agent-visible task.md + workspace/**" || record?.class !== "local_implementation" || record?.difficulty !== "medium") throw new Error("pf-api-pagination-default input manifest fixture record is invalid");
+  if (manifest.scope !== "agent-visible task.md + workspace/**" || record?.class !== "local_implementation" || record?.difficulty !== "medium") throw new Error("pf-data-schema input manifest fixture record is invalid");
   const expected = agentVisibleFiles(fixtureRoot);
-  if (stableCanonicalJson(record.files) !== stableCanonicalJson(expected)) throw new Error("pf-api-pagination-default input manifest does not exactly bind the agent-visible inventory");
-  const verification = validateVerificationCommandContract(readJson(resolve(fixtureRoot, "verification-command-contract.json"), "pf-api-pagination-default verification contract"), { root });
+  if (stableCanonicalJson(record.files) !== stableCanonicalJson(expected)) throw new Error("pf-data-schema input manifest does not exactly bind the agent-visible inventory");
+  const verification = validateVerificationCommandContract(readJson(resolve(fixtureRoot, "verification-command-contract.json"), "pf-data-schema verification contract"), { root });
   if (!verification.commands.every(({ canonical_script }) => task.includes(`\n${canonical_script}\n`))) throw new Error("public task does not expose the verification invocation");
   const inputDigest = sha256(readFileSync(resolve(fixtureRoot, "input-manifest.json")));
-  if (verification.fixture_input_digest !== inputDigest) throw new Error("pf-api-pagination-default verification/input binding is invalid");
+  if (verification.fixture_input_digest !== inputDigest) throw new Error("pf-data-schema verification/input binding is invalid");
   return { fixtureId: PF_DATA_SCHEMA_FIXTURE_ID, inputDigest, verificationDigest: verification.contract_digest };
 }
 
