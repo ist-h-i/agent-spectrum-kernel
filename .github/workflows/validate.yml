@@ -206,8 +206,17 @@ jobs:
       - name: Run build-option fixture contract tests
         run: node scripts/test-ask-benchmark-mn-build-option-update.mjs
 
+      - name: Run schema-field public source tests (current HEAD)
+        run: node --test scripts/test-ask-benchmark-mn-schema-field-source.mjs
+
       # Frozen fixture contracts run against their declared source closure, not
       # the evolving runner. Current-HEAD runtime/scorer gates remain above/below.
+      - name: Run schema-field fixture source-freeze tests
+        run: |
+          # The fixture pins the public pre-squash source, outside main ancestry.
+          git fetch --no-tags origin 2c498d974681f8b5092759386f39abd7601e4fb4
+          node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mn-schema-field-alignment.mjs
+
       - name: Run documentation/config fixture source-freeze tests
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mn-doc-config-correction.mjs
 

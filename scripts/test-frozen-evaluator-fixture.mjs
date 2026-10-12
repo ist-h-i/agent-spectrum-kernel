@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FIXTURES = Object.freeze([
-  "mn-doc-config-correction", "mn-focused-regression-test", "mp-ci-evidence-gap",
+  "mn-doc-config-correction", "mn-focused-regression-test", "mn-schema-field-alignment", "mp-ci-evidence-gap",
   "mp-accessibility-interaction-review", "mp-data-migration-handoff",
   "mp-frontend-state-review", "mp-iac-rollback-design", "mp-performance-investigation",
 ]);
