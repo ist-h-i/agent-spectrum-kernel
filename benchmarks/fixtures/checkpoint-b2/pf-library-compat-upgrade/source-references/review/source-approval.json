@@ -1,0 +1,177 @@
+{
+  "reviewer_record_id": "library-source-independent-review-final-ff4b33c7-20261012",
+  "fixture_id": "pf-library-compat-upgrade",
+  "reviewed_head": "ff4b33c75645fc53404e642b774d7f558c0a1609",
+  "base_commit": "b81fa69d96e6e3a77d279cfa7209e92d22f112e4",
+  "decision": "approve",
+  "scope": "Independent revised public-source preparation and documented-pattern lineage only; not private grader/admission or rollback safety clearance. Frozen safety-observation dependency remains HOLD.",
+  "source_type": "documented_external_pattern",
+  "source_reference_ids": [
+    "public-patterns-20261012"
+  ],
+  "official_source": {
+    "url": "https://nodejs.org/api/path.html",
+    "independently_viewed_date": "2026-10-12",
+    "supports": "Explicit host-independent POSIX/Windows path APIs; separately https://semver.org/spec/v2.0.0.html supports major-version incompatible public APIs.",
+    "does_not_support": "Real migration incidents, production filesystem behavior, actual frequency/impact or empirical hard difficulty."
+  },
+  "source_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/task.md",
+      "bytes": 1916,
+      "raw_sha256": "sha256:9bd5fb4ce2660b02e5e3d2ce55aeb8b0631c74e790962143e590428500dea2ee"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/workspace/config/migration-settings.json",
+      "bytes": 86,
+      "raw_sha256": "sha256:c94849ae6c817d5668934c106460e5d266e4218985b0bf8067c2c095efd0fa7f"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/workspace/data/compatibility-matrix.json",
+      "bytes": 566,
+      "raw_sha256": "sha256:4237f8f1f9a61f52da74f745e9f1a112e99498af84ca9cb677edbcc257e13936"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/workspace/docs/migration-contract.md",
+      "bytes": 2950,
+      "raw_sha256": "sha256:9142068da0c8b675efe826639ff780856021155cbdc5a51a2e1d8c67885521f6"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/workspace/package.json",
+      "bytes": 297,
+      "raw_sha256": "sha256:efddca87cfde435a8389073ab4d746330efcd05f8be38535c3ffbe53f56ee639"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/workspace/scripts/check-rollback.mjs",
+      "bytes": 945,
+      "raw_sha256": "sha256:1e47d9b4f880336564a20e6f9c20df68aeec3d42c0397ee0106d718c60805a92"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/workspace/scripts/validate-migration.mjs",
+      "bytes": 1190,
+      "raw_sha256": "sha256:d2cc29b3ab631189f96f9ac6a0ea42530dff946f0cb75e3cfac04349d18972ca"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/workspace/src/archive-compat.mjs",
+      "bytes": 358,
+      "raw_sha256": "sha256:521955dc1918de9262e14f8395985fa715b4feb8b1e945b9bab052ef5128b91c"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/workspace/test/archive-compat.test.mjs",
+      "bytes": 3448,
+      "raw_sha256": "sha256:493f898c2c92b522a82ba50142c29bd65802dcd24b93b833ab4731b0f9960a42"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/workspace/vendor/archive-v1.mjs",
+      "bytes": 523,
+      "raw_sha256": "sha256:032b624c513fe482b8571ec9b190214db8f721ff2f2f395427a2b75773cbc18c"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/workspace/vendor/archive-v2.mjs",
+      "bytes": 692,
+      "raw_sha256": "sha256:49f30a5d94c58d535f6ba4c8e7cf32a09fa726f13199a64d2765ac5b850d058e"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/input-manifest.json",
+      "bytes": 2338,
+      "raw_sha256": "sha256:4d6f715172603e41a5e774ef1143cb367e39b882cb3ab01df168933c1c781253"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/verification-command-contract.json",
+      "bytes": 2560,
+      "raw_sha256": "sha256:2979e361d43c903805c9e3389abf07b01c5a97921bb1f4553dbe97667b8615f2",
+      "contract_digest": "sha256:fe0a215e1003f23865defbb93fffc95c7d5b9e8af9c4eb64c9864d7044d64125"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/lineage.md",
+      "bytes": 569,
+      "raw_sha256": "sha256:5271154bd184607e826be58186398ec9df9ade020e107e5cfe281e2f19d0ede3"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/source-references/public-patterns-20261012.md",
+      "bytes": 730,
+      "raw_sha256": "sha256:23f41ff2fffbbb49e0a0163cd0464d50f831655f8881ee2aae17250aceeb98c1"
+    },
+    {
+      "path": "scripts/ask-benchmark-pf-library-source.mjs",
+      "bytes": 9133,
+      "raw_sha256": "sha256:7f827a4d8288714f7604e54d455d83573279c05b15bd947938d88c7fb3b921cb"
+    },
+    {
+      "path": "scripts/test-ask-benchmark-pf-library-source.mjs",
+      "bytes": 3107,
+      "raw_sha256": "sha256:adf51e1271c80729c3415bb7e35ed4f7f079b79913a84ac6c7684495106f3bae"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/admission-review.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:ccac69a0673f80002ae326fdabcddd17c89d0230d89c24cf235229755651d11a"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/evaluator-authority-manifest.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:ccac69a0673f80002ae326fdabcddd17c89d0230d89c24cf235229755651d11a"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/evaluator-reference.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:ccac69a0673f80002ae326fdabcddd17c89d0230d89c24cf235229755651d11a"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/evidence-map.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:ccac69a0673f80002ae326fdabcddd17c89d0230d89c24cf235229755651d11a"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/final-admission-record.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:ccac69a0673f80002ae326fdabcddd17c89d0230d89c24cf235229755651d11a"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/metadata.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:ccac69a0673f80002ae326fdabcddd17c89d0230d89c24cf235229755651d11a"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/output-contract.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:ccac69a0673f80002ae326fdabcddd17c89d0230d89c24cf235229755651d11a"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/requirement-record.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:ccac69a0673f80002ae326fdabcddd17c89d0230d89c24cf235229755651d11a"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/scoring-input-freeze-manifest.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:ccac69a0673f80002ae326fdabcddd17c89d0230d89c24cf235229755651d11a"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/source-freeze-candidate.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:ccac69a0673f80002ae326fdabcddd17c89d0230d89c24cf235229755651d11a"
+    }
+  ],
+  "lineage_policy_ref": {
+    "path": "benchmarks/portfolio-lineage-policy.json",
+    "bytes": 6039,
+    "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d",
+    "declared_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"
+  },
+  "catalog_ref": {
+    "path": "benchmarks/portfolio-catalog.json",
+    "bytes": 29625,
+    "raw_sha256": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
+    "declared_catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972"
+  },
+  "requirements_for_change": [],
+  "limitations": [
+    "Initial667b changes_requested records and legacy-only counterexample remain immutable; manifest raw SHA-25637c094b3a57d51f29fbe8b72af3a34ba5bf806ac3267b9276fca828bd69449ca. F-LIBRARY-ACTIVE-API-VERSION is independently resolved atff4b33c7.",
+    "Same independent normal source bodies each pass23/23 plus anchored test/rollback/record. Same legacy-only source now fails19pass4fail; unawaited-add fails12pass11fail.",
+    "Fixture-local readonly usage copies demonstrate selected/non-selected API calls and arguments on supplied cases. They are not authenticated history, genuine safety monitoring or proof of absent unauthorized actions. Rollback admission remains HOLD.",
+    "Explicit Node path flavors are locally verified string semantics, not Windows filesystem deployment or true external migration. No installation/service/state change is required by the fixture.",
+    "Hard/45-minute calibration and real frequency/impact remain unknown; null practice weights and practice-weighted ineligibility are maintained.",
+    "No author private originals, r9/evaluation-copy, stopped private clientr8 region, models/CodexCLI/comparison/diagnostics, main merge or implementation edit was read/run/performed."
+  ]
+}

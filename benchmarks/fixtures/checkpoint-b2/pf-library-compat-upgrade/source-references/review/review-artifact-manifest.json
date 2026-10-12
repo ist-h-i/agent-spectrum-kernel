@@ -1,0 +1,22 @@
+{
+  "reviewed_head": "ff4b33c75645fc53404e642b774d7f558c0a1609",
+  "scope": "Revised public-source approval and separate unknown bands only; not private grading/admission or rollback safety clearance.",
+  "records": [
+    {
+      "path": "source-approval.json",
+      "raw_sha256": "sha256:97176a5bbf5b686c561f407b2c3064e2056ebf08d0a15285da7a56da239693aa"
+    },
+    {
+      "path": "frequency-review.json",
+      "raw_sha256": "sha256:3157b560591b7adefacbfcbacb560a6e6da8d81614d6f2428dbdbe96c6b06770"
+    },
+    {
+      "path": "impact-review.json",
+      "raw_sha256": "sha256:d6bfdedc5e47434568037251de86e0df29ba9e35445b2965b2edfcc7437a7733"
+    },
+    {
+      "path": "review.md",
+      "raw_sha256": "sha256:33d6ee2bed69a291669b4fc3476fabd7d96e8d91f133fa26b3bc6a8faf51531a"
+    }
+  ]
+}
