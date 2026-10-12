@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
@@ -21,4 +22,15 @@ test("scope, equivalence and evidence mutations are task-specific", () => {
   assert.equal(value.evidenceMap.maps.length,3);
   assert.equal(value.mutationAsset.mutations.length,3);
   assert.ok(value.evidenceMap.scope_boundary_authority.allowed_candidate_paths.includes("workspace/schemas/member.schema.json"));
+});
+
+test("dedicated runtime config binds this fixture input and public verification", () => {
+ const config=JSON.parse(readFileSync(resolve(root,"benchmarks/mn-schema-field-alignment.config.json"),"utf8"));
+ const fixture=config.fixtures[0];
+ assert.equal(fixture.id,"mn-schema-field-alignment");
+ const prefix="benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment";
+ assert.equal(fixture.input_manifest_path,prefix+"/input-manifest.json");
+ assert.equal(fixture.verification_command_contract.path,prefix+"/verification-command-contract.json");
+ for(const [path,digest] of [[fixture.input_manifest_path,fixture.input_manifest_sha256],[fixture.verification_command_contract.path,fixture.verification_command_contract.sha256]])
+  assert.equal(createHash("sha256").update(readFileSync(resolve(root,path))).digest("hex"),digest);
 });

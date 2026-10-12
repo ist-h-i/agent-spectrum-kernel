@@ -46,11 +46,11 @@
       "difficulty": "easy_medium",
       "repetitions": 3,
       "aggregate_eligible": true,
-      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json",
-      "input_manifest_sha256": "9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/input-manifest.json",
+      "input_manifest_sha256": "bb41c0b2c89cf749d8f07e179554689c2c9fb3bde6b7fd26fc82a09cc8cb15a8",
       "verification_command_contract": {
-        "path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/verification-command-contract.json",
-        "sha256": "eb2eee7170452eff1d0e131f4ac8a25a285f050a7e8e23ab23286376b31dc620"
+        "path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/verification-command-contract.json",
+        "sha256": "4a41800780f1fe1c442b030907e64f22a94d94c9b5267eee38fd15d99ba65547"
       },
       "risk_boundary": "none"
     }
