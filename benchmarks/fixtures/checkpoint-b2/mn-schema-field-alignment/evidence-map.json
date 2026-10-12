@@ -36,11 +36,13 @@
     {
       "evidence_map_id": "schema-caller-contract",
       "agent_visible_paths": [
+        "task.md",
         "workspace/spec/member-contract.md",
         "workspace/spec/schema-alignment-plan.md",
         "workspace/schemas/member.schema.json",
         "workspace/src/member-import.mjs",
-        "workspace/src/member-export.mjs"
+        "workspace/src/member-export.mjs",
+        "workspace/test/member-record.test.mjs"
       ]
     },
     {
@@ -64,7 +66,7 @@
       "target_evidence_map_id": "schema-caller-contract",
       "expected_recoverability_state": "not_recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:6a229708deffd9868ce43dd4d217ab6e41c26540c40111c7953a46c3d66d6e66"
+      "mutation_digest": "sha256:0dd83cf9fff25571d4f7390d86948a35791fd3467e7cea287919eacb299d1eaf"
     },
     {
       "mutation_id": "remove-focused-scope-evidence",

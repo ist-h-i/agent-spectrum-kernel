@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/evaluator-authority-manifest.schema.json",
   "program": "adaptive_ask_evaluator_authority_manifest",
   "fixture_id": "mn-schema-field-alignment",
-  "evaluator_revision": "a44c73fade30e6dc46a9ca0a43900d022adf0b4c",
+  "evaluator_revision": "8541e195b6d5879f3934cda6253c5ac5c8b3f75e",
   "file_inventory": [
     {
       "path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/input-manifest.json",
@@ -16,11 +16,11 @@
     },
     {
       "path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/evidence-map.json",
-      "bytes": 2801,
-      "raw_sha256": "sha256:127711cf70d42d7652972b9d18716e4f13f146c7973b8cc69e92b312e7babe22",
-      "semantic_digest": "sha256:36928ebaa0ace3d0883daf6b9d175b462069c878673c9398997a29934dbc0a86",
+      "bytes": 2869,
+      "raw_sha256": "sha256:c4c7553afe9324bb6ab53e19f69a1eb368d38604b2631d4e06d26b482b547605",
+      "semantic_digest": "sha256:0a7944d938f240459afb1497f92225f0307ab0b5aa8469b247ea49d23345df66",
       "authority_role": "evidence_map",
-      "evidence_map_set_digest": "sha256:9fde0b0faa4cc247b1bbecd08f8112fbbde8ca2bcf2dc39e3dfa52090e584b01",
+      "evidence_map_set_digest": "sha256:46b4a8c2ed481156190d41a6edc5891aa8f56a9324f078e852b2b8486a411aaf",
       "requirement_ids": [
         "schema-field-correctness",
         "request-scope-discipline",
@@ -45,12 +45,12 @@
     {
       "path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/requirement-record.json",
       "bytes": 2786,
-      "raw_sha256": "sha256:6d5ebdb04959c4975e5e07786bb5de1bbd3bf3faa028551e12853c6921aa4014",
-      "semantic_digest": "sha256:cbf722026cfbb084caf19ed35cda1c7dca58b4162e6b49da188d99592fab5539",
+      "raw_sha256": "sha256:b2bab5b6ca40a65165b1a2b9e09c92240c94d48c0f2c95362585d5f0bad6dc6e",
+      "semantic_digest": "sha256:893fa4dd21823bdb84da921a6feb0f885f0046889a5553de0cacd5d34f76b94a",
       "authority_role": "requirement_record",
-      "requirement_record_digest": "sha256:cbf722026cfbb084caf19ed35cda1c7dca58b4162e6b49da188d99592fab5539",
+      "requirement_record_digest": "sha256:893fa4dd21823bdb84da921a6feb0f885f0046889a5553de0cacd5d34f76b94a",
       "requirement_set_digest": "sha256:59552adb1b900c4448d25225c6f77b24b583c639dbfe6afd76b3096a983de4ec"
     }
   ],
-  "manifest_digest": "sha256:f14018a0f1c1d3a40c0606877bd2a1f4317010b20bd6bc209e4ae0d6aebdffbd"
+  "manifest_digest": "sha256:a75b6925be1342b80ef0c88e08183cd6716795fd5c8e00b03aadc2d8abddc32e"
 }
