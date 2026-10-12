@@ -75,7 +75,7 @@ export function preparePrimaryEvaluation(publicParent, options) {
   const result = preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter });
   save(join(output, "preparation-result.json"), result);
   return { ...result, manifest_path: manifestPath, model_calls: 0, old_ownership_diagnostics: 0,
-    kernel_candidate_decision: "v2 selected for this practical evaluation; old v1 and candidate preserved; not product adoption" };
+    kernel_candidate_decision: `${profile.kernel_condition} selected for this practical evaluation; old v1 and candidate preserved; not product adoption` };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [input, optionPath, ...extra] = process.argv.slice(2);
