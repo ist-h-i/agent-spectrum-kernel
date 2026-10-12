@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "pf-ci-cache-flake",
+  "fixture_role": "primary",
+  "suite": "practice_frequency",
+  "task_class": "investigation",
+  "domain": "ci_build",
+  "difficulty": "medium_hard",
+  "repetitions": 5,
+  "risk_boundary": "none",
+  "capability_families": [
+    "flake_isolation",
+    "hypothesis_testing"
+  ],
+  "evidence_topologies": [
+    "ci_logs_and_config",
+    "historical_flake_runs"
+  ],
+  "outcome_dimensions": [
+    "causal_confidence",
+    "reliability"
+  ],
+  "output_contract_type": "findings_producing",
+  "requirement_record_id": "requirement-record-pf-ci-cache-flake",
+  "output_contract_id": "output-contract-pf-ci-cache-flake",
+  "evaluator_bundle_id": "evaluator-3f781f00230fa57390827f820616a7152a9a9354b3237bf3b192caf20436036c",
+  "evaluator_bundle_digest": "sha256:04b0280645c310cc70c9f6ef6d852593cd17c231692451965f1365b1548e3415",
+  "evaluator_byte_count": 445608,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:e1d01c6df248f6d8b1f65244556df4dafbda876ab5ddbc9a4e91b0b2c8c6e1b6"
+}

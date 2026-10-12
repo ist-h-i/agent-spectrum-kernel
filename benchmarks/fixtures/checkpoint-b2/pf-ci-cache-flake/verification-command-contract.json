@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "pf-ci-cache-flake",
+  "fixture_input_digest": "sha256:276cbe5632762a7b03ace4c3057e8a8b04553ba21bdc5c0794355e7c0509f83a",
+  "commands": [
+    {
+      "command_id": "cache-investigation-validation",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"ci/build-config.json\":\"dea1af75bc003425d77b45f3375602e9bde3e811d3aa9ed601ef5d935d03b942\",\"ci/build-history.log\":\"4288f4f83a1c905ce14aa3dc93a64a4e6620373d904e6b3512d84da67e30f271\",\"ci/scenarios.json\":\"b16010300c28f0bf0dd0e083e2c032b1c855e553117d741cf7ba74b39d30829d\",\"docs/investigation-contract.md\":\"fc5dfce5bc59ff14aaa66b4fbe3edf209ef7e71e35c98b4a367fe02e17d0de6f\",\"investigation.schema.json\":\"cd971cd4f36c060ea521946dd0819edbae726c57f8ac5786a7595f5fcf583270\",\"package.json\":\"10537ac134a2957fecb7b30753992caeacd2d76e16de3810b960df6610b890b2\",\"scripts/reproduce-cache.mjs\":\"2efab731082f3adf6f086580c29d87427cfdc9d000ce18ac328773fec083a75b\",\"scripts/validate-report.mjs\":\"97d3a9238a8061e866f91ce14c3c8256968dea9db5b1bac0da460dc6d4a4fca8\",\"src/cache-model.mjs\":\"3a73cfed43492a3f40e51f59e5d8ed0c4d9c25465019ef4674ae807afce56d86\",\"test/cache-observation.test.mjs\":\"42ced262a0783c01baa689ba209e11d1122e899055d0ae624e2f56ad908dfcad\",\"test/report-structure.test.mjs\":\"d7daf7abc069f718a7ace0f1b947fd7674130d1b5e582dc5588cfd9609d8aef5\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm test && npm run validate-report",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:cffd46326a77d833bd1ac3a7a32d122de0520aee09c0ac7b1bb65f316b945faf",
+      "rendered_event_command_digest": "sha256:825a8b5df9ed439c0e3f694d7b81fcf18e5bc8a10dfe5c5eb645b7350eb800ce",
+      "command_contract_digest": "sha256:a29b551cff513baf74ed98347ac65cfaecd1ba4ecd5bc17bffbb5ac590a2ce7d"
+    }
+  ],
+  "contract_digest": "sha256:d7d60fc5e09009fc5565f7ba7e3e2f8681595b15dc149235b02a6ed09e33b759"
+}

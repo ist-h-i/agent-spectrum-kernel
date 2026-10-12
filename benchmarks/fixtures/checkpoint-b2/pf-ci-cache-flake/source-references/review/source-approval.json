@@ -1,0 +1,142 @@
+{
+  "reviewer_record_id": "ci-cache-r2-source-independent-review-final-6f467d49-20261012",
+  "fixture_id": "pf-ci-cache-flake",
+  "reviewed_head": "6f467d49fa7b679749122f6a372008fa0405649b",
+  "base_commit": "6dd5c883fbd353c05e11210b14faed45e6fc0f0e",
+  "decision": "approve",
+  "scope": "Independent final r2 public-source preparation and documented-pattern lineage only. Authority-helper scope is solely its public protected-path addition by byte comparison, not private helper/meaning/grader/admission or production validation.",
+  "source_type": "documented_external_pattern",
+  "source_reference_ids": [
+    "github-actions-cache-docs-20261012"
+  ],
+  "official_source": {
+    "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching",
+    "independently_viewed_date": "2026-10-12",
+    "supports": "GitHub documents exact and prefix/restore-key matching, immutable cache contents and dependency hash inputs. The checked-in original paraphrase motivates the engineering pattern.",
+    "does_not_support": "The fictional local run history, occurrence frequency, impact, complete GitHub cache-service behavior or correctness of any private evaluator."
+  },
+  "source_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/task.md",
+      "bytes": 2050,
+      "raw_sha256": "sha256:d514b2e3db7112454ea34247b3632d995dd1fa7173b7e98cb3ecba462ef3904c"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/workspace/ci/build-config.json",
+      "bytes": 212,
+      "raw_sha256": "sha256:dea1af75bc003425d77b45f3375602e9bde3e811d3aa9ed601ef5d935d03b942"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/workspace/ci/build-history.log",
+      "bytes": 573,
+      "raw_sha256": "sha256:4288f4f83a1c905ce14aa3dc93a64a4e6620373d904e6b3512d84da67e30f271"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/workspace/ci/scenarios.json",
+      "bytes": 844,
+      "raw_sha256": "sha256:b16010300c28f0bf0dd0e083e2c032b1c855e553117d741cf7ba74b39d30829d"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/workspace/docs/investigation-contract.md",
+      "bytes": 3324,
+      "raw_sha256": "sha256:fc5dfce5bc59ff14aaa66b4fbe3edf209ef7e71e35c98b4a367fe02e17d0de6f"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/workspace/investigation.schema.json",
+      "bytes": 12222,
+      "raw_sha256": "sha256:cd971cd4f36c060ea521946dd0819edbae726c57f8ac5786a7595f5fcf583270"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/workspace/package.json",
+      "bytes": 324,
+      "raw_sha256": "sha256:10537ac134a2957fecb7b30753992caeacd2d76e16de3810b960df6610b890b2"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/workspace/scripts/reproduce-cache.mjs",
+      "bytes": 705,
+      "raw_sha256": "sha256:2efab731082f3adf6f086580c29d87427cfdc9d000ce18ac328773fec083a75b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/workspace/scripts/validate-report.mjs",
+      "bytes": 1884,
+      "raw_sha256": "sha256:97d3a9238a8061e866f91ce14c3c8256968dea9db5b1bac0da460dc6d4a4fca8"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/workspace/src/cache-model.mjs",
+      "bytes": 1131,
+      "raw_sha256": "sha256:3a73cfed43492a3f40e51f59e5d8ed0c4d9c25465019ef4674ae807afce56d86"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/workspace/test/cache-observation.test.mjs",
+      "bytes": 695,
+      "raw_sha256": "sha256:42ced262a0783c01baa689ba209e11d1122e899055d0ae624e2f56ad908dfcad"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/workspace/test/report-structure.test.mjs",
+      "bytes": 340,
+      "raw_sha256": "sha256:d7daf7abc069f718a7ace0f1b947fd7674130d1b5e582dc5588cfd9609d8aef5"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/input-manifest.json",
+      "bytes": 2515,
+      "raw_sha256": "sha256:276cbe5632762a7b03ace4c3057e8a8b04553ba21bdc5c0794355e7c0509f83a"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/verification-command-contract.json",
+      "bytes": 2667,
+      "raw_sha256": "sha256:7ab8f05af3dc87bbf1374c00d04834a2881538d5661e7a858410a81b97efefd5",
+      "contract_digest": "sha256:d7d60fc5e09009fc5565f7ba7e3e2f8681595b15dc149235b02a6ed09e33b759"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/lineage.md",
+      "bytes": 1019,
+      "raw_sha256": "sha256:9c9a42e51962289d9687288f28f3d9e90fb8684e0b458ee78195e96e79742d6c"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/source-references/github-actions-cache-docs-20261012.md",
+      "bytes": 608,
+      "raw_sha256": "sha256:4961b50fed516e06cddf5787b674e6100238c81de99f810eff87766c1099ea4d"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/source-references/revisions/r1/revision-manifest.json",
+      "bytes": 4466,
+      "raw_sha256": "sha256:d7232391ab3b8553f7a180943443a683d587b5020de35f07a64220fd2b4e7917"
+    },
+    {
+      "path": "scripts/ask-benchmark-pf-ci-cache-source.mjs",
+      "bytes": 8999,
+      "raw_sha256": "sha256:9e8e6673df67924e26675866ca3a0067498acdb6620fe74168c80ba0693efde4"
+    },
+    {
+      "path": "scripts/test-ask-benchmark-pf-ci-cache-source.mjs",
+      "bytes": 4384,
+      "raw_sha256": "sha256:bc123d879be9cab1989a965bb776dd8e2e2b9132a5b72a7e65c91a2410dd069f"
+    },
+    {
+      "path": "scripts/ask-benchmark-pf-ci-cache-authority.mjs",
+      "bytes": 54335,
+      "raw_sha256": "sha256:4c5467c60ba2e37c0fe8b8ace136f149b28399b16e06e669829988e7db4900ea"
+    }
+  ],
+  "lineage_policy_ref": {
+    "path": "benchmarks/portfolio-lineage-policy.json",
+    "bytes": 6039,
+    "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d",
+    "declared_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"
+  },
+  "catalog_ref": {
+    "path": "benchmarks/portfolio-catalog.json",
+    "bytes": 29625,
+    "raw_sha256": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
+    "declared_catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972"
+  },
+  "requirements_for_change": [],
+  "limitations": [
+    "Initial 1b65cea8 source records remain intact, manifest raw SHA-256 22d72b4fc1445cd54e53b3513b2170ce599e681f2aaa53af888ab63fa902d7b0. The P3 test invocation finding is resolved by successor bedf4633, and the summary authority concern is closed structurally at final6f467d49.",
+    "Public command accepts two independently derived normal references and two deliberately semantically bad shape-valid reports. Missing-witness and extra-summary cases are refused. These are ordinary source/structure checks, not private meaning evaluation.",
+    "Complete report now consists of structured fields; summary is removed and additionalProperties:false refuses it. Linked observation/witness/control/competing/recommendation/confidence/limitation obligations remain. Unfamiliar strategy/dimension meaning still requires review as publicly specified.",
+    "Authority helper was not semantically reviewed or executed: only addition of the public report-structure test path was mechanically verified, every other byte identical. Production authority/lineage remain r1.",
+    "Investigation intent and frozen catalog designation are supported by the public model and relations, while empirical medium_hard/duration calibration remain unknown. Frequency/impact remain unknown with null weights and practice-weighted ineligibility.",
+    "Existing r1 private originals/answers/code, private evaluator/admission, model/evaluation/comparison CLI, main merge and stopped-client re-review remain outside the review."
+  ]
+}

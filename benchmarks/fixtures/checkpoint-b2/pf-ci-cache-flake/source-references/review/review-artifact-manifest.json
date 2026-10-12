@@ -1,0 +1,22 @@
+{
+  "reviewed_head": "6f467d49fa7b679749122f6a372008fa0405649b",
+  "scope": "Independent final r2 public source and separate unknown frequency/impact judgments only; not private meaning, grading, admission or production validation.",
+  "records": [
+    {
+      "path": "source-approval.json",
+      "raw_sha256": "sha256:ea5d719fb131b088bb22e0869b34399bf11ea1d66bc140359a1f9aaf3f4c79a1"
+    },
+    {
+      "path": "frequency-review.json",
+      "raw_sha256": "sha256:f3646158f3345588d2e67322081eff0fb0fe3296e0ff6f8d628e8a5336d17413"
+    },
+    {
+      "path": "impact-review.json",
+      "raw_sha256": "sha256:41f48cc5d1cae0e1e29261f1786b64f01a636c6041cfe7db479ce163d3509628"
+    },
+    {
+      "path": "review.md",
+      "raw_sha256": "sha256:9bbb59c0360a4c1b756fd573ebf64bb63f665b4f5aeba12178311366c1d641f7"
+    }
+  ]
+}
