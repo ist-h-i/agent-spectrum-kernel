@@ -179,6 +179,11 @@ jobs:
       - name: Run portfolio admission decision overlay tests
         run: node scripts/test-ask-benchmark-admission-decision.mjs
 
+      - name: Fetch public reviewed heads for admitted fixture invariance
+        run: |
+          git fetch --no-tags origin e51eeddf5e5675660205e7f70bcdba202b57e77c
+          git fetch --no-tags origin 277d5d7bca619bb7dca17190aa4f9f99bfbbe23a
+
       - name: Guard admitted fixture invariance
         run: node scripts/test-ask-benchmark-admitted-fixture-invariance.mjs
 
