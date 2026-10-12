@@ -130,7 +130,10 @@ sealed portable-workspace protocol retains its existing locale order and numeric
 modes. The materialization boundary converts only its newly derived expected
 record into that existing protocol before comparing every path, type, mode, byte
 count and hash and checking the observed portable digest. It does not sort or
-rewrite an original observed record or weaken an identity check.
+rewrite an original observed record or weaken an identity check. The copy helper
+requires canonical real directory roots and rejects prohibited copied entries
+before restoring modes, so a rejected symlink cannot change its external target.
+Its metadata result does not grant the production execution provenance token.
 
 Synthetic development regressions cover case, punctuation, Unicode, Full-style
 managed assets and true content/inventory mismatch. Using this fix with a future

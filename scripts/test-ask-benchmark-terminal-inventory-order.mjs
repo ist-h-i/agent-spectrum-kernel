@@ -1,14 +1,14 @@
 // Synthetic metadata/copy checks only: no evaluator worker or model is launched.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonicalDigest } from './ask-benchmark-materialize.mjs';
 import { buildTerminalWorkspaceAuthority, captureTerminalWorkspaceInventory, deriveTerminalCandidateInventory,
   terminalWorkspaceInventoryDigest } from './ask-benchmark-terminal-workspace.mjs';
-import { materializeTerminalCandidateAuthorityWorkspace, terminalCandidateInventoryFromAuthority } from './ask-benchmark-evaluator-boundary.mjs';
+import { executeProductionSealedEvaluator, materializeTerminalCandidateAuthorityWorkspace, terminalCandidateInventoryFromAuthority } from './ask-benchmark-evaluator-boundary.mjs';
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 function syntheticAuthority(t) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'ask-terminal-order-unit-')));
@@ -88,4 +88,32 @@ test('changed reconstruction content or inventory still rejects before becoming 
       terminal: { authority: f.authority, reconstructedWorkspace: reconstruction } }), /metadata authority workspace is inconsistent/);
     assert.equal(readFileSync(join(reconstruction, change === 'content' ? 'src/base.mjs' : 'undeclared.mjs'), 'utf8'), 'different bytes\n');
   }
+});
+
+test('copied symlink is rejected before changing external target bytes or mode', t => {
+  const f = syntheticAuthority(t), reconstruction = join(f.root, 'symlink-reconstruction');
+  cpSync(join(f.terminalRoot, 'workspace'), reconstruction, { recursive: true });
+  const target = join(f.root, 'external-target.mjs'), bytes = Buffer.from('export const value = 1;\n');
+  writeFileSync(target, bytes, { mode: 0o600 });
+  const before = lstatSync(target).mode & 0o777;
+  rmSync(join(reconstruction, 'src/base.mjs')); symlinkSync(target, join(reconstruction, 'src/base.mjs'));
+  assert.throws(() => materializeTerminalCandidateAuthorityWorkspace({ evaluationRoot: f.root,
+    terminal: { authority: f.authority, reconstructedWorkspace: reconstruction } }), /prohibited filesystem entry|symlink/);
+  assert.deepEqual(readFileSync(target), bytes);
+  assert.equal(lstatSync(target).mode & 0o777, before);
+});
+test('copy boundary refuses symlink evaluation or reconstructed workspace roots', t => {
+  const f = syntheticAuthority(t), evaluationAlias = join(f.root, 'evaluation-alias'), reconstructionAlias = join(f.root, 'reconstruction-alias'), ancestorAlias = join(f.root, 'terminal-alias');
+  symlinkSync(f.root, evaluationAlias); symlinkSync(join(f.terminalRoot, 'workspace'), reconstructionAlias); symlinkSync(f.terminalRoot, ancestorAlias);
+  for (const [evaluationRoot, reconstructedWorkspace] of [[evaluationAlias, join(f.terminalRoot, 'workspace')], [f.root, reconstructionAlias],
+    [join(evaluationAlias, 'terminal'), join(f.terminalRoot, 'workspace')], [f.root, join(ancestorAlias, 'workspace')]])
+    assert.throws(() => materializeTerminalCandidateAuthorityWorkspace({ evaluationRoot,
+      terminal: { authority: f.authority, reconstructedWorkspace } }), /symlink/);
+});
+test('metadata copy result cannot grant production execution authority', t => {
+  const f = syntheticAuthority(t);
+  const materialized = materializeTerminalCandidateAuthorityWorkspace({ evaluationRoot: f.root,
+    terminal: { authority: f.authority, reconstructedWorkspace: join(f.terminalRoot, 'workspace') } });
+  // The first provenance gate rejects this metadata record before any worker.
+  assert.throws(() => executeProductionSealedEvaluator({ execution: materialized }), /requires a module-owned verified terminal candidate authority/);
 });

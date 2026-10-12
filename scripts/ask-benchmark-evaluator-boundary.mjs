@@ -2069,9 +2069,14 @@ export function terminalCandidateInventoryFromAuthority(authority) {
 // Copies verified metadata at the terminal/private portable protocol boundary.
 // This helper does not grant the production constructor's provenance authority.
 export function materializeTerminalCandidateAuthorityWorkspace({ evaluationRoot, terminal }) {
-  const parent = mkdtempSync(resolve(evaluationRoot, ".production-candidate-authority-"));
+  const evaluationDirectory = assertRealDirectory(evaluationRoot, "terminal candidate evaluation root");
+  const reconstructedDirectory = assertRealDirectory(terminal.reconstructedWorkspace, "terminal candidate reconstructed workspace");
+  if (evaluationDirectory !== resolve(evaluationRoot) || reconstructedDirectory !== resolve(terminal.reconstructedWorkspace)) throw new Error("terminal candidate roots must not traverse symlinks");
+  const parent = mkdtempSync(resolve(evaluationDirectory, ".production-candidate-authority-"));
   const destination = resolve(parent, "workspace");
-  cpSync(terminal.reconstructedWorkspace, destination, { recursive: true, errorOnExist: true, force: false });
+  cpSync(reconstructedDirectory, destination, { recursive: true, errorOnExist: true, force: false });
+  // Reject prohibited copied entries before chmod can follow a link outside it.
+  readStableWorkspaceInventory(destination, "terminal candidate copied workspace before metadata restoration");
   const terminalInventory = terminalCandidateInventoryFromAuthority(terminal.authority);
   const workspaceRoot = terminalInventory.find(({ path }) => path === "workspace");
   const inventory = terminalInventory.filter(({ path }) => path.startsWith("workspace/")).map((entry) => ({ ...entry, path: entry.path.slice("workspace/".length) }));
