@@ -14,6 +14,7 @@ import { deriveEffectiveVerificationEvidenceState } from './ask-benchmark-scorin
 import { scoreEvaluatorResult } from './ask-benchmark-portfolio-score.mjs';
 import { verifyPublicEvaluatorReference, verifyPrivateEvaluatorResourceAssets } from './ask-benchmark-evaluator-boundary.mjs';
 import { resolveEffectiveAdmissionAuthorityFromFiles } from './ask-benchmark-admission-decision.mjs';
+import { verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 
 import { getPrimaryEvaluationProfile, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
@@ -33,6 +34,7 @@ export function preflightPrimaryEvaluationGradingResources(block,resource) {
     assert.ok(PRIMARY_FIXTURE_IDS.includes(block.fixture_id));const binding=block.grading.binding;
     assert.deepEqual(Object.keys(binding).sort(),['evaluator_bundle_digest','fixture_id','input_manifest_digest','profile_id','scoring_input_freeze_digest'].sort());
     assert.equal(binding.fixture_id,block.fixture_id);getPrimaryEvaluationProfile(binding.profile_id);
+    verifyPrimaryScoringVersionResource(block,resource);
     const root=resource.frozenSourceRoot;assert.equal(realpathSync(root),root);
     const freezeManifestPath=join(root,`benchmarks/fixtures/checkpoint-b2/${block.fixture_id}/scoring-input-freeze-manifest.json`),freeze=json(freezeManifestPath);
     assert.equal(hash(read(freezeManifestPath)),binding.scoring_input_freeze_digest);assert.equal(freeze.fixture_id,block.fixture_id);assert.equal(freeze.fixture_input_digest,binding.input_manifest_digest);

@@ -18,6 +18,8 @@ import { verifyPortfolioScoringRootLineage, verifyEvaluatorAuthority, verifyPubl
 import { scoreEvaluatorResult } from './ask-benchmark-portfolio-score.mjs';
 import { PRIMARY_PROFILE_SCHEMAS, withPrimarySchemaBuild, withPrimaryEvaluationProducer } from './ask-primary-evaluation-scope.mjs';
 
+import { primaryScoringRoot, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
+
 import { primaryProfileForKernel, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url)), LIMIT = 33554432;
@@ -80,6 +82,7 @@ async function checkedSource(block) {
   for (const path of ['control/plan.json','control/plan.digest','control/task.md','inputs/prompt.md','control/verification.json','control/node-test-reporter.mjs',
     'control/kernel-principles-source.md','control/kernel-principles-renderer.mjs','control/kernel-principles-task-metadata.json','control/kernel-principles-renderer-closure','control/start.json','control/start.digest','control/history','control/leases']) retainTree(join(block.root,path));
   retainedRead(block.input_manifest.path);
+  if (block.grading?.scoring_version) retainedRead(block.grading.scoring_version.path);
   for (const slot of request.slots) {
     const condition = slot.condition, arm = loaded.plan.arms[condition], baseRoot = join(block.root, arm.baseline_path);
     assert.deepEqual(inventoryUserTree(baseRoot), arm.baseline_inventory, 'primary baseline changed');
@@ -238,6 +241,8 @@ export function verifyPrimaryEvaluationProducer(options) {
   assert.equal(hash(Buffer.from(JSON.stringify(source.request,null,2)+'\n')),source.request_digest,'primary grading export changed');
   assert.equal(source.request.evidence_kind, manifest.evidence_kind);
   assert.deepEqual(source.request.binding, manifest.block.grading.binding, 'primary saved request block binding changed');
+  assert.deepEqual(source.request.scoring_version, manifest.block.grading.scoring_version, 'primary scoring version selector changed');
+  primaryScoringRoot(manifest.block);
   assert.equal(source.request_digest, manifest.grading_export_digest); assert.equal(snapshotDigest(source.snapshots), manifest.snapshot_digest);
   const id = identifiers(source.request);
   for (const condition of source.request.conditions) for (const [kind, tree] of Object.entries(source.snapshots[condition])) if (tree) {
@@ -281,7 +286,10 @@ function buildPrimaryEvaluationScoringInputsWithinScope(options, { condition, fr
     verifyPortfolioScoringRootLineage({ ...verified.executionOptions, normalizedResultsPath }, normalized);
     const entry = normalized.manifest.cases.find(c => c.condition === condition)?.normalized_attempts[0]; assert.ok(entry, 'primary condition not started');
     const record = json(join(normalized.generationPath, entry.path)), freezePath = verified.request.public_grading_references.scoring_input_freeze.path;
-    const sourceRoot = frozenSourceRoot ?? resolve(ROOT);
+    const selectedRoot = primaryScoringRoot(verified.block);
+    const sourceRoot = frozenSourceRoot ?? selectedRoot;
+    verifyPrimaryScoringVersionResource(verified.block, { frozenSourceRoot: sourceRoot, privateRoot, manifestPath, admissionDecisionPath,
+      admissionReviewAuthorityPath, admissionReviewAuthoritySourceDigest, admissionReviewArchivePath });
     assert.equal(resolve(sourceRoot), sourceRoot, 'canonical source root required');
     const freeze = json(join(sourceRoot, freezePath)); assert.equal(hash(read(join(sourceRoot, freezePath))), verified.request.binding.scoring_input_freeze_digest);
     const paths = Object.fromEntries([['catalogPath','catalog'],['policyManifestPath','policy_manifest'],['scoringPolicyPath','scoring_policy'],

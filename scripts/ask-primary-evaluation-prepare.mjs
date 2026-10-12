@@ -9,18 +9,23 @@ import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 import { comparisonHash, inventoryUserTree, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 import { createPrimaryEvaluationGradingAdapter, preflightPrimaryEvaluationGrading, PRIMARY_GRADING_PROFILE_ID } from "./ask-primary-evaluation-grading.mjs";
+import { readPrimaryScoringVersion } from "./ask-primary-scoring-version.mjs";
 import { primaryProfileForKernel } from "./ask-primary-evaluation-profile.mjs";
 import { preparePrimaryEvaluationBatch, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_BATCH_LIMITS } from "./ask-primary-evaluation-batch.mjs";
 
 const SOURCE = fileURLToPath(new URL("../", import.meta.url));
 const read = path => readStableFile(path, "fixed public primary input", 32 * 1024 * 1024).bytes;
 const json = path => parseJsonRejectDuplicateKeys(read(path).toString("utf8"));
-const closedOptions = ["output", "cliBin", "cliVersion", "model", "reasoning", "globalAskPresence", "evidenceKind", "gradingResourcesPath", "gradingResourcesDigest", "kernelCondition"];
+const closedOptions = ["output", "cliBin", "cliVersion", "model", "reasoning", "globalAskPresence", "evidenceKind", "gradingResourcesPath", "gradingResourcesDigest", "kernelCondition", "scoringVersionPath", "scoringVersionDigest"];
 const save = (path, value) => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx", mode: 0o600 });
 
 export function preparePrimaryEvaluation(publicParent, options) {
   assert.ok(options && typeof options === "object" && !Array.isArray(options));
   assert.ok(Object.keys(options).every(key => closedOptions.includes(key)), "primary preparation options are closed");
+  assert.equal(options.scoringVersionPath == null, options.scoringVersionDigest == null, "scoring version path and digest supplied together");
+  const scoringVersion = options.scoringVersionPath == null ? null : { path: options.scoringVersionPath, digest: options.scoringVersionDigest };
+  // Validate every selected fixture before creating any preparation output.
+  if (scoringVersion) for (const fixtureId of PRIMARY_FIXTURE_IDS) readPrimaryScoringVersion(scoringVersion, fixtureId);
   const profile = primaryProfileForKernel(options.kernelCondition ?? "kernel_principles_v2");
   const gradingAdapter = createPrimaryEvaluationGradingAdapter({ resourcesPath: options.gradingResourcesPath ?? null,
     resourcesDigest: options.gradingResourcesDigest ?? null });
@@ -52,16 +57,18 @@ export function preparePrimaryEvaluation(publicParent, options) {
       evidenceKind: options.evidenceKind ?? "observed", timeoutMs: 3600000, verificationTimeoutMs: 300000,
       overallTimeoutMs: 14400000, tokenBudget: 5000000 });
     const base = join(SOURCE, "benchmarks/fixtures/checkpoint-b2", fixtureId);
-    const reference = json(join(base, "evaluator-reference.json"));
+    const scoringBase = scoringVersion ? join(readPrimaryScoringVersion(scoringVersion, fixtureId).root, "benchmarks/fixtures/checkpoint-b2", fixtureId) : base;
+    const reference = json(join(scoringBase, "evaluator-reference.json"));
     const binding = { fixture_id: fixtureId, input_manifest_digest: recipe.input_manifest_digest,
       evaluator_bundle_digest: reference.evaluator_bundle_digest,
-      scoring_input_freeze_digest: comparisonHash(read(join(base, "scoring-input-freeze-manifest.json"))),
+      scoring_input_freeze_digest: comparisonHash(read(join(scoringBase, "scoring-input-freeze-manifest.json"))),
       profile_id: profile.id };
     const block = { fixture_id: fixtureId, root: prepared.root, public_input_root: publicRoot,
       run_id: prepared.plan.run_id, plan_digest: prepared.plan_digest,
       source_digest: prepared.plan.source.digest, task_digest: prepared.plan.task.digest, verification_digest: prepared.plan.verification.digest,
       input_manifest: { path: join(base, "input-manifest.json"), digest: recipe.input_manifest_digest },
       grading: { status: "blocked", blockers: [], timeout_ms: PRIMARY_GRADING_RESERVATION_MS, binding,
+        ...(scoringVersion ? { scoring_version: structuredClone(scoringVersion) } : {}),
         ...(options.gradingResourcesPath ? { resources: { path: options.gradingResourcesPath, digest: options.gradingResourcesDigest } } : {}) } };
     const gradingPreflight = gradingAdapter.preflight(block);
     block.grading.status = gradingPreflight.status;

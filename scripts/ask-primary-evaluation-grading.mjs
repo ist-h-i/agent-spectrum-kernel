@@ -11,6 +11,8 @@ import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS } from './ask-primary-fi
 import { producePrimaryEvaluationArtifacts } from './ask-primary-evaluation-producer.mjs';
 import { preflightPrimaryEvaluationGradingResources, runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
 
+import { primaryScoringRoot, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
+
 import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_EVALUATION_CONDITIONS, primaryProfileForKernel, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 
 export const PRIMARY_GRADING_CONDITIONS = PRIMARY_EVALUATION_CONDITIONS;
@@ -102,7 +104,8 @@ function publicBinding(block, loaded, root) {
     assert.equal(plan.source.inventory[path].digest, entry.digest); assert.equal(plan.source.inventory[path].bytes, entry.bytes);
   }
   assert.equal(plan.task.digest, expected['task.md'].digest);
-  const base = join(root, 'benchmarks/fixtures/checkpoint-b2', block.fixture_id);
+  const scoringRoot = primaryScoringRoot(block, { root });
+  const base = join(scoringRoot, 'benchmarks/fixtures/checkpoint-b2', block.fixture_id);
   const reference = json(join(base, 'evaluator-reference.json'));
   assert.equal(reference.fixture_id, block.fixture_id); assert.equal(reference.fixture_input_digest, block.input_manifest.digest);
   assert.equal(reference.task_class, recipe.task_class); digest(reference.evaluator_bundle_digest);
@@ -110,10 +113,12 @@ function publicBinding(block, loaded, root) {
     evaluator_bundle_digest: reference.evaluator_bundle_digest,
     scoring_input_freeze_digest: comparisonHash(read(join(base, 'scoring-input-freeze-manifest.json'))), profile_id: profile.id };
   assert.deepEqual(block.grading?.binding, binding, 'declared grading binding differs from fixed public metadata pins');
-  return { recipe, binding, readoutAuthority: publicReadoutAuthority(block.fixture_id, root) };
+  return { recipe, binding, readoutAuthority: publicReadoutAuthority(block.fixture_id, scoringRoot) };
 }
 
-/** Public-only readiness: private original assets are deliberately not opened.
+/** Public identity readiness: evaluator code/answers are deliberately not opened.
+ * An explicit version selects its sealed public closure; resource authority is
+ * independently checked by the registered adapter.
  * Caller fields such as grading.status/ready/admitted cannot authorize dispatch. */
 export function preflightPrimaryEvaluationGrading(block, { root = ROOT } = {}) {
   try {
@@ -204,7 +209,8 @@ function buildRequest({ block, loaded, report, records, recipe, binding, readout
     evidence_kind: plan.config.evidence_kind, test_only: testOnly, run_id: plan.run_id, plan_digest,
     fixture_id: block.fixture_id, fixture_input_digest: recipe.input_manifest_digest, formal_task_class: recipe.task_class,
     runner_task_class: recipe.runner_task_class, public_scope: recipe.mutable_paths, source_digest: plan.source.digest,
-    task_digest: plan.task.digest, verification_digest: plan.verification.digest, binding, conditions: [...profile.conditions], slots,
+    task_digest: plan.task.digest, verification_digest: plan.verification.digest, binding,
+    ...(block.grading?.scoring_version ? { scoring_version: structuredClone(block.grading.scoring_version) } : {}), conditions: [...profile.conditions], slots,
     public_grading_references: readoutAuthority.references,
     controller: { state: report.execution?.state ?? 'unknown', history_digest: report.execution?.history?.digest ?? null,
       start_consumed: report.execution?.start_consumed ?? null },
@@ -256,6 +262,7 @@ export function buildPrimaryEvaluationReadout(request) {
   return { kind: 'ask_primary_evaluation_task_readout_v1', fixture_id: request.fixture_id,
     formal_task_class: request.formal_task_class, run_id: request.run_id, plan_digest: request.plan_digest,
     public_grading_references: request.public_grading_references,
+    ...(request.scoring_version ? { scoring_version: structuredClone(request.scoring_version) } : {}),
     conditions: request.slots.map(slot => ({ condition: slot.condition, execution_state: slot.state, quality: null,
       scope: slot.scope ?? { status: 'unknown' }, usage: slot.usage ?? null,
       native_checks: slot.native_checks ?? [], requirement_judgments: slot.requirement_judgments, cause_analysis: slot.cause_analysis, blockers: slot.blockers })),
@@ -309,6 +316,13 @@ function loadResources(path, expectedDigest, root) {
   return resources;
 }
 
+/** Execution completion is separate from whether semantic quality was resolved. */
+export function primaryGradingSemanticQuality(conditions, requiredConditions) {
+  const resolved = requiredConditions.map(condition => conditions.find(item => item.condition === condition))
+    .filter(item => item?.status === 'completed' && typeof item.quality === 'number' && Number.isFinite(item.quality));
+  return resolved.length === requiredConditions.length && requiredConditions.length > 0 ? 'scored' : resolved.length > 0 ? 'partial' : 'unknown';
+}
+
 /** Resources are separately pinned and private; no caller readiness labels or grader callbacks. */
 export function createPrimaryEvaluationGradingAdapter({ root = ROOT, resourcesPath = null, resourcesDigest = null } = {}) {
   assert.equal(resourcesPath === null, resourcesDigest === null, 'resource path and raw digest supplied together');
@@ -318,6 +332,7 @@ export function createPrimaryEvaluationGradingAdapter({ root = ROOT, resourcesPa
     const currentRaw = read(resourcesPath); assert.equal(comparisonHash(currentRaw), resourcesDigest, 'grading resources changed');
     if (!configuration) configuration = loadResources(resourcesPath, resourcesDigest, root);
     const resource = configuration.fixtures[block.fixture_id]; assert.ok(resource);
+    verifyPrimaryScoringVersionResource(block, resource, { root });
     assert.deepEqual(block.grading.resources, { path: resourcesPath, digest: resourcesDigest }, 'grading resources are not bound to fixed batch');
     for (const key of resourceKeys.filter(key => key !== 'admissionReviewAuthoritySourceDigest')) immutableTree(resource[key]);
     const loaded = readUserComparisonPlan(block.root);
@@ -370,7 +385,7 @@ export function createPrimaryEvaluationGradingAdapter({ root = ROOT, resourcesPa
             assert.equal(comparisonHash(read(graded.public_artifacts.evaluator_result.path)), graded.public_artifacts.evaluator_result.digest);
             return { ...slot, quality: graded.quality, requirement_judgments: envelope.requirement_results,
               evaluator_result_ref: graded.public_artifacts.evaluator_result, private_grading: graded };
-          }), semantic_quality: complete ? 'scored' : 'unknown' };
+          }), semantic_quality: primaryGradingSemanticQuality(conditions, profile.conditions) };
         writeFileSync(join(output, 'task-readout.json'), serialize(readout), { mode: 0o600, flag: 'wx' });
         return { status: complete ? 'completed' : 'unknown', scoring_status: readout.scoring_status, quality: null,
           conditions, readout, producer: { record_root: produced.output_root, digest: produced.external_digest },

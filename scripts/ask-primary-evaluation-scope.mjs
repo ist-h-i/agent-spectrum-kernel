@@ -5,6 +5,7 @@ import { lstatSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { verifyPrimaryEvaluationProducer } from './ask-primary-evaluation-producer.mjs';
+import { primaryScoringRoot } from './ask-primary-scoring-version.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_EVALUATION_CONDITIONS, getPrimaryEvaluationProfile, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 
@@ -29,15 +30,17 @@ export function withPrimarySchemaBuild(callback, { profileId = PRIMARY_EVALUATIO
 const activeProfile = () => active()?.profile;
 export const activePrimaryProducer = () => Boolean(active()?.verified);
 const rawDigest=raw=>`sha256:${createHash('sha256').update(raw).digest('hex')}`;
-function pinnedHistoricalGraph(root,fixtureId,binding) {
+function pinnedHistoricalGraph(root,fixtureId,binding,scoringVersion = null) {
+  const fixedRoot = primaryScoringRoot({ fixture_id: fixtureId, grading: { scoring_version: scoringVersion } });
+  if (scoringVersion && root !== fixedRoot) throw new Error('primary_resource_graph_scoring_version_root_changed');
   if(!PRIMARY_FIXTURE_IDS.includes(fixtureId)||binding.fixture_id!==fixtureId||!['primary_single_shot_v1','primary_principles_v2_single_shot_v1'].includes(binding.profile_id))throw new Error('primary_resource_graph_binding_invalid');
   if(resolve(root)!==root||realpathSync(root)!==root)throw new Error('primary_resource_graph_root_invalid');
   const base=`benchmarks/fixtures/checkpoint-b2/${fixtureId}/`,read=path=>readStableFile(path,'primary historical public graph pin',33554432).bytes;
-  const currentFreeze=read(join(ROOT,base,'scoring-input-freeze-manifest.json')),freeze=JSON.parse(currentFreeze);
+  const currentFreeze=read(join(fixedRoot,base,'scoring-input-freeze-manifest.json')),freeze=JSON.parse(currentFreeze);
   if(rawDigest(currentFreeze)!==binding.scoring_input_freeze_digest||freeze.fixture_input_digest!==binding.input_manifest_digest
     ||!read(join(root,base,'scoring-input-freeze-manifest.json')).equals(currentFreeze))throw new Error('primary_resource_graph_freeze_changed');
   if(freeze.evaluator_public_reference.path!==`${base}evaluator-reference.json`)throw new Error('primary_resource_graph_reference_path_invalid');
-  const currentReference=read(join(ROOT,freeze.evaluator_public_reference.path)),reference=JSON.parse(currentReference);
+  const currentReference=read(join(fixedRoot,freeze.evaluator_public_reference.path)),reference=JSON.parse(currentReference);
   if(rawDigest(currentReference)!==freeze.evaluator_public_reference.raw_byte_digest||!read(join(root,freeze.evaluator_public_reference.path)).equals(currentReference)
     ||reference.fixture_id!==fixtureId||reference.evaluator_bundle_digest!==binding.evaluator_bundle_digest)throw new Error('primary_resource_graph_reference_changed');
   const identity=reference.evaluator_source_identity,graph=identity.dependency_graph;
@@ -49,7 +52,7 @@ function pinnedHistoricalGraph(root,fixtureId,binding) {
 /** Source-only scope; never enables schema, producer, evaluator or start authority. */
 export function withPrimaryHistoricalEvaluatorResources(block,root,callback) {
   if(resourceGraphState.getStore()?.active||active())throw new Error('primary_resource_graph_nested_scope_refused');
-  const context={active:true,block:structuredClone(block),root};pinnedHistoricalGraph(root,block.fixture_id,block.grading.binding);
+  const context={active:true,block:structuredClone(block),root};pinnedHistoricalGraph(root,block.fixture_id,block.grading.binding,block.grading.scoring_version);
   return resourceGraphState.run(context,()=>{try{const result=callback();if(result?.then)throw new Error('primary_resource_graph_async_scope_forbidden');return result;}finally{context.active=false;}});
 }
 export function primaryEvaluatorDependencyGraphParameters({root,baseRevision,defaultParameters}) {
@@ -57,8 +60,8 @@ export function primaryEvaluatorDependencyGraphParameters({root,baseRevision,def
   if(!producer?.verified&&!resource?.active)return null;
   if(!defaultParameters)throw new Error('primary_explicit_graph_parameters_refused');
   let selected;
-  if(producer?.verified){const verified=verifyPrimaryEvaluationProducer(producer.options);selected=pinnedHistoricalGraph(root,verified.request.fixture_id,verified.request.binding);}
-  else{if(root!==resource.root)throw new Error('primary_resource_graph_root_changed');selected=pinnedHistoricalGraph(root,resource.block.fixture_id,resource.block.grading.binding);}
+  if(producer?.verified){const verified=verifyPrimaryEvaluationProducer(producer.options);selected=pinnedHistoricalGraph(root,verified.request.fixture_id,verified.request.binding,verified.request.scoring_version);}
+  else{if(root!==resource.root)throw new Error('primary_resource_graph_root_changed');selected=pinnedHistoricalGraph(root,resource.block.fixture_id,resource.block.grading.binding,resource.block.grading.scoring_version);}
   if(selected.baseRevision!==baseRevision)throw new Error('primary_resource_graph_revision_changed');
   return selected;
 }
