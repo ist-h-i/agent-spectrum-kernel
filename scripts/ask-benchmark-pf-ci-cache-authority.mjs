@@ -297,7 +297,7 @@ function generatePfCiCacheProductionAuthorityInPlace({ root, privateRoot, evalua
   const scoringPolicy = readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json"), "portfolio scoring policy");
   if (catalog.catalog_digest !== computePortfolioCatalogDigest(catalog) || policyManifest.manifest_digest !== computePolicyManifestDigest(policyManifest) || scoringPolicy.policy_digest !== computeScoringPolicyDigest(scoringPolicy)) throw new Error("portfolio policy identity is not closed before pf-ci-cache authority generation");
   const catalogFixture = catalog.fixtures.find((item) => item.fixture_id === PF_CI_CACHE_FIXTURE_ID);
-  if (!catalogFixture || catalogFixture.task_class !== "investigation" || catalogFixture.domain !== "ci_build" || catalogFixture.ci_build_security !== true) throw new Error("schema fixture catalog contract differs");
+  if (!catalogFixture || catalogFixture.task_class !== "investigation" || catalogFixture.domain !== "ci_build" || catalogFixture.backend_api_security !== false) throw new Error("CI cache fixture catalog contract differs");
   const lineage = readJson(resolve(fixtureRoot, "lineage-record.json"), "pagination lineage record");
   assertBenchmarkSchemaInstance(lineage, { schemaPath: resolve(root,"benchmarks/schemas/portfolio-lineage-record.schema.json"), label:"pagination lineage record" });
   const {lineage_record_digest, ...lineageBase}=lineage;
