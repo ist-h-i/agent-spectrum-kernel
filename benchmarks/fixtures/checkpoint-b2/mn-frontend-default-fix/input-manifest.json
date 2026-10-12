@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "mn-frontend-default-fix": {
+      "class": "local_implementation",
+      "difficulty": "medium",
+      "target_minutes": 15,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "af2bfe52b29d6982156d8da25d06cb7d4da3d014c15c5e15e0246f76d8530cf1",
+          "bytes": 594
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "9b6a95efc3b02d8c5ebee76a529caea4ec8f49e3f84d416f79acac775e0f80a9",
+          "bytes": 183
+        },
+        {
+          "path": "workspace/spec/default-state.md",
+          "sha256": "f134c15818861177f67a599232da281d48df0d1725a7fae83d1d3bf71d20b450",
+          "bytes": 1270
+        },
+        {
+          "path": "workspace/src/display-controls.mjs",
+          "sha256": "cbb12c11a017555ac617a9577747b61679aed218a6098af13dc231c3b8b62dce",
+          "bytes": 215
+        },
+        {
+          "path": "workspace/src/display-preferences.mjs",
+          "sha256": "6830b854fc22f74531aa1e42f60bed13721eab25338de90ed24452d13459d57d",
+          "bytes": 780
+        },
+        {
+          "path": "workspace/test/display-preferences.test.mjs",
+          "sha256": "cd1517ab18f65cbd70b91eb9999d46fbd7e4cd913f1e5506edaf6cb288cfcf94",
+          "bytes": 2757
+        }
+      ]
+    }
+  }
+}
