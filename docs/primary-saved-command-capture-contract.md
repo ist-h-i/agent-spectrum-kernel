@@ -48,6 +48,11 @@ capture 修正だけで pass・品質0・正式比較成功へ変えない。
    自己参照する Git commit は本文へ埋めず、外部の processing-version manifest に記録する。
    criterion_version は既存 v4、processing_version は新規 ID とする。
    これは処理系の固定であり、採点資産の admission が済んだという意味ではない。
+   処理系 checkout は元の C75 を基点に、terminal comparator/copy guard と
+   parser/producer/primary schema の正確な差分だけを適用する。開発側 e508 の
+   他の main 変更は取り込まない。変更は7 source/schema ファイルと、
+   正式 generator による bundle の validator SHA 1項目に限る。
+   他の tracked files が C75 と同一であることを inventory 比較で確認する。
 2. r9 の run/plan/batch/input、保存 stdout/stderr/final response、diff、terminal receipt、
    controller journal、旧事後採点結果を読取りで inventory 化する。bytes、digest、mode を保存。
    コピー時に source/destination の同一inode・hardlink・symlink・共有 Git alternates を拒否。
