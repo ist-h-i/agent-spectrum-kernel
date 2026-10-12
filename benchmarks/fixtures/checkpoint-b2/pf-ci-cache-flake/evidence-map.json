@@ -1,4 +1,85 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "pf-ci-cache-flake",
-  "candidate_state": "generation_pending"
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/investigation.json"
+    ],
+    "required_candidate_paths": [
+      "workspace/investigation.json"
+    ],
+    "protected_candidate_paths": [
+      "workspace/package.json",
+      "workspace/ci/build-config.json",
+      "workspace/ci/scenarios.json",
+      "workspace/ci/build-history.log",
+      "workspace/docs/investigation-contract.md",
+      "workspace/investigation.schema.json",
+      "workspace/src/cache-model.mjs",
+      "workspace/scripts/reproduce-cache.mjs",
+      "workspace/scripts/validate-report.mjs",
+      "workspace/test/cache-observation.test.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "unrecognized_report_meaning": "manual_review_required",
+    "authority_digest": "sha256:283e8cdd67f91085f2ca097e26dd4c22dd60aba68b980250eee25ccefab58ab6"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "cache-investigation-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/ci/build-config.json",
+        "workspace/ci/scenarios.json",
+        "workspace/ci/build-history.log",
+        "workspace/docs/investigation-contract.md",
+        "workspace/investigation.schema.json",
+        "workspace/src/cache-model.mjs",
+        "workspace/scripts/reproduce-cache.mjs",
+        "workspace/scripts/validate-report.mjs",
+        "workspace/test/cache-observation.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "focused-change-boundary",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/docs/investigation-contract.md"
+      ]
+    },
+    {
+      "evidence_map_id": "repository-verification-route",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/scripts/validate-report.mjs",
+        "workspace/test/cache-observation.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-cache-investigation-evidence",
+      "target_evidence_map_id": "cache-investigation-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:27203d73aa83f4067602128a80ebdf2bc33041f8ebfe8994d032d4220885fe3e"
+    },
+    {
+      "mutation_id": "remove-focused-scope-evidence",
+      "target_evidence_map_id": "focused-change-boundary",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:f751de4324acf4c3a95d236551b55761207cb6713ebc130caadc0dde2bd5245e"
+    },
+    {
+      "mutation_id": "remove-verification-route",
+      "target_evidence_map_id": "repository-verification-route",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:f814296f29c68e2de21b6c24f10d65c01f5e453fc686933c780e8cb9e4cc624d"
+    }
+  ]
 }
