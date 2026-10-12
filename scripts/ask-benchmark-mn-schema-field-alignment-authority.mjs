@@ -143,7 +143,7 @@ export function buildEvidenceMap() {
     required_candidate_paths: ["workspace/schemas/member.schema.json"],
     protected_candidate_paths: ["workspace/package.json", "workspace/spec/member-contract.md", "workspace/spec/schema-alignment-plan.md", "workspace/src/member-import.mjs", "workspace/src/member-export.mjs"],
     unmanaged_additions: "forbidden", unmanaged_deletions: "forbidden",
-    json_change_boundary: { target_properties: ["display_name", "displayName"], target_required_fields: ["display_name", "displayName"], preserve_unrelated_loaded_values: true }
+    json_change_boundary: { target_properties: ["display_name", "displayName"], target_required_fields: ["display_name", "displayName"], preserve_unrelated_loaded_values: true, required_alignment_change: "loaded_schema_value_change" }
   };
   const maps = [
     { evidence_map_id: "schema-caller-contract", agent_visible_paths: ["workspace/spec/member-contract.md", "workspace/spec/schema-alignment-plan.md", "workspace/schemas/member.schema.json", "workspace/src/member-import.mjs", "workspace/src/member-export.mjs"] },
