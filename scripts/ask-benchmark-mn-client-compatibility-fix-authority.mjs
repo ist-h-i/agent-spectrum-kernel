@@ -1,7 +1,7 @@
 import { assertFlatRegularAuthorityDirectory, prepareAuthorityPublication, publishPreparedAuthority, writeAuthorityJsonNoFollow } from "./ask-benchmark-authority-publication.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -379,7 +379,7 @@ function generateMnClientCompatibilityFixProductionAuthorityInPlace({ root, priv
     evidence_map: rawArtifact(root, evidencePath, canonicalDigest(evidence.evidenceMap)),
     evaluator_authority_manifest: rawArtifact(root, layout.manifestPath, authorityManifest.manifest_digest),
     result_profile: output.result_profile,
-    freeze_revision: "issue-207-mn-client-compatibility-fix-r5",
+    freeze_revision: "issue-207-mn-client-compatibility-fix-r6",
   };
   const freeze = { ...freezeBase, manifest_digest: computeScoringInputFreezeManifestDigest(freezeBase) };
   writeJson(resolve(fixtureRoot, "scoring-input-freeze-manifest.json"), freeze);
@@ -555,6 +555,10 @@ export function validateMnClientCompatibilityFixProductionAuthority({ root = ROO
     if (bundle.manifest.evaluator_bundle_id !== reference.evaluator_bundle_id || bundle.manifest.evaluator_bundle_digest !== reference.evaluator_bundle_digest) throw new Error("mn-client public/private bundle transplant");
   }
   const metadata = artifacts["metadata.json"];
+  const catalogFixture = catalog.fixtures.find(({ fixture_id }) => fixture_id === MN_CLIENT_FIXTURE_ID);
+  for (const field of ["fixture_role", "suite", "task_class", "domain", "difficulty", "repetitions", "risk_boundary", "capability_families", "evidence_topologies", "outcome_dimensions"]) {
+    assertExact(metadata[field], catalogFixture?.[field], `mn-client frozen catalog ${field}`);
+  }
   if (metadata.metadata_digest !== canonicalDigest(withoutField(metadata, "metadata_digest")) || metadata.evaluator_bundle_id !== reference.evaluator_bundle_id || metadata.measured_execution_performed !== false) throw new Error("mn-client metadata authority is invalid");
   const review = artifacts["admission-review.json"];
   if (review.review_package_digest !== canonicalDigest(withoutField(review, "review_package_digest")) || review.reviewer_status !== "pending_independent_review" || review.author_self_approval !== false || review.admission_status !== "admission_pending") throw new Error("mn-client pending review package authority is invalid");
@@ -594,5 +598,5 @@ export function validateMnClientCompatibilityFixProductionAuthority({ root = ROO
   };
   assertExact(candidate.public_bindings, expectedBindings, "mn-client source-freeze public binding closure");
   assertExact(candidate.evaluator_private_binding, { evaluator_revision: reference.evaluator_revision, evaluator_bundle_id: reference.evaluator_bundle_id, evaluator_bundle_digest: reference.evaluator_bundle_digest, evaluator_byte_count: admission.evaluator_byte_count, source_tree_digest: reference.evaluator_source_identity.source_tree_digest, dependency_graph_digest: reference.evaluator_source_identity.dependency_graph.graph_digest }, "mn-client source-freeze private binding closure");
-  return { fixtureId: MN_CLIENT_FIXTURE_ID, inputDigest: reference.fixture_input_digest, candidateDigest: candidate.candidate_digest, evaluatorBundleId: reference.evaluator_bundle_id, evaluatorBundleDigest: reference.evaluator_bundle_digest, evaluatorRevision: reference.evaluator_revision, reviewStatus: review.reviewer_status, scoringReady: false };
+  return { fixtureId: MN_CLIENT_FIXTURE_ID, inputDigest: reference.fixture_input_digest, candidateDigest: candidate.candidate_digest, evaluatorBundleId: reference.evaluator_bundle_id, evaluatorBundleDigest: reference.evaluator_bundle_digest, evaluatorRevision: reference.evaluator_revision, reviewStatus: review.reviewer_status, evaluatorAuthorityDigest: authorityManifest.manifest_digest, requirementRecordDigest: requirement.requirement_record_digest, requirementSetDigest: requirement.requirement_set_digest, outputContractDigest: output.output_contract_digest, scoringReady: false };
 }
