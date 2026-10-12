@@ -1,0 +1,31 @@
+{
+  "reviewer_record_id": "frontend-async-impact-independent-review-follow-up-ed78e002-20261012",
+  "fixture_id": "pf-frontend-async-state",
+  "reviewed_head": "ed78e002c3a8e85aee8fa46fa61ffccba82c76de",
+  "decision": "approve",
+  "judgment": "unknown_classification_approved",
+  "impact_band": "unknown",
+  "impact_weight": null,
+  "impact_evidence_status": "insufficient_evidence",
+  "impact_evidence_ids": [],
+  "practice_weighted_aggregate_eligible": false,
+  "reason": "A modeled stale view or missed cancellation demonstrates a local contract defect without measured real project/customer impact, incidents, engineering rework or operational burden. Locality/reversibility of fictional tests does not establish empirical low impact; frequency does not substitute for impact evidence.",
+  "reviewed_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/lineage.md",
+      "bytes": 459,
+      "raw_sha256": "sha256:8554977121bc1bf9ecbe3fc028a92a10395494fc1b8ac9b6a64e2921cdf93c7f"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/source-references/async-cleanup-20261012.md",
+      "bytes": 730,
+      "raw_sha256": "sha256:42458f9a09947fa04c2a046f1fa82f264c1cacbad02fc8238f41f8d91591b07c"
+    },
+    {
+      "path": "benchmarks/portfolio-lineage-policy.json",
+      "bytes": 6039,
+      "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d"
+    }
+  ],
+  "scope": "Separate title-only follow-up retaining unknown impact classification on identical lineage/source/policy bytes. No new empirical evidence, positive band, whole-commit approval, private evaluation or fixture admission; frozen catalog base eligibility is unchanged."
+}

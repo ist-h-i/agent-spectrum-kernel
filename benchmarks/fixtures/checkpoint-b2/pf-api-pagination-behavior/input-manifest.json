@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "pf-api-pagination-behavior": {
+      "class": "local_implementation",
+      "difficulty": "medium",
+      "target_minutes": 30,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "ad441a90a6e8a0ac878e5873b99b14010077f1610bfa7d814c4b17e17a34ba66",
+          "bytes": 1474
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "a6440425662b1dd6d849e2f7e30863ba82dec6851ba9a0faa00de9051b7b9882",
+          "bytes": 144
+        },
+        {
+          "path": "workspace/spec/pagination-contract.md",
+          "sha256": "a9d105ef7beecbff0b70ba61b5b4f4d13bfc023d39a126adf2ec76c13e2a9095",
+          "bytes": 1380
+        },
+        {
+          "path": "workspace/src/api-pages.mjs",
+          "sha256": "e99adf811f97c23ab75c1f86599868c7b4189121e8f2ac946bed36e776fa04e8",
+          "bytes": 797
+        },
+        {
+          "path": "workspace/src/catalog-consumer.mjs",
+          "sha256": "ba4bd46de51b31f00137f306972f636ecd82045d2f903f431d702a339883c50b",
+          "bytes": 188
+        },
+        {
+          "path": "workspace/src/pagination.mjs",
+          "sha256": "7837edaf7f16af0b4591d53212c244371fc18d0a13545eaacafc466273a14acd",
+          "bytes": 843
+        },
+        {
+          "path": "workspace/test/pagination.test.mjs",
+          "sha256": "59703e5b4723c4d62d424141f425dbca585474c85a84bd0f7518d4cd83e58355",
+          "bytes": 3219
+        }
+      ]
+    }
+  }
+}
