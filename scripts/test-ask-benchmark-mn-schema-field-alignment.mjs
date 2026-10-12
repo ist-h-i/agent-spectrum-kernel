@@ -1,3 +1,4 @@
+import { validatePortfolioFoundation } from "./ask-benchmark.mjs";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -26,6 +27,7 @@ test("scope, equivalence and evidence mutations are task-specific", () => {
 
 test("dedicated runtime config binds this fixture input and public verification", () => {
  const config=JSON.parse(readFileSync(resolve(root,"benchmarks/mn-schema-field-alignment.config.json"),"utf8"));
+ validatePortfolioFoundation(config, resolve(root,"benchmarks/mn-schema-field-alignment.config.json"), { root });
  const fixture=config.fixtures[0];
  assert.equal(fixture.id,"mn-schema-field-alignment");
  const prefix="benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment";

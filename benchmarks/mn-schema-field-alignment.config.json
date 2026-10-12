@@ -51,8 +51,7 @@
       "verification_command_contract": {
         "path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/verification-command-contract.json",
         "sha256": "4a41800780f1fe1c442b030907e64f22a94d94c9b5267eee38fd15d99ba65547"
-      },
-      "risk_boundary": "none"
+      }
     }
   ],
   "ordering": {
