@@ -30,6 +30,8 @@ test("dedicated runtime config binds this fixture input and public verification"
  validatePortfolioFoundation(config, resolve(root,"benchmarks/pf-frontend-async-state.config.json"), { root });
  const fixture=config.fixtures[0];
  assert.equal(fixture.id,"pf-frontend-async-state");
+ const catalogFixture=JSON.parse(readFileSync(resolve(root,"benchmarks/portfolio-catalog.json"),"utf8")).fixtures.find(x=>x.fixture_id===fixture.id);
+ for(const field of ["suite","task_class","difficulty","repetitions","aggregate_eligible"])assert.deepEqual(fixture[field],catalogFixture[field]);
  const prefix="benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state";
  assert.equal(fixture.input_manifest_path,prefix+"/input-manifest.json");
  assert.equal(fixture.verification_command_contract.path,prefix+"/verification-command-contract.json");
