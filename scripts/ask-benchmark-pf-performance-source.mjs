@@ -101,7 +101,7 @@ export function buildPfPerformanceInputArtifacts(root = ROOT) {
   }));
   const anchor = `node -e 'const fs=require("node:fs"),crypto=require("node:crypto"),expected=${JSON.stringify(protectedDigests)};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash("sha256").update(fs.readFileSync(path)).digest("hex")!==digest)process.exit(41)}'`;
   const command = closeCommand({
-    command_id: "async-search-validation",
+    command_id: "performance-event-lookup-validation",
     purpose: "test",
     working_directory: { path: ".", evidence_requirement: "not_required" },
     safe_argv: null,
@@ -145,15 +145,15 @@ export function validatePfPerformanceInputClosure({ root = ROOT } = {}) {
   const fixtureRoot = resolve(root, PF_PERFORMANCE_FIXTURE_ROOT);
   const task = readFileSync(resolve(fixtureRoot, "task.md"), "utf8");
   if (FORBIDDEN_TASK_VOCABULARY.test(task)) throw new Error("public task contains benchmark-specific vocabulary");
-  const manifest = readJson(resolve(fixtureRoot, "input-manifest.json"), "pf-frontend-async input manifest");
+  const manifest = readJson(resolve(fixtureRoot, "input-manifest.json"), "pf-performance-regression input manifest");
   const record = manifest.fixtures?.[PF_PERFORMANCE_FIXTURE_ID];
-  if (manifest.scope !== "agent-visible task.md + workspace/**" || record?.class !== "performance_investigation_implementation" || record?.difficulty !== "hard") throw new Error("pf-frontend-async input manifest fixture record is invalid");
+  if (manifest.scope !== "agent-visible task.md + workspace/**" || record?.class !== "performance_investigation_implementation" || record?.difficulty !== "hard") throw new Error("pf-performance-regression input manifest fixture record is invalid");
   const expected = agentVisibleFiles(fixtureRoot);
-  if (stableCanonicalJson(record.files) !== stableCanonicalJson(expected)) throw new Error("pf-frontend-async input manifest does not exactly bind the agent-visible inventory");
-  const verification = validateVerificationCommandContract(readJson(resolve(fixtureRoot, "verification-command-contract.json"), "pf-frontend-async verification contract"), { root });
+  if (stableCanonicalJson(record.files) !== stableCanonicalJson(expected)) throw new Error("pf-performance-regression input manifest does not exactly bind the agent-visible inventory");
+  const verification = validateVerificationCommandContract(readJson(resolve(fixtureRoot, "verification-command-contract.json"), "pf-performance-regression verification contract"), { root });
   if (!verification.commands.every(({ canonical_script }) => task.includes(`\n${canonical_script}\n`))) throw new Error("public task does not expose the verification invocation");
   const inputDigest = sha256(readFileSync(resolve(fixtureRoot, "input-manifest.json")));
-  if (verification.fixture_input_digest !== inputDigest) throw new Error("pf-frontend-async verification/input binding is invalid");
+  if (verification.fixture_input_digest !== inputDigest) throw new Error("pf-performance-regression verification/input binding is invalid");
   return { fixtureId: PF_PERFORMANCE_FIXTURE_ID, inputDigest, verificationDigest: verification.contract_digest };
 }
 

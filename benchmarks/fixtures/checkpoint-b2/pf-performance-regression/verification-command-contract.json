@@ -6,7 +6,7 @@
   "fixture_input_digest": "sha256:0e2cf6a60b1ec05023c691ef27b706229bb95d2bea1159e797440915aba5ca18",
   "commands": [
     {
-      "command_id": "async-search-validation",
+      "command_id": "performance-event-lookup-validation",
       "purpose": "test",
       "working_directory": {
         "path": ".",
@@ -27,8 +27,8 @@
       "timeout_ms": 60000,
       "logical_command_digest": "sha256:105b4427ab5897c6417dc3aff6d5e866f07f598c45d2f26a1a93303ba5f0f7b0",
       "rendered_event_command_digest": "sha256:75ec40fcd9dd5789386ebd485f6b993085d4165fcad25103a39caf649e8d7b69",
-      "command_contract_digest": "sha256:782a29996bfb65432b22121cf0750901ca5f8ea143f0d062ade819d32c1f7523"
+      "command_contract_digest": "sha256:203d50abe5687a0e0b4a8901a431f03cfd6c32cae9bfbe5cc85369c04ac4b088"
     }
   ],
-  "contract_digest": "sha256:928f73d53b3f33392b538f2ba3f0f851ddf2742e3fe7396999a9d4a06e2c6a52"
+  "contract_digest": "sha256:7903acd6e9efef8c76d86dc8f2156e7b9b3ffe0d3a6612c6d169a25f1c9bb737"
 }
