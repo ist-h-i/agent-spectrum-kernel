@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "mn-frontend-default-fix",
+  "fixture_input_digest": "sha256:db98cb9c81e50afe4f39169d722eec0e344483809176b810a118e096fa6ca2ca",
+  "commands": [
+    {
+      "command_id": "display-preferences-focused-test",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"package.json\":\"9b6a95efc3b02d8c5ebee76a529caea4ec8f49e3f84d416f79acac775e0f80a9\",\"spec/default-state.md\":\"f134c15818861177f67a599232da281d48df0d1725a7fae83d1d3bf71d20b450\",\"src/display-controls.mjs\":\"cbb12c11a017555ac617a9577747b61679aed218a6098af13dc231c3b8b62dce\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && [ -f test/display-preferences.test.mjs ] && npm test",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:10d65943936022eee3f4fca309996a1e0a9a04770f496b5805e035eca96d21a7",
+      "rendered_event_command_digest": "sha256:fc0937a94926c1bbb3bf2089fe4c8b4629e979ef25db041b530f158dc3fd0428",
+      "command_contract_digest": "sha256:17ecbd366eb83b25d8b68596489a138e7d7036464279026ba8df4a36e03b751a"
+    }
+  ],
+  "contract_digest": "sha256:28027367818d784b6ba78736c224ca966b204cdffd938df3febf2f88dbf016ab"
+}

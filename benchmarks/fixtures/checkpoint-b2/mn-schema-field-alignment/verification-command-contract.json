@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "mn-schema-field-alignment",
+  "fixture_input_digest": "sha256:bb41c0b2c89cf749d8f07e179554689c2c9fb3bde6b7fd26fc82a09cc8cb15a8",
+  "commands": [
+    {
+      "command_id": "member-record-focused-test",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"package.json\":\"4efed0d52aedcfad81aa2ea9735c6e9eb69b2ebead0fea04344c4e4e111eb77c\",\"spec/member-contract.md\":\"1bd41e23d822b0c0b18c9ec96e2eff69958f5fe321f9e5778cd8d17e7b6a182e\",\"spec/schema-alignment-plan.md\":\"2fb332652d4c7349ba8ce1cd8f9429bccbafdda54695dbb3bfbb1aef2ef83c31\",\"src/member-import.mjs\":\"23229f637aa314e5d798baf42eb32dcba56251e8dcaf0c26b9d01969756f7816\",\"src/member-export.mjs\":\"bee56827d7d03d2db64102b6607136b4655b2ceb1a9a0bb3111349f8acb41bb6\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && [ -f test/member-record.test.mjs ] && npm test",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:99753a232fa8932244a7df2be4034ce4d2cc43929700c5153fbe1e60f5ee8ea6",
+      "rendered_event_command_digest": "sha256:ffa01da21d7a153762dc49cca2b6c24a6276b174991424f5f63387cd2f5059ef",
+      "command_contract_digest": "sha256:a3d3d41a7ec5a5b4672af1a80a40e00ee8435f2f25fddf659787a65234e11910"
+    }
+  ],
+  "contract_digest": "sha256:21c3238448cf8d3bf72f339ce46ae21428c8cc7f61aaa8610abae4c2a0eae01d"
+}

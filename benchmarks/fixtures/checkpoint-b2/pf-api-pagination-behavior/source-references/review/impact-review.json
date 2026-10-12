@@ -1,0 +1,19 @@
+{
+  "reviewer_record_id": "pagination-impact-independent-review-20261012",
+  "fixture_id": "pf-api-pagination-behavior",
+  "reviewed_head": "40647e0ae3ae7c0e213dbb14416ceaaf08dedca6",
+  "decision": "approve",
+  "judgment": "unknown_classification_approved",
+  "impact_band": "unknown",
+  "impact_weight": null,
+  "impact_evidence_status": "insufficient_evidence",
+  "impact_evidence_ids": [],
+  "practice_weighted_aggregate_eligible": false,
+  "reason": "The fictional seed demonstrates omitted items and incorrect requests locally, but supplies no measured incident, business/customer impact, engineering rework, or operational burden in an actual project. Locality and reversibility of a synthetic task do not establish the empirical low-impact band. No frequency or documentation-prevalence claim substitutes for impact evidence.",
+  "reviewed_refs": [
+    {"path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/lineage.md", "raw_sha256": "sha256:65b28667bd89a04a945d8e255b77bb8d4f3925e77fff429a86f7c55f0d47835b"},
+    {"path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/source-references/github-rest-pagination-docs-20261012.md", "raw_sha256": "sha256:d9c6acba432375ed69394dc9b7afc30f45955c2e749905433c3a12bd04266263"},
+    {"path": "benchmarks/portfolio-lineage-policy.json", "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d"}
+  ],
+  "scope": "Separate review of the unknown impact classification only. Does not assign a positive empirical band, approve fixture admission, or change frozen catalog base aggregate eligibility."
+}
