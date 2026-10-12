@@ -1,0 +1,17 @@
+[
+  {
+    "id": "fixture-001",
+    "name": "North catalog",
+    "extensions": {
+      "source": "fixture"
+    }
+  },
+  {
+    "id": "fixture-002",
+    "name": "South catalog",
+    "contactNote": "Keep existing note",
+    "tags": [
+      "fixture"
+    ]
+  }
+]

@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "pf-data-schema-evolution": {
+      "class": "local_implementation",
+      "difficulty": "medium",
+      "target_minutes": 30,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "c91aaa40e0957eb054c7b39b7506a00c042e545456bbd26f75d12f6b997545b8",
+          "bytes": 1514
+        },
+        {
+          "path": "workspace/data/legacy-customers.json",
+          "sha256": "298d9873a63a3f17e606a07ff896a399e515d5ba93cbb89b54cd7bc0898402ac",
+          "bytes": 258
+        },
+        {
+          "path": "workspace/migrations/v1-v2.plan.json",
+          "sha256": "9793113c54789c1d9c854521909f6bee9d094a34ea81fdeb0192381eb0b990da",
+          "bytes": 167
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "032ca46f0b73388a59c8773f531ba7374cdc49e8d14a9e85d307688dd081f832",
+          "bytes": 223
+        },
+        {
+          "path": "workspace/schemas/customer-v1.schema.json",
+          "sha256": "76670a9124ad3181ec9c517bc112e632fd2b1b9a0a6e8c7c20bac31b92357dd4",
+          "bytes": 516
+        },
+        {
+          "path": "workspace/schemas/customer-v2.schema.json",
+          "sha256": "9c23d4ff962e41d1c8bb8cc4a5cd5646c9fe61a724d304b382f41b7821125e9c",
+          "bytes": 434
+        },
+        {
+          "path": "workspace/spec/evolution-contract.md",
+          "sha256": "cdceb75aeb4dc35cf1905f811e54a4f462db1c7e6edeeb85ca8d94615ac0565c",
+          "bytes": 1550
+        },
+        {
+          "path": "workspace/src/readers.mjs",
+          "sha256": "c051968124ab7a6538c89ffcedb1b87fe579f75b52918a568544d504181c0671",
+          "bytes": 301
+        },
+        {
+          "path": "workspace/src/schema-contract.mjs",
+          "sha256": "462eac564ffd72f9b8f5d024292bd81d1e0a1dfc0c50b5c7283002a798524f9e",
+          "bytes": 2911
+        },
+        {
+          "path": "workspace/test/schema-evolution.test.mjs",
+          "sha256": "abeab224657b551f588934da805a5dacc15346156028971cb9fbead110c65bb1",
+          "bytes": 3210
+        }
+      ]
+    }
+  }
+}
