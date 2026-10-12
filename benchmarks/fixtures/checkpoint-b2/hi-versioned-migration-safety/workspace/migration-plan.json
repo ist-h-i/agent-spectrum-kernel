@@ -1,0 +1,10 @@
+{
+  "mode": "prepare_only",
+  "read_policy": "fallback_until_verified",
+  "writer_policy": "dual_write_until_contract",
+  "rollout_steps": [],
+  "execute_requires_specific_approval": true,
+  "restore_requires_new_approval": true,
+  "revalidate_current_state": true,
+  "rollback_cases": []
+}

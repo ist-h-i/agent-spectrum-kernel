@@ -1,0 +1,1 @@
+import {readFileSync} from 'node:fs';import {inspectPlan} from './compatibility.mjs';const p=JSON.parse(readFileSync(new URL('../migration-plan.json',import.meta.url),'utf8')),r=inspectPlan(p);console.log(JSON.stringify(r));process.exitCode=r.accepted?0:1;
