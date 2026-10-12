@@ -282,3 +282,19 @@ test('offline export writer refuses retained seed and symlink parents before wri
   assert.equal(hash(readFileSync(output)), value.request_digest);
   assert.throws(() => writePrimaryEvaluationGradingRequest(output, block));
 });
+
+test('fixed original grading factory rejects partial resource identity and cannot trust caller readiness', async t => {
+  assert.throws(() => createPrimaryEvaluationGradingAdapter({ resourcesPath: '/missing' }), /supplied together/);
+  assert.throws(() => createPrimaryEvaluationGradingAdapter({ resourcesDigest: hash('missing') }), /supplied together/);
+  const block = savedPending(t, 'mn-build-option-update');
+  block.grading.status = 'ready'; block.grading.blockers = [];
+  const path = join(dirname(block.root), 'resources.json');
+  writeFileSync(path, raw({ kind: 'ask_primary_grading_resources_v1', output_root: join(dirname(block.root), 'grading'),
+    fixtures: { 'mn-build-option-update': { ready: true, admitted: true } } }));
+  const adapter = createPrimaryEvaluationGradingAdapter({ resourcesPath: path, resourcesDigest: hash(readFileSync(path)) });
+  assert.equal(adapter.preflight(block).status, 'blocked');
+  const grade = await adapter.grade(block);
+  assert.equal(grade.status, 'unknown'); assert.equal(grade.grader_process_starts, 0); assert.equal(grade.quality, null);
+  writeFileSync(path, 'changed');
+  assert.equal(adapter.preflight(block).status, 'blocked');
+});

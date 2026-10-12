@@ -1,6 +1,6 @@
 # 完成済み9課題の実用三条件本評価・準備計画
 
-計画ID `PLAN-PRIMARY-PRACTICAL-9-20261012-r2`。2026-10-12 の本人の指示を
+計画ID `PLAN-PRIMARY-PRACTICAL-9-20261012-r3`。2026-10-12 の本人の指示を
 上流とする。対象は完成済み9課題すべてで、旧 #318 の3候補は実行順の先頭。
 これは #192/#198 の正式な24課題・四条件プロトコルの開始や終了条件の変更ではない。
 校正 run `86a09258-0f66-4f05-ad61-7e62dd4fbbfc` と旧結果・計画を変更しない。
@@ -35,9 +35,11 @@ attempt 1、retry 0、concurrency 1、`single_shot_v1`、resume禁止。合計27
 結果を見て有利な課題だけ追加測定しない。
 
 提案予算は条件ごと60分、controllerの検査・private evaluator の各 command ごと5分。
-各課題の三条件ブロック4時間、9ブロック36時間、全体48時間（採点・保存・報告の余裕12時間）。
-各課題の検査数から必要予約時間を算出し、4時間を超える場合は**結果閲覧前**に計画を改版する。
-現行入口の overall timeout は最大24時間かつ一課題単位なので、一つの48時間 plan としては
+各課題の三条件ブロック4時間、9ブロック36時間。既存private採点は初回2runと保存record検証2run、
+計4run／条件を維持する。3条件×4run×5分＋変換・保存5分で課題ごと65分を予約する。
+全体は60時間（最大予約45時間45分＋余裕14時間15分）、45M tokens。旧r2の48時間記録は保持し、
+結果非閲覧でr3を作る。旧48時間manifestは読み取り可能だが、新しい本番開始には使用できない。
+現行一課題入口の overall timeout は最大24時間かつ一課題単位なので、一つの60時間 plan としては
 渡せない。継続実装の薄いbatch controllerで9個の固定ブロックを逐次処理する。夜間・複数日の
 実行は可能だが、同一runの中断を resume する設計にはしない。
 
@@ -53,13 +55,17 @@ attempt 1、retry 0、concurrency 1、`single_shot_v1`、resume禁止。合計27
 実行系の基準は main `4b1bf37961d6f2f23acf950413ac956d20a5ab01`、tree
 `cd8cc43d9f235736999bb7b4f035312fd392faf6`。#339 single_shot_v1 を含む。
 準備タスクの独立repoと実装worktreeは、元repoや15課題開発repoのGit共通領域を共有しない。
-評価sourceは独立した固定コピーとし、Git管理領域を持たせず、全ファイルhashを保存する。
+公開source snapshotはGitなしの独立コピーとする。採点source rootは歴史Git revision照合のため、
+それぞれ独立したobjectsを持つread-only repoを使用する。worktree共有・alternates・hardlinkは
+使わず、全ファイルhashを保存する。
 課題入力は各fixtureの既存 `input-manifest.json` が指定する `task.md` と `workspace/**`
 のbytesだけを別の公開入力rootへコピーする。比較用seed repoと条件別workspaceはそれぞれ
 独立したGit管理領域を持つ。採点root、control、結果rootは条件別workspaceの外に置く。
 
-採点の source closure はfixtureの既存 `evaluator_source_identity.source_files` の
-revision・bytes・sha256で歴史版から復元する。現行mainの採点コードへ置き換えない。
+採点workerの source closure はfixtureの既存 `evaluator_source_identity.source_files` の
+revision・bytes・sha256で歴史版から復元する。workerを現行版へ置き換えない。
+実際のhost adapterと三条件profileは接続PRの固定版を別のsource digestで記録する。
+raw portfolio scorer、旧schema、旧freezeのbytes・criteriaは変更しない。
 private evaluator bundle・review archive は採用済みdigestと完全一致する実体を復元・検査し、
 その後独立コピーを固定する。再生成で別版にしない。評価版固定後のfetch、pull、merge、
 checkout変更、開発branchからの取り込みを禁止する。接続PRを統合する場合は先に検査済みheadと
@@ -89,7 +95,7 @@ checkout変更、開発branchからの取り込みを禁止する。接続PRを�
    implementationへ変換しない。build-optionの構造validatorも接続不足の対象である。
    継続実装では閉じたnative fixture recipeを既存controllerへ接続した。
    [接続契約](primary-fixture-recipe-contract.md)のO1/O2で9件の元の検査・入力・scopeと
-   focused test編集を検査する。公開検査の実行経路はできたが、private意味採点は未接続。
+   focused test編集を検査する。公開検査の実行経路は実装済み。private意味採点の原本と採用authorityは未復元。
 3. **採点condition／証拠lineage**。旧normalized/evaluator schemasは
    `plain/kernel_only/adaptive_ask/full_ask`。`kernel_principles_v1` は含まれない。
    既存Core grading bridgeの `plain/core/full` も別条件なので代用しない。
@@ -108,7 +114,8 @@ checkout変更、開発branchからの取り込みを禁止する。接続PRを�
    後続モデルと採点processを止め、同runの自動resume／retry／新ID生成をしない。
    継続実装の[薄いバッチ接続](primary-evaluation-batch-contract.md)は9個の既存single_shotを
    束ねる。全27枠を保存し、一度の消費・予算予約・不明終了時停止をfake-onlyで検査した。
-   採点adapterがreadyでない本番dispatchは拒否するので、実採点接続不足は解消していない。
+   r3のdigest固定resources adapterは原constructor・初回2worker・原fragment/record/envelope保存・
+   原score内2worker検証を再利用する。実原本なしの現在は本番dispatchが拒否される。
 
 不足がある課題を対象から除外しない。各slotの品質・使用量は未実行ならnull/unknown。
 現状は全27slots未実行。K候補採用・原本・採点authorityが未解決なので、最初の一度の開始はまだ提示できない。
@@ -156,8 +163,11 @@ redacted patchはレビュー用と明示し、完全な比較はcontrollerの�
 
 不足1の設計判断と不足4の原本復元を親へ報告し、その間は公開入力の固定と非モデル検査を完了する。
 不足2/3/5を変更する場合、15課題担当と共有script/schema/CI所有権を調整する。
-継続実装の共有変更はuser-comparisonのprepare/controllerのnative recipe seamのみで、
-fixture・raw scorer・原schema・カタログ・CIには変更していない。
+継続実装の共有変更はuser-comparisonのnative recipe seamと、既存schema/normalizer/execution/
+evaluator-boundaryのprimary専用scope seam。fixture・raw scorer・原schema・カタログ・CIは不変。
+boundaryのpure private asset検査は元の検査を抽出して再利用し、開始前に偽markerを作らない。
+primary raw responseは保存済みsanitized last-messageの平文と正確なdigestを保持し、
+agent-output JSONを捏造しない。旧scopeのJSON要件は変えない。
 専用worktreeの最小差分・fake-only検査・fresh independent review・Draft PRを経て、
 検査済みheadを親に伝える。採点基準変更や旧終了条件緩和を混ぜない。
 全ての不足が解消した後に、固定run IDとplan digestを含む日本語開始プロンプトを完成させる。
@@ -190,8 +200,9 @@ controller証拠の採点request/readout exportを所有する。証明は上記
 
 [採点export接続](primary-evaluation-grading-contract.md)は9件×実条件を別々に、
 入力・採点版・controller receipt・native command・要件IDと根拠・五原因unknownへ結ぶ。
-public validatorをprivate scorerの代用にせず、原本とscoped condition/normalized authority
-接続が不足する限り、本番grading preflightはblockedのまま。
+public validatorをprivate scorerの代用にしない。profile・正規化・原採点を呼ぶ接続は実装済みだが、
+原本・review authorityの存在とoriginal private runtime互換性は未検証。
+固定資産の非モデルpreflightと実際のprivate実行成功を混同しない。
 所有者が復元すべき9件のbundle/review archive locatorと、残る最小shared seamを別途記録する。
 稼働checkoutの計画をあとから書換えず、候補選択・source最終統合後の固定は新しい準備で行う。
 
@@ -217,3 +228,13 @@ PR #340の旧docs-only headに対するUbuntu fake jobは、synthetic sessionの
 fixtureのmtimeを宣言window内へ明示固定する小修正を独立commitに分けた。
 production reader、mtime許容、旧所有権診断は変更・実行していない。
 修正後の同じsynthetic caseは通るが、Ubuntu全CIの再成功は別の観測である。
+
+## r3の正規化と実採点接続
+
+追加primary profileは旧四条件/Coreとは独立し、formal aggregateへ渡さない。モデルcommandは
+保存stdoutから既存parserで抽出し、native公開検査をモデルcommandへ変換しない。
+CLI完了と独立検査不合格を分け、欠測commandはunavailable、原因はunknownのまま。
+採点resourcesの閉じた9件mappingはraw digestをbatchへ固定し、原本/review/sourceをread-onlyに
+して、条件ごとの独立private/public出力を用いる。private workerログはprivate側に保存し、
+公開receiptはdigest/終了状態だけを持つ。途中不明終了では後続採点・モデルを止める。
+新規課題PR #341とそのprivate source、関連開発threadは今回の対象・入力から除外する。

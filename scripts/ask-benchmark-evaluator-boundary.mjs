@@ -852,6 +852,9 @@ export function deriveEvaluatorDependencyGraph({
   authorityPaths = EVALUATOR_AUTHORITY_PATHS,
   privateEntryPaths = entryPaths === EVALUATOR_DEPENDENCY_ENTRY_PATHS ? EVALUATOR_PRIVATE_ENTRY_PATHS : [],
 } = {}) {
+  const primaryParameters=primaryEvaluatorDependencyGraphParameters({root,baseRevision,
+    defaultParameters:entryPaths===EVALUATOR_DEPENDENCY_ENTRY_PATHS&&authorityPaths===EVALUATOR_AUTHORITY_PATHS&&privateEntryPaths===EVALUATOR_PRIVATE_ENTRY_PATHS});
+  if(primaryParameters){entryPaths=primaryParameters.entryPaths;authorityPaths=primaryParameters.authorityPaths;privateEntryPaths=primaryParameters.privateEntryPaths;}
   const canonicalRoot = assertRealDirectory(root, "evaluator dependency graph repository root");
   if (!baseRevision || !/^[a-f0-9]{40}$/u.test(baseRevision)) throw new Error("evaluator dependency graph base Git revision is invalid");
   const entries = [...entryPaths].map((path) => assertPortableRelativePath(path, "evaluator dependency graph entry path")).sort();
@@ -2095,7 +2098,8 @@ function verifiedFinalOutputBytesForPrivateEvaluation({ root, runDir, normalized
   }
   const runRoot = assertRealDirectory(runDir, "private final output run root");
   const relativePath = `cases/${lineage.case_id}/attempts/${lineage.attempt}/final.json`;
-  const finalPath = resolveAuthorityArtifactPath(runRoot, relativePath, "private final output source");
+  const primaryPath = primaryFinalResponseRelativePath(normalized);
+  const finalPath = resolveAuthorityArtifactPath(runRoot, primaryPath ?? relativePath, "private final output source");
   const final = readStableFile(finalPath, "private final output source", MAX_VERIFIED_FINAL_OUTPUT_BYTES, { allowEmpty: false });
   validateSealedPrivateFinalOutputEvidence({
     root, normalized,
@@ -2123,6 +2127,7 @@ export function validateSealedPrivateFinalOutputEvidence({ root, normalized, can
   if (!Buffer.isBuffer(finalBytes) || finalBytes.length !== expectedBytes || rawByteDigest(finalBytes) !== expectedDigest) {
     throw new Error("sealed private final output differs from normalized authority");
   }
+  if (validatePrimaryRawFinalResponse(normalized, finalBytes)) return;
   assertNoDuplicateJsonObjectKeys(finalBytes.toString("utf8"), "sealed private final output");
   let finalValue;
   try { finalValue = JSON.parse(finalBytes.toString("utf8")); }
@@ -2402,6 +2407,7 @@ function executeAuthorityOwnedEvaluatorChild({ runnerSource, payload, timeout, l
     maxBuffer: MAX_BOUNDARY_FILE_BYTES,
     timeout,
   });
+  capturePrimaryEvaluatorChildStreams(child, payload);
   if (child.status !== 0 || child.error) throw new Error(`${label} child execution failed${child.error ? `: ${child.error.message}` : child.stderr ? `: ${child.stderr.trim().slice(0, 512)}` : ""}`);
   return parseRunnerFragment(child.stdout, `${label} child output`);
 }
@@ -2789,19 +2795,9 @@ function assertReferenceMatchesBundle(reference, manifest) {
   }
 }
 
-export function verifyPrivateEvaluatorBundle({
-  root,
-  referencePath,
-  privateRoot,
-  manifestPath,
-  materializedPath,
-  selectionState,
-  runDir,
-  normalizedResultsPath,
-  publicArtifactRoot = null,
-}) {
-  const boundary = assertPrivateBoundary({ root, privateRoot, materializedPath, selectionState, runDir, normalizedResultsPath, publicArtifactRoot });
-  const { canonicalPrivateRoot } = boundary;
+// Resource-only read checks: no terminal/run authority is granted here.
+export function verifyPrivateEvaluatorResourceAssets({ root, referencePath, privateRoot, manifestPath }) {
+  const canonicalPrivateRoot = assertRealDirectory(privateRoot, "private evaluator root");
   if (!manifestPath || !isInside(privateRoot, manifestPath)) throw new Error("private evaluator manifest must stay inside the private evaluator root");
   const manifestRelativePath = assertPathInsideRootWithoutSymlinks(privateRoot, manifestPath, "private evaluator manifest");
   const { value: manifest } = readJsonArtifact(manifestPath, "private evaluator manifest");
@@ -2842,7 +2838,17 @@ export function verifyPrivateEvaluatorBundle({
 
   const reference = verifyPublicEvaluatorReference({ root, referencePath, privateRoot: canonicalPrivateRoot });
   assertReferenceMatchesBundle(reference, manifest);
-  const bundle = { ...boundary, files, manifest, manifestEvidence, manifestRelativePath, privateMaterialDigests, reference, independenceStatement };
+  return { canonicalPrivateRoot, files, manifest, manifestEvidence, manifestRelativePath, privateMaterialDigests, reference, independenceStatement };
+}
+
+export function verifyPrivateEvaluatorBundle({
+  root, referencePath, privateRoot, manifestPath, materializedPath, selectionState,
+  runDir, normalizedResultsPath, publicArtifactRoot = null,
+}) {
+  const boundary = assertPrivateBoundary({ root, privateRoot, materializedPath, selectionState, runDir, normalizedResultsPath, publicArtifactRoot });
+  const assets = verifyPrivateEvaluatorResourceAssets({ root, referencePath, privateRoot, manifestPath });
+  const { privateMaterialDigests } = assets;
+  const bundle = { ...boundary, ...assets };
   assertNoPrivateMaterial(managedRepositoryInventory(boundary.canonicalRoots.root), "managed repository", privateMaterialDigests);
   for (const [key, label] of [
     ["materializedPath", "materialized root"],
@@ -3049,7 +3055,7 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const fragment = fragmentRead.value;
   const fragmentSchemaDigest = rawByteDigest(readFileSync(resolve(root, PRIVATE_EVALUATOR_FRAGMENT_SCHEMA_PATH)));
   if (record.fragment_schema_digest !== fragmentSchemaDigest) throw new Error("private evaluator fragment schema digest is inconsistent");
-  const adapterSourceDigest = rawByteDigest(readFileSync(resolve(root, "scripts/ask-benchmark-evaluator-boundary.mjs")));
+  const adapterSourceDigest = primaryAdapterSourceDigest() ?? rawByteDigest(readFileSync(resolve(root, "scripts/ask-benchmark-evaluator-boundary.mjs")));
   if (record.adapter_source_digest !== adapterSourceDigest) throw new Error("private evaluator adapter source digest is inconsistent");
   const evidence = validatePrivateEvaluationEvidenceArtifacts({ root, privateEvaluationRoot: canonicalEvaluationRoot, record, normalized, result });
   const hiddenAsset = bundle.manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
@@ -3595,7 +3601,8 @@ export function verifyPortfolioScoringInputs(options) {
 }
 
 export function verifyEvaluatorAuthority(options) {
-  return withCoreGradingAuthority(options, () => assertCoreGradingVerified(verifyEvaluatorAuthorityCore(options)));
+  return withPrimaryEvaluatorAuthority(options, () => withCoreGradingAuthority(options,
+    () => assertPrimaryEvaluatorVerified(assertCoreGradingVerified(verifyEvaluatorAuthorityCore(options)))));
 }
 
 export function verifyEvaluatorResult(options) {
@@ -3616,3 +3623,5 @@ export function verifyEvaluatorBoundary(options) {
   if (!options.publicArtifactRoot) throw new Error("full evaluator boundary verification requires a public artifact root");
   return verifyEvaluatorResult(options);
 }
+import { withPrimaryEvaluatorAuthority, assertPrimaryEvaluatorVerified, primaryFinalResponseRelativePath, validatePrimaryRawFinalResponse,
+  primaryAdapterSourceDigest, capturePrimaryEvaluatorChildStreams, primaryEvaluatorDependencyGraphParameters } from './ask-primary-evaluation-scope.mjs';

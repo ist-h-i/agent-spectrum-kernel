@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { coreProducerInspection } from './ask-core-producer-scope.mjs';
 import { verifyCoreProducedTerminal } from './ask-core-capture-producer.mjs';
+import { primaryProducerInspection } from './ask-primary-evaluation-scope.mjs';
+import { verifyPrimaryProducedTerminal } from './ask-primary-evaluation-producer.mjs';
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -2003,6 +2005,8 @@ function classificationForCase({ root, context, entry }) {
 }
 
 export function inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir }) {
+  const primary = primaryProducerInspection({ root, config, planPath, materializedPath, selectionState, runDir });
+  if (primary) return primary;
   const producer = coreProducerInspection({ root, config, planPath, materializedPath, selectionState, runDir });
   if (producer) return producer;
   const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, initialize: false });
@@ -2026,6 +2030,8 @@ export function inspectVerifiedPortfolioExecution({ root, config, planPath, mate
 }
 
 export function verifyExecutionTerminalWorkspaceAuthority({ root, config, planPath, materializedPath, selectionState, runDir, caseId, attempt }) {
+  const primary = primaryProducerInspection({ root, config, planPath, materializedPath, selectionState, runDir });
+  if (primary) return verifyPrimaryProducedTerminal(primary, { root, runDir, caseId, attempt });
   const producer = coreProducerInspection({ root, config, planPath, materializedPath, selectionState, runDir });
   if (producer) return verifyCoreProducedTerminal(producer, { root, runDir, caseId, attempt });
   const inspection = inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir });

@@ -64,8 +64,8 @@ unknown consumption permanently forbids another start. There is no resume API.
 Observed preparation/inspection/start require a registered factory-created adapter
 from `ask-primary-evaluation-grading.mjs`, recognized by its private WeakSet
 predicate. Caller objects with `ready` labels are blocked before consumption;
-they cannot mask missing private/source/profile checks. The current thin grading
-adapter preserves missing profile/private evidence and remains blocked.
+they cannot mask missing private/source/profile checks. The registered adapter binds a raw-digest-pinned private resources mapping.
+Missing original private/review assets still block; caller labels never restore them.
 
 The grading adapter owns actual scorer connections. Its synchronous
 `preflight(block, loadedPlan)` returns `{status:"ready"|"blocked",blockers:[]}`
@@ -78,8 +78,8 @@ preflight repeats immediately before each dispatch. Its async
 have finished and fixed-source grading evidence is preserved. Any incomplete
 status, exception, interruption or deadline stops the batch. This coordinator
 does not infer native grading from user-comparison test outcomes; it preserves
-adapter evidence, while quality fields remain unknown for the owning reporter
-to reconcile. The adapter must obey the supplied abort/deadline and five-minute
+adapter evidence, and reports actual per-condition quality only after completed original
+scoring. The adapter receives the supplied abort/deadline and 65-minute block
 reservation; synchronous blocking or a noncooperating adapter cannot be forcibly
 terminated by this thin layer.
 
@@ -91,9 +91,11 @@ start adapter; neither model nor grading process is invoked.
 
 ## Admission, stopping and reporting
 
-The 48-hour deadline starts at consumption and includes grading. Each block
-reserves its entire fixed child overall limit plus declared grading time (at
-most five minutes), without rewriting child plans. The active AbortSignal
+The r3 60-hour deadline starts at consumption and includes grading. Each block
+reserves its entire fixed child overall limit plus 65 minutes of grading. The
+original chain performs four workers per condition (two initial plus two record
+verification runs), each bounded to five minutes. No child plan is rewritten.
+Historical 48-hour preparations remain readable but cannot start under r3. The active AbortSignal
 carries deadline/interruption to the existing child controller. Native
 single-task start/terminal/report semantics remain authoritative; each returned
 native report is saved with digest and exact run/plan identity.

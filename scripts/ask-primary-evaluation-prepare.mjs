@@ -9,17 +9,19 @@ import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 import { comparisonHash, inventoryUserTree, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 import { createPrimaryEvaluationGradingAdapter, preflightPrimaryEvaluationGrading, PRIMARY_GRADING_PROFILE_ID } from "./ask-primary-evaluation-grading.mjs";
-import { preparePrimaryEvaluationBatch } from "./ask-primary-evaluation-batch.mjs";
+import { preparePrimaryEvaluationBatch, PRIMARY_GRADING_RESERVATION_MS } from "./ask-primary-evaluation-batch.mjs";
 
 const SOURCE = fileURLToPath(new URL("../", import.meta.url));
 const read = path => readStableFile(path, "fixed public primary input", 32 * 1024 * 1024).bytes;
 const json = path => parseJsonRejectDuplicateKeys(read(path).toString("utf8"));
-const closedOptions = ["output", "cliBin", "cliVersion", "model", "reasoning", "globalAskPresence", "evidenceKind"];
+const closedOptions = ["output", "cliBin", "cliVersion", "model", "reasoning", "globalAskPresence", "evidenceKind", "gradingResourcesPath", "gradingResourcesDigest"];
 const save = (path, value) => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx", mode: 0o600 });
 
 export function preparePrimaryEvaluation(publicParent, options) {
   assert.ok(options && typeof options === "object" && !Array.isArray(options));
   assert.ok(Object.keys(options).every(key => closedOptions.includes(key)), "primary preparation options are closed");
+  const gradingAdapter = createPrimaryEvaluationGradingAdapter({ resourcesPath: options.gradingResourcesPath ?? null,
+    resourcesDigest: options.gradingResourcesDigest ?? null });
   assert.ok(isAbsolute(publicParent) && realpathSync(publicParent) === publicParent);
   const output = options.output;
   assert.ok(isAbsolute(output) && resolve(output) === output && realpathSync(dirname(output)) === dirname(output));
@@ -57,15 +59,18 @@ export function preparePrimaryEvaluation(publicParent, options) {
       run_id: prepared.plan.run_id, plan_digest: prepared.plan_digest,
       source_digest: prepared.plan.source.digest, task_digest: prepared.plan.task.digest, verification_digest: prepared.plan.verification.digest,
       input_manifest: { path: join(base, "input-manifest.json"), digest: recipe.input_manifest_digest },
-      grading: { status: "blocked", blockers: [], timeout_ms: 300000, binding } };
-    block.grading.blockers = preflightPrimaryEvaluationGrading(block).blockers;
+      grading: { status: "blocked", blockers: [], timeout_ms: PRIMARY_GRADING_RESERVATION_MS, binding,
+        ...(options.gradingResourcesPath ? { resources: { path: options.gradingResourcesPath, digest: options.gradingResourcesDigest } } : {}) } };
+    const gradingPreflight = gradingAdapter.preflight(block);
+    block.grading.status = gradingPreflight.status;
+    block.grading.blockers = gradingPreflight.blockers;
     blocks.push(block);
   }
-  const manifest = { kind: "ask_primary_evaluation_batch_manifest_v1", batch_id: "primary-nine-prepared-v1",
+  const manifest = { kind: "ask_primary_evaluation_batch_manifest_v1", batch_id: "primary-nine-prepared-v2",
     root: join(output, "batch"), conditions: ["plain", "kernel_principles_v1", "full_ask"],
-    limits: { overall_timeout_ms: 172800000, token_budget: 45000000, retries: 0, concurrency: 1, resume: "forbidden" }, blocks };
+    limits: { overall_timeout_ms: 216000000, token_budget: 45000000, retries: 0, concurrency: 1, resume: "forbidden" }, blocks };
   const manifestPath = join(output, "batch-manifest.json"); save(manifestPath, manifest);
-  const result = preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter: createPrimaryEvaluationGradingAdapter() });
+  const result = preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter });
   save(join(output, "preparation-result.json"), result);
   return { ...result, manifest_path: manifestPath, model_calls: 0, old_ownership_diagnostics: 0,
     kernel_candidate_decision: "v1 preserved; v2 candidate requires parent selection and a new preparation" };

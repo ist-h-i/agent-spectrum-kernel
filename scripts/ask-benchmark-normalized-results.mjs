@@ -18,6 +18,7 @@ import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materializ
 import { projectVerifiedCommandEvidence } from "./ask-benchmark-command-evidence.mjs";
 import { coreGradingConditions } from "./ask-core-grading-authority.mjs";
 import { activeCoreProducer } from './ask-core-producer-scope.mjs';
+import { activePrimaryProducer, primaryGradingConditions } from './ask-primary-evaluation-scope.mjs';
 
 export const NORMALIZER_VERSION = "1.3.0";
 export const NORMALIZED_RESULT_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-result.schema.json";
@@ -155,7 +156,8 @@ function telemetryFor(attempt, adapterIdentity) {
   const unavailable = runtimeUnavailableEvidence(adapterIdentity, result);
   const unavailableMissing = () => unavailableOrUnknown(outcome);
   const usage = (name) => {
-    const observed = result.successor_usage?.metrics[name] ?? (activeCoreProducer() ? result.core_capture_usage?.metrics[name] : null);
+    const observed = result.successor_usage?.metrics[name] ?? (activeCoreProducer() ? result.core_capture_usage?.metrics[name] : null)
+      ?? (activePrimaryProducer() ? result.primary_capture_usage?.metrics[name] : null);
     if (!observed) return unavailableMissing();
     return observed.status === "known" ? known(observed.value) : missing(observed.status, observed.reason);
   };
@@ -176,11 +178,11 @@ function telemetryFor(attempt, adapterIdentity) {
     runtime_unavailable_reason_code: unavailable.code,
     runtime_unavailable_reason_digest: unavailable.digest,
     runtime_unavailable_reason_bytes: unavailable.bytes,
-    thermal_state: activeCoreProducer() ? missing("unknown", "thermal_state_not_observed") : known(portableTelemetryScalar(adapterIdentity.thermal_state, "thermal state")),
-    model: known(portableTelemetryScalar(adapterIdentity.model, "model")),
-    reasoning_effort: known(portableTelemetryScalar(adapterIdentity.reasoning_effort, "reasoning effort")),
+    thermal_state: activeCoreProducer() || activePrimaryProducer() ? missing("unknown", "thermal_state_not_observed") : known(portableTelemetryScalar(adapterIdentity.thermal_state, "thermal state")),
+    model: activePrimaryProducer() ? missing("unknown", "requested_model_not_independently_resolved") : known(portableTelemetryScalar(adapterIdentity.model, "model")),
+    reasoning_effort: activePrimaryProducer() ? missing("unknown", "requested_reasoning_not_independently_resolved") : known(portableTelemetryScalar(adapterIdentity.reasoning_effort, "reasoning effort")),
     sandbox_policy: known(portableTelemetryScalar(adapterIdentity.sandbox_policy, "sandbox policy")),
-    permission_policy: known(portableTelemetryScalar(adapterIdentity.permission_policy, "permission policy")),
+    permission_policy: activePrimaryProducer() ? missing("unknown", "ordinary_global_and_provider_policy_not_observed") : known(portableTelemetryScalar(adapterIdentity.permission_policy, "permission policy")),
     // Only usage sealed inside the reverified native terminal result is used.
     // Older artifacts and non-successor adapters keep their original unknowns.
     input_tokens: usage("input_tokens"),
@@ -377,7 +379,7 @@ function completenessForCases(cases) {
     active_cases: countCases(cases, (entry) => entry.status === "active"),
     invalid_cases: invalidCaseIds.length,
     by_adapter: groupedCoverage(cases, ADAPTERS, "adapter", (entry) => entry.adapter_track),
-    by_condition: groupedCoverage(cases, coreGradingConditions(CONDITIONS), "condition", (entry) => entry.condition),
+    by_condition: groupedCoverage(cases, primaryGradingConditions(coreGradingConditions(CONDITIONS)), "condition", (entry) => entry.condition),
     by_status: STATUSES.map((status) => ({ status, count: countCases(cases, (entry) => entry.status === status) })),
     missing_case_ids: missingCaseIds,
     invalid_case_ids: invalidCaseIds,

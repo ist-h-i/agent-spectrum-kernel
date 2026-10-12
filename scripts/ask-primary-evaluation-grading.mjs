@@ -1,6 +1,6 @@
-// Public, offline export only. This module never starts an evaluator or model.
+// Public offline export plus the fixed original grading adapter. CLI stays offline.
 import assert from 'node:assert/strict';
-import { existsSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonicalDigest, parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
@@ -8,9 +8,12 @@ import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { comparisonHash } from './ask-user-comparison-prepare.mjs';
 import { readUserComparisonPlan, reportUserComparison } from './ask-user-comparison.mjs';
 import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
+import { producePrimaryEvaluationArtifacts } from './ask-primary-evaluation-producer.mjs';
+import { preflightPrimaryEvaluationGradingResources, runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
 
 export const PRIMARY_GRADING_CONDITIONS = Object.freeze(['plain', 'kernel_principles_v1', 'full_ask']);
 export const PRIMARY_GRADING_PROFILE_ID = 'primary_single_shot_v1';
+export const PRIMARY_GRADING_RESERVATION_MS = 3900000; // 2 original runs + 2 persisted-record verification runs, x 3 conditions x 5m + 5m conversion/save.
 const ROOT = fileURLToPath(new URL('../', import.meta.url)), LIMIT = 16 * 1024 * 1024;
 const adapters = new WeakSet();
 const read = path => readStableFile(path, 'public primary grading evidence', LIMIT).bytes;
@@ -113,11 +116,10 @@ function publicBinding(block, loaded, root) {
 export function preflightPrimaryEvaluationGrading(block, { root = ROOT } = {}) {
   try {
     const loaded = readUserComparisonPlan(block.root), { binding } = publicBinding(block, loaded, root);
-    return { ...notReady(['primary_condition_profile_unimplemented', 'private_original_bundle_authority_unavailable',
-      'scoring_input_freeze_authority_unconnected', 'controller_to_legacy_normalization_unimplemented']), binding, timeout_ms: 300000 };
+    return { ...notReady(['private_original_bundle_authority_unavailable', 'private_admission_review_authority_unavailable',
+      'frozen_scoring_runtime_not_configured', 'private_evaluator_runtime_unverified']), binding, timeout_ms: block.grading?.timeout_ms ?? PRIMARY_GRADING_RESERVATION_MS };
   } catch {
-    return { ...notReady(['public_controller_fixture_binding_unverified', 'primary_condition_profile_unimplemented',
-      'private_original_bundle_authority_unavailable']), binding: null, timeout_ms: 300000 };
+    return { ...notReady(['public_controller_fixture_binding_unverified', 'private_original_bundle_authority_unavailable']), binding: null, timeout_ms: block.grading?.timeout_ms ?? PRIMARY_GRADING_RESERVATION_MS };
   }
 }
 
@@ -204,10 +206,10 @@ function buildRequest({ block, loaded, report, records, recipe, binding, readout
     public_grading_references: readoutAuthority.references,
     controller: { state: report.execution?.state ?? 'unknown', history_digest: report.execution?.history?.digest ?? null,
       start_consumed: report.execution?.start_consumed ?? null },
-    scorer_connection: { status: 'unimplemented', verify_export: 'scripts/ask-benchmark-evaluator-boundary.mjs#verifyEvaluatorAuthority',
+    scorer_connection: { status: 'profile_and_normalization_implemented_private_runtime_pending', verify_export: 'scripts/ask-benchmark-evaluator-boundary.mjs#verifyEvaluatorAuthority',
       score_export: 'scripts/ask-benchmark-portfolio-score.mjs#scoreEvaluatorResult',
-      options: null, missing: ['scoped_condition_schema_profile', 'controller_owned_normalized_lineage', 'fixed_private_originals', 'scoring_input_freeze_authority'] },
-    ...notReady(['primary_condition_profile_unimplemented', 'private_original_bundle_authority_unavailable']) };
+      options: null, missing: ['fixed_private_originals', 'scoring_input_freeze_authority'] },
+    ...notReady(['private_original_bundle_authority_unavailable']) };
 }
 
 /** Read the saved report and terminals ourselves; a supplied child report is not authority. */
@@ -269,13 +271,111 @@ export function replayPrimaryEvaluationGradingRequest(path, expectedDigest, bloc
   } catch { return { ...notReady(['saved_export_or_controller_lineage_unverified']), status: 'blocked' }; }
 }
 
-export function createPrimaryEvaluationGradingAdapter({ root = ROOT } = {}) {
+const resourceKeys = ['frozenSourceRoot', 'privateRoot', 'manifestPath', 'admissionDecisionPath',
+  'admissionReviewAuthorityPath', 'admissionReviewAuthoritySourceDigest', 'admissionReviewArchivePath'];
+const overlaps = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+function immutableTree(path) {
+  assert.equal(realpathSync(path), path, 'fixed resource must be canonical');
+  const stat = lstatSync(path);
+  assert.equal(stat.mode & 0o222, 0, 'fixed resources must be read-only');
+  if (stat.isDirectory()) for (const name of readdirSync(path)) immutableTree(join(path, name));
+  else assert.ok(stat.isFile() && stat.nlink === 1, 'fixed resource cannot be linked or special');
+}
+function loadResources(path, expectedDigest, root) {
+  digest(expectedDigest); assert.equal(realpathSync(path), path);
+  const raw = read(path); assert.equal(comparisonHash(raw), expectedDigest, 'grading resources changed');
+  const resources = parse(raw);
+  assert.deepEqual(Object.keys(resources).sort(), ['kind', 'output_root', 'fixtures'].sort());
+  assert.equal(resources.kind, 'ask_primary_grading_resources_v1');
+  assert.deepEqual(Object.keys(resources.fixtures).sort(), [...PRIMARY_FIXTURE_IDS].sort());
+  assert.equal(resolve(resources.output_root), resources.output_root);
+  assert.equal(realpathSync(dirname(resources.output_root)), dirname(resources.output_root));
+  assert.ok(!existsSync(resources.output_root), 'grading output already exists');
+  for (const resource of Object.values(resources.fixtures)) {
+    assert.deepEqual(Object.keys(resource).sort(), [...resourceKeys].sort());
+    digest(resource.admissionReviewAuthoritySourceDigest);
+    for (const key of resourceKeys.filter(key => key !== 'admissionReviewAuthoritySourceDigest')) {
+      assert.equal(resolve(resource[key]), resource[key]); assert.equal(realpathSync(resource[key]), resource[key]);
+      assert.ok(!overlaps(resource[key], resources.output_root), 'grading output overlaps fixed asset');
+    }
+    assert.ok(!overlaps(root, resources.output_root) && !overlaps(path, resources.output_root));
+    immutableTree(resource.frozenSourceRoot); immutableTree(resource.privateRoot);
+    assert.ok(lstatSync(join(resource.frozenSourceRoot, '.git')).isDirectory(), 'independent Git root required');
+    assert.ok(!existsSync(join(resource.frozenSourceRoot, '.git/objects/info/alternates')), 'shared Git alternates forbidden');
+  }
+  return resources;
+}
+
+/** Resources are separately pinned and private; no caller readiness labels or grader callbacks. */
+export function createPrimaryEvaluationGradingAdapter({ root = ROOT, resourcesPath = null, resourcesDigest = null } = {}) {
+  assert.equal(resourcesPath === null, resourcesDigest === null, 'resource path and raw digest supplied together');
+  let configuration = null;
+  const resourceFor = block => {
+    if (!resourcesPath) return null;
+    const currentRaw = read(resourcesPath); assert.equal(comparisonHash(currentRaw), resourcesDigest, 'grading resources changed');
+    if (!configuration) configuration = loadResources(resourcesPath, resourcesDigest, root);
+    const resource = configuration.fixtures[block.fixture_id]; assert.ok(resource);
+    assert.deepEqual(block.grading.resources, { path: resourcesPath, digest: resourcesDigest }, 'grading resources are not bound to fixed batch');
+    for (const key of resourceKeys.filter(key => key !== 'admissionReviewAuthoritySourceDigest')) immutableTree(resource[key]);
+    const loaded = readUserComparisonPlan(block.root);
+    for (const path of [block.root, block.public_input_root, loaded.plan.source.repo]) {
+      assert.ok(!overlaps(resolve(path), configuration.output_root), 'grading output overlaps execution input');
+      for (const key of resourceKeys.filter(key => key !== 'admissionReviewAuthoritySourceDigest'))
+        assert.ok(!overlaps(resolve(path), resource[key]), 'private grading asset overlaps execution input');
+    }
+    return resource;
+  };
   const adapter = Object.freeze({
-    preflight(block) { const value = preflightPrimaryEvaluationGrading(block, { root }); return { ...value, status: 'blocked' }; },
-    async grade(block) {
-      try { return { status: 'unknown', ...exportPrimaryEvaluationGradingRequest(block, { root }), quality: null,
-        scoring_status: 'not_scoring_ready', grader_process_completed: null, grader_process_starts: 0 }; }
-      catch { return { ...notReady(['controller_grading_export_unverified']), status: 'unknown' }; }
+    preflight(block) {
+      const value = preflightPrimaryEvaluationGrading(block, { root });
+      if (!resourcesPath || !value.binding) return { ...value, status: 'blocked' };
+      try {
+        assert.equal(block.grading.timeout_ms, PRIMARY_GRADING_RESERVATION_MS, 'full original grading reservation required');
+        const resource = resourceFor(block), loaded = readUserComparisonPlan(block.root);
+        publicBinding(block, loaded, root);
+        return preflightPrimaryEvaluationGradingResources(block, resource);
+      } catch { return { ...notReady(['fixed_grading_resource_authority_unverified']), status: 'blocked' }; }
+    },
+    async grade(block, _report, { signal = null, deadline_at_ms = null } = {}) {
+      let started = false;
+      try {
+        assert.equal(adapter.preflight(block).status, 'ready', 'grading resource preflight required');
+        assert.ok(!signal?.aborted);
+        const resource = resourceFor(block), output = join(configuration.output_root, block.fixture_id);
+        mkdirSync(configuration.output_root, { recursive: true, mode: 0o700 }); mkdirSync(output, { mode: 0o700 });
+        const produced = await producePrimaryEvaluationArtifacts(block, join(output, 'producer'));
+        const producerOptions = { recordRoot: produced.output_root, externalDigest: produced.external_digest };
+        const conditions = [];
+        for (const condition of PRIMARY_GRADING_CONDITIONS) {
+          assert.ok(!signal?.aborted);
+          const privateEvaluationRoot = join(output, `private-${condition}`); mkdirSync(privateEvaluationRoot, { mode: 0o700 });
+          started = true;
+          const graded = runPrimaryEvaluationPrivateGrading(producerOptions, { ...resource, condition,
+            privateEvaluationRoot, publicResultRoot: join(output, `public-${condition}`) },
+          { timeoutMs: 300000, signal, deadlineAtMs: deadline_at_ms });
+          conditions.push(graded);
+          if (graded.status !== 'completed') break;
+        }
+        const complete = conditions.length === PRIMARY_GRADING_CONDITIONS.length && conditions.every(value => value.status === 'completed');
+        const exported = exportPrimaryEvaluationGradingRequest(block, { root });
+        const readout = { ...exported.readout, scoring_status: complete ? 'complete' : 'not_scoring_ready',
+          conditions: exported.readout.conditions.map(slot => {
+            const graded = conditions.find(item => item.condition === slot.condition);
+            if (!graded || graded.status !== 'completed') return { ...slot, private_grading: graded ?? { status: 'not_started' } };
+            const envelope = json(graded.public_artifacts.evaluator_result.path);
+            assert.equal(comparisonHash(read(graded.public_artifacts.evaluator_result.path)), graded.public_artifacts.evaluator_result.digest);
+            return { ...slot, quality: graded.quality, requirement_judgments: envelope.requirement_results,
+              evaluator_result_ref: graded.public_artifacts.evaluator_result, private_grading: graded };
+          }), semantic_quality: complete ? 'scored' : 'unknown' };
+        writeFileSync(join(output, 'task-readout.json'), serialize(readout), { mode: 0o600, flag: 'wx' });
+        return { status: complete ? 'completed' : 'unknown', scoring_status: readout.scoring_status, quality: null,
+          conditions, readout, producer: { record_root: produced.output_root, digest: produced.external_digest },
+          formal_aggregate_eligible: false, grader_process_completed: conditions.some(item => item.grader_process_completed === null)
+            ? null : conditions.length > 0 && conditions.every(item => item.grader_process_completed === true),
+          grader_process_starts: conditions.every(item => Number.isInteger(item.grader_process_starts))
+            ? conditions.reduce((count, item) => count + item.grader_process_starts, 0) : null };
+      } catch { return { ...notReady(['controller_or_original_grading_pipeline_unverified']), status: 'unknown',
+        grader_process_completed: started ? null : false, grader_process_starts: started ? null : 0 }; }
     },
   });
   adapters.add(adapter); return adapter;

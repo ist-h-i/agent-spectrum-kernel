@@ -6,14 +6,15 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
-import { isPrimaryEvaluationGradingAdapter } from './ask-primary-evaluation-grading.mjs';
+import { isPrimaryEvaluationGradingAdapter, PRIMARY_GRADING_RESERVATION_MS } from './ask-primary-evaluation-grading.mjs';
 import { comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree } from './ask-user-comparison-prepare.mjs';
 import { inspectUserComparison, readUserComparisonPlan, reportUserComparison, startUserComparison } from './ask-user-comparison.mjs';
 
 export const PRIMARY_FIXTURE_IDS = Object.freeze(['mp-ci-evidence-gap', 'mp-data-migration-handoff', 'mn-focused-regression-test',
   'mp-accessibility-interaction-review', 'mp-frontend-state-review', 'mp-iac-rollback-design', 'mp-performance-investigation',
   'mn-build-option-update', 'mn-doc-config-correction']);
-export const PRIMARY_BATCH_LIMITS = Object.freeze({ overall_timeout_ms: 172800000, token_budget: 45000000, retries: 0, concurrency: 1, resume: 'forbidden' });
+export { PRIMARY_GRADING_RESERVATION_MS };
+export const PRIMARY_BATCH_LIMITS = Object.freeze({ overall_timeout_ms: 216000000, token_budget: 45000000, retries: 0, concurrency: 1, resume: 'forbidden' });
 const LIMIT = 16 * 1024 * 1024;
 const bytes = value => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
 const stable = path => readStableFile(path, 'primary batch artifact', LIMIT).bytes;
@@ -104,7 +105,8 @@ function checkBlock(block, conditions, pending) {
 function validateManifest(manifest, pending) {
   assert.equal(manifest.kind, 'ask_primary_evaluation_batch_manifest_v1');
   assert.ok(typeof manifest.batch_id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/u.test(manifest.batch_id));
-  assert.deepEqual(manifest.limits, PRIMARY_BATCH_LIMITS);
+  assert.deepEqual(manifest.limits, manifest.limits?.overall_timeout_ms === 172800000
+    ? { ...PRIMARY_BATCH_LIMITS, overall_timeout_ms: 172800000 } : PRIMARY_BATCH_LIMITS, 'unknown primary batch budget');
   assert.deepEqual(manifest.blocks.map(block => block.fixture_id), PRIMARY_FIXTURE_IDS, 'all nine fixtures required in fixed order');
   assert.equal(manifest.conditions.length, 3); assert.equal(new Set(manifest.conditions).size, 3);
   assert.equal(new Set(manifest.blocks.map(block => block.run_id)).size, 9, 'duplicate run ID');
@@ -127,7 +129,7 @@ function gradingPreflight(manifest, loaded, adapter) {
     assert.equal(declared.binding.input_manifest_digest, block.input_manifest.digest);
     digest(declared.binding.evaluator_bundle_digest); digest(declared.binding.scoring_input_freeze_digest);
     assert.ok(typeof declared.binding.profile_id === 'string' && declared.binding.profile_id.length > 0);
-    assert.ok(Number.isSafeInteger(declared.timeout_ms) && declared.timeout_ms > 0 && declared.timeout_ms <= 300000, 'grading reservation must be bounded to 5 minutes');
+    assert.ok(Number.isSafeInteger(declared.timeout_ms) && declared.timeout_ms > 0 && declared.timeout_ms <= PRIMARY_GRADING_RESERVATION_MS, 'grading reservation must be bounded to 65 minutes');
     const blockers = declared.status === 'blocked' ? declared.blockers.length ? [...declared.blockers] : ['grading declared blocked'] : [];
     if (!adapter || typeof adapter.preflight !== 'function' || typeof adapter.grade !== 'function') blockers.push('grading adapter not connected');
     else if (loaded[index].plan.config.evidence_kind === 'observed' && !isPrimaryEvaluationGradingAdapter(adapter)) blockers.push('production grading adapter is not registered; caller ready labels cannot authorize dispatch');
@@ -145,6 +147,7 @@ export function preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter } =
   const raw = stable(manifestPath), manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
   assert.ok(isAbsolute(manifest.root) && resolve(manifest.root) === manifest.root); canonical(dirname(manifest.root));
   assert.ok(!existsSync(manifest.root), 'batch output exists; never reuse');
+  assert.deepEqual(manifest.limits, PRIMARY_BATCH_LIMITS, 'new preparation must use the current budget');
   const loaded = validateManifest(manifest, true);
   for (const value of loaded) assert.ok(!overlap(manifestPath, value.root) && !overlap(manifestPath, value.plan.source.repo), 'external manifest overlaps execution source');
   assert.ok(!overlap(manifestPath, manifest.root));
@@ -168,6 +171,8 @@ export function inspectPrimaryEvaluationBatch(root, { gradingAdapter } = {}) {
   const batch = readBatch(root), consumed = existsSync(join(root, 'consumption'));
   const loaded = validateManifest(batch.manifest, !consumed);
   const blockers = gradingPreflight(batch.manifest, loaded, gradingAdapter);
+  if (batch.manifest.limits.overall_timeout_ms !== PRIMARY_BATCH_LIMITS.overall_timeout_ms)
+    blockers.push({ fixture_id: null, reason: 'historical_preparation_budget_requires_new_plan' });
   return { ...batch, status: consumed ? 'consumed' : blockers.length ? 'blocked' : 'prepared', blockers, start_consumed: consumed,
     slot_count: 27, slots: batch.manifest.blocks.flatMap((block, index) => batch.manifest.conditions.map(condition => ({ fixture_id: block.fixture_id, run_id: block.run_id, condition, state: consumed ? 'unknown' : 'not_started', quality: null, capability: loaded[index].plan.arms[condition].capability }))) };
 }
@@ -200,7 +205,7 @@ export async function startPrimaryEvaluationBatch(root, confirmedManifestDigest,
       if (controller.signal.aborted) { stop = 'interrupted_or_deadline'; break; }
       if (known >= PRIMARY_BATCH_LIMITS.token_budget) { stop = 'usage_budget_exhausted'; break; }
       // Reserve the entire fixed child limit plus grading reservation before dispatch.
-      const reserve = loaded[index].plan.config.overall_timeout_ms + (block.grading.timeout_ms ?? 300000);
+      const reserve = loaded[index].plan.config.overall_timeout_ms + (block.grading.timeout_ms ?? PRIMARY_GRADING_RESERVATION_MS);
       if (deadline - current < reserve) { stop = 'insufficient_deadline_reservation'; break; }
       const fresh = checkBlock(block, batch.manifest.conditions, true);
       const blockers = gradingPreflight({ ...batch.manifest, blocks: [block] }, [fresh], gradingAdapter);
@@ -246,7 +251,9 @@ export function reportPrimaryEvaluationBatch(root) {
   });
   const slots = reports.flatMap(({ block, requested, report, grading }, index) => batch.manifest.conditions.map(condition => ({ fixture_id: block.fixture_id, run_id: block.run_id,
     plan_digest: block.plan_digest, condition, state: report?.slots?.find(slot => slot.condition === condition)?.state ?? (requested ? 'unknown' : 'not_started'),
-    quality: null, capability: loaded[index]?.plan.arms[condition]?.capability ?? { status: 'unknown' }, grading: grading ?? { status: 'unknown' }, usage: report?.slots?.find(slot => slot.condition === condition)?.metrics ?? null,
+    quality: grading?.conditions?.find(slot => slot.condition === condition)?.status === 'completed'
+      ? grading.conditions.find(slot => slot.condition === condition).quality : null,
+    capability: loaded[index]?.plan.arms[condition]?.capability ?? { status: 'unknown' }, grading: grading ?? { status: 'unknown' }, usage: report?.slots?.find(slot => slot.condition === condition)?.metrics ?? null,
     cost: null, child_report: report }))); // Child report preserves native single-task receipts and unknowns.
   return { kind: 'ask_primary_evaluation_batch_report_v1', batch_id: batch.manifest.batch_id, manifest_digest: batch.manifest_digest,
     state: errors.length || consumed && (!start || !terminal) ? 'consumption_unknown' : terminal?.state ?? 'not_started', start_consumed: consumed, errors, terminal,
@@ -254,7 +261,7 @@ export function reportPrimaryEvaluationBatch(root) {
       complete: reports.every(value => value.report?.usage_budget?.complete === true),
       unknown_block_count: reports.filter(value => value.report?.usage_budget?.complete !== true).length,
       missing_requested_report_count: reports.filter(value => value.requested && !value.report).length,
-      cost: null }, limits: PRIMARY_BATCH_LIMITS,
+      cost: null }, limits: batch.manifest.limits,
     limitations: ['reported input+output is a lower bound; cached input is not added again', 'budget admission occurs between fixed blocks; child plans retain their own token budgets',
       'local deadline is not provider cancellation or a hard cost cap; forced controller exit cannot guarantee child/descendant shutdown', 'no resume, retries, saved-PID probes or additional sessions', 'quality remains unknown until the fixed grading adapter supplies evidence'] };
 }

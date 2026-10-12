@@ -5,7 +5,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync,
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { comparisonHash, inventoryUserTree, prepareUserComparison } from './ask-user-comparison-prepare.mjs';
-import { PRIMARY_BATCH_LIMITS, PRIMARY_FIXTURE_IDS, inspectPrimaryEvaluationBatch, preparePrimaryEvaluationBatch, reportPrimaryEvaluationBatch, startPrimaryEvaluationBatch } from './ask-primary-evaluation-batch.mjs';
+import { PRIMARY_BATCH_LIMITS, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_FIXTURE_IDS, inspectPrimaryEvaluationBatch, preparePrimaryEvaluationBatch, reportPrimaryEvaluationBatch, startPrimaryEvaluationBatch } from './ask-primary-evaluation-batch.mjs';
 const hash = value => comparisonHash(value);
 function git(root, args) {
   const result = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], { cwd: root, encoding: 'utf8',
@@ -78,6 +78,25 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
     // Omitting the fake adapter would select production start, and is rejected for these entirely synthetic plans before consumption.
     await assert.rejects(startPrimaryEvaluationBatch(m.value.root, m.digest, { gradingAdapter: a.gradingAdapter }), /synthetic plans cannot call production start/u);
   });
+  await t.test('grading reserves four original worker runs per condition; historical budgets are read-only', async () => {
+    assert.equal(PRIMARY_GRADING_RESERVATION_MS, 3900000); assert.equal(PRIMARY_BATCH_LIMITS.overall_timeout_ms, 216000000);
+    const a = adapters(), m = f.manifest(v => ({ ...v, blocks: v.blocks.map(block => ({ ...block, grading: { ...block.grading, timeout_ms: PRIMARY_GRADING_RESERVATION_MS } })) }));
+    preparePrimaryEvaluationBatch(m.path, a);
+    assert.equal(reportPrimaryEvaluationBatch(m.value.root).limits.overall_timeout_ms, 216000000);
+    const invalid = f.manifest(v => ({ ...v, blocks: v.blocks.map(block => ({ ...block, grading: { ...block.grading, timeout_ms: PRIMARY_GRADING_RESERVATION_MS + 1 } })) }));
+    assert.throws(() => preparePrimaryEvaluationBatch(invalid.path, a), /65 minutes/);
+    const old = { ...m.value, limits: { ...PRIMARY_BATCH_LIMITS, overall_timeout_ms: 172800000 } }, raw = JSON.stringify(old);
+    // Only synthetic temporary records simulate the prior stored budget; actual r2 records are never rewritten.
+    writeFileSync(m.path, raw); writeFileSync(join(m.value.root, 'manifest.json'), raw);
+    const preparedPath = join(m.value.root, 'prepared.json'), prepared = JSON.parse(readFileSync(preparedPath)); prepared.manifest_digest = hash(raw);
+    const record = JSON.stringify(prepared); writeFileSync(preparedPath, record); writeFileSync(`${preparedPath}.digest`, hash(record));
+    assert.equal(reportPrimaryEvaluationBatch(m.value.root).limits.overall_timeout_ms, 172800000);
+    assert.ok(inspectPrimaryEvaluationBatch(m.value.root, a).blockers.some(b => b.reason === 'historical_preparation_budget_requires_new_plan'));
+    await assert.rejects(startPrimaryEvaluationBatch(m.value.root, hash(raw), a), /connections required/);
+    assert.equal(a.calls.length, 0); assert.equal(existsSync(join(m.value.root, 'consumption')), false);
+    const newOld = f.manifest(v => ({ ...v, limits: old.limits }));
+    assert.throws(() => preparePrimaryEvaluationBatch(newOld.path, a), /current budget/);
+  });
   await t.test('observed plans reject caller-ready fake grading before production dispatch', async () => {
     const originals = f.blocks.map(block => ({ plan: readFileSync(join(block.root, 'control/plan.json')), digest: readFileSync(join(block.root, 'control/plan.digest')) }));
     try {
@@ -117,7 +136,7 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
     assert.equal(report.terminal.stop, 'usage_budget_exhausted'); assert.equal(a.calls.length, 1); assert.equal(a.grades.length, 0);
     const n = f.manifest(), b = adapters(); preparePrimaryEvaluationBatch(n.path, b);
     let tick = 0;
-    const timed = await startPrimaryEvaluationBatch(n.value.root, n.digest, { ...b, now: () => ++tick <= 2 ? 1000 : 172800000 });
+    const timed = await startPrimaryEvaluationBatch(n.value.root, n.digest, { ...b, now: () => ++tick <= 2 ? 1000 : PRIMARY_BATCH_LIMITS.overall_timeout_ms });
     assert.equal(timed.terminal.stop, 'insufficient_deadline_reservation'); assert.equal(b.calls.length, 0);
   });
   await t.test('manifest drift, mutable workspace, prior starts and preexisting output cannot dispatch', async () => {
