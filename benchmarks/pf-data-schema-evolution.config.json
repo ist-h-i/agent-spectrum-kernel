@@ -42,9 +42,9 @@
     {
       "id": "pf-data-schema-evolution",
       "suite": "practice_frequency",
-      "task_class": "investigation",
-      "difficulty": "medium_hard",
-      "repetitions": 5,
+      "task_class": "implementation_verification",
+      "difficulty": "medium",
+      "repetitions": 3,
       "aggregate_eligible": true,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/input-manifest.json",
       "input_manifest_sha256": "391d06c142ff90c5a4aaf811d551cbe62b87490db9499da77db3fecfc89d03b4",
