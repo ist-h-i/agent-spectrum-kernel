@@ -6,9 +6,12 @@ import { comparisonExecutionPolicy, comparisonHash, inventoryUserTree } from './
 import { buildPrimaryFixtureRecipe } from './ask-primary-fixture-recipe.mjs';
 import { buildAgentsBlock } from './installer-lifecycle.mjs';
 import { principlesCapability, renderKernelPrinciples } from './kernel-principles.mjs';
+import { kernelPrinciplesV2FixtureDescriptor, principlesV2Capability, renderKernelPrinciplesV2 } from './kernel-principles-v2.mjs';
+import { primaryProfileForKernel } from './ask-primary-evaluation-profile.mjs';
 import { renderCommandEvent } from './ask-benchmark-command-evidence.mjs';
-const hash = comparisonHash, raw = value => Buffer.from(JSON.stringify(value, null, 2) + '\n'), CONDITIONS = ['plain','kernel_principles_v1','full_ask'];
-export function syntheticPrimarySource(t, { scenario = 'completed', command = 'pass', fixtureId = 'mn-build-option-update', mutate = false } = {}) {
+const hash = comparisonHash, raw = value => Buffer.from(JSON.stringify(value, null, 2) + '\n');
+export function syntheticPrimarySource(t, { scenario = 'completed', command = 'pass', fixtureId = 'mn-build-option-update', mutate = false, kernelCondition = 'kernel_principles_v1' } = {}) {
+  const profile = primaryProfileForKernel(kernelCondition), CONDITIONS = profile.conditions, v2 = kernelCondition === 'kernel_principles_v2';
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'primary-producer-')));
   t.after(() => {
     // Existing terminal candidate helper seals owned files0444/dirs0555.
@@ -20,7 +23,14 @@ export function syntheticPrimarySource(t, { scenario = 'completed', command = 'p
   const write = (path, bytes) => { mkdirSync(dirname(path), { recursive: true, mode: 0o700 }); writeFileSync(path, bytes, { mode: 0o600 }); };
   const base = new URL(`../benchmarks/fixtures/checkpoint-b2/${fixtureId}/`, import.meta.url), recipe = buildPrimaryFixtureRecipe(fixtureId);
   const inputRaw = readFileSync(new URL('input-manifest.json', base)), input = JSON.parse(inputRaw), comparison = join(root, 'comparison'), publicRoot = join(root, 'public');
-  const source = readFileSync(new URL('../AGENTS.md', import.meta.url)), renderer = readFileSync(new URL('./kernel-principles.mjs', import.meta.url)), generated = renderKernelPrinciples(source);
+  const source = readFileSync(new URL('../AGENTS.md', import.meta.url)), renderer = readFileSync(new URL(v2 ? './kernel-principles-v2.mjs' : './kernel-principles.mjs', import.meta.url)), generated = v2 ? renderKernelPrinciplesV2(source) : renderKernelPrinciples(source);
+  const metadata = v2 ? readFileSync(new URL('metadata.json', base)) : null;
+  const descriptor = v2 ? kernelPrinciplesV2FixtureDescriptor(fixtureId, readFileSync(new URL('task.md', base)), metadata) : null;
+  const closure = v2 ? ['scripts/kernel-principles-v2.mjs','scripts/kernel-principles-candidate-v2.mjs','scripts/kernel-principles.mjs'].map(source_path => {
+    const bytes = readFileSync(new URL(`../${source_path}`, import.meta.url)), path = `control/kernel-principles-renderer-closure/${source_path.split('/').at(-1)}`;
+    write(join(comparison, path), bytes); return { source_path, path, digest: hash(bytes) };
+  }) : [];
+  if (v2) write(join(comparison, 'control/kernel-principles-task-metadata.json'), metadata);
   write(join(comparison,'control/kernel-principles-source.md'),source); write(join(comparison,'control/kernel-principles-renderer.mjs'),renderer);
   const arms = {};
   for (const condition of CONDITIONS) {
@@ -30,16 +40,16 @@ export function syntheticPrimarySource(t, { scenario = 'completed', command = 'p
       if (condition === 'plain') write(join(publicRoot,file.path),content);
     }
     const assets = [];
-    if (condition === 'kernel_principles_v1') { const agents = Buffer.from(buildAgentsBlock(generated.body)); write(join(comparison,baselinePath,'AGENTS.md'),agents); }
+    if (condition === kernelCondition) { const agents = Buffer.from(buildAgentsBlock(generated.body)); write(join(comparison,baselinePath,'AGENTS.md'),agents); }
     const inventory = inventoryUserTree(join(comparison,baselinePath));
-    if (condition === 'kernel_principles_v1') assets.push({path:'AGENTS.md',...inventory['AGENTS.md'],kind:'generated_principles_with_preserved_custom_instructions',origin:'canonical_principles_projection'});
+    if (condition === kernelCondition) assets.push({path:'AGENTS.md',...inventory['AGENTS.md'],kind:'generated_principles_with_preserved_custom_instructions',origin:'canonical_principles_projection'});
     arms[condition] = {path:`arms/${condition}`,baseline_path:baselinePath,baseline_inventory:inventory,configuration:{},assets,
-      capability:condition === 'kernel_principles_v1' ? principlesCapability(source,generated.body,generated.generation,recipe.runner_task_class) : {status:'available'},
-      ...(condition === 'kernel_principles_v1' ? {label:'K-principles'} : {})};
+      capability:condition === kernelCondition ? (v2 ? principlesV2Capability(descriptor) : principlesCapability(source,generated.body,generated.generation,recipe.runner_task_class)) : {status:'available'},
+      ...(condition === kernelCondition ? {label:'K-principles'} : {})};
   }
-  const plan = {kind:'ask_user_comparison_plan_v1',root:comparison,run_id:`fake-primary-${fixtureId}`, config:{evidence_kind:'synthetic',kernel_condition:'kernel_principles_v1',task_class:recipe.runner_task_class,
+  const plan = {kind:'ask_user_comparison_plan_v1',root:comparison,run_id:`fake-primary-${fixtureId}`, config:{evidence_kind:'synthetic',kernel_condition:kernelCondition,task_class:recipe.runner_task_class,
     global_ask_presence:'unknown',cli_version:'fake-not-launched',model:null,reasoning:null,timeout_ms:100,verification_timeout_ms:100,overall_timeout_ms:1000,token_budget:null},
-    policy:comparisonExecutionPolicy('single_shot_v1'),execution_protocol:{resume:'forbidden'}, kernel_definition:{canonical_source:{path:'control/kernel-principles-source.md',digest:hash(source)},renderer_source:{path:'control/kernel-principles-renderer.mjs',digest:hash(renderer)},source_commit:'f'.repeat(40),generation:generated.generation},
+    policy:comparisonExecutionPolicy('single_shot_v1'),execution_protocol:{resume:'forbidden'}, kernel_definition:{canonical_source:{path:'control/kernel-principles-source.md',digest:hash(source)},renderer_source:{path:'control/kernel-principles-renderer.mjs',digest:hash(renderer)},source_commit:'f'.repeat(40),generation:generated.generation,...(v2 ? { assessment:descriptor,task_metadata:{path:'control/kernel-principles-task-metadata.json',digest:hash(metadata)},renderer_closure:closure } : {})},
     source_installation:{preserved_custom_agents_digest:hash('')},source:{commit:'f'.repeat(40),digest:hash('fake source'),inventory:inventoryUserTree(publicRoot)},
     input:{path:'inputs/prompt.md',digest:hash('fake prompt')},task:{path:'control/task.md',digest:inventoryUserTree(publicRoot)['task.md'].digest},
     verification:{path:'control/verification.json',digest:hash(raw(recipe)),recipe,reporter:{path:'control/node-test-reporter.mjs',format:'ask_node_summary_jsonl_v1',digest:hash('fake reporter')}},mutable_paths:recipe.mutable_paths,arms,unknowns:[],condition_differences:[]};
@@ -50,7 +60,7 @@ export function syntheticPrimarySource(t, { scenario = 'completed', command = 'p
   const reference=JSON.parse(readFileSync(new URL('evaluator-reference.json',base)));
   const block={root:comparison,fixture_id:fixtureId,run_id:plan.run_id,plan_digest:planDigest,source_digest:plan.source.digest,task_digest:plan.task.digest,verification_digest:plan.verification.digest,
     public_input_root:publicRoot,input_manifest:{path:publicInputPath,digest:hash(inputRaw)},grading:{binding:{fixture_id:fixtureId,input_manifest_digest:hash(inputRaw),evaluator_bundle_digest:reference.evaluator_bundle_digest,
-      scoring_input_freeze_digest:hash(readFileSync(new URL('scoring-input-freeze-manifest.json',base))),profile_id:'primary_single_shot_v1'}}};
+      scoring_input_freeze_digest:hash(readFileSync(new URL('scoring-input-freeze-manifest.json',base))),profile_id:profile.id}}};
   if(scenario==='pending')return{root,block,plan};
   const contract=JSON.parse(readFileSync(new URL('verification-command-contract.json',base))),terminalDigests={};
   for(const condition of CONDITIONS){

@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { canonicalDigest, stableCanonicalJson } from './content-addressed-store.mjs';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { buildPrimaryEvaluationScoringInputs, createPrimaryEvaluationSealedEvaluatorExecution, verifyPrimaryEvaluationProducer } from './ask-primary-evaluation-producer.mjs';
-import { PRIMARY_PROFILE_CONDITIONS, withPrimaryHistoricalEvaluatorResources, withPrimaryEvaluatorLogCapture, primaryAdapterSourceDigest, primaryEvaluatorLogFailureReceipts } from './ask-primary-evaluation-scope.mjs';
+import { withPrimaryHistoricalEvaluatorResources, withPrimaryEvaluatorLogCapture, primaryAdapterSourceDigest, primaryEvaluatorLogFailureReceipts } from './ask-primary-evaluation-scope.mjs';
 import { verifyPortfolioScoringInputs, verifyPrivateEvaluatorBundle, readEvaluatorAuthorityAnchorFromFreeze, executeProductionSealedEvaluator,
   adaptPrivateEvaluatorFragmentToEnvelope, computeAdapterResultEnvelopeDigest, computePrivateEvaluationRecordDigest, readStableWorkspaceInventory } from './ask-benchmark-evaluator-boundary.mjs';
 import { deriveEffectiveVerificationEvidenceState } from './ask-benchmark-scoring-contract.mjs';
@@ -15,6 +15,8 @@ import { scoreEvaluatorResult } from './ask-benchmark-portfolio-score.mjs';
 import { verifyPublicEvaluatorReference, verifyPrivateEvaluatorResourceAssets } from './ask-benchmark-evaluator-boundary.mjs';
 import { resolveEffectiveAdmissionAuthorityFromFiles } from './ask-benchmark-admission-decision.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
+
+import { getPrimaryEvaluationProfile, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 
 const hash=raw=>`sha256:${createHash('sha256').update(raw).digest('hex')}`;
 const read=path=>readStableFile(path,'primary private pipeline evidence',33554432).bytes;
@@ -30,7 +32,7 @@ export function preflightPrimaryEvaluationGradingResources(block,resource) {
   try{
     assert.ok(PRIMARY_FIXTURE_IDS.includes(block.fixture_id));const binding=block.grading.binding;
     assert.deepEqual(Object.keys(binding).sort(),['evaluator_bundle_digest','fixture_id','input_manifest_digest','profile_id','scoring_input_freeze_digest'].sort());
-    assert.equal(binding.fixture_id,block.fixture_id);assert.equal(binding.profile_id,'primary_single_shot_v1');
+    assert.equal(binding.fixture_id,block.fixture_id);getPrimaryEvaluationProfile(binding.profile_id);
     const root=resource.frozenSourceRoot;assert.equal(realpathSync(root),root);
     const freezeManifestPath=join(root,`benchmarks/fixtures/checkpoint-b2/${block.fixture_id}/scoring-input-freeze-manifest.json`),freeze=json(freezeManifestPath);
     assert.equal(hash(read(freezeManifestPath)),binding.scoring_input_freeze_digest);assert.equal(freeze.fixture_id,block.fixture_id);assert.equal(freeze.fixture_input_digest,binding.input_manifest_digest);
@@ -134,14 +136,14 @@ export function primaryPrivateGradingBudget(executionBudgetMs) {
   return {worker_timeout_ms:executionBudgetMs,condition_reservation_ms:4*executionBudgetMs};
 }
 export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs,{signal=null,deadlineAtMs=null,...unknownControls}={}) {
-  let requested=false,evidenceKind='unknown';
+  let requested=false,evidenceKind='unknown',profile=null;
   try {
     assert.equal(Object.keys(unknownControls).length,0,'original worker budget cannot be overridden');
     assert.ok(!signal?.aborted,'primary private grade aborted');
     // Reserve the original API maximum before construction; the verified bundle
     // supplies the unchanged actual timeout for initial and validation runs.
     if(deadlineAtMs!==null)assert.ok(Number.isFinite(deadlineAtMs)&&Date.now()+4*900000<=deadlineAtMs,'primary private grade reservation unavailable');
-    const producer=verifyPrimaryEvaluationProducer(producerOptions);evidenceKind=producer.evidence_kind;
+    const producer=verifyPrimaryEvaluationProducer(producerOptions);evidenceKind=producer.evidence_kind;profile=primaryProfileForRequest(producer.request);
     const input=buildPrimaryEvaluationScoringInputs(producerOptions,runtimeInputs),s=input.scorerOptions,n=input.normalizedResult;
     for(const key of ['frozenSourceRoot','privateRoot','privateEvaluationRoot','manifestPath','publicResultRoot'])assert.ok(runtimeInputs[key],'primary original private runtime inputs required');
     const authorityRoot=runtimeInputs.privateEvaluationRoot,publicRoot=resolve(runtimeInputs.publicResultRoot);
@@ -191,7 +193,7 @@ export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs
     const starts=receipts.length?receipts.filter(receipt=>receipt.spawn_observed).length:requested?null:0;
     const completed=receipts.length?receipts.every(receipt=>receipt.process_completed):requested?null:false;
     return {status:requested?'unknown':'blocked',scoring_status:'not_scoring_ready',quality:null,blockers:['original_private_pipeline_unverified'],
-      condition:PRIMARY_PROFILE_CONDITIONS.includes(runtimeInputs?.condition)?runtimeInputs.condition:null,evidence_kind:evidenceKind,
+      condition:profile?.conditions.includes(runtimeInputs?.condition)?runtimeInputs.condition:null,evidence_kind:evidenceKind,
       model_calls:0,grader_process_starts:starts,grader_process_completed:completed,worker_receipts:receipts,formal_aggregate_eligible:false};
   }
 }

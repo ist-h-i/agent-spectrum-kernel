@@ -9,7 +9,7 @@ import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { COMPARISON_RECORD_BYTE_LIMIT, comparisonHash, isSingleShotComparison } from "./ask-user-comparison-prepare.mjs";
 
-import { comparisonConditions } from "./kernel-principles.mjs";
+import { comparisonConditions } from "./ask-comparison-conditions.mjs";
 const LIMIT = COMPARISON_RECORD_BYTE_LIMIT;
 const NAME = /^\d{8}$/u;
 const PHASES = ["pending", "launch_intent", "model_running", "verifying", "terminal"];

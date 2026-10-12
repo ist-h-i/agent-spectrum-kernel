@@ -9,7 +9,9 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { executeCodexSession } from "./codex-exec-runner.mjs";
 import { buildAgentsBlock } from "./installer-lifecycle.mjs";
-import { comparisonConditions, KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } from "./kernel-principles.mjs";
+import { KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } from "./kernel-principles.mjs";
+import { comparisonConditions, isKernelPrinciplesCondition } from "./ask-comparison-conditions.mjs";
+import { KERNEL_PRINCIPLES_V2_ID, renderKernelPrinciplesV2, kernelPrinciplesV2FixtureDescriptor, principlesV2Capability } from "./kernel-principles-v2.mjs";
 import { boundedVerificationLogs } from "./ask-user-comparison-logs.mjs";
 import { acquireComparisonOwner, checkpointComparison, comparisonOwnershipDiagnostics, inspectComparisonExecution, observeComparisonProcess, probeComparisonOwner, releaseComparisonOwner } from "./ask-user-comparison-state.mjs";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
@@ -91,9 +93,30 @@ function validatePrinciplesDefinition(root, plan) {
   const renderer = readStableFile(join(root, definition.renderer_source.path), "principles renderer", LIMIT).bytes;
   assert.equal(comparisonHash(source), definition.canonical_source.digest, "principles source snapshot changed");
   assert.equal(comparisonHash(renderer), definition.renderer_source.digest, "principles renderer snapshot changed");
-  const expected = renderKernelPrinciples(source), arm = plan.arms[KERNEL_PRINCIPLES_ID];
+  const id = plan.config.kernel_condition, v2 = id === KERNEL_PRINCIPLES_V2_ID;
+  const expected = v2 ? renderKernelPrinciplesV2(source) : renderKernelPrinciples(source), arm = plan.arms[id];
+  let descriptor = null;
+  if (v2) {
+    assert.ok(isPrimaryFixtureRecipe(plan.verification.recipe), "v2 requires primary fixture recipe");
+    const paths = ["scripts/kernel-principles-v2.mjs", "scripts/kernel-principles-candidate-v2.mjs", "scripts/kernel-principles.mjs"];
+    assert.deepEqual(definition.renderer_closure.map(entry => entry.source_path), paths, "v2 renderer closure changed");
+    for (const entry of definition.renderer_closure) {
+      assert.equal(entry.path, `control/kernel-principles-renderer-closure/${entry.source_path.split("/").at(-1)}`);
+      assert.equal(comparisonHash(readStableFile(join(root, entry.path), "saved v2 renderer dependency", LIMIT).bytes), entry.digest);
+      assert.equal(comparisonHash(readStableFile(fileURLToPath(new URL(`../${entry.source_path}`, import.meta.url)), "current v2 renderer dependency", LIMIT).bytes), entry.digest, "v2 renderer source changed");
+    }
+    assert.equal(comparisonHash(renderer), definition.renderer_closure[0].digest);
+    assert.equal(definition.task_metadata.path, "control/kernel-principles-task-metadata.json");
+    const metadata = readStableFile(join(root, definition.task_metadata.path), "v2 public metadata", LIMIT).bytes;
+    assert.equal(comparisonHash(metadata), definition.task_metadata.digest);
+    const task = readStableFile(join(root, plan.task.path), "v2 public task", LIMIT).bytes;
+    descriptor = kernelPrinciplesV2FixtureDescriptor(plan.verification.recipe.fixture_id, task, metadata);
+    assert.equal(descriptor.task_class, plan.config.task_class, "v2 task class changed");
+    assert.deepEqual(definition.assessment, descriptor, "v2 task descriptor changed");
+    assert.deepEqual(definition.generation, expected.generation, "v2 generated identity changed");
+  }
   assert.equal(arm.label, "K-principles");
-  assert.equal(arm.baseline_path, `control/baselines/${KERNEL_PRINCIPLES_ID}`);
+  assert.equal(arm.baseline_path, `control/baselines/${id}`);
   const agents = readStableFile(join(root, arm.baseline_path, "AGENTS.md"), "principles baseline", LIMIT).bytes;
   const block = Buffer.from(buildAgentsBlock(expected.body));
   assert.ok(agents.length >= block.length && agents.subarray(-block.length).equals(block), "principles baseline does not contain exact generated block");
@@ -103,7 +126,7 @@ function validatePrinciplesDefinition(root, plan) {
   assert.deepEqual(arm.assets, [{ path: "AGENTS.md", ...arm.baseline_inventory["AGENTS.md"],
     kind: "generated_principles_with_preserved_custom_instructions", origin: "canonical_principles_projection" }]);
   assert.equal(comparisonHash(agents), arm.baseline_inventory["AGENTS.md"].digest, "principles asset digest changed");
-  assert.deepEqual(arm.capability, principlesCapability(source, expected.body, definition.generation, plan.config.task_class), "principles qualification changed");
+  assert.deepEqual(arm.capability, v2 ? principlesV2Capability(descriptor) : principlesCapability(source, expected.body, definition.generation, plan.config.task_class), "principles qualification changed");
 }
 
 export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
@@ -121,7 +144,7 @@ export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
   assert.deepEqual(plan.policy, comparisonExecutionPolicy(plan.policy?.execution_contract));
   if (isSingleShotComparison(plan)) assert.equal(plan.execution_protocol?.resume, "forbidden", "single-shot protocol must forbid resume");
   assert.deepEqual(Object.keys(plan.arms).sort(), comparisonConditions(plan.config.kernel_condition).sort(), "unknown comparison arm");
-  if (plan.config.kernel_condition === KERNEL_PRINCIPLES_ID) validatePrinciplesDefinition(root, plan);
+  if (isKernelPrinciplesCondition(plan.config.kernel_condition)) validatePrinciplesDefinition(root, plan);
   else assert.equal(plan.kernel_definition, undefined, "legacy condition cannot carry a principles definition");
   for (const id of comparisonConditions(plan.config.kernel_condition)) {
     assert.equal(plan.arms[id].path, `arms/${id}`);
@@ -800,7 +823,7 @@ export function reportUserComparison(output) {
   const overall={...issue,elapsed_ms:execution.history?.snapshot?Math.max(0,Date.now()-execution.history.snapshot.started_at_ms):null,exit_code:USER_COMPARISON_EXIT_CODES[issue.state]??7,required_action:issue.state === "completed" ? null : isSingleShotComparison(plan)
     ? singleShotAction(execution) : ACTION};
   const notes = { kind: "ask_pragmatic_evaluation_notes_v1", evidence_kind: existsSync(join(root, "control/start.json")) || execution.history?.snapshot || slots.some(slot=>slot.receipt_integrity) ? plan.config.evidence_kind : "plan",
-    planned_blocks: [plan.run_id], ...(plan.config.kernel_condition === KERNEL_PRINCIPLES_ID ? { kernel_condition: KERNEL_PRINCIPLES_ID } : {}), global_context: { ask_presence: plan.config.global_ask_presence, change_status: "unknown" },
+    planned_blocks: [plan.run_id], ...(isKernelPrinciplesCondition(plan.config.kernel_condition) ? { kernel_condition: plan.config.kernel_condition } : {}), global_context: { ask_presence: plan.config.global_ask_presence, change_status: "unknown" },
     next_improvement: "review this task's saved tests, requirements, changes and unknowns before choosing a new run",
     trials: slots.map(slot => ({ block_id: plan.run_id, condition: slot.condition,
       execution_state: slot.state === "not_started" || (slot.state === "capability_missing" && !slot.launch_requested) ? "not_started"
@@ -832,7 +855,7 @@ export function aggregateUserComparisons(outputs) {
     const members = reports.filter(report => report.evidence_kind === evidence_kind && (report.configuration.kernel_condition ?? "kernel_only") === kernel_condition);
     const notes = { ...members[0].summary.supplied_notes, planned_blocks: members.map(report => report.run_id),
       trials: members.flatMap(report => report.summary.supplied_notes.trials) };
-    return { evidence_kind, ...(kernel_condition === KERNEL_PRINCIPLES_ID ? { kernel_condition } : {}), summary: { ...buildPragmaticEvaluationReport(notes), plain_scope: members[0].summary.plain_scope } };
+    return { evidence_kind, ...(isKernelPrinciplesCondition(kernel_condition) ? { kernel_condition } : {}), summary: { ...buildPragmaticEvaluationReport(notes), plain_scope: members[0].summary.plain_scope } };
   }), mixed_evidence_pooled: false, mixed_kernel_conditions_pooled: false };
 }
 

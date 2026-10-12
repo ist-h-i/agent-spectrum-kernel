@@ -12,18 +12,21 @@ import { PRIMARY_GRADING_CONDITIONS, createPrimaryEvaluationGradingAdapter, expo
   exportPrimaryEvaluationGradingRequest, isPrimaryEvaluationGradingAdapter, preflightPrimaryEvaluationGrading,
   replayPrimaryEvaluationGradingRequest, writePrimaryEvaluationGradingRequest } from './ask-primary-evaluation-grading.mjs';
 
+import { primaryProfileForKernel } from './ask-primary-evaluation-profile.mjs';
+
 // All terminal/request/check bytes below are fake; no start, resume, evaluator,
 // subprocess, ownership diagnostics or private original is invoked.
 const hash = comparisonHash, raw = value => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
-function fixture(fixture_id = 'mp-ci-evidence-gap') {
+function fixture(fixture_id = 'mp-ci-evidence-gap', kernelCondition = 'kernel_principles_v1') {
+  const profile = primaryProfileForKernel(kernelCondition);
   const recipe = buildPrimaryFixtureRecipe(fixture_id), plan_digest = hash('fake plan');
   const base = new URL(`../benchmarks/fixtures/checkpoint-b2/${fixture_id}/`, import.meta.url);
   const reference = JSON.parse(readFileSync(new URL('evaluator-reference.json', base)));
   const block = { fixture_id, root: '/fake-primary', run_id: `fake-${fixture_id}`, plan_digest };
-  const plan = { run_id: block.run_id, config: { evidence_kind: 'synthetic', kernel_condition: 'kernel_principles_v1' },
+  const plan = { run_id: block.run_id, config: { evidence_kind: 'synthetic', kernel_condition: kernelCondition },
     source: { digest: hash('source') }, task: { digest: hash('task') }, verification: { digest: hash('verification') } };
   const records = {}, slots = [], states = {};
-  for (const condition of PRIMARY_GRADING_CONDITIONS) {
+  for (const condition of profile.conditions) {
     const artifacts = { 'stdout.jsonl': hash('fake stdout'), 'stderr.log': hash('fake stderr'), 'patch.diff': hash('fake redacted diff'),
       'changes.json': hash('fake scope') }, commandRequests = {};
     const checks = recipe.checks.map((check, index) => {
@@ -51,7 +54,7 @@ function fixture(fixture_id = 'mp-ci-evidence-gap') {
   }
   return { block, loaded: { plan, plan_digest }, recipe, binding: { fixture_id, input_manifest_digest: recipe.input_manifest_digest,
     evaluator_bundle_digest: reference.evaluator_bundle_digest,
-    scoring_input_freeze_digest: hash(readFileSync(new URL('scoring-input-freeze-manifest.json', base))), profile_id: 'primary_single_shot_v1' },
+    scoring_input_freeze_digest: hash(readFileSync(new URL('scoring-input-freeze-manifest.json', base))), profile_id: profile.id },
     records, report: { run_id: plan.run_id, plan_digest, slots,
       execution: { state: 'completed', start_consumed: true, history: { digest: hash('fake history'), snapshot: { slots: states } } } } };
 }
@@ -297,4 +300,22 @@ test('fixed original grading factory rejects partial resource identity and canno
   assert.equal(grade.status, 'unknown'); assert.equal(grade.grader_process_starts, 0); assert.equal(grade.quality, null);
   writeFileSync(path, 'changed');
   assert.equal(adapter.preflight(block).status, 'blocked');
+});
+
+test('v2 mapper preserves all nine formal classes and exact profile; mixed bindings and conditions refuse', () => {
+  const profile = primaryProfileForKernel('kernel_principles_v2');
+  for (const id of PRIMARY_FIXTURE_IDS) {
+    const input = fixture(id, profile.kernel_condition), value = exportPrimaryEvaluationGradingForTest(input);
+    assert.equal(value.request.profile_id, profile.id); assert.equal(value.request.binding.profile_id, profile.id);
+    assert.deepEqual(value.request.conditions, profile.conditions);
+    assert.deepEqual(value.request.slots.map(slot => slot.condition), profile.conditions);
+    assert.equal(value.request.formal_task_class, input.recipe.task_class);
+    assert.equal(value.request.quality, null); assert.equal(value.request.admission, 'unknown');
+    assert.ok(value.request.slots.every(slot => slot.quality === null && Object.values(slot.cause_analysis).every(cause => cause === 'unknown')));
+    input.binding.profile_id = 'primary_single_shot_v1';
+    assert.throws(() => exportPrimaryEvaluationGradingForTest(input), /primary_single_shot_v1/);
+  }
+  const mixed = fixture('mn-build-option-update', profile.kernel_condition);
+  mixed.report.slots[1].condition = 'kernel_principles_v1';
+  assert.throws(() => exportPrimaryEvaluationGradingForTest(mixed), /report condition substitution/);
 });

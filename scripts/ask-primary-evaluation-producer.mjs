@@ -16,7 +16,9 @@ import { materializeVerifiedTerminalCandidate } from './ask-benchmark-terminal-c
 import { verifyPortfolioScoringRootLineage, verifyEvaluatorAuthority, verifyPublicEvaluatorReference, verifyPrivateEvaluatorBundle,
   readEvaluatorAuthorityAnchorFromFreeze, createProductionSealedEvaluatorExecution } from './ask-benchmark-evaluator-boundary.mjs';
 import { scoreEvaluatorResult } from './ask-benchmark-portfolio-score.mjs';
-import { PRIMARY_PROFILE_CONDITIONS, PRIMARY_PROFILE_SCHEMAS, withPrimarySchemaBuild, withPrimaryEvaluationProducer } from './ask-primary-evaluation-scope.mjs';
+import { PRIMARY_PROFILE_SCHEMAS, withPrimarySchemaBuild, withPrimaryEvaluationProducer } from './ask-primary-evaluation-scope.mjs';
+
+import { primaryProfileForKernel, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url)), LIMIT = 33554432;
 const read = path => readStableFile(path, 'primary producer retained evidence', LIMIT).bytes;
@@ -39,12 +41,12 @@ function entries(root, prefix = '') {
 }
 export function primaryProducerSources() {
   const paths = ['scripts/ask-primary-evaluation-producer.mjs', 'scripts/ask-primary-evaluation-scope.mjs',
-    'scripts/ask-primary-evaluation-private-grading.mjs',
+    'scripts/ask-primary-evaluation-private-grading.mjs', 'scripts/ask-primary-evaluation-profile.mjs',
     'scripts/ask-primary-evaluation-grading.mjs', 'scripts/generate-ask-primary-grading-schemas.mjs',
     'scripts/ask-benchmark-schema.mjs', 'scripts/ask-benchmark-normalized-results.mjs', 'scripts/ask-benchmark-execution.mjs',
     'scripts/ask-benchmark-evaluator-boundary.mjs', 'scripts/ask-benchmark-command-evidence.mjs', 'scripts/ask-benchmark-terminal-workspace.mjs',
     'scripts/ask-benchmark-terminal-candidate.mjs', 'scripts/ask-benchmark-portfolio-score.mjs',
-    ...PRIMARY_PROFILE_SCHEMAS.flatMap(name => [`benchmarks/schemas/${name}.schema.json`, `benchmarks/schemas/primary-${name}.schema.json`])];
+    ...PRIMARY_PROFILE_SCHEMAS.flatMap(name => [`benchmarks/schemas/${name}.schema.json`, `benchmarks/schemas/primary-${name}.schema.json`, `benchmarks/schemas/primary-k2-${name}.schema.json`])];
   const all=new Set([...paths,'scripts/ask-primary-fixture-recipe.mjs','benchmarks/adaptive-portfolio.config.json',
     'benchmarks/portfolio-catalog.json','benchmarks/portfolio-policy-manifest.json','benchmarks/portfolio-scoring-policy.json']);
   const pending=[...all].filter(path=>path.endsWith('.mjs'));
@@ -59,9 +61,10 @@ export function primaryProducerSources() {
 }
 const executionOptions = root => ({ root: resolve(ROOT), config: null, planPath: join(root, 'plan.json'), materializedPath: join(root, 'materialized'), selectionState: join(root, 'selection'), runDir: join(root, 'run') });
 function identifiers(request) {
+  const profile = primaryProfileForRequest(request);
   const h = canonicalDigest({ run_id: request.run_id, plan_digest: request.plan_digest, fixture: request.fixture_id }).slice(7);
   return { run: `${h.slice(0,8)}-${h.slice(8,12)}-4${h.slice(13,16)}-8${h.slice(17,20)}-${h.slice(20,32)}`,
-    block: `block-${h.slice(0,16)}-${h.slice(16,28)}`, cases: Object.fromEntries(PRIMARY_PROFILE_CONDITIONS.map(c => [c, `case-${h.slice(0,16)}-${canonicalDigest(c).slice(7,23)}`])) };
+    block: `block-${h.slice(0,16)}-${h.slice(16,28)}`, cases: Object.fromEntries(profile.conditions.map(c => [c, `case-${h.slice(0,16)}-${canonicalDigest(c).slice(7,23)}`])) };
 }
 async function checkedSource(block) {
   assert.ok(PRIMARY_FIXTURE_IDS.includes(block.fixture_id), 'primary fixture set is closed');
@@ -75,7 +78,7 @@ async function checkedSource(block) {
   const retainTree = path => { if (!existsSync(path)) return; const stat = lstatSync(path); assert.ok(!stat.isSymbolicLink());
     if (stat.isDirectory()) for (const name of readdirSync(path)) retainTree(join(path, name)); else retainedRead(path); };
   for (const path of ['control/plan.json','control/plan.digest','control/task.md','inputs/prompt.md','control/verification.json','control/node-test-reporter.mjs',
-    'control/kernel-principles-source.md','control/kernel-principles-renderer.mjs','control/start.json','control/start.digest','control/history','control/leases']) retainTree(join(block.root,path));
+    'control/kernel-principles-source.md','control/kernel-principles-renderer.mjs','control/kernel-principles-task-metadata.json','control/kernel-principles-renderer-closure','control/start.json','control/start.digest','control/history','control/leases']) retainTree(join(block.root,path));
   retainedRead(block.input_manifest.path);
   for (const slot of request.slots) {
     const condition = slot.condition, arm = loaded.plan.arms[condition], baseRoot = join(block.root, arm.baseline_path);
@@ -120,7 +123,11 @@ function derive(target, source) {
   const { request, loaded, snapshots } = source, ids = identifiers(request), fixture = json(join(ROOT, 'benchmarks/adaptive-portfolio.config.json')).fixtures.find(f => f.id === request.fixture_id);
   assert.ok(fixture);
   const contract = validateVerificationCommandContract(json(join(ROOT, `benchmarks/fixtures/checkpoint-b2/${request.fixture_id}/verification-command-contract.json`)), { root: ROOT });
-  const cases = PRIMARY_PROFILE_CONDITIONS.map((condition, index) => ({ case_id: ids.cases[condition], adapter_track: 'codex', condition,
+  const profile = primaryProfileForRequest(request);
+  assert.equal(primaryProfileForKernel(loaded.plan.config.kernel_condition).id, profile.id, 'primary retained plan profile changed');
+  assert.deepEqual(Object.keys(loaded.plan.arms).sort(), [...profile.conditions].sort(), 'primary retained plan arms changed');
+  assert.deepEqual(Object.keys(snapshots).sort(), [...profile.conditions].sort(), 'primary retained snapshots changed');
+  const cases = request.conditions.map((condition, index) => ({ case_id: ids.cases[condition], adapter_track: 'codex', condition,
     fixture_id: request.fixture_id, input_manifest_sha256: request.fixture_input_digest.slice(7), suite: fixture.suite, task_class: fixture.task_class,
     difficulty: fixture.difficulty, registered_repetitions: fixture.repetitions, aggregate_eligible: fixture.aggregate_eligible,
     repetition: 1, condition_order_position: index + 1, block_id: ids.block }));
@@ -191,12 +198,12 @@ export async function producePrimaryEvaluationArtifacts(block, outputRoot) {
   for (const input of [ROOT, block.root, block.public_input_root]) assert.ok(target !== resolve(input) && !target.startsWith(`${resolve(input)}/`), 'primary output overlaps authority');
   mkdirSync(target, { mode: 0o700 });
   const id = identifiers(source.request);
-  for (const condition of PRIMARY_PROFILE_CONDITIONS) for (const [kind, tree] of Object.entries(source.snapshots[condition])) if (tree) {
+  for (const condition of source.request.conditions) for (const [kind, tree] of Object.entries(source.snapshots[condition])) if (tree) {
     const prefix = `${kind === 'baseline' ? 'materialized' : 'terminal'}/${id.cases[condition]}`;
     mkdirSync(join(target, prefix), { recursive: true, mode: 0o700 });
     for (const [path, file] of Object.entries(tree)) write(target, `${prefix}/${path}`, file.bytes, file.mode === '100755' ? 0o700 : 0o600);
   }
-  const derived = withPrimarySchemaBuild(() => derive(target, source));
+  const derived = withPrimarySchemaBuild(() => derive(target, source), { profileId: primaryProfileForRequest(source.request).id });
   for (const [path, value] of derived.output) write(target, path, value, path.endsWith('terminal-workspace-authority.json') ? 0o444 : 0o600);
   write(target, 'saved-grading-export.json', source.request);
   const retainedSource = { loaded: source.loaded, request_digest: source.request_digest, references: source.references,
@@ -230,13 +237,14 @@ export function verifyPrimaryEvaluationProducer(options) {
   assert.equal(source.loaded.plan_digest,manifest.block.plan_digest);assert.equal(source.loaded.plan.run_id,manifest.block.run_id);
   assert.equal(hash(Buffer.from(JSON.stringify(source.request,null,2)+'\n')),source.request_digest,'primary grading export changed');
   assert.equal(source.request.evidence_kind, manifest.evidence_kind);
+  assert.deepEqual(source.request.binding, manifest.block.grading.binding, 'primary saved request block binding changed');
   assert.equal(source.request_digest, manifest.grading_export_digest); assert.equal(snapshotDigest(source.snapshots), manifest.snapshot_digest);
   const id = identifiers(source.request);
-  for (const condition of PRIMARY_PROFILE_CONDITIONS) for (const [kind, tree] of Object.entries(source.snapshots[condition])) if (tree) {
+  for (const condition of source.request.conditions) for (const [kind, tree] of Object.entries(source.snapshots[condition])) if (tree) {
     const prefix = `${kind === 'baseline' ? 'materialized' : 'terminal'}/${id.cases[condition]}`;
     for (const [path, file] of Object.entries(tree)) assert.deepEqual(read(join(target, prefix, path)), file.bytes, 'primary copied snapshot differs from original');
   }
-  const derived = withPrimarySchemaBuild(() => derive(target, source));
+  const derived = withPrimarySchemaBuild(() => derive(target, source), { profileId: primaryProfileForRequest(source.request).id });
   for (const [path, value] of derived.output) assert.deepEqual(read(join(target, path)), bytes(value), 'primary derived record changed');
   return { inspection: derived.inspection, executionOptions: executionOptions(target), request: source.request, evidence_kind: manifest.evidence_kind, source_digests:manifest.source_digests,
     block: manifest.block, execution_permission: false, scoring_ready: false };
@@ -255,7 +263,7 @@ export function verifyPrimaryProducedTerminal(inspection, { root, runDir, caseId
 }
 export function materializePrimaryEvaluationCandidate(options, { condition, outputParent }) {
   return withPrimaryEvaluationProducer(options, verified => {
-    assert.ok(PRIMARY_PROFILE_CONDITIONS.includes(condition)); const outputPath = join(options.recordRoot, 'normalized');
+    assert.ok(primaryProfileForRequest(verified.request).conditions.includes(condition)); const outputPath = join(options.recordRoot, 'normalized');
     const normalized = verifyNormalizedPortfolioResults({ ...verified.executionOptions, outputPath });
     const entry = normalized.manifest.cases.find(c => c.condition === condition)?.normalized_attempts[0]; assert.ok(entry, 'primary condition not started');
     return materializeVerifiedTerminalCandidate({ ...verified.executionOptions, normalizedResultsPath: outputPath, sourceSnapshotDigest: normalized.manifest.source_snapshot_digest,
@@ -268,7 +276,7 @@ export function buildPrimaryEvaluationScoringInputs(options, runtimeInputs = {})
 function buildPrimaryEvaluationScoringInputsWithinScope(options, { condition, frozenSourceRoot = null, privateRoot = null, privateEvaluationRoot = null, manifestPath = null,
   resultPath = null, privateEvaluationRecordPath = null, privateFragmentPath = null,
   admissionDecisionPath = null, admissionReviewAuthorityPath = null, admissionReviewAuthoritySourceDigest = null, admissionReviewArchivePath = null }, verified) {
-    assert.ok(PRIMARY_PROFILE_CONDITIONS.includes(condition)); const normalizedResultsPath = join(options.recordRoot, 'normalized');
+    assert.ok(primaryProfileForRequest(verified.request).conditions.includes(condition)); const normalizedResultsPath = join(options.recordRoot, 'normalized');
     const normalized = verifyNormalizedPortfolioResults({ ...verified.executionOptions, outputPath: normalizedResultsPath });
     verifyPortfolioScoringRootLineage({ ...verified.executionOptions, normalizedResultsPath }, normalized);
     const entry = normalized.manifest.cases.find(c => c.condition === condition)?.normalized_attempts[0]; assert.ok(entry, 'primary condition not started');

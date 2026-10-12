@@ -1,0 +1,60 @@
+// Native public preparation only. No start, model, evaluator or ownership diagnostic.
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {mkdtempSync,mkdirSync,readFileSync,realpathSync,rmSync,writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {dirname,join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {preparePrimaryEvaluation} from './ask-primary-evaluation-prepare.mjs';
+import {PRIMARY_FIXTURE_IDS} from './ask-primary-fixture-recipe.mjs';
+import {comparisonHash} from './ask-user-comparison-prepare.mjs';
+import {inspectUserComparison,readUserComparisonPlan,reportUserComparison} from './ask-user-comparison.mjs';
+import {exportPrimaryEvaluationGradingRequest} from './ask-primary-evaluation-grading.mjs';
+import {PRIMARY_PRINCIPLES_V2_EVALUATION_PROFILE_ID} from './ask-primary-evaluation-profile.mjs';
+import {comparisonConditions} from './ask-comparison-conditions.mjs';
+import {comparisonConditions as v1Conditions} from './kernel-principles.mjs';
+const ROOT=fileURLToPath(new URL('../',import.meta.url));
+
+test('native nine-task preparation selects actual v2 identity and keeps all 27 slots unstarted',()=>{
+  const area=realpathSync(mkdtempSync(join(tmpdir(),'ask-primary-k2-native-')));
+  try{
+    const inputs=join(area,'public');mkdirSync(inputs);
+    for(const id of PRIMARY_FIXTURE_IDS){
+      const source=join(ROOT,'benchmarks/fixtures/checkpoint-b2',id),manifest=JSON.parse(readFileSync(join(source,'input-manifest.json')));
+      for(const entry of manifest.fixtures[id].files){const target=join(inputs,id,entry.path);mkdirSync(dirname(target),{recursive:true});writeFileSync(target,readFileSync(join(source,entry.path)));}
+    }
+    assert.throws(()=>preparePrimaryEvaluation(inputs,{output:join(area,'unknown'),kernelCondition:'kernel_principles_v2_candidate'}),/aliases/);
+    const prepared=preparePrimaryEvaluation(inputs,{output:join(area,'prepared'),evidenceKind:'synthetic'});
+    assert.equal(prepared.status,'blocked');assert.equal(prepared.start_consumed,false);assert.equal(prepared.model_calls,0);
+    assert.deepEqual(prepared.manifest.conditions,['plain','kernel_principles_v2','full_ask']);
+    assert.equal(prepared.slots.length,27);assert.ok(prepared.slots.every(s=>s.state==='not_started'&&s.quality===null&&s.capability.status==='available'));
+    assert.ok(!prepared.blockers.some(b=>b.reason.includes('capability missing')));
+    for(const block of prepared.manifest.blocks){
+      const plan=readUserComparisonPlan(block.root).plan;
+      assert.equal(plan.config.kernel_condition,'kernel_principles_v2');assert.equal(plan.kernel_definition.generation.id,'kernel_principles_v2');
+      assert.equal(plan.kernel_definition.assessment.task_class,plan.verification.recipe.runner_task_class);
+      assert.equal(plan.kernel_definition.renderer_closure.length,3);
+      assert.equal(inspectUserComparison(block.root).execution.start_consumed,false);
+      const report=reportUserComparison(block.root);assert.ok(report.slots.every(s=>s.state==='not_started'));
+      assert.equal(report.summary.supplied_notes.kernel_condition,'kernel_principles_v2');
+      const exported=exportPrimaryEvaluationGradingRequest(block).request;
+      assert.equal(exported.profile_id,PRIMARY_PRINCIPLES_V2_EVALUATION_PROFILE_ID);assert.deepEqual(exported.conditions,prepared.manifest.conditions);
+      assert.ok(exported.slots.every(s=>s.quality===null));
+    }
+    const first=prepared.manifest.blocks[0],loaded=readUserComparisonPlan(first.root),definition=loaded.plan.kernel_definition;
+    const metadataPath=join(first.root,definition.task_metadata.path),metadata=readFileSync(metadataPath);
+    writeFileSync(metadataPath,'{}');assert.throws(()=>readUserComparisonPlan(first.root));writeFileSync(metadataPath,metadata);
+    const dependency=join(first.root,definition.renderer_closure[0].path),renderer=readFileSync(dependency);
+    writeFileSync(dependency,'changed');assert.throws(()=>readUserComparisonPlan(first.root));writeFileSync(dependency,renderer);
+    const path=join(first.root,'control/plan.json'),raw=readFileSync(path),digest=readFileSync(join(first.root,'control/plan.digest'));
+    for(const mutate of [p=>p.kernel_definition.assessment.task_class='trivial',p=>p.config.kernel_condition='kernel_principles_v1']){
+      const plan=JSON.parse(raw);mutate(plan);const changed=Buffer.from(JSON.stringify(plan));writeFileSync(path,changed);writeFileSync(join(first.root,'control/plan.digest'),comparisonHash(changed));
+      assert.throws(()=>readUserComparisonPlan(first.root));
+    }
+    writeFileSync(path,raw);writeFileSync(join(first.root,'control/plan.digest'),digest);
+    assert.equal(inspectUserComparison(first.root).execution.start_consumed,false);
+    assert.deepEqual(v1Conditions('kernel_principles_v1'),['plain','kernel_principles_v1','full_ask']);
+    assert.throws(()=>v1Conditions('kernel_principles_v2'));
+    assert.deepEqual(comparisonConditions('kernel_only'),['plain','kernel_only','full_ask']);
+  }finally{rmSync(area,{recursive:true,force:true});}
+});

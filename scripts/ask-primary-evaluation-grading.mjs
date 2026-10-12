@@ -11,8 +11,10 @@ import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS } from './ask-primary-fi
 import { producePrimaryEvaluationArtifacts } from './ask-primary-evaluation-producer.mjs';
 import { preflightPrimaryEvaluationGradingResources, runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
 
-export const PRIMARY_GRADING_CONDITIONS = Object.freeze(['plain', 'kernel_principles_v1', 'full_ask']);
-export const PRIMARY_GRADING_PROFILE_ID = 'primary_single_shot_v1';
+import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_EVALUATION_CONDITIONS, primaryProfileForKernel, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
+
+export const PRIMARY_GRADING_CONDITIONS = PRIMARY_EVALUATION_CONDITIONS;
+export const PRIMARY_GRADING_PROFILE_ID = PRIMARY_EVALUATION_PROFILE_ID;
 export const PRIMARY_GRADING_RESERVATION_MS = 11100000; // 4 original runs x 3 conditions x original API max 15m + 5m conversion/save.
 const ROOT = fileURLToPath(new URL('../', import.meta.url)), LIMIT = 16 * 1024 * 1024;
 const adapters = new WeakSet();
@@ -65,8 +67,8 @@ function publicBinding(block, loaded, root) {
   assert.equal(loaded.root, resolve(block.root), 'controller root substitution');
   assert.ok(PRIMARY_FIXTURE_IDS.includes(block.fixture_id), 'unknown primary fixture');
   assert.equal(plan.policy.execution_contract, 'single_shot_v1', 'grading export requires single_shot_v1');
-  assert.equal(plan.config.kernel_condition, 'kernel_principles_v1', 'condition aliases forbidden');
-  assert.deepEqual(Object.keys(plan.arms).sort(), [...PRIMARY_GRADING_CONDITIONS].sort(), 'actual condition IDs required');
+  const profile = primaryProfileForKernel(plan.config.kernel_condition);
+  assert.deepEqual(Object.keys(plan.arms).sort(), [...profile.conditions].sort(), 'actual condition IDs required');
   assert.equal(plan.run_id, block.run_id); assert.equal(plan_digest, block.plan_digest);
   for (const name of ['source', 'task', 'verification']) {
     digest(block[`${name}_digest`]); assert.equal(plan[name].digest, block[`${name}_digest`]);
@@ -106,7 +108,7 @@ function publicBinding(block, loaded, root) {
   assert.equal(reference.task_class, recipe.task_class); digest(reference.evaluator_bundle_digest);
   const binding = { fixture_id: block.fixture_id, input_manifest_digest: block.input_manifest.digest,
     evaluator_bundle_digest: reference.evaluator_bundle_digest,
-    scoring_input_freeze_digest: comparisonHash(read(join(base, 'scoring-input-freeze-manifest.json'))), profile_id: PRIMARY_GRADING_PROFILE_ID };
+    scoring_input_freeze_digest: comparisonHash(read(join(base, 'scoring-input-freeze-manifest.json'))), profile_id: profile.id };
   assert.deepEqual(block.grading?.binding, binding, 'declared grading binding differs from fixed public metadata pins');
   return { recipe, binding, readoutAuthority: publicReadoutAuthority(block.fixture_id, root) };
 }
@@ -133,15 +135,15 @@ function artifactMap(artifacts) {
 }
 
 function buildRequest({ block, loaded, report, records, recipe, binding, readoutAuthority, testOnly = false }) {
-  const { plan, plan_digest } = loaded;
+  const { plan, plan_digest } = loaded, profile = primaryProfileForKernel(plan.config.kernel_condition);
   assert.equal(recipe.fixture_id, block.fixture_id); assert.equal(binding.fixture_id, block.fixture_id);
-  assert.equal(binding.input_manifest_digest, recipe.input_manifest_digest); assert.equal(binding.profile_id, PRIMARY_GRADING_PROFILE_ID);
+  assert.equal(binding.input_manifest_digest, recipe.input_manifest_digest); assert.equal(binding.profile_id, profile.id);
   assert.equal(block.run_id, plan.run_id); assert.equal(block.plan_digest, plan_digest);
   assert.ok(readoutAuthority?.requirements?.length > 0, 'public requirement readout references required');
   const requirementUnknowns = () => readoutAuthority.requirements.map(item => ({ ...item, judgment: 'unknown', quality: null,
     evidence_status: 'unknown', evidence_refs: [], evaluator_result_ref: null }));
   assert.equal(report.run_id, plan.run_id); assert.equal(report.plan_digest, plan_digest);
-  assert.deepEqual(report.slots.map(slot => slot.condition), PRIMARY_GRADING_CONDITIONS, 'report condition substitution');
+  assert.deepEqual(report.slots.map(slot => slot.condition), profile.conditions, 'report condition substitution');
   const slots = report.slots.map(slot => {
     const record = records[slot.condition];
     if (!record || slot.receipt_integrity !== 'valid') return { condition: slot.condition, state: slot.state ?? 'unknown',
@@ -198,11 +200,11 @@ function buildRequest({ block, loaded, report, records, recipe, binding, readout
       artifacts, native_checks: checks, verification_origin: terminal.verification?.execution_origin ?? 'unknown',
       quality: null, authority_status: 'unknown', requirement_judgments: requirementUnknowns(), cause_analysis: unknownCauses(), blockers };
   });
-  return { kind: 'ask_primary_evaluation_grading_request_v1', profile_id: PRIMARY_GRADING_PROFILE_ID,
+  return { kind: 'ask_primary_evaluation_grading_request_v1', profile_id: profile.id,
     evidence_kind: plan.config.evidence_kind, test_only: testOnly, run_id: plan.run_id, plan_digest,
     fixture_id: block.fixture_id, fixture_input_digest: recipe.input_manifest_digest, formal_task_class: recipe.task_class,
     runner_task_class: recipe.runner_task_class, public_scope: recipe.mutable_paths, source_digest: plan.source.digest,
-    task_digest: plan.task.digest, verification_digest: plan.verification.digest, binding, conditions: [...PRIMARY_GRADING_CONDITIONS], slots,
+    task_digest: plan.task.digest, verification_digest: plan.verification.digest, binding, conditions: [...profile.conditions], slots,
     public_grading_references: readoutAuthority.references,
     controller: { state: report.execution?.state ?? 'unknown', history_digest: report.execution?.history?.digest ?? null,
       start_consumed: report.execution?.start_consumed ?? null },
@@ -244,12 +246,13 @@ export function exportPrimaryEvaluationGradingRequest(block, { root = ROOT } = {
 /** Pure fake fixture coverage of the mapper; never eligible for production adapter membership. */
 export function exportPrimaryEvaluationGradingForTest(input) {
   assert.equal(input.loaded.plan.config.evidence_kind, 'synthetic', 'test export forbids observed evidence');
-  assert.equal(input.loaded.plan.config.kernel_condition, 'kernel_principles_v1');
+  primaryProfileForKernel(input.loaded.plan.config.kernel_condition);
   const request = buildRequest({ ...input, readoutAuthority: publicReadoutAuthority(input.block.fixture_id, ROOT), testOnly: true });
   return { request, request_digest: comparisonHash(serialize(request)), readout: buildPrimaryEvaluationReadout(request) };
 }
 
 export function buildPrimaryEvaluationReadout(request) {
+  primaryProfileForRequest(request);
   return { kind: 'ask_primary_evaluation_task_readout_v1', fixture_id: request.fixture_id,
     formal_task_class: request.formal_task_class, run_id: request.run_id, plan_digest: request.plan_digest,
     public_grading_references: request.public_grading_references,
@@ -341,12 +344,13 @@ export function createPrimaryEvaluationGradingAdapter({ root = ROOT, resourcesPa
       try {
         assert.equal(adapter.preflight(block).status, 'ready', 'grading resource preflight required');
         assert.ok(!signal?.aborted);
+        const profile = primaryProfileForKernel(readUserComparisonPlan(block.root).plan.config.kernel_condition);
         const resource = resourceFor(block), output = join(configuration.output_root, block.fixture_id);
         mkdirSync(configuration.output_root, { recursive: true, mode: 0o700 }); mkdirSync(output, { mode: 0o700 });
         const produced = await producePrimaryEvaluationArtifacts(block, join(output, 'producer'));
         const producerOptions = { recordRoot: produced.output_root, externalDigest: produced.external_digest };
         const conditions = [];
-        for (const condition of PRIMARY_GRADING_CONDITIONS) {
+        for (const condition of profile.conditions) {
           assert.ok(!signal?.aborted);
           const privateEvaluationRoot = join(output, `private-${condition}`); mkdirSync(privateEvaluationRoot, { mode: 0o700 });
           started = true;
@@ -356,7 +360,7 @@ export function createPrimaryEvaluationGradingAdapter({ root = ROOT, resourcesPa
           conditions.push(graded);
           if (graded.status !== 'completed') break;
         }
-        const complete = conditions.length === PRIMARY_GRADING_CONDITIONS.length && conditions.every(value => value.status === 'completed');
+        const complete = conditions.length === profile.conditions.length && conditions.every(value => value.status === 'completed');
         const exported = exportPrimaryEvaluationGradingRequest(block, { root });
         const readout = { ...exported.readout, scoring_status: complete ? 'complete' : 'not_scoring_ready',
           conditions: exported.readout.conditions.map(slot => {

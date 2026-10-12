@@ -105,3 +105,31 @@ test('capture rejects async leakage, transplanted payloads, unknown termination 
   assert.equal(primaryEvaluatorLogFailureReceipts(new Error('untrusted')),null);
   assert.deepEqual(readdirSync(save.outputRoot),['0001.stdout.log']);
 });
+
+test('v2 synthetic producer blocks unavailable originals with actual condition and zero starts', async t => {
+  const source = syntheticPrimarySource(t, { kernelCondition: 'kernel_principles_v2' });
+  const produced = await producePrimaryEvaluationArtifacts(source.block, join(source.root, 'producer'));
+  const options = { recordRoot: produced.output_root, externalDigest: produced.external_digest };
+  const result = runPrimaryEvaluationPrivateGrading(options, { condition: 'kernel_principles_v2' });
+  assert.equal(result.status, 'blocked'); assert.equal(result.condition, 'kernel_principles_v2');
+  assert.equal(result.quality, null); assert.equal(result.grader_process_starts, 0); assert.equal(result.model_calls, 0);
+  assert.deepEqual(result.blockers, ['original_private_pipeline_unverified']);
+  const mixed = runPrimaryEvaluationPrivateGrading(options, { condition: 'kernel_principles_v1' });
+  assert.equal(mixed.status, 'blocked'); assert.equal(mixed.condition, null); assert.equal(mixed.grader_process_starts, 0);
+});
+test('v2 historical public resource scope accepts its closed profile without schema or producer authority', t => {
+  const root = fileURLToPath(new URL('../../scoring-runtime-r1/mn-build-option-update', import.meta.url));
+  if (!existsSync(root)) { t.skip('independent historical public runtime not present'); return; }
+  const block = publicBlock('mn-build-option-update'); block.grading.binding.profile_id = 'primary_principles_v2_single_shot_v1';
+  withPrimaryHistoricalEvaluatorResources(block, root, () => {
+    assert.equal(activePrimaryProducer(), false);
+    const path = '/example/benchmarks/schemas/normalized-portfolio-result.schema.json';
+    assert.equal(primaryGradingSchemaPath(path), path);
+  });
+  const result = preflightPrimaryEvaluationGradingResources(block, { frozenSourceRoot: root,
+    privateRoot: '/unrestored/original-private', manifestPath: '/unrestored/original-private/private-evaluator-bundle.json' });
+  assert.equal(result.public_metadata_verified, true); assert.equal(result.status, 'blocked');
+  assert.equal(result.grader_process_starts, 0); assert.equal(result.runtime_compatibility, 'unknown');
+  block.grading.binding.profile_id = 'primary_unknown';
+  assert.throws(() => withPrimaryHistoricalEvaluatorResources(block, root, () => {}), /binding_invalid/);
+});

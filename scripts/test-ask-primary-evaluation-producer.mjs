@@ -139,3 +139,46 @@ test('saved sanitized plain response is not typed JSON; only verified primary UT
   });
   assert.throws(()=>validateSealedPrivateFinalOutputEvidence(evidence),/JSON/);
 });
+
+test('v2 retained synthetic records normalize exact actual IDs and keep original scoring readiness unknown', async t => {
+  const p = await produce(t, { kernelCondition: 'kernel_principles_v2' }), verified = verifyPrimaryEvaluationProducer(p.options);
+  assert.equal(verified.request.profile_id, 'primary_principles_v2_single_shot_v1');
+  assert.deepEqual(verified.inspection.cases.map(item => item.entry.condition), ['plain','kernel_principles_v2','full_ask']);
+  withPrimaryEvaluationProducer(p.options, () => {
+    assert.match(primaryGradingSchemaPath(legacy), /primary-k2-normalized/);
+    assert.deepEqual(primaryGradingConditions(['plain','kernel_only','adaptive_ask','full_ask']), ['plain','kernel_principles_v2','full_ask']);
+    assert.throws(() => withPrimarySchemaBuild(() => {}), /profile_mix/);
+  });
+  withPrimaryEvaluationProducer(p.options, value => {
+    value.request.profile_id = 'primary_single_shot_v1'; value.request.binding.profile_id = 'primary_single_shot_v1';
+    value.request.conditions = ['plain','kernel_principles_v1','full_ask']; value.request.slots[1].condition = 'kernel_principles_v1';
+    assert.match(primaryGradingSchemaPath(legacy), /primary-k2-normalized/);
+    assert.deepEqual(primaryGradingConditions(['plain','kernel_only','adaptive_ask','full_ask']), ['plain','kernel_principles_v2','full_ask']);
+  });
+  for (const condition of verified.request.conditions) {
+    const input = buildPrimaryEvaluationScoringInputs(p.options, { condition });
+    assert.equal(input.normalizedResult.lineage.condition, condition); assert.equal(input.scoring_ready, false);
+    assert.equal(input.original_private_evaluator_compatibility, 'unknown'); assert.equal(input.effective_admission_authority, 'unresolved');
+    assert.equal(input.grader_process_starts, 0);
+    assert.ok(Object.keys(verified.source_digests).includes('scripts/ask-primary-evaluation-profile.mjs'));
+    for (const name of PRIMARY_PROFILE_SCHEMAS) for (const prefix of ['primary', 'primary-k2'])
+      assert.ok(Object.hasOwn(verified.source_digests, `benchmarks/schemas/${prefix}-${name}.schema.json`));
+  }
+  assert.throws(() => buildPrimaryEvaluationScoringInputs(p.options, { condition: 'kernel_principles_v1' }));
+  assert.throws(() => materializePrimaryEvaluationCandidate(p.options, { condition: 'kernel_principles_v1', outputParent: p.root }));
+  const parent = join(p.root, 'k2-candidate'); mkdirSync(parent, { mode: 0o700 });
+  assert.equal(materializePrimaryEvaluationCandidate(p.options, { condition: 'kernel_principles_v2', outputParent: parent }).verified_authority.normalized_result.lineage.condition, 'kernel_principles_v2');
+});
+for (const path of ['control/kernel-principles-task-metadata.json','control/kernel-principles-renderer-closure/kernel-principles-candidate-v2.mjs'])
+  test(`v2 producer replay refuses changed saved ${path}`, async t => {
+    const p = await produce(t, { kernelCondition: 'kernel_principles_v2' });
+    writeFileSync(join(p.block.root, path), 'changed after export');
+    assert.throws(() => verifyPrimaryEvaluationProducer(p.options), /original evidence changed/);
+  });
+test('v2 missing model command evidence stays unavailable without replacement by native checks', async t => {
+  const p = await produce(t, { kernelCondition: 'kernel_principles_v2', command: 'missing' });
+  const input = buildPrimaryEvaluationScoringInputs(p.options, { condition: 'kernel_principles_v2' });
+  assert.equal(input.normalizedResult.command_evidence.succeeded_command_ids.length, 0);
+  assert.equal(input.normalizedResult.command_evidence.unavailable_command_ids.length, p.plan.verification.recipe.checks.length);
+  assert.equal(input.scoring_ready, false); assert.equal(input.original_private_evaluator_compatibility, 'unknown');
+});

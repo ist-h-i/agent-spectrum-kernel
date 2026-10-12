@@ -9,7 +9,8 @@ Spec `SPEC-PRIMARY-GRADING-EXPORT-1` references
 `single-shot-user-comparison-contract.md` and the fixed primary fixture recipe.
 The observable delta is a digest-pinned grading request and task readout preserving
 `plain`, `kernel_principles_v1`, `full_ask` exactly. Core `plain/core/full`, legacy
-`kernel_only`, and a future candidate condition are distinct IDs and are refused.
+`kernel_only` and `kernel_principles_v2_candidate` are distinct IDs and are refused.
+The separately adopted v2 profile is described below.
 
 Acceptance items: `AC-LINEAGE` binds controller run/plan, the raw fixed public input
 manifest, source/task/verification identities, formal fixture task class and
@@ -332,3 +333,46 @@ Independent review found the r3 five-minute worker cap truncated an existing ele
 fixture budget. The r4 connector fixes only scheduling: actual worker budgets, raw scorer,
 criteria and old protocol remain unchanged. A pure budget regression covers 660000,
 120000, the existing 900000 maximum and rejected invalid values; no private worker starts.
+
+## Separate K-principles v2 grading profile
+
+`SPEC-PRIMARY-K2-CONNECTION-1` revision 1 and
+`IMP-PRIMARY-K2-CONNECTION-1` revision 1 add the closed
+`primary_principles_v2_single_shot_v1` profile. Its actual IDs are exactly
+`plain`, `kernel_principles_v2`, `full_ask`, in that order. The existing
+`primary_single_shot_v1`, its condition exports and eight `primary-*` schema
+files retain their v1 behavior and serialized bytes. Eight separate
+`primary-k2-*` schemas select v2; generator writes only those new files with
+exclusive creation and checks both families.
+
+The saved plan kernel selects the public binding, request and factory grading
+loop. Producer conversion selects the same profile from the saved request:
+request profile, binding profile, ordered conditions and ordered slot IDs must
+match. Saved kernel/arm/snapshot keys are checked against that profile. Mixed
+IDs, condition aliases and unknown profiles refuse. Producer source pins include
+the profile module, both schema families and the existing unchanged base
+schemas; retained evidence includes v2 metadata and its renderer closure.
+
+Schema and condition selectors derive their profile from a reverified producer,
+or from an explicit synchronous builder profile. Builder and historical public
+resource scopes grant no producer, scoring or start authority. The historical
+resource scope accepts either closed profile and still verifies the same public
+freeze and original evaluator graph. Original worker construction, scoring,
+admission, criteria and budgets are unchanged. Missing original assets keep
+quality null and compatibility unknown; synthetic evidence cannot prove original
+hidden-worker compatibility.
+
+Focused verification for `FVC-PRIMARY-K2-CONNECTION-1` revision 1 obligation O4:
+`node --test scripts/test-ask-primary-evaluation-profile.mjs scripts/test-ask-primary-evaluation-producer.mjs scripts/test-ask-primary-evaluation-grading.mjs scripts/test-ask-primary-evaluation-private-grading.mjs`.
+These checks use retained synthetic controller records and public frozen source
+only. They start no model or original private worker.
+
+Verification evidence for this profile addition:
+`../../evidence/primary-k2-grading-focused.log` records the first 49 checks
+(44 passed, five v2 saved-history failures). Those failures identified the
+execution-state reader's old condition-selector import. After that registration
+fix, `../../evidence/primary-k2-grading-affected-rerun.log` records all 29 affected
+producer/private checks passing with no failures or skips. The 20 unaffected
+profile/public-grading checks passed in the first run. Schema generation check
+and diff whitespace check passed. Original private worker compatibility and
+numeric evaluation remain unknown; these logs contain no original worker run.

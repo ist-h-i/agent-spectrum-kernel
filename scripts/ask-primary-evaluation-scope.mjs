@@ -6,9 +6,10 @@ import { fileURLToPath } from 'node:url';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { verifyPrimaryEvaluationProducer } from './ask-primary-evaluation-producer.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
+import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_EVALUATION_CONDITIONS, getPrimaryEvaluationProfile, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 
 const state = new AsyncLocalStorage(), resourceGraphState = new AsyncLocalStorage(), logFailures = new WeakMap(), ROOT = fileURLToPath(new URL('../', import.meta.url));
-export const PRIMARY_PROFILE_CONDITIONS = Object.freeze(['plain', 'kernel_principles_v1', 'full_ask']);
+export const PRIMARY_PROFILE_CONDITIONS = PRIMARY_EVALUATION_CONDITIONS;
 export const PRIMARY_PROFILE_SCHEMAS = Object.freeze(['normalized-portfolio-result', 'normalized-portfolio-run',
   'evaluator-result-envelope', 'portfolio-engineering-result', 'original-workspace-authority',
   'portfolio-terminal-workspace-authority', 'repository-diff-artifact', 'portfolio-command-evidence']);
@@ -20,11 +21,16 @@ function run(value, callback, allowSchemaRecheck = false) {
 }
 // Builder scope selects schemas only. It supplies neither an execution inspection
 // nor permission to verify/score private results.
-export const withPrimarySchemaBuild = callback => run({ building: true, grading: false }, callback, Boolean(active()?.verified));
+export function withPrimarySchemaBuild(callback, { profileId = PRIMARY_EVALUATION_PROFILE_ID } = {}) {
+  const profile = getPrimaryEvaluationProfile(profileId), current = active();
+  if (current?.verified && current.profile.id !== profile.id) throw new Error('primary_schema_build_profile_mix_refused');
+  return run({ building: true, grading: false, profile }, callback, Boolean(current?.verified));
+}
+const activeProfile = () => active()?.profile;
 export const activePrimaryProducer = () => Boolean(active()?.verified);
 const rawDigest=raw=>`sha256:${createHash('sha256').update(raw).digest('hex')}`;
 function pinnedHistoricalGraph(root,fixtureId,binding) {
-  if(!PRIMARY_FIXTURE_IDS.includes(fixtureId)||binding.fixture_id!==fixtureId||binding.profile_id!=='primary_single_shot_v1')throw new Error('primary_resource_graph_binding_invalid');
+  if(!PRIMARY_FIXTURE_IDS.includes(fixtureId)||binding.fixture_id!==fixtureId||!['primary_single_shot_v1','primary_principles_v2_single_shot_v1'].includes(binding.profile_id))throw new Error('primary_resource_graph_binding_invalid');
   if(resolve(root)!==root||realpathSync(root)!==root)throw new Error('primary_resource_graph_root_invalid');
   const base=`benchmarks/fixtures/checkpoint-b2/${fixtureId}/`,read=path=>readStableFile(path,'primary historical public graph pin',33554432).bytes;
   const currentFreeze=read(join(ROOT,base,'scoring-input-freeze-manifest.json')),freeze=JSON.parse(currentFreeze);
@@ -59,17 +65,21 @@ export function primaryEvaluatorDependencyGraphParameters({root,baseRevision,def
 export function primaryGradingSchemaPath(path) {
   if (!active()) return path;
   if (/\/core-[^/]+\.schema\.json$/u.test(path)) throw new Error('primary_core_profile_mix_refused');
-  for (const name of PRIMARY_PROFILE_SCHEMAS) if (path.endsWith(`/benchmarks/schemas/${name}.schema.json`)) return join(ROOT, `benchmarks/schemas/primary-${name}.schema.json`);
+  const prefix = activeProfile().schema_prefix;
+  for (const name of PRIMARY_PROFILE_SCHEMAS) {
+    for (const other of ['primary', 'primary-k2']) if (other !== prefix && path.endsWith(`/benchmarks/schemas/${other}-${name}.schema.json`)) throw new Error('primary_schema_profile_mix_refused');
+  }
+  for (const name of PRIMARY_PROFILE_SCHEMAS) if (path.endsWith(`/benchmarks/schemas/${name}.schema.json`)) return join(ROOT, `benchmarks/schemas/${activeProfile().schema_prefix}-${name}.schema.json`);
   return path;
 }
 export function primaryGradingConditions(legacy) {
   if (!active()) return legacy;
   if (legacy.join(',') !== 'plain,kernel_only,adaptive_ask,full_ask') throw new Error('primary_core_condition_mix_refused');
-  return PRIMARY_PROFILE_CONDITIONS;
+  return activeProfile().conditions;
 }
 export function withPrimaryEvaluationProducer(options, callback, { grading = false } = {}) {
   const verified = verifyPrimaryEvaluationProducer(options);
-  return run({ options: Object.freeze({ ...options }), verified, grading }, callback);
+  return run({ options: Object.freeze({ ...options }), verified, grading, profile: primaryProfileForRequest(verified.request) }, callback);
 }
 export function primaryProducerInspection(options) {
   const current = active(); if (!current?.verified) return null;
