@@ -111,6 +111,13 @@ are never probed or recovered.
 
 Only terminal native `completed` or `verification_failed` slots with valid
 receipts and confirmed process completion permit grading or subsequent blocks.
+The primary safety projection also requires an available released controller,
+a closed `invocation_ended` journal, terminal checkpoints bound to the saved
+receipt bytes/digests, passing public scope and completed native checks.
+When every slot completed with passing native checks, semantic outcome `unknown`
+may retain native overall `indeterminate` while still entering fixed grading.
+Execution uncertainty remains a stop. Completed grading with manual-required,
+null quality is saved and can continue to the next fixed block.
 An independent verification failure can therefore continue. Denial,
 authentication, interruption, unknown model/verification termination, corrupt
 receipts, incomplete children and grading failure stop all later model/grading

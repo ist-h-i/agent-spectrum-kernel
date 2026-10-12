@@ -39,6 +39,9 @@ function fixture(t) {
   });
   let number = 0;
   return { root, blocks, manifest(edit = value => value) {
+    // Each fake batch gets fresh synthetic receipts; never erase unrelated slot evidence.
+    for (const block of blocks) if (existsSync(join(block.root, 'control/slots/.synthetic-batch-receipts')))
+      rmSync(join(block.root, 'control/slots'), { recursive: true });
     const value = edit({ kind: 'ask_primary_evaluation_batch_manifest_v1', batch_id: `fake-${++number}`, root: join(root, `batch-${number}`),
       conditions: ['plain', 'kernel_only', 'full_ask'], limits: PRIMARY_BATCH_LIMITS, blocks: structuredClone(blocks) });
     const path = join(root, `manifest-${number}.json`); writeFileSync(path, JSON.stringify(value)); return { path, value, digest: hash(readFileSync(path)) };
@@ -49,14 +52,30 @@ function adapters(overrides = {}) {
   return { calls, grades, gradingAdapter: { preflight: () => ({ status: 'ready', blockers: [] }), grade: async block => { grades.push(block.fixture_id); return { status: 'completed', quality: null }; }, ...overrides.grading },
     startComparison: async (root, planDigest) => {
       calls.push(root); const plan = JSON.parse(readFileSync(join(root, 'control/plan.json')));
-      return { run_id: plan.run_id, plan_digest: planDigest, overall: { state: overrides.state ?? 'completed' },
-        usage_budget: { known_tokens_lower_bound: overrides.tokens ?? 3, complete: overrides.usageComplete ?? false },
-        slots: ['plain', 'kernel_only', 'full_ask'].map(condition => ({ condition, state: overrides.slotState ?? 'completed', receipt_integrity: 'valid',
-          process_completed: !overrides.unknownChild, unresolved_child: overrides.unknownChild ?? false, verification: { checks: overrides.unknownVerifier ? [{ process_completed: false, spawn_observed: true, status: 'unknown' }] : [] }, metrics: { input_tokens: null, output_tokens: null } })) };
+      const slots = ['plain', 'kernel_only', 'full_ask'].map(condition => ({ condition, state: overrides.slotState ?? 'completed',
+        outcome: overrides.outcome ?? 'pass', receipt_integrity: 'valid', exit_code: 0, scope: { status: 'pass' },
+        process_completed: !overrides.unknownChild, unresolved_child: overrides.unknownChild ?? false,
+        verification: { checks: [{ process_completed: !overrides.unknownVerifier, spawn_observed: true,
+          status: overrides.unknownVerifier ? 'unknown' : overrides.slotState === 'verification_failed' ? 'fail' : 'pass', exit_code: overrides.slotState === 'verification_failed' ? 1 : 0 }], requirements: [] },
+        metrics: { input_tokens: null, output_tokens: null } }));
+      const terminalDigests = Object.fromEntries(slots.map(slot => {
+        const folder = join(root, 'control/slots', slot.condition); mkdirSync(folder, { recursive: true });
+        const raw = JSON.stringify(slot), terminalDigest = hash(raw);
+        writeFileSync(join(folder, 'result.json'), raw); writeFileSync(join(folder, 'result.digest'), terminalDigest);
+        return [slot.condition, terminalDigest];
+      }));
+      writeFileSync(join(root, 'control/slots/.synthetic-batch-receipts'), 'synthetic');
+      const report = { run_id: plan.run_id, plan_digest: planDigest, overall: { state: overrides.state ?? 'completed' },
+        execution: { state: 'available', start_consumed: true, resume_allowed: false, owner: { released: true },
+          history: { pending: [], snapshot: { run_id: plan.run_id, plan_digest: planDigest, event: 'invocation_ended', stop: null,
+            slots: Object.fromEntries(slots.map(slot => [slot.condition, { phase: 'terminal', attempts: 1, terminal_digest: terminalDigests[slot.condition] }])) } } },
+        usage_budget: { known_tokens_lower_bound: overrides.tokens ?? 3, complete: overrides.usageComplete ?? false }, slots };
+      overrides.editReport?.(report, root); return report;
     } };
 }
 test('primary batch is model-free until a digest-bound, grading-connected, fake-only start', async t => {
   const f = fixture(t);
+  t.afterEach(() => f.blocks.forEach(block => rmSync(join(block.root, 'control/slots'), { recursive: true, force: true })));
   await t.test('prepare/inspect/report preserve all 27 unknown slots and missing grading blockers', () => {
     const m = f.manifest(), p = preparePrimaryEvaluationBatch(m.path);
     assert.equal(p.status, 'blocked'); assert.equal(p.slots.length, 27);
@@ -124,8 +143,60 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
     assert.equal(report.usage.known_tokens_lower_bound, 27); assert.equal(report.usage.complete, false); assert.equal(report.usage.cost, null);
     await assert.rejects(startPrimaryEvaluationBatch(m.value.root, m.digest, a), /consumed/u);
   });
+  await t.test('completed execution with pending semantic quality reaches grading before the next fixed block', async () => {
+    const m = f.manifest(), events = [], a = adapters({ state: 'indeterminate', outcome: 'unknown' });
+    const start = a.startComparison;
+    a.startComparison = async (...args) => { events.push('start'); return start(...args); };
+    a.gradingAdapter.grade = async (block, report) => {
+      events.push('grade'); a.grades.push(block.fixture_id);
+      assert.equal(report.overall.state, 'indeterminate');
+      assert.ok(report.slots.every(slot => slot.state === 'completed' && slot.outcome === 'unknown'
+        && slot.scope.status === 'pass' && slot.receipt_integrity === 'valid' && slot.verification.requirements.length === 0));
+      return { status: 'completed', conditions: report.slots.map(slot => ({ condition: slot.condition,
+        status: 'completed', scoring_status: 'manual_required', quality: null })) };
+    };
+    preparePrimaryEvaluationBatch(m.path, a);
+    const report = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
+    assert.equal(report.state, 'completed'); assert.equal(a.calls.length, 9); assert.equal(a.grades.length, 9);
+    assert.deepEqual(events, Array.from({ length: 9 }, () => ['start', 'grade']).flat());
+    assert.ok(report.slots.every(slot => slot.quality === null && slot.grading.status === 'completed'
+      && slot.grading.conditions.every(condition => condition.scoring_status === 'manual_required')));
+  });
+  await t.test('indeterminate is accepted only for closed execution with pending quality', async () => {
+    const cases = [
+      report => { report.execution.state = 'indeterminate'; },
+      report => { delete report.execution; },
+      report => { report.execution.owner.released = false; },
+      report => { report.execution.start_consumed = false; },
+      report => { report.execution.resume_allowed = true; },
+      report => { report.execution.history.pending.push('unpublished'); },
+      report => { report.execution.history.snapshot.event = 'verification_running'; },
+      report => { report.execution.history.snapshot.stop = { state: 'timeout' }; },
+      report => { report.execution.history.snapshot.slots.plain.phase = 'verifying'; },
+      report => { delete report.execution.history.snapshot.slots.plain.terminal_digest; },
+      report => { report.execution.history.snapshot.slots.plain.terminal_digest = hash('changed terminal'); },
+      report => { report.slots[0].state = 'execution_unknown'; },
+      report => { report.slots[0].receipt_integrity = 'invalid'; },
+      (_report, root) => { rmSync(join(root, 'control/slots/plain/result.digest')); },
+      (_report, root) => { writeFileSync(join(root, 'control/slots/plain/result.json'), '{}'); },
+      report => { report.slots[0].scope.status = 'fail'; },
+      report => { report.slots[0].scope.status = 'unknown'; },
+      report => { report.slots[0].outcome = 'fail'; },
+      report => { report.slots[0].verification.checks = []; },
+      report => { report.slots[0].verification.checks[0].status = 'timeout'; },
+      report => { report.slots[0].verification.checks[0].exit_code = 1; },
+    ];
+    for (const editReport of cases) {
+      const m = f.manifest(), a = adapters({ state: 'indeterminate', outcome: 'unknown', editReport });
+      preparePrimaryEvaluationBatch(m.path, a);
+      const report = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
+      assert.equal(report.terminal.stop, 'unsafe_or_incomplete_child');
+      assert.equal(a.calls.length, 1); assert.equal(a.grades.length, 0);
+    }
+  });
   await t.test('unknown child, denial, auth and interrupt prevent grading and subsequent starts', async () => {
-    for (const overrides of [{ unknownChild: true }, { unknownVerifier: true }, { state: 'permission_denied' }, { state: 'authentication_required' }, { state: 'interrupted' }]) {
+    for (const overrides of [{ unknownChild: true }, { unknownVerifier: true }, { state: 'permission_denied' }, { state: 'authentication_required' }, { state: 'interrupted' },
+      { state: 'timeout' }, { state: 'state_corrupt' }, { state: 'ownership_unverified' }, { slotState: 'scope_violation' }]) {
       const m = f.manifest(), a = adapters(overrides); preparePrimaryEvaluationBatch(m.path, a);
       const report = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
       assert.equal(report.state, 'stopped'); assert.equal(a.calls.length, 1); assert.equal(a.grades.length, 0);

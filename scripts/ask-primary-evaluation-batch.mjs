@@ -179,10 +179,31 @@ export function inspectPrimaryEvaluationBatch(root, { gradingAdapter } = {}) {
 function safeTerminal(report, block, conditions) {
   assert.equal(report.run_id, block.run_id); assert.equal(report.plan_digest, block.plan_digest);
   assert.deepEqual(report.slots.map(slot => slot.condition), conditions);
-  if (['state_corrupt', 'indeterminate', 'interrupted', 'authentication_required', 'permission_denied', 'running', 'execution_blocked', 'ownership_unverified'].includes(report.overall.state)) return false;
-  return report.slots.every(slot => ['completed', 'verification_failed'].includes(slot.state) && slot.receipt_integrity === 'valid'
-    && slot.process_completed === true && !slot.unresolved_child && !slot.cleanup_error
-    && (slot.verification?.checks ?? []).every(check => !check.cleanup_error && check.process_completed === true && !['interrupted', 'timeout', 'unknown'].includes(check.status)));
+  if (!['completed', 'task_failed', 'indeterminate'].includes(report.overall.state)) return false;
+  const execution = report.execution, history = execution?.history, checkpoint = history?.snapshot;
+  if (execution?.state !== 'available' || execution.start_consumed !== true || execution.resume_allowed !== false
+    || execution.owner?.released !== true || !Array.isArray(history?.pending) || history.pending.length
+    || checkpoint?.event !== 'invocation_ended' || checkpoint.stop !== null
+    || checkpoint.run_id !== block.run_id || checkpoint.plan_digest !== block.plan_digest) return false;
+  // The single-task report retains semantic unknown. Only this primary safety
+  // projection can admit it after execution closure and native evidence pass.
+  const qualityPending = report.overall.state === 'indeterminate';
+  return report.slots.every(slot => {
+    const terminal = checkpoint.slots?.[slot.condition], checks = slot.verification?.checks;
+    if (terminal?.phase !== 'terminal' || terminal.attempts !== 1 || slot.receipt_integrity !== 'valid') return false;
+    try {
+      const path = join(block.root, 'control/slots', slot.condition, 'result.json');
+      if (comparisonHash(stable(path)) !== terminal.terminal_digest
+        || stable(join(dirname(path), 'result.digest')).toString() !== terminal.terminal_digest) return false;
+    } catch { return false; }
+    return ['completed', 'verification_failed'].includes(slot.state) && slot.process_completed === true
+      && slot.exit_code === 0 && !slot.unresolved_child && !slot.cleanup_error && !slot.runner_error && slot.scope?.status === 'pass'
+      && Array.isArray(checks) && checks.length > 0 && checks.every(check => !check.cleanup_error && !check.runner_error
+        && check.process_completed === true && check.spawn_observed === true && ['pass', 'fail'].includes(check.status)
+        && Number.isInteger(check.exit_code) && check.exit_code >= 0 && (check.status === 'pass' ? check.exit_code === 0 : check.exit_code !== 0))
+      && (!qualityPending || slot.state === 'completed' && ['pass', 'unknown'].includes(slot.outcome)
+        && checks.every(check => check.status === 'pass'));
+  });
 }
 export async function startPrimaryEvaluationBatch(root, confirmedManifestDigest, { gradingAdapter, startComparison = startUserComparison, signal, now = Date.now } = {}) {
   const batch = inspectPrimaryEvaluationBatch(root, { gradingAdapter });
