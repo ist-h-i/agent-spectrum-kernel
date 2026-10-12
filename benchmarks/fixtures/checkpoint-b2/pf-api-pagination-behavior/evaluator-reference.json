@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-eaa82b299f4346f0101a54fe551a678e3e8b183b829494092a3ee05b6b12ff80",
-  "evaluator_bundle_digest": "sha256:b36aab327297dcbd4de687fe93b35cddae441a925d1e1a7eb25a797b7f68e980",
+  "evaluator_bundle_id": "evaluator-806c9794b4a82d2f494b2b0c8ab4f3b5d07fa746b1843201d8e68c0859675795",
+  "evaluator_bundle_digest": "sha256:759c69f38b4edd35c70cd78e39edc1ed1ff110e3ce90fabda40a4c98a5223590",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "pf-api-pagination-behavior",
   "fixture_input_digest": "sha256:3f087aabe9d3bf1af6b1ccb7ba425469c7b9e5a7038cb350f94696a664a10386",
   "task_class": "implementation_verification",
   "suite": "practice_frequency",
-  "evaluator_revision": "cd8ba1234a5c5e9e7beae5e1bc6e4cdee6f4362c",
+  "evaluator_revision": "ec21232f522f45d459616772279fbf2a1de62394",
   "evaluator_source_identity": {
-    "base_git_revision": "cd8ba1234a5c5e9e7beae5e1bc6e4cdee6f4362c",
+    "base_git_revision": "ec21232f522f45d459616772279fbf2a1de62394",
     "source_tree_digest": "sha256:978a07cdabd9b519912ded9cd1f074412d8dd3e53f0a4d92195c353e4b3298b1",
     "generator_source_digest": "sha256:124f4862dbb4eba98605fb558368b561a99c7505f9bec5eeb8d14ecb632c8a53",
     "source_files": [
@@ -4042,11 +4042,11 @@
     }
   },
   "generator_identity": "sha256:509fdef6076081563ffb02e11361d1ef69bdfeae6cbe6cf5a33269e6399fb772",
-  "independence_statement_digest": "sha256:25970455b2104c2437294b13945505b74efa0602ee1efe4492cc96889cc2f40e",
-  "review_record_digest": "sha256:83339ce151eadde44792ee9148b11a9b0379744048266d8baf16baba88baf605",
+  "independence_statement_digest": "sha256:20034bd33a37be0b6f60496359a82b1c6c6b53e26e458f8874294c9cafd6153a",
+  "review_record_digest": "sha256:a34a82e375b94270691a7a4674a51d72b1262482f0d6c059941bf40064b942a6",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:43558d4d0d1d5c96fef082bd0107bb243a00a1f5d067ff599e0409f7e3fd70df",
-  "evaluator_authority_manifest_digest": "sha256:399e0ada05c06333b20cbbcc91d02be2528bec5dd7f596e665b53927d7e480aa",
+  "evaluator_authority_manifest_raw_sha256": "sha256:0b38cf4080a8f9455ace43e846ebd702aeecd7eb84b47c7bd33924c56279ecde",
+  "evaluator_authority_manifest_digest": "sha256:8dc03ecaca4b040cc651d71b6590ae222eaa58dfbe4e0c723d910a437958e89e",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:2beca3bed7bc338e7a86108086b856307af3202017ea109544398fd84dc1fc4f"
+  "public_metadata_digest": "sha256:7dc75e25dd3b284a7a9a3a531b8d9a47cb603dd047f2201d9a0dfd00c98495e0"
 }
