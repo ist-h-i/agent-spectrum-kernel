@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "pf-review-error-contract",
   "candidate_input_digest": "sha256:a46f47824169ff97d18a96db357d20a596a2bb8d7a21b8fcf088f2b67692e25b",
-  "candidate_evaluator_digest": "sha256:b7200b1792f8ea87ef5fc1670e21998b90a3e1a22bf46a476001b74058568e2d",
+  "candidate_evaluator_digest": "sha256:01779cfc9c26122eae3fdabf25ff9ee05576502020610223a7ba7945a1d52abf",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -119,5 +119,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:5270f5c854ff2d304562cc290c764d43093a4dd12a70bf440866f8520cb68387"
+  "review_package_digest": "sha256:b8c31e8d30bc2b477ffb9619cd8f4760dc32ef19471119c9456aede980788c31"
 }
