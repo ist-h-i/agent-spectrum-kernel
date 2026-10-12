@@ -1,4 +1,64 @@
 {
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
+  "program": "adaptive_ask_scoring_input_freeze",
   "fixture_id": "hi-financial-state-integrity",
-  "candidate_state": "generation_pending"
+  "fixture_input_digest": "sha256:234a13b9ccae089553d56b0e512220dfea8fe42a3c0c2f8eb0666295faceebda",
+  "catalog": {
+    "path": "benchmarks/portfolio-catalog.json",
+    "raw_byte_digest": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
+    "semantic_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972"
+  },
+  "policy_manifest": {
+    "path": "benchmarks/portfolio-policy-manifest.json",
+    "raw_byte_digest": "sha256:36fee800e7a8c943142d8d3d056e149adf773a72ee5b2373b03f5ad231752bcf",
+    "semantic_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41"
+  },
+  "scoring_policy": {
+    "path": "benchmarks/portfolio-scoring-policy.json",
+    "raw_byte_digest": "sha256:17ef3a12d0df9cf3842f4de2199171a6cd4cdb7b10ac528a091fbd70e60edb01",
+    "semantic_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831"
+  },
+  "admission_record": {
+    "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/final-admission-record.json",
+    "raw_byte_digest": "sha256:23e4d9153779b493df9336042d05fb946e6e143e88826d1472a732552cbd630e",
+    "semantic_digest": "sha256:34b87c1274fb9bbe0ee763cf700ee415dc446148b21f32e5daffcf2f1ba8cef5"
+  },
+  "requirement_record": {
+    "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/requirement-record.json",
+    "raw_byte_digest": "sha256:9780c2cc07a6bbb9538f38472b98c91986524f4be5612116777245c70ae136d9",
+    "record_digest": "sha256:7bbff2c18af7ba89d8b3e0c7a28cb03165a35c100e64b1838b2f3a9384684c38",
+    "set_digest": "sha256:34c6a8096e199bbc0f3bbfa1d56cced8220c0b49f8e99d26177e530f08ef0a21"
+  },
+  "output_contract": {
+    "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/output-contract.json",
+    "raw_byte_digest": "sha256:f8e886bb2c95c182368f9f3d1eb31e7bfc0d56a3eef584be91f8a67839b55668",
+    "semantic_digest": "sha256:da91aab57cfd158a66dbba28420c1b15d36eede6a0e216f6f3bb291ff311f558"
+  },
+  "evaluator_public_reference": {
+    "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/evaluator-reference.json",
+    "raw_byte_digest": "sha256:1f9e9369ca012114bee3b6c41529abd8d2c2ce2b308e88aef83c290771a9ca65",
+    "semantic_digest": "sha256:b66e41fea9d06a95819c3eb613fd4a8da80e0fe58442b04990eaefe2be8b1028"
+  },
+  "verification_command_contract": {
+    "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/verification-command-contract.json",
+    "raw_byte_digest": "sha256:e1a8ccd7e9d987e72c1a3e567e60a783f88c3e8f03abdfcfbeb019ade1a1c6fc",
+    "semantic_digest": "sha256:98679fb0e3e6034f120934ebb687af14340c6d63e791e21929269d13dffc7f4d"
+  },
+  "evidence_map": {
+    "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/evidence-map.json",
+    "raw_byte_digest": "sha256:c705d23342ac39c87a3b9d54233deeabbe2dfc5c76d410deefa0008dfb19a283",
+    "semantic_digest": "sha256:407291d0b527a3b9507723ca05cd1de1ff08b3fbddc8ca9d4e8666b840be8f15"
+  },
+  "evaluator_authority_manifest": {
+    "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/evaluator-authority-manifest.json",
+    "raw_byte_digest": "sha256:86a0c5a64517205a0526df24db2e2b0423db2459c6cf9d8e848da1bb0be69b2a",
+    "semantic_digest": "sha256:328fd02d99dcf8a9e4430989019acecc12eb31b6e4fe9b5f9fb0cc3f9c39f5aa"
+  },
+  "result_profile": {
+    "name": "binary_scope_verification_v1",
+    "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
+  },
+  "freeze_revision": "issue-209-hi-financial-state-integrity-r1",
+  "manifest_digest": "sha256:a0b7907c495c14841cd493214e84936805c334a379a1728a867d53877d8eab64"
 }

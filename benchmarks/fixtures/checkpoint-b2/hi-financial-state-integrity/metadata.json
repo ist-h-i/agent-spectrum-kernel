@@ -1,4 +1,32 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "hi-financial-state-integrity",
-  "candidate_state": "generation_pending"
+  "fixture_role": "primary",
+  "suite": "high_impact",
+  "task_class": "investigation_implementation",
+  "domain": "backend_financial",
+  "difficulty": "hard",
+  "repetitions": 5,
+  "risk_boundary": "financial_integrity",
+  "capability_families": [
+    "financial_integrity",
+    "state_consistency"
+  ],
+  "evidence_topologies": [
+    "audit_trail_and_state",
+    "implementation_and_tests"
+  ],
+  "outcome_dimensions": [
+    "auditability",
+    "financial_integrity"
+  ],
+  "output_contract_type": "implementation_producing",
+  "requirement_record_id": "requirement-record-hi-financial-state-integrity",
+  "output_contract_id": "output-contract-hi-financial-state-integrity",
+  "evaluator_bundle_id": "evaluator-43b0149c5644f6acec78bf3022bef7999041257f2e87f08710f8bf9aec9edc56",
+  "evaluator_bundle_digest": "sha256:a6254896bd127ed0b16fff1834742552477bbd2bba81dd1dd43f5d33dadcafdc",
+  "evaluator_byte_count": 837065,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:841f82fa8d9bb29839ad9353f9f69587102a256cc92c0675a1a4c5a42ecf7564"
 }

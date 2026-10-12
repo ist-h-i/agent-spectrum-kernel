@@ -1,4 +1,75 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "hi-financial-state-integrity",
-  "candidate_state": "generation_pending"
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/src/ledger.mjs"
+    ],
+    "required_candidate_paths": [
+      "workspace/src/ledger.mjs"
+    ],
+    "protected_candidate_paths": [
+      "workspace/data/incident.json",
+      "workspace/data/initial-state.json",
+      "workspace/docs/ledger-contract.md",
+      "workspace/package.json",
+      "workspace/test/ledger.test.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "unrecognized_candidate_meaning": "manual_review_required",
+    "authority_digest": "sha256:dec7262c7cb20b2d0f031dfbc03194f0c299b4f9e47df3e9d285553ec48163ec"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "financial-state-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/data/incident.json",
+        "workspace/data/initial-state.json",
+        "workspace/docs/ledger-contract.md",
+        "workspace/package.json",
+        "workspace/src/ledger.mjs",
+        "workspace/test/ledger.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "focused-change-boundary",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/docs/ledger-contract.md"
+      ]
+    },
+    {
+      "evidence_map_id": "repository-verification-route",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/test/ledger.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-financial-evidence",
+      "target_evidence_map_id": "financial-state-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:84d614d98ae96ebdc57661710edc2a527aae21522dc67db04063bc9d46ae4a46"
+    },
+    {
+      "mutation_id": "remove-focused-scope-evidence",
+      "target_evidence_map_id": "focused-change-boundary",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:2f729a2d391b6ea3d2e9d087be9a01c616c398d12915522467f35d5ac2976017"
+    },
+    {
+      "mutation_id": "remove-verification-route",
+      "target_evidence_map_id": "repository-verification-route",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:b2013992c643fa0246fe251d8d88d7df683a7b8e85fb12e472337c3227640c78"
+    }
+  ]
 }
