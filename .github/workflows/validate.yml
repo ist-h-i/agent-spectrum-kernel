@@ -42,6 +42,9 @@ jobs:
       - name: Verify explicit primary scoring-version connection (model-free)
         run: node --test scripts/test-ask-primary-scoring-version.mjs scripts/test-ask-primary-resource-authority-writers.mjs scripts/test-ask-primary-runner-async-local-storage.mjs scripts/test-ask-primary-evaluation-private-grading.mjs scripts/test-ask-primary-evaluation-grading.mjs scripts/test-ask-benchmark-frozen-authority-modes.mjs
 
+      - name: Verify fixed primary batch and remaining-eight progression (fake-only)
+        run: node --test scripts/test-ask-primary-evaluation-batch.mjs
+
       - name: Qualify prospective rule-batch contract and frozen preparation (model-free)
         run: node --test scripts/test-rule-batch-contract-v2.mjs scripts/test-rule-batch-comparison-preparation.mjs
 

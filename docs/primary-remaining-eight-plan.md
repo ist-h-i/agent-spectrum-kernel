@@ -73,7 +73,7 @@ Private evaluator/oracle material remains outside model workspaces.
 
 Implementation `IMPL-PRIMARY-REMAINING-EIGHT`, revision 1, references this Spec and
 Verification Contract. Only preparation/batch validation, existing fake-only
-batch regression tests, and this document change. Review and observed execution
+batch regression tests, their explicit model-free CI registration, and this document change. Review and observed execution
 logs provide item-level evidence for the obligations; CI binds the final head.
 
 ## Analysis notes
@@ -95,3 +95,9 @@ would exceed the owner's scope. The digest-keyed external immutable record is
 chosen instead. Failed preparation permanently consumes its issuance, while
 comparison execution still requires a separate later direct human instruction.
 Revisit this decision if another continuation shape or recovery becomes needed.
+
+The evaluation dispatcher remains pinned to `a40958bc75dfbfe19961ab61e9b081adc9cf84ed`.
+A later development-only CI registration does not replace that sealed dispatcher,
+its preparation source, condition assets, criterion bytes, or planned child IDs.
+CI invokes the synthetic batch tests explicitly before the long repository suite;
+those tests cannot use production start with synthetic plans.
