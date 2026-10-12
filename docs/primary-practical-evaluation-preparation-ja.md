@@ -238,3 +238,24 @@ CLI完了と独立検査不合格を分け、欠測commandはunavailable、原�
 して、条件ごとの独立private/public出力を用いる。private workerログはprivate側に保存し、
 公開receiptはdigest/終了状態だけを持つ。途中不明終了では後続採点・モデルを止める。
 新規課題PR #341とそのprivate source、関連開発threadは今回の対象・入力から除外する。
+
+## r3の開発準備証拠
+
+`connection-preparation-r3` は接続source head
+`4a8637923b7485e4dc9352c47aa1c0792c32ebaa` で新規に準備した。
+採点契約の検査ログリンクだけが未commitの状態だったことも外部検査記録に残した。
+manifest digestは `sha256:d6393d640ccd0ac4c0c3d3ef2696e6285524ddd99933bb1daf6b17a9df792c5e`。
+60時間・45M・課題ごと採点65分、27枠not_started、開始未消費、品質nullを再読取り確認し、
+`evidence/connection-preparation-r3-verification.json` と9課題exportを保存した。
+private originals未復元とK-v1の6件missingを保持するblockedの開発準備で、最終評価freezeではない。
+
+公開採点入力と9歴史source graphは、primary限定の固定graph再計算で非モデル検査が通った。
+現在版で追加されたauthority schemaを旧revisionへ要求するdefaultの差は、元のgraphの
+entry/authority/private-entry集合を読み取りで選択して解消した。base Git bytesとfull graphの
+一致検査は維持し、source-only scopeはschema/producer/scoring/startの権限を与えない。
+source/reference/root/revision/明示params/async範囲外の改変拒否も検査した。
+
+ローカル検査はbatch13件、grading/export15件、producer16件、既存pure alias3件、
+private接続6件、native recipe12件、未採用K候補11件が通った。
+原本private worker、評価CLI/model、採点model、旧所有権診断は起動していない。
+原本のhidden moduleが三条件ID・保存平文responseを受け入れるか、numeric scoringが完結するかは未検証。

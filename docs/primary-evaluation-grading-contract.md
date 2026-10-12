@@ -137,7 +137,10 @@ rejection; faithful plain-response format; and original non-ready scoring
 calculation. Run
 `node --test scripts/test-ask-primary-evaluation-producer.mjs` and
 `node scripts/generate-ask-primary-grading-schemas.mjs --check`.
-Evidence is [primary-producer-tests.log](../../evidence/primary-producer-tests.log).
+Current evidence is [primary-normalized-integration-tests.log](../../evidence/primary-normalized-integration-tests.log)
+(16 producer and three existing pure alias tests, all 19 pass) and
+[primary-schema-verification.log](../../evidence/primary-schema-verification.log)
+(schema check exit zero).
 These are synthetic/local tests. Actual completed native execution, restored
 private originals, admitted review authority, positive original private
 constructor and original worker compatibility remain unverified.
@@ -317,3 +320,6 @@ independently prepared scoring runtime if present and otherwise skips explicitly
 No original private worker is executed. Positive original constructor/worker,
 hidden raw-response/condition compatibility, original fragment acceptance and
 complete numeric scoring remain unverified because the originals are missing.
+All six focused private-connection tests pass, including exact public graph
+rederivation for all nine historical roots and original-assets-missing blocking;
+see [primary-private-grading-tests.log](../../evidence/primary-private-grading-tests.log).
