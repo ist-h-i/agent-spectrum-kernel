@@ -7,7 +7,7 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "test": "node --test test/cache-observation.test.mjs",
+    "test": "node --test test/*.test.mjs",
     "investigate": "node scripts/reproduce-cache.mjs",
     "validate-report": "node scripts/validate-report.mjs"
   }

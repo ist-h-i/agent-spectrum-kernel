@@ -10,7 +10,7 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "c2f6406cdf89a07704ab7bc8238a35396cc019a4eaad135b2f1d93fa5f44d3a6",
+          "sha256": "cd11389dd8ac200aa55d19796b6186e86e6f28cd8260155b1ae5e9900d9ba129",
           "bytes": 2050
         },
         {
@@ -40,8 +40,8 @@
         },
         {
           "path": "workspace/package.json",
-          "sha256": "9b834559b502323bf541659d86cc705d590fceaa5333d3cfeee01556b799435d",
-          "bytes": 340
+          "sha256": "10537ac134a2957fecb7b30753992caeacd2d76e16de3810b960df6610b890b2",
+          "bytes": 324
         },
         {
           "path": "workspace/scripts/reproduce-cache.mjs",

@@ -138,7 +138,7 @@ function assertExact(left, right, label) {
 }
 
 export function buildEvidenceMap() {
- const protectedPaths=['package.json','ci/build-config.json','ci/scenarios.json','ci/build-history.log','docs/investigation-contract.md','investigation.schema.json','src/cache-model.mjs','scripts/reproduce-cache.mjs','scripts/validate-report.mjs','test/cache-observation.test.mjs'].map(p=>'workspace/'+p);
+ const protectedPaths=['package.json','ci/build-config.json','ci/scenarios.json','ci/build-history.log','docs/investigation-contract.md','investigation.schema.json','src/cache-model.mjs','scripts/reproduce-cache.mjs','scripts/validate-report.mjs','test/cache-observation.test.mjs','test/report-structure.test.mjs'].map(p=>'workspace/'+p);
  const scopeBase={allowed_candidate_paths:['workspace/investigation.json'],required_candidate_paths:['workspace/investigation.json'],protected_candidate_paths:protectedPaths,unmanaged_additions:'forbidden',unmanaged_deletions:'forbidden',unrecognized_report_meaning:'manual_review_required'};
  const maps=[{evidence_map_id:'cache-investigation-basis',agent_visible_paths:['task.md',...protectedPaths]},{evidence_map_id:'focused-change-boundary',agent_visible_paths:['task.md','workspace/docs/investigation-contract.md']},{evidence_map_id:'repository-verification-route',agent_visible_paths:['task.md','workspace/package.json','workspace/scripts/validate-report.mjs','workspace/test/cache-observation.test.mjs']}];
  const seeds=[['remove-cache-investigation-evidence','cache-causal-assessment',maps[0]],['remove-focused-scope-evidence','request-scope-discipline',maps[1]],['remove-verification-route','verification-evidence',maps[2]]];
