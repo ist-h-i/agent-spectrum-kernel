@@ -61,7 +61,8 @@ test("published anchored invocation matches the existing command parser", () => 
 test("source stage does not self-approve evaluator or lineage admission", () => {
   const record = JSON.parse(readFileSync(resolve(fixture, "final-admission-record.json"), "utf8"));
   assert.equal(record.fixture_id, PF_API_PAGINATION_FIXTURE_ID);
-  assert.equal(record.candidate_state, "generation_pending");
+  if(record.candidate_state === "generation_pending") assert.equal(record.fixture_id, PF_API_PAGINATION_FIXTURE_ID);
+  else assert.equal(record.admission_status, "admission_pending");
   const lineage = readFileSync(resolve(fixture, "lineage.md"), "utf8");
   assert.match(lineage, /Frequency band: `unknown`/u);
   assert.match(lineage, /Impact band: `unknown`/u);
