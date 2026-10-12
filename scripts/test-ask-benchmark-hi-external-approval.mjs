@@ -22,7 +22,7 @@ test("scope, equivalence and evidence mutations are task-specific", () => {
   const value=buildEvidenceMap();
   assert.equal(value.evidenceMap.maps.length,3);
   assert.equal(value.mutationAsset.mutations.length,3);
-  assert.ok(value.evidenceMap.scope_boundary_authority.allowed_candidate_paths.includes("workspace/review.json"));
+  assert.deepEqual(value.evidenceMap.scope_boundary_authority.allowed_candidate_paths,["workspace/operation-plan.json"]);
 });
 
 test("dedicated runtime config binds this fixture input and public verification", () => {
