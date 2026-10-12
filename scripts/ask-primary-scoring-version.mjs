@@ -34,8 +34,22 @@ export function verifyPrimaryScoringSemantics(fixtureId, selectedRoot, { root = 
   const base = `benchmarks/fixtures/checkpoint-b2/${fixtureId}`;
   const old = name => json(join(root, base, `${name}.json`));
   const fresh = name => json(join(selectedRoot, base, `${name}.json`));
-  for (const name of ['input-manifest', 'verification-command-contract', 'evidence-map'])
+  for (const name of ['input-manifest', 'verification-command-contract'])
     assert.deepEqual(read(join(selectedRoot, base, `${name}.json`)), read(join(root, base, `${name}.json`)), `preserved ${name} changed`);
+  if (fixtureId === 'mn-build-option-update') {
+    // This successor regenerates the lost private mutation assets. Only their
+    // content identity can change; criterion/scope/state/ID fields stay fixed.
+    const mutationProjection = value => {
+      assert.ok(Array.isArray(value.mutation_contracts), 'preserved evidence-map mutation contracts required');
+      return { ...value, mutation_contracts: value.mutation_contracts.map(contract => {
+        digest(contract.mutation_digest);
+        return project(contract, ['mutation_digest']);
+      }) };
+    };
+    assert.deepEqual(mutationProjection(fresh('evidence-map')), mutationProjection(old('evidence-map')), 'preserved evidence-map semantics changed');
+  } else {
+    assert.deepEqual(read(join(selectedRoot, base, 'evidence-map.json')), read(join(root, base, 'evidence-map.json')), 'preserved evidence-map changed');
+  }
   for (const name of ['portfolio-catalog', 'portfolio-policy-manifest', 'portfolio-scoring-policy'])
     assert.deepEqual(read(join(selectedRoot, 'benchmarks', `${name}.json`)), read(join(root, 'benchmarks', `${name}.json`)), `preserved ${name} changed`);
   assert.deepEqual(read(join(selectedRoot, 'scripts/ask-benchmark-portfolio-score.mjs')), read(join(root, 'scripts/ask-benchmark-portfolio-score.mjs')), 'raw scorer changed');

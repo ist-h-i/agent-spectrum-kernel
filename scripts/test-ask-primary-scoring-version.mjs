@@ -147,3 +147,28 @@ test('retained synthetic producer and original scoring-input assembly retain sel
   assert.equal(input.scorerOptions.root, f.runtime); assert.equal(input.scoring_ready, false); assert.equal(input.grader_process_starts, 0);
   assert.throws(() => buildPrimaryEvaluationScoringInputs(options, { ...runtime, frozenSourceRoot: ROOT }), /source substitution/);
 });
+
+const buildId = 'mn-build-option-update', buildMap = `benchmarks/fixtures/checkpoint-b2/${buildId}/evidence-map.json`;
+test('build evidence-map allows only valid regenerated mutation asset digests', t => {
+  const f = setup(t);
+  f.mutate(buildMap, value => { for (const contract of value.mutation_contracts) contract.mutation_digest = hash(`new asset ${contract.mutation_id}`); });
+  assert.equal(readPrimaryScoringVersion(f.seal(), buildId).root, f.runtime);
+});
+for (const [label, edit] of [
+  ['malformed digest', value => value.mutation_contracts[0].mutation_digest = 'sha256:not-a-digest'],
+  ['maps', value => value.maps[0].agent_visible_paths.pop()],
+  ['scope', value => value.scope_boundary_authority.allowed_candidate_paths.push('workspace/extra')],
+  ['recoverability state', value => value.mutation_contracts[0].expected_recoverability_state = 'recoverable'],
+  ['admission state', value => value.mutation_contracts[0].expected_admission_result = 'pass'],
+  ['mutation ID', value => value.mutation_contracts[0].mutation_id = 'replacement'],
+  ['target ID', value => value.mutation_contracts[0].target_evidence_map_id = 'replacement'],
+  ['schema', value => value.schema_version = '2.0.0'],
+  ['extra criterion', value => value.mutation_contracts[0].new_rule = 'ignore'],
+  ['missing contract', value => value.mutation_contracts.pop()],
+]) test(`build evidence-map rebinding refuses changed ${label}`, t => {
+  const f = setup(t); f.mutate(buildMap, edit); assert.throws(() => readPrimaryScoringVersion(f.seal(), buildId));
+});
+test('build evidence-map delta does not allow mutation identity changes in other fixtures', t => {
+  const f = setup(t); f.mutate(`${base}/evidence-map.json`, value => value.mutation_contracts[0].mutation_digest = hash('other mutation'));
+  assert.throws(() => readPrimaryScoringVersion(f.seal(), id), /preserved evidence-map/);
+});

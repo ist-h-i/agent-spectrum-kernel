@@ -14,6 +14,14 @@ Its acceptance items are:
   scoring policy, catalog and policy manifest. Output-contract behavior is
   identical; reference/authority/admission binding headers and their computed
   digests may be rebound in independent evaluation copies only.
+  Fresh build-task mutation asset identities may also rebind only the public evidence-map
+  `mutation_contracts[*].mutation_digest` fields. All maps, scope authority,
+  mutation/equivalence/requirement IDs, expected recoverability/admission states,
+  order and other fields remain identical. This permits a new private asset's
+  byte identity, not a scoring-policy or evidence-meaning change. The old build
+  mutation digest cannot be reproduced from its incomplete public projection;
+  its original additional private fields remain Unknown.
+  The other eight evidence-map files remain byte-identical.
 - `AC-SEMANTICS`: each fresh private evaluator uses real candidate output,
   workspace and retained evidence, not case labels or preselected scores.
   Private coverage records include positive, equivalent, negative, scope,
