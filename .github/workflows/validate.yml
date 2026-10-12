@@ -195,6 +195,9 @@ jobs:
       - name: Run adaptive portfolio execution tests
         run: node scripts/test-ask-benchmark-execution.mjs
 
+      - name: Run admitted portfolio propagation preparation tests
+        run: node scripts/test-ask-benchmark-admission-propagation.mjs
+
       - name: Run verification command evidence contract tests
         run: node scripts/test-ask-benchmark-command-evidence.mjs
 

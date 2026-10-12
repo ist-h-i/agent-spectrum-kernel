@@ -2169,6 +2169,7 @@ export function createProductionSealedEvaluatorExecution(options = {}) {
     selectionState: options.selectionState,
     runDir: options.runDir,
     normalizedResultsPath: options.normalizedResultsPath,
+    executionAdmissionEvidenceByFixture: options.executionAdmissionEvidenceByFixture ?? null,
     sourceSnapshotDigest: options.sourceSnapshotDigest,
     normalizedResultId: options.normalizedResultId,
     outputParent: evaluationRoot,

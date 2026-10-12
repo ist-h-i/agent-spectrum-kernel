@@ -553,14 +553,14 @@ function readPlan(planPath) {
   return readJson(planPath);
 }
 
-function loadSelections({ root, config, planPath, materializedPath, selectionState, repositoryRevision, plan }) {
+function loadSelections({ root, config, planPath, materializedPath, selectionState, repositoryRevision, plan, executionAdmissionEvidenceByFixture = null }) {
   if (!selectionState || !existsSync(selectionState) || !lstatSync(selectionState).isDirectory()) throw new Error("execution requires an existing --selection-state directory");
   assertNoSymlinkSegments(selectionState, "selection state");
   const indexPath = resolve(selectionState, "selection-state.json");
   if (!existsSync(indexPath) || !lstatSync(indexPath).isFile()) throw new Error("selection state index is missing");
   const selections = new Map();
   for (const entry of plan.cases.filter((caseRecord) => caseRecord.condition === "adaptive_ask")) {
-    const record = verifyAdaptiveSelection({ root, config, planPath, materializedPath, stateDir: selectionState, caseId: entry.case_id, repositoryRevision });
+    const record = verifyAdaptiveSelection({ root, config, planPath, materializedPath, stateDir: selectionState, caseId: entry.case_id, repositoryRevision, executionAdmissionEvidenceByFixture });
     selections.set(entry.case_id, record);
   }
   return { selections, stateDigest: `sha256:${fileDigest(indexPath)}` };
@@ -670,12 +670,12 @@ function initializeRun({ root, runDir, identity, plan, selections }) {
   }
 }
 
-function loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, initialize = true }) {
+function loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, initialize = true, executionAdmissionEvidenceByFixture = null }) {
   assertTrackedRepositoryMatchesHead(root);
   const repositoryRevision = git(root, ["rev-parse", "HEAD"]);
   const plan = readPlan(planPath);
-  const materialized = validateMaterializedPortfolio({ root, config, plan, materializedRoot: materializedPath, repositoryRevision });
-  const selections = loadSelections({ root, config, planPath, materializedPath, selectionState, repositoryRevision, plan });
+  const materialized = validateMaterializedPortfolio({ root, config, plan, materializedRoot: materializedPath, repositoryRevision, executionAdmissionEvidenceByFixture });
+  const selections = loadSelections({ root, config, planPath, materializedPath, selectionState, repositoryRevision, plan, executionAdmissionEvidenceByFixture });
   const identity = runIdentity({ root, plan, materialized, selections, repositoryRevision, config });
   const safeRunDir = assertRunBoundary(runDir, materializedPath, selectionState);
   const initializedRun = initialize
@@ -688,7 +688,7 @@ function loadExecutionContext({ root, config, planPath, materializedPath, select
       if (stableCanonicalJson(existing) !== stableCanonicalJson({ ...identity, run_instance_id: existing.run_instance_id })) throw new Error("run identity changed; refusing verification");
       return { initialized: false, identity: existing };
     })();
-  return { repositoryRevision, plan, materialized, selections, identity: initializedRun.identity, runDir: safeRunDir, initialized: initializedRun.initialized };
+  return { repositoryRevision, plan, materialized, selections, identity: initializedRun.identity, runDir: safeRunDir, initialized: initializedRun.initialized, executionAdmissionEvidenceByFixture };
 }
 
 function adapterHasAttempts(runDir, plan, adapter) {
@@ -1823,7 +1823,7 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     mkdirSync(attemptRoot, { recursive: false });
     let selection = context.selections.selections.get(entry.case_id) ?? null;
     if (entry.condition === "adaptive_ask") {
-      const observed = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision });
+      const observed = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision, executionAdmissionEvidenceByFixture: context.executionAdmissionEvidenceByFixture });
       const expected = context.selections.selections.get(entry.case_id)?.selection_digest.value;
       if (observed.selection_digest.value !== expected) throw new Error("Adaptive selection changed before execution");
     }
@@ -1844,7 +1844,7 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     terminalWorkspaceBase = captureTerminalWorkspaceInventory(workspace);
     if (stableCanonicalJson(terminalWorkspaceBase.inventory.filter((item) => item.file_type === "regular_file")) !== stableCanonicalJson(expectedBaseRegularInventory(materializedRecord, projection))) throw new Error("terminal workspace base does not match verified materialization");
     if (selection) {
-      const beforeSpawn = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision });
+      const beforeSpawn = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision, executionAdmissionEvidenceByFixture: context.executionAdmissionEvidenceByFixture });
       if (beforeSpawn.selection_digest.value !== claim.selection.digest) throw new Error("Adaptive selection changed before process spawn");
     }
     const request = requestRecord({ entry, attempt, claim, projection });
@@ -1866,7 +1866,7 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     terminalWorkspaceAuthority = publishTerminalWorkspaceAuthority({ root, attemptRoot, entry, claim, baseSnapshot: terminalWorkspaceBase, workspace, record: materializedRecord, projection });
     sealedCommandEvidence = sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity: adapter.identity, processResult, contract, workspaceRoot: workspace });
     if (selection) {
-      const afterSpawn = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision });
+      const afterSpawn = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision, executionAdmissionEvidenceByFixture: context.executionAdmissionEvidenceByFixture });
       if (afterSpawn.selection_digest.value !== claim.selection.digest) throw new Error("Adaptive selection changed during process execution");
     }
     if (sealedCommandEvidence.captureError) throw new Error(`command evidence invalid:${sealedCommandEvidence.captureError.code ?? "unclassified"}`);
@@ -1915,15 +1915,36 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
   }
 }
 
+/** Prepare ordinary run custody only. Never resolves/probes an agent binary or starts an attempt. */
+export function preparePortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture = null }) {
+  if (!runDir) throw new Error("prepare-execution requires a run directory");
+  if (existsSync(runDir) && (!lstatSync(runDir).isDirectory() || readdirSync(runDir).length !== 0)) {
+    throw new Error("prepare-execution refuses a nonempty existing run directory");
+  }
+  const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture });
+  return {
+    run_instance_id: context.identity.run_instance_id,
+    plan_id: context.plan.plan_id,
+    plan_digest: context.identity.plan.digest,
+    repository_revision: context.repositoryRevision,
+    materialization_manifest_digest: context.materialized.manifestDigest,
+    selection_state_digest: context.selections.stateDigest,
+    case_count: context.plan.cases.length,
+    model_calls: 0,
+    case_attempts_created: 0,
+    execution_authorized: false,
+  };
+}
+
 // Explicit no-model native preparation: version/help probes and local run state
 // only. This function never calls executeCase or executeAgent.
-export function prepareSuccessorPortfolioSource({ root, config, planPath, materializedPath, selectionState, runDir, runtimeConfigPath, agentBin, preparation }) {
+export function prepareSuccessorPortfolioSource({ root, config, planPath, materializedPath, selectionState, runDir, runtimeConfigPath, agentBin, preparation, executionAdmissionEvidenceByFixture = null }) {
   const adapter = "codex";
   const runtimeConfig = readRuntimeConfig(root, runtimeConfigPath, adapter);
   if (runtimeConfig.value.availability !== "available") throw new Error("successor native preparation requires an available declared runtime");
   const environmentSnapshot = captureEnvironment(runtimeConfig.value);
   const verifiedExecutable = validateAgentExecutable(agentBin);
-  const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir });
+  const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture });
   if (context.plan.cases.some((entry) => readCaseState(root, context.runDir, entry).status !== "pending")) throw new Error("successor native preparation rejects a previously started run");
   const runtimeIdentity = ensureAdapterIdentity({ root, runDir: context.runDir, plan: context.plan, adapter, runtimeConfig, verifiedExecutable, environmentSnapshot, successorRuntime: preparation.runtime });
   if (runtimeIdentity.identity.availability !== "available") throw new Error("successor runtime contract is unconfirmed; no cases were started");
@@ -1943,14 +1964,14 @@ export function prepareSuccessorPortfolioSource({ root, config, planPath, materi
   };
 }
 
-export function executePortfolio({ root, config, planPath, materializedPath, selectionState, runDir, adapter, runtimeConfigPath, agentBin, caseId = null, maxCases = null, retryFailed = false, successorPromptInput = null }) {
+export function executePortfolio({ root, config, planPath, materializedPath, selectionState, runDir, adapter, runtimeConfigPath, agentBin, caseId = null, maxCases = null, retryFailed = false, successorPromptInput = null, executionAdmissionEvidenceByFixture = null }) {
   if (successorPromptInput !== null) assertSuccessorInputRun(successorPromptInput, { adapter, caseId, retryFailed, maxCases });
   if (!adapter || !["codex", "claude"].includes(adapter)) throw new Error("execute-portfolio requires --adapter codex or claude");
   if (maxCases !== null && (!Number.isInteger(maxCases) || maxCases < 1)) throw new Error("--max-cases must be a positive integer");
   const runtimeConfig = readRuntimeConfig(root, runtimeConfigPath, adapter);
   const environmentSnapshot = captureEnvironment(runtimeConfig.value);
   const verifiedExecutable = runtimeConfig.value.availability === "available" ? validateAgentExecutable(agentBin) : null;
-  const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir });
+  const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture });
   fault("after_run_initialized");
   context.planPath = planPath;
   context.materializedPath = materializedPath;
@@ -2004,12 +2025,12 @@ function classificationForCase({ root, context, entry }) {
   }
 }
 
-export function inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir }) {
+export function inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture = null }) {
   const primary = primaryProducerInspection({ root, config, planPath, materializedPath, selectionState, runDir });
   if (primary) return primary;
   const producer = coreProducerInspection({ root, config, planPath, materializedPath, selectionState, runDir });
   if (producer) return producer;
-  const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, initialize: false });
+  const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, initialize: false, executionAdmissionEvidenceByFixture });
   assertDirectoryInventory(context.runDir, ["adapters", "cases", RUN_IDENTITY_FILE], "run root");
   const adaptersRoot = resolve(context.runDir, "adapters");
   const adapterInventory = readdirSync(adaptersRoot).sort();
@@ -2029,12 +2050,12 @@ export function inspectVerifiedPortfolioExecution({ root, config, planPath, mate
   };
 }
 
-export function verifyExecutionTerminalWorkspaceAuthority({ root, config, planPath, materializedPath, selectionState, runDir, caseId, attempt }) {
+export function verifyExecutionTerminalWorkspaceAuthority({ root, config, planPath, materializedPath, selectionState, runDir, caseId, attempt, executionAdmissionEvidenceByFixture = null }) {
   const primary = primaryProducerInspection({ root, config, planPath, materializedPath, selectionState, runDir });
   if (primary) return verifyPrimaryProducedTerminal(primary, { root, runDir, caseId, attempt });
   const producer = coreProducerInspection({ root, config, planPath, materializedPath, selectionState, runDir });
   if (producer) return verifyCoreProducedTerminal(producer, { root, runDir, caseId, attempt });
-  const inspection = inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir });
+  const inspection = inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture });
   const inspectedCase = inspection.cases.find((item) => item.entry.case_id === caseId);
   if (!inspectedCase) throw new Error("terminal workspace authority case is absent from the verified execution");
   const inspectedAttempt = inspectedCase.attempts.find((item) => item.attempt === attempt);
@@ -2081,8 +2102,8 @@ export function verifyExecutionTerminalWorkspaceAuthority({ root, config, planPa
   };
 }
 
-export function verifyPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir }) {
-  const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, initialize: false });
+export function verifyPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture = null }) {
+  const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, initialize: false, executionAdmissionEvidenceByFixture });
   return {
     cases: context.plan.cases.map((entry) => classificationForCase({ root, context, entry })),
   };
