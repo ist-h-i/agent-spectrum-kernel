@@ -11,12 +11,12 @@ import { comparisonHash, inventoryUserTree, prepareGitBaseline, prepareUserCompa
 import { createPrimaryEvaluationGradingAdapter, preflightPrimaryEvaluationGrading, PRIMARY_GRADING_PROFILE_ID } from "./ask-primary-evaluation-grading.mjs";
 import { readPrimaryScoringVersion } from "./ask-primary-scoring-version.mjs";
 import { primaryProfileForKernel } from "./ask-primary-evaluation-profile.mjs";
-import { preparePrimaryEvaluationBatch, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_BATCH_LIMITS } from "./ask-primary-evaluation-batch.mjs";
+import { preparePrimaryEvaluationBatch, validatePrimaryRemainingEightContinuation, assertPrimaryContinuationIsolation, reservePrimaryRemainingEightOutput, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_BATCH_LIMITS } from "./ask-primary-evaluation-batch.mjs";
 
 const SOURCE = fileURLToPath(new URL("../", import.meta.url));
 const read = path => readStableFile(path, "fixed public primary input", 32 * 1024 * 1024).bytes;
 const json = path => parseJsonRejectDuplicateKeys(read(path).toString("utf8"));
-const closedOptions = ["output", "cliBin", "cliVersion", "model", "reasoning", "globalAskPresence", "evidenceKind", "gradingResourcesPath", "gradingResourcesDigest", "kernelCondition", "scoringVersionPath", "scoringVersionDigest"];
+const closedOptions = ["output", "cliBin", "cliVersion", "model", "reasoning", "globalAskPresence", "evidenceKind", "gradingResourcesPath", "gradingResourcesDigest", "kernelCondition", "scoringVersionPath", "scoringVersionDigest", "continuation"];
 const save = (path, value) => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx", mode: 0o600 });
 
 export function preparePrimaryEvaluation(publicParent, options) {
@@ -24,19 +24,25 @@ export function preparePrimaryEvaluation(publicParent, options) {
   assert.ok(Object.keys(options).every(key => closedOptions.includes(key)), "primary preparation options are closed");
   assert.equal(options.scoringVersionPath == null, options.scoringVersionDigest == null, "scoring version path and digest supplied together");
   const scoringVersion = options.scoringVersionPath == null ? null : { path: options.scoringVersionPath, digest: options.scoringVersionDigest };
-  // Validate every selected fixture before creating any preparation output.
-  if (scoringVersion) for (const fixtureId of PRIMARY_FIXTURE_IDS) readPrimaryScoringVersion(scoringVersion, fixtureId);
-  const profile = primaryProfileForKernel(options.kernelCondition ?? "kernel_principles_v2");
-  const gradingAdapter = createPrimaryEvaluationGradingAdapter({ resourcesPath: options.gradingResourcesPath ?? null,
-    resourcesDigest: options.gradingResourcesDigest ?? null });
+  const continuation = Object.hasOwn(options, "continuation") ? validatePrimaryRemainingEightContinuation(options.continuation) : null;
+  const fixtureIds = continuation?.fixture_ids ?? PRIMARY_FIXTURE_IDS;
+  if (continuation) assert.deepEqual(scoringVersion, options.continuation.retained_scoring_version);
   assert.ok(isAbsolute(publicParent) && realpathSync(publicParent) === publicParent);
   const output = options.output;
   assert.ok(isAbsolute(output) && resolve(output) === output && realpathSync(dirname(output)) === dirname(output));
   assert.ok(!output.startsWith(`${publicParent}/`) && !publicParent.startsWith(`${output}/`) && output !== publicParent, "output/input overlap");
+  if (continuation) assertPrimaryContinuationIsolation(continuation, [output, publicParent]);
+
+  // Validate every selected fixture before creating any preparation output.
+  if (scoringVersion) for (const fixtureId of fixtureIds) readPrimaryScoringVersion(scoringVersion, fixtureId);
+  const profile = primaryProfileForKernel(options.kernelCondition ?? "kernel_principles_v2");
+  const gradingAdapter = createPrimaryEvaluationGradingAdapter({ resourcesPath: options.gradingResourcesPath ?? null,
+    resourcesDigest: options.gradingResourcesDigest ?? null });
+  const issuance = continuation ? reservePrimaryRemainingEightOutput(options.continuation, output) : null;
   mkdirSync(output, { mode: 0o700 }); // Create once; never reopen or repair.
   for (const path of ["seeds", "blocks", "recipes"]) mkdirSync(join(output, path), { mode: 0o700 });
   const blocks = [];
-  for (const fixtureId of PRIMARY_FIXTURE_IDS) {
+  for (const fixtureId of fixtureIds) {
     const publicRoot = join(publicParent, fixtureId), original = inventoryUserTree(publicRoot);
     const recipe = buildPrimaryFixtureRecipe(fixtureId);
     const tree = new Map(Object.keys(original).map(path => [path, { bytes: read(join(publicRoot, path)), mode: "100644" }]));
@@ -75,11 +81,12 @@ export function preparePrimaryEvaluation(publicParent, options) {
     block.grading.blockers = gradingPreflight.blockers;
     blocks.push(block);
   }
-  const manifest = { kind: "ask_primary_evaluation_batch_manifest_v1", batch_id: "primary-nine-prepared-v4",
+  const manifest = { kind: "ask_primary_evaluation_batch_manifest_v1", batch_id: continuation ? "primary-r9-remaining-eight-v1" : "primary-nine-prepared-v4",
+    ...(continuation ? { continuation: structuredClone(options.continuation) } : {}),
     root: join(output, "batch"), conditions: [...profile.conditions],
     limits: { ...PRIMARY_BATCH_LIMITS }, blocks };
   const manifestPath = join(output, "batch-manifest.json"); save(manifestPath, manifest);
-  const result = preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter });
+  const result = preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter, issuance });
   save(join(output, "preparation-result.json"), result);
   return { ...result, manifest_path: manifestPath, model_calls: 0, old_ownership_diagnostics: 0,
     kernel_candidate_decision: `${profile.kernel_condition} selected for this practical evaluation; old v1 and candidate preserved; not product adoption` };

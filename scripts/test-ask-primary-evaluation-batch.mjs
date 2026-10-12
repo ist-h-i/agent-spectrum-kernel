@@ -1,35 +1,47 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { buildPrimaryFixtureRecipe } from './ask-primary-fixture-recipe.mjs';
+const AUTHENTIC_ROOT = fileURLToPath(new URL('../', import.meta.url));
 import { comparisonHash, inventoryUserTree, prepareUserComparison } from './ask-user-comparison-prepare.mjs';
-import { PRIMARY_BATCH_LIMITS, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_FIXTURE_IDS, inspectPrimaryEvaluationBatch, preparePrimaryEvaluationBatch, reportPrimaryEvaluationBatch, startPrimaryEvaluationBatch } from './ask-primary-evaluation-batch.mjs';
+import { PRIMARY_BATCH_LIMITS, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_FIXTURE_IDS, validatePrimaryRemainingEightContinuation, reservePrimaryRemainingEightOutput, inspectPrimaryEvaluationBatch, preparePrimaryEvaluationBatch, reportPrimaryEvaluationBatch, startPrimaryEvaluationBatch } from './ask-primary-evaluation-batch.mjs';
+import { preparePrimaryEvaluation } from './ask-primary-evaluation-prepare.mjs';
 const hash = value => comparisonHash(value);
 function git(root, args) {
   const result = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], { cwd: root, encoding: 'utf8',
     env: { PATH: process.env.PATH, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' } });
   assert.equal(result.status, 0, result.stderr); return result.stdout.trim();
 }
-function fixture(t) {
+function fixture(t, { kernelCondition = 'kernel_only' } = {}) {
+  const conditions = ['plain', kernelCondition, 'full_ask'];
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'ask-primary-batch-')));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const blocks = PRIMARY_FIXTURE_IDS.map((fixture_id, index) => {
     const publicRoot = join(root, `public-${index}`), source = join(root, `seed-${index}`);
     mkdirSync(publicRoot); mkdirSync(join(publicRoot, 'workspace'));
-    writeFileSync(join(publicRoot, 'task.md'), 'Update workspace/value.mjs to 1.\n');
-    writeFileSync(join(publicRoot, 'workspace/value.mjs'), 'export const value = 0;\n');
-    writeFileSync(join(publicRoot, 'workspace/value.test.mjs'), "import test from 'node:test'; test('fixture', () => {});\n");
+    const authentic = kernelCondition === 'kernel_principles_v2' ? buildPrimaryFixtureRecipe(fixture_id) : null;
+    if (authentic) {
+      const base = join(AUTHENTIC_ROOT, 'benchmarks/fixtures/checkpoint-b2', fixture_id);
+      cpSync(join(base, 'task.md'), join(publicRoot, 'task.md'));
+      cpSync(join(base, 'workspace'), join(publicRoot, 'workspace'), { recursive: true });
+    } else {
+      writeFileSync(join(publicRoot, 'task.md'), 'Update workspace/value.mjs to 1.\n');
+      writeFileSync(join(publicRoot, 'workspace/value.mjs'), 'export const value = 0;\n');
+      writeFileSync(join(publicRoot, 'workspace/value.test.mjs'), "import test from 'node:test'; test('fixture', () => {});\n");
+    }
     const files = Object.entries(inventoryUserTree(publicRoot)).map(([path, value]) => ({ path, bytes: value.bytes, sha256: value.digest.slice(7) }));
     const inputManifest = join(root, `input-${index}.json`);
     writeFileSync(inputManifest, JSON.stringify({ scope: 'agent-visible task.md + workspace/**', fixtures: { [fixture_id]: { files } } }));
     cpSync(publicRoot, source, { recursive: true }); git(source, ['init', '-q']); git(source, ['add', '.']);
     git(source, ['-c', 'user.name=Batch test', '-c', 'user.email=batch@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fake seed']);
     const recipe = join(root, `verification-${index}.json`);
-    writeFileSync(recipe, JSON.stringify({ command: ['node', '--test', 'workspace/value.test.mjs'], requirements: [] }));
+    writeFileSync(recipe, JSON.stringify(authentic ?? { command: ['node', '--test', 'workspace/value.test.mjs'], requirements: [] }));
     const prepared = prepareUserComparison({ repo: source, commit: git(source, ['rev-parse', 'HEAD']), taskFile: join(publicRoot, 'task.md'),
-      verificationFile: recipe, output: join(root, `child-${index}`), mutablePaths: ['workspace/value.mjs'], taskClass: 'trivial',
+      verificationFile: recipe, output: join(root, `child-${index}`), mutablePaths: authentic?.mutable_paths ?? ['workspace/value.mjs'], taskClass: authentic?.runner_task_class ?? 'trivial', kernelCondition,
       evidenceKind: 'synthetic', executionContract: 'single_shot_v1', cliVersion: 'fake-test', tokenBudget: 5000000, overallTimeoutMs: 14400000 });
     return { fixture_id, root: prepared.root, run_id: prepared.plan.run_id, plan_digest: prepared.plan_digest,
       source_digest: prepared.plan.source.digest, task_digest: prepared.plan.task.digest, verification_digest: prepared.plan.verification.digest,
@@ -43,7 +55,7 @@ function fixture(t) {
     for (const block of blocks) if (existsSync(join(block.root, 'control/slots/.synthetic-batch-receipts')))
       rmSync(join(block.root, 'control/slots'), { recursive: true });
     const value = edit({ kind: 'ask_primary_evaluation_batch_manifest_v1', batch_id: `fake-${++number}`, root: join(root, `batch-${number}`),
-      conditions: ['plain', 'kernel_only', 'full_ask'], limits: PRIMARY_BATCH_LIMITS, blocks: structuredClone(blocks) });
+      conditions: [...conditions], limits: { ...PRIMARY_BATCH_LIMITS }, blocks: structuredClone(blocks) });
     const path = join(root, `manifest-${number}.json`); writeFileSync(path, JSON.stringify(value)); return { path, value, digest: hash(readFileSync(path)) };
   } };
 }
@@ -52,7 +64,7 @@ function adapters(overrides = {}) {
   return { calls, grades, gradingAdapter: { preflight: () => ({ status: 'ready', blockers: [] }), grade: async block => { grades.push(block.fixture_id); return { status: 'completed', quality: null }; }, ...overrides.grading },
     startComparison: async (root, planDigest) => {
       calls.push(root); const plan = JSON.parse(readFileSync(join(root, 'control/plan.json')));
-      const slots = ['plain', 'kernel_only', 'full_ask'].map(condition => ({ condition, state: overrides.slotState ?? 'completed',
+      const slots = ['plain', plan.config.kernel_condition ?? 'kernel_only', 'full_ask'].map(condition => ({ condition, state: overrides.slotState ?? 'completed',
         outcome: overrides.outcome ?? 'pass', receipt_integrity: 'valid', exit_code: 0, scope: { status: 'pass' },
         process_completed: !overrides.unknownChild, unresolved_child: overrides.unknownChild ?? false,
         verification: { checks: [{ process_completed: !overrides.unknownVerifier, spawn_observed: true,
@@ -257,4 +269,164 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
     assert.equal(failed.state, 'consumption_unknown'); assert.equal(failed.terminal.state, 'stopped');
     assert.equal(failed.usage.missing_requested_report_count, 1); assert.equal(failed.slots.filter(slot => slot.state === 'unknown').length, 3);
   });
+});
+
+const remainingPolicy = {
+  natural_language: 'manual_allowed', command_match: 'exact_rendered_no_shell_equivalence',
+  capture_failure: 'whole_capture_unknown', missing_raw_score: 'retain_raw_separate_unknown_analysis',
+  manual_scoring: 'not_start_or_next_fixture_prerequisite',
+};
+const pinned = path => ({ path, digest: hash(readFileSync(path)) });
+async function remainingFixture(t) {
+  const parent = fixture(t, { kernelCondition: 'kernel_principles_v2' });
+  const versionPath = join(parent.root, 'retained-version.json');
+  writeFileSync(versionPath, JSON.stringify({ kind: 'ask_primary_scoring_version_v1', scoring_version_id: 'synthetic-fixed-v4',
+    fixtures: Object.fromEntries(PRIMARY_FIXTURE_IDS.map(id => [id, {}])) }));
+  const version = pinned(versionPath); parent.blocks[0].grading.scoring_version = version;
+  const pm = parent.manifest(), parentRun = join(parent.root, 'evaluation/run');
+  mkdirSync(parentRun, { recursive: true });
+  pm.value.root = join(parentRun, 'batch'); pm.path = join(parentRun, 'batch-manifest.json');
+  writeFileSync(pm.path, JSON.stringify(pm.value)); pm.digest = hash(readFileSync(pm.path));
+  const pa = adapters({ state: 'indeterminate', outcome: 'unknown', grading: { grade: async () => ({ status: 'unknown' }) } });
+  preparePrimaryEvaluationBatch(pm.path, pa);
+  const stopped = await startPrimaryEvaluationBatch(pm.value.root, pm.digest, pa);
+  assert.equal(stopped.state, 'stopped'); assert.equal(pa.calls.length, 1);
+  const first = parent.blocks[0], packet = join(parent.root, 'retained-first'); mkdirSync(packet);
+  const producerRoot = join(packet, 'producer'); mkdirSync(producerRoot);
+  const producerPath = join(producerRoot, 'producer.json');
+  writeFileSync(producerPath, JSON.stringify({ kind: 'ask_primary_evaluation_producer_v1', evidence_kind: 'synthetic', block: first }));
+  const conditions = pm.value.conditions.map(condition => {
+    const logs = join(packet, `private-${condition}`, 'worker-logs'), pub = join(packet, `public-${condition}`);
+    mkdirSync(logs, { recursive: true }); mkdirSync(pub);
+    const artifacts = Object.fromEntries(['evaluator_result', 'engineering_result'].map(name => {
+      const path = join(pub, name + '.json'); writeFileSync(path, JSON.stringify({ synthetic: true })); return [name, pinned(path)];
+    }));
+    const receipts = Array.from({ length: 4 }, (_, index) => {
+      const channels = Object.fromEntries(['stdout', 'stderr'].map(channel => {
+        const path = `${String(index + 1).padStart(4, '0')}.${channel}.log`, raw = 'synthetic\n';
+        writeFileSync(join(logs, path), raw); return [channel, { path, bytes: Buffer.byteLength(raw), digest: hash(raw) }];
+      }));
+      return { kind: 'ask_primary_private_worker_stdio_v1', evidence_kind: 'synthetic', condition,
+        spawn_observed: true, process_completed: true, exit_code: 0, signal: null, error_code: null,
+        log_capture_status: 'complete', ...channels };
+    });
+    return { condition, evidence_kind: 'synthetic', status: 'completed', quality: null, scoring_status: 'not_scoring_ready',
+      model_calls: 0, grader_process_starts: 4, grader_process_completed: true, public_artifacts: artifacts, worker_receipts: receipts };
+  });
+  const gradePath = join(packet, 'final-posthoc-report.json');
+  writeFileSync(gradePath, JSON.stringify({ kind: 'derived_processing_only_grading_result',
+    criterion_version_id: 'ask-primary-fresh-scoring-v4', original_run_id: first.run_id, status: 'completed', failure: null,
+    originals_unchanged: true, model_calls: 0, comparison_start_resume: 0, grader_process_starts: 12,
+    conditions, producer: { record_root: producerRoot, digest: hash(readFileSync(producerPath)) } }));
+  const continuation = { kind: 'ask_primary_remaining_eight_v1', parent_batch_id: pm.value.batch_id,
+    retained_scoring_version: version, parent_manifest: pinned(pm.path),
+    parent_start_record: pinned(join(pm.value.root, 'consumption/start.json')),
+    parent_first_report: pinned(join(pm.value.root, 'consumption/block-0-report.json')),
+    retained_first_grading: pinned(gradePath), parent_run_id: first.run_id, original_fixture_ids: [...PRIMARY_FIXTURE_IDS],
+    original_unstarted_blocks: parent.blocks.slice(1).map(block => ({ fixture_id: block.fixture_id, run_id: block.run_id,
+      plan_digest: block.plan_digest, start_consumed: false })), analysis_policy: remainingPolicy };
+  const fresh = fixture(t, { kernelCondition: 'kernel_principles_v2' });
+  for (const block of fresh.blocks) block.grading.scoring_version = version;
+  const manifest = (edit = value => value) => fresh.manifest(value => edit({ ...value,
+    blocks: value.blocks.slice(1), continuation: structuredClone(continuation) }));
+  return { parent, pm, first, gradePath, continuation, fresh, manifest };
+}
+function assertSiblingRefused(f) {
+  const sibling = join(f.fresh.root, 'sibling'); mkdirSync(sibling);
+  const m = f.manifest(value => ({ ...value, root: join(sibling, 'batch') }));
+  assert.throws(() => preparePrimaryEvaluationBatch(m.path, adapters()), /already issued/u);
+  assert.equal(existsSync(m.value.root), false);
+}
+test('remaining-eight is one fresh exact 24-slot plan with retained parent evidence', async t => {
+  const f = await remainingFixture(t);
+  const preserved = [f.pm.path, f.continuation.parent_start_record.path, f.continuation.parent_first_report.path, f.gradePath,
+    ...['plain', 'kernel_principles_v2', 'full_ask'].flatMap(c => ['result.json', 'result.digest'].map(n => join(f.first.root, 'control/slots', c, n)))];
+  const before = preserved.map(p => hash(readFileSync(p)));
+  await t.test('all24 partial/manual results save and terminate; second start never dispatches', async () => {
+    const m = f.manifest(), a = adapters({ state: 'indeterminate', outcome: 'unknown' });
+    a.gradingAdapter.grade = async block => {
+      a.grades.push(block.fixture_id);
+      return { status: 'completed', scoring_status: 'not_scoring_ready', conditions: m.value.conditions.map((condition, i) => ({
+        condition, status: 'completed', scoring_status: i === 0 ? 'complete' : 'not_scoring_ready', quality: i === 0 ? 0.5 : null,
+        requirement_judgments: [{ requirement_id: 'synthetic-only', outcome: i === 0 ? 'pass' : 'manual_review_required', evidence_references: [] }],
+      })) };
+    };
+    const prepared = preparePrimaryEvaluationBatch(m.path, a);
+    assert.equal(prepared.slot_count, 24); assert.equal(prepared.start_consumed, false);
+    const result = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
+    assert.equal(result.state, 'completed'); assert.equal(a.calls.length, 8); assert.equal(a.grades.length, 8);
+    assert.deepEqual(result.slots.map(s => s.fixture_id), PRIMARY_FIXTURE_IDS.slice(1).flatMap(id => [id, id, id]));
+    assert.equal(result.slots.length, 24); assert.equal(result.slots.filter(s => s.quality === null).length, 16);
+    assert.equal(result.slots.filter(s => s.quality === 0.5).length, 8);
+    assert.deepEqual(result.continuation.original_fixture_ids, PRIMARY_FIXTURE_IDS);
+    assert.ok(result.slots.every(s => s.grading.conditions.length === 3));
+    await assert.rejects(startPrimaryEvaluationBatch(m.value.root, m.digest, a), /consumed/u); assert.equal(a.calls.length, 8);
+  });
+  await t.test('issued parent refuses another sibling manifest before publication', () => assertSiblingRefused(f));
+  await t.test('prepare refuses parent or retained-grade output before any write', () => {
+    for (const output of [join(f.parent.blocks[1].root, 'new-output'), join(f.gradePath.replace('/final-posthoc-report.json', ''), 'new-output')]) {
+      const options = { output, continuation: f.continuation, scoringVersionPath: f.continuation.retained_scoring_version.path,
+        scoringVersionDigest: f.continuation.retained_scoring_version.digest };
+      assert.throws(() => preparePrimaryEvaluation(f.fresh.root, options), /overlaps parent/u);
+      assert.equal(existsSync(output), false);
+    }
+  });
+  await t.test('no substitution, changed lineage, reused IDs/roots, first replay, or lower budget', () => {
+    const edits = [m => m.blocks.reverse(), m => m.blocks.push(f.fresh.blocks[0]), m => m.blocks.pop(),
+      m => m.continuation.parent_manifest.digest = hash('changed'), m => m.continuation.parent_run_id = 'wrong',
+      m => m.continuation.original_fixture_ids.reverse(), m => m.continuation.original_unstarted_blocks[0].start_consumed = true,
+      m => m.continuation.retained_first_grading.digest = hash('changed'), m => m.continuation.analysis_policy.manual_scoring = 'required',
+      m => m.conditions[1] = 'kernel_principles_v1', m => m.blocks[0].run_id = f.parent.blocks[1].run_id,
+      m => m.blocks[0].root = f.parent.blocks[1].root, m => m.blocks[0].public_input_root = f.parent.blocks[1].public_input_root,
+      m => m.limits.token_budget = 40000000, m => m.limits.overall_timeout_ms = 216000000, m => m.continuation.arbitrary_retry = true];
+    for (const edit of edits) {
+      const m = f.manifest(value => { edit(value); return value; }); assert.throws(() => preparePrimaryEvaluationBatch(m.path, adapters()));
+    }
+    const corrupted = join(f.gradePath.replace('/final-posthoc-report.json', ''), 'private-plain/worker-logs/0001.stdout.log');
+    const oldLog = readFileSync(corrupted); writeFileSync(corrupted, 'corrupt');
+    try { assert.throws(() => preparePrimaryEvaluationBatch(f.manifest().path, adapters()), /worker log changed/u); }
+    finally { writeFileSync(corrupted, oldLog); }
+    const link = join(f.parent.blocks[1].root, 'control/start.json'); symlinkSync(join(f.parent.root, 'absent-target'), link);
+    try { assert.throws(() => preparePrimaryEvaluationBatch(f.manifest().path, adapters()), /unstarted/u); }
+    finally { rmSync(link); }
+    const oldIntent = join(f.parent.blocks[1].root, 'control/history'); mkdirSync(oldIntent);
+    try { assert.throws(() => preparePrimaryEvaluationBatch(f.manifest().path, adapters()), /unstarted/u); }
+    finally { rmSync(oldIntent, { recursive: true }); }
+  });
+  await t.test('orphan/torn issuance markers refuse before any publication', async () => {
+    const q = await remainingFixture(t), context = validatePrimaryRemainingEightContinuation(q.continuation);
+    mkdirSync(join(q.parent.root, '.ask-primary-continuations'));
+    for (const suffix of ['', '.digest', '.manifest', '.manifest.digest']) {
+      const marker = context.issuance_path + suffix; writeFileSync(marker, 'torn intent');
+      try {
+        assert.throws(() => reservePrimaryRemainingEightOutput(q.continuation, join(q.fresh.root, 'unused')), /already issued/u);
+        assert.equal(readFileSync(marker, 'utf8'), 'torn intent');
+        assert.equal(existsSync(context.issuance_path), suffix === '');
+      } finally { rmSync(marker); }
+    }
+    const grant = reservePrimaryRemainingEightOutput(q.continuation, q.fresh.root), m = q.manifest();
+    assert.equal(Object.isFrozen(grant), true);
+    assert.throws(() => { grant.path = 'another-parent'; }, TypeError);
+    assert.throws(() => preparePrimaryEvaluationBatch(m.path, { ...adapters(), issuance: { ...grant } }), /live preparation issuance/u);
+    assert.equal(existsSync(m.value.root), false);
+    preparePrimaryEvaluationBatch(m.path, { ...adapters(), issuance: grant });
+  });
+  await t.test('grading uncertainty saves failure once without replacement IDs or sibling plan', async () => {
+    const q = await remainingFixture(t), m = q.manifest(), a = adapters({ grading: { grade: async block => {
+      a.grades.push(block.fixture_id); return { status: 'unknown' };
+    } } });
+    preparePrimaryEvaluationBatch(m.path, a); const result = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
+    assert.equal(result.state, 'stopped'); assert.equal(a.calls.length, 1); assert.equal(a.grades.length, 1);
+    assert.equal(result.slots[0].run_id, m.value.blocks[0].run_id);
+    await assert.rejects(startPrimaryEvaluationBatch(m.value.root, m.digest, a), /consumed/u); assertSiblingRefused(q);
+  });
+  await t.test('permission/unknown execution stops without grading; consumed remains', async () => {
+    for (const state of ['permission_denied', 'authentication_required', 'execution_blocked', 'running']) {
+      const q = await remainingFixture(t), m = q.manifest(), a = adapters({ state });
+      preparePrimaryEvaluationBatch(m.path, a); const result = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
+      assert.equal(result.state, 'stopped'); assert.equal(a.calls.length, 1); assert.equal(a.grades.length, 0);
+      await assert.rejects(startPrimaryEvaluationBatch(m.value.root, m.digest, a), /consumed/u);
+    }
+  });
+  assert.deepEqual(preserved.map(p => hash(readFileSync(p))), before);
 });

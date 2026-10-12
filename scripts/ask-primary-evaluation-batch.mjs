@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // A one-use coordinator over prepared single_shot_v1 blocks; no new model runner.
 import assert from 'node:assert/strict';
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
@@ -21,6 +21,7 @@ const stable = path => readStableFile(path, 'primary batch artifact', LIMIT).byt
 const json = path => parseJsonRejectDuplicateKeys(stable(path).toString('utf8'));
 const overlap = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 const digest = value => assert.match(value, /^sha256:[a-f0-9]{64}$/u);
+const present = path => { try { lstatSync(path); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } };
 const canonical = path => { assert.ok(isAbsolute(path) && resolve(path) === path, 'canonical absolute path required'); assert.equal(realpathSync(path), path); return path; };
 function saveNew(path, value) {
   const raw = Buffer.isBuffer(value) ? value : bytes(value);
@@ -102,17 +103,152 @@ function checkBlock(block, conditions, pending) {
   }
   return loaded;
 }
+// Narrow continuation of one stopped primary batch. All reads are metadata/byte
+// checks; no legacy ownership probing, starts, auth inspection or worker calls.
+export function validatePrimaryRemainingEightContinuation(value) {
+  const fields = ['kind', 'parent_manifest', 'parent_start_record', 'parent_first_report', 'retained_first_grading',
+    'retained_scoring_version', 'parent_batch_id', 'parent_run_id', 'original_fixture_ids', 'original_unstarted_blocks', 'analysis_policy'];
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value));
+  assert.deepEqual(Object.keys(value).sort(), fields.sort(), 'closed remaining-eight continuation required');
+  assert.equal(value.kind, 'ask_primary_remaining_eight_v1');
+  assert.deepEqual(value.analysis_policy, { natural_language: 'manual_allowed', command_match: 'exact_rendered_no_shell_equivalence',
+    capture_failure: 'whole_capture_unknown', missing_raw_score: 'retain_raw_separate_unknown_analysis',
+    manual_scoring: 'not_start_or_next_fixture_prerequisite' });
+  const pinned = ref => {
+    assert.deepEqual(Object.keys(ref).sort(), ['digest', 'path']); canonical(ref.path); digest(ref.digest);
+    const raw = stable(ref.path); assert.equal(comparisonHash(raw), ref.digest, 'parent/retained evidence changed');
+    return parseJsonRejectDuplicateKeys(raw.toString('utf8'));
+  };
+  const parent = pinned(value.parent_manifest);
+  assert.equal(parent.kind, 'ask_primary_evaluation_batch_manifest_v1');
+  assert.equal(Object.hasOwn(parent, 'continuation'), false, 'continuation chaining is not supported');
+  assert.equal(parent.batch_id, value.parent_batch_id); canonical(parent.root);
+  assert.equal(basename(parent.root), 'batch', 'fixed parent batch layout required');
+  assert.equal(basename(dirname(parent.root)), 'run', 'fixed parent run layout required');
+  assert.equal(value.parent_manifest.path, join(dirname(parent.root), 'batch-manifest.json'), 'fixed external parent manifest required');
+  assert.deepEqual(parent.blocks.map(block => block.fixture_id), PRIMARY_FIXTURE_IDS);
+  assert.deepEqual(value.original_fixture_ids, PRIMARY_FIXTURE_IDS);
+  const conditions = ['plain', 'kernel_principles_v2', 'full_ask']; assert.deepEqual(parent.conditions, conditions);
+  const first = parent.blocks[0]; assert.equal(value.parent_run_id, first.run_id);
+  const parentPrepared = record(join(parent.root, 'prepared.json'));
+  assert.equal(parentPrepared.manifest_path, value.parent_manifest.path);
+  assert.equal(parentPrepared.manifest_digest, value.parent_manifest.digest);
+  assert.equal(value.parent_start_record.path, join(parent.root, 'consumption/start.json'));
+  const start = pinned(value.parent_start_record); record(value.parent_start_record.path);
+  assert.equal(start.batch_id, parent.batch_id); assert.equal(start.manifest_digest, value.parent_manifest.digest);
+  const terminal = record(join(parent.root, 'consumption/terminal.json'));
+  assert.equal(terminal.state, 'stopped'); assert.equal(terminal.manifest_digest, value.parent_manifest.digest);
+  assert.equal(value.parent_first_report.path, join(parent.root, 'consumption/block-0-report.json'));
+  const firstReport = pinned(value.parent_first_report); record(value.parent_first_report.path);
+  assert.ok(safeTerminal(firstReport, first, conditions), 'parent first execution is not closed');
+  const requested = record(join(parent.root, 'consumption/block-0-requested.json'));
+  assert.equal(requested.run_id, first.run_id); assert.equal(requested.plan_digest, first.plan_digest);
+  const remaining = parent.blocks.slice(1);
+  assert.deepEqual(value.original_unstarted_blocks, remaining.map(block => ({ fixture_id: block.fixture_id,
+    run_id: block.run_id, plan_digest: block.plan_digest, start_consumed: false })));
+  for (const [index, block] of remaining.entries()) {
+    canonical(block.root);
+    for (const name of ['requested', 'report', 'grading']) for (const suffix of ['', '.digest'])
+      assert.ok(!present(join(parent.root, 'consumption/block-' + (index + 1) + '-' + name + '.json' + suffix)), 'original remaining block not unstarted');
+    for (const name of ['start.json', 'start.digest', 'leases', 'history'])
+      assert.ok(!present(join(block.root, 'control', name)), 'original remaining intent is not unstarted');
+    for (const name of ['invocations', 'slots']) {
+      const dir = join(block.root, 'control', name);
+      if (!present(dir)) continue;
+      canonical(dir); assert.ok(lstatSync(dir).isDirectory(), 'original remaining directory invalid');
+      assert.ok(readdirSync(dir).every(entry => name === 'slots' && conditions.includes(entry)
+        && canonical(join(dir, entry)) && lstatSync(join(dir, entry)).isDirectory()
+        && readdirSync(join(dir, entry)).length === 0), 'original remaining evidence is not unstarted');
+    }
+  }
+  const grade = pinned(value.retained_first_grading), gradeRoot = dirname(value.retained_first_grading.path);
+  assert.equal(grade.kind, 'derived_processing_only_grading_result');
+  assert.equal(grade.criterion_version_id, 'ask-primary-fresh-scoring-v4');
+  assert.equal(grade.original_run_id, first.run_id); assert.equal(grade.status, 'completed');
+  assert.equal(grade.failure, null); assert.equal(grade.originals_unchanged, true);
+  assert.equal(grade.model_calls, 0); assert.equal(grade.comparison_start_resume, 0); assert.equal(grade.grader_process_starts, 12);
+  assert.deepEqual(grade.conditions.map(item => item.condition), conditions);
+  const version = pinned(value.retained_scoring_version);
+  assert.equal(version.kind, 'ask_primary_scoring_version_v1'); assert.deepEqual(Object.keys(version.fixtures).sort(), [...PRIMARY_FIXTURE_IDS].sort());
+  assert.equal(grade.producer.record_root, join(gradeRoot, 'producer'));
+  const producer = pinned({ path: join(grade.producer.record_root, 'producer.json'), digest: grade.producer.digest });
+  assert.equal(producer.kind, 'ask_primary_evaluation_producer_v1');
+  const parentEvidenceKind = readUserComparisonPlan(first.root).plan.config.evidence_kind;
+  assert.equal(producer.evidence_kind, parentEvidenceKind, 'retained producer evidence kind differs');
+  for (const key of ['fixture_id', 'root', 'run_id', 'plan_digest']) assert.equal(producer.block[key], first[key]);
+  assert.deepEqual(producer.block.grading.scoring_version, value.retained_scoring_version);
+  for (const item of grade.conditions) {
+    assert.equal(item.status, 'completed'); assert.equal(item.model_calls, 0); assert.equal(item.evidence_kind, parentEvidenceKind);
+    assert.equal(item.grader_process_completed, true); assert.equal(item.grader_process_starts, 4);
+    assert.ok(item.quality === null || Number.isFinite(item.quality));
+    assert.equal(item.worker_receipts.length, 4);
+    for (const [receiptIndex, receipt] of item.worker_receipts.entries()) {
+      assert.equal(receipt.kind, 'ask_primary_private_worker_stdio_v1'); assert.equal(receipt.condition, item.condition); assert.equal(receipt.evidence_kind, parentEvidenceKind);
+      assert.equal(receipt.spawn_observed, true); assert.equal(receipt.process_completed, true); assert.equal(receipt.exit_code, 0);
+      assert.equal(receipt.signal, null); assert.equal(receipt.error_code, null); assert.equal(receipt.log_capture_status, 'complete');
+      for (const channel of ['stdout', 'stderr']) {
+        const ref = receipt[channel]; assert.equal(ref.path, String(receiptIndex + 1).padStart(4, '0') + '.' + channel + '.log'); digest(ref.digest);
+        const path = join(gradeRoot, 'private-' + item.condition, 'worker-logs', ref.path); canonical(path);
+        const raw = stable(path); assert.equal(raw.length, ref.bytes, 'retained worker log changed'); assert.equal(comparisonHash(raw), ref.digest, 'retained worker log changed');
+      }
+    }
+    for (const key of ['evaluator_result', 'engineering_result']) {
+      const ref = item.public_artifacts[key]; assert.equal(dirname(ref.path), join(gradeRoot, 'public-' + item.condition)); pinned(ref);
+    }
+  }
+  return { fixture_ids: PRIMARY_FIXTURE_IDS.slice(1), parent_evidence_kind: parentEvidenceKind, parent_run_ids: parent.blocks.map(block => block.run_id),
+    issuance_path: join(dirname(dirname(dirname(parent.root))), '.ask-primary-continuations', value.parent_manifest.digest.slice(7) + '.json'),
+    parent_roots: [dirname(dirname(parent.root)), gradeRoot,
+      ...parent.blocks.flatMap(block => [block.root, block.public_input_root, readUserComparisonPlan(block.root).plan.source.repo])] };
+}
+export function assertPrimaryContinuationIsolation(continuation, roots) {
+  for (const candidate of roots) for (const parentRoot of continuation.parent_roots)
+    assert.ok(!overlap(candidate, parentRoot), 'continuation execution/input/source/output overlaps parent');
+}
+// An issuance is preparation metadata, never execution authorization. It lives
+// beside the original evaluation, not within it, and is never deleted/replaced.
+const issuanceGrants = new WeakMap();
+export function reservePrimaryRemainingEightOutput(value, output) {
+  const continuation = validatePrimaryRemainingEightContinuation(value);
+  assert.ok(isAbsolute(output) && resolve(output) === output); canonical(dirname(output));
+  assertPrimaryContinuationIsolation(continuation, [output]);
+  const registry = dirname(continuation.issuance_path);
+  const expected = { kind: 'ask_primary_remaining_eight_issuance_v1', parent_manifest: value.parent_manifest,
+    output_root: output, execution_authority: false };
+  assert.ok(['', '.digest', '.manifest', '.manifest.digest'].every(suffix => !present(continuation.issuance_path + suffix)),
+    'remaining-eight output already issued; no replacement IDs or sibling plan');
+  assertPrimaryContinuationIsolation(continuation, [registry]);
+  if (!present(registry)) mkdirSync(registry, { mode: 0o700 });
+  canonical(registry);
+  saveRecord(continuation.issuance_path, expected);
+  const grant = Object.freeze({});
+  issuanceGrants.set(grant, Object.freeze({ path: continuation.issuance_path, output_root: output,
+    parent_manifest_digest: value.parent_manifest.digest }));
+  return grant;
+}
 function validateManifest(manifest, pending) {
   assert.equal(manifest.kind, 'ask_primary_evaluation_batch_manifest_v1');
   assert.ok(typeof manifest.batch_id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/u.test(manifest.batch_id));
   assert.deepEqual(manifest.limits, [172800000, 216000000].includes(manifest.limits?.overall_timeout_ms)
     ? { ...PRIMARY_BATCH_LIMITS, overall_timeout_ms: manifest.limits.overall_timeout_ms } : PRIMARY_BATCH_LIMITS, 'unknown primary batch budget');
-  assert.deepEqual(manifest.blocks.map(block => block.fixture_id), PRIMARY_FIXTURE_IDS, 'all nine fixtures required in fixed order');
+  const continuation = Object.hasOwn(manifest, 'continuation') ? validatePrimaryRemainingEightContinuation(manifest.continuation) : null;
+  const ids = continuation?.fixture_ids ?? PRIMARY_FIXTURE_IDS;
+  assert.deepEqual(manifest.blocks.map(block => block.fixture_id), ids, 'exact fixed primary fixture order required');
+  if (continuation) {
+    assert.deepEqual(manifest.conditions, ['plain', 'kernel_principles_v2', 'full_ask']);
+    for (const block of manifest.blocks) {
+      assert.ok(!continuation.parent_run_ids.includes(block.run_id), 'original child run ID cannot be reused');
+      assert.deepEqual(block.grading.scoring_version, manifest.continuation.retained_scoring_version, 'retained scoring version required');
+      assertPrimaryContinuationIsolation(continuation, [block.root, block.public_input_root, manifest.root]);
+    }
+  }
   assert.equal(manifest.conditions.length, 3); assert.equal(new Set(manifest.conditions).size, 3);
-  assert.equal(new Set(manifest.blocks.map(block => block.run_id)).size, 9, 'duplicate run ID');
+  assert.equal(new Set(manifest.blocks.map(block => block.run_id)).size, ids.length, 'duplicate run ID');
   const loaded = manifest.blocks.map(block => checkBlock(block, manifest.conditions, pending));
   assert.equal(new Set(loaded.map(value => value.plan.config.evidence_kind)).size, 1, 'mixed evidence kinds');
+  if (continuation) assert.ok(loaded.every(value => value.plan.config.evidence_kind === continuation.parent_evidence_kind), 'continuation evidence kind differs from parent');
   const roots = [manifest.root, ...loaded.flatMap((value, index) => [value.root, value.plan.source.repo, manifest.blocks[index].public_input_root])];
+  if (continuation) assertPrimaryContinuationIsolation(continuation, roots);
   for (let i = 0; i < roots.length; i++) for (let j = i + 1; j < roots.length; j++) assert.ok(!overlap(roots[i], roots[j]), 'batch/input/source/child root overlap');
   for (const block of manifest.blocks) for (const value of loaded) {
     assert.ok(!overlap(block.input_manifest.path, value.root) && !overlap(block.input_manifest.path, value.plan.source.repo), 'input manifest overlaps execution source');
@@ -142,7 +278,7 @@ function gradingPreflight(manifest, loaded, adapter) {
     return blockers.map(reason => ({ fixture_id: block.fixture_id, reason }));
   });
 }
-export function preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter } = {}) {
+export function preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter, issuance = null } = {}) {
   canonical(manifestPath);
   const raw = stable(manifestPath), manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
   assert.ok(isAbsolute(manifest.root) && resolve(manifest.root) === manifest.root); canonical(dirname(manifest.root));
@@ -152,6 +288,21 @@ export function preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter } =
   for (const value of loaded) assert.ok(!overlap(manifestPath, value.root) && !overlap(manifestPath, value.plan.source.repo), 'external manifest overlaps execution source');
   assert.ok(!overlap(manifestPath, manifest.root));
   const blockers = gradingPreflight(manifest, loaded, gradingAdapter);
+  if (manifest.continuation) {
+    const continuation = validatePrimaryRemainingEightContinuation(manifest.continuation);
+    const grant = issuance ?? reservePrimaryRemainingEightOutput(manifest.continuation, dirname(manifest.root));
+    assert.ok(issuanceGrants.has(grant), 'live preparation issuance required; partial publication cannot be recovered');
+    const issued = issuanceGrants.get(grant);
+    assert.equal(issued.path, continuation.issuance_path);
+    assert.equal(issued.output_root, dirname(manifest.root));
+    assert.equal(issued.parent_manifest_digest, manifest.continuation.parent_manifest.digest);
+    assert.deepEqual(record(issued.path), { kind: 'ask_primary_remaining_eight_issuance_v1',
+      parent_manifest: manifest.continuation.parent_manifest, output_root: dirname(manifest.root), execution_authority: false });
+    issuanceGrants.delete(grant);
+    // Bind the sole issued output to these exact IDs and bytes before publication.
+    saveRecord(continuation.issuance_path + '.manifest', { manifest_path: manifestPath,
+      manifest_digest: comparisonHash(raw), child_run_ids: manifest.blocks.map(block => block.run_id) });
+  }
   mkdirSync(manifest.root, { mode: 0o700 });
   saveNew(join(manifest.root, 'manifest.json'), raw);
   saveRecord(join(manifest.root, 'prepared.json'), { manifest_path: manifestPath, manifest_digest: comparisonHash(raw), batch_id: manifest.batch_id,
@@ -165,6 +316,13 @@ function readBatch(root) {
   assert.equal(comparisonHash(stable(prepared.manifest_path)), prepared.manifest_digest, 'external manifest changed');
   const manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
   assert.equal(manifest.root, root); assert.equal(manifest.batch_id, prepared.batch_id);
+  if (manifest.continuation) {
+    const continuation = validatePrimaryRemainingEightContinuation(manifest.continuation);
+    assert.deepEqual(record(continuation.issuance_path), { kind: 'ask_primary_remaining_eight_issuance_v1',
+      parent_manifest: manifest.continuation.parent_manifest, output_root: dirname(root), execution_authority: false });
+    assert.deepEqual(record(continuation.issuance_path + '.manifest'), { manifest_path: prepared.manifest_path,
+      manifest_digest: prepared.manifest_digest, child_run_ids: manifest.blocks.map(block => block.run_id) });
+  }
   return { root, manifest, prepared, manifest_digest: prepared.manifest_digest };
 }
 export function inspectPrimaryEvaluationBatch(root, { gradingAdapter } = {}) {
@@ -174,7 +332,7 @@ export function inspectPrimaryEvaluationBatch(root, { gradingAdapter } = {}) {
   if (batch.manifest.limits.overall_timeout_ms !== PRIMARY_BATCH_LIMITS.overall_timeout_ms)
     blockers.push({ fixture_id: null, reason: 'historical_preparation_budget_requires_new_plan' });
   return { ...batch, status: consumed ? 'consumed' : blockers.length ? 'blocked' : 'prepared', blockers, start_consumed: consumed,
-    slot_count: 27, slots: batch.manifest.blocks.flatMap((block, index) => batch.manifest.conditions.map(condition => ({ fixture_id: block.fixture_id, run_id: block.run_id, condition, state: consumed ? 'unknown' : 'not_started', quality: null, capability: loaded[index].plan.arms[condition].capability }))) };
+    slot_count: batch.manifest.blocks.length * batch.manifest.conditions.length, slots: batch.manifest.blocks.flatMap((block, index) => batch.manifest.conditions.map(condition => ({ fixture_id: block.fixture_id, run_id: block.run_id, condition, state: consumed ? 'unknown' : 'not_started', quality: null, capability: loaded[index].plan.arms[condition].capability }))) };
 }
 function safeTerminal(report, block, conditions) {
   assert.equal(report.run_id, block.run_id); assert.equal(report.plan_digest, block.plan_digest);
@@ -283,6 +441,7 @@ export function reportPrimaryEvaluationBatch(root) {
       unknown_block_count: reports.filter(value => value.report?.usage_budget?.complete !== true).length,
       missing_requested_report_count: reports.filter(value => value.requested && !value.report).length,
       cost: null }, limits: batch.manifest.limits,
+    ...(batch.manifest.continuation ? { continuation: structuredClone(batch.manifest.continuation), analytical_fixture_count: 9 } : {}),
     limitations: ['reported input+output is a lower bound; cached input is not added again', 'budget admission occurs between fixed blocks; child plans retain their own token budgets',
       'local deadline is not provider cancellation or a hard cost cap; forced controller exit cannot guarantee child/descendant shutdown', 'no resume, retries, saved-PID probes or additional sessions', 'quality remains unknown until the fixed grading adapter supplies evidence'] };
 }
