@@ -162,6 +162,7 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
     await assert.rejects(startPrimaryEvaluationBatch(m.value.root, m.digest, a), /consumed/u);
     const n = f.manifest(); preparePrimaryEvaluationBatch(n.path, a);
     const failed = await startPrimaryEvaluationBatch(n.value.root, n.digest, { ...a, startComparison: async () => { throw new Error('fake child unknown'); } });
-    assert.equal(failed.state, 'stopped'); assert.equal(failed.slots.filter(slot => slot.state === 'unknown').length, 3);
+    assert.equal(failed.state, 'consumption_unknown'); assert.equal(failed.terminal.state, 'stopped');
+    assert.equal(failed.usage.missing_requested_report_count, 1); assert.equal(failed.slots.filter(slot => slot.state === 'unknown').length, 3);
   });
 });
