@@ -1,0 +1,171 @@
+# 完成済み9課題の実用三条件本評価・準備計画
+
+計画ID `PLAN-PRIMARY-PRACTICAL-9-20261012-r2`。2026-10-12 の本人の指示を
+上流とする。対象は完成済み9課題すべてで、旧 #318 の3候補は実行順の先頭。
+これは #192/#198 の正式な24課題・四条件プロトコルの開始や終了条件の変更ではない。
+校正 run `86a09258-0f66-4f05-ad61-7e62dd4fbbfc` と旧結果・計画を変更しない。
+
+**準備状態：blocked。この文書は開始承認でも実行可能な runner plan でもない。**
+モデル起動、比較 start/resume、採点用モデル、旧所有権診断は実行していない。
+不足を解消する前に一度の開始だけで全件実行・採点できると説明してはいけない。
+現在の私的準備記録はタスク保存領域の `evidence/preparation-manifest-r2.json`、digestは
+`sha256:8ec22f7858b3aa13471603803d6678f2378ad2821b5df9e7534afbb02499fc6b`。
+前版 `prepared-primary/preparation-manifest.json` と課題別JSONは保持した。
+r2はdocumentationの検査recipe不足の記録を補った版で、入力・採点source・criteriaは不変。
+
+## 対象・回数・予算
+
+| 順番 | fixture ID | 正式 task class | 今回の反復数 |
+| --- | --- | --- | --- |
+| 1 | mp-ci-evidence-gap | review_verification | 1 |
+| 2 | mp-data-migration-handoff | handoff_resume | 1 |
+| 3 | mn-focused-regression-test | verification_only | 1 |
+| 4 | mp-accessibility-interaction-review | pr_review | 1 |
+| 5 | mp-frontend-state-review | pr_review | 1 |
+| 6 | mp-iac-rollback-design | design_gate | 1 |
+| 7 | mp-performance-investigation | investigation | 1 |
+| 8 | mn-build-option-update | configuration | 1 |
+| 9 | mn-doc-config-correction | documentation | 1 |
+
+各課題 P (`plain`) → K-principles (`kernel_principles_v1`) → F (`full_ask`)。
+現行入口はこの固定順を使用する。順序効果は交絡として明示する。各条件1 session、
+attempt 1、retry 0、concurrency 1、`single_shot_v1`、resume禁止。合計27 slots。
+追加反復は今回行わない。単発の課題別判断が目的で、分散・優越性・一般的な製品採用の
+確証を主張しない。正式カタログの3/5反復指定は変更せず、今回の別計画との差を記録する。
+結果を見て有利な課題だけ追加測定しない。
+
+提案予算は条件ごと60分、controllerの検査・private evaluator の各 command ごと5分。
+各課題の三条件ブロック4時間、9ブロック36時間、全体48時間（採点・保存・報告の余裕12時間）。
+各課題の検査数から必要予約時間を算出し、4時間を超える場合は**結果閲覧前**に計画を改版する。
+現行入口の overall timeout は最大24時間かつ一課題単位なので、一つの48時間 plan としては
+渡せない。9個の固定ブロックを逐次処理する薄い controller 接続が必要。夜間・複数日の
+実行は可能だが、同一runの中断を resume する設計にはしない。
+
+開始判断予算は報告 input＋output 合計45,000,000 tokensを提案する。
+以前の3セッション5Mに対し、27セッションで9倍の45M。cached input を重複加算しない。
+これはproviderのhard cap、料金保証、利用枠の確保ではない。未知usageを0にしない。
+全体予算を共有する接続も現行一課題入口には存在しない。起動前に利用枠を確認し、
+27セッションを処理できない枠なら、結果非閲覧の段階で分割計画と新しい開始指示を確定する。
+開始判断に必要な予約分を確保し、予算不足で未開始となったslotも報告に残す。
+
+## 固定と隔離
+
+実行系の基準は main `4b1bf37961d6f2f23acf950413ac956d20a5ab01`、tree
+`cd8cc43d9f235736999bb7b4f035312fd392faf6`。#339 single_shot_v1 を含む。
+準備タスクの独立repoと実装worktreeは、元repoや15課題開発repoのGit共通領域を共有しない。
+評価sourceは独立した固定コピーとし、Git管理領域を持たせず、全ファイルhashを保存する。
+課題入力は各fixtureの既存 `input-manifest.json` が指定する `task.md` と `workspace/**`
+のbytesだけを別の公開入力rootへコピーする。比較用seed repoと条件別workspaceはそれぞれ
+独立したGit管理領域を持つ。採点root、control、結果rootは条件別workspaceの外に置く。
+
+採点の source closure はfixtureの既存 `evaluator_source_identity.source_files` の
+revision・bytes・sha256で歴史版から復元する。現行mainの採点コードへ置き換えない。
+private evaluator bundle・review archive は採用済みdigestと完全一致する実体を復元・検査し、
+その後独立コピーを固定する。再生成で別版にしない。評価版固定後のfetch、pull、merge、
+checkout変更、開発branchからの取り込みを禁止する。接続PRを統合する場合は先に検査済みheadと
+影響を親へ報告し、その後明示的な計画改版で最終版を固定する。
+
+私的な原本・採点資産・結果は比較モデルへ渡さない。source checkout全体を課題repoにしない。
+同一利用者・同一ホスト上のpath分離とread-only modeはOS権限の完全分離ではなく、
+プロンプトでのread禁止も機密性の強制ではない。global指示・Skills・CLI差は記録し、
+変えたり未知値だけで別の停止条件を追加したりしない。通常のprovider・認証を使い、
+認証ファイルや環境変数全体を収集しない。single_shotのdirect child終了は
+孫process/providerの完全停止を証明しない。限界は条件別レポートに残す。
+
+## 接続の具体的な不足
+
+1. **K-principles適用範囲**。現行projectionは `implementation/trivial` のみ。
+   review・investigationは `capability_missing`、handoff/designも構造的な対応がない。
+   CI、a11y、frontendレビュー、性能調査、移行handoff、IaC計画に原則だけの公平な経路を
+   定義する最小の設計判断が必要。Skill追加、trivial偽装、品質0点化はしない。
+   対応範囲を変えるなら既存v1の意味を黙って拡張せず、別候補版として結果非閲覧でレビューする。
+2. **検査recipe**。現行 `prepareUserComparison` は公開固定 `.mjs` node:testのみ。
+   CIとhandoffの構造validatorや、IaC計画などの成果物採点をそのまま扱えない。
+   focused regressionは既存testの編集が課題で、独立固定テストとの重複禁止に当たる。
+   既存検査契約・private evaluatorをcontroller側に接続する必要がある。
+   wrapperテストを新設して公開seedを変更したり、公開テスト成功だけを正解としたりしない。
+   docs/config修正とfocused test追加は実際の編集作業としてimplementation/trivialへの
+   根拠ある対応づけが可能だが、正式task classを保持し、metadataの文字列を無条件に
+   implementationへ変換しない。build-optionの構造validatorも接続不足の対象である。
+3. **採点condition／証拠lineage**。旧normalized/evaluator schemasは
+   `plain/kernel_only/adaptive_ask/full_ask`。`kernel_principles_v1` は含まれない。
+   既存Core grading bridgeの `plain/core/full` も別条件なので代用しない。
+   旧schemas・freeze・raw scorerを保持したまま、既存の追加profileパターンを参考に
+   三条件の明示profileとcontroller-owned journal／terminal／command証拠を接続する必要がある。
+   user-comparisonのテスト結果だけで旧scorerの実行証拠を捏造しない。
+4. **private実体／実行採用証拠**。repoのlatest admission overlayは採用記録だが、
+   実行resolverにはreview authority source digestとprivate review archiveが必要。
+   見つからない実体はUnknown/不足のままとし、原本保存先を所有者から復元する。
+   標準private-evaluators保存先で見つかったbuild-option bundleも、現行採用referenceとは
+   ID/digest/revisionが異なる旧版だった。9件の固定referenceに一致する実体は未発見。
+   旧focused新系列のcustom evaluatorは採用済みbundleの代替ではない。
+5. **9ブロックの一度の開始**。現行入口は一課題の三条件まで。新しい評価基盤を作らず、
+   既存single_shot startを9個の固定planに順次呼び、全体期限／usage下限／未開始slotを
+   一つのreceiptで保存する最小接続が必要。denial/authentication/unknown child終了では
+   後続モデルと採点processを止め、同runの自動resume／retry／新ID生成をしない。
+
+不足がある課題を対象から除外しない。各slotの品質・使用量は未実行ならnull/unknown。
+現状は全27slots未実行。構造的なK不足があるため、最初の一度の開始はまだ提示できない。
+
+## 採点・報告の固定方針
+
+各fixtureの採用overlay、input manifest、requirement/output contract、verification contract、
+scoring-input freeze、evaluator reference／bundle／source closureと共通scoring policyを固定する。
+private evaluatorの観測を既存 `verifyEvaluatorAuthority` と `scoreEvaluatorResult` に接続し、
+既存partial credit、blocker、scope、安全、false-positive、equivalenceの意味を維持する。
+採点モデルは不要。hidden evaluatorのNode processと採点モデルを混同しない。
+profile非対応／authority欠落はinsufficient_evidenceで、0点や成功へ変換しない。
+
+課題別にP、K-principles、Fの観測・未開始・不足を並べ、K-principles−P、F−P、
+F−K-principlesを分けて報告する。条件名をcanonical KernelやAdaptiveへ変更しない。
+品質とコスト・時間を別々に示し、機構使用は自己申告と実証を区別する。
+人手補正・レビュー時間は実測がなければunknown。practice weighted aggregateや旧#198の
+製品採用判定は行わない。生の答え・private evaluatorをGitHubへ載せない。
+
+## 課題別の読み取り用事後解析
+
+9件のadmissionを課題・採点の完全性保証としない。既存reportとslot receiptを再利用し、
+各課題×各条件の固定入力・仕様・evaluator版、出力、許可範囲の完全差分、実行・採点の
+stdout/stderrと終了状態、要件別判定・根拠、時間、input/output/cached usage、scope、
+切詰めと欠測をrun ID／plan digest／artifact digestで関連づける。
+redacted patchはレビュー用と明示し、完全な比較はcontrollerの保存済みbytesを参照する。
+採点ログをrunnerログで代用しない。出力がない条件もnull/unknownの行を残す。
+
+読み取り用の課題別JSON/日本語レポートには、以下を別フィールドで保持する。
+
+- モデルの実装不良
+- ASKによる手順や判断の問題
+- 課題の曖昧さ・解けなさ
+- 採点器の誤検知・見逃し
+- 実行環境の失敗
+
+初期値は全てunknown。自己申告や単一の機械合否だけで原因を断定しない。
+全条件同点・全滅・不自然な差は事後見直し候補として表示するが、新しい起動前ゲートには
+しない。固定入力の仕様、各条件出力・差分、既存の要件別根拠を照合するための参照を残す。
+秘密値、認証、過去sessionの追加収集はしない。
+採点器・課題を修正するときは原採点・原出力・版とdigestを保存し、別版の事後解析を追加する。
+原runを新基準で上書きせず、将来の再評価は別計画・別run・別の本人開始指示にする。
+
+## 次の完了条件
+
+不足1の設計判断と不足4の原本復元を親へ報告し、その間は公開入力の固定と非モデル検査を完了する。
+不足2/3/5を変更する場合、15課題担当と共有script/schema/CI所有権を調整する。
+専用worktreeの最小差分・fake-only検査・fresh independent review・Draft PRを経て、
+検査済みheadを親に伝える。採点基準変更や旧終了条件緩和を混ぜない。
+全ての不足が解消した後に、固定run IDとplan digestを含む日本語開始プロンプトを完成させる。
+貼る先は **Prepare primary ASK evaluation**。過去の一度限りの起動承認は再利用しない。
+
+準備・検査での成功はモデル実行／採点成功の証明ではない。
+
+## 準備作業の検査契約
+
+`SPEC-PRIMARY-PREP-1` は上記の対象・分離・未実行表示・不足の保存を定義する。
+`IMP-PRIMARY-PREP-1` の所有範囲はこの文書とタスク外部領域の入力・採点source snapshot、
+manifest、課題別の未実行readoutだけ。runner/projection/schema/scorerの修正は未実施。
+`FVC-PRIMARY-PREP-1` は `ask.verification-proof-policy@1.0.0` のFormal Verification Contract。
+根拠となるtriggerは `multi_session_multi_agent_or_handoff`、`multiple_specialized_checks`、
+`merge_release_or_stable_trace`。O1：main/tree・全公開input bytes・歴史source bytesのhash照合。
+O2：9件の採用overlayと実行resolver結果を区別し、全27条件を未開始nullで保存。
+O3：source/公開input/採点source/報告の領域分離と制限を明示。O4：既存single_shotの
+fake-only試験、独立読取りレビュー、文書差分・Git状態検査。
+モデル実行や採点を完了したという証明義務は満たしていない。実行接続はblockedのまま。
