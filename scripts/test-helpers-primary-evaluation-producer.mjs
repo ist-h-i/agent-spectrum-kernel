@@ -68,8 +68,9 @@ export function syntheticPrimarySource(t, { scenario = 'completed', command = 'p
     const events=[];
     for(const [index,c]of contract.commands.entries())if(command!=='missing'){
       const status=command==='failed'?'failed':'completed',exit=command==='failed'?5:0,id=`fake-${index}`;
-      events.push({type:'item.started',item:{id,type:'command_execution',command:renderCommandEvent(c),status:'in_progress'}},
-        {type:'item.completed',item:{id,type:'command_execution',command:renderCommandEvent(c),status,exit_code:exit,aggregated_output:'fake model command output'}});
+      const rendered = command === 'unsupported_shell' ? renderCommandEvent(c).replace('/bin/bash -lc ', '/bin/sh -lc ') : renderCommandEvent(c);
+      events.push({type:'item.started',item:{id,type:'command_execution',command:rendered,status:'in_progress'}},
+        {type:'item.completed',item:{id,type:'command_execution',command:rendered,status,exit_code:exit,aggregated_output:'fake model command output'}});
     }
     events.push({type:'turn.completed',usage:{input_tokens:20,output_tokens:5}});
     const artifacts={},save=(name,content)=>{const b=Buffer.isBuffer(content)?content:typeof content==='string'?Buffer.from(content):raw(content);write(join(folder,name),b);artifacts[name]=hash(b);};

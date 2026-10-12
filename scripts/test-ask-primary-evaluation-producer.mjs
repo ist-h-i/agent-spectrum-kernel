@@ -13,6 +13,19 @@ import { buildPortfolioEngineeringResult } from './ask-benchmark-portfolio-score
 import { resolveEffectiveAdmissionAuthority } from './ask-benchmark-admission-decision.mjs';
 const legacy = '/example/benchmarks/schemas/normalized-portfolio-result.schema.json';
 async function produce(t, options) { const source = syntheticPrimarySource(t, options), produced = await producePrimaryEvaluationArtifacts(source.block, join(source.root,'producer')); return { ...source, produced, options:{recordRoot:produced.output_root,externalDigest:produced.external_digest} }; }
+test('primary producer preserves typed capture refusal without raw command or error messages', async t => {
+  const p = await produce(t, { command: 'unsupported_shell' }), v = verifyPrimaryEvaluationProducer(p.options);
+  for (const item of v.inspection.cases) {
+    const value = JSON.parse(readFileSync(join(p.produced.output_root, 'run/cases', item.entry.case_id, 'attempts/0001/command-evidence.json')));
+    assert.equal(value.capture.parser_revision, '1.4.0-primary-saved');
+    assert.equal(value.capture.evidence_level, 'unavailable');
+    assert.equal(value.capture.downgrade_reason, 'capture_invalid:unsupported_shell');
+    assert.deepEqual(value.commands, []);
+    assert.equal(JSON.stringify(value).includes('/bin/sh'), false);
+  }
+  assert.equal(p.produced.model_calls, 0);
+  assert.equal(p.produced.grader_process_starts, 0);
+});
 test('additive schemas preserve base bytes and exact primary IDs without leaking scope', () => {
   generatePrimaryGradingSchemas({check:true}); assert.equal(primaryGradingSchemaPath(legacy),legacy);
   for (const name of PRIMARY_PROFILE_SCHEMAS) assert.deepEqual(readFileSync(new URL(`../benchmarks/schemas/primary-${name}.schema.json`,import.meta.url)),primarySchemaBytes(name));

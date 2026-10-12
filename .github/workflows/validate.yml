@@ -196,6 +196,9 @@ jobs:
       - name: Run verification command evidence contract tests
         run: node scripts/test-ask-benchmark-command-evidence.mjs
 
+      - name: Verify read-only saved primary command capture
+        run: node --test scripts/test-ask-primary-saved-command-capture.mjs
+
       - name: Run verification evidence exact-reuse tests
         run: node scripts/test-verification-evidence.mjs
 

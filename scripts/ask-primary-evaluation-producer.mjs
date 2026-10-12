@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { canonicalDigest, parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
-import { buildCodexCommandEvidence, buildUnavailableCommandEvidence, validateVerificationCommandContract, validateCommandEvidenceManifest } from './ask-benchmark-command-evidence.mjs';
+import { buildCodexCommandEvidence, buildUnavailableCommandEvidence, commandEvidenceFailureReason, PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, validateVerificationCommandContract, validateCommandEvidenceManifest } from './ask-benchmark-command-evidence.mjs';
 import { captureTerminalWorkspaceInventory, buildTerminalWorkspaceAuthority, readVerifiedTerminalWorkspaceAuthority } from './ask-benchmark-terminal-workspace.mjs';
 import { normalizePortfolioExecution, verifyNormalizedPortfolioResults } from './ask-benchmark-normalized-results.mjs';
 import { materializeVerifiedTerminalCandidate } from './ask-benchmark-terminal-candidate.mjs';
@@ -164,8 +164,9 @@ function derive(target, source) {
       const commandIdentity = { ...terminalIdentity, repetition: 1, verification_command_contract_digest: contract.contract_digest,
         runtime_identity_digest: canonicalDigest(adapter), effective_command_digest: canonicalDigest(adapter.effective_command) };
       let commands;
-      try { commands = buildCodexCommandEvidence({ identity: commandIdentity, stream: stdout, contract }); }
-      catch { commands = buildUnavailableCommandEvidence({ identity: commandIdentity, support: 'supported', probe: 'capture_invalid', reason: 'saved_model_command_stream_unavailable', stream: stdout }); }
+      const parserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
+      try { commands = buildCodexCommandEvidence({ identity: commandIdentity, stream: stdout, contract, parserRevision }); }
+      catch (error) { commands = buildUnavailableCommandEvidence({ identity: commandIdentity, support: 'supported', probe: 'capture_invalid', reason: commandEvidenceFailureReason(error), stream: stdout, parserRevision }); }
       validateCommandEvidenceManifest(commands, { root: ROOT, contract });
       // The original normalized outcome is the model CLI outcome. Independent
       // controller checks and scope findings remain supplemental receipts.
