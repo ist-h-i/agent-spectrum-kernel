@@ -1,3 +1,4 @@
+import { parseCodexCommandEvents, renderCommandEvent } from "./ask-benchmark-command-evidence.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -59,4 +60,22 @@ test("source preparation does not pretend to carry evaluator or admission author
   const admission=JSON.parse(readFileSync(resolve(fixture,"final-admission-record.json"),"utf8"));
   if(admission.candidate_state==="generation_pending") assert.equal(admission.fixture_id,MN_SCHEMA_FIELD_ALIGNMENT_FIXTURE_ID);
   else assert.equal(admission.admission_status,"admission_pending");
+});
+
+// Parser-only reproduction: these synthetic events are not a test execution.
+test("the public verification instruction matches verification evidence", () => {
+  const contract = JSON.parse(readFileSync(resolve(fixture, "verification-command-contract.json"), "utf8"));
+  const task = readFileSync(resolve(fixture, "task.md"), "utf8");
+  const publicScript = task.match(/```bash\n([^]*?)\n```/u)?.[1];
+  assert.equal(publicScript, contract.commands[0].canonical_script);
+  const command = renderCommandEvent({...contract.commands[0], canonical_script: publicScript});
+  const stream = Buffer.from([
+    {type:"item.started",item:{id:"public-test",type:"command_execution",command,status:"in_progress"}},
+    {type:"item.completed",item:{id:"public-test",type:"command_execution",command,status:"completed",exit_code:0,aggregated_output:"synthetic successful event"}},
+    {type:"turn.completed"},
+  ].map(value => JSON.stringify(value)).join("\n") + "\n");
+  const result = parseCodexCommandEvents({stream, identity:{purpose:"public command parity regression"}, contract});
+  assert.equal(result.commands.length, 1);
+  assert.equal(result.commands[0].match_state, "matched");
+  assert.equal(result.commands[0].matched_command_id, contract.commands[0].command_id);
 });

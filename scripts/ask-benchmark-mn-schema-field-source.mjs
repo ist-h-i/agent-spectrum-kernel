@@ -151,6 +151,7 @@ export function validateMnSchemaFieldAlignmentInputClosure({ root = ROOT } = {})
   const expected = agentVisibleFiles(fixtureRoot);
   if (stableCanonicalJson(record.files) !== stableCanonicalJson(expected)) throw new Error("mn-schema-field-alignment input manifest does not exactly bind the agent-visible inventory");
   const verification = validateVerificationCommandContract(readJson(resolve(fixtureRoot, "verification-command-contract.json"), "mn-schema-field-alignment verification contract"), { root });
+  if (!verification.commands.every(({ canonical_script }) => task.includes(`\n${canonical_script}\n`))) throw new Error("public task does not expose the verification invocation");
   const inputDigest = sha256(readFileSync(resolve(fixtureRoot, "input-manifest.json")));
   if (verification.fixture_input_digest !== inputDigest) throw new Error("mn-schema-field-alignment verification/input binding is invalid");
   return { fixtureId: MN_SCHEMA_FIELD_ALIGNMENT_FIXTURE_ID, inputDigest, verificationDigest: verification.contract_digest };
