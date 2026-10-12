@@ -1,4 +1,87 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "pf-library-compat-upgrade",
-  "candidate_state": "generation_pending"
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/src/archive-compat.mjs",
+      "workspace/migration-record.json"
+    ],
+    "required_candidate_paths": [
+      "workspace/src/archive-compat.mjs",
+      "workspace/migration-record.json"
+    ],
+    "protected_candidate_paths": [
+      "workspace/config/migration-settings.json",
+      "workspace/data/compatibility-matrix.json",
+      "workspace/docs/migration-contract.md",
+      "workspace/package.json",
+      "workspace/scripts/check-rollback.mjs",
+      "workspace/scripts/validate-migration.mjs",
+      "workspace/test/archive-compat.test.mjs",
+      "workspace/vendor/archive-v1.mjs",
+      "workspace/vendor/archive-v2.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "unrecognized_candidate_meaning": "manual_review_required",
+    "authority_digest": "sha256:0d27e4a2d4f43072ff1c300f5ac3df15a6182bdc62a263ab52c1cc6dcfa7a2ec"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "library-upgrade-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/config/migration-settings.json",
+        "workspace/data/compatibility-matrix.json",
+        "workspace/docs/migration-contract.md",
+        "workspace/package.json",
+        "workspace/scripts/check-rollback.mjs",
+        "workspace/scripts/validate-migration.mjs",
+        "workspace/src/archive-compat.mjs",
+        "workspace/test/archive-compat.test.mjs",
+        "workspace/vendor/archive-v1.mjs",
+        "workspace/vendor/archive-v2.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "focused-change-boundary",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/docs/migration-contract.md"
+      ]
+    },
+    {
+      "evidence_map_id": "repository-verification-route",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/scripts/check-rollback.mjs",
+        "workspace/scripts/validate-migration.mjs",
+        "workspace/test/archive-compat.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-library-evidence",
+      "target_evidence_map_id": "library-upgrade-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:7aaa38f598553ee5d38c59c159050ed0280f499adfbf75d8e16bc96633581d8d"
+    },
+    {
+      "mutation_id": "remove-focused-scope-evidence",
+      "target_evidence_map_id": "focused-change-boundary",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:7c1727e6f651d7d83767754e9a59523f479c45dc80c3d92ead39bb777dd3dba4"
+    },
+    {
+      "mutation_id": "remove-verification-route",
+      "target_evidence_map_id": "repository-verification-route",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:f08f7da15e2e728b5542566710ee738d382dd40f62da4e43e7e2a13c2faed090"
+    }
+  ]
 }

@@ -1,4 +1,68 @@
 {
+  "requirement_record_id": "requirement-record-pf-library-compat-upgrade",
+  "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+  "requirement_record_path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/requirement-record.json",
   "fixture_id": "pf-library-compat-upgrade",
-  "candidate_state": "generation_pending"
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+  "admission_record_digest": "sha256:917d761ec5eccf1c5c175990c39ea47a1adb80f8561aa290fca5a6b77930bec1",
+  "requirements": [
+    {
+      "requirement_id": "library-upgrade-correctness",
+      "requirement_kind": "weighted",
+      "max_points": 5,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "library-upgrade-basis"
+      ],
+      "mutation_ids": [
+        "remove-library-evidence"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-library"
+      ],
+      "finding_group_id": "library-upgrade-correctness-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:353e79f6be37cd9bb6dfddc4119ad2f989752f076f247288d562180da148c679"
+    },
+    {
+      "requirement_id": "request-scope-discipline",
+      "requirement_kind": "weighted",
+      "max_points": 3,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "focused-change-boundary"
+      ],
+      "mutation_ids": [
+        "remove-focused-scope-evidence"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-focused-change"
+      ],
+      "finding_group_id": "request-scope-discipline-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:70504f5d45b3c26f08412adbdf582593c870b42a9227ce21a43dc8478e8f7155"
+    },
+    {
+      "requirement_id": "verification-evidence",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "repository-verification-route"
+      ],
+      "mutation_ids": [
+        "remove-verification-route"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-focused-verification"
+      ],
+      "finding_group_id": "verification-evidence-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:48bfd71c2c8142417f225d5751fb88e3c57aa18fd6865a8fdde366082ca25afd"
+    }
+  ],
+  "requirement_set_digest": "sha256:a3a653b2d199f06af311fde46a67b2a9425303e98fe0705b0268666a32934ee5",
+  "requirement_record_digest": "sha256:0376d361a6f13945cce00e9b2ceea725f7b6665dd3797458c8308e97a32a2d3e"
 }
