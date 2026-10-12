@@ -52,7 +52,7 @@ export function preflightPrimaryEvaluationGradingResources(block,resource) {
       reviewAuthoritySourceDigest:resource.admissionReviewAuthoritySourceDigest,reviewArchivePath:resource.admissionReviewArchivePath});
     assert.equal(admission.effective_admission_status,'admitted');admissionReady=true;
     return{status:'ready',blockers:[],public_metadata_verified:true,original_assets_verified:true,admission_ready:true,
-      runtime_compatibility:'unknown',execution_isolation_authority:false,model_calls:0,grader_process_starts:0};
+      worker_timeout_ms:assets.manifest.execution_budget_ms,runtime_compatibility:'unknown',execution_isolation_authority:false,model_calls:0,grader_process_starts:0};
     });
   }catch{return{status:'blocked',blockers:[`original_grading_resources_${stage}_unverified`],public_metadata_verified:publicMetadataVerified,
     original_assets_verified:originalAssetsVerified,admission_ready:admissionReady,runtime_compatibility:'unknown',execution_isolation_authority:false,model_calls:0,grader_process_starts:0};}
@@ -129,14 +129,18 @@ function privateRecord({root,authorityRoot,privateRoot,normalized,bundle,executi
   record.evaluation_record_digest=computePrivateEvaluationRecordDigest(record);return record;
 }
 
-export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs,{timeoutMs=300000,signal=null,deadlineAtMs=null}={}) {
+export function primaryPrivateGradingBudget(executionBudgetMs) {
+  assert.ok(Number.isSafeInteger(executionBudgetMs)&&executionBudgetMs>0&&executionBudgetMs<=900000,'original private worker budget invalid');
+  return {worker_timeout_ms:executionBudgetMs,condition_reservation_ms:4*executionBudgetMs};
+}
+export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs,{signal=null,deadlineAtMs=null,...unknownControls}={}) {
   let requested=false,evidenceKind='unknown';
   try {
-    assert.ok(Number.isInteger(timeoutMs)&&timeoutMs>0&&timeoutMs<=300000);
+    assert.equal(Object.keys(unknownControls).length,0,'original worker budget cannot be overridden');
     assert.ok(!signal?.aborted,'primary private grade aborted');
-    // Record verification reruns use the immutable bundle-owned budget, which
-    // may exceed a caller's shorter first-pair timeout. Reserve the maximum.
-    if(deadlineAtMs!==null)assert.ok(Number.isFinite(deadlineAtMs)&&Date.now()+2*timeoutMs+2*300000<=deadlineAtMs,'primary private grade reservation unavailable');
+    // Reserve the original API maximum before construction; the verified bundle
+    // supplies the unchanged actual timeout for initial and validation runs.
+    if(deadlineAtMs!==null)assert.ok(Number.isFinite(deadlineAtMs)&&Date.now()+4*900000<=deadlineAtMs,'primary private grade reservation unavailable');
     const producer=verifyPrimaryEvaluationProducer(producerOptions);evidenceKind=producer.evidence_kind;
     const input=buildPrimaryEvaluationScoringInputs(producerOptions,runtimeInputs),s=input.scorerOptions,n=input.normalizedResult;
     for(const key of ['frozenSourceRoot','privateRoot','privateEvaluationRoot','manifestPath','publicResultRoot'])assert.ok(runtimeInputs[key],'primary original private runtime inputs required');
@@ -151,8 +155,10 @@ export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs
         freezeManifestPath:s.scoringInputFreezeManifestPath,freezeManifestSourceDigest:s.scoringInputFreezeManifestSourceDigest});
       const bundle=verifyPrivateEvaluatorBundle(s),anchor=readEvaluatorAuthorityAnchorFromFreeze({root:s.root,freezeManifestPath:s.scoringInputFreezeManifestPath,
         freezeManifestSourceDigest:s.scoringInputFreezeManifestSourceDigest,referencePath:s.referencePath});
+      const budget=primaryPrivateGradingBudget(bundle.manifest.execution_budget_ms);
+      if(deadlineAtMs!==null)assert.ok(Date.now()+budget.condition_reservation_ms<=deadlineAtMs,'original private grade reservation unavailable');
       assert.ok(!signal?.aborted,'primary private grade aborted');requested=true;
-      const executed=executeProductionSealedEvaluator({execution,externalAuthorityAnchor:anchor,repositoryRoot:s.root,timeout:timeoutMs});
+      const executed=executeProductionSealedEvaluator({execution,externalAuthorityAnchor:anchor,repositoryRoot:s.root,timeout:budget.worker_timeout_ms});
       assert.deepEqual(executed.firstBytes,executed.secondBytes);
       const fragmentPath=join(authorityRoot,'authority-chain/private-fragment.json');write(fragmentPath,executed.firstBytes);
       const authority={...scoring,evaluatorReference:bundle.reference,normalizedResult:n,sourceSnapshotDigest:s.sourceSnapshotDigest,bundleManifest:bundle.manifest,

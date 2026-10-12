@@ -304,11 +304,15 @@ module-owned receipt summaries on exceptions. Saving failure or unknown
 termination throws before the next run. Resource checks and receipts do not
 grant evaluator/admission authority. No caller child/stdio callback is accepted.
 
-Each initial worker timeout is at most five minutes; persisted-record reruns
-retain their immutable bundle-owned budget, also at most five minutes. Reservation
-checks allow `2*timeoutMs + 2*300000` milliseconds per condition. Parent-owned
-plans reserve 65 minutes for all three conditions and conversion/persistence.
-Older plans are not rewritten.
+Initial worker runs and persisted-record reruns both retain the verified immutable
+bundle-owned execution_budget_ms. Callers cannot override it with a shorter timeout.
+The existing original schema permits at most 900000ms; the adopted historical focused
+regression public generator declares 660000ms, seven others declare 120000ms, and the
+build-option original manifest budget remains Unknown. Public generator definitions
+are not restored private manifest evidence. Each condition reserves four original
+worker budgets; plans conservatively reserve 185 minutes per three-condition fixture
+(4 x 3 x maximum 15 minutes + five minutes conversion/save) and 84 hours overall.
+Older 48/60-hour plans are not rewritten or eligible for new start.
 
 Verification `VER-PRIMARY-PRIVATE-PIPELINE-1` uses formal synthetic/negative tests
 for missing assets and deadline/cancellation before child zero, source/binding
@@ -323,3 +327,8 @@ complete numeric scoring remain unverified because the originals are missing.
 All six focused private-connection tests pass, including exact public graph
 rederivation for all nine historical roots and original-assets-missing blocking;
 see [primary-private-grading-tests.log](../../evidence/primary-private-grading-tests.log).
+
+Independent review found the r3 five-minute worker cap truncated an existing eleven-minute
+fixture budget. The r4 connector fixes only scheduling: actual worker budgets, raw scorer,
+criteria and old protocol remain unchanged. A pure budget regression covers 660000,
+120000, the existing 900000 maximum and rejected invalid values; no private worker starts.

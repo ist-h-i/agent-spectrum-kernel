@@ -1,6 +1,6 @@
 # 完成済み9課題の実用三条件本評価・準備計画
 
-計画ID `PLAN-PRIMARY-PRACTICAL-9-20261012-r3`。2026-10-12 の本人の指示を
+計画ID `PLAN-PRIMARY-PRACTICAL-9-20261012-r4`。2026-10-12 の本人の指示を
 上流とする。対象は完成済み9課題すべてで、旧 #318 の3候補は実行順の先頭。
 これは #192/#198 の正式な24課題・四条件プロトコルの開始や終了条件の変更ではない。
 校正 run `86a09258-0f66-4f05-ad61-7e62dd4fbbfc` と旧結果・計画を変更しない。
@@ -34,12 +34,13 @@ attempt 1、retry 0、concurrency 1、`single_shot_v1`、resume禁止。合計27
 確証を主張しない。正式カタログの3/5反復指定は変更せず、今回の別計画との差を記録する。
 結果を見て有利な課題だけ追加測定しない。
 
-提案予算は条件ごと60分、controllerの検査・private evaluator の各 command ごと5分。
+提案予算は条件ごと60分、controllerの検査・各公開commandごと5分。private workerの予算は
+採用済みbundleのexecution_budget_msを維持し、5分へ切り詰めない。
 各課題の三条件ブロック4時間、9ブロック36時間。既存private採点は初回2runと保存record検証2run、
-計4run／条件を維持する。3条件×4run×5分＋変換・保存5分で課題ごと65分を予約する。
-全体は60時間（最大予約45時間45分＋余裕14時間15分）、45M tokens。旧r2の48時間記録は保持し、
-結果非閲覧でr3を作る。旧48時間manifestは読み取り可能だが、新しい本番開始には使用できない。
-現行一課題入口の overall timeout は最大24時間かつ一課題単位なので、一つの60時間 plan としては
+計4run／条件を維持する。既存API上限15分×3条件×4run＋変換・保存5分で課題ごと185分を予約する。
+全体は84時間（最大予約63時間45分＋余裕20時間15分）、45M tokens。旧r2の48時間/r3の60時間を保持し、
+結果非閲覧でr4を作る。旧manifestは読み取り可能だが、新しい本番開始には使用できない。
+現行一課題入口の overall timeout は最大24時間かつ一課題単位なので、一つの84時間 plan としては
 渡せない。継続実装の薄いbatch controllerで9個の固定ブロックを逐次処理する。夜間・複数日の
 実行は可能だが、同一runの中断を resume する設計にはしない。
 
@@ -259,3 +260,11 @@ source/reference/root/revision/明示params/async範囲外の改変拒否も検�
 private接続6件、native recipe12件、未採用K候補11件が通った。
 原本private worker、評価CLI/model、採点model、旧所有権診断は起動していない。
 原本のhidden moduleが三条件ID・保存平文responseを受け入れるか、numeric scoringが完結するかは未検証。
+
+## r4の独立レビュー修正
+
+r3の全workerを5分とする予約は誤りだった。focused regressionの既存公開generatorは11分、
+他の7件は2分、build-optionの原本private manifest予算は未確認。原本の復元後、
+検査済みmanifestの予算を初回・record検証に等しく使用する。caller短縮値は拒否する。
+現在の保守的予約は既存schema上限15分を使い、採点185分／課題、全体84時間／45Mとする。
+r3の開発準備・検査記録は不変で、本評価開始には使用しない。結果はまだ閲覧・生成していない。

@@ -9,7 +9,7 @@ import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 import { comparisonHash, inventoryUserTree, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 import { createPrimaryEvaluationGradingAdapter, preflightPrimaryEvaluationGrading, PRIMARY_GRADING_PROFILE_ID } from "./ask-primary-evaluation-grading.mjs";
-import { preparePrimaryEvaluationBatch, PRIMARY_GRADING_RESERVATION_MS } from "./ask-primary-evaluation-batch.mjs";
+import { preparePrimaryEvaluationBatch, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_BATCH_LIMITS } from "./ask-primary-evaluation-batch.mjs";
 
 const SOURCE = fileURLToPath(new URL("../", import.meta.url));
 const read = path => readStableFile(path, "fixed public primary input", 32 * 1024 * 1024).bytes;
@@ -66,9 +66,9 @@ export function preparePrimaryEvaluation(publicParent, options) {
     block.grading.blockers = gradingPreflight.blockers;
     blocks.push(block);
   }
-  const manifest = { kind: "ask_primary_evaluation_batch_manifest_v1", batch_id: "primary-nine-prepared-v2",
+  const manifest = { kind: "ask_primary_evaluation_batch_manifest_v1", batch_id: "primary-nine-prepared-v3",
     root: join(output, "batch"), conditions: ["plain", "kernel_principles_v1", "full_ask"],
-    limits: { overall_timeout_ms: 216000000, token_budget: 45000000, retries: 0, concurrency: 1, resume: "forbidden" }, blocks };
+    limits: { ...PRIMARY_BATCH_LIMITS }, blocks };
   const manifestPath = join(output, "batch-manifest.json"); save(manifestPath, manifest);
   const result = preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter });
   save(join(output, "preparation-result.json"), result);

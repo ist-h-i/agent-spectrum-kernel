@@ -6,11 +6,18 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { syntheticPrimarySource } from './test-helpers-primary-evaluation-producer.mjs';
 import { producePrimaryEvaluationArtifacts, buildPrimaryEvaluationScoringInputs } from './ask-primary-evaluation-producer.mjs';
-import { preflightPrimaryEvaluationGradingResources, runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
+import { preflightPrimaryEvaluationGradingResources, primaryPrivateGradingBudget, runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
 import { activePrimaryProducer, primaryAdapterSourceDigest, primaryEvaluatorLogFailureReceipts, primaryGradingSchemaPath, withPrimaryHistoricalEvaluatorResources, withPrimaryEvaluatorLogCapture, capturePrimaryEvaluatorChildStreams } from './ask-primary-evaluation-scope.mjs';
 import { createHash } from 'node:crypto';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 import { deriveEvaluatorDependencyGraph, validateEvaluatorSourceIdentity, verifyPublicEvaluatorReference } from './ask-benchmark-evaluator-boundary.mjs';
+
+test('original worker budget is preserved for initial and validation pairs, including the existing eleven-minute fixture', () => {
+  assert.deepEqual(primaryPrivateGradingBudget(660000), { worker_timeout_ms: 660000, condition_reservation_ms: 2640000 });
+  assert.deepEqual(primaryPrivateGradingBudget(120000), { worker_timeout_ms: 120000, condition_reservation_ms: 480000 });
+  assert.deepEqual(primaryPrivateGradingBudget(900000), { worker_timeout_ms: 900000, condition_reservation_ms: 3600000 });
+  for (const invalid of [0, -1, 900001, NaN, null]) assert.throws(() => primaryPrivateGradingBudget(invalid));
+});
 
 async function fixture(t){const source=syntheticPrimarySource(t),p=await producePrimaryEvaluationArtifacts(source.block,join(source.root,'producer'));
   const options={recordRoot:p.output_root,externalDigest:p.external_digest},normalizedResult=buildPrimaryEvaluationScoringInputs(options,{condition:'plain'}).normalizedResult;

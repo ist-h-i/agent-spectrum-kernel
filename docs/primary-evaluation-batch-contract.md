@@ -79,7 +79,7 @@ have finished and fixed-source grading evidence is preserved. Any incomplete
 status, exception, interruption or deadline stops the batch. This coordinator
 does not infer native grading from user-comparison test outcomes; it preserves
 adapter evidence, and reports actual per-condition quality only after completed original
-scoring. The adapter receives the supplied abort/deadline and 65-minute block
+scoring. The adapter receives the supplied abort/deadline and 185-minute block
 reservation; synchronous blocking or a noncooperating adapter cannot be forcibly
 terminated by this thin layer.
 
@@ -91,11 +91,11 @@ start adapter; neither model nor grading process is invoked.
 
 ## Admission, stopping and reporting
 
-The r3 60-hour deadline starts at consumption and includes grading. Each block
-reserves its entire fixed child overall limit plus 65 minutes of grading. The
+The r4 84-hour deadline starts at consumption and includes grading. Each block
+reserves its entire fixed child overall limit plus 185 minutes of grading. The
 original chain performs four workers per condition (two initial plus two record
-verification runs), each bounded to five minutes. No child plan is rewritten.
-Historical 48-hour preparations remain readable but cannot start under r3. The active AbortSignal
+verification runs), each retaining its verified immutable bundle budget (original API maximum 15 minutes). No child plan is rewritten.
+Historical 48/60-hour preparations remain readable but cannot start under r4. The active AbortSignal
 carries deadline/interruption to the existing child controller. Native
 single-task start/terminal/report semantics remain authoritative; each returned
 native report is saved with digest and exact run/plan identity.

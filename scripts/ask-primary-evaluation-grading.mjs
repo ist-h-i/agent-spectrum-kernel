@@ -13,7 +13,7 @@ import { preflightPrimaryEvaluationGradingResources, runPrimaryEvaluationPrivate
 
 export const PRIMARY_GRADING_CONDITIONS = Object.freeze(['plain', 'kernel_principles_v1', 'full_ask']);
 export const PRIMARY_GRADING_PROFILE_ID = 'primary_single_shot_v1';
-export const PRIMARY_GRADING_RESERVATION_MS = 3900000; // 2 original runs + 2 persisted-record verification runs, x 3 conditions x 5m + 5m conversion/save.
+export const PRIMARY_GRADING_RESERVATION_MS = 11100000; // 4 original runs x 3 conditions x original API max 15m + 5m conversion/save.
 const ROOT = fileURLToPath(new URL('../', import.meta.url)), LIMIT = 16 * 1024 * 1024;
 const adapters = new WeakSet();
 const read = path => readStableFile(path, 'public primary grading evidence', LIMIT).bytes;
@@ -352,7 +352,7 @@ export function createPrimaryEvaluationGradingAdapter({ root = ROOT, resourcesPa
           started = true;
           const graded = runPrimaryEvaluationPrivateGrading(producerOptions, { ...resource, condition,
             privateEvaluationRoot, publicResultRoot: join(output, `public-${condition}`) },
-          { timeoutMs: 300000, signal, deadlineAtMs: deadline_at_ms });
+          { signal, deadlineAtMs: deadline_at_ms });
           conditions.push(graded);
           if (graded.status !== 'completed') break;
         }

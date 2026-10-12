@@ -14,7 +14,7 @@ export const PRIMARY_FIXTURE_IDS = Object.freeze(['mp-ci-evidence-gap', 'mp-data
   'mp-accessibility-interaction-review', 'mp-frontend-state-review', 'mp-iac-rollback-design', 'mp-performance-investigation',
   'mn-build-option-update', 'mn-doc-config-correction']);
 export { PRIMARY_GRADING_RESERVATION_MS };
-export const PRIMARY_BATCH_LIMITS = Object.freeze({ overall_timeout_ms: 216000000, token_budget: 45000000, retries: 0, concurrency: 1, resume: 'forbidden' });
+export const PRIMARY_BATCH_LIMITS = Object.freeze({ overall_timeout_ms: 302400000, token_budget: 45000000, retries: 0, concurrency: 1, resume: 'forbidden' });
 const LIMIT = 16 * 1024 * 1024;
 const bytes = value => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
 const stable = path => readStableFile(path, 'primary batch artifact', LIMIT).bytes;
@@ -105,8 +105,8 @@ function checkBlock(block, conditions, pending) {
 function validateManifest(manifest, pending) {
   assert.equal(manifest.kind, 'ask_primary_evaluation_batch_manifest_v1');
   assert.ok(typeof manifest.batch_id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/u.test(manifest.batch_id));
-  assert.deepEqual(manifest.limits, manifest.limits?.overall_timeout_ms === 172800000
-    ? { ...PRIMARY_BATCH_LIMITS, overall_timeout_ms: 172800000 } : PRIMARY_BATCH_LIMITS, 'unknown primary batch budget');
+  assert.deepEqual(manifest.limits, [172800000, 216000000].includes(manifest.limits?.overall_timeout_ms)
+    ? { ...PRIMARY_BATCH_LIMITS, overall_timeout_ms: manifest.limits.overall_timeout_ms } : PRIMARY_BATCH_LIMITS, 'unknown primary batch budget');
   assert.deepEqual(manifest.blocks.map(block => block.fixture_id), PRIMARY_FIXTURE_IDS, 'all nine fixtures required in fixed order');
   assert.equal(manifest.conditions.length, 3); assert.equal(new Set(manifest.conditions).size, 3);
   assert.equal(new Set(manifest.blocks.map(block => block.run_id)).size, 9, 'duplicate run ID');
@@ -129,7 +129,7 @@ function gradingPreflight(manifest, loaded, adapter) {
     assert.equal(declared.binding.input_manifest_digest, block.input_manifest.digest);
     digest(declared.binding.evaluator_bundle_digest); digest(declared.binding.scoring_input_freeze_digest);
     assert.ok(typeof declared.binding.profile_id === 'string' && declared.binding.profile_id.length > 0);
-    assert.ok(Number.isSafeInteger(declared.timeout_ms) && declared.timeout_ms > 0 && declared.timeout_ms <= PRIMARY_GRADING_RESERVATION_MS, 'grading reservation must be bounded to 65 minutes');
+    assert.ok(Number.isSafeInteger(declared.timeout_ms) && declared.timeout_ms > 0 && declared.timeout_ms <= PRIMARY_GRADING_RESERVATION_MS, 'grading reservation must be bounded to 185 minutes');
     const blockers = declared.status === 'blocked' ? declared.blockers.length ? [...declared.blockers] : ['grading declared blocked'] : [];
     if (!adapter || typeof adapter.preflight !== 'function' || typeof adapter.grade !== 'function') blockers.push('grading adapter not connected');
     else if (loaded[index].plan.config.evidence_kind === 'observed' && !isPrimaryEvaluationGradingAdapter(adapter)) blockers.push('production grading adapter is not registered; caller ready labels cannot authorize dispatch');
