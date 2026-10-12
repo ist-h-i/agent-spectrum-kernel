@@ -268,3 +268,10 @@ r3の全workerを5分とする予約は誤りだった。focused regressionの�
 検査済みmanifestの予算を初回・record検証に等しく使用する。caller短縮値は拒否する。
 現在の保守的予約は既存schema上限15分を使い、採点185分／課題、全体84時間／45Mとする。
 r3の開発準備・検査記録は不変で、本評価開始には使用しない。結果はまだ閲覧・生成していない。
+
+r4はsource head `b4652b907447e73bb34c4b4b063081fa79616cba` のclean状態で新規に準備した。
+manifest digestは `sha256:bf9603dbf87c7444308b4fe6c268c9c07907bf057000e9fecfb697da5700d320`。
+84時間・45M・採点185分／課題、27未開始、開始未消費、品質nullを確認し、
+`evidence/connection-preparation-r4-verification.json` と9課題exportを保存した。
+予算修正を含む4 focused suitesは51/51、runtime bundle freshness・repo validation・whitespace検査も通った。
+これはblockedの開発準備であり、最終評価freezeと実採点成功の証拠ではない。
