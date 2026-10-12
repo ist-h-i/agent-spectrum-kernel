@@ -82,6 +82,8 @@ export const EVALUATOR_DEPENDENCY_ENTRY_PATHS = Object.freeze([
   "scripts/ask-benchmark-private-evaluator-runner.mjs",
 ]);
 export const EVALUATOR_EAGER_AUTHORITY_READS = Object.freeze([
+  Object.freeze({ path: "products/ask-core-bundle/capabilities.json", reader: "scripts/ask-core-capabilities.mjs" }),
+  Object.freeze({ path: "schemas/review-signal-gate-map.json", reader: "scripts/ask-core-capabilities.mjs" }),
   Object.freeze({ path: "schemas/claim-evidence-status.schema.json", reader: "scripts/claim-evidence-status.mjs" }),
   Object.freeze({ path: "schemas/compact-profile-control-map.json", reader: "scripts/fixed-entry-profile.mjs" }),
   Object.freeze({ path: "schemas/fixed-entry-profile-registry.json", reader: "scripts/fixed-entry-profile.mjs" }),

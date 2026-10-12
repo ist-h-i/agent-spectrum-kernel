@@ -17,8 +17,8 @@ import {
   validateEvaluatorSourceIdentity,
   validateIndependenceStatement,
   verifyPrivateEvaluatorBundle,
-  verifyPrivateEvaluatorResourceAssets,
 } from "./ask-benchmark-evaluator-boundary.mjs";
+import * as evaluatorBoundary from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import {
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
@@ -396,6 +396,7 @@ function runGit(root, args, label) {
 function validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots) {
   if (typeof resourceAssetsOnly !== "boolean") throw new Error("resourceAssetsOnly must be a boolean");
   if (resourceAssetsOnly && (!privateRoot || boundaryRoots !== null)) throw new Error("resource-assets-only validation requires a private root and no execution boundary roots");
+  if (resourceAssetsOnly && typeof evaluatorBoundary.verifyPrivateEvaluatorResourceAssets !== "function") throw new Error("resource-assets-only validation requires verifyPrivateEvaluatorResourceAssets");
 }
 
 export function writeMpDataMigrationHandoffProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots = null, resourceAssetsOnly = false }) {
@@ -537,7 +538,7 @@ export function validateMpDataMigrationHandoffProductionAuthority({ root = ROOT,
   if (privateRoot) {
     if (resourceAssetsOnly) assertPrivateRootOutsideRepository(root, privateRoot);
     if (!resourceAssetsOnly && !boundaryRoots) throw new Error("mp-data-migration-handoff private validation requires boundary roots");
-    const bundle = (resourceAssetsOnly ? verifyPrivateEvaluatorResourceAssets : verifyPrivateEvaluatorBundle)({ root, referencePath: resolve(fixtureRoot, "evaluator-reference.json"), privateRoot, manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"), ...boundaryRoots });
+    const bundle = (resourceAssetsOnly ? evaluatorBoundary.verifyPrivateEvaluatorResourceAssets : verifyPrivateEvaluatorBundle)({ root, referencePath: resolve(fixtureRoot, "evaluator-reference.json"), privateRoot, manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"), ...boundaryRoots });
     validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset: readJson(resolve(privateRoot, "evidence-removal-mutations.json"), "mp-data-migration-handoff mutation authority") });
     validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: readJson(resolve(privateRoot, "equivalent-solutions.json"), "mp-data-migration-handoff equivalence authority") });
     assertExact(readJson(resolve(privateRoot, "evidence-removal-mutations.json"), "mp-data-migration-handoff mutation authority"), authority.mutationAsset, "mp-data-migration-handoff private mutations");

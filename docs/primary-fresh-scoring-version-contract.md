@@ -47,6 +47,23 @@ Its acceptance items are:
   runtime full-bundle verification remain unchanged. Empty preparation boundary
   directories are not run evidence; this mode never fabricates run markers or
   grants start, worker, review or admission authority.
+- `AC-WORKER-IMPORT`: the sealed runner may expose only the `AsyncLocalStorage`
+  named export, `isBuiltin` predicate and frozen `performance.now` clock required
+  by the current frozen scoring libraries. No async hook factory, module loader,
+  performance observer or other export is granted;
+  worker scopes start without parent context.
+  This is a library dependency connection, not a filesystem/network/OS permission
+  change. Other unapproved builtin imports remain refused.
+  The two eager public data reads of `ask-core-capabilities.mjs` are explicitly
+  included in the source graph with raw-byte/revision pins; virtual filesystem
+  reads remain confined to the verified graph and never fall back to host files.
+- `AC-UNKNOWN-CONTINUE`: only an explicit fresh-version practical batch separates
+  completed grading execution from numeric scoring readiness. A saved original
+  score, verified through all four successful original workers, may retain
+  `not_scoring_ready` and null quality. This known semantic outcome is recorded
+  and the next task may run. Unverified/partial worker termination still stops.
+  Old/default connector behavior, original scorer status/formula and formal
+  protocol completion conditions remain unchanged; no unknown is converted to zero.
 
 Work package `WP-PRIMARY-FRESH-SCORING-1`, revision 1, references the Spec.
 The allowed change boundary is the explicit-version primary connector and its

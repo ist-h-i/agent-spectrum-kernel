@@ -376,8 +376,10 @@ export function createPrimaryEvaluationGradingAdapter({ root = ROOT, resourcesPa
           if (graded.status !== 'completed') break;
         }
         const complete = conditions.length === profile.conditions.length && conditions.every(value => value.status === 'completed');
+        const numericComplete = complete && conditions.every(value => value.scoring_status === 'complete');
         const exported = exportPrimaryEvaluationGradingRequest(block, { root });
-        const readout = { ...exported.readout, scoring_status: complete ? 'complete' : 'not_scoring_ready',
+        const readout = { ...exported.readout, scoring_status: numericComplete ? 'complete' : 'not_scoring_ready',
+          ...(exported.request.scoring_version ? { grading_execution_status: complete ? 'completed' : 'incomplete' } : {}),
           conditions: exported.readout.conditions.map(slot => {
             const graded = conditions.find(item => item.condition === slot.condition);
             if (!graded || graded.status !== 'completed') return { ...slot, private_grading: graded ?? { status: 'not_started' } };

@@ -137,6 +137,17 @@ export function primaryPrivateGradingBudget(executionBudgetMs) {
   assert.ok(Number.isSafeInteger(executionBudgetMs)&&executionBudgetMs>0&&executionBudgetMs<=900000,'original private worker budget invalid');
   return {worker_timeout_ms:executionBudgetMs,condition_reservation_ms:4*executionBudgetMs};
 }
+
+// A successfully verified/saved original score may truthfully remain unknown.
+// Only the explicitly selected fresh practical version separates that semantic
+// status from completed grading execution; legacy behavior is retained.
+export function primaryPrivateGradingExecutionStatus(scoringStatus, receipts, { freshVersion = false } = {}) {
+  assert.equal(typeof freshVersion, 'boolean');
+  assert.ok(['complete', 'not_scoring_ready'].includes(scoringStatus));
+  assert.equal(receipts.length, 4, 'all original worker runs must be retained');
+  assert.ok(receipts.every(receipt => receipt.process_completed === true && receipt.exit_code === 0), 'original worker completion is unverified');
+  return scoringStatus === 'complete' || freshVersion ? 'completed' : 'unknown';
+}
 export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs,{signal=null,deadlineAtMs=null,...unknownControls}={}) {
   let requested=false,evidenceKind='unknown',profile=null;
   try {
@@ -183,7 +194,7 @@ export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs
       return scoreEvaluatorResult({...s,resultPath,privateEvaluationRecordPath:recordPath,privateFragmentPath:fragmentPath,outputPath:join(publicRoot,'engineering-result.json')});
     });
     assert.equal(captured.receipts.length,4,'primary original private worker count changed');assert.ok(captured.receipts.every(receipt=>receipt.process_completed&&receipt.exit_code===0));
-    return {status:captured.result.artifact.scoring_status==='complete'?'completed':'unknown',scoring_status:captured.result.artifact.scoring_status,
+    return {status:primaryPrivateGradingExecutionStatus(captured.result.artifact.scoring_status,captured.receipts,{freshVersion:Boolean(producer.request.scoring_version)}),scoring_status:captured.result.artifact.scoring_status,
       scoring_reason:captured.result.artifact.scoring_reason,quality:captured.result.artifact.requirement_score.normalized_requirement_score,
       condition:runtimeInputs.condition,evidence_kind:producer.evidence_kind,formal_aggregate_eligible:false,model_calls:0,grader_process_starts:4,grader_process_completed:true,
       public_artifacts:{evaluator_result:{path:join(publicRoot,'evaluator-result.json'),digest:hash(read(join(publicRoot,'evaluator-result.json')))},

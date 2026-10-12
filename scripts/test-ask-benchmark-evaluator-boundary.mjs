@@ -806,6 +806,8 @@ try {
   assert.ok(currentDependencyGraph.edge_inventory.some(({ from, to }) => from === "scripts/ask-benchmark-execution.mjs" && to === "scripts/ask-benchmark-command-evidence.mjs"), "current evaluator graph must include execution command-evidence authority");
   assert.ok(currentDependencyGraph.edge_inventory.some(({ from, to }) => from === "scripts/ask-benchmark-evaluator-boundary.mjs" && to === "scripts/ask-benchmark-scoring-contract.mjs"), "current evaluator graph must include evaluator scoring-contract authority");
   assert.deepEqual(EVALUATOR_EAGER_AUTHORITY_READS, [
+    { path: "products/ask-core-bundle/capabilities.json", reader: "scripts/ask-core-capabilities.mjs" },
+    { path: "schemas/review-signal-gate-map.json", reader: "scripts/ask-core-capabilities.mjs" },
     { path: "schemas/claim-evidence-status.schema.json", reader: "scripts/claim-evidence-status.mjs" },
     { path: "schemas/compact-profile-control-map.json", reader: "scripts/fixed-entry-profile.mjs" },
     { path: "schemas/fixed-entry-profile-registry.json", reader: "scripts/fixed-entry-profile.mjs" },

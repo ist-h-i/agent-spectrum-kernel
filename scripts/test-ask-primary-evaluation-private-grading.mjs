@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { syntheticPrimarySource } from './test-helpers-primary-evaluation-producer.mjs';
 import { producePrimaryEvaluationArtifacts, buildPrimaryEvaluationScoringInputs } from './ask-primary-evaluation-producer.mjs';
-import { preflightPrimaryEvaluationGradingResources, primaryPrivateGradingBudget, runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
+import { preflightPrimaryEvaluationGradingResources, primaryPrivateGradingBudget, primaryPrivateGradingExecutionStatus, runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
 import { activePrimaryProducer, primaryAdapterSourceDigest, primaryEvaluatorLogFailureReceipts, primaryGradingSchemaPath, withPrimaryHistoricalEvaluatorResources, withPrimaryEvaluatorLogCapture, capturePrimaryEvaluatorChildStreams } from './ask-primary-evaluation-scope.mjs';
 import { createHash } from 'node:crypto';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
@@ -17,6 +17,18 @@ test('original worker budget is preserved for initial and validation pairs, incl
   assert.deepEqual(primaryPrivateGradingBudget(120000), { worker_timeout_ms: 120000, condition_reservation_ms: 480000 });
   assert.deepEqual(primaryPrivateGradingBudget(900000), { worker_timeout_ms: 900000, condition_reservation_ms: 3600000 });
   for (const invalid of [0, -1, 900001, NaN, null]) assert.throws(() => primaryPrivateGradingBudget(invalid));
+});
+
+test('fresh practical grading execution completion preserves unresolved original scoring without aborting later tasks', () => {
+  const complete = Array.from({ length: 4 }, () => ({ process_completed: true, exit_code: 0 }));
+  assert.equal(primaryPrivateGradingExecutionStatus('complete', complete), 'completed');
+  assert.equal(primaryPrivateGradingExecutionStatus('not_scoring_ready', complete), 'unknown');
+  assert.equal(primaryPrivateGradingExecutionStatus('not_scoring_ready', complete, { freshVersion: true }), 'completed');
+  for (const receipts of [complete.slice(0, 2), [...complete.slice(0, 3), { process_completed: false, exit_code: null }],
+    [...complete.slice(0, 3), { process_completed: true, exit_code: 1 }]])
+    assert.throws(() => primaryPrivateGradingExecutionStatus('not_scoring_ready', receipts, { freshVersion: true }));
+  assert.throws(() => primaryPrivateGradingExecutionStatus('unknown', complete, { freshVersion: true }));
+  assert.throws(() => primaryPrivateGradingExecutionStatus('not_scoring_ready', complete, { freshVersion: 'yes' }));
 });
 
 async function fixture(t){const source=syntheticPrimarySource(t),p=await producePrimaryEvaluationArtifacts(source.block,join(source.root,'producer'));
