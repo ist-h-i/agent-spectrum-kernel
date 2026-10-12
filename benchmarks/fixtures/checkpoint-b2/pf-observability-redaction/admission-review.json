@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "pf-observability-redaction",
   "candidate_input_digest": "sha256:c5e26782b946013bc1d79e386482b12abbc018ae24e532a850ceb5afe2e47aff",
-  "candidate_evaluator_digest": "sha256:14c7b880b429a4f525b620e862aa6f81bb6e091175dbfbc03b29c08c69c91a1c",
+  "candidate_evaluator_digest": "sha256:50340952358b206888f8be588e120f6d0d33897547fc5f652a27912b7e06c1d4",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -123,5 +123,5 @@
       "result": "unknown"
     }
   ],
-  "review_package_digest": "sha256:c432e766acf9d801fe3435c854aceb5bf527be910cc5aece184a26e5f5352d01"
+  "review_package_digest": "sha256:8720a9c7416502323f26c4623a8e09032ce79de8b20741c41739d17651b7aa33"
 }

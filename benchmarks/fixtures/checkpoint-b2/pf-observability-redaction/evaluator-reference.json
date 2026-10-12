@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-ffa7764e6b46a03932db7fb2bb7cec8066d81b2b8f93bc66b7040596c03fc96d",
-  "evaluator_bundle_digest": "sha256:14c7b880b429a4f525b620e862aa6f81bb6e091175dbfbc03b29c08c69c91a1c",
+  "evaluator_bundle_id": "evaluator-2d79614c5539592e380bedf63596702b09b0693cbd0e1baa4cc1ad7ebb71bf78",
+  "evaluator_bundle_digest": "sha256:50340952358b206888f8be588e120f6d0d33897547fc5f652a27912b7e06c1d4",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "pf-observability-redaction",
   "fixture_input_digest": "sha256:c5e26782b946013bc1d79e386482b12abbc018ae24e532a850ceb5afe2e47aff",
   "task_class": "implementation_review",
   "suite": "practice_frequency",
-  "evaluator_revision": "302320e55c05be01400eeec0ebf9dd3e265ee879",
+  "evaluator_revision": "96439ee35fe58806f0aa14a670abd150dc525c2a",
   "evaluator_source_identity": {
-    "base_git_revision": "302320e55c05be01400eeec0ebf9dd3e265ee879",
+    "base_git_revision": "96439ee35fe58806f0aa14a670abd150dc525c2a",
     "source_tree_digest": "sha256:978a07cdabd9b519912ded9cd1f074412d8dd3e53f0a4d92195c353e4b3298b1",
     "generator_source_digest": "sha256:124f4862dbb4eba98605fb558368b561a99c7505f9bec5eeb8d14ecb632c8a53",
     "source_files": [
@@ -4042,11 +4042,11 @@
     }
   },
   "generator_identity": "sha256:5734948cc346de1c78f2078b7430f53aeb6850dee81e25efa1bc8be3afe9c071",
-  "independence_statement_digest": "sha256:2ee97c404c4ccc7c018943cc525bed2fbeae3c3f7851c1d4dd3e6d495e87a014",
-  "review_record_digest": "sha256:269db283b09fbd1448c5f8d8632a92ed0c660539b1ffe026007d180edd4cef13",
+  "independence_statement_digest": "sha256:45b8b1cea8aed028abbe692b19c12891edb114c3001df4e485806917f8a83e4b",
+  "review_record_digest": "sha256:67f1cdbde85469432950456e33a64043943d6f1dcb890afbd94f5caa9d9aa4f8",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:5a98854f987f5c4343f403dfa3ee6d29c7f83105ef9b31ab48e4ab0da23d51e6",
-  "evaluator_authority_manifest_digest": "sha256:851a5e2281cd54aae07accb489e21608d3d528501b62a6a4a5560518f9dae893",
+  "evaluator_authority_manifest_raw_sha256": "sha256:36800ae800ed33abada05e1d128084949ad30c8f737ab762d5698e9b6631a622",
+  "evaluator_authority_manifest_digest": "sha256:7f3139615ad2c8579f2fd44bc8da9774f44ca236951f004da4f20611a65d933f",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:9605f7d0fbceca078dc824f08d0f0280b195dfbf219b5840ebfde16725bba008"
+  "public_metadata_digest": "sha256:7deba31e6dddc665a80176808f27fa2e75e9ab0b24ed9b2c4988ad11af5cd65d"
 }
