@@ -59,17 +59,20 @@ test("pinned fallback metadata warning is allowed but arbitrary error is not",()
   const {control:c}=state();c.event(thread);c.event({type:"item.completed",item:{type:"error",message:"Model metadata for `gpt-6.1-sol` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."}});c.event(start);c.event(done);c.finish();assert.equal(c.evidence().stop,null);
 });
 function child(code,extra={}) {return executeTurnBudgetAgent(process.execPath,["-e",code],{cwd:process.cwd(),env:{},input:Buffer.from("owned"),maxBuffer:1048576,...extra});}
+// Stream-format tests isolate stdout validation from a child exiting before
+// consuming its input. The explicit stdin-failure test below remains separate.
+function childAfterInput(code,extra={}) {return child(`process.stdin.resume();process.stdin.on('end',()=>{${code}});`,extra);}
 const events=JSON.stringify([thread,start,done].map(x=>JSON.stringify(x)).join("\n")+"\n");
 test("stream splits, stdin, normal exit and usage bytes are preserved",async()=>{
   const r=await child(`process.stdin.resume();process.stdin.on('end',()=>{const s=${events};process.stdout.write(s.slice(0,17));setTimeout(()=>process.stdout.write(s.slice(17)),5);});`);
   assert.equal(r.status,0);assert.equal(r.error,null);assert.equal(r.time_budget.stop,null);assert.equal(r.stdout.toString(),JSON.parse(events));assert.equal(r.workspace_descendants_detected,false);
 });
 for(const [text,expected] of [['{"type":"turn.started","type":"turn.started"}\n',"invalid_json_stream"],[JSON.stringify(thread),"incomplete_json_line"],[JSON.stringify(thread)+"\n"+JSON.stringify(start)+"\n"+JSON.stringify(start)+"\n","ambiguous_turn_start"]])test(`stream rejects ${expected}`,async()=>{
-  const r=await child(`process.stdout.write(${JSON.stringify(text)});`);assert.equal(r.time_budget.stop,expected);assert.ok(r.error);
+  const r=await childAfterInput(`process.stdout.write(${JSON.stringify(text)});`);assert.equal(r.time_budget.stop,expected);assert.ok(r.error);
 });
 test("invalid utf8 and output overflow terminate the group",async()=>{
-  const utf=await child("process.stdout.write(Buffer.from([255,10]));");assert.equal(utf.time_budget.stop,"invalid_json_stream");
-  const huge=await child("process.stdout.write('x'.repeat(2048));",{maxBuffer:1000});assert.equal(huge.error.code,"ENOBUFS");assert.equal(huge.stdout.length,1000);
+  const utf=await childAfterInput("process.stdout.write(Buffer.from([255,10]));");assert.equal(utf.time_budget.stop,"invalid_json_stream");
+  const huge=await childAfterInput("process.stdout.write('x'.repeat(2048));",{maxBuffer:1000});assert.equal(huge.error.code,"ENOBUFS");assert.equal(huge.stdout.length,1000);
 });
 test("startup with no events times out, never retries",async()=>{
   const r=await child("setInterval(()=>{},1000);",{simulationAbsoluteMs:100});assert.equal(r.error.code,"ETIMEDOUT");assert.equal(r.time_budget.stop,"absolute_timeout");assert.equal(r.signal,"SIGKILL");assert.equal(r.workspace_descendants_detected,false);
