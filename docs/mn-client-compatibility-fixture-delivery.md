@@ -24,6 +24,9 @@ source, replacing only the import of canonical primitives with the same bound
 primitive operations. This avoids importing unrelated runtime dependencies into
 the private evaluator and adds no common builtin permission or scorer change.
 Exact projection and result parity require independent inspection.
+Changes to existing test coverage retain a separate semantic review requirement;
+empty or weakened tests cannot establish scope completeness from a command exit
+code alone. Equivalent focused regression changes are not automatically rejected.
 
 Private development probes exercise equivalent correct candidates, incorrect
 candidates, missing/failed verification and scope controls. Their normalized
