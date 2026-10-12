@@ -1,0 +1,184 @@
+{
+  "reviewer_record_id": "review-error-source-independent-review-follow-up-1b8b0080-20261012",
+  "fixture_id": "pf-review-error-contract",
+  "reviewed_head": "1b8b0080133cafe3af989ca9e8bc8f168ace2738",
+  "base_commit": "15b5f7f975659dc6d5051231ac5b60e7141be721",
+  "decision": "approve",
+  "scope": "Existing public source payload approved atca7, byte-identical atworktreeHEAD1b8b0080. Three added private-preparation files are excluded and not read/reviewed. Not whole-commit/private meaning/admission/production approval.",
+  "source_type": "documented_external_pattern",
+  "source_reference_ids": [
+    "rfc9110-http-semantics-20261012"
+  ],
+  "official_source": {
+    "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+    "independently_viewed_date": "2026-10-12",
+    "supports": "RFC9110 sections9.2.2 and10.2.3 document retry/idempotence boundaries and Retry-After date/integer-delay semantics, motivating caller-visible HTTP contract interactions.",
+    "does_not_support": "The original fictional application-specific status/body/client-label/budget mapping, the filled review answer, actual frequency/impact or empirical medium_hard calibration."
+  },
+  "source_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/task.md",
+      "bytes": 2197,
+      "raw_sha256": "sha256:61bfd21fef4cb98a8c8ef2593e245302bba2c3caf5589055cf5aa2f94bd28b6e"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/base/response-adapter.mjs",
+      "bytes": 682,
+      "raw_sha256": "sha256:ee0accba181d6e2fb890ca7d2c7ccc3fb6131b97aa7bfc64fb013eee880c7537"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/data/cases.json",
+      "bytes": 1257,
+      "raw_sha256": "sha256:65a415fb5626b4c555ed75cefb2155ead45d73bfd35481dcc72aecd996552aa4"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/docs/error-contract.md",
+      "bytes": 2718,
+      "raw_sha256": "sha256:e2b653917bb3c1a54d12e61112d902958b4460740c188217da3dd35ef0aab88b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/package.json",
+      "bytes": 251,
+      "raw_sha256": "sha256:d2d55c3edd8df7aa2d7d53b7bf47e1fa8271c6846f1d3314e0c9d77bd43a79b5"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/pr.diff",
+      "bytes": 846,
+      "raw_sha256": "sha256:40585c23b4ab648a1c6d8eae5aa76e265ba1c9ce181ae41ba875858b7d62ff1e"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/review.schema.json",
+      "bytes": 9561,
+      "raw_sha256": "sha256:285c6d6b179bbe688cb8d8a6dee67e615988db91fb64ddfb02519f339b82fdb5"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/scripts/trace-cases.mjs",
+      "bytes": 691,
+      "raw_sha256": "sha256:64dd208b9c24da2dd21f7ec69c24de9e1c94eedb4b20c8bcce3550a426861fde"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/scripts/validate-review.mjs",
+      "bytes": 1898,
+      "raw_sha256": "sha256:7303c27db15cdc8ecee9b431c063e5d86b0d52ba2815f5d7da626e55bbeb8aaa"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/src/client-policy.mjs",
+      "bytes": 573,
+      "raw_sha256": "sha256:8238c6db8d39fe810a136f1d413cdfd69df765820a0d0edc793fe4a6e895c814"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/src/response-adapter.mjs",
+      "bytes": 632,
+      "raw_sha256": "sha256:2aa656641e532930f268f31987268612be1d7bd27d01eb762869c19762f4ae84"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/test/api-error.test.mjs",
+      "bytes": 1494,
+      "raw_sha256": "sha256:ff052dbe6c2ac6885b61e882e9eac6e616191ebfc0985839ed3fff59b8370cd5"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/input-manifest.json",
+      "bytes": 2471,
+      "raw_sha256": "sha256:a46f47824169ff97d18a96db357d20a596a2bb8d7a21b8fcf088f2b67692e25b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/verification-command-contract.json",
+      "bytes": 2652,
+      "raw_sha256": "sha256:7de280b768b522652fe80e3a18ab6af3f959950bc37905d169eb7ed4d33a1d0e",
+      "contract_digest": "sha256:ba7f35f1f4e3ca058c3e3f4f64db46aece0f0fe561a4efac7b6d9d13509b3522"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/lineage.md",
+      "bytes": 1048,
+      "raw_sha256": "sha256:105643b634277853cd65486445b642035c99716a7db962803c7df11d69dc7ae0"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/rfc9110-http-semantics-20261012.md",
+      "bytes": 1360,
+      "raw_sha256": "sha256:8a341138312cbe9004f596e777ea681086aff7add127bb6c710e44c89d9474ae"
+    },
+    {
+      "path": "scripts/ask-benchmark-pf-review-error-source.mjs",
+      "bytes": 9112,
+      "raw_sha256": "sha256:95f3f958fd0932fa1cc7101ed43f9c5c7df2193624bd7dc0e837c74b8601eced"
+    },
+    {
+      "path": "scripts/test-ask-benchmark-pf-review-error-source.mjs",
+      "bytes": 3915,
+      "raw_sha256": "sha256:ca26e002243d3998c77c7e2af775bfa39dd20329881cd903fe36b37c31e938af"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/admission-review.json",
+      "bytes": 90,
+      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evaluator-authority-manifest.json",
+      "bytes": 90,
+      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evaluator-reference.json",
+      "bytes": 90,
+      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evidence-map.json",
+      "bytes": 90,
+      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/final-admission-record.json",
+      "bytes": 90,
+      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/metadata.json",
+      "bytes": 90,
+      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/output-contract.json",
+      "bytes": 90,
+      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/requirement-record.json",
+      "bytes": 90,
+      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/scoring-input-freeze-manifest.json",
+      "bytes": 90,
+      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-freeze-candidate.json",
+      "bytes": 90,
+      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
+    }
+  ],
+  "lineage_policy_ref": {
+    "path": "benchmarks/portfolio-lineage-policy.json",
+    "bytes": 6039,
+    "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d",
+    "declared_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"
+  },
+  "catalog_ref": {
+    "path": "benchmarks/portfolio-catalog.json",
+    "bytes": 29625,
+    "raw_sha256": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
+    "declared_catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972"
+  },
+  "requirements_for_change": [],
+  "limitations": [
+    "Filled reviews, trace truth/control bodies and independent required-behavior calculations remain private. Only counts, verdicts, bounds and hashes are disclosed.",
+    "Three normal/equivalent reports and four deliberately bad/unsupported meaning reports are structurally accepted with semantic_correctness not_assessed. Five malformed/extra-prose/execution-declaration reports are refused. These are ordinary source/data probes, not private semantic grading.",
+    "Unsupported locator/data claims must be rejected or remain manual/unknown according to independent evidence; valid alternative evidence/order must not be rejected solely for canonical mismatch. No future grader coverage is approved.",
+    "Final source adds an ordered public severity rubric and three unique literal commands, requiring all three for passed. The anchored invocation now executes test, trace and shape validation; its exit success is command receipt evidence, not review truth.",
+    "Initial missing approved-source evidence and incorrect type alias were resolved at3317b27b and10c33695. Finalca7 updates only public review rubric/declarations/validation and bindings; adapter/caller/cases/diff/native tests/trace remain unchanged.",
+    "All ten authority/completion artifacts remain generation_pending. Author untracked authority preparation, private originals, r9, model/evaluation CLI, old diagnostics, main merge and implementation changes were not read/run/performed.",
+    "Empirical medium_hard/30-minute calibration remains unknown; frequency/impact retain unknown/null weights and practice-weighted ineligibility without changing frozen catalog base eligibility.",
+    "Original ca7 five records remain unchanged, manifest raw SHA-256 0c5d43d4f45e228f16f59043b3a4471b28f7ec438e314aea6822273d2ad11297. New config/authority/archive helper content was not inspected; same public refs and pending markers are approved by byte identity only."
+  ]
+}
