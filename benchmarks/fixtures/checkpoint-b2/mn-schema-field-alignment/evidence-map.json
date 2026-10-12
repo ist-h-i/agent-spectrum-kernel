@@ -27,9 +27,10 @@
         "display_name",
         "displayName"
       ],
-      "preserve_unrelated_loaded_values": true
+      "preserve_unrelated_loaded_values": true,
+      "required_alignment_change": "loaded_schema_value_change"
     },
-    "authority_digest": "sha256:4bbd0ca5638d3febd53d3a354999b16f5bb00dfbc5c5bb547727d7c4697adc25"
+    "authority_digest": "sha256:4d4a5fd37fbec57ef2e65942e41a54f75ac576d5e49b234ed9de2def5c23e18d"
   },
   "maps": [
     {
