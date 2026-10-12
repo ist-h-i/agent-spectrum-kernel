@@ -273,7 +273,8 @@ function buildAdmissionReview({ inputDigest, bundle, visiblePaths }) {
   const gates = [
     "public_artifact_leakage", "private_evaluator_boundary", "requirement_recoverability", "plain_fair_path", "kernel_only_fair_path", "ordinary_engineering_task_wording", "ask_vocabulary_cue_absence", "evidence_removal_mutation", "equivalent_solution_coverage", "independent_review", "input_digest_freeze", "evaluator_digest_freeze",
   ].map((gate_id) => ({ gate_id, selector_result: "applicable", result: gate_id === "independent_review" ? "unknown" : "pass" }));
-  for (const gate_id of ["suspicious_but_correct_control", "false_positive_boundary", "unauthorized_attempt_observability"]) gates.push({ gate_id, selector_result: "not_applicable", result: "not_applicable" });
+  gates.push({gate_id: "unauthorized_attempt_observability", selector_result: "applicable", result: "unknown"});
+  for (const gate_id of ["suspicious_but_correct_control", "false_positive_boundary"]) gates.push({ gate_id, selector_result: "not_applicable", result: "not_applicable" });
   const base = {
     schema_version: "1.0.0", fixture_id: PF_DATA_SCHEMA_FIXTURE_ID, candidate_input_digest: inputDigest, candidate_evaluator_digest: bundle.evaluator_bundle_digest,
     reviewer_status: "pending_independent_review", author_self_approval: false, admission_status: "admission_pending", fair_paths: { plain: fair, kernel_only: fair }, gates,
