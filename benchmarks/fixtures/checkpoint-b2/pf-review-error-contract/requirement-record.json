@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:f3f06ae9daf3cc8861bac5c83d2c95f97362ff6fa5424d04552fe24d41627a8e",
+  "admission_record_digest": "sha256:2a432342be40a2ad67e379231609f270b2eae827bc723e15e144b6c6c1d70588",
   "requirements": [
     {
       "requirement_id": "error-contract-findings",
@@ -64,5 +64,5 @@
     }
   ],
   "requirement_set_digest": "sha256:62aec47a5de8ecd3512012ecf73981013ed41646e667cb58c5d9b61617fde63d",
-  "requirement_record_digest": "sha256:f24487266b3167f68f6a0a15169a91873b5abafb88ec22bc079d553d9c59ad13"
+  "requirement_record_digest": "sha256:40984043a4eb5de4ed0633f508d7433c955f21aa00ca80fed528e68be330ef9d"
 }
