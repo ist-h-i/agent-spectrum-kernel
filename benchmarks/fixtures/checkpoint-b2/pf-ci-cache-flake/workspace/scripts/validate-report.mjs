@@ -1,0 +1,11 @@
+import {readFileSync} from 'node:fs';
+const report=JSON.parse(readFileSync('investigation.json','utf8'));
+const fail=()=>{throw new Error('investigation.json must satisfy docs/investigation-contract.md and investigation.schema.json')};
+for(const key of ['summary','confidence','hypotheses','experiments','recommended_changes','limitations'])if(!(key in report))fail();
+if(typeof report.summary!=='string'||!report.summary.trim()||!['confirmed_for_fixture','supported','unknown'].includes(report.confidence))fail();
+for(const key of ['hypotheses','experiments','recommended_changes','limitations'])if(!Array.isArray(report[key])||!report[key].length)fail();
+const refs=xs=>Array.isArray(xs)&&xs.length&&xs.every(x=>typeof x.path==='string'&&!x.path.startsWith('/')&&!x.path.split('/').includes('..')&&Number.isInteger(x.line)&&x.line>0);
+for(const h of report.hypotheses)if(typeof h.cause!=='string'||!h.cause.trim()||!['supported','contradicted','unresolved'].includes(h.status)||!refs(h.evidence))fail();
+for(const e of report.experiments)if(typeof e.command!=='string'||!e.command.trim()||typeof e.observations!=='string'||!e.observations.trim()||typeof e.conclusion!=='string'||!e.conclusion.trim())fail();
+for(const key of ['recommended_changes','limitations'])if(report[key].some(x=>typeof x!=='string'||!x.trim()))fail();
+console.log('Investigation report structure accepted; causal meaning requires review');

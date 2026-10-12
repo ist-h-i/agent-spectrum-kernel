@@ -1,0 +1,3 @@
+# Source-stage lineage — pf-ci-cache-flake
+Source type: documented_external_pattern. Public GitHub cache-key documentation motivates the technical pattern; authored local files provide inspectable evidence and controlled experiments. All run/cache IDs and logs are fictional, generated from src/cache-model.mjs. They are not evidence of real-world occurrence or impact.
+No private business data or copied implementation is used. Frequency and impact remain Unknown; their weights must be null and practice-weighted aggregation is ineligible. Frozen catalog identity/intent/scoring semantics are unchanged. Source approval and independent frequency/impact review are pending; this file is not an admission decision.
