@@ -297,11 +297,11 @@ function generatePfPerformanceProductionAuthorityInPlace({ root, privateRoot, ev
   const scoringPolicy = readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json"), "portfolio scoring policy");
   if (catalog.catalog_digest !== computePortfolioCatalogDigest(catalog) || policyManifest.manifest_digest !== computePolicyManifestDigest(policyManifest) || scoringPolicy.policy_digest !== computeScoringPolicyDigest(scoringPolicy)) throw new Error("portfolio policy identity is not closed before pf-performance authority generation");
   const catalogFixture = catalog.fixtures.find((item) => item.fixture_id === PF_PERFORMANCE_FIXTURE_ID);
-  if (!catalogFixture || catalogFixture.task_class !== "investigation_implementation" || catalogFixture.domain !== "frontend" || catalogFixture.backend_api_security !== false || catalogFixture.risk_boundary !== "none") throw new Error("Frontend async fixture catalog contract differs");
-  const lineage = readJson(resolve(fixtureRoot, "lineage-record.json"), "pagination lineage record");
-  assertBenchmarkSchemaInstance(lineage, { schemaPath: resolve(root,"benchmarks/schemas/portfolio-lineage-record.schema.json"), label:"pagination lineage record" });
+  if (!catalogFixture || catalogFixture.task_class !== "investigation_implementation" || catalogFixture.domain !== "performance" || catalogFixture.backend_api_security !== false || catalogFixture.risk_boundary !== "none") throw new Error("Performance fixture catalog contract differs");
+  const lineage = readJson(resolve(fixtureRoot, "lineage-record.json"), "performance lineage record");
+  assertBenchmarkSchemaInstance(lineage, { schemaPath: resolve(root,"benchmarks/schemas/portfolio-lineage-record.schema.json"), label:"performance lineage record" });
   const {lineage_record_digest, ...lineageBase}=lineage;
-  if(lineage_record_digest!==canonicalDigest(lineageBase)||lineage.fixture_id!==PF_PERFORMANCE_FIXTURE_ID||lineage.review_status!=="reviewed"||lineage.catalog_digest!==catalog.catalog_digest||lineage.policy_manifest_digest!==policyManifest.manifest_digest||lineage.frequency_band!=="unknown"||lineage.impact_band!=="unknown") throw new Error("pagination reviewed lineage freeze is not closed");
+  if(lineage_record_digest!==canonicalDigest(lineageBase)||lineage.fixture_id!==PF_PERFORMANCE_FIXTURE_ID||lineage.review_status!=="reviewed"||lineage.catalog_digest!==catalog.catalog_digest||lineage.policy_manifest_digest!==policyManifest.manifest_digest||lineage.frequency_band!=="unknown"||lineage.impact_band!=="unknown") throw new Error("performance reviewed lineage freeze is not closed");
   const evidence = buildEvidenceMap();
   writeJson(resolve(fixtureRoot, "evidence-map.json"), evidence.evidenceMap);
 
@@ -378,7 +378,7 @@ function generatePfPerformanceProductionAuthorityInPlace({ root, privateRoot, ev
   const review = buildAdmissionReview({ inputDigest, bundle, visiblePaths });
   writeJson(resolve(fixtureRoot, "admission-review.json"), review);
   const metadataBase = {
-    schema_version: "1.0.0", fixture_id: PF_PERFORMANCE_FIXTURE_ID, fixture_role: "primary", suite: "practice_frequency", task_class: "investigation_implementation", domain: "frontend", difficulty: "medium_hard", repetitions: 5, risk_boundary: "none", capability_families: ["async_state_management", "state_consistency"], evidence_topologies: ["cross_file_contract", "ui_semantics_and_interactions"], outcome_dimensions: ["behavioral_consistency", "reliability"],
+    schema_version: "1.0.0", fixture_id: PF_PERFORMANCE_FIXTURE_ID, fixture_role: "primary", suite: "practice_frequency", task_class: catalogFixture.task_class, domain: catalogFixture.domain, difficulty: catalogFixture.difficulty, repetitions: catalogFixture.repetitions, risk_boundary: catalogFixture.risk_boundary, capability_families: catalogFixture.capability_families, evidence_topologies: catalogFixture.evidence_topologies, outcome_dimensions: catalogFixture.outcome_dimensions,
     output_contract_type: "implementation_producing", requirement_record_id: requirement.requirement_record_id, output_contract_id: output.output_contract_id,
     evaluator_bundle_id: bundle.evaluator_bundle_id, evaluator_bundle_digest: bundle.evaluator_bundle_digest, evaluator_byte_count: admission.evaluator_byte_count,
     review_status: "pending_independent_review", measured_execution_performed: false,
