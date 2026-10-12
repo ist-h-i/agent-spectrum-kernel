@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { validateMnSchemaFieldAlignmentProductionAuthority, buildEvidenceMap } from "./ask-benchmark-mn-schema-field-alignment-authority.mjs";
 import { validateMnSchemaFieldAlignmentInputClosure } from "./ask-benchmark-mn-schema-field-source.mjs";
-const root = fileURLToPath(new URL("..", import.meta.url));
+const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 test("schema task retains exact public input closure", () => {
   assert.equal(validateMnSchemaFieldAlignmentInputClosure({ root }).fixtureId, "mn-schema-field-alignment");
 });
