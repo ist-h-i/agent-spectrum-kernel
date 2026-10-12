@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/evaluator-authority-manifest.schema.json",
+  "program": "adaptive_ask_evaluator_authority_manifest",
+  "fixture_id": "pf-ci-cache-flake",
+  "evaluator_revision": "a06e96f8a493b0ae70d3910c73c644b0da13fa25",
+  "file_inventory": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/input-manifest.json",
+      "bytes": 2515,
+      "raw_sha256": "sha256:276cbe5632762a7b03ace4c3057e8a8b04553ba21bdc5c0794355e7c0509f83a",
+      "semantic_digest": "sha256:b3ec9e4beacfe834b8e5211464318eb0b67070e9b6e6cfa6f0e9b002c43d0858",
+      "authority_role": "fixture_input",
+      "fixture_input_identity": "sha256:276cbe5632762a7b03ace4c3057e8a8b04553ba21bdc5c0794355e7c0509f83a",
+      "semantic_fixture_entry_digest": "sha256:b3ec9e4beacfe834b8e5211464318eb0b67070e9b6e6cfa6f0e9b002c43d0858"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/evidence-map.json",
+      "bytes": 3115,
+      "raw_sha256": "sha256:a8ad483d6518b1971af4c7601ac883fa810c77f09bba518d8a2bdb697f446250",
+      "semantic_digest": "sha256:514843d191c62e5d1ad451fbf92d7fca786a160d523398a714ebbbb101ee0103",
+      "authority_role": "evidence_map",
+      "evidence_map_set_digest": "sha256:6bb6310c25ed90636fca0f08d3bb687681a588a782dc59a895f7178483d85cc0",
+      "requirement_ids": [
+        "cache-causal-assessment",
+        "request-scope-discipline",
+        "verification-evidence"
+      ],
+      "evidence_map_ids": [
+        "cache-investigation-basis",
+        "focused-change-boundary",
+        "repository-verification-route"
+      ],
+      "requirement_map_closure_digest": "sha256:76721ab6dba3255c07afaca24c362357930104f79188294616d7f2c688b9e10c"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/verification-command-contract.json",
+      "bytes": 2667,
+      "raw_sha256": "sha256:7ab8f05af3dc87bbf1374c00d04834a2881538d5661e7a858410a81b97efefd5",
+      "semantic_digest": "sha256:d7d60fc5e09009fc5565f7ba7e3e2f8681595b15dc149235b02a6ed09e33b759",
+      "authority_role": "verification_command_contract",
+      "contract_digest": "sha256:d7d60fc5e09009fc5565f7ba7e3e2f8681595b15dc149235b02a6ed09e33b759",
+      "command_inventory_digest": "sha256:cb9382bc9e52aa65a7932a3116ba83dab810d1e15047bebfee0f7cc26762965b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/requirement-record.json",
+      "bytes": 2770,
+      "raw_sha256": "sha256:110f1538fea3494b0a89875f2fcbb9d4be4bd457b949d381edddcab626b3c3f4",
+      "semantic_digest": "sha256:ffe676897b637651980b3b8b64ce4c29bafdc01f3685dcb63c8aab576a274238",
+      "authority_role": "requirement_record",
+      "requirement_record_digest": "sha256:ffe676897b637651980b3b8b64ce4c29bafdc01f3685dcb63c8aab576a274238",
+      "requirement_set_digest": "sha256:53544063ad126e3f3b74a87cfdd95deef1571c56882334d42a7496a9f0f1b635"
+    }
+  ],
+  "manifest_digest": "sha256:d2d95e6fb42bb6ce0bb00861bd8035edf4d63dbc229843dec37310b8c78013b9"
+}

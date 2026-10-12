@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "pf-ci-cache-flake": {
+      "class": "local_investigation",
+      "difficulty": "medium_hard",
+      "target_minutes": 40,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "d514b2e3db7112454ea34247b3632d995dd1fa7173b7e98cb3ecba462ef3904c",
+          "bytes": 2050
+        },
+        {
+          "path": "workspace/ci/build-config.json",
+          "sha256": "dea1af75bc003425d77b45f3375602e9bde3e811d3aa9ed601ef5d935d03b942",
+          "bytes": 212
+        },
+        {
+          "path": "workspace/ci/build-history.log",
+          "sha256": "4288f4f83a1c905ce14aa3dc93a64a4e6620373d904e6b3512d84da67e30f271",
+          "bytes": 573
+        },
+        {
+          "path": "workspace/ci/scenarios.json",
+          "sha256": "b16010300c28f0bf0dd0e083e2c032b1c855e553117d741cf7ba74b39d30829d",
+          "bytes": 844
+        },
+        {
+          "path": "workspace/docs/investigation-contract.md",
+          "sha256": "fc5dfce5bc59ff14aaa66b4fbe3edf209ef7e71e35c98b4a367fe02e17d0de6f",
+          "bytes": 3324
+        },
+        {
+          "path": "workspace/investigation.schema.json",
+          "sha256": "cd971cd4f36c060ea521946dd0819edbae726c57f8ac5786a7595f5fcf583270",
+          "bytes": 12222
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "10537ac134a2957fecb7b30753992caeacd2d76e16de3810b960df6610b890b2",
+          "bytes": 324
+        },
+        {
+          "path": "workspace/scripts/reproduce-cache.mjs",
+          "sha256": "2efab731082f3adf6f086580c29d87427cfdc9d000ce18ac328773fec083a75b",
+          "bytes": 705
+        },
+        {
+          "path": "workspace/scripts/validate-report.mjs",
+          "sha256": "97d3a9238a8061e866f91ce14c3c8256968dea9db5b1bac0da460dc6d4a4fca8",
+          "bytes": 1884
+        },
+        {
+          "path": "workspace/src/cache-model.mjs",
+          "sha256": "3a73cfed43492a3f40e51f59e5d8ed0c4d9c25465019ef4674ae807afce56d86",
+          "bytes": 1131
+        },
+        {
+          "path": "workspace/test/cache-observation.test.mjs",
+          "sha256": "42ced262a0783c01baa689ba209e11d1122e899055d0ae624e2f56ad908dfcad",
+          "bytes": 695
+        },
+        {
+          "path": "workspace/test/report-structure.test.mjs",
+          "sha256": "d7daf7abc069f718a7ace0f1b947fd7674130d1b5e582dc5588cfd9609d8aef5",
+          "bytes": 340
+        }
+      ]
+    }
+  }
+}

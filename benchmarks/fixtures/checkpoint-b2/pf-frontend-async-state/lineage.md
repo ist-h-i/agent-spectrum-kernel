@@ -1,0 +1,2 @@
+# Source lineage
+Source type documented_external_pattern: public effect-cleanup/race handling guidance and AbortController API documentation motivate this original framework-neutral local controller/view exercise. All code, requests and data are fictional. No actual business incident or private operational record is used. Frequency and impact remain Unknown/null weight and practice-weighted ineligible pending source review; the base catalog is unchanged.

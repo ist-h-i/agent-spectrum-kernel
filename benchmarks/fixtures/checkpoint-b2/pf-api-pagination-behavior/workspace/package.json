@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "scripts": { "test": "node --test test/pagination.test.mjs" }
+}

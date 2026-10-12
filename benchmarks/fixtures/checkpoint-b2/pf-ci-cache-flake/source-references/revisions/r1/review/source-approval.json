@@ -1,0 +1,65 @@
+{
+  "reviewer_record_id": "ci-cache-source-independent-review-20261012",
+  "fixture_id": "pf-ci-cache-flake",
+  "reviewed_head": "639a24646009b1abef44a141ee5aad135dce0bb0",
+  "base_commit": "4b1bf37961d6f2f23acf950413ac956d20a5ab01",
+  "decision": "approve",
+  "scope": "public source preparation and documented external-pattern source lineage only; not fixture admission or private grading approval",
+  "source_type": "documented_external_pattern",
+  "source_reference_ids": [
+    "github-actions-cache-docs-20261012"
+  ],
+  "official_source": {
+    "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching",
+    "independently_viewed_date": "2026-10-12",
+    "supports": "Exact cache keys, prefix/restore-key matching, immutable cache contents, and dependency hash inputs in cache identities.",
+    "does_not_support": "The fictional run history, measured occurrence frequency, business impact, or complete equivalence of the exact-key-only local model."
+  },
+  "source_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/lineage.md",
+      "raw_sha256": "sha256:9bd812884a178f2496af929cfa0fa24eb961231816185bfbda4b983740793e72"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/source-references/github-actions-cache-docs-20261012.md",
+      "raw_sha256": "sha256:4961b50fed516e06cddf5787b674e6100238c81de99f810eff87766c1099ea4d"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/input-manifest.json",
+      "raw_sha256": "sha256:a22e4f6d28b233add4e8325eeabbde3e09dd9a51d35253e43e5a38d41a087f8f"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/verification-command-contract.json",
+      "raw_sha256": "sha256:76d688c8c718b4fb38af94445b6c37f0a8283756191320156d478b5b8eae38e7",
+      "contract_digest": "sha256:a3d8c6007df80cdeb540306dbea8c49818fff8dea4c7184bac3d96dbf4440784"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/workspace/scripts/validate-report.mjs",
+      "raw_sha256": "sha256:8c95e582f65b0c00165599914adf14204f47e7dc54b57e27d31740b817b52bb5"
+    },
+    {
+      "path": "scripts/ask-benchmark-pf-ci-cache-source.mjs",
+      "raw_sha256": "sha256:e6339c6fdcc0ae40b6c79e7656922b07331f7e23818b5e9077e3d664c16330cf"
+    },
+    {
+      "path": "scripts/test-ask-benchmark-pf-ci-cache-source.mjs",
+      "raw_sha256": "sha256:359257fdb392e5ea7471cbccd8d8c58e44ebdbd36f42335f1920a2f9ebed2965"
+    }
+  ],
+  "lineage_policy_ref": {
+    "path": "benchmarks/portfolio-lineage-policy.json",
+    "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d",
+    "declared_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"
+  },
+  "catalog_ref": {
+    "path": "benchmarks/portfolio-catalog.json",
+    "raw_sha256": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
+    "declared_catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972"
+  },
+  "requirements_for_change": [],
+  "limitations": [
+    "Source-only pre-grader judgment; no fixture admission or private grading approval.",
+    "Historical P2 at b85ea60d is independently reproduced and resolved at the final reviewed HEAD; see review.md.",
+    "Empirical medium_hard calibration, project frequency/impact and complete GitHub cache-service equivalence remain unverified."
+  ]
+}

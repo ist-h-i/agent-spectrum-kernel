@@ -1,0 +1,31 @@
+{
+  "reviewer_record_id": "ci-cache-r2-impact-independent-review-final-6f467d49-20261012",
+  "fixture_id": "pf-ci-cache-flake",
+  "reviewed_head": "6f467d49fa7b679749122f6a372008fa0405649b",
+  "decision": "approve",
+  "judgment": "unknown_classification_approved",
+  "impact_band": "unknown",
+  "impact_weight": null,
+  "impact_evidence_status": "insufficient_evidence",
+  "impact_evidence_ids": [],
+  "practice_weighted_aggregate_eligible": false,
+  "reason": "The fictional model shows controlled artifact outcomes without measured real project incidents, customer/business impact, engineering rework or operational burden. Model failure, locality and reversibility do not justify a positive empirical impact band; frequency cannot substitute for impact evidence.",
+  "reviewed_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/lineage.md",
+      "bytes": 1019,
+      "raw_sha256": "sha256:9c9a42e51962289d9687288f28f3d9e90fb8684e0b458ee78195e96e79742d6c"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/source-references/github-actions-cache-docs-20261012.md",
+      "bytes": 608,
+      "raw_sha256": "sha256:4961b50fed516e06cddf5787b674e6100238c81de99f810eff87766c1099ea4d"
+    },
+    {
+      "path": "benchmarks/portfolio-lineage-policy.json",
+      "bytes": 6039,
+      "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d"
+    }
+  ],
+  "scope": "Separate r2 source-stage review of unknown impact classification only. Source/data remain fictional and unchanged. No empirical positive band, fixture admission, production rebind or frozen catalog base-eligibility change."
+}

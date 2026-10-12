@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/evaluator-authority-manifest.schema.json",
+  "program": "adaptive_ask_evaluator_authority_manifest",
+  "fixture_id": "pf-frontend-async-state",
+  "evaluator_revision": "88359c4b4d12210180063e9bfb5d08b7edad90f3",
+  "file_inventory": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/input-manifest.json",
+      "bytes": 1387,
+      "raw_sha256": "sha256:604ebe507a4ca285311f9bce2b92ae4839467f2b27c341cca4bccb043b0fc636",
+      "semantic_digest": "sha256:faa5abb30d194f556c30a930943f630c77859caba7440b676ff5477d1b75b387",
+      "authority_role": "fixture_input",
+      "fixture_input_identity": "sha256:604ebe507a4ca285311f9bce2b92ae4839467f2b27c341cca4bccb043b0fc636",
+      "semantic_fixture_entry_digest": "sha256:faa5abb30d194f556c30a930943f630c77859caba7440b676ff5477d1b75b387"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/evidence-map.json",
+      "bytes": 2422,
+      "raw_sha256": "sha256:871b0b44548cfcbcc84ffbc03858168fc2abb392d45757fccfa68087c4da507f",
+      "semantic_digest": "sha256:63f64a37012f887ed83c4f913502bea0363af95a37e7fdfebd211f5c9cd1bad4",
+      "authority_role": "evidence_map",
+      "evidence_map_set_digest": "sha256:87f24d9f373ef5896dc5bcf041db07160d47340b2f242fa774fa11fd9a85bf56",
+      "requirement_ids": [
+        "async-state-correctness",
+        "request-scope-discipline",
+        "verification-evidence"
+      ],
+      "evidence_map_ids": [
+        "async-state-basis",
+        "focused-change-boundary",
+        "repository-verification-route"
+      ],
+      "requirement_map_closure_digest": "sha256:d6c7d0f2161554e1178ccd38ba03197ef73eb824adc5517b3930bbd8079e4b4b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/verification-command-contract.json",
+      "bytes": 1986,
+      "raw_sha256": "sha256:12802a42355943302d95cf58dd2c708563ad6a7f214638ca7fea3e3ac15701ee",
+      "semantic_digest": "sha256:6b39dfe8c4f10b3f3c95a68247f75fdc68d0989b3d63fc913dd15175b895e3e0",
+      "authority_role": "verification_command_contract",
+      "contract_digest": "sha256:6b39dfe8c4f10b3f3c95a68247f75fdc68d0989b3d63fc913dd15175b895e3e0",
+      "command_inventory_digest": "sha256:9d6597b42dd1b0a08881e5d4913d78eec1c5bc25ff699943ccae0f57ea13a15c"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/requirement-record.json",
+      "bytes": 2767,
+      "raw_sha256": "sha256:04d9e085fbbccd2670e2c39eb677bdf69eefedf2f0bb25804cbcb94dd437800f",
+      "semantic_digest": "sha256:1c1cfe2b1a3857134652e767f95e5ed4b58711167212904c22ea270a08623d9f",
+      "authority_role": "requirement_record",
+      "requirement_record_digest": "sha256:1c1cfe2b1a3857134652e767f95e5ed4b58711167212904c22ea270a08623d9f",
+      "requirement_set_digest": "sha256:2fc249eef4573ad30c5a0c151bfe4218af02621223cc5c18a635045b92c1773e"
+    }
+  ],
+  "manifest_digest": "sha256:9a602deb8b581d2e7c5a889cd8410b601904e540ad9c352d3b564230e83675e6"
+}

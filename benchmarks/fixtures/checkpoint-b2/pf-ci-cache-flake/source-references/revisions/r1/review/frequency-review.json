@@ -1,0 +1,29 @@
+{
+  "reviewer_record_id": "ci-cache-frequency-independent-review-20261012",
+  "fixture_id": "pf-ci-cache-flake",
+  "reviewed_head": "639a24646009b1abef44a141ee5aad135dce0bb0",
+  "decision": "approve",
+  "judgment": "unknown_classification_approved",
+  "frequency_band": "unknown",
+  "frequency_weight": null,
+  "frequency_evidence_status": "insufficient_evidence",
+  "frequency_evidence_ids": [],
+  "occurrences_per_year": null,
+  "practice_weighted_aggregate_eligible": false,
+  "reason": "Fictional deterministic run IDs and cache documentation do not supply observed project occurrence counts or cadence. A fixture failure count is not real incident frequency; no impact evidence substitutes for frequency evidence.",
+  "reviewed_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/lineage.md",
+      "raw_sha256": "sha256:9bd812884a178f2496af929cfa0fa24eb961231816185bfbda4b983740793e72"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/source-references/github-actions-cache-docs-20261012.md",
+      "raw_sha256": "sha256:4961b50fed516e06cddf5787b674e6100238c81de99f810eff87766c1099ea4d"
+    },
+    {
+      "path": "benchmarks/portfolio-lineage-policy.json",
+      "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d"
+    }
+  ],
+  "scope": "Separate review of the unknown frequency classification only. Does not assign a positive empirical band, approve fixture admission, or change frozen catalog base aggregate eligibility."
+}
