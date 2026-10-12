@@ -146,7 +146,7 @@ export function buildEvidenceMap() {
     json_change_boundary: { target_properties: ["display_name", "displayName"], target_required_fields: ["display_name", "displayName"], preserve_unrelated_loaded_values: true, required_alignment_change: "loaded_schema_value_change" }
   };
   const maps = [
-    { evidence_map_id: "schema-caller-contract", agent_visible_paths: ["workspace/spec/member-contract.md", "workspace/spec/schema-alignment-plan.md", "workspace/schemas/member.schema.json", "workspace/src/member-import.mjs", "workspace/src/member-export.mjs"] },
+    { evidence_map_id: "schema-caller-contract", agent_visible_paths: ["task.md", "workspace/spec/member-contract.md", "workspace/spec/schema-alignment-plan.md", "workspace/schemas/member.schema.json", "workspace/src/member-import.mjs", "workspace/src/member-export.mjs", "workspace/test/member-record.test.mjs"] },
     { evidence_map_id: "focused-change-boundary", agent_visible_paths: ["task.md", "workspace/spec/schema-alignment-plan.md"] },
     { evidence_map_id: "repository-verification-route", agent_visible_paths: ["workspace/package.json", "workspace/test/member-record.test.mjs"] }
   ];
