@@ -205,6 +205,9 @@ jobs:
       - name: Run adaptive portfolio normalized result tests
         run: node scripts/test-ask-benchmark-normalized-results.mjs
 
+      - name: Run terminal inventory protocol ordering regressions
+        run: node --test scripts/test-ask-benchmark-terminal-inventory-order.mjs
+
       - name: Run evaluator isolation boundary tests
         run: node scripts/test-ask-benchmark-evaluator-boundary.mjs
 

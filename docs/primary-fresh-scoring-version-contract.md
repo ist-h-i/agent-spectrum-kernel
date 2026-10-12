@@ -120,3 +120,22 @@ recognition remain manual review/unknown. Old hidden equivalence stays Unknown.
 The implementation evidence, independent review, final source SHA, explicit
 scoring-version digest and custody receipts are recorded locally before the
 human start prompt is finalized. Main integration is coordinated by the parent.
+
+## Development terminal inventory compatibility
+
+The terminal authority protocol orders paths by JavaScript UTF-16 code units,
+using the same relational comparator for capture, validation and candidate
+reconstruction. Locale collation is not terminal authority ordering. The private
+sealed portable-workspace protocol retains its existing locale order and numeric
+modes. The materialization boundary converts only its newly derived expected
+record into that existing protocol before comparing every path, type, mode, byte
+count and hash and checking the observed portable digest. It does not sort or
+rewrite an original observed record or weaken an identity check.
+
+Synthetic development regressions cover case, punctuation, Unicode, Full-style
+managed assets and true content/inventory mismatch. Using this fix with a future
+runtime requires a separate execution-only derivative version with a newly bound
+source closure and independent review. The fixed old scoring-version source and
+saved execution records remain unchanged. The development checks neither regrade
+a saved condition nor authorize worker execution; a new runtime remains a
+technical verification proposal until separately authorized.

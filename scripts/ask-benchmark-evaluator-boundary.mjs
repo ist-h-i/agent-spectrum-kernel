@@ -30,7 +30,7 @@ import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { materializeVerifiedTerminalCandidate } from "./ask-benchmark-terminal-candidate.mjs";
-import { deriveTerminalCandidateInventory, terminalWorkspaceInventoryDigest } from "./ask-benchmark-terminal-workspace.mjs";
+import { compareTerminalWorkspacePaths, deriveTerminalCandidateInventory, terminalWorkspaceInventoryDigest } from "./ask-benchmark-terminal-workspace.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { computeVerificationCommandContractDigest } from "./ask-benchmark-command-evidence.mjs";
 import { CALIBRATION_INPUT_MANIFEST_PATH, CALIBRATION_INPUT_MANIFEST_SHA256, CALIBRATION_SOURCE_BINDINGS, calibrationSourceIdForFixture } from "./ask-benchmark-calibration-source.mjs";
@@ -2049,7 +2049,8 @@ function terminalCandidateAuthorityBinding(materialized) {
   return { binding, reconstructedWorkspace, reconstructed, authority };
 }
 
-function terminalCandidateInventoryFromAuthority(authority) {
+// Metadata projection only; this does not register sealed execution authority.
+export function terminalCandidateInventoryFromAuthority(authority) {
   const terminal = new Map(authority.base_inventory.map((entry) => [entry.path, structuredClone(entry)]));
   for (const delta of authority.delta_inventory) {
     if (delta.change_type === "deletion") terminal.delete(delta.path);
@@ -2058,14 +2059,16 @@ function terminalCandidateInventoryFromAuthority(authority) {
       terminal.set(delta.path, { path: delta.path, ...after });
     }
   }
-  const inventory = [...terminal.values()].sort((left, right) => left.path.localeCompare(right.path));
+  const inventory = [...terminal.values()].sort((left, right) => compareTerminalWorkspacePaths(left.path, right.path));
   if (terminalWorkspaceInventoryDigest(inventory) !== authority.terminal_workspace_portable_digest) throw new Error("terminal workspace authority inventory closure is inconsistent");
   const candidate = deriveTerminalCandidateInventory(inventory, authority.managed_asset_paths, authority.base_inventory);
   if (terminalWorkspaceInventoryDigest(candidate) !== authority.terminal_candidate_tree_digest) throw new Error("terminal candidate original metadata closure is inconsistent");
   return candidate;
 }
 
-function materializeTerminalCandidateAuthorityWorkspace({ evaluationRoot, terminal }) {
+// Copies verified metadata at the terminal/private portable protocol boundary.
+// This helper does not grant the production constructor's provenance authority.
+export function materializeTerminalCandidateAuthorityWorkspace({ evaluationRoot, terminal }) {
   const parent = mkdtempSync(resolve(evaluationRoot, ".production-candidate-authority-"));
   const destination = resolve(parent, "workspace");
   cpSync(terminal.reconstructedWorkspace, destination, { recursive: true, errorOnExist: true, force: false });
@@ -2076,7 +2079,10 @@ function materializeTerminalCandidateAuthorityWorkspace({ evaluationRoot, termin
   for (const entry of inventory.filter(({ file_type: fileType }) => fileType === "directory").sort((left, right) => right.path.length - left.path.length)) chmodSync(resolve(destination, entry.path), Number.parseInt(entry.mode, 8));
   chmodSync(destination, workspaceRoot ? Number.parseInt(workspaceRoot.mode, 8) : 0o755);
   const materialized = readStableWorkspaceInventory(destination, "verified terminal candidate metadata authority workspace");
-  const expected = inventory.map((entry) => ({ path: entry.path, file_type: entry.file_type === "regular_file" ? "file" : "directory", mode: Number.parseInt(entry.mode, 8), bytes: entry.bytes, sha256: entry.sha256 === null ? null : `sha256:${entry.sha256}` }));
+  // Terminal authority uses code-unit ordering. Convert this new expected
+  // record to the existing private portable protocol; keep the observed record
+  // and its digest unchanged, with every path/type/mode/byte/hash checked.
+  const expected = inventory.map((entry) => ({ path: entry.path, file_type: entry.file_type === "regular_file" ? "file" : "directory", mode: Number.parseInt(entry.mode, 8), bytes: entry.bytes, sha256: entry.sha256 === null ? null : `sha256:${entry.sha256}` })).sort((left, right) => left.path.localeCompare(right.path));
   if (stableCanonicalJson(materialized.portableEntries) !== stableCanonicalJson(expected) || materialized.digest !== canonicalDigest(expected)) throw new Error("terminal candidate metadata authority workspace is inconsistent");
   return materialized;
 }
