@@ -1,0 +1,3 @@
+# Public source summary
+Checked 2026-10-12: https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching
+GitHub documents exact cache keys, optional restore-prefix matching, immutable cache contents, and dependency hash inputs for changing cache identities. This fixture uses an authored local exact-key model and fictional history to examine artifact/version mismatches. It does not reproduce all GitHub Actions behavior. No documentation code, private workflow data, empirical usage counts or incident rate is copied. The summary is an original paraphrase of public documentation.
