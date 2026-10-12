@@ -31,7 +31,9 @@ test("source preserves the frozen catalog role and ordinary task intent", () => 
 });
 
 test("seed reproduces the documented defects while ordinary update/reset checks pass", () => {
-  const run = spawnSync(process.execPath, ["--test", "--test-reporter=tap", "test/display-preferences.test.mjs"], { cwd: resolve(fixture, "workspace"), encoding: "utf8" });
+  const childEnvironment = { ...process.env };
+  delete childEnvironment.NODE_TEST_CONTEXT;
+  const run = spawnSync(process.execPath, ["--test", "--test-reporter=tap", "test/display-preferences.test.mjs"], { cwd: resolve(fixture, "workspace"), encoding: "utf8", env: childEnvironment });
   assert.equal(run.error, undefined);
   assert.equal(run.signal, null);
   assert.equal(run.status, 1);
