@@ -10,7 +10,7 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "7cac51be5780503b6b14fa28ce3ac926ab45941d10366d63584841ab6c13454d",
+          "sha256": "c6aad90c430b4a8a48c3ad8ef5722e80a856118de4d37621008275a1eefc341b",
           "bytes": 1892
         },
         {
@@ -50,8 +50,8 @@
         },
         {
           "path": "workspace/scripts/validate-review.mjs",
-          "sha256": "7303c27db15cdc8ecee9b431c063e5d86b0d52ba2815f5d7da626e55bbeb8aaa",
-          "bytes": 1898
+          "sha256": "9486039537e4924edc142709a3bcebbaa0236652bcb55daf690be1f164487475",
+          "bytes": 1931
         },
         {
           "path": "workspace/src/authorization.mjs",
