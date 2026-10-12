@@ -39,6 +39,9 @@ jobs:
       - name: Run offline pragmatic evaluation report regressions
         run: node --test scripts/test-ask-pragmatic-evaluation-report.mjs
 
+      - name: Verify explicit primary scoring-version connection (model-free)
+        run: node --test scripts/test-ask-primary-scoring-version.mjs scripts/test-ask-primary-resource-authority-writers.mjs scripts/test-ask-primary-runner-async-local-storage.mjs scripts/test-ask-primary-evaluation-private-grading.mjs scripts/test-ask-primary-evaluation-grading.mjs scripts/test-ask-benchmark-frozen-authority-modes.mjs
+
       - name: Qualify prospective rule-batch contract and frozen preparation (model-free)
         run: node --test scripts/test-rule-batch-contract-v2.mjs scripts/test-rule-batch-comparison-preparation.mjs
 
@@ -75,6 +78,8 @@ jobs:
 
       - name: Run successor snapshot and source-session regressions (current HEAD)
         run: |
+          # The real source-drift regression below needs PFci's exact public base.
+          git fetch --no-tags origin a06e96f8a493b0ae70d3910c73c644b0da13fa25
           node --test scripts/test-ask-benchmark-source-session.mjs scripts/test-successor-process-state.test.mjs scripts/test-frozen-evaluator-fixture.test.mjs
           node --test scripts/test-ask-benchmark-calibration-source.mjs scripts/test-ask-benchmark-prompt-successor.mjs scripts/test-ask-benchmark-prompt-successor-delivery.mjs scripts/test-ask-benchmark-prompt-successor-native.mjs scripts/test-ask-benchmark-prompt-successor-report.mjs scripts/test-ask-benchmark-prompt-successor-scoring-inputs.mjs
           node --test scripts/test-ask-benchmark-prompt-successor-integration.mjs scripts/test-ask-benchmark-successor-input-snapshot.mjs scripts/test-ask-benchmark-evaluator-root-manifest.mjs
@@ -176,6 +181,11 @@ jobs:
       - name: Run portfolio admission decision overlay tests
         run: node scripts/test-ask-benchmark-admission-decision.mjs
 
+      - name: Fetch public reviewed heads for admitted fixture invariance
+        run: |
+          git fetch --no-tags origin e51eeddf5e5675660205e7f70bcdba202b57e77c
+          git fetch --no-tags origin 277d5d7bca619bb7dca17190aa4f9f99bfbbe23a
+
       - name: Guard admitted fixture invariance
         run: node scripts/test-ask-benchmark-admitted-fixture-invariance.mjs
 
@@ -185,8 +195,17 @@ jobs:
       - name: Run adaptive portfolio execution tests
         run: node scripts/test-ask-benchmark-execution.mjs
 
+      - name: Run admitted portfolio propagation preparation tests
+        run: node scripts/test-ask-benchmark-admission-propagation.mjs
+
       - name: Run verification command evidence contract tests
         run: node scripts/test-ask-benchmark-command-evidence.mjs
+
+      - name: Verify read-only saved primary command capture
+        run: node --test scripts/test-ask-primary-saved-command-capture.mjs
+
+      - name: Verify bounded private runtime observation transport
+        run: node --test scripts/test-ask-benchmark-runtime-observation.mjs
 
       - name: Run verification evidence exact-reuse tests
         run: node scripts/test-verification-evidence.mjs
@@ -197,14 +216,46 @@ jobs:
       - name: Run adaptive portfolio normalized result tests
         run: node scripts/test-ask-benchmark-normalized-results.mjs
 
+      - name: Run terminal inventory protocol ordering regressions
+        run: node --test scripts/test-ask-benchmark-terminal-inventory-order.mjs
+
       - name: Run evaluator isolation boundary tests
         run: node scripts/test-ask-benchmark-evaluator-boundary.mjs
 
       - name: Run build-option fixture contract tests
         run: node scripts/test-ask-benchmark-mn-build-option-update.mjs
 
+      - name: Run schema-field public source tests (current HEAD)
+        run: node --test scripts/test-ask-benchmark-mn-schema-field-source.mjs
+
+      - name: Run frontend-default public source tests (current HEAD)
+        run: node --test scripts/test-ask-benchmark-mn-frontend-default-source.mjs
+
+      - name: Run practice-frequency public source tests (current HEAD)
+        run: node --test scripts/test-ask-benchmark-pf-api-pagination-source.mjs scripts/test-ask-benchmark-pf-frontend-async-source.mjs scripts/test-ask-benchmark-pf-ci-cache-source.mjs
+
+      - name: Run practice-frequency fixture source-freeze tests
+        run: |
+          # Exact declared evaluator sources; no current-runtime/admission claim.
+          git fetch --no-tags origin a762daf43bdfe254c6ecd6e0b49f3cef78d0e9ec
+          git fetch --no-tags origin 88359c4b4d12210180063e9bfb5d08b7edad90f3
+          node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-pf-api-pagination.mjs
+          node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-pf-frontend-async.mjs
+          node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-pf-ci-cache.mjs
+
       # Frozen fixture contracts run against their declared source closure, not
       # the evolving runner. Current-HEAD runtime/scorer gates remain above/below.
+      - name: Run schema-field fixture source-freeze tests
+        run: |
+          # The fixture pins the public pre-squash source, outside main ancestry.
+          git fetch --no-tags origin 2c498d974681f8b5092759386f39abd7601e4fb4
+          node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mn-schema-field-alignment.mjs
+
+      - name: Run frontend-default fixture source-freeze tests
+        run: |
+          git fetch --no-tags origin b290feb25cc1aa2fe3b04bebbd001558cc7846e1
+          node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mn-frontend-default-fix.mjs
+
       - name: Run documentation/config fixture source-freeze tests
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mn-doc-config-correction.mjs
 

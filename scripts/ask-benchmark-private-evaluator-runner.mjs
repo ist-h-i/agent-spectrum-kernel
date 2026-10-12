@@ -1,10 +1,12 @@
 import * as assertStrict from "node:assert/strict";
+import { AsyncLocalStorage } from "node:async_hooks";
 import * as childProcess from "node:child_process";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as http from "node:http";
 import * as https from "node:https";
 import * as net from "node:net";
+import { isBuiltin } from "node:module";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as url from "node:url";
@@ -19,14 +21,17 @@ const SEALED_DIRECTORY_MODE = 0o555;
 const completedBarriers = new Set();
 const ALLOWED_BUILTINS = new Map([
   ["node:assert/strict", assertStrict],
+  ["node:async_hooks", Object.freeze({ AsyncLocalStorage })],
   ["node:child_process", childProcess],
   ["node:crypto", crypto],
   ["node:fs", fs],
   ["node:http", http],
   ["node:https", https],
   ["node:net", net],
+  ["node:module", Object.freeze({ isBuiltin })],
   ["node:os", os],
   ["node:path", path],
+  ["node:perf_hooks", Object.freeze({ performance: Object.freeze({ now: performance.now.bind(performance) }) })],
   ["node:url", url],
 ]);
 

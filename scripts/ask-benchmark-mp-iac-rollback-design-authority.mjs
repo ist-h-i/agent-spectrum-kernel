@@ -18,6 +18,7 @@ import {
   validateIndependenceStatement,
   verifyPrivateEvaluatorBundle,
 } from "./ask-benchmark-evaluator-boundary.mjs";
+import * as evaluatorBoundary from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import {
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
@@ -392,14 +393,23 @@ function runGit(root, args, label) {
   return result.stdout.trim();
 }
 
-export function writeMpIacRollbackDesignProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots }) {
+// Resource generation verifies static assets without manufacturing run markers.
+// This scope cannot authorize evaluator execution, admission or comparison start.
+function validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots) {
+  if (typeof resourceAssetsOnly !== "boolean") throw new Error("resourceAssetsOnly must be a boolean");
+  if (resourceAssetsOnly && (!privateRoot || boundaryRoots !== null)) throw new Error("resource-assets-only validation requires a private root and no execution boundary roots");
+  if (resourceAssetsOnly && typeof evaluatorBoundary.verifyPrivateEvaluatorResourceAssets !== "function") throw new Error("resource-assets-only validation requires verifyPrivateEvaluatorResourceAssets");
+}
+
+export function writeMpIacRollbackDesignProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots = null, resourceAssetsOnly = false }) {
+  validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots);
   if (!privateRoot || !existsSync(privateRoot) || !lstatSync(privateRoot).isDirectory() || lstatSync(privateRoot).isSymbolicLink()) throw new Error("mp-iac-rollback writer requires an existing non-symlink private root");
   assertPrivateRootOutsideRepository(root, privateRoot);
   if (!/^[a-f0-9]{40}$/u.test(evaluatorRevision ?? "")) throw new Error("mp-iac-rollback evaluator revision is invalid");
   runGit(root, ["cat-file", "-e", `${evaluatorRevision}^{commit}`], "mp-iac-rollback evaluator revision lookup");
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(generationDate ?? "")) throw new Error("mp-iac-rollback generation date must be YYYY-MM-DD");
   const requiredBoundaries = ["materializedPath", "selectionState", "runDir", "normalizedResultsPath"];
-  if (!boundaryRoots || requiredBoundaries.some((key) => !boundaryRoots[key] || !existsSync(boundaryRoots[key]) || !lstatSync(boundaryRoots[key]).isDirectory())) throw new Error("mp-iac-rollback writer requires complete boundary roots");
+  if (!resourceAssetsOnly && (!boundaryRoots || requiredBoundaries.some((key) => !boundaryRoots[key] || !existsSync(boundaryRoots[key]) || !lstatSync(boundaryRoots[key]).isDirectory()))) throw new Error("mp-iac-rollback writer requires complete boundary roots");
   const repositoryRoot = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
   assertFlatRegularAuthorityDirectory(privateDirectory, "mp-iac-rollback private root");
@@ -417,14 +427,14 @@ export function writeMpIacRollbackDesignProductionAuthority({ root = ROOT, priva
     cpSync(privateDirectory, stagedPrivate, { recursive: true, force: false, errorOnExist: true });
     assertFlatRegularAuthorityDirectory(stagedPrivate, "mp-iac-rollback staged private root");
     generateInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate });
-    validateMpIacRollbackDesignProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots });
+    validateMpIacRollbackDesignProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots, resourceAssetsOnly });
     if (!inputBefore.equals(readFileSync(resolve(stagedRepository, MP_IAC_ROLLBACK_FIXTURE_ROOT, "input-manifest.json"))) || !verificationBefore.equals(readFileSync(resolve(stagedRepository, MP_IAC_ROLLBACK_FIXTURE_ROOT, "verification-command-contract.json"))) || stableCanonicalJson(frozenBefore) !== stableCanonicalJson(agentVisibleFiles(resolve(stagedRepository, MP_IAC_ROLLBACK_FIXTURE_ROOT)))) throw new Error("mp-iac-rollback production generation changed frozen agent-visible inputs");
     const transaction = randomUUID();
     const publicTransaction = resolve(repositoryRoot, "benchmarks/fixtures/checkpoint-b2", `.mp-iac-rollback-authority-${transaction}`);
     const privateTransaction = resolve(dirname(privateDirectory), `.mp-iac-rollback-authority-${transaction}`);
     const publicPairs = GENERATED_PUBLIC.map((name) => ({ source: resolve(stagedRepository, MP_IAC_ROLLBACK_FIXTURE_ROOT, name), target: resolve(repositoryRoot, MP_IAC_ROLLBACK_FIXTURE_ROOT, name), transactionDirectory: publicTransaction, label: `mp-iac-rollback public ${name}` }));
     const privatePairs = GENERATED_PRIVATE.map((name) => ({ source: resolve(stagedPrivate, name), target: resolve(privateDirectory, name), transactionDirectory: privateTransaction, label: `mp-iac-rollback private ${name}` }));
-    return publishPreparedAuthority(prepareAuthorityPublication([...publicPairs, ...privatePairs]), () => validateMpIacRollbackDesignProductionAuthority({ root: repositoryRoot, privateRoot: privateDirectory, boundaryRoots }));
+    return publishPreparedAuthority(prepareAuthorityPublication([...publicPairs, ...privatePairs]), () => validateMpIacRollbackDesignProductionAuthority({ root: repositoryRoot, privateRoot: privateDirectory, boundaryRoots, resourceAssetsOnly }));
   } finally {
     if (worktreeAdded) {
       const removal = spawnSync("git", ["-C", repositoryRoot, "worktree", "remove", "--force", stagedRepository], { encoding: "utf8" });
@@ -434,7 +444,8 @@ export function writeMpIacRollbackDesignProductionAuthority({ root = ROOT, priva
   }
 }
 
-export function validateMpIacRollbackDesignProductionAuthority({ root = ROOT, privateRoot = null, boundaryRoots = null } = {}) {
+export function validateMpIacRollbackDesignProductionAuthority({ root = ROOT, privateRoot = null, boundaryRoots = null, resourceAssetsOnly = false } = {}) {
+  validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots);
   const fixtureRoot = resolve(root, MP_IAC_ROLLBACK_FIXTURE_ROOT);
   const artifacts = Object.fromEntries(PUBLIC_ARTIFACTS.map((name) => [name, readJson(resolve(fixtureRoot, name), `mp-iac-rollback ${name}`)]));
   for (const [name, value] of Object.entries(artifacts)) assertAnswerNeutralPublicValue(value, `mp-iac-rollback ${name}`);
@@ -527,15 +538,16 @@ export function validateMpIacRollbackDesignProductionAuthority({ root = ROOT, pr
   const expectedRuntime = { id: MP_IAC_ROLLBACK_FIXTURE_ID, suite: "mechanism_positive", task_class: "design_gate", difficulty: "hard", repetitions: 3, aggregate_eligible: true, input_manifest_path: `${MP_IAC_ROLLBACK_FIXTURE_ROOT}/input-manifest.json`, input_manifest_sha256: sha256(readFileSync(resolve(fixtureRoot, "input-manifest.json"))).slice(7), verification_command_contract: { path: `${MP_IAC_ROLLBACK_FIXTURE_ROOT}/verification-command-contract.json`, sha256: sha256(readFileSync(resolve(fixtureRoot, "verification-command-contract.json"))).slice(7) } };
   assertExact(runtime, expectedRuntime, "mp-iac-rollback runtime registration");
   if (privateRoot) {
-    if (!boundaryRoots) throw new Error("mp-iac-rollback private validation requires boundary roots");
-    const bundle = verifyPrivateEvaluatorBundle({ root, referencePath: resolve(fixtureRoot, "evaluator-reference.json"), privateRoot, manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"), ...boundaryRoots });
+    if (resourceAssetsOnly) assertPrivateRootOutsideRepository(root, privateRoot);
+    if (!resourceAssetsOnly && !boundaryRoots) throw new Error("mp-iac-rollback private validation requires boundary roots");
+    const bundle = (resourceAssetsOnly ? evaluatorBoundary.verifyPrivateEvaluatorResourceAssets : verifyPrivateEvaluatorBundle)({ root, referencePath: resolve(fixtureRoot, "evaluator-reference.json"), privateRoot, manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"), ...boundaryRoots });
     validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset: readJson(resolve(privateRoot, "evidence-removal-mutations.json"), "mp-iac-rollback mutation authority") });
     validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: readJson(resolve(privateRoot, "equivalent-solutions.json"), "mp-iac-rollback equivalence authority") });
     assertExact(readJson(resolve(privateRoot, "evidence-removal-mutations.json"), "mp-iac-rollback mutation authority"), authority.mutationAsset, "mp-iac-rollback private mutations");
     assertExact(readJson(resolve(privateRoot, "equivalent-solutions.json"), "mp-iac-rollback equivalence authority"), authority.equivalenceAsset, "mp-iac-rollback private equivalence");
     if (bundle.manifest.evaluator_bundle_id !== reference.evaluator_bundle_id || bundle.manifest.evaluator_bundle_digest !== reference.evaluator_bundle_digest) throw new Error("mp-iac-rollback public/private evaluator transplant");
   }
-  return { fixtureId: MP_IAC_ROLLBACK_FIXTURE_ID, inputDigest: reference.fixture_input_digest, candidateDigest: candidate.candidate_digest, requirementRecordDigest: requirement.requirement_record_digest, requirementSetDigest: requirement.requirement_set_digest, outputContractDigest: output.output_contract_digest, evaluatorBundleId: reference.evaluator_bundle_id, evaluatorBundleDigest: reference.evaluator_bundle_digest, evaluatorRevision: reference.evaluator_revision, evaluatorAuthorityDigest: manifest.manifest_digest, admissionState: admission.admission_status, reviewStatus: review.reviewer_status, scoringReady: false };
+  return { fixtureId: MP_IAC_ROLLBACK_FIXTURE_ID, inputDigest: reference.fixture_input_digest, candidateDigest: candidate.candidate_digest, requirementRecordDigest: requirement.requirement_record_digest, requirementSetDigest: requirement.requirement_set_digest, outputContractDigest: output.output_contract_digest, evaluatorBundleId: reference.evaluator_bundle_id, evaluatorBundleDigest: reference.evaluator_bundle_digest, evaluatorRevision: reference.evaluator_revision, evaluatorAuthorityDigest: manifest.manifest_digest, admissionState: admission.admission_status, reviewStatus: review.reviewer_status, scoringReady: false, ...(resourceAssetsOnly ? { validation_scope: "resource_assets_only", execution_authority: false } : {}) };
 }
 
 function parseProductionArgs(argv) {
@@ -543,6 +555,7 @@ function parseProductionArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const name = argv[index];
     if (name === "write-production") continue;
+    if (name === "--resource-assets-only") { args.resourceAssetsOnly = true; continue; }
     if (name === "--root") args.root = resolve(argv[++index]);
     else if (name === "--private-root") args.privateRoot = resolve(argv[++index]);
     else if (name === "--evaluator-revision") args.evaluatorRevision = argv[++index];
@@ -553,6 +566,7 @@ function parseProductionArgs(argv) {
     else if (name === "--normalized-results") args.boundaryRoots.normalizedResultsPath = resolve(argv[++index]);
     else throw new Error(`unknown argument: ${name}`);
   }
+  if (args.resourceAssetsOnly && Object.keys(args.boundaryRoots).length === 0) args.boundaryRoots = null;
   return args;
 }
 
