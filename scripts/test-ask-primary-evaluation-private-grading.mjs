@@ -76,7 +76,12 @@ test('nine pinned historical public graphs rederive exactly; resource scope supp
 test('historical graph scope rejects source/reference tamper, changed root/revision, explicit parameters and asynchronous leakage',t=>{
   const root=fileURLToPath(new URL('../../scoring-runtime-r1/mn-build-option-update',import.meta.url));if(!existsSync(root)){t.skip('independent historical public runtime not present');return;}
   const f=syntheticPrimarySource(t,{scenario:'pending'}),block=publicBlock('mn-build-option-update'),referencePath=join(root,'benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json'),reference=JSON.parse(readFileSync(referencePath));
-  assert.throws(()=>deriveEvaluatorDependencyGraph({root,baseRevision:reference.evaluator_revision}),/dependency base Git revision is unavailable/);
+  // Pure public source reconstruction does not acquire primary execution or
+  // schema authority. Unreachable new readers must not break this old closure.
+  assert.deepEqual(deriveEvaluatorDependencyGraph({root,baseRevision:reference.evaluator_revision}),reference.evaluator_source_identity.dependency_graph);
+  assert.equal(activePrimaryProducer(),false);assert.equal(primaryAdapterSourceDigest(),null);
+  const legacySchema='/example/benchmarks/schemas/normalized-portfolio-result.schema.json';assert.equal(primaryGradingSchemaPath(legacySchema),legacySchema);
+  assert.throws(()=>deriveEvaluatorDependencyGraph({root,baseRevision:'0'.repeat(40)}),/dependency base Git revision is unavailable/);
   assert.throws(()=>withPrimaryHistoricalEvaluatorResources(block,root,()=>Promise.resolve()),/async_scope/);
   withPrimaryHistoricalEvaluatorResources(block,root,()=>{
     assert.throws(()=>deriveEvaluatorDependencyGraph({root:f.root,baseRevision:reference.evaluator_revision}),/root_changed/);
