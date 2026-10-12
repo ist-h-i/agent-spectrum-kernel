@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-62177d8f94f80d5d08e9f02b4d08f094fb8d799b643a6f98fabcb683026363b3",
-  "evaluator_bundle_digest": "sha256:3301e2f7f1319814d7873ac490b2884b0e8a0e91e4792a12bbc0da54a1f5dea5",
+  "evaluator_bundle_id": "evaluator-2b860c7c63d1f97371b41d03a19f7b6251dddc4add0e2177c4b5f5bea3ff85bb",
+  "evaluator_bundle_digest": "sha256:6f60066039625b78eae6d2d2b08ea8a71adc6698adbc5b0b1c4f3d0eae69386f",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mn-client-compatibility-fix",
   "fixture_input_digest": "sha256:ad578de2b1f36a8d742f20e0adbf570ad14090fccf86e5d03a2101cad749ac63",
   "task_class": "local_implementation",
   "suite": "mechanism_negative",
-  "evaluator_revision": "27afa5e0a117e16e6bf224171bf44ff361d64967",
+  "evaluator_revision": "a1ae16e1296502424612d01870f0d5ed80f86e84",
   "evaluator_source_identity": {
-    "base_git_revision": "27afa5e0a117e16e6bf224171bf44ff361d64967",
+    "base_git_revision": "a1ae16e1296502424612d01870f0d5ed80f86e84",
     "source_tree_digest": "sha256:978a07cdabd9b519912ded9cd1f074412d8dd3e53f0a4d92195c353e4b3298b1",
     "generator_source_digest": "sha256:124f4862dbb4eba98605fb558368b561a99c7505f9bec5eeb8d14ecb632c8a53",
     "source_files": [
@@ -4042,11 +4042,11 @@
     }
   },
   "generator_identity": "sha256:713c7eccb9e620dc50bdfe56555e67a7572c865483584e05cac57ee173b713d4",
-  "independence_statement_digest": "sha256:7d5524a855a498c0cdb2c6de1fed4df8b3331c8fb350d91168f5d340647065cb",
-  "review_record_digest": "sha256:613c69f5a3f968ba7b74f06f6e5e226be4a55e37aac4481fdb0340ff0f3c1bcb",
+  "independence_statement_digest": "sha256:4cb3216cf4feda1ed3f3341922d89094b7f4e10d6a15d5a5f200d2811eb2b707",
+  "review_record_digest": "sha256:27d7072b361a148a42edf7a57fe8c2964996f251a0f1e2bb68e7bea1c4248cb8",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:3b1a988773c2105383f29f7d79f9fa8dd309258633693a1dd9a5226d3cb3b911",
-  "evaluator_authority_manifest_digest": "sha256:e193d195aa2a972cb1a4ebeb899db35ac31901690c2e4cdadfe60fb1361c0c7e",
+  "evaluator_authority_manifest_raw_sha256": "sha256:839b7b33d23ae2b4a6fab944f422865ee2884070ea79c266f1bb962d3f408b32",
+  "evaluator_authority_manifest_digest": "sha256:6de719a599ebb348dfc5f6d9bf112a28298bc6a513485ab32f0cc766a0ab405c",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:dfcc2ef9631ddc7dd29bb10937e0f7bb7e12bcf0c9db3be507ba44ad137ed077"
+  "public_metadata_digest": "sha256:0dac35c3556402f456c14817429ff7f2816951affe4aa209cadd0b7b608568cb"
 }
