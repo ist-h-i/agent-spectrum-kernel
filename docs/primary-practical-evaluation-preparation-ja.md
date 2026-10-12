@@ -38,13 +38,13 @@ attempt 1、retry 0、concurrency 1、`single_shot_v1`、resume禁止。合計27
 各課題の三条件ブロック4時間、9ブロック36時間、全体48時間（採点・保存・報告の余裕12時間）。
 各課題の検査数から必要予約時間を算出し、4時間を超える場合は**結果閲覧前**に計画を改版する。
 現行入口の overall timeout は最大24時間かつ一課題単位なので、一つの48時間 plan としては
-渡せない。9個の固定ブロックを逐次処理する薄い controller 接続が必要。夜間・複数日の
+渡せない。継続実装の薄いbatch controllerで9個の固定ブロックを逐次処理する。夜間・複数日の
 実行は可能だが、同一runの中断を resume する設計にはしない。
 
 開始判断予算は報告 input＋output 合計45,000,000 tokensを提案する。
 以前の3セッション5Mに対し、27セッションで9倍の45M。cached input を重複加算しない。
 これはproviderのhard cap、料金保証、利用枠の確保ではない。未知usageを0にしない。
-全体予算を共有する接続も現行一課題入口には存在しない。起動前に利用枠を確認し、
+基準mainの一課題入口には全体予算共有がなく、継続実装のbatchがblock間の下限予約を担う。起動前に利用枠を確認し、
 27セッションを処理できない枠なら、結果非閲覧の段階で分割計画と新しい開始指示を確定する。
 開始判断に必要な予約分を確保し、予算不足で未開始となったslotも報告に残す。
 
@@ -194,3 +194,26 @@ public validatorをprivate scorerの代用にせず、原本とscoped condition/
 接続が不足する限り、本番grading preflightはblockedのまま。
 所有者が復元すべき9件のbundle/review archive locatorと、残る最小shared seamを別途記録する。
 稼働checkoutの計画をあとから書換えず、候補選択・source最終統合後の固定は新しい準備で行う。
+
+
+## 非モデル接続検査とレビュー修正
+
+開発用 `connection-preparation-r2` はsource head
+`a312adb9bc9a9b8f69244e483b5552dc789f5e04` から9件の既存公開入力だけを使い準備した。
+manifest digestは `sha256:1f59fbcfcc47e741bf5f58ce0ce02c8f3a7ac9ca38e23ffa63ea43b422cd06da`。
+27枠全てnot_started、開始未消費、品質nullを読み取り確認し、課題別exportを9件保存した。
+その後のbatch欠測保護・export先保護はrecipe生成器を変更していない。
+これは接続の開発証拠で、K版選択・private原本復元・最終統合後の評価freezeではない。
+
+独立レビューで要求済みchild reportの消失をcompletedで再表示する問題を検出した。
+修正は上位stateをconsumption_unknownへ落とし、未判明usageと要求済み欠測件数を保持する。
+保存terminalのstoppedと根拠欠測を別に表示し、再開始は許さない。
+offline exportはsource seedも保護し、symlinkを含む非canonical親を拒否する。
+これらの負例は新しいfake-only回帰で確認する。既存の採点基準は変更していない。
+
+PR #340の旧docs-only headに対するUbuntu fake jobは、synthetic sessionのmtimeと宣言window
+の照合で失敗した。該当テスト・production readerは基準mainと同じで、文書差分が原因とは
+確認されない。Macでのtargeted synthetic caseは修正前も通り、CI失敗時のmtimeは不明。
+fixtureのmtimeを宣言window内へ明示固定する小修正を独立commitに分けた。
+production reader、mtime許容、旧所有権診断は変更・実行していない。
+修正後の同じsynthetic caseは通るが、Ubuntu全CIの再成功は別の観測である。

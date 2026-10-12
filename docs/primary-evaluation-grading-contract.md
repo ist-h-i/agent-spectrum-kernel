@@ -34,8 +34,8 @@ transplant rejection, `AC-UNKNOWN` to missing/failed evidence checks,
 `AC-NO-DISPATCH` to factory membership and readiness-negative checks, and
 `AC-REPLAY` to digest corruption and untrusted fake-export rejection.
 Command: `node --test scripts/test-ask-primary-evaluation-grading.mjs`.
-Evidence: [primary-grading-tests.log](../../evidence/primary-grading-tests.log).
-Thirteen checks pass, including pending-plan public binding/export/replay for all
+Evidence: `evidence/primary-grading-review-fixes.log` in the local preparation task.
+Fourteen checks pass after the export-root regression was added, including pending-plan public binding/export/replay for all
 nine fixtures. The saved terminal-reading branch also exports/replays fake local
 terminal/artifact files and downgrades changed stderr to missing evidence;
 the absence of a controller checkpoint remains explicit. Actual completed
