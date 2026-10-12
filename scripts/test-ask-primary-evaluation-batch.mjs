@@ -141,6 +141,21 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
     const report = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
     assert.equal(report.terminal.stop, 'grading_incomplete'); assert.equal(a.calls.length, 1);
   });
+  await t.test('lost requested report or required grading cannot retain completed batch', async () => {
+    for (const name of ['report', 'grading', 'requested']) {
+      const m = f.manifest(), a = adapters(); preparePrimaryEvaluationBatch(m.path, a);
+      assert.equal((await startPrimaryEvaluationBatch(m.value.root, m.digest, a)).state, 'completed');
+      const path = join(m.value.root, 'consumption', `block-0-${name}.json`);
+      rmSync(path); rmSync(`${path}.digest`);
+      const report = reportPrimaryEvaluationBatch(m.value.root);
+      assert.equal(report.state, 'consumption_unknown'); assert.ok(report.errors.length > 0);
+      if (name === 'report') {
+        assert.equal(report.usage.missing_requested_report_count, 1);
+        assert.equal(report.slots.slice(0, 3).every(slot => slot.state === 'unknown'), true);
+      }
+      await assert.rejects(startPrimaryEvaluationBatch(m.value.root, m.digest, a), /consumed/);
+    }
+  });
   await t.test('partial consumption and result publication remain unknown; no restart', async () => {
     const m = f.manifest(), a = adapters(); preparePrimaryEvaluationBatch(m.path, a); mkdirSync(join(m.value.root, 'consumption'));
     const report = reportPrimaryEvaluationBatch(m.value.root); assert.equal(report.state, 'consumption_unknown'); assert.equal(report.slots.length, 27);

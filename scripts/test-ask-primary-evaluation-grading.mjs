@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
@@ -10,7 +10,7 @@ import { principlesCapability, renderKernelPrinciples } from './kernel-principle
 import { coreGradingConditions, coreGradingSchemaPath } from './ask-core-grading-authority.mjs';
 import { PRIMARY_GRADING_CONDITIONS, createPrimaryEvaluationGradingAdapter, exportPrimaryEvaluationGradingForTest,
   exportPrimaryEvaluationGradingRequest, isPrimaryEvaluationGradingAdapter, preflightPrimaryEvaluationGrading,
-  replayPrimaryEvaluationGradingRequest } from './ask-primary-evaluation-grading.mjs';
+  replayPrimaryEvaluationGradingRequest, writePrimaryEvaluationGradingRequest } from './ask-primary-evaluation-grading.mjs';
 
 // All terminal/request/check bytes below are fake; no start, resume, evaluator,
 // subprocess, ownership diagnostics or private original is invoked.
@@ -170,7 +170,8 @@ function savedPending(t, fixture_id) {
   const write = (path, bytes) => { mkdirSync(dirname(path), { recursive: true, mode: 0o700 }); writeFileSync(path, bytes, { mode: 0o600 }); };
   const base = new URL(`../benchmarks/fixtures/checkpoint-b2/${fixture_id}/`, import.meta.url);
   const inputRaw = readFileSync(new URL('input-manifest.json', base)), manifest = JSON.parse(inputRaw);
-  const publicRoot = join(root, 'public'), comparisonRoot = join(root, 'comparison'), inventory = {};
+  const publicRoot = join(root, 'public'), comparisonRoot = join(root, 'comparison'), seedRoot = join(root, 'seed'), inventory = {};
+  mkdirSync(seedRoot, { mode: 0o700 });
   for (const file of manifest.fixtures[fixture_id].files) {
     const bytes = readFileSync(new URL(file.path, base)); write(join(publicRoot, file.path), bytes);
     inventory[file.path] = { digest: hash(bytes), bytes: bytes.length };
@@ -193,7 +194,7 @@ function savedPending(t, fixture_id) {
     policy: comparisonExecutionPolicy('single_shot_v1'), execution_protocol: { resume: 'forbidden' },
     kernel_definition: { canonical_source: { path: 'control/kernel-principles-source.md', digest: hash(source) },
       renderer_source: { path: 'control/kernel-principles-renderer.mjs', digest: hash(renderer) }, source_commit: 'f'.repeat(40), generation: generated.generation },
-    source_installation: { preserved_custom_agents_digest: hash('') }, source: { commit: 'f'.repeat(40), digest: hash('synthetic source'), inventory },
+    source_installation: { preserved_custom_agents_digest: hash('') }, source: { repo: seedRoot, commit: 'f'.repeat(40), digest: hash('synthetic source'), inventory },
     input: { path: 'inputs/prompt.md', digest: hash('synthetic prompt') }, task: { path: 'control/task.md', digest: inventory['task.md'].digest },
     verification: { path: 'control/verification.json', digest: hash(raw(recipe)), recipe,
       reporter: { path: 'control/node-test-reporter.mjs', format: 'ask_node_summary_jsonl_v1', digest: hash('synthetic reporter') } },
@@ -267,4 +268,17 @@ test('saved synthetic terminal production read branch preserves evidence and can
   const drift = exportPrimaryEvaluationGradingRequest(block);
   assert.equal(drift.request.slots[0].terminal_digest, null); assert.equal(drift.request.slots[0].quality, null);
   assert.equal(replayPrimaryEvaluationGradingRequest(path, value.request_digest, block).status, 'blocked');
+});
+
+test('offline export writer refuses retained seed and symlink parents before writing', t => {
+  const block = savedPending(t, 'mn-build-option-update'), parent = dirname(block.root);
+  const seed = join(parent, 'seed'), output = join(parent, 'request.json');
+  assert.throws(() => writePrimaryEvaluationGradingRequest(join(seed, 'oracle.json'), block), /overlaps/);
+  const link = join(parent, 'seed-link'); symlinkSync(seed, link);
+  assert.throws(() => writePrimaryEvaluationGradingRequest(join(link, 'oracle.json'), block), /canonical/);
+  const external = join(parent, 'external'); mkdirSync(external); const externalLink = join(parent, 'external-link'); symlinkSync(external, externalLink);
+  assert.throws(() => writePrimaryEvaluationGradingRequest(join(externalLink, 'request.json'), block), /canonical/);
+  const value = writePrimaryEvaluationGradingRequest(output, block);
+  assert.equal(hash(readFileSync(output)), value.request_digest);
+  assert.throws(() => writePrimaryEvaluationGradingRequest(output, block));
 });

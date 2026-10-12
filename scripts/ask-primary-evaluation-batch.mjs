@@ -236,9 +236,13 @@ export function reportPrimaryEvaluationBatch(root) {
   const reports = batch.manifest.blocks.map((block, index) => {
     const requested = consumed ? read(`block-${index}-requested.json`) : null;
     const report = consumed ? read(`block-${index}-report.json`) : null;
+    const grading = consumed ? read(`block-${index}-grading.json`) : null;
+    if (requested && !report) errors.push(`block ${index} requested report missing`);
+    if (!requested && (report || grading)) errors.push(`block ${index} evidence has no request`);
+    if (terminal?.state === 'completed' && (!requested || !report || grading?.status !== 'completed')) errors.push(`block ${index} completed batch evidence incomplete`);
     if (requested && (requested.run_id !== block.run_id || requested.plan_digest !== block.plan_digest)) errors.push(`block ${index} request identity changed`);
     if (report && (report.run_id !== block.run_id || report.plan_digest !== block.plan_digest)) { errors.push(`block ${index} report identity changed`); return { block, requested, report: null, grading: null }; }
-    return { block, requested, report, grading: consumed ? read(`block-${index}-grading.json`) : null };
+    return { block, requested, report, grading };
   });
   const slots = reports.flatMap(({ block, requested, report, grading }, index) => batch.manifest.conditions.map(condition => ({ fixture_id: block.fixture_id, run_id: block.run_id,
     plan_digest: block.plan_digest, condition, state: report?.slots?.find(slot => slot.condition === condition)?.state ?? (requested ? 'unknown' : 'not_started'),
@@ -247,7 +251,10 @@ export function reportPrimaryEvaluationBatch(root) {
   return { kind: 'ask_primary_evaluation_batch_report_v1', batch_id: batch.manifest.batch_id, manifest_digest: batch.manifest_digest,
     state: errors.length || consumed && (!start || !terminal) ? 'consumption_unknown' : terminal?.state ?? 'not_started', start_consumed: consumed, errors, terminal,
     blockers: batch.prepared.blockers, slots, usage: { known_tokens_lower_bound: reports.reduce((sum, value) => sum + (value.report?.usage_budget?.known_tokens_lower_bound ?? 0), 0),
-      complete: reports.every(value => value.report?.usage_budget?.complete === true), cost: null }, limits: PRIMARY_BATCH_LIMITS,
+      complete: reports.every(value => value.report?.usage_budget?.complete === true),
+      unknown_block_count: reports.filter(value => value.report?.usage_budget?.complete !== true).length,
+      missing_requested_report_count: reports.filter(value => value.requested && !value.report).length,
+      cost: null }, limits: PRIMARY_BATCH_LIMITS,
     limitations: ['reported input+output is a lower bound; cached input is not added again', 'budget admission occurs between fixed blocks; child plans retain their own token budgets',
       'local deadline is not provider cancellation or a hard cost cap; forced controller exit cannot guarantee child/descendant shutdown', 'no resume, retries, saved-PID probes or additional sessions', 'quality remains unknown until the fixed grading adapter supplies evidence'] };
 }

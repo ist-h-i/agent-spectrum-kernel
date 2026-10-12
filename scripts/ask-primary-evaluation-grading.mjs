@@ -1,7 +1,7 @@
 // Public, offline export only. This module never starts an evaluator or model.
 import assert from 'node:assert/strict';
-import { existsSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, realpathSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonicalDigest, parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
@@ -282,19 +282,29 @@ export function createPrimaryEvaluationGradingAdapter({ root = ROOT } = {}) {
 }
 export const isPrimaryEvaluationGradingAdapter = adapter => adapters.has(adapter);
 
+/** Export writes must be outside every retained input, including the independent seed. */
+export function writePrimaryEvaluationGradingRequest(output, block, { root = ROOT } = {}) {
+  assert.ok(output && !existsSync(output));
+  const target = resolve(output), parent = dirname(target);
+  assert.equal(realpathSync(parent), parent, 'export parent must be canonical and contain no symlink');
+  const loaded = readUserComparisonPlan(block.root);
+  for (const input of [root, block.root, block.public_input_root, loaded.plan.source.repo]) {
+    const base = realpathSync(input);
+    assert.ok(target !== base && !target.startsWith(`${base}/`), 'export overlaps a retained authority/input');
+  }
+  const value = exportPrimaryEvaluationGradingRequest(block, { root });
+  writeFileSync(join(parent, basename(target)), serialize(value.request), { mode: 0o600, flag: 'wx' });
+  return value;
+}
+
 // CLI is offline export/replay only; no start/resume or scorer command exists.
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const [command, blockPath, output, pinnedDigest] = process.argv.slice(2), block = json(blockPath);
     if (command === 'preflight') console.log(JSON.stringify(preflightPrimaryEvaluationGrading(block), null, 2));
     else if (command === 'export') {
-      assert.ok(output && !existsSync(output));
-      const target = resolve(output);
-      for (const input of [ROOT, block.root, block.public_input_root]) {
-        const base = resolve(input); assert.ok(target !== base && !target.startsWith(`${base}/`), 'export overlaps a retained authority/input');
-      }
-      const value = exportPrimaryEvaluationGradingRequest(block);
-      writeFileSync(output, serialize(value.request), { mode: 0o600, flag: 'wx' }); console.log(JSON.stringify({ request_digest: value.request_digest, readout: value.readout }, null, 2));
+      const value = writePrimaryEvaluationGradingRequest(output, block);
+      console.log(JSON.stringify({ request_digest: value.request_digest, readout: value.readout }, null, 2));
     } else if (command === 'replay') console.log(JSON.stringify(replayPrimaryEvaluationGradingRequest(output, pinnedDigest, block), null, 2));
     else throw new Error('offline command required');
   } catch { console.error('Primary grading offline export refused; no process started.'); process.exitCode = 1; }
