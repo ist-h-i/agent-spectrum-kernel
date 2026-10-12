@@ -1,4 +1,32 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "hi-authorization-exception",
-  "candidate_state": "generation_pending"
+  "fixture_role": "primary",
+  "suite": "high_impact",
+  "task_class": "pr_review",
+  "domain": "security_authorization",
+  "difficulty": "hard",
+  "repetitions": 5,
+  "risk_boundary": "security_boundary",
+  "capability_families": [
+    "authorization_reasoning",
+    "review_precision"
+  ],
+  "evidence_topologies": [
+    "api_contract_and_callers",
+    "review_diff_and_tests"
+  ],
+  "outcome_dimensions": [
+    "authorization_integrity",
+    "review_precision"
+  ],
+  "output_contract_type": "findings_producing",
+  "requirement_record_id": "requirement-record-hi-authorization-exception",
+  "output_contract_id": "output-contract-hi-authorization-exception",
+  "evaluator_bundle_id": "evaluator-5223650cda382dae050c57c40611c9a9f712c8f01b27cdac60a9ab09ca3760e7",
+  "evaluator_bundle_digest": "sha256:ffe614507a8c6611b716c41c6249065bf2fb87c62b7a9a0cfcc5b89b2305bbfc",
+  "evaluator_byte_count": 397657,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:6e518980382505d7fde4cd4005ef7b4e628a37070ac1a1156fcd231d73aaa046"
 }
