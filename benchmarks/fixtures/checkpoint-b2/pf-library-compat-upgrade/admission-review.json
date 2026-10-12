@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "pf-library-compat-upgrade",
   "candidate_input_digest": "sha256:4d6f715172603e41a5e774ef1143cb367e39b882cb3ab01df168933c1c781253",
-  "candidate_evaluator_digest": "sha256:a32bb93014d954766bc039ef14fe1c7b1a43138d5b58c792cead8f84aa8cd7b0",
+  "candidate_evaluator_digest": "sha256:bb34dcfe471b7480dd08afe7395b58fabcf923a5130bbf25c653f7a7c25acd7f",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -117,5 +117,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:9f09382e9e6587cac3badf1d155776e1bd98abe54e7378f469d4564b0d158151"
+  "review_package_digest": "sha256:f581897620240ad47247d2adff670fb6d66797e6038ed5c623f3d7dbc7036e6c"
 }
