@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-43b0149c5644f6acec78bf3022bef7999041257f2e87f08710f8bf9aec9edc56",
-  "evaluator_bundle_digest": "sha256:a6254896bd127ed0b16fff1834742552477bbd2bba81dd1dd43f5d33dadcafdc",
+  "evaluator_bundle_id": "evaluator-33da992ef6fb4c957eae85222e1e38c648e0c6923cde6e76c5253398570b2a8b",
+  "evaluator_bundle_digest": "sha256:258f914c7722465b12d95ed4cd08e4c1aa25c6d78d29e3f52a277cea52c707e9",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "hi-financial-state-integrity",
   "fixture_input_digest": "sha256:234a13b9ccae089553d56b0e512220dfea8fe42a3c0c2f8eb0666295faceebda",
   "task_class": "investigation_implementation",
   "suite": "high_impact",
-  "evaluator_revision": "0b89d544dd21d8559159331069f63e0e260b390b",
+  "evaluator_revision": "90ce0393367bc592582273d8fbfcd39ca3c76830",
   "evaluator_source_identity": {
-    "base_git_revision": "0b89d544dd21d8559159331069f63e0e260b390b",
+    "base_git_revision": "90ce0393367bc592582273d8fbfcd39ca3c76830",
     "source_tree_digest": "sha256:978a07cdabd9b519912ded9cd1f074412d8dd3e53f0a4d92195c353e4b3298b1",
     "generator_source_digest": "sha256:124f4862dbb4eba98605fb558368b561a99c7505f9bec5eeb8d14ecb632c8a53",
     "source_files": [
@@ -4042,11 +4042,11 @@
     }
   },
   "generator_identity": "sha256:d63f9ec9ba189959bd5147d79a840c4ccdc6a61e0c124d7ce0a5d6a164d61e61",
-  "independence_statement_digest": "sha256:fca57496c43db2d3c1aabf7b158f4f9d6854281f486a13dc7a4c7b3300562425",
-  "review_record_digest": "sha256:0efe6143a7869db3bed83fb28ab99960f5b8fe65434fd73801f77f5d32ca3990",
+  "independence_statement_digest": "sha256:a1de6fef2b828fc97d7769302395dbbcc30cf5cc0fbd90231230107d6e9f4fe0",
+  "review_record_digest": "sha256:4dc1ded949d87f3e1052e75bbc4735b3b50a6215407746c2b98ec42421f194fc",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:86a0c5a64517205a0526df24db2e2b0423db2459c6cf9d8e848da1bb0be69b2a",
-  "evaluator_authority_manifest_digest": "sha256:328fd02d99dcf8a9e4430989019acecc12eb31b6e4fe9b5f9fb0cc3f9c39f5aa",
+  "evaluator_authority_manifest_raw_sha256": "sha256:bfedba6eded446a7c50fc0bd62306315416d9eae5fc47d9a88527046353b236a",
+  "evaluator_authority_manifest_digest": "sha256:930e2b4bfea11bd526872014a02f996989b9f3862d57702ee67bef4ba28f44af",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:b66e41fea9d06a95819c3eb613fd4a8da80e0fe58442b04990eaefe2be8b1028"
+  "public_metadata_digest": "sha256:e48de705eb8b950a3c1adf06db3fe7714e53a7011f8f36120487441b68a68bd5"
 }
