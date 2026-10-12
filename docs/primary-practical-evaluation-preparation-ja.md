@@ -79,7 +79,7 @@ checkout変更、開発branchからの取り込みを禁止する。接続PRを�
    CI、a11y、frontendレビュー、性能調査、移行handoff、IaC計画に原則だけの公平な経路を
    定義する最小の設計判断が必要。Skill追加、trivial偽装、品質0点化はしない。
    対応範囲を変えるなら既存v1の意味を黙って拡張せず、別候補版として結果非閲覧でレビューする。
-2. **検査recipe**。現行 `prepareUserComparison` は公開固定 `.mjs` node:testのみ。
+2. **検査recipe**。r2時点の `prepareUserComparison` は公開固定 `.mjs` node:testのみ。
    CIとhandoffの構造validatorや、IaC計画などの成果物採点をそのまま扱えない。
    focused regressionは既存testの編集が課題で、独立固定テストとの重複禁止に当たる。
    既存検査契約・private evaluatorをcontroller側に接続する必要がある。
@@ -87,6 +87,9 @@ checkout変更、開発branchからの取り込みを禁止する。接続PRを�
    docs/config修正とfocused test追加は実際の編集作業としてimplementation/trivialへの
    根拠ある対応づけが可能だが、正式task classを保持し、metadataの文字列を無条件に
    implementationへ変換しない。build-optionの構造validatorも接続不足の対象である。
+   継続実装では閉じたnative fixture recipeを既存controllerへ接続した。
+   [接続契約](primary-fixture-recipe-contract.md)のO1/O2で9件の元の検査・入力・scopeと
+   focused test編集を検査する。公開検査の実行経路はできたが、private意味採点は未接続。
 3. **採点condition／証拠lineage**。旧normalized/evaluator schemasは
    `plain/kernel_only/adaptive_ask/full_ask`。`kernel_principles_v1` は含まれない。
    既存Core grading bridgeの `plain/core/full` も別条件なので代用しない。
@@ -99,13 +102,16 @@ checkout変更、開発branchからの取り込みを禁止する。接続PRを�
    標準private-evaluators保存先で見つかったbuild-option bundleも、現行採用referenceとは
    ID/digest/revisionが異なる旧版だった。9件の固定referenceに一致する実体は未発見。
    旧focused新系列のcustom evaluatorは採用済みbundleの代替ではない。
-5. **9ブロックの一度の開始**。現行入口は一課題の三条件まで。新しい評価基盤を作らず、
+5. **9ブロックの一度の開始**。r2時点の入口は一課題の三条件まで。新しい評価基盤を作らず、
    既存single_shot startを9個の固定planに順次呼び、全体期限／usage下限／未開始slotを
    一つのreceiptで保存する最小接続が必要。denial/authentication/unknown child終了では
    後続モデルと採点processを止め、同runの自動resume／retry／新ID生成をしない。
+   継続実装の[薄いバッチ接続](primary-evaluation-batch-contract.md)は9個の既存single_shotを
+   束ねる。全27枠を保存し、一度の消費・予算予約・不明終了時停止をfake-onlyで検査した。
+   採点adapterがreadyでない本番dispatchは拒否するので、実採点接続不足は解消していない。
 
 不足がある課題を対象から除外しない。各slotの品質・使用量は未実行ならnull/unknown。
-現状は全27slots未実行。構造的なK不足があるため、最初の一度の開始はまだ提示できない。
+現状は全27slots未実行。K候補採用・原本・採点authorityが未解決なので、最初の一度の開始はまだ提示できない。
 
 ## 採点・報告の固定方針
 
@@ -150,6 +156,8 @@ redacted patchはレビュー用と明示し、完全な比較はcontrollerの�
 
 不足1の設計判断と不足4の原本復元を親へ報告し、その間は公開入力の固定と非モデル検査を完了する。
 不足2/3/5を変更する場合、15課題担当と共有script/schema/CI所有権を調整する。
+継続実装の共有変更はuser-comparisonのprepare/controllerのnative recipe seamのみで、
+fixture・raw scorer・原schema・カタログ・CIには変更していない。
 専用worktreeの最小差分・fake-only検査・fresh independent review・Draft PRを経て、
 検査済みheadを親に伝える。採点基準変更や旧終了条件緩和を混ぜない。
 全ての不足が解消した後に、固定run IDとplan digestを含む日本語開始プロンプトを完成させる。
@@ -161,7 +169,7 @@ redacted patchはレビュー用と明示し、完全な比較はcontrollerの�
 
 `SPEC-PRIMARY-PREP-1` は上記の対象・分離・未実行表示・不足の保存を定義する。
 `IMP-PRIMARY-PREP-1` の所有範囲はこの文書とタスク外部領域の入力・採点source snapshot、
-manifest、課題別の未実行readoutだけ。runner/projection/schema/scorerの修正は未実施。
+manifest、課題別の未実行readoutだけ（初回文書段階）。
 `FVC-PRIMARY-PREP-1` は `ask.verification-proof-policy@1.0.0` のFormal Verification Contract。
 根拠となるtriggerは `multi_session_multi_agent_or_handoff`、`multiple_specialized_checks`、
 `merge_release_or_stable_trace`。O1：main/tree・全公開input bytes・歴史source bytesのhash照合。
@@ -169,3 +177,20 @@ O2：9件の採用overlayと実行resolver結果を区別し、全27条件を未
 O3：source/公開input/採点source/報告の領域分離と制限を明示。O4：既存single_shotの
 fake-only試験、独立読取りレビュー、文書差分・Git状態検査。
 モデル実行や採点を完了したという証明義務は満たしていない。実行接続はblockedのまま。
+
+## 継続実装の現在状態
+
+`IMP-PRIMARY-CONNECTION-2` はnative recipe/prepare seam、9block coordinator、保存済み
+controller証拠の採点request/readout exportを所有する。証明は上記recipe契約と
+`FVC-PRIMARY-BATCH-1`、`VER-PRIMARY-GRADING-EXPORT-1`を参照する。
+新しい[`kernel_principles_v2_candidate`](kernel-principles-candidate-v2.md)は、v1原則抽出を
+再利用した未採用の別候補。専門/形式手順が明示必須または要求調査不明ならmissingに閉じる。
+6公開課題のsignalは原則範囲内と分析したが、版選択とdescriptor判断責任は親の判断待ち。
+旧v1の登録・bytes・過去runは不変。
+
+[採点export接続](primary-evaluation-grading-contract.md)は9件×実条件を別々に、
+入力・採点版・controller receipt・native command・要件IDと根拠・五原因unknownへ結ぶ。
+public validatorをprivate scorerの代用にせず、原本とscoped condition/normalized authority
+接続が不足する限り、本番grading preflightはblockedのまま。
+所有者が復元すべき9件のbundle/review archive locatorと、残る最小shared seamを別途記録する。
+稼働checkoutの計画をあとから書換えず、候補選択・source最終統合後の固定は新しい準備で行う。

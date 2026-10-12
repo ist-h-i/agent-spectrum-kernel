@@ -10,6 +10,7 @@ import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { buildAgentsBlock, coreImmutableAssetKind, CORE_OWNED_IMMUTABLE_ASSETS, MANAGED_START, MANAGED_END } from "./installer-lifecycle.mjs";
 import { skillAssets } from "./skill-assets.mjs";
 import { comparisonConditions, KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } from "./kernel-principles.mjs";
+import { isPrimaryFixtureRecipe, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 
 const SOURCE = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 const CORE_STATE = ".agent-spectrum-kernel/install-state.json";
@@ -275,6 +276,7 @@ function validateCommand(command, tree) {
 }
 
 function validateRecipe(recipe, tree) {
+  if (isPrimaryFixtureRecipe(recipe)) return validatePrimaryFixtureRecipe(recipe, tree);
   if (!plainObject(recipe) || Object.keys(recipe).some(key => !["command", "requirements"].includes(key))) fail("invalid_verification_recipe");
   validateCommand(recipe.command, tree);
   if (!Array.isArray(recipe.requirements)) fail("requirements_array_required");
@@ -442,7 +444,8 @@ export function prepareGitBaseline(root) {
 }
 
 function kernelCapability(inventory, config) {
-  const primary = { implementation: "controlled-implementation", review: "review-router", investigation: "doubt-driven-development" }[config.task_class];
+  const primary = { implementation: "controlled-implementation", review: "review-router", investigation: "doubt-driven-development",
+    design: "spec-driven-development", handoff: "handoff-generation" }[config.task_class];
   const required = config.task_class === "trivial" ? [] : ["operating-mode-router", "skill-router", primary,
     config.task_class === "review" ? "review-ai-quality" : "test-first-verification"];
   const available = [];
@@ -479,7 +482,7 @@ function validateOptions(options) {
   for (const field of ["cli_version", "model", "reasoning"]) if (config[field] !== null && (typeof config[field] !== "string" || !config[field].trim() || /[\u0000-\u001f\u007f]/u.test(config[field]))) fail(`invalid_${field}`);
   for (const field of ["timeout_ms", "verification_timeout_ms", "overall_timeout_ms"]) if (!Number.isSafeInteger(config[field]) || config[field] < 1 || config[field] > 86400000) fail(`invalid_${field}`);
   if (config.token_budget !== null && (!Number.isSafeInteger(config.token_budget) || config.token_budget < 1)) fail("invalid_token_budget");
-  if (!["implementation", "trivial", "review", "investigation"].includes(config.task_class) || !["observed", "synthetic"].includes(config.evidence_kind)
+  if (!["implementation", "trivial", "review", "investigation", "design", "handoff"].includes(config.task_class) || !["observed", "synthetic"].includes(config.evidence_kind)
     || !["unknown", "observed", "not_observed"].includes(config.global_ask_presence) || !Array.isArray(config.global_capabilities)
     || config.global_capabilities.some(name => typeof name !== "string" || !NAME.test(name)) || new Set(config.global_capabilities).size !== config.global_capabilities.length) fail("invalid_comparison_configuration");
   if (options.rerunOf !== undefined && options.rerunOf !== null && (typeof options.rerunOf !== "string" || !/^[a-f0-9-]{36}$/u.test(options.rerunOf))) fail("invalid_rerun_identity");
@@ -511,8 +514,11 @@ export function prepareUserComparison(options = {}) {
     fail("verification_recipe_is_committed_model_input_keep_it_external");
   }
   const recipe = validateRecipe(parseJson(verificationBytes, "verification"), original);
+  const primaryRecipe = isPrimaryFixtureRecipe(recipe);
+  if (primaryRecipe) validatePrimaryFixtureRecipe(recipe, original, { taskBytes, mutablePaths: mutable, taskClass: config.task_class });
+  else if (["design", "handoff"].includes(config.task_class)) fail("advanced_task_class_requires_primary_fixture_recipe");
   const reporterBytes = readRegular(join(SOURCE, "scripts/ask-user-comparison-test-reporter.mjs"), "node_test_reporter");
-  const testPaths = [...new Set([recipe.command, ...recipe.requirements.filter(item => item.command).map(item => item.command)].flatMap(command => command.slice(2)))];
+  const testPaths = primaryRecipe ? [] : [...new Set([recipe.command, ...recipe.requirements.filter(item => item.command).map(item => item.command)].flatMap(command => command.slice(2)))];
   for (const mutablePath of mutable) {
     if (testPaths.some(path => mutablePath.endsWith("/") ? path.startsWith(mutablePath) : path === mutablePath)) fail("mutable_scope_overlaps_verification_test");
   }
@@ -522,8 +528,9 @@ export function prepareUserComparison(options = {}) {
   const rendererBytes = principles ? readRegular(join(SOURCE, "scripts/kernel-principles.mjs"), "principles_renderer") : null;
   for (const path of testPaths) if (!separated.source.has(path)) fail("verification_test_is_managed_ask_asset");
   const root = options.output;
-  const publicCommands = [...new Map([recipe.command, ...recipe.requirements.filter(item => item.command).map(item => item.command)].map(command => [JSON.stringify(command), command])).values()];
-  const prompt = `${taskText}\n\nComparison task boundary:\nWork only in the current repository. Mutable paths: ${JSON.stringify(mutable)}.\nAll other files, including instruction assets and verification tests, are read-only.\nDo not read sibling condition directories, comparison controller records, private evaluator data, answers or global credential files.\nPublic independent verification commands (do not modify their tests):\n${publicCommands.map(command => JSON.stringify(command)).join("\n")}\nThis condition has one session and one attempt. Do not start nested Codex/model sessions, subagents or extra agent processes.\nDo not modify Git configuration, commit, reset or change branches.\nNo retries, installing dependencies, network publication or changes to global configuration are authorized by this task.\n`;
+  const publicCommands = primaryRecipe ? recipe.checks.map(check => ({ cwd: check.cwd, command: [check.executable, ...check.argv] }))
+    : [...new Map([recipe.command, ...recipe.requirements.filter(item => item.command).map(item => item.command)].map(command => [JSON.stringify(command), command])).values()];
+  const prompt = `${taskText}\n\nComparison task boundary:\nWork only in the current repository. Mutable paths: ${JSON.stringify(mutable)}.\n${primaryRecipe ? "All files outside those mutable paths, including instruction assets, are read-only." : "All other files, including instruction assets and verification tests, are read-only."}\nDo not read sibling condition directories, comparison controller records, private evaluator data, answers or global credential files.\nPublic independent verification commands${primaryRecipe ? " (only the declared task mutable paths may change)" : " (do not modify their tests)"}:\n${publicCommands.map(command => JSON.stringify(command)).join("\n")}\nThis condition has one session and one attempt. Do not start nested Codex/model sessions, subagents or extra agent processes.\nDo not modify Git configuration, commit, reset or change branches.\nNo retries, installing dependencies, network publication or changes to global configuration are authorized by this task.\n`;
   mkdirSync(root, { mode: 0o700 });
   writeNew(root, "control/task.md", taskBytes);
   writeNew(root, "control/verification.json", verificationBytes);

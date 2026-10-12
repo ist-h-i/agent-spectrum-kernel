@@ -16,6 +16,7 @@ import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPragmaticEvaluationReport } from "./ask-pragmatic-evaluation-report.mjs";
 import { COMPARISON_RECORD_BYTE_LIMIT, comparisonExecutionPolicy, comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, isSingleShotComparison, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
+import { buildPrimaryFixtureRecipe, isPrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 
 export const USER_CONDITIONS = Object.freeze(["plain", "kernel_only", "full_ask"]);
 export const USER_COMPARISON_EXIT_CODES = Object.freeze({ completed: 0, task_failed: 2, capability_missing: 3,
@@ -157,9 +158,12 @@ export function userCodexInvocation(root, plan, condition) {
 
 export function inspectUserComparison(output) {
   const loaded = readUserComparisonPlan(output), { root, plan } = loaded;
+  const primary = isPrimaryFixtureRecipe(plan.verification.recipe);
   return { ...loaded, invocations: comparisonConditions(plan.config.kernel_condition).map(id => ({ condition: id, ...userCodexInvocation(root, plan, id),
-    capability: plan.arms[id].capability })), verification: { executable: process.execPath,
-    argv: verificationArgv(root, plan, plan.verification.recipe.command), reporter: plan.verification.reporter,
+    capability: plan.arms[id].capability })), verification: { executable: primary ? null : process.execPath,
+    argv: primary ? null : verificationArgv(root, plan, plan.verification.recipe.command), reporter: plan.verification.reporter,
+    ...(primary ? { kind: plan.verification.recipe.kind, checks: plan.verification.recipe.checks,
+      quality_policy: plan.verification.recipe.quality_policy } : {}),
     cwd: "a fresh verification copy for each launched condition",
     timeout_ms: plan.config.verification_timeout_ms }, execution: inspectComparisonExecution(root, plan, loaded.plan_digest),
   limits: comparisonLimits(plan),
@@ -173,7 +177,8 @@ export function inspectUserComparison(output) {
 }
 
 function comparisonLimits(plan) {
-  const checks = 1 + plan.verification.recipe.requirements.filter(item => item.command).length;
+  const checks = isPrimaryFixtureRecipe(plan.verification.recipe) ? plan.verification.recipe.checks.length
+    : 1 + plan.verification.recipe.requirements.filter(item => item.command).length;
   return { overall_timeout_ms: plan.config.overall_timeout_ms ?? 3600000,
     condition_admission_reserve_ms: plan.config.timeout_ms + checks * plan.config.verification_timeout_ms,
     deadline_origin: "first_start_including_downtime", token_budget: plan.config.token_budget ?? null,
@@ -345,22 +350,28 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
   const cwd = join(root, "verification", condition);
   mkdirSync(dirname(cwd), { recursive: true, mode: 0o700 });
   copyRegularTree(join(root, plan.arms[condition].path), cwd);
-  const checks = [{ id: "task-tests", command: plan.verification.recipe.command },
+  const primary = isPrimaryFixtureRecipe(plan.verification.recipe);
+  const checks = primary ? plan.verification.recipe.checks.map(check => ({ ...check,
+    command: [check.executable, ...check.argv] })) : [{ id: "task-tests", command: plan.verification.recipe.command },
     ...plan.verification.recipe.requirements.filter(item => item.command).map(item => ({ id: item.id, command: item.command }))];
   const results = [];
   for (const [index, check] of checks.entries()) {
     if (signal?.aborted || remaining() < 1) break;
     assert.equal(comparisonHash(readStableFile(join(root, plan.verification.reporter.path), "Node test reporter", LIMIT).bytes),
       plan.verification.reporter.digest, "Node test reporter changed");
-    const argv = verificationArgv(root, plan, check.command);
-    const request={condition,run_id:plan.run_id,plan_digest:context?.plan_digest,executable:process.execPath,argv,cwd,evidence_kind:plan.config.evidence_kind,requested_at:new Date().toISOString()};
+    const argv = primary ? check.argv : verificationArgv(root, plan, check.command);
+    const executable = primary ? check.executable : process.execPath;
+    const checkCwd = primary ? join(cwd, check.cwd) : cwd;
+    const request={condition,run_id:plan.run_id,plan_digest:context?.plan_digest,executable,argv,cwd:checkCwd,evidence_kind:plan.config.evidence_kind,
+      ...(primary ? { command_id: check.id, command_contract_digest: check.contract_command_digest,
+        fixture_input_digest: plan.verification.recipe.input_manifest_digest, observation_origin: "controller_native_fixture_command" } : {}), requested_at:new Date().toISOString()};
     if(context) { checkpointComparison(context,"verification_intent",{condition,slot:{phase:"verifying",verification_index:index}});saveLaunchReceipt(root,condition,`verification-${index}.request`,request); }
     // Synchronous receipt persistence may consume the remaining deadline while
     // its timer cannot run. Recheck immediately before dispatch, without turning
     // an exhausted deadline into a one-millisecond new process.
     const dispatchRemaining = remaining();
     if (signal?.aborted || dispatchRemaining < 1) break;
-    const value = await execute({ executable: process.execPath, argv, cwd, input: "",
+    const value = await execute({ executable, argv, cwd: checkCwd, input: "",
       ...(isSingleShotComparison(plan) ? { terminationScope: "direct_child" } : {}),
       onSpawn:context ? observed=>{const pid=typeof observed==="number"?observed:observed.pid; context.active_child=`verification-${index}.spawn`;
         saveLaunchReceipt(root,condition,`verification-${index}.spawn`,{...request,pid,observed_at:new Date().toISOString(),
@@ -373,17 +384,20 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
     if (context && childEnded(plan, value)) context.active_child=null;
     if (isSingleShotComparison(plan) && !childEnded(plan, value)) value.cleanupError ??= { code: "CHILD_TERMINATION_UNKNOWN", message: "verification child termination unknown; no later process may start" };
     const log = `verification-${index}.log`;
-    const stdoutLog = `verification-${index}.stdout.jsonl`, stderrLog = `verification-${index}.stderr.log`;
+    const stdoutLog = `verification-${index}.stdout.${primary ? "log" : "jsonl"}`, stderrLog = `verification-${index}.stderr.log`;
     const bounded = boundedVerificationLogs(value.stdout, value.stderr,
       { sanitize: sanitizeComparisonLog, captureTruncated: Boolean(value.outputLimited) });
     saveNew(evidencePath(root, condition, stdoutLog), bounded.stdout);
     saveNew(evidencePath(root, condition, stderrLog), bounded.stderr);
     saveNew(evidencePath(root, condition, log), bounded.view);
-    const testSummary = inspectNodeVerification(value.stdout ?? "", check.command.slice(2));
+    const testSummary = primary ? null : inspectNodeVerification(value.stdout ?? "", check.command.slice(2));
     const testStatus = value.spawnObserved !== true || value.exitCode == null ? "unknown"
-      : value.exitCode !== 0 ? "fail" : testSummary.tests_observed ? "pass" : "unknown";
+      : value.exitCode !== 0 ? "fail" : primary || testSummary.tests_observed ? "pass" : "unknown";
     const evidenceIncomplete = !bounded.metadata.full_evidence_available || value.error || value.cleanupError || value.outputLimited;
-    results.push({ id: check.id, command: [process.execPath, ...argv], cwd, log, logs: [stdoutLog, stderrLog, log], log_metadata: bounded.metadata, test_summary: testSummary,
+    results.push({ id: check.id, command: [executable, ...argv], cwd:checkCwd, log, logs: [stdoutLog, stderrLog, log], log_metadata: bounded.metadata, test_summary: testSummary,
+      ...(primary ? { command_id: check.id, command_contract_digest: check.contract_command_digest,
+        fixture_input_digest: plan.verification.recipe.input_manifest_digest, verification_kind: "native_public_command",
+        semantic_quality: "unknown" } : {}),
       test_result: testStatus, spawn_observed:value.spawnObserved??null,process_completed:value.spawnObserved === true && (value.exitCode != null || value.signal != null),
       status: value.interrupted ? "interrupted" : value.timedOut ? "timeout" : evidenceIncomplete ? "unknown" : testStatus,
       exit_code: value.exitCode ?? null, duration_ms: value.durationMs ?? null,
@@ -392,13 +406,17 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
     if (value.interrupted || value.timedOut || value.error || value.cleanupError || value.outputLimited) break;
   }
   return { independent_process: execute === executeCodexSession,
-    execution_origin: execute === executeCodexSession ? "controller_node_process" : "synthetic_injected_verifier",
+    execution_origin: execute === executeCodexSession ? primary ? "controller_native_fixture_process" : "controller_node_process" : "synthetic_injected_verifier",
     common_frozen_recipe: true,
     runtime: { executable: process.execPath, node_version: process.version, reporter_digest: plan.verification.reporter.digest }, checks: results,
     requirements: plan.verification.recipe.requirements.map(item => ({ id: item.id, description: item.description,
       status: item.command ? results.find(result => result.id === item.id)?.status ?? "unknown" : "unknown" })),
     limitations: ["Node test-case receipts do not measure assertion count or prove that tests cover the requirement; the operator must check coverage", "human/semantic criteria without a command remain unknown", "verification executes repository test code in a fresh copy; this is not a security sandbox"] };
 }
+
+// The same controller path can be tested with an injected synthetic transport;
+// this export does not consume a comparison start or launch a process itself.
+export { verifyCondition as verifyUserComparisonCondition };
 
 const fault = (code, reason) => Object.assign(new Error(reason), { comparisonCode: code });
 const ACTION = "Inspect saved evidence and obtain any required legitimate authorization; do not reset attempted slots. Use a new prepared run for retries or changed settings.";
@@ -414,6 +432,11 @@ function validateInputs(root, plan) {
   assert.equal(readFileSync(join(root, plan.input.path), "utf8"), plan.prompt);
   assert.equal(comparisonHash(readStableFile(join(root, plan.verification.path), "recipe", LIMIT).bytes), plan.verification.digest, "verification changed");
   assert.deepEqual(readJson(join(root, plan.verification.path)), plan.verification.recipe, "verification plan and recipe differ");
+  if (isPrimaryFixtureRecipe(plan.verification.recipe)) {
+    assert.deepEqual(plan.verification.recipe, buildPrimaryFixtureRecipe(plan.verification.recipe.fixture_id), "fixed primary recipe source changed");
+    assert.equal(plan.config.task_class, plan.verification.recipe.runner_task_class, "primary task class changed");
+    assert.deepEqual(plan.mutable_paths, plan.verification.recipe.mutable_paths, "primary mutable scope changed");
+  }
   assert.equal(comparisonHash(readStableFile(join(root, plan.verification.reporter.path), "Node reporter", LIMIT).bytes), plan.verification.reporter.digest, "Node test reporter changed");
 }
 function validateArm(root, plan, id, pending) {
