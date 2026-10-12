@@ -1,0 +1,24 @@
+{
+  "signal_paths": [
+    "event_type",
+    "request_id",
+    "outcome",
+    "status",
+    "duration_ms",
+    "method",
+    "route_template",
+    "error.code"
+  ],
+  "sensitive_paths": [
+    "headers",
+    "body",
+    "user",
+    "error.message",
+    "error.stack",
+    "raw_path"
+  ],
+  "markers": [
+    "[redacted]",
+    "[removed]"
+  ]
+}

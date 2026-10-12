@@ -1,0 +1,13 @@
+{
+  "name": "local-event-projection",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "trace": "node scripts/trace-policy.mjs",
+    "validate:review": "node scripts/validate-review.mjs"
+  }
+}

@@ -1,0 +1,19 @@
+--- a/config/projection-policy.json
++++ b/config/projection-policy.json
+@@ -4,10 +4,14 @@
+     "request_id",
+     "outcome",
+     "status",
+-    "duration_ms",
+     "method",
+     "route_template",
+-    "error.code"
++    "headers",
++    "body",
++    "user",
++    "error.message",
++    "error.stack",
++    "raw_path"
+   ],
+   "redact_paths": [],
+   "marker": "[redacted]"
