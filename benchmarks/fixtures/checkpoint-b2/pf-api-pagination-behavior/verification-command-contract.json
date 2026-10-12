@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "pf-api-pagination-behavior",
+  "fixture_input_digest": "sha256:3f087aabe9d3bf1af6b1ccb7ba425469c7b9e5a7038cb350f94696a664a10386",
+  "commands": [
+    {
+      "command_id": "pagination-focused-test",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"package.json\":\"a6440425662b1dd6d849e2f7e30863ba82dec6851ba9a0faa00de9051b7b9882\",\"spec/pagination-contract.md\":\"a9d105ef7beecbff0b70ba61b5b4f4d13bfc023d39a126adf2ec76c13e2a9095\",\"src/api-pages.mjs\":\"e99adf811f97c23ab75c1f86599868c7b4189121e8f2ac946bed36e776fa04e8\",\"src/catalog-consumer.mjs\":\"ba4bd46de51b31f00137f306972f636ecd82045d2f903f431d702a339883c50b\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && [ -f test/pagination.test.mjs ] && npm test",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:d6d088ab5a2afc0b45990cb8c78d535f0adba0c053450e49d1f9feeef076df5c",
+      "rendered_event_command_digest": "sha256:2dc3523a608ee78c41bb4c099fb311859f16ccbec6138954f47a4dca716f53f7",
+      "command_contract_digest": "sha256:70ced3783dadded77544fbec1469a606a53da6410b374ec17e27d9e4360a7c86"
+    }
+  ],
+  "contract_digest": "sha256:9fc322fdabfced41a0e42139c54cfc6e4792ab6b3238d977ef649cadd7750d2e"
+}
