@@ -40,10 +40,18 @@ Its acceptance items are:
   not invoke comparison start/resume, evaluation Codex CLI/model, grading models
   or legacy ownership diagnostics. Ordinary deterministic Node evaluators may be
   exercised against authored non-model candidates for compatibility verification.
+- `AC-PREPARE-ONLY`: the eight existing authority writers may explicitly select
+  resource-assets-only verification during fresh asset publication. It reuses
+  `verifyPrivateEvaluatorResourceAssets`, retaining public/source/schema,
+  independence, mutation and equivalence checks. Default writer validation and
+  runtime full-bundle verification remain unchanged. Empty preparation boundary
+  directories are not run evidence; this mode never fabricates run markers or
+  grants start, worker, review or admission authority.
 
 Work package `WP-PRIMARY-FRESH-SCORING-1`, revision 1, references the Spec.
 The allowed change boundary is the explicit-version primary connector and its
-tests/documents in PR #340, plus external private authoring/runtime/archive and
+tests/documents and explicit preparation-mode writer validation in PR #340,
+plus external private authoring/runtime/archive and
 receipt files. Existing fixture/catalog/old admission/result files in the source
 repository are read-only. No PR #341/remaining-fifteen development private source
 or stopped review operation is an input. Local generated-binding commits inside
@@ -60,7 +68,9 @@ Verification Contract under `ask.verification-proof-policy@1.0.0`, with triggers
 2. `O-SEMANTICS`: run task-specific private positive/equivalent/negative/unknown
    checks and validate original fragment contracts, with per-task status receipts.
 3. `O-BIND`: verify manifest substitution/drift rejection and the original
-   constructor/normalizer/scorer route using authored non-model candidates.
+   constructor/normalizer/scorer route using authored non-model candidates;
+   verify explicit writer asset mode needs no fabricated run markers and cannot
+   authorize execution or change the default full validation path.
 4. `O-REVIEW`: perform fresh independent asset and connector review; retain exact
    target digests, findings and post-fix results before new admission.
 5. `O-CUSTODY`: verify archive inventory/digests and restore into a new directory
@@ -76,6 +86,10 @@ package and verification. Task authoring is isolated by fixture. Runtime
 packaging reuses original writers/digest/validator APIs; the build task requires
 an explicitly documented external assembly because its adopted revision lacks
 a production writer. No new model grader or replacement scoring platform is added.
+The new build bundle receives an explicit 300000 ms ordinary worker budget;
+the old build budget is unrecovered and is not asserted. The other eight
+writer-defined budgets remain intact, including focused's 660000 ms. The
+conservative reservation already covers four 900000 ms worker runs per condition.
 
 Known interpretation limits: existing binary scope/verification classification
 recognizes specific historical requirement IDs. Some review/handoff tasks use

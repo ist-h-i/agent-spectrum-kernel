@@ -17,6 +17,7 @@ import {
   validateEvaluatorSourceIdentity,
   validateIndependenceStatement,
   verifyPrivateEvaluatorBundle,
+  verifyPrivateEvaluatorResourceAssets,
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import {
@@ -428,14 +429,22 @@ function publishPrepared(preparedState, validatePublished) {
   }
 }
 
-export function writeMpCiEvidenceGapProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots }) {
+// Resource generation verifies static assets without manufacturing run markers.
+// This scope cannot authorize evaluator execution, admission or comparison start.
+function validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots) {
+  if (typeof resourceAssetsOnly !== "boolean") throw new Error("resourceAssetsOnly must be a boolean");
+  if (resourceAssetsOnly && (!privateRoot || boundaryRoots !== null)) throw new Error("resource-assets-only validation requires a private root and no execution boundary roots");
+}
+
+export function writeMpCiEvidenceGapProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots = null, resourceAssetsOnly = false }) {
+  validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots);
   if (!privateRoot || !existsSync(privateRoot) || !lstatSync(privateRoot).isDirectory() || lstatSync(privateRoot).isSymbolicLink()) throw new Error("mp-ci writer requires an existing non-symlink private root");
   assertPrivateRootOutsideRepository(root, privateRoot);
   if (!/^[a-f0-9]{40}$/u.test(evaluatorRevision ?? "")) throw new Error("mp-ci evaluator revision is invalid");
   runGit(root, ["cat-file", "-e", `${evaluatorRevision}^{commit}`], "mp-ci evaluator revision lookup");
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(generationDate ?? "")) throw new Error("mp-ci generation date must be YYYY-MM-DD");
   const requiredBoundaries = ["materializedPath", "selectionState", "runDir", "normalizedResultsPath"];
-  if (!boundaryRoots || requiredBoundaries.some((key) => !boundaryRoots[key] || !existsSync(boundaryRoots[key]) || !lstatSync(boundaryRoots[key]).isDirectory())) throw new Error("mp-ci writer requires complete boundary roots");
+  if (!resourceAssetsOnly && (!boundaryRoots || requiredBoundaries.some((key) => !boundaryRoots[key] || !existsSync(boundaryRoots[key]) || !lstatSync(boundaryRoots[key]).isDirectory()))) throw new Error("mp-ci writer requires complete boundary roots");
   const repositoryRoot = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
   const frozenBefore = agentVisibleFiles(resolve(repositoryRoot, MP_CI_FIXTURE_ROOT));
@@ -451,14 +460,14 @@ export function writeMpCiEvidenceGapProductionAuthority({ root = ROOT, privateRo
     worktreeAdded = true;
     cpSync(privateDirectory, stagedPrivate, { recursive: true, force: false, errorOnExist: true });
     generateInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate });
-    validateMpCiEvidenceGapProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots });
+    validateMpCiEvidenceGapProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots, resourceAssetsOnly });
     if (!inputBefore.equals(readFileSync(resolve(stagedRepository, MP_CI_FIXTURE_ROOT, "input-manifest.json"))) || !verificationBefore.equals(readFileSync(resolve(stagedRepository, MP_CI_FIXTURE_ROOT, "verification-command-contract.json"))) || stableCanonicalJson(frozenBefore) !== stableCanonicalJson(agentVisibleFiles(resolve(stagedRepository, MP_CI_FIXTURE_ROOT)))) throw new Error("mp-ci production generation changed frozen agent-visible inputs");
     const transaction = randomUUID();
     const publicTransaction = resolve(repositoryRoot, "benchmarks/fixtures/checkpoint-b2", `.mp-ci-authority-${transaction}`);
     const privateTransaction = resolve(dirname(privateDirectory), `.mp-ci-authority-${transaction}`);
     const publicPairs = GENERATED_PUBLIC.map((name) => ({ source: resolve(stagedRepository, MP_CI_FIXTURE_ROOT, name), target: resolve(repositoryRoot, MP_CI_FIXTURE_ROOT, name), transactionDirectory: publicTransaction, label: `mp-ci public ${name}` }));
     const privatePairs = GENERATED_PRIVATE.map((name) => ({ source: resolve(stagedPrivate, name), target: resolve(privateDirectory, name), transactionDirectory: privateTransaction, label: `mp-ci private ${name}` }));
-    return publishPrepared(preparePublication([...publicPairs, ...privatePairs]), () => validateMpCiEvidenceGapProductionAuthority({ root: repositoryRoot, privateRoot: privateDirectory, boundaryRoots }));
+    return publishPrepared(preparePublication([...publicPairs, ...privatePairs]), () => validateMpCiEvidenceGapProductionAuthority({ root: repositoryRoot, privateRoot: privateDirectory, boundaryRoots, resourceAssetsOnly }));
   } finally {
     if (worktreeAdded) {
       const removal = spawnSync("git", ["-C", repositoryRoot, "worktree", "remove", "--force", stagedRepository], { encoding: "utf8" });
@@ -468,7 +477,8 @@ export function writeMpCiEvidenceGapProductionAuthority({ root = ROOT, privateRo
   }
 }
 
-export function validateMpCiEvidenceGapProductionAuthority({ root = ROOT, privateRoot = null, boundaryRoots = null } = {}) {
+export function validateMpCiEvidenceGapProductionAuthority({ root = ROOT, privateRoot = null, boundaryRoots = null, resourceAssetsOnly = false } = {}) {
+  validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots);
   const fixtureRoot = resolve(root, MP_CI_FIXTURE_ROOT);
   const artifacts = Object.fromEntries(PUBLIC_ARTIFACTS.map((name) => [name, readJson(resolve(fixtureRoot, name), `mp-ci ${name}`)]));
   for (const [name, value] of Object.entries(artifacts)) assertAnswerNeutralPublicValue(value, `mp-ci ${name}`);
@@ -561,15 +571,16 @@ export function validateMpCiEvidenceGapProductionAuthority({ root = ROOT, privat
   const expectedRuntime = { id: MP_CI_FIXTURE_ID, suite: "mechanism_positive", task_class: "review_verification", difficulty: "medium_hard", repetitions: 3, aggregate_eligible: true, input_manifest_path: `${MP_CI_FIXTURE_ROOT}/input-manifest.json`, input_manifest_sha256: sha256(readFileSync(resolve(fixtureRoot, "input-manifest.json"))).slice(7), verification_command_contract: { path: `${MP_CI_FIXTURE_ROOT}/verification-command-contract.json`, sha256: sha256(readFileSync(resolve(fixtureRoot, "verification-command-contract.json"))).slice(7) } };
   assertExact(runtime, expectedRuntime, "mp-ci runtime registration");
   if (privateRoot) {
-    if (!boundaryRoots) throw new Error("mp-ci private validation requires boundary roots");
-    const bundle = verifyPrivateEvaluatorBundle({ root, referencePath: resolve(fixtureRoot, "evaluator-reference.json"), privateRoot, manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"), ...boundaryRoots });
+    if (resourceAssetsOnly) assertPrivateRootOutsideRepository(root, privateRoot);
+    if (!resourceAssetsOnly && !boundaryRoots) throw new Error("mp-ci private validation requires boundary roots");
+    const bundle = (resourceAssetsOnly ? verifyPrivateEvaluatorResourceAssets : verifyPrivateEvaluatorBundle)({ root, referencePath: resolve(fixtureRoot, "evaluator-reference.json"), privateRoot, manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"), ...boundaryRoots });
     validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset: readJson(resolve(privateRoot, "evidence-removal-mutations.json"), "mp-ci mutation authority") });
     validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: readJson(resolve(privateRoot, "equivalent-solutions.json"), "mp-ci equivalence authority") });
     assertExact(readJson(resolve(privateRoot, "evidence-removal-mutations.json"), "mp-ci mutation authority"), authority.mutationAsset, "mp-ci private mutations");
     assertExact(readJson(resolve(privateRoot, "equivalent-solutions.json"), "mp-ci equivalence authority"), authority.equivalenceAsset, "mp-ci private equivalence");
     if (bundle.manifest.evaluator_bundle_id !== reference.evaluator_bundle_id || bundle.manifest.evaluator_bundle_digest !== reference.evaluator_bundle_digest) throw new Error("mp-ci public/private evaluator transplant");
   }
-  return { fixtureId: MP_CI_FIXTURE_ID, inputDigest: reference.fixture_input_digest, candidateDigest: candidate.candidate_digest, requirementRecordDigest: requirement.requirement_record_digest, requirementSetDigest: requirement.requirement_set_digest, outputContractDigest: output.output_contract_digest, evaluatorBundleId: reference.evaluator_bundle_id, evaluatorBundleDigest: reference.evaluator_bundle_digest, evaluatorRevision: reference.evaluator_revision, evaluatorAuthorityDigest: manifest.manifest_digest, admissionState: admission.admission_status, reviewStatus: review.reviewer_status, scoringReady: false };
+  return { fixtureId: MP_CI_FIXTURE_ID, inputDigest: reference.fixture_input_digest, candidateDigest: candidate.candidate_digest, requirementRecordDigest: requirement.requirement_record_digest, requirementSetDigest: requirement.requirement_set_digest, outputContractDigest: output.output_contract_digest, evaluatorBundleId: reference.evaluator_bundle_id, evaluatorBundleDigest: reference.evaluator_bundle_digest, evaluatorRevision: reference.evaluator_revision, evaluatorAuthorityDigest: manifest.manifest_digest, admissionState: admission.admission_status, reviewStatus: review.reviewer_status, scoringReady: false, ...(resourceAssetsOnly ? { validation_scope: "resource_assets_only", execution_authority: false } : {}) };
 }
 
 function parseProductionArgs(argv) {
@@ -577,6 +588,7 @@ function parseProductionArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const name = argv[index];
     if (name === "write-production") continue;
+    if (name === "--resource-assets-only") { args.resourceAssetsOnly = true; continue; }
     if (name === "--root") args.root = resolve(argv[++index]);
     else if (name === "--private-root") args.privateRoot = resolve(argv[++index]);
     else if (name === "--evaluator-revision") args.evaluatorRevision = argv[++index];
@@ -587,6 +599,7 @@ function parseProductionArgs(argv) {
     else if (name === "--normalized-results") args.boundaryRoots.normalizedResultsPath = resolve(argv[++index]);
     else throw new Error(`unknown argument: ${name}`);
   }
+  if (args.resourceAssetsOnly && Object.keys(args.boundaryRoots).length === 0) args.boundaryRoots = null;
   return args;
 }
 
