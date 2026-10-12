@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:384b33859bb6cea1b40e6ce42bb0dd437c09424bc1ff9e91ea0732ac3dccd6cf",
+  "admission_record_digest": "sha256:8720f48229d082d3313bf16831bc7f6bea75786ec17934a48e3c325e79fe1aaa",
   "requirements": [
     {
       "requirement_id": "schema-field-correctness",
@@ -64,5 +64,5 @@
     }
   ],
   "requirement_set_digest": "sha256:59552adb1b900c4448d25225c6f77b24b583c639dbfe6afd76b3096a983de4ec",
-  "requirement_record_digest": "sha256:40eb7dbe380b5d7c5d917fcd7c2a941be5be1d3dc9a41ec4b505c34ca34bbbb3"
+  "requirement_record_digest": "sha256:17059226f503f355f9a1c058aa1eacb21a932f57b930182ee0593ba69e938871"
 }
