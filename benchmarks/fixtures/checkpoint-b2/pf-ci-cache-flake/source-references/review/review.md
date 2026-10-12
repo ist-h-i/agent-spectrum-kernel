@@ -1,94 +1,126 @@
-# CI cache public source and lineage independent review
+# CI cache r2 final public source / lineage review
 
-Independent source-only review, 2026-10-12. Repository: `ask-ci-cache-development`; fixed base `4b1bf37961d6f2f23acf950413ac956d20a5ab01`. Initial reviewed HEAD: `b85ea60d51bf1899cfa941ce8bde1ff3b4014457`. Its diff adds 27 public files and 564 lines. The initial worktree was clean. The reviewer made no repository/Git edits; only this new review directory contains reviewer-written records.
+Exact reviewed HEAD: `6f467d49fa7b679749122f6a372008fa0405649b`. Original r2 predecessor/base: `6dd5c883fbd353c05e11210b14faed45e6fc0f0e`. Earlier source review: `1b65cea8f78f76a1c81ddf525f8c881f9c3c2463`; intermediate fix: `bedf4633f3ab5a54d15a94fb91333d5ca72a77f8`. Repository: ask-ci-cache-development. Completed 2026-10-12.
 
-This is the pre-grader public source/lineage stage. It does not approve fixture admission, private grading, scored outputs, model/CLI execution, comparison, deployment or production cache changes. Frequency and impact classifications are independently approved as `unknown`, with null weights and practice-weighted ineligibility; neither empirical measurement is upgraded by this review.
+**Source approval: approve. Separate frequency and impact judgments: approve retaining unknown/null, practice-weighted ineligible.** No source blocker or open finding remains. This approval concerns public-source preparation and source lineage only; it does not approve private meaning/grading, admission, production authority validation or empirical difficulty. Current production authority/lineage remain r1, and the earlier r1 semantic insufficient-evidence review is not reopened or resolved.
 
-## Official source and policy
+## Public source and lineage
 
-The reviewer independently read the [official GitHub dependency caching reference](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching) on 2026-10-12. It documents exact key matching, additional prefix/restore-key matching, cache-content immutability and dependency hashes in key construction. The checked-in source summary accurately describes that pattern and clearly distinguishes the fictional exact-key-only local model from the full GitHub service. It is a short paraphrase, rather than a copied workflow/code example.
+Verified: policy/catalog, lineage.md and the original short documentation paraphrase remain unchanged from the predecessor. documented_external_pattern is an existing approved closed source type. The reviewer independently checked [GitHub dependency caching documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching). Its cache-key/restoration guidance motivates the engineering pattern; it does not establish this fictional history, service-equivalent behavior, frequency or impact. No documentation code, private workflow data or private answer was copied. Fictional local data and authored model remain the complete evidence domain.
 
-`documented_external_pattern` is an approved type in the existing lineage policy and closed schema enum. The policy gives both unknown frequency and unknown impact null weights and false practice-weighted eligibility, with separate evidence/reviewer fields. The frozen catalog's base eligibility and identity remain unchanged by the diff. The fixture is primary `pf-ci-cache-flake`, practice-frequency investigation, ci_build, medium_hard, five repetitions, with ci_logs_and_config/historical_flake_runs evidence topology and the original public intent.
+Verified: frozen primary identity, investigation task class, ci_build domain, medium_hard designation, repetitions5, risk none and CI-log/config/historical-run topology are intact. Catalog base aggregate eligibility is unchanged. Frequency and impact have no observed empirical evidence, remain unknown with null weights and exclude practice-weighted aggregation. A deterministic fixture row/failure count is not incident frequency or measured customer/operational impact.
 
-The historical observations and run/cache IDs are explicitly fictional in task, investigation contract, scenario provenance, history heading and lineage. The reproducer reports `measured_external_ci:false`. Thus four fixture observations and one synthetic failure are not asserted as an incident count or empirical failure rate. No real occurrence cadence or business/incident impact evidence is supplied. Documentation availability cannot establish frequency; a modeled local failure cannot establish business impact. Neither a low band nor a positive numerical weight is justified. No prohibited private/customer/Issue #195/model-outcome material was review evidence. Public provenance inspection cannot prove the author's entire history; no prohibited provenance was observed in the authorized files.
+Supported: Plain can recover the exercise from ordinary task/spec/config/history/scenarios/model/reproducer. The source requires complete experiment observations, matched fixed-input cold/restored comparisons, linked controlled intervention, competing-explanation and confounding limits, recommendation options/predictions and scope/confidence. The solver must derive row identities and relations, distinguish build success from cache reuse and avoid inferring isolated external-runtime behavior from a comparison that also changes cache selection. The contract gives named experiment/recommendation categories, reducing unconstrained search, but does not supply the actual linked tuples or eliminate causal comparison. This remains a bounded investigation. Empirical medium_hard calibration and40-minute duration remain Unknown and were not measured.
 
-## Source recoverability and meaning
+Verified: all12 task/workspace input entries match exact length/hash. Public input raw digest is `sha256:276cbe5632762a7b03ace4c3057e8a8b04553ba21bdc5c0794355e7c0509f83a`; verification semantic digest is `sha256:d7d60fc5e09009fc5565f7ba7e3e2f8681595b15dc149235b02a6ed09e33b759`. Full exact task/workspace/manifests/source/helper/policy/catalog refs are in source-approval.json.
 
-Verified: Plain investigation is possible using the supplied task, config, history, scenarios, model, controlled reproducer options and report contract. All ten supplied workspace files are protected; only `investigation.json` is the intended output. The exact final verification command is disclosed in the task and matches the command manifest. The local model never requests a network/cache service or performs a dependency install; `dependencies:'installed'` is modeled fixture output, not a real installation observation.
+## Closed report and difficulty judgment
 
-The report contract distinguishes confidence for the fixture from broader causal claims, requires hypotheses/evidence/experiments/limitations, and explicitly states that structural validation does not establish causal truth. The public validator likewise prints that causal meaning requires review. A neutral unresolved report is deliberately accepted by the source test; it is not a benchmark answer, causal approval or a completed investigation. All controller/admission/evaluator/source-freeze records remain pending. The review generated no investigation solution and added no answer to the public source.
+The intermediate package fix includes all test/*.test.mjs in npm test, resolving initial P3 F-CACHE-R2-STRUCTURE-TEST-INVOKE. The sole changed authority-helper bytes add the public structure-test path to protection; every other byte is identical. Only this byte/protected-path delta was inspected mechanically, not the helper's private semantics or execution. Source helper wording now names the correct fixture.
 
-Supported: the investigation role, CI evidence topology and hypothesis/causal-confidence intent fit the source qualitatively. Actual medium_hard difficulty, elapsed solving time and empirical usefulness are unknown; no model execution or timing calibration occurred. A deterministic reproduction of supplied observations is distinct from a real stochastic CI flake or actual historical incidents.
+At the final HEAD, summary is removed from required/properties, additionalProperties:false remains, and docs explicitly define the structured fields as the complete report with no extra freeform summaries/claims. All existing observation/witness/control/competing/recommendation/confidence/limitations obligations remain unchanged. This is a justified minimal boundary change: removing mandatory prose does not remove their investigation burden. Unfamiliar strategies/new dimensions still require review under the public contract; this source review does not approve their automatic semantic treatment.
 
-## Initial independent ordinary checks
+The earlier independent contradictory-summary JSON passed the intermediate shape-only command. The same raw case is now structurally rejected at investigation.summary. Thus that unbounded mandatory prose channel is closed. This is ordinary JSON source verification, not private evaluator evidence, and does not by itself prove causal grading soundness.
 
-Node `v24.19.0`.
+## Independent tests and public-model feasibility
 
-| Public check | Initial result |
+Node v24.19.0. The reviewer independently constructed normal/bad JSON reports only from public evidence, without reading author's private original/reference reports or executing candidate code. Four reproducer experiments match a separate calculation from config/scenarios. Two normal references use distinct permitted interventions with valid matched-input comparisons and predicted observations. Their correctness claims are confined to the authored deterministic fixture.
+
+The final normal2/bad2 reports are exactly the original independent reports with summary removed and every other parsed field unchanged. Normal2 pass the final anchored command. Deliberately semantically bad but shape-valid reports2 also pass, matching the explicitly structural validator boundary. Missing witness and extra summary are refused. These passes do not award or prove causal points: future private meaning review must reject wrong links/unestablished rows and cannot substitute labels/schema for observation correctness.
+
+| Independently executed check | Observed result |
 |---|---|
-| Helper/source-test `node --check` | pass |
-| `node scripts/ask-benchmark-pf-ci-cache-source.mjs` | exit 0; exact public closure |
-| `node --test scripts/test-ask-benchmark-pf-ci-cache-source.mjs` | exit 0; 6 pass / 0 fail |
-| `node scripts/test-ask-benchmark-pf-ci-cache-source.mjs` | exit 0; 6 pass / 0 fail |
-| Fixture workspace `npm test` | exit 0; 5 pass / 0 fail |
-| Ordinary reproducer `--no-cache` and `--node-major=25` | exit 0; each returns four modeled passing observations and `measured_external_ci:false` |
-| Base-to-HEAD `git diff --check` | pass |
+| node --test scripts/test-ask-benchmark-pf-ci-cache-source.mjs | 6 pass / 0 fail |
+| node scripts/ask-benchmark-pf-ci-cache-source.mjs | exit0; current closure/digests |
+| four public reproducer experiments | 4/4 exit0, complete observation equality4/4 |
+| exact final anchored command, normal JSON | 2/2 exit0; six ordinary tests each |
+| exact final anchored command, deliberately bad shape-valid JSON | 2/2 exit0; six tests each, shape-only acceptance |
+| exact final anchored command, missing witness | refused as expected |
+| exact final anchored command, extra summary | exit1, refused at investigation.summary |
+| standalone report-structure test | 1 pass / 0 fail |
+| predecessor-to-final git diff --check | exit0 |
+| input byte/digest inventory / r1 public archive | 12/12 current,25/25 archived; original workspace inventory complete |
 
-The source tests also execute the baseline and `--include-lock` local reproducer. The workspace's five passing tests establish expected fixture observations; they do not mean all fictional build outcomes succeeded or an investigation answer is correct. Repository-validator success was supplied by the author but was not independently rerun; no repository-wide green claim is made.
+The r1 archived public task/workspace/authority records match the predecessor byte-for-byte. No r1 private bundle/archive/review or private original answer/code was read. The production repository validator was not run or claimed green. Model/evaluation/comparison CLI, main merge and stopped-client retry were not performed. No repository/Git file was modified by this reviewer.
 
-## Historical minor finding at b85ea60d
+Normal/bad reference bodies are confined to directories700/files600 in evidence/ and were not printed or sent to the parent. Raw identities:
 
-- Finding ID: `F-CACHE-EMPTY-EVIDENCE-PATH`.
-  Severity: minor (P2).
-  Merge blocker: false.
-  Practical impact: a report with an empty evidence path is accepted as structurally valid even though the supplied schema requires a nonempty path.
-  Trigger or failure trace: an otherwise neutral structure-only report with `hypotheses[0].evidence[0].path=""` yields public validator exit 0 and the structure-accepted message. The existing JSON Schema validator rejects the same object on `minLength:1`. This was reproduced only in a `/tmp` copy of the public workspace, with no causal/scoring answer.
-  Evidence location: `workspace/scripts/validate-report.mjs:7`, compared with `workspace/investigation.schema.json` evidence path declaration, at the initial reviewed commit.
-  Required post-fix condition: empty evidence paths are rejected; valid relative nonempty paths remain accepted; the public source tests include that structural boundary and input/protected-command closure is regenerated.
-  Category: automated-evidence.
+| Path | Raw SHA-256 |
+|---|---|
+| evidence/independent-public-checks.py | 7145500861ba6a59fc8c79466795c981bfcf1952edffb3ad15f73f65706e5feb |
+| evidence/independent-check-results.json | 61d462c99dbb368dc1df793dba6c8efa65ddf9096a829af8b07c5e2b64f18e1f |
+| evidence/closed-report-check-results.json | 2a17fcd3f96b9266af151e6cb562783ee217caab13da00412935fd482a75add7 |
+| evidence/reference-key_dimensions.json | 394b1ac4fe05a089becf08117b44fae6a76ff7726dbd35d4e7b7d620797d3562 |
+| evidence/reference-disable_artifact_restore.json | ab83c4606ec151c4ec2a6dab66344f58e2d73f27496033109e04011d0410d890 |
+| evidence/bad-witness-link.json | dd8f64c9425053cdc64b1e927205b7ae5dcc16a6947061a313ac71ae859293bc |
+| evidence/bad-labels-and-unlinked-rows.json | f00e14005ddbbe202ad9639405cd5e993ecf8b85bdb7f1c4fab42d9cc794aec4 |
+| evidence/bad-missing-witness.json | 520b8ed1b38cc2037e2e3c2672ede367aa5fdea67a183020ebd1c4ce72f86605 |
+| evidence/bad-contradictory-summary.json | 59b522bd57ea313282a84eaa6618ce55dfec23bb88d263be61a7452d55808652 |
 
-The author supplied a bounded correction adding `x.path.length>0` and an empty-path rejection assertion to the existing neutral structure-only test. The reviewer independently inspected that correction and its derived input/task/command hash updates.
+## Record preservation and result
 
-Initial closure refs at `b85ea60d51bf1899cfa941ce8bde1ff3b4014457`:
-- Input manifest raw digest: `sha256:3f22c19b4a1fa0d54478e8ed91661b0988742ed51b13bf75f473f07bb0a8d932`.
-- Verification contract semantic digest: `sha256:fc14d2557cfd7b8ff548dd62850604aedab871e5cf6b07e0b59162582d8ba7f6`.
-- Initial validator raw digest: `sha256:78f59a19d139644e01a40def093849b4b9a0f269531fa969ec60837b046d1f49`.
-
-## Final correction verification and current result
-
-Final reviewed HEAD: **`639a24646009b1abef44a141ee5aad135dce0bb0`**. The worktree is clean. The delta from the initial HEAD changes only the validator, author-side neutral structural assertion, derived input manifest, disclosed task invocation and verification command contract (five files; 12 additions and 12 deletions).
-
-Independent reruns at the final HEAD:
-- Source closure validator: exit 0.
-- `node --test scripts/test-ask-benchmark-pf-ci-cache-source.mjs`: exit 0; 6 pass / 0 fail, including empty-path rejection.
-- Direct `node scripts/test-ask-benchmark-pf-ci-cache-source.mjs`: exit 0; 6 pass / 0 fail.
-- Final base-to-HEAD whitespace check: pass.
-
-Current input manifest raw digest: `sha256:a22e4f6d28b233add4e8325eeabbde3e09dd9a51d35253e43e5a38d41a087f8f`. Current verification semantic digest: `sha256:a3d8c6007df80cdeb540306dbea8c49818fff8dea4c7184bac3d96dbf4440784`. Detailed raw source/hash refs are in `source-approval.json`; raw JSON-file digests are distinguished from embedded semantic contract digests.
-
-`F-CACHE-EMPTY-EVIDENCE-PATH` is resolved. The correction rejects schema-invalid empty refs while preserving neutral valid structure acceptance and the explicit separation of causal meaning from structure. It does not alter observations/model, source lineage, frequency/impact evidence or catalog identity.
+The initial five source records at the parent directory remain intact, including the original P3 finding and its evidence. Original manifest raw SHA-256: `22d72b4fc1445cd54e53b3513b2170ce599e681f2aaa53af888ab63fa902d7b0`. Intermediate bedf evidence is also retained separately. This final directory contains new typed source/frequency/impact records, review.md and its manifest; it does not rewrite the earlier review identity.
 
 Baseline review:
-- Gate: `review-ai-quality`.
-- Status: `pass`.
-- Evidence: initial complete public diff, local fixture/contracts, ordinary tests, exact final correction and regenerated closures at final reviewed HEAD.
+- Gate: review-ai-quality.
+- Status: pass.
+- Evidence: exact final public diff, closed report contract, resolved test invocation, preserved model/intent and independent normal/bad JSON boundaries.
 
 Additional required gates:
-- `review-domain-impact`: status=`pass`; evidence=separate unknown band decisions, existing approved-source/weight policy, unchanged catalog identity and base eligibility; signals=`reporting_meaning_change`.
-- `review-output-quality`: status=`pass`; evidence=explicitly fictional observations, official source summary, public report contract and structure-only validator message; signals=`docs_output_change,ai_facing_output_change,structured_output_change,cli_output_change`.
-- `review-automated-gate`: status=`pass`; evidence=6/6 author checks in both forms, initial 5/5 unchanged observations, final closure/diff checks and resolved structural boundary; signals=`automated_evidence_required`.
+- review-domain-impact: status=pass; evidence=bounded investigation meaning, retained matched/control/confounding obligations and separate unknown judgments; signals=reporting_meaning_change.
+- review-architecture-impact: status=pass; evidence=explicit version2 source boundary, r1 public byte preservation and sole public authority protected-path delta; signals=public_contract_change.
+- review-output-quality: status=pass; evidence=complete structured contract, explicit shape-only CLI and extra-summary refusal; signals=reporting_meaning_change,docs_output_change,report_output_change,cli_output_change,ai_facing_output_change,structured_output_change.
+- review-automated-gate: status=pass; evidence=source6/6, closure12/12, reproducible experiments4/4, final normal2/bad2 with6 tests each, required-field/extra-field refusal and archive25/25; signals=automated_evidence_required.
 
 Missing evidence:
 - none
 
 Findings:
-- none open. The initial P2 is retained above as historical, independently reproduced and resolved.
+- none open; F-CACHE-R2-STRUCTURE-TEST-INVOKE resolved. The intermediate summary-authority concern is closed structurally by final source changes.
 
 Decision:
-- **approve**, for exact final public source preparation and source lineage only.
+- approve for final public source and documented-pattern lineage only. Private grading/admission remain separate unperformed judgments.
 
-The separate `frequency-review.json` and `impact-review.json` each approve retaining the unknown classification. Both weights are null and practice-weighted eligibility false. These are classification approvals in the presence of insufficient empirical evidence, not positive empirical measurements or a changed catalog eligibility. The canonical machine-readable frozen lineage/admission artifacts and private grading remain future stages; these external reviewer records do not substitute for them.
-
-## Scope limits
-
-Only the named public worktree, official documentation and ordinary public-source tests/local deterministic reproducer were inspected or run. The structure-only counterexample and source test reports exist only in temporary copies, which were removed. No private grading/client material, past model outcomes, stopped-client review, score/comparison/real model CLI, real CI/cache service or production modification was accessed or performed. No scoring answer was added to public source. No full final investigation report was authored. This review does not establish real-world cache incidents, frequency, impact, stochastic flakiness, empirical task difficulty, complete GitHub Actions cache equivalence or fixture admission.
+Execution Envelope:
+```json
+{
+  "schema_version": "1.0.0",
+  "route": {
+    "work_mode": "レビュー",
+    "operating_mode": "delivery_quality",
+    "user_facing": "CI cache r2最終公開sourceとlineageを独立承認する",
+    "internal": {
+      "primary": "review-router",
+      "secondary": [
+        "review-ai-quality",
+        "review-domain-impact",
+        "review-architecture-impact",
+        "review-output-quality",
+        "review-automated-gate",
+        "review-final-merge-gate"
+      ],
+      "next_if_resolved": "review-final-merge-gate"
+    }
+  },
+  "evidence_status": {
+    "checked": [
+      "exact source HEAD6f467d49fa7b679749122f6a372008fa0405649b",
+      "current source6/6 input12/12 and protected command",
+      "r1 public archived bytes25/25",
+      "independent experiments4/4 and final normal2/bad2 with six ordinary tests each",
+      "missing witness and extra-summary refusal",
+      "unchanged policy/catalog/lineage/source documentation and resolved test invocation"
+    ],
+    "missing": []
+  },
+  "stop_reason": {
+    "status": "completed",
+    "details": [],
+    "human_decision_required": [],
+    "stop_if": [
+      "Work would enter private meaning/grader/admission/production authority validation, r1 private originals, model/evaluation/comparison CLI, main merge or stopped-client re-review"
+    ]
+  },
+  "next_action": "Return final exact-head source approval and separate unknown classification records; retain initial finding and interim evidence."
+}
+```

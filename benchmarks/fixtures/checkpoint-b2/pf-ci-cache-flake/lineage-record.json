@@ -13,10 +13,10 @@
   "review_status": "reviewed",
   "frequency_band": "unknown",
   "frequency_evidence_ids": [],
-  "frequency_reviewer_record_id": "ci-cache-frequency-independent-review-20261012",
+  "frequency_reviewer_record_id": "ci-cache-r2-frequency-independent-review-final-6f467d49-20261012",
   "impact_band": "unknown",
   "impact_evidence_ids": [],
-  "impact_reviewer_record_id": "ci-cache-impact-independent-review-20261012",
-  "lineage_revision": 1,
-  "lineage_record_digest": "sha256:a86e70cde2be9dc4493bc9d423e3eec60709ee440cacb1d799f896d06355eee3"
+  "impact_reviewer_record_id": "ci-cache-r2-impact-independent-review-final-6f467d49-20261012",
+  "lineage_revision": 2,
+  "lineage_record_digest": "sha256:5f495e6ede02e7d87b487429a59d8d4a26d74cdb1db561ba0a4b0695447c6dff"
 }

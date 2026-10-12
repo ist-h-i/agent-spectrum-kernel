@@ -1,7 +1,7 @@
 {
-  "reviewer_record_id": "ci-cache-impact-independent-review-20261012",
+  "reviewer_record_id": "ci-cache-r2-impact-independent-review-final-6f467d49-20261012",
   "fixture_id": "pf-ci-cache-flake",
-  "reviewed_head": "639a24646009b1abef44a141ee5aad135dce0bb0",
+  "reviewed_head": "6f467d49fa7b679749122f6a372008fa0405649b",
   "decision": "approve",
   "judgment": "unknown_classification_approved",
   "impact_band": "unknown",
@@ -13,16 +13,19 @@
   "reviewed_refs": [
     {
       "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/lineage.md",
-      "raw_sha256": "sha256:9bd812884a178f2496af929cfa0fa24eb961231816185bfbda4b983740793e72"
+      "bytes": 1019,
+      "raw_sha256": "sha256:9c9a42e51962289d9687288f28f3d9e90fb8684e0b458ee78195e96e79742d6c"
     },
     {
       "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/source-references/github-actions-cache-docs-20261012.md",
+      "bytes": 608,
       "raw_sha256": "sha256:4961b50fed516e06cddf5787b674e6100238c81de99f810eff87766c1099ea4d"
     },
     {
       "path": "benchmarks/portfolio-lineage-policy.json",
+      "bytes": 6039,
       "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d"
     }
   ],
-  "scope": "Separate review of the unknown impact classification only. Does not assign a positive empirical band, approve fixture admission, or change frozen catalog base aggregate eligibility."
+  "scope": "Separate r2 source-stage review of unknown impact classification only. Source/data remain fictional and unchanged. No empirical positive band, fixture admission, production rebind or frozen catalog base-eligibility change."
 }
