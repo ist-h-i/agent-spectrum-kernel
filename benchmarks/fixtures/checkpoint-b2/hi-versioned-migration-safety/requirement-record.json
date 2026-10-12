@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:4f72aa3dc5937df8bc7ae49b3ede173d0892d7ab87a9dff44980ff1ca6cfe231",
+  "admission_record_digest": "sha256:58d3120e4cd84141050c45a3870bce830f740fd849a89d52f3878c230395a3fe",
   "requirements": [
     {
       "requirement_id": "versioned-migration-plan",
@@ -64,5 +64,5 @@
     }
   ],
   "requirement_set_digest": "sha256:98b0174ca34c8bce4e23b7e2c99d3480929ffa94714f3b5736e0e5e805305bc8",
-  "requirement_record_digest": "sha256:7f0f2c2f190025a1c563233e5fc975199857ddbbcf065d8df510bd2ebc236fc0"
+  "requirement_record_digest": "sha256:dfce637a2a8a6c0547277ff3f9c118b4c10e521f7d0f8f9d287db8c778734aeb"
 }

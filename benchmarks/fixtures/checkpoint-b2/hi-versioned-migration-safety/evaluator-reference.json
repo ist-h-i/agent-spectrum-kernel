@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-ee4cef80113f3f5f29d25075f80fdfde254f3b0f79bbdabb02a135e7e9748f69",
-  "evaluator_bundle_digest": "sha256:af87e5dbf8d8bff8bc7ea64b495999e59751f7f8b2dd31d3bc95dfd3e0dcd37c",
+  "evaluator_bundle_id": "evaluator-3c99613b1a28aabfc8fada430ccfe6bec18802a9f003845d0a133334b140b2ad",
+  "evaluator_bundle_digest": "sha256:9a8b37168b7c5b2898669f869c341c4baaace576035d6f71f006804b5adbf92e",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "hi-versioned-migration-safety",
   "fixture_input_digest": "sha256:db88f4f33b022546f07e9d20fd3a18814aff4e7642dd58a0c92f9a5bfcb9e584",
   "task_class": "migration_design",
   "suite": "high_impact",
-  "evaluator_revision": "34976e35feb21282e8c6facdd99b2d9080cf5a20",
+  "evaluator_revision": "bf211dfcf6c80adf2c8a4df5c93410b6cf95bb45",
   "evaluator_source_identity": {
-    "base_git_revision": "34976e35feb21282e8c6facdd99b2d9080cf5a20",
+    "base_git_revision": "bf211dfcf6c80adf2c8a4df5c93410b6cf95bb45",
     "source_tree_digest": "sha256:978a07cdabd9b519912ded9cd1f074412d8dd3e53f0a4d92195c353e4b3298b1",
     "generator_source_digest": "sha256:124f4862dbb4eba98605fb558368b561a99c7505f9bec5eeb8d14ecb632c8a53",
     "source_files": [
@@ -4042,11 +4042,11 @@
     }
   },
   "generator_identity": "sha256:938ecb1c51dcc9a8f78f4240f8ce8ebdfafc831a067befcc835999d54cee3917",
-  "independence_statement_digest": "sha256:e1f745aa99a903a7ab3ee955f9c781d2e468a316adfc1d333387ae8e51da7fdb",
-  "review_record_digest": "sha256:199c1d763e3214c70c3c572e0e345180c85aca39058346f3fb0ceab7b0c9ff49",
+  "independence_statement_digest": "sha256:8a2e69c3b6b6979a92051a139425bbb2a2cec11178d814ba5b0dd405657d8460",
+  "review_record_digest": "sha256:9f63972e572e4c20a2815f5e2b0c2269670462fc8e449ea8ed08377d56009e8a",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:4fcd1134d267ff2f666101b5f5e21cf758ef55fc8794df693dbb52e9818b2380",
-  "evaluator_authority_manifest_digest": "sha256:c56ce53e8ad6018a1e8d29653225cb640efed22afde29ba5560bc3b63d107898",
+  "evaluator_authority_manifest_raw_sha256": "sha256:1f019e0846583328e9c1947d5706fb02c2943767a8e981c6aca59ae3e4f1e700",
+  "evaluator_authority_manifest_digest": "sha256:cac7b40e1b61428aa846a7f422efac969c350b89db4129f63a510a79d70d4c93",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:403d97c4cab1ca128b2b4db7aa04319de8a26a7df335553784fdc0ca1df3c909"
+  "public_metadata_digest": "sha256:702c13287868d46f14e2ab9e88162bc4f42cc2e91bb3dc48807a91f30af9c94c"
 }
