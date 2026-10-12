@@ -206,6 +206,34 @@
       }
     },
     {
+      "id": "mn-frontend-default-fix",
+      "suite": "mechanism_negative",
+      "task_class": "local_bug_fix",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-frontend-default-fix/input-manifest.json",
+      "input_manifest_sha256": "db98cb9c81e50afe4f39169d722eec0e344483809176b810a118e096fa6ca2ca",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/mn-frontend-default-fix/verification-command-contract.json",
+        "sha256": "ce02343ca5cc7b63dc043e2a989cf9b4c8984a1336f1f9b767e72bada4bcad06"
+      }
+    },
+    {
+      "id": "mn-schema-field-alignment",
+      "suite": "mechanism_negative",
+      "task_class": "small_feature",
+      "difficulty": "easy_medium",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/input-manifest.json",
+      "input_manifest_sha256": "bb41c0b2c89cf749d8f07e179554689c2c9fb3bde6b7fd26fc82a09cc8cb15a8",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/verification-command-contract.json",
+        "sha256": "4a41800780f1fe1c442b030907e64f22a94d94c9b5267eee38fd15d99ba65547"
+      }
+    },
+    {
       "id": "pf-api-pagination-behavior",
       "suite": "practice_frequency",
       "task_class": "implementation_verification",
