@@ -138,7 +138,7 @@ function assertExact(left, right, label) {
 }
 
 export function buildEvidenceMap() {
- const protectedPaths=['package.json','schemas/customer-v1.schema.json','src/schema-contract.mjs','src/readers.mjs','spec/evolution-contract.md','data/customers.json','test/schema-evolution.test.mjs'].map(p=>'workspace/'+p);
+ const protectedPaths=['package.json','schemas/customer-v1.schema.json','src/schema-contract.mjs','src/readers.mjs','spec/evolution-contract.md','data/legacy-customers.json','test/schema-evolution.test.mjs'].map(p=>'workspace/'+p);
  const scopeBase={allowed_candidate_paths:['workspace/schemas/customer-v2.schema.json','workspace/migrations/v1-v2.plan.json'],required_candidate_paths:['workspace/schemas/customer-v2.schema.json','workspace/migrations/v1-v2.plan.json'],protected_candidate_paths:protectedPaths,unmanaged_additions:'forbidden',unmanaged_deletions:'forbidden',unrecognized_schema_meaning:'manual_review_required'};
  const maps=[{evidence_map_id:'schema-evolution-basis',agent_visible_paths:['task.md',...protectedPaths]},{evidence_map_id:'focused-change-boundary',agent_visible_paths:['task.md','workspace/spec/evolution-contract.md']},{evidence_map_id:'repository-verification-route',agent_visible_paths:['task.md','workspace/package.json','workspace/test/schema-evolution.test.mjs']}];
  const seeds=[['remove-schema-evolution-evidence','schema-evolution-correctness',maps[0]],['remove-focused-scope-evidence','request-scope-discipline',maps[1]],['remove-verification-route','verification-evidence',maps[2]]];
