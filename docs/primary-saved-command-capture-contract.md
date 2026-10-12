@@ -3,7 +3,9 @@
 Requirement REQ-PRIMARY-SAVED-CAPTURE-1 は、9課題を個別に分析する目標を維持し、
 追加モデルなしで保存イベントの互換性を修正する本人の指示を参照する。
 Spec SPEC-PRIMARY-SAVED-CAPTURE-1 と Verification VER-PRIMARY-SAVED-CAPTURE-COMPATIBILITY-1
-は、イベントの解析と検証コマンドへの一致を分ける。今回は手順の固定までで、実採点はしない。
+は、イベントの解析と検証コマンドへの一致を分ける。権限は操作単位で確認する。
+今回の保存結果の読取り解析、モデルなし事後評価、v4を保つ参照更新と独立レビューは
+親から承認済みであり、本人への再承認待ちにはしない。新しい実モデル比較は別である。
 
 ## 変更範囲と版
 
@@ -80,14 +82,18 @@ capture 修正だけで pass・品質0・正式比較成功へ変えない。
 7. 新資産の独立 source/closure review、criterion-byte comparison、非モデル preflight を
    行い、選択版の raw digest と全条件の lineage を固定する。準備用の空領域を
    実行証拠にしたり、未実施の worker/review/admission を記録したりしない。
-8. **ここで親へ返す。** 新 processing/resource IDs、criterion 不変証拠、独立レビュー、
-   parser の捕捉/未確認結果、未実行一覧、本人の新しい承認が必要な実採点範囲を提示する。
-   現時点では private grading worker、比較 start/resume、モデル/CLI、残24枠を起動しない。
+8. 新 processing/resource IDs、criterion 不変証拠、独立レビュー、parser の捕捉/
+   未確認結果、未実行一覧を親へ返す。一般の利用では、この先のモデルなし派生評価も
+   当該操作への正規の権限確認が必要である。今回の非モデル保存結果解析・事後評価は
+   承認済みなので、条件と資産検証が揃えばその範囲を進める。別段階で停止する指示が
+   あればその指示を優先する。追加モデル、比較 start/resume、残24枠は許可されない。
 
-## 本人が別途承認した後だけ行う派生採点
+## 権限確認済みのモデルなし派生評価
 
 対象は保存済み mp-ci-evidence-gap の3条件であり、モデル再実行ではない。
-新しい専用出力・一度限りの派生採点印を使う。既存 export/producer/original private
+一般の利用では対象・資産版・出力先を含む操作の承認を確認する。今回の対象は親の
+承認に含まれる。新しい専用出力に操作記録を残すが、それを比較開始権限や新しい
+start 印として扱わず、原評価の権限・消費印を変更しない。既存 export/producer/original private
 grading/score/save APIs を使い、P→K-principles v2→F を各1回、既存4 worker/条件の
 予算と185分の block grading reservation を維持する。モデル tokens は0。
 採点 API が blocked/unknown、worker 終了が未検証、原本 drift があれば直ちに止め、
@@ -96,5 +102,5 @@ grading/score/save APIs を使い、P→K-principles v2→F を各1回、既存4
 旧原報告、初回事後採点、派生報告を別ファイルで保存する。criterion v4 と processing ID、
 各要件の判定/根拠/未評価、capture の状態、実施/未実施を並記する。
 manual/null/unmatched は維持し、数値・順位を作らない。
-残8課題24枠は未開始として9課題一覧に明記する。将来の本人の実行承認と独立の
+残8課題24枠は未開始として9課題一覧に明記する。将来の本人による実モデル比較の直接指示と独立の
 固定実行計画が必要であり、この回収手順から自動で開始・resume しない。
