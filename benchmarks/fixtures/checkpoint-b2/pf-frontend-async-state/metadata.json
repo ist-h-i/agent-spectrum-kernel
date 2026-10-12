@@ -1,4 +1,32 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "pf-frontend-async-state",
-  "candidate_state": "generation_pending"
+  "fixture_role": "primary",
+  "suite": "practice_frequency",
+  "task_class": "investigation_implementation",
+  "domain": "frontend",
+  "difficulty": "medium_hard",
+  "repetitions": 5,
+  "risk_boundary": "none",
+  "capability_families": [
+    "async_state_management",
+    "state_consistency"
+  ],
+  "evidence_topologies": [
+    "cross_file_contract",
+    "ui_semantics_and_interactions"
+  ],
+  "outcome_dimensions": [
+    "behavioral_consistency",
+    "reliability"
+  ],
+  "output_contract_type": "implementation_producing",
+  "requirement_record_id": "requirement-record-pf-frontend-async-state",
+  "output_contract_id": "output-contract-pf-frontend-async-state",
+  "evaluator_bundle_id": "evaluator-64c47af9fdb85570fddcd4118fce774ee4fc770ff6b7c995e86a53a931937422",
+  "evaluator_bundle_digest": "sha256:288dbddfb59acd7803a53292d893d229703fff584a8ee65f6b6bbad2ce19001a",
+  "evaluator_byte_count": 731220,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:fa59a3434831ca9cf54c005e59762510cc5dde4f33c5ecc888213e0002ede975"
 }
