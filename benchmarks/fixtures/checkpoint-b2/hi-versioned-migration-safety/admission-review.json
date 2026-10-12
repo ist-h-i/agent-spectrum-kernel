@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "hi-versioned-migration-safety",
   "candidate_input_digest": "sha256:db88f4f33b022546f07e9d20fd3a18814aff4e7642dd58a0c92f9a5bfcb9e584",
-  "candidate_evaluator_digest": "sha256:ac70c274cf047037ed00236cc186544183fc4f58ae11652b1964f5bbecc19e5d",
+  "candidate_evaluator_digest": "sha256:af87e5dbf8d8bff8bc7ea64b495999e59751f7f8b2dd31d3bc95dfd3e0dcd37c",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -121,5 +121,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:def7680c2a3fc3f9feee7bc88269d98b309f79116fa29ff6c96e634edb1618e8"
+  "review_package_digest": "sha256:65176ebaf8b347053f2062289524efcd7f05f53c16bd5a6b49dd1128f5d58d0c"
 }
