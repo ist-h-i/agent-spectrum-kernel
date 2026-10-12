@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-6d494fec35f40507fc99f23d982b5f2d70bae69bb09a0e0c9acbef00df2890a1",
-  "evaluator_bundle_digest": "sha256:d630a42d7db5b2880caf67c90374a0d3a7bc7178c4aef03b24e524b81fc10853",
+  "evaluator_bundle_id": "evaluator-2e33337ba8983d70806bf7598447bc389398f88f37f9b04f7b3ba17be903d926",
+  "evaluator_bundle_digest": "sha256:ab59566dbe690be486d8eb98aa1ee12ac16040a6b12cce94d1d30559bcdfa4fb",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "pf-review-error-contract",
-  "fixture_input_digest": "sha256:a46f47824169ff97d18a96db357d20a596a2bb8d7a21b8fcf088f2b67692e25b",
+  "fixture_input_digest": "sha256:395fd2a624d1b1743657f0e59ddc7ac1d7b9a1e18bafd55cddcdd259cb9e9ec9",
   "task_class": "pr_review",
   "suite": "practice_frequency",
-  "evaluator_revision": "63efa201827822d596718d546504f45fbf7ce55d",
+  "evaluator_revision": "7b08128d49c80041d17a5c882e6c5216d2b273b6",
   "evaluator_source_identity": {
-    "base_git_revision": "63efa201827822d596718d546504f45fbf7ce55d",
+    "base_git_revision": "7b08128d49c80041d17a5c882e6c5216d2b273b6",
     "source_tree_digest": "sha256:978a07cdabd9b519912ded9cd1f074412d8dd3e53f0a4d92195c353e4b3298b1",
     "generator_source_digest": "sha256:124f4862dbb4eba98605fb558368b561a99c7505f9bec5eeb8d14ecb632c8a53",
     "source_files": [
@@ -4042,11 +4042,11 @@
     }
   },
   "generator_identity": "sha256:adbcce49e12300fe0ed1878f57995f1168b443a08b491cb8e68f9c95d53dba7a",
-  "independence_statement_digest": "sha256:e5f0baa9c99d8aec5952514c3d3542956802abfc11fcff634b931c5d2b1d5b24",
-  "review_record_digest": "sha256:075e26730a87f82674326fbca4d4eba5ac5229330cdd83499fb84d196736e4f0",
+  "independence_statement_digest": "sha256:ad6d4b3ae9a6a072c0b29b6fcd89cb59ad99a0210749d17aa121c2b536e1da2b",
+  "review_record_digest": "sha256:7b91ccb519afdcbb7b37dc4dc5885a7b0231e587685d74fde217ed186c33eb14",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:95f9781203e85f66f2df116504725040a34775dfb0bada8d906403431822ea42",
-  "evaluator_authority_manifest_digest": "sha256:b1228551a7b3cd7f682ef04ca70ff177d63c903900accae7f0e44a20ca64a83d",
+  "evaluator_authority_manifest_raw_sha256": "sha256:c7901d0ae56a7dc6dd986f4914972b86a5367b691296db745f5cfa2a3ce3e8fd",
+  "evaluator_authority_manifest_digest": "sha256:f7af84e355c59e5b5f30c862bb45c3296e25c9f3d039e615ff8f1ed7303abcae",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:4f4abdccaab7f403612191a6bfdecb94c444c4a75cb3018b4a6ca28dd2b7096b"
+  "public_metadata_digest": "sha256:2d63f59a72560c807c32829dfaaabe2c3945c7614b327d964d863d781c4b0627"
 }
