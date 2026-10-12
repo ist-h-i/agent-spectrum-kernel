@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "5219fc408968917e5707b3087b3794546351919fcd8cd0ea290bc1676a1ec4d6",
-          "bytes": 2168
+          "sha256": "61bfd21fef4cb98a8c8ef2593e245302bba2c3caf5589055cf5aa2f94bd28b6e",
+          "bytes": 2197
         },
         {
           "path": "workspace/base/response-adapter.mjs",
@@ -25,8 +25,8 @@
         },
         {
           "path": "workspace/docs/error-contract.md",
-          "sha256": "53d53857a4239ac6fa625c5f66ad73409ea05846edfa910bfb3d206c3ebc5230",
-          "bytes": 1558
+          "sha256": "e2b653917bb3c1a54d12e61112d902958b4460740c188217da3dd35ef0aab88b",
+          "bytes": 2718
         },
         {
           "path": "workspace/package.json",
@@ -40,8 +40,8 @@
         },
         {
           "path": "workspace/review.schema.json",
-          "sha256": "37e208792b333486c24d0bf8b6a46b978a610b9d03841c6b552992cce5d3138d",
-          "bytes": 9454
+          "sha256": "285c6d6b179bbe688cb8d8a6dee67e615988db91fb64ddfb02519f339b82fdb5",
+          "bytes": 9561
         },
         {
           "path": "workspace/scripts/trace-cases.mjs",
@@ -50,8 +50,8 @@
         },
         {
           "path": "workspace/scripts/validate-review.mjs",
-          "sha256": "35fdba9cf2bf42587e81c8bd39836b6868d4a33653ecd1b9d67dbd5ad5c6264e",
-          "bytes": 1549
+          "sha256": "7303c27db15cdc8ecee9b431c063e5d86b0d52ba2815f5d7da626e55bbeb8aaa",
+          "bytes": 1898
         },
         {
           "path": "workspace/src/client-policy.mjs",

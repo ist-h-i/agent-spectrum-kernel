@@ -108,7 +108,7 @@ export function buildPfReviewErrorInputArtifacts(root = ROOT) {
     execution_form: "codex_shell_command",
     shell_family: "posix_bash",
     shell_envelope: { executable: "/bin/bash", arguments: ["-lc"] },
-    canonical_script: `${anchor} && npm run validate:review`,
+    canonical_script: `${anchor} && npm test && npm run trace && npm run validate:review`,
     requirement: "required",
     alternative_group_id: null,
     timeout_ms: 60000,
