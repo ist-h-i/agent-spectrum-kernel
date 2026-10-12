@@ -18,12 +18,13 @@
       "workspace/src/cache-model.mjs",
       "workspace/scripts/reproduce-cache.mjs",
       "workspace/scripts/validate-report.mjs",
-      "workspace/test/cache-observation.test.mjs"
+      "workspace/test/cache-observation.test.mjs",
+      "workspace/test/report-structure.test.mjs"
     ],
     "unmanaged_additions": "forbidden",
     "unmanaged_deletions": "forbidden",
     "unrecognized_report_meaning": "manual_review_required",
-    "authority_digest": "sha256:283e8cdd67f91085f2ca097e26dd4c22dd60aba68b980250eee25ccefab58ab6"
+    "authority_digest": "sha256:19f9a9c21634c87d37b951ebd4a745c13bb663f305c3191498202206d659a1cb"
   },
   "maps": [
     {
@@ -39,7 +40,8 @@
         "workspace/src/cache-model.mjs",
         "workspace/scripts/reproduce-cache.mjs",
         "workspace/scripts/validate-report.mjs",
-        "workspace/test/cache-observation.test.mjs"
+        "workspace/test/cache-observation.test.mjs",
+        "workspace/test/report-structure.test.mjs"
       ]
     },
     {
@@ -65,7 +67,7 @@
       "target_evidence_map_id": "cache-investigation-basis",
       "expected_recoverability_state": "not_recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:27203d73aa83f4067602128a80ebdf2bc33041f8ebfe8994d032d4220885fe3e"
+      "mutation_digest": "sha256:f8555575cffa06e4bfe064f2aebc332832c507fdd3160c48c4f5e9b65e792e54"
     },
     {
       "mutation_id": "remove-focused-scope-evidence",

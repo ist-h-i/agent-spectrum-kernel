@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
   "fixture_id": "pf-ci-cache-flake",
-  "candidate_input_digest": "sha256:a22e4f6d28b233add4e8325eeabbde3e09dd9a51d35253e43e5a38d41a087f8f",
-  "candidate_evaluator_digest": "sha256:f48027485c3de25b11e707177c5429e8de681ff3cb2e1672f3fcb2293a24f110",
+  "candidate_input_digest": "sha256:276cbe5632762a7b03ace4c3057e8a8b04553ba21bdc5c0794355e7c0509f83a",
+  "candidate_evaluator_digest": "sha256:04b0280645c310cc70c9f6ef6d852593cd17c231692451965f1365b1548e3415",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -20,7 +20,8 @@
         "workspace/scripts/reproduce-cache.mjs",
         "workspace/scripts/validate-report.mjs",
         "workspace/src/cache-model.mjs",
-        "workspace/test/cache-observation.test.mjs"
+        "workspace/test/cache-observation.test.mjs",
+        "workspace/test/report-structure.test.mjs"
       ]
     },
     "kernel_only": {
@@ -36,7 +37,8 @@
         "workspace/scripts/reproduce-cache.mjs",
         "workspace/scripts/validate-report.mjs",
         "workspace/src/cache-model.mjs",
-        "workspace/test/cache-observation.test.mjs"
+        "workspace/test/cache-observation.test.mjs",
+        "workspace/test/report-structure.test.mjs"
       ]
     }
   },
@@ -117,5 +119,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:41b1895bb9c031aa2c2b388ab60127e667fe59eeffc107c73033468ec0049fd8"
+  "review_package_digest": "sha256:97a0238bbb542e9256963a7993bfd7644d8979ce50dcdf2c0f46b79de4872413"
 }
