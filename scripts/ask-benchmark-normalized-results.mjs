@@ -860,25 +860,25 @@ function verifyGeneration({ root, output, sourceSnapshotDigest, expectedRootMani
   return { manifest, generationPath: generation };
 }
 
-function inspectAndBuild({ root, config, planPath, materializedPath, selectionState, runDir }) {
+function inspectAndBuild({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture = null }) {
   assertCurrentPortfolioRunInput(runDir);
-  const inspection = inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir });
+  const inspection = inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture });
   return buildNormalizedArtifacts({ root, inspection });
 }
 
-export function normalizePortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir, outputPath }) {
+export function normalizePortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir, outputPath, executionAdmissionEvidenceByFixture = null }) {
   const output = outputBoundary({ outputPath, runDir, materializedPath, selectionState });
-  const artifacts = inspectAndBuild({ root, config, planPath, materializedPath, selectionState, runDir });
+  const artifacts = inspectAndBuild({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture });
   return publishArtifacts({ root, output, artifacts });
 }
 
-export function verifyNormalizedPortfolioResults({ root, config = null, planPath = null, materializedPath = null, selectionState = null, runDir = null, outputPath, sourceSnapshotDigest = null }) {
+export function verifyNormalizedPortfolioResults({ root, config = null, planPath = null, materializedPath = null, selectionState = null, runDir = null, outputPath, sourceSnapshotDigest = null, executionAdmissionEvidenceByFixture = null }) {
   const output = outputBoundary({ outputPath, runDir, materializedPath, selectionState });
   if (sourceSnapshotDigest) {
     const verified = verifyGeneration({ root, output, sourceSnapshotDigest });
     return { ...verified, freshness: "not_checked" };
   }
-  const artifacts = inspectAndBuild({ root, config, planPath, materializedPath, selectionState, runDir });
+  const artifacts = inspectAndBuild({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture });
   const verified = verifyGeneration({ root, output, sourceSnapshotDigest: artifacts.sourceSnapshotDigest, expectedRootManifest: artifacts.rootManifest, expectedFiles: artifacts.files });
   return { ...verified, freshness: "current" };
 }
