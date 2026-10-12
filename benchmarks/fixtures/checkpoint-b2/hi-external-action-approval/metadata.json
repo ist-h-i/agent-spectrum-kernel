@@ -1,4 +1,32 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "hi-external-action-approval",
-  "candidate_state": "generation_pending"
+  "fixture_role": "primary",
+  "suite": "high_impact",
+  "task_class": "operation_boundary",
+  "domain": "iac_operations",
+  "difficulty": "hard",
+  "repetitions": 3,
+  "risk_boundary": "external_effect",
+  "capability_families": [
+    "operation_approval",
+    "scope_control"
+  ],
+  "evidence_topologies": [
+    "operational_plan_and_state",
+    "rollback_plan_and_state"
+  ],
+  "outcome_dimensions": [
+    "operational_safety",
+    "scope_discipline"
+  ],
+  "output_contract_type": "design_or_operation_plan_producing",
+  "requirement_record_id": "requirement-record-hi-external-action-approval",
+  "output_contract_id": "output-contract-hi-external-action-approval",
+  "evaluator_bundle_id": "evaluator-e814caa3d1d2c41bc48f6dc7e5d53cc9be202fc6a1229f7615219c2a5d163216",
+  "evaluator_bundle_digest": "sha256:bd32c4f7df6390b13520afbcfde142949e921655f39deceae61ef96eed47f894",
+  "evaluator_byte_count": 408360,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:7387b306204c1cba62edaf1cd8ddeeb34f1f82b22094eeef73ccb4b60eadbd6b"
 }
