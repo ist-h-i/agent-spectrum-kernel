@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
   "program": "adaptive_ask_verification_command_contract",
   "fixture_id": "pf-ci-cache-flake",
-  "fixture_input_digest": "sha256:a22e4f6d28b233add4e8325eeabbde3e09dd9a51d35253e43e5a38d41a087f8f",
+  "fixture_input_digest": "sha256:dd4ad226d6f5025a249470be71a5c2f6cb0a900d8c5bdab7d3b786bed440a596",
   "commands": [
     {
       "command_id": "cache-investigation-validation",
@@ -21,14 +21,14 @@
           "-lc"
         ]
       },
-      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"ci/build-config.json\":\"dea1af75bc003425d77b45f3375602e9bde3e811d3aa9ed601ef5d935d03b942\",\"ci/build-history.log\":\"4288f4f83a1c905ce14aa3dc93a64a4e6620373d904e6b3512d84da67e30f271\",\"ci/scenarios.json\":\"b16010300c28f0bf0dd0e083e2c032b1c855e553117d741cf7ba74b39d30829d\",\"docs/investigation-contract.md\":\"fe7959d703a3adec3c110b3d5dd3d907dadd30d4a476f1a7652b32742b9d7d3c\",\"investigation.schema.json\":\"98e5ab2bbc8c5d42e215a88eaf69b7c7b373789d240022b84ec9c4068dab7327\",\"package.json\":\"9b834559b502323bf541659d86cc705d590fceaa5333d3cfeee01556b799435d\",\"scripts/reproduce-cache.mjs\":\"2efab731082f3adf6f086580c29d87427cfdc9d000ce18ac328773fec083a75b\",\"scripts/validate-report.mjs\":\"8c95e582f65b0c00165599914adf14204f47e7dc54b57e27d31740b817b52bb5\",\"src/cache-model.mjs\":\"3a73cfed43492a3f40e51f59e5d8ed0c4d9c25465019ef4674ae807afce56d86\",\"test/cache-observation.test.mjs\":\"42ced262a0783c01baa689ba209e11d1122e899055d0ae624e2f56ad908dfcad\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm test && npm run validate-report",
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"ci/build-config.json\":\"dea1af75bc003425d77b45f3375602e9bde3e811d3aa9ed601ef5d935d03b942\",\"ci/build-history.log\":\"4288f4f83a1c905ce14aa3dc93a64a4e6620373d904e6b3512d84da67e30f271\",\"ci/scenarios.json\":\"b16010300c28f0bf0dd0e083e2c032b1c855e553117d741cf7ba74b39d30829d\",\"docs/investigation-contract.md\":\"8e225ea6646596be68f83de0a492fbc67ff967e8fac0d0d4c0d18aee6e44e89c\",\"investigation.schema.json\":\"712fa136ec6b56bf664b2ad3249b60b538fc60a7438786386412e44b41dd729a\",\"package.json\":\"9b834559b502323bf541659d86cc705d590fceaa5333d3cfeee01556b799435d\",\"scripts/reproduce-cache.mjs\":\"2efab731082f3adf6f086580c29d87427cfdc9d000ce18ac328773fec083a75b\",\"scripts/validate-report.mjs\":\"97d3a9238a8061e866f91ce14c3c8256968dea9db5b1bac0da460dc6d4a4fca8\",\"src/cache-model.mjs\":\"3a73cfed43492a3f40e51f59e5d8ed0c4d9c25465019ef4674ae807afce56d86\",\"test/cache-observation.test.mjs\":\"42ced262a0783c01baa689ba209e11d1122e899055d0ae624e2f56ad908dfcad\",\"test/report-structure.test.mjs\":\"d7daf7abc069f718a7ace0f1b947fd7674130d1b5e582dc5588cfd9609d8aef5\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm test && npm run validate-report",
       "requirement": "required",
       "alternative_group_id": null,
       "timeout_ms": 60000,
-      "logical_command_digest": "sha256:abe92b5c110b49068c7be97456f83d56dc026701aeb6d2d519517c97f978afc1",
-      "rendered_event_command_digest": "sha256:fb74b9d61e2a47cfc52f2ee7c8c4d93231c2b2bcd8df39abf45b6c65d3ebec15",
-      "command_contract_digest": "sha256:cb9bd836c967a8b4a2f288dc8aaff60dce33cdaa9a358dcc4183b72600a05c19"
+      "logical_command_digest": "sha256:e50bf39ba0de01e6d2ab3b4d59a60dbb4c54a9141ee6bacbdcb028af864828b4",
+      "rendered_event_command_digest": "sha256:c5816369bb278cec40bf1ec105ed4a384b45ff75c700db51d3e2cd5da54feaa9",
+      "command_contract_digest": "sha256:fe4ab90819fece1e9fb144d7098cc3a341e304e147475f190a004d8c9617022c"
     }
   ],
-  "contract_digest": "sha256:a3d8c6007df80cdeb540306dbea8c49818fff8dea4c7184bac3d96dbf4440784"
+  "contract_digest": "sha256:f749bc6ff4a5aacc389ac34c9e98e8c7f8a2970f681340006bd74b43e648eec7"
 }

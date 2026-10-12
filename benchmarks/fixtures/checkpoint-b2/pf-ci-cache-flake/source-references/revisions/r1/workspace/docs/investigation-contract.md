@@ -1,0 +1,6 @@
+# Build evidence contract
+All supplied history is a deterministic local fixture, not production incidents or occurrence estimates. Investigate why the same source/lock-B build can pass cold and fail after restoring a previous artifact. Compare the current key with dependency changes and test a competing explanation.
+
+The local reproducer accepts --no-cache, --include-lock and --node-major=24 or 25. It prints observed requested/restored keys, artifact versions and outcomes. It does not contact GitHub, npm or a filesystem cache. Cache entries are immutable. It approximates exact-key restoration only; restore-prefix selection and the real cache service are outside this experiment.
+
+Write investigation.json with a summary, confidence, hypotheses, evidence references, controlled experiment observations, recommended_changes and limitations. confidence must be confirmed_for_fixture, supported or unknown. A hypothesis status is supported, contradicted or unresolved. Evidence references use relative paths and positive line numbers. Preserve the supplied files; only investigation.json is an output. The structural validator does not establish that a causal statement is correct. No production change or deployment is requested.
