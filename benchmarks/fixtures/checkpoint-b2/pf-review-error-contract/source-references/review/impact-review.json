@@ -1,7 +1,7 @@
 {
-  "reviewer_record_id": "review-error-impact-independent-review-follow-up-1b8b0080-20261012",
+  "reviewer_record_id": "review-error-impact-independent-follow-up-6ca74347-20261012",
   "fixture_id": "pf-review-error-contract",
-  "reviewed_head": "1b8b0080133cafe3af989ca9e8bc8f168ace2738",
+  "reviewed_head": "6ca74347ab4bb54c8d0c93b58f8d3f4bc8f49a4e",
   "decision": "approve",
   "judgment": "unknown_classification_approved",
   "impact_band": "unknown",
@@ -27,5 +27,6 @@
       "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d"
     }
   ],
-  "scope": "Separate unknown impact classification on identical public lineage/policy/source refs at1b8b0080; no positive empirical band, whole-commit approval or private meaning/admission judgment."
+  "scope": "Separate retained Unknown/null classification for limited r4 public source successor; no positive empirical band, private meaning/admission/current whole readiness approval.",
+  "follow_up_judgment": "No empirical evidence added; lineage/pattern/policy exact bytes unchanged from admitted r3 base."
 }

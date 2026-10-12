@@ -1,22 +1,23 @@
 {
-  "reviewed_head": "1b8b0080133cafe3af989ca9e8bc8f168ace2738",
-  "scope": "Existing approved ca7 public-source payload atworktreeHEAD1b8b0080; private preparation additions excluded. Not whole-commit/private/admission approval.",
+  "reviewed_head": "6ca74347ab4bb54c8d0c93b58f8d3f4bc8f49a4e",
+  "scope": "Limited public r4 successor source preparation: own-property validator fix, exact task/input/verification reclosure, source regression and historical public r3 byte retention. No current private binding, adoption, whole repository readiness or full invariance approval.",
+  "prior_review_manifest_raw_sha256": "sha256:6c2b39482b7df88d97ea48edacdc9fdfead4f940dc869add85625c9705f11d8d",
   "records": [
     {
       "path": "source-approval.json",
-      "raw_sha256": "sha256:8a1997834fda527e37c87280b6a8e8b25e456818350f2b224b3a9ec611ad2e5b"
+      "raw_sha256": "sha256:79271da84a9e61160a417cefa80fc73df5d1da4fa53aca5a3bb864713462c2e9"
     },
     {
       "path": "frequency-review.json",
-      "raw_sha256": "sha256:f5f68743facad6e61775dfddbda2793d55171392ff2685b33ca94d7b5d36ff1c"
+      "raw_sha256": "sha256:e8329549e781d1fa189cd2df3a9abdca8844c657ed60656f77d3761077161913"
     },
     {
       "path": "impact-review.json",
-      "raw_sha256": "sha256:e7784912ccc09c45f55daf007d818b229cd7851752813ac8780a18683feeb1d3"
+      "raw_sha256": "sha256:9750ca8b98f952a1d5494c9654792d89d57d3fa4a037a47eb56a58d1a1d09c4f"
     },
     {
       "path": "review.md",
-      "raw_sha256": "sha256:1144d209bc63215ffb3b91d6135cd4d9310fd0b44d37bb600689c566cbc792a5"
+      "raw_sha256": "sha256:808dc66e939bce18b4f9886ef318b23ca9b9799b7479eae3f9d03df11b660eac"
     }
   ]
 }

@@ -13,10 +13,10 @@
   "review_status": "reviewed",
   "frequency_band": "unknown",
   "frequency_evidence_ids": [],
-  "frequency_reviewer_record_id": "review-error-frequency-independent-review-follow-up-1b8b0080-20261012",
+  "frequency_reviewer_record_id": "review-error-frequency-independent-follow-up-6ca74347-20261012",
   "impact_band": "unknown",
   "impact_evidence_ids": [],
-  "impact_reviewer_record_id": "review-error-impact-independent-review-follow-up-1b8b0080-20261012",
-  "lineage_revision": 1,
-  "lineage_record_digest": "sha256:cd061683af655aa7c40666417ab80036b31c8706585687e9917fd416e3a23d2c"
+  "impact_reviewer_record_id": "review-error-impact-independent-follow-up-6ca74347-20261012",
+  "lineage_revision": 2,
+  "lineage_record_digest": "sha256:fe7b3aa0c1c04a78076b099e41faea3f1efdcc00f9109732c42b788b0a217c6c"
 }

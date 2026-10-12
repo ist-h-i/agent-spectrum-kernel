@@ -369,7 +369,7 @@ function generatePfReviewErrorProductionAuthorityInPlace({ root, privateRoot, ev
     evidence_map: rawArtifact(root, evidencePath, canonicalDigest(evidence.evidenceMap)),
     evaluator_authority_manifest: rawArtifact(root, layout.manifestPath, authorityManifest.manifest_digest),
     result_profile: output.result_profile,
-    freeze_revision: "issue-208-pf-review-error-contract-r3",
+    freeze_revision: "issue-208-pf-review-error-contract-r4",
   };
   const freeze = { ...freezeBase, manifest_digest: computeScoringInputFreezeManifestDigest(freezeBase) };
   writeJson(resolve(fixtureRoot, "scoring-input-freeze-manifest.json"), freeze);

@@ -1,10 +1,10 @@
 {
-  "reviewer_record_id": "review-error-source-independent-review-follow-up-1b8b0080-20261012",
+  "reviewer_record_id": "review-error-source-independent-follow-up-6ca74347-20261012",
   "fixture_id": "pf-review-error-contract",
-  "reviewed_head": "1b8b0080133cafe3af989ca9e8bc8f168ace2738",
-  "base_commit": "15b5f7f975659dc6d5051231ac5b60e7141be721",
+  "reviewed_head": "6ca74347ab4bb54c8d0c93b58f8d3f4bc8f49a4e",
+  "base_commit": "11ab437b9bcbc9c221530e5c56a5fee01ac7852e",
   "decision": "approve",
-  "scope": "Existing public source payload approved atca7, byte-identical atworktreeHEAD1b8b0080. Three added private-preparation files are excluded and not read/reviewed. Not whole-commit/private meaning/admission/production approval.",
+  "scope": "Limited public r4 successor source preparation: own-property validator fix, exact task/input/verification reclosure, source regression and historical public r3 byte retention. No current private binding, adoption, whole repository readiness or full invariance approval.",
   "source_type": "documented_external_pattern",
   "source_reference_ids": [
     "rfc9110-http-semantics-20261012"
@@ -13,13 +13,14 @@
     "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
     "independently_viewed_date": "2026-10-12",
     "supports": "RFC9110 sections9.2.2 and10.2.3 document retry/idempotence boundaries and Retry-After date/integer-delay semantics, motivating caller-visible HTTP contract interactions.",
-    "does_not_support": "The original fictional application-specific status/body/client-label/budget mapping, the filled review answer, actual frequency/impact or empirical medium_hard calibration."
+    "does_not_support": "The original fictional application-specific status/body/client-label/budget mapping, the filled review answer, actual frequency/impact or empirical medium_hard calibration.",
+    "follow_up_note": "Public pattern and source paraphrase unchanged at admitted base; prior source review reference retained, no new web/source-rights claim."
   },
   "source_refs": [
     {
       "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/task.md",
       "bytes": 2197,
-      "raw_sha256": "sha256:61bfd21fef4cb98a8c8ef2593e245302bba2c3caf5589055cf5aa2f94bd28b6e"
+      "raw_sha256": "sha256:26059d1c2ed472de461778213f77cbc172a69e6946a9ff711e2393e0fabf3928"
     },
     {
       "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/base/response-adapter.mjs",
@@ -58,8 +59,8 @@
     },
     {
       "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/scripts/validate-review.mjs",
-      "bytes": 1898,
-      "raw_sha256": "sha256:7303c27db15cdc8ecee9b431c063e5d86b0d52ba2815f5d7da626e55bbeb8aaa"
+      "bytes": 1931,
+      "raw_sha256": "sha256:9486039537e4924edc142709a3bcebbaa0236652bcb55daf690be1f164487475"
     },
     {
       "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/src/client-policy.mjs",
@@ -79,13 +80,12 @@
     {
       "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/input-manifest.json",
       "bytes": 2471,
-      "raw_sha256": "sha256:a46f47824169ff97d18a96db357d20a596a2bb8d7a21b8fcf088f2b67692e25b"
+      "raw_sha256": "sha256:395fd2a624d1b1743657f0e59ddc7ac1d7b9a1e18bafd55cddcdd259cb9e9ec9"
     },
     {
       "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/verification-command-contract.json",
       "bytes": 2652,
-      "raw_sha256": "sha256:7de280b768b522652fe80e3a18ab6af3f959950bc37905d169eb7ed4d33a1d0e",
-      "contract_digest": "sha256:ba7f35f1f4e3ca058c3e3f4f64db46aece0f0fe561a4efac7b6d9d13509b3522"
+      "raw_sha256": "sha256:59db954bfa31cebef5653ba20562e1ba407772f6e38b111462a266df9d75a622"
     },
     {
       "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/lineage.md",
@@ -104,81 +104,127 @@
     },
     {
       "path": "scripts/test-ask-benchmark-pf-review-error-source.mjs",
-      "bytes": 3915,
-      "raw_sha256": "sha256:ca26e002243d3998c77c7e2af775bfa39dd20329881cd903fe36b37c31e938af"
-    },
-    {
-      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/admission-review.json",
-      "bytes": 90,
-      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
-    },
-    {
-      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evaluator-authority-manifest.json",
-      "bytes": 90,
-      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
-    },
-    {
-      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evaluator-reference.json",
-      "bytes": 90,
-      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
-    },
-    {
-      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evidence-map.json",
-      "bytes": 90,
-      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
-    },
-    {
-      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/final-admission-record.json",
-      "bytes": 90,
-      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
-    },
-    {
-      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/metadata.json",
-      "bytes": 90,
-      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
-    },
-    {
-      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/output-contract.json",
-      "bytes": 90,
-      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
-    },
-    {
-      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/requirement-record.json",
-      "bytes": 90,
-      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
-    },
-    {
-      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/scoring-input-freeze-manifest.json",
-      "bytes": 90,
-      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
-    },
-    {
-      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-freeze-candidate.json",
-      "bytes": 90,
-      "raw_sha256": "sha256:ef3ef0066cd3ccdde8ec353018cd827849bdcb7edee5fb5218521baaef444ea8"
+      "bytes": 5788,
+      "raw_sha256": "sha256:69038960e9eb947480650a558c7f4bb56405ce625a49c2ae1fb5dc8126015489"
     }
   ],
-  "lineage_policy_ref": {
-    "path": "benchmarks/portfolio-lineage-policy.json",
-    "bytes": 6039,
-    "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d",
-    "declared_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"
+  "prior_review_ref": {
+    "reviewed_head": "1b8b0080133cafe3af989ca9e8bc8f168ace2738",
+    "manifest_path": "../follow-up-1b8b0080/review-artifact-manifest.json",
+    "raw_sha256": "sha256:6c2b39482b7df88d97ea48edacdc9fdfead4f940dc869add85625c9705f11d8d"
+  },
+  "revision_retention": {
+    "base": "11ab437b9bcbc9c221530e5c56a5fee01ac7852e",
+    "retained_exact_public_files": 39,
+    "snapshot_total_files": 40,
+    "review_ref": {
+      "path": "evidence/retention-and-scope.json",
+      "raw_sha256": "sha256:dea58e6b8c543176229c07687fb2b718eee32487ec5780d55249518801673424"
+    },
+    "meaning_reviewed": false
+  },
+  "diff_review": {
+    "total_files": 45,
+    "retained_snapshot_files": 40,
+    "active_files": [
+      "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/input-manifest.json",
+      "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/task.md",
+      "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/verification-command-contract.json",
+      "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/scripts/validate-review.mjs",
+      "scripts/test-ask-benchmark-pf-review-error-source.mjs"
+    ],
+    "active_additions": 17,
+    "active_deletions": 12,
+    "public_meaning_unchanged": true
+  },
+  "focused_verification": {
+    "source": {
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "pass": 7,
+      "fail": 0,
+      "log_sha256": "sha256:d00bc02e9722f617cfb37cba22471e9e4c6d86806ae7b9af32cce5368705ce9f"
+    },
+    "shape_normal_accept": 1,
+    "prototype_extra_fields_refused": 4,
+    "same_cases_old_validator_accepts": 4,
+    "ordinary_neutral_reports_anchor_pass": 2,
+    "native_each": 4,
+    "old_command_guard_exit": 41,
+    "additional_properties_positive_pass": 1,
+    "additional_properties_bad_type_refused": 1,
+    "fixture_input_digest": "sha256:395fd2a624d1b1743657f0e59ddc7ac1d7b9a1e18bafd55cddcdd259cb9e9ec9",
+    "verification_semantic_digest": "sha256:0eb96e5c525c11cde265e69d241fcb502623049c34836be46df215994bdaa176",
+    "summary_ref": {
+      "path": "evidence/independent-summary.json",
+      "raw_sha256": "sha256:3f4af609e0e59de230d727afbde69fd4a69fcc3de21aced34bb4da4f2d9ce82f"
+    }
+  },
+  "lineage_reviewed_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/lineage.md",
+      "bytes": 1048,
+      "raw_sha256": "sha256:105643b634277853cd65486445b642035c99716a7db962803c7df11d69dc7ae0"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/rfc9110-http-semantics-20261012.md",
+      "bytes": 1360,
+      "raw_sha256": "sha256:8a341138312cbe9004f596e777ea681086aff7add127bb6c710e44c89d9474ae"
+    },
+    {
+      "path": "benchmarks/portfolio-lineage-policy.json",
+      "bytes": 6039,
+      "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d"
+    }
+  ],
+  "frozen_catalog_entry": {
+    "fixture_id": "pf-review-error-contract",
+    "fixture_role": "primary",
+    "suite": "practice_frequency",
+    "task_class": "pr_review",
+    "domain": "backend_api",
+    "difficulty": "medium_hard",
+    "repetitions": 3,
+    "capability_families": [
+      "api_contracts",
+      "review_precision"
+    ],
+    "evidence_topologies": [
+      "api_contract_and_callers",
+      "review_diff_and_tests"
+    ],
+    "outcome_dimensions": [
+      "contract_consistency",
+      "review_precision"
+    ],
+    "risk_boundary": "none",
+    "backend_api_security": true,
+    "lineage_required": true,
+    "aggregate_eligible": true,
+    "evaluator_binding_required": "required_pending",
+    "admission_state": "metadata_frozen_evaluator_pending",
+    "public_intent": "Review caller-visible error contract behavior across implementation boundaries.",
+    "fixture_metadata_digest": "sha256:aa374b85a010fd8ea7c25239475976859598b7c31f6d49565564d2fa96af56ca"
   },
   "catalog_ref": {
     "path": "benchmarks/portfolio-catalog.json",
-    "bytes": 29625,
-    "raw_sha256": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
-    "declared_catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972"
+    "raw_sha256": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8"
+  },
+  "public_old_binding_observation": {
+    "path": "evidence/public-old-binding-observation.json",
+    "raw_sha256": "sha256:72adae057a013b73166d07d5a413dc5101b2c131a9f67c407aa212ae60dfbcae",
+    "old_authority_public_manifest_contains_old_not_new_input": true,
+    "private_files_read": false
   },
   "requirements_for_change": [],
   "limitations": [
-    "Filled reviews, trace truth/control bodies and independent required-behavior calculations remain private. Only counts, verdicts, bounds and hashes are disclosed.",
-    "Three normal/equivalent reports and four deliberately bad/unsupported meaning reports are structurally accepted with semantic_correctness not_assessed. Five malformed/extra-prose/execution-declaration reports are refused. These are ordinary source/data probes, not private semantic grading.",
-    "Unsupported locator/data claims must be rejected or remain manual/unknown according to independent evidence; valid alternative evidence/order must not be rejected solely for canonical mismatch. No future grader coverage is approved.",
-    "Final source adds an ordered public severity rubric and three unique literal commands, requiring all three for passed. The anchored invocation now executes test, trace and shape validation; its exit success is command receipt evidence, not review truth.",
-    "Initial missing approved-source evidence and incorrect type alias were resolved at3317b27b and10c33695. Finalca7 updates only public review rubric/declarations/validation and bindings; adapter/caller/cases/diff/native tests/trace remain unchanged.",
-    "All ten authority/completion artifacts remain generation_pending. Author untracked authority preparation, private originals, r9, model/evaluation CLI, old diagnostics, main merge and implementation changes were not read/run/performed.",
-    "Empirical medium_hard/30-minute calibration remains unknown; frequency/impact retain unknown/null weights and practice-weighted ineligibility without changing frozen catalog base eligibility.",
-    "Original ca7 five records remain unchanged, manifest raw SHA-256 0c5d43d4f45e228f16f59043b3a4471b28f7ec438e314aea6822273d2ad11297. New config/authority/archive helper content was not inspected; same public refs and pending markers are approved by byte identity only."
+    "Only source approval; current R3 private authority/binding still targets old input and is not a valid current r4 admission authority. No private files read or generated.",
+    "Neutral reports are schema probes, not factual normal findings; anchor execution/shape receipts do not prove severity, observations, supporting locators or semantic correctness.",
+    "Unknown valid meaning/manual boundaries and prior findings-producing investigation intent are retained, not regraded.",
+    "R3 public admission metadata and retained39 bytes remain unchanged; this source approval does not revise previous adoption decision or claim r4 admitted.",
+    "Whole validator/current full invariance not run at this head; proper r4 independent re-adoption and binding transition remain separate work.",
+    "Pattern documentation does not establish empirical frequency/impact/difficulty; both bands unknown/null weights, practice weighted ineligible.",
+    "No private generation/adoption, model/CodexCLI/r9/evaluation copy/old diagnostic/shared normalizer or repo source/Git changes."
   ]
 }
