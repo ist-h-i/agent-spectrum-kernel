@@ -414,9 +414,12 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
     limitations: ["Node test-case receipts do not measure assertion count or prove that tests cover the requirement; the operator must check coverage", "human/semantic criteria without a command remain unknown", "verification executes repository test code in a fresh copy; this is not a security sandbox"] };
 }
 
-// The same controller path can be tested with an injected synthetic transport;
-// this export does not consume a comparison start or launch a process itself.
-export { verifyCondition as verifyUserComparisonCondition };
+// Exercise the same branch without exposing an unowned production verifier.
+export function verifyUserComparisonConditionForTest(root, plan, condition, signal, execute, remaining) {
+  assert.equal(plan.config.evidence_kind, "synthetic", "test verification requires synthetic evidence");
+  assert.ok(typeof execute === "function" && execute !== executeCodexSession, "test verification requires an injected fake transport");
+  return verifyCondition(root, plan, condition, signal, execute, remaining);
+}
 
 const fault = (code, reason) => Object.assign(new Error(reason), { comparisonCode: code });
 const ACTION = "Inspect saved evidence and obtain any required legitimate authorization; do not reset attempted slots. Use a new prepared run for retries or changed settings.";

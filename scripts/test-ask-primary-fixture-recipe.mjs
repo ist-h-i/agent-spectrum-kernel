@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
-import { verifyUserComparisonCondition } from "./ask-user-comparison.mjs";
+import { verifyUserComparisonConditionForTest } from "./ask-user-comparison.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 function source(id) {
@@ -48,7 +48,7 @@ async function verify({ exitCode = 0, outputLimited = false, terminationConfirme
     writeFileSync(join(area, "control/reporter.mjs"), reporter);
     const { comparisonHash } = await import("./ask-user-comparison-prepare.mjs");
     const plan = { arms: { plain: { path: "arms/plain" } }, policy: { execution_contract: "single_shot_v1" },
-      config: { verification_timeout_ms: 300000 }, verification: { recipe,
+      config: { verification_timeout_ms: 300000, evidence_kind: "synthetic" }, verification: { recipe,
         reporter: { path: "control/reporter.mjs", digest: comparisonHash(reporter) } } };
     const calls = [];
     const transport = async value => {
@@ -56,7 +56,7 @@ async function verify({ exitCode = 0, outputLimited = false, terminationConfirme
       return { stdout: "validator output\n", stderr: "diagnostic\n", exitCode,
         spawnObserved: true, terminationConfirmed, outputLimited, durationMs: 3 };
     };
-    const result = await verifyUserComparisonCondition(area, plan, "plain", undefined, transport);
+    const result = await verifyUserComparisonConditionForTest(area, plan, "plain", undefined, transport);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].executable, "/bin/bash");
     assert.deepEqual(calls[0].argv, recipe.checks[0].argv);
