@@ -2085,6 +2085,11 @@ function materializeVerifiedFrozenAuthorityWorkspace({ evaluationRoot, source })
   const parent = mkdtempSync(resolve(evaluationRoot, ".production-frozen-authority-"));
   const destination = resolve(parent, "workspace");
   cpSync(source.root, destination, { recursive: true, errorOnExist: true, force: false });
+  // cpSync creates directories with default modes. Restore the verified source
+  // metadata before comparing inventories, including empty nested directories.
+  for (const entry of source.portableEntries.filter(({ file_type }) => file_type === "file")) chmodSync(resolve(destination, entry.path), entry.mode);
+  for (const entry of source.portableEntries.filter(({ file_type }) => file_type === "directory").sort((left, right) => right.path.length - left.path.length)) chmodSync(resolve(destination, entry.path), entry.mode);
+  chmodSync(destination, source.rootIdentity.mode & 0o777);
   const materialized = readStableWorkspaceInventory(destination, "verified frozen fixture metadata authority workspace");
   if (stableCanonicalJson(materialized.portableEntries) !== stableCanonicalJson(source.portableEntries) || materialized.digest !== source.digest) throw new Error("verified frozen fixture metadata authority workspace is inconsistent");
   return materialized;
