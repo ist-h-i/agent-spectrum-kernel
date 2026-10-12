@@ -1,0 +1,3 @@
+import {createSearchController} from './search-controller.mjs';
+export function renderSearchView(state){return {ariaBusy:state.phase==='loading',statusText:state.phase==='loading'?'Searching':state.phase==='ready'?String(state.items.length)+' results':'',visibleItems:[...state.items],alertText:state.phase==='error'?state.message:null,searchEnabled:true}}
+export function mountSearchView(load,render){const controller=createSearchController(load,state=>render(renderSearchView(state)));render(renderSearchView(controller.getState()));return {search:query=>controller.search(query),unmount:()=>controller.dispose()}}
