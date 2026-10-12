@@ -229,7 +229,7 @@ export function generateMnSchemaFieldAlignmentReviewArchive({ root = ROOT, priva
   const generatorEntry = unique.get(`repository/${GENERATOR_PATH}`);
   const manifest = {
     schema_version: "1.0.0",
-    program: "mn_focused_regression_test_private_review_archive",
+    program: "mn_schema_field_alignment_private_review_archive",
     fixture_id: FIXTURE_ID,
     reviewed_repository_head: reviewedHead,
     evaluator_source_revision: sourceRevision,
