@@ -78,6 +78,8 @@ jobs:
 
       - name: Run successor snapshot and source-session regressions (current HEAD)
         run: |
+          # The real source-drift regression below needs PFci's exact public base.
+          git fetch --no-tags origin a06e96f8a493b0ae70d3910c73c644b0da13fa25
           node --test scripts/test-ask-benchmark-source-session.mjs scripts/test-successor-process-state.test.mjs scripts/test-frozen-evaluator-fixture.test.mjs
           node --test scripts/test-ask-benchmark-calibration-source.mjs scripts/test-ask-benchmark-prompt-successor.mjs scripts/test-ask-benchmark-prompt-successor-delivery.mjs scripts/test-ask-benchmark-prompt-successor-native.mjs scripts/test-ask-benchmark-prompt-successor-report.mjs scripts/test-ask-benchmark-prompt-successor-scoring-inputs.mjs
           node --test scripts/test-ask-benchmark-prompt-successor-integration.mjs scripts/test-ask-benchmark-successor-input-snapshot.mjs scripts/test-ask-benchmark-evaluator-root-manifest.mjs
@@ -228,8 +230,6 @@ jobs:
           # Exact declared evaluator sources; no current-runtime/admission claim.
           git fetch --no-tags origin a762daf43bdfe254c6ecd6e0b49f3cef78d0e9ec
           git fetch --no-tags origin 88359c4b4d12210180063e9bfb5d08b7edad90f3
-          git fetch --no-tags origin a06e96f8a493b0ae70d3910c73c644b0da13fa25
-          node --test scripts/test-frozen-evaluator-fixture.test.mjs
           node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-pf-api-pagination.mjs
           node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-pf-frontend-async.mjs
           node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-pf-ci-cache.mjs
