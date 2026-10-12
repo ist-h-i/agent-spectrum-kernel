@@ -884,8 +884,11 @@ export function deriveEvaluatorDependencyGraph({
   };
   for (const entry of entries) visit(entry);
   for (const authorityPath of authorities) {
-    visit(authorityPath);
     const eagerAuthorityRead = EVALUATOR_EAGER_AUTHORITY_READS.find(({ path }) => path === authorityPath);
+    // Historical entry closures do not acquire data obligations from readers
+    // that were never reachable in that evaluator's module graph.
+    if (eagerAuthorityRead && !nodePaths.has(eagerAuthorityRead.reader)) continue;
+    visit(authorityPath);
     const owner = eagerAuthorityRead?.reader
       ?? (authorityPath.includes("scoring-input") || authorityPath.includes("portfolio-" )
         ? "scripts/ask-benchmark-scoring-contract.mjs"

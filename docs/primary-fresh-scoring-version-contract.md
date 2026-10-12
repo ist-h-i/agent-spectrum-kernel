@@ -55,7 +55,9 @@ Its acceptance items are:
   This is a library dependency connection, not a filesystem/network/OS permission
   change. Other unapproved builtin imports remain refused.
   The two eager public data reads of `ask-core-capabilities.mjs` are explicitly
-  included in the source graph with raw-byte/revision pins; virtual filesystem
+  included in the source graph with raw-byte/revision pins whenever their reader
+  is reachable from the selected entries. Historical graphs without that reader
+  retain their exact previous closure. Virtual filesystem
   reads remain confined to the verified graph and never fall back to host files.
 - `AC-UNKNOWN-CONTINUE`: only an explicit fresh-version practical batch separates
   completed grading execution from numeric scoring readiness. A saved original
