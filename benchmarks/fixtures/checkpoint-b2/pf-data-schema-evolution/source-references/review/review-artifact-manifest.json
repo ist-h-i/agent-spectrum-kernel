@@ -1,0 +1,22 @@
+{
+  "reviewed_head": "f91d5cb59fe5a73403e5f354ca07da634ccf1d68",
+  "scope": "independent exact-HEAD public source follow-up and separate continued unknown-band reviews only",
+  "records": [
+    {
+      "path": "source-approval.json",
+      "raw_sha256": "sha256:74b712dad51aa70883985e9c45dbfed1198349d3b52f18b5601b8fd260e51438"
+    },
+    {
+      "path": "frequency-review.json",
+      "raw_sha256": "sha256:d602fd1167cf5bbb2ab8430fc3d61c9c9366f934112d229d300ffb5482007988"
+    },
+    {
+      "path": "impact-review.json",
+      "raw_sha256": "sha256:d55572e62ed3e0ce93226a1bfa16d19f4bae1d94c3a5a3b530aa45ab36b443b4"
+    },
+    {
+      "path": "review.md",
+      "raw_sha256": "sha256:87a7bef6e085ae0e5d73683b460ad2da150e91b99b08380de5711a211f50f6db"
+    }
+  ]
+}

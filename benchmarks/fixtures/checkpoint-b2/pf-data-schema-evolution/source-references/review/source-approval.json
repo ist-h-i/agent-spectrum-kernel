@@ -1,0 +1,87 @@
+{
+  "reviewer_record_id": "data-schema-source-independent-followup-f91d5cb5-20261012",
+  "fixture_id": "pf-data-schema-evolution",
+  "reviewed_head": "f91d5cb59fe5a73403e5f354ca07da634ccf1d68",
+  "base_commit": "158dbe69b006a4af21d07cc35f3267d621223fea",
+  "decision": "approve",
+  "scope": "targeted public source follow-up for Unicode minLength and diagnostic identity fixes plus regenerated closure; carries forward prior public source judgment, not private grading/scoring/admission approval",
+  "source_type": "documented_external_pattern",
+  "source_reference_ids": [
+    "json-schema-object-annotations-20261012"
+  ],
+  "official_source": {
+    "url": "https://json-schema.org/understanding-json-schema/reference/object",
+    "related_urls": [
+      "https://json-schema.org/understanding-json-schema/reference/annotations",
+      "https://json-schema.org/understanding-json-schema/reference/type",
+      "https://json-schema.org/understanding-json-schema/reference/combining"
+    ],
+    "independently_viewed_date": "2026-10-12",
+    "supports": "Required properties distinct from properties, additional-property handling, absent/null distinction, default as non-filling annotation, type unions and anyOf alternatives motivate the authored bounded fixture.",
+    "does_not_support": "Fictional customer records, actual project occurrences, frequency, impact, complete engine conformance, real database migration safety, empirical difficulty, private grading or admission."
+  },
+  "source_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/lineage.md",
+      "raw_sha256": "sha256:66ad488e0ac792967caee08be35899c2bfc44090ccdd62087fc94c4059d5bd0b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/source-references/json-schema-object-annotations-20261012.md",
+      "raw_sha256": "sha256:53f6a42ffc5a931bd8ac90142a8f148e84d0325c4eea65f671a70f86ff2fbfcf"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/task.md",
+      "raw_sha256": "sha256:824c949a00ae0a5f7539d0280126aa025d468b819e147c36faea2ad2f68f7451"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/input-manifest.json",
+      "raw_sha256": "sha256:391d06c142ff90c5a4aaf811d551cbe62b87490db9499da77db3fecfc89d03b4"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/verification-command-contract.json",
+      "raw_sha256": "sha256:e7d18974dcfe0f704490570c1a9a8cb29c301e84d43d27b1569b92fe7cc6e8f8",
+      "contract_digest": "sha256:2ca4e80ecd3a2a7f0b60fd7183f1de90fe6ecde1c765751b110fbcb76fcbc454"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/workspace/spec/evolution-contract.md",
+      "raw_sha256": "sha256:cdceb75aeb4dc35cf1905f811e54a4f462db1c7e6edeeb85ca8d94615ac0565c"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/workspace/src/schema-contract.mjs",
+      "raw_sha256": "sha256:08df8a61eaa1ed6ad2fccc5d14311cd7013108fcf25db99863cba3d431953b9a"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/workspace/src/readers.mjs",
+      "raw_sha256": "sha256:c051968124ab7a6538c89ffcedb1b87fe579f75b52918a568544d504181c0671"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/workspace/test/schema-evolution.test.mjs",
+      "raw_sha256": "sha256:abeab224657b551f588934da805a5dacc15346156028971cb9fbead110c65bb1"
+    },
+    {
+      "path": "scripts/ask-benchmark-pf-data-schema-source.mjs",
+      "raw_sha256": "sha256:355640f77d534f5113db5d192023aadb8f2f11089209cc0108cd9d4d4bb5cb3d"
+    },
+    {
+      "path": "scripts/test-ask-benchmark-pf-data-schema-source.mjs",
+      "raw_sha256": "sha256:57b7ca43a6ee8ac5353230f581fa3d3c0e2b5e27bf8ab43c3807428305cc66a3"
+    }
+  ],
+  "lineage_policy_ref": {
+    "path": "benchmarks/portfolio-lineage-policy.json",
+    "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d",
+    "declared_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"
+  },
+  "catalog_ref": {
+    "path": "benchmarks/portfolio-catalog.json",
+    "raw_sha256": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
+    "declared_catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972"
+  },
+  "requirements_for_change": [],
+  "limitations": [
+    "Exact-HEAD public source-only follow-up based on preserved independent source review at 158dbe69; no private grading/scoring/admission or model results reviewed.",
+    "Independent current source tests 6/6, 11 targeted Unicode/null/closure/digest checks pass, complete five-file diff reviewed. Prior broader executable results remain bound to their original HEAD.",
+    "Previous Unicode minLength and copied diagnostic-name caveats resolved. Bounded local simulator still makes no full JSON Schema conformance or real-DB safety claim.",
+    "Frequency and impact remain Unknown/null weight and practice-weighted aggregate ineligible; empirical medium calibration remains unverified."
+  ]
+}
