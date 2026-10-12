@@ -204,6 +204,20 @@
         "path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/verification-command-contract.json",
         "sha256": "5826a6fe97da24f0d341d6df5e7134ffff7d9f20ec4bc69c4189be1762fd1ad6"
       }
+    },
+    {
+      "id": "mn-frontend-default-fix",
+      "suite": "mechanism_negative",
+      "task_class": "local_bug_fix",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-frontend-default-fix/input-manifest.json",
+      "input_manifest_sha256": "db98cb9c81e50afe4f39169d722eec0e344483809176b810a118e096fa6ca2ca",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/mn-frontend-default-fix/verification-command-contract.json",
+        "sha256": "ce02343ca5cc7b63dc043e2a989cf9b4c8984a1336f1f9b767e72bada4bcad06"
+      }
     }
   ],
   "ordering": {
