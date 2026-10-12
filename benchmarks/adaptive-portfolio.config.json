@@ -232,6 +232,20 @@
         "path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/verification-command-contract.json",
         "sha256": "4a41800780f1fe1c442b030907e64f22a94d94c9b5267eee38fd15d99ba65547"
       }
+    },
+    {
+      "id": "pf-review-error-contract",
+      "suite": "practice_frequency",
+      "task_class": "pr_review",
+      "difficulty": "medium_hard",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/input-manifest.json",
+      "input_manifest_sha256": "a46f47824169ff97d18a96db357d20a596a2bb8d7a21b8fcf088f2b67692e25b",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/verification-command-contract.json",
+        "sha256": "7de280b768b522652fe80e3a18ab6af3f959950bc37905d169eb7ed4d33a1d0e"
+      }
     }
   ],
   "ordering": {
