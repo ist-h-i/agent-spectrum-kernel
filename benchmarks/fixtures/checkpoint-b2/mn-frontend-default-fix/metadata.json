@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mn-frontend-default-fix",
+  "fixture_role": "primary",
+  "suite": "mechanism_negative",
+  "task_class": "local_bug_fix",
+  "domain": "frontend",
+  "difficulty": "medium",
+  "repetitions": 3,
+  "risk_boundary": "none",
+  "capability_families": [
+    "focused_implementation",
+    "state_consistency"
+  ],
+  "evidence_topologies": [
+    "implementation_and_tests",
+    "single_file_spec"
+  ],
+  "outcome_dimensions": [
+    "behavioral_consistency",
+    "regression_prevention"
+  ],
+  "output_contract_type": "implementation_producing",
+  "requirement_record_id": "requirement-record-mn-frontend-default-fix",
+  "output_contract_id": "output-contract-mn-frontend-default-fix",
+  "evaluator_bundle_id": "evaluator-2daebe55650507bde08697019e3ba83e64b0236e5bbdae59315fbd267c171d5a",
+  "evaluator_bundle_digest": "sha256:7758a981091fb4409b676487d98e8a05c4998ab3c6f7878a086ca612a6512798",
+  "evaluator_byte_count": 693824,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:a7a16938142e418b94003a693fd6a2e69f3749912d6ccc354f966ec4159cae8f"
+}
