@@ -260,6 +260,20 @@
         "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/verification-command-contract.json",
         "sha256": "12802a42355943302d95cf58dd2c708563ad6a7f214638ca7fea3e3ac15701ee"
       }
+    },
+    {
+      "id": "pf-ci-cache-flake",
+      "suite": "practice_frequency",
+      "task_class": "investigation",
+      "difficulty": "medium_hard",
+      "repetitions": 5,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/input-manifest.json",
+      "input_manifest_sha256": "276cbe5632762a7b03ace4c3057e8a8b04553ba21bdc5c0794355e7c0509f83a",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/verification-command-contract.json",
+        "sha256": "7ab8f05af3dc87bbf1374c00d04834a2881538d5661e7a858410a81b97efefd5"
+      }
     }
   ],
   "ordering": {

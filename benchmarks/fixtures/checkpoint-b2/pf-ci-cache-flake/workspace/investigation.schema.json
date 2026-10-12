@@ -1,0 +1,504 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bounded local build investigation report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "confidence",
+    "experiments",
+    "causal_witness",
+    "competing_explanation",
+    "recommendation",
+    "limitations"
+  ],
+  "properties": {
+    "format_version": {
+      "enum": [
+        2
+      ]
+    },
+    "confidence": {
+      "enum": [
+        "confirmed_for_fixture",
+        "supported",
+        "unknown"
+      ]
+    },
+    "experiments": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "experiment_id",
+          "options",
+          "observations"
+        ],
+        "properties": {
+          "experiment_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "noCache",
+              "includeLock",
+              "nodeMajor"
+            ],
+            "properties": {
+              "noCache": {
+                "type": "boolean"
+              },
+              "includeLock": {
+                "type": "boolean"
+              },
+              "nodeMajor": {
+                "enum": [
+                  24,
+                  25
+                ]
+              }
+            }
+          },
+          "observations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "run_id",
+                "node_major",
+                "lock_digest",
+                "requested_key",
+                "restored_key",
+                "restored_cache",
+                "dependencies",
+                "artifact_version",
+                "required_artifact_version",
+                "exit_code"
+              ],
+              "properties": {
+                "run_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "node_major": {
+                  "enum": [
+                    24,
+                    25
+                  ]
+                },
+                "lock_digest": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "requested_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "restored_key": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "restored_cache": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dependencies": {
+                  "enum": [
+                    "installed"
+                  ]
+                },
+                "artifact_version": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "required_artifact_version": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "exit_code": {
+                  "enum": [
+                    0,
+                    1
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "causal_witness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cold_run_id",
+        "restored_run_id",
+        "fixed_inputs",
+        "changed_factor",
+        "outcomes",
+        "controlled_intervention"
+      ],
+      "properties": {
+        "cold_run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "restored_run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixed_inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "node_major",
+            "lock_digest",
+            "required_artifact_version"
+          ],
+          "properties": {
+            "node_major": {
+              "enum": [
+                24,
+                25
+              ]
+            },
+            "lock_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required_artifact_version": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "changed_factor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cold",
+            "restored"
+          ],
+          "properties": {
+            "cold": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "restored_cache",
+                "artifact_version"
+              ],
+              "properties": {
+                "restored_cache": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "artifact_version": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "restored": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "restored_cache",
+                "artifact_version"
+              ],
+              "properties": {
+                "restored_cache": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "artifact_version": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "outcomes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cold_exit_code",
+            "restored_exit_code"
+          ],
+          "properties": {
+            "cold_exit_code": {
+              "enum": [
+                0,
+                1
+              ]
+            },
+            "restored_exit_code": {
+              "enum": [
+                0,
+                1
+              ]
+            }
+          }
+        },
+        "controlled_intervention": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "experiment_id",
+            "run_id",
+            "restored_cache",
+            "artifact_version",
+            "exit_code"
+          ],
+          "properties": {
+            "experiment_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "restored_cache": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "artifact_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "exit_code": {
+              "enum": [
+                0,
+                1
+              ]
+            }
+          }
+        }
+      }
+    },
+    "competing_explanation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim",
+        "status",
+        "experiment_id",
+        "comparison_limits"
+      ],
+      "properties": {
+        "claim": {
+          "enum": [
+            "runtime_alone"
+          ]
+        },
+        "status": {
+          "enum": [
+            "supported",
+            "contradicted",
+            "unresolved"
+          ]
+        },
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "comparison_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "changes_cache_selection",
+            "isolated_runtime_effect",
+            "real_runtime_effect_observed"
+          ],
+          "properties": {
+            "changes_cache_selection": {
+              "type": "boolean"
+            },
+            "isolated_runtime_effect": {
+              "type": "boolean"
+            },
+            "real_runtime_effect_observed": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "key_fields",
+        "options",
+        "observations"
+      ],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key_fields": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 10,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "noCache",
+            "includeLock",
+            "nodeMajor"
+          ],
+          "properties": {
+            "noCache": {
+              "type": "boolean"
+            },
+            "includeLock": {
+              "type": "boolean"
+            },
+            "nodeMajor": {
+              "enum": [
+                24,
+                25
+              ]
+            }
+          }
+        },
+        "observations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "run_id",
+              "node_major",
+              "lock_digest",
+              "requested_key",
+              "restored_key",
+              "restored_cache",
+              "dependencies",
+              "artifact_version",
+              "required_artifact_version",
+              "exit_code"
+            ],
+            "properties": {
+              "run_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "node_major": {
+                "enum": [
+                  24,
+                  25
+                ]
+              },
+              "lock_digest": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requested_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "restored_key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "restored_cache": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "dependencies": {
+                "enum": [
+                  "installed"
+                ]
+              },
+              "artifact_version": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "required_artifact_version": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "exit_code": {
+                "enum": [
+                  0,
+                  1
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_domain",
+        "cache_selection",
+        "service_observation",
+        "frequency_estimate"
+      ],
+      "properties": {
+        "evidence_domain": {
+          "enum": [
+            "fictional_local",
+            "external_ci"
+          ]
+        },
+        "cache_selection": {
+          "enum": [
+            "exact_key_only",
+            "service_and_prefix"
+          ]
+        },
+        "service_observation": {
+          "enum": [
+            "not_observed",
+            "observed"
+          ]
+        },
+        "frequency_estimate": {
+          "enum": [
+            "unknown",
+            "measured"
+          ]
+        }
+      }
+    }
+  }
+}

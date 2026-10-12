@@ -1,0 +1,132 @@
+{
+  "revision": "r1",
+  "state": "not_admitted_semantic_evidence_insufficient",
+  "source_head": "6dd5c883fbd353c05e11210b14faed45e6fc0f0e",
+  "records": [
+    {
+      "path": "admission-review.json",
+      "raw_sha256": "sha256:f0b9095307ecdf3ed2d8edd1a56ae7a8788b6f4b79179d87c007633b39bbbd76",
+      "bytes": 3516
+    },
+    {
+      "path": "evaluator-authority-manifest.json",
+      "raw_sha256": "sha256:c90caa7e04c39c2157ae0a8b8241fa1fc84d29392a9cbfef9f77aa05483e4c58",
+      "bytes": 3024
+    },
+    {
+      "path": "evaluator-reference.json",
+      "raw_sha256": "sha256:2979df01300bd229fd8fe1cdc713f41ecab8dc0ebfa3cf5bcbf6d5e3beb6bd10",
+      "bytes": 169667
+    },
+    {
+      "path": "evidence-map.json",
+      "raw_sha256": "sha256:db3742dac24b47e18e6a72e9581c4d9427b13ff25673a29d4b7790f312898536",
+      "bytes": 3013
+    },
+    {
+      "path": "final-admission-record.json",
+      "raw_sha256": "sha256:db636ba5e9cad7971af95abcb1051f31b5af9d5d58afe4b519af7f7515ec6164",
+      "bytes": 169743
+    },
+    {
+      "path": "input-manifest.json",
+      "raw_sha256": "sha256:a22e4f6d28b233add4e8325eeabbde3e09dd9a51d35253e43e5a38d41a087f8f",
+      "bytes": 2320
+    },
+    {
+      "path": "lineage-record.json",
+      "raw_sha256": "sha256:6301ed1c25d5c974e93e5617c6589493f034079ec8ea8812822f3577a4506be0",
+      "bytes": 1152
+    },
+    {
+      "path": "lineage.md",
+      "raw_sha256": "sha256:9c9a42e51962289d9687288f28f3d9e90fb8684e0b458ee78195e96e79742d6c",
+      "bytes": 1019
+    },
+    {
+      "path": "metadata.json",
+      "raw_sha256": "sha256:a3f4f6835a82f82ac60e4cbd8b1d0cdfae887fd51af3426d89dfa46c3583d9e9",
+      "bytes": 1109
+    },
+    {
+      "path": "output-contract.json",
+      "raw_sha256": "sha256:c755d37422fb36566968f692f40a1985ec5e397ec2e1af67ca03bdca1f25ce14",
+      "bytes": 1848
+    },
+    {
+      "path": "requirement-record.json",
+      "raw_sha256": "sha256:8495b6997fc036170ea6a7b691b59ba0d035801082552a0e900581f1e794e9dc",
+      "bytes": 2770
+    },
+    {
+      "path": "scoring-input-freeze-manifest.json",
+      "raw_sha256": "sha256:59f8880fa94ad1ed6cf21ea5160d732290cf3b1e38c16e45b0b153759630b213",
+      "bytes": 3778
+    },
+    {
+      "path": "source-freeze-candidate.json",
+      "raw_sha256": "sha256:acd59fa1cf96e534c64bab516b2b079f30583b50940657e6732655d232519c9c",
+      "bytes": 4509
+    },
+    {
+      "path": "task.md",
+      "raw_sha256": "sha256:aaf66d6a9b57db75cb86ff6b9a31b8a1d150cd50bf6cb607e305945dd184f129",
+      "bytes": 1871
+    },
+    {
+      "path": "verification-command-contract.json",
+      "raw_sha256": "sha256:76d688c8c718b4fb38af94445b6c37f0a8283756191320156d478b5b8eae38e7",
+      "bytes": 2563
+    },
+    {
+      "path": "workspace/ci/build-config.json",
+      "raw_sha256": "sha256:dea1af75bc003425d77b45f3375602e9bde3e811d3aa9ed601ef5d935d03b942",
+      "bytes": 212
+    },
+    {
+      "path": "workspace/ci/build-history.log",
+      "raw_sha256": "sha256:4288f4f83a1c905ce14aa3dc93a64a4e6620373d904e6b3512d84da67e30f271",
+      "bytes": 573
+    },
+    {
+      "path": "workspace/ci/scenarios.json",
+      "raw_sha256": "sha256:b16010300c28f0bf0dd0e083e2c032b1c855e553117d741cf7ba74b39d30829d",
+      "bytes": 844
+    },
+    {
+      "path": "workspace/docs/investigation-contract.md",
+      "raw_sha256": "sha256:fe7959d703a3adec3c110b3d5dd3d907dadd30d4a476f1a7652b32742b9d7d3c",
+      "bytes": 1235
+    },
+    {
+      "path": "workspace/investigation.schema.json",
+      "raw_sha256": "sha256:98e5ab2bbc8c5d42e215a88eaf69b7c7b373789d240022b84ec9c4068dab7327",
+      "bytes": 2346
+    },
+    {
+      "path": "workspace/package.json",
+      "raw_sha256": "sha256:9b834559b502323bf541659d86cc705d590fceaa5333d3cfeee01556b799435d",
+      "bytes": 340
+    },
+    {
+      "path": "workspace/scripts/reproduce-cache.mjs",
+      "raw_sha256": "sha256:2efab731082f3adf6f086580c29d87427cfdc9d000ce18ac328773fec083a75b",
+      "bytes": 705
+    },
+    {
+      "path": "workspace/scripts/validate-report.mjs",
+      "raw_sha256": "sha256:8c95e582f65b0c00165599914adf14204f47e7dc54b57e27d31740b817b52bb5",
+      "bytes": 1433
+    },
+    {
+      "path": "workspace/src/cache-model.mjs",
+      "raw_sha256": "sha256:3a73cfed43492a3f40e51f59e5d8ed0c4d9c25465019ef4674ae807afce56d86",
+      "bytes": 1131
+    },
+    {
+      "path": "workspace/test/cache-observation.test.mjs",
+      "raw_sha256": "sha256:42ced262a0783c01baa689ba209e11d1122e899055d0ae624e2f56ad908dfcad",
+      "bytes": 695
+    }
+  ]
+}
