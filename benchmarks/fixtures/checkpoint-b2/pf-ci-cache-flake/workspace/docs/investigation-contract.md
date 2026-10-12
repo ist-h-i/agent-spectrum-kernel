@@ -2,7 +2,7 @@
 
 All supplied history is fictional deterministic local data. Trace configuration, scenarios, model and history to investigate the strongest supported cause, test a competing explanation, and recommend the smallest intervention. Occurrence frequency and real service behavior are not supplied.
 
-Create investigation.json conforming to investigation.schema.json, format_version2. Summary prose is for readers; substantive claims must be expressed in the structured evidence below. The validator establishes shape only, not a correct causal explanation. Reproducing the model in a report is not evidence that a command was executed. Use the final validation invocation from task.md separately.
+Create investigation.json conforming to investigation.schema.json, format_version2. The structured fields below are the complete report. Do not add freeform summaries or extra claims outside these fields. The validator establishes shape only, not a correct causal explanation. Reproducing the model in a report is not evidence that a command was executed. Use the final validation invocation from task.md separately.
 
 Experiments: provide complete observation rows for every supplied run, uniquely identified as baseline, no_cache, key_with_lock and runtime_major. These correspond to the unchanged reproducer with no options, --no-cache, --include-lock and --node-major=25 respectively. Record the complete option tuple for each; omitted flags are false and the supplied runtime is24. Preserve row/run identities and every returned field. Additional experiments may be reported but unfamiliar strategies or meanings require review.
 

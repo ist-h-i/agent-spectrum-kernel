@@ -10,7 +10,7 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "cd11389dd8ac200aa55d19796b6186e86e6f28cd8260155b1ae5e9900d9ba129",
+          "sha256": "d514b2e3db7112454ea34247b3632d995dd1fa7173b7e98cb3ecba462ef3904c",
           "bytes": 2050
         },
         {
@@ -30,13 +30,13 @@
         },
         {
           "path": "workspace/docs/investigation-contract.md",
-          "sha256": "8e225ea6646596be68f83de0a492fbc67ff967e8fac0d0d4c0d18aee6e44e89c",
-          "bytes": 3304
+          "sha256": "fc5dfce5bc59ff14aaa66b4fbe3edf209ef7e71e35c98b4a367fe02e17d0de6f",
+          "bytes": 3324
         },
         {
           "path": "workspace/investigation.schema.json",
-          "sha256": "712fa136ec6b56bf664b2ad3249b60b538fc60a7438786386412e44b41dd729a",
-          "bytes": 12306
+          "sha256": "cd971cd4f36c060ea521946dd0819edbae726c57f8ac5786a7595f5fcf583270",
+          "bytes": 12222
         },
         {
           "path": "workspace/package.json",
