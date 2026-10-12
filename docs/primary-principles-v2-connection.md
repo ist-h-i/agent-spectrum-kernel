@@ -64,3 +64,25 @@ starting comparison/evaluator/model processes, checks all 27 unstarted/quality
 null rows, actual v2 profile and descriptor/renderer closure, and rejects changed
 metadata/renderer/descriptor or v1 aliases. Original v1/canonical routes remain
 separate. Missing private original/admission authority continues to block launch.
+
+## Saved non-model preparation evidence
+
+The clean implementation head `bbe2257b882d8af7ea4fd43c790df3c9f9cda7a0`
+prepared `connection-preparation-r5` using the original fixed public inputs.
+Manifest raw digest:
+`sha256:675f686bf5851e19bb1200deac6c906d56221571db28fa4af0702f05400af1e7`.
+All nine v2 entries are available; all 27 slots are not_started, start unconsumed,
+quality null. Public exports are retained in `evidence/connected-task-readouts-r5/`
+and bindings/run IDs in `evidence/connection-preparation-r5-verification.json`.
+This is development evidence, not the final evaluation freeze or a launch-ready
+prompt. Parent selection of scoring originals/fresh scoring version remains open.
+
+Follow-up `c49cd7fc389203a9e7439ef13324ad77c2e1c478` changes only the returned
+selection explanation to derive the actual profile ID. Independent review found
+that explicit v1 selection previously returned a v2 explanation; actual renderer,
+plan, condition IDs and capability were already v1 and remain unchanged.
+Independent integrated source/synthetic checks passed 79/79, with no Major/Blocker
+finding. Original private worker compatibility/numeric scoring remain unverified.
+The local native/batch suite passed 14/14, profile/public grading 20/20 and the
+state-selector affected producer/private rerun 29/29. Namespace registration in
+the existing execution-state reader changes only its closed condition selector.
