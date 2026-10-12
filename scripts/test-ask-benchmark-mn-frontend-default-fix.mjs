@@ -1,3 +1,4 @@
+import { validatePortfolioFoundation } from "./ask-benchmark.mjs";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -6,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { validateMnFrontendDefaultProductionAuthority, buildEvidenceMap } from "./ask-benchmark-mn-frontend-default-fix-authority.mjs";
 import { validateMnFrontendDefaultInputClosure } from "./ask-benchmark-mn-frontend-default-source.mjs";
-const root = fileURLToPath(new URL("..", import.meta.url));
+const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 test("frontend task retains exact public input closure", () => {
   assert.equal(validateMnFrontendDefaultInputClosure({ root }).fixtureId, "mn-frontend-default-fix");
 });
@@ -26,6 +27,7 @@ test("scope, equivalence and evidence mutations are task-specific", () => {
 
 test("dedicated runtime config binds this fixture input and public verification", () => {
  const config=JSON.parse(readFileSync(resolve(root,"benchmarks/mn-frontend-default-fix.config.json"),"utf8"));
+ validatePortfolioFoundation(config, resolve(root,"benchmarks/mn-frontend-default-fix.config.json"), { root });
  const fixture=config.fixtures[0];
  assert.equal(fixture.id,"mn-frontend-default-fix");
  const prefix="benchmarks/fixtures/checkpoint-b2/mn-frontend-default-fix";

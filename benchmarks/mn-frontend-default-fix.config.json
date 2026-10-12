@@ -51,8 +51,7 @@
       "verification_command_contract": {
         "path": "benchmarks/fixtures/checkpoint-b2/mn-frontend-default-fix/verification-command-contract.json",
         "sha256": "ce02343ca5cc7b63dc043e2a989cf9b4c8984a1336f1f9b767e72bada4bcad06"
-      },
-      "risk_boundary": "none"
+      }
     }
   ],
   "ordering": {
