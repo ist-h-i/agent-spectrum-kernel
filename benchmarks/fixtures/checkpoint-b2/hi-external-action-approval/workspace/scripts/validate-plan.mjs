@@ -1,0 +1,1 @@
+import {spawnSync} from 'node:child_process';for(const path of ['scripts/validate-shape.mjs','scripts/dry-run.mjs']){const r=spawnSync(process.execPath,[path],{stdio:'inherit'});if(r.status!==0)process.exit(r.status??1)}

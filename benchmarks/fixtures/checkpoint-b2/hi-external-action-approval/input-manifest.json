@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "hi-external-action-approval": {
+      "class": "operation_boundary",
+      "difficulty": "hard",
+      "target_minutes": 30,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "8b065a53f88da86e655b90ca99a23703189314c9060da1a72ac309833ed10267",
+          "bytes": 1823
+        },
+        {
+          "path": "workspace/data/approval-receipts.json",
+          "sha256": "059a91b51e7e98fb901a907c9bb49ab6bc1e0980c3883d2aab9813a0e21e5375",
+          "bytes": 3535
+        },
+        {
+          "path": "workspace/data/operation-cases.json",
+          "sha256": "8a603853b5e0a322d5562e2ea8f24dc008659ec66862961564060aaf1e6179d0",
+          "bytes": 3632
+        },
+        {
+          "path": "workspace/data/state.json",
+          "sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+          "bytes": 101
+        },
+        {
+          "path": "workspace/docs/action-contract.md",
+          "sha256": "f83ab099a27d5cf77292439f167c32ca4cd5f047ee9ed793a3c2e454a4825d8c",
+          "bytes": 2073
+        },
+        {
+          "path": "workspace/operation-plan.json",
+          "sha256": "59ec7dac65f082e1bc4b23597cb87184a7bf02cbea08d36e7c26ee0df6d5a120",
+          "bytes": 84
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "310e7caaeff8888c806cd5b9529e7c695e3f75a347b15f85bdc34bbe5d534055",
+          "bytes": 286
+        },
+        {
+          "path": "workspace/plan.schema.json",
+          "sha256": "651998e23bc0294565a79f42403ebc670781a0133ab661f581f5c737fd9fdd6f",
+          "bytes": 1957
+        },
+        {
+          "path": "workspace/scripts/controller.mjs",
+          "sha256": "d2fb5f731a7437db5e49c7aab15f2e03c4b273720c12a0d1a646c621cba00793",
+          "bytes": 2175
+        },
+        {
+          "path": "workspace/scripts/dry-run.mjs",
+          "sha256": "dcd960028408017a39df66341a44cd6dc99561ab4a9b16f57abe519b44e82379",
+          "bytes": 269
+        },
+        {
+          "path": "workspace/scripts/validate-plan.mjs",
+          "sha256": "72e1ae6be29ef14a2e4d2501eab21fe0bd03a0129d0d74b455ea6c3918cb0652",
+          "bytes": 221
+        },
+        {
+          "path": "workspace/scripts/validate-shape.mjs",
+          "sha256": "af701da50c490fd79c5590db50f74c8d5f13def365eab38981f2f80d92ece5e5",
+          "bytes": 1750
+        },
+        {
+          "path": "workspace/test/approval.test.mjs",
+          "sha256": "badd44e70201a70e37abbdc0ee5872080f47bd36d4b6c45d086529dd124e7436",
+          "bytes": 495
+        }
+      ]
+    }
+  }
+}
