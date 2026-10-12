@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "pf-api-pagination-behavior",
+  "fixture_role": "primary",
+  "suite": "practice_frequency",
+  "task_class": "implementation_verification",
+  "domain": "backend_api",
+  "difficulty": "medium",
+  "repetitions": 3,
+  "risk_boundary": "none",
+  "capability_families": [
+    "api_contracts",
+    "verification_discipline"
+  ],
+  "evidence_topologies": [
+    "api_contract_and_callers",
+    "implementation_and_tests"
+  ],
+  "outcome_dimensions": [
+    "behavioral_consistency",
+    "regression_prevention"
+  ],
+  "output_contract_type": "implementation_producing",
+  "requirement_record_id": "requirement-record-pf-api-pagination-behavior",
+  "output_contract_id": "output-contract-pf-api-pagination-behavior",
+  "evaluator_bundle_id": "evaluator-7ac78d381beb78dd9144796221784c7d8d43f5b91b280a246bbcb9d6935d9618",
+  "evaluator_bundle_digest": "sha256:62d6fa98aa058a436ba62f97629952eba012df9f08b671319f4712fdcd269700",
+  "evaluator_byte_count": 691773,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:95114ec9705efeedc2efd7e9c305c9eeb731e79ee6cc52515e6053b9cbae2a05"
+}
