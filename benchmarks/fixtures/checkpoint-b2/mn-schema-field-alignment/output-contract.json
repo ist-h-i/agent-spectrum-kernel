@@ -6,9 +6,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:e06af954cc33588ae0a1b24b04da5cf23745ba1086f699f48d3cbba1b501c2ad",
+  "evaluator_public_reference_digest": "sha256:d52c6b51a46042af59b7054e9d218509bb759bc1479c430b597fefc3e1b72ad4",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/verification-command-contract.json",
-  "verification_command_contract_digest": "sha256:d8a712a5cc5136b2887a95f6099b4a29608e797c87eb2d77d2e2f1fa9a8a5643",
+  "verification_command_contract_digest": "sha256:21c3238448cf8d3bf72f339ce46ae21428c8cc7f61aaa8610abae4c2a0eae01d",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:4d4a5fd37fbec57ef2e65942e41a54f75ac576d5e49b234ed9de2def5c23e18d",
   "result_profile": {
@@ -17,7 +17,7 @@
   },
   "declares_findings": false,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:b7a81f67d103105b0401a7bf19b341efb1669cbd7b399d9e1b195e48e8908133",
-  "evaluator_authority_manifest_digest": "sha256:d900ae35d492fbe11fb26e02118af10e1c83937fb7f82e098f52a3f3ddc1e501",
-  "output_contract_digest": "sha256:7aea316fe900dac848db3f645c7bf435a5ae5cc02b9a80286db978007258868f"
+  "evaluator_authority_manifest_raw_sha256": "sha256:6fd6f7880c774f7c578a78fd1b3afd22b28ca78ff58f128d11b69ec05f035b4b",
+  "evaluator_authority_manifest_digest": "sha256:8e6a6d13ceac336f1855fa3869c6e1545ab0efc4a7774db04b2d20e4f9d75d5c",
+  "output_contract_digest": "sha256:ae0dd37fc27e1ae7bf8e625073077cd5aa746e9026e6637e88c6eb7d6388f481"
 }
