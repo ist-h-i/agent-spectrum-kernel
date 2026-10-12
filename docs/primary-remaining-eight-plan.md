@@ -33,6 +33,16 @@ is 84 hours / 45M token start-decision upper limit, 60 minutes per condition,
 5 minutes per public check, original private worker timeouts, 185 minutes grading
 reservation per block. Standard CLI/global instruction differences are recorded.
 
+Closed native verification failures remain quality evidence, including a block
+where an earlier completed/manual-pending slot makes the single-task overall
+state `indeterminate`. The primary admission checks each slot instead of using
+that overall label: `completed` requires pass/unknown with every native check
+passing; `verification_failed` requires fail with at least one closed native
+failure. Every receipt/owner/journal/process/scope/exit consistency guard stays
+required. Inconsistent state/check/outcome combinations and true execution
+unknown still stop. Global single-task and formal four-condition semantics do
+not change.
+
 Fresh primary grading distinguishes completed processing/saved results from
 numeric completeness. Manual/null/partial requirement judgments are saved and
 permit the next fixed fixture. Execution unknown, damaged evidence, permission

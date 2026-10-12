@@ -103,6 +103,17 @@ function checkBlock(block, conditions, pending) {
   }
   return loaded;
 }
+// Original unstarted blocks are never dispatched. Read their pinned plan bytes
+// only to bind lineage and protected source roots, not to probe legacy owners.
+function originalPrimaryPlanMetadata(block) {
+  const raw = stable(join(block.root, 'control/plan.json'));
+  assert.equal(comparisonHash(raw), block.plan_digest, 'original parent plan changed');
+  assert.equal(stable(join(block.root, 'control/plan.digest')).toString().trim(), block.plan_digest);
+  const plan = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
+  assert.equal(plan.kind, 'ask_user_comparison_plan_v1'); assert.equal(plan.root, block.root); assert.equal(plan.run_id, block.run_id);
+  assert.equal(plan.policy.execution_contract, 'single_shot_v1'); assert.equal(plan.source.digest, block.source_digest);
+  canonical(plan.source.repo); return plan;
+}
 // Narrow continuation of one stopped primary batch. All reads are metadata/byte
 // checks; no legacy ownership probing, starts, auth inspection or worker calls.
 export function validatePrimaryRemainingEightContinuation(value) {
@@ -130,6 +141,7 @@ export function validatePrimaryRemainingEightContinuation(value) {
   assert.deepEqual(value.original_fixture_ids, PRIMARY_FIXTURE_IDS);
   const conditions = ['plain', 'kernel_principles_v2', 'full_ask']; assert.deepEqual(parent.conditions, conditions);
   const first = parent.blocks[0]; assert.equal(value.parent_run_id, first.run_id);
+  const parentPlans = parent.blocks.map(originalPrimaryPlanMetadata);
   const parentPrepared = record(join(parent.root, 'prepared.json'));
   assert.equal(parentPrepared.manifest_path, value.parent_manifest.path);
   assert.equal(parentPrepared.manifest_digest, value.parent_manifest.digest);
@@ -199,7 +211,7 @@ export function validatePrimaryRemainingEightContinuation(value) {
   return { fixture_ids: PRIMARY_FIXTURE_IDS.slice(1), parent_evidence_kind: parentEvidenceKind, parent_run_ids: parent.blocks.map(block => block.run_id),
     issuance_path: join(dirname(dirname(dirname(parent.root))), '.ask-primary-continuations', value.parent_manifest.digest.slice(7) + '.json'),
     parent_roots: [dirname(dirname(parent.root)), gradeRoot,
-      ...parent.blocks.flatMap(block => [block.root, block.public_input_root, readUserComparisonPlan(block.root).plan.source.repo])] };
+      ...parent.blocks.flatMap((block, index) => [block.root, block.public_input_root, parentPlans[index].source.repo])] };
 }
 export function assertPrimaryContinuationIsolation(continuation, roots) {
   for (const candidate of roots) for (const parentRoot of continuation.parent_roots)
@@ -354,8 +366,7 @@ function safeTerminal(report, block, conditions) {
     || checkpoint?.event !== 'invocation_ended' || checkpoint.stop !== null
     || checkpoint.run_id !== block.run_id || checkpoint.plan_digest !== block.plan_digest) return false;
   // The single-task report retains semantic unknown. Only this primary safety
-  // projection can admit it after execution closure and native evidence pass.
-  const qualityPending = report.overall.state === 'indeterminate';
+  // projection admits each slot after execution closure and consistent native evidence.
   return report.slots.every(slot => {
     const terminal = checkpoint.slots?.[slot.condition], checks = slot.verification?.checks;
     if (terminal?.phase !== 'terminal' || terminal.attempts !== 1 || slot.receipt_integrity !== 'valid') return false;
@@ -369,8 +380,8 @@ function safeTerminal(report, block, conditions) {
       && Array.isArray(checks) && checks.length > 0 && checks.every(check => !check.cleanup_error && !check.runner_error
         && check.process_completed === true && check.spawn_observed === true && ['pass', 'fail'].includes(check.status)
         && Number.isInteger(check.exit_code) && check.exit_code >= 0 && (check.status === 'pass' ? check.exit_code === 0 : check.exit_code !== 0))
-      && (!qualityPending || slot.state === 'completed' && ['pass', 'unknown'].includes(slot.outcome)
-        && checks.every(check => check.status === 'pass'));
+      && (slot.state === 'completed' ? ['pass', 'unknown'].includes(slot.outcome) && checks.every(check => check.status === 'pass')
+        : slot.outcome === 'fail' && checks.some(check => check.status === 'fail'));
   });
 }
 export async function startPrimaryEvaluationBatch(root, confirmedManifestDigest, { gradingAdapter, startComparison = startUserComparison, signal, now = Date.now } = {}) {

@@ -65,11 +65,14 @@ function adapters(overrides = {}) {
     startComparison: async (root, planDigest) => {
       calls.push(root); const plan = JSON.parse(readFileSync(join(root, 'control/plan.json')));
       const slots = ['plain', plan.config.kernel_condition ?? 'kernel_only', 'full_ask'].map(condition => ({ condition, state: overrides.slotState ?? 'completed',
-        outcome: overrides.outcome ?? 'pass', receipt_integrity: 'valid', exit_code: 0, scope: { status: 'pass' },
+        outcome: overrides.outcome ?? (overrides.slotState === 'verification_failed' ? 'fail' : 'pass'), receipt_integrity: 'valid', exit_code: 0, scope: { status: 'pass' },
         process_completed: !overrides.unknownChild, unresolved_child: overrides.unknownChild ?? false,
         verification: { checks: [{ process_completed: !overrides.unknownVerifier, spawn_observed: true,
           status: overrides.unknownVerifier ? 'unknown' : overrides.slotState === 'verification_failed' ? 'fail' : 'pass', exit_code: overrides.slotState === 'verification_failed' ? 1 : 0 }], requirements: [] },
         metrics: { input_tokens: null, output_tokens: null } }));
+      overrides.editSlots?.(slots, calls.length - 1);
+      const firstNonpass = slots.find(slot => slot.state !== 'completed' || slot.outcome !== 'pass');
+      const overallState = firstNonpass ? firstNonpass.state === 'verification_failed' ? 'task_failed' : 'indeterminate' : 'completed';
       const terminalDigests = Object.fromEntries(slots.map(slot => {
         const folder = join(root, 'control/slots', slot.condition); mkdirSync(folder, { recursive: true });
         const raw = JSON.stringify(slot), terminalDigest = hash(raw);
@@ -77,7 +80,7 @@ function adapters(overrides = {}) {
         return [slot.condition, terminalDigest];
       }));
       writeFileSync(join(root, 'control/slots/.synthetic-batch-receipts'), 'synthetic');
-      const report = { run_id: plan.run_id, plan_digest: planDigest, overall: { state: overrides.state ?? 'completed' },
+      const report = { run_id: plan.run_id, plan_digest: planDigest, overall: { state: overrides.state ?? overallState },
         execution: { state: 'available', start_consumed: true, resume_allowed: false, owner: { released: true },
           history: { pending: [], snapshot: { run_id: plan.run_id, plan_digest: planDigest, event: 'invocation_ended', stop: null,
             slots: Object.fromEntries(slots.map(slot => [slot.condition, { phase: 'terminal', attempts: 1, terminal_digest: terminalDigests[slot.condition] }])) } } },
@@ -343,7 +346,7 @@ test('remaining-eight is one fresh exact 24-slot plan with retained parent evide
     ...['plain', 'kernel_principles_v2', 'full_ask'].flatMap(c => ['result.json', 'result.digest'].map(n => join(f.first.root, 'control/slots', c, n)))];
   const before = preserved.map(p => hash(readFileSync(p)));
   await t.test('all24 partial/manual results save and terminate; second start never dispatches', async () => {
-    const m = f.manifest(), a = adapters({ state: 'indeterminate', outcome: 'unknown' });
+    const m = f.manifest(), a = adapters({ editSlots: mixClosedNativeSlots });
     a.gradingAdapter.grade = async block => {
       a.grades.push(block.fixture_id);
       return { status: 'completed', scoring_status: 'not_scoring_ready', conditions: m.value.conditions.map((condition, i) => ({
@@ -442,4 +445,30 @@ test('remaining-eight is one fresh exact 24-slot plan with retained parent evide
     }
   });
   assert.deepEqual(preserved.map(p => hash(readFileSync(p))), before);
+});
+
+// Authentic synthetic receipt construction precedes byte/digest publication.
+// Logical order differs across blocks; the reporter selects the first nonpass.
+function mixClosedNativeSlots(slots, index) {
+  const unknown = index % 3, failed = (index + 1) % 3;
+  slots[unknown].outcome = 'unknown';
+  slots[failed].state = 'verification_failed'; slots[failed].outcome = 'fail';
+  slots[failed].verification.checks[0].status = 'fail'; slots[failed].verification.checks[0].exit_code = 1;
+}
+test('mixed primary native failures and pending quality advance independent of first-nonpass order', async t => {
+  const f = fixture(t, { kernelCondition: 'kernel_principles_v2' }), m = f.manifest(), a = adapters({ editSlots: mixClosedNativeSlots });
+  preparePrimaryEvaluationBatch(m.path, a);
+  const result = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
+  assert.equal(result.state, 'completed'); assert.equal(a.calls.length, 9); assert.equal(a.grades.length, 9);
+  assert.equal(result.slots.filter(slot => slot.state === 'verification_failed').length, 9);
+  for (const editSlots of [
+    slots => { slots[0].outcome = 'unknown'; slots[0].verification.checks[0].status = 'fail'; slots[0].verification.checks[0].exit_code = 1; },
+    slots => { slots[0].state = 'verification_failed'; slots[0].outcome = 'fail'; },
+    slots => { mixClosedNativeSlots(slots, 0); slots[1].outcome = 'pass'; },
+  ]) {
+    const bad = f.manifest(), b = adapters({ editSlots }); preparePrimaryEvaluationBatch(bad.path, b);
+    const stopped = await startPrimaryEvaluationBatch(bad.value.root, bad.digest, b);
+    assert.equal(stopped.state, 'stopped'); assert.equal(b.calls.length, 1); assert.equal(b.grades.length, 0);
+    await assert.rejects(startPrimaryEvaluationBatch(bad.value.root, bad.digest, b), /consumed/u);
+  }
 });
