@@ -229,7 +229,7 @@ export function generatePfReviewErrorReviewArchive({ root = ROOT, privateRoot, c
   const generatorEntry = unique.get(`repository/${GENERATOR_PATH}`);
   const manifest = {
     schema_version: "1.0.0",
-    program: "pf_frontend_async_state_private_review_archive",
+    program: "pf_review_error_contract_private_review_archive",
     fixture_id: FIXTURE_ID,
     reviewed_repository_head: reviewedHead,
     evaluator_source_revision: sourceRevision,

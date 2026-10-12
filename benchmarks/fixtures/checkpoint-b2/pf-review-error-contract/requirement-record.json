@@ -1,4 +1,68 @@
 {
+  "requirement_record_id": "requirement-record-pf-review-error-contract",
+  "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+  "requirement_record_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/requirement-record.json",
   "fixture_id": "pf-review-error-contract",
-  "candidate_state": "generation_pending"
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+  "admission_record_digest": "sha256:183ce6ec473374ee5c743102138239f5ec2bcc91767cfbfd3cfcdcbb98f14096",
+  "requirements": [
+    {
+      "requirement_id": "error-contract-findings",
+      "requirement_kind": "weighted",
+      "max_points": 5,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "error-contract-review-basis"
+      ],
+      "mutation_ids": [
+        "remove-error-contract-evidence"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-error-contract-review"
+      ],
+      "finding_group_id": "error-contract-findings-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:eec2d18f4c87f9cc7945a16eeb4ef1b86945794d98b8404366adbe60e1ac21b4"
+    },
+    {
+      "requirement_id": "request-scope-discipline",
+      "requirement_kind": "weighted",
+      "max_points": 3,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "focused-change-boundary"
+      ],
+      "mutation_ids": [
+        "remove-focused-scope-evidence"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-focused-change"
+      ],
+      "finding_group_id": "request-scope-discipline-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:e3187209cf50b708e59e5ff55959485ac7d5ffabe5cd56c2e41bb410a45e49e0"
+    },
+    {
+      "requirement_id": "verification-evidence",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "repository-verification-route"
+      ],
+      "mutation_ids": [
+        "remove-verification-route"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-focused-verification"
+      ],
+      "finding_group_id": "verification-evidence-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:bd83b73db00635e17e21c28de1d57fd2711c659e596761c28149794bf5077022"
+    }
+  ],
+  "requirement_set_digest": "sha256:62aec47a5de8ecd3512012ecf73981013ed41646e667cb58c5d9b61617fde63d",
+  "requirement_record_digest": "sha256:9c82ed2166c3f8cf0d506d51247edf42c8e872d505017912a33ae166c0381c63"
 }

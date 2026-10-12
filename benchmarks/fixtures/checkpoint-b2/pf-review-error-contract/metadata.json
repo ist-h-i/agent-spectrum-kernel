@@ -1,4 +1,32 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "pf-review-error-contract",
-  "candidate_state": "generation_pending"
+  "fixture_role": "primary",
+  "suite": "practice_frequency",
+  "task_class": "pr_review",
+  "domain": "backend_api",
+  "difficulty": "medium_hard",
+  "repetitions": 3,
+  "risk_boundary": "none",
+  "capability_families": [
+    "api_contracts",
+    "review_precision"
+  ],
+  "evidence_topologies": [
+    "api_contract_and_callers",
+    "review_diff_and_tests"
+  ],
+  "outcome_dimensions": [
+    "contract_consistency",
+    "review_precision"
+  ],
+  "output_contract_type": "findings_producing",
+  "requirement_record_id": "requirement-record-pf-review-error-contract",
+  "output_contract_id": "output-contract-pf-review-error-contract",
+  "evaluator_bundle_id": "evaluator-648392b764a70d8d95bfe14e7fa79d418869cbe57eee2b03c3c16261a3de5b64",
+  "evaluator_bundle_digest": "sha256:b7200b1792f8ea87ef5fc1670e21998b90a3e1a22bf46a476001b74058568e2d",
+  "evaluator_byte_count": 402706,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:4cb45c2ab2c0e8a4aa5694623400ffbf5e456a83b00b086263d073872c690ee2"
 }
