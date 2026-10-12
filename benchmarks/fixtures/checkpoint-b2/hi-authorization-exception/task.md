@@ -1,0 +1,9 @@
+# Review the ownership-exception authorization PR
+
+Review the proposed local authorization PR against the ownership contract, trusted caller inputs and preserved legitimate exceptions. Add the closed factual review in workspace/review.json with publicly evidenced findings and completed verification declarations. Use the source, base, diff and full supplied trace to distinguish an unauthorized grant from a correctly scoped exception.
+
+Only add workspace/review.json. All existing files are protected. This is a fictional local boolean decision model; no real permission change, users, credentials, deployment or external action is requested. Use the exact final validation below.
+
+```bash
+node -e 'const fs=require("node:fs"),crypto=require("node:crypto"),expected={"base/authorization.mjs":"d309499d88e4a26a07eb2c213cf4f94d124af02a70b989ad45dedcf3274783ab","data/access-cases.json":"75a02b0d0eec26816cbe04820b3a04d55142a810f31a8cff62b8d38c9f5ad93b","docs/ownership-contract.md":"9e4e640a30fda00d28d99116d6a38a3af59d3e5d0da4453c47386845cfd686f7","package.json":"5183d1b158e0d43e6d5775193b40dd8dceb57238f864240092bb14736008e7eb","pr.diff":"6cd8938c1c4e2126b0c555f87b85ee80dd3a65f497056fc82b4b171ea19a2de5","review.schema.json":"ccb9b5e08df42f1c1ec4a6184cefceeb63d6141fadbf0cd390597a14d2a83914","scripts/trace-access.mjs":"613d2d77bed0831a111f4d5a6c4f519d06b2c39b7d23987aca2259388c1ee3ae","scripts/validate-review.mjs":"7303c27db15cdc8ecee9b431c063e5d86b0d52ba2815f5d7da626e55bbeb8aaa","src/authorization.mjs":"1513a26035db0002c4c4cbfb19a5b353d8fbf08095bae1cedd18b63c6222c721","test/access-subset.test.mjs":"997710eb46664ada0f764cbe8a320943ec53acb8d7c235de32afe6cc25164528"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash("sha256").update(fs.readFileSync(path)).digest("hex")!==digest)process.exit(41)}' && npm test && npm run trace && npm run validate:review
+```
