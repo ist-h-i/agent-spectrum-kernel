@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { validatePfApiPaginationProductionAuthority, buildEvidenceMap } from "./ask-benchmark-pf-api-pagination-behavior-authority.mjs";
+import { validatePfApiPaginationProductionAuthority, buildEvidenceMap } from "./ask-benchmark-pf-api-pagination-authority.mjs";
 import { validatePfApiPaginationInputClosure } from "./ask-benchmark-pf-api-pagination-source.mjs";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 test("pagination task retains exact public input closure", () => {

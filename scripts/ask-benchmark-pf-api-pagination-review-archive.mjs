@@ -6,7 +6,7 @@ import { basename, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { computeEvaluatorBundleDigest, computeEvaluatorBundleId } from "./ask-benchmark-evaluator-boundary.mjs";
 import { assertPrivateRootOutsideRepository } from "./ask-benchmark-mn-build-option-update.mjs";
-import { validatePfApiPaginationProductionAuthority } from "./ask-benchmark-pf-api-pagination-behavior-authority.mjs";
+import { validatePfApiPaginationProductionAuthority } from "./ask-benchmark-pf-api-pagination-authority.mjs";
 import {
   establishReviewArchiveIdentity,
   evaluatorSourceReviewEntries,
@@ -33,7 +33,7 @@ const SOURCE_PATHS = Object.freeze([
   "scripts/ask-benchmark-evaluator-boundary.mjs",
   "scripts/ask-benchmark-private-evaluator-runner.mjs",
   "scripts/ask-benchmark-pf-api-pagination-source.mjs",
-  "scripts/ask-benchmark-pf-api-pagination-behavior-authority.mjs",
+  "scripts/ask-benchmark-pf-api-pagination-authority.mjs",
   GENERATOR_PATH,
   "scripts/test-ask-benchmark-pf-api-pagination-behavior.mjs",
 ]);
