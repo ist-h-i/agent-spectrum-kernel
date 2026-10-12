@@ -204,6 +204,9 @@ jobs:
       - name: Verify read-only saved primary command capture
         run: node --test scripts/test-ask-primary-saved-command-capture.mjs
 
+      - name: Verify bounded private runtime observation transport
+        run: node --test scripts/test-ask-benchmark-runtime-observation.mjs
+
       - name: Run verification evidence exact-reuse tests
         run: node scripts/test-verification-evidence.mjs
 
