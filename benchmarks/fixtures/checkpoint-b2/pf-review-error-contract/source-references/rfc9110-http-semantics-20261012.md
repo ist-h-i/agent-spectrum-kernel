@@ -1,6 +1,6 @@
 # Public source reference: RFC9110 HTTP Semantics
 source_reference_id: rfc9110-http-semantics-20261012
-source_type: public_documented_pattern
+source_type: documented_external_pattern
 Publisher: RFC Editor / IETF; RFC9110 June2022, checked2026-10-12.
 Links: https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-after ; https://www.rfc-editor.org/rfc/rfc9110.html#name-idempotent-methods .
 
