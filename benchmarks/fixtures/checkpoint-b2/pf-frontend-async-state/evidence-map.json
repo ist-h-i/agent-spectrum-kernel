@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "pf-frontend-async-state",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/src/search-controller.mjs"
+    ],
+    "required_candidate_paths": [
+      "workspace/src/search-controller.mjs"
+    ],
+    "protected_candidate_paths": [
+      "workspace/package.json",
+      "workspace/src/search-view.mjs",
+      "workspace/spec/search-state-contract.md",
+      "workspace/test/search-state.test.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "unrecognized_controller_meaning": "manual_review_required",
+    "authority_digest": "sha256:6cf5d1f5aacfc3f309ba7b551a5f43d0f0f56826ef3ee68ee9800e9cd33d5938"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "async-state-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/src/search-view.mjs",
+        "workspace/spec/search-state-contract.md",
+        "workspace/test/search-state.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "focused-change-boundary",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/spec/search-state-contract.md"
+      ]
+    },
+    {
+      "evidence_map_id": "repository-verification-route",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/test/search-state.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-async-state-evidence",
+      "target_evidence_map_id": "async-state-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:ec950a57843a284f3415cd046b9fd84fa2d1ebbf1aea17cab4bf528a554610a1"
+    },
+    {
+      "mutation_id": "remove-focused-scope-evidence",
+      "target_evidence_map_id": "focused-change-boundary",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:c3321536420734eacb5c053841e36b391b792745e2eb77375447668b8a5e283b"
+    },
+    {
+      "mutation_id": "remove-verification-route",
+      "target_evidence_map_id": "repository-verification-route",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:4295888a51d2aaf4603fccb6239860c1f7a5c54c2e5e1eb6e5d9aa1283e6217b"
+    }
+  ]
+}

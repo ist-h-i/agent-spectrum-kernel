@@ -1,0 +1,28 @@
+{
+  "reviewer_record_id": "pagination-source-independent-review-20261012",
+  "fixture_id": "pf-api-pagination-behavior",
+  "reviewed_head": "40647e0ae3ae7c0e213dbb14416ceaaf08dedca6",
+  "base_commit": "4b1bf37961d6f2f23acf950413ac956d20a5ab01",
+  "decision": "approve",
+  "scope": "public source preparation and documented external-pattern source lineage only; not fixture admission or private grading approval",
+  "source_type": "documented_external_pattern",
+  "source_reference_ids": ["github-rest-pagination-docs-20261012"],
+  "official_source": {
+    "url": "https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api",
+    "independently_viewed_date": "2026-10-12",
+    "supports": "Server-supplied next-page URLs, variable pagination parameters, missing relations, and page-size parameters in continuation URLs.",
+    "does_not_support": "Measured task frequency, project prevalence, business impact, or the fictional API body representation."
+  },
+  "source_refs": [
+    {"path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/lineage.md", "raw_sha256": "sha256:65b28667bd89a04a945d8e255b77bb8d4f3925e77fff429a86f7c55f0d47835b"},
+    {"path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/source-references/github-rest-pagination-docs-20261012.md", "raw_sha256": "sha256:d9c6acba432375ed69394dc9b7afc30f45955c2e749905433c3a12bd04266263"},
+    {"path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/input-manifest.json", "raw_sha256": "sha256:3f087aabe9d3bf1af6b1ccb7ba425469c7b9e5a7038cb350f94696a664a10386"},
+    {"path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/verification-command-contract.json", "raw_sha256": "sha256:8a7f8c4880deace5ce83ae5ba0e62d3d0086ea5cbfd1c078c1c05812d2df4dcc", "contract_digest": "sha256:9fc322fdabfced41a0e42139c54cfc6e4792ab6b3238d977ef649cadd7750d2e"},
+    {"path": "scripts/ask-benchmark-pf-api-pagination-source.mjs", "raw_sha256": "sha256:52740f2f79b96d394c175b82309682d49a16077d6cbb7e632f9ca5d0781d0a6f"},
+    {"path": "scripts/test-ask-benchmark-pf-api-pagination-source.mjs", "raw_sha256": "sha256:61c17d5d017be3b49db68ea52d670914ea61357bd375fb9331c25f9308b828be"}
+  ],
+  "lineage_policy_ref": {"path": "benchmarks/portfolio-lineage-policy.json", "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d", "declared_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"},
+  "catalog_ref": {"path": "benchmarks/portfolio-catalog.json", "raw_sha256": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8", "declared_catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972"},
+  "requirements_for_change": [],
+  "limitations": ["Approves exact inspected source for the pre-grader source-lineage stage only.", "No private materials, model results, scoring or comparison were inspected or run.", "Empirical medium-difficulty calibration remains unverified."]
+}
