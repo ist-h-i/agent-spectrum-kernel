@@ -1,0 +1,9 @@
+# Migrate the local archive library API
+
+Complete the application adapter migration to the supplied version2 library while preserving the published application manifest and explicit POSIX/Windows behavior. Verify the compatibility matrix, preserve the version1 local rollback path and add the closed migration record in docs/migration-contract.md. Public vendor source and documentation define both APIs.
+
+Only workspace/src/archive-compat.mjs may change; add workspace/migration-record.json. All other supplied files are protected. The modules and data are fictional and memory-only. No package installation, real migration, service connection or external write is required. Use the exact final validation below.
+
+```bash
+node -e 'const fs=require("node:fs"),crypto=require("node:crypto"),expected={"config/migration-settings.json":"c94849ae6c817d5668934c106460e5d266e4218985b0bf8067c2c095efd0fa7f","data/compatibility-matrix.json":"4237f8f1f9a61f52da74f745e9f1a112e99498af84ca9cb677edbcc257e13936","docs/migration-contract.md":"5090f50b67c173d19574fde24656e7a48604caaeb066d859e6690b5d1d2e92fd","package.json":"efddca87cfde435a8389073ab4d746330efcd05f8be38535c3ffbe53f56ee639","scripts/check-rollback.mjs":"1e47d9b4f880336564a20e6f9c20df68aeec3d42c0397ee0106d718c60805a92","scripts/validate-migration.mjs":"d2cc29b3ab631189f96f9ac6a0ea42530dff946f0cb75e3cfac04349d18972ca","test/archive-compat.test.mjs":"f7a3d071167c389e253383a2f8c83eb2df267bb5fd41b46924a5020309f9be7b","vendor/archive-v1.mjs":"fb914ff9b1f0160ff8214ba85ad912488ab739698e155e8077a610ca852d882b","vendor/archive-v2.mjs":"020fa105951a30f2bf710d1b7341431aefae6517c7e89a2275f04952cb569ce8"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash("sha256").update(fs.readFileSync(path)).digest("hex")!==digest)process.exit(41)}' && [ -f test/archive-compat.test.mjs ] && npm test && npm run rollback && npm run validate:migration
+```

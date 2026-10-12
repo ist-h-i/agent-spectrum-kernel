@@ -1,0 +1,2 @@
+import {win32,posix} from 'node:path';
+export async function createIndex({baseDirectory,flavor}){const api=flavor==='win32'?win32:posix;const records=[];return {async add({relativePath,content}){if(!(content instanceof Uint8Array))throw new TypeError('content must be bytes');await Promise.resolve();records.push({location:api.join(baseDirectory,relativePath),byteLength:content.byteLength})},async close(){return {format:2,records:records.map(record=>({...record}))}}}}

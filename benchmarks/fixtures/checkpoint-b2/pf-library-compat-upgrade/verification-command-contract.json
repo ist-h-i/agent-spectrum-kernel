@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "pf-library-compat-upgrade",
+  "fixture_input_digest": "sha256:ac95831a89f2e05c6a5e4d2742988fb820eefbca1b94e4fb90bc30efdee4117f",
+  "commands": [
+    {
+      "command_id": "library-compat-migration-validation",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"config/migration-settings.json\":\"c94849ae6c817d5668934c106460e5d266e4218985b0bf8067c2c095efd0fa7f\",\"data/compatibility-matrix.json\":\"4237f8f1f9a61f52da74f745e9f1a112e99498af84ca9cb677edbcc257e13936\",\"docs/migration-contract.md\":\"5090f50b67c173d19574fde24656e7a48604caaeb066d859e6690b5d1d2e92fd\",\"package.json\":\"efddca87cfde435a8389073ab4d746330efcd05f8be38535c3ffbe53f56ee639\",\"scripts/check-rollback.mjs\":\"1e47d9b4f880336564a20e6f9c20df68aeec3d42c0397ee0106d718c60805a92\",\"scripts/validate-migration.mjs\":\"d2cc29b3ab631189f96f9ac6a0ea42530dff946f0cb75e3cfac04349d18972ca\",\"test/archive-compat.test.mjs\":\"f7a3d071167c389e253383a2f8c83eb2df267bb5fd41b46924a5020309f9be7b\",\"vendor/archive-v1.mjs\":\"fb914ff9b1f0160ff8214ba85ad912488ab739698e155e8077a610ca852d882b\",\"vendor/archive-v2.mjs\":\"020fa105951a30f2bf710d1b7341431aefae6517c7e89a2275f04952cb569ce8\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && [ -f test/archive-compat.test.mjs ] && npm test && npm run rollback && npm run validate:migration",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:0ac7464f82619e83e01a1dc4b2c6a44fdc1fad6c5597cdb9daa39d74ce87c885",
+      "rendered_event_command_digest": "sha256:d8f49d81ed8767d065d54f4b9bd3f0022c09f1cb79aa2e28abc04cc32f50b64e",
+      "command_contract_digest": "sha256:0e29f43917dc321d4de46c62e4ec6f931a98657d445201674d638ee03e4489f9"
+    }
+  ],
+  "contract_digest": "sha256:18c738817e5f57d0066c5f667e2a09601b205cca507efa7e8c58d90dd4a0fd22"
+}
