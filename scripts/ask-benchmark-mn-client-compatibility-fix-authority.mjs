@@ -379,7 +379,7 @@ function generateMnClientCompatibilityFixProductionAuthorityInPlace({ root, priv
     evidence_map: rawArtifact(root, evidencePath, canonicalDigest(evidence.evidenceMap)),
     evaluator_authority_manifest: rawArtifact(root, layout.manifestPath, authorityManifest.manifest_digest),
     result_profile: output.result_profile,
-    freeze_revision: "issue-207-mn-client-compatibility-fix-r1",
+    freeze_revision: "issue-207-mn-client-compatibility-fix-r2",
   };
   const freeze = { ...freezeBase, manifest_digest: computeScoringInputFreezeManifestDigest(freezeBase) };
   writeJson(resolve(fixtureRoot, "scoring-input-freeze-manifest.json"), freeze);
