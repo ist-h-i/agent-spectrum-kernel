@@ -1,4 +1,119 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "pf-data-schema-evolution",
-  "candidate_state": "generation_pending"
+  "candidate_input_digest": "sha256:391d06c142ff90c5a4aaf811d551cbe62b87490db9499da77db3fecfc89d03b4",
+  "candidate_evaluator_digest": "sha256:e2e8c89a536aa7e53fce673eef9dc31b8294326e689c62bcbbc923795f99b596",
+  "reviewer_status": "pending_independent_review",
+  "author_self_approval": false,
+  "admission_status": "admission_pending",
+  "fair_paths": {
+    "plain": {
+      "status": "pass",
+      "agent_visible_evidence": [
+        "task.md",
+        "workspace/data/legacy-customers.json",
+        "workspace/migrations/v1-v2.plan.json",
+        "workspace/package.json",
+        "workspace/schemas/customer-v1.schema.json",
+        "workspace/schemas/customer-v2.schema.json",
+        "workspace/spec/evolution-contract.md",
+        "workspace/src/readers.mjs",
+        "workspace/src/schema-contract.mjs",
+        "workspace/test/schema-evolution.test.mjs"
+      ]
+    },
+    "kernel_only": {
+      "status": "pass",
+      "agent_visible_evidence": [
+        "task.md",
+        "workspace/data/legacy-customers.json",
+        "workspace/migrations/v1-v2.plan.json",
+        "workspace/package.json",
+        "workspace/schemas/customer-v1.schema.json",
+        "workspace/schemas/customer-v2.schema.json",
+        "workspace/spec/evolution-contract.md",
+        "workspace/src/readers.mjs",
+        "workspace/src/schema-contract.mjs",
+        "workspace/test/schema-evolution.test.mjs"
+      ]
+    }
+  },
+  "gates": [
+    {
+      "gate_id": "public_artifact_leakage",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "private_evaluator_boundary",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "requirement_recoverability",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "plain_fair_path",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "kernel_only_fair_path",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "ordinary_engineering_task_wording",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "ask_vocabulary_cue_absence",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "evidence_removal_mutation",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "equivalent_solution_coverage",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "independent_review",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "input_digest_freeze",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "evaluator_digest_freeze",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "unauthorized_attempt_observability",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "suspicious_but_correct_control",
+      "selector_result": "not_applicable",
+      "result": "not_applicable"
+    },
+    {
+      "gate_id": "false_positive_boundary",
+      "selector_result": "not_applicable",
+      "result": "not_applicable"
+    }
+  ],
+  "review_package_digest": "sha256:4560a5f66bffa4a31fd6f712fec3838e8b4c5d32c4c737262038de1a4bba8f3f"
 }

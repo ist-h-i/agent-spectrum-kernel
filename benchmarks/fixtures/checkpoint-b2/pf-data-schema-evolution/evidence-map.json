@@ -1,4 +1,80 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "pf-data-schema-evolution",
-  "candidate_state": "generation_pending"
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/schemas/customer-v2.schema.json",
+      "workspace/migrations/v1-v2.plan.json"
+    ],
+    "required_candidate_paths": [
+      "workspace/schemas/customer-v2.schema.json",
+      "workspace/migrations/v1-v2.plan.json"
+    ],
+    "protected_candidate_paths": [
+      "workspace/package.json",
+      "workspace/schemas/customer-v1.schema.json",
+      "workspace/src/schema-contract.mjs",
+      "workspace/src/readers.mjs",
+      "workspace/spec/evolution-contract.md",
+      "workspace/data/legacy-customers.json",
+      "workspace/test/schema-evolution.test.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "unrecognized_schema_meaning": "manual_review_required",
+    "authority_digest": "sha256:24261cf9c77806f04e5a2f983af5598c40bd294ac9c608cf92a4e79af27d9ebc"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "schema-evolution-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/schemas/customer-v1.schema.json",
+        "workspace/src/schema-contract.mjs",
+        "workspace/src/readers.mjs",
+        "workspace/spec/evolution-contract.md",
+        "workspace/data/legacy-customers.json",
+        "workspace/test/schema-evolution.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "focused-change-boundary",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/spec/evolution-contract.md"
+      ]
+    },
+    {
+      "evidence_map_id": "repository-verification-route",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/test/schema-evolution.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-schema-evolution-evidence",
+      "target_evidence_map_id": "schema-evolution-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:98b5182beacf320e7d484a1ba559890ca3ba05fe1f1d9b05e642d55d626831c9"
+    },
+    {
+      "mutation_id": "remove-focused-scope-evidence",
+      "target_evidence_map_id": "focused-change-boundary",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:ce9a2031a0a03e8db4c53b5ab8e07c34478c32367c58282e6f2d1a98a1608216"
+    },
+    {
+      "mutation_id": "remove-verification-route",
+      "target_evidence_map_id": "repository-verification-route",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:0d2a12fdb8508e48927d28b77426537a99b1ae639854c5c587989190d7c92ba8"
+    }
+  ]
 }
