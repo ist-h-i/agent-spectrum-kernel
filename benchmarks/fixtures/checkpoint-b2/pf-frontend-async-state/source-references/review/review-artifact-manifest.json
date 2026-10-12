@@ -1,0 +1,22 @@
+{
+  "reviewed_head": "ed78e002c3a8e85aee8fa46fa61ffccba82c76de",
+  "scope": "Independent title-only follow-up of existing public source and separate unknown frequency/impact classification; four private-preparation additions excluded. Not whole-commit/private/admission approval.",
+  "records": [
+    {
+      "path": "source-approval.json",
+      "raw_sha256": "sha256:b13bbe123b511b1a3d06d8d32dce46b4feda2999139ff84e3ec6e851d33fae27"
+    },
+    {
+      "path": "frequency-review.json",
+      "raw_sha256": "sha256:76c6c94895e25bcf2146f6cfa247d5be1edfeb7b54f42480215801d6010de445"
+    },
+    {
+      "path": "impact-review.json",
+      "raw_sha256": "sha256:03e0f3d118c1cb899fb828a5993e466b939f5ce3511743f6c6e9430c80869e58"
+    },
+    {
+      "path": "review.md",
+      "raw_sha256": "sha256:4fe8eb2e8883d422fd003a3407226325f87d906a3a822095f884a2e9cf478655"
+    }
+  ]
+}
