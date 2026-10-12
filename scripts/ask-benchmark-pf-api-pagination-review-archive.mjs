@@ -17,7 +17,7 @@ import {
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE_ID = "pf-api-pagination-behavior";
 const FIXTURE_PATH = `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`;
-const GENERATOR_PATH = "scripts/ask-benchmark-pf-api-pagination-behavior-review-archive.mjs";
+const GENERATOR_PATH = "scripts/ask-benchmark-pf-api-pagination-review-archive.mjs";
 const FORMAT_REVISION = "issue-282-fresh-successor-store-zip.v1";
 const DOS_TIME = 0;
 const DOS_DATE = 0x0021;
