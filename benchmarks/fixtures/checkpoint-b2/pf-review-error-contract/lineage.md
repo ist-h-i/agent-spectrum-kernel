@@ -1,0 +1,2 @@
+# Source lineage
+Original author-created fictional Record API change, caller policy and scenarios for the frozen API contract/review-precision intent. No private business data, imported prior evaluation output or historical performance/frequency records. JavaScript and JSON run locally using the existing Node runtime; no external service or new dependency. API status/delay behavior is the supplied application contract. Frequency, impact and empirical difficulty remain Unknown. Native examples and independent source review are needed before source freeze; no admission claim.

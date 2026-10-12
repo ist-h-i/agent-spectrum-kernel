@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "pf-review-error-contract": {
+      "class": "pr_review",
+      "difficulty": "medium_hard",
+      "target_minutes": 30,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "5219fc408968917e5707b3087b3794546351919fcd8cd0ea290bc1676a1ec4d6",
+          "bytes": 2168
+        },
+        {
+          "path": "workspace/base/response-adapter.mjs",
+          "sha256": "ee0accba181d6e2fb890ca7d2c7ccc3fb6131b97aa7bfc64fb013eee880c7537",
+          "bytes": 682
+        },
+        {
+          "path": "workspace/data/cases.json",
+          "sha256": "65a415fb5626b4c555ed75cefb2155ead45d73bfd35481dcc72aecd996552aa4",
+          "bytes": 1257
+        },
+        {
+          "path": "workspace/docs/error-contract.md",
+          "sha256": "53d53857a4239ac6fa625c5f66ad73409ea05846edfa910bfb3d206c3ebc5230",
+          "bytes": 1558
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "d2d55c3edd8df7aa2d7d53b7bf47e1fa8271c6846f1d3314e0c9d77bd43a79b5",
+          "bytes": 251
+        },
+        {
+          "path": "workspace/pr.diff",
+          "sha256": "40585c23b4ab648a1c6d8eae5aa76e265ba1c9ce181ae41ba875858b7d62ff1e",
+          "bytes": 846
+        },
+        {
+          "path": "workspace/review.schema.json",
+          "sha256": "37e208792b333486c24d0bf8b6a46b978a610b9d03841c6b552992cce5d3138d",
+          "bytes": 9454
+        },
+        {
+          "path": "workspace/scripts/trace-cases.mjs",
+          "sha256": "64dd208b9c24da2dd21f7ec69c24de9e1c94eedb4b20c8bcce3550a426861fde",
+          "bytes": 691
+        },
+        {
+          "path": "workspace/scripts/validate-review.mjs",
+          "sha256": "35fdba9cf2bf42587e81c8bd39836b6868d4a33653ecd1b9d67dbd5ad5c6264e",
+          "bytes": 1549
+        },
+        {
+          "path": "workspace/src/client-policy.mjs",
+          "sha256": "8238c6db8d39fe810a136f1d413cdfd69df765820a0d0edc793fe4a6e895c814",
+          "bytes": 573
+        },
+        {
+          "path": "workspace/src/response-adapter.mjs",
+          "sha256": "2aa656641e532930f268f31987268612be1d7bd27d01eb762869c19762f4ae84",
+          "bytes": 632
+        },
+        {
+          "path": "workspace/test/api-error.test.mjs",
+          "sha256": "ff052dbe6c2ac6885b61e882e9eac6e616191ebfc0985839ed3fff59b8370cd5",
+          "bytes": 1494
+        }
+      ]
+    }
+  }
+}
