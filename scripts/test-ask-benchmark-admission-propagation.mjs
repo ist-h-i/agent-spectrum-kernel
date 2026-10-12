@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, readlinkSync, lstatSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -100,6 +100,13 @@ try {
   const negative = run("prepare-execution", [...common.filter((_, i) => i < common.length - 2), "--run-dir", resolve(work, "rejected-run"), "--execution-admission-evidence", forgedEvidencePath], 1);
   assert.match(negative.stderr, /raw digest differs/u); assert.equal(existsSync(resolve(work, "rejected-run")), false);
   const reprepare = run("prepare-execution", [...common, ...admission], 1); assert.match(reprepare.stderr, /nonempty|already exists/u);
+  const danglingRun = resolve(work, "dangling-run");
+  const missingTarget = resolve(work, "missing-run-target");
+  symlinkSync(missingTarget, danglingRun);
+  const danglingRejected = run("prepare-execution", [...common.slice(0, -2), "--run-dir", danglingRun, ...admission], 1);
+  assert.match(danglingRejected.stderr, /nonempty|already exists/u);
+  assert.equal(lstatSync(danglingRun).isSymbolicLink(), true); assert.equal(readlinkSync(danglingRun), missingTarget);
+  assert.equal(existsSync(missingTarget), false);
   const rejectedRun = (name, evidenceFile, pattern) => {
     const path = resolve(work, name);
     const result = run("prepare-execution", [...common.slice(0, -2), "--run-dir", path, "--execution-admission-evidence", evidenceFile], 1);
@@ -129,8 +136,10 @@ try {
   git(["add", "--", relative(root, revisionMarker)]);
   git(["-c", "user.name=ASK synthetic verification", "-c", "user.email=synthetic@example.invalid", "commit", "-m", "Synthetic source revision mismatch negative only"]);
   rejectedRun("source-revision-rejected-run", evidencePath, /repository revision mismatch/u);
+  git(["checkout", "--detach", revision]);
+  assert.equal(git(["status", "--porcelain"]), "");
 
-  const receipt = { kind: "ask.admission-propagation-nonmodel-proof@1", actual_external_evidence: Boolean(actualEvidencePath), source_context: "Independent test-only configuration/source commit; controller preparation only, not grader processing admission", source_revision: revision, source_origin_revision: originRevision, fixture_ids: fixtureIds, case_count: plan.cases.length, adaptive_selection_count: adaptive.length, checks: ["admitted normal plan", "materialization", "missing-evidence selection refused before writes", "all adaptive selection seals and verification", "missing-evidence preparation refused before writes", "pending execution preparation/inspection", "normalization and freshness verification", "wrong-authority digest refused before writes", "existing run preparation refused", "partial evidence refused", "changed archive refused", ...(fixtureIds.length > 1 ? ["cross-fixture evidence refused"] : []), "tracked source byte mismatch refused", "different exact source revision refused"], models_started: 0, agent_binary_resolved_or_probed: false, actual_comparison_started: false, private_workers_started: 0, all_attempts_empty: true, source_root: keep ? root : null };
+  const receipt = { kind: "ask.admission-propagation-nonmodel-proof@1", actual_external_evidence: Boolean(actualEvidencePath), source_context: "Independent test-only configuration/source commit; controller preparation only, not grader processing admission", source_revision: revision, source_file_digests: Object.fromEntries(["ask-benchmark.mjs", "ask-benchmark-selection.mjs", "ask-benchmark-execution.mjs", "ask-benchmark-normalized-results.mjs", "ask-benchmark-terminal-candidate.mjs", "ask-benchmark-evaluator-boundary.mjs"].map((name) => [name, hash(readFileSync(resolve(root, "scripts", name)))])), source_origin_revision: originRevision, fixture_ids: fixtureIds, case_count: plan.cases.length, adaptive_selection_count: adaptive.length, checks: ["admitted normal plan", "materialization", "missing-evidence selection refused before writes", "all adaptive selection seals and verification", "missing-evidence preparation refused before writes", "pending execution preparation/inspection", "normalization and freshness verification", "wrong-authority digest refused before writes", "existing run preparation refused", "dangling existing run symlink refused without writes", "partial evidence refused", "changed archive refused", ...(fixtureIds.length > 1 ? ["cross-fixture evidence refused"] : []), "tracked source byte mismatch refused", "different exact source revision refused"], models_started: 0, agent_binary_resolved_or_probed: false, actual_comparison_started: false, private_workers_started: 0, all_attempts_empty: true, source_root: keep ? root : null };
   if (keep) write(resolve(work, "proof.json"), receipt);
   console.log(JSON.stringify({ ...receipt, retained_proof: keep ? resolve(work, "proof.json") : null }));
 } finally { if (!keep) rmSync(work, { recursive: true, force: true }); }

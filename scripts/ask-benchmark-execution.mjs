@@ -1918,7 +1918,10 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
 /** Prepare ordinary run custody only. Never resolves/probes an agent binary or starts an attempt. */
 export function preparePortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture = null }) {
   if (!runDir) throw new Error("prepare-execution requires a run directory");
-  if (existsSync(runDir) && (!lstatSync(runDir).isDirectory() || readdirSync(runDir).length !== 0)) {
+  let existingRun = null;
+  try { existingRun = lstatSync(runDir); }
+  catch (error) { if (error.code !== "ENOENT") throw error; }
+  if (existingRun && (!existingRun.isDirectory() || readdirSync(runDir).length !== 0)) {
     throw new Error("prepare-execution refuses a nonempty existing run directory");
   }
   const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture });
