@@ -1,0 +1,101 @@
+{
+  "reviewer_record_id": "frontend-async-source-independent-review-follow-up-ed78e002-20261012",
+  "fixture_id": "pf-frontend-async-state",
+  "reviewed_head": "ed78e002c3a8e85aee8fa46fa61ffccba82c76de",
+  "base_commit": "f1ac0141eb7c6ef75ddc6cb35f0be7ef72b2a879",
+  "decision": "approve",
+  "scope": "Title-only follow-up of the previously reviewed public source subset. The four added private-preparation files are excluded; not whole-commit approval, private evaluator review, fixture admission, browser UI acceptance or real-network reliability approval.",
+  "source_type": "documented_external_pattern",
+  "source_reference_ids": [
+    "async-cleanup-20261012"
+  ],
+  "official_source": {
+    "url": "https://react.dev/reference/react/useEffect",
+    "independently_viewed_date": "2026-10-12",
+    "supports": "React documents asynchronous response ordering and cleanup/ignoring obsolete effects. Also independently checked https://developer.mozilla.org/en-US/docs/Web/API/AbortController for signals and cancellation requests.",
+    "does_not_support": "Actual React/browser implementation, DOM/ARIA accessibility compliance, empirical incident frequency, project impact or network reliability. The transport ignoring cancellation is an explicitly authored local test condition."
+  },
+  "source_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/task.md",
+      "bytes": 1210,
+      "raw_sha256": "sha256:bbf8c0fcc5db005958a0ddc531279a7a5bfc4a5f7ed424441dea629dd72d89dd"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/workspace/package.json",
+      "bytes": 93,
+      "raw_sha256": "sha256:a1334e7d677ec2df23b95a284b1a7179c07280762028c38fcb43ca16bfe5b943"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/workspace/spec/search-state-contract.md",
+      "bytes": 1423,
+      "raw_sha256": "sha256:a4e981c2a5200f5ef4bcdaffc58a43a00fd697bbd311ebf07ddd5538ac53420c"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/workspace/src/search-controller.mjs",
+      "bytes": 505,
+      "raw_sha256": "sha256:45f537540747220d76042c250665559dad3a2919707436580aa5d38bf7857b72"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/workspace/src/search-view.mjs",
+      "bytes": 617,
+      "raw_sha256": "sha256:2d76ec1961c6888e9c321d8f47df7e54a8aed317fd9524ba3180b74d9664ea68"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/workspace/test/search-state.test.mjs",
+      "bytes": 4414,
+      "raw_sha256": "sha256:1474fb9f6f54e7de19e96eed04491859f7f84fd656369d2fdba52c45adc7df17"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/input-manifest.json",
+      "bytes": 1387,
+      "raw_sha256": "sha256:604ebe507a4ca285311f9bce2b92ae4839467f2b27c341cca4bccb043b0fc636"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/verification-command-contract.json",
+      "bytes": 1986,
+      "raw_sha256": "sha256:12802a42355943302d95cf58dd2c708563ad6a7f214638ca7fea3e3ac15701ee",
+      "contract_digest": "sha256:6b39dfe8c4f10b3f3c95a68247f75fdc68d0989b3d63fc913dd15175b895e3e0"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/lineage.md",
+      "bytes": 459,
+      "raw_sha256": "sha256:8554977121bc1bf9ecbe3fc028a92a10395494fc1b8ac9b6a64e2921cdf93c7f"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/source-references/async-cleanup-20261012.md",
+      "bytes": 730,
+      "raw_sha256": "sha256:42458f9a09947fa04c2a046f1fa82f264c1cacbad02fc8238f41f8d91591b07c"
+    },
+    {
+      "path": "scripts/ask-benchmark-pf-frontend-async-source.mjs",
+      "bytes": 9164,
+      "raw_sha256": "sha256:a817af3c776af19a7fc36476ba687ecaa6b881d36c7d011112d164618a43db0b"
+    },
+    {
+      "path": "scripts/test-ask-benchmark-pf-frontend-async-source.mjs",
+      "bytes": 2775,
+      "raw_sha256": "sha256:671291c0f736ea2de5c42e234aeffdb5d64f59a7b9e115d93cf0447c9f9839c4"
+    }
+  ],
+  "lineage_policy_ref": {
+    "path": "benchmarks/portfolio-lineage-policy.json",
+    "bytes": 6039,
+    "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d",
+    "declared_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"
+  },
+  "catalog_ref": {
+    "path": "benchmarks/portfolio-catalog.json",
+    "bytes": 29625,
+    "raw_sha256": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
+    "declared_catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972"
+  },
+  "requirements_for_change": [],
+  "limitations": [
+    "This is a separate bounded follow-up to bb9665c9eca56de74e2a0efc245a9586a60048b7. The original five records remain unchanged; their manifest raw SHA-256 is 0af1bb807d7beed8501cfccc127da354d17d7bf1e7db8ea36e63d26bed40c57f.",
+    "Only two existing source-author test titles changed; byte replacement equality confirms assertions and every other byte in that file are unchanged. Thirteen other original source/policy/catalog refs are identical.",
+    "The four additions benchmarks/pf-frontend-async-state.config.json, scripts/ask-benchmark-pf-frontend-async-authority.mjs, scripts/ask-benchmark-pf-frontend-async-review-archive.mjs and scripts/test-ask-benchmark-pf-frontend-async.mjs were identified by path only and not read or reviewed.",
+    "The original local view-semantics evidence is retained by reference. Real DOM rendering, React hooks, accessibility, real-network reliability and empirical difficulty remain outside approval.",
+    "Source approval does not approve private preparation, private meaning, grading, model outcomes or admission. Frequency and impact remain unknown with null weights."
+  ]
+}

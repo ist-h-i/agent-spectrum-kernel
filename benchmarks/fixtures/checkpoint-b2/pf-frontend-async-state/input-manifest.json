@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "pf-frontend-async-state": {
+      "class": "local_implementation",
+      "difficulty": "medium_hard",
+      "target_minutes": 45,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "bbf8c0fcc5db005958a0ddc531279a7a5bfc4a5f7ed424441dea629dd72d89dd",
+          "bytes": 1210
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "a1334e7d677ec2df23b95a284b1a7179c07280762028c38fcb43ca16bfe5b943",
+          "bytes": 93
+        },
+        {
+          "path": "workspace/spec/search-state-contract.md",
+          "sha256": "a4e981c2a5200f5ef4bcdaffc58a43a00fd697bbd311ebf07ddd5538ac53420c",
+          "bytes": 1423
+        },
+        {
+          "path": "workspace/src/search-controller.mjs",
+          "sha256": "45f537540747220d76042c250665559dad3a2919707436580aa5d38bf7857b72",
+          "bytes": 505
+        },
+        {
+          "path": "workspace/src/search-view.mjs",
+          "sha256": "2d76ec1961c6888e9c321d8f47df7e54a8aed317fd9524ba3180b74d9664ea68",
+          "bytes": 617
+        },
+        {
+          "path": "workspace/test/search-state.test.mjs",
+          "sha256": "1474fb9f6f54e7de19e96eed04491859f7f84fd656369d2fdba52c45adc7df17",
+          "bytes": 4414
+        }
+      ]
+    }
+  }
+}
