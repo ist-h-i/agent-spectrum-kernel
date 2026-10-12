@@ -28,9 +28,7 @@ test('changed public bytes cannot reuse the input identity', () => {
   } finally { rmSync(scratch, { recursive: true, force: true }); }
 });
 
-test('actual frozen client production authority is valid and remains pending', {
-  skip: JSON.parse(readFileSync(resolve(root, MN_CLIENT_COMPATIBILITY_FIXTURE_ROOT, 'metadata.json'))).candidate_state === 'generation_pending',
-}, () => {
+test('actual frozen client production authority is valid and remains pending', () => {
   const result = validateMnClientCompatibilityFixProductionAuthority({ root });
   assert.equal(result.reviewStatus, 'pending_independent_review');
   assert.equal(result.scoringReady, false);

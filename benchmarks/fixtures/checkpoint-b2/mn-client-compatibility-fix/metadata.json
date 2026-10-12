@@ -1,4 +1,32 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "mn-client-compatibility-fix",
-  "candidate_state": "generation_pending"
+  "fixture_role": "primary",
+  "suite": "mechanism_negative",
+  "task_class": "local_implementation",
+  "domain": "client_mobile",
+  "difficulty": "medium",
+  "repetitions": 3,
+  "risk_boundary": "none",
+  "capability_families": [
+    "compatibility_management",
+    "focused_implementation"
+  ],
+  "evidence_topologies": [
+    "implementation_and_tests",
+    "version_compatibility_matrix"
+  ],
+  "outcome_dimensions": [
+    "compatibility_preservation",
+    "scope_discipline"
+  ],
+  "output_contract_type": "implementation_producing",
+  "requirement_record_id": "requirement-record-mn-client-compatibility-fix",
+  "output_contract_id": "output-contract-mn-client-compatibility-fix",
+  "evaluator_bundle_id": "evaluator-62177d8f94f80d5d08e9f02b4d08f094fb8d799b643a6f98fabcb683026363b3",
+  "evaluator_bundle_digest": "sha256:3301e2f7f1319814d7873ac490b2884b0e8a0e91e4792a12bbc0da54a1f5dea5",
+  "evaluator_byte_count": 375454,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:5e85ee370c2c81a9e56659e9ee19db425db1a6a5a649f71b89c0d04be67757c9"
 }
