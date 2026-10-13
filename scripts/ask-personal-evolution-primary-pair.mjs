@@ -31,6 +31,7 @@ const equal = (a, b) => canonicalDigest(a) === canonicalDigest(b);
 const overlaps = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 const roles = ["baseline", "challenger"];
 const ROOT = resolve(import.meta.dirname, "..");
+const present = path => { try { lstatSync(path); return true; } catch (error) { if (error.code === "ENOENT") return false; throw error; } };
 function controllerSources() {
   const source = { ...primaryProducerSources() }, pending = ["scripts/ask-personal-evolution-primary-pair.mjs",
     "scripts/ask-personal-evolution-alignment.mjs", "scripts/ask-personal-evolution-saved-results.mjs"];
@@ -56,8 +57,28 @@ function outputBoundary(outputRoot, storeRoot, bindings, existing) {
   assert.equal(resolve(outputRoot), outputRoot); assert.equal(realpathSync(dirname(outputRoot)), dirname(outputRoot));
   if (existing) { assert.equal(realpathSync(outputRoot), outputRoot); assert.ok(lstatSync(outputRoot).isDirectory()); }
   else assert.equal(existsSync(outputRoot), false, "pair output must be new");
-  for (const root of [resolve(storeRoot), ...roles.flatMap(role => bindings[role].flatMap(item => [item.block.root, item.block.public_input_root,
-    ...(item.source_repository ? [item.source_repository] : [])]))]) assert.ok(!overlaps(root, outputRoot), "pair output overlaps authority/model writable root");
+  for (const root of [ROOT, resolve(storeRoot), ...roles.flatMap(role => bindings[role].flatMap(item => [item.block.root, item.block.public_input_root,
+    ...(item.source_repository ? [item.source_repository] : []), ...(item.grading_resources ? [item.grading_resources.output_root,
+      item.grading_resources.path, ...item.grading_resources.fixed_resource_paths] : [])]))]) assert.ok(!overlaps(root, outputRoot), "pair output overlaps authority/model/grading writable root");
+}
+function gradingResources(block) {
+  if (!block.grading.resources) return null;
+  assertPersonalEvolutionFields(block.grading.resources, ["path", "digest"], "fixed role grading resources");
+  const { path, digest } = block.grading.resources;
+  assert.equal(resolve(path), path); assert.equal(realpathSync(path), path);
+  assert.equal(comparisonHash(raw(path)), digest, "fixed role grading resources changed");
+  const config = json(path);
+  assertPersonalEvolutionFields(config, ["kind", "output_root", "fixtures"], "grading resource metadata");
+  assert.equal(config.kind, "ask_primary_grading_resources_v1");
+  assert.equal(resolve(config.output_root), config.output_root);
+  assert.equal(realpathSync(dirname(config.output_root)), dirname(config.output_root));
+  if (present(config.output_root)) { assert.equal(realpathSync(config.output_root), config.output_root); assert.ok(lstatSync(config.output_root).isDirectory()); }
+  // Existing registered factory independently validates all private/resource
+  // authorities. This public snapshot only pins config and write destinations.
+  const pathKeys = ["frozenSourceRoot", "privateRoot", "manifestPath", "admissionDecisionPath", "admissionReviewAuthorityPath", "admissionReviewArchivePath"];
+  const fixed = [...new Set(Object.values(config.fixtures).flatMap(item => pathKeys.filter(key => Object.hasOwn(item, key)).map(key => item[key])))].sort();
+  for (const locus of fixed) { assert.equal(resolve(locus), locus); assert.equal(realpathSync(locus), locus); }
+  return { path, digest, output_root: config.output_root, fixtures_digest: canonicalDigest(config.fixtures), fixed_resource_paths: fixed };
 }
 function capture(options, role, block) {
   const loaded = readUserComparisonPlan(block.root), { plan, plan_digest } = loaded;
@@ -70,6 +91,8 @@ function capture(options, role, block) {
   assert.ok(equal(materialization.record, read(options.storeRoot, materialization.asset.record_digest)));
   assert.ok(equal(materialization.content, read(options.storeRoot, materialization.asset.content_digest)));
   const exported = exportPrimaryEvaluationGradingRequest(block), recipe = buildPrimaryFixtureRecipe(block.fixture_id);
+  const grading = gradingResources(block);
+  if (plan.config.evidence_kind === "observed") assert.ok(grading, "separate fixed role grading resources required");
   assert.ok(options.candidate.evaluation_scope.task_classes.includes(recipe.task_class), "formal task applicability missing");
   const selectionObjectDigest = block.personal_selection_object_digest ?? options.experiment.roles[role].selection_object_digest;
   const selected = verifyPortfolioSelection({ ...options, selectionObjectDigest });
@@ -93,6 +116,7 @@ function capture(options, role, block) {
   return { fixture_id: block.fixture_id, block: structuredClone(block), run_id: plan.run_id, plan_digest,
     source_digest: plan.source.digest, task_digest: plan.task.digest, input_digest: plan.input.digest,
     source_repository: plan.source.repo ?? null, selection_object_digest: selectionObjectDigest,
+    grading_resources: grading,
     verification_digest: plan.verification.digest, public_criteria: exported.request.public_grading_references,
     grading_binding: exported.request.binding, scoring_version: exported.request.scoring_version ?? null,
     profile_id: exported.request.profile_id, formal_task_class: recipe.task_class, runner_task_class: recipe.runner_task_class,
@@ -125,6 +149,24 @@ export function describePersonalEvolutionPromptPair(options) {
     assert.ok(!overlaps(resolve(options.storeRoot), all[i].block.root), "CAS and model writable roots must be separate");
     for (let j = i + 1; j < all.length; j++) assert.ok(!overlaps(all[i].block.root, all[j].block.root), "pair workspaces overlap");
   }
+  const roleGrading = roles.map(role => {
+    const fixed = bindings[role][0].grading_resources;
+    assert.ok(bindings[role].every(item => equal(item.grading_resources, fixed)), "each role must use one fixed grading resource configuration");
+    return fixed;
+  });
+  if (roleGrading.some(Boolean)) {
+    assert.ok(roleGrading.every(Boolean), "both roles need fixed grading resources");
+    assert.notEqual(roleGrading[0].path, roleGrading[1].path, "separate role grading configurations required");
+    assert.equal(roleGrading[0].fixtures_digest, roleGrading[1].fixtures_digest, "role grading fixed asset maps differ");
+    assert.ok(!overlaps(roleGrading[0].output_root, roleGrading[1].output_root), "role grading outputs overlap");
+    const protectedRoots = [ROOT, options.storeRoot, ...roleGrading.flatMap(item => [item.path, ...item.fixed_resource_paths]),
+      ...all.flatMap(item => [item.block.root, item.block.public_input_root, ...(item.source_repository ? [item.source_repository] : [])])];
+    for (const resource of roleGrading) for (const root of protectedRoots) {
+      assert.ok(!overlaps(resource.output_root, root), "grading output overlaps authority/model input");
+    }
+    for (const resource of roleGrading) for (const item of all) for (const root of [item.block.root, item.block.public_input_root,
+      ...(item.source_repository ? [item.source_repository] : [])]) assert.ok(!overlaps(resource.path, root), "grading configuration belongs outside model/public/seed roots");
+  }
   const parity = item => Object.fromEntries(["fixture_id", "source_digest", "task_digest", "input_digest", "verification_digest", "public_criteria",
     "grading_binding", "scoring_version", "profile_id", "formal_task_class", "runner_task_class", "config", "mutable_paths"].map(key => [key, item[key]]));
   for (let i = 0; i < bindings.baseline.length; i++) assert.ok(equal(parity(bindings.baseline[i]), parity(bindings.challenger[i])), "pair task/criterion/runtime/budget mismatch");
@@ -136,6 +178,7 @@ export function describePersonalEvolutionPromptPair(options) {
 export function sealPersonalEvolutionPromptPair(options) {
   const description = describePersonalEvolutionPromptPair(options);
   for (const item of roles.flatMap(role => description.bindings[role])) {
+    if (item.grading_resources) assert.equal(present(item.grading_resources.output_root), false, "grading output already exists before pair freeze");
     for (const path of ["start.json", "start.digest", "slots", "leases", "history"]) assert.equal(existsSync(join(item.block.root, "control", path)), false, "post-result pair registration forbidden");
     const report = reportUserComparison(item.block.root);
     assert.equal(report.execution.start_consumed, false); assert.ok(report.slots.every(slot => slot.state === "not_started"));
@@ -275,17 +318,27 @@ export async function startPersonalEvolutionPromptPair(options) {
   const ctx = registered(options), registration = ctx.registration;
   assert.equal(options.confirmedPairObjectDigest, options.pairRegistrationObjectDigest, "human must confirm fixed pair digest");
   const start = options.startComparison ?? startUserComparison;
+  const graders = options.gradingAdapters;
+  assert.equal(options.gradingAdapter, undefined, "singular grading adapter is unsupported for two role outputs");
+  assertPersonalEvolutionFields(graders, roles, "separate role grading adapters");
+  assert.notEqual(graders.baseline, graders.challenger, "one grading adapter cannot serve both role output roots");
   const all = roles.flatMap(role => ctx.blocks[role]);
   const synthetic = all.every(block => readUserComparisonPlan(block.root).plan.config.evidence_kind === "synthetic");
+  for (const role of roles) {
+    const resource = registration.description.bindings[role][0].grading_resources;
+    if (resource) assert.equal(present(resource.output_root), false, "role grading output already exists before invocation");
+  }
   assert.ok(start === startUserComparison ? !synthetic && all.every(block => readUserComparisonPlan(block.root).plan.config.evidence_kind === "observed")
     : synthetic, "fake start is synthetic only; no production fallback for synthetic pair");
-  if (!synthetic) assert.ok(isPrimaryEvaluationGradingAdapter(options.gradingAdapter), "observed grading requires existing registered factory");
+  if (!synthetic) assert.ok(roles.every(role => isPrimaryEvaluationGradingAdapter(graders[role])), "observed grading requires separate existing registered factories");
   const inspect = () => {
-    for (const block of all) {
+    for (const role of roles) for (const [index, block] of ctx.blocks[role].entries()) {
       const loaded = readUserComparisonPlan(block.root);
+      const resource = registration.description.bindings[role][index].grading_resources;
+      if (resource) assert.equal(present(join(resource.output_root, block.fixture_id)), false, "fixture grading output already exists before child dispatch");
       assert.ok(Object.values(loaded.plan.arms).every(arm => arm.capability.status === "available"), "missing Skill/capability is a blocker, not quality0");
       assert.equal(existsSync(join(block.root, "control/start.json")), false, "role start already consumed");
-      const preflight = options.gradingAdapter.preflight(block, loaded);
+      const preflight = graders[role].preflight(block, loaded);
       assert.equal(preflight.status, "ready"); assert.equal(preflight.blockers.length, 0);
     }
   };
@@ -304,7 +357,9 @@ export async function startPersonalEvolutionPromptPair(options) {
       assert.ok(tokens < registration.limits.token_budget, "pair usage admission budget exhausted");
       const loaded = readUserComparisonPlan(block.root);
       assert.ok(deadline - now() >= loaded.plan.config.overall_timeout_ms + PRIMARY_GRADING_RESERVATION_MS, "insufficient full child+grading reservation");
-      const refreshed = options.gradingAdapter.preflight(block, loaded);
+      const resource = registration.description.bindings[role][index].grading_resources;
+      if (resource) assert.equal(present(join(resource.output_root, block.fixture_id)), false, "fixture grading output already exists before child dispatch");
+      const refreshed = graders[role].preflight(block, loaded);
       assert.equal(refreshed.status, "ready"); assert.equal(refreshed.blockers.length, 0);
       save(`${role}-${index}-requested.json`, { run_id: block.run_id, plan_digest: block.plan_digest });
       await start(block.root, block.plan_digest, { signal: controller.signal });
@@ -313,9 +368,11 @@ export async function startPersonalEvolutionPromptPair(options) {
       assert.ok(report.slots.every(slot => slot.receipt_integrity === "valid" && slot.process_completed === true
         && slot.unresolved_child === false && ["completed", "verification_failed"].includes(slot.state)), "incomplete/unresolved child; no repeated start");
       const lower = report.usage_budget?.known_tokens_lower_bound; assert.ok(Number.isSafeInteger(lower) && lower >= 0); tokens += lower;
+      assert.ok(tokens < registration.limits.token_budget, "pair usage admission budget exhausted after child");
       assert.ok(!controller.signal.aborted && now() < deadline);
-      const grade = await options.gradingAdapter.grade(block, report, { signal: controller.signal, deadline_at_ms: deadline });
+      const grade = await graders[role].grade(block, report, { signal: controller.signal, deadline_at_ms: deadline });
       save(`${role}-${index}-grading.json`, grade);
+      assert.ok(!controller.signal.aborted && now() < deadline, "grading deadline/interruption");
       assert.equal(grade.status, "completed", "existing grading incomplete");
       const full = grade.conditions.find(item => item.condition === "full_ask");
       assert.ok(full?.public_artifacts?.engineering_result && grade.producer, "saved original grading artifacts required");

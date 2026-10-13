@@ -39,7 +39,7 @@ Skill Asset、unrendered template、非Codex bundle、空/非UTF8のrendered fil
 
 ## 一度の開始から保存・報告
 
-本人がこのタスク「Prepare primary ASK evaluation」に直接、固定済みpair digestを指定して開始指示を渡した場合だけ、既存 `createPrimaryEvaluationGradingAdapter` と `startPersonalEvolutionPromptPair` を一度使う。observedではregistered grading factory以外を拒否し、fake startは全syntheticだけ許す。preflightがreadyで全blockerが空、capability available、未開始を確認してからexclusive `output_root/invocation` を消費する。
+本人がこのタスク「Prepare primary ASK evaluation」に直接、固定済みpair digestを指定して開始指示を渡した場合だけ、role別の既存 `createPrimaryEvaluationGradingAdapter` 二つと `startPersonalEvolutionPromptPair` を一度使う。closed optionは `gradingAdapters:{baseline,challenger}` で、旧singular adapterは拒否する。既存factoryはoutput_root/fixture_idへexclusive書込みするため、別config/digest/fresh outputRootを事前固定する。readonly fixtures mapは両roleで同一、write rootsはrole/CAS/model/public/seed/controller/固定資産/保存先から分離する。instanceだけ別で同じrootを向く設定、既存root、dangling link、config改変は最初のstart前に拒否する。observedではregistered grading factory以外を拒否し、fake startは全syntheticだけ許す。preflightがreadyで全blockerが空、capability available、未開始を確認してからexclusive `output_root/invocation` を消費する。
 
 coordinatorは既存 `startUserComparison` を逐次使用し、ネイティブterminal/process closure/usageを読んで既存graderを呼ぶ。request・child report・grading receipt・最終saved-result-connectionをatomic no-replaceで保存。失敗/期限/interrupt/半端なpublication後は再開始しない。復旧は別判断として元receiptを保全する。
 
@@ -60,7 +60,7 @@ coordinatorは既存 `startUserComparison` を逐次使用し、ネイティブt
 
 1. 設定とcode/source/採点資産のID・digest、Portfolio authority、source安全分類/permissions/freshness、task class別eligible selection、exact未開始run/plan、runtime input、独立copy/.git、条件workspace・CAS・公開入力・採点・保存先を検査してください。development側のmain/branch変更は取り込まないでください。設定自身のdigestだけを外部trustの代わりにせず、controller-ownedな根拠を照合してください。
 2. 欠落・不適格・Capability/Skill不足・既存consumed invocationがあればNOT_RUN/hold、quality:nullと実理由を保存して停止してください。Asset型やtask種別の言換え、Skillの無断追加、採点基準変更、旧P/K/F結果の移植、結果後の再基準化は禁止です。
-3. 既存createPrimaryEvaluationGradingAdapterで固定resourcesのpreflightを閉じ、既存startPersonalEvolutionPromptPairをconfirmedPairObjectDigestとして上の本人確認digestを渡して一度だけ起動してください。コードのfake start overrideを使わず、実観測roleに既存startUserComparisonを使ってください。start/resume/retryを重ねないでください。
+3. baseline/challenger別の既存createPrimaryEvaluationGradingAdapterを各固定resourcesから作り、両roleのpreflightを閉じ、gradingAdapters:{baseline,challenger}を渡して、既存startPersonalEvolutionPromptPairをconfirmedPairObjectDigestとして上の本人確認digestを渡して一度だけ起動してください。コードのfake start overrideを使わず、実観測roleに既存startUserComparisonを使ってください。start/resume/retryを重ねないでください。
 4. 固定全role/fixtureを順に実行し、既存原採点経路で採点・保存まで完結してください。task/public Prompt inputにprivate evaluator/正解を含めないでください。期限・使用量admission・unresolved child・採点不備を検出したらreceiptを保全して停止し、同じ消費済み起動をやり直さないでください。
 5. 保存producerとpublic gradingのexact lineage/固定採点資産/rawdigestを検証し、既存Evolution recommendationを保存してください。parent/candidate Fの原値と差、P/K/F診断context、Unknown/unsafe/未収集、CLI/global指示差、完了・不完了と証拠pathを日本語で報告してください。正式四条件評価や因果的改善とは主張しないでください。候補採用、Mac apply/restore、release、global設定、権限変更はこの指示には含みません。
 ```

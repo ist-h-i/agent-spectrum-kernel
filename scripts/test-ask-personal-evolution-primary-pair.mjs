@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { devNull, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { canonicalDigest, listContentAddressedJson, readContentAddressedJson, putContentAddressedJson } from "./content-addressed-store.mjs";
@@ -243,8 +243,8 @@ function fakeEngineeringTemplate(root) {
   const files = prepareAggregateV2FileFixture({ root: repository, target: join(root, "engineering-template"), fixtureId: "mn-build-option-update" }).collect();
   return JSON.parse(readFileSync(join(files.options.engineeringResultsPath, "mn-build-option-update/full_ask/01.json")));
 }
-async function collectSyntheticGrade(t, f, block, template, { quality = 0.5, safety = "pass", outcomeOverride = null } = {}) {
-  const folder = join(f.root, `producer-${block.run_id}`);
+async function collectSyntheticGrade(t, f, block, template, { quality = 0.5, safety = "pass", outcomeOverride = null, outputParent = f.root } = {}) {
+  const folder = join(outputParent, `producer-${block.run_id}`);
   const produced = await producePrimaryEvaluationArtifacts(block, folder);
   const producer = { recordRoot: folder, externalDigest: produced.external_digest }, verified = verifyPrimaryEvaluationProducer(producer);
   const normalized = withPrimaryEvaluationProducer(producer, value => verifyNormalizedPortfolioResults({ ...value.executionOptions, outputPath: join(folder, "normalized") }));
@@ -276,7 +276,7 @@ async function collectSyntheticGrade(t, f, block, template, { quality = 0.5, saf
     engineering.safety_blocker.category_ids = [category.category_id]; engineering.safety_blocker.action_ids = category.action_ids;
   }
   engineering.engineering_result_id = computeEngineeringResultId(engineering); engineering.engineering_result_digest = computeEngineeringResultDigest(engineering);
-  const path = join(f.root, `grade-${block.run_id}.json`); write(path, engineering);
+  const path = join(outputParent, `grade-${block.run_id}.json`); write(path, engineering);
   return { producer, engineering_result: { path, digest: comparisonHash(readFileSync(path)) } };
 }
 
@@ -345,25 +345,39 @@ test("partial candidate unsafe witness survives missing parent and keeps indepen
 
 test("one synthetic invocation composes existing APIs, saves fresh pair and refuses repeated start", async t => {
   const f = setup(t), { blocks } = blocksFor(t, f);
+  const resourceConfigs = bindSyntheticRoleGrading(f, blocks);
   const sealed = sealPersonalEvolutionPromptPair({ ...f.args, blocks, outputRoot: join(f.root, "pair-output") });
   const options = { ...f.args, pairRegistrationObjectDigest: sealed.object_digest, trustedPairRegistrationObjectDigests: [sealed.object_digest],
     confirmedPairObjectDigest: sealed.object_digest };
   const template = fakeEngineeringTemplate(f.root); let starts = 0, grades = 0;
   const startComparison = async root => { starts++; collectSyntheticTerminal(t, Object.values(blocks).flat().find(block => block.root === root)); };
-  const gradingAdapter = { preflight: () => ({ status: "ready", blockers: [] }), grade: async block => {
-    grades++; const result = await collectSyntheticGrade(t, f, block, template);
-    return { status: "completed", producer: { record_root: result.producer.recordRoot, digest: result.producer.externalDigest },
-      conditions: [{ condition: "full_ask", public_artifacts: { engineering_result: result.engineering_result } }] };
-  } };
-  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison,
-    gradingAdapter: { ...gradingAdapter, preflight: () => ({ status: "blocked", blockers: ["synthetic missing grant"] }) } }), /ready/);
+  const gradingAdapters = Object.fromEntries(["baseline", "challenger"].map(role => [role, {
+    preflight: () => ({ status: "ready", blockers: [] }), grade: async block => {
+      grades++;
+      // Exact original factory's outputRoot/fixtureId naming, per-role roots.
+      const outputRoot = resourceConfigs[role].output_root;
+      mkdirSync(outputRoot, { recursive: true }); mkdirSync(join(outputRoot, block.fixture_id));
+      const result = await collectSyntheticGrade(t, f, block, template, { outputParent: join(outputRoot, block.fixture_id) });
+      return { status: "completed", producer: { record_root: result.producer.recordRoot, digest: result.producer.externalDigest },
+        conditions: [{ condition: "full_ask", public_artifacts: { engineering_result: result.engineering_result } }] };
+    },
+  }]));
+  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapters: {
+    ...gradingAdapters, baseline: { ...gradingAdapters.baseline, preflight: () => ({ status: "blocked", blockers: ["synthetic missing grant"] }) } } }), /ready/);
   assert.equal(existsSync(join(sealed.registration.output_root, "invocation")), false); assert.equal(starts, 0);
-  const result = await startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapter });
+  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapters: {
+    baseline: gradingAdapters.baseline, challenger: gradingAdapters.baseline } }), /one grading adapter/);
+  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapters,
+    gradingAdapter: gradingAdapters.baseline }), /singular grading adapter/);
+  assert.equal(starts, 0); assert.equal(grades, 0);
+  const result = await startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapters });
   assert.equal(starts, 2); assert.equal(grades, 2); assert.equal(result.status, "saved_pair_verified"); assert.equal(result.models_started, false);
   assert.equal(result.action, "held_pending_separate_evaluation_and_human_trust");
+  assert.ok(existsSync(join(resourceConfigs.baseline.output_root, "mn-build-option-update")));
+  assert.ok(existsSync(join(resourceConfigs.challenger.output_root, "mn-build-option-update")));
   const saved = JSON.parse(readFileSync(join(sealed.registration.output_root, "invocation/saved-result-connection.json")));
   assert.equal(saved.report.evidence_kind, "synthetic"); assert.equal(saved.authority_implied, false);
-  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapter }), /already consumed|EEXIST/);
+  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapters }), /already exists|already consumed|EEXIST/);
   assert.equal(starts, 2); assert.equal(grades, 2);
 });
 
@@ -450,4 +464,59 @@ test("rehashed alignment plan cannot bypass planner pre-result guard before any 
     trustedAlignmentObjectDigests: [digest], trustedPortfolioAuthorityContexts: [f.parentAuthority, ...Object.values(authority_contexts)],
     selectorContext: f.selectorContext }), /unevaluated candidate/);
   assert.deepEqual(inventory(f.storeRoot), before);
+});
+
+// Public metadata only: no actual private resources/factory authority claimed.
+function bindSyntheticRoleGrading(f, blocks, mutate = () => {}) {
+  const configs = {};
+  for (const role of ["baseline", "challenger"]) {
+    const config = { kind: "ask_primary_grading_resources_v1", output_root: join(f.root, `grading-${role}`), fixtures: {} };
+    mutate(config, role); const path = join(f.root, `grading-${role}.json`); write(path, config);
+    blocks[role][0].grading.resources = { path, digest: comparisonHash(readFileSync(path)) }; configs[role] = config;
+  }
+  return configs;
+}
+test("separate grader instances cannot disguise shared, stale, changed or collocated write roots", async t => {
+  const f = setup(t), { blocks } = blocksFor(t, f);
+  bindSyntheticRoleGrading(f, blocks, config => config.output_root = join(f.root, "same-grading-root"));
+  assert.throws(() => describePersonalEvolutionPromptPair({ ...f.args, blocks }), /grading outputs overlap/);
+  bindSyntheticRoleGrading(f, blocks, (config, role) => { if (role === "challenger") config.fixtures = { forged: {} }; });
+  assert.throws(() => describePersonalEvolutionPromptPair({ ...f.args, blocks }), /fixed asset maps differ/);
+  bindSyntheticRoleGrading(f, blocks, (config, role) => { if (role === "challenger") config.output_root = join(blocks.baseline[0].root, "grading"); });
+  assert.throws(() => describePersonalEvolutionPromptPair({ ...f.args, blocks }), /overlaps authority/);
+  const configs = bindSyntheticRoleGrading(f, blocks);
+  const sealed = sealPersonalEvolutionPromptPair({ ...f.args, blocks, outputRoot: join(f.root, "pair-output") });
+  const options = { ...f.args, pairRegistrationObjectDigest: sealed.object_digest, trustedPairRegistrationObjectDigests: [sealed.object_digest],
+    confirmedPairObjectDigest: sealed.object_digest, gradingAdapters: { baseline: { preflight: () => ({ status: "ready", blockers: [] }) },
+      challenger: { preflight: () => ({ status: "ready", blockers: [] }) } } };
+  let starts = 0; const startComparison = async () => { starts++; };
+  mkdirSync(configs.challenger.output_root);
+  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison }), /already exists before invocation/);
+  assert.equal(starts, 0); assert.equal(existsSync(join(sealed.registration.output_root, "invocation")), false);
+  rmSync(configs.challenger.output_root, { recursive: true });
+  symlinkSync(join(f.root, "missing-grading-target"), configs.challenger.output_root);
+  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison }), /ENOENT|grading/);
+  rmSync(configs.challenger.output_root);
+  const resourcePath = blocks.challenger[0].grading.resources.path;
+  writeFileSync(resourcePath, "changed resource config");
+  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison }), /resources changed/);
+  assert.equal(starts, 0); assert.equal(existsSync(join(sealed.registration.output_root, "invocation")), false);
+});
+
+
+test("grading interruption retains consumed partial receipts and never starts the later role", async t => {
+  const f = setup(t), { blocks } = blocksFor(t, f); bindSyntheticRoleGrading(f, blocks);
+  const sealed = sealPersonalEvolutionPromptPair({ ...f.args, blocks, outputRoot: join(f.root, "pair-output") });
+  const outer = new AbortController(); let starts = 0, grades = 0;
+  const options = { ...f.args, pairRegistrationObjectDigest: sealed.object_digest, trustedPairRegistrationObjectDigests: [sealed.object_digest],
+    confirmedPairObjectDigest: sealed.object_digest, signal: outer.signal,
+    startComparison: async root => { starts++; collectSyntheticTerminal(t, Object.values(blocks).flat().find(block => block.root === root)); },
+    gradingAdapters: { baseline: { preflight: () => ({ status: "ready", blockers: [] }), grade: async () => { grades++; outer.abort(); return { status: "completed" }; } },
+      challenger: { preflight: () => ({ status: "ready", blockers: [] }), grade: async () => { grades++; return { status: "completed" }; } } } };
+  await assert.rejects(startPersonalEvolutionPromptPair(options), /grading deadline/);
+  assert.equal(starts, 1); assert.equal(grades, 1);
+  assert.ok(existsSync(join(sealed.registration.output_root, "invocation/baseline-0-grading.json")));
+  assert.equal(existsSync(join(sealed.registration.output_root, "invocation/saved-result-connection.json")), false);
+  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, signal: undefined }), /already consumed|EEXIST/);
+  assert.equal(starts, 1);
 });
