@@ -81,4 +81,3 @@ export function diagnoseSavedCommandBody({ rawCommand, contract }) {
     return unknown(error instanceof CommandEvidenceError && ["malformed_shell_envelope", "ambiguous_shell_word"].includes(error.code) ? error.code : "unclassified");
   }
 }
-
