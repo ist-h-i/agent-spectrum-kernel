@@ -1,0 +1,132 @@
+{
+  "kind": "sanitized-public-command-render-fixtures@1",
+  "privacy": "Only public check commands. All source hashes replaced with synthetic a*64. No original outputs, absolute workspaces, case/oracle/private payloads, secrets, run IDs or model answers. Commands are data and must never execute.",
+  "fixtures": [
+    {
+      "id": "mn-build-option-update-plain-1",
+      "public_origin_fixture": "mn-build-option-update",
+      "public_check_id": "build-config-semantic-validator",
+      "declared_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"ci/release-build.log\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"docs/build-options.md\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"package.json\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"test/build-config.test.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"scripts/validate-build-config.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest) process.exit(41)}' && [ -f build.config.json ] && node scripts/validate-build-config.mjs",
+      "observed_render": "/bin/zsh -lc \"node -e 'const fs=require(\\\"node:fs\\\"),crypto=require(\\\"node:crypto\\\"),expected={\\\"ci/release-build.log\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"docs/build-options.md\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"package.json\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"test/build-config.test.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"scripts/validate-build-config.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\\\"sha256\\\").update(fs.readFileSync(path)).digest(\\\"hex\\\")\"'!==digest) process.exit(41)}'\"' && [ -f build.config.json ] && node scripts/validate-build-config.mjs\"",
+      "expected_body_bytes_equal": true,
+      "declared_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      }
+    },
+    {
+      "id": "mn-build-option-update-plain-2",
+      "public_origin_fixture": "mn-build-option-update",
+      "public_check_id": "build-config-focused-test",
+      "declared_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"ci/release-build.log\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"docs/build-options.md\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"package.json\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"test/build-config.test.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"scripts/validate-build-config.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest) process.exit(41)}' && [ -f build.config.json ] && node test/build-config.test.mjs",
+      "observed_render": "/bin/zsh -lc \"node -e 'const fs=require(\\\"node:fs\\\"),crypto=require(\\\"node:crypto\\\"),expected={\\\"ci/release-build.log\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"docs/build-options.md\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"package.json\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"test/build-config.test.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"scripts/validate-build-config.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\\\"sha256\\\").update(fs.readFileSync(path)).digest(\\\"hex\\\")\"'!==digest) process.exit(41)}'\"' && [ -f build.config.json ] && node test/build-config.test.mjs\"",
+      "expected_body_bytes_equal": true,
+      "declared_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      }
+    },
+    {
+      "id": "mn-build-option-update-kernel_principles_v2-1",
+      "public_origin_fixture": "mn-build-option-update",
+      "public_check_id": "build-config-semantic-validator",
+      "declared_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"ci/release-build.log\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"docs/build-options.md\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"package.json\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"test/build-config.test.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"scripts/validate-build-config.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest) process.exit(41)}' && [ -f build.config.json ] && node scripts/validate-build-config.mjs",
+      "observed_render": "/bin/bash -lc \"node -e 'const fs=require(\\\"node:fs\\\"),crypto=require(\\\"node:crypto\\\"),expected={\\\"ci/release-build.log\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"docs/build-options.md\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"package.json\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"test/build-config.test.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"scripts/validate-build-config.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\\\"sha256\\\").update(fs.readFileSync(path)).digest(\\\"hex\\\")\"'!==digest) process.exit(41)}'\"' && [ -f build.config.json ] && node scripts/validate-build-config.mjs\"",
+      "expected_body_bytes_equal": true,
+      "declared_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      }
+    },
+    {
+      "id": "mn-build-option-update-kernel_principles_v2-2",
+      "public_origin_fixture": "mn-build-option-update",
+      "public_check_id": "build-config-focused-test",
+      "declared_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"ci/release-build.log\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"docs/build-options.md\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"package.json\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"test/build-config.test.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"scripts/validate-build-config.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest) process.exit(41)}' && [ -f build.config.json ] && node test/build-config.test.mjs",
+      "observed_render": "/bin/bash -lc \"node -e 'const fs=require(\\\"node:fs\\\"),crypto=require(\\\"node:crypto\\\"),expected={\\\"ci/release-build.log\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"docs/build-options.md\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"package.json\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"test/build-config.test.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"scripts/validate-build-config.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\\\"sha256\\\").update(fs.readFileSync(path)).digest(\\\"hex\\\")\"'!==digest) process.exit(41)}'\"' && [ -f build.config.json ] && node test/build-config.test.mjs\"",
+      "expected_body_bytes_equal": true,
+      "declared_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      }
+    },
+    {
+      "id": "mn-build-option-update-full_ask-1",
+      "public_origin_fixture": "mn-build-option-update",
+      "public_check_id": "build-config-semantic-validator",
+      "declared_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"ci/release-build.log\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"docs/build-options.md\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"package.json\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"test/build-config.test.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"scripts/validate-build-config.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest) process.exit(41)}' && [ -f build.config.json ] && node scripts/validate-build-config.mjs",
+      "observed_render": "/bin/bash -lc \"node -e 'const fs=require(\\\"node:fs\\\"),crypto=require(\\\"node:crypto\\\"),expected={\\\"ci/release-build.log\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"docs/build-options.md\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"package.json\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"test/build-config.test.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"scripts/validate-build-config.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\\\"sha256\\\").update(fs.readFileSync(path)).digest(\\\"hex\\\")\"'!==digest) process.exit(41)}'\"' && [ -f build.config.json ] && node scripts/validate-build-config.mjs\"",
+      "expected_body_bytes_equal": true,
+      "declared_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      }
+    },
+    {
+      "id": "mn-build-option-update-full_ask-2",
+      "public_origin_fixture": "mn-build-option-update",
+      "public_check_id": "build-config-focused-test",
+      "declared_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"ci/release-build.log\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"docs/build-options.md\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"package.json\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"test/build-config.test.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"scripts/validate-build-config.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest) process.exit(41)}' && [ -f build.config.json ] && node test/build-config.test.mjs",
+      "observed_render": "/bin/bash -lc \"node -e 'const fs=require(\\\"node:fs\\\"),crypto=require(\\\"node:crypto\\\"),expected={\\\"ci/release-build.log\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"docs/build-options.md\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"package.json\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"test/build-config.test.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"scripts/validate-build-config.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\\\"sha256\\\").update(fs.readFileSync(path)).digest(\\\"hex\\\")\"'!==digest) process.exit(41)}'\"' && [ -f build.config.json ] && node test/build-config.test.mjs\"",
+      "expected_body_bytes_equal": true,
+      "declared_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      }
+    },
+    {
+      "id": "mn-doc-config-correction-plain-1",
+      "public_origin_fixture": "mn-doc-config-correction",
+      "public_check_id": "worker-retry-doc-test",
+      "declared_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"config/retry-policy.json\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"package.json\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"test/worker-retries.test.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && [ -f docs/worker-retries.md ] && npm test",
+      "observed_render": "/bin/zsh -lc \"/bin/bash -lc 'node -e '\\\\''const fs=require(\\\"node:fs\\\"),crypto=require(\\\"node:crypto\\\"),expected={\\\"config/retry-policy.json\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"package.json\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"test/worker-retries.test.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\\\"sha256\\\").update(fs.readFileSync(path)).digest(\\\"hex\\\")\"'!==digest)process.exit(41)}'\"'\\\\'' && [ -f docs/worker-retries.md ] && npm test'\"",
+      "expected_body_bytes_equal": true,
+      "declared_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      }
+    },
+    {
+      "id": "mn-doc-config-correction-kernel_principles_v2-1",
+      "public_origin_fixture": "mn-doc-config-correction",
+      "public_check_id": "worker-retry-doc-test",
+      "declared_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"config/retry-policy.json\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"package.json\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"test/worker-retries.test.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && [ -f docs/worker-retries.md ] && npm test",
+      "observed_render": "/bin/bash -lc \"node -e 'const fs=require(\\\"node:fs\\\"),crypto=require(\\\"node:crypto\\\"),expected={\\\"config/retry-policy.json\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"package.json\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"test/worker-retries.test.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\\\"sha256\\\").update(fs.readFileSync(path)).digest(\\\"hex\\\")\"'!==digest)process.exit(41)}'\"' && [ -f docs/worker-retries.md ] && npm test\"",
+      "expected_body_bytes_equal": true,
+      "declared_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      }
+    },
+    {
+      "id": "mn-doc-config-correction-full_ask-1",
+      "public_origin_fixture": "mn-doc-config-correction",
+      "public_check_id": "worker-retry-doc-test",
+      "declared_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"config/retry-policy.json\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"package.json\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"test/worker-retries.test.mjs\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && [ -f docs/worker-retries.md ] && npm test",
+      "observed_render": "/bin/bash -lc \"node -e 'const fs=require(\\\"node:fs\\\"),crypto=require(\\\"node:crypto\\\"),expected={\\\"config/retry-policy.json\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"package.json\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\",\\\"test/worker-retries.test.mjs\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\\\"sha256\\\").update(fs.readFileSync(path)).digest(\\\"hex\\\")\"'!==digest)process.exit(41)}'\"' && [ -f docs/worker-retries.md ] && npm test\"",
+      "expected_body_bytes_equal": true,
+      "declared_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      }
+    }
+  ]
+}
