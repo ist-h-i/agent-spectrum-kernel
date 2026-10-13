@@ -34,7 +34,9 @@ const ROOT = resolve(import.meta.dirname, "..");
 function controllerSources() {
   const source = { ...primaryProducerSources() }, pending = ["scripts/ask-personal-evolution-primary-pair.mjs",
     "scripts/ask-personal-evolution-alignment.mjs", "scripts/ask-personal-evolution-saved-results.mjs"];
-  for (const name of readdirSync(join(ROOT, "schemas"))) if (/^(asset|portfolio|evolution)-.*\.schema\.json$/u.test(name)) source[`schemas/${name}`] = comparisonHash(raw(join(ROOT, "schemas", name)));
+  // Include shared $ref targets (for example claim-evidence-status), not just
+  // Asset/Portfolio/Evolution entry schemas, in the immutable copy's closure.
+  for (const name of readdirSync(join(ROOT, "schemas"))) if (name.endsWith(".schema.json")) source[`schemas/${name}`] = comparisonHash(raw(join(ROOT, "schemas", name)));
   while (pending.length) {
     const path = pending.pop(); if (source[path]) continue;
     assert.ok(!path.startsWith("../") && !path.startsWith("/"));

@@ -166,6 +166,8 @@ test("new registration aligns before freeze with explicit trust; unstarted fresh
   assert.throws(() => applyPersonalEvolutionBaselineAlignment({ ...f.alignArgs, trustedPortfolioAuthorityContexts: f.alignArgs.trustedPortfolioAuthorityContexts.slice(0, 1) }), /separate exact/);
   assert.deepEqual(inventory(f.storeRoot), before);
   const sealed = sealPersonalEvolutionPromptPair({ ...f.args, blocks, outputRoot: join(f.root, "pair-output") });
+  assert.equal(sealed.registration.description.controller_sources["schemas/claim-evidence-status.schema.json"],
+    comparisonHash(readFileSync(join(repository, "schemas/claim-evidence-status.schema.json"))));
   const options = { ...f.args, pairRegistrationObjectDigest: sealed.object_digest, trustedPairRegistrationObjectDigests: [sealed.object_digest] };
   const checked = verifyPersonalEvolutionPromptPairResults(options); assert.equal(checked.status, "NOT_RUN");
   assert.equal(checked.recommendation.recommendation, "insufficient_evidence"); assert.equal(checked.evidence.dimensions.quality.conclusion, "unavailable");
