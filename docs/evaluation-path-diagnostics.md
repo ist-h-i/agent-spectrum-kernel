@@ -4,7 +4,7 @@
 
 ## Command body
 
-`diagnoseSavedCommandBody({ rawCommand, contract })` は `ask-benchmark-command-evidence.mjs` のpure diagnostic exportである。public宣言の各shell commandについて `body_bytes_equal`、`canonical_render_bytes_equal`、`shell_envelope_equal` を分けて返す。bodyの一致はdecode後のbytes完全一致で、shell semanticsの同値化、scriptの実行、任意digestの再認証は行わない。
+`diagnoseSavedCommandBody({ rawCommand, contract })` は `ask-saved-command-body-observation.mjs` のpure diagnostic exportである。public宣言の各shell commandについて `body_bytes_equal`、`canonical_render_bytes_equal`、`shell_envelope_equal` を分けて返す。bodyの一致はdecode後のbytes完全一致で、shell semanticsの同値化、scriptの実行、任意digestの再認証は行わない。
 
 有限の `/bin/bash -lc`、`/bin/bash -c`、`/bin/zsh -lc` literal envelopeを最大2段までdecodeする。引用片の連結・literal escapingをdataとして処理し、outer substitution/変数展開、extra statement/argument、NUL、未知shell/flag、過深nestはUnknown。body内の追加statementや`cd`は指定bodyと異なれば一致しない。rawやbody本文は返さずdigestを保持する。
 

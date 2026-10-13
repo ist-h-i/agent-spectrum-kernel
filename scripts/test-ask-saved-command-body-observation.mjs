@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import * as evidence from './ask-benchmark-command-evidence.mjs';
+import * as evidence from './ask-saved-command-body-observation.mjs';
 
 const fixtures = JSON.parse(readFileSync(new URL('./fixtures/primary-command-body-observation-public.json', import.meta.url))).fixtures;
 const makeContract = script => ({ commands: [{ command_id: 'public-check', canonical_script: script,
