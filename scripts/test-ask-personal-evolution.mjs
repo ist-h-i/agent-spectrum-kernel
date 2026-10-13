@@ -112,6 +112,23 @@ test("candidate generation is detached from mutable blueprint and observation in
   assert.ok(candidate.evaluation_scope.exclusions.includes(input.observationInput.non_applicability[0]));
 });
 
+for (const [label, mutate, match] of [
+  ["recomputed Registry identity", x => { x.blueprint.registry.registry_id = "different"; }, /Registry identity/],
+  ["recomputed historical parent", x => { x.blueprint.parent_portfolio.lock_digest = adapter.challenger_portfolio.lock_digest;
+    x.blueprint.rollback.parent_portfolio.lock_digest = adapter.challenger_portfolio.lock_digest; }, /current head/],
+]) test(`inspection rejects ${label} even when preparation digest is valid`, t => {
+  const input = setup(t); mutate(input);
+  const observation = buildPersonalEvolutionObservation(input.observationInput);
+  const candidate = buildPersonalEvolutionCandidate({ ...input, observation });
+  const observed = putContentAddressedJson({ storeRoot: input.storeRoot, artifact: observation });
+  const published = putContentAddressedJson({ storeRoot: input.storeRoot, artifact: candidate });
+  const body = { schema_version: "1.0.0", object_kind: "personal_evolution_preparation",
+    observation_object_digest: observed.digest, candidate_object_digest: published.digest,
+    holdout_task_ids: input.holdoutTaskIds, authority_implied: false };
+  const saved = putContentAddressedJson({ storeRoot: input.storeRoot, artifact: { ...body, preparation_digest: canonicalDigest(body) } });
+  assert.throws(() => inspectPersonalEvolution({ ...input, preparationObjectDigest: saved.digest }), match);
+});
+
 test("six-object synthetic insufficient-evidence closure never means installation or adoption", t => {
   const input = setup(t); const prepared = preparePersonalEvolutionCandidate(input);
   const experimentObjectDigest = experimentFor(input, prepared);

@@ -111,6 +111,8 @@ export function inspectPersonalEvolution({ storeRoot, preparationObjectDigest, a
     blueprint: Object.fromEntries(BLUEPRINT_KEYS.map(key => [key, candidate[key]])),
     generationActor: candidate.generation.actor, holdoutTaskIds: preparation.holdout_task_ids });
   if (!equal(candidate, reconstructed)) throw new Error("candidate observation binding mismatch");
+  assertRegisteredCandidate({ storeRoot, candidate, trustedAssetAuthorityContexts,
+    trustedPortfolioAuthorityContexts, trustedHighImpactApprovalGrants });
   const stages = [["experimentObjectDigest", verifyEvolutionExperiment, "experiment_sealed"],
     ["recommendationObjectDigest", verifyEvolutionRecommendation, "recommendation_verified"],
     ["proposalObjectDigest", verifyEvolutionActionProposal, "proposal_verified"],
