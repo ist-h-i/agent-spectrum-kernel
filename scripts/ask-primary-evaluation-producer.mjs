@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { canonicalDigest, parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
+import { normalizeRuntimeObservationCarrier } from './ask-benchmark-runtime-observation.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 import { buildCodexCommandEvidence, buildUnavailableCommandEvidence, commandEvidenceFailureReason, PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, validateVerificationCommandContract, validateCommandEvidenceManifest } from './ask-benchmark-command-evidence.mjs';
 import { captureTerminalWorkspaceInventory, buildTerminalWorkspaceAuthority, readVerifiedTerminalWorkspaceAuthority } from './ask-benchmark-terminal-workspace.mjs';
@@ -50,6 +51,7 @@ export function primaryProducerSources() {
     'scripts/ask-benchmark-terminal-candidate.mjs', 'scripts/ask-benchmark-portfolio-score.mjs',
     ...PRIMARY_PROFILE_SCHEMAS.flatMap(name => [`benchmarks/schemas/${name}.schema.json`, `benchmarks/schemas/primary-${name}.schema.json`, `benchmarks/schemas/primary-k2-${name}.schema.json`])];
   const all=new Set([...paths,'scripts/ask-primary-fixture-recipe.mjs','benchmarks/adaptive-portfolio.config.json',
+    'benchmarks/schemas/runtime-observation-carrier.schema.json',
     'benchmarks/portfolio-catalog.json','benchmarks/portfolio-policy-manifest.json','benchmarks/portfolio-scoring-policy.json']);
   const pending=[...all].filter(path=>path.endsWith('.mjs'));
   // Reuse the existing Core producer's local-import source-pin convention.
@@ -185,7 +187,7 @@ function derive(target, source) {
         final_output_digest: final ? hash(final) : null, final_output_bytes: final?.length ?? null,
         ...Object.fromEntries(Object.entries(result).filter(([key]) => key.startsWith('terminal_workspace_'))) };
       Object.assign(state, { status, attempt_count: 1, terminal_attempt: '0001' });
-      attempts.push({ attempt: '0001', request: r, result, evidence, commandEvidence: commands, verificationCommandContract: contract,
+      attempts.push({ attempt: '0001', request: r, result, evidence, commandEvidence: commands, verificationCommandContract: contract, nativeEventStream: Buffer.from(stdout),
         terminalWorkspaceAuthority: terminal, expectedBaseInventory: baseSnapshot.inventory.filter(f => f.file_type === 'regular_file'), expectedManagedAssetPaths: managed });
       for (const [name, value] of [['request.json', r], ['result.json', result], ['terminal-commit.json', commit], ['command-evidence.json', commands],
         ['terminal-workspace-authority.json', terminal.bytes], ['stdout.jsonl', stdout], ['stderr.log', stderr], ...(final ? [['primary-response.txt', final]] : [])]) output.set(prefix + name, value);
@@ -253,7 +255,7 @@ export function verifyPrimaryEvaluationProducer(options) {
   const derived = withPrimarySchemaBuild(() => derive(target, source), { profileId: primaryProfileForRequest(source.request).id });
   for (const [path, value] of derived.output) assert.deepEqual(read(join(target, path)), bytes(value), 'primary derived record changed');
   return { inspection: derived.inspection, executionOptions: executionOptions(target), request: source.request, evidence_kind: manifest.evidence_kind, source_digests:manifest.source_digests,
-    block: manifest.block, execution_permission: false, scoring_ready: false };
+    block: manifest.block, originalSourceRepository: source.loaded.plan.source.repo ?? null, execution_permission: false, scoring_ready: false };
 }
 export function verifyPrimaryProducedTerminal(inspection, { root, runDir, caseId, attempt }) {
   const c = inspection.cases.find(value => value.entry.case_id === caseId), a = c?.attempts.find(value => value.attempt === attempt); assert.ok(a);
@@ -279,8 +281,15 @@ export function materializePrimaryEvaluationCandidate(options, { condition, outp
 export function buildPrimaryEvaluationScoringInputs(options, runtimeInputs = {}) {
   return withPrimaryEvaluationProducer(options, verified => buildPrimaryEvaluationScoringInputsWithinScope(options,runtimeInputs,verified));
 }
+// Explicit opt-in; existing producer and normalized records remain byte-exact.
+export function normalizePrimaryRuntimeObservationCarrier(options, { observationRoot }) {
+  return withPrimaryEvaluationProducer(options, verified => normalizeRuntimeObservationCarrier({
+    ...verified.executionOptions, normalizedResultsPath: join(options.recordRoot, 'normalized'), observationRoot,
+  }));
+}
 function buildPrimaryEvaluationScoringInputsWithinScope(options, { condition, frozenSourceRoot = null, privateRoot = null, privateEvaluationRoot = null, manifestPath = null,
   resultPath = null, privateEvaluationRecordPath = null, privateFragmentPath = null,
+  runtimeObservationRoot = null,
   admissionDecisionPath = null, admissionReviewAuthorityPath = null, admissionReviewAuthoritySourceDigest = null, admissionReviewArchivePath = null }, verified) {
     assert.ok(primaryProfileForRequest(verified.request).conditions.includes(condition)); const normalizedResultsPath = join(options.recordRoot, 'normalized');
     const normalized = verifyNormalizedPortfolioResults({ ...verified.executionOptions, outputPath: normalizedResultsPath });
@@ -302,8 +311,10 @@ function buildPrimaryEvaluationScoringInputsWithinScope(options, { condition, fr
     const admissionMetadata=existsSync(paths.admissionRecordPath)?json(paths.admissionRecordPath).admission_status:'unknown';
     return { status: 'assembled_not_executed', normalizedResult: record,
       privateHelperOptions:{...verified.executionOptions,root:sourceRoot,normalizedResultsPath,sourceSnapshotDigest:normalized.manifest.source_snapshot_digest,
-        normalizedResultId:entry.normalized_result_id,privateRoot,privateEvaluationRoot},
+        normalizedResultId:entry.normalized_result_id,privateRoot,privateEvaluationRoot,
+        ...(runtimeObservationRoot !== null ? { runtimeObservationRoot } : {})},
       scorerOptions: { ...verified.executionOptions, root: sourceRoot, ...paths, ...(reviewCount?review:{}),
+      ...(runtimeObservationRoot !== null ? { runtimeObservationRoot } : {}),
       normalizedResultsPath, sourceSnapshotDigest: normalized.manifest.source_snapshot_digest, scoringInputFreezeManifestPath: join(sourceRoot, freezePath),
       scoringInputFreezeManifestSourceDigest: verified.request.binding.scoring_input_freeze_digest, primaryEvaluationProducer: { ...options },
       privateRoot, privateEvaluationRoot, manifestPath, resultPath, privateEvaluationRecordPath, privateFragmentPath },
@@ -327,7 +338,8 @@ export function createPrimaryEvaluationSealedEvaluatorExecution(options, runtime
     const bundle=verifyPrivateEvaluatorBundle(inputs.scorerOptions);
     assert.equal(bundle.manifest.evaluator_bundle_digest,verified.request.binding.evaluator_bundle_digest,'primary original private bundle changed');
     const hiddenAsset=bundle.manifest.asset_inventory.find(asset=>asset.role==='hidden_tests');assert.ok(hiddenAsset,'primary original hidden asset required');
-    return createProductionSealedEvaluatorExecution({...inputs.privateHelperOptions,hiddenAsset,externalAuthorityAnchor,evaluatorRevision:bundle.manifest.evaluator_revision});
+    return createProductionSealedEvaluatorExecution({...inputs.privateHelperOptions,hiddenAsset,externalAuthorityAnchor,evaluatorRevision:bundle.manifest.evaluator_revision,
+      ...(runtimeInputs.runtimeObservationRoot ? { runtimeObservationRoot: runtimeInputs.runtimeObservationRoot } : {})});
   });
 }
 export function verifyPrimaryEvaluationResult(options) { assert.ok(options.primaryEvaluationProducer); return withPrimaryEvaluationProducer(options.primaryEvaluationProducer, () => verifyEvaluatorAuthority(options), { grading: true }); }

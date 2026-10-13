@@ -29,6 +29,14 @@ export function withPrimarySchemaBuild(callback, { profileId = PRIMARY_EVALUATIO
 }
 const activeProfile = () => active()?.profile;
 export const activePrimaryProducer = () => Boolean(active()?.verified);
+// Only authority-owned roots from the verified producer; callers cannot supply
+// a shorter boundary list to place private observations in model/public inputs.
+export function primaryRuntimeObservationSourceRoots() {
+  const current = active(); if (!current?.verified) return [];
+  const verified = verifyPrimaryEvaluationProducer(current.options);
+  return [current.options.recordRoot, verified.block.root, verified.block.public_input_root,
+    verified.block.input_manifest.path, ...(verified.originalSourceRepository === null ? [] : [verified.originalSourceRepository])];
+}
 const rawDigest=raw=>`sha256:${createHash('sha256').update(raw).digest('hex')}`;
 function pinnedHistoricalGraph(root,fixtureId,binding,scoringVersion = null) {
   const fixedRoot = primaryScoringRoot({ fixture_id: fixtureId, grading: { scoring_version: scoringVersion } });
