@@ -64,8 +64,16 @@ function readRequest(storeRoot, digest, trust) {
   if (observation.observation_digest !== request.observation_digest) throw new Error("generation observation transplant rejected");
   validatePolicy({ observation, blueprint: request.blueprint, generationActor: request.generation_actor,
     holdoutTaskIds: request.holdout_task_ids, requestedVersion: request.requested_version, requestId: request.request_id });
-  verifyPersonalEvolutionParent({ storeRoot, candidate: request.blueprint, ...trust });
-  return { request, observation };
+  const { parent } = verifyPersonalEvolutionParent({ storeRoot, candidate: request.blueprint, ...trust });
+  return { request, observation, parent };
+}
+
+// Shared exact request/parent verification for the once-generation connector.
+// Reading this object never invokes a provider or grants source/evaluation trust.
+export function readPersonalEvolutionGenerationRequest({ storeRoot, requestObjectDigest,
+  trustedAssetAuthorityContexts = [], trustedPortfolioAuthorityContexts = [], trustedHighImpactApprovalGrants = [] }) {
+  return freezePersonalEvolutionValue(readRequest(storeRoot, requestObjectDigest,
+    { trustedAssetAuthorityContexts, trustedPortfolioAuthorityContexts, trustedHighImpactApprovalGrants }));
 }
 
 function contains(root, child) {
