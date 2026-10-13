@@ -13,6 +13,7 @@ import { planPersonalEvolutionBaselineAlignment, applyPersonalEvolutionBaselineA
 import { buildEvolutionExperiment, publishEvolutionExperiment, computePromptV2ExactProjectionDigests,
   buildEvolutionHumanDecision, publishEvolutionHumanDecision } from "./evolution-loop.mjs";
 import { buildPersonalPromptMaterialization, personalPromptInput } from "./ask-personal-prompt-materialization.mjs";
+import { applyPersonalEvolutionLoopPortfolioAction } from "./ask-personal-evolution-driver.mjs";
 import { describePersonalEvolutionPromptPair, sealPersonalEvolutionPromptPair, verifyPersonalEvolutionPromptPairResults, startPersonalEvolutionPromptPair } from "./ask-personal-evolution-primary-pair.mjs";
 import { preparePersonalEvolutionSavedResultActions, finishPersonalEvolutionSavedResultNoop } from "./ask-personal-evolution-saved-results.mjs";
 import { comparisonHash, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
@@ -139,13 +140,13 @@ function setup(t, { sourceClassified = true, changeSelectedEntrypoint = true, re
     evaluationAuthority: { authority_id: "synthetic-saved-grading-controller", authority_revision: 1, authority_evidence_digest: canonicalDigest("synthetic") } };
   return { root, storeRoot, planned, alignArgs, aligned, args, descriptor, parentAsset, sourceRoot, content, original, imported, sourceReview, entrypoint: descriptor.type_extension.entrypoints[1] };
 }
-function blocksFor(t, f) {
+function blocksFor(t, f, runtimeVersion) {
   const blocks = {}, sources = {};
   for (const role of ["baseline", "challenger"]) {
     const p = syntheticPrimarySource(t, { scenario: "pending" }); sources[role] = p;
     p.plan.run_id += `-${role}`; p.plan.config.model = "gpt-5.6-sol";
     const material = buildPersonalPromptMaterialization({ storeRoot: f.storeRoot, registrySnapshotDigest: f.aligned.prepared.candidate.registry.snapshot_digest,
-      asset: f.aligned.roles[role].selected_asset, entrypoint: f.entrypoint, trustedAssetAuthorityContexts: [] }, { taskClass: "configuration", hash: comparisonHash });
+      asset: f.aligned.roles[role].selected_asset, entrypoint: f.entrypoint, trustedAssetAuthorityContexts: [], ...(runtimeVersion ? {runtimeVersion} : {}) }, { taskClass: "configuration", hash: comparisonHash });
     p.plan.prompt = "synthetic task boundary";
     writeFileSync(join(p.block.root, p.plan.input.path), p.plan.prompt); p.plan.input.digest = comparisonHash(Buffer.from(p.plan.prompt));
     const input = Buffer.from(personalPromptInput(p.plan.prompt, material.entry_text));
@@ -536,4 +537,46 @@ test("grading interruption retains consumed partial receipts and never starts th
   assert.equal(existsSync(join(sealed.registration.output_root, "invocation/saved-result-connection.json")), false);
   await assert.rejects(startPersonalEvolutionPromptPair({ ...options, signal: undefined }), /already consumed|EEXIST/);
   assert.equal(starts, 1);
+});
+
+test("new v2 pair requires the same active/reference runtime contract in both roles", t => {
+  const f = setup(t), {blocks} = blocksFor(t, f, "selected_active_reference_v2");
+  const description = describePersonalEvolutionPromptPair({...f.args, blocks});
+  assert.equal(description.bindings.baseline[0].prompt_runtime_contract.kind, "personal_registered_prompt_materialization_v2");
+  assert.deepEqual(description.bindings.baseline[0].prompt_runtime_contract, description.bindings.challenger[0].prompt_runtime_contract);
+  const wrong = blocksFor(t, f);
+  assert.throws(() => describePersonalEvolutionPromptPair({...f.args, blocks: {baseline: blocks.baseline, challenger: wrong.blocks.challenger}}),
+    /runtime\/budget mismatch/);
+});
+
+test("positive driver cannot turn an unstarted pair or an unpinned lifecycle plan into adoption", t => {
+  const f = setup(t), {blocks} = blocksFor(t, f, "selected_active_reference_v2");
+  const sealed = sealPersonalEvolutionPromptPair({...f.args, blocks, outputRoot: join(f.root, "pair-output")});
+  const saved = {...f.args, pairRegistrationObjectDigest: sealed.object_digest, trustedPairRegistrationObjectDigests: [sealed.object_digest]};
+  const plan = putContentAddressedJson({storeRoot: f.storeRoot, artifact: {synthetic_plan: true}}).digest;
+  const value = {application: {}, saved, lifecyclePlanObjectDigest: plan, trustedLifecyclePlanObjectDigests: []};
+  const before = inventory(f.storeRoot);
+  assert.throws(() => applyPersonalEvolutionLoopPortfolioAction(value), /pre-result lifecycle plan pin/);
+  value.trustedLifecyclePlanObjectDigests = [plan];
+  assert.throws(() => applyPersonalEvolutionLoopPortfolioAction(value), /pre-result plan-bearing/);
+  assert.deepEqual(inventory(f.storeRoot), before);
+});
+
+test("v2 registration fixes lifecycle plans while NOT_RUN and rejects foreign parent or unpinned late plan", t => {
+  const f = setup(t), {blocks} = blocksFor(t, f, "selected_active_reference_v2");
+  const candidate = f.aligned.prepared.candidate, {lock_digest, ...parent} = candidate.parent_portfolio;
+  const lifecycle = {base_registry_snapshot_digest: candidate.registry.snapshot_digest, base_portfolio_lock_digest: lock_digest,
+    base_current_manifest: parent, target_manifest: parent, rollback_anchor: parent, portfolio_transitions: [], asset_transitions: [],
+    reason_codes: ["synthetic_pre_result_pin_only"]};
+  const pin = putContentAddressedJson({storeRoot: f.storeRoot, artifact: lifecycle}).digest;
+  const wrong = putContentAddressedJson({storeRoot: f.storeRoot, artifact: {...lifecycle, base_portfolio_lock_digest: canonicalDigest("wrong")}}).digest;
+  assert.throws(() => sealPersonalEvolutionPromptPair({...f.args, blocks, lifecyclePlanObjectDigests: [wrong], outputRoot: join(f.root, "wrong-output")}));
+  const sealed = sealPersonalEvolutionPromptPair({...f.args, blocks, lifecyclePlanObjectDigests: [pin], outputRoot: join(f.root, "v2-output")});
+  assert.equal(sealed.registration.kind, "personal_pre_result_prompt_pair_v2");
+  assert.deepEqual(sealed.registration.lifecycle_plan_object_digests, [pin]);
+  const saved = {...f.args, pairRegistrationObjectDigest: sealed.object_digest, trustedPairRegistrationObjectDigests: [sealed.object_digest]};
+  assert.equal(verifyPersonalEvolutionPromptPairResults(saved).status, "NOT_RUN");
+  const late = putContentAddressedJson({storeRoot: f.storeRoot, artifact: {...lifecycle, reason_codes: ["late"]}}).digest;
+  assert.throws(() => applyPersonalEvolutionLoopPortfolioAction({saved, application: {}, lifecyclePlanObjectDigest: late,
+    trustedLifecyclePlanObjectDigests: [late]}), /not fixed in the invoked pair/);
 });
