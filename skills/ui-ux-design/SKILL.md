@@ -1,13 +1,13 @@
 ---
 name: ui-ux-design
-description: Add a bounded human-centered UI/UX supplement to an already-selected delivery workflow when changed behavior is user-visible and interactive.
+description: Shape UI composition, visual finish, task usability, and interaction evidence as a bounded supplement to the selected delivery workflow.
 ---
 
 # UI/UX Design Harness
 
 ## Goal
 
-Constrain UI implementation and review around the user's evidenced goal, information priority, interaction semantics, consequence awareness, and recoverable state. This is an execution supplement, not a lifecycle replacement and not a visual design system.
+Constrain UI design, implementation and review around the user's evidenced goal, visual hierarchy and finish, task usability, interaction semantics, consequence awareness, and recoverable state. This is an execution supplement, not a lifecycle replacement and not a visual design system.
 
 Use the smallest applicable subset. Do not invent personas, business priorities, device assumptions, recovery guarantees, or interaction behavior that the task does not evidence.
 
@@ -25,19 +25,19 @@ Do not use it for non-UI work, purely machine-consumed output, or as a reason to
 
 ## Process
 
-1. **Anchor to evidence.** Identify the known user goal, usage context, primary action, completion state, next action, required information, constraints, and existing product contracts. If a consequential choice cannot be made safely because the user goal, task boundary, or recovery semantics are unknown, stop on that missing fact rather than creating a generic persona or workflow.
-2. **Select patterns, not decoration.** Read only the applicable sections of `references/principles.md`, `references/decision-patterns.md`, and `references/anti-patterns.md`. Record why each selected pattern applies. Treat examples as evidence prompts, not global bans.
-3. **Structure before prose.** Prefer removal, hierarchy, grouping, ordering, defaults, state, and familiar controls before adding explanation. Keep language required for an accurate or accessible decision.
+1. **Anchor to evidence.** Identify the known user goal, usage context, first information to notice, action priorities, completion/next action, and constraints. Choose density and composition for that purpose: a comparison workspace and a product introduction need different treatments. Existing contracts are inputs, not a quality ceiling; revisit observed weaknesses within scope. Stop only decisions that depend on consequential missing facts, without inventing a persona or workflow.
+2. **Select applicable principles and patterns.** Read only the relevant sections of `references/principles.md`, `references/decision-patterns.md`, and `references/anti-patterns.md`. Record why they apply. Treat examples as evidence prompts, not global bans.
+3. **Make composition concrete.** Connect grouping, order, text hierarchy and wrapping, alignment anchors, spacing, imagery and control relationships to the task. Prefer clear structure/state before adding explanation; retain required meaning and accessible labels. For Japanese, judge labels, target/result wording and feedback in their displayed position and state, not grammar alone; use an available `japanese-expression` capability under the discovery rules below.
 4. **Specify behavior.** Define applicable affordances/signifiers, state semantics, immediate feedback, transitions, focus/current state, continuation, and equivalent interaction paths. Mark non-applicable concerns explicitly; do not manufacture hover, drag, gesture, or motion behavior.
 5. **Separate consequence classes.** Distinguish cancel before commitment, undo after a completed reversible change, and compensating action after a committed change. For irreversible or materially consequential actions, show target, scope, consequence, and recovery limit before commitment. Do not add blanket confirmation to low-risk reversible actions.
 6. **Bound failures.** Keep healthy, authorized, semantically valid regions and user input usable when an independent region fails. Keep unresolved failure visible in the affected region, make retry scoped, and verify retry outcome. Distinguish loading, legitimate empty, missing, stale, partial, and complete states. Do not zero-fill missing data or expose derived actions whose prerequisite truth is incomplete. Widen the block only when authorization, security, consistency, or dependency semantics require it.
-7. **Define observable verification.** Include scenarios that exercise state transitions, keyboard/focus behavior where applicable, actual model/state restoration for undo, pre-commit cancellation for irreversible actions, partial failure preservation, retry failure/success, and whole-screen blocking only for foundational failure. A screenshot can evidence static hierarchy but cannot prove undo, loading, recovery, or state restoration.
+7. **Refine and verify actual rendering.** During implementation, inspect a representative whole screen before polishing controls, then refine relevant component details, narrow layouts and states before independent review. Judge visual finish, task usability and functional behavior separately; working clicks, equal CSS values and no overflow do not establish finish. Exercise applicable transitions, keyboard/focus, actual undo, pre-commit cancellation, retained input and scoped retry. A screenshot supports static appearance, not recovery or state restoration. Use the observation and handoff rules in `references/ui-capability-contract.md`.
 8. **Connect available UI capabilities.** Follow `references/ui-capability-contract.md` for contract-only, existing-contract build, or direct UI requests. Keep principle ownership here, resolve external capability owners from the active environment, and preserve contract-to-implementation-to-evidence links. Capability or runtime gaps stop only affected dependent work and never count as completed review.
 9. **Hand constraints back to the selected workflow.** `requirement-grill`, `grill-design`, `controlled-implementation`, `test-first-verification`, review gates, and final merge gates retain their responsibilities. This supplement narrows UI decisions; it does not authorize implementation or approval by itself.
 
 ## Output
 
-Emit a bounded supplement. Omit irrelevant fields or use `not_applicable: <reason>`; never fill them speculatively.
+Emit a bounded supplement in the current task's decision record. For a local adjustment, record only the changed decisions and affected evidence; do not require a new JSON contract or a filled template. Omit irrelevant fields or use `not_applicable: <reason>`; never fill them speculatively.
 
 ```yaml
 UX supplement:
@@ -84,13 +84,14 @@ UX supplement:
   stop_conditions:
 ```
 
-Each verification scenario names the initial state, action/input, expected visible state, expected retained or mutated state, and recovery/continuation result.
+Each verification scenario names the inspected state and observable relationship. For interactions, add action/input, expected visible and underlying state, and applicable recovery/continuation result. Keep design decisions in the existing information model and implementation constraints rather than creating another schema.
 
 ## Exit criteria
 
 - The supplement is connected only because current evidence contains a UI signal.
 - User, product, brand, and business assumptions are sourced or marked unknown.
 - The primary task and next action are clearer without removing required semantics.
+- For rendered UI judgments, composition and component finish have rendered evidence distinct from functional checks; contract-only work specifies observation criteria without claiming actual-screen approval. A passing contract does not dismiss observed roughness.
 - Dynamic claims have interactive/state evidence requirements, not screenshot-only proof.
 - Reversible, irreversible, partial-failure, and foundational-blocking behavior are distinguished when applicable.
 - Healthy state and user input are preserved across independent failure and retry.

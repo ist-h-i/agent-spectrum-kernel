@@ -1,6 +1,6 @@
 # Representative UI/UX anti-patterns
 
-Use these as prompts to inspect a concrete interface. They are not universal bans. Report a defect only when there is an evidenced user/task, contract, inclusion, state, or recovery impact.
+Use these as prompts to inspect a concrete interface, not universal bans or a finding quota. Name the observed location/state, concrete relationship, reading or interaction impact and repair direction. Visible roughness can be a supported finding even when operation succeeds; distinguish it from an optional aesthetic alternative. Do not call an interface “unpolished” without explaining what is wrong.
 
 ## Structure and language
 
@@ -14,6 +14,16 @@ Use these as prompts to inspect a concrete interface. They are not universal ban
 - Asking the user to re-enter information the system already knows without a reason.
 - Ambiguous action labels such as only “Next” or “Continue” where the consequence is not evident.
 - A completed flow that provides no meaningful continuation where one exists.
+
+## Visual finish and evidence
+
+- Treating no overflow, non-collision, passing tests or contract compliance as overall visual approval.
+- Checking text-to-arrow clearance while overlooking an arrow crowded against its frame; confusing CSS padding with native indicator geometry.
+- Uneven optical alignment, accidental wrapping or cramped text/icon/border relationships that weaken scanning despite working controls.
+- Polishing isolated controls before checking whole-screen hierarchy and density.
+- Automatically shrinking an appropriate introduction heading or loosening a useful comparison list merely to fit one preferred style.
+- Approving Japanese strings in isolation when their location or changed state makes the target/result misleading.
+- Claiming a screenshot was reviewed after only saving it or extracting its text, or inventing precise pixel measurements/implementation causes from appearance alone.
 
 ## Affordance, state, and behavior
 
