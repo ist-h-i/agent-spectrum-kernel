@@ -204,6 +204,9 @@ jobs:
       - name: Verify read-only saved primary command capture
         run: node --test scripts/test-ask-primary-saved-command-capture.mjs
 
+      - name: Verify literal body and review target diagnostics (no execution)
+        run: node --test scripts/test-ask-saved-command-body-observation.mjs scripts/test-ask-review-target-requirement.mjs
+
       - name: Verify bounded private runtime observation transport
         run: node --test scripts/test-ask-benchmark-runtime-observation.mjs
 

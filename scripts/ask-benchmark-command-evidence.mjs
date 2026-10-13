@@ -194,6 +194,45 @@ function decodeLiteralShellWord(value) {
   return output;
 }
 
+// Diagnostic comparison only: this never grants matched evidence, reconstructs
+// cwd/actor, or changes either historical parser revision or wire authority.
+export function diagnoseSavedCommandBody({ rawCommand, contract }) {
+  const base = { kind: "ask.saved-command-body-observation@1", scoring_eligible: false,
+    unverified_context: ["working_directory", "execution_actor", "source_loaded", "outcome"] };
+  const unknown = reason => ({ ...base, state: "unknown", reason, commands: [] });
+  if (typeof rawCommand !== "string" || !rawCommand.length) return unknown("unsafe_command");
+  if (Buffer.byteLength(rawCommand) > MAX_COMMAND_EVENT_LINE_BYTES) return unknown("line_oversized");
+  if (!Array.isArray(contract?.commands) || !contract.commands.length) return unknown("command_contract_unavailable");
+  try {
+    let script = rawCommand;
+    const wrappers = [];
+    for (;;) {
+      const prefix = SAVED_SHELL_PREFIXES.find(value => script.startsWith(value));
+      if (!prefix) {
+        if (!wrappers.length || /^\/bin\/[a-z]+\s/u.test(script)) return unknown("unsupported_shell");
+        break;
+      }
+      if (wrappers.length === 2) return unknown("nested_shell_limit");
+      const [executable, flag] = prefix.trim().split(" ");
+      wrappers.push({ executable, arguments: [flag] });
+      script = decodeLiteralShellWord(script.slice(prefix.length));
+    }
+    const commands = contract.commands.filter(command => command.execution_form === "codex_shell_command").map(command => {
+      // renderCommandEvent checks the supported declared envelope. The output
+      // describes byte relationships to caller-supplied public declarations;
+      // even a valid declaration does not authenticate this runtime string.
+      const rendered = renderCommandEvent(command);
+      return { command_id: command.command_id, body_bytes_equal: script === command.canonical_script,
+        canonical_render_bytes_equal: rawCommand === rendered,
+        shell_envelope_equal: wrappers.length === 1 && stableCanonicalJson(wrappers[0]) === stableCanonicalJson(command.shell_envelope) };
+    });
+    return { ...base, state: "compared", raw_render_digest: sha256(Buffer.from(rawCommand)),
+      body_digest: sha256(Buffer.from(script)), wrappers, commands };
+  } catch (error) {
+    return unknown(error instanceof CommandEvidenceError && FAILURE_CODES.has(error.code) ? error.code : "unclassified");
+  }
+}
+
 function classifyRuntimeCommand(rawCommand, contract, parserRevision) {
   if (typeof rawCommand !== "string" || rawCommand.length === 0) throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified");
   const direct = contract?.commands.filter(({ execution_form }) => execution_form === "direct_argv").find((command) => renderCommandEvent(command) === rawCommand);
