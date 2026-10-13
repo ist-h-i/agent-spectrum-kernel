@@ -34,7 +34,7 @@ const ROOT = resolve(import.meta.dirname, "..");
 const present = path => { try { lstatSync(path); return true; } catch (error) { if (error.code === "ENOENT") return false; throw error; } };
 function controllerSources() {
   const source = { ...primaryProducerSources() }, pending = ["scripts/ask-personal-evolution-primary-pair.mjs",
-    "scripts/ask-personal-evolution-alignment.mjs", "scripts/ask-personal-evolution-saved-results.mjs"];
+    "scripts/ask-personal-evolution-alignment.mjs", "scripts/ask-personal-evolution-saved-results.mjs", "scripts/ask-personal-evolution-driver.mjs"];
   // Include shared $ref targets (for example claim-evidence-status), not just
   // Asset/Portfolio/Evolution entry schemas, in the immutable copy's closure.
   for (const name of readdirSync(join(ROOT, "schemas"))) if (name.endsWith(".schema.json")) source[`schemas/${name}`] = comparisonHash(raw(join(ROOT, "schemas", name)));
@@ -91,6 +91,11 @@ function capture(options, role, block) {
   assert.ok(equal(materialization.record, read(options.storeRoot, materialization.asset.record_digest)));
   assert.ok(equal(materialization.content, read(options.storeRoot, materialization.asset.content_digest)));
   const exported = exportPrimaryEvaluationGradingRequest(block), recipe = buildPrimaryFixtureRecipe(block.fixture_id);
+  const activeBasename = materialization.entrypoint.split("/").at(-1);
+  const primaryEntrypoints = { "mp-ci-evidence-gap": "skill-review.md", "mp-data-migration-handoff": "skill-handoff.md",
+    "mn-focused-regression-test": "skill-verify.md" };
+  if (materialization.kind === "personal_registered_prompt_materialization_v2" && Object.hasOwn(primaryEntrypoints, block.fixture_id))
+    assert.equal(activeBasename, primaryEntrypoints[block.fixture_id], "fixed primary fixture active mode mismatch");
   const grading = gradingResources(block);
   if (plan.config.evidence_kind === "observed") assert.ok(grading, "separate fixed role grading resources required");
   assert.ok(options.candidate.evaluation_scope.task_classes.includes(recipe.task_class), "formal task applicability missing");
@@ -120,7 +125,8 @@ function capture(options, role, block) {
     verification_digest: plan.verification.digest, public_criteria: exported.request.public_grading_references,
     grading_binding: exported.request.binding, scoring_version: exported.request.scoring_version ?? null,
     profile_id: exported.request.profile_id, formal_task_class: recipe.task_class, runner_task_class: recipe.runner_task_class,
-    config: plan.config, mutable_paths: plan.mutable_paths, prompt_materialization_digest: plan.arms.full_ask.personal_prompt.materialization_digest,
+    config: plan.config, mutable_paths: plan.mutable_paths, prompt_runtime_contract: { kind: materialization.kind, contract: materialization.runtime_contract ?? null, active_entrypoint_basename: activeBasename },
+    prompt_materialization_digest: plan.arms.full_ask.personal_prompt.materialization_digest,
     prompt_input_digest: plan.arms.full_ask.personal_prompt.input_digest };
 }
 function context(options) {
@@ -168,15 +174,32 @@ export function describePersonalEvolutionPromptPair(options) {
       ...(item.source_repository ? [item.source_repository] : [])]) assert.ok(!overlaps(resource.path, root), "grading configuration belongs outside model/public/seed roots");
   }
   const parity = item => Object.fromEntries(["fixture_id", "source_digest", "task_digest", "input_digest", "verification_digest", "public_criteria",
-    "grading_binding", "scoring_version", "profile_id", "formal_task_class", "runner_task_class", "config", "mutable_paths"].map(key => [key, item[key]]));
+    "grading_binding", "scoring_version", "profile_id", "formal_task_class", "runner_task_class", "config", "mutable_paths", "prompt_runtime_contract"].map(key => [key, item[key]]));
   for (let i = 0; i < bindings.baseline.length; i++) assert.ok(equal(parity(bindings.baseline[i]), parity(bindings.challenger[i])), "pair task/criterion/runtime/budget mismatch");
   return freezePersonalEvolutionValue({ bindings, producer_sources: primaryProducerSources(), controller_sources: controllerSources(),
     evidence_kind: all[0].config.evidence_kind, candidate_digest: ctx.candidate.candidate_digest,
     experiment_digest: ctx.experiment.experiment_digest, comparison_scope: "fresh_parent_candidate_full_ask_with_P_K_F_context",
     formal_aggregate_eligible: false, models_started: false });
 }
+function pinnedLifecyclePlans(ctx, pins) {
+  assert.ok(Array.isArray(pins) && pins.length <= 8 && new Set(pins).size === pins.length, "bounded unique pre-result lifecycle plans required");
+  assert.deepEqual(pins, [...pins].sort(), "lifecycle plan pins must be sorted");
+  const {lock_digest, ...parent} = ctx.candidate.parent_portfolio;
+  for (const digest of pins) {
+    assert.match(digest, /^sha256:[0-9a-f]{64}$/u);
+    const plan = read(ctx.storeRoot, digest);
+    assertPersonalEvolutionFields(plan, ["base_registry_snapshot_digest", "base_portfolio_lock_digest",
+      "base_current_manifest", "target_manifest", "rollback_anchor", "portfolio_transitions", "asset_transitions", "reason_codes"], "pre-result lifecycle plan");
+    assert.equal(plan.base_registry_snapshot_digest, ctx.candidate.registry.snapshot_digest);
+    assert.equal(plan.base_portfolio_lock_digest, lock_digest);
+    assert.ok(equal(plan.base_current_manifest, parent) && equal(plan.rollback_anchor, parent), "pre-result lifecycle parent/rollback drift");
+  }
+  return [...pins];
+}
 export function sealPersonalEvolutionPromptPair(options) {
   const description = describePersonalEvolutionPromptPair(options);
+  const lifecyclePlans = Object.hasOwn(options, "lifecyclePlanObjectDigests")
+    ? pinnedLifecyclePlans(context(options), options.lifecyclePlanObjectDigests) : null;
   for (const item of roles.flatMap(role => description.bindings[role])) {
     if (item.grading_resources) assert.equal(present(item.grading_resources.output_root), false, "grading output already exists before pair freeze");
     for (const path of ["start.json", "start.digest", "slots", "leases", "history"]) assert.equal(existsSync(join(item.block.root, "control", path)), false, "post-result pair registration forbidden");
@@ -186,7 +209,8 @@ export function sealPersonalEvolutionPromptPair(options) {
   outputBoundary(options.outputRoot, options.storeRoot, description.bindings, false);
   mkdirSync(options.outputRoot, { mode: 0o700 });
   const count = description.bindings.baseline.length;
-  const body = { kind: "personal_pre_result_prompt_pair_v1", preparation_object_digest: options.preparationObjectDigest,
+  const body = { kind: lifecyclePlans ? "personal_pre_result_prompt_pair_v2" : "personal_pre_result_prompt_pair_v1",
+    ...(lifecyclePlans ? { lifecycle_plan_object_digests: lifecyclePlans } : {}), preparation_object_digest: options.preparationObjectDigest,
     experiment_object_digest: options.experimentObjectDigest, description, output_root: options.outputRoot,
     limits: limitsFor(count), authority_implied: false };
   const registration = { ...body, pair_digest: canonicalDigest(body) };
@@ -196,13 +220,16 @@ export function sealPersonalEvolutionPromptPair(options) {
 function registered(options) {
   assert.ok(options.trustedPairRegistrationObjectDigests?.includes(options.pairRegistrationObjectDigest), "independent pre-result pair pin required");
   const registration = read(options.storeRoot, options.pairRegistrationObjectDigest);
-  assertPersonalEvolutionFields(registration, ["kind", "preparation_object_digest", "experiment_object_digest", "description", "output_root", "limits", "authority_implied", "pair_digest"], "Prompt pair registration");
+  const v2 = registration.kind === "personal_pre_result_prompt_pair_v2";
+  assertPersonalEvolutionFields(registration, ["kind", "preparation_object_digest", "experiment_object_digest", "description", "output_root", "limits", "authority_implied", "pair_digest",
+    ...(v2 ? ["lifecycle_plan_object_digests"] : [])], "Prompt pair registration");
   const { pair_digest, ...body } = registration; assert.equal(canonicalDigest(body), pair_digest); assert.equal(registration.authority_implied, false);
-  assert.equal(registration.kind, "personal_pre_result_prompt_pair_v1");
+  if (!v2) assert.equal(registration.kind, "personal_pre_result_prompt_pair_v1");
   assert.equal(options.preparationObjectDigest, registration.preparation_object_digest);
   assert.equal(options.experimentObjectDigest, registration.experiment_object_digest);
   const blocks = Object.fromEntries(roles.map(role => [role, registration.description.bindings[role].map(item => item.block)]));
   const ctx = context(options), description = describePersonalEvolutionPromptPair({ ...options, blocks });
+  if (v2) pinnedLifecyclePlans(ctx, registration.lifecycle_plan_object_digests);
   assert.ok(equal(description, registration.description), "pair pre-result bindings/source drift");
   assert.ok(equal(registration.limits, limitsFor(description.bindings.baseline.length)), "pair derived limits drift");
   outputBoundary(registration.output_root, options.storeRoot, description.bindings, true);
@@ -248,6 +275,11 @@ export function verifyPersonalEvolutionPromptPairResults(options) {
       const block = ctx.blocks[role][i], report = reportUserComparison(block.root);
       const saved = options.savedResults?.[role]?.[block.fixture_id];
       if (report.execution.start_consumed === false) { assert.equal(saved, undefined, "an unstarted candidate cannot claim historical saved results"); pending++; continue; }
+      if (ctx.registration.kind === "personal_pre_result_prompt_pair_v2") {
+        const invocation = json(join(ctx.registration.output_root, "invocation/request.json"));
+        assertPersonalEvolutionFields(invocation, ["pair_object_digest", "started_at_ms", "deadline_at_ms"], "pair invocation request");
+        assert.equal(invocation.pair_object_digest, options.pairRegistrationObjectDigest, "post-result pair/plan registration transplant");
+      }
       if (!saved) { incomplete++; continue; }
       assertPersonalEvolutionFields(saved, ["producer", "engineering_result"], "saved Prompt pair result");
       const producer = verifyPrimaryEvaluationProducer(saved.producer);
