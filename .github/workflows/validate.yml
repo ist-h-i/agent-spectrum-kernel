@@ -239,6 +239,7 @@ jobs:
           # Exact declared evaluator sources; no current-runtime/admission claim.
           git fetch --no-tags origin a762daf43bdfe254c6ecd6e0b49f3cef78d0e9ec
           git fetch --no-tags origin 88359c4b4d12210180063e9bfb5d08b7edad90f3
+          node --test scripts/test-ask-benchmark-prepare-capability.mjs
           node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-pf-api-pagination.mjs
           node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-pf-frontend-async.mjs
           node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-pf-ci-cache.mjs
