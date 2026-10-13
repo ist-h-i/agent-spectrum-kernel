@@ -39,7 +39,7 @@ export function buildPersonalEvolutionCandidate({ observation, blueprint, genera
   return candidate;
 }
 
-function assertRegisteredCandidate({ storeRoot, candidate, trustedAssetAuthorityContexts = [],
+export function verifyPersonalEvolutionParent({ storeRoot, candidate, trustedAssetAuthorityContexts = [],
   trustedPortfolioAuthorityContexts = [], trustedHighImpactApprovalGrants = [] }) {
   const registry = verifyAssetRegistry({ storeRoot, snapshotDigest: candidate.registry.snapshot_digest, trustedAuthorityContexts: trustedAssetAuthorityContexts });
   for (const key of ["registry_id", "repository_id", "scope_id", "snapshot_revision"]) {
@@ -50,11 +50,7 @@ function assertRegisteredCandidate({ storeRoot, candidate, trustedAssetAuthority
     if (found.length !== 1) throw new Error("candidate exact Asset is absent or transplanted");
     return found[0];
   };
-  resolveExact(candidate.parent_asset);
-  const child = resolveExact(candidate.candidate_asset);
-  if (child.state !== "candidate" || child.record.derivation.kind !== "full_content_revision"
-    || !equal(child.record.derivation.parent, candidate.parent_asset)
-    || !equal(child.record.maintenance.rollback.target, candidate.parent_asset)) throw new Error("candidate revision must retain the exact parent and rollback in candidate state");
+  const parent = resolveExact(candidate.parent_asset);
   const portfolio = verifyPortfolioLock({ storeRoot, lockDigest: candidate.parent_portfolio.lock_digest,
     trustedAssetAuthorityContexts, trustedPortfolioAuthorityContexts, trustedHighImpactApprovalGrants });
   if (portfolio.lock.current_manifest_digest !== candidate.parent_portfolio.manifest_digest) throw new Error("candidate parent Portfolio must be the exact current head");
@@ -62,6 +58,18 @@ function assertRegisteredCandidate({ storeRoot, candidate, trustedAssetAuthority
   if (!current || current.entries.filter(entry => equal(entry.asset, candidate.parent_asset)).length !== 1) throw new Error("current parent Portfolio must bind the exact parent Asset once");
   if (portfolio.lock.portfolio_id !== candidate.parent_portfolio.portfolio_id || current.revision !== candidate.parent_portfolio.revision
     || current.asset_set_digest !== candidate.parent_portfolio.asset_set_digest) throw new Error("candidate parent Portfolio identity drifted");
+  return freezePersonalEvolutionValue({ registry, parent });
+}
+
+function assertRegisteredCandidate(context) {
+  const { registry } = verifyPersonalEvolutionParent(context);
+  const { candidate } = context;
+  const children = registry.assets.filter(asset => equal(exactAsset(asset), candidate.candidate_asset));
+  if (children.length !== 1) throw new Error("candidate exact Asset is absent or transplanted");
+  const child = children[0];
+  if (child.state !== "candidate" || child.record.derivation.kind !== "full_content_revision"
+    || !equal(child.record.derivation.parent, candidate.parent_asset)
+    || !equal(child.record.maintenance.rollback.target, candidate.parent_asset)) throw new Error("candidate revision must retain the exact parent and rollback in candidate state");
 }
 
 // Authoring/publication only. No registry promotion, model, or installer call.
