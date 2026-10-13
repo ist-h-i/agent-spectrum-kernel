@@ -375,17 +375,26 @@ test("one synthetic invocation composes existing APIs, saves fresh pair and refu
   await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapters: accessors }), /accessor refused/);
   assert.equal(accessorReads, 0); assert.equal(starts, 0);
   const supplied = { ...gradingAdapters }; let replacementCalls = 0;
-  const result = await startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapters: supplied,
+  const invocation = { ...options, startComparison, gradingAdapters: supplied,
     now: () => { supplied.challenger = { preflight: () => { replacementCalls++; throw new Error("replacement must not be called"); },
-      grade: () => { replacementCalls++; throw new Error("replacement must not be called"); } }; return Date.now(); } });
+      grade: () => { replacementCalls++; throw new Error("replacement must not be called"); } };
+      invocation.pairRegistrationObjectDigest = canonicalDigest("post_start_replacement");
+      invocation.confirmedPairObjectDigest = invocation.pairRegistrationObjectDigest;
+      options.trustedPairRegistrationObjectDigests.length = 0; f.args.evaluationAuthority.authority_id = "post_start_replacement";
+      return Date.now(); } };
+  const result = await startPersonalEvolutionPromptPair(invocation);
+  const request = JSON.parse(readFileSync(join(sealed.registration.output_root, "invocation/request.json")));
+  assert.equal(request.pair_object_digest, sealed.object_digest);
   assert.equal(replacementCalls, 0);
+  assert.equal(result.report.pair_digest, sealed.registration.pair_digest);
+  assert.equal(result.evidence.authority.authority_id, "synthetic-saved-grading-controller");
   assert.equal(starts, 2); assert.equal(grades, 2); assert.equal(result.status, "saved_pair_verified"); assert.equal(result.models_started, false);
   assert.equal(result.action, "held_pending_separate_evaluation_and_human_trust");
   assert.ok(existsSync(join(resourceConfigs.baseline.output_root, "mn-build-option-update")));
   assert.ok(existsSync(join(resourceConfigs.challenger.output_root, "mn-build-option-update")));
   const saved = JSON.parse(readFileSync(join(sealed.registration.output_root, "invocation/saved-result-connection.json")));
   assert.equal(saved.report.evidence_kind, "synthetic"); assert.equal(saved.authority_implied, false);
-  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapters }), /already exists|already consumed|EEXIST/);
+  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, trustedPairRegistrationObjectDigests: [sealed.object_digest], startComparison, gradingAdapters }), /already exists|already consumed|EEXIST/);
   assert.equal(starts, 2); assert.equal(grades, 2);
 });
 

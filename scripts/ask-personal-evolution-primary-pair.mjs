@@ -315,9 +315,15 @@ export function verifyPersonalEvolutionPromptPairResults(options) {
 // A one-use composition of existing child runner/grading APIs, not a runner.
 // Only a new direct human invocation may call this function in observed mode.
 export async function startPersonalEvolutionPromptPair(options) {
-  const ctx = registered(options), registration = ctx.registration;
-  assert.equal(options.confirmedPairObjectDigest, options.pairRegistrationObjectDigest, "human must confirm fixed pair digest");
-  const start = options.startComparison ?? startUserComparison;
+  const verificationKeys = ["storeRoot", "preparationObjectDigest", "experimentObjectDigest", "pairRegistrationObjectDigest",
+    "trustedAssetAuthorityContexts", "trustedPortfolioAuthorityContexts", "trustedHighImpactApprovalGrants",
+    "trustedExperimentAuthorities", "trustedExperimentObjectDigests", "trustedPairRegistrationObjectDigests", "evaluationAuthority"];
+  const verificationInputs = freezePersonalEvolutionValue(structuredClone(Object.fromEntries(verificationKeys
+    .filter(key => Object.hasOwn(options, key)).map(key => [key, options[key]]))));
+  const confirmedPairObjectDigest = options.confirmedPairObjectDigest;
+  const start = options.startComparison ?? startUserComparison, now = options.now ?? Date.now, signal = options.signal;
+  const ctx = registered(verificationInputs), registration = ctx.registration;
+  assert.equal(confirmedPairObjectDigest, verificationInputs.pairRegistrationObjectDigest, "human must confirm fixed pair digest");
   const suppliedGraders = options.gradingAdapters;
   assert.equal(options.gradingAdapter, undefined, "singular grading adapter is unsupported for two role outputs");
   assertPersonalEvolutionFields(suppliedGraders, roles, "separate role grading adapters");
@@ -350,10 +356,10 @@ export async function startPersonalEvolutionPromptPair(options) {
   inspect();
   const consumption = join(registration.output_root, "invocation"); mkdirSync(consumption, { mode: 0o700 });
   const save = (name, artifact) => publishJsonAtomicNoReplace({ outputPath: join(consumption, name), artifact, label: "personal pair invocation evidence" });
-  const now = options.now ?? Date.now, started = now(), deadline = started + registration.limits.overall_timeout_ms;
-  save("request.json", { pair_object_digest: options.pairRegistrationObjectDigest, started_at_ms: started, deadline_at_ms: deadline });
+  const started = now(), deadline = started + registration.limits.overall_timeout_ms;
+  save("request.json", { pair_object_digest: verificationInputs.pairRegistrationObjectDigest, started_at_ms: started, deadline_at_ms: deadline });
   const controller = new AbortController(), relay = () => controller.abort();
-  options.signal?.addEventListener("abort", relay, { once: true }); if (options.signal?.aborted) relay();
+  signal?.addEventListener("abort", relay, { once: true }); if (signal?.aborted) relay();
   const timer = setTimeout(relay, registration.limits.overall_timeout_ms); timer.unref();
   const savedResults = { baseline: {}, challenger: {} }, trustedGrades = []; let tokens = 0;
   try {
@@ -387,11 +393,11 @@ export async function startPersonalEvolutionPromptPair(options) {
       // evaluation evidence is inserted into Evolution's separate trust arrays.
       trustedGrades.push(full.public_artifacts.engineering_result.digest);
     }
-    const result = verifyPersonalEvolutionPromptPairResults({ ...options, savedResults, trustedSavedEngineeringResultDigests: trustedGrades });
+    const result = verifyPersonalEvolutionPromptPairResults({ ...verificationInputs, savedResults, trustedSavedEngineeringResultDigests: trustedGrades });
     save("saved-result-connection.json", { savedResults, trusted_grade_receipt_digests: trustedGrades, report: result.report,
       evidence: result.evidence, recommendation: result.recommendation, action: "held_pending_separate_evaluation_and_human_trust",
       models_started_by_report: false, authority_implied: false });
     return freezePersonalEvolutionValue({ ...result, models_started: !synthetic,
       scope: "one_authorized_invocation_of_existing_runner_and_grader", action: "held_pending_separate_evaluation_and_human_trust" });
-  } finally { clearTimeout(timer); options.signal?.removeEventListener("abort", relay); }
+  } finally { clearTimeout(timer); signal?.removeEventListener("abort", relay); }
 }
