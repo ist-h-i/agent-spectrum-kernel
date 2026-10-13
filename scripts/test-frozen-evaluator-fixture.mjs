@@ -7,8 +7,14 @@ import { chmodSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, 
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { EVALUATOR_EAGER_AUTHORITY_READS } from "./ask-benchmark-evaluator-boundary.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+// This concrete product policy is already a declared evaluator dependency.
+// Never project arbitrary product, fixture or admission metadata.
+const DECLARED_PRODUCT_DATA = new Set(EVALUATOR_EAGER_AUTHORITY_READS
+  .filter(({ path }) => path === "products/ask-core-bundle/capabilities.json")
+  .map(({ path }) => path));
 const FIXTURES = Object.freeze([
   "mn-doc-config-correction", "mn-focused-regression-test", "mn-schema-field-alignment", "mn-frontend-default-fix", "mp-ci-evidence-gap",
   "mp-accessibility-interaction-review", "mp-data-migration-handoff",
@@ -68,8 +74,9 @@ export function prepareFrozenEvaluatorTestRoot({ root, fixtureId, testPath }) {
   assert.deepEqual(testBytes, git(sourceRoot, ["show", `${sourceRevision}:${testPath}`], null));
   let totalBytes = 0;
   const files = identity.source_files.map(entry => {
-    assert.ok(typeof entry.path === "string" && /^(?:scripts|schemas|benchmarks\/schemas)\/[A-Za-z0-9._/-]+\.(?:mjs|cjs|js|json)$/u.test(entry.path)
-      && !entry.path.split("/").some(part => ["", ".", ".."].includes(part)), "only frozen dependency modules/schemas may be projected");
+    assert.ok(typeof entry.path === "string"
+      && (/^(?:scripts|schemas|benchmarks\/schemas)\/[A-Za-z0-9._/-]+\.(?:mjs|cjs|js|json)$/u.test(entry.path) || DECLARED_PRODUCT_DATA.has(entry.path))
+      && !entry.path.split("/").some(part => ["", ".", ".."].includes(part)), "only frozen dependency modules/schemas or the declared product policy may be projected");
     assert.ok(Number.isSafeInteger(entry.bytes) && entry.bytes > 0 && entry.bytes <= 64 * 1024 * 1024);
     totalBytes += entry.bytes; assert.ok(totalBytes <= 256 * 1024 * 1024, "frozen source byte budget");
     const mode = text(sourceRoot, ["ls-tree", identity.base_git_revision, "--", entry.path]);

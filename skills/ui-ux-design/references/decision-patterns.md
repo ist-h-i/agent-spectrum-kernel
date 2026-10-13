@@ -9,7 +9,7 @@ Select only patterns whose conditions are evidenced. Each pattern states a trans
 **Goal:** Align screen/flow structure with the evidenced user decision and action sequence.\
 **Decision rule:** Start from user goal, usage context, known constraints, primary action, completion, and continuation; leave unknown product priorities unknown.\
 **Applies when:** A user-facing task or flow is being designed or materially changed.\
-**Does not apply when:** Output is purely machine-consumed or no user interaction changes.\
+**Does not apply when:** Output is purely machine-consumed or neither user interpretation, presentation nor interaction is affected.\
 **Required states/scenarios:** Entry, decision/action, completion, continuation; include interruption/re-entry when relevant.\
 **Avoid:** Invented personas, showing fields because they exist, generic dashboard composition.\
 **Preferred alternative:** Evidence-backed task model and smallest information set.\
@@ -49,13 +49,13 @@ Select only patterns whose conditions are evidenced. Each pattern states a trans
 **Problem:** Available information receives equal placement/weight regardless of the current decision.\
 **User consequence:** Primary action and decision inputs are hard to locate.\
 **Goal:** Make one page/state purpose and its necessary information evident.\
-**Decision rule:** Order and emphasize by task dependency and consequence, not data availability.\
+**Decision rule:** Order and emphasize by task dependency and consequence; choose density, text roles, alignment and spacing for the intended reading/comparison sequence.\
 **Applies when:** A screen has multiple regions/actions.\
-**Does not apply when:** Deliberate comparison requires equal prominence and the comparison is the primary task.\
+**Does not apply when:** There are no competing information or action priorities; deliberate comparison can justify equal prominence.\
 **Required states/scenarios:** Entry and changed states that alter what becomes primary.\
-**Avoid:** Competing CTAs, card-everything, equal visual weight.\
-**Preferred alternative:** Clear hierarchy, grouping, and one evidenced primary action.\
-**Verification:** The current task, required information, and primary action are identifiable without explanatory prose.\
+**Avoid:** Competing CTAs or uniform grouping/weight that obscures priority; treating all large headings, dense lists or cards as defects.\
+**Preferred alternative:** Task-appropriate hierarchy, grouping, density and evidenced action priority.\
+**Verification:** View the whole screen and representative narrow layout: the intended first information, comparison and action remain clear. Inspect text scale/wrapping, section rhythm and alignment rather than inferring quality from CSS values.\
 **Inclusion:** Hierarchy must not depend only on color or position.
 
 ## `explain-last`
@@ -83,7 +83,7 @@ Select only patterns whose conditions are evidenced. Each pattern states a trans
 **Required states/scenarios:** Normal, validation/error, success, empty/missing when applicable.\
 **Avoid:** Abstract headings, unexplained internal nouns, generic “Continue” for consequential steps.\
 **Preferred alternative:** Natural task language with precise target/consequence.\
-**Verification:** Given the immediate context, a reviewer can state what action occurs and what changes.\
+**Verification:** Read actual rendered wording before and after the action. A reviewer can identify the target, result and current state; check Japanese phrasing, wrapping and placement in context when applicable.\
 **Inclusion:** Prefer familiar language; retain domain precision where simplification would change meaning.
 
 ## `perceived-affordance-and-signifiers`
@@ -97,7 +97,7 @@ Select only patterns whose conditions are evidenced. Each pattern states a trans
 **Required states/scenarios:** Idle, focus, active/pressed, disabled where applicable.\
 **Avoid:** Unsignified clickable cards/text, decorative controls that resemble actions.\
 **Preferred alternative:** Semantically appropriate interactive element with visible focus/state.\
-**Verification:** Interaction targets are discoverable without reading separate instructions.\
+**Verification:** Inspect representative controls and their focus/selection states: targets are discoverable, text/icons align coherently, and both content-to-accessory and accessory-to-border spacing are intentional. A working click or non-colliding label alone does not prove visual finish.\
 **Inclusion:** Interactive semantics and focus must be available to assistive/keyboard paths where applicable.
 
 ## `consistent-interaction-semantics`
