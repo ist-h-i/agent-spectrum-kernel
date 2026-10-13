@@ -7,7 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { canonicalDigest, listContentAddressedJson, readContentAddressedJson, putContentAddressedJson } from "./content-addressed-store.mjs";
 import { preparePersonalEvolutionCandidate } from "./ask-personal-evolution.mjs";
 import { createEmptyAssetRegistry, registerAsset } from "./asset-registry.mjs";
-import { createEmptyPortfolioLock, publishPortfolioManifest, buildPortfolioAuthorityContext, applyPortfolioTransitions } from "./portfolio-manager.mjs";
+import { createEmptyPortfolioLock, buildPortfolioManifest, publishPortfolioManifest, buildPortfolioAuthorityContext, applyPortfolioTransitions } from "./portfolio-manager.mjs";
 import { preparePersonalEvolutionGenerationRequest, importPersonalEvolutionGenerationResult } from "./ask-personal-evolution-generation.mjs";
 import { planPersonalEvolutionBaselineAlignment, applyPersonalEvolutionBaselineAlignment } from "./ask-personal-evolution-alignment.mjs";
 import { buildEvolutionExperiment, publishEvolutionExperiment, computePromptV2ExactProjectionDigests,
@@ -34,7 +34,7 @@ const assetRef = record => Object.fromEntries(["asset_type", "stable_id", "versi
 const ref = publication => Object.fromEntries(["portfolio_id", "revision", "manifest_digest", "asset_set_digest"].map(key => [key, publication[key]]));
 const inventory = root => listContentAddressedJson({ storeRoot: root }).map(item => item.digest);
 
-function setup(t, { sourceClassified = true, changeSelectedEntrypoint = true } = {}) {
+function setup(t, { sourceClassified = true, changeSelectedEntrypoint = true, reviewedEvaluationStatus = "not_evaluated", deferAlignment = false } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "personal-primary-pair-"))); t.after(() => rmSync(root, { recursive: true, force: true }));
   const storeRoot = join(root, "store"); cpSync(join(fixture, "store"), storeRoot, { recursive: true });
   const record = structuredClone(read(storeRoot, adapter.baseline_asset.record_digest));
@@ -102,6 +102,8 @@ function setup(t, { sourceClassified = true, changeSelectedEntrypoint = true } =
     const classificationDigest = putContentAddressedJson({ storeRoot, artifact: classification }).digest;
     reviewed.safety = { status: "supported", classifications: ["synthetic_source_review_only"],
       constraint_refs: [classificationDigest] };
+    if (reviewedEvaluationStatus !== "not_evaluated") reviewed.evaluation_history = {
+      status: reviewedEvaluationStatus, evidence_refs: ["synthetic_prior_evaluation"], cost: null };
     const registered = registerAsset({ storeRoot, sourceRoot: childRoot, predecessorSnapshotDigest: imported.prepared.candidate.registry.snapshot_digest, descriptor: reviewed });
     const reviewedAsset = { ...assetRef(reviewed), record_digest: registered.record_digest, content_digest: registered.content_digest };
     sourceReview = { kind: "synthetic_external_source_review", original_candidate_asset: imported.prepared.candidate.candidate_asset,
@@ -116,6 +118,7 @@ function setup(t, { sourceClassified = true, changeSelectedEntrypoint = true } =
   selectorContext.task_class = "configuration"; selectorContext.source_revision = "f".repeat(40);
   const alignmentInput = { storeRoot, preparationObjectDigest,
     trustedPortfolioAuthorityContexts: [parentAuthority], baselineRevision: "fake-aligned-parent", challengerRevision: "fake-aligned-candidate", portfolioAuthority: authority };
+  if (deferAlignment) return { root, storeRoot, alignmentInput, selectorContext, parentAuthority };
   const planned = planPersonalEvolutionBaselineAlignment(alignmentInput);
   const alignedTrust = [parentAuthority, ...Object.values(planned.plan.authority_contexts)];
   const alignArgs = { ...alignmentInput, alignmentObjectDigest: planned.object_digest, trustedAlignmentObjectDigests: [planned.object_digest],
@@ -410,4 +413,39 @@ test("saved grade cannot rewrite actual source outcome or public criterion even 
   const grade = await collectSyntheticGrade(t, f, block, fakeEngineeringTemplate(f.root), { outcomeOverride: "completed" });
   assert.throws(() => verifyPersonalEvolutionPromptPairResults({ ...options, savedResults: { challenger: { [block.fixture_id]: grade } },
     trustedSavedEngineeringResultDigests: [grade.engineering_result.digest] }), /outcome differs/);
+});
+
+
+test("rehashed alignment plan cannot bypass planner pre-result guard before any transition publication", t => {
+  const f = setup(t, { reviewedEvaluationStatus: "supported", deferAlignment: true });
+  assert.throws(() => planPersonalEvolutionBaselineAlignment(f.alignmentInput), /unevaluated candidate/);
+  const prep = read(f.storeRoot, f.alignmentInput.preparationObjectDigest), candidate = read(f.storeRoot, prep.candidate_object_digest);
+  const current = structuredClone(read(f.storeRoot, candidate.parent_portfolio.manifest_digest));
+  delete current.asset_set_digest; delete current.selection_basis_digest;
+  const baseline = buildPortfolioManifest({ ...current, registry: candidate.registry, revision: f.alignmentInput.baselineRevision,
+    rollback: { ...current.rollback, mode: "exact", target: (({ lock_digest, ...ref }) => ref)(candidate.parent_portfolio) } });
+  const challengerDraft = structuredClone(baseline); delete challengerDraft.asset_set_digest; delete challengerDraft.selection_basis_digest;
+  challengerDraft.revision = f.alignmentInput.challengerRevision;
+  const entry = challengerDraft.entries.find(item => canonicalDigest(item.asset) === canonicalDigest(candidate.parent_asset));
+  Object.assign(entry, { asset: candidate.candidate_asset, expected_registry_state: "candidate", role: "experimental",
+    assurance_lane: "exploratory", evidence_requirement_ids: [], exposure: { mode: "shadow", canary_percent: null } });
+  challengerDraft.evidence_requirements = challengerDraft.evidence_requirements.map(item => ({ ...item,
+    entry_ids: item.entry_ids.filter(id => id !== entry.entry_id) })).filter(item => item.entry_ids.length);
+  const challenger = buildPortfolioManifest(challengerDraft), manifests = {}, authority_contexts = {};
+  for (const [role, draft] of Object.entries({ baseline, challenger })) {
+    const publication = publishPortfolioManifest({ storeRoot: f.storeRoot, draft }); manifests[role] = ref(publication);
+    authority_contexts[role] = buildPortfolioAuthorityContext({ portfolioId: current.portfolio_id, repositoryId: current.repository_id,
+      scopeId: current.scope_id, predecessorLockDigest: candidate.parent_portfolio.lock_digest, authority: f.alignmentInput.portfolioAuthority,
+      transitions: [{ manifest: (({ lock_digest, ...ref }) => ref)(candidate.parent_portfolio), from_state: "current", to_state: "historical" },
+        { manifest: manifests[role], from_state: null, to_state: "current" }] });
+  }
+  const body = { kind: "personal_pre_result_baseline_alignment_v1", preparation_object_digest: f.alignmentInput.preparationObjectDigest,
+    old_parent_portfolio: candidate.parent_portfolio, candidate_digest: candidate.candidate_digest, registry: candidate.registry,
+    manifests, authority_contexts, authority_implied: false };
+  const plan = { ...body, alignment_digest: canonicalDigest(body) }, digest = putContentAddressedJson({ storeRoot: f.storeRoot, artifact: plan }).digest;
+  const before = inventory(f.storeRoot);
+  assert.throws(() => applyPersonalEvolutionBaselineAlignment({ ...f.alignmentInput, alignmentObjectDigest: digest,
+    trustedAlignmentObjectDigests: [digest], trustedPortfolioAuthorityContexts: [f.parentAuthority, ...Object.values(authority_contexts)],
+    selectorContext: f.selectorContext }), /unevaluated candidate/);
+  assert.deepEqual(inventory(f.storeRoot), before);
 });

@@ -34,10 +34,7 @@ function drafts(candidate, current, baselineRevision, challengerRevision) {
   return { baseline, challenger: buildPortfolioManifest(challenger) };
 }
 
-export function planPersonalEvolutionBaselineAlignment(options) {
-  inspectPersonalEvolution(options);
-  const { storeRoot, preparationObjectDigest, baselineRevision, challengerRevision, portfolioAuthority } = options;
-  const prep = read(storeRoot, preparationObjectDigest), candidate = read(storeRoot, prep.candidate_object_digest);
+function preResultParent(storeRoot, candidate) {
   const current = read(storeRoot, candidate.parent_portfolio.manifest_digest);
   let snapshot = read(storeRoot, candidate.registry.snapshot_digest);
   while (canonicalDigest(snapshot) !== current.registry.snapshot_digest && snapshot.predecessor) snapshot = read(storeRoot, snapshot.predecessor.snapshot_digest);
@@ -45,6 +42,14 @@ export function planPersonalEvolutionBaselineAlignment(options) {
   const child = read(storeRoot, candidate.candidate_asset.record_digest);
   assert.equal(child.evaluation_history.status, "not_evaluated", "alignment must be pre-result for an unevaluated candidate");
   assert.equal(child.safety.classifications.includes("high_impact"), false, "high-impact candidate requires its separate approval path");
+  return current;
+}
+
+export function planPersonalEvolutionBaselineAlignment(options) {
+  inspectPersonalEvolution(options);
+  const { storeRoot, preparationObjectDigest, baselineRevision, challengerRevision, portfolioAuthority } = options;
+  const prep = read(storeRoot, preparationObjectDigest), candidate = read(storeRoot, prep.candidate_object_digest);
+  const current = preResultParent(storeRoot, candidate);
   const pair = drafts(candidate, current, baselineRevision, challengerRevision);
   // Preflight both drafts and transitions before any publication.
   const refs = Object.fromEntries(Object.entries(pair).map(([role, manifest]) => [role, manifestRef(manifest, canonicalDigest(manifest))]));
@@ -76,7 +81,9 @@ export function applyPersonalEvolutionBaselineAlignment(options) {
   const prep = read(storeRoot, plan.preparation_object_digest), candidate = read(storeRoot, prep.candidate_object_digest);
   assert.equal(candidate.candidate_digest, plan.candidate_digest); assert.ok(equal(candidate.registry, plan.registry));
   assert.ok(equal(candidate.parent_portfolio, plan.old_parent_portfolio));
-  const current = read(storeRoot, candidate.parent_portfolio.manifest_digest);
+  // Independently trusted self-digested plans are not proof that planning ran.
+  // Replay all pure pre-result premises before any transition publication.
+  const current = preResultParent(storeRoot, candidate);
   const pair = drafts(candidate, current, plan.manifests.baseline.revision, plan.manifests.challenger.revision);
   for (const role of ["baseline", "challenger"]) {
     assert.ok(equal(manifestRef(pair[role], canonicalDigest(pair[role])), plan.manifests[role]), "aligned manifest policy drift");
