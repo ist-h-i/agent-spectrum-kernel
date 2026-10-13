@@ -1,0 +1,22 @@
+{
+  "reviewed_head": "1b8b0080133cafe3af989ca9e8bc8f168ace2738",
+  "scope": "Existing approved ca7 public-source payload atworktreeHEAD1b8b0080; private preparation additions excluded. Not whole-commit/private/admission approval.",
+  "records": [
+    {
+      "path": "source-approval.json",
+      "raw_sha256": "sha256:8a1997834fda527e37c87280b6a8e8b25e456818350f2b224b3a9ec611ad2e5b"
+    },
+    {
+      "path": "frequency-review.json",
+      "raw_sha256": "sha256:f5f68743facad6e61775dfddbda2793d55171392ff2685b33ca94d7b5d36ff1c"
+    },
+    {
+      "path": "impact-review.json",
+      "raw_sha256": "sha256:e7784912ccc09c45f55daf007d818b229cd7851752813ac8780a18683feeb1d3"
+    },
+    {
+      "path": "review.md",
+      "raw_sha256": "sha256:1144d209bc63215ffb3b91d6135cd4d9310fd0b44d37bb600689c566cbc792a5"
+    }
+  ]
+}

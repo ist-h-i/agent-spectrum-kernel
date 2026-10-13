@@ -1,0 +1,22 @@
+{
+  "lineage_record_id": "lineage-record-pf-review-error-contract",
+  "lineage_record_schema_path": "benchmarks/schemas/portfolio-lineage-record.schema.json",
+  "lineage_record_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/lineage-record.json",
+  "fixture_id": "pf-review-error-contract",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "lineage_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0",
+  "source_type": "documented_external_pattern",
+  "source_reference_ids": [
+    "rfc9110-http-semantics-20261012"
+  ],
+  "review_status": "reviewed",
+  "frequency_band": "unknown",
+  "frequency_evidence_ids": [],
+  "frequency_reviewer_record_id": "review-error-frequency-independent-review-follow-up-1b8b0080-20261012",
+  "impact_band": "unknown",
+  "impact_evidence_ids": [],
+  "impact_reviewer_record_id": "review-error-impact-independent-review-follow-up-1b8b0080-20261012",
+  "lineage_revision": 1,
+  "lineage_record_digest": "sha256:cd061683af655aa7c40666417ab80036b31c8706585687e9917fd416e3a23d2c"
+}

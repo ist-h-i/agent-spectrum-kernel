@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "pf-ci-cache-flake",
   "candidate_input_digest": "sha256:276cbe5632762a7b03ace4c3057e8a8b04553ba21bdc5c0794355e7c0509f83a",
-  "candidate_evaluator_digest": "sha256:04b0280645c310cc70c9f6ef6d852593cd17c231692451965f1365b1548e3415",
+  "candidate_evaluator_digest": "sha256:ed27c9b1851a3946194478c46e84e66d42802f32fda3f9e2ef4a1bd73702b039",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -119,5 +119,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:97a0238bbb542e9256963a7993bfd7644d8979ce50dcdf2c0f46b79de4872413"
+  "review_package_digest": "sha256:b2575617869240d2f05ca3c550c045c11c669275ae1d62458d1d4d1c3071b9c7"
 }
