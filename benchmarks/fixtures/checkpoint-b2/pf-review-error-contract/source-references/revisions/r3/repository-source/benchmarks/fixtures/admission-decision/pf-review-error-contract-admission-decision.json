@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-admission-decision.schema.json",
+  "program": "adaptive_ask_portfolio_admission_decision",
+  "decision_revision": 1,
+  "fixture_id": "pf-review-error-contract",
+  "decision_status": "admitted",
+  "review_status": "approved",
+  "author_self_approval": false,
+  "reviewer_type": "independent_agent",
+  "reviewer_record_id": "review-error-r3-independent-review-agent",
+  "reviewer_count": 1,
+  "reviewed_at": "2026-10-12T14:07:16.213085+00:00",
+  "reviewed_repository": "ist-h-i/agent-spectrum-kernel",
+  "reviewed_pull_request": 357,
+  "reviewed_head_revision": "9aa8795e87c10948f79eb56eebcd7251196f6b00",
+  "blocking_finding_count": 0,
+  "review_evidence": {
+    "archive_sha256": "sha256:a66dee74d41d8615758966d118d1f7bc55725f3330ad1cc7ea0417c4e2fddecd",
+    "archive_bytes": 6042816
+  },
+  "evaluator": {
+    "evaluator_revision": "63efa201827822d596718d546504f45fbf7ce55d",
+    "evaluator_bundle_id": "evaluator-6d494fec35f40507fc99f23d982b5f2d70bae69bb09a0e0c9acbef00df2890a1",
+    "evaluator_bundle_digest": "sha256:d630a42d7db5b2880caf67c90374a0d3a7bc7178c4aef03b24e524b81fc10853",
+    "evaluator_bundle_bytes": 403640
+  },
+  "evaluator_public_reference_digest": "sha256:4f4abdccaab7f403612191a6bfdecb94c444c4a75cb3018b4a6ca28dd2b7096b",
+  "frozen_admission_authority": {
+    "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/final-admission-record.json",
+    "raw_byte_digest": "sha256:eae715c997df3b02097fc94dfebb2c96681599e2156f9e5f605b6cf4214a269f",
+    "semantic_digest": "sha256:1d48e946325797ddf0df812e9d9f990790f509e470e443baed1c3127956880c5",
+    "requirement_authority_digest": "sha256:555e066a49938e66446b599e8e22c0a58d3fcb71106f5654df26780eab79175f"
+  },
+  "frozen_requirement_record": {
+    "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/requirement-record.json",
+    "raw_byte_digest": "sha256:a1ad07de5c2859c592196bdda9a74a2f0608b4a711c2c7b8f8870f146fc91218",
+    "record_digest": "sha256:998019add4e064ca690ecea826962f99443b790fbde3b3350e37e3c7df12c858",
+    "set_digest": "sha256:62aec47a5de8ecd3512012ecf73981013ed41646e667cb58c5d9b61617fde63d"
+  },
+  "frozen_scoring_input_manifest": {
+    "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/scoring-input-freeze-manifest.json",
+    "raw_byte_digest": "sha256:b8c77511020915f1d12d6debac2ccfcb7fee19e74f386dae6b2849fd231cda5f",
+    "semantic_digest": "sha256:5f2996a59f4df04086e5a80bc27768424378102abcd4dfae6f8d9e42ad6331cd"
+  },
+  "decision_id": "admission-decision-632326bd93e1373a8dbcc7be23b91f32",
+  "decision_digest": "sha256:d9b56f4da5aa25de9d268ccf20e0b8e8708daf48e9aac4f71e0f137273c56b59"
+}

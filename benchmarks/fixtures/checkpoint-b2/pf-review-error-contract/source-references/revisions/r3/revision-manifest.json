@@ -1,0 +1,247 @@
+{
+  "fixture_id": "pf-review-error-contract",
+  "revision": "r3",
+  "source_revision": "63efa201827822d596718d546504f45fbf7ce55d",
+  "reviewed_candidate": "9aa8795e87c10948f79eb56eebcd7251196f6b00",
+  "admitted_revision": "11ab437b9bcbc9c221530e5c56a5fee01ac7852e",
+  "admission_decision_unchanged": true,
+  "integration_hold_reason": "new undeclared inherited-key counterexamples show closed-shape/private primary falsepass",
+  "preserved_public_files": [
+    {
+      "original_path": "benchmarks/fixtures/admission-decision/pf-review-error-contract-admission-decision.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/repository-source/benchmarks/fixtures/admission-decision/pf-review-error-contract-admission-decision.json",
+      "bytes": 2705,
+      "sha256": "48199535bc95bb2501ca24840df36af0028d06557b8c09e311698953643c03aa"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/admission-review.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/admission-review.json",
+      "bytes": 3517,
+      "sha256": "fe84eb8ff1f842c4b41db20d3838a065ae668c9edda3cbe304e4f07d875d0a92"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evaluator-authority-manifest.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/evaluator-authority-manifest.json",
+      "bytes": 3061,
+      "sha256": "95f9781203e85f66f2df116504725040a34775dfb0bada8d906403431822ea42"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evaluator-reference.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/evaluator-reference.json",
+      "bytes": 169677,
+      "sha256": "279c4a0519687087d95b529bdbc5dec36aa93cc5c6435bffd985909ec1481f50"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evidence-map.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/evidence-map.json",
+      "bytes": 3004,
+      "sha256": "c77dccccc4cbdbc02129aa1e49ac3db27d97609fbbe95dae1d3b51b1e167e3bb"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/final-admission-record.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/final-admission-record.json",
+      "bytes": 169761,
+      "sha256": "eae715c997df3b02097fc94dfebb2c96681599e2156f9e5f605b6cf4214a269f"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/input-manifest.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/input-manifest.json",
+      "bytes": 2471,
+      "sha256": "a46f47824169ff97d18a96db357d20a596a2bb8d7a21b8fcf088f2b67692e25b"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/lineage-record.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/lineage-record.json",
+      "bytes": 1216,
+      "sha256": "3225bcd09ab565ea1d0c5d9dada5d06ee208cd6e183839aead27c9d148a0f7e8"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/lineage.md",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/lineage.md",
+      "bytes": 1048,
+      "sha256": "105643b634277853cd65486445b642035c99716a7db962803c7df11d69dc7ae0"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/metadata.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/metadata.json",
+      "bytes": 1139,
+      "sha256": "5a18ed7c269137856205fc2431d83e9c860038262dc0ae015b6a3644d0274427"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/output-contract.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/output-contract.json",
+      "bytes": 1896,
+      "sha256": "aa82238650d3b3bcf0ed25ca47d184761bcf0c7e4f0fe1b75de8ed99b7cdc02d"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/requirement-record.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/requirement-record.json",
+      "bytes": 2778,
+      "sha256": "a1ad07de5c2859c592196bdda9a74a2f0608b4a711c2c7b8f8870f146fc91218"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/scoring-input-freeze-manifest.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/scoring-input-freeze-manifest.json",
+      "bytes": 3841,
+      "sha256": "b8c77511020915f1d12d6debac2ccfcb7fee19e74f386dae6b2849fd231cda5f"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-freeze-candidate.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/source-freeze-candidate.json",
+      "bytes": 4593,
+      "sha256": "a435b9112255bf2b4a90519a4590f9f29ef0655ef44342cdb2dc7d6b49631814"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/review/frequency-review.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/source-references/review/frequency-review.json",
+      "bytes": 1571,
+      "sha256": "f5f68743facad6e61775dfddbda2793d55171392ff2685b33ca94d7b5d36ff1c"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/review/impact-review.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/source-references/review/impact-review.json",
+      "bytes": 1567,
+      "sha256": "e7784912ccc09c45f55daf007d818b229cd7851752813ac8780a18683feeb1d3"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/review/review-artifact-manifest.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/source-references/review/review-artifact-manifest.json",
+      "bytes": 820,
+      "sha256": "6c2b39482b7df88d97ea48edacdc9fdfead4f940dc869add85625c9705f11d8d"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/review/review.md",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/source-references/review/review.md",
+      "bytes": 4924,
+      "sha256": "1144d209bc63215ffb3b91d6135cd4d9310fd0b44d37bb600689c566cbc792a5"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/review/source-approval.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/source-references/review/source-approval.json",
+      "bytes": 10265,
+      "sha256": "8a1997834fda527e37c87280b6a8e8b25e456818350f2b224b3a9ec611ad2e5b"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/rfc9110-http-semantics-20261012.md",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/source-references/rfc9110-http-semantics-20261012.md",
+      "bytes": 1360,
+      "sha256": "8a341138312cbe9004f596e777ea681086aff7add127bb6c710e44c89d9474ae"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/task.md",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/task.md",
+      "bytes": 2197,
+      "sha256": "61bfd21fef4cb98a8c8ef2593e245302bba2c3caf5589055cf5aa2f94bd28b6e"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/verification-command-contract.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/verification-command-contract.json",
+      "bytes": 2652,
+      "sha256": "7de280b768b522652fe80e3a18ab6af3f959950bc37905d169eb7ed4d33a1d0e"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/base/response-adapter.mjs",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/workspace/base/response-adapter.mjs",
+      "bytes": 682,
+      "sha256": "ee0accba181d6e2fb890ca7d2c7ccc3fb6131b97aa7bfc64fb013eee880c7537"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/data/cases.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/workspace/data/cases.json",
+      "bytes": 1257,
+      "sha256": "65a415fb5626b4c555ed75cefb2155ead45d73bfd35481dcc72aecd996552aa4"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/docs/error-contract.md",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/workspace/docs/error-contract.md",
+      "bytes": 2718,
+      "sha256": "e2b653917bb3c1a54d12e61112d902958b4460740c188217da3dd35ef0aab88b"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/package.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/workspace/package.json",
+      "bytes": 251,
+      "sha256": "d2d55c3edd8df7aa2d7d53b7bf47e1fa8271c6846f1d3314e0c9d77bd43a79b5"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/pr.diff",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/workspace/pr.diff",
+      "bytes": 846,
+      "sha256": "40585c23b4ab648a1c6d8eae5aa76e265ba1c9ce181ae41ba875858b7d62ff1e"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/review.schema.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/workspace/review.schema.json",
+      "bytes": 9561,
+      "sha256": "285c6d6b179bbe688cb8d8a6dee67e615988db91fb64ddfb02519f339b82fdb5"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/scripts/trace-cases.mjs",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/workspace/scripts/trace-cases.mjs",
+      "bytes": 691,
+      "sha256": "64dd208b9c24da2dd21f7ec69c24de9e1c94eedb4b20c8bcce3550a426861fde"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/scripts/validate-review.mjs",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/workspace/scripts/validate-review.mjs",
+      "bytes": 1898,
+      "sha256": "7303c27db15cdc8ecee9b431c063e5d86b0d52ba2815f5d7da626e55bbeb8aaa"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/src/client-policy.mjs",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/workspace/src/client-policy.mjs",
+      "bytes": 573,
+      "sha256": "8238c6db8d39fe810a136f1d413cdfd69df765820a0d0edc793fe4a6e895c814"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/src/response-adapter.mjs",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/workspace/src/response-adapter.mjs",
+      "bytes": 632,
+      "sha256": "2aa656641e532930f268f31987268612be1d7bd27d01eb762869c19762f4ae84"
+    },
+    {
+      "original_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/workspace/test/api-error.test.mjs",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/workspace/test/api-error.test.mjs",
+      "bytes": 1494,
+      "sha256": "ff052dbe6c2ac6885b61e882e9eac6e616191ebfc0985839ed3fff59b8370cd5"
+    },
+    {
+      "original_path": "benchmarks/pf-review-error-contract.config.json",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/repository-source/benchmarks/pf-review-error-contract.config.json",
+      "bytes": 2324,
+      "sha256": "a6f77211caec2302e54606c9603f1039aa4884764995d18249088ffb9982d9c2"
+    },
+    {
+      "original_path": "scripts/ask-benchmark-pf-review-error-authority.mjs",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/repository-source/scripts/ask-benchmark-pf-review-error-authority.mjs",
+      "bytes": 54960,
+      "sha256": "1f25a911a46bafecbc6d35412b27e375c40a3dda331dead44d09b49f2c56b489"
+    },
+    {
+      "original_path": "scripts/ask-benchmark-pf-review-error-review-archive.mjs",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/repository-source/scripts/ask-benchmark-pf-review-error-review-archive.mjs",
+      "bytes": 17712,
+      "sha256": "6259f0496501c38e77657f180a484c5d556e122f3763759fe52c2b2d93deec46"
+    },
+    {
+      "original_path": "scripts/ask-benchmark-pf-review-error-source.mjs",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/repository-source/scripts/ask-benchmark-pf-review-error-source.mjs",
+      "bytes": 9112,
+      "sha256": "95f3f958fd0932fa1cc7101ed43f9c5c7df2193624bd7dc0e837c74b8601eced"
+    },
+    {
+      "original_path": "scripts/test-ask-benchmark-pf-review-error-source.mjs",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/repository-source/scripts/test-ask-benchmark-pf-review-error-source.mjs",
+      "bytes": 4184,
+      "sha256": "7e97207751bd55be6fd88efe64e00d848c3f9e265c59287f9c7b8e7a6e13b6e5"
+    },
+    {
+      "original_path": "scripts/test-ask-benchmark-pf-review-error.mjs",
+      "retained_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/source-references/revisions/r3/repository-source/scripts/test-ask-benchmark-pf-review-error.mjs",
+      "bytes": 2833,
+      "sha256": "877af2291b2176712b942ac8613b4170d3783af521e94987552422b2fac264a5"
+    }
+  ],
+  "private_roots_and_archive_retained_outside_git": true,
+  "model_evaluation": false
+}
