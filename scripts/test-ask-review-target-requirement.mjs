@@ -26,6 +26,10 @@ for (const [text, expected] of [
   ['No telemetry change is requested.', 'unknown'],
   ['Require telemetry to be optional.', 'unknown'],
   ['Require telemetry not to block merge.', 'unknown'],
+  ['Telemetry must pass. Telemetry does not need to pass.', 'unknown'],
+  ['Telemetry is optional. Telemetry is mandatory.', 'unknown'],
+  ['Require telemetry to pass before merge?', 'unknown'],
+  ['テレメトリの成功をマージの必須条件にする？', 'unknown'],
 ]) test(expected + ': ' + text, () => assert.equal(classifyTargetRequirement(text, target), expected));
 test('target aliases are literal strings, not regular expressions', () => {
   assert.equal(classifyTargetRequirement('Tests must pass before merge.', { aliases: ['.*'] }), 'unknown');

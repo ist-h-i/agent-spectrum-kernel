@@ -7,7 +7,7 @@ export function classifyTargetRequirement(actionText, target) {
     || !Array.isArray(target?.aliases) || !target.aliases.length || target.aliases.length > 8
     || target.aliases.some(value => typeof value !== 'string' || !value.trim() || value.length > 80)) return 'unknown';
   // Proposals, quotations and conditions are not unconditional requirements.
-  if (/["'`>]/u.test(actionText) || /\b(?:if|unless|may|might|could|would|consider|suggest|example)\b|(?:場合|もし|提案|例示)/iu.test(actionText)) return 'unknown';
+  if (/["'`>?？]/u.test(actionText) || /\b(?:if|unless|may|might|could|would|consider|suggest|example)\b|(?:場合|もし|提案|例示)/iu.test(actionText)) return 'unknown';
   const aliases = '(?:' + target.aliases.map(escapeRegex).join('|') + ')';
   const subject = '(?:the\\s+)?' + aliases;
   const required = [
@@ -23,9 +23,13 @@ export function classifyTargetRequirement(actionText, target) {
     new RegExp('^' + aliases + 'は(?:必須ではない|任意|非blocking)$', 'u'),
   ];
   const states = new Set();
+  const mentionsTarget = new RegExp(aliases, 'iu');
   for (const clause of actionText.split(/[.!?;。；\n]+/u).map(value => value.trim()).filter(Boolean)) {
-    if (required.some(pattern => pattern.test(clause))) states.add('required');
-    if (optional.some(pattern => pattern.test(clause))) states.add('not_required');
+    const positive = required.some(pattern => pattern.test(clause));
+    const negative = optional.some(pattern => pattern.test(clause));
+    if (mentionsTarget.test(clause) && !positive && !negative) return 'unknown';
+    if (positive) states.add('required');
+    if (negative) states.add('not_required');
   }
   return states.size === 1 ? [...states][0] : 'unknown';
 }
