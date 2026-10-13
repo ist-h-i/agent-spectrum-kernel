@@ -1,6 +1,6 @@
 # Personal Evolution: generation request and supplied file registration
 
-This slice prepares a bounded generation request and imports a caller-supplied instruction Asset revision into the existing Registry and Evolution preparation path. It never invokes a model or generator. Automatic generation effectiveness remains `Unknown`.
+This slice prepares a bounded generation request and imports a caller-supplied instruction Asset revision into the existing Registry and Evolution preparation path. These APIs never invoke a model or generator. The [once-generation connector](personal-evolution-generation-connector.md) separately calls one explicit supervised provider and binds measured candidate files and an execution receipt to this import. Its development checks use a fake provider only. Automatic generation effectiveness remains `Unknown`.
 
 `preparePersonalEvolutionGenerationRequest` takes the observation input used by the bridge, `blueprint` without `candidate_asset`, `generationActor`, `holdoutTaskIds`, `requestedVersion`, `requestId`, a dedicated `storeRoot`, and the existing independent trust arrays. It verifies the exact Registry and current parent in the supplied immutable Portfolio lock before publishing the observation and request. Candidate policy is checked against the existing schema using a validation-only reference in memory; that unproduced reference is never published or registered. Supported Asset types are `skill` and `prompt`; evaluator Assets are excluded.
 
