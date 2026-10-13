@@ -163,6 +163,9 @@ jobs:
       - name: Run governed Evolution full-closure integration tests
         run: node scripts/test-evolution-loop-integration.mjs
 
+      - name: Run personal observation and supplied candidate contracts (model-free)
+        run: node --test scripts/test-ask-personal-evolution-observation.mjs scripts/test-ask-personal-evolution.mjs scripts/test-ask-personal-evolution-generation.mjs
+
       - name: Check the exact governed Evolution sample
         run: node scripts/evolution-loop-samples.mjs --check
 
