@@ -81,13 +81,20 @@ export function finishPersonalEvolutionSavedResultNoop(options) {
   if (connection.schema_version !== "1.0.0" || connection.object_kind !== "personal_evolution_saved_result_connection"
     || connection.authority_implied !== false || canonicalDigest(body) !== connection_digest) throw new Error("saved-result connection drifted");
   requirePin(connection.experiment_object_digest, trustedExperimentObjectDigests);
+  // A self-digested connection is not proof that the saved-file adapter ran.
+  // Recheck its supported protocol and exact unchanged source chain before any receipt.
+  const saved = verifyPersonalEvolutionSavedResults({ ...options,
+    preparationObjectDigest: connection.preparation_object_digest,
+    experimentObjectDigest: connection.experiment_object_digest });
   const artifacts = { experimentObjectDigest: connection.experiment_object_digest,
     recommendationObjectDigest: connection.recommendation_object_digest,
     proposalObjectDigest: connection.proposal_object_digest, decisionObjectDigest };
   const context = { ...options, preparationObjectDigest: connection.preparation_object_digest, artifacts };
   inspectPersonalEvolution(context);
   const recommendation = read(storeRoot, connection.recommendation_object_digest);
-  if (canonicalDigest(evidenceOf(recommendation)) !== connection.evaluation_evidence_digest) throw new Error("saved evaluation evidence digest mismatch");
+  if (canonicalDigest(saved.evidence) !== connection.evaluation_evidence_digest
+    || canonicalDigest(evidenceOf(recommendation)) !== connection.evaluation_evidence_digest
+    || canonicalDigest(saved.recommendation) !== canonicalDigest(recommendation)) throw new Error("saved evaluation evidence or recommendation digest mismatch");
   const preparation = read(storeRoot, connection.preparation_object_digest);
   const closure = verifyEvolutionHumanDecision({ ...options, ...artifacts, candidateObjectDigest: preparation.candidate_object_digest });
   if (connection.action !== closure.proposal.action || !NOOPS.has(closure.proposal.action)) throw new Error("saved-result no-op cannot execute a candidate rejection or other mutation");

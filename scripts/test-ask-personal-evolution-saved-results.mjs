@@ -97,12 +97,19 @@ export function runPersonalSavedResultRegressions({ root, work, storeRoot, baseE
   const approved = buildEvolutionHumanDecision({ proposal: connected.proposal, disposition: "approved", reasonCodes: ["synthetic_noop"],
     authority: connected.proposal.required_decision_authority });
   const approvedPublication = publishEvolutionHumanDecision({ storeRoot, decision: approved });
-  const finish = { storeRoot, ...trust, connectionObjectDigest: connected.connection_object_digest,
+  const finish = { ...normal.input, connectionObjectDigest: connected.connection_object_digest,
     decisionObjectDigest: approvedPublication.object_digest, trustedExperimentObjectDigests: normal.input.trustedExperimentObjectDigests,
     trustedEvaluationAuthorities: [verified.evidence], trustedHumanDecisionAuthorities: [approved] };
   check("personal no-op refuses missing independent human trust", () => {
     const before = inventory();
     assert.throws(() => finishPersonalEvolutionSavedResultNoop({ ...finish, trustedHumanDecisionAuthorities: [] }), /authority/);
+    assert.deepEqual(inventory(), before);
+  });
+  check("personal no-op rechecks exact saved files before receipt publication", () => {
+    const before = inventory();
+    assert.throws(() => finishPersonalEvolutionSavedResultNoop({ ...finish,
+      aggregateOptions: { ...finish.aggregateOptions, sourceManifestSourceDigest: canonicalDigest("changed saved source") } }), /digest/);
+    assert.throws(() => finishPersonalEvolutionSavedResultNoop({ ...finish, aggregateOptions: undefined }));
     assert.deepEqual(inventory(), before);
   });
   check("trusted approval records existing no-op receipt with exact unchanged heads", () => {
@@ -152,7 +159,7 @@ export function runPersonalSavedResultRegressions({ root, work, storeRoot, baseE
     const decision = buildEvolutionHumanDecision({ proposal: outcome.proposal, disposition: "approved", reasonCodes: ["synthetic_rejection_proposal"],
       authority: outcome.proposal.required_decision_authority });
     const pub = publishEvolutionHumanDecision({ storeRoot, decision }); const before = inventory();
-    assert.throws(() => finishPersonalEvolutionSavedResultNoop({ ...finish, connectionObjectDigest: outcome.connection_object_digest,
+    assert.throws(() => finishPersonalEvolutionSavedResultNoop({ ...finish, ...unsafe.input, connectionObjectDigest: outcome.connection_object_digest,
       decisionObjectDigest: pub.object_digest, trustedExperimentObjectDigests: unsafe.input.trustedExperimentObjectDigests,
       trustedEvaluationAuthorities: [data.evidence], trustedHumanDecisionAuthorities: [decision] }), /cannot execute.*rejection/);
     assert.deepEqual(inventory(), before);
