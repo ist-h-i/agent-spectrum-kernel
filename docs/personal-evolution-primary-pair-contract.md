@@ -27,7 +27,7 @@ Skill Asset、unrendered template、非Codex bundle、空/非UTF8のrendered fil
 
 最初は `mp-ci-evidence-gap`, `mp-data-migration-handoff`, `mn-focused-regression-test`。完成済み他6件は同じ手順で別の事前固定scopeへ展開する。scopeを後から有利な結果だけ増やさない。fixture id昇順、baseline全fixture→challenger全fixture、各child内の既存P/K/F順序で固定。各role/fixtureは1回、retry/resumeなし。単発は製品判断に用いる記述的差の確認でありvariance推定をしない。追加反復が製品判断に必要なら、結果閲覧前に別の明示的protocolで決める。
 
-既存childの60分/条件、5分/検査を保ち、標準overall4時間/child、5M tokens/child、原採点reservation185分を維持する。pair全体の使用量開始判断予算は既存9課題batch84時間/45Mの2role分をscope件数で比例させる。
+本評価では60分/条件、5分/検査、overall4時間/child、5M tokens/childを明示指定し、原採点reservation185分を維持する。汎用prepareの既定値（10分/条件、1分/検査、overall1時間、tokens未指定）を本評価へ流用しない。pair全体の使用量開始判断予算は既存9課題batch84時間/45Mの2role分をscope件数で比例させる。
 
 | fixture数 | 新規比較child数 / 条件session数 | pair全体時間 | 使用量開始判断予算 |
 | --- | --- | --- | --- |
