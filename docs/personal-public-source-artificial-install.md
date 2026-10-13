@@ -1,0 +1,23 @@
+# 公開source factsと人工利用先の適用・復元
+
+SPEC/IMPL-PERSONAL-SOURCE-INSTALL。基点は #374 `7e7fd53ab4560d4f0afa2ea2f80a0b068f02211f`。この接続は実モデル比較、実採点、実Mac採用、通常repoへの適用を起動しない。
+
+`inspectPersonalPublicPromptSource` は既存の登録済み rendered Codex Prompt bundleを読み、許可された公開Markdownの5filesについて、source revisionのGitblobとCAS本文の全bytesを照合する。返すVerifiedはbyte対応と公開path inventoryだけ。内容意味の独立レビュー、owner/license、品質、runtime互換性、権限を既知化しない。既存provenance/applicabilityを返し、原recordを変更せず、安全分類や評価履歴へ昇格しない。Markdown本文が受動的でも、後のagentへ編集・検査を指示する効果は残る。
+
+公開sourceの独立意味レビューは baseline/candidate各5filesを読んだ別factsとして保存する。新しいsource-reviewed versionへの適用提案は `review_verification`、`handoff_resume`、`verification_only` のliteral formal IDsに限定する。旧generic class、旧measured除外、旧pre-result権限や旧結果を新実行へ移植しない。全5filesに固定entry-modeとreadonly/edit規則が同時に存在するため、whole-bundle stdinの解釈はUnknown。compact candidateに繰り返されていない具体的privacy文は参照contractの実効性に依存し、それもUnknown。
+
+`mintArtificialPersonalPromptTarget` は物理 `/tmp` 配下へ新しい利用先を生成し、process内のprivate WeakMapにopaque capabilityを保持する。caller指定path、serialized handle、通常repoの`.git`、既存Codex/kernel/Claude stateは受けない。各entryでroot inodeと全ancestor、全treeのlink/specialfile、固定write pathsを検査する。`TMPDIR`は利用先を通常repoへ変更できない。対象は完全な5fileのCodex `.agents/prompts` basename projectionと専用 `personal-prompt-artificial-state.json` のみ。追加Skill・profile・rendererを作らない。
+
+`planArtificialPersonalPromptApply` は既存Evolution verifierで完全な approved `adopt_candidate` receiptと独立trusted closureを確認し、role別lockで正確に選択されたAssetを既存Portfolio/materialization verifierで確認する。Portfolio-only adoptionではRegistry candidate enumが残る既存責務を尊重し、Registryを勝手に昇格しない。まず同じreceiptのparentを空の人工利用先へ初期配置し、その実bytes/stateが一致する場合だけcandidateへ適用する。これは事後に完成した同じclosureの機械試験であり、未評価candidateの採用承認ではない。
+
+計画は呼出元のJSONから独立したowned値とtarget全treeのsnapshotを保持する。nested accessor、非JSON、foreign handle、wrong pin、target driftは書込み前に拒否する。`applyArtificialPersonalPromptPlan` は同じclosure/selectionを再検証し、既存 `planWriteManaged` / `buildLifecycleState` / `applyLifecyclePlan` を使って固定計画を一度だけ適用する。forceや通常installerの状態取込みはない。
+
+`planArtificialPersonalPromptRestore` は同じreceiptのcandidateとlocal rollback snapshotに加え、別の明示的rollback authorityに基づくfresh current lock/selectionを要求する。そのlockのpredecessorはreceiptのresult lock、targetはreceiptのexact rollback anchorでなければならない。全5snapshot bytesを登録済みparentと照合し、既存 `rollbackLifecycleState` のdry-runを通した後にowned planを返す。`restoreArtificialPersonalPromptPlan` は変更有無と権限を再検証して同じ既存機構で復元する。unowned project filesは保持する。
+
+CAS publicationとFS適用は一つのtransactionではない。既存機構のpartial marker/snapshotを保持し、自動retry/recoveryを行わない。process内capabilityは永続利用先の識別子ではなく、process終了後の実Mac運用は対象外。source/tree検査はOS sandboxや悪意ある同時processへの完全な隔離ではない。実Codexのload/read、実Mac採用・復元、実効果はUnknownのまま。
+
+試験は明記した合成contract closureと公開sourceを使う。既存の署名付きverification evidence、Portfolio選択、Evolution適用を経て、人工利用先の実bytesをparent→candidate→parentに戻す。合成human decisionやunit witnessは実採用の権限・実品質の証拠ではない。対象・trust・selection・receipt・pin・accessor・link・旧state・rollback snapshot・local driftの拒否も検査する。
+
+固定 `kernel_principles_v1` のrendererは `implementation` と `trivial` のみを対応種別として宣言する。最初の3本評価課題の既存runner値は CI review=`review`、migration handoff=`handoff`、focused regression=`implementation`。したがって前2件はv1で `capability_missing` となり、接続は品質0点にせず開始前blockerとして保持する。Skillを足す、classをimplementationへ改称する、既存v2資産をv1へ呼び替える操作は行わない。全件開始可能とは宣言しない。
+
+実候補のMac採用には、将来の本評価による独立evaluation closureと、別の本人の採用判断によるcomplete approved adopt receiptが必要。この未解消点は人工試験で埋めない。評価開始の承認とも分離する。
