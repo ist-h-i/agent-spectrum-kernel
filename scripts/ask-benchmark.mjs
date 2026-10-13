@@ -27,6 +27,7 @@ import { validateSchemaValue } from "./json-schema-validation.mjs";
 import { assertTrackedRepositoryMatchesHead, materializePortfolio } from "./ask-benchmark-materialize.mjs";
 import { sealAdaptiveSelection, verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
 import { executePortfolio, recoverPortfolioCase, verifyPortfolioExecution } from "./ask-benchmark-execution.mjs";
+import * as portfolioExecutionCapabilities from "./ask-benchmark-execution.mjs";
 import { assertCurrentPortfolioRunInput, normalizePortfolioExecution, verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { verifyEvaluatorBoundary, verifyEvaluatorResult, verifyPrivateEvaluatorBundle } from "./ask-benchmark-evaluator-boundary.mjs";
 import { scoreEvaluatorResult } from "./ask-benchmark-portfolio-score.mjs";
@@ -175,6 +176,7 @@ Commands:
   materialize --config <portfolio-config.json> --plan <execution-plan.json> --output <absent-or-empty-directory> [--execution-admission-evidence <fixture-keyed-evidence-manifest.json>]
   seal-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id> --input <selection-input.json>
   verify-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id>
+  prepare-execution --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <absent-or-empty-directory> [--execution-admission-evidence <fixture-keyed-evidence-manifest.json>]
   execute-portfolio --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --adapter <codex|claude> --runtime-config <runtime-config.json> --agent-bin <executable> [--case-id <case-id>] [--max-cases <count>] [--retry-failed]
   verify-execution --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory>
   normalize-execution --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --output <normalized-results-directory>
@@ -454,7 +456,7 @@ function requireLegacyConfig(config, command) {
 
 function executionAdmissionEvidenceByFixture(args) {
   const legacySupplied = [args.executionAdmissionFixture, args.admissionDecision, args.admissionReviewAuthority, args.admissionReviewAuthoritySourceDigest, args.admissionReviewArchive].some((value) => value !== null);
-  if (legacySupplied) throw new Error("plan/materialize execution admission no longer accepts caller decision or single-fixture flags; use --execution-admission-evidence");
+  if (legacySupplied) throw new Error("portfolio execution admission no longer accepts caller decision or single-fixture flags; use --execution-admission-evidence");
   return args.executionAdmissionEvidence ? readExecutionAdmissionEvidenceManifest(args.executionAdmissionEvidence) : null;
 }
 
@@ -500,6 +502,7 @@ function sealSelection(args) {
     caseId: args.caseId,
     input: readJson(args.input),
     repositoryRevision: git(ROOT, ["rev-parse", "HEAD"]),
+    executionAdmissionEvidenceByFixture: executionAdmissionEvidenceByFixture(args),
   });
   console.log(`Sealed Adaptive selection for ${record.case_id}: sha256:${record.selection_digest.value}`);
 }
@@ -516,6 +519,7 @@ function verifySelection(args) {
     stateDir: args.stateDir,
     caseId: args.caseId,
     repositoryRevision: git(ROOT, ["rev-parse", "HEAD"]),
+    executionAdmissionEvidenceByFixture: executionAdmissionEvidenceByFixture(args),
   });
   console.log(`Adaptive selection verified for ${record.case_id}: sha256:${record.selection_digest.value}`);
 }
@@ -537,15 +541,27 @@ function executePortfolioCommand(args) {
     caseId: args.caseId,
     maxCases: args.maxCases,
     retryFailed: args.retryFailed,
+    executionAdmissionEvidenceByFixture: executionAdmissionEvidenceByFixture(args),
   });
   for (const outcome of result.outcomes) console.log(`${outcome.case_id}: ${outcome.status}`);
+}
+
+function prepareExecution(args) {
+  // Historical frozen dependencies retain the ordinary execution API but may
+  // predate model-free preparation. Reject that command before reading inputs.
+  if (typeof portfolioExecutionCapabilities.preparePortfolioExecution !== "function") throw new Error("prepare-execution is unsupported by the loaded execution module: preparePortfolioExecution capability unavailable");
+  const config = validateProtocol(args.configPath);
+  if (config._kind !== "portfolio") throw new Error("prepare-execution requires an Adaptive portfolio config");
+  if (!args.plan || !args.materialized || !args.stateDir || !args.runDir) throw new Error("prepare-execution requires --plan, --materialized, --selection-state, and --run-dir");
+  const prepared = portfolioExecutionCapabilities.preparePortfolioExecution({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir, executionAdmissionEvidenceByFixture: executionAdmissionEvidenceByFixture(args) });
+  console.log(JSON.stringify(prepared, null, 2));
 }
 
 function verifyExecution(args) {
   const config = validateProtocol(args.configPath);
   if (config._kind !== "portfolio") throw new Error("verify-execution requires an Adaptive portfolio config");
   if (!args.plan || !args.materialized || !args.stateDir || !args.runDir) throw new Error("verify-execution requires --plan, --materialized, --selection-state, and --run-dir");
-  const result = verifyPortfolioExecution({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir });
+  const result = verifyPortfolioExecution({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir, executionAdmissionEvidenceByFixture: executionAdmissionEvidenceByFixture(args) });
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -554,7 +570,7 @@ function normalizeExecution(args) {
   const config = validateProtocol(args.configPath);
   if (config._kind !== "portfolio") throw new Error("normalize-execution requires an Adaptive portfolio config");
   if (!args.plan || !args.materialized || !args.stateDir || !args.runDir || !args.output) throw new Error("normalize-execution requires --plan, --materialized, --selection-state, --run-dir, and --output");
-  const result = normalizePortfolioExecution({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir, outputPath: args.output });
+  const result = normalizePortfolioExecution({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir, outputPath: args.output, executionAdmissionEvidenceByFixture: executionAdmissionEvidenceByFixture(args) });
   console.log(`${result.idempotent ? "Verified existing" : "Published"} normalized execution snapshot ${result.sourceSnapshotDigest} with ${result.manifest.completeness.normalized_cases}/${result.manifest.completeness.expected_cases} cases containing committed attempts at ${result.generationPath}`);
 }
 
@@ -569,7 +585,7 @@ function verifyNormalizedResults(args) {
   const config = validateProtocol(args.configPath);
   if (config._kind !== "portfolio") throw new Error("verify-normalized-results requires an Adaptive portfolio config");
   if (!args.plan || !args.materialized || !args.stateDir || !args.runDir || !args.output) throw new Error("verify-normalized-results requires --plan, --materialized, --selection-state, --run-dir, and --output");
-  const result = verifyNormalizedPortfolioResults({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir, outputPath: args.output });
+  const result = verifyNormalizedPortfolioResults({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir, outputPath: args.output, executionAdmissionEvidenceByFixture: executionAdmissionEvidenceByFixture(args) });
   console.log(`Current normalized execution snapshot ${result.manifest.source_snapshot_digest} verified with ${result.manifest.completeness.normalized_cases}/${result.manifest.completeness.expected_cases} cases containing committed attempts`);
 }
 
@@ -1284,6 +1300,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   else if (args.command === "materialize") materialize(args);
   else if (args.command === "seal-selection") sealSelection(args);
   else if (args.command === "verify-selection") verifySelection(args);
+  else if (args.command === "prepare-execution") prepareExecution(args);
   else if (args.command === "execute-portfolio") executePortfolioCommand(args);
   else if (args.command === "verify-execution") verifyExecution(args);
   else if (args.command === "normalize-execution") normalizeExecution(args);

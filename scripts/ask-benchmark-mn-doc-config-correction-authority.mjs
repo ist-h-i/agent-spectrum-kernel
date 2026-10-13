@@ -18,6 +18,7 @@ import {
   validateIndependenceStatement,
   verifyPrivateEvaluatorBundle,
 } from "./ask-benchmark-evaluator-boundary.mjs";
+import * as evaluatorBoundary from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import {
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
@@ -428,13 +429,14 @@ function runGit(root, args, label) {
   return result.stdout.trim();
 }
 
-function assertProductionWriterInputs({ root, privateRoot, evaluatorRevision, generationDate, boundaryRoots }) {
+function assertProductionWriterInputs({ root, privateRoot, evaluatorRevision, generationDate, boundaryRoots, resourceAssetsOnly }) {
   if (!existsSync(root) || !lstatSync(root).isDirectory()) throw new Error("mn-doc production writer repository root is missing");
   if (!privateRoot || !existsSync(privateRoot) || !lstatSync(privateRoot).isDirectory() || lstatSync(privateRoot).isSymbolicLink()) throw new Error("mn-doc production writer requires an existing non-symlink private root");
   assertPrivateRootOutsideRepository(root, privateRoot);
   if (!/^[a-f0-9]{40}$/u.test(evaluatorRevision ?? "")) throw new Error("mn-doc evaluator revision is invalid");
   runGit(root, ["cat-file", "-e", `${evaluatorRevision}^{commit}`], "mn-doc evaluator revision lookup");
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(generationDate ?? "")) throw new Error("mn-doc production generation date must be YYYY-MM-DD");
+  if (resourceAssetsOnly) return;
   const requiredBoundaryFields = ["materializedPath", "selectionState", "runDir", "normalizedResultsPath"];
   if (!boundaryRoots || typeof boundaryRoots !== "object" || Array.isArray(boundaryRoots)) throw new Error("mn-doc production writer requires complete private boundary roots");
   const unknownBoundaryFields = Object.keys(boundaryRoots).filter((field) => !requiredBoundaryFields.includes(field));
@@ -501,8 +503,17 @@ function publishPrepared({ prepared, transactionDirectories }, validatePublished
   }
 }
 
-export function writeMnDocConfigCorrectionProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots }) {
-  assertProductionWriterInputs({ root, privateRoot, evaluatorRevision, generationDate, boundaryRoots });
+// Resource generation verifies static assets without manufacturing run markers.
+// This scope cannot authorize evaluator execution, admission or comparison start.
+function validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots) {
+  if (typeof resourceAssetsOnly !== "boolean") throw new Error("resourceAssetsOnly must be a boolean");
+  if (resourceAssetsOnly && (!privateRoot || boundaryRoots !== null)) throw new Error("resource-assets-only validation requires a private root and no execution boundary roots");
+  if (resourceAssetsOnly && typeof evaluatorBoundary.verifyPrivateEvaluatorResourceAssets !== "function") throw new Error("resource-assets-only validation requires verifyPrivateEvaluatorResourceAssets");
+}
+
+export function writeMnDocConfigCorrectionProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots = null, resourceAssetsOnly = false }) {
+  validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots);
+  assertProductionWriterInputs({ root, privateRoot, evaluatorRevision, generationDate, boundaryRoots, resourceAssetsOnly });
   const repositoryRoot = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
   const staging = resolve(tmpdir(), `ask-mn-doc-production-authority-${randomUUID()}`);
@@ -515,7 +526,7 @@ export function writeMnDocConfigCorrectionProductionAuthority({ root = ROOT, pri
     worktreeAdded = true;
     cpSync(privateDirectory, stagedPrivate, { recursive: true, force: false, errorOnExist: true });
     generateMnDocConfigCorrectionProductionAuthorityInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate });
-    validateMnDocConfigCorrectionProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots });
+    validateMnDocConfigCorrectionProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots, resourceAssetsOnly });
     assertFrozenInputsUnchanged(repositoryRoot, stagedRepository);
     const transactionId = randomUUID();
     const publicTransactionDirectory = resolve(repositoryRoot, "benchmarks/fixtures/checkpoint-b2", `.mn-doc-authority-transaction-${transactionId}`);
@@ -523,7 +534,7 @@ export function writeMnDocConfigCorrectionProductionAuthority({ root = ROOT, pri
     const publicPairs = GENERATED_PUBLIC_ARTIFACTS.map((name) => ({ source: resolve(stagedRepository, MN_DOC_FIXTURE_ROOT, name), target: resolve(repositoryRoot, MN_DOC_FIXTURE_ROOT, name), transactionDirectory: publicTransactionDirectory, label: `mn-doc public ${name}` }));
     const privatePairs = GENERATED_PRIVATE_ARTIFACTS.map((name) => ({ source: resolve(stagedPrivate, name), target: resolve(privateDirectory, name), transactionDirectory: privateTransactionDirectory, label: `mn-doc private ${name}` }));
     const prepared = preparePublication([...publicPairs, ...privatePairs]);
-    return publishPrepared(prepared, () => validateMnDocConfigCorrectionProductionAuthority({ root: repositoryRoot, privateRoot: privateDirectory, boundaryRoots }));
+    return publishPrepared(prepared, () => validateMnDocConfigCorrectionProductionAuthority({ root: repositoryRoot, privateRoot: privateDirectory, boundaryRoots, resourceAssetsOnly }));
   } finally {
     if (worktreeAdded) {
       const removal = spawnSync("git", ["-C", repositoryRoot, "worktree", "remove", "--force", stagedRepository], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
@@ -533,7 +544,8 @@ export function writeMnDocConfigCorrectionProductionAuthority({ root = ROOT, pri
   }
 }
 
-export function validateMnDocConfigCorrectionProductionAuthority({ root = ROOT, privateRoot = null, boundaryRoots = null } = {}) {
+export function validateMnDocConfigCorrectionProductionAuthority({ root = ROOT, privateRoot = null, boundaryRoots = null, resourceAssetsOnly = false } = {}) {
+  validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots);
   const fixtureRoot = resolve(root, MN_DOC_FIXTURE_ROOT);
   const artifacts = Object.fromEntries(PRODUCTION_PUBLIC_ARTIFACTS.map((name) => [name, readJson(resolve(fixtureRoot, name), `mn-doc ${name}`)]));
   for (const [name, value] of Object.entries(artifacts)) assertAnswerNeutralPublicValue(value, `mn-doc ${name}`);
@@ -600,8 +612,9 @@ export function validateMnDocConfigCorrectionProductionAuthority({ root = ROOT, 
     }
   }
   if (privateRoot) {
-    if (!boundaryRoots) throw new Error("mn-doc production private validation requires complete boundary roots");
-    const bundle = verifyPrivateEvaluatorBundle({ root, referencePath: resolve(fixtureRoot, "evaluator-reference.json"), privateRoot, manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"), ...boundaryRoots });
+    if (resourceAssetsOnly) assertPrivateRootOutsideRepository(root, privateRoot);
+    if (!resourceAssetsOnly && !boundaryRoots) throw new Error("mn-doc production private validation requires complete boundary roots");
+    const bundle = (resourceAssetsOnly ? evaluatorBoundary.verifyPrivateEvaluatorResourceAssets : verifyPrivateEvaluatorBundle)({ root, referencePath: resolve(fixtureRoot, "evaluator-reference.json"), privateRoot, manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"), ...boundaryRoots });
     validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset: readJson(resolve(privateRoot, "evidence-removal-mutations.json"), "mn-doc private mutation authority") });
     validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: readJson(resolve(privateRoot, "equivalent-solutions.json"), "mn-doc private equivalence authority") });
     assertExact(readJson(resolve(privateRoot, "evidence-removal-mutations.json"), "mn-doc private mutation authority"), mutationAsset, "mn-doc private mutation authority");
@@ -647,5 +660,5 @@ export function validateMnDocConfigCorrectionProductionAuthority({ root = ROOT, 
   };
   assertExact(candidate.public_bindings, expectedBindings, "mn-doc source-freeze public binding closure");
   assertExact(candidate.evaluator_private_binding, { evaluator_revision: reference.evaluator_revision, evaluator_bundle_id: reference.evaluator_bundle_id, evaluator_bundle_digest: reference.evaluator_bundle_digest, evaluator_byte_count: admission.evaluator_byte_count, source_tree_digest: reference.evaluator_source_identity.source_tree_digest, dependency_graph_digest: reference.evaluator_source_identity.dependency_graph.graph_digest }, "mn-doc source-freeze private binding closure");
-  return { fixtureId: MN_DOC_FIXTURE_ID, inputDigest: reference.fixture_input_digest, candidateDigest: candidate.candidate_digest, evaluatorBundleId: reference.evaluator_bundle_id, evaluatorBundleDigest: reference.evaluator_bundle_digest, evaluatorRevision: reference.evaluator_revision, reviewStatus: review.reviewer_status, scoringReady: false };
+  return { fixtureId: MN_DOC_FIXTURE_ID, inputDigest: reference.fixture_input_digest, candidateDigest: candidate.candidate_digest, evaluatorBundleId: reference.evaluator_bundle_id, evaluatorBundleDigest: reference.evaluator_bundle_digest, evaluatorRevision: reference.evaluator_revision, reviewStatus: review.reviewer_status, scoringReady: false, ...(resourceAssetsOnly ? { validation_scope: "resource_assets_only", execution_authority: false } : {}) };
 }

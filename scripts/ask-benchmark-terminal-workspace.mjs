@@ -54,7 +54,8 @@ export function assertTerminalWorkspaceRelativePath(value, label = "terminal wor
   return value;
 }
 
-function comparePaths(left, right) {
+// Terminal authority paths use deterministic UTF-16 code-unit order, not locale collation.
+export function compareTerminalWorkspacePaths(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
@@ -64,7 +65,7 @@ function assertCanonicalPaths(entries, label) {
   if (new Set(paths).size !== paths.length) throw new Error(`${label} contains a duplicate path`);
   const folded = paths.map((path) => path.normalize("NFC").toLowerCase());
   if (new Set(folded).size !== folded.length) throw new Error(`${label} contains a case-colliding path`);
-  const sorted = [...paths].sort(comparePaths);
+  const sorted = [...paths].sort(compareTerminalWorkspacePaths);
   if (stableCanonicalJson(paths) !== stableCanonicalJson(sorted)) throw new Error(`${label} is not canonically ordered`);
   return paths;
 }
@@ -128,7 +129,7 @@ export function collectBoundedDirectoryEntryNames(directory, maximumEntries) {
   } finally {
     directory.closeSync();
   }
-  return names.sort(comparePaths);
+  return names.sort(compareTerminalWorkspacePaths);
 }
 
 function readBoundedDirectoryEntryNames(path, remainingEntries) {
@@ -189,7 +190,7 @@ function scanTerminalWorkspace(root, scan, inspectionHook) {
     identities.set(directoryPath ?? "", { ...finalIdentity, entries: names });
   };
   visit(root);
-  inventory.sort((left, right) => comparePaths(left.path, right.path));
+  inventory.sort((left, right) => compareTerminalWorkspacePaths(left.path, right.path));
   validateTerminalWorkspaceTreeInventory(inventory, "terminal workspace inventory");
   return { inventory, contents, identities, totalBytes };
 }
@@ -280,11 +281,11 @@ export function terminalWorkspaceAuthorityBytes(authority) {
 
 export function buildTerminalWorkspaceAuthority({ root, baseSnapshot, terminalWorkspaceRoot, identity, managedAssetPaths }) {
   const terminal = captureTerminalWorkspaceInventory(terminalWorkspaceRoot);
-  const managed = [...new Set(managedAssetPaths.map((path) => assertTerminalWorkspaceRelativePath(path, "managed asset path")))].sort(comparePaths);
+  const managed = [...new Set(managedAssetPaths.map((path) => assertTerminalWorkspaceRelativePath(path, "managed asset path")))].sort(compareTerminalWorkspacePaths);
   validateTerminalWorkspaceTreeInventory(baseSnapshot.inventory, "base workspace inventory");
   const baseByPath = new Map(baseSnapshot.inventory.map((entry) => [entry.path, entry]));
   const terminalByPath = new Map(terminal.inventory.map((entry) => [entry.path, entry]));
-  const paths = [...new Set([...baseByPath.keys(), ...terminalByPath.keys()])].sort(comparePaths);
+  const paths = [...new Set([...baseByPath.keys(), ...terminalByPath.keys()])].sort(compareTerminalWorkspacePaths);
   const delta = [];
   let changedContentBytes = 0;
   for (const path of paths) {
@@ -362,7 +363,7 @@ function applyDelta(authority) {
     }
     inventory.set(entry.path, next);
   }
-  const terminal = [...inventory.values()].sort((left, right) => comparePaths(left.path, right.path));
+  const terminal = [...inventory.values()].sort((left, right) => compareTerminalWorkspacePaths(left.path, right.path));
   validateTerminalWorkspaceTreeInventory(terminal, "terminal workspace terminal inventory");
   return { inventory: terminal, contents };
 }
@@ -411,7 +412,7 @@ export function readVerifiedTerminalWorkspaceAuthority({ root, authorityPath, re
     const authorityRegular = authority.base_inventory.filter((entry) => entry.file_type === "regular_file");
     if (stableCanonicalJson(authorityRegular) !== stableCanonicalJson(expectedBaseInventory)) throw new Error("terminal workspace base inventory mismatch");
   }
-  if (expectedManagedAssetPaths && stableCanonicalJson(authority.managed_asset_paths) !== stableCanonicalJson([...new Set(expectedManagedAssetPaths)].sort(comparePaths))) throw new Error("terminal workspace managed asset inventory mismatch");
+  if (expectedManagedAssetPaths && stableCanonicalJson(authority.managed_asset_paths) !== stableCanonicalJson([...new Set(expectedManagedAssetPaths)].sort(compareTerminalWorkspacePaths))) throw new Error("terminal workspace managed asset inventory mismatch");
   const terminal = applyDelta(authority);
   if (authority.base_workspace_portable_digest !== terminalWorkspaceInventoryDigest(authority.base_inventory)) throw new Error("terminal workspace base digest mismatch");
   if (authority.terminal_workspace_portable_digest !== terminalWorkspaceInventoryDigest(terminal.inventory)) throw new Error("terminal workspace terminal digest mismatch");

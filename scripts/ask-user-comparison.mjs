@@ -9,13 +9,16 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { executeCodexSession } from "./codex-exec-runner.mjs";
 import { buildAgentsBlock } from "./installer-lifecycle.mjs";
-import { comparisonConditions, KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } from "./kernel-principles.mjs";
+import { KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } from "./kernel-principles.mjs";
+import { comparisonConditions, isKernelPrinciplesCondition } from "./ask-comparison-conditions.mjs";
+import { KERNEL_PRINCIPLES_V2_ID, renderKernelPrinciplesV2, kernelPrinciplesV2FixtureDescriptor, principlesV2Capability } from "./kernel-principles-v2.mjs";
 import { boundedVerificationLogs } from "./ask-user-comparison-logs.mjs";
 import { acquireComparisonOwner, checkpointComparison, comparisonOwnershipDiagnostics, inspectComparisonExecution, observeComparisonProcess, probeComparisonOwner, releaseComparisonOwner } from "./ask-user-comparison-state.mjs";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPragmaticEvaluationReport } from "./ask-pragmatic-evaluation-report.mjs";
 import { COMPARISON_RECORD_BYTE_LIMIT, comparisonExecutionPolicy, comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, isSingleShotComparison, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
+import { buildPrimaryFixtureRecipe, isPrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 
 export const USER_CONDITIONS = Object.freeze(["plain", "kernel_only", "full_ask"]);
 export const USER_COMPARISON_EXIT_CODES = Object.freeze({ completed: 0, task_failed: 2, capability_missing: 3,
@@ -90,9 +93,30 @@ function validatePrinciplesDefinition(root, plan) {
   const renderer = readStableFile(join(root, definition.renderer_source.path), "principles renderer", LIMIT).bytes;
   assert.equal(comparisonHash(source), definition.canonical_source.digest, "principles source snapshot changed");
   assert.equal(comparisonHash(renderer), definition.renderer_source.digest, "principles renderer snapshot changed");
-  const expected = renderKernelPrinciples(source), arm = plan.arms[KERNEL_PRINCIPLES_ID];
+  const id = plan.config.kernel_condition, v2 = id === KERNEL_PRINCIPLES_V2_ID;
+  const expected = v2 ? renderKernelPrinciplesV2(source) : renderKernelPrinciples(source), arm = plan.arms[id];
+  let descriptor = null;
+  if (v2) {
+    assert.ok(isPrimaryFixtureRecipe(plan.verification.recipe), "v2 requires primary fixture recipe");
+    const paths = ["scripts/kernel-principles-v2.mjs", "scripts/kernel-principles-candidate-v2.mjs", "scripts/kernel-principles.mjs"];
+    assert.deepEqual(definition.renderer_closure.map(entry => entry.source_path), paths, "v2 renderer closure changed");
+    for (const entry of definition.renderer_closure) {
+      assert.equal(entry.path, `control/kernel-principles-renderer-closure/${entry.source_path.split("/").at(-1)}`);
+      assert.equal(comparisonHash(readStableFile(join(root, entry.path), "saved v2 renderer dependency", LIMIT).bytes), entry.digest);
+      assert.equal(comparisonHash(readStableFile(fileURLToPath(new URL(`../${entry.source_path}`, import.meta.url)), "current v2 renderer dependency", LIMIT).bytes), entry.digest, "v2 renderer source changed");
+    }
+    assert.equal(comparisonHash(renderer), definition.renderer_closure[0].digest);
+    assert.equal(definition.task_metadata.path, "control/kernel-principles-task-metadata.json");
+    const metadata = readStableFile(join(root, definition.task_metadata.path), "v2 public metadata", LIMIT).bytes;
+    assert.equal(comparisonHash(metadata), definition.task_metadata.digest);
+    const task = readStableFile(join(root, plan.task.path), "v2 public task", LIMIT).bytes;
+    descriptor = kernelPrinciplesV2FixtureDescriptor(plan.verification.recipe.fixture_id, task, metadata);
+    assert.equal(descriptor.task_class, plan.config.task_class, "v2 task class changed");
+    assert.deepEqual(definition.assessment, descriptor, "v2 task descriptor changed");
+    assert.deepEqual(definition.generation, expected.generation, "v2 generated identity changed");
+  }
   assert.equal(arm.label, "K-principles");
-  assert.equal(arm.baseline_path, `control/baselines/${KERNEL_PRINCIPLES_ID}`);
+  assert.equal(arm.baseline_path, `control/baselines/${id}`);
   const agents = readStableFile(join(root, arm.baseline_path, "AGENTS.md"), "principles baseline", LIMIT).bytes;
   const block = Buffer.from(buildAgentsBlock(expected.body));
   assert.ok(agents.length >= block.length && agents.subarray(-block.length).equals(block), "principles baseline does not contain exact generated block");
@@ -102,7 +126,7 @@ function validatePrinciplesDefinition(root, plan) {
   assert.deepEqual(arm.assets, [{ path: "AGENTS.md", ...arm.baseline_inventory["AGENTS.md"],
     kind: "generated_principles_with_preserved_custom_instructions", origin: "canonical_principles_projection" }]);
   assert.equal(comparisonHash(agents), arm.baseline_inventory["AGENTS.md"].digest, "principles asset digest changed");
-  assert.deepEqual(arm.capability, principlesCapability(source, expected.body, definition.generation, plan.config.task_class), "principles qualification changed");
+  assert.deepEqual(arm.capability, v2 ? principlesV2Capability(descriptor) : principlesCapability(source, expected.body, definition.generation, plan.config.task_class), "principles qualification changed");
 }
 
 export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
@@ -120,7 +144,7 @@ export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
   assert.deepEqual(plan.policy, comparisonExecutionPolicy(plan.policy?.execution_contract));
   if (isSingleShotComparison(plan)) assert.equal(plan.execution_protocol?.resume, "forbidden", "single-shot protocol must forbid resume");
   assert.deepEqual(Object.keys(plan.arms).sort(), comparisonConditions(plan.config.kernel_condition).sort(), "unknown comparison arm");
-  if (plan.config.kernel_condition === KERNEL_PRINCIPLES_ID) validatePrinciplesDefinition(root, plan);
+  if (isKernelPrinciplesCondition(plan.config.kernel_condition)) validatePrinciplesDefinition(root, plan);
   else assert.equal(plan.kernel_definition, undefined, "legacy condition cannot carry a principles definition");
   for (const id of comparisonConditions(plan.config.kernel_condition)) {
     assert.equal(plan.arms[id].path, `arms/${id}`);
@@ -157,9 +181,12 @@ export function userCodexInvocation(root, plan, condition) {
 
 export function inspectUserComparison(output) {
   const loaded = readUserComparisonPlan(output), { root, plan } = loaded;
+  const primary = isPrimaryFixtureRecipe(plan.verification.recipe);
   return { ...loaded, invocations: comparisonConditions(plan.config.kernel_condition).map(id => ({ condition: id, ...userCodexInvocation(root, plan, id),
-    capability: plan.arms[id].capability })), verification: { executable: process.execPath,
-    argv: verificationArgv(root, plan, plan.verification.recipe.command), reporter: plan.verification.reporter,
+    capability: plan.arms[id].capability })), verification: { executable: primary ? null : process.execPath,
+    argv: primary ? null : verificationArgv(root, plan, plan.verification.recipe.command), reporter: plan.verification.reporter,
+    ...(primary ? { kind: plan.verification.recipe.kind, checks: plan.verification.recipe.checks,
+      quality_policy: plan.verification.recipe.quality_policy } : {}),
     cwd: "a fresh verification copy for each launched condition",
     timeout_ms: plan.config.verification_timeout_ms }, execution: inspectComparisonExecution(root, plan, loaded.plan_digest),
   limits: comparisonLimits(plan),
@@ -173,7 +200,8 @@ export function inspectUserComparison(output) {
 }
 
 function comparisonLimits(plan) {
-  const checks = 1 + plan.verification.recipe.requirements.filter(item => item.command).length;
+  const checks = isPrimaryFixtureRecipe(plan.verification.recipe) ? plan.verification.recipe.checks.length
+    : 1 + plan.verification.recipe.requirements.filter(item => item.command).length;
   return { overall_timeout_ms: plan.config.overall_timeout_ms ?? 3600000,
     condition_admission_reserve_ms: plan.config.timeout_ms + checks * plan.config.verification_timeout_ms,
     deadline_origin: "first_start_including_downtime", token_budget: plan.config.token_budget ?? null,
@@ -345,22 +373,28 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
   const cwd = join(root, "verification", condition);
   mkdirSync(dirname(cwd), { recursive: true, mode: 0o700 });
   copyRegularTree(join(root, plan.arms[condition].path), cwd);
-  const checks = [{ id: "task-tests", command: plan.verification.recipe.command },
+  const primary = isPrimaryFixtureRecipe(plan.verification.recipe);
+  const checks = primary ? plan.verification.recipe.checks.map(check => ({ ...check,
+    command: [check.executable, ...check.argv] })) : [{ id: "task-tests", command: plan.verification.recipe.command },
     ...plan.verification.recipe.requirements.filter(item => item.command).map(item => ({ id: item.id, command: item.command }))];
   const results = [];
   for (const [index, check] of checks.entries()) {
     if (signal?.aborted || remaining() < 1) break;
     assert.equal(comparisonHash(readStableFile(join(root, plan.verification.reporter.path), "Node test reporter", LIMIT).bytes),
       plan.verification.reporter.digest, "Node test reporter changed");
-    const argv = verificationArgv(root, plan, check.command);
-    const request={condition,run_id:plan.run_id,plan_digest:context?.plan_digest,executable:process.execPath,argv,cwd,evidence_kind:plan.config.evidence_kind,requested_at:new Date().toISOString()};
+    const argv = primary ? check.argv : verificationArgv(root, plan, check.command);
+    const executable = primary ? check.executable : process.execPath;
+    const checkCwd = primary ? join(cwd, check.cwd) : cwd;
+    const request={condition,run_id:plan.run_id,plan_digest:context?.plan_digest,executable,argv,cwd:checkCwd,evidence_kind:plan.config.evidence_kind,
+      ...(primary ? { command_id: check.id, command_contract_digest: check.contract_command_digest,
+        fixture_input_digest: plan.verification.recipe.input_manifest_digest, observation_origin: "controller_native_fixture_command" } : {}), requested_at:new Date().toISOString()};
     if(context) { checkpointComparison(context,"verification_intent",{condition,slot:{phase:"verifying",verification_index:index}});saveLaunchReceipt(root,condition,`verification-${index}.request`,request); }
     // Synchronous receipt persistence may consume the remaining deadline while
     // its timer cannot run. Recheck immediately before dispatch, without turning
     // an exhausted deadline into a one-millisecond new process.
     const dispatchRemaining = remaining();
     if (signal?.aborted || dispatchRemaining < 1) break;
-    const value = await execute({ executable: process.execPath, argv, cwd, input: "",
+    const value = await execute({ executable, argv, cwd: checkCwd, input: "",
       ...(isSingleShotComparison(plan) ? { terminationScope: "direct_child" } : {}),
       onSpawn:context ? observed=>{const pid=typeof observed==="number"?observed:observed.pid; context.active_child=`verification-${index}.spawn`;
         saveLaunchReceipt(root,condition,`verification-${index}.spawn`,{...request,pid,observed_at:new Date().toISOString(),
@@ -373,17 +407,20 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
     if (context && childEnded(plan, value)) context.active_child=null;
     if (isSingleShotComparison(plan) && !childEnded(plan, value)) value.cleanupError ??= { code: "CHILD_TERMINATION_UNKNOWN", message: "verification child termination unknown; no later process may start" };
     const log = `verification-${index}.log`;
-    const stdoutLog = `verification-${index}.stdout.jsonl`, stderrLog = `verification-${index}.stderr.log`;
+    const stdoutLog = `verification-${index}.stdout.${primary ? "log" : "jsonl"}`, stderrLog = `verification-${index}.stderr.log`;
     const bounded = boundedVerificationLogs(value.stdout, value.stderr,
       { sanitize: sanitizeComparisonLog, captureTruncated: Boolean(value.outputLimited) });
     saveNew(evidencePath(root, condition, stdoutLog), bounded.stdout);
     saveNew(evidencePath(root, condition, stderrLog), bounded.stderr);
     saveNew(evidencePath(root, condition, log), bounded.view);
-    const testSummary = inspectNodeVerification(value.stdout ?? "", check.command.slice(2));
+    const testSummary = primary ? null : inspectNodeVerification(value.stdout ?? "", check.command.slice(2));
     const testStatus = value.spawnObserved !== true || value.exitCode == null ? "unknown"
-      : value.exitCode !== 0 ? "fail" : testSummary.tests_observed ? "pass" : "unknown";
+      : value.exitCode !== 0 ? "fail" : primary || testSummary.tests_observed ? "pass" : "unknown";
     const evidenceIncomplete = !bounded.metadata.full_evidence_available || value.error || value.cleanupError || value.outputLimited;
-    results.push({ id: check.id, command: [process.execPath, ...argv], cwd, log, logs: [stdoutLog, stderrLog, log], log_metadata: bounded.metadata, test_summary: testSummary,
+    results.push({ id: check.id, command: [executable, ...argv], cwd:checkCwd, log, logs: [stdoutLog, stderrLog, log], log_metadata: bounded.metadata, test_summary: testSummary,
+      ...(primary ? { command_id: check.id, command_contract_digest: check.contract_command_digest,
+        fixture_input_digest: plan.verification.recipe.input_manifest_digest, verification_kind: "native_public_command",
+        semantic_quality: "unknown" } : {}),
       test_result: testStatus, spawn_observed:value.spawnObserved??null,process_completed:value.spawnObserved === true && (value.exitCode != null || value.signal != null),
       status: value.interrupted ? "interrupted" : value.timedOut ? "timeout" : evidenceIncomplete ? "unknown" : testStatus,
       exit_code: value.exitCode ?? null, duration_ms: value.durationMs ?? null,
@@ -392,12 +429,19 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
     if (value.interrupted || value.timedOut || value.error || value.cleanupError || value.outputLimited) break;
   }
   return { independent_process: execute === executeCodexSession,
-    execution_origin: execute === executeCodexSession ? "controller_node_process" : "synthetic_injected_verifier",
+    execution_origin: execute === executeCodexSession ? primary ? "controller_native_fixture_process" : "controller_node_process" : "synthetic_injected_verifier",
     common_frozen_recipe: true,
     runtime: { executable: process.execPath, node_version: process.version, reporter_digest: plan.verification.reporter.digest }, checks: results,
     requirements: plan.verification.recipe.requirements.map(item => ({ id: item.id, description: item.description,
       status: item.command ? results.find(result => result.id === item.id)?.status ?? "unknown" : "unknown" })),
     limitations: ["Node test-case receipts do not measure assertion count or prove that tests cover the requirement; the operator must check coverage", "human/semantic criteria without a command remain unknown", "verification executes repository test code in a fresh copy; this is not a security sandbox"] };
+}
+
+// Exercise the same branch without exposing an unowned production verifier.
+export function verifyUserComparisonConditionForTest(root, plan, condition, signal, execute, remaining) {
+  assert.equal(plan.config.evidence_kind, "synthetic", "test verification requires synthetic evidence");
+  assert.ok(typeof execute === "function" && execute !== executeCodexSession, "test verification requires an injected fake transport");
+  return verifyCondition(root, plan, condition, signal, execute, remaining);
 }
 
 const fault = (code, reason) => Object.assign(new Error(reason), { comparisonCode: code });
@@ -414,6 +458,11 @@ function validateInputs(root, plan) {
   assert.equal(readFileSync(join(root, plan.input.path), "utf8"), plan.prompt);
   assert.equal(comparisonHash(readStableFile(join(root, plan.verification.path), "recipe", LIMIT).bytes), plan.verification.digest, "verification changed");
   assert.deepEqual(readJson(join(root, plan.verification.path)), plan.verification.recipe, "verification plan and recipe differ");
+  if (isPrimaryFixtureRecipe(plan.verification.recipe)) {
+    assert.deepEqual(plan.verification.recipe, buildPrimaryFixtureRecipe(plan.verification.recipe.fixture_id), "fixed primary recipe source changed");
+    assert.equal(plan.config.task_class, plan.verification.recipe.runner_task_class, "primary task class changed");
+    assert.deepEqual(plan.mutable_paths, plan.verification.recipe.mutable_paths, "primary mutable scope changed");
+  }
   assert.equal(comparisonHash(readStableFile(join(root, plan.verification.reporter.path), "Node reporter", LIMIT).bytes), plan.verification.reporter.digest, "Node test reporter changed");
 }
 function validateArm(root, plan, id, pending) {
@@ -774,7 +823,7 @@ export function reportUserComparison(output) {
   const overall={...issue,elapsed_ms:execution.history?.snapshot?Math.max(0,Date.now()-execution.history.snapshot.started_at_ms):null,exit_code:USER_COMPARISON_EXIT_CODES[issue.state]??7,required_action:issue.state === "completed" ? null : isSingleShotComparison(plan)
     ? singleShotAction(execution) : ACTION};
   const notes = { kind: "ask_pragmatic_evaluation_notes_v1", evidence_kind: existsSync(join(root, "control/start.json")) || execution.history?.snapshot || slots.some(slot=>slot.receipt_integrity) ? plan.config.evidence_kind : "plan",
-    planned_blocks: [plan.run_id], ...(plan.config.kernel_condition === KERNEL_PRINCIPLES_ID ? { kernel_condition: KERNEL_PRINCIPLES_ID } : {}), global_context: { ask_presence: plan.config.global_ask_presence, change_status: "unknown" },
+    planned_blocks: [plan.run_id], ...(isKernelPrinciplesCondition(plan.config.kernel_condition) ? { kernel_condition: plan.config.kernel_condition } : {}), global_context: { ask_presence: plan.config.global_ask_presence, change_status: "unknown" },
     next_improvement: "review this task's saved tests, requirements, changes and unknowns before choosing a new run",
     trials: slots.map(slot => ({ block_id: plan.run_id, condition: slot.condition,
       execution_state: slot.state === "not_started" || (slot.state === "capability_missing" && !slot.launch_requested) ? "not_started"
@@ -806,7 +855,7 @@ export function aggregateUserComparisons(outputs) {
     const members = reports.filter(report => report.evidence_kind === evidence_kind && (report.configuration.kernel_condition ?? "kernel_only") === kernel_condition);
     const notes = { ...members[0].summary.supplied_notes, planned_blocks: members.map(report => report.run_id),
       trials: members.flatMap(report => report.summary.supplied_notes.trials) };
-    return { evidence_kind, ...(kernel_condition === KERNEL_PRINCIPLES_ID ? { kernel_condition } : {}), summary: { ...buildPragmaticEvaluationReport(notes), plain_scope: members[0].summary.plain_scope } };
+    return { evidence_kind, ...(isKernelPrinciplesCondition(kernel_condition) ? { kernel_condition } : {}), summary: { ...buildPragmaticEvaluationReport(notes), plain_scope: members[0].summary.plain_scope } };
   }), mixed_evidence_pooled: false, mixed_kernel_conditions_pooled: false };
 }
 

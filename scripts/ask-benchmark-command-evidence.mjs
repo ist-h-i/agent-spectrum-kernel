@@ -2,18 +2,28 @@ import { createHash } from "node:crypto";
 import { dirname, posix, resolve, win32 } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
+import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { validateSchemaValue } from "./json-schema-validation.mjs";
 
 export const VERIFICATION_COMMAND_CONTRACT_SCHEMA_PATH = "benchmarks/schemas/portfolio-verification-command-contract.schema.json";
 export const COMMAND_EVIDENCE_SCHEMA_PATH = "benchmarks/schemas/portfolio-command-evidence.schema.json";
 export const CODEX_COMMAND_EVENT_FORMAT_REVISION = "codex-exec-jsonl-v1";
 export const COMMAND_EVIDENCE_PARSER_REVISION = "1.3.0";
+// Opt-in offline primary parsing; legacy adapters retain their exact revision.
+export const PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION = "1.4.0-primary-saved";
 export const COMMAND_EVIDENCE_PATH = "command-evidence.json";
 export const MAX_COMMAND_EVENT_STREAM_BYTES = 16 * 1024 * 1024;
 export const MAX_COMMAND_EVENT_LINE_BYTES = 1024 * 1024;
 
 const TERMINAL_ITEM_STATUSES = new Set(["completed", "failed", "declined"]);
 const SHELL_PREFIX = "/bin/bash -lc ";
+const SAVED_SHELL_PREFIXES = [SHELL_PREFIX, "/bin/zsh -lc ", "/bin/bash -c "];
+const PARSER_REVISIONS = [COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION];
+const FAILURE_CODES = new Set(["stream_oversized", "stream_truncated", "line_oversized", "malformed_jsonl", "malformed_event",
+  "duplicate_terminal_turn", "sequence_reversal", "event_drop", "runtime_item_error", "turn_failed", "missing_item_id",
+  "duplicate_item_id", "invalid_started_status", "completed_without_started", "command_drift", "unknown_status",
+  "status_exit_contradiction", "started_without_completed", "missing_terminal_turn", "unsafe_command",
+  "unsupported_shell", "malformed_shell_envelope", "ambiguous_shell_word", "unsupported_parser_revision"]);
 const STREAM_INTEGRITY_ERROR = /(?:drop(?:ped)?\s+event|event\s+(?:drop|loss)|stream\s+lag|lagged|backpressure|truncat|sequence\s+integrity|integrity\s+failure)/iu;
 const SENSITIVE_VALUE = /(?:^|\s)(?:[A-Za-z_][A-Za-z0-9_]*=|\/Users\/|\/home\/|\/private\/|\/var\/folders\/|[A-Za-z]:[\\/]|file:\/\/|(?:token|secret|password|credential)[A-Za-z0-9_-]*=)/iu;
 const UNSAFE_SCRIPT = /(?:^|[\s;&|(<"'])(?:[A-Za-z_][A-Za-z0-9_]*=|\/(?:[^/\s;&|()<>"']|$)|[A-Za-z]:[\\/]|file:\/\/|(?:token|secret|password|credential)[A-Za-z0-9_-]*=)/iu;
@@ -143,12 +153,56 @@ function decodePosixSingleQuotedWord(value) {
   return output;
 }
 
-function classifyRuntimeCommand(rawCommand, contract) {
+export function commandEvidenceFailureReason(error) {
+  return "capture_invalid:" + (error instanceof CommandEvidenceError && FAILURE_CODES.has(error.code) ? error.code : "unclassified");
+}
+
+function assertParserRevision(value) {
+  if (!PARSER_REVISIONS.includes(value)) throw new CommandEvidenceError("unsupported_parser_revision", "unsupported command evidence parser revision");
+}
+
+// Decode one literal shell word as data. No expansions, evaluation or execution.
+function decodeLiteralShellWord(value) {
+  let output = "", quote = null, sawQuote = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (character === "\0") throw new CommandEvidenceError("malformed_shell_envelope", "runtime shell word contains a prohibited character");
+    if (quote === "'") {
+      if (character === "'") quote = null; else output += character;
+      continue;
+    }
+    if (character === "\\") {
+      const next = value[++index];
+      if (next === undefined) throw new CommandEvidenceError("malformed_shell_envelope", "runtime shell word has incomplete escaping");
+      if (next === "\0") throw new CommandEvidenceError("malformed_shell_envelope", "runtime shell word contains a prohibited character");
+      if (next === "\n") continue;
+      if (quote === '"' && !['$', String.fromCharCode(96), '"', '\\'].includes(next)) output += "\\";
+      output += next;
+      continue;
+    }
+    if (quote === '"') {
+      if (character === '"') quote = null;
+      else if (character === "$" || character === String.fromCharCode(96)) throw new CommandEvidenceError("ambiguous_shell_word", "runtime shell word requires expansion");
+      else output += character;
+      continue;
+    }
+    if (character === "'" || character === '"') { quote = character; sawQuote = true; continue; }
+    if (!/[A-Za-z0-9_./:@%+=,-]/u.test(character)) throw new CommandEvidenceError("ambiguous_shell_word", "runtime shell envelope is not one literal word");
+    output += character;
+  }
+  if (quote !== null || !sawQuote || output.length === 0) throw new CommandEvidenceError("malformed_shell_envelope", "runtime shell word has malformed quoting");
+  return output;
+}
+
+function classifyRuntimeCommand(rawCommand, contract, parserRevision) {
   if (typeof rawCommand !== "string" || rawCommand.length === 0) throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified");
   const direct = contract?.commands.filter(({ execution_form }) => execution_form === "direct_argv").find((command) => renderCommandEvent(command) === rawCommand);
   if (direct) return { execution_form: "direct_argv", logical_digest: direct.logical_command_digest, rendered_digest: sha256(Buffer.from(rawCommand)), script: null };
-  if (!rawCommand.startsWith(SHELL_PREFIX)) throw new CommandEvidenceError("unsupported_shell", "runtime command uses an unsupported shell envelope");
-  const script = decodePosixSingleQuotedWord(rawCommand.slice(SHELL_PREFIX.length));
+  const saved = parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
+  const prefix = (saved ? SAVED_SHELL_PREFIXES : [SHELL_PREFIX]).find(value => rawCommand.startsWith(value));
+  if (!prefix) throw new CommandEvidenceError("unsupported_shell", "runtime command uses an unsupported shell envelope");
+  const word = rawCommand.slice(prefix.length);
+  const script = saved ? decodeLiteralShellWord(word) : decodePosixSingleQuotedWord(word);
   if (/(?:^|[;,])\s*(?:token|secret|password|credential)[A-Za-z0-9_-]*\s*=/iu.test(script)) throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified");
   try { assertSafeScript(script, "runtime canonical script"); } catch { throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified"); }
   return { execution_form: "codex_shell_command", logical_digest: canonicalDigest({ execution_form: "codex_shell_command", canonical_script: script }), rendered_digest: sha256(Buffer.from(rawCommand)), script };
@@ -169,9 +223,9 @@ function assertCommandPairIntegrity(started, completed) {
   commandTerminalOutcome(completed);
 }
 
-function commandEvidenceBase({ sequence, started, completed, contract }) {
+function commandEvidenceBase({ sequence, started, completed, contract, parserRevision }) {
   const rawCommand = completed.command ?? started.command;
-  const classified = classifyRuntimeCommand(rawCommand, contract);
+  const classified = classifyRuntimeCommand(rawCommand, contract, parserRevision);
   const renderedMatches = contract?.commands.filter((command) => command.rendered_event_command_digest === classified.rendered_digest && command.execution_form === classified.execution_form) ?? [];
   const commandMatch = renderedMatches.find((command) => command.logical_command_digest === classified.logical_digest) ?? null;
   const matched = commandMatch?.working_directory.evidence_requirement === "not_required" ? commandMatch : null;
@@ -213,7 +267,8 @@ function failOnRuntimeErrorEvent(event) {
   throw new CommandEvidenceError("runtime_item_error", "runtime emitted an unclassified error item");
 }
 
-export function parseCodexCommandEvents({ stream, identity, contract }) {
+export function parseCodexCommandEvents({ stream, identity, contract, parserRevision = COMMAND_EVIDENCE_PARSER_REVISION }) {
+  assertParserRevision(parserRevision);
   const bytes = Buffer.isBuffer(stream) ? stream : Buffer.from(stream ?? "");
   if (bytes.length > MAX_COMMAND_EVENT_STREAM_BYTES) throw new CommandEvidenceError("stream_oversized", "command event stream exceeds the byte limit");
   if (bytes.length === 0 || bytes.at(-1) !== 0x0a) throw new CommandEvidenceError("stream_truncated", "command event stream is empty or truncated");
@@ -226,7 +281,9 @@ export function parseCodexCommandEvents({ stream, identity, contract }) {
   for (const line of lines) {
     if (Buffer.byteLength(line) > MAX_COMMAND_EVENT_LINE_BYTES) throw new CommandEvidenceError("line_oversized", "command event line exceeds the byte limit");
     let event;
-    try { event = JSON.parse(line); } catch { throw new CommandEvidenceError("malformed_jsonl", "command event stream contains malformed JSONL"); }
+    try { event = parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION ? parseJsonRejectDuplicateKeys(line) : JSON.parse(line); }
+    catch { throw new CommandEvidenceError("malformed_jsonl", "command event stream contains malformed JSONL"); }
+    if (parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION && (!event || typeof event !== "object" || Array.isArray(event) || typeof event.type !== "string" || !event.type)) throw new CommandEvidenceError("malformed_event", "command event has no unambiguous type");
     eventSequence += 1;
     if (event.type === "turn.completed") {
       if (terminalTurn) throw new CommandEvidenceError("duplicate_terminal_turn", "command event stream contains duplicate terminal turn events");
@@ -259,7 +316,7 @@ export function parseCodexCommandEvents({ stream, identity, contract }) {
   let unsupportedShell = null;
   for (const pair of commandPairs) {
     try {
-      commands.push(closeCommandEvidence(commandEvidenceBase({ ...pair, contract }), identity));
+      commands.push(closeCommandEvidence(commandEvidenceBase({ ...pair, contract, parserRevision }), identity));
     } catch (error) {
       if (error?.code !== "unsupported_shell") throw error;
       unsupportedShell ??= error;
@@ -300,7 +357,8 @@ export function buildCommandEvidenceManifest({ identity, capture, stream, comman
   return { ...base, manifest_digest: canonicalDigest(base) };
 }
 
-export function buildUnavailableCommandEvidence({ identity, support, probe, reason, stream = Buffer.alloc(0) }) {
+export function buildUnavailableCommandEvidence({ identity, support, probe, reason, stream = Buffer.alloc(0), parserRevision = COMMAND_EVIDENCE_PARSER_REVISION }) {
+  assertParserRevision(parserRevision);
   const bytes = Buffer.isBuffer(stream) ? stream : Buffer.from(stream ?? "");
   return buildCommandEvidenceManifest({
     identity,
@@ -309,7 +367,7 @@ export function buildUnavailableCommandEvidence({ identity, support, probe, reas
       evidence_level: "unavailable",
       event_transport: support === "supported" ? "codex_exec_jsonl" : "none",
       event_format_revision: support === "supported" ? CODEX_COMMAND_EVENT_FORMAT_REVISION : null,
-      parser_revision: support === "supported" ? COMMAND_EVIDENCE_PARSER_REVISION : null,
+      parser_revision: support === "supported" ? parserRevision : null,
       contract_probe_evidence: probe,
       downgrade_reason: reason,
     },
@@ -319,8 +377,8 @@ export function buildUnavailableCommandEvidence({ identity, support, probe, reas
   });
 }
 
-export function buildCodexCommandEvidence({ identity, stream, contract }) {
-  const parsed = parseCodexCommandEvents({ stream, identity: manifestIdentity(identity), contract });
+export function buildCodexCommandEvidence({ identity, stream, contract, parserRevision = COMMAND_EVIDENCE_PARSER_REVISION }) {
+  const parsed = parseCodexCommandEvents({ stream, identity: manifestIdentity(identity), contract, parserRevision });
   return buildCommandEvidenceManifest({
     identity,
     capture: {
@@ -328,7 +386,7 @@ export function buildCodexCommandEvidence({ identity, stream, contract }) {
       evidence_level: "executed",
       event_transport: "codex_exec_jsonl",
       event_format_revision: CODEX_COMMAND_EVENT_FORMAT_REVISION,
-      parser_revision: COMMAND_EVIDENCE_PARSER_REVISION,
+      parser_revision: parserRevision,
       contract_probe_evidence: "runtime_event_shell_authority",
       downgrade_reason: null,
     },
@@ -339,11 +397,11 @@ export function buildCodexCommandEvidence({ identity, stream, contract }) {
 function assertCaptureSemantics(manifest) {
   const capture = manifest.capture;
   if (capture.evidence_level === "executed") {
-    if (capture.support !== "supported" || capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || capture.contract_probe_evidence !== "runtime_event_shell_authority" || capture.downgrade_reason !== null) throw new Error("executed command evidence capture contract is inconsistent");
+    if (capture.support !== "supported" || capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || !PARSER_REVISIONS.includes(capture.parser_revision) || capture.contract_probe_evidence !== "runtime_event_shell_authority" || capture.downgrade_reason !== null) throw new Error("executed command evidence capture contract is inconsistent");
     return;
   }
   if (capture.support === "supported") {
-    if (capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || !["capture_invalid", "command_contract_unavailable", "runtime_unavailable", "shell_capability_unavailable"].includes(capture.contract_probe_evidence) || capture.downgrade_reason === null) throw new Error("supported unavailable command evidence capture contract is inconsistent");
+    if (capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || !PARSER_REVISIONS.includes(capture.parser_revision) || !["capture_invalid", "command_contract_unavailable", "runtime_unavailable", "shell_capability_unavailable"].includes(capture.contract_probe_evidence) || capture.downgrade_reason === null) throw new Error("supported unavailable command evidence capture contract is inconsistent");
   } else if (capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null || capture.downgrade_reason === null) throw new Error("unsupported command evidence capture contract is inconsistent");
 }
 

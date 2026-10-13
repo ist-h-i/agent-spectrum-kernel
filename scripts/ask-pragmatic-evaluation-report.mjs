@@ -6,7 +6,7 @@ import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { derivePortfolioDistribution } from "./ask-benchmark-portfolio-repetition-report.mjs";
 
-import { comparisonConditions } from "./kernel-principles.mjs";
+import { comparisonConditions } from "./ask-comparison-conditions.mjs";
 const OUTCOMES = ["pass", "unknown", "fail"];
 const STATES = ["not_started", "completed", "failed", "stopped"];
 const METRICS = ["duration_ms", "human_review_minutes", "rework_minutes", "input_tokens", "output_tokens", "cached_tokens"];
