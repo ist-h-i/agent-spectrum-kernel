@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Exploratory user lane. Fixed experiment drivers and their authority stay separate.
 import assert from "node:assert/strict";
+import { verifyPersonalPromptMaterialization } from "./ask-personal-prompt-materialization.mjs";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { chmodSync, closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -155,6 +156,7 @@ export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
   assert.equal(plan.verification.path, "control/verification.json");
   assert.equal(plan.verification.reporter.path, "control/node-test-reporter.mjs");
   assert.equal(plan.verification.reporter.format, "ask_node_summary_jsonl_v1");
+  verifyPersonalPromptMaterialization({ plan, read: path => readStableFile(join(root, path), "personal Prompt input", LIMIT).bytes, hash: comparisonHash });
   if (!ignoreStart && !existsSync(join(root,"control/start.json")) && (existsSync(join(root,"control/start.digest")) || existsSync(join(root,"control/leases")) || existsSync(join(root,"control/history")))) throw fault(10,"start record missing from an existing execution; state corrupt");
   if (!ignoreStart && existsSync(join(root, "control/start.json"))) {
     const started = readJson(join(root, "control/start.json"));
@@ -176,7 +178,9 @@ export function userCodexInvocation(root, plan, condition) {
   if (plan.config.reasoning !== null) argv.push("--config", `model_reasoning_effort=${JSON.stringify(plan.config.reasoning)}`);
   argv.push("-");
   return { executable: plan.config.cli_bin, argv, cwd: join(root, plan.arms[condition].path),
-    input: plan.prompt, timeoutMs: plan.config.timeout_ms };
+    input: condition === "full_ask" && plan.arms.full_ask.personal_prompt
+      ? readStableFile(join(root, plan.arms.full_ask.personal_prompt.input_path), "personal Prompt invocation", LIMIT).bytes.toString("utf8")
+      : plan.prompt, timeoutMs: plan.config.timeout_ms };
 }
 
 export function inspectUserComparison(output) {

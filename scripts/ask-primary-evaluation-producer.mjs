@@ -82,7 +82,8 @@ async function checkedSource(block) {
   const retainTree = path => { if (!existsSync(path)) return; const stat = lstatSync(path); assert.ok(!stat.isSymbolicLink());
     if (stat.isDirectory()) for (const name of readdirSync(path)) retainTree(join(path, name)); else retainedRead(path); };
   for (const path of ['control/plan.json','control/plan.digest','control/task.md','inputs/prompt.md','control/verification.json','control/node-test-reporter.mjs',
-    'control/kernel-principles-source.md','control/kernel-principles-renderer.mjs','control/kernel-principles-task-metadata.json','control/kernel-principles-renderer-closure','control/start.json','control/start.digest','control/history','control/leases']) retainTree(join(block.root,path));
+    'control/kernel-principles-source.md','control/kernel-principles-renderer.mjs','control/kernel-principles-task-metadata.json','control/kernel-principles-renderer-closure',
+    'control/personal-prompt-asset.json','inputs/full_ask-prompt.md','control/start.json','control/start.digest','control/history','control/leases']) retainTree(join(block.root,path));
   retainedRead(block.input_manifest.path);
   if (block.grading?.scoring_version) retainedRead(block.grading.scoring_version.path);
   for (const slot of request.slots) {

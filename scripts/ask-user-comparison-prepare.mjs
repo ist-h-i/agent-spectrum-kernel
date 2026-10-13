@@ -13,6 +13,7 @@ import { KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } fr
 import { comparisonConditions, isKernelPrinciplesCondition } from "./ask-comparison-conditions.mjs";
 import { KERNEL_PRINCIPLES_V2_ID, renderKernelPrinciplesV2, kernelPrinciplesV2FixtureDescriptor, principlesV2Capability } from "./kernel-principles-v2.mjs";
 import { isPrimaryFixtureRecipe, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
+import { buildPersonalPromptMaterialization, personalPromptInput } from "./ask-personal-prompt-materialization.mjs";
 
 const SOURCE = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 const CORE_STATE = ".agent-spectrum-kernel/install-state.json";
@@ -462,7 +463,7 @@ function kernelCapability(inventory, config) {
 
 function validateOptions(options) {
   if (!plainObject(options)) fail("options_object_required");
-  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf", "kernelCondition", "executionContract"];
+  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf", "kernelCondition", "executionContract", "personalPrompt"];
   if (Object.keys(options).some(key => !allowed.includes(key))) fail("unknown_preparation_option");
   comparisonExecutionPolicy(options.executionContract);
   for (const name of ["repo", "output"]) if (typeof options[name] !== "string" || !isAbsolute(options[name]) || resolve(options[name]) !== options[name]) fail(`absolute_${name}_required`);
@@ -519,6 +520,8 @@ export function prepareUserComparison(options = {}) {
   const primaryRecipe = isPrimaryFixtureRecipe(recipe);
   if (primaryRecipe) validatePrimaryFixtureRecipe(recipe, original, { taskBytes, mutablePaths: mutable, taskClass: config.task_class });
   else if (["design", "handoff"].includes(config.task_class)) fail("advanced_task_class_requires_primary_fixture_recipe");
+  const personalPrompt = options.personalPrompt === undefined ? null : buildPersonalPromptMaterialization(options.personalPrompt,
+    { taskClass: primaryRecipe ? recipe.task_class : config.task_class, hash: comparisonHash });
   const reporterBytes = readRegular(join(SOURCE, "scripts/ask-user-comparison-test-reporter.mjs"), "node_test_reporter");
   const testPaths = primaryRecipe ? [] : [...new Set([recipe.command, ...recipe.requirements.filter(item => item.command).map(item => item.command)].flatMap(command => command.slice(2)))];
   for (const mutablePath of mutable) {
@@ -615,6 +618,15 @@ export function prepareUserComparison(options = {}) {
         : id === "kernel_only" ? "Canonical AGENTS only; no ASK Skills added; preserved custom/global capabilities may apply."
           : isKernelPrinciplesCondition(id) ? "Generated canonical basic principles only; no added ASK Skills or formal protocols; distinct from legacy K and Core Bundle."
           : "Live core plus Codex full and all classified reference-supplement paths; preserved custom/global instructions may apply." };
+    if (id === "full_ask" && personalPrompt) {
+      const input = Buffer.from(personalPromptInput(prompt, personalPrompt.entry_text));
+      writeNew(root, personalPrompt.input_path, input);
+      writeNew(root, personalPrompt.materialization_path, jsonBytes(personalPrompt.materialization));
+      arms[id].personal_prompt = { materialization_path: personalPrompt.materialization_path,
+        materialization_digest: personalPrompt.materialization_digest, input_path: personalPrompt.input_path,
+        input_digest: comparisonHash(input) };
+      arms[id].configuration += " Exact registered Prompt entrypoint appended to this F input; separate candidate-parent experiment required.";
+    }
   }
   const sourceInventory = Object.fromEntries([...original].sort(([a], [b]) => a.localeCompare(b)).map(([path, value]) => [path, record(value.bytes, value.mode)]));
   const plan = { schema_version: 1, kind: "ask_user_comparison_plan_v1", run_id: randomUUID(), created_at: new Date().toISOString(),

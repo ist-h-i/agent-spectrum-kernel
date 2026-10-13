@@ -4,6 +4,7 @@ import { deriveEvolutionActionProposal, publishEvolutionRecommendation, publishE
   verifyEvolutionHumanDecision, recordEvolutionNoopReceipt } from "./evolution-loop.mjs";
 import { inspectPersonalEvolution } from "./ask-personal-evolution.mjs";
 import { assertPersonalEvolutionFields, freezePersonalEvolutionValue } from "./ask-personal-evolution-observation.mjs";
+import { verifyPersonalEvolutionPromptPairResults } from "./ask-personal-evolution-primary-pair.mjs";
 
 const NOOPS = new Set(["retain_current", "revise_candidate", "insufficient_evidence"]);
 const CONNECTION_KEYS = ["schema_version", "object_kind", "preparation_object_digest", "experiment_object_digest",
@@ -24,7 +25,10 @@ export function verifyPersonalEvolutionSavedResults(options) {
   const preparation = read(storeRoot, preparationObjectDigest);
   const candidate = read(storeRoot, preparation.candidate_object_digest);
   const experiment = read(storeRoot, experimentObjectDigest);
-  if (experiment.projection.mode !== "fixed_b1_exact") throw new Error("saved-file adapter supports fixed_b1_exact only; Prompt/P-K-F needs its own exact authority adapter");
+  if (experiment.projection.mode === "prompt_v2_exact" && options.pairRegistrationObjectDigest) {
+    return verifyPersonalEvolutionPromptPairResults(options);
+  }
+  if (experiment.projection.mode !== "fixed_b1_exact") throw new Error("saved-file adapter supports fixed_b1_exact only without a separately pinned fresh Prompt pair");
   const verified = verifyPortfolioEvolutionEvidence(options);
   if (verified.recommendation.candidate_digest !== candidate.candidate_digest) throw new Error("saved results candidate transplant rejected");
   return freezePersonalEvolutionValue({ ...verified, candidate, experiment, preparation_object_digest: preparationObjectDigest,
