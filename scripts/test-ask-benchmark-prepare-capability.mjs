@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import test from "node:test";
 import { preparePortfolioExecution } from "./ask-benchmark-execution.mjs";
 import { prepareFrozenEvaluatorTestRoot } from "./test-frozen-evaluator-fixture.mjs";
@@ -51,7 +51,9 @@ test("current supported CLI reaches input validation without unsupported fallbac
   const work = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-supported-prepare-test-")));
   t.after(() => rmSync(work, { recursive: true, force: true }));
   const runDir = resolve(work, "absent-run");
-  const result = spawnSync(process.execPath, ["scripts/ask-benchmark.mjs", "prepare-execution", "--config", resolve(work, "missing-config.json"),
+  const missingConfig = resolve(root, `synthetic-missing-config-${basename(work)}.json`);
+  assert.equal(existsSync(missingConfig), false);
+  const result = spawnSync(process.execPath, ["scripts/ask-benchmark.mjs", "prepare-execution", "--config", missingConfig,
     "--plan", resolve(work, "missing-plan.json"), "--materialized", resolve(work, "missing-materialized"),
     "--selection-state", resolve(work, "missing-selection"), "--run-dir", runDir], { cwd: root, encoding: "utf8", timeout: 30000 });
   assert.ifError(result.error);
@@ -60,6 +62,7 @@ test("current supported CLI reaches input validation without unsupported fallbac
   assert.match(result.stderr, /ENOENT/u);
   assert.doesNotMatch(result.stderr, /unsupported|SyntaxError/u);
   assert.equal(existsSync(runDir), false);
+  assert.equal(existsSync(missingConfig), false);
   assert.deepEqual(readdirSync(work), []);
 });
 
