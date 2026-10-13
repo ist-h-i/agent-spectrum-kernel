@@ -318,9 +318,14 @@ export async function startPersonalEvolutionPromptPair(options) {
   const ctx = registered(options), registration = ctx.registration;
   assert.equal(options.confirmedPairObjectDigest, options.pairRegistrationObjectDigest, "human must confirm fixed pair digest");
   const start = options.startComparison ?? startUserComparison;
-  const graders = options.gradingAdapters;
+  const suppliedGraders = options.gradingAdapters;
   assert.equal(options.gradingAdapter, undefined, "singular grading adapter is unsupported for two role outputs");
-  assertPersonalEvolutionFields(graders, roles, "separate role grading adapters");
+  assertPersonalEvolutionFields(suppliedGraders, roles, "separate role grading adapters");
+  const descriptors = Object.getOwnPropertyDescriptors(suppliedGraders);
+  for (const role of roles) assert.ok(Object.hasOwn(descriptors[role], "value"), "grading adapter accessor refused");
+  // Check and call the same owned refs across callbacks and awaits. The caller
+  // cannot replace a checked factory with an unregistered later capability.
+  const graders = Object.freeze(Object.fromEntries(roles.map(role => [role, descriptors[role].value])));
   assert.notEqual(graders.baseline, graders.challenger, "one grading adapter cannot serve both role output roots");
   const all = roles.flatMap(role => ctx.blocks[role]);
   const synthetic = all.every(block => readUserComparisonPlan(block.root).plan.config.evidence_kind === "synthetic");

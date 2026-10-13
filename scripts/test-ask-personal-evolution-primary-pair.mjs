@@ -370,7 +370,15 @@ test("one synthetic invocation composes existing APIs, saves fresh pair and refu
   await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapters,
     gradingAdapter: gradingAdapters.baseline }), /singular grading adapter/);
   assert.equal(starts, 0); assert.equal(grades, 0);
-  const result = await startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapters });
+  let accessorReads = 0;
+  const accessors = { get baseline() { accessorReads++; return gradingAdapters.baseline; }, challenger: gradingAdapters.challenger };
+  await assert.rejects(startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapters: accessors }), /accessor refused/);
+  assert.equal(accessorReads, 0); assert.equal(starts, 0);
+  const supplied = { ...gradingAdapters }; let replacementCalls = 0;
+  const result = await startPersonalEvolutionPromptPair({ ...options, startComparison, gradingAdapters: supplied,
+    now: () => { supplied.challenger = { preflight: () => { replacementCalls++; throw new Error("replacement must not be called"); },
+      grade: () => { replacementCalls++; throw new Error("replacement must not be called"); } }; return Date.now(); } });
+  assert.equal(replacementCalls, 0);
   assert.equal(starts, 2); assert.equal(grades, 2); assert.equal(result.status, "saved_pair_verified"); assert.equal(result.models_started, false);
   assert.equal(result.action, "held_pending_separate_evaluation_and_human_trust");
   assert.ok(existsSync(join(resourceConfigs.baseline.output_root, "mn-build-option-update")));
