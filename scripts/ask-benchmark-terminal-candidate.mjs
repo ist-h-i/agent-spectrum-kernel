@@ -108,6 +108,7 @@ export function verifyTerminalWorkspaceAuthority({
   normalizedResultsPath,
   sourceSnapshotDigest,
   normalizedResultId,
+  executionAdmissionEvidenceByFixture = null,
 }) {
   if (!normalizedResultsPath || !sourceSnapshotDigest || !normalizedResultId) throw new Error("terminal workspace verification requires a normalized collection, source snapshot digest, and normalized result ID");
   const normalized = verifyNormalizedPortfolioResults({
@@ -118,6 +119,7 @@ export function verifyTerminalWorkspaceAuthority({
     selectionState,
     runDir,
     outputPath: normalizedResultsPath,
+    executionAdmissionEvidenceByFixture,
   });
   if (normalized.manifest.source_snapshot_digest !== sourceSnapshotDigest) throw new Error("normalized source snapshot digest mismatch");
   const collectionRoot = realpathSync(resolve(normalizedResultsPath));
@@ -144,6 +146,7 @@ export function verifyTerminalWorkspaceAuthority({
     runDir,
     caseId: record.lineage.case_id,
     attempt: record.lineage.attempt,
+    executionAdmissionEvidenceByFixture,
   });
   assertNormalizedExecutionClosure(record, execution.execution);
   const manifestAfter = readStableFile(manifestPath, "normalized generation manifest", MAX_NORMALIZED_MANIFEST_BYTES, { allowEmpty: false });

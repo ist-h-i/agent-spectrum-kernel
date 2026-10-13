@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { test } from "node:test";
+import { pathToFileURL } from "node:url";
 import { prepareFrozenEvaluatorTestRoot, runFrozenFixtureSuite } from "./test-frozen-evaluator-fixture.mjs";
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const fixtureId = "synthetic-fixture";
@@ -77,4 +78,20 @@ test("CLI accepts no unknown suite or arbitrary extra argument", () => {
   for (const args of [[], ["unknown.mjs"], ["test-ask-benchmark-mn-doc-config-correction.mjs", "--private-root"]]) {
     assert.throws(() => runFrozenFixtureSuite(args, { root: "/never-read" }));
   }
+});
+
+test("real frozen PFci graph still rejects source-byte drift; historical compatibility grants no current runtime or admission", async t => {
+  const root = resolve(import.meta.dirname, "..");
+  const context = prepareFrozenEvaluatorTestRoot({ root, fixtureId: "pf-ci-cache-flake", testPath: "scripts/test-ask-benchmark-pf-ci-cache.mjs" });
+  t.after(() => context.dispose());
+  const reference = JSON.parse(readFileSync(resolve(context.checkout, context.referencePath), "utf8"));
+  const boundaryPath = resolve(context.checkout, "scripts/ask-benchmark-evaluator-boundary.mjs");
+  const { validateEvaluatorSourceIdentity } = await import(pathToFileURL(boundaryPath));
+  const options = { root: context.checkout, identity: reference.evaluator_source_identity,
+    expectedRevision: reference.evaluator_revision, expectedGeneratorSourceDigest: reference.evaluator_source_identity.generator_source_digest };
+  validateEvaluatorSourceIdentity(options);
+  writeFileSync(boundaryPath, Buffer.concat([readFileSync(boundaryPath), Buffer.from("\n// synthetic source drift\n")]));
+  assert.throws(() => validateEvaluatorSourceIdentity(options), /source bytes drift/u);
+  assert.equal(context.evidence.current_head_runtime_verified, false);
+  assert.equal(context.evidence.admission_created, false);
 });

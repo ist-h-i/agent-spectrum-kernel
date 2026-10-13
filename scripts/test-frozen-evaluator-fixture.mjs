@@ -10,14 +10,18 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FIXTURES = Object.freeze([
-  "mn-doc-config-correction", "mn-focused-regression-test", "mp-ci-evidence-gap",
+  "mn-doc-config-correction", "mn-focused-regression-test", "mn-schema-field-alignment", "mn-frontend-default-fix", "mp-ci-evidence-gap",
   "mp-accessibility-interaction-review", "mp-data-migration-handoff",
   "mp-frontend-state-review", "mp-iac-rollback-design", "mp-performance-investigation",
 ]);
-const TESTS = new Map(FIXTURES.flatMap(id => [
+const TESTS = new Map([...FIXTURES.flatMap(id => [
   [`test-ask-benchmark-${id}.mjs`, id],
   ...(id.startsWith("mp-") ? [[`test-ask-benchmark-${id}${id === "mp-frontend-state-review" ? "-archive" : "-review-archive"}.mjs`, id]] : []),
-]));
+]),
+  ["test-ask-benchmark-pf-api-pagination.mjs", "pf-api-pagination-behavior"],
+  ["test-ask-benchmark-pf-frontend-async.mjs", "pf-frontend-async-state"],
+  ["test-ask-benchmark-pf-ci-cache.mjs", "pf-ci-cache-flake"],
+]);
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const git = (root, args, encoding = "utf8") => execFileSync("git", ["-c", "core.hooksPath=/dev/null", "-C", root, ...args], {
   encoding, timeout: 60000, maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"],

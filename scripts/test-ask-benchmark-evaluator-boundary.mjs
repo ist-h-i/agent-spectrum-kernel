@@ -162,12 +162,16 @@ function run(args, expectedStatus = 0) {
   return result;
 }
 
-function writeDependencyGraphFixture(name, source) {
+function writeDependencyGraphFixture(name, source, files = {}) {
   const fixtureRoot = resolve(graphWork, name);
   mkdirSync(fixtureRoot, { recursive: true });
   writeFileSync(resolve(fixtureRoot, "entry.mjs"), source);
   for (const path of ["command-evidence.mjs", "nested.mjs", "scoring-contract.mjs", "static.mjs", "options.mjs"]) {
     writeFileSync(resolve(fixtureRoot, path), "export const value = true;\n");
+  }
+  for (const [path, bytes] of Object.entries(files)) {
+    mkdirSync(dirname(resolve(fixtureRoot, path)), { recursive: true });
+    writeFileSync(resolve(fixtureRoot, path), bytes);
   }
   for (const args of [["init"], ["add", "."], ["-c", "user.name=ASK test", "-c", "user.email=ask-test@example.invalid", "commit", "-m", "dependency graph fixture"], ["rev-parse", "HEAD"]]) {
     const result = spawnSync("git", args, { cwd: fixtureRoot, encoding: "utf8" });
@@ -806,6 +810,8 @@ try {
   assert.ok(currentDependencyGraph.edge_inventory.some(({ from, to }) => from === "scripts/ask-benchmark-execution.mjs" && to === "scripts/ask-benchmark-command-evidence.mjs"), "current evaluator graph must include execution command-evidence authority");
   assert.ok(currentDependencyGraph.edge_inventory.some(({ from, to }) => from === "scripts/ask-benchmark-evaluator-boundary.mjs" && to === "scripts/ask-benchmark-scoring-contract.mjs"), "current evaluator graph must include evaluator scoring-contract authority");
   assert.deepEqual(EVALUATOR_EAGER_AUTHORITY_READS, [
+    { path: "products/ask-core-bundle/capabilities.json", reader: "scripts/ask-core-capabilities.mjs" },
+    { path: "schemas/review-signal-gate-map.json", reader: "scripts/ask-core-capabilities.mjs" },
     { path: "schemas/claim-evidence-status.schema.json", reader: "scripts/claim-evidence-status.mjs" },
     { path: "schemas/compact-profile-control-map.json", reader: "scripts/fixed-entry-profile.mjs" },
     { path: "schemas/fixed-entry-profile-registry.json", reader: "scripts/fixed-entry-profile.mjs" },
@@ -814,6 +820,44 @@ try {
   for (const { path: authorityPath, reader: readerPath } of EVALUATOR_EAGER_AUTHORITY_READS) {
     assert.ok(currentDependencyGraph.node_inventory.some(({ path, file_type: fileType }) => path === authorityPath && fileType === "authority_data"), `current evaluator graph must freeze ${authorityPath} as authority data`);
     assert.ok(currentDependencyGraph.edge_inventory.some(({ from, to, kind }) => from === readerPath && to === authorityPath && kind === "authority_read"), `current evaluator graph must bind ${authorityPath} to ${readerPath}`);
+  }
+  const coreAuthorityPaths = EVALUATOR_EAGER_AUTHORITY_READS
+    .filter(({ reader }) => reader === "scripts/ask-core-capabilities.mjs").map(({ path }) => path);
+  const inactiveReaderFixture = writeDependencyGraphFixture("inactive-core-reader", 'export { value } from "./nested.mjs";\n');
+  const inactiveParameters = { root: inactiveReaderFixture.root, baseRevision: inactiveReaderFixture.revision, entryPaths: ["entry.mjs"] };
+  assert.deepEqual(
+    deriveEvaluatorDependencyGraph({ ...inactiveParameters, authorityPaths: coreAuthorityPaths }),
+    deriveEvaluatorDependencyGraph({ ...inactiveParameters, authorityPaths: [] }),
+    "an unreachable eager reader must preserve the exact prior graph without its absent data files",
+  );
+  assert.throws(() => deriveEvaluatorDependencyGraph({ ...inactiveParameters, authorityPaths: [...coreAuthorityPaths, "unrelated-required.json"] }),
+    /evaluator dependency unrelated-required\.json is missing/u,
+    "unrelated explicit authority requirements must remain enforced when an eager reader is unreachable");
+  const activeReaderFixture = writeDependencyGraphFixture("active-core-reader", 'import "./scripts/ask-core-capabilities.mjs";\n', {
+    "scripts/ask-core-capabilities.mjs": "export const capabilities = true;\n",
+    "products/ask-core-bundle/capabilities.json": '{"capabilities":[]}\n',
+    "schemas/review-signal-gate-map.json": '{"gates":[]}\n',
+  });
+  const activeParameters = { root: activeReaderFixture.root, baseRevision: activeReaderFixture.revision, entryPaths: ["entry.mjs"], authorityPaths: coreAuthorityPaths };
+  const activeGraph = deriveEvaluatorDependencyGraph(activeParameters);
+  for (const authorityPath of coreAuthorityPaths) {
+    assert.ok(activeGraph.node_inventory.some(({ path, file_type }) => path === authorityPath && file_type === "authority_data"),
+      `reachable CORE reader must pin ${authorityPath}`);
+    assert.ok(activeGraph.edge_inventory.some(({ from, to, kind }) => from === "scripts/ask-core-capabilities.mjs" && to === authorityPath && kind === "authority_read"),
+      `reachable CORE reader must own the ${authorityPath} authority edge`);
+    const path = resolve(activeReaderFixture.root, authorityPath), bytes = readFileSync(path);
+    try {
+      rmSync(path);
+      assert.throws(() => deriveEvaluatorDependencyGraph(activeParameters), error => {
+        assert.equal(error.message, `evaluator dependency ${authorityPath} is missing`);
+        return true;
+      }, `reachable CORE reader must refuse missing ${authorityPath}`);
+      writeFileSync(path, Buffer.concat([bytes, Buffer.from("\n")]));
+      assert.throws(() => deriveEvaluatorDependencyGraph(activeParameters), error => {
+        assert.equal(error.message, `evaluator dependency bytes do not match the base Git revision at ${authorityPath}`);
+        return true;
+      }, `reachable CORE reader must refuse changed ${authorityPath}`);
+    } finally { writeFileSync(path, bytes); }
   }
   const dependencyFixture = writeDependencyGraphFixture("template-interpolation", [
     'const ignored = `quasi import("./ignored.mjs")`; ',

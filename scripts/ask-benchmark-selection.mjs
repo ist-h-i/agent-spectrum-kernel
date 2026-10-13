@@ -89,7 +89,7 @@ function assertNoResultArtifacts(caseRoot, caseId) {
   if (artifacts.length > 0) throw new Error(`${caseId} contains result-like artifact(s) before or during selection verification: ${artifacts.join(", ")}`);
 }
 
-function selectionContext({ root, config, planPath, materializedPath, repositoryRevision, caseId }) {
+function selectionContext({ root, config, planPath, materializedPath, repositoryRevision, caseId, executionAdmissionEvidenceByFixture = null }) {
   if (!planPath || !materializedPath || !caseId) throw new Error("selection commands require --plan, --materialized, and --case-id");
   const plan = readJson(planPath);
   const validated = validateMaterializedPortfolio({
@@ -98,6 +98,7 @@ function selectionContext({ root, config, planPath, materializedPath, repository
     plan,
     materializedRoot: materializedPath,
     repositoryRevision,
+    executionAdmissionEvidenceByFixture,
   });
   const materializedRoot = resolve(materializedPath);
   const materializedCase = validated.casesById.get(caseId);
@@ -318,10 +319,10 @@ function loadSealedRecord(paths, context) {
   return { index, record, path };
 }
 
-export function sealAdaptiveSelection({ root, config, planPath, materializedPath, stateDir, caseId, input, repositoryRevision, now = () => new Date().toISOString() }) {
+export function sealAdaptiveSelection({ root, config, planPath, materializedPath, stateDir, caseId, input, repositoryRevision, now = () => new Date().toISOString(), executionAdmissionEvidenceByFixture = null }) {
   if (!stateDir) throw new Error("seal-selection requires --state-dir");
   assertTrackedRepositoryMatchesHead(root);
-  const context = { ...selectionContext({ root, config, planPath, materializedPath, repositoryRevision, caseId }), root };
+  const context = { ...selectionContext({ root, config, planPath, materializedPath, repositoryRevision, caseId, executionAdmissionEvidenceByFixture }), root };
   assertSelectionInputSemantics(input, context);
   const paths = initializeStateRoot(stateDir, context.materializedRoot, { create: true });
   let index = loadStateIndex(paths, context, { allowInitialize: true });
@@ -375,10 +376,10 @@ export function sealAdaptiveSelection({ root, config, planPath, materializedPath
   }
 }
 
-export function verifyAdaptiveSelection({ root, config, planPath, materializedPath, stateDir, caseId, repositoryRevision }) {
+export function verifyAdaptiveSelection({ root, config, planPath, materializedPath, stateDir, caseId, repositoryRevision, executionAdmissionEvidenceByFixture = null }) {
   if (!stateDir) throw new Error("verify-selection requires --state-dir");
   assertTrackedRepositoryMatchesHead(root);
-  const context = { ...selectionContext({ root, config, planPath, materializedPath, repositoryRevision, caseId }), root };
+  const context = { ...selectionContext({ root, config, planPath, materializedPath, repositoryRevision, caseId, executionAdmissionEvidenceByFixture }), root };
   const paths = initializeStateRoot(stateDir, context.materializedRoot, { create: false });
   const sealed = loadSealedRecord(paths, context);
   assertNoResultArtifacts(context.caseRoot, caseId);
