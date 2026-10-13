@@ -4,6 +4,7 @@ import { createHash, generateKeyPairSync } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -67,6 +68,7 @@ import {
 
 import { runHighImpactEvolutionFileRegressions } from "./test-ask-benchmark-portfolio-high-impact-evolution-files.mjs";
 import { runPortfolioEvolutionFileRegressions } from "./test-ask-benchmark-portfolio-evolution-files.mjs";
+import { runPersonalSavedResultRegressions } from "./test-ask-personal-evolution-saved-results.mjs";
 
 const REPOSITORY_ID = "github.com/ist-h-i/agent-spectrum-kernel";
 const REGISTRY_ID = "issue-278-evolution-assets";
@@ -774,7 +776,7 @@ function evaluationEvidence(experiment) {
   return evidence;
 }
 
-const temporaryRoot = mkdtempSync(resolve(tmpdir(), "ask-evolution-integration-"));
+const temporaryRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-evolution-integration-")));
 try {
   const sourceRoot = resolve(temporaryRoot, "source");
   const storeRoot = resolve(temporaryRoot, "store");
@@ -2071,6 +2073,10 @@ try {
     }
   });
   (HIGH_IMPACT_MODE ? runHighImpactEvolutionFileRegressions : runPortfolioEvolutionFileRegressions)({
+    root: resolve(import.meta.dirname, ".."), work: temporaryRoot, storeRoot,
+    baseExperiment: experiment, assetTrust, portfolioTrust, check: closes,
+  });
+  if (!HIGH_IMPACT_MODE) runPersonalSavedResultRegressions({
     root: resolve(import.meta.dirname, ".."), work: temporaryRoot, storeRoot,
     baseExperiment: experiment, assetTrust, portfolioTrust, check: closes,
   });
