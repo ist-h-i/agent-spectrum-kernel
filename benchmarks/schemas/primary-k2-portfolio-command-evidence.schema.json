@@ -177,7 +177,10 @@
                 "const": "codex-exec-jsonl-v1"
               },
               "parser_revision": {
-                "const": "1.3.0"
+                "enum": [
+                  "1.3.0",
+                  "1.4.0-primary-saved"
+                ]
               },
               "contract_probe_evidence": {
                 "const": "runtime_event_shell_authority"
@@ -207,7 +210,10 @@
                   "const": "codex-exec-jsonl-v1"
                 },
                 "parser_revision": {
-                  "const": "1.3.0"
+                  "enum": [
+                    "1.3.0",
+                    "1.4.0-primary-saved"
+                  ]
                 },
                 "downgrade_reason": {
                   "type": "string"

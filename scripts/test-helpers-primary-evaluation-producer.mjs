@@ -10,7 +10,7 @@ import { kernelPrinciplesV2FixtureDescriptor, principlesV2Capability, renderKern
 import { primaryProfileForKernel } from './ask-primary-evaluation-profile.mjs';
 import { renderCommandEvent } from './ask-benchmark-command-evidence.mjs';
 const hash = comparisonHash, raw = value => Buffer.from(JSON.stringify(value, null, 2) + '\n');
-export function syntheticPrimarySource(t, { scenario = 'completed', command = 'pass', fixtureId = 'mn-build-option-update', mutate = false, kernelCondition = 'kernel_principles_v1' } = {}) {
+export function syntheticPrimarySource(t, { scenario = 'completed', command = 'pass', fixtureId = 'mn-build-option-update', mutate = false, kernelCondition = 'kernel_principles_v1', extraNativeEvents = [], retainSourceRepository = false } = {}) {
   const profile = primaryProfileForKernel(kernelCondition), CONDITIONS = profile.conditions, v2 = kernelCondition === 'kernel_principles_v2';
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'primary-producer-')));
   t.after(() => {
@@ -50,7 +50,7 @@ export function syntheticPrimarySource(t, { scenario = 'completed', command = 'p
   const plan = {kind:'ask_user_comparison_plan_v1',root:comparison,run_id:`fake-primary-${fixtureId}`, config:{evidence_kind:'synthetic',kernel_condition:kernelCondition,task_class:recipe.runner_task_class,
     global_ask_presence:'unknown',cli_version:'fake-not-launched',model:null,reasoning:null,timeout_ms:100,verification_timeout_ms:100,overall_timeout_ms:1000,token_budget:null},
     policy:comparisonExecutionPolicy('single_shot_v1'),execution_protocol:{resume:'forbidden'}, kernel_definition:{canonical_source:{path:'control/kernel-principles-source.md',digest:hash(source)},renderer_source:{path:'control/kernel-principles-renderer.mjs',digest:hash(renderer)},source_commit:'f'.repeat(40),generation:generated.generation,...(v2 ? { assessment:descriptor,task_metadata:{path:'control/kernel-principles-task-metadata.json',digest:hash(metadata)},renderer_closure:closure } : {})},
-    source_installation:{preserved_custom_agents_digest:hash('')},source:{commit:'f'.repeat(40),digest:hash('fake source'),inventory:inventoryUserTree(publicRoot)},
+    source_installation:{preserved_custom_agents_digest:hash('')},source:{...(retainSourceRepository ? { repo: join(root, 'source-repository') } : {}),commit:'f'.repeat(40),digest:hash('fake source'),inventory:inventoryUserTree(publicRoot)},
     input:{path:'inputs/prompt.md',digest:hash('fake prompt')},task:{path:'control/task.md',digest:inventoryUserTree(publicRoot)['task.md'].digest},
     verification:{path:'control/verification.json',digest:hash(raw(recipe)),recipe,reporter:{path:'control/node-test-reporter.mjs',format:'ask_node_summary_jsonl_v1',digest:hash('fake reporter')}},mutable_paths:recipe.mutable_paths,arms,unknowns:[],condition_differences:[]};
   write(join(comparison,'control/task.md'),readFileSync(new URL('task.md',base))); write(join(comparison,'inputs/prompt.md'),'fake prompt');
@@ -68,10 +68,11 @@ export function syntheticPrimarySource(t, { scenario = 'completed', command = 'p
     const events=[];
     for(const [index,c]of contract.commands.entries())if(command!=='missing'){
       const status=command==='failed'?'failed':'completed',exit=command==='failed'?5:0,id=`fake-${index}`;
-      events.push({type:'item.started',item:{id,type:'command_execution',command:renderCommandEvent(c),status:'in_progress'}},
-        {type:'item.completed',item:{id,type:'command_execution',command:renderCommandEvent(c),status,exit_code:exit,aggregated_output:'fake model command output'}});
+      const rendered = command === 'unsupported_shell' ? renderCommandEvent(c).replace('/bin/bash -lc ', '/bin/sh -lc ') : renderCommandEvent(c);
+      events.push({type:'item.started',item:{id,type:'command_execution',command:rendered,status:'in_progress'}},
+        {type:'item.completed',item:{id,type:'command_execution',command:rendered,status,exit_code:exit,aggregated_output:'fake model command output'}});
     }
-    events.push({type:'turn.completed',usage:{input_tokens:20,output_tokens:5}});
+    events.push(...structuredClone(extraNativeEvents), {type:'turn.completed',usage:{input_tokens:20,output_tokens:5}});
     const artifacts={},save=(name,content)=>{const b=Buffer.isBuffer(content)?content:typeof content==='string'?Buffer.from(content):raw(content);write(join(folder,name),b);artifacts[name]=hash(b);};
     save('stdout.jsonl',Buffer.from(events.map(event=>JSON.stringify(event)).join('\n')+'\n'));save('stderr.log','');save('last-message.txt','synthetic final output');
     const after=structuredClone(baseline),changedPath=mutate?recipe.mutable_paths.find(path=>Object.hasOwn(baseline,path)):null;

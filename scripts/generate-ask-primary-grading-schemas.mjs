@@ -10,6 +10,8 @@ export function primarySchemaBytes(name, { root = ROOT, profileId = PRIMARY_EVAL
   function extend(item) {
     if (!item || typeof item !== 'object') return;
     if (JSON.stringify(item.enum) === JSON.stringify(['plain', 'kernel_only', 'adaptive_ask', 'full_ask'])) item.enum = [...profile.conditions];
+    // Only primary capture schemas admit the explicitly versioned saved parser.
+    if (item.properties?.parser_revision?.const === '1.3.0') item.properties.parser_revision = { enum: ['1.3.0', '1.4.0-primary-saved'] };
     for (const child of Object.values(item)) extend(child);
   }
   extend(value); value.title = `Primary grading compatibility profile: ${value.title}`;

@@ -26,7 +26,8 @@ import { validateVerificationCommandContract } from "./ask-benchmark-command-evi
 import { validateSchemaValue } from "./json-schema-validation.mjs";
 import { assertTrackedRepositoryMatchesHead, materializePortfolio } from "./ask-benchmark-materialize.mjs";
 import { sealAdaptiveSelection, verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
-import { executePortfolio, preparePortfolioExecution, recoverPortfolioCase, verifyPortfolioExecution } from "./ask-benchmark-execution.mjs";
+import { executePortfolio, recoverPortfolioCase, verifyPortfolioExecution } from "./ask-benchmark-execution.mjs";
+import * as portfolioExecutionCapabilities from "./ask-benchmark-execution.mjs";
 import { assertCurrentPortfolioRunInput, normalizePortfolioExecution, verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { verifyEvaluatorBoundary, verifyEvaluatorResult, verifyPrivateEvaluatorBundle } from "./ask-benchmark-evaluator-boundary.mjs";
 import { scoreEvaluatorResult } from "./ask-benchmark-portfolio-score.mjs";
@@ -546,10 +547,13 @@ function executePortfolioCommand(args) {
 }
 
 function prepareExecution(args) {
+  // Historical frozen dependencies retain the ordinary execution API but may
+  // predate model-free preparation. Reject that command before reading inputs.
+  if (typeof portfolioExecutionCapabilities.preparePortfolioExecution !== "function") throw new Error("prepare-execution is unsupported by the loaded execution module: preparePortfolioExecution capability unavailable");
   const config = validateProtocol(args.configPath);
   if (config._kind !== "portfolio") throw new Error("prepare-execution requires an Adaptive portfolio config");
   if (!args.plan || !args.materialized || !args.stateDir || !args.runDir) throw new Error("prepare-execution requires --plan, --materialized, --selection-state, and --run-dir");
-  const prepared = preparePortfolioExecution({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir, executionAdmissionEvidenceByFixture: executionAdmissionEvidenceByFixture(args) });
+  const prepared = portfolioExecutionCapabilities.preparePortfolioExecution({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir, executionAdmissionEvidenceByFixture: executionAdmissionEvidenceByFixture(args) });
   console.log(JSON.stringify(prepared, null, 2));
 }
 

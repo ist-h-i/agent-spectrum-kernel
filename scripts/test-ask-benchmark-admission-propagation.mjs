@@ -32,15 +32,29 @@ try {
   if (actualEvidencePath) cpSync(actualEvidencePath, evidencePath);
   else {
     const fixtureId = fixtureIds[0];
-    const decisionPath = resolve(root, "benchmarks/fixtures/admission-decision", `${fixtureId}-admission-decision.json`);
-    const decision = read(decisionPath);
+    // Never rewrite a lineage ancestor when registered decisions advance.
+    // Resolve the canonical current tip, then append a synthetic-only successor
+    // in this independent test checkout. Production source/assets stay intact.
+    const selected = authorityModule.resolveRepositoryAdmissionDecision({ root, repositoryRevision: git(["rev-parse", "HEAD"]), fixtureId });
+    assert.ok(selected, "synthetic preparation requires an existing decision lineage");
+    const predecessorBytes = readFileSync(resolve(root, selected.path));
+    const decision = structuredClone(selected.decision);
+    decision.decision_revision += 1;
+    decision.predecessor_decision = { path: selected.path, raw_byte_digest: selected.raw_byte_digest,
+      decision_id: selected.decision.decision_id, decision_revision: selected.decision.decision_revision,
+      fixture_id: fixtureId, decision_digest: selected.decision.decision_digest };
+    const decisionPath = resolve(root, "benchmarks/fixtures/admission-decision", `${fixtureId}-admission-decision-synthetic-propagation-r${decision.decision_revision}.json`);
+    assert.equal(existsSync(decisionPath), false, "synthetic successor must be append-only");
     const archivePath = resolve(work, "synthetic-review.archive");
     writeFileSync(archivePath, "Synthetic TEST ONLY review archive. Not production admission.\n");
     decision.reviewer_record_id = "synthetic-admission-propagation-test";
     decision.review_evidence = { archive_sha256: hash(readFileSync(archivePath)), archive_bytes: readFileSync(archivePath).length };
     decision.decision_id = authorityModule.computeAdmissionDecisionId(decision);
     decision.decision_digest = authorityModule.computeAdmissionDecisionDigest(decision);
+    authorityModule.assertAdmissionDecisionAppendOnly(selected.decision, decision, { root,
+      previousDecisionSource: { path: selected.path, bytes: predecessorBytes } });
     write(decisionPath, decision);
+    assert.deepEqual(readFileSync(resolve(root, selected.path)), predecessorBytes);
     const fields = ["review_status", "author_self_approval", "reviewer_type", "reviewer_record_id", "reviewer_count", "reviewed_at", "reviewed_repository", "reviewed_pull_request", "reviewed_head_revision", "blocking_finding_count", "review_evidence"];
     const review = { schema_version: "1.0.0", schema_path: "benchmarks/schemas/portfolio-admission-review-authority.schema.json", program: "adaptive_ask_portfolio_admission_review_authority", authority_revision: 1, fixture_id: fixtureId, ...Object.fromEntries(fields.map((key) => [key, decision[key]])) };
     review.authority_id = authorityModule.computeAdmissionReviewAuthorityId(review);

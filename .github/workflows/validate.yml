@@ -163,6 +163,9 @@ jobs:
       - name: Run governed Evolution full-closure integration tests
         run: node scripts/test-evolution-loop-integration.mjs
 
+      - name: Run personal observation and supplied candidate contracts (model-free)
+        run: node --test scripts/test-ask-personal-evolution-observation.mjs scripts/test-ask-personal-evolution.mjs scripts/test-ask-personal-evolution-generation.mjs scripts/test-ask-personal-evolution-saved-results-mode.mjs
+
       - name: Check the exact governed Evolution sample
         run: node scripts/evolution-loop-samples.mjs --check
 
@@ -201,6 +204,15 @@ jobs:
       - name: Run verification command evidence contract tests
         run: node scripts/test-ask-benchmark-command-evidence.mjs
 
+      - name: Verify read-only saved primary command capture
+        run: node --test scripts/test-ask-primary-saved-command-capture.mjs
+
+      - name: Verify literal body and review target diagnostics (no execution)
+        run: node --test scripts/test-ask-saved-command-body-observation.mjs scripts/test-ask-review-target-requirement.mjs
+
+      - name: Verify bounded private runtime observation transport
+        run: node --test scripts/test-ask-benchmark-runtime-observation.mjs
+
       - name: Run verification evidence exact-reuse tests
         run: node scripts/test-verification-evidence.mjs
 
@@ -233,6 +245,7 @@ jobs:
           # Exact declared evaluator sources; no current-runtime/admission claim.
           git fetch --no-tags origin a762daf43bdfe254c6ecd6e0b49f3cef78d0e9ec
           git fetch --no-tags origin 88359c4b4d12210180063e9bfb5d08b7edad90f3
+          node --test scripts/test-ask-benchmark-prepare-capability.mjs
           node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-pf-api-pagination.mjs
           node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-pf-frontend-async.mjs
           node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-pf-ci-cache.mjs
