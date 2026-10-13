@@ -14,6 +14,18 @@ Important meaning must survive differences in input method, vision, motion toler
 
 Use information hierarchy, grouping, ordering, progressive disclosure, sensible defaults, selection, and visible state before adding prose. Explanatory copy is appropriate when it conveys constraints, consequences, recovery limits, or domain meaning that structure cannot make unambiguous. Removing prose must not remove required labels or semantics.
 
+## Composition serves the task
+
+Decide what should be noticed first, what should be compared, and what action follows. Use text roles, line length, alignment anchors, section spacing and imagery to support that sequence. Dense lists can support comparison; large headings and generous space can explain a product. Neither density nor sparseness is inherently better. Revisit a weak adopted design within scope, identifying the observed relationship and its effect instead of imposing a preferred aesthetic.
+
+## Visual finish needs observation at component scale
+
+Inspect text wrapping and baselines, icon size and optical alignment, content-to-icon and icon-to-border spacing, and relationships to neighboring controls. Equal CSS padding can look unequal; no clipping proves containment, not a balanced composition. Label clearance does not measure a trailing arrow's inset. When native geometry cannot be measured, leave the number unknown while reporting visible crowding from the image. Functionality, task usability and visual finish need their own evidence.
+
+## Language belongs to a visible state
+
+Read labels and feedback alongside the control, value and result they describe. For Japanese, check natural phrasing, target/scope, current state, wrapping and placement; isolated grammatical correctness is insufficient. Resolve unclear grouping or action order before adding instructions. Missing business semantics remain unknown rather than becoming invented validation or explanatory text.
+
 ## Perceivable and consistent interaction semantics
 
 Users should be able to identify what can be acted on, what state a control is in, and what result to expect. Equivalent controls and states should have equivalent meanings unless the contextual difference is visible and documented. Applicable states such as focus, selected, disabled, loading, success, error, and completed must be distinguishable through more than one fragile cue when the distinction matters.
@@ -40,4 +52,4 @@ Whole-screen blocking is appropriate only when a foundational dependency makes t
 
 ## Verification follows behavior
 
-Static evidence can validate visible hierarchy, labeling, and layout. It cannot prove focus movement, loading behavior, duplicate-action prevention, actual undo, state retention, retry success, or recovery. Verify those properties by exercising the state transition and inspecting the resulting visible and underlying state.
+View the actual image, not only extracted DOM text or a screenshot filename. Observe whole-screen hierarchy/density, representative component details, then applicable task/state transitions. Static evidence can validate visible hierarchy, labeling, and layout. It cannot prove focus movement, loading behavior, duplicate-action prevention, actual undo, state retention, retry success, or recovery. Verify those properties by exercising the state transition and inspecting the resulting visible and underlying state. Scope checks to the task; do not manufacture fixtures or a full state matrix merely to perform a review.

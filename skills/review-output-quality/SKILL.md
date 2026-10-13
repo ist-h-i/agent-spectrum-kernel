@@ -1,6 +1,6 @@
 ---
 name: review-output-quality
-description: Review human-facing, system-facing, AI-facing, and generated outputs for consumer fit, structure, completeness, accessibility, and output contract compliance. Use when review-router detects changed UI, reports, notifications, docs, CLI output, API responses, generated text, or machine-consumed output.
+description: Review human-facing, system-facing, AI-facing, and generated outputs for consumer fit, visual finish, usability, structure, accessibility, and contract compliance. Use when review-router detects changed UI, reports, docs, CLI/API output, or generated content.
 ---
 
 # Output Quality Review
@@ -35,6 +35,8 @@ If `docs/ai/review-context.md` has `context_status: template`, treat it as missi
 
 If target audience, purpose, medium, or output contract is missing, mark the affected judgment as `insufficient evidence` instead of giving generic UX, copy, or formatting advice.
 
+Limit that gap to judgments which depend on the missing fact. A public page or supplied screenshot can support a scoped visual critique without a private contract or invented persona. Existing contracts do not exclude observable design weaknesses beyond their acceptance criteria. Review-only requests authorize findings, not silent edits.
+
 For an interactive UI target, consume the current task's `UX supplement` when one exists and read only the applicable parts of `skills/ui-ux-design/SKILL.md` and its referenced patterns. Absence of that supplement is missing evidence only for judgments that actually depend on unstated interaction semantics; it is not a reason to invent a persona, product goal, or generic redesign.
 
 ## Process
@@ -47,17 +49,19 @@ For an interactive UI target, consume the current task's `UX supplement` when on
 
 2. For interactive UI output, bind findings to applicable harness patterns and evidence.
    - Confirm the observed UI signal that made `ui-ux-design` applicable.
-   - Consume the referenced design contract revision and obligation trace from `skills/ui-ux-design/references/ui-capability-contract.md` when applicable. For implemented UI, require independent actual-screen inspection and interaction evidence from available `ui-review` or an evidenced equivalent; contract/source checks alone leave affected runtime judgments `insufficient_evidence`. Include applicable select trailing-space and table edit-priority/alignment probes. Numeric overall scores never replace acceptance criteria.
-   - Trace each UX finding to the applicable pattern, task consequence, and observed artifact/state.
-   - Use screenshots/rendered artifacts for static hierarchy, labeling, and visible state only.
+   - Consume the adopted design contract revision or scoped decision and applicable obligation trace from `skills/ui-ux-design/references/ui-capability-contract.md`. For nontrivial delivery, require a separate reviewer using raw task/artifacts without implementation conversation or expected verdict; report unavailable independence. Contract/source checks alone leave affected runtime judgments `insufficient_evidence`. Keep ASK gate statuses and authority; external review verdicts are supporting evidence, not a gate substitute.
+   - Inspect the actual image at whole-screen, representative-component and task/state levels: scan order, density, text hierarchy/wrapping, alignment, spacing and action emphasis. Include relevant narrow views and select/table probes from the connection reference. Non-collision and equal CSS values do not prove optical spacing; label clearance does not measure icon-to-border inset.
+   - Trace each UX finding to the applicable principle/pattern, observed artifact/state, concrete relationship, reading/interaction impact and repair direction. Identify design gaps beyond a contract separately from violations; exact dimensions or implementation causes remain unknown unless evidenced.
+   - Use screenshots/rendered artifacts for static hierarchy, typography, spacing, labeling and visible state only. Judge visual finish, task usability and functionality separately; passing functional checks or numeric scores cannot approve the other dimensions.
    - Require interactive or state evidence for focus/selection transitions, loading, duplicate-action prevention, actual undo, pre-commit cancellation, input retention, scoped retry, recovery, and whole-screen blocking.
    - For partial data, distinguish legitimate empty, missing, stale, partial, and complete. Do not accept zero-filled or derived output when prerequisite truth is incomplete unless the product contract explicitly defines that semantics.
 
 3. Check human-facing output when applicable.
    - visibility and information hierarchy,
+   - typography, wrapping, alignment and content/icon/border relationships,
    - cognitive load and information density,
    - evidenced user/audience fit without invented personas,
-   - natural task language and unambiguous action/result wording,
+   - natural task language and unambiguous action/result wording in the rendered position and current state, including Japanese labels/feedback when applicable,
    - accessibility and equivalent interaction constraints,
    - current/focus/selected/loading/error/success/completed state when applicable,
    - actionability, continuation, reversibility, and recovery,
@@ -73,11 +77,12 @@ For an interactive UI target, consume the current task's `UX supplement` when on
    - missing or ambiguous information.
 
 5. Control review noise.
-   - Do not critique taste without persona, style guide, product promise, or output contract evidence.
+   - Distinguish observed roughness from taste: explain the concrete relationship and its effect, not merely “unpolished.” A style guide or explicit contract violation is not required to report a visible finish defect.
    - Do not invent brand, persona, or project goals.
    - Do not report internal implementation concerns here.
-   - Do not block on optional polish unless it breaks the consumer's task or contract.
+   - Do not block on an optional aesthetic alternative. Supported visual findings can still need correction even when clicks work; assign severity/blocking from evidenced impact and the requested quality scope.
    - Visual taste alone is not a Major or Blocker; require an evidenced task, contract, inclusion, state, recovery, or consequence failure.
+   - Do not impose a finding quota or automatically reject a dense comparison list, a large introduction heading or cards. Keep appropriate design choices and avoid unrelated redesign.
 
 6. Return output quality gate status, not final merge approval.
 
@@ -98,6 +103,7 @@ Output quality gate:
 Human-output checks:
 - visibility:
 - information hierarchy:
+- visual finish / typography / spacing:
 - cognitive load:
 - persona fit:
 - language / action semantics:
@@ -142,7 +148,8 @@ Residual output risk:
 - Output-layer findings are separated from implementation, domain, and adversarial findings.
 - Human-facing and system/AI-facing output checks are represented when applicable.
 - Dynamic UI claims are not accepted from screenshot-only evidence.
-- Applicable UI findings trace to a harness pattern plus an observed task/state/recovery consequence.
+- For rendered UI judgments, visual finish is observed separately from functional success and supported finish defects are distinguished from optional alternatives. Contract/schema-only review assesses applicable criteria without claiming actual rendering was inspected.
+- Applicable UI findings trace to a principle/pattern plus an observed reading/task/state/recovery consequence.
 - Missing persona, medium, sample output, output contract, or required interactive evidence produces `insufficient evidence` only for the affected judgment.
 - Every actionable finding uses the closed common fields and names the consumer impact and observed failure trace.
 - Final merge decision is left to `review-final-merge-gate`.
@@ -151,7 +158,8 @@ Residual output risk:
 
 | Failure | Correction |
 |---|---|
-| Inventing persona or brand goals | Mark persona or style evidence as missing and limit findings to observable contract issues. |
+| Inventing persona or brand goals | Mark dependent judgments as missing while retaining supported task-based and visual findings. |
+| Equating contract/test success with visual finish | Inspect whole-screen hierarchy and component relationships in the actual rendering. |
 | Reviewing internal code design | Route to `review-ai-quality` or `review-architecture-impact`. |
 | Treating preference as defect | Require consumer impact, contract, inclusion, state, recovery, or consequence evidence; do not promote taste to Major/Blocker. |
 | Proving dynamic UI behavior with a screenshot | Exercise the transition and inspect the resulting visible and underlying state. |
