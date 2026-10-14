@@ -203,11 +203,16 @@ retains the original result-set suite and coverage inventory.
 Affected public checks: `node scripts/test-ask-benchmark-portfolio-policy.mjs`,
 `node --test scripts/test-ask-benchmark-runtime-observation.mjs`, and
 `node scripts/validate-repo.mjs`. CI adds only the new model-free test entry.
+`node scripts/adapter-runtime-bundle.mjs --check` verifies the current generated
+runtime descriptor. Its existing `engineering_result_set_test_file_sha256`
+reference follows the updated public test source; original frozen evaluation
+assets, profile/catalog/scorer/result digests remain unchanged.
 
 Implementation Contract `IMP-TASK-EVIDENCE-1`, revision 1, references the Spec
 and FVC above. Change refs C1 (selector/readout), C2 (non-model regression), C3
 (public contract/ADR), C4 (CI entry), C5 (thin saved-source reader and synthetic
-connection mode in the existing result-set test). No dependency, runner, legacy profile,
+connection mode in the existing result-set test), C6 (generated current runtime
+test-source digest reference). No dependency, runner, legacy profile,
 catalog/tag, scorer, historical result/hash or admission mutation is included.
 Independent review and CI receipts are recorded in the Draft PR and linked Issue
 comments; they support this code slice only. The saved-source reader is usable;
