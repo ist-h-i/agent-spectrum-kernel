@@ -171,7 +171,7 @@ export function inspectPreparedPersonalEvolutionCodexGeneration(value, dependenc
 }
 export function inspectPreparedPersonalEvolutionCodexGenerationFile(path, digest) {
   const bytes = readStableBytes(path, "generation adapter context"); assert.equal(hash(bytes), digest, "generation context file drift");
-  return inspectPreparedPersonalEvolutionCodexGeneration(parseJsonRejectDuplicateKeys(bytes.toString("utf8")));
+  return inspectPreparedPersonalEvolutionCodexGeneration(parseJsonRejectDuplicateKeys(bytes));
 }
 export async function startPreparedPersonalEvolutionCodexGeneration(handle, confirmation, controls = {}) {
   assert.ok(controls && typeof controls === "object" && !types.isProxy(controls)

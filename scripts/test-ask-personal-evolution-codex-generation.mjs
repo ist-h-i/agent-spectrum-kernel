@@ -249,6 +249,21 @@ test("file inspection binds raw context bytes and derives real declared identity
   assert.throws(() => inspectPreparedPersonalEvolutionCodexGenerationFile(path, digest), /file drift/);
 });
 
+test("file inspection rejects malformed UTF-8 with a matching raw digest without dispatch", t => {
+  const f = setup(t), path = join(f.root, "context.json");
+  const valid = Buffer.from(JSON.stringify({ ...f.options, executable: "codex-\uFFFD" }));
+  const offset = valid.indexOf(Buffer.from("\uFFFD"));
+  assert.ok(offset >= 0);
+  const bytes = Buffer.concat([valid.subarray(0, offset), Buffer.from([0xff]), valid.subarray(offset + 3)]);
+  const digest = "sha256:" + createHash("sha256").update(bytes).digest("hex");
+  const before = listContentAddressedJson({ storeRoot: f.options.storeRoot }).map(x => x.digest);
+  writeFileSync(path, bytes);
+  assert.throws(() => inspectPreparedPersonalEvolutionCodexGenerationFile(path, digest), /not valid UTF-8 JSON/);
+  assert.equal(readdirSync(f.root).includes("workspace"), false);
+  assert.equal(readdirSync(f.options.storeRoot).includes("personal-generation-invocations"), false);
+  assert.deepEqual(listContentAddressedJson({ storeRoot: f.options.storeRoot }).map(x => x.digest), before);
+});
+
 test("request byte drift refuses dispatch and preserves the unclaimed state", async t => {
   const f = setup(t), transport = fakeTransport(), p = inspectPreparedPersonalEvolutionCodexGeneration(f.options, transport.dependencies);
   const saved = readContentAddressedJson({ storeRoot: f.options.storeRoot, digest: f.options.requestObjectDigest });
