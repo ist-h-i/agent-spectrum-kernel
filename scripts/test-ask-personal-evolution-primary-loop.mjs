@@ -100,7 +100,7 @@ test("nine primary fixtures: fake generation → prepared driver → saved hold 
   const pending = setup(t, { fixtureIds: PRIMARY_FIXTURE_IDS, sourceRevision: sourceRevision(), deferGeneration: true });
   const oldObjects = listContentAddressedJson({ storeRoot: pending.storeRoot }).map(({ digest }) => [digest, read(pending.storeRoot, digest)]);
   let providerCalls = 0;
-  const inspected = inspectPreparedPersonalEvolutionCodexGeneration({ storeRoot: pending.storeRoot,
+  const generationInspection = inspectPreparedPersonalEvolutionCodexGeneration({ storeRoot: pending.storeRoot,
     trustedPortfolioAuthorityContexts: pending.generation.trustedPortfolioAuthorityContexts,
     requestObjectDigest: pending.requested.request_object_digest, timeoutMs: 3600000, executable: "must-never-launch-codex",
     workspaceRoot: join(pending.root, "generation-workspace") }, { spawnProcess: (executable, argv, options) => {
@@ -120,8 +120,8 @@ test("nine primary fixtures: fake generation → prepared driver → saved hold 
       });
       queueMicrotask(() => child.emit("spawn")); return child;
     } });
-  const generated = await startPreparedPersonalEvolutionCodexGeneration(inspected.handle, {
-    confirmedRequestObjectDigest: inspected.request_object_digest, confirmedPreparationDigest: inspected.preparation_digest });
+  const generated = await startPreparedPersonalEvolutionCodexGeneration(generationInspection.handle, {
+    confirmedRequestObjectDigest: generationInspection.request_object_digest, confirmedPreparationDigest: generationInspection.preparation_digest });
   assert.equal(providerCalls, 1); assert.equal(generated.status, "candidate_ready");
   assert.equal(verifyPersonalEvolutionGenerationExecution({ storeRoot: pending.storeRoot,
     requestObjectDigest: pending.requested.request_object_digest, executionReceiptObjectDigest: generated.execution_receipt_object_digest,
