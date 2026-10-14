@@ -308,6 +308,19 @@ test("API rejects nested accessors and callbacks before inspecting or executing 
   assert.equal(calls, 0); assert.deepEqual(snapshot(root), before);
 });
 
+test("API rejects root and nested Proxies before any reflection trap can run", t => {
+  const { root, args } = setup(t), before = snapshot(root); let calls = 0;
+  const wrap = value => new Proxy(value, {
+    getPrototypeOf(target) { calls++; return Reflect.getPrototypeOf(target); },
+    ownKeys(target) { calls++; return Reflect.ownKeys(target); },
+    getOwnPropertyDescriptor(target, key) { calls++; return Reflect.getOwnPropertyDescriptor(target, key); },
+  });
+  for (const input of [wrap(statusArgs(args)), { ...statusArgs(args), trustedAssetAuthorityContexts: [wrap({})] }]) {
+    assert.throws(() => inspectPersonalEvolutionGenerationStatus(input), /JSON|Proxy/);
+  }
+  assert.equal(calls, 0); assert.deepEqual(snapshot(root), before);
+});
+
 test("unaccepted held inventory cannot print arbitrary paths or unbounded file metadata", async t => {
   const { root, args } = setup(t); args.provider.generate = () => { throw new Error("fake exception"); };
   const outcome = await runPersonalEvolutionGeneration(args);

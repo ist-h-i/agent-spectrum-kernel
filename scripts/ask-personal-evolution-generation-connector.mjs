@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { lstatSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { types } from "node:util";
 import { assertNoSymlinkPathSegments, canonicalDigest, putContentAddressedJson, readContentAddressedJson,
   readJsonFileStrict, readStableBytes, writeCanonicalJsonNoReplace } from "./content-addressed-store.mjs";
 import { assertPersonalEvolutionFields, freezePersonalEvolutionValue } from "./ask-personal-evolution-observation.mjs";
@@ -215,7 +216,7 @@ export function verifyPersonalEvolutionGenerationExecution(options) {
 function assertStatusJsonData(value, ancestors = new Set()) {
   if (value === null || ["string", "boolean"].includes(typeof value)) return;
   if (typeof value === "number") { assert.ok(Number.isFinite(value), "finite status JSON number required"); return; }
-  assert.ok(value && typeof value === "object" && !ancestors.has(value), "non-JSON or cyclic status input");
+  assert.ok(value && typeof value === "object" && !types.isProxy(value) && !ancestors.has(value), "non-JSON, Proxy or cyclic status input");
   const array = Array.isArray(value);
   assert.ok(array || [Object.prototype, null].includes(Object.getPrototypeOf(value)), "plain status JSON required");
   const fields = Object.getOwnPropertyDescriptors(value);
@@ -235,7 +236,7 @@ function assertStatusJsonData(value, ancestors = new Set()) {
 
 export function inspectPersonalEvolutionGenerationStatus(options) {
   const allowed = ["storeRoot", "requestObjectDigest", ...TRUST_KEYS];
-  assert.ok(options && typeof options === "object" && !Array.isArray(options)
+  assert.ok(options && typeof options === "object" && !types.isProxy(options) && !Array.isArray(options)
     && [Object.prototype, null].includes(Object.getPrototypeOf(options)), "status options must be JSON");
   const fields = Object.getOwnPropertyDescriptors(options);
   assert.ok(["storeRoot", "requestObjectDigest"].every(key => Object.hasOwn(fields, key))
