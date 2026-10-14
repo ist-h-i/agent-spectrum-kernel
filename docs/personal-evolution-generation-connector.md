@@ -111,6 +111,11 @@ timer, automatic retry or resume. If a provider never settles or the host exits,
 the durable invocation remains unknown and consumed. Filesystem finalization
 failure can likewise leave a consumed request without a terminal receipt.
 
+The [ordinary Codex adapter](personal-evolution-codex-generation.md) bounds its
+explicit public payload and controller writes and reuses the existing runner.
+Its ordinary CLI/global effective context remains Unknown; fixed input and
+read-only sandbox must not be represented as full read isolation or privacy proof.
+
 Privacy declarations are attestations, not secrecy proof. File hashes prove
 imported bytes, not authorship or truth of the declared Git revision/provider
 implementation. `model_execution: "not_applicable"` describes a declared fake;

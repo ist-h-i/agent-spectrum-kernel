@@ -3,6 +3,8 @@
 // delegate. Production driver inputs/authority and private grading are unchanged.
 import assert from "node:assert/strict";
 import test from "node:test";
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { devNull } from "node:os";
@@ -10,8 +12,10 @@ import { dirname, join, resolve } from "node:path";
 import { canonicalDigest, listContentAddressedJson, readContentAddressedJson } from "./content-addressed-store.mjs";
 import { setup, finishPersonalPairSetup, bindSyntheticRoleGrading, fakeEngineeringTemplate,
   collectSyntheticGrade } from "./test-helpers-personal-evolution-primary-pair.mjs";
-import { runPersonalEvolutionGeneration, verifyPersonalEvolutionGenerationExecution,
+import { verifyPersonalEvolutionGenerationExecution,
   inspectPersonalEvolutionGenerationStatus } from "./ask-personal-evolution-generation-connector.mjs";
+import { inspectPreparedPersonalEvolutionCodexGeneration, startPreparedPersonalEvolutionCodexGeneration }
+  from "./ask-personal-evolution-codex-generation.mjs";
 import { preparePersonalEvolutionGenerationRequest } from "./ask-personal-evolution-generation.mjs";
 import { PRIMARY_FIXTURE_IDS, buildPrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 import { resolvePortfolioSelection } from "./portfolio-manager.mjs";
@@ -96,26 +100,28 @@ test("nine primary fixtures: fake generation → prepared driver → saved hold 
   const pending = setup(t, { fixtureIds: PRIMARY_FIXTURE_IDS, sourceRevision: sourceRevision(), deferGeneration: true });
   const oldObjects = listContentAddressedJson({ storeRoot: pending.storeRoot }).map(({ digest }) => [digest, read(pending.storeRoot, digest)]);
   let providerCalls = 0;
-  const identity = { provider_id: "synthetic-primary-roundtrip", version: "1.0.0",
-    source_revision: pending.child.source.revision, implementation_digest: canonicalDigest("public artificial provider"), execution_kind: "fake" };
-  const generated = await runPersonalEvolutionGeneration({ storeRoot: pending.storeRoot,
+  const generationInspection = inspectPreparedPersonalEvolutionCodexGeneration({ storeRoot: pending.storeRoot,
     trustedPortfolioAuthorityContexts: pending.generation.trustedPortfolioAuthorityContexts,
-    requestObjectDigest: pending.requested.request_object_digest, confirmedRequestObjectDigest: pending.requested.request_object_digest,
-    workspaceRoot: join(pending.root, "generation-workspace"), provider: { identity, generate: async ({ input, outputRoot }) => {
+    requestObjectDigest: pending.requested.request_object_digest, timeoutMs: 3600000, executable: "must-never-launch-codex",
+    workspaceRoot: join(pending.root, "generation-workspace") }, { spawnProcess: (executable, argv, options) => {
       providerCalls++;
-      assert.equal(input.requested_action, "produce_candidate_files_only");
-      assert.deepEqual(input.parent_asset, pending.parentAsset);
-      const descriptor = structuredClone(pending.child);
-      descriptor.content.files = input.parent_files.map(file => {
-        const bytes = Buffer.concat([Buffer.from(file.bytes_base64, "base64"), Buffer.from("\nSynthetic scoped target rule.\n")]);
-        const path = join(outputRoot, file.path); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, bytes);
-        return { path: file.path, media_type: file.media_type, raw_digest: comparisonHash(bytes) };
+      assert.equal(executable, "must-never-launch-codex"); assert.deepEqual(readdirSync(options.cwd), []);
+      const child = new EventEmitter(); child.pid = 1234567; child.exitCode = null; child.signalCode = null;
+      child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+      child.kill = () => { assert.fail("successful fake session must not need termination"); }; child.unref = () => {};
+      let prompt = ""; child.stdin.on("data", chunk => { prompt += chunk.toString("utf8"); });
+      child.stdin.once("finish", () => {
+        const input = JSON.parse(prompt.split("\nPUBLIC_GENERATION_INPUT\n")[1]);
+        assert.equal(input.requested_action, "produce_candidate_files_only"); assert.deepEqual(input.parent_asset, pending.parentAsset);
+        for (const id of PRIMARY_FIXTURE_IDS) assert.equal(prompt.includes(id), false, "holdouts must not enter generation prompt");
+        writeFileSync(argv[argv.indexOf("--output-last-message") + 1], JSON.stringify({ status: "completed", files: input.parent_files.map(file => ({
+          path: file.path, text: Buffer.from(file.bytes_base64, "base64").toString("utf8") + "\nSynthetic scoped target rule.\n" })) }));
+        queueMicrotask(() => { child.exitCode = 0; child.emit("exit", 0, null); child.emit("close", 0, null); });
       });
-      descriptor.type_extension.renderer.projection_digest = canonicalDigest(descriptor.content.files.map(({ path, raw_digest }) => ({ path, raw_digest })));
-      return { request_digest: input.request_digest, input_digest: canonicalDigest(input), generator: identity, status: "completed",
-        files: descriptor.content.files.map(({ path, raw_digest }) => ({ path, raw_digest })), candidate_descriptor: descriptor,
-        privacy: { classification: "caller_reviewed_asset_source", private_answers_included: false, raw_task_history_included: false } };
-    } } });
+      queueMicrotask(() => child.emit("spawn")); return child;
+    } });
+  const generated = await startPreparedPersonalEvolutionCodexGeneration(generationInspection.handle, {
+    confirmedRequestObjectDigest: generationInspection.request_object_digest, confirmedPreparationDigest: generationInspection.preparation_digest });
   assert.equal(providerCalls, 1); assert.equal(generated.status, "candidate_ready");
   assert.equal(verifyPersonalEvolutionGenerationExecution({ storeRoot: pending.storeRoot,
     requestObjectDigest: pending.requested.request_object_digest, executionReceiptObjectDigest: generated.execution_receipt_object_digest,
