@@ -1,5 +1,9 @@
 # Personal evolution prepared driver
 
+For the existing nine-primary-fixture sequence, exact saved-result handoff,
+model-free roundtrip command and remaining direct-human start boundary, see
+[Personal primary loop](personal-evolution-primary-loop.md).
+
 This driver composes existing APIs; it is not a new evaluation engine or an automatic source/evaluation/human authority. inspectPreparedPersonalEvolutionLoopFile reads an independently pinned detached JSON context, verifies the fresh exact parent/candidate registration and creates separate registered original grading factories for its fixed resource configurations. Inspection is model-free. startPreparedPersonalEvolutionLoop requires the opaque handle and the exact human-confirmed pair object digest. It delegates one durable atomic invocation, all P/K-principles/F child sessions, original private grading, saved result connection and reporting to startPersonalEvolutionPromptPair. No caller start callback, grader, process configuration, or resume is accepted. Failed attempts consume the in-process capability; the durable pair retains its existing guards.
 
 New plans can opt into personalPrompt.runtimeVersion equal to selected_active_reference_v2. One exact registered entrypoint is active, the other four files are explicitly JSON reference data. The materialization keeps all original registered bytes, record/content identities and a separate wrapper contract digest. Both roles must use the same runtime contract. Default v1 input reconstruction remains byte-compatible. The comparison measures selected mode behavior under a common wrapper with bundle context; it does not establish the effectiveness of the four inactive modes, model compliance, Skill loading, or operational Mac compatibility.
