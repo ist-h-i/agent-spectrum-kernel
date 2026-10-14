@@ -18,6 +18,8 @@ jobs:
           node-version: "24.19.0"
       - name: Observe host prerequisites without Codex or auth
         run: node scripts/ask-local-eval.mjs preflight
+      - name: Nine-primary-fixture personal roundtrip (fake provider/runner/grading only)
+        run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-primary-loop.mjs
       - name: Fake lifecycle and failure regressions (no model calls)
         run: node --test scripts/test-ask-local-eval.mjs scripts/test-ask-local-codex.mjs scripts/test-ask-local-codex-time-budget.mjs scripts/test-ask-synthetic-json-pilot.mjs
       - name: User repository comparison preparation and execution (fake runner only)
