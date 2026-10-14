@@ -53,6 +53,8 @@ import {
   validatePortfolioEngineeringResultSet,
   verifyEngineeringResultSet,
 } from "./ask-benchmark-portfolio-result-set.mjs";
+import { readSavedTaskEvidenceResults, assertTaskEvidenceResultSet, TASK_EVIDENCE_PROFILE_ID,
+  TASK_EVIDENCE_PROFILE_VERSION } from "./ask-task-evidence-profile.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
@@ -1178,6 +1180,47 @@ try {
   const codex = buildEngineeringRoot(base, normalized, "codex");
   const claude = buildEngineeringRoot(base, normalized, "claude");
 
+  if (process.argv.includes("--task-evidence-readout-only")) {
+    const fixture = cloneFixture("saved-task-evidence-reader");
+    const collected = collectEngineeringResults(options(fixture));
+    const { outputPath: _output, ...sourceOptions } = options(fixture);
+    const args = { profile_id: TASK_EVIDENCE_PROFILE_ID, profile_version: TASK_EVIDENCE_PROFILE_VERSION,
+      result_set_options: { ...sourceOptions, inputPath: fixture.outputPath } };
+    const before = inputEvidence(fixture);
+    const value = readSavedTaskEvidenceResults(args);
+    assert.deepEqual(inputEvidence(fixture), before);
+    assert.equal(value.records.length, collected.verified_results.length);
+    assert.deepEqual(value.records.map(r => r.original_result), collected.verified_results.map(r => r.result));
+    assert.equal(value.mode, "retained_source_only");
+    assert.equal(value.boundaries.prospective_evaluation_eligible, false);
+    assert.equal(value.boundaries.adoption_eligible, false);
+    assert.equal(value.totals.normalized_score, null);
+    assert.ok(value.records.every(r => r.runtime.task_operation_coverage === "unknown" && r.runtime.specific_action_approval === "unknown"));
+    assert.ok(value.records.some(r => r.stop_reason_codes.includes("execution_not_completed")));
+    assert.ok(value.records.some(r => r.stop_reason_codes.includes("invalid_input_or_evidence")));
+    assert.ok(value.records.some(r => r.recorded_capability.requirement_score.normalized_requirement_score !== null));
+    assert.ok(value.records.some(r => r.recorded_capability.requirement_score.normalized_requirement_score === null));
+    assert.throws(() => assertTaskEvidenceResultSet([value]), /readout/);
+    assert.throws(() => readSavedTaskEvidenceResults({ ...args, profile_id: "primary_single_shot_v1" }), /profile/);
+    assert.throws(() => readSavedTaskEvidenceResults({ ...args, profile_version: "2.0.0" }), /version/);
+    assert.throws(() => readSavedTaskEvidenceResults({ ...args, result_set_options: { ...args.result_set_options, privateRoot: "unused-private-root" } }), /closed/);
+    assert.throws(() => readSavedTaskEvidenceResults({ ...args, result_set_options: { ...args.result_set_options, sourceManifestSourceDigest: digest("wrong") } }), /digest/);
+    const originalSource = readFileSync(fixture.sourcePath);
+    writeFileSync(fixture.sourcePath, Buffer.concat([originalSource, Buffer.from(" ")]));
+    assert.throws(() => readSavedTaskEvidenceResults(args), /digest/);
+    writeFileSync(fixture.sourcePath, originalSource);
+    const first = resolve(fixture.resultRoot, collected.artifact.inventory[0].path);
+    const originalResult = readFileSync(first);
+    writeFileSync(first, Buffer.concat([originalResult, Buffer.from(" ")]));
+    assert.throws(() => readSavedTaskEvidenceResults(args), /digest|byte/);
+    writeFileSync(first, originalResult);
+    const supplied = readJson(fixture.outputPath);
+    supplied.inventory.pop();
+    writeJson(fixture.outputPath, supplied);
+    assert.throws(() => readSavedTaskEvidenceResults(args), /digest|inventory|count/);
+    console.log("Saved task evidence reader checks passed: 32 retained source records; positive, unchanged-input, explicit-version, private-input, corruption and subset controls");
+  } else {
+
   const positive = cloneFixture("positive");
   const collected = collectEngineeringResults(options(positive));
   assert.equal(collected.artifact.completeness.completeness_status, "complete");
@@ -2075,6 +2118,7 @@ try {
   ];
   assert.deepEqual([...covered].filter((name) => required.includes(name)).sort(), [...required].sort(), "focused result-set coverage inventory must remain closed");
   console.log(`ASK benchmark portfolio engineering result-set tests passed (${required.length} named closures)`);
+  }
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
