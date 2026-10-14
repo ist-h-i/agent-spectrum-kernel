@@ -22,6 +22,10 @@ Mac / Codex の導入で得られるものは、プロジェクト内の判断�
 候補・比較条件の事前固定、保存結果の受渡し、独立した採否判断と次の要求を接続します。
 公開検証は fake provider/runner/grading による人工の保留経路で、実運用の成功は未確認です。
 
+[Codex 候補生成 adapter](docs/personal-evolution-codex-generation.md) は、公開入力の固定・確認から
+既存の一度限りの生成入口へ接続します。検証は fake transport のみで、実開始には本人の
+新しい直接指示が必要です。global/CLI context と実生成の有効性は Unknown のままです。
+
 [利用者 repo の三条件比較手順](docs/user-repository-comparison-mac-codex-ja.md) では、
 指定 commit から P／K／F を準備し、内容確認後の明示的な開始を既存 Codex runner に
 つなぎます。途中の失敗・未開始を含む結果は指定した保存先から再表示できます。

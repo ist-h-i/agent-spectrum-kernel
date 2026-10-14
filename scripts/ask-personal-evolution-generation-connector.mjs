@@ -45,6 +45,8 @@ function inputFor(loaded, requestObjectDigest, generator) {
     parent_asset: structuredClone(loaded.request.blueprint.parent_asset), requested_version: loaded.request.requested_version,
     parent_files: publicFiles(loaded.parent.content.files), generator });
 }
+// Shared bounded projection; callers must first verify the saved request/parent.
+export { inputFor as buildPersonalEvolutionGenerationInput };
 function measure(outputRoot) {
   assertNoSymlinkPathSegments(outputRoot, "generation output");
   assert.ok(lstatSync(outputRoot).isDirectory(), "generation output must be a directory");
