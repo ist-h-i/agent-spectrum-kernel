@@ -28,7 +28,7 @@ producer、保存結果検証、Evolution の契約は既存実装を使う。
 provider 通信、モデル品質、実 Mac の適用/復元はこの検証に含まれない。
 production driver に fake callback を渡す API は追加していない。
 
-非モデルの再現コマンド（Node 24）:
+非モデルの再現コマンド（CI と同じ Node 24.19.0）:
 
 ```sh
 node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-primary-loop.mjs
