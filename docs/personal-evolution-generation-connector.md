@@ -7,6 +7,11 @@ existing `importPersonalEvolutionGenerationResult`. It creates no provider
 transport, Codex CLI process, evaluator, optimizer, adoption decision or installer.
 Importing the module or verifying a saved receipt never calls the provider.
 
+The [read-only generation status command](personal-evolution-generation-status.md)
+locates these existing records by request object digest, including consumed
+invocations whose terminal receipt digest was not returned. It never retries or
+dispatches the provider.
+
 The development evidence uses a deterministic fake provider only. Actual model
 execution, candidate quality, live comparison and completion of the personal Mac
 loop remain **Unknown**. A future real invocation requires a fresh direct human

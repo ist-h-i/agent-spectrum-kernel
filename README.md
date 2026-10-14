@@ -14,6 +14,10 @@ Mac / Codex の導入で得られるものは、プロジェクト内の判断�
 導入後の一件を具体化する [Mac 初回開発受入の準備](docs/first-workflow-mac-codex-ja.md)
 では、公開人工タスク・軽量 bypass 入力・未実行の受入記録をローカルに用意できます。
 
+[個人ループの生成状態確認](docs/personal-evolution-generation-status.md) では、
+生成要求のIDから未開始、終了不明、候補登録済み、保留を読み取り専用で確認できます。
+開始印を保持して次の扱いを示し、実生成・評価・適用の完了や権限は補いません。
+
 [利用者 repo の三条件比較手順](docs/user-repository-comparison-mac-codex-ja.md) では、
 指定 commit から P／K／F を準備し、内容確認後の明示的な開始を既存 Codex runner に
 つなぎます。途中の失敗・未開始を含む結果は指定した保存先から再表示できます。

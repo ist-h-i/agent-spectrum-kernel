@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { canonicalDigest, listContentAddressedJson, putContentAddressedJson, readContentAddressedJson } from "./content-addressed-store.mjs";
 import { preparePersonalEvolutionGenerationRequest } from "./ask-personal-evolution-generation.mjs";
 import { inspectPersonalEvolution } from "./ask-personal-evolution.mjs";
-import { runPersonalEvolutionGeneration, verifyPersonalEvolutionGenerationExecution } from "./ask-personal-evolution-generation-connector.mjs";
+import { inspectPersonalEvolutionGenerationStatus, runPersonalEvolutionGeneration, verifyPersonalEvolutionGenerationExecution } from "./ask-personal-evolution-generation-connector.mjs";
+import { inspectPersonalEvolutionGenerationStatusFile } from "./ask-personal-evolution-status.mjs";
 
 const fixture = resolve(import.meta.dirname, "../docs/fixtures/prompt-v2-preregistration");
 const reference = JSON.parse(readFileSync(join(fixture, "reference.json"), "utf8"));
@@ -188,5 +190,178 @@ test("recomputed receipt cannot transplant request, generator, candidate or fail
     const { receipt_digest: ignored, ...body } = changed; changed.receipt_digest = canonicalDigest(body);
     const saved = putContentAddressedJson({ storeRoot: args.storeRoot, artifact: changed });
     assert.throws(() => verify(args, { execution_receipt_object_digest: saved.digest }));
+  }
+});
+
+const statusArgs = args => ({ storeRoot: args.storeRoot, requestObjectDigest: args.requestObjectDigest,
+  trustedPortfolioAuthorityContexts: args.trustedPortfolioAuthorityContexts });
+function snapshot(root) {
+  return readdirSync(root).sort().flatMap(name => {
+    const path = join(root, name), stat = lstatSync(path);
+    if (stat.isSymbolicLink()) return [[name, "symlink", readlinkSync(path)]];
+    if (stat.isDirectory()) return [[name, "directory"], ...snapshot(path).map(entry => [name + "/" + entry[0], ...entry.slice(1)])];
+    return [[name, "file", rawDigest(readFileSync(path))]];
+  });
+}
+function inspectUnchanged(root, args) {
+  const before = snapshot(root), result = inspectPersonalEvolutionGenerationStatus(statusArgs(args));
+  assert.deepEqual(snapshot(root), before, "status inspection must not change any files or directories");
+  for (const key of ["provider_called", "models_started", "mutation_performed", "authority_implied"]) assert.equal(result[key], false);
+  assert.equal(result.generation_effectiveness, "Unknown");
+  return result;
+}
+
+test("request-only status is NOT_RUN and does not create or consume a claim", t => {
+  const { root, args } = setup(t), result = inspectUnchanged(root, args);
+  assert.equal(result.status, "NOT_RUN"); assert.equal(result.invocation_consumed, false);
+  assert.equal(result.execution_receipt_object_digest, null); assert.equal(result.preparation_object_digest, null);
+  assert.equal(result.next_action, "review_request_and_obtain_fresh_generation_authorization");
+});
+
+test("empty consumed claim stays unknown, read-only and unavailable for restart", async t => {
+  const { root, args } = setup(t); mkdirSync(invokeDir(args), { recursive: true });
+  let calls = 0; args.provider.generate = () => { calls++; };
+  const result = inspectUnchanged(root, args);
+  assert.equal(result.status, "consumed_unknown"); assert.equal(result.invocation_consumed, true);
+  assert.equal(result.execution_receipt_object_digest, null); assert.equal(result.preparation_object_digest, null);
+  assert.equal(result.next_action, "preserve_consumed_invocation_and_resolve_unknown_outcome");
+  await assert.rejects(runPersonalEvolutionGeneration(args), /already consumed/); assert.equal(calls, 0);
+});
+
+test("inspection during one pending fake call is unknown and never dispatches a second call", async t => {
+  const { root, args } = setup(t), generate = args.provider.generate;
+  let release, calls = 0; const waiting = new Promise(resolve => { release = resolve; });
+  args.provider.generate = async context => { calls++; await waiting; return generate(context); };
+  const started = runPersonalEvolutionGeneration(args);
+  try { assert.equal(inspectUnchanged(root, args).status, "consumed_unknown"); assert.equal(calls, 1); }
+  finally { release(); }
+  const outcome = await started, result = inspectUnchanged(root, args);
+  assert.equal(result.status, "candidate_ready"); assert.equal(calls, 1);
+  assert.equal(result.execution_receipt_object_digest, outcome.execution_receipt_object_digest);
+  assert.equal(result.preparation_object_digest, outcome.receipt.preparation_object_digest);
+  assert.deepEqual(result.candidate_asset, outcome.receipt.candidate_asset);
+  assert.equal(result.model_execution, "not_applicable");
+  assert.equal(result.next_action, "independently_review_source_then_prepare_fresh_evaluation");
+});
+
+for (const status of ["partial", "failed", "exception"]) test("status retains bounded " + status + " evidence without accepting a candidate", async t => {
+  const { root, args } = setup(t), generate = args.provider.generate;
+  args.provider.generate = async context => {
+    const result = await generate(context);
+    if (status === "exception") throw new Error("secret=private-provider-error");
+    return { ...result, status, candidate_descriptor: null };
+  };
+  const outcome = await runPersonalEvolutionGeneration(args), result = inspectUnchanged(root, args);
+  assert.equal(result.status, "held"); assert.equal(result.invocation_consumed, true);
+  assert.equal(result.execution_receipt_object_digest, outcome.execution_receipt_object_digest);
+  assert.equal(result.failure_code, status === "exception" ? "provider_exception" : "provider_" + status);
+  assert.deepEqual(result.files, outcome.receipt.files); assert.ok(result.files.length);
+  assert.equal(result.candidate_asset, null); assert.equal(result.preparation_object_digest, null);
+  assert.equal(result.next_action, "retain_held_evidence_and_review_new_cycle");
+  assert.equal(JSON.stringify(result).includes("private-provider-error"), false);
+});
+
+for (const [label, change] of [
+  ["malformed terminal", (args) => writeFileSync(join(invokeDir(args), "receipt.json"), "secret=private-record")],
+  ["duplicate-key terminal", (args) => writeFileSync(join(invokeDir(args), "receipt.json"), '{"status":"held","status":"candidate_ready"}')],
+  ["transplanted terminal", (args, outcome) => { const receipt = structuredClone(outcome.receipt);
+    receipt.request_object_digest = canonicalDigest("foreign"); const { receipt_digest: ignored, ...body } = receipt;
+    receipt.receipt_digest = canonicalDigest(body); writeFileSync(join(invokeDir(args), "receipt.json"), JSON.stringify(receipt)); }],
+  ["transplanted claim", args => { const path = join(invokeDir(args), "request.json"), claim = JSON.parse(readFileSync(path));
+    claim.request_object_digest = canonicalDigest("foreign"); writeFileSync(path, JSON.stringify(claim)); }],
+  ["missing terminal CAS", (args, outcome) => { const hex = outcome.execution_receipt_object_digest.slice(7);
+    rmSync(join(args.storeRoot, "objects/sha256", hex.slice(0, 2), hex.slice(2) + ".json")); }],
+  ["missing claim with terminal", args => rmSync(join(invokeDir(args), "request.json"))],
+  ["symlink terminal", args => { const path = join(invokeDir(args), "receipt.json"); rmSync(path); symlinkSync(join(fixture, "reference.json"), path); }],
+]) test("status refuses " + label + " while preserving consumed evidence", async t => {
+  const { root, args } = setup(t), outcome = await runPersonalEvolutionGeneration(args); change(args, outcome);
+  const result = inspectUnchanged(root, args);
+  assert.equal(result.status, "invalid_evidence"); assert.equal(result.invocation_consumed, true);
+  assert.equal(result.execution_receipt_object_digest, null); assert.equal(result.preparation_object_digest, null);
+  assert.equal(result.candidate_asset, null); assert.deepEqual(result.files, []);
+  assert.equal(result.next_action, "preserve_records_and_investigate_evidence");
+  assert.equal(JSON.stringify(result).includes("private-record"), false);
+});
+
+test("unknown malformed claim and symlink invocation never become NOT_RUN", t => {
+  const { root, args } = setup(t); mkdirSync(invokeDir(args), { recursive: true });
+  writeFileSync(join(invokeDir(args), "request.json"), "malformed");
+  assert.equal(inspectUnchanged(root, args).status, "invalid_evidence");
+  rmSync(invokeDir(args), { recursive: true }); symlinkSync(join(root, "missing-target"), invokeDir(args));
+  assert.equal(inspectUnchanged(root, args).status, "invalid_evidence");
+});
+
+test("unsafe invocation ancestor keeps consumption unknown without traversing it", t => {
+  const { root, args } = setup(t), outside = join(root, "outside"); mkdirSync(outside);
+  symlinkSync(outside, join(args.storeRoot, "personal-generation-invocations"));
+  const result = inspectUnchanged(root, args);
+  assert.equal(result.status, "invalid_evidence"); assert.equal(result.invocation_consumed, null);
+});
+
+test("API rejects nested accessors and callbacks before inspecting or executing them", t => {
+  const { root, args } = setup(t), before = snapshot(root); let calls = 0;
+  const nested = {}; Object.defineProperty(nested, "value", { enumerable: true, get() { calls++; return "forbidden"; } });
+  const array = []; Object.defineProperty(array, "0", { enumerable: true, get() { calls++; return "forbidden"; } });
+  for (const trust of [[nested], array, [{ callback: () => { calls++; } }], [,], [{ value: undefined }]]) {
+    assert.throws(() => inspectPersonalEvolutionGenerationStatus({ ...statusArgs(args), trustedAssetAuthorityContexts: trust }));
+  }
+  assert.equal(calls, 0); assert.deepEqual(snapshot(root), before);
+});
+
+test("unaccepted held inventory cannot print arbitrary paths or unbounded file metadata", async t => {
+  const { root, args } = setup(t); args.provider.generate = () => { throw new Error("fake exception"); };
+  const outcome = await runPersonalEvolutionGeneration(args);
+  for (const files of [
+    [{ path: "/Users/private-record", raw_digest: canonicalDigest("fake"), byte_length: 1 }],
+    [{ path: "bounded.md", raw_digest: canonicalDigest("fake"), byte_length: 512 * 1024 + 1 }],
+  ]) {
+    const changed = { ...structuredClone(outcome.receipt), files };
+    const { receipt_digest: ignored, ...body } = changed; changed.receipt_digest = canonicalDigest(body);
+    putContentAddressedJson({ storeRoot: args.storeRoot, artifact: changed });
+    writeFileSync(join(invokeDir(args), "receipt.json"), JSON.stringify(changed));
+    const result = inspectUnchanged(root, args);
+    assert.equal(result.status, "invalid_evidence"); assert.deepEqual(result.files, []);
+    assert.equal(JSON.stringify(result).includes("private-record"), false);
+  }
+});
+
+test("one CLI reads an exact context and returns only status evidence", async t => {
+  const { root, args } = setup(t), outcome = await runPersonalEvolutionGeneration(args);
+  const path = join(root, "private-context.json"); writeFileSync(path, JSON.stringify(statusArgs(args)));
+  const digest = rawDigest(readFileSync(path)), before = snapshot(root);
+  const result = inspectPersonalEvolutionGenerationStatusFile(path, digest);
+  const cli = spawnSync(process.execPath, [resolve(import.meta.dirname, "ask-personal-evolution-status.mjs"),
+    "generation", "--context", path, "--context-digest", digest], { encoding: "utf8" });
+  assert.equal(cli.status, 0, cli.stderr); assert.equal(cli.stderr, "");
+  assert.deepEqual(JSON.parse(cli.stdout), result); assert.deepEqual(snapshot(root), before);
+  assert.equal(result.execution_receipt_object_digest, outcome.execution_receipt_object_digest);
+  assert.equal(cli.stdout.includes(root), false); assert.equal(cli.stdout.includes("Bind blockers"), false);
+});
+
+test("CLI rejects unpinned, duplicate-key, symlink and control-bearing contexts without writes or raw errors", t => {
+  const { root, args } = setup(t), path = join(root, "private-context.json");
+  const script = resolve(import.meta.dirname, "ask-personal-evolution-status.mjs");
+  const ordinary = JSON.stringify(statusArgs(args)); writeFileSync(path, ordinary);
+  const call = argv => spawnSync(process.execPath, [script, ...argv], { encoding: "utf8" });
+  const commands = [
+    ["generation", "--context", path],
+    ["generation", "--context", path, "--context-digest", rawDigest("wrong")],
+    ["generation", "--context", path, "--context", path, "--context-digest", rawDigest(ordinary)],
+    ["generation", "--context", path, "--context-digest", rawDigest(ordinary), "--start"],
+    ["start", "--context", path, "--context-digest", rawDigest(ordinary)],
+  ];
+  for (const argv of commands) { const before = snapshot(root), result = call(argv);
+    assert.equal(result.status, 10); assert.equal(result.stdout, ""); assert.equal(result.stderr.includes(root), false);
+    assert.deepEqual(snapshot(root), before); }
+  for (const text of ['{"storeRoot":"secret=private-context","storeRoot":"again"}',
+    JSON.stringify({ ...statusArgs(args), provider: "forbidden" }), JSON.stringify({ ...statusArgs(args), confirmedRequestObjectDigest: args.requestObjectDigest })]) {
+    writeFileSync(path, text); const before = snapshot(root), result = call(["generation", "--context", path, "--context-digest", rawDigest(text)]);
+    assert.equal(result.status, 10); assert.equal(result.stderr.includes("private-context"), false);
+    assert.deepEqual(snapshot(root), before);
+  }
+  writeFileSync(path, ordinary); const link = join(root, "linked-context.json"); symlinkSync(path, link);
+  assert.throws(() => inspectPersonalEvolutionGenerationStatusFile(link, rawDigest(ordinary)), /symlink/);
+  for (const key of ["provider", "workspaceRoot", "confirmedRequestObjectDigest", "privateEvaluatorRoot"]) {
+    assert.throws(() => inspectPersonalEvolutionGenerationStatus({ ...statusArgs(args), [key]: "refused" }), /option/);
   }
 });
