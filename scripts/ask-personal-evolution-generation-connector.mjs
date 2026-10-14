@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { lstatSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { types } from "node:util";
 import { assertNoSymlinkPathSegments, canonicalDigest, putContentAddressedJson, readContentAddressedJson,
   readJsonFileStrict, readStableBytes, writeCanonicalJsonNoReplace } from "./content-addressed-store.mjs";
 import { assertPersonalEvolutionFields, freezePersonalEvolutionValue } from "./ask-personal-evolution-observation.mjs";
@@ -208,4 +209,106 @@ export function verifyPersonalEvolutionGenerationExecution(options) {
     if (response) assert.equal(receipt.failure_code, `provider_${response.status}`);
   }
   return freezePersonalEvolutionValue({ status: receipt.status, receipt, authority_implied: false, generation_effectiveness: "Unknown" });
+}
+
+// A read-only projection of existing records, including a claim whose terminal
+// digest was never returned. No alternate ledger, dispatch, retry or recovery write.
+function assertStatusJsonData(value, ancestors = new Set()) {
+  if (value === null || ["string", "boolean"].includes(typeof value)) return;
+  if (typeof value === "number") { assert.ok(Number.isFinite(value), "finite status JSON number required"); return; }
+  assert.ok(value && typeof value === "object" && !types.isProxy(value) && !ancestors.has(value), "non-JSON, Proxy or cyclic status input");
+  const array = Array.isArray(value);
+  assert.ok(array || [Object.prototype, null].includes(Object.getPrototypeOf(value)), "plain status JSON required");
+  const fields = Object.getOwnPropertyDescriptors(value);
+  if (array) {
+    assert.equal(Reflect.ownKeys(fields).length, fields.length.value + 1, "sparse or extended status array refused");
+    for (let i = 0; i < fields.length.value; i++) assert.ok(Object.hasOwn(fields, String(i)), "sparse status array refused");
+  }
+  ancestors.add(value);
+  for (const key of Reflect.ownKeys(fields)) {
+    if (array && key === "length") continue;
+    const field = fields[key];
+    assert.ok(typeof key === "string" && Object.hasOwn(field, "value") && field.enumerable, "status accessor or symbol refused");
+    assertStatusJsonData(field.value, ancestors);
+  }
+  ancestors.delete(value);
+}
+
+export function inspectPersonalEvolutionGenerationStatus(options) {
+  const allowed = ["storeRoot", "requestObjectDigest", ...TRUST_KEYS];
+  assert.ok(options && typeof options === "object" && !types.isProxy(options) && !Array.isArray(options)
+    && [Object.prototype, null].includes(Object.getPrototypeOf(options)), "status options must be JSON");
+  const fields = Object.getOwnPropertyDescriptors(options);
+  assert.ok(["storeRoot", "requestObjectDigest"].every(key => Object.hasOwn(fields, key))
+    && Reflect.ownKeys(fields).every(key => allowed.includes(key) && Object.hasOwn(fields[key], "value") && fields[key].enumerable),
+  "unknown, missing or accessor status option");
+  assertStatusJsonData(options);
+  const owned = structuredClone(options), { requestObjectDigest } = owned, trust = trustOf(owned);
+  assert.match(requestObjectDigest, DIGEST);
+  const storeRoot = resolve(owned.storeRoot);
+  assertNoSymlinkPathSegments(storeRoot, "generation status store");
+  const invocation = invocationPath(storeRoot, requestObjectDigest);
+  const next = {
+    NOT_RUN: "review_request_and_obtain_fresh_generation_authorization",
+    consumed_unknown: "preserve_consumed_invocation_and_resolve_unknown_outcome",
+    candidate_ready: "independently_review_source_then_prepare_fresh_evaluation",
+    held: "retain_held_evidence_and_review_new_cycle",
+    invalid_evidence: "preserve_records_and_investigate_evidence",
+  };
+  const report = (status, invocationConsumed, evidence = {}) => freezePersonalEvolutionValue({
+    kind: "personal_evolution_generation_status_v1", request_object_digest: requestObjectDigest,
+    status, invocation_consumed: invocationConsumed, execution_receipt_object_digest: null,
+    provider_status: "unknown", file_inventory_status: "unverified", files: [], failure_code: null,
+    candidate_asset: null, preparation_object_digest: null, model_execution: "Unknown", ...evidence,
+    next_action: next[status], provider_called: false, models_started: false, mutation_performed: false,
+    authority_implied: false, generation_effectiveness: "Unknown",
+  });
+  const present = path => {
+    try { return lstatSync(path); } catch (error) { if (error.code === "ENOENT") return null; throw error; }
+  };
+  let consumed = null;
+  try {
+    // Check path ancestors before interpreting absence, including broken links.
+    assertNoSymlinkPathSegments(dirname(invocation), "generation status invocations", { allowMissingLeaf: true });
+    const claim = present(invocation); consumed = claim !== null;
+    assertNoSymlinkPathSegments(invocation, "generation status invocation", { allowMissingLeaf: true });
+    const loaded = readPersonalEvolutionGenerationRequest({ storeRoot, requestObjectDigest, ...trust });
+    if (!claim) return report("NOT_RUN", false);
+    assert.ok(claim.isDirectory(), "generation invocation must be a directory");
+    const requestPath = join(invocation, "request.json"), receiptPath = join(invocation, "receipt.json");
+    const hasRequest = present(requestPath), hasReceipt = present(receiptPath);
+    if (hasRequest) {
+      const request = readJsonFileStrict(requestPath);
+      assertPersonalEvolutionFields(request, ["request_object_digest", "input_digest", "generator"], "generation invocation request");
+      const generator = identity(request.generator);
+      assert.ok(equal(request, { request_object_digest: requestObjectDigest,
+        input_digest: canonicalDigest(inputFor(loaded, requestObjectDigest, generator)), generator }), "generation invocation transplant");
+    }
+    if (!hasReceipt) return report("consumed_unknown", true);
+    assert.ok(hasRequest, "terminal receipt requires the original invocation request");
+    const receipt = readJsonFileStrict(receiptPath), digest = canonicalDigest(receipt);
+    const checked = verifyPersonalEvolutionGenerationExecution({ storeRoot, requestObjectDigest,
+      executionReceiptObjectDigest: digest, ...trust });
+    // A held receipt without an accepted provider response still needs a bounded
+    // public inventory before any of its fields can be printed by the command.
+    assert.ok(["unknown", "completed", "partial", "failed"].includes(checked.receipt.provider_status));
+    assert.ok(["verified", "unverified"].includes(checked.receipt.file_inventory_status));
+    const files = checked.receipt.files; let totalBytes = 0;
+    assert.ok(Array.isArray(files) && files.length <= 256);
+    const paths = new Set();
+    for (const file of files) {
+      assertPersonalEvolutionFields(file, ["path", "raw_digest", "byte_length"], "generation status file");
+      assert.ok(typeof file.path === "string" && file.path.length <= 512 && PATH.test(file.path) && !paths.has(file.path));
+      paths.add(file.path); assert.match(file.raw_digest, DIGEST);
+      assert.ok(Number.isSafeInteger(file.byte_length) && file.byte_length >= 0);
+      totalBytes += file.byte_length;
+    }
+    assert.ok(totalBytes <= 512 * 1024);
+    return report(checked.status, true, { execution_receipt_object_digest: digest,
+      ...Object.fromEntries(["provider_status", "file_inventory_status", "files", "failure_code", "candidate_asset",
+        "preparation_object_digest", "model_execution"].map(key => [key, checked.receipt[key]])) });
+  } catch {
+    // Inaccessible/unsafe paths leave consumption Unknown, never fresh-start authority.
+    return report("invalid_evidence", consumed, { failure_code: "generation_evidence_invalid" });
+  }
 }
