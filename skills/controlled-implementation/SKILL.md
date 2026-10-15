@@ -34,6 +34,8 @@ Read `docs/ai/implementation-context.md` when it exists. Check `context_status` 
 
 If implementation context is missing or `template` but the task is small and local, proceed from nearby repository evidence instead of forcing context generation. If it is missing, `template`, or `stale` for repeated or non-trivial work, recommend `implementation-context-generation`.
 
+When the project explicitly adopts `docs/ai/executable-spec-profile.md` (or a recorded equivalent), use its current source locations and the applicable `spec-driven-development` references for context retrieval and test writing. Read the actual test bodies and applicable current ADRs; a generated index alone is not sufficient context. Carry the profile reference through the existing contract instead of creating another report. Do not impose setup or migration on projects that have not adopted the method.
+
 When `docs/ai/engineering-pattern-ledger.md` exists, consult it only when the task has a repeated implementation shape, project-specific pattern, or review finding that materially affects the implementation choice:
 
 - `template`: treat as no project-specific pattern evidence.

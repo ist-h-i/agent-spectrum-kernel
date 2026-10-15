@@ -39,6 +39,7 @@ This skill is for safe refactor execution after a candidate exists. It does not 
      - Boundary movement is implied: route to `application-boundary-architecture` first.
 
 2. Define the behavior-preservation contract.
+   - On projects that explicitly adopt the executable-spec method, read the project profile and the relevant `spec-driven-development` writing/context references. Preserve business and compatibility items; reassess architecture constraints against current ADRs and replace implementation-specific tests only with a reason and retained behavior evidence. Do not activate a new project-wide migration.
    - Must not change public API, UI behavior, schema, snapshots, runtime behavior, errors, logs, data shape, permissions, notifications, or external I/O unless explicitly authorized.
    - Record any authorized exception before editing.
    - Treat accidental behavior changes as failures, not as acceptable cleanup.

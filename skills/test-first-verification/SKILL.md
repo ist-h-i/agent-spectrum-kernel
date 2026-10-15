@@ -39,6 +39,8 @@ For `formal_verification_contract`, read `docs/lifecycle-artifact-contract.md` a
 
 Use available repository context for commands, existing coverage, and test patterns. If a stack or project overlay supplies verification supplements, apply it without hard-coding stack-specific rules into this skill.
 
+When the project explicitly adopts the executable-spec method, read its `docs/ai/executable-spec-profile.md` (or recorded equivalent) and `spec-driven-development`'s `references/verification-selection.md`. Select checks from specification items, source dependencies, shared rules, and runtime boundaries; stale or incomplete indexes must widen investigation, not silently shrink verification. This supplement never replaces the proof policy above or required CI/merge/release checks. Do not force method setup on unadopted projects.
+
 When `docs/ai/verification-pattern-ledger.md` exists, consult it only for matching change types, risk classes, regressions, or historically flaky areas:
 
 - `template`: treat as no project-specific reusable verification evidence.
