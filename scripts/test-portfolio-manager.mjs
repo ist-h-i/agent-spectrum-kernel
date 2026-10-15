@@ -396,6 +396,7 @@ function manifestDraft({
       ...structuredClone(selectionPolicy),
     },
     budgets: {
+      ...(Object.hasOwn(budgets, "cost_policy") ? { cost_policy: budgets.cost_policy } : {}),
       policy_limits: {
         token_count: unbounded(),
         duration_ms: unbounded(),
@@ -1839,6 +1840,26 @@ try {
     assert.equal(resolved.selection.decision, "bypass");
     assert.ok(hasReason(resolved.selection, "budget_unknown", "bypass"));
     assert.equal(resolved.selection.selected_assets.length, 0);
+  });
+
+  for (const maximum of [5, 0]) check(`subscription downgrade rechecks token/time but keeps unknown cost (${maximum})`, () => {
+    const portfolioId = `ask.portfolio.subscription-downgrade-${maximum}`;
+    const entry = portfolioEntry({ entryId: "baseline", asset: assets.baseline, expectedState: "current",
+      role: "baseline", assuranceLane: "admitted",
+      costEstimate: { token_count: known(1), duration_ms: known(1), cost_microunits: unknown() } });
+    const challenger = portfolioEntry({ entryId: "challenger", asset: assets.challenger,
+      costEstimate: { token_count: known(10), duration_ms: known(10), cost_microunits: unknown() } });
+    const draft = prepareEvidenceManifest({ storeRoot, registry, portfolioId, revision: "v1", entry,
+      manifestOverrides: { entries: [{ ...entry, evidence_requirement_ids: [`${portfolioId}.evidence`] }, challenger],
+        budgets: { cost_policy: "subscription_no_additional_spend_v1", unknown_value_action: "stop",
+          exceeded_action: "downgrade", policy_limits: { token_count: bounded(maximum) } } } });
+    const scenario = activateInitial({ storeRoot, draft, assetTrust });
+    const resolved = select({ storeRoot, scenario, assetTrust,
+      contextOverrides: { availableBudget: { token_count: known(100), duration_ms: known(100), cost_microunits: unknown() } } });
+    assert.equal(resolved.selection.decision, maximum === 5 ? "downgrade" : "stop");
+    assert.equal(resolved.selection.selected_assets.length, maximum === 5 ? 1 : 0);
+    assert.equal(resolved.selection.budget.cost_microunits.status, "unknown");
+    assert.equal(hasReason(resolved.selection, "budget_unknown"), false);
   });
 
   const exceededBudgetScenario = createExploratoryScenario({

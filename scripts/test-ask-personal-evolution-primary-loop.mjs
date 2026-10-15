@@ -97,7 +97,12 @@ function prepareNineBlocks(f) {
 }
 
 test("nine primary fixtures: fake generation → prepared driver → saved hold → independent no-op → fresh next request", async t => {
-  const pending = setup(t, { fixtureIds: PRIMARY_FIXTURE_IDS, sourceRevision: sourceRevision(), deferGeneration: true });
+  const pending = setup(t, { fixtureIds: PRIMARY_FIXTURE_IDS, sourceRevision: sourceRevision(), deferGeneration: true,
+    portfolioBudgets: { cost_policy: "subscription_no_additional_spend_v1" },
+    entryCostEstimate: { token_count: { status: "known", value: 1 }, duration_ms: { status: "known", value: 1 },
+      cost_microunits: { status: "unknown", value: null } },
+    availableBudget: { token_count: { status: "known", value: 90000000 }, duration_ms: { status: "known", value: 604800000 },
+      cost_microunits: { status: "unknown", value: null } } });
   const oldObjects = listContentAddressedJson({ storeRoot: pending.storeRoot }).map(({ digest }) => [digest, read(pending.storeRoot, digest)]);
   let providerCalls = 0;
   const generationInspection = inspectPreparedPersonalEvolutionCodexGeneration({ storeRoot: pending.storeRoot,
@@ -141,6 +146,13 @@ test("nine primary fixtures: fake generation → prepared driver → saved hold 
   assert.equal(pairApi.verifyPersonalEvolutionPromptPairResults(savedInput).status, "NOT_RUN");
   assert.deepEqual(sealed.registration.description.bindings.baseline.map(item => item.fixture_id), [...PRIMARY_FIXTURE_IDS].sort());
   for (const role of roles) for (const binding of sealed.registration.description.bindings[role]) {
+    assert.equal(binding.cost_policy, "subscription_no_additional_spend_v1");
+    const selection = read(f.storeRoot, binding.selection_object_digest);
+    assert.equal(selection.cost_policy, binding.cost_policy);
+    assert.equal(read(f.storeRoot, selection.manifest.manifest_digest).budgets.cost_policy, binding.cost_policy);
+    assert.deepEqual(selection.budget.cost_microunits.estimated, { status: "unknown", value: null });
+    assert.deepEqual(selection.budget.cost_microunits.available, { status: "unknown", value: null });
+    assert.equal(selection.budget.cost_microunits.status, "unknown");
     assert.equal(binding.profile_id, "primary_principles_v2_single_shot_v1");
     assert.equal(binding.prompt_runtime_contract.kind, "personal_registered_prompt_materialization_v2");
     assert.equal(binding.block.grading.timeout_ms, gradingApi.PRIMARY_GRADING_RESERVATION_MS);

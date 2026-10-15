@@ -47,6 +47,12 @@ const CONTEXT_SELECTOR_FIELDS = {
 };
 const CONTEXT_ALLOWLIST_SET_FIELDS = ["capabilities", "operation_scopes"];
 const BUDGET_METRICS = ["token_count", "duration_ms", "cost_microunits"];
+const SUBSCRIPTION_COST_POLICY = "subscription_no_additional_spend_v1";
+// Closed declared-effects restriction, not a provider billing/subscription check.
+const SUBSCRIPTION_PROHIBITED_EFFECTS = new Set([
+  "purchase", "subscription_upgrade", "top_up", "additional_paid_capacity", "paid_fallback",
+  "credentials_change", "provider_settings_change", "payment_settings_change",
+]);
 const PROHIBITED_SELECTION_KEY = /(?:^|_)(?:result|results|score|scores|correctness|recommendation|recommendations|completion_claim|outcome|outcomes|measured_result|measured_metric|hidden_test|hidden_answer|oracle|evaluator_result|evaluator_outcome|evaluator_decision|evaluation_decision|promotion_decision|post_execution|post_result|verdict|verdicts|reward|rewards|pass_rate|failure_rate|success_rate|observed_quality|telemetry)(?:_|$)/iu;
 
 const schemaPath = (name) => {
@@ -441,6 +447,10 @@ export function validatePortfolioManifest(manifest) {
     }
   }
   for (const metric of BUDGET_METRICS) validateLimit(manifest.budgets.policy_limits[metric], `Portfolio ${metric} policy`);
+  if (manifest.budgets.cost_policy === SUBSCRIPTION_COST_POLICY
+    && manifest.budgets.policy_limits.cost_microunits.status !== "unbounded") {
+    throw new Error("subscription cost policy cannot enforce a monetary cap; use the monetary-budget policy instead");
+  }
   assertSortedUnique(manifest.safety_guardrails.prohibited_effects, compareText, "Portfolio prohibited effects");
   if (manifest.rollback.mode === "none" && manifest.rollback.target !== null) throw new Error("Portfolio rollback none mode cannot carry a target");
   if (manifest.rollback.mode === "exact") {
@@ -1342,7 +1352,11 @@ function budgetDisposition(entries, metric, context, manifest) {
   const available = cloneJson(context.available_budget[metric]);
   const policyLimit = cloneJson(manifest.budgets.policy_limits[metric]);
   let status = "within";
-  if (estimated.status === "unknown" || available.status === "unknown") status = "unknown";
+  if (manifest.budgets.cost_policy === SUBSCRIPTION_COST_POLICY && metric !== "cost_microunits"
+    && estimated.status === "known"
+    && ((available.status === "known" && estimated.value > available.value)
+      || (policyLimit.status === "bounded" && estimated.value > policyLimit.maximum))) status = "exceeded";
+  else if (estimated.status === "unknown" || available.status === "unknown") status = "unknown";
   else if (estimated.value > available.value
     || (policyLimit.status === "bounded" && estimated.value > policyLimit.maximum)) status = "exceeded";
   return { estimated, available, policy_limit: policyLimit, status };
@@ -1458,6 +1472,11 @@ export function resolvePortfolioSelection({
   const closure = verified.manifests.get(current.manifest_digest);
   const manifest = closure.manifest;
   validateSelectionContextAgainstManifest(context, manifest);
+  const subscriptionCost = manifest.budgets.cost_policy === SUBSCRIPTION_COST_POLICY;
+  if (subscriptionCost && context.available_budget.cost_microunits.status !== "unknown") {
+    throw new Error("subscription cost policy requires unknown available monetary budget; a known amount is a contradictory cap");
+  }
+  const enforcedBudgetMetrics = subscriptionCost ? ["token_count", "duration_ms"] : BUDGET_METRICS;
   const assetsByEntry = new Map(closure.bound_assets.map((binding) => [binding.entry_id, binding.asset]));
   const reasons = [];
   const entryReasonMap = new Map(manifest.entries.map((entry) => [entry.entry_id, []]));
@@ -1559,7 +1578,8 @@ export function resolvePortfolioSelection({
       });
     }
     const prohibitedEffect = asset.record.permissions_and_effects.possible_effects
-      .find((effect) => manifest.safety_guardrails.prohibited_effects.includes(effect));
+      .find((effect) => manifest.safety_guardrails.prohibited_effects.includes(effect)
+        || (subscriptionCost && SUBSCRIPTION_PROHIBITED_EFFECTS.has(effect)));
     if (prohibitedEffect) {
       addReason({
         action: "stop",
@@ -1625,8 +1645,8 @@ export function resolvePortfolioSelection({
   const entryBlocked = (entry) => (entryReasonMap.get(entry.entry_id) ?? []).length > 0;
   let eligibleEntries = manifest.entries.filter((entry) => !entryBlocked(entry));
   let budget = computeBudget(eligibleEntries, context, manifest);
-  const unknownBudget = Object.values(budget).some((entry) => entry.status === "unknown");
-  const exceededBudget = Object.values(budget).some((entry) => entry.status === "exceeded");
+  const unknownBudget = enforcedBudgetMetrics.some((metric) => budget[metric].status === "unknown");
+  const exceededBudget = enforcedBudgetMetrics.some((metric) => budget[metric].status === "exceeded");
   if (unknownBudget || exceededBudget) {
     const budgetFailures = [
       ...(unknownBudget ? [{ action: manifest.budgets.unknown_value_action, code: "budget_unknown" }] : []),
@@ -1649,7 +1669,7 @@ export function resolvePortfolioSelection({
     }
     eligibleEntries = eligibleEntries.filter((entry) => !toOmit.includes(entry));
     budget = computeBudget(eligibleEntries, context, manifest);
-    const remainingInvalid = Object.values(budget).some((entry) => entry.status !== "within");
+    const remainingInvalid = enforcedBudgetMetrics.some((metric) => budget[metric].status !== "within");
     if (remainingInvalid && eligibleEntries.length > 0) {
       for (const failure of budgetFailures) {
         addReason({ action: "stop", code: failure.code, subjectDigest: manifest.selection_basis_digest });
@@ -1714,6 +1734,7 @@ export function resolvePortfolioSelection({
     },
     context_object_digest: contextPublication.digest,
     context_digest: context.context_digest,
+    ...(subscriptionCost ? { cost_policy: manifest.budgets.cost_policy } : {}),
     decision,
     selected_assets: eligibleEntries.map(selectedAssetFromEntry),
     omitted_assets: omittedAssets,

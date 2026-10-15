@@ -371,6 +371,58 @@ metrics. When both occur, the selection retains both typed reason codes and
 combines their configured actions by `stop > downgrade > bypass`. The
 unknown-value action cannot mask or downgrade an exceeded-budget stop.
 
+### Explicit subscription comparison policy
+
+An optional manifest field selects one narrow policy:
+
+```json
+{"budgets":{"cost_policy":"subscription_no_additional_spend_v1"}}
+```
+
+This fragment supplements the existing required budget fields. Without the field,
+the monetary-budget behavior and serialized manifest/selection shapes remain
+unchanged; no default field is inserted into historical objects.
+
+This is a caller declaration of existing-subscription use with no additional
+spending. It neither proves a subscription nor guarantees which billing route a
+provider or CLI uses. Selection is not execution or purchase authorization. The
+selector performs no account, quota or billing lookup, and never purchases,
+upgrades, tops up, enables paid fallback/capacity, or reads/changes credentials,
+provider configuration or payment settings. Service-side limits and refusals
+remain real execution limits; this policy adds no retries or recovery route.
+
+Only monetary admission is observational. Estimated and available
+`cost_microunits` remain exact known/unknown quantities; Unknown stays null and
+the saved disposition stays `unknown`, even with a `selected` decision. It does
+not become zero, free, within budget or an enforced spending cap. A bounded
+`policy_limits.cost_microunits` or a known
+`available_budget.cost_microunits` contradicts this mode and is rejected. Use the
+existing monetary-budget policy for monetary caps. Token/duration planning
+limits and unknown/exceeded actions still apply, including after downgrade. In
+this mode a known exceeded token/time bound takes precedence over unknown
+availability; unknown quota/balance is not a substitute for a planning bound.
+
+All evidence, safety, capability, applicability and authority checks remain.
+In addition to the manifest's prohibited effects, this mode stops selection of
+Assets declaring `purchase`, `subscription_upgrade`, `top_up`,
+`additional_paid_capacity`, `paid_fallback`, `credentials_change`,
+`provider_settings_change` or `payment_settings_change`. These exact declared
+effect identifiers are an admission restriction, not a runtime sandbox or proof
+that undeclared effects cannot occur. A caller must review the actual execution
+scope and must not automate these actions under this policy.
+
+The declaration participates in the existing manifest/selection-basis digests
+and is copied as optional `cost_policy` on the saved selection, covered by its
+digest and deterministic replay. Evolution verifies both role selections use
+the same policy; the experiment's exact selection references preserve this
+evidence without another policy authority. Personal pair bindings copy it and
+require every fixture selection to match its role and counterpart. Altering or
+removing it requires a new reviewed manifest, selection and experiment/pair,
+not an edit to a frozen selection or a reinterpretation of a prior hold.
+
+Post-result monetary evidence remains independent: this selection policy never
+makes unknown cost complete, demonstrates benefit, or authorizes adoption.
+
 ## Typed deterministic resolution
 
 For the same verified lock, authority contexts, selector context, budgets,

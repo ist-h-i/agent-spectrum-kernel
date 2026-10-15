@@ -555,6 +555,7 @@ export function verifyEvolutionExperiment({
       }
     }
   }
+  const costPolicies = new Set();
   for (const role of [experiment.roles.baseline, experiment.roles.challenger]) {
     const verified = verifyPortfolioSelection({
       storeRoot,
@@ -564,7 +565,9 @@ export function verifyEvolutionExperiment({
       trustedHighImpactApprovalGrants,
     });
     assertRoleSelection(role, verified, role.selected_asset);
+    costPolicies.add(verified.selection.cost_policy ?? null);
   }
+  if (costPolicies.size !== 1) throw new Error("Evolution baseline and challenger must use the same cost policy");
   return deepFreeze({ experiment_object_digest: experimentObjectDigest, experiment: cloneJson(experiment), candidate: cloneJson(candidateVerified.candidate) });
 }
 

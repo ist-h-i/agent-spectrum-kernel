@@ -49,6 +49,7 @@
     },
     "context_object_digest": { "$ref": "#/$defs/digest" },
     "context_digest": { "$ref": "#/$defs/digest" },
+    "cost_policy": { "type": "string", "const": "subscription_no_additional_spend_v1" },
     "decision": { "$ref": "#/$defs/actionOrSelected" },
     "selected_assets": {
       "type": "array",

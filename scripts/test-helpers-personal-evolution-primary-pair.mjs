@@ -30,7 +30,8 @@ const assetRef = record => Object.fromEntries(["asset_type", "stable_id", "versi
 const ref = publication => Object.fromEntries(["portfolio_id", "revision", "manifest_digest", "asset_set_digest"].map(key => [key, publication[key]]));
 
 export function setup(t, { changeSelectedEntrypoint = true, fixtureIds = ["mn-build-option-update"],
-  sourceRevision = "f".repeat(40), deferGeneration = false, ...alignmentOptions } = {}) {
+  sourceRevision = "f".repeat(40), deferGeneration = false, portfolioBudgets = null,
+  entryCostEstimate = null, availableBudget = null, possibleEffects = null, ...alignmentOptions } = {}) {
   fixtureIds = [...fixtureIds].sort();
   const taskClasses = [...new Set(fixtureIds.map(id => buildPrimaryFixtureRecipe(id).task_class))].sort();
   const root = realpathSync(mkdtempSync(join(tmpdir(), "personal-primary-pair-"))); t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -40,6 +41,7 @@ export function setup(t, { changeSelectedEntrypoint = true, fixtureIds = ["mn-bu
   const descriptor = { ...record }; delete descriptor.object_kind;
   descriptor.version = "fake-parent-1"; descriptor.applicability.task_classes.included = taskClasses;
   descriptor.applicability.task_classes.excluded = [];
+  if (possibleEffects) descriptor.permissions_and_effects.possible_effects = possibleEffects;
   const sourceRoot = join(root, "source");
   descriptor.content = { package_format: "canonical_json_base64_files", files: content.files.map(file => {
     const bytes = Buffer.from(file.bytes_base64, "base64"); write(join(sourceRoot, file.path), bytes);
@@ -55,6 +57,8 @@ export function setup(t, { changeSelectedEntrypoint = true, fixtureIds = ["mn-bu
   m.selection_context_allowlist.task_classes = taskClasses;
   m.selectors.task_classes.included = taskClasses;
   m.entries[0].selectors.task_classes.included = taskClasses; m.entries[0].asset = parentAsset;
+  if (portfolioBudgets) Object.assign(m.budgets, structuredClone(portfolioBudgets));
+  if (entryCostEstimate) m.entries[0].cost_estimate = structuredClone(entryCostEstimate);
   const lock0 = createEmptyPortfolioLock({ storeRoot, portfolioId: m.portfolio_id, repositoryId: m.repository_id, scopeId: m.scope_id });
   const manifest = publishPortfolioManifest({ storeRoot, draft: m });
   const authority = { ...adapter.portfolio_authority_contexts[0].authority, authority_id: "synthetic-personal-parent-authority" };
@@ -86,7 +90,7 @@ export function setup(t, { changeSelectedEntrypoint = true, fixtureIds = ["mn-bu
     write(join(childRoot, file.path), bytes); return { ...file, raw_digest: comparisonHash(bytes) }; });
   child.type_extension.renderer.projection_digest = canonicalDigest(child.content.files.map(({ path, raw_digest }) => ({ path, raw_digest })));
   const pending = { root, storeRoot, generation, requested, child, childRoot, descriptor, parentAsset, sourceRoot,
-    content, original, policy, registry, parentAuthority, authority, fixtureIds, taskClasses, sourceRevision };
+    content, original, policy, registry, parentAuthority, authority, fixtureIds, taskClasses, sourceRevision, availableBudget };
   if (deferGeneration) return pending;
   const imported = importPersonalEvolutionGenerationResult({ ...generation, sourceRoot: childRoot, requestObjectDigest: requested.request_object_digest,
     result: { request_digest: requested.request.request_digest, observation_digest: requested.request.observation_digest, parent_asset: parentAsset,
@@ -124,6 +128,7 @@ export function finishPersonalPairSetup(pending, imported, { sourceClassified = 
   }
   const select = read(storeRoot, adapter.baseline_selection.selection_object_digest);
   const selectorContext = structuredClone(read(storeRoot, select.context_object_digest)); delete selectorContext.context_digest;
+  if (pending.availableBudget) selectorContext.available_budget = structuredClone(pending.availableBudget);
   selectorContext.task_class = buildPrimaryFixtureRecipe(fixtureIds[0]).task_class; selectorContext.source_revision = sourceRevision;
   const alignmentInput = { storeRoot, preparationObjectDigest,
     trustedPortfolioAuthorityContexts: [parentAuthority], baselineRevision: "fake-aligned-parent", challengerRevision: "fake-aligned-candidate", portfolioAuthority: authority };

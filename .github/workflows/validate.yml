@@ -152,7 +152,9 @@ jobs:
         run: node scripts/asset-registry-samples.mjs --check
 
       - name: Run evidence-conditioned Portfolio Manager contract tests
-        run: node scripts/test-portfolio-manager.mjs
+        run: |
+          node scripts/test-portfolio-manager.mjs
+          node --test scripts/test-portfolio-subscription-policy.mjs
 
       - name: Check the exact Portfolio Manager sample
         run: node scripts/portfolio-manager-samples.mjs --check
