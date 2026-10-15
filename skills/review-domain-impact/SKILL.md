@@ -47,6 +47,8 @@ Domain input sources:
 
 Treat missing, template, stale, or contradicted inputs as evidence limitations. Do not infer confirmed business truth from placeholders.
 
+When a scenario animation is supplied or requested, compare its source acceptance revision, test expectations and observed execution, using `spec-driven-development/references/scenario-visual-review.md` only when that optional capability is selected. Read the underlying tests and mock boundaries. Keep unasserted values, changed inputs and unobserved behavior visible; replay success is not human approval or proof of application-wide behavior. The visual aid does not add or waive review gates.
+
 2. Apply evidence priority.
 
 ```text

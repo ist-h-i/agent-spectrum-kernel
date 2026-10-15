@@ -122,8 +122,11 @@ test("executable-spec setup has selected capability and references in delivery a
     for (const skill of ["operating-mode-router", "skill-router", route.primary, "work-package-compiler", "test-first-verification"]) {
       assert.ok(selected.includes(skill), `${surface} ${profileName}: ${skill}`);
     }
-    for (const reference of ["spec-writing-conventions", "spec-index", "context-retrieval", "verification-selection"]) {
+    for (const reference of ["spec-writing-conventions", "spec-index", "context-retrieval", "verification-selection", "scenario-visual-review"]) {
       assert.ok(plan.projectedManagedAssets.some(({ path }) => path === `${surface}/skills/${route.primary}/references/${reference}.md`));
+    }
+    for (const file of ["reservation.cases.mjs", "scenario-observer.mjs", "scenario-review.mjs", "scenario-player.html"]) {
+      assert.ok(plan.projectedManagedAssets.some(({ path }) => path === `${surface}/skills/${route.primary}/references/examples/javascript/${file}`));
     }
     if (profileName === "daily") {
       assert.equal(plan.routingFixtures.find(({ id }) => id === "daily_adoption_capability_missing")?.outcome, "capability_missing");

@@ -636,7 +636,7 @@
       },
       {
         "id": "executable_spec_setup",
-        "signals": ["executable-spec method setup", "specification test conventions", "specification index setup", "AI context retrieval setup", "verification selection rules"],
+        "signals": ["executable-spec method setup", "specification test conventions", "specification index setup", "AI context retrieval setup", "verification selection rules", "specification scenario visualization", "unit-test scenario animation"],
         "task_class": "design",
         "primary": "spec-driven-development",
         "secondary": []

@@ -49,6 +49,9 @@ jobs:
         run: |
           node --test scripts/test-codex-skill-reference-preflight.mjs scripts/test-skill-assets.mjs scripts/test-skill-reference-canonical.mjs scripts/test-ui-ux-adapter-assets.mjs docs/fixtures/ui-ux-design/fixture-state.test.mjs scripts/test-prompt-v2-historical-renderer.mjs
 
+      - name: Run dependency-free scenario visual review regressions
+        run: node --test scripts/test-scenario-visual-review.mjs
+
       # Fail before expensive suites, retaining the generator's exact-byte check.
       - name: Check adapter runtime bundle freshness
         run: |
