@@ -71,10 +71,11 @@ This skill prevents ordinary delivery work from being polluted by adoption, metr
 User-facing route text should explain the work path in these terms. Skill names belong in `Internal route` for review and debugging.
 
 4. Distinguish close signals.
+   - Executable-spec method setup for a concrete project (test writing conventions, specification index, AI context retrieval, or verification selection): classify as `delivery_quality`, then route through `skill-router` to `spec-driven-development`, including for a new project. A method setup request alone does not request rollout of the ASK skill set or an adoption pack. If ASK rollout is also requested, keep that rollout in `adoption_bootstrap` and delegate only the requested method setup after checking its capability.
    - One completed task effectiveness question: route to `skill-effectiveness-evaluation`.
    - Multiple tasks or a period-over-period adoption question: route to `skill-adoption-metrics`.
    - Evidence-backed full-layer engineering capability or reusable intelligence maturity question: route to `engineering-capability-evaluation`.
-   - First-time repository rollout: route to `project-adoption-pack-generation`.
+   - First-time rollout of the ASK skill set into a repository: route to `project-adoption-pack-generation`.
    - Weekly/monthly cadence: classify as `operation_automation`, then use report templates or external scheduling outside the skill set.
    - Release candidate readiness: classify as `delivery_quality`, then route through `skill-router` to `release-readiness-gate`; release execution still requires `risk-gate`.
    - Requirement-to-Rule Loop work for a concrete repository task: keep requirement, packaging, and domain review in execution; enter `review-to-rule-compiler` or `domain-rule-ledger` only after the knowledge-promotion trigger is explicit and bounded.

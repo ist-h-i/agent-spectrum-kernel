@@ -36,7 +36,7 @@ source_scope: "<確認したリポジトリ範囲>"
 
 既存のプロジェクトルールへ、実際に解決できるパスで追加する。CodexへのASK導入では通常`.agents/skills/spec-driven-development/`へ投影されるが、使用中のadapter stateとファイルを確認する。他の導入形式へそのパスを無条件にコピーしない。
 
-ASKでは`.agent-spectrum-kernel/codex-install-state.json`の`selected_skills`に`spec-driven-development`が含まれることを確認する。現行の`daily`、`organizational`、`full`には含まれ、既定の`implementation`だけでは含まれない。既存の導入手順から必要なスキルを含むプロファイル、または依存関係を満たす明示的な選択を使う。単に正本リポジトリへファイルが存在するだけでは、導入済みと扱わない。
+ASKでは`.agent-spectrum-kernel/codex-install-state.json`の`selected_skills`に`spec-driven-development`が含まれることを確認する。現行の`daily`、`adoption`、`organizational`、`full`には含まれ、既定の`implementation`だけでは含まれない。既存の導入手順から必要なスキルを含むプロファイル、または依存関係を満たす明示的な選択を使う。単に正本リポジトリへファイルが存在するだけでは、導入済みと扱わない。
 
 ```markdown
 このプロジェクトは実行可能な仕様の開発手法を採用する。
@@ -61,8 +61,10 @@ spec-driven-development の必要な参照だけを読む。
 
 ```sh
 node --test references/examples/javascript/reservation.test.mjs
-python -m unittest discover -s references/examples/python -p 'test_*.py'
+python -B -m unittest discover -s references/examples/python -p 'test_*.py'
 ```
+
+Pythonの`-B`は、配布対象の`references/`へバイトコードを生成しないために付ける。
 
 ## 索引の一項目の例
 

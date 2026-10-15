@@ -203,6 +203,8 @@ const CODEX_PROFILES = {
     description: "Project adoption and documentation-context setup profile.",
     skills: [
       "operating-mode-router",
+      "skill-router",
+      "spec-driven-development",
       "repository-orientation",
       "project-adoption-pack-generation",
       "implementation-context-generation",
@@ -240,6 +242,7 @@ const CODEX_PROFILES = {
 
 const PROFILE_ROUTING_FIXTURES = {
   daily: [
+    { id: "executable_spec_setup", signal: "Set up executable specifications for this new project", router: "skill-router", selected_route: "spec-driven-development", outcome: "available", requiredSkills: ["spec-driven-development", "work-package-compiler", "test-first-verification"] },
     { id: "daily_implementation_available", signal: "Ordinary implementation", router: "skill-router", selected_route: "controlled-implementation", outcome: "available", requiredSkills: ["controlled-implementation"] },
     { id: "daily_review_available", signal: "Ordinary review", router: "skill-router", selected_route: "review-router", outcome: "available", requiredSkills: ["review-router"] },
     { id: "daily_knowledge_capability_missing", signal: "Explicit knowledge promotion", router: "skill-router", selected_route: "review-finding-compiler", outcome: "capability_missing", recommendedProfile: "organizational", requiredSkills: [] },
@@ -288,6 +291,7 @@ const PROFILE_ROUTING_FIXTURES = {
     },
   ],
   adoption: [
+    { id: "executable_spec_setup", signal: "Set up executable specifications for this new project", router: "skill-router", selected_route: "spec-driven-development", outcome: "available", requiredSkills: ["spec-driven-development", "work-package-compiler", "test-first-verification"] },
     {
       id: "unfamiliar_repository",
       signal: "Repository adoption starts from unknown project context",

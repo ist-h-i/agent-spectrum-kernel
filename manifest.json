@@ -635,6 +635,13 @@
         "secondary": []
       },
       {
+        "id": "executable_spec_setup",
+        "signals": ["executable-spec method setup", "specification test conventions", "specification index setup", "AI context retrieval setup", "verification selection rules"],
+        "task_class": "design",
+        "primary": "spec-driven-development",
+        "secondary": []
+      },
+      {
         "id": "new_behavior",
         "signals": ["new behavior", "feature", "observable behavior change"],
         "task_class": "implementation",
