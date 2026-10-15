@@ -75,6 +75,23 @@ Portfolio authority contexts を別途確認・pin してから
 `NOT_RUN` なら、quality を0にせず reasons と不足証拠を保持する。
 これは評価用 branch の準備であり、Mac の設定適用ではない。
 
+既存 subscription を使い追加支出を認めない比較では、新しく確認する manifest の
+`budgets.cost_policy: "subscription_no_additional_spend_v1"` を両 role に同じように
+固定できる。[Portfolio の費用契約](portfolio-manager-contract.md#explicit-subscription-comparison-policy)
+に従い、金額見積・利用可能金額の欠測は `unknown` / `null` のまま残す。
+この mode の利用可能金額は Unknown とし、金額上限との併記は拒否される。
+値を0に置き換えたり、月間残量を推測したりしない。token / 時間の planning 上限、
+サービス自体の拒否、安全性と証拠の条件は維持する。宣言は subscription や課金先の
+確認済み証拠にはならず、購入・upgrade・top-up・追加有料 capacity、認証情報や
+provider / payment 設定の変更を自動実行する権限を与えない。
+
+alignment は親 manifest の契約を引き継ぐ。既存の hold や固定入力を編集して
+新 mode を後付けせず、専用の新しい manifest / selector context / authority と
+preparation plan を別途確認してから固定する。保存 selection の `cost_policy` と
+manifest digest、experiment 両 role の selection refs、pair の各 fixture binding を
+確認する。片側だけの宣言は使えない。費用不明のまま選択できても、結果の費用証拠が
+足りなければ採否は引き続き保留になり得る。実開始には別途の直接指示が必要である。
+
 課題の正本は `PRIMARY_FIXTURE_IDS` / `buildPrimaryFixtureRecipe` である。
 
 | Fixture | Formal task class | Active Prompt file |

@@ -314,6 +314,7 @@
       "additionalProperties": false,
       "required": ["policy_limits", "unknown_value_action", "exceeded_action"],
       "properties": {
+        "cost_policy": { "type": "string", "const": "subscription_no_additional_spend_v1" },
         "policy_limits": {
           "type": "object",
           "additionalProperties": false,

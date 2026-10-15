@@ -84,6 +84,14 @@ the parent Asset in the baseline and the candidate Asset in the challenger.
 Baseline and challenger roles, locks, manifests, Registry snapshots, selection
 objects, and selection digests are not interchangeable.
 
+Both verified selections must use the same optional Portfolio `cost_policy`.
+The `subscription_no_additional_spend_v1` declaration is bound by each exact
+selection and manifest reference; it cannot be enabled for one role only. See
+[Portfolio cost policy](portfolio-manager-contract.md#explicit-subscription-comparison-policy).
+This admission declaration does not complete unknown monetary result evidence,
+prove subscription/billing status, or grant execution, spending or adoption
+authority.
+
 The protocol freezes source revision/tree, model, CLI, adapter, fixtures,
 task classes, exclusions, repetitions, evaluator Asset, evaluator contract,
 scoring policy, thresholds, weights, stop conditions, and privacy boundary. The

@@ -101,6 +101,8 @@ function capture(options, role, block) {
   assert.ok(options.candidate.evaluation_scope.task_classes.includes(recipe.task_class), "formal task applicability missing");
   const selectionObjectDigest = block.personal_selection_object_digest ?? options.experiment.roles[role].selection_object_digest;
   const selected = verifyPortfolioSelection({ ...options, selectionObjectDigest });
+  const roleSelection = read(options.storeRoot, options.experiment.roles[role].selection_object_digest);
+  assert.equal(selected.selection.cost_policy ?? null, roleSelection.cost_policy ?? null, "per-fixture cost policy differs from experiment role");
   const selectionContext = read(options.storeRoot, selected.selection.context_object_digest);
   assert.equal(selectionContext.task_class, recipe.task_class, "each formal task needs its own pre-result eligible selection");
   assert.equal(selectionContext.model, options.experiment.protocol.model); assert.equal(selectionContext.adapter, "codex");
@@ -121,6 +123,7 @@ function capture(options, role, block) {
   return { fixture_id: block.fixture_id, block: structuredClone(block), run_id: plan.run_id, plan_digest,
     source_digest: plan.source.digest, task_digest: plan.task.digest, input_digest: plan.input.digest,
     source_repository: plan.source.repo ?? null, selection_object_digest: selectionObjectDigest,
+    ...(Object.hasOwn(selected.selection, "cost_policy") ? { cost_policy: selected.selection.cost_policy } : {}),
     grading_resources: grading,
     verification_digest: plan.verification.digest, public_criteria: exported.request.public_grading_references,
     grading_binding: exported.request.binding, scoring_version: exported.request.scoring_version ?? null,
@@ -176,6 +179,8 @@ export function describePersonalEvolutionPromptPair(options) {
   const parity = item => Object.fromEntries(["fixture_id", "source_digest", "task_digest", "input_digest", "verification_digest", "public_criteria",
     "grading_binding", "scoring_version", "profile_id", "formal_task_class", "runner_task_class", "config", "mutable_paths", "prompt_runtime_contract"].map(key => [key, item[key]]));
   for (let i = 0; i < bindings.baseline.length; i++) assert.ok(equal(parity(bindings.baseline[i]), parity(bindings.challenger[i])), "pair task/criterion/runtime/budget mismatch");
+  for (let i = 0; i < bindings.baseline.length; i++) assert.equal(bindings.baseline[i].cost_policy ?? null,
+    bindings.challenger[i].cost_policy ?? null, "pair baseline/challenger cost policy mismatch");
   return freezePersonalEvolutionValue({ bindings, producer_sources: primaryProducerSources(), controller_sources: controllerSources(),
     evidence_kind: all[0].config.evidence_kind, candidate_digest: ctx.candidate.candidate_digest,
     experiment_digest: ctx.experiment.experiment_digest, comparison_scope: "fresh_parent_candidate_full_ask_with_P_K_F_context",
