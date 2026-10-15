@@ -243,6 +243,7 @@ const CLAUDE_PROFILES = {
 };
 const PROFILE_ROUTING_FIXTURES = {
   daily: [
+    { id: "executable_spec_setup", router: "skill-router", selectedRoute: "spec-driven-development", outcome: "available", requiredSkills: ["spec-driven-development", "work-package-compiler", "test-first-verification"] },
     { id: "daily_implementation_available", router: "skill-router", selectedRoute: "controlled-implementation", outcome: "available", requiredSkills: ["controlled-implementation"] },
     { id: "daily_review_available", router: "skill-router", selectedRoute: "review-router", outcome: "available", requiredSkills: ["review-router"] },
     { id: "daily_knowledge_capability_missing", router: "skill-router", selectedRoute: "review-finding-compiler", outcome: "capability_missing", recommendedProfile: "organizational", requiredSkills: [] },

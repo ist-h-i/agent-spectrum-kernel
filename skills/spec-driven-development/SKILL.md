@@ -1,6 +1,6 @@
 ---
 name: spec-driven-development
-description: Define the observable behavior delta and acceptance criteria for a feature or behavior request without recreating upstream business decisions or downstream execution plans.
+description: Define observable behavior and acceptance criteria, or establish a language-independent executable-spec test method for new projects, including writing conventions, a specification index, AI context retrieval, and verification selection.
 ---
 
 # Spec-Driven Development
@@ -16,11 +16,31 @@ Turn a stable Requirement Contract or behavior request into an observable behavi
 - Acceptance criteria are missing.
 - Edge cases are unclear.
 - Migration, compatibility, or rollout may matter.
+- A new project needs tests as durable specification assets for developers and AI.
+- The user asks to establish test writing conventions, a specification index, context retrieval, or verification selection.
 
 ## Do not use when
 
 - The task is a trivial localized edit.
-- A current Spec already exists and its acceptance criteria remain unchanged.
+- A current Spec already exists and its acceptance criteria remain unchanged, unless establishing or consuming the executable-spec method below.
+
+## Executable-spec method for new projects
+
+For an explicit method setup request, read [the setup workflow](references/executable-spec-workflow.md) first. Establish the project conventions and one representative behavior; do not invent business decisions or migrate an existing suite wholesale. This method is language-independent, developer/AI-facing, and opt-in per project. Ordinary behavior requests still use the process below.
+
+Load only the reference needed for the current step:
+
+| Work | Reference |
+|---|---|
+| Write or change a specification test; distinguish test lifetimes | [Writing conventions](references/spec-writing-conventions.md) |
+| Build, refresh, or question a specification index | [Index contract](references/spec-index.md) |
+| Determine what the AI must read before changing code | [Context retrieval](references/context-retrieval.md) |
+| Select checks and expand verification after a change | [Verification selection](references/verification-selection.md) |
+| Initialize project files or inspect language examples | [Templates and examples](references/project-templates.md) |
+
+Keep business rationale in its existing Requirement/domain context, observable acceptance in ordinary test code or a referenced non-executable acceptance item, architectural reasons in current ADRs, and execution obligations/results in the existing verification/evidence artifacts. The index is a derived navigation view, never another authority or proof of completeness. Test metadata reuses lifecycle artifact/item IDs and revisions; it does not introduce a second spec identity system.
+
+On adopted projects, carry the project profile reference through the existing Work Package/Implementation context. `controlled-implementation`, `refactor-implementation`, and `test-first-verification` consume it only when applicable. Do not add another always-on workflow, mandatory report, test framework, or proof-path selector. Do not claim registration, installation, execution, or effectiveness from source files alone.
 
 ## Process
 
@@ -64,6 +84,8 @@ Conditional fields, omit when irrelevant:
 
 Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits the spec artifact below; it does not repeat the envelope fields.
 
+For method setup only, report the conventions/templates created, their verified availability, and any project-specific setup gaps instead of inventing a business Spec. A reusable skill package can be complete while a project's generator, CI, and domain decisions remain unconfigured; state the boundary explicitly.
+
 ```text
 Spec:
 - Artifact ID:
@@ -83,6 +105,8 @@ Conditional fields, omit when irrelevant:
 ```
 
 ## Exit criteria
+
+For method setup, the four references and their entry points are available, examples are checked, and registration versus project initialization is distinguished. For behavior-definition work:
 
 - Acceptance criteria are testable.
 - Observable behavior is separated from business rationale and executable task scope.

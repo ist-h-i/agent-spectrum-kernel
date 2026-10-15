@@ -21,7 +21,7 @@ This skill is the canonical delivery/quality router. `operating-mode-router` sel
 
 - The task is a trivial local edit.
 - The user explicitly names a relevant skill and no routing decision is needed.
-- The request is about first-time project rollout, skill effectiveness, adoption metrics, or weekly/monthly reporting. Use `operating-mode-router` first.
+- The request is about first-time rollout of the ASK skill set, skill effectiveness, adoption metrics, or weekly/monthly reporting. Use `operating-mode-router` first. A concrete executable-spec method setup belongs to delivery/quality, including in a new project.
 
 ## Inputs
 
@@ -83,7 +83,8 @@ The user-facing route should describe work steps and stop points without requiri
 
 | Situation | Primary | Secondary |
 |---|---|---|
-| First-time project rollout or adoption pack request | `operating-mode-router` | Route to `adoption_bootstrap` -> `project-adoption-pack-generation` |
+| Executable-spec method setup: test writing conventions, specification index, AI context retrieval, or verification selection for a concrete project | `spec-driven-development` | Read its setup workflow; use only needed references. Do not require a behavior change, an existing business Spec, or an ASK adoption pack. Check the selected capability before delegation. |
+| First-time rollout of the ASK skill set or adoption pack request | `operating-mode-router` | Route to `adoption_bootstrap` -> `project-adoption-pack-generation` |
 | Skill effectiveness, routing quality, or one-task workflow retrospective | `operating-mode-router` | Route to `observability_metrics` -> `skill-effectiveness-evaluation` |
 | Adoption maturity, instruction quality, usage metrics, or multi-task adoption impact | `operating-mode-router` | Route to `observability_metrics` -> `skill-adoption-metrics` |
 | Evidence-backed full-layer engineering capability evaluation | `operating-mode-router` | Route to `observability_metrics` -> `engineering-capability-evaluation` |

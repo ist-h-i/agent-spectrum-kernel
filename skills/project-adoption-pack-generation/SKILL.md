@@ -57,6 +57,7 @@ This skill separates generic workflow rules from project-specific overlay rules.
    - Improvement ledger initialization guidance: whether the project should start from the generic template and which categories are likely useful.
 
 5. Recommend first workflows.
+   - If the user also requests executable-spec method setup, check that `skill-router` and `spec-driven-development` are selected, then delegate that bounded delivery task through `skill-router`. Do not copy its conventions into the adoption pack or enable the method on an unrequested project. A method-only request goes directly through the delivery router without requiring this adoption pack.
    - Name the first three project-specific recipes that will reduce risk without over-processing.
    - Choose from adoption setup, implementation context generation, review context generation, first review route, first implementation route, or improvement-ledger initialization.
    - When Claude Code is the target runtime, recommend the local-first adapter path: install core kernel/skills, install the Claude project adapter or optional plugin, enable local hooks for project-local observability, use Pattern B `@claude review` only for PR-level shared review, and generate local weekly/monthly reports from project-local events and ledgers.
