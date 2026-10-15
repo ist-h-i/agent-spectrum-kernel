@@ -1,6 +1,6 @@
 ---
 name: spec-driven-development
-description: Define observable behavior and acceptance criteria, or establish a language-independent executable-spec test method for new projects, including writing conventions, a specification index, AI context retrieval, and verification selection.
+description: Define observable behavior and acceptance criteria, establish an executable-spec test method, or visualize specifications and unit-test behavior as scenarios for human review, preserving source IDs and evidence boundaries.
 ---
 
 # Spec-Driven Development
@@ -18,6 +18,7 @@ Turn a stable Requirement Contract or behavior request into an observable behavi
 - Migration, compatibility, or rollout may matter.
 - A new project needs tests as durable specification assets for developers and AI.
 - The user asks to establish test writing conventions, a specification index, context retrieval, or verification selection.
+- The user asks to animate a specification before implementation or compare test expectations and observed execution for human review.
 
 ## Do not use when
 
@@ -37,6 +38,9 @@ Load only the reference needed for the current step:
 | Determine what the AI must read before changing code | [Context retrieval](references/context-retrieval.md) |
 | Select checks and expand verification after a change | [Verification selection](references/verification-selection.md) |
 | Initialize project files or inspect language examples | [Templates and examples](references/project-templates.md) |
+| Preview a specification or visually compare test expectations and execution | [Scenario visual review](references/scenario-visual-review.md) |
+
+For an explicit scenario visualization request, read the scenario reference directly; do not require a full method setup first. Keep the scenario as a derived view of existing acceptance items. Separate intended behavior, reached assertions, and observed execution; preserve missing evidence and human review responsibility. A rendered animation never grants approval or supplies missing tests.
 
 Keep business rationale in its existing Requirement/domain context, observable acceptance in ordinary test code or a referenced non-executable acceptance item, architectural reasons in current ADRs, and execution obligations/results in the existing verification/evidence artifacts. The index is a derived navigation view, never another authority or proof of completeness. Test metadata reuses lifecycle artifact/item IDs and revisions; it does not introduce a second spec identity system.
 
@@ -106,7 +110,7 @@ Conditional fields, omit when irrelevant:
 
 ## Exit criteria
 
-For method setup, the four references and their entry points are available, examples are checked, and registration versus project initialization is distinguished. For behavior-definition work:
+For method setup or scenario visualization, the applicable references and their entry points are available, examples are checked, and registration versus project initialization is distinguished. For behavior-definition work:
 
 - Acceptance criteria are testable.
 - Observable behavior is separated from business rationale and executable task scope.

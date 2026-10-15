@@ -83,7 +83,7 @@ The user-facing route should describe work steps and stop points without requiri
 
 | Situation | Primary | Secondary |
 |---|---|---|
-| Executable-spec method setup: test writing conventions, specification index, AI context retrieval, or verification selection for a concrete project | `spec-driven-development` | Read its setup workflow; use only needed references. Do not require a behavior change, an existing business Spec, or an ASK adoption pack. Check the selected capability before delegation. |
+| Executable-spec method setup, or specification/test scenario visualization for human review | `spec-driven-development` | Read the setup workflow for method setup, or `references/scenario-visual-review.md` for a visual preview/comparison. Do not require a behavior change, an existing business Spec, or an ASK adoption pack. A preview does not require full setup. Check the selected capability before delegation. A PR review still enters `review-router`; a visual aid never replaces its gates. |
 | First-time rollout of the ASK skill set or adoption pack request | `operating-mode-router` | Route to `adoption_bootstrap` -> `project-adoption-pack-generation` |
 | Skill effectiveness, routing quality, or one-task workflow retrospective | `operating-mode-router` | Route to `observability_metrics` -> `skill-effectiveness-evaluation` |
 | Adoption maturity, instruction quality, usage metrics, or multi-task adoption impact | `operating-mode-router` | Route to `observability_metrics` -> `skill-adoption-metrics` |

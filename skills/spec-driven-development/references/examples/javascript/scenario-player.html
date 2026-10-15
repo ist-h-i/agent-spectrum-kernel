@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASK · シナリオで仕様を確かめる</title>
+<style>
+:root{color-scheme:light;--ink:#172c3a;--muted:#526778;--line:#d7e2e7;--blue:#285ced;--good:#11775d;--bad:#af3540;--paper:#f4f7f8}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 system-ui,sans-serif}button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);border-radius:9px;background:white;color:var(--ink);padding:9px 15px}button:hover{background:#eaf0ff}button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #285ced;outline-offset:3px}button[aria-pressed=true]{background:var(--ink);color:white}header{max-width:1440px;margin:auto;padding:34px 36px 24px;display:flex;justify-content:space-between;gap:20px;align-items:center}.eyebrow{font-size:12px;letter-spacing:.15em;color:var(--muted);font-weight:700}h1{font-size:clamp(23px,3vw,34px);line-height:1.35;margin:7px 0}h2{font-size:22px;margin:0}p{margin:8px 0}.pill{display:inline-block;padding:5px 11px;border:1px solid var(--line);border-radius:30px;font-size:12px;background:white}.layout{max-width:1440px;margin:auto;padding:0 36px 36px;display:grid;grid-template-columns:218px minmax(0,1fr);gap:24px}nav{display:flex;flex-direction:column;gap:7px;align-self:start}.case{text-align:left;padding:12px 13px;display:grid;grid-template-columns:22px 1fr;gap:9px}.case small{display:block;opacity:.75}.case[aria-current=true]{border-color:var(--blue);background:#e9efff}.case-num{font-size:12px;padding-top:3px;color:var(--muted)}.case-marker{font-size:12px;color:var(--bad)}main{min-width:0}.heading{display:flex;justify-content:space-between;gap:15px;align-items:start;margin-bottom:15px}.sub{color:var(--muted);font-size:13px}.notice{background:#fff4df;border:1px solid #e6c68a;border-radius:9px;padding:10px 14px;font-size:13px;margin-bottom:12px;white-space:pre-line}.notice:empty{display:none}.lanes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.lane{background:white;border:1px solid var(--line);border-radius:16px;overflow:hidden;min-width:0}.lane-head{padding:15px 17px 0}.lane-head strong{font-size:15px}.lane-head small{display:block;color:var(--muted);font-size:11px}.scene{display:block;width:100%;height:auto;background:linear-gradient(180deg,#fff,#f2f6fb)}.scene text{font-family:system-ui,sans-serif;fill:var(--ink)}.result{padding:12px 17px 16px;min-height:90px;border-top:1px solid var(--line);overflow-wrap:anywhere}.result strong{display:block;font-size:19px}.result small{color:var(--muted)}.controls{background:white;padding:17px;border:1px solid var(--line);border-radius:13px;margin-top:15px}.control-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.primary{background:var(--blue);color:white;border-color:var(--blue)}.primary:hover{background:#1745c7}input[type=range]{width:100%;accent-color:var(--blue);margin:17px 0 7px}.timeline-labels{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}.checks{margin-top:20px;overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px;text-align:left}th,td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:12px;color:var(--muted)}.good{color:var(--good)}.bad{color:var(--bad);font-weight:650}.unknown{color:#7b5d20}details{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;font-size:13px}summary{cursor:pointer;font-weight:600}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,monospace;background:white;border:1px solid var(--line);border-radius:8px;padding:13px}.scope{margin-top:14px;font-size:12px;color:var(--muted)}.motion-note{margin-left:auto;font-size:12px;color:var(--muted)}[hidden]{display:none!important}@media(max-width:1050px){.layout{grid-template-columns:1fr}nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.case{font-size:12px}.case-num{display:none}.case{grid-template-columns:1fr}}@media(max-width:700px){header{padding:22px 18px;display:block}.layout{padding:0 18px 24px;gap:17px}nav{grid-template-columns:repeat(2,minmax(0,1fr))}.lanes{grid-template-columns:1fr}.scene{max-height:290px}.heading{display:block}.lane{display:grid;grid-template-columns:1fr}.result{min-height:0}.motion-note{width:100%;margin-left:0}.pill{margin-top:8px}}
+</style>
+<header><div><div class="eyebrow">ASK / SCENARIO REVIEW</div><h1>仕様を、動きで確かめる。</h1><p class="sub">前提 → 操作 → 結果。3つの視点で同じ場面を比べる。</p></div><span class="pill" id="mode"></span></header>
+<div class="layout"><nav aria-label="シナリオ" id="cases"></nav><main>
+<div class="heading"><div><h2 id="title"></h2><div class="sub" id="identity"></div></div><span class="pill" id="input"></span></div>
+<div class="notice" id="notice" role="status"></div>
+<div class="lanes" id="lanes"></div>
+<div class="controls"><div class="control-row"><button class="primary" id="play">▶ 再生</button><button id="restart">先頭へ</button><button data-step="0">前提</button><button data-step="0.5">操作</button><button data-step="1">結果</button><span class="motion-note" id="motion-note">8秒の図解 · 実際の処理時間とは無関係</span></div>
+<input id="seek" type="range" min="0" max="1000" value="0" aria-label="再生位置"><div class="timeline-labels"><span>前提</span><span>操作</span><span>結果</span></div></div>
+<section class="checks" aria-label="検証の対応"><table><thead><tr><th>確認する項目</th><th>期待値の対応</th><th>実測との対応</th><th>assertの実行</th></tr></thead><tbody id="checks"></tbody></table></section>
+<p class="scope">架空の予約機能 · 単体テスト · モックなし。永続化・認可・並行更新・通知は対象外。図の移動は説明上の演出で、内部処理の観測ではありません。</p>
+<details><summary>値・参照元・実行ログを見る</summary><p>スナップショットの生成は人間の承認を意味しません。承認は元の仕様のID・版・内容に結び付けて記録します。</p><pre id="evidence"></pre></details>
+</main></div>
+<script>
+const report = /*__SCENARIO_DATA__*/null;
+if (!report) throw new Error('Generate this page with scenario-review.mjs');
+const $ = (id) => document.getElementById(id);
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const NS = 'http://www.w3.org/2000/svg';
+const labels = {match:'一致',different:'不一致',unasserted:'未assert',ambiguous:'対応が重複',unobserved:'未観測',passed:'成功',failed:'失敗',unbound:'観測値と結び付かない'};
+let selected = 0, progress = 0, running = false, lastTime = null, frame = null;
+const lanes = [];
+function el(name, text, parent, cls) { const node=document.createElement(name); if(text!==undefined)node.textContent=text;if(cls)node.className=cls;if(parent)parent.append(node);return node; }
+function svg(name, attrs, parent, text) {const node=document.createElementNS(NS,name);for(const [key,value]of Object.entries(attrs))node.setAttribute(key,value);if(text!==undefined)node.textContent=text;if(parent)parent.append(node);return node;}
+function inputLabel(input) {return (input.type==='string'?JSON.stringify(input.value):String(input.value))+' · '+input.type;}
+function verdict(value) {if(value?.ok===true)return '予約できる';if(value?.ok===false)return '予約を拒否';return '結果を判定できない';}
+function statusClass(status){return ['match','passed'].includes(status)?'good':['different','failed','unbound'].includes(status)?'bad':'unknown';}
+function laneValue(scenario,index,field) {const item=scenario.fields.find(item=>item.field===field);if(index===0)return {known:true,value:item.expected};if(index===1)return {known:['match','different'].includes(item.expectation),value:item.test_expected};return {known:item.observation!=='unobserved',value:item.actual};}
+['仕様スナップショット','テストの期待','実行で観測した結果'].forEach((title,index)=>{
+  const card=el('article',undefined,$('lanes'),'lane');const heading=el('div',undefined,card,'lane-head');el('strong',title,heading);el('small',['確認する仕様 · 人間の承認は別途','実行されたassertから取得','単体テストで呼び出した値'][index],heading);
+  const scene=svg('svg',{viewBox:'0 0 300 300',role:'img','aria-label':title},card);
+  svg('ellipse',{cx:150,cy:253,rx:125,ry:15,fill:'#e2eaf1'},scene);
+  const person=svg('g',{},scene);svg('circle',{cx:57,cy:96,r:15,fill:'#e9ba93'},person);svg('path',{d:'M42 92 Q40 70 59 77 Q75 80 72 92 L60 84 Z',fill:'#283546'},person);
+  svg('path',{d:'M45 120 Q55 114 67 121 L74 180 L38 180 Z',fill:'#285ced'},person);
+  svg('path',{d:'M45 177 L44 220 L35 240 M64 177 L70 220 L82 240',fill:'none',stroke:'#263449','stroke-width':10,'stroke-linecap':'round','stroke-linejoin':'round'},person);
+  svg('path',{d:'M66 128 L82 145 L96 132 M44 129 L32 157',fill:'none',stroke:'#e9ba93','stroke-width':9,'stroke-linecap':'round','stroke-linejoin':'round'},person);
+  svg('text',{x:56,y:275,'text-anchor':'middle','font-size':12},scene,'申込者');
+  svg('path',{d:'M105 155 Q130 112 157 147',fill:'none',stroke:'#adc0d4','stroke-width':2,'stroke-dasharray':'4 5'},scene);
+  const parcel=svg('g',{},scene);svg('rect',{x:-16,y:-16,width:32,height:32,rx:8,fill:'#285ced'},parcel);const quantity=svg('text',{x:0,y:5,'text-anchor':'middle','font-size':12,style:'fill:white;font-weight:700'},parcel);
+  const grid=svg('g',{},scene);const counter=svg('text',{x:219,y:77,'text-anchor':'middle','font-size':20,'font-weight':700},scene);
+  svg('text',{x:219,y:275,'text-anchor':'middle','font-size':12},scene,'確保済み / 総数');
+  const symbol=svg('text',{x:137,y:210,'text-anchor':'middle','font-size':25,'font-weight':700},scene);
+  const result=el('div',undefined,card,'result');const primary=el('strong','',result);const detail=el('small','',result);
+  lanes.push({scene,person,parcel,quantity,grid,counter,symbol,primary,detail});
+});
+function draw(){
+  const scenario=report.scenarios[selected];
+  $('seek').value=Math.round(progress*1000);$('seek').setAttribute('aria-valuetext',progress<.3?'前提':progress<.72?'操作':'結果');
+  document.querySelectorAll('[data-step]').forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.step)===(progress<.3?0:progress<.72?.5:1))));
+  const then=progress>=.72;const movement=reduced?(then?1:0):Math.max(0,Math.min(1,(progress-.3)/.42));const eased=movement*movement*(3-2*movement);
+  lanes.forEach((lane,index)=>{
+    const context=index===0?scenario:scenario.candidate;
+    const reserved=laneValue(scenario,index,'reserved'),result=laneValue(scenario,index,'result');
+    const available=index===0||report.mode==='review'&&context;
+    const capacity=context?.before.capacity??scenario.before.capacity;
+    const before=context?.before.reserved??scenario.before.reserved;
+    const count=then?(reserved.known?reserved.value:null):available?before:null;
+    lane.grid.replaceChildren();
+    const valid=Number.isSafeInteger(count)&&count>=0;
+    const drawn=Number.isSafeInteger(capacity)&&capacity>=1&&capacity<=10?capacity:0;
+    if(!drawn)svg('text',{x:219,y:150,'text-anchor':'middle','font-size':13},lane.grid,'図解範囲外');
+    for(let slot=0;slot<drawn;slot++)svg('rect',{x:174+(slot%2)*44,y:96+Math.floor(slot/2)*28,width:36,height:20,rx:5,fill:!valid?'#eff2f5':slot<count?(slot>=before?'#148269':'#6284d8'):'#e6edf3',stroke:valid?'none':'#a7b3be','stroke-dasharray':valid?'0':'3 2'},lane.grid);
+    lane.counter.textContent=valid?count+' / '+capacity:'? / '+capacity;
+    const inp=context?.input??scenario.input;
+    lane.quantity.textContent=String(inp.value).slice(0,5);
+    lane.parcel.setAttribute('transform','translate('+(110+eased*45)+' '+(152-Math.sin(eased*Math.PI)*32)+')');
+    lane.parcel.setAttribute('opacity',available&&progress>=.3&&(!then||result.value?.ok===false)?1:0);
+    lane.person.setAttribute('transform','translate('+(available?Math.sin(eased*Math.PI)*5:0)+' 0)');
+    lane.symbol.textContent=then?(result.known?(result.value?.ok===true?'✓':result.value?.ok===false?'×':'?'):'?'):'';
+    lane.symbol.setAttribute('style','fill:'+(result.value?.ok===true?'#11775d':'#af3540'));
+    const unknown=index===1?'未assert':index===2?'未観測':'不明';
+    lane.primary.textContent=!available?'未実行':then?(result.known?verdict(result.value):unknown):progress<.3?'空き '+(capacity-before)+' 枠':'数量 '+inputLabel(inp)+' を申し込む';
+    lane.detail.textContent=!available?'実行するとここに表示されます':then?'確保数 '+(reserved.known?JSON.stringify(reserved.value):unknown)+(result.value?.error?' · '+result.value.error:''):'確保済み '+before+' / 総数 '+capacity;
+    lane.scene.setAttribute('aria-label',lane.primary.textContent+'。'+lane.detail.textContent);
+  });
+}
+function pause(){running=false;lastTime=null;if(frame!==null)cancelAnimationFrame(frame);frame=null;$('play').textContent='▶ 再生';}
+function select(index){pause();selected=index;progress=0;const scenario=report.scenarios[index];$('title').textContent=scenario.title;$('identity').textContent=report.snapshot.spec.artifact_id+'@'+report.snapshot.spec.revision+' / '+scenario.item_id;$('input').textContent='入力 '+inputLabel(scenario.input);
+  [...$('cases').children].forEach((button,i)=>button.setAttribute('aria-current',String(i===index)));
+  const warnings=[];
+  if(report.mode==='preview')warnings.push('仕様のプレビューです。テスト・実装は未実行です。');
+  if(report.execution&&(report.execution.exit_code!==0||report.execution.error))warnings.push('テスト実行に失敗があります。ログと未観測の項目を確認してください。');
+  if(report.source_drift.length||report.revision_drift)warnings.push('取得時から参照元が変わっています。差分と仕様の版を確認してください。');
+  if(scenario.input_drift)warnings.push('前提または入力が一致しない／取得できません。同じ条件の比較として扱えません。');
+  if(scenario.removed)warnings.push('このケースは現在のfixtureから削除されています。');
+  if(report.extra_cases.length)warnings.push('スナップショットにない追加ケース: '+report.extra_cases.join(', '));
+  $('notice').textContent=warnings.join('\n');$('checks').replaceChildren();
+  for(const field of scenario.fields){const row=el('tr',undefined,$('checks'));el('td',field.field==='result'?'返り値':'確保数の変更',row);for(const key of ['expectation','observation','assertion']){const incomparable=scenario.input_drift&&key!=='assertion';el('td',report.mode==='preview'?'未実行':incomparable?'条件差分あり':labels[field[key]],row,report.mode==='preview'||incomparable?'unknown':statusClass(field[key]));}}
+  $('evidence').textContent=JSON.stringify({source_spec:report.snapshot.spec,human_review:report.snapshot.human_review,snapshot_digest:report.snapshot_digest,source_drift:report.source_drift,snapshot_sources:report.snapshot.sources,current_sources:report.current_sources,scenario,execution:report.execution},null,2);draw();
+}
+report.scenarios.forEach((scenario,index)=>{const button=el('button',undefined,$('cases'),'case');el('span',String(index+1).padStart(2,'0'),button,'case-num');const text=el('span',scenario.title,button);el('small',inputLabel(scenario.input),text);if(scenario.needs_attention)el('span','要確認',text,'case-marker');button.addEventListener('click',()=>select(index));});
+function tick(time){if(!running)return;if(lastTime!==null)progress=Math.min(1,progress+(time-lastTime)/8000);lastTime=time;draw();if(progress>=1)pause();else frame=requestAnimationFrame(tick);}
+$('play').addEventListener('click',()=>{if(running)return pause();if(progress>=1)progress=0;running=true;lastTime=null;$('play').textContent='Ⅱ 一時停止';frame=requestAnimationFrame(tick);});
+$('restart').addEventListener('click',()=>{pause();progress=0;draw();});
+$('seek').addEventListener('input',()=>{pause();progress=Number($('seek').value)/1000;draw();});
+document.querySelectorAll('[data-step]').forEach(button=>button.addEventListener('click',()=>{pause();progress=Number(button.dataset.step);draw();}));
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
+$('mode').textContent=report.mode==='preview'?'仕様プレビュー · 未実行':'テスト実行の比較 · 人間の承認は別途';
+if(reduced)$('motion-note').textContent='動きを抑える設定 · ステップ表示';
+select(0);
+</script>
+</html>
