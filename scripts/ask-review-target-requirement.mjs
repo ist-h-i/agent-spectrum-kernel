@@ -58,17 +58,28 @@ function proseClauses(text) {
   return clauses;
 }
 
+// Do not discard arbitrary targetless prose: a prefix, correction or quotation
+// can qualify the next/previous sentence across a newline. Only these bounded,
+// explicitly independent source/presentation notes may accompany a statement.
+// Unknown vocabulary stays Unknown rather than being assumed irrelevant.
+function independentExplanationClause(clause) {
+  const source = '(?:the )?(?:synthetic )?(?:source(?: code)?|code|implementation)';
+  const count = '(?:one|two|three|four|five|six|seven|eight|nine|ten|[1-9][0-9]{0,2})';
+  const structure = '(?:handlers?|listeners?|functions?|modules?|files?|parameters?|imports?)';
+  return new RegExp('^' + source + ' (?:has ' + count + ' ' + structure + '|was inspected)$', 'iu').test(clause)
+    || /^preserve (?:the )?(?:synthetic )?(?:label|focus order|layout|spacing|names?)$/iu.test(clause);
+}
+
 export function classifyTargetRequirement(actionText, target, { revision = '1' } = {}) {
   if (revision === '1') return classifyTargetRequirementV1(actionText, target);
   if (revision !== '2') return 'unknown';
   const pattern = literalTarget(actionText, target);
-  if (!pattern || /[?？]/u.test(actionText)) return 'unknown';
+  if (!pattern || /["'`>“”‘’«»?？]/u.test(actionText)) return 'unknown';
   const states = new Set();
   for (const clause of proseClauses(actionText)) {
     pattern.lastIndex = 0;
     if (!pattern.test(clause)) {
-      // Do not discard a pronoun-based denial or a qualified continuation.
-      if (/\b(?:it|they|this|that|unless|otherwise)\b|^(?:optional|unnecessary|not required|not needed|don't)$|^(?:except|but|however|instead)\b/iu.test(clause)) return 'unknown';
+      if (!independentExplanationClause(clause)) return 'unknown';
       continue;
     }
     pattern.lastIndex = 0;
@@ -87,12 +98,12 @@ export function classifyTargetRequirement(actionText, target, { revision = '1' }
 export function classifyObservedVerification(conclusion, target, { revision = PUBLIC_REVIEW_RECOGNITION_REVISION } = {}) {
   if (revision !== PUBLIC_REVIEW_RECOGNITION_REVISION) return 'unknown';
   const pattern = literalTarget(conclusion, target);
-  if (!pattern || /[?？]/u.test(conclusion)) return 'unknown';
+  if (!pattern || /["'`>“”‘’«»?？]/u.test(conclusion)) return 'unknown';
   const states = new Set();
   for (const clause of proseClauses(conclusion)) {
     pattern.lastIndex = 0;
     if (!pattern.test(clause)) {
-      if (/\b(?:tests?|suites?|checks?|pass\w*|fail\w*|error\w*|success\w*|verification|outcomes?|results?|it|they|this|that)\b/iu.test(clause)) return 'unknown';
+      if (!independentExplanationClause(clause)) return 'unknown';
       continue;
     }
     pattern.lastIndex = 0;

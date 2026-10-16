@@ -1,6 +1,6 @@
 # Prospective primary evidence and public review recognition
 
-Spec `SPEC-PRIMARY-EVIDENCE-RECOGNITION-2`, revision 1, references the authorized
+Spec `SPEC-PRIMARY-EVIDENCE-RECOGNITION-2`, revision 2, references the authorized
 ASK development continuation, #391 and #379. This is a prospective implementation,
 not permission to start a comparison, a model, a provider or a private grader.
 All examples and regression inputs in this change are newly authored synthetic
@@ -68,6 +68,12 @@ Public review consumers explicitly use
 `classifyObservedVerification(text, subject, { revision: '2' })`.
 Target aliases are literal bounded data; all qualifiers needed for a remedy
 belong in the selected alias. Target-bearing unfamiliar clauses remain Unknown.
+Targetless prose is not assumed irrelevant: only bounded source-structure counts,
+source inspection notes and presentation-preservation instructions are accepted
+as independent explanations. Other prefixes, corrections, conditions and quoted
+blocks stay Unknown, including when separated from the target by a newline.
+This intentionally leaves unsupported prose Unknown rather than inferring its
+relationship to the recognized statement.
 Observed-result recognition returns passed/failed/incomplete/unknown; it does
 not decide whether the claim is true. The fake consumer test compares it with
 an independently supplied artificial fact and rejects conflicting state labels.
@@ -76,8 +82,8 @@ explanation. A future private consumer still owns those independent judgments.
 
 ## Verification Contract
 
-- Artifact ID: `FVC-PRIMARY-EVIDENCE-RECOGNITION-2`, revision 1.
-- Upstream: `SPEC-PRIMARY-EVIDENCE-RECOGNITION-2`, observed revision 1.
+- Artifact ID: `FVC-PRIMARY-EVIDENCE-RECOGNITION-2`, revision 2.
+- Upstream: `SPEC-PRIMARY-EVIDENCE-RECOGNITION-2`, observed revision 2.
 - Policy: `ask.verification-proof-policy@1.0.0`, formal path; triggers
   `bug_reproduction_or_regression`, `public_api_schema_or_compatibility`, and
   `multi_session_multi_agent_or_handoff`.
@@ -95,6 +101,6 @@ explanation. A future private consumer still owns those independent judgments.
 - Insufficient evidence: any failed obligation, unclosed processing identity or
   missing independent review; model effectiveness and private adoption Unknown.
 
-Implementation `IMPL-PRIMARY-EVIDENCE-RECOGNITION-2`, revision 1, references this
+Implementation `IMPL-PRIMARY-EVIDENCE-RECOGNITION-2`, revision 2, references this
 Spec and Verification Contract. Executed evidence and remaining limitations are
 recorded in the linked Draft PR; no new result ledger or scoring platform exists.
