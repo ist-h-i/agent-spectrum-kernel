@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test, { before, after } from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, realpathSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -60,6 +60,27 @@ test('source-only build refuses root/revision changes, explicit graph injection 
     assert.throws(() => deriveEvaluatorDependencyGraph({ root, baseRevision: revision, entryPaths: [helper] }), /explicit_graph_parameters/u);
     assert.throws(() => scope.withPrimaryEvaluationProducer({ recordRoot: '/not-an-input', externalDigest: 'sha256:' + '0'.repeat(64) }, () => {}), /source_build.*producer|processing_build.*producer/u);
     assert.throws(() => scope.withPrimaryProcessingSourceBuild({ root, baseRevision: revision }, () => {}), /nested_scope/u);
+  });
+});
+
+test('source-only construction accepts its writers linked staging worktree and refuses an unrelated clone', () => {
+  const stage = join(parent, 'writer-stage'), unrelated = join(parent, 'unrelated-source');
+  git(root, ['worktree', 'add', '--detach', stage, revision]);
+  execFileSync('git', ['clone', '--no-hardlinks', root, unrelated], { stdio: 'pipe' });
+  git(unrelated, ['checkout', '--detach', revision]);
+  const ancestorAlias = join(parent, 'os-ancestor-alias'), finalAlias = join(parent, 'final-root-alias'), unregistered = join(parent, 'unregistered-root');
+  symlinkSync(parent, ancestorAlias, 'dir'); symlinkSync(stage, finalAlias, 'dir'); mkdirSync(unregistered);
+  scope.withPrimaryProcessingSourceBuild({ root, baseRevision: revision }, () => {
+    assert.equal(deriveEvaluatorDependencyGraph({ root: stage, baseRevision: revision }).entry_paths.includes(helper), true);
+    assert.equal(deriveEvaluatorDependencyGraph({ root: join(ancestorAlias, 'writer-stage'), baseRevision: revision }).entry_paths.includes(helper), true);
+    assert.throws(() => deriveEvaluatorDependencyGraph({ root: finalAlias, baseRevision: revision }), /root_changed/u);
+    assert.throws(() => deriveEvaluatorDependencyGraph({ root: unrelated, baseRevision: revision }), /root_changed/u);
+    for (const gitDirectory of [join(root, '.git'), git(stage, ['rev-parse', '--absolute-git-dir'])]) {
+      writeFileSync(join(unregistered, '.git'), `gitdir: ${gitDirectory}\n`);
+      assert.throws(() => deriveEvaluatorDependencyGraph({ root: unregistered, baseRevision: revision }), /root_changed/u);
+    }
+    git(stage, ['-c', 'user.name=ASK synthetic stage', '-c', 'user.email=synthetic-source@invalid', 'commit', '--allow-empty', '-m', 'Different staging revision']);
+    assert.throws(() => deriveEvaluatorDependencyGraph({ root: stage, baseRevision: revision }), /root_changed/u);
   });
 });
 

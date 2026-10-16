@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
-import { join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { dirname, join, resolve } from 'node:path';
 import { lstatSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
@@ -46,6 +47,27 @@ const rawDigest=raw=>`sha256:${createHash('sha256').update(raw).digest('hex')}`;
 const historicalEntries = Object.freeze(['scripts/ask-benchmark-evaluator-boundary.mjs','scripts/ask-benchmark-materialize.mjs',
   'scripts/ask-benchmark-normalized-results.mjs','scripts/ask-benchmark-private-evaluator-runner.mjs','scripts/ask-benchmark-scoring-contract.mjs']);
 const processingSchemas = PRIMARY_PROCESSING_SOURCE_PATHS.filter(path => path.endsWith('.schema.json'));
+const sourceGit = (root, ...args) => execFileSync('git', ['-C', root, 'rev-parse', ...args],
+  { encoding: 'utf8', maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+const sourceCommonDirectory = root => realpathSync(sourceGit(root, '--path-format=absolute', '--git-common-dir'));
+function sourceBuildRoot(root, context) {
+  try {
+    if (lstatSync(root).isSymbolicLink()) throw new Error('symlink');
+    // Writers use the OS temporary path, which may have a canonical ancestor
+    // alias (/var on macOS). The final root itself must be an ordinary directory.
+    const selected = realpathSync(root);
+    if (selected === context.root) return selected;
+    // Existing transactional writers stage in a linked worktree. Only their
+    // selected commit in the same Git common directory can join this scope.
+    const gitFile = join(selected, '.git'), gitDirectory = realpathSync(sourceGit(selected, '--absolute-git-dir'));
+    if (lstatSync(gitFile).isFile() && dirname(gitDirectory) === join(context.commonDirectory, 'worktrees')
+      && sourceCommonDirectory(selected) === context.commonDirectory && sourceGit(selected, 'HEAD') === context.baseRevision) {
+      const backlink = readStableFile(join(gitDirectory, 'gitdir'), 'source construction staging backlink', 8192).bytes.toString('utf8').replace(/\n$/u, '');
+      if (realpathSync(backlink) === gitFile) return selected;
+    }
+  } catch { /* Preserve the closed construction-root error below. */ }
+  throw new Error('primary_source_build_root_changed');
+}
 /** Explicit source construction only, before a new private version is admitted.
  * No producer/schema/worker authority is supplied; async writers retain only
  * this graph choice until their returned work settles. Detached work loses it. */
@@ -56,7 +78,7 @@ export function withPrimaryProcessingSourceBuild({ root, baseRevision, ...unknow
   if (!/^[a-f0-9]{40}$/u.test(baseRevision)) throw new Error('primary_source_build_revision_invalid');
   const processing = primaryProcessingDescriptor({ root });
   if (JSON.stringify(processing) !== JSON.stringify(primaryProcessingDescriptor())) throw new Error('primary_source_build_processing_source_changed');
-  const context = { active: true, sourceBuild: true, root, baseRevision, processing };
+  const context = { active: true, sourceBuild: true, root, baseRevision, processing, commonDirectory: sourceCommonDirectory(root) };
   return resourceGraphState.run(context, () => {
     try {
       const result = callback();
@@ -101,7 +123,7 @@ export function primaryEvaluatorDependencyGraphParameters({root,baseRevision,def
   if(!producer?.verified&&!resource?.active)return null;
   if(!defaultParameters)throw new Error('primary_explicit_graph_parameters_refused');
   if (resource?.active && resource.sourceBuild) {
-    if (root !== resource.root) throw new Error('primary_source_build_root_changed');
+    root = sourceBuildRoot(root, resource);
     if (baseRevision !== resource.baseRevision) throw new Error('primary_source_build_revision_changed');
     if (JSON.stringify(primaryProcessingDescriptor({ root })) !== JSON.stringify(resource.processing)) throw new Error('primary_source_build_processing_source_changed');
     if (!defaults || JSON.stringify([...defaults.entryPaths].sort()) !== JSON.stringify(historicalEntries)) throw new Error('primary_source_build_default_entries_changed');

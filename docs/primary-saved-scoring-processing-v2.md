@@ -1,6 +1,6 @@
 # Explicit processing version for saved primary evidence
 
-Spec `SPEC-PRIMARY-SAVED-SCORING-2`, revision 1, references #393, #379 and
+Spec `SPEC-PRIMARY-SAVED-SCORING-2`, revision 2, references #393, #379 and
 the merged #392 public processing seam. This is a separately identified,
 posthoc processing interpretation of retained evidence. It does not restore
 old admission or rewrite the meaning of an old score.
@@ -48,6 +48,14 @@ authority writers assemble a new private version. It selects a fixed graph shape
 and reuses the existing generator/validator. It supplies no verified producer,
 schema, admission, start or execution authority. Historical graph reconstruction
 continues to use the exact version-selected old graph.
+The existing transactional writers may stage at their selected commit in a
+linked worktree of the same Git common directory. Construction rechecks that
+relationship through its Git administrative directory and reciprocal worktree
+backlink, selected commit, physical path and processing bytes. OS ancestor aliases
+are normalized; a final root symlink, forged Git pointer, unrelated clone or
+staging worktree at another commit is refused. Runtime permissions are unchanged.
+Revision 2 adds this existing writer transaction to the construction boundary;
+revision 1 evidence remains scoped to its earlier single-root construction tests.
 
 The private copy imports the public helper through its existing verified
 `private_entry_import` edge. A recognized assertion must still agree with a
@@ -120,8 +128,8 @@ be a separate, newly authorized execution, never an automatic retry.
 
 ## Formal Verification Contract
 
-- Artifact: `FVC-PRIMARY-SAVED-SCORING-2`, revision 1.
-- Upstream: `SPEC-PRIMARY-SAVED-SCORING-2`, observed revision 1.
+- Artifact: `FVC-PRIMARY-SAVED-SCORING-2`, revision 2.
+- Upstream: `SPEC-PRIMARY-SAVED-SCORING-2`, observed revision 2.
 - Policy: `ask.verification-proof-policy@1.0.0`; formal triggers are
   `public_api_schema_or_compatibility`,
   `state_concurrency_persistence_lifecycle_or_cross_module`,
@@ -130,6 +138,8 @@ be a separate, newly authorized execution, never an automatic retry.
   source-digest and descriptor substitution controls.
 - `O-CLOSURE`: construct and verify the explicit graph; reject added entries,
   missing helper/schema nodes, changed root/revision and stale async scope.
+  Exercise the actual CI/doc resource writers in source-only construction;
+  permit only their same-repository, same-commit linked staging worktrees.
   Pass the same graph through sealed byte validation, retaining exact schema
   types and all descriptor checks. A source-build scope cannot acquire
   producer/scoring authority.
@@ -145,7 +155,7 @@ be a separate, newly authorized execution, never an automatic retry.
 - `O-REVIEW`: independent public/private review, relevant local checks and
   exact-head CI. A blocked private authority stays blocked.
 
-Implementation `IMPL-PRIMARY-SAVED-SCORING-2`, revision 1, references this Spec
+Implementation `IMPL-PRIMARY-SAVED-SCORING-2`, revision 2, references this Spec
 and FVC. Executed evidence and current limitations belong in the linked PR and
 the separate private preparation record. This file grants no formal regrading,
 model execution, adoption, Mac application or merge permission.
