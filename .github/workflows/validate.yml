@@ -217,6 +217,11 @@ jobs:
       - name: Verify read-only saved primary command capture
         run: node --test scripts/test-ask-primary-saved-command-capture.mjs
 
+      - name: Verify prospective primary evidence and public review recognition (artificial inputs only)
+        run: |
+          node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v2 --check
+          node --test scripts/test-ask-primary-evidence-recognition-v2.mjs scripts/test-ask-review-target-requirement-v2.mjs
+
       - name: Verify literal body and review target diagnostics (no execution)
         run: node --test scripts/test-ask-saved-command-body-observation.mjs scripts/test-ask-review-target-requirement.mjs
 

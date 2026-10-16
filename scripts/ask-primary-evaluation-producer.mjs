@@ -10,7 +10,7 @@ import { canonicalDigest, parseJsonRejectDuplicateKeys } from './content-address
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { normalizeRuntimeObservationCarrier } from './ask-benchmark-runtime-observation.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
-import { buildCodexCommandEvidence, buildUnavailableCommandEvidence, commandEvidenceFailureReason, PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, validateVerificationCommandContract, validateCommandEvidenceManifest } from './ask-benchmark-command-evidence.mjs';
+import { buildCodexCommandEvidence, buildUnavailableCommandEvidence, commandEvidenceFailureReason, PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, validateVerificationCommandContract, validateCommandEvidenceManifest } from './ask-benchmark-command-evidence.mjs';
 import { captureTerminalWorkspaceInventory, buildTerminalWorkspaceAuthority, readVerifiedTerminalWorkspaceAuthority } from './ask-benchmark-terminal-workspace.mjs';
 import { normalizePortfolioExecution, verifyNormalizedPortfolioResults } from './ask-benchmark-normalized-results.mjs';
 import { materializeVerifiedTerminalCandidate } from './ask-benchmark-terminal-candidate.mjs';
@@ -49,7 +49,8 @@ export function primaryProducerSources() {
     'scripts/ask-benchmark-schema.mjs', 'scripts/ask-benchmark-normalized-results.mjs', 'scripts/ask-benchmark-execution.mjs',
     'scripts/ask-benchmark-evaluator-boundary.mjs', 'scripts/ask-benchmark-command-evidence.mjs', 'scripts/ask-benchmark-terminal-workspace.mjs',
     'scripts/ask-benchmark-terminal-candidate.mjs', 'scripts/ask-benchmark-portfolio-score.mjs',
-    ...PRIMARY_PROFILE_SCHEMAS.flatMap(name => [`benchmarks/schemas/${name}.schema.json`, `benchmarks/schemas/primary-${name}.schema.json`, `benchmarks/schemas/primary-k2-${name}.schema.json`])];
+    ...PRIMARY_PROFILE_SCHEMAS.flatMap(name => [`benchmarks/schemas/${name}.schema.json`, `benchmarks/schemas/primary-${name}.schema.json`, `benchmarks/schemas/primary-k2-${name}.schema.json`]),
+    'benchmarks/schemas/primary-saved-v2-portfolio-command-evidence.schema.json', 'benchmarks/schemas/primary-k2-saved-v2-portfolio-command-evidence.schema.json'];
   const all=new Set([...paths,'scripts/ask-primary-fixture-recipe.mjs','benchmarks/adaptive-portfolio.config.json',
     'benchmarks/schemas/runtime-observation-carrier.schema.json',
     'benchmarks/portfolio-catalog.json','benchmarks/portfolio-policy-manifest.json','benchmarks/portfolio-scoring-policy.json']);
@@ -125,7 +126,7 @@ function snapshotDigest(snapshots) {
 }
 function typedUsage(metrics) { return { metrics: Object.fromEntries(['input_tokens','output_tokens','cached_tokens'].map(name => {
   const value = metrics?.[name]; return [name, Number.isSafeInteger(value) && value >= 0 ? { status: 'known', value, reason: 'saved_controller_usage' } : { status: 'unknown', value: null, reason: 'usage_not_observed' }]; })) }; }
-function derive(target, source) {
+function derive(target, source, parserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION) {
   const { request, loaded, snapshots } = source, ids = identifiers(request), fixture = json(join(ROOT, 'benchmarks/adaptive-portfolio.config.json')).fixtures.find(f => f.id === request.fixture_id);
   assert.ok(fixture);
   const contract = validateVerificationCommandContract(json(join(ROOT, `benchmarks/fixtures/checkpoint-b2/${request.fixture_id}/verification-command-contract.json`)), { root: ROOT });
@@ -167,7 +168,6 @@ function derive(target, source) {
       const commandIdentity = { ...terminalIdentity, repetition: 1, verification_command_contract_digest: contract.contract_digest,
         runtime_identity_digest: canonicalDigest(adapter), effective_command_digest: canonicalDigest(adapter.effective_command) };
       let commands;
-      const parserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
       try { commands = buildCodexCommandEvidence({ identity: commandIdentity, stream: stdout, contract, parserRevision }); }
       catch (error) { commands = buildUnavailableCommandEvidence({ identity: commandIdentity, support: 'supported', probe: 'capture_invalid', reason: commandEvidenceFailureReason(error), stream: stdout, parserRevision }); }
       validateCommandEvidenceManifest(commands, { root: ROOT, contract });
@@ -199,7 +199,8 @@ function derive(target, source) {
     adapter_identities: new Map([['codex', adapter]]), cases: inspected } };
 }
 
-export async function producePrimaryEvaluationArtifacts(block, outputRoot) {
+export async function producePrimaryEvaluationArtifacts(block, outputRoot, { commandEvidenceParserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION } = {}) {
+  assert.ok([PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION].includes(commandEvidenceParserRevision), 'unsupported primary command evidence revision');
   const source = await checkedSource(block), target = resolve(outputRoot);
   assert.ok(!existsSync(target)); assert.equal(realpathSync(dirname(target)), dirname(target));
   for (const input of [ROOT, block.root, block.public_input_root]) assert.ok(target !== resolve(input) && !target.startsWith(`${resolve(input)}/`), 'primary output overlaps authority');
@@ -210,14 +211,16 @@ export async function producePrimaryEvaluationArtifacts(block, outputRoot) {
     mkdirSync(join(target, prefix), { recursive: true, mode: 0o700 });
     for (const [path, file] of Object.entries(tree)) write(target, `${prefix}/${path}`, file.bytes, file.mode === '100755' ? 0o700 : 0o600);
   }
-  const derived = withPrimarySchemaBuild(() => derive(target, source), { profileId: primaryProfileForRequest(source.request).id });
+  const derived = withPrimarySchemaBuild(() => derive(target, source, commandEvidenceParserRevision), { profileId: primaryProfileForRequest(source.request).id, commandEvidenceParserRevision });
   for (const [path, value] of derived.output) write(target, path, value, path.endsWith('terminal-workspace-authority.json') ? 0o444 : 0o600);
   write(target, 'saved-grading-export.json', source.request);
   const retainedSource = { loaded: source.loaded, request_digest: source.request_digest, references: source.references,
     snapshots: Object.fromEntries(Object.entries(source.snapshots).map(([condition,item])=>[condition,Object.fromEntries(Object.entries(item).map(([kind,tree])=>[kind,
       tree === null ? null : Object.fromEntries(Object.entries(tree).map(([path,file])=>[path,{ original_path:file.original_path,bytes:file.bytes.length,digest:hash(file.bytes),mode:file.mode }]))]))])) };
   write(target, 'source-binding.json', retainedSource);
-  const manifest = { kind: 'ask_primary_evaluation_producer_v1', evidence_kind: source.request.evidence_kind, response_format:'primary_plain_utf8_response_v1', block, grading_export_digest: source.request_digest,
+  const v2 = commandEvidenceParserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION;
+  const manifest = { kind: v2 ? 'ask_primary_evaluation_producer_v2' : 'ask_primary_evaluation_producer_v1',
+    ...(v2 ? { command_evidence_parser_revision: commandEvidenceParserRevision } : {}), evidence_kind: source.request.evidence_kind, response_format:'primary_plain_utf8_response_v1', block, grading_export_digest: source.request_digest,
     snapshot_digest: snapshotDigest(source.snapshots), source_digests: primaryProducerSources(), artifact_inventory: entries(target),
     execution_permission: false, scoring_ready: false, formal_aggregate_eligible: false, model_calls: 0, grader_process_starts: 0 };
   write(target, 'producer.json', manifest); const options = { recordRoot: target, externalDigest: hash(bytes(manifest)) };
@@ -230,7 +233,11 @@ export function verifyPrimaryEvaluationProducer(options) {
   const raw = read(join(target, 'producer.json')); assert.equal(hash(raw), options.externalDigest, 'primary external producer pin changed');
   const manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
   assert.ok(PRIMARY_FIXTURE_IDS.includes(manifest.block.fixture_id), 'primary fixture set is closed');
-  assert.equal(manifest.kind, 'ask_primary_evaluation_producer_v1'); assert.equal(manifest.execution_permission, false); assert.equal(manifest.scoring_ready, false);
+  assert.ok(['ask_primary_evaluation_producer_v1', 'ask_primary_evaluation_producer_v2'].includes(manifest.kind), 'unknown primary producer version');
+  const commandEvidenceParserRevision = manifest.kind === 'ask_primary_evaluation_producer_v2' ? manifest.command_evidence_parser_revision : PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
+  if (manifest.kind === 'ask_primary_evaluation_producer_v2') assert.equal(commandEvidenceParserRevision, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, 'primary v2 parser revision changed');
+  else assert.equal(Object.hasOwn(manifest, 'command_evidence_parser_revision'), false, 'legacy primary producer cannot select a new parser');
+  assert.equal(manifest.execution_permission, false); assert.equal(manifest.scoring_ready, false);
   assert.equal(manifest.response_format,'primary_plain_utf8_response_v1');
   assert.equal(manifest.formal_aggregate_eligible,false);
   assert.equal(manifest.model_calls, 0); assert.equal(manifest.grader_process_starts, 0); assert.ok(same(manifest.source_digests, primaryProducerSources()), 'primary producer sources changed');
@@ -253,10 +260,10 @@ export function verifyPrimaryEvaluationProducer(options) {
     const prefix = `${kind === 'baseline' ? 'materialized' : 'terminal'}/${id.cases[condition]}`;
     for (const [path, file] of Object.entries(tree)) assert.deepEqual(read(join(target, prefix, path)), file.bytes, 'primary copied snapshot differs from original');
   }
-  const derived = withPrimarySchemaBuild(() => derive(target, source), { profileId: primaryProfileForRequest(source.request).id });
+  const derived = withPrimarySchemaBuild(() => derive(target, source, commandEvidenceParserRevision), { profileId: primaryProfileForRequest(source.request).id, commandEvidenceParserRevision });
   for (const [path, value] of derived.output) assert.deepEqual(read(join(target, path)), bytes(value), 'primary derived record changed');
   return { inspection: derived.inspection, executionOptions: executionOptions(target), request: source.request, evidence_kind: manifest.evidence_kind, source_digests:manifest.source_digests,
-    block: manifest.block, originalSourceRepository: source.loaded.plan.source.repo ?? null, execution_permission: false, scoring_ready: false };
+    block: manifest.block, commandEvidenceParserRevision, originalSourceRepository: source.loaded.plan.source.repo ?? null, execution_permission: false, scoring_ready: false };
 }
 export function verifyPrimaryProducedTerminal(inspection, { root, runDir, caseId, attempt }) {
   const c = inspection.cases.find(value => value.entry.case_id === caseId), a = c?.attempts.find(value => value.attempt === attempt); assert.ok(a);
