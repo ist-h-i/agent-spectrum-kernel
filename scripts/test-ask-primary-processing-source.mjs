@@ -31,6 +31,23 @@ before(() => {
 });
 after(() => { if (parent) rmSync(parent, { recursive: true, force: true }); });
 
+test('production processing entrypoints initialize independently in a fresh process', () => {
+  // A shared test module can accidentally initialize the circular producer /
+  // scope / version imports in a favorable order. Application callers must be
+  // able to import each entry first, without preparation or worker dispatch.
+  for (const [name, exported] of [
+    ['ask-primary-scoring-version.mjs', 'readPrimaryScoringVersion'],
+    ['ask-primary-evaluation-scope.mjs', 'withPrimaryProcessingSourceBuild'],
+    ['ask-primary-evaluation-producer.mjs', 'inspectPrimaryEvaluationSource'],
+    ['ask-primary-evaluation-private-grading.mjs', 'preflightPrimaryEvaluationGradingResources'],
+    ['ask-primary-evaluation-grading.mjs', 'createPrimaryEvaluationGradingAdapter'],
+    ['ask-primary-saved-scoring.mjs', 'preparePrimarySavedScoring'],
+  ]) {
+    const script = `const api = await import(${JSON.stringify(new URL(name, import.meta.url).href)}); if (typeof api[${JSON.stringify(exported)}] !== 'function') throw new Error('entry export missing');`;
+    execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: ROOT, stdio: 'pipe' });
+  }
+});
+
 test('explicit source-only build closes the helper and additive schemas without changing defaults', () => {
   const old = deriveEvaluatorDependencyGraph({ root, baseRevision: revision });
   assert.equal(old.entry_paths.includes(helper), false);

@@ -1,6 +1,6 @@
 # Explicit processing version for saved primary evidence
 
-Spec `SPEC-PRIMARY-SAVED-SCORING-2`, revision 2, references #393, #379 and
+Spec `SPEC-PRIMARY-SAVED-SCORING-2`, revision 3, references #393, #379 and
 the merged #392 public processing seam. This is a separately identified,
 posthoc processing interpretation of retained evidence. It does not restore
 old admission or rewrite the meaning of an old score.
@@ -56,6 +56,10 @@ are normalized; a final root symlink, forged Git pointer, unrelated clone or
 staging worktree at another commit is refused. Runtime permissions are unchanged.
 Revision 2 adds this existing writer transaction to the construction boundary;
 revision 1 evidence remains scoped to its earlier single-root construction tests.
+Revision 3 also checks each public processing entry as the first import in a
+fresh process. Source graph constants are read when constructing a graph, after
+the existing producer/scope/version import cycle has initialized. Earlier shared
+test imports did not establish this application-entry behavior.
 
 The private copy imports the public helper through its existing verified
 `private_entry_import` edge. A recognized assertion must still agree with a
@@ -128,14 +132,15 @@ be a separate, newly authorized execution, never an automatic retry.
 
 ## Formal Verification Contract
 
-- Artifact: `FVC-PRIMARY-SAVED-SCORING-2`, revision 2.
-- Upstream: `SPEC-PRIMARY-SAVED-SCORING-2`, observed revision 2.
+- Artifact: `FVC-PRIMARY-SAVED-SCORING-2`, revision 3.
+- Upstream: `SPEC-PRIMARY-SAVED-SCORING-2`, observed revision 3.
 - Policy: `ask.verification-proof-policy@1.0.0`; formal triggers are
   `public_api_schema_or_compatibility`,
   `state_concurrency_persistence_lifecycle_or_cross_module`,
   `bug_reproduction_or_regression`, and `multi_session_multi_agent_or_handoff`.
 - `O-VERSION`: static synthetic v1/v2 descriptors, option conflict, revision,
-  source-digest and descriptor substitution controls.
+  source-digest and descriptor substitution controls. Import each public
+  processing entry first in its own process, without preparation or dispatch.
 - `O-CLOSURE`: construct and verify the explicit graph; reject added entries,
   missing helper/schema nodes, changed root/revision and stale async scope.
   Exercise the actual CI/doc resource writers in source-only construction;
@@ -155,7 +160,7 @@ be a separate, newly authorized execution, never an automatic retry.
 - `O-REVIEW`: independent public/private review, relevant local checks and
   exact-head CI. A blocked private authority stays blocked.
 
-Implementation `IMPL-PRIMARY-SAVED-SCORING-2`, revision 2, references this Spec
+Implementation `IMPL-PRIMARY-SAVED-SCORING-2`, revision 3, references this Spec
 and FVC. Executed evidence and current limitations belong in the linked PR and
 the separate private preparation record. This file grants no formal regrading,
 model execution, adoption, Mac application or merge permission.

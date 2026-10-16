@@ -46,7 +46,9 @@ export function primaryRuntimeObservationSourceRoots() {
 const rawDigest=raw=>`sha256:${createHash('sha256').update(raw).digest('hex')}`;
 const historicalEntries = Object.freeze(['scripts/ask-benchmark-evaluator-boundary.mjs','scripts/ask-benchmark-materialize.mjs',
   'scripts/ask-benchmark-normalized-results.mjs','scripts/ask-benchmark-private-evaluator-runner.mjs','scripts/ask-benchmark-scoring-contract.mjs']);
-const processingSchemas = PRIMARY_PROCESSING_SOURCE_PATHS.filter(path => path.endsWith('.schema.json'));
+// Version, producer and scope modules form an existing import cycle. Read the
+// version constants only when a graph is requested, after module initialization.
+const processingSchemas = () => PRIMARY_PROCESSING_SOURCE_PATHS.filter(path => path.endsWith('.schema.json'));
 const sourceGit = (root, ...args) => execFileSync('git', ['-C', root, 'rev-parse', ...args],
   { encoding: 'utf8', maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const sourceCommonDirectory = root => realpathSync(sourceGit(root, '--path-format=absolute', '--git-common-dir'));
@@ -107,7 +109,7 @@ function pinnedHistoricalGraph(root,fixtureId,binding,scoringVersion = null) {
   if (version?.processing) {
     if (!graph.edge_inventory.some(edge => edge.kind === 'private_entry_import' && edge.to === PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH)) throw new Error('primary_processing_graph_helper_edge_missing');
     for (const path of PRIMARY_PROCESSING_SOURCE_PATHS) if (!graph.node_inventory.some(node => node.path === path
-      && (!processingSchemas.includes(path) || node.file_type === 'authority_data'))) throw new Error('primary_processing_graph_source_missing');
+      && (!processingSchemas().includes(path) || node.file_type === 'authority_data'))) throw new Error('primary_processing_graph_source_missing');
   }
   return{root,baseRevision:identity.base_git_revision,entryPaths:[...graph.entry_paths],authorityPaths:graph.node_inventory.filter(node=>node.file_type==='authority_data').map(node=>node.path),
     privateEntryPaths:graph.edge_inventory.filter(edge=>edge.kind==='private_entry_import').map(edge=>edge.to)};
@@ -128,7 +130,7 @@ export function primaryEvaluatorDependencyGraphParameters({root,baseRevision,def
     if (JSON.stringify(primaryProcessingDescriptor({ root })) !== JSON.stringify(resource.processing)) throw new Error('primary_source_build_processing_source_changed');
     if (!defaults || JSON.stringify([...defaults.entryPaths].sort()) !== JSON.stringify(historicalEntries)) throw new Error('primary_source_build_default_entries_changed');
     return { root, baseRevision, entryPaths: [...defaults.entryPaths, PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH].sort(),
-      authorityPaths: [...new Set([...defaults.authorityPaths, ...processingSchemas])].sort(),
+      authorityPaths: [...new Set([...defaults.authorityPaths, ...processingSchemas()])].sort(),
       privateEntryPaths: [...new Set([...defaults.privateEntryPaths, PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH])].sort() };
   }
   let selected;
