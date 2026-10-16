@@ -14,7 +14,8 @@ import { deriveEffectiveVerificationEvidenceState } from './ask-benchmark-scorin
 import { scoreEvaluatorResult } from './ask-benchmark-portfolio-score.mjs';
 import { verifyPublicEvaluatorReference, verifyPrivateEvaluatorResourceAssets } from './ask-benchmark-evaluator-boundary.mjs';
 import { resolveEffectiveAdmissionAuthorityFromFiles } from './ask-benchmark-admission-decision.mjs';
-import { verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
+import { primaryProcessingSelection, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
+import { PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION } from './ask-benchmark-command-evidence.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 
 import { getPrimaryEvaluationProfile, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
@@ -157,6 +158,8 @@ export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs
     // supplies the unchanged actual timeout for initial and validation runs.
     if(deadlineAtMs!==null)assert.ok(Number.isFinite(deadlineAtMs)&&Date.now()+4*900000<=deadlineAtMs,'primary private grade reservation unavailable');
     const producer=verifyPrimaryEvaluationProducer(producerOptions);evidenceKind=producer.evidence_kind;profile=primaryProfileForRequest(producer.request);
+    const processing=primaryProcessingSelection(producer.block);
+    assert.equal(producer.commandEvidenceParserRevision,processing?.command_evidence_parser_revision??PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION,'private grading requires the fixed processing selection');
     const input=buildPrimaryEvaluationScoringInputs(producerOptions,runtimeInputs),s=input.scorerOptions,n=input.normalizedResult;
     for(const key of ['frozenSourceRoot','privateRoot','privateEvaluationRoot','manifestPath','publicResultRoot'])assert.ok(runtimeInputs[key],'primary original private runtime inputs required');
     const authorityRoot=runtimeInputs.privateEvaluationRoot,publicRoot=resolve(runtimeInputs.publicResultRoot);

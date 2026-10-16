@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { prepareFrozenEvaluatorTestRoot } from './test-frozen-evaluator-fixture.mjs';
+import { withPrimaryProcessingSourceBuild } from './ask-primary-evaluation-scope.mjs';
 const ROOT = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const ids = ['mp-ci-evidence-gap', 'mp-data-migration-handoff', 'mn-focused-regression-test', 'mp-accessibility-interaction-review',
   'mp-frontend-state-review', 'mp-iac-rollback-design', 'mp-performance-investigation', 'mn-doc-config-correction'];
@@ -64,7 +65,7 @@ for (const api of [writer, validator]) assert.throws(() => api({ root: process.c
     } finally { context.dispose(); }
   }
 });
-test('actual CI and doc writers publish only statically verified pending resources; full validation and asset checks remain required', t => {
+for (const processingV2 of [false, true]) test(`actual CI and doc writers publish statically verified pending resources (${processingV2 ? 'processing v2' : 'legacy'}); full checks remain required`, t => {
   const parent = realpathSync(mkdtempSync(join(tmpdir(), 'ask-resource-authority-'))), repository = join(parent, 'repository');
   t.after(() => rmSync(parent, { recursive: true, force: true }));
   const cloned = spawnSync('git', ['clone', '--no-hardlinks', '--no-checkout', ROOT, repository], { encoding: 'utf8', maxBuffer: 16777216 });
@@ -85,22 +86,24 @@ test('actual CI and doc writers publish only statically verified pending resourc
     if (fixtureId === 'mn-doc-config-correction') for (const name of ['dependency-graph.json', 'equivalent-solutions.json', 'evidence-removal-mutations.json', 'independence.json', 'private-evaluator-bundle.json'])
       writeFileSync(join(privateRoot, name), '{}\n');
     const options = { root: repository, privateRoot, evaluatorRevision: revision, generationDate: '2026-10-12' };
-    assert.throws(() => writer(options), /complete.*boundary roots/);
-    const generated = writer({ ...options, resourceAssetsOnly: true });
+    const context = callback => processingV2 ? withPrimaryProcessingSourceBuild({ root: repository, baseRevision: revision }, callback) : callback();
+    const checkedWriter = options => context(() => writer(options)), checkedValidator = options => context(() => validator(options));
+    assert.throws(() => checkedWriter(options), /complete.*boundary roots/);
+    const generated = checkedWriter({ ...options, resourceAssetsOnly: true });
     assert.equal(generated.fixtureId, fixtureId); assert.equal(generated.validation_scope, 'resource_assets_only');
     assert.equal(generated.execution_authority, false); assert.equal(generated.scoringReady, false);
     assert.equal(generated.reviewStatus, 'pending_independent_review');
-    const checked = validator({ root: repository, privateRoot, resourceAssetsOnly: true });
+    const checked = checkedValidator({ root: repository, privateRoot, resourceAssetsOnly: true });
     assert.equal(checked.evaluatorBundleDigest, generated.evaluatorBundleDigest);
-    assert.throws(() => validator({ root: repository, privateRoot }), /boundary roots/);
+    assert.throws(() => checkedValidator({ root: repository, privateRoot }), /boundary roots/);
     const boundaryRoots = Object.fromEntries(['materializedPath', 'selectionState', 'runDir', 'normalizedResultsPath'].map(key => {
       const path = join(parent, `${fixtureId}-${key}`); mkdirSync(path); return [key, path];
     }));
-    assert.throws(() => validator({ root: repository, privateRoot, boundaryRoots }), /materialization.*manifest|marker|run.*identity|selection.*state/i);
-    assert.throws(() => validator({ root: repository, privateRoot, boundaryRoots, resourceAssetsOnly: true }), /no execution boundary roots/);
+    assert.throws(() => checkedValidator({ root: repository, privateRoot, boundaryRoots }), /materialization.*manifest|marker|run.*identity|selection.*state/i);
+    assert.throws(() => checkedValidator({ root: repository, privateRoot, boundaryRoots, resourceAssetsOnly: true }), /no execution boundary roots/);
     const oracle = join(privateRoot, 'oracle.json'), original = readFileSync(oracle);
     writeFileSync(oracle, 'changed synthetic oracle');
-    assert.throws(() => validator({ root: repository, privateRoot, resourceAssetsOnly: true }), /asset digest/);
+    assert.throws(() => checkedValidator({ root: repository, privateRoot, resourceAssetsOnly: true }), /asset digest/);
     writeFileSync(oracle, original);
     assert.equal(existsSync(workerMarker), false, 'static validation must never execute the evaluator');
     for (const path of Object.values(boundaryRoots)) {

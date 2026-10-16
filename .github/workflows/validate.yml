@@ -40,7 +40,9 @@ jobs:
         run: node --test scripts/test-ask-pragmatic-evaluation-report.mjs
 
       - name: Verify explicit primary scoring-version connection (model-free)
-        run: node --test scripts/test-ask-primary-scoring-version.mjs scripts/test-ask-primary-resource-authority-writers.mjs scripts/test-ask-primary-runner-async-local-storage.mjs scripts/test-ask-primary-evaluation-private-grading.mjs scripts/test-ask-primary-evaluation-grading.mjs scripts/test-ask-benchmark-frozen-authority-modes.mjs
+        run: |
+          node --test scripts/test-ask-primary-scoring-version.mjs scripts/test-ask-primary-processing-source.mjs scripts/test-ask-primary-resource-authority-writers.mjs scripts/test-ask-primary-runner-async-local-storage.mjs scripts/test-ask-primary-evaluation-private-grading.mjs scripts/test-ask-primary-evaluation-grading.mjs scripts/test-ask-benchmark-frozen-authority-modes.mjs
+          node --experimental-test-module-mocks --test scripts/test-ask-primary-saved-scoring.mjs
 
       - name: Qualify prospective rule-batch contract and frozen preparation (model-free)
         run: node --test scripts/test-rule-batch-contract-v2.mjs scripts/test-rule-batch-comparison-preparation.mjs

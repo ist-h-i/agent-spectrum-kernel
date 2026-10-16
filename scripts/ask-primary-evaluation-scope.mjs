@@ -1,11 +1,13 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
-import { join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { dirname, join, resolve } from 'node:path';
 import { lstatSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { verifyPrimaryEvaluationProducer } from './ask-primary-evaluation-producer.mjs';
-import { primaryScoringRoot } from './ask-primary-scoring-version.mjs';
+import { primaryScoringRoot, primaryProcessingDescriptor, readPrimaryScoringVersion,
+  PRIMARY_PROCESSING_SOURCE_PATHS, PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH } from './ask-primary-scoring-version.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_EVALUATION_CONDITIONS, getPrimaryEvaluationProfile, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 import { PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION } from './ask-benchmark-command-evidence.mjs';
@@ -42,8 +44,54 @@ export function primaryRuntimeObservationSourceRoots() {
     verified.block.input_manifest.path, ...(verified.originalSourceRepository === null ? [] : [verified.originalSourceRepository])];
 }
 const rawDigest=raw=>`sha256:${createHash('sha256').update(raw).digest('hex')}`;
+const historicalEntries = Object.freeze(['scripts/ask-benchmark-evaluator-boundary.mjs','scripts/ask-benchmark-materialize.mjs',
+  'scripts/ask-benchmark-normalized-results.mjs','scripts/ask-benchmark-private-evaluator-runner.mjs','scripts/ask-benchmark-scoring-contract.mjs']);
+// Version, producer and scope modules form an existing import cycle. Read the
+// version constants only when a graph is requested, after module initialization.
+const processingSchemas = () => PRIMARY_PROCESSING_SOURCE_PATHS.filter(path => path.endsWith('.schema.json'));
+const sourceGit = (root, ...args) => execFileSync('git', ['-C', root, 'rev-parse', ...args],
+  { encoding: 'utf8', maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+const sourceCommonDirectory = root => realpathSync(sourceGit(root, '--path-format=absolute', '--git-common-dir'));
+function sourceBuildRoot(root, context) {
+  try {
+    if (lstatSync(root).isSymbolicLink()) throw new Error('symlink');
+    // Writers use the OS temporary path, which may have a canonical ancestor
+    // alias (/var on macOS). The final root itself must be an ordinary directory.
+    const selected = realpathSync(root);
+    if (selected === context.root) return selected;
+    // Existing transactional writers stage in a linked worktree. Only their
+    // selected commit in the same Git common directory can join this scope.
+    const gitFile = join(selected, '.git'), gitDirectory = realpathSync(sourceGit(selected, '--absolute-git-dir'));
+    if (lstatSync(gitFile).isFile() && dirname(gitDirectory) === join(context.commonDirectory, 'worktrees')
+      && sourceCommonDirectory(selected) === context.commonDirectory && sourceGit(selected, 'HEAD') === context.baseRevision) {
+      const backlink = readStableFile(join(gitDirectory, 'gitdir'), 'source construction staging backlink', 8192).bytes.toString('utf8').replace(/\n$/u, '');
+      if (realpathSync(backlink) === gitFile) return selected;
+    }
+  } catch { /* Preserve the closed construction-root error below. */ }
+  throw new Error('primary_source_build_root_changed');
+}
+/** Explicit source construction only, before a new private version is admitted.
+ * No producer/schema/worker authority is supplied; async writers retain only
+ * this graph choice until their returned work settles. Detached work loses it. */
+export function withPrimaryProcessingSourceBuild({ root, baseRevision, ...unknown }, callback) {
+  if (Object.keys(unknown).length || typeof callback !== 'function') throw new Error('primary_source_build_arguments_invalid');
+  if (resourceGraphState.getStore()?.active || active()) throw new Error('primary_source_build_nested_scope_refused');
+  if (resolve(root) !== root || realpathSync(root) !== root) throw new Error('primary_source_build_root_invalid');
+  if (!/^[a-f0-9]{40}$/u.test(baseRevision)) throw new Error('primary_source_build_revision_invalid');
+  const processing = primaryProcessingDescriptor({ root });
+  if (JSON.stringify(processing) !== JSON.stringify(primaryProcessingDescriptor())) throw new Error('primary_source_build_processing_source_changed');
+  const context = { active: true, sourceBuild: true, root, baseRevision, processing, commonDirectory: sourceCommonDirectory(root) };
+  return resourceGraphState.run(context, () => {
+    try {
+      const result = callback();
+      if (result?.then) return Promise.resolve(result).finally(() => { context.active = false; });
+      context.active = false; return result;
+    } catch (error) { context.active = false; throw error; }
+  });
+}
 function pinnedHistoricalGraph(root,fixtureId,binding,scoringVersion = null) {
-  const fixedRoot = primaryScoringRoot({ fixture_id: fixtureId, grading: { scoring_version: scoringVersion } });
+  const version = scoringVersion ? readPrimaryScoringVersion(scoringVersion, fixtureId) : null;
+  const fixedRoot = version?.root ?? primaryScoringRoot({ fixture_id: fixtureId, grading: { scoring_version: null } });
   if (scoringVersion && root !== fixedRoot) throw new Error('primary_resource_graph_scoring_version_root_changed');
   if(!PRIMARY_FIXTURE_IDS.includes(fixtureId)||binding.fixture_id!==fixtureId||!['primary_single_shot_v1','primary_principles_v2_single_shot_v1'].includes(binding.profile_id))throw new Error('primary_resource_graph_binding_invalid');
   if(resolve(root)!==root||realpathSync(root)!==root)throw new Error('primary_resource_graph_root_invalid');
@@ -56,8 +104,13 @@ function pinnedHistoricalGraph(root,fixtureId,binding,scoringVersion = null) {
   if(rawDigest(currentReference)!==freeze.evaluator_public_reference.raw_byte_digest||!read(join(root,freeze.evaluator_public_reference.path)).equals(currentReference)
     ||reference.fixture_id!==fixtureId||reference.evaluator_bundle_digest!==binding.evaluator_bundle_digest)throw new Error('primary_resource_graph_reference_changed');
   const identity=reference.evaluator_source_identity,graph=identity.dependency_graph;
-  const entries=['scripts/ask-benchmark-evaluator-boundary.mjs','scripts/ask-benchmark-materialize.mjs','scripts/ask-benchmark-normalized-results.mjs','scripts/ask-benchmark-private-evaluator-runner.mjs','scripts/ask-benchmark-scoring-contract.mjs'];
+  const entries = version?.processing ? [...historicalEntries, PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH].sort() : [...historicalEntries];
   if(JSON.stringify(graph.entry_paths)!==JSON.stringify(entries)||identity.base_git_revision!==reference.evaluator_revision)throw new Error('primary_resource_graph_entries_changed');
+  if (version?.processing) {
+    if (!graph.edge_inventory.some(edge => edge.kind === 'private_entry_import' && edge.to === PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH)) throw new Error('primary_processing_graph_helper_edge_missing');
+    for (const path of PRIMARY_PROCESSING_SOURCE_PATHS) if (!graph.node_inventory.some(node => node.path === path
+      && (!processingSchemas().includes(path) || node.file_type === 'authority_data'))) throw new Error('primary_processing_graph_source_missing');
+  }
   return{root,baseRevision:identity.base_git_revision,entryPaths:[...graph.entry_paths],authorityPaths:graph.node_inventory.filter(node=>node.file_type==='authority_data').map(node=>node.path),
     privateEntryPaths:graph.edge_inventory.filter(edge=>edge.kind==='private_entry_import').map(edge=>edge.to)};
 }
@@ -67,10 +120,19 @@ export function withPrimaryHistoricalEvaluatorResources(block,root,callback) {
   const context={active:true,block:structuredClone(block),root};pinnedHistoricalGraph(root,block.fixture_id,block.grading.binding,block.grading.scoring_version);
   return resourceGraphState.run(context,()=>{try{const result=callback();if(result?.then)throw new Error('primary_resource_graph_async_scope_forbidden');return result;}finally{context.active=false;}});
 }
-export function primaryEvaluatorDependencyGraphParameters({root,baseRevision,defaultParameters}) {
+export function primaryEvaluatorDependencyGraphParameters({root,baseRevision,defaultParameters,defaults}) {
   const producer=active(),resource=resourceGraphState.getStore();
   if(!producer?.verified&&!resource?.active)return null;
   if(!defaultParameters)throw new Error('primary_explicit_graph_parameters_refused');
+  if (resource?.active && resource.sourceBuild) {
+    root = sourceBuildRoot(root, resource);
+    if (baseRevision !== resource.baseRevision) throw new Error('primary_source_build_revision_changed');
+    if (JSON.stringify(primaryProcessingDescriptor({ root })) !== JSON.stringify(resource.processing)) throw new Error('primary_source_build_processing_source_changed');
+    if (!defaults || JSON.stringify([...defaults.entryPaths].sort()) !== JSON.stringify(historicalEntries)) throw new Error('primary_source_build_default_entries_changed');
+    return { root, baseRevision, entryPaths: [...defaults.entryPaths, PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH].sort(),
+      authorityPaths: [...new Set([...defaults.authorityPaths, ...processingSchemas()])].sort(),
+      privateEntryPaths: [...new Set([...defaults.privateEntryPaths, PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH])].sort() };
+  }
   let selected;
   if(producer?.verified){const verified=verifyPrimaryEvaluationProducer(producer.options);selected=pinnedHistoricalGraph(root,verified.request.fixture_id,verified.request.binding,verified.request.scoring_version);}
   else{if(root!==resource.root)throw new Error('primary_resource_graph_root_changed');selected=pinnedHistoricalGraph(root,resource.block.fixture_id,resource.block.grading.binding,resource.block.grading.scoring_version);}
@@ -96,6 +158,7 @@ export function primaryGradingConditions(legacy) {
   return activeProfile().conditions;
 }
 export function withPrimaryEvaluationProducer(options, callback, { grading = false } = {}) {
+  if (resourceGraphState.getStore()?.active && resourceGraphState.getStore().sourceBuild) throw new Error('primary_source_build_no_producer_authority');
   const verified = verifyPrimaryEvaluationProducer(options);
   return run({ options: Object.freeze({ ...options }), verified, grading, profile: primaryProfileForRequest(verified.request), commandEvidenceParserRevision: verified.commandEvidenceParserRevision }, callback);
 }
