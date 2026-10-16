@@ -1,29 +1,37 @@
 // Synthetic static copies only. No evaluator worker, model, start or resume.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chmodSync, cpSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { comparisonHash as hash } from './ask-user-comparison-prepare.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 import { readPrimaryScoringVersion, primaryScoringRoot, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
+import * as scoringVersion from './ask-primary-scoring-version.mjs';
 import { preparePrimaryEvaluation } from './ask-primary-evaluation-prepare.mjs';
 import { exportPrimaryEvaluationGradingRequest, primaryGradingSemanticQuality } from './ask-primary-evaluation-grading.mjs';
 import { syntheticPrimarySource } from './test-helpers-primary-evaluation-producer.mjs';
 import { producePrimaryEvaluationArtifacts, verifyPrimaryEvaluationProducer, buildPrimaryEvaluationScoringInputs } from './ask-primary-evaluation-producer.mjs';
 import { withPrimaryHistoricalEvaluatorResources, primaryEvaluatorDependencyGraphParameters } from './ask-primary-evaluation-scope.mjs';
+import { runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('../', import.meta.url))), raw = value => `${JSON.stringify(value, null, 2)}\n`;
 const json = path => JSON.parse(readFileSync(path));
 const mode = (path, writable) => { const stat = lstatSync(path); if (stat.isDirectory()) { chmodSync(path, writable ? 0o700 : 0o500); for (const name of readdirSync(path)) mode(join(path, name), writable); } else chmodSync(path, writable ? 0o600 : 0o400); };
-function setup(t) {
+const processingFiles = ['scripts/ask-benchmark-command-evidence.mjs', 'scripts/ask-review-target-requirement.mjs',
+  'benchmarks/schemas/primary-saved-v2-portfolio-command-evidence.schema.json',
+  'benchmarks/schemas/primary-k2-saved-v2-portfolio-command-evidence.schema.json'];
+function setup(t, { processingV2 = false } = {}) {
   const parent = realpathSync(mkdtempSync(join(tmpdir(), 'ask-scoring-version-'))), runtime = join(parent, 'runtime'), privateRoot = join(parent, 'private');
   mkdirSync(runtime); mkdirSync(privateRoot);
   t.after(() => { mode(parent, true); rmSync(parent, { recursive: true, force: true }); });
   for (const id of PRIMARY_FIXTURE_IDS) cpSync(join(ROOT, 'benchmarks/fixtures/checkpoint-b2', id), join(runtime, 'benchmarks/fixtures/checkpoint-b2', id), { recursive: true });
   for (const name of ['portfolio-catalog', 'portfolio-policy-manifest', 'portfolio-scoring-policy']) cpSync(join(ROOT, 'benchmarks', `${name}.json`), join(runtime, 'benchmarks', `${name}.json`));
   mkdirSync(join(runtime, 'scripts')); cpSync(join(ROOT, 'scripts/ask-benchmark-portfolio-score.mjs'), join(runtime, 'scripts/ask-benchmark-portfolio-score.mjs'));
+  if (processingV2) for (const path of processingFiles) {
+    mkdirSync(resolve(join(runtime, path), '..'), { recursive: true }); cpSync(join(ROOT, path), join(runtime, path));
+  }
   const resource = { privateRoot, admissionReviewAuthoritySourceDigest: hash('synthetic static receipt') };
   for (const key of ['manifestPath', 'admissionDecisionPath', 'admissionReviewAuthorityPath', 'admissionReviewArchivePath']) {
     resource[key] = join(privateRoot, key); writeFileSync(resource[key], 'synthetic static receipt');
@@ -42,7 +50,10 @@ function setup(t) {
         resource: { ...resource }, resource_file_digests: Object.fromEntries(['manifestPath', 'admissionDecisionPath', 'admissionReviewAuthorityPath', 'admissionReviewArchivePath'].map(key => [key, hash(readFileSync(resource[key]))])) };
     }
     try { chmodSync(manifestPath, 0o600); } catch {}
-    writeFileSync(manifestPath, raw({ kind: 'ask_primary_scoring_version_v1', scoring_version_id: 'synthetic-successor-v1', fixtures }));
+    writeFileSync(manifestPath, raw({ kind: processingV2 ? 'ask_primary_scoring_version_v2' : 'ask_primary_scoring_version_v1',
+      scoring_version_id: processingV2 ? 'synthetic-processing-v2' : 'synthetic-successor-v1',
+      ...(processingV2 ? { processing: { command_evidence_parser_revision: '1.5.0-primary-saved', review_recognition_revision: '2',
+        source_file_digests: Object.fromEntries(processingFiles.map(path => [path, hash(readFileSync(join(runtime, path)))])) } } : {}), fixtures }));
     mode(runtime, false); mode(privateRoot, false); chmodSync(manifestPath, 0o400);
     return { path: manifestPath, digest: hash(readFileSync(manifestPath)) };
   };
@@ -50,6 +61,101 @@ function setup(t) {
   return { parent, runtime, privateRoot, resource, seal, mutate, selector: seal() };
 }
 const id = PRIMARY_FIXTURE_IDS[0], base = `benchmarks/fixtures/checkpoint-b2/${id}`;
+test('saved paired scoring preparation retains all nine blocks per role with no dispatch', async t => {
+  const f = setup(t, { processingV2: true }), retained = join(f.parent, 'retained'); mkdirSync(retained);
+  const roles = ['baseline', 'challenger'], blocks = {};
+  for (const role of roles) blocks[role] = PRIMARY_FIXTURE_IDS.map(fixtureId => syntheticPrimarySource(t, { fixtureId }).block);
+  const sourcePath = join(retained, 'paired-source.json'); writeFileSync(sourcePath, raw({ blocks }), { mode: 0o400 });
+  const source = { path: sourcePath, digest: hash(readFileSync(sourcePath)) }, resources = {};
+  for (const role of roles) {
+    const path = join(f.parent, `resources-${role}.json`);
+    writeFileSync(path, raw({ kind: 'ask_primary_grading_resources_v1', output_root: join(f.parent, `future-${role}`),
+      fixtures: Object.fromEntries(PRIMARY_FIXTURE_IDS.map(fixtureId => [fixtureId, { frozenSourceRoot: f.runtime, ...f.resource }])) }), { mode: 0o400 });
+    resources[role] = { path, digest: hash(readFileSync(path)) };
+  }
+  const args = { source, scoringVersion: f.selector, resources, retainedRoots: [retained], outputRoot: join(f.parent, 'prepared-saved-scoring') };
+  const saved = await import('./ask-primary-saved-scoring.mjs');
+  const prepared = await saved.preparePrimarySavedScoring(args);
+  assert.equal(prepared.status, 'blocked'); // Synthetic static receipts are deliberately not admission.
+  assert.equal(prepared.model_calls, 0); assert.equal(prepared.grader_process_starts, 0); assert.equal(prepared.producer_normalizations, 0);
+  const options = { recordRoot: prepared.output_root, externalDigest: prepared.external_digest };
+  const checked = await saved.verifyPrimarySavedScoringPreparation(options);
+  assert.deepEqual(Object.keys(checked.record.blocks), roles);
+  for (const role of roles) {
+    assert.equal(checked.record.blocks[role].length, 9);
+    assert.equal(existsSync(join(f.parent, `future-${role}`)), false);
+  }
+  assert.equal(checked.record.execution_permission, false); assert.equal(checked.record.formal_aggregate_eligible, false);
+  assert.equal(JSON.stringify(checked.record).includes('synthetic static receipt'), false);
+  assert.equal(hash(readFileSync(source.path)), source.digest);
+  await assert.rejects(saved.gradePreparedPrimarySavedScoring(options), /blocked|not.ready|preflight/u);
+  await t.test('overlapping output and missing primary source blocks refuse before writing', async () => {
+    await assert.rejects(saved.preparePrimarySavedScoring({ ...args, outputRoot: retained }), /overlap|exists/u);
+    const missing = join(retained, 'missing-block.json'); writeFileSync(missing, raw({ blocks: { ...blocks, baseline: blocks.baseline.slice(1) } }));
+    await assert.rejects(saved.preparePrimarySavedScoring({ ...args, source: { path: missing, digest: hash(readFileSync(missing)) }, outputRoot: join(f.parent, 'missing-output') }), /nine|fixture|block/u);
+    assert.equal(existsSync(join(f.parent, 'missing-output')), false);
+  });
+  await t.test('source and resource drift cannot reopen a preparation', async () => {
+    const original = readFileSync(source.path); chmodSync(source.path, 0o600); writeFileSync(source.path, raw({ blocks, changed: true })); chmodSync(source.path, 0o400);
+    await assert.rejects(saved.verifyPrimarySavedScoringPreparation(options), /source.*changed|digest/u);
+    chmodSync(source.path, 0o600); writeFileSync(source.path, original); chmodSync(source.path, 0o400);
+    const path = resources.baseline.path, bytes = readFileSync(path); chmodSync(path, 0o600); writeFileSync(path, 'changed synthetic resource'); chmodSync(path, 0o400);
+    await assert.rejects(saved.verifyPrimarySavedScoringPreparation(options), /resource.*changed|digest/u);
+    chmodSync(path, 0o600); writeFileSync(path, bytes); chmodSync(path, 0o400);
+  });
+  await t.test('a caller-repinned readiness label cannot start a grading worker', async () => {
+    const path = join(prepared.output_root, 'preparation.json'), value = json(path); value.status = 'prepared';
+    for (const role of roles) for (const item of value.preflights[role]) item.result.status = 'ready';
+    writeFileSync(path, raw(value));
+    const repinned = { recordRoot: prepared.output_root, externalDigest: hash(readFileSync(path)) };
+    assert.equal((await saved.verifyPrimarySavedScoringPreparation(repinned)).status, 'prepared');
+    await assert.rejects(saved.gradePreparedPrimarySavedScoring(repinned), /not.ready|preflight/u);
+    for (const role of roles) assert.equal(existsSync(join(f.parent, `future-${role}`)), false);
+  });
+});
+test('v2 pins public processing bytes and selects the new parser without changing v1', t => {
+  const f = setup(t, { processingV2: true });
+  const selected = readPrimaryScoringVersion(f.selector, id);
+  assert.equal(selected.processing.command_evidence_parser_revision, '1.5.0-primary-saved');
+  assert.equal(selected.processing.review_recognition_revision, '2');
+  assert.deepEqual(Object.keys(selected.processing.source_file_digests).sort(), [...processingFiles].sort());
+  assert.deepEqual(scoringVersion.primaryProcessingSelection({ fixture_id: id, grading: { scoring_version: f.selector } }), selected.processing);
+  assert.equal(scoringVersion.primaryProcessingSelection({ fixture_id: id, grading: {} }), null);
+  assert.equal(scoringVersion.primaryProcessingSelection({ fixture_id: id, grading: { scoring_version: setup(t).selector } }), null);
+});
+test('v2 refuses a self-consistently repinned different public helper', t => {
+  const f = setup(t, { processingV2: true }), path = join(f.runtime, 'scripts/ask-review-target-requirement.mjs');
+  mode(f.runtime, true); writeFileSync(path, 'export const syntheticForgedHelper = true;\n');
+  const selector = f.seal();
+  assert.throws(() => readPrimaryScoringVersion(selector, id), /processing source.*changed|processing source.*differs/u);
+});
+test('v2 refuses unsupported processing selectors even with a fresh external digest', t => {
+  const f = setup(t, { processingV2: true }), path = f.selector.path;
+  const initial = readFileSync(path);
+  for (const mutate of [p => { p.command_evidence_parser_revision = 'future'; },
+    p => { p.review_recognition_revision = 'future'; }, p => { p.automatic_admission = true; },
+    p => { delete p.source_file_digests[processingFiles[0]]; }]) {
+    const value = JSON.parse(initial); mutate(value.processing); chmodSync(path, 0o600); writeFileSync(path, raw(value)); chmodSync(path, 0o400);
+    assert.throws(() => readPrimaryScoringVersion({ path, digest: hash(readFileSync(path)) }, id));
+  }
+});
+test('the existing producer call derives v2 from the fixed selector and refuses an override before writing', async t => {
+  const f = setup(t, { processingV2: true }), source = syntheticPrimarySource(t, { fixtureId: id });
+  source.block.grading.scoring_version = f.selector;
+  const produced = await producePrimaryEvaluationArtifacts(source.block, join(source.root, 'selected-producer'));
+  const verified = verifyPrimaryEvaluationProducer({ recordRoot: produced.output_root, externalDigest: produced.external_digest });
+  assert.equal(verified.commandEvidenceParserRevision, '1.5.0-primary-saved');
+  assert.equal(json(join(produced.output_root, 'producer.json')).kind, 'ask_primary_evaluation_producer_v2');
+  const output = join(source.root, 'conflicting-producer');
+  await assert.rejects(producePrimaryEvaluationArtifacts(source.block, output, { commandEvidenceParserRevision: '1.4.0-primary-saved' }), /selector override/u);
+  assert.equal(readdirSync(source.root).includes('conflicting-producer'), false);
+});
+test('an unbound offline v2 capture cannot start the private grading path', async t => {
+  const source = syntheticPrimarySource(t);
+  const produced = await producePrimaryEvaluationArtifacts(source.block, join(source.root, 'offline-producer'), { commandEvidenceParserRevision: '1.5.0-primary-saved' });
+  const result = runPrimaryEvaluationPrivateGrading({ recordRoot: produced.output_root, externalDigest: produced.external_digest }, { condition: 'plain' });
+  assert.equal(result.status, 'blocked'); assert.equal(result.grader_process_starts, 0); assert.equal(result.model_calls, 0); assert.equal(result.quality, null);
+});
 test('explicit version verifies all nine preserved semantics and resource identity; default stays old', t => {
   const f = setup(t);
   for (const fixtureId of PRIMARY_FIXTURE_IDS) {

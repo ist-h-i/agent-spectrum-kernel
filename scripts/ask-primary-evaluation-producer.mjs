@@ -19,7 +19,7 @@ import { verifyPortfolioScoringRootLineage, verifyEvaluatorAuthority, verifyPubl
 import { scoreEvaluatorResult } from './ask-benchmark-portfolio-score.mjs';
 import { PRIMARY_PROFILE_SCHEMAS, withPrimarySchemaBuild, withPrimaryEvaluationProducer } from './ask-primary-evaluation-scope.mjs';
 
-import { primaryScoringRoot, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
+import { primaryScoringRoot, primaryProcessingSelection, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
 
 import { primaryProfileForKernel, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 
@@ -124,6 +124,14 @@ function snapshotDigest(snapshots) {
   return canonicalDigest(Object.fromEntries(Object.entries(snapshots).map(([condition, item]) => [condition,
     Object.fromEntries(Object.entries(item).map(([kind, tree]) => [kind, tree === null ? null : Object.fromEntries(Object.entries(tree).map(([path, f]) => [path, { bytes: f.bytes.length, digest: hash(f.bytes), mode: f.mode }]))]))])));
 }
+/** Read-only source closure for saved-result preparation. No derived records,
+ * normalization, grading workers or model/controller operations are performed. */
+export async function inspectPrimaryEvaluationSource(block) {
+  const source = await checkedSource(block);
+  return { request: source.request, request_digest: source.request_digest, snapshot_digest: snapshotDigest(source.snapshots),
+    references: structuredClone(source.references), source_repository: source.loaded.plan.source.repo ?? null,
+    producer_normalizations: 0, model_calls: 0, grader_process_starts: 0 };
+}
 function typedUsage(metrics) { return { metrics: Object.fromEntries(['input_tokens','output_tokens','cached_tokens'].map(name => {
   const value = metrics?.[name]; return [name, Number.isSafeInteger(value) && value >= 0 ? { status: 'known', value, reason: 'saved_controller_usage' } : { status: 'unknown', value: null, reason: 'usage_not_observed' }]; })) }; }
 function derive(target, source, parserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION) {
@@ -199,7 +207,10 @@ function derive(target, source, parserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_
     adapter_identities: new Map([['codex', adapter]]), cases: inspected } };
 }
 
-export async function producePrimaryEvaluationArtifacts(block, outputRoot, { commandEvidenceParserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION } = {}) {
+export async function producePrimaryEvaluationArtifacts(block, outputRoot, { commandEvidenceParserRevision } = {}) {
+  const processing = primaryProcessingSelection(block);
+  commandEvidenceParserRevision ??= processing?.command_evidence_parser_revision ?? PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
+  if (processing) assert.equal(commandEvidenceParserRevision, processing.command_evidence_parser_revision, 'primary processing selector override refused');
   assert.ok([PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION].includes(commandEvidenceParserRevision), 'unsupported primary command evidence revision');
   const source = await checkedSource(block), target = resolve(outputRoot);
   assert.ok(!existsSync(target)); assert.equal(realpathSync(dirname(target)), dirname(target));
@@ -237,6 +248,8 @@ export function verifyPrimaryEvaluationProducer(options) {
   const commandEvidenceParserRevision = manifest.kind === 'ask_primary_evaluation_producer_v2' ? manifest.command_evidence_parser_revision : PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
   if (manifest.kind === 'ask_primary_evaluation_producer_v2') assert.equal(commandEvidenceParserRevision, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, 'primary v2 parser revision changed');
   else assert.equal(Object.hasOwn(manifest, 'command_evidence_parser_revision'), false, 'legacy primary producer cannot select a new parser');
+  const processing = primaryProcessingSelection(manifest.block);
+  if (processing) assert.equal(commandEvidenceParserRevision, processing.command_evidence_parser_revision, 'primary producer differs from fixed processing selector');
   assert.equal(manifest.execution_permission, false); assert.equal(manifest.scoring_ready, false);
   assert.equal(manifest.response_format,'primary_plain_utf8_response_v1');
   assert.equal(manifest.formal_aggregate_eligible,false);
