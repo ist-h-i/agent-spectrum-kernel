@@ -10,7 +10,7 @@ import { primaryScoringRoot, primaryProcessingDescriptor, readPrimaryScoringVers
   PRIMARY_PROCESSING_SOURCE_PATHS, PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH } from './ask-primary-scoring-version.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_EVALUATION_CONDITIONS, getPrimaryEvaluationProfile, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
-import { PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION } from './ask-benchmark-command-evidence.mjs';
+import { PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION } from './ask-benchmark-command-evidence.mjs';
 
 const state = new AsyncLocalStorage(), resourceGraphState = new AsyncLocalStorage(), logFailures = new WeakMap(), ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const PRIMARY_PROFILE_CONDITIONS = PRIMARY_EVALUATION_CONDITIONS;
@@ -28,7 +28,7 @@ function run(value, callback, allowSchemaRecheck = false) {
 export function withPrimarySchemaBuild(callback, { profileId = PRIMARY_EVALUATION_PROFILE_ID, commandEvidenceParserRevision } = {}) {
   const profile = getPrimaryEvaluationProfile(profileId), current = active();
   commandEvidenceParserRevision ??= current?.commandEvidenceParserRevision ?? PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
-  if (![PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION].includes(commandEvidenceParserRevision)) throw new Error('primary_unknown_command_evidence_revision');
+  if (![PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION].includes(commandEvidenceParserRevision)) throw new Error('primary_unknown_command_evidence_revision');
   if (current?.verified && current.profile.id !== profile.id) throw new Error('primary_schema_build_profile_mix_refused');
   if (current?.verified && current.commandEvidenceParserRevision !== commandEvidenceParserRevision) throw new Error('primary_schema_build_processing_mix_refused');
   return run({ building: true, grading: false, profile, commandEvidenceParserRevision }, callback, Boolean(current?.verified));
@@ -147,7 +147,10 @@ export function primaryGradingSchemaPath(path) {
     for (const other of ['primary', 'primary-k2']) if (other !== prefix && path.endsWith(`/benchmarks/schemas/${other}-${name}.schema.json`)) throw new Error('primary_schema_profile_mix_refused');
   }
   for (const name of PRIMARY_PROFILE_SCHEMAS) if (path.endsWith(`/benchmarks/schemas/${name}.schema.json`)) {
-    const version = name === 'portfolio-command-evidence' && active().commandEvidenceParserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION ? '-saved-v2' : '';
+    const selected = active().commandEvidenceParserRevision;
+    const version = name === 'portfolio-command-evidence'
+      ? selected === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION ? '-saved-v3'
+        : selected === PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION ? '-saved-v2' : '' : '';
     return join(ROOT, `benchmarks/schemas/${activeProfile().schema_prefix}${version}-${name}.schema.json`);
   }
   return path;

@@ -149,6 +149,9 @@ test('the existing producer call derives v2 from the fixed selector and refuses 
   const output = join(source.root, 'conflicting-producer');
   await assert.rejects(producePrimaryEvaluationArtifacts(source.block, output, { commandEvidenceParserRevision: '1.4.0-primary-saved' }), /selector override/u);
   assert.equal(readdirSync(source.root).includes('conflicting-producer'), false);
+  const v3Output = join(source.root, 'conflicting-producer-v3');
+  await assert.rejects(producePrimaryEvaluationArtifacts(source.block, v3Output, { commandEvidenceParserRevision: '1.6.0-primary-saved' }), /selector override/u);
+  assert.equal(readdirSync(source.root).includes('conflicting-producer-v3'), false);
 });
 test('an unbound offline v2 capture cannot start the private grading path', async t => {
   const source = syntheticPrimarySource(t);
