@@ -1,0 +1,100 @@
+{
+  "type": "object",
+  "required": [
+    "mode",
+    "read_policy",
+    "writer_policy",
+    "rollout_steps",
+    "execute_requires_specific_approval",
+    "restore_requires_new_approval",
+    "revalidate_current_state",
+    "rollback_cases"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "mode": {
+      "const": "prepare_only"
+    },
+    "read_policy": {
+      "const": "fallback_until_verified"
+    },
+    "writer_policy": {
+      "const": "dual_write_until_contract"
+    },
+    "rollout_steps": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "expand_optional_field",
+          "deploy_dual_writer",
+          "backfill",
+          "drain_legacy_writers",
+          "verify_fresh_backfill",
+          "cutover_reads",
+          "drop_legacy_field"
+        ]
+      }
+    },
+    "execute_requires_specific_approval": {
+      "const": true
+    },
+    "restore_requires_new_approval": {
+      "const": true
+    },
+    "revalidate_current_state": {
+      "const": true
+    },
+    "rollback_cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "case_id",
+          "cutover_ready",
+          "rollback_possible",
+          "action",
+          "snapshot_id",
+          "loss_risk"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cutover_ready": {
+            "type": "boolean"
+          },
+          "rollback_possible": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "action": {
+            "enum": [
+              "revert_app_keep_expanded",
+              "restore_snapshot",
+              "forward_recover",
+              "manual_review"
+            ]
+          },
+          "snapshot_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "loss_risk": {
+            "enum": [
+              "none",
+              "post_snapshot_writes",
+              "unknown"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

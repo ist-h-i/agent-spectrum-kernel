@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "hi-versioned-migration-safety",
+  "fixture_role": "primary",
+  "suite": "high_impact",
+  "task_class": "migration_design",
+  "domain": "data_schema",
+  "difficulty": "hard",
+  "repetitions": 5,
+  "risk_boundary": "data_integrity",
+  "capability_families": [
+    "rollback_planning",
+    "schema_evolution",
+    "state_consistency"
+  ],
+  "evidence_topologies": [
+    "rollback_plan_and_state",
+    "schema_and_migration_plan",
+    "version_compatibility_matrix"
+  ],
+  "outcome_dimensions": [
+    "backward_compatibility",
+    "rollback_truthfulness"
+  ],
+  "output_contract_type": "design_or_operation_plan_producing",
+  "requirement_record_id": "requirement-record-hi-versioned-migration-safety",
+  "output_contract_id": "output-contract-hi-versioned-migration-safety",
+  "evaluator_bundle_id": "evaluator-3c99613b1a28aabfc8fada430ccfe6bec18802a9f003845d0a133334b140b2ad",
+  "evaluator_bundle_digest": "sha256:9a8b37168b7c5b2898669f869c341c4baaace576035d6f71f006804b5adbf92e",
+  "evaluator_byte_count": 397078,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:315112a9dce56f0ff5bf8604f4a401254f2e1c6b4402113eb39386f33d1b919c"
+}
