@@ -27,17 +27,68 @@ authority and carries no literal-word trace.
 
 ## Formal Verification Contract
 
-`FVC-PRIMARY-LITERAL-WORD-5`, revision1, upstream `SPEC-PRIMARY-LITERAL-WORD-5@1`; policy `ask.verification-proof-policy@1.0.0`, formal triggers `public_api_schema_or_compatibility`, `state_concurrency_persistence_lifecycle_or_cross_module`, `bug_reproduction_or_regression`, `multi_session_multi_agent_or_handoff`, `multiple_specialized_checks`.
+`FVC-PRIMARY-LITERAL-WORD-5`, revision2, upstream `SPEC-PRIMARY-LITERAL-WORD-5@1`; policy `ask.verification-proof-policy@1.0.0`, formal triggers `public_api_schema_or_compatibility`, `state_concurrency_persistence_lifecycle_or_cross_module`, `bug_reproduction_or_regression`, `multi_session_multi_agent_or_handoff`, `multiple_specialized_checks`.
 
 - O-WORD supports AC5-1/2: RED before implementation, then exact positive/negative finite-word and invalid-byte controls with no shell/eval invocation.
 - O-AUTH supports AC5-1/5/7: independent rendered-digest/body/witness forgery controls and explicit privacy/schema checks; no opaque authority assertion.
 - O-CHAIN supports AC5-3/4: combined artificial producer-normalizer roundtrip and isolated fake saved consumer preserve references, success/failure1 and Unknown/partial outcomes.
-- O-VERSION supports AC5-5/6: explicit selection/source-only graph/schema closure, cross-version refusal, old focused regressions, generated schemas, repository/core-bundle validation and required CI.
+- O-VERSION supports AC5-5/6: current-HEAD explicit selection/source-only graph/schema closure, producer/normalizer/fake saved consumer, cross-version refusal, old focused regressions, generated schemas, repository validation and adapter-runtime freshness; immutable Full/Core product compatibility in the existing digest-verified historical context; required CI on the exact PR head. Bind the two contexts as specified below.
 - O-REVIEW supports AC5-1..7: independent review with observed required gates, resolved blocking findings, Draft PR and terminal CI on its exact head. Parent owns Ready/merge.
+
+### O-VERSION contexts and evidence
+
+Revision2 clarifies revision1's ambiguous `repository/core-bundle validation`
+phrase under the FVC owner's decision on 2026-10-17. It applies the existing
+PR330 boundary, introduced at `d4ad39ead0f13965aeaf5aa919ef35f830a50e26`:
+[local-eval CI](../.github/workflows/local-eval.yml) treats immutable Full/Core
+as historical compatibility and validates the current distribution separately.
+The [Core product contract](ask-core-bundle-implementation.md#product-and-reuse-boundary)
+retains the original Full inventories and exact source pins. This revision
+keeps the generator, assertions, tests and failed observations; it changes no
+manifest, product identity, source hash, guard or skip policy.
+
+| Context | Required checks and binding |
+| --- | --- |
+| Current PR HEAD | Run the explicit v5 selector/source/schema/producer/normalizer/fake saved-consumer and older-version regressions, repository validator and adapter-runtime freshness from the clean reviewed checkout. Bind each command/exit and source inventory to that HEAD/tree; historical overlays cannot supply this evidence. |
+| Immutable Full/Core compatibility | Use the unchanged `scripts/prepare-historical-full-test-root.mjs` from that clean HEAD, with the two unchanged inventories below. Bind their raw digests and declared source commits, caller HEAD/tree, context commit/parent/tree, expected and observed changed/deleted paths, and actual generator/test command/exits. Every PR400 changed file must retain its caller bytes in the context. |
+
+The historical inputs are `docs/mac-ask-full-static-inventory.json`
+(`sha256:3634c9ef3801067636d990a63f1793c268390ccb4012a1e2f1c4ac2e5b566bed`,
+source `f65a24c910135f160cfdec0bb35f9c6546d563de`) and
+`docs/mac-ask-full-reference-supplement.json`
+(`sha256:466da3374a9d2311a335ebf7113288dccd1d1c25c9a5b9e278f4d03e61a05b5f`,
+source `b68dc5d168f16a495e9f9eea85bbfa863e8abbae`). Verify the complete
+declared source set against those Git blobs. Only exact sealed source overlays
+and selected Skill assets absent from that set may change in the new context.
+Compare the actual context delta with this expected set and retain the caller's
+clean HEAD/status. Confirm the frozen inventories, Core product/builders,
+historical helper/test and local-eval workflow are unchanged by this PR.
+
+In the resulting context run `node scripts/generate-ask-core-bundle.mjs --check`
+and `node --test scripts/test-ask-core-bundle.mjs`. Retain the local context
+identity/delta and command exits; record clean context status and unchanged
+commit/tree before and after each command. Link PR-event-head CI run/job/step observations
+for the unchanged historical preparation and Core checks, separately from the
+current-HEAD checks. Record the actual checkout commit/tree/parents separately
+from the PR event head and historical context parent. For a synthetic PR merge
+checkout, show its parent mapping to the reviewed PR head and identical reviewed
+tree/helper/input bytes; do not require the two commit IDs to be identical.
+A local context ID is not a claimed CI context ID. Any context identity not
+emitted by CI remains unobserved; the unchanged helper's parent/source assertions
+and the observed checkout mapping bind that CI execution's construction contract.
+
+The earlier direct current-checkout command's exit1/`legacy_full_source_drift`
+on the PR and base is retained as failed history. The guard correctly refuses
+current-development bytes against an immutable product. Historical compatibility
+success does not turn that command into a pass, establish Core generation from
+the current checkout, adopt v5 into the Core product, or grant runtime/grading
+admission. A new current-source product would require its own reviewed version
+and source identity. F-V5-BUNDLE-PROOF remains unresolved until revision2's
+evidence and independent review are complete; Ready/merge remains with the parent.
 
 ## Implementation decision to review
 
-`IMPL-PRIMARY-LITERAL-WORD-5`, revision1, upstream Spec/FVC above. Keep one finite word parser shared by runtime classification and manifest validation. A v5-only nullable `literal_word_encoding` is a closed grammar trace, not raw command text. Trace alphabet: `l` copies one Unicode code point from the already public registered script, `e` prefixes its next point with a backslash, `n` encodes an escaped newline, and `s`/`d` encode single/double quote delimiters. Reconstruction must consume the entire public body, reparse to the same body and trace, and reproduce the actual rendered digest in the exact Bash-lc envelope. Unmatched auxiliary commands retain null. This preserves `privacy.raw_command_stored=false` and avoids a new authority registry or reinterpretation of the rendered digest field. The trace and source are evidence, never standalone admission or execution permission.
+`IMPL-PRIMARY-LITERAL-WORD-5`, revision2, upstream `SPEC-PRIMARY-LITERAL-WORD-5@1` and `FVC-PRIMARY-LITERAL-WORD-5@2`. Revision2 changes the verification-context declaration only; the implementation bytes and behavior below remain unchanged. Keep one finite word parser shared by runtime classification and manifest validation. A v5-only nullable `literal_word_encoding` is a closed grammar trace, not raw command text. Trace alphabet: `l` copies one Unicode code point from the already public registered script, `e` prefixes its next point with a backslash, `n` encodes an escaped newline, and `s`/`d` encode single/double quote delimiters. Reconstruction must consume the entire public body, reparse to the same body and trace, and reproduce the actual rendered digest in the exact Bash-lc envelope. Unmatched auxiliary commands retain null. This preserves `privacy.raw_command_stored=false` and avoids a new authority registry or reinterpretation of the rendered digest field. The trace and source are evidence, never standalone admission or execution permission.
 
 Public follow-up exclusions remain shell/flag variants, nested shells, broader reads, external instruction reads and command-contained writes without the existing edit/delta proof. Artificial compatibility does not prove retained-runtime compatibility or semantic scoring.
 
