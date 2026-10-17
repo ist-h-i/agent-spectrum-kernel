@@ -23,18 +23,27 @@ export const PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH = 'scripts/ask-review-target
 export const PRIMARY_PROCESSING_SOURCE_PATHS = Object.freeze(['scripts/ask-benchmark-command-evidence.mjs', PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH,
   'benchmarks/schemas/primary-saved-v2-portfolio-command-evidence.schema.json',
   'benchmarks/schemas/primary-k2-saved-v2-portfolio-command-evidence.schema.json']);
-/** Source bytes only. This descriptor supplies no admission or execution authority. */
-export function primaryProcessingDescriptor({ root = ROOT } = {}) {
-  return { command_evidence_parser_revision: '1.5.0-primary-saved', review_recognition_revision: '2',
-    source_file_digests: Object.fromEntries(PRIMARY_PROCESSING_SOURCE_PATHS.map(path => [path, hash(read(join(root, path)))])) };
+export const PRIMARY_PROCESSING_V3_SOURCE_PATHS = Object.freeze(['scripts/ask-benchmark-command-evidence.mjs', PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH,
+  'benchmarks/schemas/primary-saved-v3-portfolio-command-evidence.schema.json',
+  'benchmarks/schemas/primary-k2-saved-v3-portfolio-command-evidence.schema.json']);
+function processingSourcePaths(commandEvidenceParserRevision) {
+  if (commandEvidenceParserRevision === '1.5.0-primary-saved') return PRIMARY_PROCESSING_SOURCE_PATHS;
+  assert.equal(commandEvidenceParserRevision, '1.6.0-primary-saved', 'unknown primary processing command revision');
+  return PRIMARY_PROCESSING_V3_SOURCE_PATHS;
 }
-function verifyProcessingDescriptor(value, selectedRoot, root) {
+/** Source bytes only. This descriptor supplies no admission or execution authority. */
+export function primaryProcessingDescriptor({ root = ROOT, commandEvidenceParserRevision = '1.5.0-primary-saved' } = {}) {
+  return { command_evidence_parser_revision: commandEvidenceParserRevision, review_recognition_revision: '2',
+    source_file_digests: Object.fromEntries(processingSourcePaths(commandEvidenceParserRevision).map(path => [path, hash(read(join(root, path)))])) };
+}
+function verifyProcessingDescriptor(value, selectedRoot, root, commandEvidenceParserRevision) {
   keys(value, ['command_evidence_parser_revision', 'review_recognition_revision', 'source_file_digests']);
-  assert.equal(value.command_evidence_parser_revision, '1.5.0-primary-saved', 'unknown primary processing command revision');
+  assert.equal(value.command_evidence_parser_revision, commandEvidenceParserRevision, 'primary processing revision differs from manifest kind');
   assert.equal(value.review_recognition_revision, '2', 'unknown primary processing review revision');
-  keys(value.source_file_digests, PRIMARY_PROCESSING_SOURCE_PATHS);
-  const expected = primaryProcessingDescriptor({ root });
-  for (const path of PRIMARY_PROCESSING_SOURCE_PATHS) {
+  const paths = processingSourcePaths(commandEvidenceParserRevision);
+  keys(value.source_file_digests, paths);
+  const expected = primaryProcessingDescriptor({ root, commandEvidenceParserRevision });
+  for (const path of paths) {
     digest(value.source_file_digests[path]); fixedPath(join(selectedRoot, path));
     assert.equal(hash(read(join(selectedRoot, path))), value.source_file_digests[path], 'processing source bytes changed');
     assert.equal(value.source_file_digests[path], expected.source_file_digests[path], 'processing source differs from selected implementation');
@@ -101,16 +110,17 @@ export function readPrimaryScoringVersion(selector, fixtureId, { root = ROOT, ve
   keys(selector, ['path', 'digest']); digest(selector.digest); fixedPath(selector.path);
   const raw = read(selector.path); assert.equal(hash(raw), selector.digest, 'scoring version manifest changed');
   const manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
-  assert.ok(['ask_primary_scoring_version_v1', 'ask_primary_scoring_version_v2'].includes(manifest.kind), 'unknown primary scoring version');
-  const processingV2 = manifest.kind === 'ask_primary_scoring_version_v2';
-  keys(manifest, ['kind', 'scoring_version_id', 'fixtures', ...(processingV2 ? ['processing'] : [])]);
+  assert.ok(['ask_primary_scoring_version_v1', 'ask_primary_scoring_version_v2', 'ask_primary_scoring_version_v3'].includes(manifest.kind), 'unknown primary scoring version');
+  const processing = manifest.kind !== 'ask_primary_scoring_version_v1';
+  keys(manifest, ['kind', 'scoring_version_id', 'fixtures', ...(processing ? ['processing'] : [])]);
   assert.match(manifest.scoring_version_id, /^[a-z][a-z0-9_-]{1,127}$/u);
   keys(manifest.fixtures, PRIMARY_FIXTURE_IDS);
   assert.ok(PRIMARY_FIXTURE_IDS.includes(fixtureId), 'unknown primary fixture');
   const fixture = manifest.fixtures[fixtureId];
   keys(fixture, ['frozen_source_root', 'selected', 'resource', 'resource_file_digests']);
   fixedPath(fixture.frozen_source_root, true);
-  if (processingV2) verifyProcessingDescriptor(manifest.processing, fixture.frozen_source_root, root);
+  if (processing) verifyProcessingDescriptor(manifest.processing, fixture.frozen_source_root, root,
+    manifest.kind === 'ask_primary_scoring_version_v3' ? '1.6.0-primary-saved' : '1.5.0-primary-saved');
   keys(fixture.resource, PRIMARY_SCORING_VERSION_RESOURCE_FIELDS);
   keys(fixture.resource_file_digests, PRIMARY_SCORING_VERSION_FILE_FIELDS);
   digest(fixture.resource.admissionReviewAuthoritySourceDigest);
@@ -135,7 +145,7 @@ export function readPrimaryScoringVersion(selector, fixtureId, { root = ROOT, ve
   for (const pin of pins) assert.equal(fixture.selected[pin.path], pin.raw_byte_digest, 'scoring version freeze closure changed');
   verifyPrimaryScoringSemantics(fixtureId, fixture.frozen_source_root, { root });
   return { selector: structuredClone(selector), scoring_version_id: manifest.scoring_version_id,
-    ...(processingV2 ? { processing: structuredClone(manifest.processing) } : {}),
+    ...(processing ? { processing: structuredClone(manifest.processing) } : {}),
     root: fixture.frozen_source_root, fixture: structuredClone(fixture) };
 }
 export function primaryProcessingSelection(block, { root = ROOT } = {}) {

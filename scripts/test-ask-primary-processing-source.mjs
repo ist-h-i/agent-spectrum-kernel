@@ -70,6 +70,26 @@ test('explicit source-only build closes the helper and additive schemas without 
   assert.deepEqual(deriveEvaluatorDependencyGraph({ root, baseRevision: revision }), old);
 });
 
+test('AC-CLOSURE explicit 1.6 source construction selects only saved-v3 schemas without authority', () => {
+  const selected = { root, baseRevision: revision, commandEvidenceParserRevision: '1.6.0-primary-saved' };
+  const old = deriveEvaluatorDependencyGraph({ root, baseRevision: revision });
+  scope.withPrimaryProcessingSourceBuild(selected, () => {
+    const graph = deriveEvaluatorDependencyGraph({ root, baseRevision: revision });
+    assert.deepEqual(graph.entry_paths, [...old.entry_paths, helper].sort());
+    for (const path of schemas) {
+      assert.equal(graph.node_inventory.some(node => node.path === path), false);
+      assert.equal(graph.node_inventory.find(node => node.path === path.replace('saved-v2-', 'saved-v3-')).file_type, 'authority_data');
+    }
+    assert.equal(scope.activePrimaryProducer(), false);
+    assert.equal(scope.primaryAdapterSourceDigest(), null);
+    assert.throws(() => scope.withPrimaryEvaluationProducer({}, () => {}), /source_build_no_producer_authority/u);
+  });
+  assert.deepEqual(deriveEvaluatorDependencyGraph({ root, baseRevision: revision }), old);
+  let entered = false;
+  assert.throws(() => scope.withPrimaryProcessingSourceBuild({ ...selected, commandEvidenceParserRevision: 'future' }, () => { entered = true; }), /unknown primary processing command revision/u);
+  assert.equal(entered, false);
+});
+
 test('source-only build refuses root/revision changes, explicit graph injection and producer entry', () => {
   scope.withPrimaryProcessingSourceBuild({ root, baseRevision: revision }, () => {
     assert.throws(() => deriveEvaluatorDependencyGraph({ root: parent, baseRevision: revision }), /root_changed/u);
@@ -114,7 +134,7 @@ test('async source construction has isolated lifetime and cannot retain a later 
 });
 
 // Bytes-only public validation. No private bundle or evaluator is opened.
-test('v1 and v2 source graphs pass sealed byte validation with exact known file types', () => {
+test('v1, v2 and v3 source graphs pass sealed byte validation with exact known file types', () => {
   const hash = b => 'sha256:' + createHash('sha256').update(b).digest('hex');
   const fixtureId = 'mn-build-option-update';
   const fixturePaths = evaluatorAuthorityPathsForFixture(fixtureId).fixturePaths;
@@ -141,12 +161,15 @@ test('v1 and v2 source graphs pass sealed byte validation with exact known file 
   // The same public manifest, fixture bytes, descriptor rules and generator pass
   // without the v2 source-only selection.
   assert.ok(validate(deriveEvaluatorDependencyGraph({root,baseRevision:revision})));
-  const graph = scope.withPrimaryProcessingSourceBuild({root,baseRevision:revision}, () => deriveEvaluatorDependencyGraph({root,baseRevision:revision}));
-  for (const path of schemas) assert.equal(graph.node_inventory.find(node => node.path === path).file_type, 'authority_data');
-  assert.ok(validate(graph));
-  for (const path of [schemas[0], helper]) {
-    const changed = structuredClone(graph); changed.node_inventory.find(node => node.path === path).file_type = path === helper ? 'authority_data' : 'json';
-    const { graph_digest, ...base } = changed; changed.graph_digest = canonicalDigest(base);
-    assert.throws(() => validate(changed), /source graph file type is invalid/u);
+  for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved']) {
+    const graph = scope.withPrimaryProcessingSourceBuild({root,baseRevision:revision,commandEvidenceParserRevision}, () => deriveEvaluatorDependencyGraph({root,baseRevision:revision}));
+    const selectedSchemas = schemas.map(path => commandEvidenceParserRevision === '1.6.0-primary-saved' ? path.replace('saved-v2-', 'saved-v3-') : path);
+    for (const path of selectedSchemas) assert.equal(graph.node_inventory.find(node => node.path === path).file_type, 'authority_data');
+    assert.ok(validate(graph));
+    for (const path of [selectedSchemas[0], helper]) {
+      const changed = structuredClone(graph); changed.node_inventory.find(node => node.path === path).file_type = path === helper ? 'authority_data' : 'json';
+      const { graph_digest, ...base } = changed; changed.graph_digest = canonicalDigest(base);
+      assert.throws(() => validate(changed), /source graph file type is invalid/u);
+    }
   }
 });

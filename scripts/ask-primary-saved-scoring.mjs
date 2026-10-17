@@ -68,7 +68,7 @@ async function inputs(input, outputRoot) {
     protectedPaths.push(input.resources[role].path);
     blocks[role] = grouped[role].map(block => {
       const version = readPrimaryScoringVersion(input.scoringVersion, block.fixture_id, { verifyResourceFiles: true });
-      assert.ok(version.processing, 'saved scoring requires an explicit processing v2 selector'); versions[block.fixture_id] = version;
+      assert.ok(version.processing, 'saved scoring requires an explicit processing v2/v3 selector'); versions[block.fixture_id] = version;
       const base = join(version.root, 'benchmarks/fixtures/checkpoint-b2', block.fixture_id), freezePath = join(base, 'scoring-input-freeze-manifest.json');
       const ref = json(join(base, 'evaluator-reference.json'));
       const selected = { ...structuredClone(block), grading: { ...structuredClone(block.grading),
