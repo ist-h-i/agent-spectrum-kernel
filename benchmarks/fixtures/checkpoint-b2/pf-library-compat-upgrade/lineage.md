@@ -1,0 +1,2 @@
+# Pattern attribution and original local fixture
+Original authored library modules, caller API and fictional matrix model a major API migration. Node path.win32/path.posix documentation motivates explicit cross-platform semantics; SemVer2.0.0 motivates incompatible API version distinction. No documentation code examples, licensed external library implementation, production incidents or private business data are copied. Frequency/impact remain Unknown and practice weights null. Frozen catalog difficulty hard is retained without empirical difficulty certification.
