@@ -134,6 +134,19 @@ test('AC4 missing/duplicate terminal, trailing event, truncated JSON and duplica
     assert.throws(() => evidence.buildCodexCommandEvidence({ identity, stream, contract: authority(), parserRevision: revision }));
   }
 });
+test('AC4 invalid UTF8 cannot merge different raw runtime item IDs', () => {
+  const malformed = pair(declared).map((event, index) => {
+    const text = JSON.stringify(event), marker = '"check-1"', at = text.indexOf(marker);
+    assert.ok(at >= 0);
+    return Buffer.concat([Buffer.from(text.slice(0, at + 1)), Buffer.from([index ? 0xfe : 0xff]), Buffer.from(text.slice(at + marker.length - 1) + '\n')]);
+  });
+  const stream = Buffer.concat([...malformed, Buffer.from(encode([{ type: 'turn.completed' }]))]);
+  assert.throws(() => evidence.buildCodexCommandEvidence({ identity, stream, contract: authority(), parserRevision: revision }),
+    error => error instanceof evidence.CommandEvidenceError && error.code === 'malformed_jsonl');
+});
+test('AC4 a valid UTF8 replacement-character ID retains exact text pairing', () => {
+  assert.deepEqual(project(build(pair(declared, '\ufffd'))).succeeded_command_ids, [publicContract.commands[0].command_id]);
+});
 test('AC4 event loss and failed runtime turns preserve explicit unavailable reasons', () => {
   for (const [event, reason] of [
     [{ type: 'error', message: 'runtime reported dropped events' }, 'event_drop'],
@@ -190,10 +203,33 @@ test('AC4 action/inert identity drift and duplicate file-change IDs refuse', () 
     assert.equal(capture(events, { candidateChangePaths: [mutablePath] }).capture.evidence_level, 'unavailable');
   }
 });
+const threadStart = thread_id => ({ type: 'thread.started', thread_id });
+const turnStart = () => ({ type: 'turn.started' });
+test('AC4 optional lifecycle headers precede item activity without changing check authority', () => {
+  for (const headers of [[], [threadStart('first')], [turnStart()], [threadStart('first'), turnStart()]]) {
+    assert.deepEqual(project(build([...headers, ...pair(declared)])).succeeded_command_ids, [publicContract.commands[0].command_id]);
+  }
+});
+for (const [label, events] of [
+  ['thread switch during pair', [threadStart('first'), pair(declared)[0], threadStart('different'), pair(declared)[1]]],
+  ['turn restart during pair', [turnStart(), pair(declared)[0], turnStart(), pair(declared)[1]]],
+  ['late first turn during pair', [pair(declared)[0], turnStart(), pair(declared)[1]]],
+  ['duplicate thread before pair', [threadStart('first'), threadStart('first'), ...pair(declared)]],
+  ['thread after turn header', [turnStart(), threadStart('first'), ...pair(declared)]],
+  ['thread after completed pair', [...pair(declared), threadStart('first')]],
+  ['turn after completed pair', [...pair(declared), turnStart()]],
+  ['thread after message activity', [{ type: 'item.completed', item: { id: 'prose', type: 'agent_message', text: 'artificial' } }, threadStart('first'), ...pair(declared)]],
+]) test('AC4 ambiguous lifecycle refuses: ' + label, () => {
+  const value = capture(events);
+  assert.equal(value.capture.downgrade_reason, 'capture_invalid:unsupported_event');
+  assert.deepEqual(project(value).succeeded_command_ids, []);
+});
 test('AC5 non-command refusal is v3-only', () => {
   const events = [...pair(declared), fileChange('command-evidence.json')];
   assert.equal(build(events, { parserRevision: '1.5.0-primary-saved' }).commands[0].status, 'succeeded');
   assert.equal(capture(events).capture.evidence_level, 'unavailable');
+  const crossThread = [threadStart('first'), pair(declared)[0], threadStart('different'), pair(declared)[1]];
+  assert.equal(build(crossThread, { parserRevision: '1.5.0-primary-saved' }).commands[0].status, 'succeeded');
 });
 test('AC5 ambiguous public authority is refused and different shell cannot acquire its ID', () => {
   assert.throws(() => build(pair(declared), { contract: authority({ duplicate: true }) }));
@@ -261,8 +297,10 @@ for (const kernelCondition of ['kernel_principles_v1', 'kernel_principles_v2']) 
     assert.equal(existsSync(overridden), false);
   });
 }
-test('AC6 transient evidence writes cannot survive full producer rederivation', async t => {
-  const events = [...pair(declared), fileChange('command-evidence.json', 'add-evidence', 'add'), fileChange('command-evidence.json', 'remove-evidence', 'delete')];
+for (const [label, events, reason] of [
+  ['transient evidence writes', [...pair(declared), fileChange('command-evidence.json', 'add-evidence', 'add'), fileChange('command-evidence.json', 'remove-evidence', 'delete')], 'unverified_file_change'],
+  ['ambiguous lifecycle', [threadStart('first'), pair(declared)[0], threadStart('different'), pair(declared)[1]], 'unsupported_event'],
+]) test(`AC6 ${label} cannot survive full producer rederivation`, async t => {
   const source = syntheticPrimarySource(t, { fixtureId: 'mn-doc-config-correction', command: 'missing', extraNativeEvents: events });
   const produced = await producePrimaryEvaluationArtifacts(source.block, join(source.root, 'refused-v3'), { commandEvidenceParserRevision: revision });
   const options = { recordRoot: produced.output_root, externalDigest: produced.external_digest };
@@ -272,6 +310,6 @@ test('AC6 transient evidence writes cannot survive full producer rederivation', 
     assert.equal(p.evidence_level, 'unavailable'); assert.deepEqual(p.succeeded_command_ids, []);
     const plan = JSON.parse(readFileSync(join(produced.output_root, 'plan.json'))), c = plan.cases.find(x => x.condition === condition);
     const m = JSON.parse(readFileSync(join(produced.output_root, 'run/cases', c.case_id, 'attempts/0001/command-evidence.json')));
-    assert.equal(m.capture.downgrade_reason, 'capture_invalid:unverified_file_change');
+    assert.equal(m.capture.downgrade_reason, 'capture_invalid:' + reason);
   }
 });

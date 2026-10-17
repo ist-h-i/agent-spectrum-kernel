@@ -1,6 +1,6 @@
 # Primary command evidence processing v3
 
-Spec `PRIMARY-COMMAND-EVIDENCE-3`, revision 2. Upstream: [#395](https://github.com/ist-h-i/agent-spectrum-kernel/issues/395), limited evidence connection for [#379](https://github.com/ist-h-i/agent-spectrum-kernel/issues/379).
+Spec `PRIMARY-COMMAND-EVIDENCE-3`, revision 3. Upstream: [#395](https://github.com/ist-h-i/agent-spectrum-kernel/issues/395), limited evidence connection for [#379](https://github.com/ist-h-i/agent-spectrum-kernel/issues/379).
 
 ## Observable contract
 
@@ -34,12 +34,19 @@ event drop, missing/duplicate/reversed/drifting association, or overlapping
 command execution makes capture unavailable with its reason. Do not salvage a
 passing check from such a stream. Existing unavailable manifests keep zero
 records; no partial-manifest or generic execution-state framework is added.
+V3 also requires lossless UTF8 decoding before parsing JSON, so distinct invalid
+raw item IDs cannot collapse into the same replacement-character ID. Such a
+stream is unavailable with `malformed_jsonl`; valid Unicode IDs remain valid.
 Unlike v2, an exact declared body under a different shell/envelope cannot be
 retained unless it independently qualifies as a bounded read. Known script
 bytes alone do not establish an independent invocation's semantics or effects.
 
 V3 also checks non-command event meaning. Only closed known metadata/message
-forms are inert; opaque tools and unknown event/item variants are unavailable.
+forms are accepted; opaque tools and unknown event/item variants are unavailable.
+Optional thread/turn start headers must precede all item activity and may appear
+only once, with thread before turn when both exist. A duplicate or late header
+cannot silently change an item's association namespace and makes capture
+unavailable with `unsupported_event`.
 A completed file-change notification is accepted only before the first declared
 verification **start**, outside any active command, and for an exact canonical
 fixture-relative path in the existing public recipe's mutable paths. This
@@ -74,8 +81,9 @@ reasons. It does not add per-record unavailable fields.
   commands, non-command side effects and forged prose cannot produce unsupported
   verification success. Only public-scope task edits before verification start
   can be retained; transient restored evidence writes remain unavailable.
-- AC4: incomplete/duplicate/drifting/reversed/overlapping events and malformed
-  or truncated streams remain unavailable with a bounded reason.
+- AC4: incomplete/duplicate/drifting/reversed/overlapping events, restarted or
+  late thread/turn headers, and malformed or truncated streams remain unavailable
+  with a bounded reason.
 - AC5: v3 is explicit through producer/schema selection and source pins;
   mismatched fixed selectors fail. Existing default/v1/v2 behavior remains covered.
 - AC6: a public artificial `mn-doc-config-correction` fake-runner roundtrip
@@ -83,9 +91,9 @@ reasons. It does not add per-record unavailable fields.
 
 ## Verification Contract
 
-- Artifact ID: `VC-PRIMARY-COMMAND-EVIDENCE-3`, revision 2.
+- Artifact ID: `VC-PRIMARY-COMMAND-EVIDENCE-3`, revision 3.
 - Artifact type: verification.
-- Upstream refs: `PRIMARY-COMMAND-EVIDENCE-3@2`, AC1–AC6; #395.
+- Upstream refs: `PRIMARY-COMMAND-EVIDENCE-3@3`, AC1–AC6; #395.
 - Selected path: `formal_verification_contract` under
   `ask.verification-proof-policy@1.0.0`; triggers
   `bug_reproduction_or_regression`, `public_api_schema_or_compatibility`, and

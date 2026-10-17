@@ -365,12 +365,15 @@ export function parseCodexCommandEvents({ stream, identity, contract, parserRevi
   const bytes = Buffer.isBuffer(stream) ? stream : Buffer.from(stream ?? "");
   if (bytes.length > MAX_COMMAND_EVENT_STREAM_BYTES) throw new CommandEvidenceError("stream_oversized", "command event stream exceeds the byte limit");
   if (bytes.length === 0 || bytes.at(-1) !== 0x0a) throw new CommandEvidenceError("stream_truncated", "command event stream is empty or truncated");
-  const lines = bytes.toString("utf8").split("\n").slice(0, -1);
+  const decoded = bytes.toString("utf8");
+  if (v3 && !Buffer.from(decoded, 'utf8').equals(bytes)) throw new CommandEvidenceError('malformed_jsonl', 'command event stream contains malformed UTF8');
+  const lines = decoded.split("\n").slice(0, -1);
   const active = new Map();
   const completedIds = new Set();
   const itemTypes = new Map();
   const commandPairs = [];
   let verificationStarted = false;
+  let threadStarted = false, turnStarted = false;
   let terminalTurn = false;
   let eventSequence = 0;
   for (const line of lines) {
@@ -389,6 +392,14 @@ export function parseCodexCommandEvents({ stream, identity, contract, parserRevi
     if (terminalTurn) throw new CommandEvidenceError("sequence_reversal", "runtime event appears after terminal turn completion");
     failOnRuntimeErrorEvent(event);
     if (event.type === "turn.failed") throw new CommandEvidenceError("turn_failed", "runtime turn failed before command evidence completion");
+    if (v3 && event.type === 'thread.started') {
+      if (threadStarted || turnStarted || itemTypes.size) throw new CommandEvidenceError('unsupported_event', 'thread lifecycle changed within command capture');
+      threadStarted = true;
+    }
+    if (v3 && event.type === 'turn.started') {
+      if (turnStarted || itemTypes.size) throw new CommandEvidenceError('unsupported_event', 'turn lifecycle changed within command capture');
+      turnStarted = true;
+    }
     if (v3 && event.item) {
       const { id, type } = event.item;
       if (itemTypes.has(id) && itemTypes.get(id) !== type) throw new CommandEvidenceError('unsupported_event', 'item identity changed its event meaning');
