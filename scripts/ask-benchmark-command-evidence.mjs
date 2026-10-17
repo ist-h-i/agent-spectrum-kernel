@@ -13,6 +13,7 @@ export const COMMAND_EVIDENCE_PARSER_REVISION = "1.3.0";
 export const PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION = "1.4.0-primary-saved";
 export const PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION = "1.5.0-primary-saved";
 export const PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION = "1.6.0-primary-saved";
+export const PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION = "1.7.0-primary-saved";
 export const COMMAND_EVIDENCE_PATH = "command-evidence.json";
 export const MAX_COMMAND_EVENT_STREAM_BYTES = 16 * 1024 * 1024;
 export const MAX_COMMAND_EVENT_LINE_BYTES = 1024 * 1024;
@@ -20,13 +21,13 @@ export const MAX_COMMAND_EVENT_LINE_BYTES = 1024 * 1024;
 const TERMINAL_ITEM_STATUSES = new Set(["completed", "failed", "declined"]);
 const SHELL_PREFIX = "/bin/bash -lc ";
 const SAVED_SHELL_PREFIXES = [SHELL_PREFIX, "/bin/zsh -lc ", "/bin/bash -c "];
-const PARSER_REVISIONS = [COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION];
-const boundedSavedRevision = revision => [PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION].includes(revision);
+const PARSER_REVISIONS = [COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION];
+const boundedSavedRevision = revision => [PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION].includes(revision);
 const FAILURE_CODES = new Set(["stream_oversized", "stream_truncated", "line_oversized", "malformed_jsonl", "malformed_event",
   "duplicate_terminal_turn", "sequence_reversal", "event_drop", "runtime_item_error", "turn_failed", "missing_item_id",
   "duplicate_item_id", "invalid_started_status", "completed_without_started", "command_drift", "unknown_status",
   "status_exit_contradiction", "started_without_completed", "missing_terminal_turn", "unsafe_command",
-  "unsupported_shell", "malformed_shell_envelope", "ambiguous_shell_word", "unsupported_parser_revision", "ambiguous_command_match", "overlapping_commands", "missing_command", "unsupported_event", "unverified_file_change"]);
+  "unsupported_shell", "malformed_shell_envelope", "ambiguous_shell_word", "unsupported_parser_revision", "ambiguous_command_match", "overlapping_commands", "missing_command", "unsupported_event", "unverified_file_change", "unsupported_command", "change_context_unavailable"]);
 const STREAM_INTEGRITY_ERROR = /(?:drop(?:ped)?\s+event|event\s+(?:drop|loss)|stream\s+lag|lagged|backpressure|truncat|sequence\s+integrity|integrity\s+failure)/iu;
 const SENSITIVE_VALUE = /(?:^|\s)(?:[A-Za-z_][A-Za-z0-9_]*=|\/Users\/|\/home\/|\/private\/|\/var\/folders\/|[A-Za-z]:[\\/]|file:\/\/|(?:token|secret|password|credential)[A-Za-z0-9_-]*=)/iu;
 const UNSAFE_SCRIPT = /(?:^|[\s;&|(<"'])(?:[A-Za-z_][A-Za-z0-9_]*=|\/(?:[^/\s;&|()<>"']|$)|[A-Za-z]:[\\/]|file:\/\/|(?:token|secret|password|credential)[A-Za-z0-9_-]*=)/iu;
@@ -137,6 +138,17 @@ function boundedAuxiliaryReadV3(script) {
     || new RegExp(`^rg --files(?: -g ${filter})+$`, 'u').test(part));
 }
 
+// V4's finite discovery addition remains inert and unmatched. Glob patterns
+// must be literal quoted words; no executable rg options or expansions enter.
+function boundedAuxiliaryReadV4(script) {
+  if (typeof script !== 'string' || script.includes('..')) return false;
+  const plain = '[A-Za-z0-9_./-]+';
+  const glob = `[A-Za-z0-9_./!*?{}\\[\\]-]+`;
+  const filter = `(?:${plain}|'${glob}'|"${glob}")`;
+  return script.split(/\s*(?:&&|;)\s*/u).every(part => boundedAuxiliaryReadV3(part)
+    || new RegExp(`^rg --files(?: --hidden)?(?: -g ${filter})*(?: -- [A-Za-z0-9_./][A-Za-z0-9_./-]*)?$`, 'u').test(part));
+}
+
 export function commandInvocationDigest(safeArgv) {
   return canonicalDigest({ execution_form: "direct_argv", safe_argv: safeArgv });
 }
@@ -198,8 +210,13 @@ function decodePosixSingleQuotedWord(value) {
   return output;
 }
 
-export function commandEvidenceFailureReason(error) {
-  return "capture_invalid:" + (error instanceof CommandEvidenceError && FAILURE_CODES.has(error.code) ? error.code : "unclassified");
+export function commandEvidenceFailureReason(error, { parserRevision } = {}) {
+  const code = error instanceof CommandEvidenceError && FAILURE_CODES.has(error.code) ? error.code : 'unclassified';
+  if (parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION) {
+    if (['unsupported_event', 'unsupported_shell', 'unsupported_command', 'overlapping_commands', 'change_context_unavailable'].includes(code)) return 'capture_unsupported:' + code;
+    if (code === 'unsafe_command') return 'capture_unsafe:' + code;
+  }
+  return 'capture_invalid:' + code;
 }
 
 function assertParserRevision(value) {
@@ -241,6 +258,11 @@ function decodeLiteralShellWord(value) {
 
 function classifyRuntimeCommand(rawCommand, contract, parserRevision) {
   if (typeof rawCommand !== "string" || rawCommand.length === 0) throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified");
+  if (parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION) {
+    const exact = contract?.commands.find(command => authorityRenderDigests(command, parserRevision).includes(sha256(Buffer.from(rawCommand))));
+    if (exact) return { execution_form: exact.execution_form, logical_digest: exact.logical_command_digest,
+      rendered_digest: sha256(Buffer.from(rawCommand)), script: exact.canonical_script ?? null };
+  }
   const direct = contract?.commands.filter(({ execution_form }) => execution_form === "direct_argv").find((command) => renderCommandEvent(command) === rawCommand);
   if (direct) return { execution_form: "direct_argv", logical_digest: direct.logical_command_digest, rendered_digest: sha256(Buffer.from(rawCommand)), script: null };
   const saved = parserRevision !== COMMAND_EVIDENCE_PARSER_REVISION;
@@ -249,10 +271,13 @@ function classifyRuntimeCommand(rawCommand, contract, parserRevision) {
   const word = rawCommand.slice(prefix.length);
   // Only this complete literal auxiliary word bypasses quoted-word decoding.
   // It remains unmatched; this does not add unquoted verification renderings.
-  const script = parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION && word === 'pwd'
+  const script = [PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION].includes(parserRevision) && word === 'pwd'
     ? 'pwd' : saved ? decodeLiteralShellWord(word) : decodePosixSingleQuotedWord(word);
   if (/(?:^|[;,])\s*(?:token|secret|password|credential)[A-Za-z0-9_-]*\s*=/iu.test(script)) throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified");
-  try { assertSafeScript(script, "runtime canonical script"); } catch { throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified"); }
+  if (parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION) {
+    if (UNSAFE_SCRIPT.test(script) || /(?:^|[;&|])\s*(?:rm|mv|cp|touch|tee|chmod|chown|mkdir|rmdir)\b|[<>]|\$\(|`|\b(?:writeFile|unlink|rename|rmSync|process\.env)\b/u.test(script)) throw new CommandEvidenceError('unsafe_command', 'runtime operation can change or expose evidence');
+    if (!boundedAuxiliaryReadV4(script)) throw new CommandEvidenceError('unsupported_command', 'runtime command meaning is outside the finite read grammar');
+  } else try { assertSafeScript(script, "runtime canonical script"); } catch { throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified"); }
   return { execution_form: "codex_shell_command", logical_digest: canonicalDigest({ execution_form: "codex_shell_command", canonical_script: script }), rendered_digest: sha256(Buffer.from(rawCommand)), script };
 }
 
@@ -271,8 +296,7 @@ function assertCommandPairIntegrity(started, completed) {
   commandTerminalOutcome(completed);
 }
 
-function commandEvidenceBase({ sequence, started, completed, contract, parserRevision }) {
-  const rawCommand = completed.command ?? started.command;
+function commandAuthority(rawCommand, contract, parserRevision) {
   const classified = classifyRuntimeCommand(rawCommand, contract, parserRevision);
   const candidate = { execution_form: classified.execution_form, logical_command_digest: classified.logical_digest,
     rendered_event_command_digest: classified.rendered_digest };
@@ -280,14 +304,19 @@ function commandEvidenceBase({ sequence, started, completed, contract, parserRev
   if (boundedSavedRevision(parserRevision)) {
     if (matches.length > 1) throw new CommandEvidenceError("ambiguous_command_match", "multiple public command IDs match one invocation");
     const declaredBody = contract?.commands.some(command => command.execution_form === classified.execution_form && command.logical_command_digest === classified.logical_digest);
-    const auxiliaryRead = parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION
-      ? boundedAuxiliaryReadV3(classified.script) : boundedAuxiliaryRead(classified.script);
+    const auxiliaryRead = parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION ? boundedAuxiliaryReadV4(classified.script)
+      : parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION ? boundedAuxiliaryReadV3(classified.script) : boundedAuxiliaryRead(classified.script);
     // V2 retained a declared body under a different envelope as unmatched. V3
     // cannot establish that invocation's relationship/side effects and refuses.
     const legacyDeclaredBody = parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION && declaredBody;
-    if (!matches.length && !legacyDeclaredBody && !auxiliaryRead) throw new CommandEvidenceError("unsafe_command", "undeclared command is outside the bounded auxiliary read grammar");
+    if (!matches.length && !legacyDeclaredBody && !auxiliaryRead) throw new CommandEvidenceError(parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION ? 'unsupported_command' : 'unsafe_command', "undeclared command is outside the bounded auxiliary read grammar");
   }
-  const commandMatch = matches[0] ?? null;
+  return { classified, commandMatch: matches[0] ?? null };
+}
+
+function commandEvidenceBase({ sequence, started, completed, contract, parserRevision }) {
+  const rawCommand = completed.command ?? started.command;
+  const { classified, commandMatch } = commandAuthority(rawCommand, contract, parserRevision);
   const matched = commandMatch?.working_directory.evidence_requirement === "not_required" ? commandMatch : null;
   const matchState = matched ? "matched" : commandMatch ? "cwd_unverified" : "unmatched";
   const outcome = commandTerminalOutcome(completed);
@@ -355,8 +384,132 @@ function assertV3EventShape(event) {
   if (!valid) throw new CommandEvidenceError('unsupported_event', 'event meaning or side effects are not established');
 }
 
-export function parseCodexCommandEvents({ stream, identity, contract, parserRevision = COMMAND_EVIDENCE_PARSER_REVISION, candidateChangePaths = [] }) {
+function assertV4EventShape(event) {
+  const closed = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
+    && Object.keys(value).every(key => keys.includes(key));
+  if (event.type === 'turn.completed') {
+    if (!closed(event, ['type', 'usage']) || event.usage !== undefined && (!closed(event.usage,
+      ['input_tokens', 'cached_input_tokens', 'output_tokens', 'cache_write_input_tokens', 'reasoning_output_tokens'])
+      || Object.values(event.usage).some(value => !Number.isSafeInteger(value) || value < 0))) {
+      throw new CommandEvidenceError('unsupported_event', 'terminal telemetry shape is outside the finite contract');
+    }
+    return;
+  }
+  if (event.item?.type === 'file_change') {
+    const item = event.item;
+    if (!closed(event, ['type', 'item']) || !['item.started', 'item.completed'].includes(event.type)
+      || !closed(item, ['id', 'type', 'changes', 'status']) || typeof item.id !== 'string' || !item.id
+      || !Array.isArray(item.changes) || !item.changes.length || item.changes.some(change => !closed(change, ['path', 'kind'])
+        || typeof change.path !== 'string' || !['add', 'delete', 'update'].includes(change.kind))) {
+      throw new CommandEvidenceError('unsupported_event', 'file change shape is outside the finite contract');
+    }
+    return;
+  }
+  assertV3EventShape(event);
+}
+
+// One owner for this invocation's finite action relationships. Nothing is
+// published until the complete thread/turn and every edit/check have closed.
+function parseCodexCommandEventsV4({ stream, identity, contract, candidateChangePaths, candidateChanges, candidateWorkspaceRoot }) {
+  const parserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION;
+  const portable = path => typeof path === 'string' && path !== '.' && /^[A-Za-z0-9._/-]+$/u.test(path)
+    && !posix.isAbsolute(path) && posix.normalize(path) === path && !path.split('/').includes('..');
+  if (!Array.isArray(candidateChangePaths) || candidateChangePaths.some(path => !portable(path))
+    || !Array.isArray(candidateChanges) || candidateChanges.some(change => !change || Object.keys(change).sort().join(',') !== 'kind,path'
+      || !portable(change.path) || !['add', 'delete', 'update'].includes(change.kind))) {
+    throw new CommandEvidenceError('change_context_unavailable', 'closed candidate delta context is required');
+  }
+  const allowed = new Set(candidateChangePaths), expected = new Map(candidateChanges.map(change => [change.path, change.kind]));
+  if (expected.size !== candidateChanges.length || candidateChanges.some(change => !allowed.has(change.path))) {
+    throw new CommandEvidenceError('unverified_file_change', 'candidate delta is outside the finite mutable scope');
+  }
+  if (candidateWorkspaceRoot !== null && (typeof candidateWorkspaceRoot !== 'string' || !posix.isAbsolute(candidateWorkspaceRoot)
+    || posix.normalize(candidateWorkspaceRoot) !== candidateWorkspaceRoot || candidateWorkspaceRoot === '/' || candidateWorkspaceRoot.endsWith('/'))) {
+    throw new CommandEvidenceError('change_context_unavailable', 'exact canonical arm-root context is required');
+  }
+  const canonicalChanges = changes => {
+    const result = changes.map(change => {
+      const path = posix.isAbsolute(change.path) && candidateWorkspaceRoot !== null && change.path.startsWith(candidateWorkspaceRoot + '/')
+        ? change.path.slice(candidateWorkspaceRoot.length + 1) : change.path;
+      if (!portable(path) || !allowed.has(path) || expected.get(path) !== change.kind) throw new CommandEvidenceError('unverified_file_change', 'file change does not close to the public scope and final snapshot delta');
+      return { path, kind: change.kind };
+    }).sort((a,b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+    if (new Set(result.map(change => change.path)).size !== result.length) throw new CommandEvidenceError('unverified_file_change', 'file-change aliases are ambiguous');
+    return result;
+  };
+  const bytes = Buffer.isBuffer(stream) ? stream : Buffer.from(stream ?? '');
+  if (bytes.length > MAX_COMMAND_EVENT_STREAM_BYTES) throw new CommandEvidenceError('stream_oversized', 'command event stream exceeds the byte limit');
+  if (!bytes.length || bytes.at(-1) !== 0x0a) throw new CommandEvidenceError('stream_truncated', 'command event stream is empty or truncated');
+  const decoded = bytes.toString('utf8');
+  if (!Buffer.from(decoded).equals(bytes)) throw new CommandEvidenceError('malformed_jsonl', 'command event stream contains malformed UTF8');
+  const active = new Map(), items = new Map(), edited = new Set(), commands = [];
+  let threadStarted = false, turnStarted = false, terminal = false, verificationStarted = false, editing = null, sequence = 0;
+  for (const line of decoded.split('\n').slice(0,-1)) {
+    if (Buffer.byteLength(line) > MAX_COMMAND_EVENT_LINE_BYTES) throw new CommandEvidenceError('line_oversized', 'command event line exceeds the byte limit');
+    let event;
+    try { event = parseJsonRejectDuplicateKeys(line); }
+    catch { throw new CommandEvidenceError('malformed_jsonl', 'command event stream contains malformed JSONL'); }
+    if (!event || typeof event !== 'object' || Array.isArray(event) || typeof event.type !== 'string') throw new CommandEvidenceError('malformed_event', 'command event has no unambiguous type');
+    sequence++;
+    assertV4EventShape(event);
+    if (terminal) throw new CommandEvidenceError(event.type === 'turn.completed' ? 'duplicate_terminal_turn' : 'sequence_reversal', 'activity follows terminal completion');
+    failOnRuntimeErrorEvent(event);
+    if (event.type === 'turn.failed') throw new CommandEvidenceError('turn_failed', 'runtime turn failed');
+    if (event.type === 'thread.started') {
+      if (threadStarted || turnStarted || items.size) throw new CommandEvidenceError('unsupported_event', 'thread boundary changed');
+      threadStarted = true; continue;
+    }
+    if (event.type === 'turn.started') {
+      if (!threadStarted || turnStarted || items.size) throw new CommandEvidenceError('unsupported_event', 'turn boundary changed');
+      turnStarted = true; continue;
+    }
+    if (!turnStarted) throw new CommandEvidenceError('unsupported_event', 'explicit thread and turn headers are required');
+    if (event.type === 'turn.completed') {
+      if (active.size || editing || [...items.values()].some(item => item.state === 'started')) throw new CommandEvidenceError('started_without_completed', 'an item is not terminal');
+      terminal = true; continue;
+    }
+    const item = event.item, prior = items.get(item.id);
+    if (prior && prior.type !== item.type) throw new CommandEvidenceError('unsupported_event', 'item identity changed meaning');
+    if (prior?.state === 'completed' || prior && event.type === 'item.started') throw new CommandEvidenceError('duplicate_item_id', 'item identity was reused');
+    if (item.type === 'command_execution') {
+      if (typeof item.command !== 'string' || !item.command) throw new CommandEvidenceError('missing_command', 'both command events must identify the invocation');
+      if (event.type === 'item.started') {
+        if (editing) throw new CommandEvidenceError('unverified_file_change', 'command started during an unfinished edit');
+        if (item.status !== undefined && item.status !== 'in_progress') throw new CommandEvidenceError('invalid_started_status', 'command start is not in progress');
+        const { commandMatch } = commandAuthority(item.command, contract, parserRevision);
+        if (commandMatch) {
+          verificationStarted = true;
+          if ([...active.values()].some(value => value.commandId === commandMatch.command_id)) throw new CommandEvidenceError('overlapping_commands', 'the same declared check has no serial precedence');
+        }
+        active.set(item.id, { item, sequence, commandId: commandMatch?.command_id ?? null });
+      } else {
+        const started = active.get(item.id);
+        if (!started) throw new CommandEvidenceError('completed_without_started', 'command completion lacks its invocation');
+        assertCommandPairIntegrity(started.item, item);
+        commands.push(closeCommandEvidence(commandEvidenceBase({ sequence:{started:started.sequence,completed:sequence}, started:started.item, completed:item, contract, parserRevision }), identity));
+        active.delete(item.id);
+      }
+    } else if (item.type === 'file_change') {
+      if (verificationStarted || active.size) throw new CommandEvidenceError('unverified_file_change', 'edit is not in the quiet pre-verification phase');
+      const changes = canonicalChanges(item.changes);
+      if (event.type === 'item.started') {
+        if (editing || item.status !== 'in_progress' || changes.some(change => edited.has(change.path))) throw new CommandEvidenceError('unverified_file_change', 'edit history is outside the finite snapshot-bound scope');
+        editing = { id:item.id, changes };
+      } else {
+        if (!editing || editing.id !== item.id || item.status !== 'completed' || stableCanonicalJson(changes) !== stableCanonicalJson(editing.changes)) throw new CommandEvidenceError('unverified_file_change', 'edit completion does not close its start');
+        changes.forEach(change => edited.add(change.path)); editing = null;
+      }
+    } else if (event.type === 'item.updated' && prior?.state !== 'started') throw new CommandEvidenceError('unsupported_event', 'item update lacks its lifetime');
+    items.set(item.id, { type:item.type, state:event.type === 'item.completed' ? 'completed' : 'started' });
+  }
+  if (!terminal) throw new CommandEvidenceError('missing_terminal_turn', 'command event stream lacks terminal completion');
+  if (edited.size !== expected.size || [...expected.keys()].some(path => !edited.has(path))) throw new CommandEvidenceError('unverified_file_change', 'snapshot delta has an unexplained change');
+  return { stream:{bytes:bytes.length,digest:sha256(bytes)}, command_event_count:commands.length, commands };
+}
+
+export function parseCodexCommandEvents({ stream, identity, contract, parserRevision = COMMAND_EVIDENCE_PARSER_REVISION, candidateChangePaths = [], candidateChanges = [], candidateWorkspaceRoot = null }) {
   assertParserRevision(parserRevision);
+  if (parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION) return parseCodexCommandEventsV4({stream,identity,contract,candidateChangePaths,candidateChanges,candidateWorkspaceRoot});
   const v3 = parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION;
   if (v3 && (!Array.isArray(candidateChangePaths) || candidateChangePaths.some(path => typeof path !== 'string'
     || path === '.' || !/^[A-Za-z0-9._/-]+$/u.test(path) || posix.isAbsolute(path)
@@ -501,8 +654,8 @@ export function buildUnavailableCommandEvidence({ identity, support, probe, reas
   });
 }
 
-export function buildCodexCommandEvidence({ identity, stream, contract, parserRevision = COMMAND_EVIDENCE_PARSER_REVISION, candidateChangePaths = [] }) {
-  const parsed = parseCodexCommandEvents({ stream, identity: manifestIdentity(identity), contract, parserRevision, candidateChangePaths });
+export function buildCodexCommandEvidence({ identity, stream, contract, parserRevision = COMMAND_EVIDENCE_PARSER_REVISION, candidateChangePaths = [], candidateChanges = [], candidateWorkspaceRoot = null }) {
+  const parsed = parseCodexCommandEvents({ stream, identity: manifestIdentity(identity), contract, parserRevision, candidateChangePaths,candidateChanges,candidateWorkspaceRoot });
   return buildCommandEvidenceManifest({
     identity,
     capture: {
@@ -540,6 +693,9 @@ export function validateCommandEvidenceManifest(manifest, { root, contract = nul
   if (manifest.command_event_count !== manifest.commands.length) throw new Error("command evidence event count mismatch");
   if (manifest.capture.evidence_level === "unavailable" && (manifest.command_event_count !== 0 || manifest.commands.length !== 0)) throw new Error("unavailable command evidence must have zero events");
   const commandById = new Map(contract?.commands.map((command) => [command.command_id, command]) ?? []);
+  const v4 = manifest.capture.parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION;
+  if (v4) assertUnique(manifest.commands.flatMap(command => [command.event_sequence.started, command.event_sequence.completed]), 'command event positions');
+  const latestCompletion = new Map();
   let previousCompleted = 0;
   for (const command of manifest.commands) {
     const base = withoutField(withoutField(withoutField(command, "command_evidence_id"), "command_evidence_digest"), "bytes");
@@ -550,6 +706,13 @@ export function validateCommandEvidenceManifest(manifest, { root, contract = nul
     if (command.event_sequence.completed <= command.event_sequence.started || command.event_sequence.completed <= previousCompleted) throw new Error("command event sequence is reversed");
     if (manifest.capture.parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION && command.event_sequence.started <= previousCompleted) throw new Error('command event sequences overlap');
     previousCompleted = command.event_sequence.completed;
+    if (v4 && contract) {
+      const authority = contract.commands.find(item => closesCommandAuthority(command, item, manifest.capture.parser_revision));
+      if (authority) {
+        if (command.event_sequence.started <= (latestCompletion.get(authority.command_id) ?? 0)) throw new Error('overlapping invocations of one public command are ambiguous');
+        latestCompletion.set(authority.command_id, command.event_sequence.completed);
+      }
+    }
     if ((command.status === "succeeded" && command.exit_code !== 0) || (command.status === "failed" && (!Number.isInteger(command.exit_code) || command.exit_code === 0)) || (command.status === "declined" && command.exit_code !== null)) throw new Error("command evidence status contradicts exit code");
     if (command.match_state === "matched") {
       const authority = commandById.get(command.matched_command_id);

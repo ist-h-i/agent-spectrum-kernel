@@ -8,8 +8,10 @@ import { dirname, join, resolve } from 'node:path';
 import { comparisonHash as hash } from './ask-user-comparison-prepare.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 import { primaryProcessingDescriptor } from './ask-primary-scoring-version.mjs';
-import { producePrimaryEvaluationArtifacts, verifyPrimaryEvaluationProducer } from './ask-primary-evaluation-producer.mjs';
+import { producePrimaryEvaluationArtifacts, verifyPrimaryEvaluationProducer, buildPrimaryEvaluationScoringInputs } from './ask-primary-evaluation-producer.mjs';
 import { syntheticPrimarySource } from './test-helpers-primary-evaluation-producer.mjs';
+import { artificialCombinedEnvelope, artificialCommand } from './test-helpers-primary-command-envelope-v4.mjs';
+import { renderCommandEvent } from './ask-benchmark-command-evidence.mjs';
 import * as grading from './ask-primary-evaluation-grading.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..'), roles = ['baseline', 'challenger'];
@@ -18,7 +20,8 @@ const json = path => JSON.parse(readFileSync(path));
 const write = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, raw(value), { mode: 0o400 }); };
 const pin = path => ({ path, digest: hash(readFileSync(path)) });
 
-for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved']) test(`artificial fixed ${commandEvidenceParserRevision} saved pair prepares without dispatch and separately grades all nine tasks with Unknown quality`, async t => {
+for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved', '1.7.0-primary-saved']) test(`artificial fixed ${commandEvidenceParserRevision} saved pair preserves normalized references and fake or Unknown quality`, async t => {
+  const v4 = commandEvidenceParserRevision === '1.7.0-primary-saved';
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'ask-saved-scoring-roundtrip-')));
   t.after(() => { for (const path of ['runtime', 'inert-private']) chmodSync(join(root, path), 0o700); rmSync(root, { recursive: true, force: true }); });
   const runtime = join(root, 'runtime'), privateRoot = join(root, 'inert-private'); mkdirSync(runtime); mkdirSync(privateRoot);
@@ -46,15 +49,25 @@ for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-prima
       resource_file_digests: Object.fromEntries(['manifestPath', 'admissionDecisionPath', 'admissionReviewAuthorityPath', 'admissionReviewArchivePath'].map(key => [key, hash(readFileSync(resource[key]))])) };
   }
   chmodSync(runtime, 0o500);
-  const version = commandEvidenceParserRevision === '1.6.0-primary-saved' ? 'v3' : 'v2';
+  const version = v4 ? 'v4' : commandEvidenceParserRevision === '1.6.0-primary-saved' ? 'v3' : 'v2';
   const selectorPath = join(root, 'selector.json'); write(selectorPath, { kind: `ask_primary_scoring_version_${version}`, scoring_version_id: `artificial-processing-${version}`, processing, fixtures });
-  const blocks = Object.fromEntries(roles.map(role => [role, PRIMARY_FIXTURE_IDS.map(fixtureId => syntheticPrimarySource(t, { fixtureId }).block)]));
+  const blocks = Object.fromEntries(roles.map(role => [role, PRIMARY_FIXTURE_IDS.map(fixtureId => syntheticPrimarySource(t, { fixtureId,
+    ...(v4 ? { mutate: fixtureId === 'mn-build-option-update', nativeEvents: ({ armRoot, contract }) => {
+      const declined = role === 'challenger' && fixtureId === 'mn-doc-config-correction';
+      const events = artificialCombinedEnvelope({ contract, armRoot, edit: fixtureId === 'mn-build-option-update',
+        status: declined ? 'declined' : 'completed', exit_code: declined ? null : 0 });
+      if (fixtureId === 'mn-build-option-update' && role === 'challenger') events.splice(-1, 0,
+        ...artificialCommand(renderCommandEvent(contract.commands[0]), 'artificial-later-failure', 'failed', 7));
+      if (fixtureId === 'mp-frontend-state-review') events.splice(-1, 0,
+        ...artificialCommand("/bin/zsh -lc 'node unknown-program.mjs'", 'artificial-opaque-operation'));
+      return events;
+    } } : {}) }).block)]));
   const retained = join(root, 'retained'), sourcePath = join(retained, 'source.json'); write(sourcePath, { blocks });
   const resources = Object.fromEntries(roles.map(role => {
     const path = join(root, role + '-resources.json'); write(path, { kind: 'ask_primary_grading_resources_v1', output_root: join(root, role + '-grading'),
       fixtures: Object.fromEntries(PRIMARY_FIXTURE_IDS.map(id => [id, { frozenSourceRoot: runtime, ...resource }])) }); return [role, pin(path)];
   }));
-  const calls = [], adapters = {}; let releaseFirst, enterFirst, incomplete = false;
+  const calls = [], adapters = {}, normalizedProofs = {}; let releaseFirst, enterFirst, incomplete = false;
   const held = new Promise(resolve => { releaseFirst = resolve; }), entered = new Promise(resolve => { enterFirst = resolve; });
   t.mock.module('./ask-primary-evaluation-grading.mjs', { exports: { ...grading, createPrimaryEvaluationGradingAdapter: ({ resourcesPath, resourcesDigest }) => {
     const role = roles.find(role => resources[role].path === resourcesPath); assert.ok(role); assert.equal(resourcesDigest, resources[role].digest);
@@ -64,7 +77,20 @@ for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-prima
       if (calls.length === 1) { enterFirst(); await held; }
       const produced = await producePrimaryEvaluationArtifacts(block, join(root, role + '-' + block.fixture_id + '-producer'));
       assert.equal(verifyPrimaryEvaluationProducer({ recordRoot: produced.output_root, externalDigest: produced.external_digest }).commandEvidenceParserRevision, commandEvidenceParserRevision);
-      return { status: 'completed', quality: null, semantic_status: 'manual_review_required', grader_process_starts: 0, model_calls: 0 };
+      const proof = v4 ? ['plain', 'kernel_principles_v1', 'full_ask'].map(condition => {
+        const input = buildPrimaryEvaluationScoringInputs({ recordRoot: produced.output_root, externalDigest: produced.external_digest },
+          { condition, frozenSourceRoot: runtime, ...resource });
+        assert.equal(input.status, 'assembled_not_executed');
+        const n = input.normalizedResult;
+        return { condition, normalized_result_id: n.normalized_result_id, normalized_result_digest: hash(Buffer.from(raw(n))),
+          terminal_workspace_tree_digest: n.lineage.terminal_workspace_tree_digest, command_evidence: n.command_evidence };
+      }) : null;
+      if (v4) normalizedProofs[role + '/' + block.fixture_id] = structuredClone(proof);
+      // This is a fake boundary result, not a semantic score. A numeric zero
+      // proves preservation independently of the command-success projection.
+      const numericFake = v4 && block.fixture_id === 'mp-iac-rollback-design';
+      return { status: 'completed', quality: numericFake ? 0 : null, semantic_status: numericFake ? 'synthetic_numeric' : 'manual_review_required',
+        ...(v4 ? { normalized_command_evidence: proof } : {}), grader_process_starts: 0, model_calls: 0 };
     } };
   } } });
   const saved = await import(`./ask-primary-saved-scoring.mjs?artificial-roundtrip-${version}`);
@@ -81,7 +107,34 @@ for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-prima
   const result = await first;
   assert.equal(result.status, 'completed'); assert.equal(result.inspected_sources_unchanged, true); assert.equal(result.formal_aggregate_eligible, false);
   assert.equal(calls.length, 18); assert.equal(result.grader_process_starts, 0); assert.equal(result.model_calls, 0);
-  for (const role of roles) { assert.deepEqual(result.results[role].map(item => item.fixture_id), PRIMARY_FIXTURE_IDS); assert.ok(result.results[role].every(item => item.quality === null)); }
+  for (const role of roles) {
+    assert.deepEqual(result.results[role].map(item => item.fixture_id), PRIMARY_FIXTURE_IDS);
+    for (const item of result.results[role]) {
+      assert.equal(item.quality, v4 && item.fixture_id === 'mp-iac-rollback-design' ? 0 : null);
+      if (v4) {
+        assert.deepEqual(item.normalized_command_evidence, normalizedProofs[role + '/' + item.fixture_id]);
+        for (const proof of item.normalized_command_evidence) {
+          assert.ok(proof.normalized_result_id); assert.match(proof.normalized_result_digest, /^sha256:[a-f0-9]{64}$/u);
+          const c = json(join(ROOT, 'benchmarks/fixtures/checkpoint-b2', item.fixture_id, 'verification-command-contract.json'));
+          const p = proof.command_evidence;
+          if (item.fixture_id === 'mp-frontend-state-review') {
+            assert.equal(p.evidence_level, 'unavailable'); assert.deepEqual(p.succeeded_command_ids, []);
+            assert.deepEqual(p.unavailable_command_ids, c.commands.map(command => command.command_id));
+          } else if (item.fixture_id === 'mn-build-option-update') {
+            const ids = c.commands.map(command => command.command_id);
+            assert.equal(p.evidence_level, 'executed');
+            assert.deepEqual(p.succeeded_command_ids, role === 'baseline' ? ids : [ids[1]]);
+            assert.deepEqual(p.failed_command_ids, role === 'challenger' ? [ids[0]] : []);
+            assert.deepEqual(p.references.filter(ref => ref.command_id !== null).map(ref => ref.command_id), role === 'baseline' ? ids.toReversed() : [...ids.toReversed(), ids[0]]);
+          } else if (item.fixture_id === 'mn-doc-config-correction' && role === 'challenger') {
+            assert.deepEqual(p.succeeded_command_ids, []); assert.deepEqual(p.declined_command_ids, c.commands.map(command => command.command_id));
+          }
+          for (const ref of p.references) { assert.ok(ref.command_evidence_id); assert.match(ref.digest, /^sha256:[a-f0-9]{64}$/u); }
+        }
+      }
+    }
+  }
+  if (v4) assert.deepEqual(json(result.result_path).results, result.results);
   await saved.verifyPrimarySavedScoringPreparation(options);
   await assert.rejects(saved.gradePreparedPrimarySavedScoring(options), /already exists/u); assert.equal(calls.length, 18);
   const partialPreparation = await saved.preparePrimarySavedScoring({ source: pin(sourcePath), scoringVersion: pin(selectorPath), resources,

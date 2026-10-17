@@ -10,7 +10,7 @@ import { kernelPrinciplesV2FixtureDescriptor, principlesV2Capability, renderKern
 import { primaryProfileForKernel } from './ask-primary-evaluation-profile.mjs';
 import { renderCommandEvent } from './ask-benchmark-command-evidence.mjs';
 const hash = comparisonHash, raw = value => Buffer.from(JSON.stringify(value, null, 2) + '\n');
-export function syntheticPrimarySource(t, { scenario = 'completed', command = 'pass', fixtureId = 'mn-build-option-update', mutate = false, kernelCondition = 'kernel_principles_v1', extraNativeEvents = [], retainSourceRepository = false } = {}) {
+export function syntheticPrimarySource(t, { scenario = 'completed', command = 'pass', fixtureId = 'mn-build-option-update', mutate = false, kernelCondition = 'kernel_principles_v1', extraNativeEvents = [], nativeEvents = null, retainSourceRepository = false } = {}) {
   const profile = primaryProfileForKernel(kernelCondition), CONDITIONS = profile.conditions, v2 = kernelCondition === 'kernel_principles_v2';
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'primary-producer-')));
   t.after(() => {
@@ -74,7 +74,8 @@ export function syntheticPrimarySource(t, { scenario = 'completed', command = 'p
     }
     events.push(...structuredClone(extraNativeEvents), {type:'turn.completed',usage:{input_tokens:20,output_tokens:5}});
     const artifacts={},save=(name,content)=>{const b=Buffer.isBuffer(content)?content:typeof content==='string'?Buffer.from(content):raw(content);write(join(folder,name),b);artifacts[name]=hash(b);};
-    save('stdout.jsonl',Buffer.from(events.map(event=>JSON.stringify(event)).join('\n')+'\n'));save('stderr.log','');save('last-message.txt','synthetic final output');
+    const completeEvents = nativeEvents === null ? events : nativeEvents({condition,armRoot:join(comparison,arms[condition].path),contract,recipe});
+    save('stdout.jsonl',Buffer.from(completeEvents.map(event=>JSON.stringify(event)).join('\n')+'\n'));save('stderr.log','');save('last-message.txt','synthetic final output');
     const after=structuredClone(baseline),changedPath=mutate?recipe.mutable_paths.find(path=>Object.hasOwn(baseline,path)):null;
     if(mutate){if(!changedPath)throw new Error('fake mutable file missing');const content=Buffer.concat([readFileSync(join(comparison,arms[condition].baseline_path,changedPath)),Buffer.from('\nsynthetic offline delta\n')]);
       write(join(comparison,'control/patch-workspaces',condition,changedPath),content);after[changedPath]={...baseline[changedPath],bytes:content.length,digest:hash(content)};}
