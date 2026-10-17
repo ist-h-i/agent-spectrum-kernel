@@ -65,7 +65,7 @@ for (const api of [writer, validator]) assert.throws(() => api({ root: process.c
     } finally { context.dispose(); }
   }
 });
-for (const commandEvidenceParserRevision of [null, '1.5.0-primary-saved', '1.6.0-primary-saved', '1.7.0-primary-saved']) test(`actual CI and doc writers publish statically verified pending resources (${commandEvidenceParserRevision ?? 'legacy'}); full checks remain required`, t => {
+for (const commandEvidenceParserRevision of [null, '1.5.0-primary-saved', '1.6.0-primary-saved', '1.7.0-primary-saved', '1.8.0-primary-saved']) test(`actual CI and doc writers publish statically verified pending resources (${commandEvidenceParserRevision ?? 'legacy'}); full checks remain required`, t => {
   const parent = realpathSync(mkdtempSync(join(tmpdir(), 'ask-resource-authority-'))), repository = join(parent, 'repository');
   t.after(() => rmSync(parent, { recursive: true, force: true }));
   const cloned = spawnSync('git', ['clone', '--no-hardlinks', '--no-checkout', ROOT, repository], { encoding: 'utf8', maxBuffer: 16777216 });
@@ -97,8 +97,8 @@ for (const commandEvidenceParserRevision of [null, '1.5.0-primary-saved', '1.6.0
     const graph = reference.evaluator_source_identity.dependency_graph;
     assert.equal(graph.entry_paths.includes('scripts/ask-review-target-requirement.mjs'), commandEvidenceParserRevision !== null);
     if (commandEvidenceParserRevision) {
-      const selectedVersion = commandEvidenceParserRevision === '1.7.0-primary-saved' ? 'v4' : commandEvidenceParserRevision === '1.6.0-primary-saved' ? 'v3' : 'v2';
-      for (const prefix of ['primary', 'primary-k2']) for (const version of ['v2', 'v3', 'v4']) {
+      const selectedVersion = commandEvidenceParserRevision === '1.8.0-primary-saved' ? 'v5' : commandEvidenceParserRevision === '1.7.0-primary-saved' ? 'v4' : commandEvidenceParserRevision === '1.6.0-primary-saved' ? 'v3' : 'v2';
+      for (const prefix of ['primary', 'primary-k2']) for (const version of ['v2', 'v3', 'v4', 'v5']) {
         const node = graph.node_inventory.find(node => node.path === `benchmarks/schemas/${prefix}-saved-${version}-portfolio-command-evidence.schema.json`);
         if (version === selectedVersion) assert.equal(node?.file_type, 'authority_data');
         else assert.equal(node, undefined);

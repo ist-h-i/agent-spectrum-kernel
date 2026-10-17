@@ -1,5 +1,9 @@
 # Primary saved command evidence v4
 
+For the separately selected literal-word successor, see
+[Primary saved literal command words v5](primary-command-literal-word-v5.md).
+This v4 contract and its fixed records retain their original meaning.
+
 Spec: `SPEC-PRIMARY-COMMAND-EVIDENCE-4`, revision 2. Upstream: #379,
 #395 and #397; the public parser/consumer contracts merged through #396/#398.
 This is prospective public implementation and artificial verification. It

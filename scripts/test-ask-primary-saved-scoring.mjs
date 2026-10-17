@@ -11,6 +11,7 @@ import { primaryProcessingDescriptor } from './ask-primary-scoring-version.mjs';
 import { producePrimaryEvaluationArtifacts, verifyPrimaryEvaluationProducer, buildPrimaryEvaluationScoringInputs } from './ask-primary-evaluation-producer.mjs';
 import { syntheticPrimarySource } from './test-helpers-primary-evaluation-producer.mjs';
 import { artificialCombinedEnvelope, artificialCommand } from './test-helpers-primary-command-envelope-v4.mjs';
+import { artificialLiteralEnvelope, artificialLiteralCommand } from './test-helpers-primary-literal-word-v5.mjs';
 import { renderCommandEvent } from './ask-benchmark-command-evidence.mjs';
 import * as grading from './ask-primary-evaluation-grading.mjs';
 
@@ -20,8 +21,9 @@ const json = path => JSON.parse(readFileSync(path));
 const write = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, raw(value), { mode: 0o400 }); };
 const pin = path => ({ path, digest: hash(readFileSync(path)) });
 
-for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved', '1.7.0-primary-saved']) test(`artificial fixed ${commandEvidenceParserRevision} saved pair preserves normalized references and fake or Unknown quality`, async t => {
-  const v4 = commandEvidenceParserRevision === '1.7.0-primary-saved';
+for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved', '1.7.0-primary-saved', '1.8.0-primary-saved']) test(`artificial fixed ${commandEvidenceParserRevision} saved pair preserves normalized references and fake or Unknown quality`, async t => {
+  const v5 = commandEvidenceParserRevision === '1.8.0-primary-saved';
+  const closedActions = v5 || commandEvidenceParserRevision === '1.7.0-primary-saved';
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'ask-saved-scoring-roundtrip-')));
   t.after(() => { for (const path of ['runtime', 'inert-private']) chmodSync(join(root, path), 0o700); rmSync(root, { recursive: true, force: true }); });
   const runtime = join(root, 'runtime'), privateRoot = join(root, 'inert-private'); mkdirSync(runtime); mkdirSync(privateRoot);
@@ -49,15 +51,15 @@ for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-prima
       resource_file_digests: Object.fromEntries(['manifestPath', 'admissionDecisionPath', 'admissionReviewAuthorityPath', 'admissionReviewArchivePath'].map(key => [key, hash(readFileSync(resource[key]))])) };
   }
   chmodSync(runtime, 0o500);
-  const version = v4 ? 'v4' : commandEvidenceParserRevision === '1.6.0-primary-saved' ? 'v3' : 'v2';
+  const version = v5 ? 'v5' : closedActions ? 'v4' : commandEvidenceParserRevision === '1.6.0-primary-saved' ? 'v3' : 'v2';
   const selectorPath = join(root, 'selector.json'); write(selectorPath, { kind: `ask_primary_scoring_version_${version}`, scoring_version_id: `artificial-processing-${version}`, processing, fixtures });
   const blocks = Object.fromEntries(roles.map(role => [role, PRIMARY_FIXTURE_IDS.map(fixtureId => syntheticPrimarySource(t, { fixtureId,
-    ...(v4 ? { mutate: fixtureId === 'mn-build-option-update', nativeEvents: ({ armRoot, contract }) => {
+    ...(closedActions ? { mutate: fixtureId === 'mn-build-option-update', nativeEvents: ({ armRoot, contract }) => {
       const declined = role === 'challenger' && fixtureId === 'mn-doc-config-correction';
-      const events = artificialCombinedEnvelope({ contract, armRoot, edit: fixtureId === 'mn-build-option-update',
+      const events = (v5 ? artificialLiteralEnvelope : artificialCombinedEnvelope)({ contract, armRoot, edit: fixtureId === 'mn-build-option-update',
         status: declined ? 'declined' : 'completed', exit_code: declined ? null : 0 });
       if (fixtureId === 'mn-build-option-update' && role === 'challenger') events.splice(-1, 0,
-        ...artificialCommand(renderCommandEvent(contract.commands[0]), 'artificial-later-failure', 'failed', 7));
+        ...artificialCommand(v5 ? artificialLiteralCommand(contract.commands[0]) : renderCommandEvent(contract.commands[0]), 'artificial-later-failure', 'failed', v5 ? 1 : 7));
       if (fixtureId === 'mp-frontend-state-review') events.splice(-1, 0,
         ...artificialCommand("/bin/zsh -lc 'node unknown-program.mjs'", 'artificial-opaque-operation'));
       return events;
@@ -76,8 +78,17 @@ for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-prima
       if (incomplete) return { status: role === 'baseline' ? 'completed' : 'unknown', quality: null, grader_process_starts: 0, model_calls: 0 };
       if (calls.length === 1) { enterFirst(); await held; }
       const produced = await producePrimaryEvaluationArtifacts(block, join(root, role + '-' + block.fixture_id + '-producer'));
-      assert.equal(verifyPrimaryEvaluationProducer({ recordRoot: produced.output_root, externalDigest: produced.external_digest }).commandEvidenceParserRevision, commandEvidenceParserRevision);
-      const proof = v4 ? ['plain', 'kernel_principles_v1', 'full_ask'].map(condition => {
+      const verified = verifyPrimaryEvaluationProducer({ recordRoot: produced.output_root, externalDigest: produced.external_digest });
+      assert.equal(verified.commandEvidenceParserRevision, commandEvidenceParserRevision);
+      if (v5) {
+        assert.equal(json(join(produced.output_root, 'producer.json')).kind, 'ask_primary_evaluation_producer_v5');
+        for (const attempt of verified.inspection.cases.flatMap(item => item.attempts)) {
+          const commands = attempt.commandEvidence.commands.filter(command => command.match_state === 'matched');
+          if (block.fixture_id !== 'mp-frontend-state-review') assert.ok(commands.length > 0);
+          for (const command of commands) assert.match(command.literal_word_encoding, /^[lensd]+$/u);
+        }
+      }
+      const proof = closedActions ? ['plain', 'kernel_principles_v1', 'full_ask'].map(condition => {
         const input = buildPrimaryEvaluationScoringInputs({ recordRoot: produced.output_root, externalDigest: produced.external_digest },
           { condition, frozenSourceRoot: runtime, ...resource });
         assert.equal(input.status, 'assembled_not_executed');
@@ -85,12 +96,12 @@ for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-prima
         return { condition, normalized_result_id: n.normalized_result_id, normalized_result_digest: hash(Buffer.from(raw(n))),
           terminal_workspace_tree_digest: n.lineage.terminal_workspace_tree_digest, command_evidence: n.command_evidence };
       }) : null;
-      if (v4) normalizedProofs[role + '/' + block.fixture_id] = structuredClone(proof);
+      if (closedActions) normalizedProofs[role + '/' + block.fixture_id] = structuredClone(proof);
       // This is a fake boundary result, not a semantic score. A numeric zero
       // proves preservation independently of the command-success projection.
-      const numericFake = v4 && block.fixture_id === 'mp-iac-rollback-design';
+      const numericFake = closedActions && block.fixture_id === 'mp-iac-rollback-design';
       return { status: 'completed', quality: numericFake ? 0 : null, semantic_status: numericFake ? 'synthetic_numeric' : 'manual_review_required',
-        ...(v4 ? { normalized_command_evidence: proof } : {}), grader_process_starts: 0, model_calls: 0 };
+        ...(closedActions ? { normalized_command_evidence: proof } : {}), grader_process_starts: 0, model_calls: 0 };
     } };
   } } });
   const saved = await import(`./ask-primary-saved-scoring.mjs?artificial-roundtrip-${version}`);
@@ -110,8 +121,8 @@ for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-prima
   for (const role of roles) {
     assert.deepEqual(result.results[role].map(item => item.fixture_id), PRIMARY_FIXTURE_IDS);
     for (const item of result.results[role]) {
-      assert.equal(item.quality, v4 && item.fixture_id === 'mp-iac-rollback-design' ? 0 : null);
-      if (v4) {
+      assert.equal(item.quality, closedActions && item.fixture_id === 'mp-iac-rollback-design' ? 0 : null);
+      if (closedActions) {
         assert.deepEqual(item.normalized_command_evidence, normalizedProofs[role + '/' + item.fixture_id]);
         for (const proof of item.normalized_command_evidence) {
           assert.ok(proof.normalized_result_id); assert.match(proof.normalized_result_digest, /^sha256:[a-f0-9]{64}$/u);
@@ -125,6 +136,7 @@ for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-prima
             assert.equal(p.evidence_level, 'executed');
             assert.deepEqual(p.succeeded_command_ids, role === 'baseline' ? ids : [ids[1]]);
             assert.deepEqual(p.failed_command_ids, role === 'challenger' ? [ids[0]] : []);
+            if (v5 && role === 'challenger') { assert.equal(p.references.at(-1).outcome, 'failed'); assert.equal(p.references.at(-1).exit_code, 1); }
             assert.deepEqual(p.references.filter(ref => ref.command_id !== null).map(ref => ref.command_id), role === 'baseline' ? ids.toReversed() : [...ids.toReversed(), ids[0]]);
           } else if (item.fixture_id === 'mn-doc-config-correction' && role === 'challenger') {
             assert.deepEqual(p.succeeded_command_ids, []); assert.deepEqual(p.declined_command_ids, c.commands.map(command => command.command_id));
@@ -134,7 +146,7 @@ for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-prima
       }
     }
   }
-  if (v4) assert.deepEqual(json(result.result_path).results, result.results);
+  if (closedActions) assert.deepEqual(json(result.result_path).results, result.results);
   await saved.verifyPrimarySavedScoringPreparation(options);
   await assert.rejects(saved.gradePreparedPrimarySavedScoring(options), /already exists/u); assert.equal(calls.length, 18);
   const partialPreparation = await saved.preparePrimarySavedScoring({ source: pin(sourcePath), scoringVersion: pin(selectorPath), resources,
