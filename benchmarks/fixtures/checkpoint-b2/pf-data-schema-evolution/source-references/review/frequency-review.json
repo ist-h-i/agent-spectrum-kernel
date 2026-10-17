@@ -1,0 +1,29 @@
+{
+  "reviewer_record_id": "data-schema-frequency-independent-followup-f91d5cb5-20261012",
+  "fixture_id": "pf-data-schema-evolution",
+  "reviewed_head": "f91d5cb59fe5a73403e5f354ca07da634ccf1d68",
+  "decision": "approve",
+  "judgment": "unknown_classification_approved",
+  "frequency_band": "unknown",
+  "frequency_weight": null,
+  "frequency_evidence_status": "insufficient_evidence",
+  "frequency_evidence_ids": [],
+  "occurrences_per_year": null,
+  "practice_weighted_aggregate_eligible": false,
+  "reason": "Official JSON Schema documentation establishes a documented pattern, not observed project task cadence or occurrence counts. Authored fictional records, suite placement and repetitions 3 supply no empirical frequency evidence. Impact and rollback requirements cannot substitute for frequency evidence. Targeted Unicode/diagnostic fixes and regenerated hashes introduce no new empirical band evidence; lineage, catalog and policy are unchanged.",
+  "reviewed_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/lineage.md",
+      "raw_sha256": "sha256:66ad488e0ac792967caee08be35899c2bfc44090ccdd62087fc94c4059d5bd0b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/source-references/json-schema-object-annotations-20261012.md",
+      "raw_sha256": "sha256:53f6a42ffc5a931bd8ac90142a8f148e84d0325c4eea65f671a70f86ff2fbfcf"
+    },
+    {
+      "path": "benchmarks/portfolio-lineage-policy.json",
+      "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d"
+    }
+  ],
+  "scope": "Separate approval of unknown frequency classification only; no positive empirical band, fixture admission or change to frozen catalog base eligibility."
+}
