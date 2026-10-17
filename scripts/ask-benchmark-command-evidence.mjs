@@ -26,7 +26,7 @@ const FAILURE_CODES = new Set(["stream_oversized", "stream_truncated", "line_ove
   "duplicate_terminal_turn", "sequence_reversal", "event_drop", "runtime_item_error", "turn_failed", "missing_item_id",
   "duplicate_item_id", "invalid_started_status", "completed_without_started", "command_drift", "unknown_status",
   "status_exit_contradiction", "started_without_completed", "missing_terminal_turn", "unsafe_command",
-  "unsupported_shell", "malformed_shell_envelope", "ambiguous_shell_word", "unsupported_parser_revision", "ambiguous_command_match", "overlapping_commands", "missing_command"]);
+  "unsupported_shell", "malformed_shell_envelope", "ambiguous_shell_word", "unsupported_parser_revision", "ambiguous_command_match", "overlapping_commands", "missing_command", "unsupported_event", "unverified_file_change"]);
 const STREAM_INTEGRITY_ERROR = /(?:drop(?:ped)?\s+event|event\s+(?:drop|loss)|stream\s+lag|lagged|backpressure|truncat|sequence\s+integrity|integrity\s+failure)/iu;
 const SENSITIVE_VALUE = /(?:^|\s)(?:[A-Za-z_][A-Za-z0-9_]*=|\/Users\/|\/home\/|\/private\/|\/var\/folders\/|[A-Za-z]:[\\/]|file:\/\/|(?:token|secret|password|credential)[A-Za-z0-9_-]*=)/iu;
 const UNSAFE_SCRIPT = /(?:^|[\s;&|(<"'])(?:[A-Za-z_][A-Za-z0-9_]*=|\/(?:[^/\s;&|()<>"']|$)|[A-Za-z]:[\\/]|file:\/\/|(?:token|secret|password|credential)[A-Za-z0-9_-]*=)/iu;
@@ -327,15 +327,50 @@ function failOnRuntimeErrorEvent(event) {
   throw new CommandEvidenceError("runtime_item_error", "runtime emitted an unclassified error item");
 }
 
-export function parseCodexCommandEvents({ stream, identity, contract, parserRevision = COMMAND_EVIDENCE_PARSER_REVISION }) {
+// An inert type must not conceal an opaque tool payload. Other event forms are
+// unknown in V3, not assumed harmless merely because they are not commands.
+function assertV3EventShape(event) {
+  const closed = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
+    && Object.keys(value).every(key => keys.includes(key));
+  const item = event.item;
+  if (event.type === 'error' || event.type === 'turn.failed' || event.type === 'item.completed' && item?.type === 'error') return;
+  let valid = false;
+  if (event.type === 'thread.started') valid = closed(event, ['type', 'thread_id']) && typeof event.thread_id === 'string' && event.thread_id.length > 0;
+  else if (event.type === 'turn.started') valid = closed(event, ['type']);
+  else if (event.type === 'turn.completed') valid = closed(event, ['type', 'usage']) && (event.usage === undefined
+    || closed(event.usage, ['input_tokens', 'cached_input_tokens', 'output_tokens'])
+      && Object.values(event.usage).every(value => Number.isInteger(value) && value >= 0));
+  else if (closed(event, ['type', 'item']) && ['item.started', 'item.updated', 'item.completed'].includes(event.type)
+    && typeof item?.id === 'string' && item.id.length > 0) {
+    if (item.type === 'command_execution') valid = event.type !== 'item.updated'
+      && closed(item, ['id', 'type', 'command', 'status', 'exit_code', 'aggregated_output', 'cwd', 'command_id']);
+    else if (item.type === 'file_change') valid = event.type === 'item.completed' && closed(item, ['id', 'type', 'changes', 'status'])
+      && Array.isArray(item.changes) && item.changes.length > 0
+      && item.changes.every(change => closed(change, ['path', 'kind']) && typeof change.path === 'string' && ['add', 'delete', 'update'].includes(change.kind));
+    else if (['agent_message', 'reasoning'].includes(item.type)) valid = closed(item, ['id', 'type', 'text'])
+      && (event.type === 'item.started' && item.text === undefined || typeof item.text === 'string');
+    else if (item.type === 'todo_list') valid = closed(item, ['id', 'type', 'items']) && Array.isArray(item.items)
+      && item.items.every(entry => closed(entry, ['text', 'completed']) && typeof entry.text === 'string' && typeof entry.completed === 'boolean');
+  }
+  if (!valid) throw new CommandEvidenceError('unsupported_event', 'event meaning or side effects are not established');
+}
+
+export function parseCodexCommandEvents({ stream, identity, contract, parserRevision = COMMAND_EVIDENCE_PARSER_REVISION, candidateChangePaths = [] }) {
   assertParserRevision(parserRevision);
+  const v3 = parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION;
+  if (v3 && (!Array.isArray(candidateChangePaths) || candidateChangePaths.some(path => typeof path !== 'string'
+    || path === '.' || !/^[A-Za-z0-9._/-]+$/u.test(path) || posix.isAbsolute(path)
+    || posix.normalize(path) !== path || path.split('/').includes('..')))) throw new CommandEvidenceError('unverified_file_change', 'candidate change context is not canonical');
+  const changePaths = new Set(v3 ? candidateChangePaths : []);
   const bytes = Buffer.isBuffer(stream) ? stream : Buffer.from(stream ?? "");
   if (bytes.length > MAX_COMMAND_EVENT_STREAM_BYTES) throw new CommandEvidenceError("stream_oversized", "command event stream exceeds the byte limit");
   if (bytes.length === 0 || bytes.at(-1) !== 0x0a) throw new CommandEvidenceError("stream_truncated", "command event stream is empty or truncated");
   const lines = bytes.toString("utf8").split("\n").slice(0, -1);
   const active = new Map();
   const completedIds = new Set();
+  const itemTypes = new Map();
   const commandPairs = [];
+  let verificationStarted = false;
   let terminalTurn = false;
   let eventSequence = 0;
   for (const line of lines) {
@@ -344,6 +379,7 @@ export function parseCodexCommandEvents({ stream, identity, contract, parserRevi
     try { event = parserRevision !== COMMAND_EVIDENCE_PARSER_REVISION ? parseJsonRejectDuplicateKeys(line) : JSON.parse(line); }
     catch { throw new CommandEvidenceError("malformed_jsonl", "command event stream contains malformed JSONL"); }
     if (parserRevision !== COMMAND_EVIDENCE_PARSER_REVISION && (!event || typeof event !== "object" || Array.isArray(event) || typeof event.type !== "string" || !event.type)) throw new CommandEvidenceError("malformed_event", "command event has no unambiguous type");
+    if (v3) assertV3EventShape(event);
     eventSequence += 1;
     if (event.type === "turn.completed") {
       if (terminalTurn) throw new CommandEvidenceError("duplicate_terminal_turn", "command event stream contains duplicate terminal turn events");
@@ -353,6 +389,18 @@ export function parseCodexCommandEvents({ stream, identity, contract, parserRevi
     if (terminalTurn) throw new CommandEvidenceError("sequence_reversal", "runtime event appears after terminal turn completion");
     failOnRuntimeErrorEvent(event);
     if (event.type === "turn.failed") throw new CommandEvidenceError("turn_failed", "runtime turn failed before command evidence completion");
+    if (v3 && event.item) {
+      const { id, type } = event.item;
+      if (itemTypes.has(id) && itemTypes.get(id) !== type) throw new CommandEvidenceError('unsupported_event', 'item identity changed its event meaning');
+      itemTypes.set(id, type);
+      if (type === 'file_change') {
+        if (completedIds.has(id)) throw new CommandEvidenceError('duplicate_item_id', 'file change item ID is duplicated');
+        if (verificationStarted || active.size || event.item.status !== 'completed'
+          || event.item.changes.some(change => !changePaths.has(change.path))) throw new CommandEvidenceError('unverified_file_change', 'file change is outside the established pre-verification candidate scope');
+        completedIds.add(id);
+        continue;
+      }
+    }
     if (!["item.started", "item.completed"].includes(event.type) || event.item?.type !== "command_execution") continue;
     const item = event.item;
     if (typeof item.id !== "string" || item.id.length === 0) throw new CommandEvidenceError("missing_item_id", "command event lacks a stable item ID");
@@ -361,6 +409,9 @@ export function parseCodexCommandEvents({ stream, identity, contract, parserRevi
       if (active.has(item.id) || completedIds.has(item.id)) throw new CommandEvidenceError("duplicate_item_id", "command event item ID is duplicated");
       if (parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION && active.size) throw new CommandEvidenceError('overlapping_commands', 'command relationship is not serially established');
       if (item.status !== undefined && item.status !== "in_progress") throw new CommandEvidenceError("invalid_started_status", "started command event has a non-progress status");
+      // The boundary begins at invocation start, even if the eventual check
+      // fails, is declined, or cannot close required cwd evidence.
+      if (v3 && contract?.commands.some(command => authorityRenderDigests(command, parserRevision).includes(sha256(Buffer.from(item.command))))) verificationStarted = true;
       active.set(item.id, { item, sequence: eventSequence });
       continue;
     }
@@ -439,8 +490,8 @@ export function buildUnavailableCommandEvidence({ identity, support, probe, reas
   });
 }
 
-export function buildCodexCommandEvidence({ identity, stream, contract, parserRevision = COMMAND_EVIDENCE_PARSER_REVISION }) {
-  const parsed = parseCodexCommandEvents({ stream, identity: manifestIdentity(identity), contract, parserRevision });
+export function buildCodexCommandEvidence({ identity, stream, contract, parserRevision = COMMAND_EVIDENCE_PARSER_REVISION, candidateChangePaths = [] }) {
+  const parsed = parseCodexCommandEvents({ stream, identity: manifestIdentity(identity), contract, parserRevision, candidateChangePaths });
   return buildCommandEvidenceManifest({
     identity,
     capture: {

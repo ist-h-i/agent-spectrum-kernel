@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { canonicalDigest, parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { normalizeRuntimeObservationCarrier } from './ask-benchmark-runtime-observation.mjs';
-import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
+import { PRIMARY_FIXTURE_IDS, buildPrimaryFixtureRecipe } from './ask-primary-fixture-recipe.mjs';
 import { buildCodexCommandEvidence, buildUnavailableCommandEvidence, commandEvidenceFailureReason, PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, validateVerificationCommandContract, validateCommandEvidenceManifest } from './ask-benchmark-command-evidence.mjs';
 import { captureTerminalWorkspaceInventory, buildTerminalWorkspaceAuthority, readVerifiedTerminalWorkspaceAuthority } from './ask-benchmark-terminal-workspace.mjs';
 import { normalizePortfolioExecution, verifyNormalizedPortfolioResults } from './ask-benchmark-normalized-results.mjs';
@@ -177,7 +177,9 @@ function derive(target, source, parserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_
       const commandIdentity = { ...terminalIdentity, repetition: 1, verification_command_contract_digest: contract.contract_digest,
         runtime_identity_digest: canonicalDigest(adapter), effective_command_digest: canonicalDigest(adapter.effective_command) };
       let commands;
-      try { commands = buildCodexCommandEvidence({ identity: commandIdentity, stream: stdout, contract, parserRevision }); }
+      try { commands = buildCodexCommandEvidence({ identity: commandIdentity, stream: stdout, contract, parserRevision,
+        candidateChangePaths: parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION
+          ? buildPrimaryFixtureRecipe(request.fixture_id).mutable_paths : [] }); }
       catch (error) { commands = buildUnavailableCommandEvidence({ identity: commandIdentity, support: 'supported', probe: 'capture_invalid', reason: commandEvidenceFailureReason(error), stream: stdout, parserRevision }); }
       validateCommandEvidenceManifest(commands, { root: ROOT, contract });
       // The original normalized outcome is the model CLI outcome. Independent
@@ -208,11 +210,12 @@ function derive(target, source, parserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_
     adapter_identities: new Map([['codex', adapter]]), cases: inspected } };
 }
 
-export async function producePrimaryEvaluationArtifacts(block, outputRoot, { commandEvidenceParserRevision } = {}) {
+export async function producePrimaryEvaluationArtifacts(block, outputRoot, { commandEvidenceParserRevision, ...unknown } = {}) {
   const processing = primaryProcessingSelection(block);
   commandEvidenceParserRevision ??= processing?.command_evidence_parser_revision ?? PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
   if (processing) assert.equal(commandEvidenceParserRevision, processing.command_evidence_parser_revision, 'primary processing selector override refused');
   assert.ok([PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION].includes(commandEvidenceParserRevision), 'unsupported primary command evidence revision');
+  if (commandEvidenceParserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION) assert.deepEqual(Object.keys(unknown), [], 'primary v3 caller context override refused');
   const source = await checkedSource(block), target = resolve(outputRoot);
   assert.ok(!existsSync(target)); assert.equal(realpathSync(dirname(target)), dirname(target));
   for (const input of [ROOT, block.root, block.public_input_root]) assert.ok(target !== resolve(input) && !target.startsWith(`${resolve(input)}/`), 'primary output overlaps authority');

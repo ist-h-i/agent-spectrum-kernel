@@ -27,14 +27,16 @@ function authority({ cwd = 'not_required', duplicate = false } = {}) {
   return c;
 }
 const declared = evidence.renderCommandEvent(publicContract.commands[0]);
+const mutablePath = 'workspace/docs/worker-retries.md';
+const fileChange = (path = mutablePath, id = 'edit-1', kind = 'update') => ({ type: 'item.completed', item: { id, type: 'file_change', status: 'completed', changes: [{ path, kind }] } });
 function pair(command, id = 'check-1', status = 'completed', exit = 0) {
   return [{ type: 'item.started', item: { id, type: 'command_execution', command, status: 'in_progress' } },
     { type: 'item.completed', item: { id, type: 'command_execution', command, status, exit_code: exit, aggregated_output: 'artificial runner output\n' } }];
 }
 const encode = events => events.map(e => JSON.stringify(e)).join('\n') + '\n';
-function build(events, { contract = authority(), parserRevision = revision, terminal = true } = {}) {
+function build(events, { contract = authority(), parserRevision = revision, terminal = true, candidateChangePaths = [] } = {}) {
   return evidence.buildCodexCommandEvidence({ identity: { ...identity, verification_command_contract_digest: contract.contract_digest },
-    stream: encode([...events, ...(terminal ? [{ type: 'turn.completed' }] : [])]), contract, parserRevision });
+    stream: encode([...events, ...(terminal ? [{ type: 'turn.completed' }] : [])]), contract, parserRevision, candidateChangePaths });
 }
 function capture(events, options = {}) {
   try { return build(events, options); }
@@ -143,6 +145,56 @@ test('AC4 event loss and failed runtime turns preserve explicit unavailable reas
     assert.deepEqual(project(value).succeeded_command_ids, []);
   }
 });
+test('AC3 bounded canonical candidate edits after reads and before verification are retainable', () => {
+  const value = build([...pair(reads[0], 'read-before'), fileChange(), ...pair(declared)], { candidateChangePaths: [mutablePath] });
+  assert.deepEqual(project(value).succeeded_command_ids, [publicContract.commands[0].command_id]);
+  assert.equal(value.command_event_count, 2);
+});
+for (const path of ['command-evidence.json', 'stdout.jsonl', 'producer.json', 'workspace/config/retry-policy.json',
+  '../workspace/docs/worker-retries.md', '/tmp/workspace/docs/worker-retries.md', 'docs/worker-retries.md']) {
+  test('AC3 file change outside exact public candidate scope is unavailable: ' + path, () => {
+    const value = capture([fileChange(path), ...pair(declared)], { candidateChangePaths: [mutablePath] });
+    assert.equal(value.capture.downgrade_reason, 'capture_invalid:unverified_file_change');
+    assert.deepEqual(project(value).succeeded_command_ids, []);
+  });
+}
+test('AC3 post-check, overlapping, unbound and failed file changes remain unavailable', () => {
+  for (const events of [[...pair(declared), fileChange()], [pair(declared)[0], fileChange(), pair(declared)[1]],
+    [{ ...fileChange(), item: { ...fileChange().item, status: 'failed' } }, ...pair(declared)]]) {
+    const value = capture(events, { candidateChangePaths: [mutablePath] });
+    assert.equal(value.capture.evidence_level, 'unavailable');
+    assert.deepEqual(project(value).succeeded_command_ids, []);
+  }
+  assert.equal(capture([fileChange(), ...pair(declared)]).capture.downgrade_reason, 'capture_invalid:unverified_file_change');
+});
+test('AC3 failed/declined/cwd-unverified starts also close candidate edit permission', () => {
+  for (const [status, exit] of [['failed', 2], ['declined', null], ['completed', 0]]) {
+    const events = [...pair(declared, 'check-1', status, exit), fileChange()];
+    const value = capture(events, { contract: authority({ cwd: 'runtime_observed' }), candidateChangePaths: [mutablePath] });
+    assert.equal(value.capture.downgrade_reason, 'capture_invalid:unverified_file_change');
+  }
+});
+for (const event of [
+  { type: 'item.completed', item: { id: 'opaque', type: 'mcp_tool_call', tool: 'write_file' } },
+  { type: 'item.updated', item: { id: 'opaque', type: 'command_execution', command: "/bin/zsh -lc 'touch stdout.jsonl'" } },
+  { type: 'item.completed', item: { id: 'opaque', type: 'agent_message', text: 'done', changes: [{ path: 'stdout.jsonl', kind: 'update' }] } },
+  { type: 'turn.completed', item: { id: 'opaque', type: 'mcp_tool_call' } },
+]) test('AC3 opaque or disguised side effects cannot hide in inert event types: ' + event.type + '/' + event.item.type, () => {
+  const value = capture([...pair(declared), event]);
+  assert.equal(value.capture.downgrade_reason, 'capture_invalid:unsupported_event');
+  assert.deepEqual(project(value).succeeded_command_ids, []);
+});
+test('AC4 action/inert identity drift and duplicate file-change IDs refuse', () => {
+  for (const events of [[fileChange(), fileChange(), ...pair(declared)],
+    [{ type: 'item.completed', item: { id: 'check-1', type: 'agent_message', text: 'fake' } }, ...pair(declared)]]) {
+    assert.equal(capture(events, { candidateChangePaths: [mutablePath] }).capture.evidence_level, 'unavailable');
+  }
+});
+test('AC5 non-command refusal is v3-only', () => {
+  const events = [...pair(declared), fileChange('command-evidence.json')];
+  assert.equal(build(events, { parserRevision: '1.5.0-primary-saved' }).commands[0].status, 'succeeded');
+  assert.equal(capture(events).capture.evidence_level, 'unavailable');
+});
 test('AC5 ambiguous public authority is refused and different shell cannot acquire its ID', () => {
   assert.throws(() => build(pair(declared), { contract: authority({ duplicate: true }) }));
   const value = capture(pair(declared.replace('/bin/bash -lc ', '/bin/zsh -lc ')));
@@ -177,7 +229,7 @@ for (const kernelCondition of ['kernel_principles_v1', 'kernel_principles_v2']) 
     let fakeRunnerCalls = 0;
     const fakeRunner = () => {
       fakeRunnerCalls++;
-      return [...pair(reads[0], 'read-before'), ...pair(declared, 'declared-doc', outcome === 'failure' ? 'failed' : 'completed', outcome === 'failure' ? 4 : 0),
+      return [...pair(reads[0], 'read-before'), fileChange(), ...pair(declared, 'declared-doc', outcome === 'failure' ? 'failed' : 'completed', outcome === 'failure' ? 4 : 0),
         ...pair(outcome === 'unavailable' ? "/bin/zsh -lc 'touch stdout.jsonl'" : reads[1], 'read-after')];
     };
     const source = syntheticPrimarySource(t, { fixtureId: 'mn-doc-config-correction', kernelCondition, command: 'missing', extraNativeEvents: fakeRunner() });
@@ -204,5 +256,22 @@ for (const kernelCondition of ['kernel_principles_v1', 'kernel_principles_v2']) 
     const rejected = join(source.root, 'future');
     await assert.rejects(producePrimaryEvaluationArtifacts(source.block, rejected, { commandEvidenceParserRevision: 'future' }));
     assert.equal(existsSync(rejected), false);
+    const overridden = join(source.root, 'caller-context');
+    await assert.rejects(producePrimaryEvaluationArtifacts(source.block, overridden, { commandEvidenceParserRevision: revision, candidateChangePaths: ['stdout.jsonl'] }), /caller context override/u);
+    assert.equal(existsSync(overridden), false);
   });
 }
+test('AC6 transient evidence writes cannot survive full producer rederivation', async t => {
+  const events = [...pair(declared), fileChange('command-evidence.json', 'add-evidence', 'add'), fileChange('command-evidence.json', 'remove-evidence', 'delete')];
+  const source = syntheticPrimarySource(t, { fixtureId: 'mn-doc-config-correction', command: 'missing', extraNativeEvents: events });
+  const produced = await producePrimaryEvaluationArtifacts(source.block, join(source.root, 'refused-v3'), { commandEvidenceParserRevision: revision });
+  const options = { recordRoot: produced.output_root, externalDigest: produced.external_digest };
+  verifyPrimaryEvaluationProducer(options);
+  for (const condition of ['plain', 'kernel_principles_v1', 'full_ask']) {
+    const p = buildPrimaryEvaluationScoringInputs(options, { condition }).normalizedResult.command_evidence;
+    assert.equal(p.evidence_level, 'unavailable'); assert.deepEqual(p.succeeded_command_ids, []);
+    const plan = JSON.parse(readFileSync(join(produced.output_root, 'plan.json'))), c = plan.cases.find(x => x.condition === condition);
+    const m = JSON.parse(readFileSync(join(produced.output_root, 'run/cases', c.case_id, 'attempts/0001/command-evidence.json')));
+    assert.equal(m.capture.downgrade_reason, 'capture_invalid:unverified_file_change');
+  }
+});

@@ -1,6 +1,6 @@
 # Primary command evidence processing v3
 
-Spec `PRIMARY-COMMAND-EVIDENCE-3`, revision 1. Upstream: [#395](https://github.com/ist-h-i/agent-spectrum-kernel/issues/395), limited evidence connection for [#379](https://github.com/ist-h-i/agent-spectrum-kernel/issues/379).
+Spec `PRIMARY-COMMAND-EVIDENCE-3`, revision 2. Upstream: [#395](https://github.com/ist-h-i/agent-spectrum-kernel/issues/395), limited evidence connection for [#379](https://github.com/ist-h-i/agent-spectrum-kernel/issues/379).
 
 ## Observable contract
 
@@ -38,6 +38,20 @@ Unlike v2, an exact declared body under a different shell/envelope cannot be
 retained unless it independently qualifies as a bounded read. Known script
 bytes alone do not establish an independent invocation's semantics or effects.
 
+V3 also checks non-command event meaning. Only closed known metadata/message
+forms are inert; opaque tools and unknown event/item variants are unavailable.
+A completed file-change notification is accepted only before the first declared
+verification **start**, outside any active command, and for an exact canonical
+fixture-relative path in the existing public recipe's mutable paths. This
+includes the `workspace/` prefix: absolute paths, basename/suffix matching and
+inferred cwd mappings are not accepted. The producer obtains this scope from
+`buildPrimaryFixtureRecipe` and rederives it; callers cannot override it. The
+low-level parser defaults to no permitted changes when no context is supplied.
+Failed/declined/cwd-unverified checks also close the editing boundary. Evidence
+or authority writes, edits after verification, failed/ambiguous edits and opaque
+side effects make the whole capture unavailable, even if the final snapshot
+restores the earlier bytes. No new operation ledger is introduced.
+
 Select prospectively with
 `producePrimaryEvaluationArtifacts(block, freshOutputRoot, { commandEvidenceParserRevision: '1.6.0-primary-saved' })`.
 The externally pinned `ask_primary_evaluation_producer_v3` record selects the
@@ -46,8 +60,9 @@ revision again during verification. Scope selects one of the two additive
 bytes with `node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v3 --check`.
 An auxiliary record's `unmatched` state and null command ID express its lack of
 verification authority. Refused streams use the existing closed
-`capture_invalid:<code>` reason; v3 adds `missing_command` and
-`overlapping_commands` reasons. It does not add per-record unavailable fields.
+`capture_invalid:<code>` reason; v3 adds `missing_command`,
+`overlapping_commands`, `unsupported_event` and `unverified_file_change`
+reasons. It does not add per-record unavailable fields.
 
 ## Acceptance items
 
@@ -56,7 +71,9 @@ verification authority. Refused streams use the existing closed
 - AC2: success, nonzero failure, decline, missing check and unobserved required
   cwd remain distinct. Auxiliary status/text/claimed command IDs confer no credit.
 - AC3: malformed envelopes, expansion, evidence writes, dangerous/unrelated
-  commands and forged prose cannot produce unsupported verification success.
+  commands, non-command side effects and forged prose cannot produce unsupported
+  verification success. Only public-scope task edits before verification start
+  can be retained; transient restored evidence writes remain unavailable.
 - AC4: incomplete/duplicate/drifting/reversed/overlapping events and malformed
   or truncated streams remain unavailable with a bounded reason.
 - AC5: v3 is explicit through producer/schema selection and source pins;
@@ -66,9 +83,9 @@ verification authority. Refused streams use the existing closed
 
 ## Verification Contract
 
-- Artifact ID: `VC-PRIMARY-COMMAND-EVIDENCE-3`, revision 1.
+- Artifact ID: `VC-PRIMARY-COMMAND-EVIDENCE-3`, revision 2.
 - Artifact type: verification.
-- Upstream refs: `PRIMARY-COMMAND-EVIDENCE-3@1`, AC1–AC6; #395.
+- Upstream refs: `PRIMARY-COMMAND-EVIDENCE-3@2`, AC1–AC6; #395.
 - Selected path: `formal_verification_contract` under
   `ask.verification-proof-policy@1.0.0`; triggers
   `bug_reproduction_or_regression`, `public_api_schema_or_compatibility`, and
