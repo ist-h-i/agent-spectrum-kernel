@@ -65,7 +65,7 @@ for (const api of [writer, validator]) assert.throws(() => api({ root: process.c
     } finally { context.dispose(); }
   }
 });
-for (const processingV2 of [false, true]) test(`actual CI and doc writers publish statically verified pending resources (${processingV2 ? 'processing v2' : 'legacy'}); full checks remain required`, t => {
+for (const commandEvidenceParserRevision of [null, '1.5.0-primary-saved', '1.6.0-primary-saved']) test(`actual CI and doc writers publish statically verified pending resources (${commandEvidenceParserRevision ?? 'legacy'}); full checks remain required`, t => {
   const parent = realpathSync(mkdtempSync(join(tmpdir(), 'ask-resource-authority-'))), repository = join(parent, 'repository');
   t.after(() => rmSync(parent, { recursive: true, force: true }));
   const cloned = spawnSync('git', ['clone', '--no-hardlinks', '--no-checkout', ROOT, repository], { encoding: 'utf8', maxBuffer: 16777216 });
@@ -86,13 +86,24 @@ for (const processingV2 of [false, true]) test(`actual CI and doc writers publis
     if (fixtureId === 'mn-doc-config-correction') for (const name of ['dependency-graph.json', 'equivalent-solutions.json', 'evidence-removal-mutations.json', 'independence.json', 'private-evaluator-bundle.json'])
       writeFileSync(join(privateRoot, name), '{}\n');
     const options = { root: repository, privateRoot, evaluatorRevision: revision, generationDate: '2026-10-12' };
-    const context = callback => processingV2 ? withPrimaryProcessingSourceBuild({ root: repository, baseRevision: revision }, callback) : callback();
+    const context = callback => commandEvidenceParserRevision ? withPrimaryProcessingSourceBuild({ root: repository, baseRevision: revision, commandEvidenceParserRevision }, callback) : callback();
     const checkedWriter = options => context(() => writer(options)), checkedValidator = options => context(() => validator(options));
     assert.throws(() => checkedWriter(options), /complete.*boundary roots/);
     const generated = checkedWriter({ ...options, resourceAssetsOnly: true });
     assert.equal(generated.fixtureId, fixtureId); assert.equal(generated.validation_scope, 'resource_assets_only');
     assert.equal(generated.execution_authority, false); assert.equal(generated.scoringReady, false);
     assert.equal(generated.reviewStatus, 'pending_independent_review');
+    const reference = JSON.parse(readFileSync(join(repository, 'benchmarks/fixtures/checkpoint-b2', fixtureId, 'evaluator-reference.json')));
+    const graph = reference.evaluator_source_identity.dependency_graph;
+    assert.equal(graph.entry_paths.includes('scripts/ask-review-target-requirement.mjs'), commandEvidenceParserRevision !== null);
+    if (commandEvidenceParserRevision) {
+      const selectedVersion = commandEvidenceParserRevision === '1.6.0-primary-saved' ? 'v3' : 'v2';
+      for (const prefix of ['primary', 'primary-k2']) for (const version of ['v2', 'v3']) {
+        const node = graph.node_inventory.find(node => node.path === `benchmarks/schemas/${prefix}-saved-${version}-portfolio-command-evidence.schema.json`);
+        if (version === selectedVersion) assert.equal(node?.file_type, 'authority_data');
+        else assert.equal(node, undefined);
+      }
+    }
     const checked = checkedValidator({ root: repository, privateRoot, resourceAssetsOnly: true });
     assert.equal(checked.evaluatorBundleDigest, generated.evaluatorBundleDigest);
     assert.throws(() => checkedValidator({ root: repository, privateRoot }), /boundary roots/);

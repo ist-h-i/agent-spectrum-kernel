@@ -18,7 +18,7 @@ const json = path => JSON.parse(readFileSync(path));
 const write = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, raw(value), { mode: 0o400 }); };
 const pin = path => ({ path, digest: hash(readFileSync(path)) });
 
-test('artificial saved pair prepares without dispatch and separately grades all nine tasks with Unknown quality', async t => {
+for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved']) test(`artificial fixed ${commandEvidenceParserRevision} saved pair prepares without dispatch and separately grades all nine tasks with Unknown quality`, async t => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'ask-saved-scoring-roundtrip-')));
   t.after(() => { for (const path of ['runtime', 'inert-private']) chmodSync(join(root, path), 0o700); rmSync(root, { recursive: true, force: true }); });
   const runtime = join(root, 'runtime'), privateRoot = join(root, 'inert-private'); mkdirSync(runtime); mkdirSync(privateRoot);
@@ -27,7 +27,7 @@ test('artificial saved pair prepares without dispatch and separately grades all 
     resource[key] = join(privateRoot, key); writeFileSync(resource[key], 'artificial receipt', { mode: 0o400 });
   }
   chmodSync(privateRoot, 0o500);
-  const processing = primaryProcessingDescriptor();
+  const processing = primaryProcessingDescriptor({ commandEvidenceParserRevision });
   for (const path of Object.keys(processing.source_file_digests)) { mkdirSync(dirname(join(runtime, path)), { recursive: true }); cpSync(join(ROOT, path), join(runtime, path)); chmodSync(join(runtime, path), 0o400); }
   for (const name of ['portfolio-catalog', 'portfolio-policy-manifest', 'portfolio-scoring-policy']) {
     cpSync(join(ROOT, 'benchmarks', name + '.json'), join(runtime, 'benchmarks', name + '.json')); chmodSync(join(runtime, 'benchmarks', name + '.json'), 0o400);
@@ -46,7 +46,8 @@ test('artificial saved pair prepares without dispatch and separately grades all 
       resource_file_digests: Object.fromEntries(['manifestPath', 'admissionDecisionPath', 'admissionReviewAuthorityPath', 'admissionReviewArchivePath'].map(key => [key, hash(readFileSync(resource[key]))])) };
   }
   chmodSync(runtime, 0o500);
-  const selectorPath = join(root, 'selector.json'); write(selectorPath, { kind: 'ask_primary_scoring_version_v2', scoring_version_id: 'artificial-processing-v2', processing, fixtures });
+  const version = commandEvidenceParserRevision === '1.6.0-primary-saved' ? 'v3' : 'v2';
+  const selectorPath = join(root, 'selector.json'); write(selectorPath, { kind: `ask_primary_scoring_version_${version}`, scoring_version_id: `artificial-processing-${version}`, processing, fixtures });
   const blocks = Object.fromEntries(roles.map(role => [role, PRIMARY_FIXTURE_IDS.map(fixtureId => syntheticPrimarySource(t, { fixtureId }).block)]));
   const retained = join(root, 'retained'), sourcePath = join(retained, 'source.json'); write(sourcePath, { blocks });
   const resources = Object.fromEntries(roles.map(role => {
@@ -62,17 +63,18 @@ test('artificial saved pair prepares without dispatch and separately grades all 
       if (incomplete) return { status: role === 'baseline' ? 'completed' : 'unknown', quality: null, grader_process_starts: 0, model_calls: 0 };
       if (calls.length === 1) { enterFirst(); await held; }
       const produced = await producePrimaryEvaluationArtifacts(block, join(root, role + '-' + block.fixture_id + '-producer'));
-      assert.equal(verifyPrimaryEvaluationProducer({ recordRoot: produced.output_root, externalDigest: produced.external_digest }).commandEvidenceParserRevision, '1.5.0-primary-saved');
+      assert.equal(verifyPrimaryEvaluationProducer({ recordRoot: produced.output_root, externalDigest: produced.external_digest }).commandEvidenceParserRevision, commandEvidenceParserRevision);
       return { status: 'completed', quality: null, semantic_status: 'manual_review_required', grader_process_starts: 0, model_calls: 0 };
     } };
   } } });
-  const saved = await import('./ask-primary-saved-scoring.mjs?artificial-roundtrip');
+  const saved = await import(`./ask-primary-saved-scoring.mjs?artificial-roundtrip-${version}`);
   const prepared = await saved.preparePrimarySavedScoring({ source: pin(sourcePath), scoringVersion: pin(selectorPath), resources,
     retainedRoots: [retained], outputRoot: join(root, 'preparation') });
   assert.equal(prepared.status, 'prepared'); assert.equal(calls.length, 0);
   assert.equal(prepared.producer_normalizations, 0); assert.equal(prepared.grader_process_starts, 0); assert.equal(prepared.model_calls, 0);
   for (const role of roles) assert.equal(existsSync(join(root, role + '-grading')), false);
   const options = { recordRoot: prepared.output_root, externalDigest: prepared.external_digest };
+  assert.deepEqual((await saved.verifyPrimarySavedScoringPreparation(options)).record.processing, processing);
   const first = saved.gradePreparedPrimarySavedScoring(options); await entered;
   try { await assert.rejects(saved.gradePreparedPrimarySavedScoring(options), /already exists|EEXIST/u); assert.equal(calls.length, 1); }
   finally { releaseFirst(); }

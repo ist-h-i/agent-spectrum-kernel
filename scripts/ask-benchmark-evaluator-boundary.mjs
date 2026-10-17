@@ -27,7 +27,7 @@ import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { withCoreGradingAuthority, assertCoreGradingVerified } from "./ask-core-grading-authority.mjs";
 import { readStableJsonFile } from "./ask-benchmark-duplicate-key-json.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
-import { PRIMARY_PROCESSING_SOURCE_PATHS } from './ask-primary-scoring-version.mjs';
+import { PRIMARY_PROCESSING_SOURCE_PATHS, PRIMARY_PROCESSING_V3_SOURCE_PATHS } from './ask-primary-scoring-version.mjs';
 import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
@@ -1435,10 +1435,10 @@ export function validateSealedRepositoryAuthorityBytes({
   for (const node of graph.node_inventory) {
     const inventoryEntry = fileByPath.get(node.path);
     if (!inventoryEntry || inventoryEntry.file_type !== "file" || inventoryEntry.bytes !== node.bytes || inventoryEntry.sha256 !== node.sha256) throw new Error(`${label} source graph node is not cross-bound to executable bytes at ${node.path}`);
-    // Explicit v2 graphs include these two pinned schemas. Recognizing their
-    // existing authority-data type does not add them to default/v1 graphs.
+    // Explicit v2/v3 graphs select their pinned schema pair. Recognizing these
+    // existing authority-data types does not add paths to default/v1 graphs.
     const expectedType = dependencyFileType(node.path, [...EVALUATOR_AUTHORITY_PATHS,
-      ...PRIMARY_PROCESSING_SOURCE_PATHS.filter(path => path.endsWith('.schema.json'))]);
+      ...[...PRIMARY_PROCESSING_SOURCE_PATHS, ...PRIMARY_PROCESSING_V3_SOURCE_PATHS].filter(path => path.endsWith('.schema.json'))]);
     if (node.file_type !== expectedType) throw new Error(`${label} source graph file type is invalid at ${node.path}`);
   }
   for (const fixture of descriptor.fixture_authority) {
