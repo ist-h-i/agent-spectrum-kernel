@@ -70,15 +70,16 @@ test('explicit source-only build closes the helper and additive schemas without 
   assert.deepEqual(deriveEvaluatorDependencyGraph({ root, baseRevision: revision }), old);
 });
 
-test('AC-CLOSURE explicit 1.6 source construction selects only saved-v3 schemas without authority', () => {
-  const selected = { root, baseRevision: revision, commandEvidenceParserRevision: '1.6.0-primary-saved' };
+for (const [commandEvidenceParserRevision, version] of [['1.6.0-primary-saved', 'v3'], ['1.7.0-primary-saved', 'v4']]) test(`AC-CLOSURE explicit ${commandEvidenceParserRevision} source construction selects only saved-${version} schemas without authority`, () => {
+  const selected = { root, baseRevision: revision, commandEvidenceParserRevision };
   const old = deriveEvaluatorDependencyGraph({ root, baseRevision: revision });
   scope.withPrimaryProcessingSourceBuild(selected, () => {
     const graph = deriveEvaluatorDependencyGraph({ root, baseRevision: revision });
     assert.deepEqual(graph.entry_paths, [...old.entry_paths, helper].sort());
     for (const path of schemas) {
       assert.equal(graph.node_inventory.some(node => node.path === path), false);
-      assert.equal(graph.node_inventory.find(node => node.path === path.replace('saved-v2-', 'saved-v3-')).file_type, 'authority_data');
+      assert.equal(graph.node_inventory.find(node => node.path === path.replace('saved-v2-', `saved-${version}-`)).file_type, 'authority_data');
+      for (const other of ['v2', 'v3', 'v4'].filter(other => other !== version)) assert.equal(graph.node_inventory.some(node => node.path === path.replace('saved-v2-', `saved-${other}-`)), false);
     }
     assert.equal(scope.activePrimaryProducer(), false);
     assert.equal(scope.primaryAdapterSourceDigest(), null);
@@ -134,7 +135,7 @@ test('async source construction has isolated lifetime and cannot retain a later 
 });
 
 // Bytes-only public validation. No private bundle or evaluator is opened.
-test('v1, v2 and v3 source graphs pass sealed byte validation with exact known file types', () => {
+test('v1 through v4 source graphs pass sealed byte validation with exact known file types', () => {
   const hash = b => 'sha256:' + createHash('sha256').update(b).digest('hex');
   const fixtureId = 'mn-build-option-update';
   const fixturePaths = evaluatorAuthorityPathsForFixture(fixtureId).fixturePaths;
@@ -161,9 +162,10 @@ test('v1, v2 and v3 source graphs pass sealed byte validation with exact known f
   // The same public manifest, fixture bytes, descriptor rules and generator pass
   // without the v2 source-only selection.
   assert.ok(validate(deriveEvaluatorDependencyGraph({root,baseRevision:revision})));
-  for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved']) {
+  for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved', '1.7.0-primary-saved']) {
     const graph = scope.withPrimaryProcessingSourceBuild({root,baseRevision:revision,commandEvidenceParserRevision}, () => deriveEvaluatorDependencyGraph({root,baseRevision:revision}));
-    const selectedSchemas = schemas.map(path => commandEvidenceParserRevision === '1.6.0-primary-saved' ? path.replace('saved-v2-', 'saved-v3-') : path);
+    const version = commandEvidenceParserRevision === '1.7.0-primary-saved' ? 'v4' : commandEvidenceParserRevision === '1.6.0-primary-saved' ? 'v3' : 'v2';
+    const selectedSchemas = schemas.map(path => path.replace('saved-v2-', `saved-${version}-`));
     for (const path of selectedSchemas) assert.equal(graph.node_inventory.find(node => node.path === path).file_type, 'authority_data');
     assert.ok(validate(graph));
     for (const path of [selectedSchemas[0], helper]) {

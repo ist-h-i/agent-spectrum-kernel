@@ -23,9 +23,9 @@ const mode = (path, writable) => { const stat = lstatSync(path); if (stat.isDire
 const processingFiles = ['scripts/ask-benchmark-command-evidence.mjs', 'scripts/ask-review-target-requirement.mjs',
   'benchmarks/schemas/primary-saved-v2-portfolio-command-evidence.schema.json',
   'benchmarks/schemas/primary-k2-saved-v2-portfolio-command-evidence.schema.json'];
-function setup(t, { processingV2 = false, processingV3 = false } = {}) {
-  const processing = processingV2 || processingV3, version = processingV3 ? 'v3' : 'v2';
-  const sourcePaths = processingFiles.map(path => processingV3 ? path.replace('saved-v2-', 'saved-v3-') : path);
+function setup(t, { processingV2 = false, processingV3 = false, processingV4 = false } = {}) {
+  const processing = processingV2 || processingV3 || processingV4, version = processingV4 ? 'v4' : processingV3 ? 'v3' : 'v2';
+  const sourcePaths = processingFiles.map(path => path.replace('saved-v2-', `saved-${version}-`));
   const parent = realpathSync(mkdtempSync(join(tmpdir(), 'ask-scoring-version-'))), runtime = join(parent, 'runtime'), privateRoot = join(parent, 'private');
   mkdirSync(runtime); mkdirSync(privateRoot);
   t.after(() => { mode(parent, true); rmSync(parent, { recursive: true, force: true }); });
@@ -55,7 +55,7 @@ function setup(t, { processingV2 = false, processingV3 = false } = {}) {
     try { chmodSync(manifestPath, 0o600); } catch {}
     writeFileSync(manifestPath, raw({ kind: processing ? `ask_primary_scoring_version_${version}` : 'ask_primary_scoring_version_v1',
       scoring_version_id: processing ? `synthetic-processing-${version}` : 'synthetic-successor-v1',
-      ...(processing ? { processing: { command_evidence_parser_revision: processingV3 ? '1.6.0-primary-saved' : '1.5.0-primary-saved', review_recognition_revision: '2',
+      ...(processing ? { processing: { command_evidence_parser_revision: processingV4 ? '1.7.0-primary-saved' : processingV3 ? '1.6.0-primary-saved' : '1.5.0-primary-saved', review_recognition_revision: '2',
         source_file_digests: Object.fromEntries(sourcePaths.map(path => [path, hash(readFileSync(join(runtime, path)))])) } } : {}), fixtures }));
     mode(runtime, false); mode(privateRoot, false); chmodSync(manifestPath, 0o400);
     return { path: manifestPath, digest: hash(readFileSync(manifestPath)) };
@@ -64,8 +64,8 @@ function setup(t, { processingV2 = false, processingV3 = false } = {}) {
   return { parent, runtime, privateRoot, resource, seal, mutate, selector: seal() };
 }
 const id = PRIMARY_FIXTURE_IDS[0], base = `benchmarks/fixtures/checkpoint-b2/${id}`;
-for (const processingV3 of [false, true]) test(`saved paired scoring ${processingV3 ? 'v3' : 'v2'} preparation retains all nine blocks per role with no dispatch`, async t => {
-  const f = setup(t, { processingV2: !processingV3, processingV3 }), retained = join(f.parent, 'retained'); mkdirSync(retained);
+for (const version of ['v2', 'v3', 'v4']) test(`saved paired scoring ${version} preparation retains all nine blocks per role with no dispatch`, async t => {
+  const f = setup(t, { processingV2: version === 'v2', processingV3: version === 'v3', processingV4: version === 'v4' }), retained = join(f.parent, 'retained'); mkdirSync(retained);
   const roles = ['baseline', 'challenger'], blocks = {};
   for (const role of roles) blocks[role] = PRIMARY_FIXTURE_IDS.map(fixtureId => syntheticPrimarySource(t, { fixtureId }).block);
   const sourcePath = join(retained, 'paired-source.json'); writeFileSync(sourcePath, raw({ blocks }), { mode: 0o400 });
@@ -83,7 +83,7 @@ for (const processingV3 of [false, true]) test(`saved paired scoring ${processin
   assert.equal(prepared.model_calls, 0); assert.equal(prepared.grader_process_starts, 0); assert.equal(prepared.producer_normalizations, 0);
   const options = { recordRoot: prepared.output_root, externalDigest: prepared.external_digest };
   const checked = await saved.verifyPrimarySavedScoringPreparation(options);
-  assert.equal(checked.record.processing.command_evidence_parser_revision, processingV3 ? '1.6.0-primary-saved' : '1.5.0-primary-saved');
+  assert.equal(checked.record.processing.command_evidence_parser_revision, version === 'v4' ? '1.7.0-primary-saved' : version === 'v3' ? '1.6.0-primary-saved' : '1.5.0-primary-saved');
   assert.deepEqual(Object.keys(checked.record.blocks), roles);
   for (const role of roles) {
     assert.equal(checked.record.blocks[role].length, 9);
@@ -138,8 +138,18 @@ test('AC-VERSION an explicit v3 manifest pins parser 1.6 and saved-v3 sources fo
     assert.equal(verifyPrimaryScoringVersionResource({ fixture_id: fixtureId, grading: { scoring_version: f.selector } }, { frozenSourceRoot: f.runtime, ...f.resource }).root, f.runtime);
   }
 });
-for (const version of ['v2', 'v3']) test(`AC-VERSION ${version} refuses a repinned kind/revision/schema/source mismatch`, t => {
-  const f = setup(t, { processingV2: version === 'v2', processingV3: version === 'v3' }), path = f.selector.path, initial = readFileSync(path);
+test('AC4-1 explicit v4 pins parser 1.7 and only saved-v4 processing sources for all nine tasks', t => {
+  const f = setup(t, { processingV4: true });
+  for (const fixtureId of PRIMARY_FIXTURE_IDS) {
+    const selected = readPrimaryScoringVersion(f.selector, fixtureId, { verifyResourceFiles: true });
+    assert.equal(selected.processing.command_evidence_parser_revision, '1.7.0-primary-saved');
+    assert.equal(selected.processing.review_recognition_revision, '2');
+    assert.deepEqual(Object.keys(selected.processing.source_file_digests).sort(), processingFiles.map(path => path.replace('saved-v2-', 'saved-v4-')).sort());
+    assert.equal(verifyPrimaryScoringVersionResource({ fixture_id: fixtureId, grading: { scoring_version: f.selector } }, { frozenSourceRoot: f.runtime, ...f.resource }).root, f.runtime);
+  }
+});
+for (const version of ['v2', 'v3', 'v4']) test(`AC-VERSION ${version} refuses a repinned kind/revision/schema/source mismatch`, t => {
+  const f = setup(t, { processingV2: version === 'v2', processingV3: version === 'v3', processingV4: version === 'v4' }), path = f.selector.path, initial = readFileSync(path);
   for (const mutate of [
     value => { value.kind = version === 'v2' ? 'ask_primary_scoring_version_v3' : 'ask_primary_scoring_version_v2'; },
     value => { value.processing.command_evidence_parser_revision = version === 'v2' ? '1.6.0-primary-saved' : '1.5.0-primary-saved'; },
@@ -227,7 +237,7 @@ test('the existing producer call derives v2 from the fixed selector and refuses 
   await assert.rejects(producePrimaryEvaluationArtifacts(source.block, v3Output, { commandEvidenceParserRevision: '1.6.0-primary-saved' }), /selector override/u);
   assert.equal(readdirSync(source.root).includes('conflicting-producer-v3'), false);
 });
-for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved']) test(`an unbound offline ${commandEvidenceParserRevision} capture cannot start the private grading path`, async t => {
+for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved', '1.7.0-primary-saved']) test(`an unbound offline ${commandEvidenceParserRevision} capture cannot start the private grading path`, async t => {
   const source = syntheticPrimarySource(t);
   const produced = await producePrimaryEvaluationArtifacts(source.block, join(source.root, 'offline-producer'), { commandEvidenceParserRevision });
   const result = runPrimaryEvaluationPrivateGrading({ recordRoot: produced.output_root, externalDigest: produced.external_digest }, { condition: 'plain' });
@@ -284,11 +294,11 @@ test('historical graph scope selects explicit version and refuses a different ro
   assert.equal(primaryEvaluatorDependencyGraphParameters({ root: f.runtime, baseRevision: ref.evaluator_revision, defaultParameters: {} }), null);
   assert.throws(() => withPrimaryHistoricalEvaluatorResources(block, ROOT, () => {}), /version_root_changed/);
 });
-for (const processingV3 of [false, true]) test(`AC-CLOSURE historical ${processingV3 ? 'v3' : 'v2'} selection requires its exact schema types and helper edge`, t => {
-  const f = setup(t, { processingV2: !processingV3, processingV3 });
+for (const version of ['v2', 'v3', 'v4']) test(`AC-CLOSURE historical ${version} selection requires its exact schema types and helper edge`, t => {
+  const f = setup(t, { processingV2: version === 'v2', processingV3: version === 'v3', processingV4: version === 'v4' });
   const referencePath = `${base}/evaluator-reference.json`, reference = json(join(f.runtime, referencePath));
   const identity = reference.evaluator_source_identity, graph = identity.dependency_graph;
-  const selectedPaths = processingFiles.map(path => processingV3 ? path.replace('saved-v2-', 'saved-v3-') : path);
+  const selectedPaths = processingFiles.map(path => path.replace('saved-v2-', `saved-${version}-`));
   const helper = 'scripts/ask-review-target-requirement.mjs';
   // Artificial projection tests only historical graph selection, not complete
   // source identity validity. Genuine derive/sealed/static-writer verification
@@ -321,7 +331,8 @@ for (const processingV3 of [false, true]) test(`AC-CLOSURE historical ${processi
   withPrimaryHistoricalEvaluatorResources(block, f.runtime, () => {
     const selected = primaryEvaluatorDependencyGraphParameters(parameters);
     for (const path of selectedPaths.filter(path => path.endsWith('.schema.json'))) assert.ok(selected.authorityPaths.includes(path));
-    for (const path of selectedPaths.filter(path => path.endsWith('.schema.json')).map(path => path.replace(processingV3 ? 'saved-v3-' : 'saved-v2-', processingV3 ? 'saved-v2-' : 'saved-v3-'))) assert.equal(selected.authorityPaths.includes(path), false);
+    for (const other of ['v2', 'v3', 'v4'].filter(other => other !== version))
+      for (const path of selectedPaths.filter(path => path.endsWith('.schema.json')).map(path => path.replace(`saved-${version}-`, `saved-${other}-`))) assert.equal(selected.authorityPaths.includes(path), false);
     assert.equal(activePrimaryProducer(), false);
   });
   assert.equal(primaryEvaluatorDependencyGraphParameters(parameters), null);
