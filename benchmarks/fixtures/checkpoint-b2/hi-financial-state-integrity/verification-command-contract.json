@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "hi-financial-state-integrity",
+  "fixture_input_digest": "sha256:234a13b9ccae089553d56b0e512220dfea8fe42a3c0c2f8eb0666295faceebda",
+  "commands": [
+    {
+      "command_id": "financial-state-integrity-validation",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"data/incident.json\":\"044860fee3e97446b7955ee4b6602ce5bfb3447feccb37d730f1821f0bb7143e\",\"data/initial-state.json\":\"7e0bb7baeacb9b18406dca3985ce6ce45b03bebf7cb7c65d3fba4a8ed9a71d4e\",\"docs/ledger-contract.md\":\"236ae38d35685890be54aba7ea910477ad9748a51a924182a7a1ca96e95f5775\",\"package.json\":\"94fcbb8eafdca97376b4cb987d196f018d1ecc61cf8201421a8830d09a00bc86\",\"test/ledger.test.mjs\":\"1ee13d777325c2dad8381ed0d23cdd3da959d6dbe8547270622e71a2897f3c5b\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm test",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:3fe7be54d3cfcc1e6e63c9ba4857a3612d1fd81aa6c17be58b51c0f057e40d3f",
+      "rendered_event_command_digest": "sha256:a51ac5fd877f29d60a19c92db4cf36e7d502fc349c631cd6a064c2d3a93ad227",
+      "command_contract_digest": "sha256:2e3626181ebe30b0ac8d9ee3c1abe71bf6e297eed7eb57aba119cb629a947dbb"
+    }
+  ],
+  "contract_digest": "sha256:98679fb0e3e6034f120934ebb687af14340c6d63e791e21929269d13dffc7f4d"
+}

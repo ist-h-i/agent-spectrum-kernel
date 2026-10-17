@@ -1,0 +1,1 @@
+Original fictional ledger implementation, balances, incident, contract and tests. No real payment, customer data, private incident or empirical impact/frequency source. High-impact risk is frozen catalog intent; ordinary memory-only checks do not certify production financial integrity.
