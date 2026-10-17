@@ -1,0 +1,80 @@
+[
+  {
+    "case_id": "completed",
+    "event": {
+      "event_type": "request_complete",
+      "request_id": "request-one",
+      "outcome": "success",
+      "status": 200,
+      "duration_ms": 17,
+      "method": "GET",
+      "route_template": "/records/:id",
+      "headers": {
+        "authorization": "fictional-auth-label",
+        "cookie": "fictional-session-label",
+        "x-other": "fictional-other-label"
+      },
+      "body": {
+        "comment": "fictional-private-comment"
+      },
+      "user": {
+        "email": "person@example.invalid"
+      },
+      "raw_path": "/records/fictional-user-id?token=fictional-token-label"
+    }
+  },
+  {
+    "case_id": "failed",
+    "event": {
+      "event_type": "request_failed",
+      "request_id": "request-two",
+      "outcome": "failure",
+      "status": 503,
+      "duration_ms": 82,
+      "method": "POST",
+      "route_template": "/records",
+      "error": {
+        "code": "TEMPORARY",
+        "message": "fictional-private-message",
+        "stack": "fictional-private-stack"
+      },
+      "body": {
+        "password": "fictional-password-label"
+      }
+    }
+  },
+  {
+    "case_id": "deferred",
+    "event": {
+      "event_type": "request_failed",
+      "request_id": "request-three",
+      "outcome": "deferred",
+      "status": 429,
+      "duration_ms": 3,
+      "method": "PUT",
+      "route_template": "/records/:id",
+      "error": {
+        "code": "RATE_LIMIT"
+      }
+    }
+  },
+  {
+    "case_id": "malformed-field",
+    "event": {
+      "event_type": "request_failed",
+      "request_id": "fictional\nsecond-line",
+      "outcome": "failure",
+      "status": "503",
+      "duration_ms": -1,
+      "method": "DELETE",
+      "route_template": "/records/:id",
+      "error": {
+        "code": "VALIDATION"
+      }
+    }
+  },
+  {
+    "case_id": "empty",
+    "event": {}
+  }
+]

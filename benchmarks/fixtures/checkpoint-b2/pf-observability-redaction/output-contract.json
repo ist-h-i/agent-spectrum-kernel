@@ -1,0 +1,23 @@
+{
+  "output_contract_id": "output-contract-pf-observability-redaction",
+  "output_contract_schema_path": "benchmarks/schemas/portfolio-output-contract.schema.json",
+  "output_contract_path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/output-contract.json",
+  "fixture_id": "pf-observability-redaction",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/evaluator-reference.json",
+  "evaluator_public_reference_digest": "sha256:7deba31e6dddc665a80176808f27fa2e75e9ab0b24ed9b2c4988ad11af5cd65d",
+  "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/verification-command-contract.json",
+  "verification_command_contract_digest": "sha256:3f9fe28daac65170ef2db9a8aa9e0822f97d332e1b6ace1861a3064a3246cb10",
+  "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/evidence-map.json",
+  "scope_boundary_authority_digest": "sha256:86c27a78b2cfe225db4e87ccb661d9198c12b553cde9dcb6563d825367602b78",
+  "result_profile": {
+    "name": "binary_scope_verification_v1",
+    "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
+  },
+  "declares_findings": true,
+  "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/evaluator-authority-manifest.json",
+  "evaluator_authority_manifest_raw_sha256": "sha256:36800ae800ed33abada05e1d128084949ad30c8f737ab762d5698e9b6631a622",
+  "evaluator_authority_manifest_digest": "sha256:7f3139615ad2c8579f2fd44bc8da9774f44ca236951f004da4f20611a65d933f",
+  "output_contract_digest": "sha256:6a0b062dd0ed38e16297b1267c546664bdaa974e844fd1a2dc4446bd0b89de6c"
+}

@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "pf-observability-redaction": {
+      "class": "implementation_review",
+      "difficulty": "medium_hard",
+      "target_minutes": 30,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "eca02950ba10488accb9529ead7f622dff91ca94d130789e8a21904fa7f31b66",
+          "bytes": 2128
+        },
+        {
+          "path": "workspace/base/projection-policy.json",
+          "sha256": "f61f5aea4739d016aa1e999c36ac5e926f2218ccb6a833599686369e7fdaa206",
+          "bytes": 212
+        },
+        {
+          "path": "workspace/config/field-contract.json",
+          "sha256": "9ce0b72c70bf17b7f9946ce39b88d6b6cce1437f6f5c2638668bff7690c06009",
+          "bytes": 341
+        },
+        {
+          "path": "workspace/config/projection-policy.json",
+          "sha256": "b11b938b7b90b14513b7017a440ee668e18fd3a8500bed1fb4005477373925d5",
+          "bytes": 270
+        },
+        {
+          "path": "workspace/config/proposed-policy.json",
+          "sha256": "b11b938b7b90b14513b7017a440ee668e18fd3a8500bed1fb4005477373925d5",
+          "bytes": 270
+        },
+        {
+          "path": "workspace/data/events.json",
+          "sha256": "941dd78d58637ef8c31dbadc23981396a7592fa8fbef52376cec771e9d429ce4",
+          "bytes": 1847
+        },
+        {
+          "path": "workspace/docs/projection-contract.md",
+          "sha256": "aecc2018eff6ae94be37d81928454b07cb73274d7766b194d0e084569ae9d65c",
+          "bytes": 2735
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "dea18b7f612fe9e5749cd2398c18319b03e1b49c978185d30bc27acd5da86d0e",
+          "bytes": 284
+        },
+        {
+          "path": "workspace/pr.diff",
+          "sha256": "e7fede9ba765c6ad5be68f3ed5f523928859a1175c14691edf0cb7ff5a14b2e4",
+          "bytes": 371
+        },
+        {
+          "path": "workspace/review.schema.json",
+          "sha256": "6aad052cf95583237fc1e9d500ecc2813cdc72ed990ee8af835e68b1d287c2b2",
+          "bytes": 2619
+        },
+        {
+          "path": "workspace/scripts/trace-policy.mjs",
+          "sha256": "7d58e23867034c4238ed2ea1a0e95cb356a0e3d9afacdbd12e18276d876168f6",
+          "bytes": 543
+        },
+        {
+          "path": "workspace/scripts/validate-review.mjs",
+          "sha256": "9486039537e4924edc142709a3bcebbaa0236652bcb55daf690be1f164487475",
+          "bytes": 1931
+        },
+        {
+          "path": "workspace/src/project-event.mjs",
+          "sha256": "6aa6cfbd183af53bcb5a3390cfb3691b0ce2c9f7fa3fedc1ccbc4a4c56184054",
+          "bytes": 2165
+        },
+        {
+          "path": "workspace/test/project-event.test.mjs",
+          "sha256": "2fa2d20465cb1334620b11e609a8dc6de66ea4476355cda31258b8fe9f9799d1",
+          "bytes": 1694
+        }
+      ]
+    }
+  }
+}

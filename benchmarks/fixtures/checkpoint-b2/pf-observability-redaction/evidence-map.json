@@ -1,0 +1,94 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "pf-observability-redaction",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/config/projection-policy.json",
+      "workspace/review.json"
+    ],
+    "required_candidate_paths": [
+      "workspace/config/projection-policy.json",
+      "workspace/review.json"
+    ],
+    "protected_candidate_paths": [
+      "workspace/base/projection-policy.json",
+      "workspace/config/field-contract.json",
+      "workspace/config/proposed-policy.json",
+      "workspace/data/events.json",
+      "workspace/docs/projection-contract.md",
+      "workspace/package.json",
+      "workspace/pr.diff",
+      "workspace/review.schema.json",
+      "workspace/scripts/trace-policy.mjs",
+      "workspace/scripts/validate-review.mjs",
+      "workspace/src/project-event.mjs",
+      "workspace/test/project-event.test.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "unrecognized_candidate_meaning": "manual_review_required",
+    "authority_digest": "sha256:86c27a78b2cfe225db4e87ccb661d9198c12b553cde9dcb6563d825367602b78"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "observability-review-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/base/projection-policy.json",
+        "workspace/config/field-contract.json",
+        "workspace/config/projection-policy.json",
+        "workspace/config/proposed-policy.json",
+        "workspace/data/events.json",
+        "workspace/docs/projection-contract.md",
+        "workspace/package.json",
+        "workspace/pr.diff",
+        "workspace/review.schema.json",
+        "workspace/scripts/trace-policy.mjs",
+        "workspace/scripts/validate-review.mjs",
+        "workspace/src/project-event.mjs",
+        "workspace/test/project-event.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "focused-change-boundary",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/docs/projection-contract.md"
+      ]
+    },
+    {
+      "evidence_map_id": "repository-verification-route",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/review.schema.json",
+        "workspace/scripts/trace-policy.mjs",
+        "workspace/scripts/validate-review.mjs",
+        "workspace/test/project-event.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-observability-evidence",
+      "target_evidence_map_id": "observability-review-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:e5db245f78aa99a8b3a015c85c6674fe01c76af3d990a4f6bcd8cf359a6ba611"
+    },
+    {
+      "mutation_id": "remove-focused-scope-evidence",
+      "target_evidence_map_id": "focused-change-boundary",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:353aeb4df81d1cec75977f32b80fba322bc380c6113e21f833f30a3d9a270a94"
+    },
+    {
+      "mutation_id": "remove-verification-route",
+      "target_evidence_map_id": "repository-verification-route",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:dae03cd8dc0560e7c51d1fc9dd227242bff9428b1141b3ca4eecaad70c0b73ca"
+    }
+  ]
+}

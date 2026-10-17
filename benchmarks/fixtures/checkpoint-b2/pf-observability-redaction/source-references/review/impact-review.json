@@ -1,0 +1,32 @@
+{
+  "reviewer_record_id": "observability-impact-independent-follow-up-18ac4a1b-20261012",
+  "fixture_id": "pf-observability-redaction",
+  "reviewed_head": "18ac4a1bf546c7c4d011e279d25b49d5a5a88989",
+  "decision": "approve",
+  "judgment": "unknown_classification_approved",
+  "impact_band": "unknown",
+  "impact_weight": null,
+  "impact_evidence_status": "insufficient_evidence",
+  "impact_evidence_ids": [],
+  "practice_weighted_aggregate_eligible": false,
+  "reason": "Declared sensitive-path/diagnostic defects demonstrate local contractual consequences without measured real customer or operational harm. Modeled security relevance, frequency and a reversible fictional exercise do not establish empirical impact.",
+  "reviewed_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/lineage.md",
+      "bytes": 536,
+      "raw_sha256": "sha256:4684ead93387c96d373e85686b2e60ea416bff89a186292547e45cb6719ec20e"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/source-references/owasp-logging-pattern-20261012.md",
+      "bytes": 670,
+      "raw_sha256": "sha256:8b8abff656164423409b02161b638508419124fdb043865ea80873eced7f4ddd"
+    },
+    {
+      "path": "benchmarks/portfolio-lineage-policy.json",
+      "bytes": 6039,
+      "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d"
+    }
+  ],
+  "scope": "Separate approval of Unknown impact classification; no empirical band, fixture admission or change to frozen catalog base aggregate eligibility.",
+  "follow_up_judgment": "Unknown/null judgment carried forward after confirming original lineage/pattern/policy bytes unchanged; no new empirical evidence."
+}

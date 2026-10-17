@@ -1,0 +1,23 @@
+{
+  "reviewed_head": "18ac4a1bf546c7c4d011e279d25b49d5a5a88989",
+  "scope": "Limited public source revision review: own-property schema child resolution, public task/input/verification reclosure and ordinary regression only; no private/admission/safety gate approval.",
+  "prior_review_manifest_sha256": "sha256:c01dfb7df52cd7eba7107f2956ad427a540d6146c9610c227c0b89aca6946f9a",
+  "records": [
+    {
+      "path": "source-approval.json",
+      "raw_sha256": "sha256:5c5e6af1933906638a4f4070729efa89f1586e63428e7ee184ed4bd2b2bb22fe"
+    },
+    {
+      "path": "frequency-review.json",
+      "raw_sha256": "sha256:101e276010fa2da0a096fca94dbde7e6b927718c3dc041391215827e724326df"
+    },
+    {
+      "path": "impact-review.json",
+      "raw_sha256": "sha256:eba8d4ca9e64a9ffd37eca2a4316091f6b4e41119ba99db8565ff1c4f3cc5db3"
+    },
+    {
+      "path": "review.md",
+      "raw_sha256": "sha256:4079bf87fd5132a702e3bbc41821bae4ca8959e6ad51ac0e35cef2f81ad68cc8"
+    }
+  ]
+}
