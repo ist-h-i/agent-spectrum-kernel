@@ -12,6 +12,7 @@ import { producePrimaryEvaluationArtifacts, verifyPrimaryEvaluationProducer, bui
 import { syntheticPrimarySource } from './test-helpers-primary-evaluation-producer.mjs';
 import { artificialCombinedEnvelope, artificialCommand } from './test-helpers-primary-command-envelope-v4.mjs';
 import { artificialLiteralEnvelope, artificialLiteralCommand } from './test-helpers-primary-literal-word-v5.mjs';
+import { artificialAuxiliaryEnvelope } from './test-helpers-primary-auxiliary-shell-v6.mjs';
 import { renderCommandEvent } from './ask-benchmark-command-evidence.mjs';
 import * as grading from './ask-primary-evaluation-grading.mjs';
 
@@ -21,8 +22,9 @@ const json = path => JSON.parse(readFileSync(path));
 const write = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, raw(value), { mode: 0o400 }); };
 const pin = path => ({ path, digest: hash(readFileSync(path)) });
 
-for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved', '1.7.0-primary-saved', '1.8.0-primary-saved']) test(`artificial fixed ${commandEvidenceParserRevision} saved pair preserves normalized references and fake or Unknown quality`, async t => {
-  const v5 = commandEvidenceParserRevision === '1.8.0-primary-saved';
+for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved', '1.7.0-primary-saved', '1.8.0-primary-saved', '1.9.0-primary-saved']) test(`artificial fixed ${commandEvidenceParserRevision} saved pair preserves normalized references and fake or Unknown quality`, async t => {
+  const v6 = commandEvidenceParserRevision === '1.9.0-primary-saved';
+  const v5 = commandEvidenceParserRevision === '1.8.0-primary-saved' || v6;
   const closedActions = v5 || commandEvidenceParserRevision === '1.7.0-primary-saved';
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'ask-saved-scoring-roundtrip-')));
   t.after(() => { for (const path of ['runtime', 'inert-private']) chmodSync(join(root, path), 0o700); rmSync(root, { recursive: true, force: true }); });
@@ -51,12 +53,12 @@ for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-prima
       resource_file_digests: Object.fromEntries(['manifestPath', 'admissionDecisionPath', 'admissionReviewAuthorityPath', 'admissionReviewArchivePath'].map(key => [key, hash(readFileSync(resource[key]))])) };
   }
   chmodSync(runtime, 0o500);
-  const version = v5 ? 'v5' : closedActions ? 'v4' : commandEvidenceParserRevision === '1.6.0-primary-saved' ? 'v3' : 'v2';
+  const version = v6 ? 'v6' : v5 ? 'v5' : closedActions ? 'v4' : commandEvidenceParserRevision === '1.6.0-primary-saved' ? 'v3' : 'v2';
   const selectorPath = join(root, 'selector.json'); write(selectorPath, { kind: `ask_primary_scoring_version_${version}`, scoring_version_id: `artificial-processing-${version}`, processing, fixtures });
   const blocks = Object.fromEntries(roles.map(role => [role, PRIMARY_FIXTURE_IDS.map(fixtureId => syntheticPrimarySource(t, { fixtureId,
     ...(closedActions ? { mutate: fixtureId === 'mn-build-option-update', nativeEvents: ({ armRoot, contract }) => {
       const declined = role === 'challenger' && fixtureId === 'mn-doc-config-correction';
-      const events = (v5 ? artificialLiteralEnvelope : artificialCombinedEnvelope)({ contract, armRoot, edit: fixtureId === 'mn-build-option-update',
+      const events = (v6 ? artificialAuxiliaryEnvelope : v5 ? artificialLiteralEnvelope : artificialCombinedEnvelope)({ contract, armRoot, edit: fixtureId === 'mn-build-option-update',
         status: declined ? 'declined' : 'completed', exit_code: declined ? null : 0 });
       if (fixtureId === 'mn-build-option-update' && role === 'challenger') events.splice(-1, 0,
         ...artificialCommand(v5 ? artificialLiteralCommand(contract.commands[0]) : renderCommandEvent(contract.commands[0]), 'artificial-later-failure', 'failed', v5 ? 1 : 7));
@@ -81,7 +83,7 @@ for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-prima
       const verified = verifyPrimaryEvaluationProducer({ recordRoot: produced.output_root, externalDigest: produced.external_digest });
       assert.equal(verified.commandEvidenceParserRevision, commandEvidenceParserRevision);
       if (v5) {
-        assert.equal(json(join(produced.output_root, 'producer.json')).kind, 'ask_primary_evaluation_producer_v5');
+        assert.equal(json(join(produced.output_root, 'producer.json')).kind, v6 ? 'ask_primary_evaluation_producer_v6' : 'ask_primary_evaluation_producer_v5');
         for (const attempt of verified.inspection.cases.flatMap(item => item.attempts)) {
           const commands = attempt.commandEvidence.commands.filter(command => command.match_state === 'matched');
           if (block.fixture_id !== 'mp-frontend-state-review') assert.ok(commands.length > 0);

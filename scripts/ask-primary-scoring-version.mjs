@@ -32,7 +32,11 @@ export const PRIMARY_PROCESSING_V4_SOURCE_PATHS = Object.freeze(['scripts/ask-be
 export const PRIMARY_PROCESSING_V5_SOURCE_PATHS = Object.freeze(['scripts/ask-benchmark-command-evidence.mjs', PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH,
   'benchmarks/schemas/primary-saved-v5-portfolio-command-evidence.schema.json',
   'benchmarks/schemas/primary-k2-saved-v5-portfolio-command-evidence.schema.json']);
+export const PRIMARY_PROCESSING_V6_SOURCE_PATHS = Object.freeze(['scripts/ask-benchmark-command-evidence.mjs', PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH,
+  'benchmarks/schemas/primary-saved-v6-portfolio-command-evidence.schema.json',
+  'benchmarks/schemas/primary-k2-saved-v6-portfolio-command-evidence.schema.json']);
 function processingSourcePaths(commandEvidenceParserRevision) {
+  if (commandEvidenceParserRevision === '1.9.0-primary-saved') return PRIMARY_PROCESSING_V6_SOURCE_PATHS;
   if (commandEvidenceParserRevision === '1.8.0-primary-saved') return PRIMARY_PROCESSING_V5_SOURCE_PATHS;
   if (commandEvidenceParserRevision === '1.5.0-primary-saved') return PRIMARY_PROCESSING_SOURCE_PATHS;
   if (commandEvidenceParserRevision === '1.7.0-primary-saved') return PRIMARY_PROCESSING_V4_SOURCE_PATHS;
@@ -118,7 +122,7 @@ export function readPrimaryScoringVersion(selector, fixtureId, { root = ROOT, ve
   keys(selector, ['path', 'digest']); digest(selector.digest); fixedPath(selector.path);
   const raw = read(selector.path); assert.equal(hash(raw), selector.digest, 'scoring version manifest changed');
   const manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
-  assert.ok(['ask_primary_scoring_version_v1', 'ask_primary_scoring_version_v2', 'ask_primary_scoring_version_v3', 'ask_primary_scoring_version_v4', 'ask_primary_scoring_version_v5'].includes(manifest.kind), 'unknown primary scoring version');
+  assert.ok(['ask_primary_scoring_version_v1', 'ask_primary_scoring_version_v2', 'ask_primary_scoring_version_v3', 'ask_primary_scoring_version_v4', 'ask_primary_scoring_version_v5', 'ask_primary_scoring_version_v6'].includes(manifest.kind), 'unknown primary scoring version');
   const processing = manifest.kind !== 'ask_primary_scoring_version_v1';
   keys(manifest, ['kind', 'scoring_version_id', 'fixtures', ...(processing ? ['processing'] : [])]);
   assert.match(manifest.scoring_version_id, /^[a-z][a-z0-9_-]{1,127}$/u);
@@ -128,7 +132,7 @@ export function readPrimaryScoringVersion(selector, fixtureId, { root = ROOT, ve
   keys(fixture, ['frozen_source_root', 'selected', 'resource', 'resource_file_digests']);
   fixedPath(fixture.frozen_source_root, true);
   if (processing) verifyProcessingDescriptor(manifest.processing, fixture.frozen_source_root, root,
-    manifest.kind === 'ask_primary_scoring_version_v5' ? '1.8.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v4' ? '1.7.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v3' ? '1.6.0-primary-saved' : '1.5.0-primary-saved');
+    manifest.kind === 'ask_primary_scoring_version_v6' ? '1.9.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v5' ? '1.8.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v4' ? '1.7.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v3' ? '1.6.0-primary-saved' : '1.5.0-primary-saved');
   keys(fixture.resource, PRIMARY_SCORING_VERSION_RESOURCE_FIELDS);
   keys(fixture.resource_file_digests, PRIMARY_SCORING_VERSION_FILE_FIELDS);
   digest(fixture.resource.admissionReviewAuthoritySourceDigest);
