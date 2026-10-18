@@ -13,6 +13,7 @@ import { setup, fakeEngineeringTemplate, collectSyntheticGrade, bindSyntheticRol
 import { PRIMARY_FIXTURE_IDS } from "./ask-primary-fixture-recipe.mjs";
 import { preparePersonalEvolutionCliPair } from "./ask-personal-evolution-cli-prepare.mjs";
 import { comparisonHash } from "./ask-user-comparison-prepare.mjs";
+import { setupPrimaryScoringVersion } from "./test-helpers-primary-scoring-version.mjs";
 import { readUserComparisonPlan, startUserComparison } from "./ask-user-comparison.mjs";
 import { renderCommandEvent } from "./ask-benchmark-command-evidence.mjs";
 import * as codexApi from "./ask-personal-evolution-codex-generation.mjs";
@@ -30,6 +31,7 @@ function files(root) { return Object.fromEntries(readdirSync(root, { withFileTyp
 })); }
 
 test("same CLI: configured target → source review → saved comparison → explicit hold → fresh request; lost returns never repeat dispatch", async t => {
+  const scoring = setupPrimaryScoringVersion(t);
   const pending = setup(t, { deferGeneration: true, portfolioBudgets: { cost_policy: "subscription_no_additional_spend_v1" },
     entryCostEstimate: { token_count: { status: "known", value: 1 }, duration_ms: { status: "known", value: 1 }, cost_microunits: { status: "unknown", value: null } },
     availableBudget: { token_count: { status: "known", value: 90000000 }, duration_ms: { status: "known", value: 604800000 }, cost_microunits: { status: "unknown", value: null } } });
@@ -51,7 +53,8 @@ test("same CLI: configured target → source review → saved comparison → exp
     evaluationAuthority: { authority_id: "synthetic-independent-cli-evaluation", authority_revision: 1, authority_evidence_digest: canonicalDigest("synthetic") },
     generation: { executable: "must-never-launch-codex", timeoutMs: 3600000 },
     evaluation: { publicInputRoot: join(ROOT, "benchmarks/fixtures/checkpoint-b2"), cliBin: join(pending.root, "must-never-launch-codex"),
-      cliVersion: "fake-not-launched", model: "gpt-5.6-sol", reasoning: "high", evidenceKind: "synthetic", gradingResources: resources } });
+      cliVersion: "fake-not-launched", model: "gpt-5.6-sol", reasoning: "high", evidenceKind: "synthetic",
+      scoringVersion: scoring.selector, gradingResources: resources } });
   let providers = 0, comparisons = 0, sessions = 0, grades = 0, loseGenerationReturn = true, loseComparisonReturn = true;
   t.mock.module("./ask-personal-evolution-codex-generation.mjs", { exports: { ...codexApi,
     inspectPreparedPersonalEvolutionCodexGeneration: value => codexApi.inspectPreparedPersonalEvolutionCodexGeneration(value, {
@@ -109,7 +112,23 @@ test("same CLI: configured target → source review → saved comparison → exp
       if (loseComparisonReturn) { loseComparisonReturn = false; throw new Error("synthetic lost comparison return after saved results"); } return result;
     } } });
   const { runPersonalEvolutionCommand: run } = await import("./ask-personal-evolution-cli.mjs");
+  const management = json(configPath);
+  for (const [name, edit] of [
+    ["missing", value => { delete value.evaluation.scoringVersion; }],
+    ["null", value => { value.evaluation.scoringVersion = null; }],
+    ["unknown-field", value => { value.evaluation.scoringVersion.fallback = true; }],
+    ["missing-file", value => { value.evaluation.scoringVersion.path = join(pending.root, "missing-selector.json"); }],
+    ["wrong-digest", value => { value.evaluation.scoringVersion.digest = canonicalDigest("wrong selector bytes"); }],
+  ]) {
+    const bad = structuredClone(management); edit(bad); write(configPath, bad);
+    const rejectedProfile = join(pending.root, `rejected-${name}`);
+    await assert.rejects(run(["configure", "--config", configPath, "--profile", rejectedProfile]));
+    assert.equal(existsSync(rejectedProfile), false, "invalid selector cannot create a usable profile");
+    assert.equal(providers, 0); assert.equal(comparisons, 0); assert.equal(grades, 0);
+  }
+  write(configPath, management);
   assert.equal((await run(["configure", "--config", configPath, "--profile", profile])).status, "configured");
+  assert.deepEqual(json(join(profile, "profile.json")).value.evaluation.scoringVersion, scoring.selector);
   assert.equal(providers + sessions, 0);
   const started = await run(["start", "--profile", profile, "--cycle", cycle, "--target", pending.parentAsset.stable_id, "--problem", problem]);
   assert.equal(started.status, "needs_action", JSON.stringify(started)); assert.match(started.detail, /lost generation/);
@@ -219,6 +238,7 @@ test("partial/invalid saved evidence and unsupported positive application remain
 });
 
 test("CLI preparation seals all existing nine primary recipes and exact role Prompt bindings without dispatch", t => {
+  const scoring = setupPrimaryScoringVersion(t);
   const revision = spawnSync("git", ["-c", `core.hooksPath=${devNull}`, "rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8",
     env: { PATH: process.env.PATH, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_SYSTEM: devNull, GIT_CONFIG_NOSYSTEM: "1" } });
   assert.equal(revision.status, 0);
@@ -234,7 +254,8 @@ test("CLI preparation seals all existing nine primary recipes and exact role Pro
     portfolioAuthority: f.authority, selectorContext: f.alignArgs.selectorContext, sourceRevision: revision.stdout.trim(),
     experimentTemplateObjectDigest: reference.adapters[0].evolution.experiment_object_digest, evaluationAuthority: f.args.evaluationAuthority,
     evaluation: { publicInputRoot: join(ROOT, "benchmarks/fixtures/checkpoint-b2"), cliBin: join(f.root, "must-never-launch-codex"),
-      cliVersion: "fake-not-launched", model: "gpt-5.6-sol", reasoning: "high", evidenceKind: "synthetic", gradingResources } },
+      cliVersion: "fake-not-launched", model: "gpt-5.6-sol", reasoning: "high", evidenceKind: "synthetic",
+      scoringVersion: scoring.selector, gradingResources } },
     cycleRoot, cycleId: "synthetic-nine-cli", preparationObjectDigest: f.args.preparationObjectDigest });
   assert.ok(prepared.input);
   const registration = read(f.storeRoot, prepared.input.pairRegistrationObjectDigest);
@@ -243,6 +264,12 @@ test("CLI preparation seals all existing nine primary recipes and exact role Pro
     assert.deepEqual(bindings.map(binding => binding.fixture_id), [...PRIMARY_FIXTURE_IDS].sort());
     assert.ok(bindings.every(binding => binding.prompt_runtime_contract.kind === "personal_registered_prompt_materialization_v2"));
     assert.ok(bindings.every(binding => binding.block.root.startsWith(cycleRoot + "/evaluation/")));
+    for (const binding of bindings) {
+      const block = binding.block, base = join(scoring.runtime, "benchmarks/fixtures/checkpoint-b2", binding.fixture_id);
+      assert.deepEqual(block.grading.scoring_version, scoring.selector);
+      assert.equal(block.grading.binding.evaluator_bundle_digest, json(join(base, "evaluator-reference.json")).evaluator_bundle_digest);
+      assert.equal(block.grading.binding.scoring_input_freeze_digest, comparisonHash(readFileSync(join(base, "scoring-input-freeze-manifest.json"))));
+    }
     assert.equal(bindings.find(binding => binding.fixture_id === "mp-ci-evidence-gap").prompt_runtime_contract.active_entrypoint_basename, "skill-review.md");
     assert.equal(bindings.find(binding => binding.fixture_id === "mp-data-migration-handoff").prompt_runtime_contract.active_entrypoint_basename, "skill-handoff.md");
     assert.equal(bindings.find(binding => binding.fixture_id === "mn-focused-regression-test").prompt_runtime_contract.active_entrypoint_basename, "skill-verify.md");

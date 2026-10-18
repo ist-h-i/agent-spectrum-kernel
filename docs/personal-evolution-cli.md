@@ -1,13 +1,13 @@
 # Personal evolution command
 
 Implementation Contract: `personal-evolution-cli-implementation-v1` (implementation).
-Revision: 1. Upstream artifact ref: `personal-evolution-cli-spec-v1@1`.
+Revision: 2. Upstream artifact ref: `personal-evolution-cli-spec-v1@2`.
 Upstream: #385, #379; base `189ca2a4f47db9c0f3ab63677afa58a7a0e90622`.
 Change boundary: a CLI composing the existing generation, Prompt pair, saved-result
 and human-decision APIs; no new runner, scoring, installation or authority model.
 
 Spec: `personal-evolution-cli-spec-v1` (spec).
-Revision: 1.
+Revision: 2.
 
 - PECLI-1: configure existing Asset/Portfolio/evaluation references once. A user
   then supplies a public problem summary and the configured target to `start`.
@@ -19,15 +19,18 @@ Revision: 1.
 - PECLI-4: approved hold can close with the existing no-op receipt and an unstarted
   next request. Candidate rejection/adoption and physical installation are never
   silently reported as applied. Missing dimensions remain Unknown.
+- PECLI-5: explicitly fix the existing scoring-version selector before generation.
+  Missing, invalid or drifted selectors cannot fall back to checkout grading refs;
+  both comparison roles retain its exact selector and selected public bindings.
 
 Verification Contract: `personal-evolution-cli-verification-v1` (verification),
-revision 1; upstream artifact ref: `personal-evolution-cli-spec-v1@1`,
+revision 2; upstream artifact ref: `personal-evolution-cli-spec-v1@2`,
 selected `formal_verification_contract` under
 `ask.verification-proof-policy@1.0.0` because the CLI crosses persisted lifecycle
 and cross-module boundaries and feeds a PR handoff (canonical triggers
 `state_concurrency_persistence_lifecycle_or_cross_module`,
 `multi_session_multi_agent_or_handoff`, `merge_release_or_stable_trace`).
-Focused obligation: PECLI-1–4
+Focused obligation: PECLI-1–5
 through an artificial public input, fake provider, runner and original grading
 interface, including repeated resume and missing/declined review. Command:
 `node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs`.
@@ -45,10 +48,17 @@ The JSON contains the existing API inputs: `storeRoot`, generation `blueprint`,
 arrays), `portfolioAuthority`, `selectorContext`, `experimentTemplateObjectDigest`,
 `evaluationAuthority`, `generation` (`executable`, `timeoutMs`), and `evaluation`
 (`publicInputRoot`, `cliBin`, `cliVersion`, `model`, `reasoning`, `evidenceKind`,
+`scoringVersion` with the existing fixed manifest `path` and raw `digest`,
 `gradingResources` with distinct `baseline` and `challenger` path/digest refs).
 The blueprint selects only existing primary fixtures (normally all nine); the
 unrelated eight-task profile is not included. Evaluation resources remain local.
 The template retains its predeclared recommendation and action policy.
+The scoring selector is required and checked through the existing scoring-version
+verifier, including pinned resource bytes, before a profile is saved. Both roles
+use that version's evaluator/freeze references. This selects an existing version;
+it does not revise scoring or admission. Older profiles lacking the selector need
+a fresh explicit configuration before new execution; saved completed results
+continue to use their original records.
 Each cycle uses a fresh grading output root; the fixed resource template's
 fixture references are unchanged. Cycle directories must be fresh and outside
 the ASK source checkout, CAS and fixed grading resources. The profile pins this
