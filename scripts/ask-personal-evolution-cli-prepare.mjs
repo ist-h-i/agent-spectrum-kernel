@@ -8,6 +8,7 @@ import { buildPrimaryFixtureRecipe, validatePrimaryFixtureRecipe } from "./ask-p
 import { comparisonHash, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 import { resolvePortfolioSelection } from "./portfolio-manager.mjs";
 import { PRIMARY_GRADING_RESERVATION_MS } from "./ask-primary-evaluation-batch.mjs";
+import { readPrimaryScoringVersion } from "./ask-primary-scoring-version.mjs";
 import { buildEvolutionExperiment, publishEvolutionExperiment, computePromptV2ExactProjectionDigests } from "./evolution-loop.mjs";
 import { planPersonalEvolutionBaselineAlignment, applyPersonalEvolutionBaselineAlignment } from "./ask-personal-evolution-alignment.mjs";
 import { sealPersonalEvolutionPromptPair } from "./ask-personal-evolution-primary-pair.mjs";
@@ -91,16 +92,18 @@ export function preparePersonalEvolutionCliPair({ profile, cycleRoot, preparatio
         timeoutMs: 3600000, verificationTimeoutMs: 300000, overallTimeoutMs: 14400000, tokenBudget: 5000000,
         personalPrompt: { storeRoot, registrySnapshotDigest: candidate.registry.snapshot_digest, asset, entrypoint,
           runtimeVersion: "selected_active_reference_v2", trustedAssetAuthorityContexts: trust.trustedAssetAuthorityContexts } });
-      const reference = json(join(base, "evaluator-reference.json"));
+      const scoring = readPrimaryScoringVersion(evaluation.scoringVersion, fixtureId);
+      const gradingBase = join(scoring.root, "benchmarks/fixtures/checkpoint-b2", fixtureId);
+      const reference = json(join(gradingBase, "evaluator-reference.json"));
       blocks[role].push({ root: prepared.root, fixture_id: fixtureId, run_id: prepared.plan.run_id,
         plan_digest: prepared.plan_digest, source_digest: prepared.plan.source.digest, task_digest: prepared.plan.task.digest,
         verification_digest: prepared.plan.verification.digest, public_input_root: seed,
         input_manifest: { path: join(base, "input-manifest.json"), digest: recipe.input_manifest_digest },
         personal_selection_object_digest: selection.selection_object_digest,
-        grading: { timeout_ms: PRIMARY_GRADING_RESERVATION_MS, resources: resources[role],
+        grading: { timeout_ms: PRIMARY_GRADING_RESERVATION_MS, resources: resources[role], scoring_version: scoring.selector,
           binding: { fixture_id: fixtureId, input_manifest_digest: recipe.input_manifest_digest,
             evaluator_bundle_digest: reference.evaluator_bundle_digest,
-            scoring_input_freeze_digest: comparisonHash(bytes(join(base, "scoring-input-freeze-manifest.json"))),
+            scoring_input_freeze_digest: comparisonHash(bytes(join(gradingBase, "scoring-input-freeze-manifest.json"))),
             profile_id: "primary_principles_v2_single_shot_v1" } } });
     }
   }
