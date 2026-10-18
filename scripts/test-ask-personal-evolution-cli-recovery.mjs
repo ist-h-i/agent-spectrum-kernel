@@ -168,6 +168,10 @@ if(readFileSync(${JSON.stringify(control)},'utf8')==='fail') {
     const path = join(oldControl, marker); writeFileSync(path, "unknown"); return () => rmSync(path);
   }, /partial comparison started or unknown/u);
   await rejectMutation("incomplete plan blocks recovery", () => edit(join(oldControl, "plan.digest"), path => writeFileSync(path, "unknown")), /saved plan changed/u);
+  for (const file of ["control/task.md", "inputs/prompt.md", "control/verification.json", "control/node-test-reporter.mjs"])
+    await rejectMutation(`partial ${file} drift blocks recovery`, () => edit(join(cycle, "evaluation", `baseline-${id}`, file), path => write(path, { artificially_tampered: true })), file === "control/task.md" ? /task|changed/u : /partial control input changed/u);
+  await rejectMutation("external verification drift blocks recovery", () => edit(join(cycle, "evaluation", `${id}-verification.json`), path => write(path, { artificially_tampered: true })), /partial external verification changed/u);
+  await rejectMutation("partial Git identity drift blocks recovery", () => edit(join(cycle, "evaluation", `baseline-${id}`, "arms/plain/.git/info/attributes"), path => writeFileSync(path, "changed")), /partial prepared Git metadata changed/u);
   await rejectMutation("partial prepared bytes cannot be edited", () => edit(join(cycle, "evaluation", `baseline-${id}`, "arms/plain/task.md"), path => writeFileSync(path, "tampered")), /partial prepared files changed/u);
   await rejectMutation("partial grading configuration cannot be edited", () => edit(join(cycle, "grading-baseline-resources.json"), path => write(path, { changed: true })), /partial grading configuration changed/u);
   await rejectMutation("unknown preparation child blocks recovery", () => {

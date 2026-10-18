@@ -65,11 +65,11 @@ function fixedSource(sourceRoot, expected) {
 export async function preparePersonalEvolutionCliRecovery(options) {
   const c = inputs(options); fixedSource(c.sourceRoot, c.profile.sourceRevision);
   const load = name => import(pathToFileURL(join(c.sourceRoot, "scripts", name)).href);
-  const [cas, generation, comparison, preparation, driver, scoring] = await Promise.all([
+  const [cas, generation, comparison, preparation, driver, scoring, fixture] = await Promise.all([
     load("content-addressed-store.mjs"), load("ask-personal-evolution-generation-connector.mjs"),
     load("ask-user-comparison.mjs"), load("ask-personal-evolution-cli-prepare.mjs"),
-    load("ask-personal-evolution-driver.mjs"), load("ask-primary-scoring-version.mjs")]);
-  const inventory = (await load("ask-user-comparison-prepare.mjs")).inventoryUserTree;
+    load("ask-personal-evolution-driver.mjs"), load("ask-primary-scoring-version.mjs"), load("ask-primary-fixture-recipe.mjs")]);
+  const { inventoryUserTree: inventory, inventoryComparisonGitMetadata: gitInventory } = await load("ask-user-comparison-prepare.mjs");
   const read = digest => cas.readContentAddressedJson({ storeRoot: c.profile.storeRoot, digest }).value;
   const gen = generation.inspectPersonalEvolutionGenerationStatus({ storeRoot: c.profile.storeRoot,
     requestObjectDigest: c.input.requestObjectDigest, ...c.profile.trust });
@@ -89,7 +89,8 @@ export async function preparePersonalEvolutionCliRecovery(options) {
     const ref = c.profile.evaluation.gradingResources[role], raw = readStableBytes(ref.path, "grading template");
     assert.equal(comparisonHash(raw), ref.digest, "grading template changed");
     const expected = parseJsonRejectDuplicateKeys(raw.toString("utf8")); expected.output_root = join(c.cycleRoot, `grading-${role}`);
-    same(json(join(c.cycleRoot, `grading-${role}-resources.json`)), expected, "partial grading configuration changed");
+    assert.equal(comparisonHash(readStableBytes(join(c.cycleRoot, `grading-${role}-resources.json`), "partial grading configuration")),
+      comparisonHash(Buffer.from(`${JSON.stringify(expected, null, 2)}\n`)), "partial grading configuration changed");
   }
   const ids = c.profile.blueprint.evaluation_scope.fixture_ids, allowed = new Set();
   for (const id of ids) {
@@ -97,10 +98,17 @@ export async function preparePersonalEvolutionCliRecovery(options) {
     const manifest = json(join(c.sourceRoot, "benchmarks/fixtures/checkpoint-b2", id, "input-manifest.json"));
     const expected = Object.fromEntries(manifest.fixtures[id].files.map(file => [file.path, file.sha256]));
     const seed = join(c.cycleRoot, "evaluation", `seed-${id}`);
-    for (const root of [join(c.profile.evaluation.publicInputRoot, id), ...(existsSync(seed) ? [seed] : [])]) {
-      const actual = inventory(root); same(Object.keys(actual).sort(), Object.keys(expected).sort(), "public input file set changed");
+    // The existing preparer reads only manifest-listed public files. Other
+    // controller files in that source directory are not model inputs.
+    for (const [file, digest] of Object.entries(expected)) assert.equal(comparisonHash(readStableBytes(
+      join(c.profile.evaluation.publicInputRoot, id, file), "public input")), `sha256:${digest}`, "public input changed");
+    if (existsSync(seed)) {
+      const actual = inventory(seed); same(Object.keys(actual).sort(), Object.keys(expected).sort(), "public input file set changed");
       for (const [file, digest] of Object.entries(expected)) assert.equal(actual[file].digest, `sha256:${digest}`, "public input changed");
     }
+    const recipe = fixture.buildPrimaryFixtureRecipe(id), external = join(c.cycleRoot, "evaluation", `${id}-verification.json`);
+    if (existsSync(external)) assert.equal(comparisonHash(readStableBytes(external, "partial external verification")),
+      comparisonHash(Buffer.from(`${JSON.stringify(recipe, null, 2)}\n`)), "partial external verification changed");
     allowed.add(`seed-${id}`); allowed.add(`${id}-verification.json`);
     for (const role of roles) {
       const name = `${role}-${id}`, root = join(c.cycleRoot, "evaluation", name); allowed.add(name);
@@ -109,12 +117,22 @@ export async function preparePersonalEvolutionCliRecovery(options) {
         assert.equal(existsSync(join(root, "control", marker)), false, "partial comparison started or unknown");
       assert.equal(existsSync(join(root, "evidence")), false, "partial comparison evidence exists");
       const { plan } = comparison.readUserComparisonPlan(root), report = comparison.reportUserComparison(root);
+      assert.ok(existsSync(external), "partial external verification missing");
+      assert.equal(plan.source.repo, seed, "partial seed identity changed");
+      same(plan.source.inventory, inventory(seed), "partial seed inventory changed");
+      for (const ref of [plan.input, plan.task, plan.verification, plan.verification.reporter])
+        assert.equal(comparisonHash(readStableBytes(join(root, ref.path), "partial control input")), ref.digest, "partial control input changed");
+      assert.equal(comparisonHash(readStableBytes(external, "partial external verification")), plan.verification.digest, "partial external verification changed");
+      assert.equal(readStableBytes(join(root, plan.input.path), "partial prompt").toString("utf8"), plan.prompt, "partial prompt binding changed");
+      same(json(join(root, plan.verification.path)), recipe, "partial verification recipe changed");
+      same(plan.verification.recipe, recipe, "partial plan recipe changed");
       assert.equal(report.execution.start_consumed, false, "partial start consumed or unknown");
       assert.ok(report.slots.every(slot => slot.state === "not_started" && slot.launch_requested === false), "partial execution state unknown");
       assert.equal(plan.config.evidence_kind, c.profile.evaluation.evidenceKind);
       assert.equal(plan.full_definition.source_commit, c.profile.sourceRevision, "partial source revision changed");
       for (const arm of Object.values(plan.arms)) for (const copy of [arm.path, arm.baseline_path])
         same(inventory(join(root, copy)), arm.baseline_inventory, "partial prepared files changed");
+      for (const arm of Object.values(plan.arms)) same(gitInventory(join(root, arm.path)), arm.git_metadata, "partial prepared Git metadata changed");
     }
   }
   assert.ok(readdirSync(join(c.cycleRoot, "evaluation")).every(name => allowed.has(name)), "unknown partial preparation entry");
