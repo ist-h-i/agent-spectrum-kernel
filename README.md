@@ -22,6 +22,11 @@ Mac / Codex の導入で得られるものは、プロジェクト内の判断�
 候補・比較条件の事前固定、保存結果の受渡し、独立した採否判断と次の要求を接続します。
 公開検証は fake provider/runner/grading による人工の保留経路で、実運用の成功は未確認です。
 
+[個人ループ CLI](docs/personal-evolution-cli.md) は、一度の管理設定後、問題の公開要約と
+対象 Prompt を入力し、生成・source review・保存比較・評価確認・人の判断を同じ入口で
+扱います。再開は既存記録を使い、完了した生成・比較を重複起動しません。
+実モデルの開始は本人の直接承認が必要で、採用の実適用・Mac 設定の更新は別段階です。
+
 [Codex 候補生成 adapter](docs/personal-evolution-codex-generation.md) は、公開入力の固定・確認から
 既存の一度限りの生成入口へ接続します。検証は fake transport のみで、実開始には本人の
 新しい直接指示が必要です。global/CLI context と実生成の有効性は Unknown のままです。
