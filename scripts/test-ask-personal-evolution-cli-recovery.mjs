@@ -130,10 +130,11 @@ if(readFileSync(${JSON.stringify(control)},'utf8')==='fail') {
   const command = outputRoot => ["recover-preparation", "--cycle", cycle, "--source", ROOT, "--output", outputRoot,
     "--input-digest", initial.digest, "--source-review-digest", approvals.digest];
   let index = 0;
-  const rejectMutation = async (label, mutate) => t.test(label, async () => {
+  const rejectMutation = async (label, mutate, expected) => t.test(label, async () => {
     const output = join(f.root, `blocked-${index++}`), restore = mutate();
     try {
       const result = await run(command(output)); assert.equal(result.status, "needs_action", JSON.stringify(result));
+      assert.match(result.detail, expected); assert.doesNotMatch(result.detail, /preparation_worker_failed/u);
       assert.equal(existsSync(output), false); assert.equal(existsSync(join(cycle, "pair.json")), false);
     } finally { restore(); }
     unchanged(preserved);
@@ -159,23 +160,23 @@ if(readFileSync(${JSON.stringify(control)},'utf8')==='fail') {
     try { await assert.rejects(run(command(join(f.root, "changed-approval"))), /snapshot drift/u); }
     finally { writeFileSync(path, bytes); }
   });
-  await rejectMutation("generated content change blocks recovery", () => edit(join(cycle, "generation/candidate/docs/fixtures/codex-pre-compact-prompts/skill-handoff.md"), path => writeFileSync(path, "tampered")));
-  await rejectMutation("public input change blocks recovery", () => edit(join(publicInputRoot, id, "task.md"), path => writeFileSync(path, "tampered")));
-  await rejectMutation("fixed resource change blocks recovery", () => edit(resources.baseline.path, path => writeFileSync(path, "tampered")));
+  await rejectMutation("generated content change blocks recovery", () => edit(join(cycle, "generation/candidate/docs/fixtures/codex-pre-compact-prompts/skill-handoff.md"), path => writeFileSync(path, "tampered")), /generated file changed/u);
+  await rejectMutation("public input change blocks recovery", () => edit(join(publicInputRoot, id, "task.md"), path => writeFileSync(path, "tampered")), /public input changed/u);
+  await rejectMutation("fixed resource change blocks recovery", () => edit(resources.baseline.path, path => writeFileSync(path, "tampered")), /grading template changed/u);
   const oldControl = join(cycle, "evaluation", `baseline-${id}`, "control");
   for (const marker of ["start.json", "start.digest", "slots", "leases", "history"]) await rejectMutation(`started or unknown ${marker} blocks recovery`, () => {
     const path = join(oldControl, marker); writeFileSync(path, "unknown"); return () => rmSync(path);
-  });
-  await rejectMutation("incomplete plan blocks recovery", () => edit(join(oldControl, "plan.digest"), path => writeFileSync(path, "unknown")));
-  await rejectMutation("partial prepared bytes cannot be edited", () => edit(join(cycle, "evaluation", `baseline-${id}`, "arms/plain/task.md"), path => writeFileSync(path, "tampered")));
-  await rejectMutation("partial grading configuration cannot be edited", () => edit(join(cycle, "grading-baseline-resources.json"), path => write(path, { changed: true })));
+  }, /partial comparison started or unknown/u);
+  await rejectMutation("incomplete plan blocks recovery", () => edit(join(oldControl, "plan.digest"), path => writeFileSync(path, "unknown")), /saved plan changed/u);
+  await rejectMutation("partial prepared bytes cannot be edited", () => edit(join(cycle, "evaluation", `baseline-${id}`, "arms/plain/task.md"), path => writeFileSync(path, "tampered")), /partial prepared files changed/u);
+  await rejectMutation("partial grading configuration cannot be edited", () => edit(join(cycle, "grading-baseline-resources.json"), path => write(path, { changed: true })), /partial grading configuration changed/u);
   await rejectMutation("unknown preparation child blocks recovery", () => {
     const path = join(cycle, "evaluation/unknown-child"); mkdirSync(path); return () => rmSync(path, { recursive: true });
-  });
+  }, /unknown partial preparation entry/u);
   await rejectMutation("consumed generation without terminal receipt blocks recovery", () => {
     const path = join(f.storeRoot, "personal-generation-invocations", initial.value.requestObjectDigest.slice(7), "receipt.json"), backup = path + ".test-backup";
     renameSync(path, backup); return () => renameSync(backup, path);
-  });
+  }, /completed generation required/u);
   await t.test("output collision is preserved without preparing", async () => {
     const output = join(f.root, "collision"); mkdirSync(output); writeFileSync(join(output, "sentinel"), "preserved");
     await assert.rejects(run(command(output)), /output already exists/u); assert.equal(readFileSync(join(output, "sentinel"), "utf8"), "preserved");

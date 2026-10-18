@@ -17,7 +17,7 @@ export function runPreparationRecoveryWorker(options, env) {
   return outcome;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+async function main() {
   const original = childProcess.spawnSync;
   let failedOperation = null;
   childProcess.spawnSync = (bin, args, ...rest) => {
@@ -39,3 +39,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     childProcess.spawnSync = original; syncBuiltinESMExports();
   }
 }
+// The core imports this module's transport export. Complete this module before
+// asynchronously importing the core, avoiding a top-level-await import cycle.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) void main();
