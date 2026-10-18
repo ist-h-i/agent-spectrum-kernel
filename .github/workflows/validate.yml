@@ -225,9 +225,11 @@ jobs:
           node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v3 --check
           node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v4 --check
           node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v5 --check
+          node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v6 --check
           node --test scripts/test-ask-primary-command-evidence-v3.mjs
           node --test scripts/test-ask-primary-command-evidence-v4.mjs
           node --test scripts/test-ask-primary-command-literal-word-v5.mjs
+          node --test scripts/test-ask-primary-auxiliary-shell-v6.mjs
           node --test scripts/test-ask-primary-evidence-recognition-v2.mjs scripts/test-ask-review-target-requirement-v2.mjs
 
       - name: Verify literal body and review target diagnostics (no execution)

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PRIMARY_PROFILE_SCHEMAS } from './ask-primary-evaluation-scope.mjs';
 import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_PRINCIPLES_V2_EVALUATION_PROFILE_ID, getPrimaryEvaluationProfile } from './ask-primary-evaluation-profile.mjs';
-import { PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION } from './ask-benchmark-command-evidence.mjs';
+import { PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_FAILURE_CODES, COMMAND_EVIDENCE_DIAGNOSTIC_EVENT_TYPES } from './ask-benchmark-command-evidence.mjs';
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 export function primarySchemaBytes(name, { root = ROOT, profileId = PRIMARY_EVALUATION_PROFILE_ID } = {}) {
   const profile = getPrimaryEvaluationProfile(profileId);
@@ -97,8 +97,35 @@ export function generatePrimaryCommandEvidenceV5Schemas({ check = false, root = 
     else writeFileSync(path, raw, { flag: 'wx' });
   }
 }
+export function generatePrimaryCommandEvidenceV6Schemas({ check = false, root = ROOT } = {}) {
+  for (const prefix of ['primary', 'primary-k2']) {
+    const value = JSON.parse(readFileSync(resolve(root, `benchmarks/schemas/${prefix}-saved-v5-portfolio-command-evidence.schema.json`)));
+    function select(item) {
+      if (!item || typeof item !== 'object') return;
+      if (item.const === PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION) item.const = PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION;
+      for (const child of Object.values(item)) select(child);
+    }
+    select(value); value.title = value.title.replace('processing v5', 'processing v6');
+    const nullableDigest = { anyOf: [{ type: 'null' }, { $ref: '#/$defs/digest' }] };
+    value.properties.capture.required.push('failure_diagnostic');
+    value.properties.capture.properties.failure_diagnostic = { anyOf: [{ type: 'null' }, {
+      type: 'object', additionalProperties: false,
+      required: ['reason', 'line', 'event_type', 'event_line_digest', 'runtime_item_id_digest', 'rendered_event_command_digest'],
+      properties: {
+        reason: { enum: [...PRIMARY_SAVED_COMMAND_EVIDENCE_V6_FAILURE_CODES] },
+        line: { type: ['integer', 'null'], minimum: 1 },
+        event_type: { enum: [null, ...COMMAND_EVIDENCE_DIAGNOSTIC_EVENT_TYPES] },
+        event_line_digest: nullableDigest, runtime_item_id_digest: nullableDigest, rendered_event_command_digest: nullableDigest,
+      },
+    }] };
+    const path = resolve(root, `benchmarks/schemas/${prefix}-saved-v6-portfolio-command-evidence.schema.json`);
+    const raw = Buffer.from(JSON.stringify(value, null, 2) + '\n');
+    if (check) { if (!readFileSync(path).equals(raw)) throw new Error('stale primary v6 command evidence schema'); }
+    else writeFileSync(path, raw, { flag: 'wx' });
+  }
+}
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const generate = process.argv.includes('--command-evidence-v5') ? generatePrimaryCommandEvidenceV5Schemas : process.argv.includes('--command-evidence-v4') ? generatePrimaryCommandEvidenceV4Schemas : process.argv.includes('--command-evidence-v3') ? generatePrimaryCommandEvidenceV3Schemas
+  const generate = process.argv.includes('--command-evidence-v6') ? generatePrimaryCommandEvidenceV6Schemas : process.argv.includes('--command-evidence-v5') ? generatePrimaryCommandEvidenceV5Schemas : process.argv.includes('--command-evidence-v4') ? generatePrimaryCommandEvidenceV4Schemas : process.argv.includes('--command-evidence-v3') ? generatePrimaryCommandEvidenceV3Schemas
     : process.argv.includes('--command-evidence-v2') ? generatePrimaryCommandEvidenceV2Schemas : generatePrimaryGradingSchemas;
   generate({ check: process.argv.includes('--check') }); console.log('Primary grading schemas verified');
 }

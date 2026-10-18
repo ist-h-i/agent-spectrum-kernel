@@ -10,7 +10,7 @@ import { canonicalDigest, parseJsonRejectDuplicateKeys } from './content-address
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { normalizeRuntimeObservationCarrier } from './ask-benchmark-runtime-observation.mjs';
 import { PRIMARY_FIXTURE_IDS, buildPrimaryFixtureRecipe } from './ask-primary-fixture-recipe.mjs';
-import { buildCodexCommandEvidence, buildUnavailableCommandEvidence, commandEvidenceFailureReason, PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, validateVerificationCommandContract, validateCommandEvidenceManifest } from './ask-benchmark-command-evidence.mjs';
+import { buildCodexCommandEvidence, buildUnavailableCommandEvidence, commandEvidenceFailureReason, commandEvidenceFailureDiagnostic, PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, validateVerificationCommandContract, validateCommandEvidenceManifest } from './ask-benchmark-command-evidence.mjs';
 import { captureTerminalWorkspaceInventory, buildTerminalWorkspaceAuthority, readVerifiedTerminalWorkspaceAuthority } from './ask-benchmark-terminal-workspace.mjs';
 import { normalizePortfolioExecution, verifyNormalizedPortfolioResults } from './ask-benchmark-normalized-results.mjs';
 import { materializeVerifiedTerminalCandidate } from './ask-benchmark-terminal-candidate.mjs';
@@ -53,7 +53,8 @@ export function primaryProducerSources() {
     'benchmarks/schemas/primary-saved-v2-portfolio-command-evidence.schema.json', 'benchmarks/schemas/primary-k2-saved-v2-portfolio-command-evidence.schema.json',
     'benchmarks/schemas/primary-saved-v3-portfolio-command-evidence.schema.json', 'benchmarks/schemas/primary-k2-saved-v3-portfolio-command-evidence.schema.json',
     'benchmarks/schemas/primary-saved-v4-portfolio-command-evidence.schema.json', 'benchmarks/schemas/primary-k2-saved-v4-portfolio-command-evidence.schema.json',
-    'benchmarks/schemas/primary-saved-v5-portfolio-command-evidence.schema.json', 'benchmarks/schemas/primary-k2-saved-v5-portfolio-command-evidence.schema.json'];
+    'benchmarks/schemas/primary-saved-v5-portfolio-command-evidence.schema.json', 'benchmarks/schemas/primary-k2-saved-v5-portfolio-command-evidence.schema.json',
+    'benchmarks/schemas/primary-saved-v6-portfolio-command-evidence.schema.json', 'benchmarks/schemas/primary-k2-saved-v6-portfolio-command-evidence.schema.json'];
   const all=new Set([...paths,'scripts/ask-primary-fixture-recipe.mjs','benchmarks/adaptive-portfolio.config.json',
     'benchmarks/schemas/runtime-observation-carrier.schema.json',
     'benchmarks/portfolio-catalog.json','benchmarks/portfolio-policy-manifest.json','benchmarks/portfolio-scoring-policy.json']);
@@ -179,7 +180,7 @@ function derive(target, source, parserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_
       const commandIdentity = { ...terminalIdentity, repetition: 1, verification_command_contract_digest: contract.contract_digest,
         runtime_identity_digest: canonicalDigest(adapter), effective_command_digest: canonicalDigest(adapter.effective_command) };
       let editContext = {};
-      if ([PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION].includes(parserRevision)) {
+      if ([PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION].includes(parserRevision)) {
         const arm = loaded.plan.arms[condition];
         assert.equal(arm.path, `arms/${condition}`, 'primary v4 exact source arm path required');
         const paths = [...new Set([...Object.keys(snapshot.baseline), ...Object.keys(snapshot.terminal)])];
@@ -189,11 +190,12 @@ function derive(target, source, parserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_
             return !before || !after || before.mode !== after.mode || !before.bytes.equals(after.bytes); })
             .map(path => ({path,kind:!snapshot.baseline[path]?'add':!snapshot.terminal[path]?'delete':'update'})) };
       }
+      if (parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION) editContext.auxiliaryReadInputManifest = read(join(ROOT, `benchmarks/fixtures/checkpoint-b2/${request.fixture_id}/input-manifest.json`));
       let commands;
       try { commands = buildCodexCommandEvidence({ identity: commandIdentity, stream: stdout, contract, parserRevision,
         candidateChangePaths: parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION
           ? buildPrimaryFixtureRecipe(request.fixture_id).mutable_paths : [], ...editContext }); }
-      catch (error) { commands = buildUnavailableCommandEvidence({ identity: commandIdentity, support: 'supported', probe: 'capture_invalid', reason: commandEvidenceFailureReason(error,{parserRevision}), stream: stdout, parserRevision }); }
+      catch (error) { commands = buildUnavailableCommandEvidence({ identity: commandIdentity, support: 'supported', probe: 'capture_invalid', reason: commandEvidenceFailureReason(error,{parserRevision}), stream: stdout, parserRevision, failureDiagnostic: commandEvidenceFailureDiagnostic(error,{parserRevision}) }); }
       validateCommandEvidenceManifest(commands, { root: ROOT, contract });
       // The original normalized outcome is the model CLI outcome. Independent
       // controller checks and scope findings remain supplemental receipts.
@@ -227,8 +229,8 @@ export async function producePrimaryEvaluationArtifacts(block, outputRoot, { com
   const processing = primaryProcessingSelection(block);
   commandEvidenceParserRevision ??= processing?.command_evidence_parser_revision ?? PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
   if (processing) assert.equal(commandEvidenceParserRevision, processing.command_evidence_parser_revision, 'primary processing selector override refused');
-  assert.ok([PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION].includes(commandEvidenceParserRevision), 'unsupported primary command evidence revision');
-  if ([PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION].includes(commandEvidenceParserRevision)) assert.deepEqual(Object.keys(unknown), [], 'primary caller context override refused');
+  assert.ok([PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION].includes(commandEvidenceParserRevision), 'unsupported primary command evidence revision');
+  if ([PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION].includes(commandEvidenceParserRevision)) assert.deepEqual(Object.keys(unknown), [], 'primary caller context override refused');
   const source = await checkedSource(block), target = resolve(outputRoot);
   assert.ok(!existsSync(target)); assert.equal(realpathSync(dirname(target)), dirname(target));
   for (const input of [ROOT, block.root, block.public_input_root]) assert.ok(target !== resolve(input) && !target.startsWith(`${resolve(input)}/`), 'primary output overlaps authority');
@@ -250,8 +252,9 @@ export async function producePrimaryEvaluationArtifacts(block, outputRoot, { com
   const v3 = commandEvidenceParserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION;
   const v4 = commandEvidenceParserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION;
   const v5 = commandEvidenceParserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION;
-  const manifest = { kind: v5 ? 'ask_primary_evaluation_producer_v5' : v4 ? 'ask_primary_evaluation_producer_v4' : v3 ? 'ask_primary_evaluation_producer_v3' : v2 ? 'ask_primary_evaluation_producer_v2' : 'ask_primary_evaluation_producer_v1',
-    ...(v2 || v3 || v4 || v5 ? { command_evidence_parser_revision: commandEvidenceParserRevision } : {}), evidence_kind: source.request.evidence_kind, response_format:'primary_plain_utf8_response_v1', block, grading_export_digest: source.request_digest,
+  const v6 = commandEvidenceParserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION;
+  const manifest = { kind: v6 ? 'ask_primary_evaluation_producer_v6' : v5 ? 'ask_primary_evaluation_producer_v5' : v4 ? 'ask_primary_evaluation_producer_v4' : v3 ? 'ask_primary_evaluation_producer_v3' : v2 ? 'ask_primary_evaluation_producer_v2' : 'ask_primary_evaluation_producer_v1',
+    ...(v2 || v3 || v4 || v5 || v6 ? { command_evidence_parser_revision: commandEvidenceParserRevision } : {}), evidence_kind: source.request.evidence_kind, response_format:'primary_plain_utf8_response_v1', block, grading_export_digest: source.request_digest,
     snapshot_digest: snapshotDigest(source.snapshots), source_digests: primaryProducerSources(), artifact_inventory: entries(target),
     execution_permission: false, scoring_ready: false, formal_aggregate_eligible: false, model_calls: 0, grader_process_starts: 0 };
   write(target, 'producer.json', manifest); const options = { recordRoot: target, externalDigest: hash(bytes(manifest)) };
@@ -264,9 +267,10 @@ export function verifyPrimaryEvaluationProducer(options) {
   const raw = read(join(target, 'producer.json')); assert.equal(hash(raw), options.externalDigest, 'primary external producer pin changed');
   const manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
   assert.ok(PRIMARY_FIXTURE_IDS.includes(manifest.block.fixture_id), 'primary fixture set is closed');
-  assert.ok(['ask_primary_evaluation_producer_v1', 'ask_primary_evaluation_producer_v2', 'ask_primary_evaluation_producer_v3', 'ask_primary_evaluation_producer_v4', 'ask_primary_evaluation_producer_v5'].includes(manifest.kind), 'unknown primary producer version');
+  assert.ok(['ask_primary_evaluation_producer_v1', 'ask_primary_evaluation_producer_v2', 'ask_primary_evaluation_producer_v3', 'ask_primary_evaluation_producer_v4', 'ask_primary_evaluation_producer_v5', 'ask_primary_evaluation_producer_v6'].includes(manifest.kind), 'unknown primary producer version');
   const commandEvidenceParserRevision = manifest.kind !== 'ask_primary_evaluation_producer_v1' ? manifest.command_evidence_parser_revision : PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
-  if (manifest.kind === 'ask_primary_evaluation_producer_v5') assert.equal(commandEvidenceParserRevision, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, 'primary v5 parser revision changed');
+  if (manifest.kind === 'ask_primary_evaluation_producer_v6') assert.equal(commandEvidenceParserRevision, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, 'primary v6 parser revision changed');
+  else if (manifest.kind === 'ask_primary_evaluation_producer_v5') assert.equal(commandEvidenceParserRevision, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, 'primary v5 parser revision changed');
   else if (manifest.kind === 'ask_primary_evaluation_producer_v4') assert.equal(commandEvidenceParserRevision, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, 'primary v4 parser revision changed');
   else if (manifest.kind === 'ask_primary_evaluation_producer_v3') assert.equal(commandEvidenceParserRevision, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, 'primary v3 parser revision changed');
   else if (manifest.kind === 'ask_primary_evaluation_producer_v2') assert.equal(commandEvidenceParserRevision, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, 'primary v2 parser revision changed');
