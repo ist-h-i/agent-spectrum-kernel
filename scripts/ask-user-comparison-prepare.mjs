@@ -1,6 +1,7 @@
 // Exploratory user-repository preparation. This module never starts Codex.
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { preparationGitOperation } from "./ask-preparation-git-diagnostic.mjs";
 import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { devNull, release } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
@@ -210,7 +211,7 @@ function localChild(bin, args, cwd, input) {
     timeout: 120000, maxBuffer: TREE_LIMIT });
   if (result.error || result.signal || result.status !== 0) {
     // Never expose the environment or arbitrary Git stderr in a control record.
-    fail(`local_preparation_failed:${basename(bin)}:${result.error?.code ?? result.signal ?? result.status}`);
+    fail(`local_preparation_failed:${basename(bin)}:${result.error?.code ?? result.signal ?? result.status}${bin === "git" ? `:operation=${preparationGitOperation(args)}` : ""}`);
   }
   return result.stdout;
 }

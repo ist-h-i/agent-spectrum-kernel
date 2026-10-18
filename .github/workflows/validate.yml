@@ -173,6 +173,9 @@ jobs:
       - name: Run personal observation and generated candidate contracts (model-free)
         run: node --test scripts/test-ask-personal-evolution-observation.mjs scripts/test-ask-personal-evolution.mjs scripts/test-ask-personal-evolution-generation.mjs scripts/test-ask-personal-evolution-generation-connector.mjs scripts/test-ask-personal-evolution-saved-results-mode.mjs scripts/test-ask-personal-evolution-primary-pair.mjs scripts/test-ask-personal-source-install.mjs scripts/test-ask-personal-prompt-runtime-v2.mjs
 
+      - name: Verify personal CLI and unstarted preparation recovery (model-free)
+        run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-cli-recovery.mjs
+
       - name: Check the exact governed Evolution sample
         run: node scripts/evolution-loop-samples.mjs --check
 

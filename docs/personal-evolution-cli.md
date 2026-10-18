@@ -1,13 +1,13 @@
 # Personal evolution command
 
 Implementation Contract: `personal-evolution-cli-implementation-v1` (implementation).
-Revision: 2. Upstream artifact ref: `personal-evolution-cli-spec-v1@2`.
+Revision: 3. Upstream artifact ref: `personal-evolution-cli-spec-v1@3`.
 Upstream: #385, #379; base `189ca2a4f47db9c0f3ab63677afa58a7a0e90622`.
 Change boundary: a CLI composing the existing generation, Prompt pair, saved-result
 and human-decision APIs; no new runner, scoring, installation or authority model.
 
 Spec: `personal-evolution-cli-spec-v1` (spec).
-Revision: 2.
+Revision: 3.
 
 - PECLI-1: configure existing Asset/Portfolio/evaluation references once. A user
   then supplies a public problem summary and the configured target to `start`.
@@ -22,19 +22,32 @@ Revision: 2.
 - PECLI-5: explicitly fix the existing scoring-version selector before generation.
   Missing, invalid or drifted selectors cannot fall back to checkout grading refs;
   both comparison roles retain its exact selector and selected public bindings.
+- PECLI-6: explicitly recover interrupted, wholly unstarted local preparation
+  into a fresh disjoint directory. Preserve generated files, source approval and
+  old partial files. Verify the fixed source revision, confirmed cycle/review
+  snapshots and all inputs before using that revision's preparation/sealing and
+  driver inspection APIs. Publish the absent cycle pair snapshot only after
+  both roles are sealed, preflight-ready and unstarted; stop without dispatch.
+  Started/unknown work, input drift, locks and output collisions block recovery.
+  A failed attempt retains its new partial files and never retries automatically.
 
 Verification Contract: `personal-evolution-cli-verification-v1` (verification),
-revision 2; upstream artifact ref: `personal-evolution-cli-spec-v1@2`,
+revision 3; upstream artifact ref: `personal-evolution-cli-spec-v1@3`,
 selected `formal_verification_contract` under
 `ask.verification-proof-policy@1.0.0` because the CLI crosses persisted lifecycle
 and cross-module boundaries and feeds a PR handoff (canonical triggers
 `state_concurrency_persistence_lifecycle_or_cross_module`,
 `multi_session_multi_agent_or_handoff`, `merge_release_or_stable_trace`).
-Focused obligation: PECLI-1–5
+Focused obligation: PECLI-1–6
 through an artificial public input, fake provider, runner and original grading
 interface, including repeated resume and missing/declined review. Command:
 `node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs`.
 Existing driver/primary-loop tests and repository CI supply regression evidence.
+PECLI-6 additionally requires artificial interruption/recovery, immutable old
+files, unchanged approval, real existing seal/inspect APIs with fake grading
+preflight, no dispatch, source/input drift and started/unknown/collision refusal,
+and preservation after another preparation failure. Command:
+`node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli-recovery.mjs`.
 Actual provider, model quality, Mac application and all-Skill support remain
 Unknown; synthetic success does not prove them. Evidence and final handoff are
 recorded in the PR.
@@ -118,6 +131,65 @@ empty lock with `rmdir /absolute/cycle/.command-lock` and resume the same cycle.
 Consumed incomplete work still remains needs-action; removing a lock grants no
 retry or new authority. The tested lost-return case runs `finally` and removes
 the lock; it does not prove automatic recovery from every kind of interruption.
+
+## Recover interrupted local preparation
+
+An approved source can have a partial `evaluation/` but no `pair.json`, invocation
+or child start. Ordinary `start` preserves this state. Use the explicit
+preparation-only operation after reading the original records:
+
+```sh
+node scripts/ask-personal-evolution-cli.mjs recover-preparation \
+  --cycle /absolute/cycle-1 \
+  --source /absolute/clean-fixed-ASK-checkout \
+  --output /absolute/new-unused-preparation-directory \
+  --input-digest sha256:CONFIRMED_CYCLE_INPUT_SNAPSHOT_DIGEST \
+  --source-review-digest sha256:CONFIRMED_SOURCE_REVIEW_SNAPSHOT_DIGEST
+```
+
+Copy the confirmed `digest` fields from `cycle-1/input.json` and
+`cycle-1/source-review.json`; verify their values and the candidate first.
+The output parent must exist and the output must be absent and disjoint from
+the old cycle, source checkouts, CAS, public inputs and resource templates.
+Existing output is preserved and refused, even after a failed recovery.
+
+`--source` defaults to this checkout. For an older profile, explicitly select
+its unchanged clean checkout at the exact `profile.sourceRevision`. Git checks
+ignore replacement objects so replacement refs cannot mask changed API bytes. The new
+command owns only the command lock and atomic publication of the absent cycle
+pair snapshot. An isolated local Node worker imports that fixed checkout's
+existing generation-status, preparation, sealing and driver-inspection APIs.
+It does not upgrade/rewrite the old profile, source approval, generated content,
+plans, scoring version or grading originals. The fixed code must provide those
+existing APIs; this is a compatibility helper, not execution under a newer
+evaluation definition. Preparation can add immutable objects to the dedicated
+CAS and creates local comparison repositories in the fresh output.
+
+Recovery requires a completed generation receipt, the existing explicit source
+approval and unchanged generated/input/resource bytes. Every existing partial
+comparison must have a valid plan, exact saved copies and wholly unstarted
+slots. Starts, evidence, unknown/torn plans, unknown preparation entries,
+grading outputs, an existing pair or a command lock stop recovery. No automatic
+process recovery or retry is attempted. A new failure retains the new partial
+directory and leaves `pair.json` absent; inspect it before choosing any further
+action. The earlier readout/error cache is retained.
+
+Success runs existing pair sealing and original grading resource preflight,
+then saves `pair.json` once and returns `prepared_comparison`. It starts zero
+generation, comparison or grading processes. Inspect the fixed pair and obtain
+a new direct human instruction before `start --cycle /absolute/cycle-1` in the
+fixed source checkout. Source approval is already recorded; do not repeat it.
+The profile's fixtures, six-session-per-fixture protocol, budgets, retry 0 and
+concurrency 1 remain fixed. Evaluation confirmation and judgment remain later
+human actions after saved results exist.
+
+Preparation Git errors now include a closed operation label, with a validated
+object ID for `cat-file`. They retain no arbitrary argv, stderr or environment.
+For an immutable older API, the isolated worker observes its `spawnSync` failure
+and appends the same label without changing its arguments, return values,
+timeouts or retry behavior. It restores the builtin binding before exiting;
+the supervising process and fixed source files are unchanged. An operation label
+identifies the failed call, not the underlying OS cause of `EAGAIN`.
 
 Mutating adoption/rejection remains an explicit pending lifecycle action after
 the human decision; this CLI does not apply it to a Portfolio or to the Mac.

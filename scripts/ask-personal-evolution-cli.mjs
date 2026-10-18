@@ -325,12 +325,13 @@ function next(c, output, summary) {
 }
 
 const COMMANDS = {
+  "recover-preparation": ["cycle", "output", "source", "input-digest", "source-review-digest"],
   configure: ["config", "profile"], start: ["cycle", "profile", "target", "problem"], status: ["cycle"], result: ["cycle"],
   "review-source": ["cycle", "approve", "reason"], "confirm-evaluation": ["cycle", "confirm", "reason"],
   decide: ["cycle", "approve", "decline", "reason"], next: ["cycle", "output", "problem"],
 };
 function parse(argv) {
-  const [command, ...args] = argv; assert.ok(Object.hasOwn(COMMANDS, command), "commands: configure, start, status, result, review-source, confirm-evaluation, decide, next");
+  const [command, ...args] = argv; assert.ok(Object.hasOwn(COMMANDS, command), `commands: ${Object.keys(COMMANDS).join(", ")}`);
   const values = {};
   for (let i = 0; i < args.length; i++) {
     const key = args[i].startsWith("--") ? args[i].slice(2) : null;
@@ -342,6 +343,11 @@ function parse(argv) {
 }
 export async function runPersonalEvolutionCommand(argv) {
   const { command, values: v } = parse(argv);
+  if (command === "recover-preparation") {
+    const { recoverPersonalEvolutionCliPreparation } = await import("./ask-personal-evolution-cli-recovery.mjs");
+    return recoverPersonalEvolutionCliPreparation({ cycleRoot: v.cycle, outputRoot: v.output, sourceRoot: v.source,
+      inputDigest: v["input-digest"], sourceReviewDigest: v["source-review-digest"] });
+  }
   if (command === "configure") return configure(v.config, v.profile);
   absolute(v.cycle);
   if (command === "start" && !existsSync(v.cycle)) {
