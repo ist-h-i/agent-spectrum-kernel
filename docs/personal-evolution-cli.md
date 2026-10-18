@@ -154,7 +154,8 @@ the old cycle, source checkouts, CAS, public inputs and resource templates.
 Existing output is preserved and refused, even after a failed recovery.
 
 `--source` defaults to this checkout. For an older profile, explicitly select
-its unchanged clean checkout at the exact `profile.sourceRevision`. The new
+its unchanged clean checkout at the exact `profile.sourceRevision`. Git checks
+ignore replacement objects so replacement refs cannot mask changed API bytes. The new
 command owns only the command lock and atomic publication of the absent cycle
 pair snapshot. An isolated local Node worker imports that fixed checkout's
 existing generation-status, preparation, sealing and driver-inspection APIs.

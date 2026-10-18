@@ -16,7 +16,7 @@ const ROOT = resolve(import.meta.dirname, ".."), roles = ["baseline", "challenge
 const json = path => parseJsonRejectDuplicateKeys(readStableBytes(path, "recovery input").toString("utf8"));
 const same = (a, b, label) => assert.equal(canonicalDigest(a), canonicalDigest(b), label);
 const environment = () => ({ PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C", GIT_CONFIG_GLOBAL: devNull,
-  GIT_CONFIG_SYSTEM: devNull, GIT_CONFIG_NOSYSTEM: "1", GIT_OPTIONAL_LOCKS: "0", GIT_NO_LAZY_FETCH: "1" });
+  GIT_CONFIG_SYSTEM: devNull, GIT_CONFIG_NOSYSTEM: "1", GIT_OPTIONAL_LOCKS: "0", GIT_NO_LAZY_FETCH: "1", GIT_NO_REPLACE_OBJECTS: "1" });
 function path(value) {
   assert.ok(typeof value === "string" && resolve(value) === value, "canonical absolute recovery path required");
   assertNoSymlinkPathSegments(value, "recovery path", { allowMissingLeaf: true }); return value;

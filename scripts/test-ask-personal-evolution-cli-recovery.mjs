@@ -4,6 +4,7 @@ import childProcess from "node:child_process";
 import { syncBuiltinESMExports } from "node:module";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
+import { devNull } from "node:os";
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -159,6 +160,32 @@ if(readFileSync(${JSON.stringify(control)},'utf8')==='fail') {
     changed.value.candidate_asset.content_digest = canonicalDigest("tampered"); write(path, changed);
     try { await assert.rejects(run(command(join(f.root, "changed-approval"))), /snapshot drift/u); }
     finally { writeFileSync(path, bytes); }
+  });
+  await t.test("Git replacement cannot mask changed fixed API bytes before worker or import", async () => {
+    const source = join(f.root, "artificial-fixed-api"); mkdirSync(source); mkdirSync(join(source, "scripts"));
+    const git = args => {
+      const result = originalSpawn("git", ["--no-optional-locks", "-c", `core.hooksPath=${devNull}`, "-c", "core.fsmonitor=false", ...args],
+        { cwd: source, env: { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C", GIT_CONFIG_GLOBAL: devNull,
+          GIT_CONFIG_SYSTEM: devNull, GIT_CONFIG_NOSYSTEM: "1", GIT_OPTIONAL_LOCKS: "0", GIT_NO_LAZY_FETCH: "1" }, encoding: "utf8", shell: false });
+      assert.equal(result.error, undefined); assert.equal(result.status, 0, result.stderr); return result.stdout.trim();
+    };
+    git(["-c", "init.defaultBranch=main", "init"]);
+    const api = join(source, "scripts/api.mjs"), identity = ["-c", "user.name=Artificial Recovery", "-c", "user.email=artificial@example.invalid", "-c", "commit.gpgsign=false"];
+    writeFileSync(api, 'export const source = "original";\n'); git(["add", "--", "scripts/api.mjs"]);
+    git([...identity, "commit", "-m", "Artificial fixed source"]); const fixed = git(["rev-parse", "HEAD"]);
+    writeFileSync(api, 'export const source = "replacement";\n'); git(["add", "--", "scripts/api.mjs"]);
+    const replacement = git([...identity, "commit-tree", git(["write-tree"]), "-m", "Artificial replacement"]);
+    git(["replace", fixed, replacement]);
+    assert.equal(git(["rev-parse", "HEAD"]), fixed); assert.equal(git(["status", "--porcelain", "--untracked-files=normal"]), "");
+    const path = join(cycle, "input.json"), bytes = readFileSync(path), changed = json(path);
+    changed.value.profile.sourceRevision = fixed; changed.digest = canonicalDigest(changed.value); write(path, changed);
+    const output = join(f.root, "replaced-source"), args = command(output), callsBefore = workerCalls;
+    args[args.indexOf("--source") + 1] = source; args[args.indexOf("--input-digest") + 1] = changed.digest;
+    try {
+      const result = await run(args); assert.equal(result.status, "needs_action"); assert.match(result.detail, /fixed source must be clean/u);
+      assert.equal(workerCalls, callsBefore); assert.equal(existsSync(output), false); assert.equal(existsSync(join(cycle, "pair.json")), false);
+    } finally { writeFileSync(path, bytes); }
+    unchanged(preserved);
   });
   await rejectMutation("generated content change blocks recovery", () => edit(join(cycle, "generation/candidate/docs/fixtures/codex-pre-compact-prompts/skill-handoff.md"), path => writeFileSync(path, "tampered")), /generated file changed/u);
   await rejectMutation("public input change blocks recovery", () => edit(join(publicInputRoot, id, "task.md"), path => writeFileSync(path, "tampered")), /public input changed/u);
