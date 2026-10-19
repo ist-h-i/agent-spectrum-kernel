@@ -61,7 +61,7 @@ before configuring a **fresh** profile:
   },
   "decisionActions": ["retain_current", "revise_candidate", "insufficient_evidence", "reject_candidate"],
   "maxCycles": 2,
-  "maxDurationMs": 1216800000,
+  "maxDurationMs": 1224000000,
   "maxComparisonTokens": 180000000
 }
 ```

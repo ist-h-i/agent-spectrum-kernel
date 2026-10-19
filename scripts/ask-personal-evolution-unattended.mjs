@@ -58,12 +58,12 @@ function acceptReview(record, input) {
   return record;
 }
 async function sourceApproval({ cycle, profile, policy, policyDigest, command, deadline }) {
-  const gen = (await command(["status", "--cycle", cycle])).generation;
+  const view = await command(["review-source", "--cycle", cycle]), gen = view.generation;
   assert.equal(gen.status, "candidate_ready", "generation must be terminal and ready");
   assert.equal(gen.invocation_consumed, true);
   const approval = join(cycle, "source-review.json"), request = join(cycle, "source-review-request.json"), result = join(cycle, "source-review-result.json");
   if (existsSync(request) && !existsSync(result)) throw new Error("source review consumed without a verified result; no retry");
-  const view = await command(["review-source", "--cycle", cycle]), input = reviewInput(view.source, policyDigest);
+  const input = reviewInput(view.source, policyDigest);
   for (const file of view.source.files) if (file.before !== file.after)
     assert.ok(policy.allowedPaths.includes(file.path), "candidate changed a path outside run policy");
   if (existsSync(approval) && !existsSync(result)) {
@@ -71,7 +71,11 @@ async function sourceApproval({ cycle, profile, policy, policyDigest, command, d
     const fact = read(profile, snapshot(approval).reviewObjectDigest);
     assert.equal(fact.kind, "personal_explicit_source_review_v1"); assert.equal(fact.content_digest, gen.candidate_asset.content_digest);
     same(fact.inherited_parent, profile.blueprint.parent_asset); same(fact.candidate_asset, gen.candidate_asset);
-    return;
+    assert.equal(fact.fresh_for_fixed_comparison, true); assert.equal(fact.authority_implied, false);
+    same(fact.reviewed_scope, view.source.inherited_scope);
+    same(fact.reviewed_permissions_and_effects, view.source.inherited_permissions_and_effects);
+    same(fact.reviewed_maintenance, view.source.inherited_maintenance);
+    return view;
   }
   reviewerSource(policy);
   let reviewed;
@@ -93,7 +97,9 @@ async function sourceApproval({ cycle, profile, policy, policyDigest, command, d
     const outcome = await command(["review-source", "--cycle", cycle, "--approve", "--reason",
       `Confirmed unattended policy ${policyDigest}; completed source review ${canonicalDigest(reviewed)}: ${reviewed.reason}`.slice(0, 2048)]);
     if (outcome.status === "needs_action") throw new Error(`source approval/evaluation stopped: ${outcome.reason}`);
+    return outcome;
   }
+  return view;
 }
 
 export async function runUnattendedPersonalEvolution(options, command) {
@@ -127,6 +133,12 @@ export async function runUnattendedPersonalEvolution(options, command) {
   const count = profile.blueprint.evaluation_scope.fixture_ids.length;
   const tokens = PRIMARY_BATCH_LIMITS.token_budget * 2 * count / 9, duration = Math.ceil(PRIMARY_BATCH_LIMITS.overall_timeout_ms * 2 * count / 9);
   let cycle;
+  const allowedAction = state => {
+    const pair = snapshot(join(cycle, "pair.json")), experiment = read(profile, pair.input.experimentObjectDigest);
+    const mapping = experiment.action_mapping.find(item => item.recommendation === state.recommendation.recommendation)?.actions;
+    assert.ok(mapping?.length === 1 && policy.decisionActions.includes(mapping[0]), "frozen action requires separate application authority");
+    return mapping[0];
+  };
   try {
     for (let index = 1; index <= policy.maxCycles; index++) {
       cycle = join(output, `cycle-${index}`);
@@ -139,35 +151,35 @@ export async function runUnattendedPersonalEvolution(options, command) {
         assert.equal(input.observationInput.correction, fixed.problem, "cycle public problem drift");
         if (index === 1) { same(input.profile, profile); assert.equal(input.predecessorReceiptObjectDigest, null); }
       }
+      let state;
       if (!complete) {
         assert.ok(index * tokens <= policy.maxComparisonTokens, "comparison admission budget exhausted before next cycle");
         assert.ok(Date.now() + duration < deadline, "run deadline cannot reserve full comparison");
-        let state;
         if (!existsSync(cycle)) {
           assert.ok(Date.now() + duration + profile.generation.timeoutMs + policy.sourceReview.timeoutMs < deadline, "run deadline cannot reserve generation/review/comparison");
           state = await invoke(["start", "--profile", fixed.profileRoot, "--cycle", cycle, "--target", fixed.target, "--problem", join(output, "problem.txt")]);
         }
         else state = await invoke(["status", "--cycle", cycle]);
         if (state.generation?.status === "NOT_RUN") state = await invoke(["start", "--cycle", cycle]);
-        if (state.status === "needs_source_review") await sourceApproval({ cycle, profile, policy, policyDigest: fixed.policyDigest, command: invoke, deadline });
-        else if (state.status === "prepared_comparison") {
-          await sourceApproval({ cycle, profile, policy, policyDigest: fixed.policyDigest, command: invoke, deadline });
-          await invoke(["start", "--cycle", cycle]);
-        }
-        state = await invoke(["status", "--cycle", cycle]);
+        if (state.status === "needs_action") throw new Error(`cycle stopped: ${state.detail ?? state.reason}; no retry`);
+        if (state.generation?.status === "candidate_ready")
+          state = await sourceApproval({ cycle, profile, policy, policyDigest: fixed.policyDigest, command: invoke, deadline });
+        if (state.status === "prepared_comparison") state = await invoke(["start", "--cycle", cycle]);
         if (!["needs_evaluation_confirmation", "needs_decision", "completed"].includes(state.status))
           throw new Error(`cycle stopped: ${state.reason ?? state.status}; no retry`);
         if (state.status !== "completed") {
-          const pair = snapshot(join(cycle, "pair.json")), experiment = read(profile, pair.input.experimentObjectDigest);
-          const mapping = experiment.action_mapping.find(item => item.recommendation === state.recommendation.recommendation)?.actions;
-          assert.ok(mapping?.length === 1 && policy.decisionActions.includes(mapping[0]), "frozen action requires separate application authority");
+          const action = allowedAction(state);
           if (state.status === "needs_evaluation_confirmation") state = await invoke(["confirm-evaluation", "--cycle", cycle, "--confirm", "--reason", `Evaluation confirmation delegated by fixed run policy ${fixed.policyDigest}.`]);
           assert.equal(state.status, "needs_decision", "evaluation confirmation did not produce an authorized decision");
-          state = await invoke(["decide", "--cycle", cycle, "--approve", "--reason", `Fixed run policy ${fixed.policyDigest} authorizes ${mapping[0]}; preserve all Unknown dimensions and the original baseline.`]);
+          state = await invoke(["decide", "--cycle", cycle, "--approve", "--reason", `Fixed run policy ${fixed.policyDigest} authorizes ${action}; preserve all Unknown dimensions and the original baseline.`]);
           assert.equal(state.status, "completed", "decision did not complete its supported receipt");
         }
       }
-      const state = await invoke(["status", "--cycle", cycle]); assert.equal(state.status, "completed", "verified completion required");
+      else {
+        state = await invoke(["status", "--cycle", cycle]); assert.equal(state.status, "completed", "verified completion required");
+        state = await sourceApproval({ cycle, profile, policy, policyDigest: fixed.policyDigest, command: invoke, deadline });
+      }
+      assert.equal(state.status, "completed", "verified completion required"); allowedAction(state);
       summaries.push({ cycle_root: cycle, receipt_object_digest: state.receipt_object_digest, recommendation: state.recommendation.recommendation });
       if (index < policy.maxCycles) {
         const next = join(output, `cycle-${index + 1}`);
@@ -179,7 +191,7 @@ export async function runUnattendedPersonalEvolution(options, command) {
         assert.equal(snapshot(join(next, "input.json")).predecessorReceiptObjectDigest, state.receipt_object_digest, "next-cycle predecessor drift");
       }
     }
-    return { status: "completed", reason: "cycle_limit_reached", cycles: summaries, application_performed: false,
+    return { status: "completed", reason: "cycle_limit_reached", cycles: summaries, portfolio_adoption_performed: false, installation_performed: false,
       auxiliary_token_usage: "Unknown", comparison_token_reservation: tokens * policy.maxCycles };
   } catch (error) {
     return { status: "needs_action", reason: "unattended_run_stopped_preserved", detail: String(error.message).slice(0, 2048),

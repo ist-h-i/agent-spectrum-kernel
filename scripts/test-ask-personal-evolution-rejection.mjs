@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { readContentAddressedJson } from "./content-addressed-store.mjs";
 import { buildAssetLifecycleAuthorityContext, verifyAssetRegistry } from "./asset-registry.mjs";
 import { buildEvolutionExperiment, publishEvolutionExperiment, buildEvolutionHumanDecision,
-  publishEvolutionHumanDecision, applyApprovedEvolutionCandidateRejection, verifyEvolutionApplicationReceipt } from "./evolution-loop.mjs";
+  publishEvolutionHumanDecision, applyApprovedEvolutionCandidateRejection, verifyEvolutionApplicationReceipt,
+  buildEvolutionApplicationReceipt, publishEvolutionApplicationReceipt } from "./evolution-loop.mjs";
 import { sealPersonalEvolutionPromptPair, verifyPersonalEvolutionPromptPairResults } from "./ask-personal-evolution-primary-pair.mjs";
 import { preparePersonalEvolutionSavedResultActions } from "./ask-personal-evolution-saved-results.mjs";
 import { setup, blocksFor, collectSyntheticTerminal, fakeEngineeringTemplate, collectSyntheticGrade } from "./test-helpers-personal-evolution-primary-pair.mjs";
@@ -53,4 +54,20 @@ test("approved rejection retires only the exact candidate and verifies its recei
   const original = read(base.base_registry_snapshot_digest), next = read(done.snapshot_digest);
   assert.deepEqual(next.entries.filter(item => item.record_digest !== entry.record_digest), original.entries.filter(item => item.record_digest !== entry.record_digest));
   assert.equal(applyApprovedEvolutionCandidateRejection(options).object_digest, done.object_digest);
+  // Self-consistent digests never make an omitted or unrelated mutation valid.
+  for (const overrides of [
+    { result_heads: closure.receipt.base_heads, steps: [] },
+    { steps: [{ ...closure.receipt.steps[0], step_id: "unrelated_step" }] },
+    { steps: [...closure.receipt.steps, { ...closure.receipt.steps[0], step_id: "extra_verification", operation: "verify_asset_commit_marker" }] },
+  ]) {
+    const forged = buildEvolutionApplicationReceipt({ ...closure.receipt, ...overrides });
+    const publication = publishEvolutionApplicationReceipt({ storeRoot: f.storeRoot, receipt: forged });
+    assert.throws(() => verifyEvolutionApplicationReceipt({ ...options, receiptObjectDigest: publication.object_digest }), /rejection/);
+  }
+  const wrongDecision = buildAssetLifecycleAuthorityContext({ registryId: candidate.registry.registry_id,
+    repositoryId: candidate.registry.repository_id, scopeId: candidate.registry.scope_id,
+    predecessorSnapshotDigest: base.base_registry_snapshot_digest, transitions: base.asset_transitions,
+    authority: { ...authorityContext.authority, authority_evidence_digest: candidate.candidate_digest } });
+  assert.throws(() => applyApprovedEvolutionCandidateRejection({ ...options, assetAuthorityContext: wrongDecision,
+    trustedAssetAuthorityContexts: [wrongDecision] }), /exact approved proposal and decision/);
 });

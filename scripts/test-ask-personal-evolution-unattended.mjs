@@ -155,7 +155,7 @@ console.log(JSON.stringify(result));\n`);
   const counts = f => ({ providers: f.providers, comparisons: f.comparisons, sessions: f.sessions, grades: f.grades, reviews: f.reviews() });
   await t.test("two insufficient cycles close, keep Unknown and retain predecessor; resume repeats no dispatch", async st => {
     const f = await fixture(st, { cycles: 2 }), done = await f.start();
-    assert.equal(done.status, "completed", JSON.stringify(done)); assert.equal(done.application_performed, false);
+    assert.equal(done.status, "completed", JSON.stringify(done)); assert.equal(done.portfolio_adoption_performed, false); assert.equal(done.installation_performed, false);
     assert.equal(done.auxiliary_token_usage, "Unknown"); assert.equal(done.cycles.length, 2);
     assert.deepEqual(counts(f), { providers: 2, comparisons: 4, sessions: 12, grades: 4, reviews: 2 });
     for (const item of done.cycles) {
