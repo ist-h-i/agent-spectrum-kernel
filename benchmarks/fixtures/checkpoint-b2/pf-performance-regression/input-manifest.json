@@ -10,7 +10,7 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "8ff90fd087928126b9a3e554c8e84f4e988344f946c0cf9f8167b8bc722dca0f",
+          "sha256": "5cc8c8ea485e46b9931006a75ccc7cbf9ba971e915757ae7737c167df87d8465",
           "bytes": 1679
         },
         {
@@ -20,8 +20,8 @@
         },
         {
           "path": "workspace/docs/lookup-contract.md",
-          "sha256": "cfd9bdc853c8220ab187029b983557c68b28783c9c089ca6c7ab14706286107d",
-          "bytes": 2310
+          "sha256": "95ff21fa7c5fb4486b692b0516a35e4d2ab56d79e64d31ecd0392220a969a374",
+          "bytes": 2734
         },
         {
           "path": "workspace/package.json",
@@ -40,8 +40,8 @@
         },
         {
           "path": "workspace/scripts/measure-lookup.mjs",
-          "sha256": "b88d5c0ff8fadafa2ad1c16c02d2faff3a8079d94ce096dcb51b55e5d4000c3a",
-          "bytes": 2458
+          "sha256": "3a0b6d74951510e6109770e99236eaa8db676ef799cdf0617e051accf16ae34d",
+          "bytes": 2756
         },
         {
           "path": "workspace/src/event-lookup.mjs",

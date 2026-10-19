@@ -157,6 +157,36 @@ export function validatePfPerformanceInputClosure({ root = ROOT } = {}) {
   return { fixtureId: PF_PERFORMANCE_FIXTURE_ID, inputDigest, verificationDigest: verification.contract_digest };
 }
 
+/** Validate retained measurement data only. Authentication belongs to the existing
+ * execution authority; a candidate-written JSON object never supplies it. */
+export function inspectPfPerformanceMeasurement(report, { sourceDigest, config } = {}) {
+  const unknown = reason => ({ state: "unavailable", reason, quality: null });
+  if (report == null) return unknown("measurement_output_unavailable");
+  const invalid = reason => ({ state: "invalid", reason, quality: null });
+  if (!/^sha256:[a-f0-9]{64}$/u.test(sourceDigest ?? "") || report.candidate_source_digest !== sourceDigest) return invalid("measurement_source_binding_mismatch");
+  if (report.measurement_version !== "1.0.0" || report.clock !== "performance.now" || report.fictional_local_workloads !== true || report.measured_external_service !== false) return invalid("measurement_identity_invalid");
+  if (!config || !Array.isArray(config.workloads) || !Number.isInteger(config.samples) || config.samples < 3 || config.samples % 2 !== 1 || !Number.isFinite(config.minimum_baseline_ms) || config.minimum_baseline_ms <= 0 || !Number.isFinite(config.maximum_dispersion_ratio) || config.maximum_dispersion_ratio < 1 || !Number.isFinite(config.maximum_candidate_median_ratio) || config.maximum_candidate_median_ratio <= 0) return invalid("measurement_config_invalid");
+  if (!Array.isArray(report.records) || report.records.length !== config.workloads.length) return invalid("measurement_workload_inventory_invalid");
+  const median = values => [...values].sort((a,b)=>a-b)[Math.floor(values.length/2)];
+  const equal = (actual, expected) => Number.isFinite(actual) && Math.abs(actual-expected) <= Number.EPSILON * Math.max(1,Math.abs(expected))*8;
+  const states = [];
+  for (const [index, workload] of config.workloads.entries()) {
+    const record = report.records[index];
+    if (!record || record.workload !== workload.name || record.event_count !== workload.events || record.request_count !== workload.requests || !Number.isSafeInteger(record.output_count) || record.output_count < 0 || record.consumed !== record.output_count*config.samples*2) return invalid("measurement_workload_counts_invalid");
+    const durations = record.durations_ms;
+    if (!durations || Object.keys(durations).sort().join(",") !== "candidate,reference" || Object.values(durations).some(series=>!Array.isArray(series)||series.length!==config.samples||series.some(value=>!Number.isFinite(value)||value<0))) return invalid("measurement_samples_invalid");
+    const baseline = median(durations.reference), candidate = median(durations.candidate), ratio = candidate/baseline;
+    if (!equal(record.reference_median_ms,baseline) || !equal(record.candidate_median_ms,candidate) || (Number.isFinite(ratio) ? !equal(record.candidate_to_reference_ratio,ratio) : record.candidate_to_reference_ratio !== null)) return invalid("measurement_summary_mismatch");
+    const dispersion = series=>Math.max(...series)/Math.max(Math.min(...series),Number.EPSILON);
+    const bounded = Number.isFinite(ratio)&&baseline>=config.minimum_baseline_ms&&Object.values(durations).every(series=>dispersion(series)<=config.maximum_dispersion_ratio);
+    const state = !bounded ? "inconclusive" : ratio<=config.maximum_candidate_median_ratio ? "within_local_target" : "local_regression";
+    if (record.state !== state) return invalid("measurement_claim_mismatch");
+    states.push(state);
+  }
+  return { state: states.includes("inconclusive") ? "inconclusive" : states.includes("local_regression") ? "local_regression" : "within_local_target", reason: null, quality: null,
+    authentication: "not_established_by_data_validation", source_digest: sourceDigest };
+}
+
 function parseArgs(argv) {
   const args = { root: ROOT, command: "validate" };
   for (let index = 0; index < argv.length; index += 1) {
