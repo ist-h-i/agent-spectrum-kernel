@@ -299,11 +299,11 @@ function generatePfPerformanceProductionAuthorityInPlace({ root, privateRoot, ev
   const scoringPolicy = readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json"), "portfolio scoring policy");
   if (catalog.catalog_digest !== computePortfolioCatalogDigest(catalog) || policyManifest.manifest_digest !== computePolicyManifestDigest(policyManifest) || scoringPolicy.policy_digest !== computeScoringPolicyDigest(scoringPolicy)) throw new Error("portfolio policy identity is not closed before pf-performance authority generation");
   const catalogFixture = catalog.fixtures.find((item) => item.fixture_id === PF_PERFORMANCE_FIXTURE_ID);
-  if (!catalogFixture || catalogFixture.task_class !== "investigation_implementation" || catalogFixture.domain !== "cross_platform" || catalogFixture.backend_api_security !== false || catalogFixture.risk_boundary !== "none") throw new Error("Review error fixture catalog contract differs");
-  const lineage = readJson(resolve(fixtureRoot, "lineage-record.json"), "review error lineage record");
-  assertBenchmarkSchemaInstance(lineage, { schemaPath: resolve(root,"benchmarks/schemas/portfolio-lineage-record.schema.json"), label:"review error lineage record" });
+  if (!catalogFixture || catalogFixture.task_class !== "investigation_implementation" || catalogFixture.domain !== "performance" || catalogFixture.backend_api_security !== false || catalogFixture.risk_boundary !== "none") throw new Error("Performance fixture catalog contract differs");
+  const lineage = readJson(resolve(fixtureRoot, "lineage-record.json"), "performance lineage record");
+  assertBenchmarkSchemaInstance(lineage, { schemaPath: resolve(root,"benchmarks/schemas/portfolio-lineage-record.schema.json"), label:"performance lineage record" });
   const {lineage_record_digest, ...lineageBase}=lineage;
-  if(lineage_record_digest!==canonicalDigest(lineageBase)||lineage.fixture_id!==PF_PERFORMANCE_FIXTURE_ID||lineage.review_status!=="reviewed"||lineage.catalog_digest!==catalog.catalog_digest||lineage.policy_manifest_digest!==policyManifest.manifest_digest||lineage.frequency_band!=="unknown"||lineage.impact_band!=="unknown") throw new Error("review error lineage freeze is not closed");
+  if(lineage_record_digest!==canonicalDigest(lineageBase)||lineage.fixture_id!==PF_PERFORMANCE_FIXTURE_ID||lineage.review_status!=="reviewed"||lineage.catalog_digest!==catalog.catalog_digest||lineage.policy_manifest_digest!==policyManifest.manifest_digest||lineage.frequency_band!=="unknown"||lineage.impact_band!=="unknown") throw new Error("performance lineage freeze is not closed");
   const evidence = buildEvidenceMap({ root });
   writeJson(resolve(fixtureRoot, "evidence-map.json"), evidence.evidenceMap);
 
@@ -596,7 +596,7 @@ export function validatePfPerformanceProductionAuthority({ root = ROOT, privateR
   }
   const metadata = artifacts["metadata.json"];
   const frozenMetadata = catalog.fixtures.find((entry) => entry.fixture_id === PF_PERFORMANCE_FIXTURE_ID);
-  for (const field of ["fixture_role", "suite", "task_class", "domain", "difficulty", "repetitions", "risk_boundary", "capability_families", "evidence_topologies", "outcome_dimensions"]) assertExact(metadata[field], frozenMetadata[field], `review error catalog field ${field}`);
+  for (const field of ["fixture_role", "suite", "task_class", "domain", "difficulty", "repetitions", "risk_boundary", "capability_families", "evidence_topologies", "outcome_dimensions"]) assertExact(metadata[field], frozenMetadata[field], `performance catalog field ${field}`);
   if (metadata.metadata_digest !== canonicalDigest(withoutField(metadata, "metadata_digest")) || metadata.evaluator_bundle_id !== reference.evaluator_bundle_id || metadata.measured_execution_performed !== false) throw new Error("pf-performance metadata authority is invalid");
   const review = artifacts["admission-review.json"];
   if (review.review_package_digest !== canonicalDigest(withoutField(review, "review_package_digest")) || review.reviewer_status !== "pending_independent_review" || review.author_self_approval !== false || review.admission_status !== "admission_pending") throw new Error("pf-performance pending review package authority is invalid");
