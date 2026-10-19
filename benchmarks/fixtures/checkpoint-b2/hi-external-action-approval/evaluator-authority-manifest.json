@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/evaluator-authority-manifest.schema.json",
+  "program": "adaptive_ask_evaluator_authority_manifest",
+  "fixture_id": "hi-external-action-approval",
+  "evaluator_revision": "c718e00be50644cd0fb01295b2a195fdce8e68d4",
+  "file_inventory": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/input-manifest.json",
+      "bytes": 2674,
+      "raw_sha256": "sha256:274483c68faf1e5634e4a52b128cce51c9770f83c924a30af5df947dd62c4dd6",
+      "semantic_digest": "sha256:046208db39b2a2e6c6720c59c16bed2ec54723fde1fd7fd470c76c65282856df",
+      "authority_role": "fixture_input",
+      "fixture_input_identity": "sha256:274483c68faf1e5634e4a52b128cce51c9770f83c924a30af5df947dd62c4dd6",
+      "semantic_fixture_entry_digest": "sha256:046208db39b2a2e6c6720c59c16bed2ec54723fde1fd7fd470c76c65282856df"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/evidence-map.json",
+      "bytes": 3262,
+      "raw_sha256": "sha256:033460e73014285bbfcab187cf0f97e7975c8282b74622d45487cdea3ff750d6",
+      "semantic_digest": "sha256:d6a5b53a3c6cd94a1fe2e6b30569b600c425d5792bd63c5d1a8f4fa55e457d44",
+      "authority_role": "evidence_map",
+      "evidence_map_set_digest": "sha256:930fa43db03ee65f9e8e1d3dde0fca6cae37d458c450f94473177607987300ba",
+      "requirement_ids": [
+        "specific-action-plan",
+        "request-scope-discipline",
+        "verification-evidence"
+      ],
+      "evidence_map_ids": [
+        "specific-action-basis",
+        "focused-change-boundary",
+        "repository-verification-route"
+      ],
+      "requirement_map_closure_digest": "sha256:d389c364cb8d0143a26260e4ed23ddbde5d806d60f6a87bd38046a0db28ca360"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/verification-command-contract.json",
+      "bytes": 2673,
+      "raw_sha256": "sha256:ebb416d1dd3f580fedce6a255664780213fad88f1ba089ae916f3e64e238d2c1",
+      "semantic_digest": "sha256:0b4c9f5113e71e55a6dba58d731137edda835af0050af7a0cb962141720b70b8",
+      "authority_role": "verification_command_contract",
+      "contract_digest": "sha256:0b4c9f5113e71e55a6dba58d731137edda835af0050af7a0cb962141720b70b8",
+      "command_inventory_digest": "sha256:cfed80c323747fbbadc8e09792a94048f89c99099d2ff28456bffd0e8c5e89b1"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/requirement-record.json",
+      "bytes": 2789,
+      "raw_sha256": "sha256:7830ab271b7fcfb1d2a6b8e0fd191e98cb8a844fb2cda9d20bf8cc8cd46df276",
+      "semantic_digest": "sha256:e3037a27779ca2ccd40bc666e88c63d9575d48d8a0aabdf82c6d014402043ae7",
+      "authority_role": "requirement_record",
+      "requirement_record_digest": "sha256:e3037a27779ca2ccd40bc666e88c63d9575d48d8a0aabdf82c6d014402043ae7",
+      "requirement_set_digest": "sha256:661ffebd031eecf8d5579c98665b5eb2ae2a3cd6257306b67bab5c2720a6fb0f"
+    }
+  ],
+  "manifest_digest": "sha256:62b0b48617e7ad65e09c9b571400ed1b34ae71bb7cf79d42cbea1b00a0dd4a6a"
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "pf-observability-redaction",
+  "fixture_input_digest": "sha256:c5e26782b946013bc1d79e386482b12abbc018ae24e532a850ceb5afe2e47aff",
+  "commands": [
+    {
+      "command_id": "observability-redaction-validation",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"base/projection-policy.json\":\"f61f5aea4739d016aa1e999c36ac5e926f2218ccb6a833599686369e7fdaa206\",\"config/field-contract.json\":\"9ce0b72c70bf17b7f9946ce39b88d6b6cce1437f6f5c2638668bff7690c06009\",\"config/proposed-policy.json\":\"b11b938b7b90b14513b7017a440ee668e18fd3a8500bed1fb4005477373925d5\",\"data/events.json\":\"941dd78d58637ef8c31dbadc23981396a7592fa8fbef52376cec771e9d429ce4\",\"docs/projection-contract.md\":\"aecc2018eff6ae94be37d81928454b07cb73274d7766b194d0e084569ae9d65c\",\"package.json\":\"dea18b7f612fe9e5749cd2398c18319b03e1b49c978185d30bc27acd5da86d0e\",\"pr.diff\":\"e7fede9ba765c6ad5be68f3ed5f523928859a1175c14691edf0cb7ff5a14b2e4\",\"review.schema.json\":\"6aad052cf95583237fc1e9d500ecc2813cdc72ed990ee8af835e68b1d287c2b2\",\"scripts/trace-policy.mjs\":\"7d58e23867034c4238ed2ea1a0e95cb356a0e3d9afacdbd12e18276d876168f6\",\"scripts/validate-review.mjs\":\"9486039537e4924edc142709a3bcebbaa0236652bcb55daf690be1f164487475\",\"src/project-event.mjs\":\"6aa6cfbd183af53bcb5a3390cfb3691b0ce2c9f7fa3fedc1ccbc4a4c56184054\",\"test/project-event.test.mjs\":\"2fa2d20465cb1334620b11e609a8dc6de66ea4476355cda31258b8fe9f9799d1\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm test && npm run trace && npm run validate:review",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:15a05ec62c36b67c83ecda3d13c5ebc4f0ff54b29f1888c8c8ccdd1bfaadcca8",
+      "rendered_event_command_digest": "sha256:065de48de694095fa92c511c912252efb7eece3805e282e8837321d8e3bef270",
+      "command_contract_digest": "sha256:7a8d6b47bb60a8b5cdecd12c34b1243db9db90cad35e37dd75ae7698ceb5b080"
+    }
+  ],
+  "contract_digest": "sha256:3f9fe28daac65170ef2db9a8aa9e0822f97d332e1b6ace1861a3064a3246cb10"
+}

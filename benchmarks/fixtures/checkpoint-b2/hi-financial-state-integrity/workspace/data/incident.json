@@ -1,0 +1,19 @@
+{
+  "description": "Fictional same-request retry charged the source balance twice; a rejected transfer also altered an input balance.",
+  "requests": [
+    {
+      "id": "txn-one",
+      "from": "account-a",
+      "to": "account-b",
+      "amount": "7"
+    },
+    {
+      "id": "txn-one",
+      "from": "account-a",
+      "to": "account-b",
+      "amount": "7"
+    }
+  ],
+  "observed_audit_entries": 2,
+  "source_type": "original_fictional_example"
+}

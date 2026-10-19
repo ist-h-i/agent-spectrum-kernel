@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "hi-financial-state-integrity": {
+      "class": "investigation_implementation",
+      "difficulty": "hard",
+      "target_minutes": 30,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "5244dda996f874f01871685f0f6db3fb42342e4d6d35eff87ce5904e7ddd5d65",
+          "bytes": 1209
+        },
+        {
+          "path": "workspace/data/incident.json",
+          "sha256": "044860fee3e97446b7955ee4b6602ce5bfb3447feccb37d730f1821f0bb7143e",
+          "bytes": 451
+        },
+        {
+          "path": "workspace/data/initial-state.json",
+          "sha256": "7e0bb7baeacb9b18406dca3985ce6ce45b03bebf7cb7c65d3fba4a8ed9a71d4e",
+          "bytes": 142
+        },
+        {
+          "path": "workspace/docs/ledger-contract.md",
+          "sha256": "236ae38d35685890be54aba7ea910477ad9748a51a924182a7a1ca96e95f5775",
+          "bytes": 2473
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "94fcbb8eafdca97376b4cb987d196f018d1ecc61cf8201421a8830d09a00bc86",
+          "bytes": 182
+        },
+        {
+          "path": "workspace/src/ledger.mjs",
+          "sha256": "cc3ccada6f45ab113a65a80f6e54def1df66f380ec5d743ebbf8c7eaa17f76ed",
+          "bytes": 663
+        },
+        {
+          "path": "workspace/test/ledger.test.mjs",
+          "sha256": "1ee13d777325c2dad8381ed0d23cdd3da959d6dbe8547270622e71a2897f3c5b",
+          "bytes": 4073
+        }
+      ]
+    }
+  }
+}

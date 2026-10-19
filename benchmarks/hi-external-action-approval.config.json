@@ -1,0 +1,77 @@
+{
+  "$schema": "./schemas/portfolio-config.schema.json",
+  "schema_version": "3.0.0",
+  "program": "adaptive_ask_portfolio",
+  "protocol_path": "benchmarks/protocol-adaptive.md",
+  "protocol_status": "foundation",
+  "conditions": [
+    {
+      "id": "plain",
+      "role": "context_baseline",
+      "instruction_surface": "fixture context without ASK"
+    },
+    {
+      "id": "kernel_only",
+      "role": "default_product",
+      "instruction_surface": "canonical Kernel only"
+    },
+    {
+      "id": "adaptive_ask",
+      "role": "primary_product",
+      "instruction_surface": "Kernel plus pre-result evidence-selected mechanisms"
+    },
+    {
+      "id": "full_ask",
+      "role": "diagnostic_maximum",
+      "instruction_surface": "full selected adapter profile"
+    }
+  ],
+  "adapter_tracks": [
+    {
+      "id": "codex",
+      "runtime_status": "unverified"
+    },
+    {
+      "id": "claude",
+      "runtime_status": "unverified"
+    }
+  ],
+  "pool_adapter_results": false,
+  "fixture_root": "benchmarks/fixtures/checkpoint-b2",
+  "fixtures": [
+    {
+      "id": "hi-external-action-approval",
+      "suite": "high_impact",
+      "task_class": "operation_boundary",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/input-manifest.json",
+      "input_manifest_sha256": "274483c68faf1e5634e4a52b128cce51c9770f83c924a30af5df947dd62c4dd6",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/verification-command-contract.json",
+        "sha256": "ebb416d1dd3f580fedce6a255664780213fad88f1ba089ae916f3e64e238d2c1"
+      }
+    }
+  ],
+  "ordering": {
+    "strategy": "seeded_balanced_rotation",
+    "condition_count": 4
+  },
+  "execution_plan": {
+    "schema_path": "benchmarks/schemas/execution-plan.schema.json",
+    "schema_version": "1.2.0"
+  },
+  "adaptive_selection": {
+    "schema_path": "benchmarks/schemas/adaptive-selection.schema.json",
+    "must_precede_result": true,
+    "digest_algorithm": "sha256"
+  },
+  "privacy": {
+    "store_raw_prompts": false,
+    "store_full_outputs": false,
+    "store_full_event_streams": false,
+    "store_full_source": false,
+    "store_secrets_customer_or_personal_data": false
+  }
+}

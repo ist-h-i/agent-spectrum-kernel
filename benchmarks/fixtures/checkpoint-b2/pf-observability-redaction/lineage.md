@@ -1,0 +1,2 @@
+# Original local example and public logging pattern
+Original authored projector, policy diff, signal contract and fictional events apply OWASP Logging Cheat Sheet patterns: useful correlated event signals, bounded validation/sanitization and exclusion of sensitive contents. No implementation or incidents are copied. Fictional strings are not usable credentials or private business data. Frequency/impact remain Unknown and practice weights null; frozen medium_hard difficulty retained pending independent practical complexity review.

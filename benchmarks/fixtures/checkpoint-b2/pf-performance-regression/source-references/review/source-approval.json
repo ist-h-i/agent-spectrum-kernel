@@ -1,0 +1,167 @@
+{
+  "reviewer_record_id": "performance-source-independent-review-final-02c527f6-20261012",
+  "fixture_id": "pf-performance-regression",
+  "reviewed_head": "02c527f64d8fc9b3e19a117d328e8100d2dafb10",
+  "base_commit": "b81fa69d96e6e3a77d279cfa7209e92d22f112e4",
+  "decision": "approve",
+  "scope": "Independent public source preparation and documented external-pattern lineage only; not private evaluator/admission, model outcome, empirical difficulty calibration or production performance approval.",
+  "source_type": "documented_external_pattern",
+  "source_reference_ids": [
+    "node-perf-hooks-docs-20261012"
+  ],
+  "official_source": {
+    "url": "https://nodejs.org/docs/latest-v24.x/api/perf_hooks.html#performancenow",
+    "independently_viewed_date": "2026-10-12",
+    "supports": "Documented high-resolution millisecond timestamp API used for actual local elapsed timing. The performance exercise and regression pattern are separately authored fictional material.",
+    "does_not_support": "An observed real event-lookup incident, production latency/throughput, occurrence frequency, business impact, generic workload performance or empirical hard calibration."
+  },
+  "source_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/task.md",
+      "bytes": 1679,
+      "raw_sha256": "sha256:8ff90fd087928126b9a3e554c8e84f4e988344f946c0cf9f8167b8bc722dca0f"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/workspace/data/measurement-config.json",
+      "bytes": 366,
+      "raw_sha256": "sha256:39c99ef4f2862e8a3bbff704d95d96e216ea66482c977468a54d5f11df33fa94"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/workspace/docs/lookup-contract.md",
+      "bytes": 2310,
+      "raw_sha256": "sha256:cfd9bdc853c8220ab187029b983557c68b28783c9c089ca6c7ab14706286107d"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/workspace/package.json",
+      "bytes": 225,
+      "raw_sha256": "sha256:5f9aaa8750bc6a5c6966526f363b3d076b38c0b5ba22d599130103d31cf8ae20"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/workspace/reference/scan-lookup.mjs",
+      "bytes": 527,
+      "raw_sha256": "sha256:a29942b5523324e7f05b5f72901e31bebfd6fdce776401970c1b51da56772eff"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/workspace/scripts/generate-data.mjs",
+      "bytes": 512,
+      "raw_sha256": "sha256:86c05e9d5a1cd67ae7984edb5f2bbdc27c34ca266653b5552fbbd1cdad68a2c3"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/workspace/scripts/measure-lookup.mjs",
+      "bytes": 2458,
+      "raw_sha256": "sha256:b88d5c0ff8fadafa2ad1c16c02d2faff3a8079d94ce096dcb51b55e5d4000c3a"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/workspace/src/event-lookup.mjs",
+      "bytes": 527,
+      "raw_sha256": "sha256:a29942b5523324e7f05b5f72901e31bebfd6fdce776401970c1b51da56772eff"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/workspace/test/event-lookup.test.mjs",
+      "bytes": 3988,
+      "raw_sha256": "sha256:338bcd006cc6c30bb7190053141bbc7620ff051dc3cfb18af370cef765cfdd30"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/input-manifest.json",
+      "bytes": 1970,
+      "raw_sha256": "sha256:0e2cf6a60b1ec05023c691ef27b706229bb95d2bea1159e797440915aba5ca18"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/verification-command-contract.json",
+      "bytes": 2320,
+      "raw_sha256": "sha256:ef0abe468a3f44fdbecd6732f725bbc2cdb8945a221cc868f5a64d85d7e0b34f",
+      "contract_digest": "sha256:7903acd6e9efef8c76d86dc8f2156e7b9b3ffe0d3a6612c6d169a25f1c9bb737"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/lineage.md",
+      "bytes": 620,
+      "raw_sha256": "sha256:72d7a636d591b426ff88bf681294c054e3730b10954964f1ed3349c35ddeb33e"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/source-references/node-perf-hooks-docs-20261012.md",
+      "bytes": 612,
+      "raw_sha256": "sha256:6d60901cfeac4ff263667e729c51fe5911dc8804081c0044f69f8d3cfc31d1a1"
+    },
+    {
+      "path": "scripts/ask-benchmark-pf-performance-source.mjs",
+      "bytes": 9210,
+      "raw_sha256": "sha256:ac4cd3a12d3ccf7cd269babe6700abf4313b9a58075aa2380488a661d6fcd82f"
+    },
+    {
+      "path": "scripts/test-ask-benchmark-pf-performance-source.mjs",
+      "bytes": 3921,
+      "raw_sha256": "sha256:144f6ceb13f01266824d2dfafd94185fcf3aab89e649a6d3f3d94db0c6b9f42f"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/admission-review.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:0a0f4bdf7b0179832ad7323516353c298fe937018f6d787f006450904db02c7b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/evaluator-authority-manifest.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:0a0f4bdf7b0179832ad7323516353c298fe937018f6d787f006450904db02c7b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/evaluator-reference.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:0a0f4bdf7b0179832ad7323516353c298fe937018f6d787f006450904db02c7b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/evidence-map.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:0a0f4bdf7b0179832ad7323516353c298fe937018f6d787f006450904db02c7b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/final-admission-record.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:0a0f4bdf7b0179832ad7323516353c298fe937018f6d787f006450904db02c7b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/metadata.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:0a0f4bdf7b0179832ad7323516353c298fe937018f6d787f006450904db02c7b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/output-contract.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:0a0f4bdf7b0179832ad7323516353c298fe937018f6d787f006450904db02c7b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/requirement-record.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:0a0f4bdf7b0179832ad7323516353c298fe937018f6d787f006450904db02c7b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/scoring-input-freeze-manifest.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:0a0f4bdf7b0179832ad7323516353c298fe937018f6d787f006450904db02c7b"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/source-freeze-candidate.json",
+      "bytes": 91,
+      "raw_sha256": "sha256:0a0f4bdf7b0179832ad7323516353c298fe937018f6d787f006450904db02c7b"
+    }
+  ],
+  "lineage_policy_ref": {
+    "path": "benchmarks/portfolio-lineage-policy.json",
+    "bytes": 6039,
+    "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d",
+    "declared_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"
+  },
+  "catalog_ref": {
+    "path": "benchmarks/portfolio-catalog.json",
+    "bytes": 29625,
+    "raw_sha256": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
+    "declared_catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972"
+  },
+  "requirements_for_change": [],
+  "limitations": [
+    "One independently authored public-contract solution passes functional14, extra boundaries5 and final anchored runtime2 repeats. Author private normal source files were not read.",
+    "Reported ratios apply only to this Node environment and two generated narrow-window workloads. Wide-window/output-heavy cost, peak memory, production services and all hardware distributions are not measured.",
+    "Measurement uses elapsed performance.now durations, two warmups, alternating five samples, medians and conditional floor/dispersion guards; these are local controls, not formal statistical confidence intervals.",
+    "The frozen hard designation and45-minute target are not empirically calibrated. A legitimate timestamp-range-first implementation need not build a compound-key index; correctness obligations do not mandate an algorithm.",
+    "Initial copied diagnostic/command identity P3 at351b539f is resolved by02c527f6; task/input/canonical script are byte-identical across that correction.",
+    "Frequency and impact remain unknown with null weights and practice-weighted ineligibility. Catalog base aggregate eligibility is unchanged; all ten completion/admission artifacts remain generation_pending."
+  ]
+}

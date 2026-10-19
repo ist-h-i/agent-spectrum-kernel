@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "pf-library-compat-upgrade",
+  "fixture_role": "primary",
+  "suite": "practice_frequency",
+  "task_class": "dependency_migration",
+  "domain": "cross_platform",
+  "difficulty": "hard",
+  "repetitions": 3,
+  "risk_boundary": "rollback_required",
+  "capability_families": [
+    "compatibility_management",
+    "dependency_migration"
+  ],
+  "evidence_topologies": [
+    "dependency_api_and_build",
+    "version_compatibility_matrix"
+  ],
+  "outcome_dimensions": [
+    "backward_compatibility",
+    "compatibility_preservation"
+  ],
+  "output_contract_type": "implementation_producing",
+  "requirement_record_id": "requirement-record-pf-library-compat-upgrade",
+  "output_contract_id": "output-contract-pf-library-compat-upgrade",
+  "evaluator_bundle_id": "evaluator-8de952ce57a46e4955de18e071bf3937704211cd3bda258203929e2a004be6fc",
+  "evaluator_bundle_digest": "sha256:bb34dcfe471b7480dd08afe7395b58fabcf923a5130bbf25c653f7a7c25acd7f",
+  "evaluator_byte_count": 738443,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:3b81cf093aa316784eda05481d9cfef4c6b8656c973455ba7dcd29929ab1a08a"
+}

@@ -1,0 +1,1 @@
+Original fictional schema phases, compatibility functions, mixed rows and snapshot examples. No live database, real incident, private records or empirical impact/frequency claim. Frozen high-impact classification is task intent; fake local checks do not certify production recoverability.

@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "pf-data-schema-evolution",
+  "fixture_input_digest": "sha256:391d06c142ff90c5a4aaf811d551cbe62b87490db9499da77db3fecfc89d03b4",
+  "commands": [
+    {
+      "command_id": "schema-evolution-validation",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"data/legacy-customers.json\":\"298d9873a63a3f17e606a07ff896a399e515d5ba93cbb89b54cd7bc0898402ac\",\"package.json\":\"032ca46f0b73388a59c8773f531ba7374cdc49e8d14a9e85d307688dd081f832\",\"schemas/customer-v1.schema.json\":\"76670a9124ad3181ec9c517bc112e632fd2b1b9a0a6e8c7c20bac31b92357dd4\",\"spec/evolution-contract.md\":\"cdceb75aeb4dc35cf1905f811e54a4f462db1c7e6edeeb85ca8d94615ac0565c\",\"src/readers.mjs\":\"c051968124ab7a6538c89ffcedb1b87fe579f75b52918a568544d504181c0671\",\"src/schema-contract.mjs\":\"08df8a61eaa1ed6ad2fccc5d14311cd7013108fcf25db99863cba3d431953b9a\",\"test/schema-evolution.test.mjs\":\"abeab224657b551f588934da805a5dacc15346156028971cb9fbead110c65bb1\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && [ -f test/schema-evolution.test.mjs ] && npm test",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:cee619237c870a6998258747ed75849ce18e6516c51f0fadc6db49b6fa4bfa4a",
+      "rendered_event_command_digest": "sha256:5bcc26c9c165e4999260cd1d3a84e0fa33ba29157472941225c4662f35ba8c8d",
+      "command_contract_digest": "sha256:ca4e14d6aa395fd3d03a96a2f979163e893103858d947e353fb64209c2b52bd5"
+    }
+  ],
+  "contract_digest": "sha256:2ca4e80ecd3a2a7f0b60fd7183f1de90fe6ecde1c765751b110fbcb76fcbc454"
+}

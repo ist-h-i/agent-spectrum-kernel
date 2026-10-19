@@ -1,0 +1,17 @@
+{
+  "rows": [
+    {
+      "id": "record-one",
+      "name": "Original One",
+      "display_name": "Original One"
+    },
+    {
+      "id": "record-two",
+      "name": "Original Two",
+      "display_name": null
+    }
+  ],
+  "legacy_writers": 1,
+  "snapshot_id": "snapshot-before-contract",
+  "snapshot_contains_complete_legacy_state": true
+}

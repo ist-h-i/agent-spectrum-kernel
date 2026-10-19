@@ -1,0 +1,54 @@
+[
+  {
+    "phase": "legacy",
+    "fields": {
+      "name": "required"
+    },
+    "readers": [
+      "v1"
+    ],
+    "writers": [
+      "v1"
+    ]
+  },
+  {
+    "phase": "expanded",
+    "fields": {
+      "name": "required",
+      "display_name": "optional"
+    },
+    "readers": [
+      "v1",
+      "v2_fallback"
+    ],
+    "writers": [
+      "v1",
+      "v2_dual"
+    ]
+  },
+  {
+    "phase": "cutover",
+    "fields": {
+      "name": "required",
+      "display_name": "required"
+    },
+    "readers": [
+      "v2"
+    ],
+    "writers": [
+      "v2_dual"
+    ]
+  },
+  {
+    "phase": "contracted",
+    "fields": {
+      "display_name": "required"
+    },
+    "readers": [
+      "v2"
+    ],
+    "writers": [
+      "v2"
+    ]
+  }
+]

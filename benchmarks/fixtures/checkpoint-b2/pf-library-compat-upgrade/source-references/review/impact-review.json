@@ -1,0 +1,31 @@
+{
+  "reviewer_record_id": "library-impact-independent-review-final-ff4b33c7-20261012",
+  "fixture_id": "pf-library-compat-upgrade",
+  "reviewed_head": "ff4b33c75645fc53404e642b774d7f558c0a1609",
+  "decision": "approve",
+  "judgment": "unknown_classification_approved",
+  "impact_band": "unknown",
+  "impact_weight": null,
+  "impact_evidence_status": "insufficient_evidence",
+  "impact_evidence_ids": [],
+  "practice_weighted_aggregate_eligible": false,
+  "reason": "Fictional local code/matrix and public API/version patterns are not empirical impact evidence. Native probe counts and local compatibility outcomes do not establish real cadence/harm, and the other band cannot substitute.",
+  "reviewed_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/lineage.md",
+      "bytes": 569,
+      "raw_sha256": "sha256:5271154bd184607e826be58186398ec9df9ade020e107e5cfe281e2f19d0ede3"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/source-references/public-patterns-20261012.md",
+      "bytes": 730,
+      "raw_sha256": "sha256:23f41ff2fffbbb49e0a0163cd0464d50f831655f8881ee2aae17250aceeb98c1"
+    },
+    {
+      "path": "benchmarks/portfolio-lineage-policy.json",
+      "bytes": 6039,
+      "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d"
+    }
+  ],
+  "scope": "Separate unknown impact classification only; source quality is reviewed separately and this does not clear rollback admission HOLD."
+}

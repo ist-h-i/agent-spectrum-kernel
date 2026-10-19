@@ -13,14 +13,14 @@ test('canonical 24 tasks expose public readiness independently of nine-task scor
   const report = inspectPrimaryPublicInputs();
   assert.equal(report.fixtures.length, 24);
   assert.deepEqual(report.suite_counts, { high_impact: 4, mechanism_negative: 6, mechanism_positive: 6, practice_frequency: 8 });
-  assert.equal(report.fixtures.filter(x => x.public_input_status === 'valid').length, 15);
+  assert.equal(report.fixtures.filter(x => x.public_input_status === 'valid').length, 23);
   assert.equal(report.fixtures.filter(x => x.primary_comparison_registered).length, 9);
   assert.equal(report.fixtures.filter(x => x.portfolio_registered).length, 15);
   assert.ok(report.fixtures.every(x => x.quality === null && x.semantic_controls.status === 'not_run'));
   const good = report.fixtures.find(x => x.fixture_id === 'mp-ci-evidence-gap');
   assert.ok(good.requirements.length > 0 && good.output_contract && good.verification_commands.length);
   assert.ok(good.slots.every(x => x.quality === null && x.requirements.every(y => y.status === 'not_evaluated')));
-  assert.ok(report.fixtures.find(x => x.fixture_id === 'hi-authorization-exception').failures.length);
+  assert.ok(report.fixtures.find(x => x.fixture_id === 'pf-performance-regression').failures.length);
 });
 
 test('fresh preparation keeps all 24 records, copies only public inputs, and verifies independently', () => {
@@ -28,7 +28,7 @@ test('fresh preparation keeps all 24 records, copies only public inputs, and ver
   try {
     const output = join(area, 'prepared'), first = preparePrimaryPublicInputs(output);
     assert.equal(first.fixtures.length, 24);
-    assert.equal(first.fixtures.filter(x => x.public_input_status === 'prepared').length, 15);
+    assert.equal(first.fixtures.filter(x => x.public_input_status === 'prepared').length, 23);
     assert.equal(first.fixtures.flatMap(x => x.slots).length, 72);
     for (const row of first.fixtures) {
       assert.ok(existsSync(join(output, 'records', row.fixture_id, 'status.json')));
@@ -36,14 +36,14 @@ test('fresh preparation keeps all 24 records, copies only public inputs, and ver
       if (row.public_input_status === 'prepared') assert.deepEqual(Object.keys(json(join(output, 'records', row.fixture_id, 'input-manifest.json')).fixtures), [row.fixture_id]);
     }
     const verified = verifyPrimaryPublicInputs(output);
-    assert.equal(verified.fixtures.filter(x => x.public_input_status === 'valid').length, 15);
+    assert.equal(verified.fixtures.filter(x => x.public_input_status === 'valid').length, 23);
     assert.ok(verified.fixtures.every(x => x.quality === null));
     assert.throws(() => preparePrimaryPublicInputs(output), /exist/i);
     const id = 'mn-doc-config-correction';
     writeFileSync(join(output, 'inputs', id, 'task.md'), 'changed');
     const after = verifyPrimaryPublicInputs(output);
     assert.equal(after.fixtures.find(x => x.fixture_id === id).public_input_status, 'invalid');
-    assert.equal(after.fixtures.filter(x => x.public_input_status === 'valid').length, 14);
+    assert.equal(after.fixtures.filter(x => x.public_input_status === 'valid').length, 22);
     assert.ok(after.fixtures.find(x => x.fixture_id === id).failures.some(x => /input changed/.test(x)));
     assert.equal(json(join(output, 'preparation.json')).fixtures.find(x => x.fixture_id === id).public_input_status, 'prepared');
   } finally { rmSync(area, { recursive: true, force: true }); }
@@ -98,7 +98,7 @@ test('prepared controls and extra files cannot silently change; preparation rema
     writeFileSync(join(output, 'records/mn-focused-regression-test/requirement-record.json'), '{}');
     const after = verifyPrimaryPublicInputs(output);
     assert.equal(after.fixtures.find(x => x.fixture_id === 'mn-focused-regression-test').public_input_status, 'invalid');
-    assert.equal(after.fixtures.filter(x => x.public_input_status === 'valid').length, 13);
+    assert.equal(after.fixtures.filter(x => x.public_input_status === 'valid').length, 21);
     assert.ok(after.fixtures.flatMap(x => x.slots).every(x => x.quality === null));
   } finally { rmSync(area, { recursive: true, force: true }); }
 });
