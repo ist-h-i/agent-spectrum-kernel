@@ -71,7 +71,7 @@ are present. This is not an additional proof framework.
   failure exit, changed body/shell/flags/witness/digest, ambiguous words,
   malformed events, missing terminals and fake success text cannot pass.
 - O7-CHAIN → AC7-VERSION: synthetic producer → normalized evidence → existing
-  fake saved consumer, explicit selector/source/schema closure, new profile
+  fragment/envelope adapter, explicit selector/source/schema closure, new profile
   private-authority binding, source drift and cross-version refusal.
 - O7-OLD → AC7-VERSION/ISOLATE: old focused parser/scoring/authority regressions,
   unchanged historical fixture/frozen inputs, generated schema freshness,

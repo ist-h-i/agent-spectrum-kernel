@@ -466,13 +466,35 @@ function invalidInputAuthorityReferences({ evaluatorResult, normalizedResult }) 
   return authority.evidence_references;
 }
 
+function requirementProfileFailureReferences(normalizedResult) {
+  const evidence = normalizedResult.command_evidence;
+  if (evidence.capture_support !== "supported" || evidence.evidence_level !== "executed") return [];
+  const latest = latestCommandReferences(normalizedResult);
+  const matched = entry => entry && (entry.match_state ?? "matched") === "matched";
+  const failure = entry => matched(entry) && (entry.outcome === "failed" && Number.isInteger(entry.exit_code) && entry.exit_code !== 0
+    || entry.outcome === "interrupted" && entry.exit_code !== 0);
+  const direct = evidence.required_command_ids.map(id => latest.get(id)).filter(failure);
+  const alternatives = (evidence.required_alternative_groups ?? []).flatMap(group => {
+    const members = group.member_ids.map(id => latest.get(id)).filter(Boolean);
+    if (members.some(entry => matched(entry) && entry.outcome === "succeeded" && entry.exit_code === 0)) return [];
+    return members.filter(failure);
+  });
+  return [...new Map([...direct, ...alternatives].map(entry => [referenceKey(executionEventReference(entry)), executionEventReference(entry)])).values()];
+}
+
 export function deriveEffectiveVerificationEvidenceState({ normalizedResult, evaluatorResult = null }) {
   if (evaluatorResult?.evaluation_status === "invalid_input" || evaluatorResult?.invalid_input_authority || evaluatorResult?.classification === "invalid_evidence") return "invalid";
-  return deriveVerificationEvidenceState(normalizedResult);
+  const state = deriveVerificationEvidenceState(normalizedResult);
+  // V2 preserves a causally established required failure when a different
+  // command/group is missing or has unverified cwd. V1 remains missing-first.
+  if (evaluatorResult?.result_profile?.name === REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME && state !== "invalid"
+    && requirementProfileFailureReferences(normalizedResult).length > 0) return "executed_failure";
+  return state;
 }
 
 export function deriveEffectiveVerificationEvidenceReferences({ normalizedResult, evaluatorResult = null, state = deriveEffectiveVerificationEvidenceState({ normalizedResult, evaluatorResult }) }) {
   if (state === "invalid") return invalidInputAuthorityReferences({ evaluatorResult, normalizedResult });
+  if (state === "executed_failure" && evaluatorResult?.result_profile?.name === REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME) return requirementProfileFailureReferences(normalizedResult);
   return deriveVerificationEvidenceReferences(normalizedResult, state);
 }
 
@@ -507,7 +529,7 @@ function assertReferenceSet(actual, expected, label) {
   if (!arraysEqual(actualKeys, expectedKeys)) throw new Error(`${label} must match the deterministically derived causal reference set`);
 }
 
-function assertStateSpecificReferenceSemantics(references, normalizedResult, state, label) {
+function assertStateSpecificReferenceSemantics(references, normalizedResult, state, label, allowInterrupted = false) {
   const sources = new Map(normalizedResult.command_evidence.references.map((entry) => [referenceKey({ kind: "execution_event", digest: entry.digest, bytes: entry.bytes }), entry]));
   for (const reference of references) {
     if (reference.kind === "normalized_result") {
@@ -518,7 +540,8 @@ function assertStateSpecificReferenceSemantics(references, normalizedResult, sta
     if (!source) throw new Error(`${label} contains an unbound execution-event reference`);
     const matchState = source.match_state ?? "matched";
     if (state === "executed_success" && (matchState !== "matched" || source.outcome !== "succeeded" || source.exit_code !== 0)) throw new Error(`${label} contains a non-success causal event`);
-    if (state === "executed_failure" && (source.outcome !== "failed" || source.exit_code === 0 || source.exit_code === null)) throw new Error(`${label} contains a non-failure causal event`);
+    if (state === "executed_failure" && !(source.outcome === "failed" && source.exit_code !== 0 && source.exit_code !== null
+      || allowInterrupted && source.outcome === "interrupted" && source.exit_code !== 0)) throw new Error(`${label} contains a non-failure causal event`);
     if (state === "declined" && (source.outcome !== "declined" || source.exit_code !== null)) throw new Error(`${label} contains a non-declined causal event`);
     if (state === "cwd_unverified" && matchState !== "cwd_unverified") throw new Error(`${label} must reference cwd-unverified causal events`);
   }
@@ -644,7 +667,7 @@ export function validateRequirementScopeVerificationResult({ evaluatorResult, re
   if (evaluatorResult.verification_correctness?.state !== derived.verification_correctness) throw new Error("verification correctness does not rederive from command evidence");
   assertReferenceSet(evaluatorResult.verification_correctness.evidence_references, expectedReferences, "verification correctness references");
   if (derived.evaluation_status === "invalid_input") validateInvalidInputContract({ evaluatorResult, normalizedResult, expectedReferences });
-  else assertStateSpecificReferenceSemantics(expectedReferences, normalizedResult, derived.verification_evidence_state, "verification correctness references");
+  else assertStateSpecificReferenceSemantics(expectedReferences, normalizedResult, derived.verification_evidence_state, "verification correctness references", true);
   return derived.classification;
 }
 

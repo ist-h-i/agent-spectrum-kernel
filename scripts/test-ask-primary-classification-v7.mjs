@@ -110,3 +110,38 @@ test('O7-CLASSIFY known failed validation is not passed by forged success observ
   assert.equal(result.quality, 'fail');
   assert.equal(result.verification_correctness, 'fail');
 });
+for (const missing of ['direct', 'alternative', 'cwd_unverified']) test('O7-CLASSIFY a known required failure survives another unknown check: ' + missing, () => {
+  const input = example(), evidence = input.normalizedResult.command_evidence;
+  Object.assign(evidence.references[0], { outcome: 'failed', exit_code: 1 });
+  if (missing === 'direct') evidence.required_command_ids.push('not-run');
+  if (missing === 'alternative') evidence.required_alternative_groups.push({ group_id: 'other-check', member_ids: ['not-run-a', 'not-run-b'] });
+  if (missing === 'cwd_unverified') { evidence.cwd_unverified_command_count = 1; evidence.references.push({ command_id: null, match_state: 'cwd_unverified', digest: 'sha256:' + 'b'.repeat(64), bytes: 9, outcome: 'succeeded', exit_code: 0 }); }
+  const result = derive(input);
+  assert.equal(result.classification, 'under_processing'); assert.equal(result.quality, 'fail'); assert.equal(result.under_processing, 'detected');
+  assert.equal(result.verification_evidence_state, 'executed_failure');
+  assert.deepEqual(scoring.deriveEffectiveVerificationEvidenceReferences(input), [{ kind: 'execution_event', digest, bytes: 10 }]);
+});
+test('O7-CLASSIFY a failed alternative is preserved alongside a missing required check; a successful alternative supersedes it', () => {
+  const input = example(), evidence = input.normalizedResult.command_evidence;
+  evidence.required_command_ids = ['not-run']; evidence.required_alternative_groups = [{ group_id: 'alternatives', member_ids: ['contract-validation', 'other-check'] }];
+  Object.assign(evidence.references[0], { outcome: 'failed', exit_code: 1 });
+  assert.equal(derive(input).quality, 'fail');
+  evidence.references.push({ command_id: 'other-check', digest: 'sha256:' + 'b'.repeat(64), bytes: 9, outcome: 'succeeded', exit_code: 0 });
+  assert.equal(derive(input).quality, 'manual_review_required');
+});
+test('O7-CLASSIFY required interrupted evidence survives a missing check and has a closed v2 causal reference', () => {
+  const input = example(); input.normalizedResult.command_evidence.required_command_ids.push('not-run');
+  Object.assign(input.normalizedResult.command_evidence.references[0], { outcome: 'interrupted', exit_code: null });
+  const derived = derive(input); assert.equal(derived.verification_correctness, 'fail');
+  const result = input.evaluatorResult; result.evaluation_status = derived.evaluation_status; result.classification = derived.classification;
+  for (const row of result.requirement_results) Object.assign(row, { scope_deviation_references: [], verification_evidence_references: [] });
+  for (const field of ['quality', 'decision_correctness', 'completion_claim_correctness', 'under_processing', 'over_processing']) result[field] = { state: derived[field], evidence_references: structuredClone(derived.evidence_references) };
+  result.verification_correctness = { state: derived.verification_correctness, evidence_references: scoring.deriveEffectiveVerificationEvidenceReferences(input) };
+  assert.equal(scoring.validateRequirementScopeVerificationResult(input), 'under_processing');
+});
+test('O7-OLD missing-first verification semantics remain v1-only', () => {
+  const input = example(); input.evaluatorResult.result_profile = { name: 'binary_scope_verification_v1', digest: scoring.computeResultProfileDigest() };
+  Object.assign(input.normalizedResult.command_evidence.references[0], { outcome: 'failed', exit_code: 1 });
+  input.normalizedResult.command_evidence.required_command_ids.push('not-run');
+  assert.equal(scoring.deriveEffectiveVerificationEvidenceState(input), 'missing');
+});
