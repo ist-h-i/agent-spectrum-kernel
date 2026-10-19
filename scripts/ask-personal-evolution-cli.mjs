@@ -168,9 +168,12 @@ function describeStatus(c, alreadyVerified) {
     assert.ok(decision.decision.reason_codes.includes(`human_reason:${decision.reasonObjectDigest}`));
     decisionReason = fact.reason;
   }
-  if (completion) { assert.ok(decision, "completion requires recorded human decision"); return { ...result,
-    status: "completed", reason: completion.lifecycle_mutated ? "approved_saved_rejection" : "approved_saved_noop", ...completion, decision, decision_reason: decisionReason,
-    next_command: "next --cycle CYCLE --output NEW_CYCLE --problem PUBLIC_SUMMARY" };
+  if (completion) {
+    assert.ok(decision, "completion requires recorded human decision");
+    const lifecycleMutated = read(c.profile.storeRoot, completion.receipt_object_digest).action === "reject_candidate";
+    return { ...result, status: "completed", reason: lifecycleMutated ? "approved_saved_rejection" : "approved_saved_noop",
+      receipt_object_digest: completion.receipt_object_digest, lifecycle_mutated: lifecycleMutated, decision, decision_reason: decisionReason,
+      next_command: "next --cycle CYCLE --output NEW_CYCLE --problem PUBLIC_SUMMARY" };
   }
   if (decision) return { ...result, status: decision.decision.disposition === "declined" ? "decision_declined" : "needs_action",
     reason: decision.decision.disposition === "declined" ? "human_declined_proposal" : "explicit_lifecycle_application_required", decision,
@@ -343,7 +346,7 @@ function next(c, output, summary) {
   const candidate = read(c.profile.storeRoot, prep.candidate_object_digest);
   const rejection = rejectionAuthority(c), assets = [...(pair.input.trustedAssetAuthorityContexts ?? []), ...(rejection ? [rejection] : [])];
   const receipt = read(c.profile.storeRoot, done.receipt_object_digest);
-  const resultRegistry = done.lifecycle_mutated ? exportAssetRegistryReference({ storeRoot: c.profile.storeRoot,
+  const resultRegistry = receipt.action === "reject_candidate" ? exportAssetRegistryReference({ storeRoot: c.profile.storeRoot,
     snapshotDigest: receipt.result_heads.registry_snapshot_digest, trustedAuthorityContexts: assets }) : candidate.registry;
   const registry = { ...candidate.registry, snapshot_digest: resultRegistry.snapshot_digest, snapshot_revision: resultRegistry.snapshot_revision };
   const profile = { ...c.profile, trust: { ...c.profile.trust, trustedAssetAuthorityContexts: assets, trustedPortfolioAuthorityContexts: pair.input.trustedPortfolioAuthorityContexts },

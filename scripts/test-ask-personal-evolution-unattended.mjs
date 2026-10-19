@@ -185,6 +185,17 @@ console.log(JSON.stringify(result));\n`);
         old.entries.find(entry => entry.record_digest === f.parentAsset.record_digest).state);
     }
     assert.deepEqual(counts(f), { providers: 2, comparisons: 4, sessions: 12, grades: 4, reviews: 2 });
+    const first = done.cycles[0], completionPath = join(first.cycle_root, "completion.json");
+    const completion = { ...value(completionPath), lifecycle_mutated: false };
+    write(completionPath, { value: completion, digest: canonicalDigest(completion) });
+    const displayed = await run(["status", "--cycle", first.cycle_root]);
+    assert.equal(displayed.reason, "approved_saved_rejection"); assert.equal(displayed.lifecycle_mutated, true);
+    const nextRoot = join(f.root, "next-after-flag-drift");
+    assert.equal((await run(["next", "--cycle", first.cycle_root, "--output", nextRoot, "--problem", f.problem])).status, "prepared");
+    const nextInput = value(join(nextRoot, "input.json")), receipt = read(f, first.receipt_object_digest);
+    assert.equal(nextInput.profile.blueprint.registry.snapshot_digest, receipt.result_heads.registry_snapshot_digest,
+      "next uses the verified result Registry, never the completion display flag");
+    assert.equal(nextInput.predecessorReceiptObjectDigest, first.receipt_object_digest);
     const before = counts(f); assert.equal((await f.resume()).status, "completed"); assert.deepEqual(counts(f), before);
   });
   await t.test("unchanged candidate and negative quality evidence can complete without adoption", async st => {
