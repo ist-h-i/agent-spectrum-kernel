@@ -16,7 +16,7 @@ import { verifyPublicEvaluatorReference, verifyPrivateEvaluatorResourceAssets } 
 import { resolveEffectiveAdmissionAuthorityFromFiles } from './ask-benchmark-admission-decision.mjs';
 import { primaryProcessingSelection, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
 import { PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION } from './ask-benchmark-command-evidence.mjs';
-import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
+import { isRegisteredPrimaryFixtureId } from './ask-primary-fixture-recipe.mjs';
 
 import { getPrimaryEvaluationProfile, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 
@@ -32,7 +32,7 @@ const write=(path,value)=>{mkdirSync(dirname(path),{recursive:true,mode:0o700});
 export function preflightPrimaryEvaluationGradingResources(block,resource) {
   let publicMetadataVerified=false,originalAssetsVerified=false,admissionReady=false,stage='fixed_binding';
   try{
-    assert.ok(PRIMARY_FIXTURE_IDS.includes(block.fixture_id));const binding=block.grading.binding;
+    assert.ok(isRegisteredPrimaryFixtureId(block.fixture_id));const binding=block.grading.binding;
     assert.deepEqual(Object.keys(binding).sort(),['evaluator_bundle_digest','fixture_id','input_manifest_digest','profile_id','scoring_input_freeze_digest'].sort());
     assert.equal(binding.fixture_id,block.fixture_id);getPrimaryEvaluationProfile(binding.profile_id);
     verifyPrimaryScoringVersionResource(block,resource);

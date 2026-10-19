@@ -10,11 +10,16 @@ import { isPrimaryEvaluationGradingAdapter, PRIMARY_GRADING_RESERVATION_MS } fro
 import { comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree } from './ask-user-comparison-prepare.mjs';
 import { inspectUserComparison, readUserComparisonPlan, reportUserComparison, startUserComparison } from './ask-user-comparison.mjs';
 
-export const PRIMARY_FIXTURE_IDS = Object.freeze(['mp-ci-evidence-gap', 'mp-data-migration-handoff', 'mn-focused-regression-test',
-  'mp-accessibility-interaction-review', 'mp-frontend-state-review', 'mp-iac-rollback-design', 'mp-performance-investigation',
-  'mn-build-option-update', 'mn-doc-config-correction']);
+import { PRIMARY_FIXTURE_IDS, primaryFixtureIdsForSet, assertPrimaryFixtureInventory } from './ask-primary-fixture-recipe.mjs';
+export { PRIMARY_FIXTURE_IDS };
 export { PRIMARY_GRADING_RESERVATION_MS };
 export const PRIMARY_BATCH_LIMITS = Object.freeze({ overall_timeout_ms: 302400000, token_budget: 45000000, retries: 0, concurrency: 1, resume: 'forbidden' });
+export function primaryBatchLimitsForSet(fixtureSet = 'legacy9') {
+  const ids = primaryFixtureIdsForSet(fixtureSet);
+  return fixtureSet === 'legacy9' ? PRIMARY_BATCH_LIMITS : Object.freeze({ ...PRIMARY_BATCH_LIMITS,
+    overall_timeout_ms: ids.length * (14400000 + PRIMARY_GRADING_RESERVATION_MS), token_budget: ids.length * 5000000 });
+}
+const fixtureSetOf = manifest => manifest.fixture_set ?? 'legacy9';
 const LIMIT = 16 * 1024 * 1024;
 const bytes = value => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
 const stable = path => readStableFile(path, 'primary batch artifact', LIMIT).bytes;
@@ -105,11 +110,12 @@ function checkBlock(block, conditions, pending) {
 function validateManifest(manifest, pending) {
   assert.equal(manifest.kind, 'ask_primary_evaluation_batch_manifest_v1');
   assert.ok(typeof manifest.batch_id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/u.test(manifest.batch_id));
-  assert.deepEqual(manifest.limits, [172800000, 216000000].includes(manifest.limits?.overall_timeout_ms)
-    ? { ...PRIMARY_BATCH_LIMITS, overall_timeout_ms: manifest.limits.overall_timeout_ms } : PRIMARY_BATCH_LIMITS, 'unknown primary batch budget');
-  assert.deepEqual(manifest.blocks.map(block => block.fixture_id), PRIMARY_FIXTURE_IDS, 'all nine fixtures required in fixed order');
+  const fixtureSet = fixtureSetOf(manifest), limits = primaryBatchLimitsForSet(fixtureSet);
+  assert.deepEqual(manifest.limits, fixtureSet === 'legacy9' && [172800000, 216000000].includes(manifest.limits?.overall_timeout_ms)
+    ? { ...limits, overall_timeout_ms: manifest.limits.overall_timeout_ms } : limits, 'unknown primary batch budget');
+  const ids = assertPrimaryFixtureInventory(manifest.blocks.map(block => block.fixture_id), fixtureSet);
   assert.equal(manifest.conditions.length, 3); assert.equal(new Set(manifest.conditions).size, 3);
-  assert.equal(new Set(manifest.blocks.map(block => block.run_id)).size, 9, 'duplicate run ID');
+  assert.equal(new Set(manifest.blocks.map(block => block.run_id)).size, ids.length, 'duplicate run ID');
   const loaded = manifest.blocks.map(block => checkBlock(block, manifest.conditions, pending));
   assert.equal(new Set(loaded.map(value => value.plan.config.evidence_kind)).size, 1, 'mixed evidence kinds');
   const roots = [manifest.root, ...loaded.flatMap((value, index) => [value.root, value.plan.source.repo, manifest.blocks[index].public_input_root])];
@@ -147,7 +153,7 @@ export function preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter } =
   const raw = stable(manifestPath), manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
   assert.ok(isAbsolute(manifest.root) && resolve(manifest.root) === manifest.root); canonical(dirname(manifest.root));
   assert.ok(!existsSync(manifest.root), 'batch output exists; never reuse');
-  assert.deepEqual(manifest.limits, PRIMARY_BATCH_LIMITS, 'new preparation must use the current budget');
+  assert.deepEqual(manifest.limits, primaryBatchLimitsForSet(fixtureSetOf(manifest)), 'new preparation must use the current budget');
   const loaded = validateManifest(manifest, true);
   for (const value of loaded) assert.ok(!overlap(manifestPath, value.root) && !overlap(manifestPath, value.plan.source.repo), 'external manifest overlaps execution source');
   assert.ok(!overlap(manifestPath, manifest.root));
@@ -171,10 +177,10 @@ export function inspectPrimaryEvaluationBatch(root, { gradingAdapter } = {}) {
   const batch = readBatch(root), consumed = existsSync(join(root, 'consumption'));
   const loaded = validateManifest(batch.manifest, !consumed);
   const blockers = gradingPreflight(batch.manifest, loaded, gradingAdapter);
-  if (batch.manifest.limits.overall_timeout_ms !== PRIMARY_BATCH_LIMITS.overall_timeout_ms)
+  if (batch.manifest.limits.overall_timeout_ms !== primaryBatchLimitsForSet(fixtureSetOf(batch.manifest)).overall_timeout_ms)
     blockers.push({ fixture_id: null, reason: 'historical_preparation_budget_requires_new_plan' });
   return { ...batch, status: consumed ? 'consumed' : blockers.length ? 'blocked' : 'prepared', blockers, start_consumed: consumed,
-    slot_count: 27, slots: batch.manifest.blocks.flatMap((block, index) => batch.manifest.conditions.map(condition => ({ fixture_id: block.fixture_id, run_id: block.run_id, condition, state: consumed ? 'unknown' : 'not_started', quality: null, capability: loaded[index].plan.arms[condition].capability }))) };
+    slot_count: batch.manifest.blocks.length * batch.manifest.conditions.length, slots: batch.manifest.blocks.flatMap((block, index) => batch.manifest.conditions.map(condition => ({ fixture_id: block.fixture_id, run_id: block.run_id, condition, state: consumed ? 'unknown' : 'not_started', quality: null, capability: loaded[index].plan.arms[condition].capability }))) };
 }
 function safeTerminal(report, block, conditions) {
   assert.equal(report.run_id, block.run_id); assert.equal(report.plan_digest, block.plan_digest);
@@ -214,7 +220,7 @@ export async function startPrimaryEvaluationBatch(root, confirmedManifestDigest,
   assert.ok(startComparison === startUserComparison ? loaded.every(value => value.plan.config.evidence_kind === 'observed')
     : loaded.every(value => value.plan.config.evidence_kind === 'synthetic'), 'fake start adapters require entirely synthetic plans; synthetic plans cannot call production start');
   const consumption = join(root, 'consumption'); mkdirSync(consumption, { mode: 0o700 }); // Exclusive, never removed, even on partial write.
-  const started = now(), deadline = started + PRIMARY_BATCH_LIMITS.overall_timeout_ms;
+  const started = now(), deadline = started + batch.manifest.limits.overall_timeout_ms;
   saveRecord(join(consumption, 'start.json'), { batch_id: batch.manifest.batch_id, manifest_digest: batch.manifest_digest, started_at_ms: started, deadline_at_ms: deadline });
   let known = 0, stop = null, lastTime = started;
   const controller = new AbortController(), relay = () => controller.abort();
@@ -224,7 +230,7 @@ export async function startPrimaryEvaluationBatch(root, confirmedManifestDigest,
     for (const [index, block] of batch.manifest.blocks.entries()) {
       const current = now(); assert.ok(current >= lastTime, 'clock moved backwards'); lastTime = current;
       if (controller.signal.aborted) { stop = 'interrupted_or_deadline'; break; }
-      if (known >= PRIMARY_BATCH_LIMITS.token_budget) { stop = 'usage_budget_exhausted'; break; }
+      if (known >= batch.manifest.limits.token_budget) { stop = 'usage_budget_exhausted'; break; }
       // Reserve the entire fixed child limit plus grading reservation before dispatch.
       const reserve = loaded[index].plan.config.overall_timeout_ms + (block.grading.timeout_ms ?? PRIMARY_GRADING_RESERVATION_MS);
       if (deadline - current < reserve) { stop = 'insufficient_deadline_reservation'; break; }
@@ -239,7 +245,7 @@ export async function startPrimaryEvaluationBatch(root, confirmedManifestDigest,
       if (!safe || controller.signal.aborted || now() >= deadline) { stop = 'unsafe_or_incomplete_child'; break; }
       const lower = report.usage_budget?.known_tokens_lower_bound;
       assert.ok(Number.isSafeInteger(lower) && lower >= 0, 'usage lower bound missing'); known += lower;
-      if (known >= PRIMARY_BATCH_LIMITS.token_budget) { stop = 'usage_budget_exhausted'; break; }
+      if (known >= batch.manifest.limits.token_budget) { stop = 'usage_budget_exhausted'; break; }
       const grade = await gradingAdapter.grade(block, report, { signal: controller.signal, deadline_at_ms: deadline });
       saveRecord(join(consumption, `block-${index}-grading.json`), grade);
       if (!grade || grade.status !== 'completed' || controller.signal.aborted || now() >= deadline) { stop = 'grading_incomplete'; break; }

@@ -9,10 +9,12 @@ import {
   renderedEventCommandDigest,
   validateVerificationCommandContract,
 } from "./ask-benchmark-command-evidence.mjs";
-import { stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
+import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 
 export const PF_PERFORMANCE_FIXTURE_ID = "pf-performance-regression";
 export const PF_PERFORMANCE_FIXTURE_ROOT = `benchmarks/fixtures/checkpoint-b2/${PF_PERFORMANCE_FIXTURE_ID}`;
+import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const AGENT_VISIBLE_PATTERN = /^(?:task\.md|workspace\/.+)$/u;
 const PRIVATE_NAME_PATTERN = /(?:^|[._/-])(?:evaluator|hidden|oracle|rubric|private)(?:[._/-]|$)/iu;
@@ -185,6 +187,49 @@ export function inspectPfPerformanceMeasurement(report, { sourceDigest, config }
   }
   return { state: states.includes("inconclusive") ? "inconclusive" : states.includes("local_regression") ? "local_regression" : "within_local_target", reason: null, quality: null,
     authentication: "not_established_by_data_validation", source_digest: sourceDigest };
+}
+
+/** Task-specific consumer for bytes already selected and sealed by the existing
+ * runtime-observation authority. Validation here cannot authenticate caller bytes
+ * or grant grading/start authority; the private runner supplies the evidence root. */
+export function inspectPfPerformanceRuntimeEvidence({ observation = null, bodyBytes = null,
+  normalizedResult, candidateSource, config } = {}) {
+  const result = (state, reason) => ({ state, reason, quality: null });
+  if (!observation || bodyBytes === null) return result("unavailable", "sealed_measurement_evidence_unavailable");
+  try {
+    const { observation_digest, ...base } = observation;
+    if (observation_digest !== canonicalDigest(base) || observation.origin !== "verified_execution_and_normalized_snapshot"
+      || observation.availability !== "captured" || observation.support !== "supported") throw new Error();
+    const lineage = observation.lineage, normalized = normalizedResult?.lineage;
+    if (lineage?.fixture_id !== "pf-performance-regression" || !normalized || lineage.normalized_result_id !== normalizedResult.normalized_result_id
+      || lineage.normalized_result_digest !== normalizedResult.normalized_result_digest) throw new Error();
+    for (const field of ["run_instance_id", "case_id", "attempt", "fixture_id", "fixture_input_digest", "condition", "runtime_identity_digest",
+      "environment_snapshot_digest", "request_digest", "raw_result_digest", "terminal_commit_digest"])
+      if (typeof lineage[field] !== "string" || lineage[field] !== normalized[field]) throw new Error();
+    const pin = observation.body_reference;
+    if (pin?.path !== `bodies/${lineage.normalized_result_id}.json` || !Buffer.isBuffer(bodyBytes)
+      || pin.bytes !== bodyBytes.length || pin.digest !== sha256(bodyBytes)) throw new Error();
+    const body = parseJsonRejectDuplicateKeys(bodyBytes, "sealed measurement command body");
+    if (body.origin !== "verified_retained_native_command_transport" || body.schema_version !== "1.0.0"
+      || stableCanonicalJson(body.lineage) !== stableCanonicalJson(lineage) || !Array.isArray(body.items)) throw new Error();
+    const evidence = normalizedResult.command_evidence;
+    if (evidence?.capture_support !== "supported" || stableCanonicalJson(evidence.references) !== stableCanonicalJson(observation.command_evidence?.references)) throw new Error();
+    const matched = evidence.references.filter(reference => reference.command_id === "performance-event-lookup-validation" && reference.match_state === "matched");
+    if (!matched.length) return result("unavailable", "matched_measurement_command_unavailable");
+    const reference = matched.at(-1), items = body.items.filter(item => item.command_evidence_digest === reference.digest);
+    if (items.length !== 1 || ![0,1,3].includes(reference.exit_code)
+      || reference.outcome !== (reference.exit_code === 0 ? "succeeded" : "failed")) throw new Error();
+    const output = items[0].aggregated_output;
+    if (typeof output !== "string" || Buffer.byteLength(output) > 16*1024*1024) throw new Error();
+    const starts = [...output.matchAll(/(?:^|\n)(\{(?=\s*"measurement_version"\s*:))/gu)];
+    if (starts.length !== 1) return result("unavailable", "measurement_output_unavailable");
+    const report = parseJsonRejectDuplicateKeys(output.slice(starts[0].index + (output[starts[0].index] === "\n" ? 1 : 0)), "retained measurement output");
+    const checked = inspectPfPerformanceMeasurement(report, { sourceDigest: sha256(candidateSource), config });
+    if (["invalid", "unavailable"].includes(checked.state)) return checked;
+    if (reference.exit_code !== ({ within_local_target: 0, local_regression: 1, inconclusive: 3 })[checked.state]) throw new Error();
+    return { ...checked, source_binding: "loaded_bytes_match_final_candidate", command_evidence_digest: reference.digest,
+      evidence_scope: "requires_existing_verified_sealed_runtime_observation" };
+  } catch { return result("invalid", "sealed_measurement_evidence_invalid"); }
 }
 
 function parseArgs(argv) {

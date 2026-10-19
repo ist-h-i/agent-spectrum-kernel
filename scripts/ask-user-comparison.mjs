@@ -12,7 +12,8 @@ import { executeCodexSession } from "./codex-exec-runner.mjs";
 import { buildAgentsBlock } from "./installer-lifecycle.mjs";
 import { KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } from "./kernel-principles.mjs";
 import { comparisonConditions, isKernelPrinciplesCondition } from "./ask-comparison-conditions.mjs";
-import { KERNEL_PRINCIPLES_V2_ID, renderKernelPrinciplesV2, kernelPrinciplesV2FixtureDescriptor, principlesV2Capability } from "./kernel-principles-v2.mjs";
+import { KERNEL_PRINCIPLES_V2_ID, renderKernelPrinciplesV2 } from "./kernel-principles-v2.mjs";
+import {kernelPrinciplesV2FixtureDescriptor, principlesV2Capability, kernelPrinciplesV2DescriptorSourcePaths} from "./kernel-principles-v2-catalog24.mjs";
 import { boundedVerificationLogs } from "./ask-user-comparison-logs.mjs";
 import { acquireComparisonOwner, checkpointComparison, comparisonOwnershipDiagnostics, inspectComparisonExecution, observeComparisonProcess, probeComparisonOwner, releaseComparisonOwner } from "./ask-user-comparison-state.mjs";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
@@ -99,7 +100,7 @@ function validatePrinciplesDefinition(root, plan) {
   let descriptor = null;
   if (v2) {
     assert.ok(isPrimaryFixtureRecipe(plan.verification.recipe), "v2 requires primary fixture recipe");
-    const paths = ["scripts/kernel-principles-v2.mjs", "scripts/kernel-principles-candidate-v2.mjs", "scripts/kernel-principles.mjs"];
+    const paths = kernelPrinciplesV2DescriptorSourcePaths(plan.verification.recipe.fixture_id);
     assert.deepEqual(definition.renderer_closure.map(entry => entry.source_path), paths, "v2 renderer closure changed");
     for (const entry of definition.renderer_closure) {
       assert.equal(entry.path, `control/kernel-principles-renderer-closure/${entry.source_path.split("/").at(-1)}`);

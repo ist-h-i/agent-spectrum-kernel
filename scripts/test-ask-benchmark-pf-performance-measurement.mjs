@@ -11,3 +11,38 @@ test('dispersion cannot be disguised as a measured pass',()=>{const value=record
 test('invalid measurement policy cannot become a zero or a pass',()=>{for(const changed of [{samples:0},{samples:4},{minimum_baseline_ms:0},{maximum_dispersion_ratio:0},{maximum_candidate_median_ratio:NaN}])assert.equal(inspectPfPerformanceMeasurement(record(),{sourceDigest,config:{...config,...changed}}).state,'invalid');});
 
 test('empty, duplicate, malformed or impossible workloads cannot pass',()=>{for(const changed of [{workloads:[]},{workloads:[null,null]},{workloads:[config.workloads[0],config.workloads[0]]},{workloads:[{...config.workloads[0],events:0},config.workloads[1]]}])assert.equal(inspectPfPerformanceMeasurement(record(),{sourceDigest,config:{...config,...changed}}).state,'invalid');const impossible=record();impossible.records[0].output_count=99999;impossible.records[0].consumed=999990;assert.equal(inspect(impossible).state,'invalid');});
+
+// Synthetic data controls only. Authentication/selection is exercised by the
+// existing runtime-observation seal tests; these objects grant no authority.
+const { inspectPfPerformanceRuntimeEvidence } = await import('./ask-benchmark-pf-performance-source.mjs');
+const { canonicalDigest } = await import('./ask-benchmark-materialize.mjs');
+const { createHash } = await import('node:crypto');
+const hash = value=>'sha256:'+createHash('sha256').update(value).digest('hex');
+function carrierData({candidate=4,baseline=20,exitCode=0}={}){
+ const candidateSource=Buffer.from('fixed synthetic source bytes'),report=record(candidate,baseline);report.candidate_source_digest=hash(candidateSource);
+ const digest=hash('synthetic-command'),lineage={run_instance_id:'491e9343-2492-489b-a827-fc89cfa01851',case_id:'case-0000000000000000-0000000000000000',attempt:'0001',fixture_id:'pf-performance-regression',fixture_input_digest:hash('input'),condition:'plain',runtime_identity_digest:hash('runtime'),environment_snapshot_digest:hash('environment'),request_digest:hash('request'),raw_result_digest:hash('result'),terminal_commit_digest:hash('terminal'),normalized_result_id:'normalized-'+'a'.repeat(32),normalized_result_digest:hash('normalized'),source_snapshot_digest:hash('snapshot')};
+ const references=[{command_id:'performance-event-lookup-validation',digest,bytes:64,match_state:'matched',outcome:exitCode===0?'succeeded':'failed',exit_code:exitCode}];
+ const normalizedResult={normalized_result_id:lineage.normalized_result_id,normalized_result_digest:lineage.normalized_result_digest,lineage:{...lineage},command_evidence:{capture_support:'supported',references}};
+ const body={schema_version:'1.0.0',origin:'verified_retained_native_command_transport',lineage,items:[{command_evidence_digest:digest,aggregated_output:'fixed npm/test output\n'+JSON.stringify(report,null,2)+'\n'}]};
+ const bodyBytes=Buffer.from(JSON.stringify(body)),observation={origin:'verified_execution_and_normalized_snapshot',availability:'captured',support:'supported',lineage,command_evidence:{references},body_reference:{path:`bodies/${lineage.normalized_result_id}.json`,bytes:bodyBytes.length,digest:hash(bodyBytes)}};
+ observation.observation_digest=canonicalDigest(observation);
+ return {observation,bodyBytes,normalizedResult,candidateSource,config};
+}
+function resign(value){const{observation_digest,...base}=value.observation;value.observation.observation_digest=canonicalDigest(base);}
+function changeBody(value,mutate){const body=JSON.parse(value.bodyBytes);mutate(body);value.bodyBytes=Buffer.from(JSON.stringify(body));Object.assign(value.observation.body_reference,{bytes:value.bodyBytes.length,digest:hash(value.bodyBytes)});resign(value);}
+test('retained command data binds runtime success, regression and inconclusive to final source bytes',()=>{
+ for(const [settings,state]of [[{},'within_local_target'],[{candidate:19,exitCode:1},'local_regression'],[{candidate:1,baseline:2,exitCode:3},'inconclusive']]){
+  const value=inspectPfPerformanceRuntimeEvidence(carrierData(settings));assert.equal(value.state,state);assert.equal(value.quality,null);assert.equal(value.source_binding,'loaded_bytes_match_final_candidate');assert.equal(value.evidence_scope,'requires_existing_verified_sealed_runtime_observation');
+ }
+ assert.equal(inspectPfPerformanceRuntimeEvidence().state,'unavailable');
+});
+test('detached carrier, raw body, command or final source data cannot supply a runtime pass',()=>{
+ for(const mutate of [x=>x.observation.lineage.attempt='0002',x=>x.normalizedResult.lineage.fixture_id='different-task',x=>x.bodyBytes=Buffer.from('{}'),x=>x.candidateSource=Buffer.from('different final source'),x=>{x.observation.body_reference.path='../outside.json';resign(x);},x=>changeBody(x,b=>b.lineage.condition='full_ask'),x=>changeBody(x,b=>b.items[0].command_evidence_digest=hash('detached')),x=>changeBody(x,b=>b.items.push(b.items[0])),x=>{x.normalizedResult.command_evidence.references[0].exit_code=1;resign(x);}]){
+  const value=carrierData();mutate(value);assert.equal(inspectPfPerformanceRuntimeEvidence(value).state,'invalid');
+ }
+});
+test('missing stdout and duplicate or inconsistent measurement JSON remain unscored',()=>{
+ const missing=carrierData();changeBody(missing,b=>b.items[0].aggregated_output='no measurement output');assert.equal(inspectPfPerformanceRuntimeEvidence(missing).state,'unavailable');
+ const duplicate=carrierData();changeBody(duplicate,b=>b.items[0].aggregated_output=b.items[0].aggregated_output.replace('"measurement_version": "1.0.0",','"measurement_version": "1.0.0", "measurement_version": "1.0.0",'));assert.equal(inspectPfPerformanceRuntimeEvidence(duplicate).state,'invalid');
+ const wrongExit=carrierData({candidate:19,exitCode:0});assert.equal(inspectPfPerformanceRuntimeEvidence(wrongExit).state,'invalid');
+});

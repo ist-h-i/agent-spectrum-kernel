@@ -410,7 +410,15 @@ assert.ok(normalized.comparison.workflow_recommendations.every((entry) => ["expa
 // The existing benchmark CI entry also qualifies the model-free primary input
 // commands. Keep this registration here so shared workflow edits are unnecessary.
 const { NODE_TEST_CONTEXT: _testContext, ...publicInputTestEnv } = process.env;
-const publicInputTests = spawnSync(process.execPath, ["--test", resolve(root, "scripts/test-ask-primary-public-inputs.mjs"), resolve(root, "scripts/test-ask-benchmark-pf-performance-measurement.mjs"), resolve(root, "scripts/test-ask-benchmark-pf-performance-source.mjs"), resolve(root, "scripts/test-ask-benchmark-pf-data-schema-source.mjs"), resolve(root, "scripts/test-ask-benchmark-pf-library-source.mjs"), resolve(root, "scripts/test-ask-benchmark-pf-observability-source.mjs"), resolve(root, "scripts/test-ask-benchmark-hi-authorization-source.mjs"), resolve(root, "scripts/test-ask-benchmark-hi-external-approval-source.mjs"), resolve(root, "scripts/test-ask-benchmark-hi-financial-source.mjs"), resolve(root, "scripts/test-ask-benchmark-hi-migration-source.mjs")], {
+const publicInputTests = spawnSync(process.execPath, ["--test", ...[
+  "test-ask-primary-public-inputs.mjs", "test-ask-primary-fixture-recipe.mjs",
+  "test-ask-primary-evaluation-batch.mjs", "test-ask-primary-principles-v2-connection.mjs",
+  "test-ask-benchmark-pf-performance-measurement.mjs", "test-ask-benchmark-pf-performance-source.mjs",
+  "test-ask-benchmark-pf-data-schema-source.mjs", "test-ask-benchmark-pf-library-source.mjs",
+  "test-ask-benchmark-pf-observability-source.mjs", "test-ask-benchmark-hi-authorization-source.mjs",
+  "test-ask-benchmark-hi-external-approval-source.mjs", "test-ask-benchmark-hi-financial-source.mjs",
+  "test-ask-benchmark-hi-migration-source.mjs",
+].map(name => resolve(root, "scripts", name))], {
   cwd: root, encoding: "utf8", env: publicInputTestEnv, maxBuffer: 10 * 1024 * 1024,
 });
 assert.equal(publicInputTests.status, 0, publicInputTests.stderr || publicInputTests.stdout);

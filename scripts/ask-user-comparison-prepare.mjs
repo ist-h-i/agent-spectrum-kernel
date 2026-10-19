@@ -12,7 +12,8 @@ import { buildAgentsBlock, coreImmutableAssetKind, CORE_OWNED_IMMUTABLE_ASSETS, 
 import { skillAssets } from "./skill-assets.mjs";
 import { KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } from "./kernel-principles.mjs";
 import { comparisonConditions, isKernelPrinciplesCondition } from "./ask-comparison-conditions.mjs";
-import { KERNEL_PRINCIPLES_V2_ID, renderKernelPrinciplesV2, kernelPrinciplesV2FixtureDescriptor, principlesV2Capability } from "./kernel-principles-v2.mjs";
+import { KERNEL_PRINCIPLES_V2_ID, renderKernelPrinciplesV2 } from "./kernel-principles-v2.mjs";
+import {kernelPrinciplesV2FixtureDescriptor, principlesV2Capability, kernelPrinciplesV2DescriptorSourcePaths} from "./kernel-principles-v2-catalog24.mjs";
 import { isPrimaryFixtureRecipe, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 import { buildPersonalPromptMaterialization, personalPromptInput } from "./ask-personal-prompt-materialization.mjs";
 
@@ -538,7 +539,7 @@ export function prepareUserComparison(options = {}) {
   const principles = v2 ? renderKernelPrinciplesV2(canonicalBytes) : config.kernel_condition === KERNEL_PRINCIPLES_ID ? renderKernelPrinciples(canonicalBytes) : null;
   const rendererPath = v2 ? "scripts/kernel-principles-v2.mjs" : "scripts/kernel-principles.mjs";
   const rendererBytes = principles ? readRegular(join(SOURCE, rendererPath), "principles_renderer") : null;
-  const rendererClosure = v2 ? [rendererPath, "scripts/kernel-principles-candidate-v2.mjs", "scripts/kernel-principles.mjs"].map(sourcePath => {
+  const rendererClosure = v2 ? kernelPrinciplesV2DescriptorSourcePaths(recipe.fixture_id).map(sourcePath => {
     const bytes = readRegular(join(SOURCE, sourcePath), "principles_renderer_dependency");
     return { source_path: sourcePath, path: `control/kernel-principles-renderer-closure/${sourcePath.split("/").at(-1)}`, digest: comparisonHash(bytes), bytes };
   }) : [];
