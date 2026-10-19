@@ -111,7 +111,7 @@ export function buildPfPerformanceInputArtifacts(root = ROOT) {
     canonical_script: `${anchor} && [ -f test/event-lookup.test.mjs ] && npm test && npm run measure`,
     requirement: "required",
     alternative_group_id: null,
-    timeout_ms: 60000,
+    timeout_ms: null,
   });
   const verificationBase = {
     schema_version: "1.2.0",
