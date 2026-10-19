@@ -58,7 +58,8 @@ test("approved rejection retires only the exact candidate and verifies its recei
   for (const overrides of [
     { result_heads: closure.receipt.base_heads, steps: [] },
     { steps: [{ ...closure.receipt.steps[0], step_id: "unrelated_step" }] },
-    { steps: [...closure.receipt.steps, { ...closure.receipt.steps[0], step_id: "extra_verification", operation: "verify_asset_commit_marker" }] },
+    { steps: [...closure.receipt.steps, { ...closure.receipt.steps[0], input_digest: done.snapshot_digest,
+      step_id: "extra_verification", operation: "verify_asset_commit_marker" }] },
   ]) {
     const forged = buildEvolutionApplicationReceipt({ ...closure.receipt, ...overrides });
     const publication = publishEvolutionApplicationReceipt({ storeRoot: f.storeRoot, receipt: forged });
