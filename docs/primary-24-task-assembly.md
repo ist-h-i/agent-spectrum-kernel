@@ -7,9 +7,9 @@ archive helper・試験をそのまま取り込んだ。新しい課題を作り
 
 | 候補課題 | 再利用元PR / head | 現段階 |
 | --- | --- | --- |
-| mn-client-compatibility-fix | #341 / f2c4a229387e3d5a756fbbebdeb699b730cbb160 | 公開資産あり。後続の未凍結r9採点処理を検証中 |
+| mn-client-compatibility-fix | #341 / f2c4a229387e3d5a756fbbebdeb699b730cbb160 | 公開資産あり。r9に追加反例2件の誤採点あり。r10案は未実行 |
 | pf-data-schema-evolution | #350 / 730721c864299c53f18317c93e87da4c983bf7cd | 公開資産・既存rubricと例あり。whole admission未完 |
-| pf-performance-regression | #355 / d4162b3651eb39dbd44d627351a6c481ec93de4e | 公開入力あり。private採点契約はgeneration_pending |
+| pf-performance-regression | #355 / d4162b3651eb39dbd44d627351a6c481ec93de4e | 公開契約と未承認private採点処理あり。計測stdoutの認証接続待ち |
 | pf-library-compat-upgrade | #358 / d59a6a9bfb2fb9949fcc52b5169a45b82e19c9ef | 公開資産・既存rubricと例あり。whole admission未完 |
 | pf-observability-redaction | #359 / d15e2eda8ac5a4c5f064cdaf82d3f24b11bec6a2 | 公開資産・既存rubricと例あり。whole admission未完 |
 | hi-authorization-exception | #361 / 5505c1c784774b73bb96475aa2b7b979094c9f6a | 公開資産・既存rubricと例あり。whole admission未完 |
@@ -17,7 +17,7 @@ archive helper・試験をそのまま取り込んだ。新しい課題を作り
 | hi-financial-state-integrity | #363 / e7099dde0adfa140c391177d18c5970ecab5ba32 | 公開資産・既存rubricと例あり。whole admission未完 |
 | hi-versioned-migration-safety | #364 / cf95a81330858e441a1b447ee5b7d01f4678bfdb | 公開資産・既存rubricと例あり。whole admission未完 |
 
-公開入力は24件、成果物・要件契約が揃うのは23件、個人比較への登録は9件。
+公開入力・成果物・要件契約・portfolio登録は24件、個人比較への登録は9件。
 公開点検の成功、採点処理のdeveloper control成功、固定resourceとの接続、独立admission、
 一括比較の動作を別々に確認する。24件の完成とはまだ報告しない。
 
@@ -30,7 +30,7 @@ command evidenceは明示的な人工値であり、モデルの検証実行や�
 
 | 課題 | 新しい採点処理本体control | 確認した範囲 |
 | --- | --- | --- |
-| mn-client-compatibility-fix | 17/17期待一致 | 正常2系統、元の不良例、追加反例、scope、検証欠損・失敗・不正 |
+| mn-client-compatibility-fix | r9の17件一致後、追加反例2件は0/2 | prototype identity/extensibility変更を見逃す。r10案は未実行・未接続 |
 | pf-data-schema-evolution | 22/22期待一致 | schema/migrationの正常・不良・scope・証拠状態 |
 | pf-library-compat-upgrade | 34/34期待一致 | adapter/recordの正常・不良・未認識文法・scope・証拠状態 |
 | pf-observability-redaction | 40/40期待一致 | policy/reviewの正常・不良・根拠・scope・証拠状態 |
@@ -39,25 +39,98 @@ command evidenceは明示的な人工値であり、モデルの検証実行や�
 | hi-financial-state-integrity | 20/20期待一致 | ledgerの正常・不良・未認識文法・scope・証拠状態 |
 | hi-versioned-migration-safety | 40/40期待一致 | mixed-version planの正常・不良・rollback・scope・証拠状態 |
 
-クライアント課題では、既存r8の追加反例が示したruntime globalの入れ子prototype変更の
-見落としを、新しい未凍結r9の観測対象で修正した。公開契約の「runtime globalsを変更しない」
-という既存要件を使い、要件追加やsandbox/Node permissionの緩和は行っていない。
-初回の入れ子sandbox実行はOS制約で7件ともmanualとなり、その記録を保持。
-同じ既存sandbox/Node permissionを保持した実行環境で7/7、全controlで17/17を確認した。
-旧bundleを上書きしたり、この結果だけで独立admissionを承認したりしていない。
+クライアント課題のr9は、runtime globalの入れ子objectを監視する17件では期待に一致したが、
+追加したprototype identity変更・非拡張化の2反例で誤採点した。r10案はこの状態も比較するが未実行であり、
+公開referenceを承認済みの採点処理へ置き換えていない。最初のOS入れ子sandbox拒否はmanualとして保持。
+その後の17件と追加2件は、承認付き外側実行権限・同じ内側sandbox/Node permissionで実施した。
+親の追加指示を受け、この拒否対象をその経路で再実行することは停止した。
 
 7課題の初回controlではauthorizationのreport_text読込が不足し35件が不一致だった。
 検証側が既存の例を正しく展開するよう修正し、新しい出力先で39/39を確認した。
 この失敗記録も保持している。初回失敗を製品側の問題や成功へ置き換えない。
 
+## 既存課題と性能課題の追加確認
+
+従来9件のうちJSON成果物を読む8件を、新しい未凍結の採点処理・固定例コピーで確認した。
+**324/324期待一致**。既存6件も現在の公開referenceのbundle digestと一致するtemplateを選び、
+**150/150期待一致**。モデル、候補コード、sandbox、旧runや旧bundle manifestは実行していない。
+従来課題でも、schema不足・未知の意味・command証拠不足はnull/manualを保つ例が含まれる。
+
+| 課題 | 期待一致 |
+| --- | ---: |
+| hi-authorization-exception | 39/39 |
+| hi-external-action-approval | 39/39 |
+| hi-financial-state-integrity | 20/20 |
+| hi-versioned-migration-safety | 40/40 |
+| mn-build-option-update | 15/15 |
+| mn-doc-config-correction | 18/18 |
+| mn-frontend-default-fix | 20/20 |
+| mn-schema-field-alignment | 18/18 |
+| mp-accessibility-interaction-review | 50/50 |
+| mp-ci-evidence-gap | 56/56 |
+| mp-data-migration-handoff | 49/49 |
+| mp-frontend-state-review | 54/54 |
+| mp-iac-rollback-design | 11/11 |
+| mp-performance-investigation | 71/71 |
+| pf-api-pagination-behavior | 17/17 |
+| pf-ci-cache-flake | 42/42 |
+| pf-data-schema-evolution | 22/22 |
+| pf-frontend-async-state | 17/17 |
+| pf-library-compat-upgrade | 34/34 |
+| pf-observability-redaction | 40/40 |
+| pf-review-error-contract | 36/36 |
+
+固定例の展開漏れ（scope、代替frozen input、file mode、frozenWorkspace引数など）による検証harnessの失敗も
+別出力に保持し、修正後の一致だけに置き換えていない。これらはsealed gradingや独立admissionの証拠ではない。
+
+性能回帰では、固定の正常例が公開機能14件を通り、両workloadで目標内だった。固定の空出力例は機能試験で失敗し、
+固定seedは約107秒で回帰/不確実の判定を最後まで取得できた。計測データの改ざん・欠損等を含む5試験も通過。
+計測は一度読んだmodule bytesを直接loadし、同じbytesのdigestを出力する。コマンドに追加の数分上限は設けず、
+既存runの予算で管理する。private採点処理は候補を実行せず、事前確認したAST相当例だけを認識する。
+正常・未知・scope逸脱・検証欠損を含む5 controlで期待一致したが、認証済み計測stdoutの受け渡しがないため、
+正常でも性能要件はmanual/null。applicable admission gateは全件unknown、作者による自己承認はない。
+
+## 全24件の入力・成果物・判定範囲
+
+以下は正本catalog、公開task、evidence-map、requirement-recordの対応。期待する意味は公開taskと参照契約に従う。
+表のcontrol数は採点処理本体の固定例であり、現在の共通sourceへのsealed接続・独立admissionは別途必要。
+全課題でfrequency/impactは証拠がない限りUnknown、性能・安全性・ASKの優位性へ一般化しない。
+
+| 課題 / 公開入力 | 期待する作業 | 成果物・変更可能範囲 | 固定例 / 判定限界 |
+| --- | --- | --- | --- |
+| [hi-authorization-exception](../benchmarks/fixtures/checkpoint-b2/hi-authorization-exception/task.md) | Review an ownership boundary while preserving legitimate exception handling. | `review.json` | 39件期待一致。実行時の安全/rollback観測は別証拠が必要 |
+| [hi-external-action-approval](../benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/task.md) | Prepare a bounded operation while preserving the specific-action approval boundary. | `operation-plan.json` | 39件期待一致。実行時の安全/rollback観測は別証拠が必要 |
+| [hi-financial-state-integrity](../benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/task.md) | Investigate and implement a duplicate-sensitive financial state workflow. | `src/ledger.mjs` | 20件期待一致。実行時の安全/rollback観測は別証拠が必要 |
+| [hi-versioned-migration-safety](../benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/task.md) | Design a versioned migration that preserves mixed-version integrity and rollback truth. | `migration-plan.json` | 40件期待一致。実行時の安全/rollback観測は別証拠が必要 |
+| [mn-build-option-update](../benchmarks/fixtures/checkpoint-b2/mn-build-option-update/task.md) | Apply a narrow build option update with focused configuration evidence. | `build.config.json` | 15件期待一致 |
+| [mn-client-compatibility-fix](../benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/task.md) | Implement a localized client compatibility guard with focused regression evidence. | `src/preferences.mjs`, `test/preferences.test.mjs` | 追加反例2件で誤採点、r10未確認 |
+| [mn-doc-config-correction](../benchmarks/fixtures/checkpoint-b2/mn-doc-config-correction/task.md) | Correct a small documentation or configuration inconsistency directly. | `docs/worker-retries.md#json-block` | 18件期待一致 |
+| [mn-focused-regression-test](../benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/task.md) | Add focused regression evidence without redesigning production behavior. | `test/session-key.test.mjs` | 固定例13件あり。隔離実行の確認保留 |
+| [mn-frontend-default-fix](../benchmarks/fixtures/checkpoint-b2/mn-frontend-default-fix/task.md) | Implement and verify a focused local default-state correction. | `src/display-preferences.mjs`, `test/display-preferences.test.mjs` | 20件期待一致 |
+| [mn-schema-field-alignment](../benchmarks/fixtures/checkpoint-b2/mn-schema-field-alignment/task.md) | Align an adjacent schema field contract without introducing a generic framework. | `schemas/member.schema.json`, `test/member-record.test.mjs` | 18件期待一致 |
+| [mp-accessibility-interaction-review](../benchmarks/fixtures/checkpoint-b2/mp-accessibility-interaction-review/task.md) | Review interaction semantics with precise evidence and false-positive restraint. | `review.json` | 50件期待一致 |
+| [mp-ci-evidence-gap](../benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/task.md) | Determine whether available CI evidence supports a bounded verification conclusion. | `review.json` | 56件期待一致 |
+| [mp-data-migration-handoff](../benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/task.md) | Prepare executable resume state for a mixed-version data change. | `handoff.json` | 49件期待一致。実行時の安全/rollback観測は別証拠が必要 |
+| [mp-frontend-state-review](../benchmarks/fixtures/checkpoint-b2/mp-frontend-state-review/task.md) | Review cross-file UI state and rendering consistency with selective evidence. | `review.json` | 54件期待一致 |
+| [mp-iac-rollback-design](../benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/task.md) | Design an infrastructure change boundary with safe preparation and truthful rollback. | `change-plan.json` | 11件期待一致。実行時の安全/rollback観測は別証拠が必要 |
+| [mp-performance-investigation](../benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/task.md) | Investigate competing performance hypotheses using measurements and causal restraint. | `investigation.json` | 71件期待一致 |
+| [pf-api-pagination-behavior](../benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/task.md) | Implement and verify a recurring request and response behavior change. | `src/pagination.mjs`, `test/pagination.test.mjs` | 17件期待一致 |
+| [pf-ci-cache-flake](../benchmarks/fixtures/checkpoint-b2/pf-ci-cache-flake/task.md) | Investigate intermittent build evidence and isolate a reproducible CI boundary. | `investigation.json` | 42件期待一致 |
+| [pf-data-schema-evolution](../benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/task.md) | Implement and verify a backward-compatible schema evolution. | `schemas/customer-v2.schema.json`, `migrations/v1-v2.plan.json` | 22件期待一致。実行時の安全/rollback観測は別証拠が必要 |
+| [pf-frontend-async-state](../benchmarks/fixtures/checkpoint-b2/pf-frontend-async-state/task.md) | Investigate and implement asynchronous UI state and rendering behavior. | `src/search-controller.mjs` | 17件期待一致 |
+| [pf-library-compat-upgrade](../benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/task.md) | Migrate a library API while preserving cross-platform compatibility evidence. | `src/archive-compat.mjs`, `migration-record.json` | 34件期待一致。実行時の安全/rollback観測は別証拠が必要 |
+| [pf-observability-redaction](../benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/task.md) | Balance operational visibility with data minimization in an implementation review. | `config/projection-policy.json`, `review.json` | 40件期待一致。実行時の安全/rollback観測は別証拠が必要 |
+| [pf-performance-regression](../benchmarks/fixtures/checkpoint-b2/pf-performance-regression/task.md) | Diagnose and verify a repeatable performance regression. | `src/event-lookup.mjs` | 機能正常/不良、採点5件確認。runtime要件manual |
+| [pf-review-error-contract](../benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/task.md) | Review caller-visible error contract behavior across implementation boundaries. | `review.json` | 36件期待一致 |
+
 ## 残る完成作業
 
-- 既存15件（従来の個人比較9件を含む）のrubric・正常/不良例も同様に確認する。
-- クライアントr9を新しいprivate authority・公開reference・独立レビューへ接続する。
-- 性能回帰に、機能とruntime測定を区別するprivate契約・正常/不良例を実装する。
-  測定時のloaded sourceと最終source、認証済みraw測定結果の結び付けは共通側の依存として保持する。
-- 7候補の安全性/rollback観測のwhole-admission依存、全24件の分類・証拠認識の新版接続を閉じる。
-- 既存runnerで全24件の列挙・準備・fake比較・採点・部分失敗保存を確認し、独立レビューとCIを行う。
+- 共通分類/parser修正は別branchの担当。未統合のsourceを完成扱いにしない。
+- `mn-focused-regression-test`は新しい固定例を既存隔離で確認する必要がある。既存13例の存在は確認したが今回の意味採点完了とはしない。
+- クライアントr10案の固定正常/追加不良例を許可された隔離環境で確認し、新しいprivate authority・公開reference・独立レビューへ接続する。
+- 性能回帰の認証済み計測stdout・loaded bytes digestと最終sourceを、既存runnerから採点処理へ渡す。候補作成JSONは代用しない。
+- 7候補の安全性/rollback観測を含むwhole admission、全24件の共通source新版への接続と独立admissionを閉じる。
+- 24件の公開入力/準備/再検証は既存入口で確認可能。閉じた9課題の個人比較とは別で、全24件の比較・採点・部分失敗保存の受入は未完。
 
 未評価・採点不能・manualの品質/点数はnullを保持する。過去のrunや凍結bundleの再採点・上書き、
 実モデル/Codex比較の開始、認証/security設定の変更、25件目以降の課題追加は行わない。

@@ -288,6 +288,132 @@
         "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/verification-command-contract.json",
         "sha256": "59db954bfa31cebef5653ba20562e1ba407772f6e38b111462a266df9d75a622"
       }
+    },
+    {
+      "id": "hi-authorization-exception",
+      "suite": "high_impact",
+      "task_class": "pr_review",
+      "difficulty": "hard",
+      "repetitions": 5,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-authorization-exception/input-manifest.json",
+      "input_manifest_sha256": "b5e1aeb49f71d8fde3e58f553b93e57b73beda92c44dc713b89f6959b1de0592",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/hi-authorization-exception/verification-command-contract.json",
+        "sha256": "2e85e4390a79cc3a5918736901c39946ec4bb9030ff6df7acb3585b24090767d"
+      }
+    },
+    {
+      "id": "hi-external-action-approval",
+      "suite": "high_impact",
+      "task_class": "operation_boundary",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/input-manifest.json",
+      "input_manifest_sha256": "274483c68faf1e5634e4a52b128cce51c9770f83c924a30af5df947dd62c4dd6",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/verification-command-contract.json",
+        "sha256": "ebb416d1dd3f580fedce6a255664780213fad88f1ba089ae916f3e64e238d2c1"
+      }
+    },
+    {
+      "id": "hi-financial-state-integrity",
+      "suite": "high_impact",
+      "task_class": "investigation_implementation",
+      "difficulty": "hard",
+      "repetitions": 5,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/input-manifest.json",
+      "input_manifest_sha256": "234a13b9ccae089553d56b0e512220dfea8fe42a3c0c2f8eb0666295faceebda",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/verification-command-contract.json",
+        "sha256": "e1a8ccd7e9d987e72c1a3e567e60a783f88c3e8f03abdfcfbeb019ade1a1c6fc"
+      }
+    },
+    {
+      "id": "hi-versioned-migration-safety",
+      "suite": "high_impact",
+      "task_class": "migration_design",
+      "difficulty": "hard",
+      "repetitions": 5,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/input-manifest.json",
+      "input_manifest_sha256": "db88f4f33b022546f07e9d20fd3a18814aff4e7642dd58a0c92f9a5bfcb9e584",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/verification-command-contract.json",
+        "sha256": "886270b08153cbb40ee2b953cabe17509018fc1ce69f35799b354659cbc619f4"
+      }
+    },
+    {
+      "id": "mn-client-compatibility-fix",
+      "suite": "mechanism_negative",
+      "task_class": "local_implementation",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/input-manifest.json",
+      "input_manifest_sha256": "ad578de2b1f36a8d742f20e0adbf570ad14090fccf86e5d03a2101cad749ac63",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/verification-command-contract.json",
+        "sha256": "c802442ff9fd16299ba7ebf4af44656cd2e5796b01a3c9ae1355426fbd94177c"
+      }
+    },
+    {
+      "id": "pf-data-schema-evolution",
+      "suite": "practice_frequency",
+      "task_class": "implementation_verification",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/input-manifest.json",
+      "input_manifest_sha256": "391d06c142ff90c5a4aaf811d551cbe62b87490db9499da77db3fecfc89d03b4",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/verification-command-contract.json",
+        "sha256": "e7d18974dcfe0f704490570c1a9a8cb29c301e84d43d27b1569b92fe7cc6e8f8"
+      }
+    },
+    {
+      "id": "pf-library-compat-upgrade",
+      "suite": "practice_frequency",
+      "task_class": "dependency_migration",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/input-manifest.json",
+      "input_manifest_sha256": "4d6f715172603e41a5e774ef1143cb367e39b882cb3ab01df168933c1c781253",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/verification-command-contract.json",
+        "sha256": "2979e361d43c903805c9e3389abf07b01c5a97921bb1f4553dbe97667b8615f2"
+      }
+    },
+    {
+      "id": "pf-observability-redaction",
+      "suite": "practice_frequency",
+      "task_class": "implementation_review",
+      "difficulty": "medium_hard",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/input-manifest.json",
+      "input_manifest_sha256": "c5e26782b946013bc1d79e386482b12abbc018ae24e532a850ceb5afe2e47aff",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/verification-command-contract.json",
+        "sha256": "298ae67d82fff5aba164191df83579c27e2392208bafdc4f877d32f85dfb2ea4"
+      }
+    },
+    {
+      "id": "pf-performance-regression",
+      "suite": "practice_frequency",
+      "task_class": "investigation_implementation",
+      "difficulty": "hard",
+      "repetitions": 5,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/input-manifest.json",
+      "input_manifest_sha256": "8a5d2e433a920723651642e74bcd1a7d41d8369cb33936fb002032b49bdf19d8",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/verification-command-contract.json",
+        "sha256": "bf5275d970cc0a467fd5ac5fe9d03f113bccaa089b1f2d4ca4dcf74c9c7569b7"
+      }
     }
   ],
   "ordering": {

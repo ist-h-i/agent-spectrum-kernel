@@ -7,8 +7,8 @@
 
 **24件の比較・意味採点の完成ではない。** main `281c6a93` を調べた時点では公開資産15件、
 個人比較・採点の登録9件。未統合9件には既存候補PRと未解決依存がある。
-このbranchには既存9候補の資産を固定headから取り込み、公開入力24件・成果物/要件契約23件がある。
-性能回帰の契約はgeneration_pending。[課題の組立・採点検証](primary-24-task-assembly.md)を継続する。
+このbranchには既存9候補の資産を固定headから取り込み、公開入力・成果物/要件契約・portfolio登録24件がある。
+性能回帰の独立admissionと計測証拠の接続は保留。[課題の組立・採点検証](primary-24-task-assembly.md)を継続する。
 既存9件も、この点検だけで正常例・不良例の意味採点が確認済みになるわけではない。
 
 ## 同じ既存入口から使う
@@ -25,7 +25,7 @@ node scripts/ask-benchmark.mjs verify-primary-inputs --input /absolute/new-prima
 exit 0、一部の欠損・不整合が残れば **レポートを保存したうえで exit 2**。
 出力の再利用や準備全体の破損など、入口自体の失敗は exit 1。
 
-基点main由来では15件、このbranchでは契約が揃った23件をコピーし、性能回帰の未完成契約も理由付きで記録する。
+基点main由来の15件を維持し、このbranchでは全24件をコピーする。改変・欠損を検出した課題は理由付きで記録する。
 独立した課題は処理を続ける。存在しない課題を削って分母を変えたり、他の課題で代用したりしない。
 
 ```text
@@ -115,7 +115,7 @@ scopeと要件根拠の公開範囲を検査する。private evaluatorの正当�
 | --- | --- |
 | [#341](https://github.com/ist-h-i/agent-spectrum-kernel/pull/341) `f2c4a229` | grading mismatch。未公開の後続候補・過去の失敗を確認し、許可された範囲で反例を解消して再レビュー |
 | [#350](https://github.com/ist-h-i/agent-spectrum-kernel/pull/350) `730721c8` | rollbackのunsafe-attempt観測/contextと独立whole admission |
-| [#355](https://github.com/ist-h-i/agent-spectrum-kernel/pull/355) `d4162b36` | measurement-time sourceと最終提出source、認証済みraw結果の結び付け。private evaluatorはgeneration_pending |
+| [#355](https://github.com/ist-h-i/agent-spectrum-kernel/pull/355) `d4162b36` | measurement-time sourceと最終提出source、認証済みraw結果の結び付け。元headではprivate evaluatorがgeneration_pending。本branchでは未承認の契約・固定例を作成し、認証済み計測の接続待ち |
 | [#358](https://github.com/ist-h-i/agent-spectrum-kernel/pull/358) `d59a6a9b` | 個別semantic review済みというPR記録。安全性観測とwhole admissionはHOLD |
 | [#359](https://github.com/ist-h-i/agent-spectrum-kernel/pull/359) `d15e2eda` | 個別semantic review済みというPR記録。安全性観測とwhole admissionはHOLD |
 | [#361](https://github.com/ist-h-i/agent-spectrum-kernel/pull/361) `5505c1c7` | 個別semantic review済みというPR記録。安全性観測とwhole admissionはHOLD |
@@ -141,10 +141,10 @@ node --test scripts/test-ask-primary-public-inputs.mjs
 node --test scripts/test-ask-primary-fixture-recipe.mjs scripts/test-ask-primary-evaluation-batch.mjs scripts/test-ask-primary-evaluation-profile.mjs
 ```
 
-既存CIの `scripts/test-ask-benchmark.mjs` が新しい試験も起動する。共通workflowは変更しない。
-新しい試験は、契約が揃った23件と未完成1件、入力・契約・範囲の不整合、部分失敗、
+既存CIの `scripts/test-ask-benchmark.mjs` が公開入力・性能source・計測データの試験も起動する。共通workflowは変更しない。
+新しい試験は、実在する全24件の入力・契約、改変・欠損・範囲の不整合、部分失敗、
 保存入力への追加・変更、出力の再利用拒否、CLIと72枠のnullを検査する。
-24件すべての公開契約が揃った場合は、反復した人工レビュー入力によるtransport controlで
+別途、反復した人工レビュー入力によるtransport controlで
 同じ24件ループを検査する。これは24種類の実課題・意味採点の代替ではない。
 
 Implementation Contract:

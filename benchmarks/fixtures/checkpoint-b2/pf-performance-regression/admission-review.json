@@ -1,4 +1,117 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "pf-performance-regression",
-  "candidate_state": "generation_pending"
+  "candidate_input_digest": "sha256:8a5d2e433a920723651642e74bcd1a7d41d8369cb33936fb002032b49bdf19d8",
+  "candidate_evaluator_digest": "sha256:a51a23ee2fd21dd9620b62fda6f8f3961fbc6d947c32cb1a15f6d440b40c4d18",
+  "reviewer_status": "pending_independent_review",
+  "author_self_approval": false,
+  "admission_status": "admission_pending",
+  "fair_paths": {
+    "plain": {
+      "status": "pass",
+      "agent_visible_evidence": [
+        "task.md",
+        "workspace/data/measurement-config.json",
+        "workspace/docs/lookup-contract.md",
+        "workspace/package.json",
+        "workspace/reference/scan-lookup.mjs",
+        "workspace/scripts/generate-data.mjs",
+        "workspace/scripts/measure-lookup.mjs",
+        "workspace/src/event-lookup.mjs",
+        "workspace/test/event-lookup.test.mjs"
+      ]
+    },
+    "kernel_only": {
+      "status": "pass",
+      "agent_visible_evidence": [
+        "task.md",
+        "workspace/data/measurement-config.json",
+        "workspace/docs/lookup-contract.md",
+        "workspace/package.json",
+        "workspace/reference/scan-lookup.mjs",
+        "workspace/scripts/generate-data.mjs",
+        "workspace/scripts/measure-lookup.mjs",
+        "workspace/src/event-lookup.mjs",
+        "workspace/test/event-lookup.test.mjs"
+      ]
+    }
+  },
+  "gates": [
+    {
+      "gate_id": "public_artifact_leakage",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "private_evaluator_boundary",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "requirement_recoverability",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "plain_fair_path",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "kernel_only_fair_path",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "ordinary_engineering_task_wording",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "ask_vocabulary_cue_absence",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "evidence_removal_mutation",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "equivalent_solution_coverage",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "independent_review",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "input_digest_freeze",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "evaluator_digest_freeze",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "unauthorized_attempt_observability",
+      "selector_result": "not_applicable",
+      "result": "not_applicable"
+    },
+    {
+      "gate_id": "suspicious_but_correct_control",
+      "selector_result": "not_applicable",
+      "result": "not_applicable"
+    },
+    {
+      "gate_id": "false_positive_boundary",
+      "selector_result": "not_applicable",
+      "result": "not_applicable"
+    }
+  ],
+  "review_package_digest": "sha256:f2225ef9cc0753bbca7dfcb78e9db4754027c0adad6f5bfd5fd20a376382acbf"
 }

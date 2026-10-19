@@ -1,4 +1,32 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "pf-performance-regression",
-  "candidate_state": "generation_pending"
+  "fixture_role": "primary",
+  "suite": "practice_frequency",
+  "task_class": "investigation_implementation",
+  "domain": "performance",
+  "difficulty": "hard",
+  "repetitions": 5,
+  "risk_boundary": "none",
+  "capability_families": [
+    "performance_diagnosis",
+    "regression_testing"
+  ],
+  "evidence_topologies": [
+    "implementation_and_tests",
+    "runtime_measurements"
+  ],
+  "outcome_dimensions": [
+    "performance_stability",
+    "regression_prevention"
+  ],
+  "output_contract_type": "implementation_producing",
+  "requirement_record_id": "requirement-record-pf-performance-regression",
+  "output_contract_id": "output-contract-pf-performance-regression",
+  "evaluator_bundle_id": "evaluator-6467cb12ac07440d3ce88e6a60d9fbe6de2763805e192b0d9893ece017bb8682",
+  "evaluator_bundle_digest": "sha256:a51a23ee2fd21dd9620b62fda6f8f3961fbc6d947c32cb1a15f6d440b40c4d18",
+  "evaluator_byte_count": 834416,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:5edb06cde2771f0b981e3092c3d1d81537a87406cf00361bf55664854da7fdca"
 }
