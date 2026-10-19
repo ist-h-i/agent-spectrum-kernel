@@ -184,4 +184,3 @@ appendFileSync(${JSON.stringify(log)},"review\\n"); console.log("synthetic trans
   }
   assert.equal(readFileSync(log, "utf8"), "review\nreview\n");
 });
-

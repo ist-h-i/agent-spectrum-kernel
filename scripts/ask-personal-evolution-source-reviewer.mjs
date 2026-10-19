@@ -137,4 +137,3 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.stderr.write("Source review failed; preserve its request and captures. Do not retry unknown work.\n"); process.exitCode = 1;
   });
 }
-
