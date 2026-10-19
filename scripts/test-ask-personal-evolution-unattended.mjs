@@ -129,8 +129,23 @@ reason:safe?"Exact synthetic changes preserve reviewed scope and effects.":"Unex
 file_reviews:input.files.map(file=>({path:file.path,raw_digest:file.raw_digest,verdict,reason:"Inspected exact synthetic file bytes."}))};
 if(process.argv[2]==="malformed") result.input_digest=canonicalDigest("different input");
 console.log(JSON.stringify(result));\n`);
+    let reviewCommand = [process.execPath, f.reviewer, f.reviewMode ?? "approve"];
+    if (f.useCodexReviewer) {
+      // The production adapter runs normally; only its Codex executable is fake.
+      const originalReviewer = f.reviewer, fakeCodex = join(f.root, "fake-review-codex.mjs");
+      writeFileSync(fakeCodex, `#!${process.execPath}
+import { readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+const prompt=readFileSync(0,"utf8"), input=JSON.parse(prompt.split("\\nSOURCE_REVIEW_DATA\\n")[1]);
+const r=spawnSync(process.execPath,[${JSON.stringify(originalReviewer)},${JSON.stringify(f.reviewMode ?? "approve")}],{input:JSON.stringify(input),encoding:"utf8",shell:false});
+if(r.status!==0) process.exit(r.status ?? 1);
+writeFileSync(process.argv[process.argv.indexOf("--output-last-message")+1],r.stdout);
+`, { mode: 0o700 });
+      f.reviewer = join(ROOT, "scripts/ask-personal-evolution-source-reviewer.mjs");
+      reviewCommand = [process.execPath, f.reviewer, "--codex-bin", fakeCodex, "--model", "gpt-6.1-sol", "--reasoning", "high", "--timeout-ms", "30000"];
+    }
     const policy = { allowedPaths: f.content.files.map(file => file.path),
-      sourceReview: { command: [process.execPath, f.reviewer, f.reviewMode ?? "approve"], timeoutMs: 30000,
+      sourceReview: { command: reviewCommand, timeoutMs: f.useCodexReviewer ? 60000 : 30000,
         source: { path: f.reviewer, digest: comparisonHash(readFileSync(f.reviewer)) }, allowExistingApproval: false },
       decisionActions: f.actions ?? ["retain_current", "revise_candidate", "insufficient_evidence", "reject_candidate"],
       maxCycles: f.cycles ?? 1, maxDurationMs: 604800000, maxComparisonTokens: f.tokenBudget ?? 90000000 };
@@ -153,6 +168,19 @@ console.log(JSON.stringify(result));\n`);
     return f;
   }
   const counts = f => ({ providers: f.providers, comparisons: f.comparisons, sessions: f.sessions, grades: f.grades, reviews: f.reviews() });
+  await t.test("real source-review adapter composes a one-task cycle or preserves refusal through fake Codex only", async st => {
+    for (const reviewMode of ["approve", "decline"]) {
+      const f = await fixture(st, { useCodexReviewer: true, reviewMode, tokenBudget: 10000000 });
+      const done = await f.start();
+      assert.equal(done.status, reviewMode === "approve" ? "completed" : "needs_action", JSON.stringify(done));
+      assert.deepEqual(counts(f), { providers: 1, comparisons: reviewMode === "approve" ? 2 : 0,
+        sessions: reviewMode === "approve" ? 6 : 0, grades: reviewMode === "approve" ? 2 : 0, reviews: 1 });
+      const review = value(join(f.output, "cycle-1/source-review-result.json")).review;
+      assert.equal(review.verdict, reviewMode === "approve" ? "approved" : "declined");
+      const before = counts(f); const resumed = await f.resume();
+      assert.equal(resumed.status, done.status); assert.deepEqual(counts(f), before);
+    }
+  });
   await t.test("two insufficient cycles close, keep Unknown and retain predecessor; resume repeats no dispatch", async st => {
     const f = await fixture(st, { cycles: 2 }), done = await f.start();
     assert.equal(done.status, "completed", JSON.stringify(done)); assert.equal(done.portfolio_adoption_performed, false); assert.equal(done.installation_performed, false);

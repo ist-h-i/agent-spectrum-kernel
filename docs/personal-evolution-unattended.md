@@ -72,6 +72,11 @@ one command argument. Hash its raw bytes with the existing `comparisonHash`
 helper. No reviewer or model is selected implicitly. The caller is responsible
 for reviewing the program and any dependencies before confirming the policy.
 
+The optional [Codex source-reviewer adapter](personal-evolution-source-reviewer.md)
+connects this contract to an explicitly chosen real Codex executable/model.
+Its development tests use fake transport only. Select and pin it explicitly;
+it does not authorize a live review, comparison or application by itself.
+
 The command receives one JSON object on stdin: `policy_digest`, the full
 `review-source` `source` view (exact before/after files, candidate reference,
 inherited scope/effects/maintenance and approval attestation), and `files` with
