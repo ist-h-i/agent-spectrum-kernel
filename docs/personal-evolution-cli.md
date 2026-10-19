@@ -191,7 +191,13 @@ timeouts or retry behavior. It restores the builtin binding before exiting;
 the supervising process and fixed source files are unchanged. An operation label
 identifies the failed call, not the underlying OS cause of `EAGAIN`.
 
-Mutating adoption/rejection remains an explicit pending lifecycle action after
-the human decision; this CLI does not apply it to a Portfolio or to the Mac.
+An approved `reject_candidate` decision now creates and verifies a completed
+receipt retiring only that candidate in the derived Registry snapshot, retaining
+the baseline and exact Portfolio. `next` passes its result Registry and receipt
+to a new request. Adoption remains a separate pending lifecycle action; this CLI
+does not adopt a candidate into a Portfolio or apply it to the Mac.
 A positive recommendation needing a separately fixed lifecycle plan is reported
 as needs-action, not converted to a hold or auto-approved.
+
+For bounded unattended composition of these same operations, see
+[the run policy and procedure](personal-evolution-unattended.md).

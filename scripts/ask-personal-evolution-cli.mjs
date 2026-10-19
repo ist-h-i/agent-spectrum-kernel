@@ -13,7 +13,7 @@ import { assertNoSymlinkPathSegments, canonicalDigest, parseJsonRejectDuplicateK
 import { publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
 import { PRIMARY_FIXTURE_IDS } from "./ask-primary-fixture-recipe.mjs";
 import { readPrimaryScoringVersion } from "./ask-primary-scoring-version.mjs";
-import { registerAsset } from "./asset-registry.mjs";
+import { registerAsset, buildAssetLifecycleAuthorityContext, exportAssetRegistryReference } from "./asset-registry.mjs";
 import { preparePersonalEvolutionCandidate, verifyPersonalEvolutionParent, inspectPersonalEvolution } from "./ask-personal-evolution.mjs";
 import { preparePersonalEvolutionGenerationRequest } from "./ask-personal-evolution-generation.mjs";
 import { inspectPersonalEvolutionGenerationStatus } from "./ask-personal-evolution-generation-connector.mjs";
@@ -22,8 +22,9 @@ import { inspectPreparedPersonalEvolutionLoop, startPreparedPersonalEvolutionLoo
 import { preparePersonalEvolutionCliPair } from "./ask-personal-evolution-cli-prepare.mjs";
 import { verifyPersonalEvolutionSavedResults, preparePersonalEvolutionSavedResultActions,
   finishPersonalEvolutionSavedResultNoop } from "./ask-personal-evolution-saved-results.mjs";
-import { buildEvolutionHumanDecision, publishEvolutionHumanDecision } from "./evolution-loop.mjs";
+import { buildEvolutionHumanDecision, publishEvolutionHumanDecision, applyApprovedEvolutionCandidateRejection } from "./evolution-loop.mjs";
 import { reportUserComparison } from "./ask-user-comparison.mjs";
+import { runUnattendedPersonalEvolution, validatePersonalEvolutionRunPolicy } from "./ask-personal-evolution-unattended.mjs";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const TRUST_KEYS = ["trustedAssetAuthorityContexts", "trustedPortfolioAuthorityContexts", "trustedHighImpactApprovalGrants"];
@@ -48,7 +49,8 @@ function sourceRevision() {
 function configure(configPath, profileRoot) {
   const config = json(absolute(configPath));
   exact(config, ["storeRoot", "blueprint", "generationActor", "trust", "portfolioAuthority", "selectorContext",
-    "experimentTemplateObjectDigest", "evaluationAuthority", "generation", "evaluation"], "management inputs");
+    "experimentTemplateObjectDigest", "evaluationAuthority", "generation", "evaluation", ...(Object.hasOwn(config, "unattended") ? ["unattended"] : [])], "management inputs");
+  if (config.unattended) validatePersonalEvolutionRunPolicy(config.unattended);
   absolute(config.storeRoot); exact(config.trust, TRUST_KEYS, "existing trust inputs");
   for (const key of TRUST_KEYS) assert.ok(Array.isArray(config.trust[key]), key);
   exact(config.generation, ["executable", "timeoutMs"], "generation inputs");
@@ -74,7 +76,8 @@ function configure(configPath, profileRoot) {
   const profile = { ...config, sourceRevision: revision, selectorContext: { ...config.selectorContext, source_revision: revision } };
   mkdirSync(absolute(profileRoot), { mode: 0o700 }); save(join(profileRoot, "profile.json"), snapshot(profile));
   return { status: "configured", target: config.blueprint.parent_asset.stable_id, fixture_ids: ids,
-    model_execution: "Unknown", models_started: false, installation_performed: false };
+    model_execution: "Unknown", models_started: false, installation_performed: false,
+    ...(config.unattended ? { unattended_policy_digest: canonicalDigest(config.unattended) } : {}) };
 }
 function loadCycle(cycleRoot) {
   absolute(cycleRoot); const input = loadSnapshot(join(cycleRoot, "input.json"));
@@ -84,13 +87,23 @@ function pointer(c, name) { const path = join(c.root, `${name}.json`); return ex
 function pin(c, name, value) { save(join(c.root, `${name}.json`), snapshot(value)); return value; }
 function generation(c) { return inspectPersonalEvolutionGenerationStatus({ storeRoot: c.profile.storeRoot,
   requestObjectDigest: c.input.requestObjectDigest, ...c.profile.trust }); }
+function rejectionAuthority(c) {
+  const human = pointer(c, "decision"), actions = pointer(c, "actions");
+  if (human?.decision.disposition !== "approved" || human.decision.action !== "reject_candidate" || actions?.proposal.action !== "reject_candidate") return null;
+  const plan = actions.proposal.lifecycle_plan, registry = read(c.profile.storeRoot, plan.base_registry_snapshot_digest);
+  return buildAssetLifecycleAuthorityContext({ registryId: registry.registry_id, repositoryId: registry.repository_id, scopeId: registry.scope_id,
+    predecessorSnapshotDigest: plan.base_registry_snapshot_digest, transitions: plan.asset_transitions,
+    authority: { ...human.decision.authority, authority_revision: String(human.decision.authority.authority_revision),
+      kind: "external_asset_lifecycle_authority", authority_evidence_digest: human.decisionObjectDigest } });
+}
 function savedInput(c, pair) {
   const path = join(pair.outputRoot, "invocation/saved-result-connection.json");
   if (!existsSync(path)) return null;
   const connection = json(path);
   // Registered original graders emitted these receipt pins. The human must
   // separately confirm the whole verified evaluation before actions are authored.
-  return { ...pair.input, savedResults: connection.savedResults,
+  const rejection = rejectionAuthority(c);
+  return { ...pair.input, trustedAssetAuthorityContexts: [...(pair.input.trustedAssetAuthorityContexts ?? []), ...(rejection ? [rejection] : [])], savedResults: connection.savedResults,
     trustedSavedEngineeringResultDigests: connection.trusted_grade_receipt_digests };
 }
 function reviewView(c, status) {
@@ -155,9 +168,12 @@ function describeStatus(c, alreadyVerified) {
     assert.ok(decision.decision.reason_codes.includes(`human_reason:${decision.reasonObjectDigest}`));
     decisionReason = fact.reason;
   }
-  if (completion) { assert.ok(decision, "completion requires recorded human decision"); return { ...result,
-    status: "completed", reason: "approved_saved_noop", ...completion, decision, decision_reason: decisionReason,
-    next_command: "next --cycle CYCLE --output NEW_CYCLE --problem PUBLIC_SUMMARY" };
+  if (completion) {
+    assert.ok(decision, "completion requires recorded human decision");
+    const lifecycleMutated = read(c.profile.storeRoot, completion.receipt_object_digest).action === "reject_candidate";
+    return { ...result, status: "completed", reason: lifecycleMutated ? "approved_saved_rejection" : "approved_saved_noop",
+      receipt_object_digest: completion.receipt_object_digest, lifecycle_mutated: lifecycleMutated, decision, decision_reason: decisionReason,
+      next_command: "next --cycle CYCLE --output NEW_CYCLE --problem PUBLIC_SUMMARY" };
   }
   if (decision) return { ...result, status: decision.decision.disposition === "declined" ? "decision_declined" : "needs_action",
     reason: decision.decision.disposition === "declined" ? "human_declined_proposal" : "explicit_lifecycle_application_required", decision,
@@ -241,12 +257,13 @@ function approveSource(c, gen, humanReason) {
     generationActor: c.profile.generationActor, holdoutTaskIds: c.input.blueprint.evaluation_scope.fixture_ids });
   pin(c, "source-review", { reviewObjectDigest: reviewDigest, preparationObjectDigest: prepared.preparation_object_digest, candidate_asset });
 }
-async function advance(c) {
+async function advance(c, deadlineAtMs = null) {
   let gen = generation(c);
   if (gen.status === "NOT_RUN") {
     assert.equal(sourceRevision(), c.profile.sourceRevision, "configured source changed; configure a fresh profile before new execution");
     const inspected = inspectPreparedPersonalEvolutionCodexGeneration({ storeRoot: c.profile.storeRoot, ...c.profile.trust,
       requestObjectDigest: c.input.requestObjectDigest, workspaceRoot: join(c.root, "generation"), ...c.profile.generation });
+    if (deadlineAtMs !== null) assert.ok(Date.now() + c.profile.generation.timeoutMs <= deadlineAtMs, "run deadline cannot reserve full generation");
     await startPreparedPersonalEvolutionCodexGeneration(inspected.handle, { confirmedRequestObjectDigest: inspected.request_object_digest,
       confirmedPreparationDigest: inspected.preparation_digest });
     gen = generation(c);
@@ -266,6 +283,8 @@ async function advance(c) {
   if (!existsSync(join(pair.outputRoot, "invocation"))) {
     assert.equal(sourceRevision(), c.profile.sourceRevision, "configured source changed; preserve the fixed pair without starting it");
     const inspected = inspectPreparedPersonalEvolutionLoop(pair.input);
+    if (deadlineAtMs !== null) assert.ok(Date.now() + read(c.profile.storeRoot, pair.input.pairRegistrationObjectDigest).limits.overall_timeout_ms <= deadlineAtMs,
+      "run deadline cannot reserve full fixed comparison");
     await startPreparedPersonalEvolutionLoop(inspected.handle, inspected.pair_object_digest);
   }
   return status(c);
@@ -311,20 +330,34 @@ function decide(c, disposition, humanReason) {
       decisionObjectDigest: human.decisionObjectDigest });
     pin(c, "completion", { receipt_object_digest: done.receipt_object_digest, lifecycle_mutated: false });
   }
+  if (disposition === "approved" && actions.proposal.action === "reject_candidate" && !pointer(c, "completion")) {
+    const authority = rejectionAuthority(c), prepared = read(c.profile.storeRoot, pair.input.preparationObjectDigest);
+    const done = applyApprovedEvolutionCandidateRejection({ ...context, ...actions.artifacts,
+      candidateObjectDigest: prepared.candidate_object_digest, decisionObjectDigest: human.decisionObjectDigest,
+      assetAuthorityContext: authority, trustedAssetAuthorityContexts: [...saved.trustedAssetAuthorityContexts, authority] });
+    pin(c, "completion", { receipt_object_digest: done.object_digest, lifecycle_mutated: true });
+  }
   return status(c, verified);
 }
 function next(c, output, summary) {
-  const done = pointer(c, "completion"); assert.ok(done, "completed no-op receipt required for this next-cycle connector");
+  const done = pointer(c, "completion"); assert.ok(done, "completed personal receipt required for this next-cycle connector");
+  assert.equal(status(c).status, "completed", "verified completion required before next cycle");
   const pair = pointer(c, "pair"), prep = read(c.profile.storeRoot, pair.input.preparationObjectDigest);
   const candidate = read(c.profile.storeRoot, prep.candidate_object_digest);
-  const profile = { ...c.profile, trust: { ...c.profile.trust, trustedPortfolioAuthorityContexts: pair.input.trustedPortfolioAuthorityContexts },
-    blueprint: { ...c.profile.blueprint, parent_portfolio: candidate.parent_portfolio, registry: candidate.registry, rollback: candidate.rollback } };
+  const rejection = rejectionAuthority(c), assets = [...(pair.input.trustedAssetAuthorityContexts ?? []), ...(rejection ? [rejection] : [])];
+  const receipt = read(c.profile.storeRoot, done.receipt_object_digest);
+  const resultRegistry = receipt.action === "reject_candidate" ? exportAssetRegistryReference({ storeRoot: c.profile.storeRoot,
+    snapshotDigest: receipt.result_heads.registry_snapshot_digest, trustedAuthorityContexts: assets }) : candidate.registry;
+  const registry = { ...candidate.registry, snapshot_digest: resultRegistry.snapshot_digest, snapshot_revision: resultRegistry.snapshot_revision };
+  const profile = { ...c.profile, trust: { ...c.profile.trust, trustedAssetAuthorityContexts: assets, trustedPortfolioAuthorityContexts: pair.input.trustedPortfolioAuthorityContexts },
+    blueprint: { ...c.profile.blueprint, parent_portfolio: candidate.parent_portfolio, registry, rollback: candidate.rollback } };
   const created = initializeCycle({ profile, cycleRoot: output, target: profile.blueprint.parent_asset.stable_id,
     text: summary, predecessor: done.receipt_object_digest });
   return status(created);
 }
 
 const COMMANDS = {
+  run: ["profile", "output", "target", "problem", "confirmed-policy-digest"],
   "recover-preparation": ["cycle", "output", "source", "input-digest", "source-review-digest"],
   configure: ["config", "profile"], start: ["cycle", "profile", "target", "problem"], status: ["cycle"], result: ["cycle"],
   "review-source": ["cycle", "approve", "reason"], "confirm-evaluation": ["cycle", "confirm", "reason"],
@@ -341,8 +374,13 @@ function parse(argv) {
   }
   return { command, values };
 }
-export async function runPersonalEvolutionCommand(argv) {
+export async function runPersonalEvolutionCommand(argv, controls = {}) {
+  assert.ok(controls && Object.keys(controls).every(key => key === "deadlineAtMs"), "unknown personal command controls");
+  const deadlineAtMs = controls.deadlineAtMs ?? null;
+  if (deadlineAtMs !== null) assert.ok(Number.isSafeInteger(deadlineAtMs) && deadlineAtMs > 0);
   const { command, values: v } = parse(argv);
+  if (command === "run") return runUnattendedPersonalEvolution({ profile: v.profile, output: v.output,
+    target: v.target, problem: v.problem, confirmedPolicyDigest: v["confirmed-policy-digest"] }, runPersonalEvolutionCommand);
   if (command === "recover-preparation") {
     const { recoverPersonalEvolutionCliPreparation } = await import("./ask-personal-evolution-cli-recovery.mjs");
     return recoverPersonalEvolutionCliPreparation({ cycleRoot: v.cycle, outputRoot: v.output, sourceRoot: v.source,
@@ -366,8 +404,8 @@ export async function runPersonalEvolutionCommand(argv) {
   }
   try {
     let result;
-    if (command === "start") result = await advance(c);
-    else if (command === "review-source") { approveSource(c, generation(c), v.reason); result = await advance(c); }
+    if (command === "start") result = await advance(c, deadlineAtMs);
+    else if (command === "review-source") { approveSource(c, generation(c), v.reason); result = await advance(c, deadlineAtMs); }
     else if (command === "confirm-evaluation") result = confirmEvaluation(c, v.reason);
     else if (command === "decide") { assert.notEqual(Boolean(v.approve), Boolean(v.decline), "choose exactly one explicit disposition");
       result = decide(c, v.approve ? "approved" : "declined", v.reason); }
