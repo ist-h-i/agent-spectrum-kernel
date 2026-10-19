@@ -8,7 +8,7 @@ import {
   readContentAddressedJson,
   stableCanonicalJson,
 } from "./content-addressed-store.mjs";
-import { verifyAssetRegistry } from "./asset-registry.mjs";
+import { applyAssetLifecycleTransitions, verifyAssetRegistry } from "./asset-registry.mjs";
 import {
   applyPortfolioTransitions,
   verifyPortfolioLock,
@@ -1556,6 +1556,20 @@ export function verifyEvolutionApplicationReceipt({
         || !["historical", "superseded"].includes(rollbackEntry.state)) {
         throw new Error("Evolution receipt rollback anchor is not preserved in the resulting Portfolio history");
       }
+    } else if (receipt.action === "reject_candidate") {
+      const [step] = receipt.steps;
+      if (receipt.result_heads.portfolio_lock_digest !== receipt.base_heads.portfolio_lock_digest
+        || receipt.result_heads.registry_snapshot_digest === receipt.base_heads.registry_snapshot_digest
+        || receipt.steps.length !== 1 || step.step_id !== "candidate_rejection"
+        || step.operation !== "apply_asset_transition"
+        || step.input_digest !== receipt.base_heads.registry_snapshot_digest
+        || step.output_digest !== receipt.result_heads.registry_snapshot_digest) {
+        throw new Error("completed candidate rejection requires exactly its approved Registry step and unchanged Portfolio");
+      }
+      const snapshot = readContentAddressedJson({ storeRoot, digest: receipt.result_heads.registry_snapshot_digest }).value;
+      const ref = decision.candidate.candidate_asset;
+      const retired = snapshot.entries.find(entry => Object.keys(ref).every(key => entry[key] === ref[key]));
+      if (!retired || retired.state !== "retired") throw new Error("candidate rejection did not retire the exact candidate");
     } else if (NOOP_ACTIONS.has(receipt.action)) {
       if (!compareCanonical(receipt.result_heads, receipt.base_heads) || receipt.steps.length !== 0) {
         throw new Error("completed Evolution no-op receipt must preserve exact heads and contain no lifecycle steps");
@@ -1675,6 +1689,39 @@ export function applyApprovedEvolutionPortfolioAction({
   });
   const published = publishEvolutionApplicationReceipt({ storeRoot, receipt });
   return deepFreeze({ ...published, lock_digest: applied.lock_digest, lock_revision: applied.lock_revision });
+}
+
+// Caller supplies independently trusted lifecycle authority, as for bounded
+// Portfolio adoption. A verified recommendation never manufactures that trust.
+export function applyApprovedEvolutionCandidateRejection({ assetAuthorityContext, predecessorReceiptDigest = null, ...options }) {
+  const closure = verifyEvolutionHumanDecision(options);
+  const { storeRoot, decisionObjectDigest } = options;
+  if (closure.decision.disposition !== "approved" || closure.proposal.action !== "reject_candidate")
+    throw new Error("only an approved reject_candidate proposal may retire a candidate");
+  assertReceiptAuthorityBinding({ context: assetAuthorityContext, resource: "Registry",
+    predecessorDigest: closure.proposal.lifecycle_plan.base_registry_snapshot_digest,
+    transitions: closure.proposal.lifecycle_plan.asset_transitions, decision: closure.decision, decisionObjectDigest });
+  exactTrustedAuthority(assetAuthorityContext, options.trustedAssetAuthorityContexts, "candidate rejection");
+  const applied = applyAssetLifecycleTransitions({ storeRoot,
+    predecessorSnapshotDigest: closure.proposal.lifecycle_plan.base_registry_snapshot_digest,
+    authorityContext: assetAuthorityContext, trustedAuthorityContexts: options.trustedAssetAuthorityContexts });
+  const receipt = buildEvolutionApplicationReceipt({ schema_version: SCHEMA_VERSION,
+    object_kind: "evolution_application_receipt", predecessor_receipt_digest: predecessorReceiptDigest,
+    candidate_digest: closure.candidate.candidate_digest, experiment_digest: closure.experiment.experiment_digest,
+    recommendation_digest: closure.recommendation.recommendation_digest, proposal_digest: closure.proposal.proposal_digest,
+    decision_digest: closure.decision.decision_digest, action: "reject_candidate", state: "completed",
+    base_heads: { registry_snapshot_digest: closure.proposal.lifecycle_plan.base_registry_snapshot_digest,
+      portfolio_lock_digest: closure.proposal.lifecycle_plan.base_portfolio_lock_digest },
+    result_heads: { registry_snapshot_digest: applied.snapshot_digest,
+      portfolio_lock_digest: closure.proposal.lifecycle_plan.base_portfolio_lock_digest },
+    steps: [{ step_id: "candidate_rejection", operation: "apply_asset_transition",
+      input_digest: closure.proposal.lifecycle_plan.base_registry_snapshot_digest,
+      authority_context_digest: applied.authority_context_digest, output_digest: applied.snapshot_digest, status: "completed" }],
+    rollback_anchor: cloneJson(closure.proposal.lifecycle_plan.rollback_anchor), stop: null, next_step: null,
+    history_preserved: true, authority_implied: false });
+  const publication = publishEvolutionApplicationReceipt({ storeRoot, receipt });
+  verifyEvolutionApplicationReceipt({ ...options, receiptObjectDigest: publication.object_digest });
+  return deepFreeze({ ...publication, snapshot_digest: applied.snapshot_digest, snapshot_revision: applied.snapshot_revision });
 }
 
 export function recordEvolutionNoopReceipt({
