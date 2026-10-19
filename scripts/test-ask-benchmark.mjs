@@ -407,4 +407,13 @@ assert.ok(normalized.runs.every((entry) => entry.human_effort.senior_review_minu
 assert.ok(normalized.runs.every((entry) => !Object.hasOwn(entry, "raw_output")));
 assert.ok(normalized.comparison.workflow_recommendations.every((entry) => ["expand", "retain", "simplify", "stop"].includes(entry.recommendation)));
 
+// The existing benchmark CI entry also qualifies the model-free primary input
+// commands. Keep this registration here so shared workflow edits are unnecessary.
+const { NODE_TEST_CONTEXT: _testContext, ...publicInputTestEnv } = process.env;
+const publicInputTests = spawnSync(process.execPath, ["--test", resolve(root, "scripts/test-ask-primary-public-inputs.mjs")], {
+  cwd: root, encoding: "utf8", env: publicInputTestEnv, maxBuffer: 10 * 1024 * 1024,
+});
+assert.equal(publicInputTests.status, 0, publicInputTests.stderr || publicInputTests.stdout);
+console.log(publicInputTests.stdout.trimEnd());
+
 console.log("ASK benchmark tests passed");
