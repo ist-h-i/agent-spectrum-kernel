@@ -150,7 +150,7 @@
       "if": {
         "properties": {
           "result_profile": {
-            "properties": { "name": { "const": "binary_scope_verification_v1" } },
+            "properties": { "name": { "enum": ["binary_scope_verification_v1", "requirement_scope_verification_v2"] } },
             "required": ["name"]
           }
         },
@@ -169,7 +169,7 @@
       "additionalProperties": false,
       "required": ["name", "digest"],
       "properties": {
-        "name": { "const": "binary_scope_verification_v1" },
+        "name": { "enum": ["binary_scope_verification_v1", "requirement_scope_verification_v2"] },
         "digest": { "$ref": "#/$defs/digest" }
       }
     },

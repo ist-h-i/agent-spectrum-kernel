@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PRIMARY_PROFILE_SCHEMAS } from './ask-primary-evaluation-scope.mjs';
 import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_PRINCIPLES_V2_EVALUATION_PROFILE_ID, getPrimaryEvaluationProfile } from './ask-primary-evaluation-profile.mjs';
-import { PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_FAILURE_CODES, COMMAND_EVIDENCE_DIAGNOSTIC_EVENT_TYPES } from './ask-benchmark-command-evidence.mjs';
+import { PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_FAILURE_CODES, COMMAND_EVIDENCE_DIAGNOSTIC_EVENT_TYPES } from './ask-benchmark-command-evidence.mjs';
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 export function primarySchemaBytes(name, { root = ROOT, profileId = PRIMARY_EVALUATION_PROFILE_ID } = {}) {
   const profile = getPrimaryEvaluationProfile(profileId);
@@ -11,6 +11,8 @@ export function primarySchemaBytes(name, { root = ROOT, profileId = PRIMARY_EVAL
   function extend(item) {
     if (!item || typeof item !== 'object') return;
     if (JSON.stringify(item.enum) === JSON.stringify(['plain', 'kernel_only', 'adaptive_ask', 'full_ask'])) item.enum = [...profile.conditions];
+    // Historical mirrors retain the v1 result interpretation byte-for-byte.
+    if (JSON.stringify(item.enum) === JSON.stringify(['binary_scope_verification_v1', 'requirement_scope_verification_v2'])) { delete item.enum; item.const = 'binary_scope_verification_v1'; }
     // Only primary capture schemas admit the explicitly versioned saved parser.
     if (item.properties?.parser_revision?.const === '1.3.0') item.properties.parser_revision = { enum: ['1.3.0', '1.4.0-primary-saved'] };
     for (const child of Object.values(item)) extend(child);
@@ -124,8 +126,29 @@ export function generatePrimaryCommandEvidenceV6Schemas({ check = false, root = 
     else writeFileSync(path, raw, { flag: 'wx' });
   }
 }
+export function generatePrimaryEvaluationV7Schemas({ check = false, root = ROOT } = {}) {
+  for (const prefix of ['primary', 'primary-k2']) for (const name of ['portfolio-command-evidence', 'evaluator-result-envelope']) {
+    const source = name === 'portfolio-command-evidence' ? `${prefix}-saved-v6-${name}` : `${prefix}-${name}`;
+    const value = JSON.parse(readFileSync(resolve(root, `benchmarks/schemas/${source}.schema.json`)));
+    function select(item) {
+      if (!item || typeof item !== 'object') return;
+      if (item.const === PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION) item.const = PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION;
+      if (item.const === 'binary_scope_verification_v1') item.const = 'requirement_scope_verification_v2';
+      for (const child of Object.values(item)) select(child);
+    }
+    select(value); value.title += ' (explicit evaluation correctness v7)';
+    if (name === 'portfolio-command-evidence') {
+      value.$defs.commandEvidence.required.push('runtime_shell_executable');
+      value.$defs.commandEvidence.properties.runtime_shell_executable = { enum: [null, '/bin/bash', '/bin/zsh'] };
+    }
+    const path = resolve(root, `benchmarks/schemas/${prefix}-saved-v7-${name}.schema.json`);
+    const raw = Buffer.from(JSON.stringify(value, null, 2) + '\n');
+    if (check) { if (!readFileSync(path).equals(raw)) throw new Error(`stale primary v7 schema: ${name}`); }
+    else writeFileSync(path, raw, { flag: 'wx' });
+  }
+}
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const generate = process.argv.includes('--command-evidence-v6') ? generatePrimaryCommandEvidenceV6Schemas : process.argv.includes('--command-evidence-v5') ? generatePrimaryCommandEvidenceV5Schemas : process.argv.includes('--command-evidence-v4') ? generatePrimaryCommandEvidenceV4Schemas : process.argv.includes('--command-evidence-v3') ? generatePrimaryCommandEvidenceV3Schemas
+  const generate = process.argv.includes('--evaluation-v7') ? generatePrimaryEvaluationV7Schemas : process.argv.includes('--command-evidence-v6') ? generatePrimaryCommandEvidenceV6Schemas : process.argv.includes('--command-evidence-v5') ? generatePrimaryCommandEvidenceV5Schemas : process.argv.includes('--command-evidence-v4') ? generatePrimaryCommandEvidenceV4Schemas : process.argv.includes('--command-evidence-v3') ? generatePrimaryCommandEvidenceV3Schemas
     : process.argv.includes('--command-evidence-v2') ? generatePrimaryCommandEvidenceV2Schemas : generatePrimaryGradingSchemas;
   generate({ check: process.argv.includes('--check') }); console.log('Primary grading schemas verified');
 }

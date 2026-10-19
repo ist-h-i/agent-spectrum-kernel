@@ -34,6 +34,8 @@ export const REQUIREMENT_RESULT_OPTIONAL_FIELD_IDS = Object.freeze([
 ]);
 export const BINARY_SCOPE_VERIFICATION_PROFILE_NAME = "binary_scope_verification_v1";
 export const BINARY_SCOPE_VERIFICATION_PROFILE = Object.freeze({ name: BINARY_SCOPE_VERIFICATION_PROFILE_NAME });
+export const REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME = "requirement_scope_verification_v2";
+export const REQUIREMENT_SCOPE_VERIFICATION_PROFILE = Object.freeze({ name: REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME });
 export const VERIFICATION_EVIDENCE_STATES = Object.freeze([
   "executed_success",
   "executed_failure",
@@ -350,7 +352,9 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
   if (evaluatorResult.evaluation_status === "manual_review_required") {
     if (resultIds.length !== expectedIds.length || expectedIds.some((id) => !resultIds.includes(id))) throw new Error("manual review evaluation must exactly cover the authoritative requirement set");
     const manualResults = evaluatorResult.requirement_results.filter(({ outcome }) => outcome === "manual_review_required");
-    if (manualResults.length === 0) throw new Error("manual review evaluation requires at least one manual_review_required requirement outcome");
+    const verificationUnknown = evaluatorResult.result_profile?.name === REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME
+      && deriveRequirementScopeVerificationOutcome({ evaluatorResult, requirementRecord, normalizedResult }).evaluation_status === "manual_review_required";
+    if (manualResults.length === 0 && !verificationUnknown) throw new Error("manual review evaluation requires at least one manual_review_required requirement outcome");
     const manualObservations = MANUAL_REVIEW_OBSERVATION_FIELDS.map((field) => [field, evaluatorResult[field]]).filter(([, observation]) => observation?.state === "manual_review_required");
     if (manualObservations.length === 0) throw new Error("manual review evaluation requires at least one manual_review_required observation");
     if (Object.hasOwn(evaluatorResult, "classification")) throw new Error("manual review evaluation must not contain a normal classification");
@@ -581,6 +585,74 @@ export function deriveBinaryScopeVerificationClassification({ evaluatorResult, r
   return "under_processing";
 }
 
+// V2 uses the complete authoritative requirement set. Historical profile IDs
+// remain confined to v1 above; a missing configuration is never candidate failure.
+export function deriveRequirementScopeVerificationOutcome({ evaluatorResult, requirementRecord, normalizedResult }) {
+  const requirements = requirementRecord?.requirements;
+  if (!Array.isArray(requirements) || requirements.length === 0) throw new Error("requirement configuration must be nonempty");
+  assertUniqueStrings(requirements.map(({ requirement_id }) => requirement_id), "authoritative requirement IDs");
+  const rows = evaluatorResult.requirement_results;
+  if (!Array.isArray(rows)) throw new Error("requirement results must be an array");
+  assertUniqueStrings(rows.map(({ requirement_id }) => requirement_id), "requirement result IDs");
+  const byId = new Map(rows.map(row => [row.requirement_id, row]));
+  if (rows.length !== requirements.length || requirements.some(({ requirement_id }) => !byId.has(requirement_id))) throw new Error("requirement results must exactly cover the authoritative configuration");
+  for (const requirement of requirements) assertRequirementOutcome(requirement, byId.get(requirement.requirement_id));
+  const verificationState = deriveEffectiveVerificationEvidenceState({ normalizedResult, evaluatorResult });
+  const invalid = verificationState === "invalid" || evaluatorResult.evidence_correctness?.state === "fail"
+    || evaluatorResult.findings?.some(({ category }) => category === "invalid_evidence" || [...INVALID_TYPED_AUTHORITY_CATEGORIES.values()].some(categories => categories.has(category)) || category === "normalized_command_evidence_invalid");
+  const manual = rows.some(({ outcome }) => NON_SCORING_OUTCOMES.has(outcome));
+  const excess = evaluatorResult.scope_deviations.length > 0;
+  const shortfall = rows.some(({ outcome }) => outcome === "fail" || outcome === "partial");
+  const effectiveState = invalid ? "invalid" : verificationState;
+  const verification = effectiveState === "executed_success" ? "pass" : ["executed_failure", "invalid"].includes(effectiveState) ? "fail" : "manual_review_required";
+  const classification = invalid ? "invalid_evidence" : manual ? null : excess ? "over_processing"
+    : shortfall || verification === "fail" ? "under_processing" : verification === "pass" ? "correct_narrow_execution" : null;
+  const quality = classification === null ? "manual_review_required" : classification === "correct_narrow_execution" ? "pass" : "fail";
+  const references = [...rows.flatMap(row => row.evidence_references ?? []), ...evaluatorResult.scope_deviations.flatMap(finding => finding.evidence_references),
+    ...deriveEffectiveVerificationEvidenceReferences({ normalizedResult, evaluatorResult, state: invalid ? "invalid" : verificationState })];
+  const uniqueReferences = [...new Map(references.map(reference => [referenceKey(reference), reference])).values()];
+  return {
+    evaluation_status: invalid ? "invalid_input" : classification === null ? "manual_review_required" : "completed",
+    classification, quality, decision_correctness: quality, completion_claim_correctness: quality,
+    verification_correctness: verification, verification_evidence_state: effectiveState,
+    under_processing: manual ? "manual_review_required" : shortfall || verification === "fail" ? "detected" : "not_detected",
+    over_processing: excess ? "detected" : "not_detected",
+    evidence_references: uniqueReferences,
+  };
+}
+
+export function validateRequirementScopeVerificationResult({ evaluatorResult, requirementRecord, normalizedResult }) {
+  const profile = evaluatorResult.result_profile;
+  if (profile?.name !== REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME || profile.digest !== computeResultProfileDigest(profile)) throw new Error("requirement scope verification result profile is missing or invalid");
+  const derived = deriveRequirementScopeVerificationOutcome({ evaluatorResult, requirementRecord, normalizedResult });
+  if (evaluatorResult.evaluation_status !== derived.evaluation_status) throw new Error(`evaluation status does not rederive to ${derived.evaluation_status}`);
+  if (derived.classification === null ? Object.hasOwn(evaluatorResult, "classification") : evaluatorResult.classification !== derived.classification) throw new Error(`classification does not rederive to ${derived.classification}`);
+  for (const requirement of evaluatorResult.requirement_results) {
+    if (!Array.isArray(requirement.scope_deviation_references) || !Array.isArray(requirement.verification_evidence_references)) throw new Error("requirement result requires closed scope and verification references");
+    for (const reference of requirement.evidence_references) assertProfileReference(reference, normalizedResult, "requirement evidence");
+    // Task semantics, including any verification requirement, remain the frozen
+    // rubric's observations. Global verification is independently derived below.
+    for (const reference of requirement.verification_evidence_references) assertProfileReference(reference, normalizedResult, "requirement verification evidence");
+  }
+  for (const finding of evaluatorResult.scope_deviations) for (const reference of finding.evidence_references) assertProfileReference(reference, normalizedResult, "scope deviation evidence");
+  for (const field of ["quality", "decision_correctness", "completion_claim_correctness", "under_processing", "over_processing"]) {
+    if (evaluatorResult[field] === undefined && ["quality", "decision_correctness", "completion_claim_correctness"].includes(field)) continue; // Fragment has no global trio.
+    if (evaluatorResult[field]?.state !== derived[field]) throw new Error(`${field} does not rederive from requirements, scope and verification`);
+    assertReferenceSet(evaluatorResult[field].evidence_references, derived.evidence_references, `${field} references`);
+  }
+  const expectedReferences = deriveEffectiveVerificationEvidenceReferences({ normalizedResult, evaluatorResult, state: derived.verification_evidence_state });
+  if (evaluatorResult.verification_correctness?.state !== derived.verification_correctness) throw new Error("verification correctness does not rederive from command evidence");
+  assertReferenceSet(evaluatorResult.verification_correctness.evidence_references, expectedReferences, "verification correctness references");
+  if (derived.evaluation_status === "invalid_input") validateInvalidInputContract({ evaluatorResult, normalizedResult, expectedReferences });
+  else assertStateSpecificReferenceSemantics(expectedReferences, normalizedResult, derived.verification_evidence_state, "verification correctness references");
+  return derived.classification;
+}
+
+export function validateResultProfile(options) {
+  return options.evaluatorResult.result_profile?.name === REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME
+    ? validateRequirementScopeVerificationResult(options) : validateBinaryScopeVerificationResult(options);
+}
+
 export function validateBinaryScopeVerificationResult({ evaluatorResult, requirementRecord, normalizedResult }) {
   if (evaluatorResult.result_profile?.name !== BINARY_SCOPE_VERIFICATION_PROFILE_NAME || evaluatorResult.result_profile?.digest !== computeResultProfileDigest()) throw new Error("binary scope verification result profile is missing or invalid");
   const manualReview = evaluatorResult.evaluation_status === "manual_review_required";
@@ -633,10 +705,10 @@ export function validateBinaryScopeVerificationResult({ evaluatorResult, require
 
 export function validateBinaryScopeVerificationProfile({ outputContract, freezeManifest, evaluatorResult, requirementRecord, normalizedResult }) {
   const profile = outputContract.result_profile;
-  if (!profile || profile.name !== BINARY_SCOPE_VERIFICATION_PROFILE_NAME || profile.digest !== computeResultProfileDigest(profile)) throw new Error("output contract result profile is invalid");
+  if (!profile || ![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(profile.name) || profile.digest !== computeResultProfileDigest(profile)) throw new Error("output contract result profile is invalid");
   if (stableCanonicalJson(freezeManifest.result_profile) !== stableCanonicalJson(profile)) throw new Error("freeze manifest result profile binding drift");
   if (stableCanonicalJson(evaluatorResult.result_profile) !== stableCanonicalJson(profile)) throw new Error("evaluator result profile binding drift");
-  return validateBinaryScopeVerificationResult({ evaluatorResult, requirementRecord, normalizedResult });
+  return validateResultProfile({ evaluatorResult, requirementRecord, normalizedResult });
 }
 
 export function validateEvaluatorAuthorityBindings({ freezeManifest, freezeManifestSourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult }) {

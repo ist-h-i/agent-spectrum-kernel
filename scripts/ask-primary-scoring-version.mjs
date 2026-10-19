@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
+import { computeResultProfileDigest, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME } from './ask-benchmark-scoring-contract.mjs';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('../', import.meta.url)));
@@ -35,7 +36,12 @@ export const PRIMARY_PROCESSING_V5_SOURCE_PATHS = Object.freeze(['scripts/ask-be
 export const PRIMARY_PROCESSING_V6_SOURCE_PATHS = Object.freeze(['scripts/ask-benchmark-command-evidence.mjs', PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH,
   'benchmarks/schemas/primary-saved-v6-portfolio-command-evidence.schema.json',
   'benchmarks/schemas/primary-k2-saved-v6-portfolio-command-evidence.schema.json']);
+export const PRIMARY_PROCESSING_V7_SOURCE_PATHS = Object.freeze(['scripts/ask-benchmark-command-evidence.mjs', 'scripts/ask-benchmark-scoring-contract.mjs',
+  PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH,
+  'benchmarks/schemas/primary-saved-v7-portfolio-command-evidence.schema.json', 'benchmarks/schemas/primary-k2-saved-v7-portfolio-command-evidence.schema.json',
+  'benchmarks/schemas/primary-saved-v7-evaluator-result-envelope.schema.json', 'benchmarks/schemas/primary-k2-saved-v7-evaluator-result-envelope.schema.json']);
 function processingSourcePaths(commandEvidenceParserRevision) {
+  if (commandEvidenceParserRevision === '1.10.0-primary-saved') return PRIMARY_PROCESSING_V7_SOURCE_PATHS;
   if (commandEvidenceParserRevision === '1.9.0-primary-saved') return PRIMARY_PROCESSING_V6_SOURCE_PATHS;
   if (commandEvidenceParserRevision === '1.8.0-primary-saved') return PRIMARY_PROCESSING_V5_SOURCE_PATHS;
   if (commandEvidenceParserRevision === '1.5.0-primary-saved') return PRIMARY_PROCESSING_SOURCE_PATHS;
@@ -71,7 +77,7 @@ function fixedPath(path, directory = false) {
 }
 
 /** Preserve all fields other than explicitly permitted regenerated identity headers. */
-export function verifyPrimaryScoringSemantics(fixtureId, selectedRoot, { root = ROOT } = {}) {
+export function verifyPrimaryScoringSemantics(fixtureId, selectedRoot, { root = ROOT, evaluationVersion = null } = {}) {
   assert.ok(PRIMARY_FIXTURE_IDS.includes(fixtureId), 'unknown primary fixture');
   const base = `benchmarks/fixtures/checkpoint-b2/${fixtureId}`;
   const old = name => json(join(root, base, `${name}.json`));
@@ -102,9 +108,15 @@ export function verifyPrimaryScoringSemantics(fixtureId, selectedRoot, { root = 
     assert.equal(bytes.length, file.bytes, 'preserved input size changed');
     assert.equal(hash(bytes), `sha256:${file.sha256}`, 'preserved input bytes changed');
   }
+  const v7 = evaluationVersion === 'ask_primary_scoring_version_v7';
+  const expectedProfile = { name: REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME, digest: computeResultProfileDigest({ name: REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME }) };
+  if (v7) {
+    assert.deepEqual(fresh('output-contract').result_profile, expectedProfile, 'v7 output requires its explicit new result profile');
+    assert.deepEqual(fresh('scoring-input-freeze-manifest').result_profile, expectedProfile, 'v7 freeze result profile drift');
+  }
   const allow = {
     'requirement-record': ['admission_record_digest', 'requirement_record_digest'],
-    'output-contract': ['evaluator_public_reference_digest', 'evaluator_authority_manifest_raw_sha256', 'evaluator_authority_manifest_digest', 'output_contract_digest'],
+    'output-contract': ['evaluator_public_reference_digest', 'evaluator_authority_manifest_raw_sha256', 'evaluator_authority_manifest_digest', 'output_contract_digest', ...(v7 ? ['result_profile'] : [])],
     metadata: ['evaluator_bundle_id', 'evaluator_bundle_digest', 'evaluator_byte_count', 'review_status', 'metadata_digest'],
   };
   for (const [name, fields] of Object.entries(allow)) {
@@ -113,7 +125,7 @@ export function verifyPrimaryScoringSemantics(fixtureId, selectedRoot, { root = 
   }
   const reference = fresh('evaluator-reference'), original = old('evaluator-reference');
   for (const key of ['fixture_id', 'fixture_input_digest', 'task_class', 'suite', 'fixture_role', 'verification_command_contract', 'result_profile'])
-    if (Object.hasOwn(original, key)) assert.deepEqual(reference[key], original[key], `preserved reference ${key} changed`);
+    if (Object.hasOwn(original, key)) assert.deepEqual(reference[key], v7 && key === 'result_profile' ? expectedProfile : original[key], `preserved reference ${key} changed`);
   return { fixture_id: fixtureId, public_semantics_preserved: true };
 }
 
@@ -122,17 +134,20 @@ export function readPrimaryScoringVersion(selector, fixtureId, { root = ROOT, ve
   keys(selector, ['path', 'digest']); digest(selector.digest); fixedPath(selector.path);
   const raw = read(selector.path); assert.equal(hash(raw), selector.digest, 'scoring version manifest changed');
   const manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
-  assert.ok(['ask_primary_scoring_version_v1', 'ask_primary_scoring_version_v2', 'ask_primary_scoring_version_v3', 'ask_primary_scoring_version_v4', 'ask_primary_scoring_version_v5', 'ask_primary_scoring_version_v6'].includes(manifest.kind), 'unknown primary scoring version');
+  assert.ok(['ask_primary_scoring_version_v1', 'ask_primary_scoring_version_v2', 'ask_primary_scoring_version_v3', 'ask_primary_scoring_version_v4', 'ask_primary_scoring_version_v5', 'ask_primary_scoring_version_v6', 'ask_primary_scoring_version_v7'].includes(manifest.kind), 'unknown primary scoring version');
   const processing = manifest.kind !== 'ask_primary_scoring_version_v1';
   keys(manifest, ['kind', 'scoring_version_id', 'fixtures', ...(processing ? ['processing'] : [])]);
   assert.match(manifest.scoring_version_id, /^[a-z][a-z0-9_-]{1,127}$/u);
-  keys(manifest.fixtures, PRIMARY_FIXTURE_IDS);
+  if (manifest.kind === 'ask_primary_scoring_version_v7') {
+    assert.ok(Object.keys(manifest.fixtures).length > 0 && Object.keys(manifest.fixtures).every(id => PRIMARY_FIXTURE_IDS.includes(id)), 'v7 requires a nonempty explicit primary fixture selection');
+  } else keys(manifest.fixtures, PRIMARY_FIXTURE_IDS);
   assert.ok(PRIMARY_FIXTURE_IDS.includes(fixtureId), 'unknown primary fixture');
+  assert.ok(Object.hasOwn(manifest.fixtures, fixtureId), 'fixture absent from explicit scoring version');
   const fixture = manifest.fixtures[fixtureId];
   keys(fixture, ['frozen_source_root', 'selected', 'resource', 'resource_file_digests']);
   fixedPath(fixture.frozen_source_root, true);
   if (processing) verifyProcessingDescriptor(manifest.processing, fixture.frozen_source_root, root,
-    manifest.kind === 'ask_primary_scoring_version_v6' ? '1.9.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v5' ? '1.8.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v4' ? '1.7.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v3' ? '1.6.0-primary-saved' : '1.5.0-primary-saved');
+    manifest.kind === 'ask_primary_scoring_version_v7' ? '1.10.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v6' ? '1.9.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v5' ? '1.8.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v4' ? '1.7.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v3' ? '1.6.0-primary-saved' : '1.5.0-primary-saved');
   keys(fixture.resource, PRIMARY_SCORING_VERSION_RESOURCE_FIELDS);
   keys(fixture.resource_file_digests, PRIMARY_SCORING_VERSION_FILE_FIELDS);
   digest(fixture.resource.admissionReviewAuthoritySourceDigest);
@@ -155,7 +170,7 @@ export function readPrimaryScoringVersion(selector, fixtureId, { root = ROOT, ve
     assert.equal(hash(read(join(fixture.frozen_source_root, path))), expectedDigest, 'selected scoring version public bytes changed');
   }
   for (const pin of pins) assert.equal(fixture.selected[pin.path], pin.raw_byte_digest, 'scoring version freeze closure changed');
-  verifyPrimaryScoringSemantics(fixtureId, fixture.frozen_source_root, { root });
+  verifyPrimaryScoringSemantics(fixtureId, fixture.frozen_source_root, { root, evaluationVersion: manifest.kind });
   return { selector: structuredClone(selector), scoring_version_id: manifest.scoring_version_id,
     ...(processing ? { processing: structuredClone(manifest.processing) } : {}),
     root: fixture.frozen_source_root, fixture: structuredClone(fixture) };
