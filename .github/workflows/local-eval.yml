@@ -24,6 +24,8 @@ jobs:
         run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-unattended-policy.mjs scripts/test-ask-personal-evolution-unattended.mjs
       - name: Personal candidate generation adapter (fake transport only)
         run: node --test scripts/test-ask-personal-evolution-codex-generation.mjs
+      - name: Personal source reviewer adapter (fake transport only)
+        run: node --test scripts/test-ask-personal-evolution-source-reviewer.mjs
       - name: Fake lifecycle and failure regressions (no model calls)
         run: node --test scripts/test-ask-local-eval.mjs scripts/test-ask-local-codex.mjs scripts/test-ask-local-codex-time-budget.mjs scripts/test-ask-synthetic-json-pilot.mjs
       - name: User repository comparison preparation and execution (fake runner only)

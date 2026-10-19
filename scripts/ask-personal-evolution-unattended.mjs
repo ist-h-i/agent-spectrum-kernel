@@ -41,7 +41,7 @@ function reviewInput(source, policyDigest) {
   return { policy_digest: policyDigest, source, files: source.files.map(f => ({ path: f.path,
     before_digest: comparisonHash(Buffer.from(f.before)), raw_digest: comparisonHash(Buffer.from(f.after)) })) };
 }
-function acceptReview(record, input) {
+export function validatePersonalEvolutionSourceReviewResult(record, input) {
   exact(record, ["input_digest", "candidate_asset", "verdict", "reason", "file_reviews"]);
   assert.equal(record.input_digest, canonicalDigest(input)); same(record.candidate_asset, input.source.candidate_asset);
   assert.ok(["approved", "declined", "needs_action"].includes(record.verdict));
@@ -54,6 +54,10 @@ function acceptReview(record, input) {
     assert.ok(["approved", "declined", "needs_action"].includes(reviewed.verdict));
     if (record.verdict === "approved") assert.equal(reviewed.verdict, "approved", "every exact file needs source review");
   }
+  return record;
+}
+function acceptReview(record, input) {
+  validatePersonalEvolutionSourceReviewResult(record, input);
   assert.equal(record.verdict, "approved", "source review declined or needs action");
   return record;
 }
