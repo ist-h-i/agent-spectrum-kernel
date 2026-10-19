@@ -2,8 +2,8 @@
 
 ## Spec
 
-Artifact `SPEC-PRIMARY-EVALUATION-CORRECTNESS-7`, revision 1. Upstream: the
-owner's scoped continuation decision, #379 and #385. The two defects are an
+Artifact `SPEC-PRIMARY-EVALUATION-CORRECTNESS-7`, revision 2. Upstream: the
+owner's scoped continuation and PR #407 API connection decisions, #379 and #385. The two defects are an
 inapplicable historical requirement-ID classifier and a retained command
 processor which cannot close supported runtime shell renderings to the public
 verification command. This work ends analysis of the current candidate.
@@ -48,6 +48,13 @@ receipts and start records retain their meanings. No old result is rescored.
   existing resource-assets-only authoring boundary; preparation is not runtime
   admission. No model, real comparison, old private evaluation, candidate edit,
   Mac adoption/application or global/auth/security change is performed.
+- AC7-REGISTRY: with the registered-task recipe API installed, a new v7 manifest
+  may explicitly select `fixture_set: "catalog24"`. The recipe authority checks
+  all 24 IDs in their canonical order; missing, reordered or unknown IDs fail.
+  Producer and resource scope accept a registered non-legacy fixture only with
+  the explicit fixed v7 selector. Without that API the catalog request fails
+  closed. Existing v1–v6 keep their nine-task inventory; v7 without a set keeps
+  its existing nonempty nine-task subset. No saved record or admission is widened.
 
 The v7 envelope equivalence is a new explicit processing rule, not a claim of
 general Bash/Zsh program equivalence. Arbitrary per-command shell selection is
@@ -56,8 +63,9 @@ when they are not observed; collecting them is not an acceptance condition.
 
 ## Verification Contract
 
-`FVC-PRIMARY-EVALUATION-CORRECTNESS-7`, revision 1, upstream
-`SPEC-PRIMARY-EVALUATION-CORRECTNESS-7@1`. Select the existing
+`FVC-PRIMARY-EVALUATION-CORRECTNESS-7`, revision 2, upstream
+`SPEC-PRIMARY-EVALUATION-CORRECTNESS-7@2`. Revision 1 evidence remains associated
+with its executed source head; the new registry obligation is additive. Select the existing
 `ask.verification-proof-policy@1.0.0` formal path: bug reproduction/regression,
 public schema/compatibility, cross-module persistence and independent PR review
 are present. This is not an additional proof framework.
@@ -78,6 +86,11 @@ are present. This is not an additional proof framework.
   repository validation and relevant required CI on the exact reviewed head.
 - O7-REVIEW → all AC: independent required review gates, resolved blocking
   findings, linked Draft PR and terminal CI. Parent owns Ready/merge.
+- O7-REGISTRY → AC7-REGISTRY: registry interface controls with explicit old/new
+  inventories; the isolated PR #407 combination verifies every public v7
+  selection and a non-legacy producer/normalizer/resource-scope round trip using
+  synthetic events and inadmissible receipts. The standalone checkout must
+  refuse catalog24 while retaining its legacy subset.
 
 Evidence records commands, exit codes, source head/tree and supported items in
 the task's external delivery directory. Live acceptance remains separate; no
@@ -85,7 +98,7 @@ test count or static resource preparation proves provider/runtime success.
 
 ## Implementation Contract
 
-`IMPL-PRIMARY-EVALUATION-CORRECTNESS-7`, revision 1. Upstream Spec/FVC above.
+`IMPL-PRIMARY-EVALUATION-CORRECTNESS-7`, revision 2. Upstream Spec/FVC above.
 Change class: bug fix. Allowed boundary: existing scoring/profile validator,
 private envelope adaptation, command evidence parser, primary source/schema/
 producer/selector and handoff resource writer, their tests and CI/docs.
@@ -139,6 +152,19 @@ existing primary fixture keys (the single handoff fixture is supported), the
 paths. Output and scoring freeze must both bind the exact new result profile.
 `readPrimaryScoringVersion` checks these bindings and unchanged task/scoring
 semantics; it supplies no execution permission.
+
+PR #408 can be integrated before the registered-task assembly in PR #407.
+Until that assembly supplies `assertPrimaryFixtureInventory` and
+`isRegisteredPrimaryFixtureId` from the existing recipe module, only the legacy
+selection is available. In the combined source, a new all-task manifest adds
+`"fixture_set": "catalog24"` and lists all 24 fixture entries in canonical order.
+`validatePrimaryScoringVersionFixtureInventory` delegates the exact inventory
+check to that recipe API; `isPrimaryScoringFixtureId` keeps non-legacy IDs behind
+v7 for producer/scope consumers. An explicit `"fixture_set": "legacy9"` selects
+the complete historical ordered inventory. Omitting the field preserves the
+previous v7 subset behavior. The runtime bundle must be regenerated for the
+combined source. Registration and these static checks do not admit private
+resources or establish all-task semantic/safety acceptance.
 
 Configure a fresh personal-loop profile with those reviewed resources using the
 [existing CLI procedure](personal-evolution-cli.md). Inspect its frozen inputs

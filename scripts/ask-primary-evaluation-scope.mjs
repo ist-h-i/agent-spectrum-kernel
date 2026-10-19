@@ -7,8 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { verifyPrimaryEvaluationProducer } from './ask-primary-evaluation-producer.mjs';
 import { primaryScoringRoot, primaryProcessingDescriptor, readPrimaryScoringVersion,
-  PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH } from './ask-primary-scoring-version.mjs';
-import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
+  PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH, isPrimaryScoringFixtureId } from './ask-primary-scoring-version.mjs';
 import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_EVALUATION_CONDITIONS, getPrimaryEvaluationProfile, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 import { PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION } from './ask-benchmark-command-evidence.mjs';
 
@@ -93,7 +92,8 @@ function pinnedHistoricalGraph(root,fixtureId,binding,scoringVersion = null) {
   const version = scoringVersion ? readPrimaryScoringVersion(scoringVersion, fixtureId) : null;
   const fixedRoot = version?.root ?? primaryScoringRoot({ fixture_id: fixtureId, grading: { scoring_version: null } });
   if (scoringVersion && root !== fixedRoot) throw new Error('primary_resource_graph_scoring_version_root_changed');
-  if(!PRIMARY_FIXTURE_IDS.includes(fixtureId)||binding.fixture_id!==fixtureId||!['primary_single_shot_v1','primary_principles_v2_single_shot_v1'].includes(binding.profile_id))throw new Error('primary_resource_graph_binding_invalid');
+  const evaluationVersion = version?.processing?.command_evidence_parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION ? 'ask_primary_scoring_version_v7' : null;
+  if(!isPrimaryScoringFixtureId(fixtureId,{evaluationVersion})||binding.fixture_id!==fixtureId||!['primary_single_shot_v1','primary_principles_v2_single_shot_v1'].includes(binding.profile_id))throw new Error('primary_resource_graph_binding_invalid');
   if(resolve(root)!==root||realpathSync(root)!==root)throw new Error('primary_resource_graph_root_invalid');
   const base=`benchmarks/fixtures/checkpoint-b2/${fixtureId}/`,read=path=>readStableFile(path,'primary historical public graph pin',33554432).bytes;
   const currentFreeze=read(join(fixedRoot,base,'scoring-input-freeze-manifest.json')),freeze=JSON.parse(currentFreeze);
