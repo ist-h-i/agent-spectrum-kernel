@@ -273,7 +273,7 @@ function buildAdmissionReview({ inputDigest, bundle, visiblePaths }) {
   const fair = { status: "pass", agent_visible_evidence: visiblePaths };
   const gates = [
     "public_artifact_leakage", "private_evaluator_boundary", "requirement_recoverability", "plain_fair_path", "kernel_only_fair_path", "ordinary_engineering_task_wording", "ask_vocabulary_cue_absence", "evidence_removal_mutation", "equivalent_solution_coverage", "independent_review", "input_digest_freeze", "evaluator_digest_freeze" ,
-  ].map((gate_id) => ({ gate_id, selector_result: "applicable", result: gate_id === "independent_review" ? "unknown" : "pass" }));
+  ].map((gate_id) => ({ gate_id, selector_result: "applicable", result: "unknown" }));
   gates.push({gate_id:"unauthorized_attempt_observability",selector_result:"not_applicable",result:"not_applicable"});
   for(const gate_id of ["suspicious_but_correct_control","false_positive_boundary"])gates.push({gate_id,selector_result:"not_applicable",result:"not_applicable"});
   const base = {
