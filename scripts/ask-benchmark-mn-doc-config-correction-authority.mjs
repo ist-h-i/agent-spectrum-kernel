@@ -22,6 +22,7 @@ import * as evaluatorBoundary from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import {
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
+  REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME,
   computeFinalAdmissionRecordDigest,
   computeFinalAdmissionRequirementAuthorityDigest,
   computeOutputContractDigest,
@@ -306,7 +307,7 @@ function candidateBinding(root, path, semanticDigest) {
   return { path, raw_sha256: sha256(readFileSync(resolve(root, path))), semantic_digest: semanticDigest };
 }
 
-function generateMnDocConfigCorrectionProductionAuthorityInPlace({ root, privateRoot, evaluatorRevision, generationDate }) {
+function generateMnDocConfigCorrectionProductionAuthorityInPlace({ root, privateRoot, evaluatorRevision, generationDate, resultProfileName = BINARY_SCOPE_VERIFICATION_PROFILE_NAME }) {
   if (!/^[a-f0-9]{40}$/u.test(evaluatorRevision ?? "")) throw new Error("mn-doc evaluator revision is invalid");
   const fixtureRoot = resolve(root, MN_DOC_FIXTURE_ROOT);
   const inputPath = `${MN_DOC_FIXTURE_ROOT}/input-manifest.json`;
@@ -354,7 +355,7 @@ function generateMnDocConfigCorrectionProductionAuthorityInPlace({ root, private
     verification_command_contract_digest: verification.contract_digest,
     scope_boundary_authority_path: `${MN_DOC_FIXTURE_ROOT}/evidence-map.json`,
     scope_boundary_authority_digest: evidence.evidenceMap.scope_boundary_authority.authority_digest,
-    result_profile: { name: BINARY_SCOPE_VERIFICATION_PROFILE_NAME, digest: computeResultProfileDigest() },
+    result_profile: { name: resultProfileName, digest: computeResultProfileDigest({ name: resultProfileName }) },
     declares_findings: false,
     ...authorityBinding,
   };
@@ -511,7 +512,8 @@ function validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoo
   if (resourceAssetsOnly && typeof evaluatorBoundary.verifyPrivateEvaluatorResourceAssets !== "function") throw new Error("resource-assets-only validation requires verifyPrivateEvaluatorResourceAssets");
 }
 
-export function writeMnDocConfigCorrectionProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots = null, resourceAssetsOnly = false }) {
+export function writeMnDocConfigCorrectionProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots = null, resourceAssetsOnly = false, resultProfileName = BINARY_SCOPE_VERIFICATION_PROFILE_NAME }) {
+  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(resultProfileName)) throw new Error("unknown primary result profile");
   validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots);
   assertProductionWriterInputs({ root, privateRoot, evaluatorRevision, generationDate, boundaryRoots, resourceAssetsOnly });
   const repositoryRoot = realpathSync(root);
@@ -525,7 +527,7 @@ export function writeMnDocConfigCorrectionProductionAuthority({ root = ROOT, pri
     runGit(repositoryRoot, ["worktree", "add", "--detach", stagedRepository, evaluatorRevision], "mn-doc production staging worktree creation");
     worktreeAdded = true;
     cpSync(privateDirectory, stagedPrivate, { recursive: true, force: false, errorOnExist: true });
-    generateMnDocConfigCorrectionProductionAuthorityInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate });
+    generateMnDocConfigCorrectionProductionAuthorityInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate, resultProfileName });
     validateMnDocConfigCorrectionProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots, resourceAssetsOnly });
     assertFrozenInputsUnchanged(repositoryRoot, stagedRepository);
     const transactionId = randomUUID();
@@ -559,6 +561,7 @@ export function validateMnDocConfigCorrectionProductionAuthority({ root = ROOT, 
   validatePortfolioPolicyArtifacts({ root });
   const requirement = artifacts["requirement-record.json"];
   const output = artifacts["output-contract.json"];
+  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(output.result_profile?.name) || output.result_profile.digest !== computeResultProfileDigest(output.result_profile)) throw new Error("unknown or invalid primary result profile");
   const admission = artifacts["final-admission-record.json"];
   const reference = artifacts["evaluator-reference.json"];
   const authorityManifest = artifacts["evaluator-authority-manifest.json"];

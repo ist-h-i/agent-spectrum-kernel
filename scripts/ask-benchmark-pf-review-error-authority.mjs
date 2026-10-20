@@ -18,9 +18,11 @@ import {
   validateIndependenceStatement,
   verifyPrivateEvaluatorBundle,
 } from "./ask-benchmark-evaluator-boundary.mjs";
+import * as evaluatorBoundary from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import {
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
+  REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME,
   computeFinalAdmissionRecordDigest,
   computeFinalAdmissionRequirementAuthorityDigest,
   computeOutputContractDigest,
@@ -285,7 +287,7 @@ function candidateBinding(root, path, semanticDigest) {
   return { path, raw_sha256: sha256(readFileSync(resolve(root, path))), semantic_digest: semanticDigest };
 }
 
-function generatePfReviewErrorProductionAuthorityInPlace({ root, privateRoot, evaluatorRevision, generationDate }) {
+function generatePfReviewErrorProductionAuthorityInPlace({ root, privateRoot, evaluatorRevision, generationDate, resultProfileName = BINARY_SCOPE_VERIFICATION_PROFILE_NAME }) {
   if (!/^[a-f0-9]{40}$/u.test(evaluatorRevision ?? "")) throw new Error("pf-review-error evaluator revision is invalid");
   const fixtureRoot = resolve(root, PF_REVIEW_ERROR_FIXTURE_ROOT);
   const inputPath = `${PF_REVIEW_ERROR_FIXTURE_ROOT}/input-manifest.json`;
@@ -339,7 +341,7 @@ function generatePfReviewErrorProductionAuthorityInPlace({ root, privateRoot, ev
     verification_command_contract_digest: verification.contract_digest,
     scope_boundary_authority_path: `${PF_REVIEW_ERROR_FIXTURE_ROOT}/evidence-map.json`,
     scope_boundary_authority_digest: evidence.evidenceMap.scope_boundary_authority.authority_digest,
-    result_profile: { name: BINARY_SCOPE_VERIFICATION_PROFILE_NAME, digest: computeResultProfileDigest() },
+    result_profile: { name: resultProfileName, digest: computeResultProfileDigest({ name: resultProfileName }) },
     declares_findings: true,
     ...authorityBinding,
   };
@@ -413,13 +415,14 @@ function runGit(root, args, label) {
   return result.stdout.trim();
 }
 
-function assertProductionWriterInputs({ root, privateRoot, evaluatorRevision, generationDate, boundaryRoots }) {
+function assertProductionWriterInputs({ root, privateRoot, evaluatorRevision, generationDate, boundaryRoots, resourceAssetsOnly }) {
   if (!existsSync(root) || !lstatSync(root).isDirectory()) throw new Error("pf-review-error production writer repository root is missing");
   if (!privateRoot || !existsSync(privateRoot) || !lstatSync(privateRoot).isDirectory() || lstatSync(privateRoot).isSymbolicLink()) throw new Error("pf-review-error production writer requires an existing non-symlink private root");
   assertPrivateRootOutsideRepository(root, privateRoot);
   if (!/^[a-f0-9]{40}$/u.test(evaluatorRevision ?? "")) throw new Error("pf-review-error evaluator revision is invalid");
   runGit(root, ["cat-file", "-e", `${evaluatorRevision}^{commit}`], "pf-review-error evaluator revision lookup");
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(generationDate ?? "")) throw new Error("pf-review-error production generation date must be YYYY-MM-DD");
+  if (resourceAssetsOnly) return;
   const requiredBoundaryFields = ["materializedPath", "selectionState", "runDir", "normalizedResultsPath"];
   if (!boundaryRoots || typeof boundaryRoots !== "object" || Array.isArray(boundaryRoots)) throw new Error("pf-review-error production writer requires complete private boundary roots");
   const unknownBoundaryFields = Object.keys(boundaryRoots).filter((field) => !requiredBoundaryFields.includes(field));
@@ -486,8 +489,17 @@ function publishPrepared({ prepared, transactionDirectories }, validatePublished
   }
 }
 
-export function writePfReviewErrorProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots }) {
-  assertProductionWriterInputs({ root, privateRoot, evaluatorRevision, generationDate, boundaryRoots });
+// Static resource validation never supplies execution or admission authority.
+function validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots) {
+  if (typeof resourceAssetsOnly !== "boolean") throw new Error("resourceAssetsOnly must be a boolean");
+  if (resourceAssetsOnly && (!privateRoot || boundaryRoots !== null)) throw new Error("resource-assets-only validation requires a private root and no execution boundary roots");
+  if (resourceAssetsOnly && typeof evaluatorBoundary.verifyPrivateEvaluatorResourceAssets !== "function") throw new Error("resource-assets-only validation requires verifyPrivateEvaluatorResourceAssets");
+}
+
+export function writePfReviewErrorProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots = null, resourceAssetsOnly = false, resultProfileName = BINARY_SCOPE_VERIFICATION_PROFILE_NAME }) {
+  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(resultProfileName)) throw new Error("unknown primary result profile");
+  validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots);
+  assertProductionWriterInputs({ root, privateRoot, evaluatorRevision, generationDate, boundaryRoots, resourceAssetsOnly });
   const repositoryRoot = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
   const staging = resolve(tmpdir(), `ask-pf-review-error-production-authority-${randomUUID()}`);
@@ -499,8 +511,8 @@ export function writePfReviewErrorProductionAuthority({ root = ROOT, privateRoot
     runGit(repositoryRoot, ["worktree", "add", "--detach", stagedRepository, evaluatorRevision], "pf-review-error production staging worktree creation");
     worktreeAdded = true;
     cpSync(privateDirectory, stagedPrivate, { recursive: true, force: false, errorOnExist: true });
-    generatePfReviewErrorProductionAuthorityInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate });
-    validatePfReviewErrorProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots });
+    generatePfReviewErrorProductionAuthorityInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate, resultProfileName });
+    validatePfReviewErrorProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots, resourceAssetsOnly });
     assertFrozenInputsUnchanged(repositoryRoot, stagedRepository);
     const transactionId = randomUUID();
     const publicTransactionDirectory = resolve(repositoryRoot, "benchmarks/fixtures/checkpoint-b2", `.pf-review-error-authority-transaction-${transactionId}`);
@@ -508,7 +520,7 @@ export function writePfReviewErrorProductionAuthority({ root = ROOT, privateRoot
     const publicPairs = GENERATED_PUBLIC_ARTIFACTS.map((name) => ({ source: resolve(stagedRepository, PF_REVIEW_ERROR_FIXTURE_ROOT, name), target: resolve(repositoryRoot, PF_REVIEW_ERROR_FIXTURE_ROOT, name), transactionDirectory: publicTransactionDirectory, label: `pf-review-error public ${name}` }));
     const privatePairs = GENERATED_PRIVATE_ARTIFACTS.map((name) => ({ source: resolve(stagedPrivate, name), target: resolve(privateDirectory, name), transactionDirectory: privateTransactionDirectory, label: `pf-review-error private ${name}` }));
     const prepared = preparePublication([...publicPairs, ...privatePairs]);
-    return publishPrepared(prepared, () => validatePfReviewErrorProductionAuthority({ root: repositoryRoot, privateRoot: privateDirectory, boundaryRoots }));
+    return publishPrepared(prepared, () => validatePfReviewErrorProductionAuthority({ root: repositoryRoot, privateRoot: privateDirectory, boundaryRoots, resourceAssetsOnly }));
   } finally {
     if (worktreeAdded) {
       const removal = spawnSync("git", ["-C", repositoryRoot, "worktree", "remove", "--force", stagedRepository], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
@@ -518,7 +530,9 @@ export function writePfReviewErrorProductionAuthority({ root = ROOT, privateRoot
   }
 }
 
-export function validatePfReviewErrorProductionAuthority({ root = ROOT, privateRoot = null, boundaryRoots = null } = {}) {
+export function validatePfReviewErrorProductionAuthority({ root = ROOT, privateRoot = null, boundaryRoots = null, resourceAssetsOnly = false } = {}) {
+  validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots);
+  if (resourceAssetsOnly) assertPrivateRootOutsideRepository(root, privateRoot);
   const fixtureRoot = resolve(root, PF_REVIEW_ERROR_FIXTURE_ROOT);
   const artifacts = Object.fromEntries(PRODUCTION_PUBLIC_ARTIFACTS.map((name) => [name, readJson(resolve(fixtureRoot, name), `pf-review-error ${name}`)]));
   for (const [name, value] of Object.entries(artifacts)) assertAnswerNeutralPublicValue(value, `pf-review-error ${name}`);
@@ -532,6 +546,7 @@ export function validatePfReviewErrorProductionAuthority({ root = ROOT, privateR
   validatePortfolioPolicyArtifacts({ root });
   const requirement = artifacts["requirement-record.json"];
   const output = artifacts["output-contract.json"];
+  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(output.result_profile?.name) || output.result_profile.digest !== computeResultProfileDigest(output.result_profile)) throw new Error("unknown or invalid primary result profile");
   const admission = artifacts["final-admission-record.json"];
   const reference = artifacts["evaluator-reference.json"];
   const authorityManifest = artifacts["evaluator-authority-manifest.json"];
@@ -585,8 +600,8 @@ export function validatePfReviewErrorProductionAuthority({ root = ROOT, privateR
     }
   }
   if (privateRoot) {
-    if (!boundaryRoots) throw new Error("pf-review-error production private validation requires complete boundary roots");
-    const bundle = verifyPrivateEvaluatorBundle({ root, referencePath: resolve(fixtureRoot, "evaluator-reference.json"), privateRoot, manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"), ...boundaryRoots });
+    if (!resourceAssetsOnly && !boundaryRoots) throw new Error("pf-review-error production private validation requires complete boundary roots");
+    const bundle = (resourceAssetsOnly ? evaluatorBoundary.verifyPrivateEvaluatorResourceAssets : verifyPrivateEvaluatorBundle)({ root, referencePath: resolve(fixtureRoot, "evaluator-reference.json"), privateRoot, manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"), ...boundaryRoots });
     validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset: readJson(resolve(privateRoot, "evidence-removal-mutations.json"), "pf-review-error private mutation authority") });
     validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: readJson(resolve(privateRoot, "equivalent-solutions.json"), "pf-review-error private equivalence authority") });
     assertExact(readJson(resolve(privateRoot, "evidence-removal-mutations.json"), "pf-review-error private mutation authority"), mutationAsset, "pf-review-error private mutation authority");
@@ -634,5 +649,5 @@ export function validatePfReviewErrorProductionAuthority({ root = ROOT, privateR
   };
   assertExact(candidate.public_bindings, expectedBindings, "pf-review-error source-freeze public binding closure");
   assertExact(candidate.evaluator_private_binding, { evaluator_revision: reference.evaluator_revision, evaluator_bundle_id: reference.evaluator_bundle_id, evaluator_bundle_digest: reference.evaluator_bundle_digest, evaluator_byte_count: admission.evaluator_byte_count, source_tree_digest: reference.evaluator_source_identity.source_tree_digest, dependency_graph_digest: reference.evaluator_source_identity.dependency_graph.graph_digest }, "pf-review-error source-freeze private binding closure");
-  return { fixtureId: PF_REVIEW_ERROR_FIXTURE_ID, inputDigest: reference.fixture_input_digest, candidateDigest: candidate.candidate_digest, evaluatorBundleId: reference.evaluator_bundle_id, evaluatorBundleDigest: reference.evaluator_bundle_digest, evaluatorRevision: reference.evaluator_revision, evaluatorAuthorityDigest: authorityManifest.manifest_digest, requirementRecordDigest: requirement.requirement_record_digest, requirementSetDigest: requirement.requirement_set_digest, outputContractDigest: output.output_contract_digest, reviewStatus: review.reviewer_status, scoringReady: false };
+  return { fixtureId: PF_REVIEW_ERROR_FIXTURE_ID, inputDigest: reference.fixture_input_digest, candidateDigest: candidate.candidate_digest, evaluatorBundleId: reference.evaluator_bundle_id, evaluatorBundleDigest: reference.evaluator_bundle_digest, evaluatorRevision: reference.evaluator_revision, evaluatorAuthorityDigest: authorityManifest.manifest_digest, requirementRecordDigest: requirement.requirement_record_digest, requirementSetDigest: requirement.requirement_set_digest, outputContractDigest: output.output_contract_digest, reviewStatus: review.reviewer_status, scoringReady: false, ...(resourceAssetsOnly ? { validation_scope: "resource_assets_only", execution_authority: false } : {}) };
 }

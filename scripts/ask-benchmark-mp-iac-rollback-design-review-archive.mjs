@@ -7,6 +7,7 @@ import { computeEvaluatorBundleDigest, computeEvaluatorBundleId } from "./ask-be
 import { assertPrivateRootOutsideRepository } from "./ask-benchmark-mn-build-option-update.mjs";
 import { validateMpIacRollbackDesignProductionAuthority } from "./ask-benchmark-mp-iac-rollback-design-authority.mjs";
 import { validateMpPerformanceInvestigationProductionAuthority } from "./ask-benchmark-mp-performance-investigation-authority.mjs";
+import { validatePfPerformanceProductionAuthority } from "./ask-benchmark-pf-performance-authority.mjs";
 import {
   addUniqueReviewArchiveEntries,
   establishReviewArchiveIdentity,
@@ -59,6 +60,7 @@ function revisionEntry(root, revision, path, prefix = "repository") {
 function productionAuthority(fixtureId, root) {
   if (fixtureId === "mp-iac-rollback-design") return validateMpIacRollbackDesignProductionAuthority({ root });
   if (fixtureId === "mp-performance-investigation") return validateMpPerformanceInvestigationProductionAuthority({ root });
+  if (fixtureId === "pf-performance-regression") return validatePfPerformanceProductionAuthority({ root });
   throw new Error(`review archive fixture is unsupported: ${fixtureId}`);
 }
 
@@ -206,6 +208,10 @@ export function generateMpIacRollbackDesignReviewArchive(options) {
 
 export function generateMpPerformanceInvestigationReviewArchiveFromShared(options) {
   return generateConfiguredFreshSuccessorReviewArchive({ fixtureId: "mp-performance-investigation", program: "mp_performance_investigation_private_review_archive", generatorPath: "scripts/ask-benchmark-mp-performance-investigation-review-archive.mjs" }, options);
+}
+
+export function generatePfPerformanceReviewArchiveFromShared(options) {
+  return generateConfiguredFreshSuccessorReviewArchive({ fixtureId: "pf-performance-regression", program: "pf_performance_regression_private_review_archive", generatorPath: "scripts/ask-benchmark-pf-performance-review-archive.mjs" }, options);
 }
 
 function parse(argv) {

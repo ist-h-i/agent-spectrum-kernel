@@ -235,6 +235,7 @@ jobs:
           node scripts/generate-ask-primary-grading-schemas.mjs --evaluation-v7 --check
           node --test scripts/test-ask-primary-classification-v7.mjs scripts/test-ask-primary-runtime-shell-v7.mjs scripts/test-ask-primary-evaluation-correctness-v7.mjs
           node --experimental-test-module-mocks --test scripts/test-ask-primary-registered-fixture-v7.mjs
+          node --experimental-test-module-mocks --test scripts/test-ask-primary-authority-v2.mjs scripts/test-ask-primary-build-successor-v2.mjs
           node --test scripts/test-ask-primary-command-evidence-v3.mjs
           node --test scripts/test-ask-primary-command-evidence-v4.mjs
           node --test scripts/test-ask-primary-command-literal-word-v5.mjs

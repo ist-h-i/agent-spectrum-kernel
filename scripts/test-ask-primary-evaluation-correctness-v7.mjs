@@ -67,18 +67,36 @@ for (const shell of ['/bin/bash', '/bin/zsh']) test('O7-CHAIN saved synthetic ha
     evaluatorReference: read(s.referencePath), sourceSnapshotDigest: s.sourceSnapshotDigest,
     bundleManifest: { evaluator_bundle_id: read(s.referencePath).evaluator_bundle_id, evaluator_bundle_digest: read(s.referencePath).evaluator_bundle_digest, evaluator_revision: read(s.referencePath).evaluator_revision },
     fragmentBinding: { normalized_result_id: n.normalized_result_id, normalized_result_digest: n.normalized_result_digest, run_instance_id: n.lineage.run_instance_id, case_id: n.lineage.case_id, attempt: n.lineage.attempt } };
-  for (const kind of ['all_pass', 'under', 'over', 'missing']) {
+  const capturedReferences = structuredClone(n.command_evidence.references);
+  for (const kind of ['all_pass', 'under', 'over', 'semantic_invalid', 'semantic_invalid_missing', 'semantic_invalid_manual', 'missing']) {
     if (kind === 'under') Object.assign(fragment.requirement_results[0], { outcome: 'fail', earned_points: 0 });
     if (kind === 'over') fragment.scope_deviations = [{ finding_id: 'artificial-extra', category: 'scope_deviation', severity: 'medium', evidence_references: [ref] }];
-    if (kind === 'missing') { fragment.scope_deviations = []; Object.assign(fragment.requirement_results[0], { outcome: 'pass', earned_points: requirementRecord.requirements[0].max_points }); n.command_evidence.references = []; }
+    if (kind.startsWith('semantic_invalid')) {
+      fragment.scope_deviations = [];
+      Object.assign(fragment.requirement_results[0], { outcome: 'pass', earned_points: requirementRecord.requirements[0].max_points });
+      fragment.evidence_correctness.state = 'fail';
+      fragment.findings = [{ finding_id: 'artificial-false-citation', category: 'invalid_evidence', severity: 'high', evidence_references: [ref] }];
+    }
+    if (kind === 'semantic_invalid_missing' || kind === 'missing') n.command_evidence.references = [];
+    if (kind === 'semantic_invalid_manual') {
+      n.command_evidence.references = structuredClone(capturedReferences);
+      Object.assign(fragment.requirement_results[0], { outcome: 'manual_review_required', earned_points: null });
+    }
+    if (kind === 'missing') { fragment.evidence_correctness.state = 'pass'; fragment.findings = []; Object.assign(fragment.requirement_results[0], { outcome: 'pass', earned_points: requirementRecord.requirements[0].max_points }); }
     const derived = fill();
     const fragmentRaw = Buffer.from(JSON.stringify(fragment));
     Object.assign(authority, { privateFragmentDigest: comparisonHash(fragmentRaw), privateFragmentBytes: fragmentRaw.length,
       privateEvaluationRecordDigest: comparisonHash('inert artificial record, never admission') });
     const result = withPrimarySchemaBuild(() => adaptPrivateEvaluatorFragmentToEnvelope({ root: ROOT, fragment, authority }), { commandEvidenceParserRevision: revision });
-    assert.equal(result.classification ?? null, { all_pass: 'correct_narrow_execution', under: 'under_processing', over: 'over_processing', missing: null }[kind]);
+    assert.equal(result.classification ?? null, { all_pass: 'correct_narrow_execution', under: 'under_processing', over: 'over_processing', semantic_invalid: 'invalid_evidence', semantic_invalid_missing: 'invalid_evidence', semantic_invalid_manual: null, missing: null }[kind]);
+    if (kind.startsWith('semantic_invalid')) {
+      assert.equal(result.evaluation_status, kind === 'semantic_invalid_manual' ? 'manual_review_required' : 'completed');
+      assert.equal(result.verification_correctness.state, kind === 'semantic_invalid_missing' ? 'manual_review_required' : 'pass');
+      assert.equal(Object.hasOwn(result, 'invalid_input_authority'), false);
+      assert.equal(result.evidence_correctness.state, 'fail');
+    }
     assert.equal(result.quality.state, derived.quality); assert.equal(result.completion_claim_correctness.state, derived.quality);
-    assert.equal(validateRequirementResultObservations({ evaluatorResult: result, requirementRecord, normalizedResult: n }).evaluationReady, kind !== 'missing');
+    assert.equal(validateRequirementResultObservations({ evaluatorResult: result, requirementRecord, normalizedResult: n }).evaluationReady, !['missing', 'semantic_invalid_manual'].includes(kind));
     validateResultProfile({ evaluatorResult: result, requirementRecord, normalizedResult: n });
     const forged = structuredClone(result); forged.quality.state = kind === 'all_pass' ? 'fail' : 'pass';
     assert.throws(() => validateResultProfile({ evaluatorResult: forged, requirementRecord, normalizedResult: n }), /quality/u);

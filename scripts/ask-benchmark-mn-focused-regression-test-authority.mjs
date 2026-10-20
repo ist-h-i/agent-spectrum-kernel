@@ -22,6 +22,7 @@ import * as evaluatorBoundary from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import {
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
+  REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME,
   computeFinalAdmissionRecordDigest,
   computeFinalAdmissionRequirementAuthorityDigest,
   computeOutputContractDigest,
@@ -368,7 +369,7 @@ function buildAdmissionReview({ inputDigest, bundle, visiblePaths }) {
   return { ...base, review_package_digest: canonicalDigest(base) };
 }
 
-function generateInPlace({ root, privateRoot, evaluatorRevision, generationDate }) {
+function generateInPlace({ root, privateRoot, evaluatorRevision, generationDate, resultProfileName = BINARY_SCOPE_VERIFICATION_PROFILE_NAME }) {
   validateMnFocusedRegressionTestInputClosure({ root });
   if (!/^[a-f0-9]{40}$/u.test(evaluatorRevision ?? "")) throw new Error("mn-focused-regression evaluator revision is invalid");
   const fixtureRoot = resolve(root, MN_FOCUSED_REGRESSION_FIXTURE_ROOT);
@@ -406,7 +407,7 @@ function generateInPlace({ root, privateRoot, evaluatorRevision, generationDate 
     evaluator_public_reference_path: `${MN_FOCUSED_REGRESSION_FIXTURE_ROOT}/evaluator-reference.json`, evaluator_public_reference_digest: reference.public_metadata_digest,
     verification_command_contract_path: `${MN_FOCUSED_REGRESSION_FIXTURE_ROOT}/verification-command-contract.json`, verification_command_contract_digest: verification.contract_digest,
     scope_boundary_authority_path: `${MN_FOCUSED_REGRESSION_FIXTURE_ROOT}/evidence-map.json`, scope_boundary_authority_digest: authority.evidenceMap.scope_boundary_authority.authority_digest,
-    result_profile: { name: BINARY_SCOPE_VERIFICATION_PROFILE_NAME, digest: computeResultProfileDigest() }, declares_findings: false, ...authorityBinding,
+    result_profile: { name: resultProfileName, digest: computeResultProfileDigest({ name: resultProfileName }) }, declares_findings: false, ...authorityBinding,
   };
   const output = { ...outputBase, output_contract_digest: computeOutputContractDigest(outputBase) };
   writeJson(resolve(fixtureRoot, "output-contract.json"), output);
@@ -464,7 +465,8 @@ function validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoo
   if (resourceAssetsOnly && typeof evaluatorBoundary.verifyPrivateEvaluatorResourceAssets !== "function") throw new Error("resource-assets-only validation requires verifyPrivateEvaluatorResourceAssets");
 }
 
-export function writeMnFocusedRegressionTestProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots = null, resourceAssetsOnly = false }) {
+export function writeMnFocusedRegressionTestProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots = null, resourceAssetsOnly = false, resultProfileName = BINARY_SCOPE_VERIFICATION_PROFILE_NAME }) {
+  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(resultProfileName)) throw new Error("unknown primary result profile");
   validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots);
   if (!privateRoot || !existsSync(privateRoot) || !lstatSync(privateRoot).isDirectory() || lstatSync(privateRoot).isSymbolicLink()) throw new Error("mn-focused-regression writer requires an existing non-symlink private root");
   assertPrivateRootOutsideRepository(root, privateRoot);
@@ -489,7 +491,7 @@ export function writeMnFocusedRegressionTestProductionAuthority({ root = ROOT, p
     worktreeAdded = true;
     cpSync(privateDirectory, stagedPrivate, { recursive: true, force: false, errorOnExist: true });
     assertFlatRegularAuthorityDirectory(stagedPrivate, "mn-focused-regression staged private root");
-    generateInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate });
+    generateInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate, resultProfileName });
     validateMnFocusedRegressionTestProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots, resourceAssetsOnly });
     if (!inputBefore.equals(readFileSync(resolve(stagedRepository, MN_FOCUSED_REGRESSION_FIXTURE_ROOT, "input-manifest.json"))) || !verificationBefore.equals(readFileSync(resolve(stagedRepository, MN_FOCUSED_REGRESSION_FIXTURE_ROOT, "verification-command-contract.json"))) || stableCanonicalJson(frozenBefore) !== stableCanonicalJson(agentVisibleFiles(resolve(stagedRepository, MN_FOCUSED_REGRESSION_FIXTURE_ROOT)))) throw new Error("mn-focused-regression production generation changed frozen agent-visible inputs");
     const transaction = randomUUID();
@@ -523,6 +525,7 @@ export function validateMnFocusedRegressionTestProductionAuthority({ root = ROOT
   validatePortfolioPolicyArtifacts({ root });
   const requirement = artifacts["requirement-record.json"];
   const output = artifacts["output-contract.json"];
+  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(output.result_profile?.name) || output.result_profile.digest !== computeResultProfileDigest(output.result_profile)) throw new Error("unknown or invalid primary result profile");
   const admission = artifacts["final-admission-record.json"];
   const reference = artifacts["evaluator-reference.json"];
   const manifest = artifacts["evaluator-authority-manifest.json"];
