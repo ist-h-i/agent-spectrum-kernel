@@ -344,8 +344,8 @@ function commitHistoricalResolverFixture(repositoryRoot, message) {
 function withHistoricalResolverClone(label, callback) {
   const repositoryRoot = mkdtempSync(resolve(tmpdir(), `ask-mn-r21-${label}-`));
   removeTree(repositoryRoot);
-  execFileSync("git", ["clone", "--local", root, repositoryRoot], { stdio: "ignore" });
   try {
+    execFileSync("git", ["clone", "--local", root, repositoryRoot], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
     callback(repositoryRoot);
   } finally {
     removeTree(repositoryRoot);

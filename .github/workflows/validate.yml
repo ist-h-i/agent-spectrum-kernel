@@ -5,6 +5,32 @@ on:
   workflow_dispatch:
 
 jobs:
+  historical-local-clone-diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Record exact local clone failure without changing clone policy
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { mkdtempSync, rmSync } from 'node:fs';
+          import { tmpdir } from 'node:os';
+          import { join } from 'node:path';
+          import { spawnSync } from 'node:child_process';
+          const parent = mkdtempSync(join(tmpdir(), 'ask-ci-local-clone-diagnostic-'));
+          try {
+            const result = spawnSync('git', ['clone', '--local', process.cwd(), join(parent, 'repository')], { encoding: 'utf8' });
+            console.log(JSON.stringify({ status: result.status, signal: result.signal, stdout: result.stdout, stderr: result.stderr, error: result.error?.message }));
+            assert.equal(result.status, 0, result.stderr);
+          } finally {
+            rmSync(parent, { recursive: true, force: true });
+          }
+          NODE
   validate:
     runs-on: ubuntu-latest
     steps:
