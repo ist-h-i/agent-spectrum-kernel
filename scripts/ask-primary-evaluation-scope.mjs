@@ -9,7 +9,7 @@ import { verifyPrimaryEvaluationProducer } from './ask-primary-evaluation-produc
 import { primaryScoringRoot, primaryProcessingDescriptor, readPrimaryScoringVersion,
   PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH, isPrimaryScoringFixtureId } from './ask-primary-scoring-version.mjs';
 import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_EVALUATION_CONDITIONS, getPrimaryEvaluationProfile, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
-import { PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION } from './ask-benchmark-command-evidence.mjs';
+import { PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION } from './ask-benchmark-command-evidence.mjs';
 
 const state = new AsyncLocalStorage(), resourceGraphState = new AsyncLocalStorage(), logFailures = new WeakMap(), ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const PRIMARY_PROFILE_CONDITIONS = PRIMARY_EVALUATION_CONDITIONS;
@@ -27,7 +27,7 @@ function run(value, callback, allowSchemaRecheck = false) {
 export function withPrimarySchemaBuild(callback, { profileId = PRIMARY_EVALUATION_PROFILE_ID, commandEvidenceParserRevision } = {}) {
   const profile = getPrimaryEvaluationProfile(profileId), current = active();
   commandEvidenceParserRevision ??= current?.commandEvidenceParserRevision ?? PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
-  if (![PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(commandEvidenceParserRevision)) throw new Error('primary_unknown_command_evidence_revision');
+  if (![PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION].includes(commandEvidenceParserRevision)) throw new Error('primary_unknown_command_evidence_revision');
   if (current?.verified && current.profile.id !== profile.id) throw new Error('primary_schema_build_profile_mix_refused');
   if (current?.verified && current.commandEvidenceParserRevision !== commandEvidenceParserRevision) throw new Error('primary_schema_build_processing_mix_refused');
   return run({ building: true, grading: false, profile, commandEvidenceParserRevision }, callback, Boolean(current?.verified));
@@ -92,7 +92,7 @@ function pinnedHistoricalGraph(root,fixtureId,binding,scoringVersion = null) {
   const version = scoringVersion ? readPrimaryScoringVersion(scoringVersion, fixtureId) : null;
   const fixedRoot = version?.root ?? primaryScoringRoot({ fixture_id: fixtureId, grading: { scoring_version: null } });
   if (scoringVersion && root !== fixedRoot) throw new Error('primary_resource_graph_scoring_version_root_changed');
-  const evaluationVersion = version?.processing?.command_evidence_parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION ? 'ask_primary_scoring_version_v7' : null;
+  const evaluationVersion = version?.processing?.command_evidence_parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION ? 'ask_primary_scoring_version_v8' : version?.processing?.command_evidence_parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION ? 'ask_primary_scoring_version_v7' : null;
   if(!isPrimaryScoringFixtureId(fixtureId,{evaluationVersion})||binding.fixture_id!==fixtureId||!['primary_single_shot_v1','primary_principles_v2_single_shot_v1'].includes(binding.profile_id))throw new Error('primary_resource_graph_binding_invalid');
   if(resolve(root)!==root||realpathSync(root)!==root)throw new Error('primary_resource_graph_root_invalid');
   const base=`benchmarks/fixtures/checkpoint-b2/${fixtureId}/`,read=path=>readStableFile(path,'primary historical public graph pin',33554432).bytes;
@@ -148,7 +148,7 @@ export function primaryGradingSchemaPath(path) {
   }
   for (const name of PRIMARY_PROFILE_SCHEMAS) if (path.endsWith(`/benchmarks/schemas/${name}.schema.json`)) {
     const selected = active().commandEvidenceParserRevision;
-    const version = selected === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION && ['portfolio-command-evidence', 'evaluator-result-envelope'].includes(name) ? '-saved-v7' : name === 'portfolio-command-evidence'
+    const version = selected === PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION && ['portfolio-command-evidence', 'normalized-portfolio-result', 'evaluator-result-envelope', 'portfolio-engineering-result'].includes(name) ? '-saved-v8' : selected === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION && ['portfolio-command-evidence', 'evaluator-result-envelope'].includes(name) ? '-saved-v7' : name === 'portfolio-command-evidence'
       ? selected === PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION ? '-saved-v6' : selected === PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION ? '-saved-v5' : selected === PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION ? '-saved-v4' : selected === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION ? '-saved-v3'
         : selected === PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION ? '-saved-v2' : '' : '';
     return join(ROOT, `benchmarks/schemas/${activeProfile().schema_prefix}${version}-${name}.schema.json`);

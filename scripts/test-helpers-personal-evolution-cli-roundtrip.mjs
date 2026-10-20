@@ -9,6 +9,7 @@ import { join, resolve } from "node:path";
 import { canonicalDigest, readContentAddressedJson } from "./content-addressed-store.mjs";
 import { setup, fakeEngineeringTemplate, collectSyntheticGrade } from "./test-helpers-personal-evolution-primary-pair.mjs";
 import { CANONICAL_PRIMARY_FIXTURE_IDS } from "./ask-primary-fixture-recipe.mjs";
+import { syntheticV8ScoringVersion } from './test-helpers-primary-evaluation-v8.mjs';
 import { syntheticV7ScoringVersion } from "./test-helpers-primary-evaluation-v7.mjs";
 import { comparisonHash } from "./ask-user-comparison-prepare.mjs";
 import { setupPrimaryScoringVersion } from "./test-helpers-primary-scoring-version.mjs";
@@ -26,12 +27,13 @@ function files(root) { return Object.fromEntries(readdirSync(root, { withFileTyp
   const path = join(root, entry.name); return entry.isDirectory() ? Object.entries(files(path)) : [[path, comparisonHash(readFileSync(path))]];
 })); }
 
-export function personalCliRoundtrip(fixtureSet) {
+export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7" } = {}) {
+  assert.ok(["v7","v8"].includes(scoringVersion));
   const scope = fixtureSet === "catalog24" ? "configured target → source review → saved comparison/readout"
     : "configured target → source review → saved comparison → explicit hold → fresh request";
-  test(`same CLI ${fixtureSet}: ${scope}; lost returns never repeat dispatch`, async t => {
+  test(`same CLI ${fixtureSet}/${scoringVersion}: ${scope}; lost returns never repeat dispatch`, async t => {
     const fixtureIds = fixtureSet === "catalog24" ? CANONICAL_PRIMARY_FIXTURE_IDS : [fixtureId];
-    const scoring = fixtureSet === "catalog24" ? syntheticV7ScoringVersion(t, { fixtureIds, fixtureSet }) : setupPrimaryScoringVersion(t);
+    const scoring = fixtureSet === "catalog24" ? (scoringVersion === "v8" ? syntheticV8ScoringVersion : syntheticV7ScoringVersion)(t, { fixtureIds, fixtureSet }) : setupPrimaryScoringVersion(t);
     const pending = setup(t, { fixtureIds, deferGeneration: true, portfolioBudgets: { cost_policy: "subscription_no_additional_spend_v1" },
       entryCostEstimate: { token_count: { status: "known", value: 1 }, duration_ms: { status: "known", value: 1 }, cost_microunits: { status: "unknown", value: null } },
       availableBudget: { token_count: { status: "known", value: 90000000 }, duration_ms: { status: "known", value: 604800000 }, cost_microunits: { status: "unknown", value: null } } });
