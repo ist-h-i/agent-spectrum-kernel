@@ -100,16 +100,16 @@ node scripts/test-release-install-recovery.mjs
 
 ## 現在使えるものと検証中のもの
 
-以下は **2026-10-20、main [`4c0b9d3`](https://github.com/ist-h-i/agent-spectrum-kernel/commit/4c0b9d348cc5c705ba1a72f20df3a79660a9d857) 時点**の実装・記録の要約です。日々の進捗はリンク先で確認してください。
+以下は **2026-10-20、main [`8cf5bd6`](https://github.com/ist-h-i/agent-spectrum-kernel/commit/8cf5bd64c3032a7c895eb46b80f4716c71e74a87) 時点**の実装・記録の要約です。日々の進捗はリンク先で確認してください。
 
 | 領域 | 存在する実装・記録 | そこからは言えないこと・残る確認 |
 | --- | --- | --- |
 | 開発手順と導入 | Kernel、Skill、adapter、setup / doctor、モデル不要の導入復旧試験 | 導入先での工程適用、実務上の品質改善、全環境での動作 |
 | 証拠と採否判断 | 証拠再利用、Asset Registry、Portfolio、Evolutionの契約と実装 | 保存・登録・採用判断だけで実適用や有効性が成立すること |
 | 個人改善CLI | Prompt候補から比較・確認・人の判断へつなぐ入口と合成試験 | 任意Skillの自律改善、Mac設定への自動適用、実運用の成功 |
-| 24課題評価 | 公開入力・契約・portfolio登録24件。明示`catalog24`によるP / K2 / Fの72枠準備、CLIでの選択、fake比較・採点処理 | 全24課題のprivate採点・native受入の完成、実モデルでの比較結果 |
+| 24課題評価 | 公開入力・契約・portfolio登録24件。明示`catalog24`によるP / K2 / Fの72枠準備、CLIでの選択、v2採点資産接続、v8有限操作観測の保存採点対応と合成試験 | 全24課題のnative受入の完成、認証済みの性能実測、実モデルでの比較結果 |
 
-24課題の基盤はPR407/408でmainへ統合済みです。この確認時点で [PR409](https://github.com/ist-h-i/agent-spectrum-kernel/pull/409) は開発中のDraftで、採点・受入の追加作業が残っています。課題別の根拠と残件は [組立・採点検証状況](docs/primary-24-task-assembly.md)、公開入力と未実行枠の扱いは [公開入力点検](docs/primary-24-public-inputs.md) を参照してください。
+24課題の基盤に加え、PR409/410の採点資産接続と操作試行観測もmainへ統合済みです。[v2採点資産の接続](docs/primary-24-private-v2.md) と [v8有限操作観測の範囲](docs/primary-24-unsafe-action-v8.md) は実装と合成試験の証拠を示し、実native受入・性能実測・ASKの優位性とは区別しています。課題別の根拠と残件は [組立・採点検証状況](docs/primary-24-task-assembly.md)、公開入力と未実行枠の扱いは [公開入力点検](docs/primary-24-public-inputs.md) を参照してください。
 
 実装の存在、合成試験、実モデルの測定、実務での効果はそれぞれ別の証拠です。[リリース判定資料](docs/release-package-2026-10.md) も対象revisionと日付を持つ記録であり、その後の開発を自動的に完成扱いにはしません。
 

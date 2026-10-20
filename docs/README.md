@@ -44,6 +44,7 @@
 | --- | --- |
 | 過去の比較と不利な結果を含む測定 | [benchmark定義](../benchmarks/)、[B2報告](../benchmarks/results/checkpoint-b2-report.md)、[C報告](../benchmarks/results/checkpoint-c-report.md)、[保存結果一覧](../benchmarks/results/) |
 | 24課題の公開入力・組立・採点の未完事項 | [公開入力点検](primary-24-public-inputs.md)、[組立・採点検証状況](primary-24-task-assembly.md)、[正本catalog](../benchmarks/portfolio-catalog.json) |
+| v2採点資産・v8有限操作観測の接続と限界 | [v2資産接続](primary-24-private-v2.md)、[v8保存採点](primary-24-unsafe-action-v8.md) |
 | 利用者repoで比較する・環境差を記録する | [Mac / Codex三条件比較](user-repository-comparison-mac-codex-ja.md)、[探索的評価](pragmatic-evaluation.md) |
 | モデル不要のlocal eval・Full準備・実行境界 | [配布とplatform経路](local-eval-distribution.md)、[Full静的準備](local-full-static-preparation.md)、[三条件比較](local-three-arm-comparison.md)、[Codex接続](local-codex-connection.md)、[probe / evaluation開始境界](local-codex-admission.md) |
 | 従来構成とSkillゼロのCore Bundleの違い | [Core Bundle実装・導入・未検証範囲](ask-core-bundle-implementation.md)、[製品の原則](../products/ask-core-bundle/AGENTS.md) |
