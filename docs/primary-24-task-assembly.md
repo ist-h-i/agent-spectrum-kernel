@@ -18,7 +18,8 @@ archive helper・試験をそのまま取り込んだ。新しい課題を作り
 | hi-financial-state-integrity | #363 / e7099dde0adfa140c391177d18c5970ecab5ba32 | 公開資産・既存rubricと例あり。whole admission未完 |
 | hi-versioned-migration-safety | #364 / cf95a81330858e441a1b447ee5b7d01f4678bfdb | 公開資産・既存rubricと例あり。whole admission未完 |
 
-公開入力・成果物・要件契約・portfolio登録は24件。個人比較の既存入口も明示選択`catalog24`で24件へ拡張した。
+公開入力・成果物・要件契約・portfolio登録は24件。既存primary evaluation batch入口を
+明示選択`catalog24`で24件へ拡張した。個人ループCLI/pair/driverは別経路で、従来9件内の選択のままである。
 既定の`legacy9`は元の9件・順序・予算を維持する。
 公開点検の成功、採点処理のdeveloper control成功、固定resourceとの接続、独立admission、
 一括比較の動作を別々に確認する。24件の完成とはまだ報告しない。
@@ -147,6 +148,7 @@ carrierは人工値であり認証済み実計測の受入証拠にはしない�
 | 実装済み・統合済み | recipe/batch/prepare/gradingとv2公開task bindingの正本24件対応 | 実公開入力とv7 selectorを使う72枠準備2/2、recipe/batch fake43/43。モデル・grader起動なし |
 | 実装済み・共通source固定と受入待ち | 性能のsealed stdout consumerと未凍結private処理 | 既存evaluationInputEvidenceRoot経由のrecord/body、normalized lineage、command digest、loaded source digest、最終source、raw samplesを照合。pure8/8、人工private control9/9。別の証拠経路は作らない |
 | 実装済み・統合済み | PR408の分類・shell parser・v7登録集合API | 実APIで3/3。24件すべての選択resource検証と新15件のうち1件のproducer/scope接続を確認。v1〜v6は9件限定を維持 |
+| 後続の実装 | 個人ループCLI/pair/driverの24件選択 | primary batch拡張は自動伝播しない。v7 selector・全24件の集合・両role resource・予算を整合させて既存driverへ接続する必要がある |
 | 通常権限での検証待ち | client r10の既存隔離による正常・不良例 | 拒否対象を権限変更や隔離外経路で再実行しない。通常権限の受入証拠を別途取得するまで未検証 |
 | 通常権限での検証待ち | focused-regressionの13固定例の挙動受入 | 通常権限の固定正常1件はcoverage manual/null。既存隔離で観測が成立するまでは未検証 |
 | 実装不足／通常権限での検証待ち | 候補7件の課題別安全・rollback観測とwhole admission | carrierの存在を安全証明にせず、対応付けを実装し、観測不足はunknownのまま独立reviewへ渡す |

@@ -20,7 +20,8 @@ Mac / Codex の導入で得られるものは、プロジェクト内の判断�
 
 [既存24課題の公開入力点検](docs/primary-24-public-inputs.md) は、同じbenchmark入口から
 24件の列挙・入力準備・再検証と、不足理由・未評価の72枠の保存を行います。
-既存候補を含む24件の公開入力、契約23件・個人比較登録9件の差と残る依存を示します。
+公開入力・契約・portfolio登録は24件で、primary evaluation batchは明示`catalog24`で72枠を準備できます。
+個人ループCLIは従来9件内の選択を維持し、全24件のprivate採点・native受入は別途必要です。
 [24課題の組立・採点検証状況](docs/primary-24-task-assembly.md) に課題別の完成作業を記録します。
 
 [既存9課題で個人ループを一巡する手順](docs/personal-evolution-primary-loop.md) は、
