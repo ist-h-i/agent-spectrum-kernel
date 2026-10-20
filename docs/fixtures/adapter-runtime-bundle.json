@@ -555,7 +555,7 @@
       "evaluator_result_schema_path": "benchmarks/schemas/evaluator-result-envelope.schema.json",
       "evaluator_result_schema_file_sha256": "60729a9f3fbca22910e823854bbadbb8cd4f53321d14ad0088f375fed8a27024",
       "scoring_contract_validator_path": "scripts/ask-benchmark-scoring-contract.mjs",
-      "scoring_contract_validator_file_sha256": "7e0d9a821d23bffbc15c5ed38fb1e7f3a6e299e00a2024d2c80e6a9a036c940b",
+      "scoring_contract_validator_file_sha256": "2327b427da687ad784a96b97a2fa49d03ed9d35016e23a1f8bc655cff24afc0f",
       "scoring_authority_validator_path": "scripts/ask-benchmark-evaluator-boundary.mjs",
       "scoring_authority_validator_file_sha256": "12abd8c977d17f4ca51994ba3484531ef29fae38c0ee070cf634635000c9b9d0",
       "engineering_result_schema_path": "benchmarks/schemas/portfolio-engineering-result.schema.json",
@@ -842,7 +842,7 @@
       "measured_execution_performed": false,
       "private_evaluator_included": false,
       "validator_path": "scripts/ask-benchmark-mn-build-option-update.mjs",
-      "validator_file_sha256": "d51640759283df4171b685fbb349caee18e97496928a3498f41a707c2c4e47da",
+      "validator_file_sha256": "1a118585a3b0a83243603a63f0036dcbdb480406acfae48312c21c852206492a",
       "focused_test_path": "scripts/test-ask-benchmark-mn-build-option-update.mjs",
       "focused_test_file_sha256": "bc7b3a2fc6cae5e0023bb6f5882d38e01431ab0146beb7e36a08fece2acb5690"
     }
