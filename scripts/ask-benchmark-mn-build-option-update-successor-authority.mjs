@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import * as scoringContract from "./ask-benchmark-scoring-contract.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -7,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { validateMnBuildOptionUpdatePublicFixture } from "./ask-benchmark-mn-build-option-update.mjs";
-import { BINARY_SCOPE_VERIFICATION_PROFILE_NAME, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME,
+import { BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
   computeResultProfileDigest, computeOutputContractDigest, computeScoringInputFreezeManifestDigest } from "./ask-benchmark-scoring-contract.mjs";
 import { prepareAuthorityPublication, publishPreparedAuthority } from "./ask-benchmark-authority-publication.mjs";
 
@@ -55,7 +56,7 @@ function binding(root, name, updates = new Map()) {
 }
 
 export function finalizeMnBuildOptionUpdateSuccessorAuthority({ root = ROOT, privateRoot, resultProfileName = BINARY_SCOPE_VERIFICATION_PROFILE_NAME } = {}) {
-  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(resultProfileName)) throw new Error("unknown build result profile");
+  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, scoringContract.REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(resultProfileName)) throw new Error("unknown build result profile");
   if (!privateRoot || !existsSync(privateRoot) || !lstatSync(privateRoot).isDirectory() || lstatSync(privateRoot).isSymbolicLink()) throw new Error("mn-build successor finalizer requires an existing non-symlink private root");
   const repository = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);

@@ -1,3 +1,4 @@
+import * as scoringContract from "./ask-benchmark-scoring-contract.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { constants, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync } from "node:fs";
@@ -22,7 +23,6 @@ import * as evaluatorBoundary from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import {
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
-  REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME,
   computeFinalAdmissionRecordDigest,
   computeFinalAdmissionRequirementAuthorityDigest,
   computeOutputContractDigest,
@@ -438,7 +438,7 @@ function validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoo
 }
 
 export function writeMpAccessibilityInteractionReviewProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots = null, resourceAssetsOnly = false, resultProfileName = BINARY_SCOPE_VERIFICATION_PROFILE_NAME }) {
-  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(resultProfileName)) throw new Error("unknown primary result profile");
+  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, scoringContract.REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(resultProfileName)) throw new Error("unknown primary result profile");
   validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots);
   if (!privateRoot || !existsSync(privateRoot) || !lstatSync(privateRoot).isDirectory() || lstatSync(privateRoot).isSymbolicLink()) throw new Error("mp-accessibility writer requires an existing non-symlink private root");
   assertPrivateRootOutsideRepository(root, privateRoot);
@@ -495,7 +495,7 @@ export function validateMpAccessibilityInteractionReviewProductionAuthority({ ro
   validatePortfolioPolicyArtifacts({ root });
   const requirement = artifacts["requirement-record.json"];
   const output = artifacts["output-contract.json"];
-  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(output.result_profile?.name) || output.result_profile.digest !== computeResultProfileDigest(output.result_profile)) throw new Error("unknown or invalid primary result profile");
+  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, scoringContract.REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(output.result_profile?.name) || output.result_profile.digest !== computeResultProfileDigest(output.result_profile)) throw new Error("unknown or invalid primary result profile");
   const admission = artifacts["final-admission-record.json"];
   const reference = artifacts["evaluator-reference.json"];
   const manifest = artifacts["evaluator-authority-manifest.json"];
