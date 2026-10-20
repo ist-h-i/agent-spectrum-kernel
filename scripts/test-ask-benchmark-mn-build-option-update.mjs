@@ -344,8 +344,9 @@ function commitHistoricalResolverFixture(repositoryRoot, message) {
 function withHistoricalResolverClone(label, callback) {
   const repositoryRoot = mkdtempSync(resolve(tmpdir(), `ask-mn-r21-${label}-`));
   removeTree(repositoryRoot);
-  execFileSync("git", ["clone", "--local", root, repositoryRoot], { stdio: "ignore" });
   try {
+    // CI checkout and tmpdir can be separate devices; fixtures need independent objects.
+    execFileSync("git", ["clone", "--local", "--no-hardlinks", root, repositoryRoot], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
     callback(repositoryRoot);
   } finally {
     removeTree(repositoryRoot);
@@ -3443,8 +3444,9 @@ async function runPrivatePortabilityChecks(privateRoot) {
   }
 
   const alternate = mkdtempSync(resolve(tmpdir(), "ask-mn-r7-repository-copy-"));
+  temporaryAuthorityRoots.add(alternate);
   rmSync(alternate, { recursive: true, force: true });
-  execFileSync("git", ["clone", "--local", root, alternate], { stdio: "ignore" });
+  execFileSync("git", ["clone", "--local", "--no-hardlinks", root, alternate], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   copyCurrentFixtureAuthority(alternate);
   const evaluator = await import(pathToFileURL(hiddenTestsPath).href);
   const commandContract = readJson(resolve(alternate, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/verification-command-contract.json"));
@@ -3488,8 +3490,9 @@ async function runPrivatePortabilityChecks(privateRoot) {
   await assert.rejects(() => evaluator.evaluateCandidate({ repositoryRoot: alternateRepositoryRoot, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true }), /source .*bytes drifted|sealed repository|authority/u, "sealed source transplant must fail closed");
 
   const symlinkRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-r7-symlink-copy-"));
+  temporaryAuthorityRoots.add(symlinkRoot);
   rmSync(symlinkRoot, { recursive: true, force: true });
-  execFileSync("git", ["clone", "--local", root, symlinkRoot], { stdio: "ignore" });
+  execFileSync("git", ["clone", "--local", "--no-hardlinks", root, symlinkRoot], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   copyCurrentFixtureAuthority(symlinkRoot);
   const symlinkTarget = resolve(symlinkRoot, "scripts/ask-benchmark-scoring-contract.mjs");
   rmSync(symlinkTarget);
@@ -3505,8 +3508,9 @@ async function runPrivatePortabilityChecks(privateRoot) {
   }), /symlink|regular file/u, "symlinked public module must fail closed");
 
   const graphRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-r8-graph-copy-"));
+  temporaryAuthorityRoots.add(graphRoot);
   rmSync(graphRoot, { recursive: true, force: true });
-  execFileSync("git", ["clone", "--local", root, graphRoot], { stdio: "ignore" });
+  execFileSync("git", ["clone", "--local", "--no-hardlinks", root, graphRoot], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   const graphEvaluator = await import(pathToFileURL(hiddenTestsPath).href);
   const graphFrozen = resolve(graphRoot, "r8-frozen");
   const graphCandidate = resolve(graphRoot, "r8-candidate");

@@ -145,3 +145,101 @@ test('O7-OLD missing-first verification semantics remain v1-only', () => {
   input.normalizedResult.command_evidence.required_command_ids.push('not-run');
   assert.equal(scoring.deriveEffectiveVerificationEvidenceState(input), 'missing');
 });
+
+function setDerivedObservations(input, derived = derive(input)) {
+  const result = input.evaluatorResult;
+  result.evaluation_status = derived.evaluation_status;
+  if (derived.classification === null) delete result.classification; else result.classification = derived.classification;
+  for (const row of result.requirement_results) Object.assign(row, { scope_deviation_references: [], verification_evidence_references: [] });
+  for (const field of ['quality', 'decision_correctness', 'completion_claim_correctness', 'under_processing', 'over_processing'])
+    result[field] = { state: derived[field], evidence_references: structuredClone(derived.evidence_references) };
+  result.verification_correctness = { state: derived.verification_correctness,
+    evidence_references: scoring.deriveEffectiveVerificationEvidenceReferences({ ...input, state: derived.verification_evidence_state }) };
+  return input;
+}
+
+for (const command of ['success', 'missing', 'unavailable']) test('P24V2-SEMANTIC invalid candidate evidence is independent of command authority: ' + command, () => {
+  const input = failRequirement(example());
+  const candidateRef = { kind: 'final_output', digest, bytes: 8 };
+  input.evaluatorResult.evidence_correctness = { state: 'fail', evidence_references: [candidateRef] };
+  input.evaluatorResult.findings.push({ finding_id: 'fabricated-citation', category: 'invalid_evidence', severity: 'high', evidence_references: [candidateRef] });
+  if (command === 'missing') input.normalizedResult.command_evidence.references = [];
+  if (command === 'unavailable') input.normalizedResult.command_evidence.evidence_level = 'unavailable';
+  const rows = structuredClone(input.evaluatorResult.requirement_results), result = derive(input);
+  assert.equal(result.evaluation_status, 'completed');
+  assert.equal(result.classification, 'invalid_evidence');
+  assert.equal(result.quality, 'fail');
+  assert.equal(result.verification_correctness, command === 'success' ? 'pass' : 'manual_review_required');
+  assert.ok(result.evidence_references.some(ref => ref.kind === 'final_output'), 'candidate precision evidence must reach the global judgment');
+  assert.deepEqual(input.evaluatorResult.requirement_results, rows, 'task points and evidence remain unchanged');
+  assert.equal(scoring.validateRequirementScopeVerificationResult(setDerivedObservations(input, result)), 'invalid_evidence');
+  assert.equal(Object.hasOwn(input.evaluatorResult, 'invalid_input_authority'), false, 'task precision failure must not manufacture input authority');
+  assert.ok(input.evaluatorResult.verification_correctness.evidence_references.every(ref => ref.kind !== 'final_output'));
+});
+
+test('P24V2-SEMANTIC classification or status declarations cannot manufacture input failure', () => {
+  for (const field of ['classification', 'evaluation_status']) {
+    const input = setDerivedObservations(example());
+    input.evaluatorResult[field] = field === 'classification' ? 'invalid_evidence' : 'invalid_input';
+    assert.equal(derive(input).verification_correctness, 'pass');
+    assert.throws(() => scoring.validateRequirementScopeVerificationResult(input), /does not rederive/u);
+  }
+});
+
+for (const source of ['observation', 'finding']) for (const field of ['digest', 'bytes']) test(`P24V2-SEMANTIC causal ${source} ${field} must bind the final output`, () => {
+  const input = example(), reference = { kind: 'final_output', digest, bytes: 8 };
+  input.evaluatorResult.evidence_correctness = { state: 'fail', evidence_references: source === 'observation' ? [reference] : [ref] };
+  input.evaluatorResult.findings.push({ finding_id: 'bad-citation', category: 'invalid_evidence', severity: 'high', evidence_references: source === 'finding' ? [reference] : [ref] });
+  reference[field] = field === 'digest' ? 'sha256:' + 'b'.repeat(64) : 9;
+  setDerivedObservations(input);
+  assert.throws(() => scoring.validateRequirementScopeVerificationResult(input), /close.*final output/u);
+});
+
+for (const outcome of ['manual_review_required', 'not_evaluated', 'unavailable']) test('P24V2-SEMANTIC unknown requirement remains null with a known false citation: ' + outcome, () => {
+  const input = example();
+  for (const row of input.evaluatorResult.requirement_results) Object.assign(row, { matched_equivalence_class_ids: [], finding_ids: [] });
+  Object.assign(input.evaluatorResult.requirement_results[0], { outcome, earned_points: null });
+  input.evaluatorResult.evidence_correctness.state = 'fail';
+  const derived = derive(input);
+  assert.equal(derived.evaluation_status, 'manual_review_required');
+  assert.equal(derived.classification, null);
+  assert.equal(derived.quality, 'manual_review_required');
+  assert.equal(derived.verification_correctness, 'pass');
+  setDerivedObservations(input, derived);
+  assert.equal(scoring.validateRequirementResultObservations(input).evaluationReady, false);
+  assert.equal(scoring.validateRequirementScopeVerificationResult(input), null);
+  assert.equal(input.evaluatorResult.requirement_results[0].earned_points, null);
+  assert.equal(input.evaluatorResult.evidence_correctness.state, 'fail');
+});
+
+test('P24V2-INPUT real invalid command evidence still requires exact typed authority', () => {
+  const input = example(); input.normalizedResult.command_evidence.references[0].exit_code = 1;
+  const derived = derive(input);
+  assert.equal(derived.evaluation_status, 'invalid_input');
+  setDerivedObservations(input, derived);
+  input.evaluatorResult.evidence_correctness.state = 'fail';
+  assert.throws(() => scoring.validateRequirementScopeVerificationResult(input), /typed invalid-input authority/u);
+  input.evaluatorResult.invalid_input_authority = { layer: 'command_evidence', category: 'normalized_command_evidence_invalid', code: 'invalid-command-state', evidence_references: [ref] };
+  input.evaluatorResult.findings.push({ finding_id: 'invalid-command-state', category: 'normalized_command_evidence_invalid', severity: 'high', evidence_references: [ref] });
+  setDerivedObservations(input);
+  assert.equal(scoring.validateRequirementScopeVerificationResult(input), 'invalid_evidence');
+  for (const variant of ['category', 'reference']) {
+    const forged = structuredClone(input);
+    if (variant === 'category') forged.evaluatorResult.invalid_input_authority.category = 'invented';
+    else forged.evaluatorResult.invalid_input_authority.evidence_references[0].digest = 'sha256:' + 'b'.repeat(64);
+    assert.throws(() => scoring.validateRequirementScopeVerificationResult(forged), /category|close/u);
+  }
+});
+
+test('P24V2-INPUT typed failure category alone is not an input authority', () => {
+  const input = example();
+  input.evaluatorResult.findings.push({ finding_id: 'unsupported-authority-claim', category: 'candidate_source_invalid', severity: 'high', evidence_references: [ref] });
+  assert.throws(() => derive(input), /typed.*authority/u);
+});
+
+test('P24V2-OLD legacy classification continues to select invalid verification', () => {
+  const input = example();
+  input.evaluatorResult.result_profile = { name: 'binary_scope_verification_v1', digest: scoring.computeResultProfileDigest() };
+  input.evaluatorResult.classification = 'invalid_evidence';
+  assert.equal(scoring.deriveEffectiveVerificationEvidenceState(input), 'invalid');
+});

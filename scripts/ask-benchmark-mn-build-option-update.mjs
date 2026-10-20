@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import * as scoringContract from "./ask-benchmark-scoring-contract.mjs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
@@ -368,7 +369,7 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
   if (outputContract.verification_command_contract_path !== `${FIXTURE_ROOT_RELATIVE}/verification-command-contract.json` || outputContract.verification_command_contract_digest !== verificationContract.contract_digest) throw new Error("output contract verification-command binding mismatch");
   if (outputContract.scope_boundary_authority_path !== `${FIXTURE_ROOT_RELATIVE}/evidence-map.json` || outputContract.scope_boundary_authority_digest !== artifacts["evidence-map.json"].scope_boundary_authority.authority_digest) throw new Error("output contract scope-boundary binding mismatch");
   if (outputContract.evaluator_authority_manifest_path !== expectedEvaluatorAuthority.path || outputContract.evaluator_authority_manifest_raw_sha256 !== expectedEvaluatorAuthority.raw || outputContract.evaluator_authority_manifest_digest !== expectedEvaluatorAuthority.semantic) throw new Error("output contract evaluator authority-manifest binding mismatch");
-  if (outputContract.result_profile?.name !== BINARY_SCOPE_VERIFICATION_PROFILE_NAME || outputContract.result_profile.digest !== computeResultProfileDigest(outputContract.result_profile)) throw new Error("output contract result profile binding mismatch");
+  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, scoringContract.REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(outputContract.result_profile?.name) || outputContract.result_profile.digest !== computeResultProfileDigest(outputContract.result_profile)) throw new Error("output contract result profile binding mismatch");
 
   const metadata = artifacts["metadata.json"];
   assertDigest(metadata.metadata_digest, canonicalDigest(withoutField(metadata, "metadata_digest")), "fixture metadata");

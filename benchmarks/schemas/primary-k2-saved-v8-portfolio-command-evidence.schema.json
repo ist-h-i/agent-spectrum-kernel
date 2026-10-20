@@ -1,0 +1,687 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Primary K-principles v2 grading compatibility profile: Adaptive ASK sealed per-command execution evidence (explicit saved-command processing v6) (explicit evaluation correctness v7) (explicit finite unsafe-action observations v8)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "run_instance_id",
+    "case_id",
+    "attempt",
+    "adapter",
+    "condition",
+    "fixture_id",
+    "repetition",
+    "fixture_input_digest",
+    "verification_command_contract_digest",
+    "runtime_identity_digest",
+    "effective_command_digest",
+    "capture",
+    "stream",
+    "command_event_count",
+    "commands",
+    "privacy",
+    "manifest_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.2.0"
+    },
+    "schema_path": {
+      "const": "benchmarks/schemas/portfolio-command-evidence.schema.json"
+    },
+    "program": {
+      "const": "adaptive_ask_command_evidence"
+    },
+    "run_instance_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$"
+    },
+    "attempt": {
+      "type": "string",
+      "pattern": "^[0-9]{4}$"
+    },
+    "adapter": {
+      "enum": [
+        "codex",
+        "claude"
+      ]
+    },
+    "condition": {
+      "enum": [
+        "plain",
+        "kernel_principles_v2",
+        "full_ask"
+      ]
+    },
+    "fixture_id": {
+      "$ref": "#/$defs/token"
+    },
+    "repetition": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "fixture_input_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "verification_command_contract_digest": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "runtime_identity_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "effective_command_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "support",
+        "evidence_level",
+        "event_transport",
+        "event_format_revision",
+        "parser_revision",
+        "contract_probe_evidence",
+        "downgrade_reason",
+        "failure_diagnostic",
+        "unsafe_action_contract_revision"
+      ],
+      "properties": {
+        "support": {
+          "enum": [
+            "supported",
+            "unsupported",
+            "unknown"
+          ]
+        },
+        "evidence_level": {
+          "enum": [
+            "executed",
+            "unavailable"
+          ]
+        },
+        "event_transport": {
+          "enum": [
+            "codex_exec_jsonl",
+            "none"
+          ]
+        },
+        "event_format_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9A-Za-z._-]+$"
+        },
+        "parser_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9A-Za-z._-]+$"
+        },
+        "contract_probe_evidence": {
+          "enum": [
+            "runtime_event_shell_authority",
+            "shell_capability_unavailable",
+            "adapter_event_contract_not_implemented",
+            "runtime_unavailable",
+            "capture_invalid",
+            "command_contract_unavailable"
+          ]
+        },
+        "downgrade_reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[a-z0-9][a-z0-9_.:-]*$"
+        },
+        "failure_diagnostic": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason",
+                "line",
+                "event_type",
+                "event_line_digest",
+                "runtime_item_id_digest",
+                "rendered_event_command_digest"
+              ],
+              "properties": {
+                "reason": {
+                  "enum": [
+                    "stream_oversized",
+                    "stream_truncated",
+                    "line_oversized",
+                    "malformed_jsonl",
+                    "malformed_event",
+                    "duplicate_terminal_turn",
+                    "sequence_reversal",
+                    "event_drop",
+                    "runtime_item_error",
+                    "turn_failed",
+                    "missing_item_id",
+                    "duplicate_item_id",
+                    "invalid_started_status",
+                    "completed_without_started",
+                    "command_drift",
+                    "unknown_status",
+                    "status_exit_contradiction",
+                    "started_without_completed",
+                    "missing_terminal_turn",
+                    "unsafe_command",
+                    "unsupported_shell",
+                    "malformed_shell_envelope",
+                    "ambiguous_shell_word",
+                    "unsupported_parser_revision",
+                    "ambiguous_command_match",
+                    "overlapping_commands",
+                    "missing_command",
+                    "unsupported_event",
+                    "unverified_file_change",
+                    "unsupported_command",
+                    "change_context_unavailable",
+                    "auxiliary_read_context_unavailable",
+                    "auxiliary_read_path_unavailable",
+                    "unclassified"
+                  ]
+                },
+                "line": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1
+                },
+                "event_type": {
+                  "enum": [
+                    null,
+                    "thread.started",
+                    "turn.started",
+                    "turn.completed",
+                    "turn.failed",
+                    "error",
+                    "item.started",
+                    "item.updated",
+                    "item.completed"
+                  ]
+                },
+                "event_line_digest": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/$defs/digest"
+                    }
+                  ]
+                },
+                "runtime_item_id_digest": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/$defs/digest"
+                    }
+                  ]
+                },
+                "rendered_event_command_digest": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/$defs/digest"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "unsafe_action_contract_revision": {
+          "const": "primary-unsafe-actions-v1"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "evidence_level": {
+                "const": "executed"
+              }
+            },
+            "required": [
+              "evidence_level"
+            ]
+          },
+          "then": {
+            "properties": {
+              "support": {
+                "const": "supported"
+              },
+              "event_transport": {
+                "const": "codex_exec_jsonl"
+              },
+              "event_format_revision": {
+                "const": "codex-exec-jsonl-v1"
+              },
+              "parser_revision": {
+                "const": "1.11.0-primary-saved"
+              },
+              "contract_probe_evidence": {
+                "const": "runtime_event_shell_authority"
+              },
+              "downgrade_reason": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "if": {
+              "properties": {
+                "support": {
+                  "const": "supported"
+                }
+              },
+              "required": [
+                "support"
+              ]
+            },
+            "then": {
+              "properties": {
+                "event_transport": {
+                  "const": "codex_exec_jsonl"
+                },
+                "event_format_revision": {
+                  "const": "codex-exec-jsonl-v1"
+                },
+                "parser_revision": {
+                  "const": "1.11.0-primary-saved"
+                },
+                "downgrade_reason": {
+                  "type": "string"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "event_transport": {
+                  "const": "none"
+                },
+                "event_format_revision": {
+                  "type": "null"
+                },
+                "parser_revision": {
+                  "type": "null"
+                },
+                "downgrade_reason": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "stream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bytes",
+        "digest"
+      ],
+      "properties": {
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777216
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "command_event_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 256
+    },
+    "commands": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/commandEvidence"
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_command_stored",
+        "raw_output_stored",
+        "full_event_stream_stored",
+        "absolute_paths_stored",
+        "secrets_stored"
+      ],
+      "properties": {
+        "raw_command_stored": {
+          "const": false
+        },
+        "raw_output_stored": {
+          "const": false
+        },
+        "full_event_stream_stored": {
+          "const": false
+        },
+        "absolute_paths_stored": {
+          "const": false
+        },
+        "secrets_stored": {
+          "const": false
+        }
+      }
+    },
+    "manifest_digest": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 96,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    },
+    "commandEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_evidence_id",
+        "command_evidence_digest",
+        "event_sequence",
+        "runtime_item_id_digest",
+        "matched_command_id",
+        "match_state",
+        "execution_form",
+        "logical_command_digest",
+        "rendered_event_command_digest",
+        "working_directory",
+        "status",
+        "exit_code",
+        "duration",
+        "aggregated_output",
+        "capture_source",
+        "evidence_level",
+        "bytes",
+        "literal_word_encoding",
+        "runtime_shell_executable",
+        "unsafe_action_category"
+      ],
+      "properties": {
+        "command_evidence_id": {
+          "type": "string",
+          "pattern": "^command-evidence-[a-f0-9]{32}$"
+        },
+        "command_evidence_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "event_sequence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "started",
+            "completed"
+          ],
+          "properties": {
+            "started": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "completed": {
+              "type": "integer",
+              "minimum": 2
+            }
+          }
+        },
+        "runtime_item_id_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "matched_command_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/token"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "match_state": {
+          "enum": [
+            "matched",
+            "unmatched",
+            "cwd_unverified"
+          ]
+        },
+        "execution_form": {
+          "enum": [
+            "direct_argv",
+            "codex_shell_command"
+          ]
+        },
+        "logical_command_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "rendered_event_command_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "working_directory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "classification",
+            "value",
+            "digest",
+            "source"
+          ],
+          "properties": {
+            "status": {
+              "const": "unavailable"
+            },
+            "classification": {
+              "type": "null"
+            },
+            "value": {
+              "type": "null"
+            },
+            "digest": {
+              "type": "null"
+            },
+            "source": {
+              "const": "codex_exec_jsonl_cwd_not_exposed"
+            }
+          }
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "declined",
+            "interrupted"
+          ]
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "duration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "milliseconds"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "known",
+                "unknown"
+              ]
+            },
+            "milliseconds": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "aggregated_output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bytes",
+            "digest"
+          ],
+          "properties": {
+            "bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "digest": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        },
+        "capture_source": {
+          "const": "codex_exec_jsonl"
+        },
+        "evidence_level": {
+          "const": "executed"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "literal_word_encoding": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 1048576,
+          "pattern": "^[lensd]+$"
+        },
+        "runtime_shell_executable": {
+          "enum": [
+            null,
+            "/bin/bash",
+            "/bin/zsh"
+          ]
+        },
+        "unsafe_action_category": {
+          "enum": [
+            null,
+            "unauthorized_attempt"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "succeeded"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "exit_code": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "failed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "exit_code": {
+                "type": "integer",
+                "not": {
+                  "const": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "declined"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "exit_code": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$comment": "Additive actual-condition schema; original wire schema_path retained. Requires reverified primary controller producer scope. No scoring rules changed."
+}

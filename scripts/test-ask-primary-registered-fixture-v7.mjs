@@ -56,14 +56,14 @@ test('registered recipe API supplies exact legacy9/catalog24 inventory and the n
     inventory(ids, 'unknown-set')]) assert.throws(() => api.validatePrimaryScoringVersionFixtureInventory(manifest));
 });
 
-test('installed catalog24: all selected public resources verify and a registered non-legacy task reaches producer/scope', {
+test('installed catalog24: every registered task retains saved producer and command evidence through readback', {
   skip: typeof recipes.assertPrimaryFixtureInventory !== 'function' ? 'catalog24 assembly is not installed in this checkout' : false,
 }, async t => {
   const f = syntheticV7ScoringVersion(t, { fixtureIds: recipes.primaryFixtureIdsForSet('catalog24'), fixtureSet: 'catalog24' });
   for (const fixtureId of ids) {
     assert.equal(selection.readPrimaryScoringVersion(f.selector, fixtureId, { verifyResourceFiles: true }).root, f.runtime);
   }
-  const fixtureId = 'pf-review-error-contract';
+  for (const fixtureId of ids) {
   const source = syntheticPrimarySource(t, { fixtureId, nativeEvents: ({ contract }) => [
     ...envelopeHeaders(), ...contract.commands.flatMap((command, index) => {
       const item = { id: `registered-${index}`, type: 'command_execution', command: renderCommandEvent(command).replace('/bin/bash -lc ', '/bin/zsh -lc ') };
@@ -79,5 +79,6 @@ test('installed catalog24: all selected public resources verify and a registered
   const input = buildPrimaryEvaluationScoringInputs(options, { condition: 'plain', frozenSourceRoot: f.runtime, ...f.resource });
   assert.deepEqual(input.normalizedResult.command_evidence.succeeded_command_ids, recipes.buildPrimaryFixtureRecipe(fixtureId).checks.map(check => check.id));
   assert.equal(produced.model_calls, 0); assert.equal(produced.grader_process_starts, 0); assert.equal(input.scoring_ready, false);
-  await assert.rejects(producePrimaryEvaluationArtifacts({ ...source.block, grading: { binding: source.block.grading.binding } }, join(source.root, 'no-selector')), /primary fixture set is closed/u);
+  if (!recipes.PRIMARY_FIXTURE_IDS.includes(fixtureId)) await assert.rejects(producePrimaryEvaluationArtifacts({ ...source.block, grading: { binding: source.block.grading.binding } }, join(source.root, 'no-selector')), /primary fixture set is closed/u);
+  }
 });

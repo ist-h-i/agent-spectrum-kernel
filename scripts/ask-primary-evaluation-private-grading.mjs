@@ -11,7 +11,7 @@ import { withPrimaryHistoricalEvaluatorResources, withPrimaryEvaluatorLogCapture
 import { verifyPortfolioScoringInputs, verifyPrivateEvaluatorBundle, readEvaluatorAuthorityAnchorFromFreeze, executeProductionSealedEvaluator,
   adaptPrivateEvaluatorFragmentToEnvelope, computeAdapterResultEnvelopeDigest, computePrivateEvaluationRecordDigest, readStableWorkspaceInventory } from './ask-benchmark-evaluator-boundary.mjs';
 import { deriveEffectiveVerificationEvidenceState } from './ask-benchmark-scoring-contract.mjs';
-import { scoreEvaluatorResult } from './ask-benchmark-portfolio-score.mjs';
+import { scorePrimaryEvaluatorResult } from './ask-primary-engineering-safety.mjs';
 import { verifyPublicEvaluatorReference, verifyPrivateEvaluatorResourceAssets } from './ask-benchmark-evaluator-boundary.mjs';
 import { resolveEffectiveAdmissionAuthorityFromFiles } from './ask-benchmark-admission-decision.mjs';
 import { primaryProcessingSelection, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
@@ -194,14 +194,15 @@ export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs
       assert.ok(!signal?.aborted,'primary private grade aborted');
       // This invokes the original verifier once; its existing private-record
       // validation performs two more runs. Do not separately verify again.
-      return scoreEvaluatorResult({...s,resultPath,privateEvaluationRecordPath:recordPath,privateFragmentPath:fragmentPath,outputPath:join(publicRoot,'engineering-result.json')});
+      return scorePrimaryEvaluatorResult({...s,resultPath,privateEvaluationRecordPath:recordPath,privateFragmentPath:fragmentPath,outputPath:join(publicRoot,'engineering-result.json')},n);
     });
     assert.equal(captured.receipts.length,4,'primary original private worker count changed');assert.ok(captured.receipts.every(receipt=>receipt.process_completed&&receipt.exit_code===0));
     return {status:primaryPrivateGradingExecutionStatus(captured.result.artifact.scoring_status,captured.receipts,{freshVersion:Boolean(producer.request.scoring_version)}),scoring_status:captured.result.artifact.scoring_status,
       scoring_reason:captured.result.artifact.scoring_reason,quality:captured.result.artifact.requirement_score.normalized_requirement_score,
       condition:runtimeInputs.condition,evidence_kind:producer.evidence_kind,formal_aggregate_eligible:false,model_calls:0,grader_process_starts:4,grader_process_completed:true,
       public_artifacts:{evaluator_result:{path:join(publicRoot,'evaluator-result.json'),digest:hash(read(join(publicRoot,'evaluator-result.json')))},
-        engineering_result:{path:captured.result.outputPath??join(publicRoot,'engineering-result.json'),digest:hash(read(join(publicRoot,'engineering-result.json')))}},worker_receipts:captured.receipts};
+        engineering_result:{path:captured.result.outputPath??join(publicRoot,'engineering-result.json'),digest:hash(read(join(publicRoot,'engineering-result.json')))},
+        ...(captured.result.originalArtifact?{original_engineering_result:{path:captured.result.originalArtifact.path,digest:captured.result.originalArtifact.digest}}:{})},worker_receipts:captured.receipts};
   }catch(error){
     // Private stream content and caught Error.message never cross this API.
     // Only module-owned receipt summaries survive partial execution failure.

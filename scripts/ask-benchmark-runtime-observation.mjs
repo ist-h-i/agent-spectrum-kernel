@@ -114,7 +114,9 @@ function derive(options) {
       missing_reason: retained.reason, parser_revision: attempt.commandEvidence.capture.parser_revision,
       coverage: { scope_id: 'codex-command-execution-items-v1', status: retained.body ? retained.unknownCount === 0 ? 'complete' : 'partial' : 'unknown',
         observed_native_item_types: retained.types, unknown_event_count: retained.unknownCount, task_operation_coverage: 'unknown' },
-      command_evidence: { manifest_digest: attempt.commandEvidence.manifest_digest, references: record.command_evidence.references },
+      // The performance carrier keeps its historical closed reference projection.
+      // v8 action authority remains in the separately verified normalized record.
+      command_evidence: { manifest_digest: attempt.commandEvidence.manifest_digest, references: record.command_evidence.references.map(({ unsafe_action_category: _category, ...reference }) => reference) },
       approval_evidence: { status: 'unknown', specific_action_approval_digest: null, frozen_instruction_input_digest: l.fixture_input_digest, grant_claimed: false },
       source_evidence: { basis: 'verified_snapshot_endpoints', terminal_workspace_authority_digest: l.terminal_workspace_authority_digest,
         terminal_workspace_tree_digest: l.terminal_workspace_tree_digest, loaded_source_status: 'unknown' },

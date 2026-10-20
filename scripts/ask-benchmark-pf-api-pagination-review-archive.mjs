@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { validateReviewArchiveProductionAuthority } from "./ask-benchmark-review-archive-identity.mjs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
@@ -199,7 +200,7 @@ export function generatePfApiPaginationReviewArchive({ root = ROOT, privateRoot,
   if (head !== reviewedHead) throw new Error("pf-pagination review archive reviewed HEAD differs from repository HEAD");
   const trackedDiff = spawnSync("git", ["-C", repositoryRoot, "diff", "--quiet", reviewedHead, "--"]);
   if (trackedDiff.status !== 0) throw new Error("pf-pagination review archive repository tracked bytes differ from the reviewed HEAD");
-  const authority = validatePfApiPaginationProductionAuthority({ root: repositoryRoot });
+  const authority = validateReviewArchiveProductionAuthority({ root: repositoryRoot, fixtureId: FIXTURE_ID, sourceRevision }, () => validatePfApiPaginationProductionAuthority({ root: repositoryRoot }));
   const identity = establishReviewArchiveIdentity({ root: repositoryRoot, runtimeRoot: ROOT, reviewedHead, sourceRevision, evaluatorRevision: authority.evaluatorRevision, generatorPath: GENERATOR_PATH });
   const bundle = readJson(resolve(privateDirectory, "private-evaluator-bundle.json"), "pf-pagination private evaluator bundle");
   const privateEntries = walk(privateDirectory, "private-evaluator");

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { validateReviewArchiveProductionAuthority } from "./ask-benchmark-review-archive-identity.mjs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
@@ -73,7 +74,7 @@ export function generateMpFrontendStateReviewArchive({ root = ROOT, privateRoot,
   if ([repositoryRoot, privateDirectory, caseDirectory].some((directory) => archiveTarget === directory || archiveTarget.startsWith(`${directory}${sep}`))) throw new Error("frontend review archive output must stay outside repository and authority source roots");
   if (git(repositoryRoot, ["rev-parse", "HEAD"], "frontend reviewed HEAD").trim() !== reviewedHead) throw new Error("frontend review archive reviewed HEAD differs from repository HEAD");
   if (spawnSync("git", ["-C", repositoryRoot, "diff", "--quiet", reviewedHead, "--"]).status !== 0) throw new Error("frontend review archive tracked bytes differ from reviewed HEAD");
-  const authority = validateMpFrontendStateReviewProductionAuthority({ root: repositoryRoot });
+  const authority = validateReviewArchiveProductionAuthority({ root: repositoryRoot, fixtureId: FIXTURE_ID, sourceRevision }, () => validateMpFrontendStateReviewProductionAuthority({ root: repositoryRoot }));
   const identity = establishReviewArchiveIdentity({ root: repositoryRoot, runtimeRoot: ROOT, reviewedHead, sourceRevision, evaluatorRevision: authority.evaluatorRevision, generatorPath: GENERATOR_PATH });
   const bundle = readJson(resolve(privateDirectory, "private-evaluator-bundle.json"), "frontend private bundle");
   if (bundle.evaluator_bundle_id !== authority.evaluatorBundleId || bundle.evaluator_bundle_digest !== authority.evaluatorBundleDigest || bundle.evaluator_revision !== authority.evaluatorRevision || bundle.evaluator_bundle_id !== computeEvaluatorBundleId(bundle) || bundle.evaluator_bundle_digest !== computeEvaluatorBundleDigest(bundle)) throw new Error("frontend review archive private bundle differs from public authority");
