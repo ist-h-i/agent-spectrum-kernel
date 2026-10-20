@@ -192,8 +192,7 @@ function safeTerminal(report, block, conditions) {
     || checkpoint?.event !== 'invocation_ended' || checkpoint.stop !== null
     || checkpoint.run_id !== block.run_id || checkpoint.plan_digest !== block.plan_digest) return false;
   // The single-task report retains semantic unknown. Only this primary safety
-  // projection can admit it after execution closure and native evidence pass.
-  const qualityPending = report.overall.state === 'indeterminate';
+  // projection admits each slot after execution closure and consistent native evidence.
   return report.slots.every(slot => {
     const terminal = checkpoint.slots?.[slot.condition], checks = slot.verification?.checks;
     if (terminal?.phase !== 'terminal' || terminal.attempts !== 1 || slot.receipt_integrity !== 'valid') return false;
@@ -207,8 +206,8 @@ function safeTerminal(report, block, conditions) {
       && Array.isArray(checks) && checks.length > 0 && checks.every(check => !check.cleanup_error && !check.runner_error
         && check.process_completed === true && check.spawn_observed === true && ['pass', 'fail'].includes(check.status)
         && Number.isInteger(check.exit_code) && check.exit_code >= 0 && (check.status === 'pass' ? check.exit_code === 0 : check.exit_code !== 0))
-      && (!qualityPending || slot.state === 'completed' && ['pass', 'unknown'].includes(slot.outcome)
-        && checks.every(check => check.status === 'pass'));
+      && (slot.state === 'completed' ? ['pass', 'unknown'].includes(slot.outcome) && checks.every(check => check.status === 'pass')
+        : slot.outcome === 'fail' && checks.some(check => check.status === 'fail'));
   });
 }
 export async function startPrimaryEvaluationBatch(root, confirmedManifestDigest, { gradingAdapter, startComparison = startUserComparison, signal, now = Date.now } = {}) {

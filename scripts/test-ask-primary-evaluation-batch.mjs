@@ -137,7 +137,7 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
     }
   });
   await t.test('fake sequential nine blocks; verification failure can continue; consumed once', async () => {
-    const m = f.manifest(), a = adapters({ state: 'task_failed', slotState: 'verification_failed' }); preparePrimaryEvaluationBatch(m.path, a);
+    const m = f.manifest(), a = adapters({ state: 'task_failed', slotState: 'verification_failed', outcome: 'fail' }); preparePrimaryEvaluationBatch(m.path, a);
     const report = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
     assert.equal(report.state, 'completed'); assert.equal(a.calls.length, 9); assert.equal(a.grades.length, 9);
     assert.deepEqual(a.calls, f.blocks.map(block => block.root)); assert.equal(report.slots.length, 27);
@@ -260,6 +260,57 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
   });
 });
 
+function resealEditedSlots(report, root) {
+  for (const slot of report.slots) {
+    const folder = join(root, 'control/slots', slot.condition), raw = JSON.stringify(slot), digest = hash(raw);
+    writeFileSync(join(folder, 'result.json'), raw); writeFileSync(join(folder, 'result.digest'), digest);
+    report.execution.history.snapshot.slots[slot.condition].terminal_digest = digest;
+  }
+}
+
+test('mixed closed slots advance catalog24 regardless of first nonpass order and retain unknown quality', async t => {
+  const f = fixture(t, 'catalog24'), m = f.manifest();
+  let index = 0;
+  const a = adapters({ editReport(report, root) {
+    const unknown = index++ % 3, failed = (unknown + 1) % 3;
+    report.slots[unknown].outcome = 'unknown';
+    const slot = report.slots[failed];
+    slot.state = 'verification_failed'; slot.outcome = 'fail';
+    slot.verification.checks[0].status = 'fail'; slot.verification.checks[0].exit_code = 1;
+    // Match the existing single-task reporter's first-nonpass projection.
+    const first = report.slots.find(value => value.outcome !== 'pass');
+    report.overall.state = first.outcome === 'unknown' ? 'indeterminate' : 'task_failed';
+    resealEditedSlots(report, root);
+  } });
+  preparePrimaryEvaluationBatch(m.path, a);
+  const report = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
+  assert.equal(report.state, 'completed'); assert.equal(a.calls.length, 24); assert.equal(a.grades.length, 24);
+  assert.ok(report.slots.every(slot => slot.quality === null));
+  assert.equal(report.slots.filter(slot => slot.child_report.overall.state === 'indeterminate').length, 48);
+  assert.equal(report.slots.filter(slot => slot.child_report.overall.state === 'task_failed').length, 24);
+  await assert.rejects(startPrimaryEvaluationBatch(m.value.root, m.digest, a), /consumed/u);
+  assert.equal(a.calls.length, 24);
+});
+
+test('contradictory closed slots stop before grading even when the overall label is task_failed', async t => {
+  const f = fixture(t);
+  for (const mutate of [
+    slot => { slot.outcome = 'unknown'; slot.verification.checks[0].status = 'fail'; slot.verification.checks[0].exit_code = 1; },
+    slot => { slot.state = 'verification_failed'; slot.outcome = 'fail'; },
+    slot => { slot.state = 'verification_failed'; slot.verification.checks[0].status = 'fail'; slot.verification.checks[0].exit_code = 1; },
+    slot => { slot.outcome = 'fail'; },
+  ]) {
+    const m = f.manifest(), a = adapters({ editReport(report, root) {
+      mutate(report.slots[0]); report.overall.state = 'task_failed'; resealEditedSlots(report, root);
+    } });
+    preparePrimaryEvaluationBatch(m.path, a);
+    const report = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
+    assert.equal(report.state, 'stopped'); assert.equal(a.calls.length, 1); assert.equal(a.grades.length, 0);
+    await assert.rejects(startPrimaryEvaluationBatch(m.value.root, m.digest, a), /consumed/u);
+    assert.equal(a.calls.length, 1);
+  }
+});
+
 
 test('catalog24 uses the existing batch entrance and preserves task failures, manual requirements and later results', async t => {
   const f = fixture(t, 'catalog24'), m = f.manifest(), a = adapters();
@@ -267,7 +318,7 @@ test('catalog24 uses the existing batch entrance and preserves task failures, ma
   a.startComparison = async (root, digest) => {
     const report = await baseStart(root, digest), index = f.blocks.findIndex(block => block.root === root);
     if (index === 3) { report.overall.state = 'task_failed'; for (const slot of report.slots) {
-      slot.state = 'verification_failed'; slot.verification.checks[0].status = 'fail'; slot.verification.checks[0].exit_code = 1;
+      slot.state = 'verification_failed'; slot.outcome = 'fail'; slot.verification.checks[0].status = 'fail'; slot.verification.checks[0].exit_code = 1;
       slot.verification.checks[0].logs = ['retained-fixed-failure.log'];
       const folder = join(root, 'control/slots', slot.condition), raw = JSON.stringify(slot), value = hash(raw);
       writeFileSync(join(folder, 'retained-fixed-failure.log'), 'intentional fixed verification failure\n');
