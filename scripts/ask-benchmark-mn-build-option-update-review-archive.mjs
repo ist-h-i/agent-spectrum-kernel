@@ -5,7 +5,7 @@ import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSyn
 import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertPrivateRootOutsideRepository } from "./ask-benchmark-mn-build-option-update.mjs";
-import { validateReviewArchiveCases } from "./ask-benchmark-review-archive-identity.mjs";
+import { resolveReviewArchiveOutput, validateReviewArchiveCases } from "./ask-benchmark-review-archive-identity.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FIXTURE_ID = "mn-build-option-update";
@@ -93,14 +93,13 @@ export function generateMnBuildOptionUpdateReviewArchive({ root = ROOT, privateR
   const repository = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
   if (privateDirectory === repository || privateDirectory.startsWith(`${repository}/`)) throw new Error("mn-build review archive private root must stay outside the repository");
-  let caseEntries = [], caseSummary = null;
+  let caseEntries = [], caseSummary = null, archiveTarget = resolve(outputPath);
   if (caseRoot !== null) {
     if (!existsSync(caseRoot) || lstatSync(caseRoot).isSymbolicLink() || !lstatSync(caseRoot).isDirectory()) throw new Error("mn-build review archive case root must be a non-symlink directory");
     const caseDirectory = realpathSync(caseRoot);
     assertPrivateRootOutsideRepository(repository, caseDirectory);
     if (caseDirectory === privateDirectory || caseDirectory.startsWith(`${privateDirectory}${sep}`) || privateDirectory.startsWith(`${caseDirectory}${sep}`)) throw new Error("mn-build review archive private and case roots must be disjoint");
-    const target = resolve(outputPath);
-    if (target === caseDirectory || target.startsWith(`${caseDirectory}${sep}`)) throw new Error("mn-build review archive output must stay outside case root");
+    archiveTarget = resolveReviewArchiveOutput({ repositoryRoot: repository, privateRoot: privateDirectory, caseRoot: caseDirectory, outputPath });
     caseEntries = walk(caseDirectory, "cases");
     caseSummary = validateReviewArchiveCases({ fixtureId: FIXTURE_ID, caseEntries, casePrefix: "cases", singleton: true });
   }
@@ -148,8 +147,8 @@ export function generateMnBuildOptionUpdateReviewArchive({ root = ROOT, privateR
   };
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
   const archiveBytes = zip([...unique.values(), { path: "REVIEW-MANIFEST.json", bytes: manifestBytes, mode: 0o644 }]);
-  writeFileSync(resolve(outputPath), archiveBytes, { flag: "wx" });
-  return Object.freeze({ fixtureId: FIXTURE_ID, reviewedHead, evaluatorRevision: bundle.evaluator_revision, bundleId: bundle.evaluator_bundle_id, bundleDigest: bundle.evaluator_bundle_digest, evaluatorAuthorityDigest: authority.manifest_digest, requirementRecordDigest: requirement.requirement_record_digest, requirementSetDigest: requirement.requirement_set_digest, outputContractDigest: output.output_contract_digest, sourceFreezeDigest: candidate.candidate_digest, inputDigest: reference.fixture_input_digest, archivePath: resolve(outputPath), archiveSha256: sha256(archiveBytes), archiveBytes: archiveBytes.length, entryCount: unique.size + 1 });
+  writeFileSync(archiveTarget, archiveBytes, { flag: "wx" });
+  return Object.freeze({ fixtureId: FIXTURE_ID, reviewedHead, evaluatorRevision: bundle.evaluator_revision, bundleId: bundle.evaluator_bundle_id, bundleDigest: bundle.evaluator_bundle_digest, evaluatorAuthorityDigest: authority.manifest_digest, requirementRecordDigest: requirement.requirement_record_digest, requirementSetDigest: requirement.requirement_set_digest, outputContractDigest: output.output_contract_digest, sourceFreezeDigest: candidate.candidate_digest, inputDigest: reference.fixture_input_digest, archivePath: archiveTarget, archiveSha256: sha256(archiveBytes), archiveBytes: archiveBytes.length, entryCount: unique.size + 1 });
 }
 
 function parseArgs(argv) {
