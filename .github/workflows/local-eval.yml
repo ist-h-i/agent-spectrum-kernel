@@ -19,11 +19,11 @@ jobs:
       - name: Observe host prerequisites without Codex or auth
         run: node scripts/ask-local-eval.mjs preflight
       - name: Primary authority profile and static resource boundaries (no workers)
-        run: node --experimental-test-module-mocks --test scripts/test-ask-primary-authority-v2.mjs scripts/test-ask-primary-build-successor-v2.mjs scripts/test-ask-review-archive-v2-scope.mjs
+        run: node --experimental-test-module-mocks --test scripts/test-ask-primary-authority-v2.mjs scripts/test-ask-primary-build-successor-v2.mjs scripts/test-ask-review-archive-v2-scope.mjs scripts/test-ask-primary-unsafe-actions-v8.mjs
       - name: Nine-primary-fixture personal roundtrip (fake provider/runner/grading only)
         run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-primary-loop.mjs
       - name: Personal user command loop and resume (fake dispatch only)
-        run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-cli-catalog24.mjs scripts/test-ask-personal-evolution-unattended-policy.mjs scripts/test-ask-personal-evolution-unattended.mjs
+        run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-cli-catalog24.mjs scripts/test-ask-personal-evolution-cli-catalog24-v8.mjs scripts/test-ask-personal-evolution-unattended-policy.mjs scripts/test-ask-personal-evolution-unattended.mjs
       - name: Personal candidate generation adapter (fake transport only)
         run: node --test scripts/test-ask-personal-evolution-codex-generation.mjs
       - name: Personal source reviewer adapter (fake transport only)

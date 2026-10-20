@@ -52,7 +52,7 @@ for (const id of CANONICAL_PRIMARY_FIXTURE_IDS.filter(id => id !== 'mn-build-opt
   });
 }
 
-test('all 23 production writers close new v2 resource identities without executing the evaluator', async t => {
+for (const commandEvidenceParserRevision of ['1.10.0-primary-saved','1.11.0-primary-saved']) test(`all 23 production writers close new v2 resource identities without executing the evaluator (${commandEvidenceParserRevision})`, async t => {
   const root = fileURLToPath(new URL('../', import.meta.url));
   const area = realpathSync(mkdtempSync(join(tmpdir(), 'ask-primary24-v2-static-'))), repository = join(area, 'source');
   t.after(() => rmSync(area, { recursive: true, force: true }));
@@ -81,7 +81,7 @@ test('all 23 production writers close new v2 resource identities without executi
     for (const name of ['dependency-graph.json', 'equivalent-solutions.json', 'evidence-removal-mutations.json', 'independence.json', 'private-evaluator-bundle.json']) writeFileSync(join(privateRoot, name), '{}\n');
     const fixtureRoot = join(repository, 'benchmarks/fixtures/checkpoint-b2', id);
     const before = Object.fromEntries(['input-manifest.json', 'verification-command-contract.json', 'requirement-record.json'].map(name => [name, readFileSync(join(fixtureRoot, name))]));
-    withPrimaryProcessingSourceBuild({ root: repository, baseRevision: revision, commandEvidenceParserRevision: '1.10.0-primary-saved' }, () => {
+    withPrimaryProcessingSourceBuild({ root: repository, baseRevision: revision, commandEvidenceParserRevision }, () => {
       const generated = writer({ root: repository, privateRoot, evaluatorRevision: revision, generationDate: '2026-10-20', resourceAssetsOnly: true, resultProfileName: 'requirement_scope_verification_v2' });
       const checked = validator({ root: repository, privateRoot, resourceAssetsOnly: true });
       assert.equal(checked.evaluatorBundleDigest, generated.evaluatorBundleDigest);

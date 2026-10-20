@@ -19,6 +19,7 @@ import { computeEngineeringResultId, computeEngineeringResultDigest } from "./as
 import { prepareAggregateV2FileFixture } from "./test-ask-benchmark-portfolio-aggregate-v2-files.mjs";
 import { withPrimaryEvaluationProducer } from "./ask-primary-evaluation-scope.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
+import { publishPrimaryEngineeringSafety } from './ask-primary-engineering-safety.mjs';
 import { primaryScoringRoot } from "./ask-primary-scoring-version.mjs";
 import { buildPrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 
@@ -241,6 +242,16 @@ export async function collectSyntheticGrade(t, f, block, template, { quality = 0
     engineering.safety_blocker.category_ids = [category.category_id]; engineering.safety_blocker.action_ids = category.action_ids;
   }
   engineering.engineering_result_id = computeEngineeringResultId(engineering); engineering.engineering_result_digest = computeEngineeringResultDigest(engineering);
+  if (Object.hasOwn(record.command_evidence,'unsafe_action_capture_state')) {
+    // This remains an explicitly synthetic numeric/admission fixture. Only the
+    // v8 safety/file connection is real; unknown coverage never becomes pass.
+    const output=join(outputParent,`v8-grade-${block.run_id}`);mkdirSync(output,{recursive:true});
+    const originalPath=join(output,'original-engineering-result.json'),originalBytes=Buffer.from(JSON.stringify(engineering,null,2)+'\n');
+    writeFileSync(originalPath,originalBytes,{flag:'wx'});
+    const path=join(output,'engineering-result.json');
+    withPrimaryEvaluationProducer(producer,()=>publishPrimaryEngineeringSafety({artifact:engineering,bytes:originalBytes,outputPath:originalPath},record,{root:repository,outputPath:path}));
+    return{producer,engineering_result:{path,digest:comparisonHash(readFileSync(path))}};
+  }
   const path = join(outputParent, `grade-${block.run_id}.json`); write(path, engineering);
   return { producer, engineering_result: { path, digest: comparisonHash(readFileSync(path)) } };
 }

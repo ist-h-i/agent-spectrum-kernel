@@ -147,8 +147,49 @@ export function generatePrimaryEvaluationV7Schemas({ check = false, root = ROOT 
     else writeFileSync(path, raw, { flag: 'wx' });
   }
 }
+export function generatePrimaryEvaluationV8Schemas({ check = false, root = ROOT } = {}) {
+  for (const prefix of ['primary','primary-k2']) for (const name of ['portfolio-command-evidence','normalized-portfolio-result','evaluator-result-envelope','portfolio-engineering-result']) {
+    const from = ['portfolio-command-evidence','evaluator-result-envelope'].includes(name) ? `${prefix}-saved-v7-${name}` : `${prefix}-${name}`;
+    const value = JSON.parse(readFileSync(resolve(root, `benchmarks/schemas/${from}.schema.json`)));
+    function select(item) {
+      if (!item || typeof item !== 'object') return;
+      if (item.const === '1.10.0-primary-saved') item.const = '1.11.0-primary-saved';
+      for (const child of Object.values(item)) select(child);
+    }
+    select(value); value.title += ' (explicit finite unsafe-action observations v8)';
+    const category = { enum: [null,'unauthorized_attempt'] };
+    if (name === 'portfolio-command-evidence') {
+      value.properties.capture.required.push('unsafe_action_contract_revision');
+      value.properties.capture.properties.unsafe_action_contract_revision = {const:'primary-unsafe-actions-v1'};
+      value.$defs.commandEvidence.required.push('unsafe_action_category');
+      value.$defs.commandEvidence.properties.unsafe_action_category = category;
+    } else if (name === 'normalized-portfolio-result') {
+      const evidence = value.properties.command_evidence;
+      evidence.required.push('unsafe_action_capture_state');
+      evidence.properties.unsafe_action_capture_state = { enum: ['observed_finite_scope','unavailable','invalid'] };
+      const ref = value.$defs.commandEvidenceReference;
+      ref.required.push('unsafe_action_category'); ref.properties.unsafe_action_category = category;
+    } else {
+      const observation = { type: 'object', additionalProperties: false,
+        required: ['coverage','capture_state','contract_revision','evidence_references'],
+        properties: { coverage: { const: 'unknown' }, capture_state: { enum: ['observed_finite_scope','unavailable','invalid'] },
+          contract_revision: { const: 'primary-unsafe-actions-v1' },
+          evidence_references: { type:'array', minItems:1, maxItems:1, items: { type:'object', additionalProperties:false, required:['kind','digest','bytes'], properties:{kind:{const:'normalized_result'},digest:{type:'string',pattern:'^sha256:[a-f0-9]{64}$'},bytes:{type:'null'}} } } } };
+      if(name==='evaluator-result-envelope')value.required.push('unsafe_action_observation');
+      value.properties.unsafe_action_observation = observation;
+      if(name==='portfolio-engineering-result'){
+        value.properties.original_engineering_result={type:'object',additionalProperties:false,required:['path','digest','bytes'],properties:{path:{const:'original-engineering-result.json'},digest:{type:'string',pattern:'^sha256:[a-f0-9]{64}$'},bytes:{type:'integer',minimum:1}}};
+        value.allOf??=[];
+        value.allOf.push({if:{anyOf:[{required:['unsafe_action_observation']},{required:['original_engineering_result']}]},then:{required:['unsafe_action_observation','original_engineering_result']}});
+      }
+    }
+    const path = resolve(root, `benchmarks/schemas/${prefix}-saved-v8-${name}.schema.json`), bytes = Buffer.from(JSON.stringify(value,null,2)+'\n');
+    if (check) { if (!readFileSync(path).equals(bytes)) throw new Error(`stale primary v8 schema: ${name}`); }
+    else writeFileSync(path, bytes, {flag:'wx'});
+  }
+}
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const generate = process.argv.includes('--evaluation-v7') ? generatePrimaryEvaluationV7Schemas : process.argv.includes('--command-evidence-v6') ? generatePrimaryCommandEvidenceV6Schemas : process.argv.includes('--command-evidence-v5') ? generatePrimaryCommandEvidenceV5Schemas : process.argv.includes('--command-evidence-v4') ? generatePrimaryCommandEvidenceV4Schemas : process.argv.includes('--command-evidence-v3') ? generatePrimaryCommandEvidenceV3Schemas
+  const generate = process.argv.includes('--evaluation-v8') ? generatePrimaryEvaluationV8Schemas : process.argv.includes('--evaluation-v7') ? generatePrimaryEvaluationV7Schemas : process.argv.includes('--command-evidence-v6') ? generatePrimaryCommandEvidenceV6Schemas : process.argv.includes('--command-evidence-v5') ? generatePrimaryCommandEvidenceV5Schemas : process.argv.includes('--command-evidence-v4') ? generatePrimaryCommandEvidenceV4Schemas : process.argv.includes('--command-evidence-v3') ? generatePrimaryCommandEvidenceV3Schemas
     : process.argv.includes('--command-evidence-v2') ? generatePrimaryCommandEvidenceV2Schemas : generatePrimaryGradingSchemas;
   generate({ check: process.argv.includes('--check') }); console.log('Primary grading schemas verified');
 }
