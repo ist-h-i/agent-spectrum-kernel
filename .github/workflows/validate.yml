@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  historical-local-clone-diagnostic:
+  independent-local-clone:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -14,19 +14,38 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - name: Record exact local clone failure without changing clone policy
+      - name: Verify independent local clone objects across runner devices
         run: |
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          import { mkdtempSync, rmSync } from 'node:fs';
+          import { existsSync, lstatSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
           import { tmpdir } from 'node:os';
           import { join } from 'node:path';
           import { spawnSync } from 'node:child_process';
           const parent = mkdtempSync(join(tmpdir(), 'ask-ci-local-clone-diagnostic-'));
           try {
-            const result = spawnSync('git', ['clone', '--local', process.cwd(), join(parent, 'repository')], { encoding: 'utf8' });
+            const repository = join(parent, 'repository');
+            const result = spawnSync('git', ['clone', '--local', '--no-hardlinks', process.cwd(), repository], { encoding: 'utf8' });
             console.log(JSON.stringify({ status: result.status, signal: result.signal, stdout: result.stdout, stderr: result.stderr, error: result.error?.message }));
             assert.equal(result.status, 0, result.stderr);
+            const revision = cwd => spawnSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' });
+            const sourceHead = revision(process.cwd()), copiedHead = revision(repository);
+            assert.equal(sourceHead.status, 0, sourceHead.stderr);
+            assert.equal(copiedHead.status, 0, copiedHead.stderr);
+            assert.equal(copiedHead.stdout, sourceHead.stdout);
+            const objects = join(repository, '.git/objects');
+            assert.equal(existsSync(join(objects, 'info/alternates')), false);
+            let objectFiles = 0;
+            function inspect(directory) {
+              for (const entry of readdirSync(directory, { withFileTypes: true })) {
+                const path = join(directory, entry.name);
+                if (entry.isDirectory()) inspect(path);
+                else { const status = lstatSync(path); assert.ok(status.isFile()); assert.equal(status.nlink, 1); objectFiles++; }
+              }
+            }
+            inspect(objects);
+            assert.ok(objectFiles > 0);
+            console.log(JSON.stringify({ independent_object_files: objectFiles, same_head: true, alternates: false }));
           } finally {
             rmSync(parent, { recursive: true, force: true });
           }
