@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
-import { PRIMARY_FIXTURE_REGISTRY } from "./ask-benchmark-portfolio-catalog.mjs";
+import { PRIMARY_FIXTURE_REGISTRY } from "./ask-primary-fixture-registry.mjs";
 import { validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
 
 export const PRIMARY_RECIPE_KIND = "ask_primary_fixture_recipe_v1";
