@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, relative, resolve, sep } from "node:path";
-import * as primaryScope from "./ask-primary-evaluation-scope.mjs";
+import * as scoringContract from "./ask-benchmark-scoring-contract.mjs";
 import {
   computeEvaluatorBundleDigest,
   computeEvaluatorBundleId,
@@ -10,6 +10,11 @@ import {
 } from "./ask-benchmark-evaluator-boundary.mjs";
 
 const REPOSITORY_IDENTITY = "ist-h-i/agent-spectrum-kernel";
+// Legacy frozen scoring modules have no primary-v2 capability. Loading the
+// optional processing graph there would mix current imports with frozen exports.
+// Keep this literal import visible to the archive source-closure verifier.
+const primaryScope = scoringContract.REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME === "requirement_scope_verification_v2"
+  ? await import("./ask-primary-evaluation-scope.mjs") : null;
 
 // A new primary profile has a distinct, pinned processing closure. Select it
 // only while validating static public resource authority, then leave the scope
@@ -20,7 +25,7 @@ export function validateReviewArchiveProductionAuthority({ root, fixtureId, sour
   if (output.result_profile?.name !== "requirement_scope_verification_v2") return validate();
   const reference = JSON.parse(readFileSync(resolve(folder, "evaluator-reference.json")));
   if (reference.evaluator_revision !== sourceRevision) throw new Error("review archive processing source revision differs from evaluator source");
-  if (typeof primaryScope.withPrimaryProcessingSourceBuild !== "function") throw new Error("review archive primary processing source construction is unavailable");
+  if (typeof primaryScope?.withPrimaryProcessingSourceBuild !== "function") throw new Error("review archive primary processing source construction is unavailable");
   const nodes = reference.evaluator_source_identity?.dependency_graph?.node_inventory ?? [];
   const commandEvidenceParserRevision = nodes.some(node => node.path === 'benchmarks/schemas/primary-saved-v8-normalized-portfolio-result.schema.json')
     ? '1.11.0-primary-saved' : '1.10.0-primary-saved';
