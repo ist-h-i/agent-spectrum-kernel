@@ -16,6 +16,7 @@ export const PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION = "1.6.0-primary-
 export const PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION = "1.7.0-primary-saved";
 export const PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION = "1.8.0-primary-saved";
 export const PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION = "1.9.0-primary-saved";
+export const PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION = "1.10.0-primary-saved";
 export const COMMAND_EVIDENCE_PATH = "command-evidence.json";
 export const MAX_COMMAND_EVENT_STREAM_BYTES = 16 * 1024 * 1024;
 export const MAX_COMMAND_EVENT_LINE_BYTES = 1024 * 1024;
@@ -23,9 +24,9 @@ export const MAX_COMMAND_EVENT_LINE_BYTES = 1024 * 1024;
 const TERMINAL_ITEM_STATUSES = new Set(["completed", "failed", "declined"]);
 const SHELL_PREFIX = "/bin/bash -lc ";
 const SAVED_SHELL_PREFIXES = [SHELL_PREFIX, "/bin/zsh -lc ", "/bin/bash -c "];
-const PARSER_REVISIONS = [COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION];
-const boundedSavedRevision = revision => [PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION].includes(revision);
-const literalAuthorityRevision = revision => [PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION].includes(revision);
+const PARSER_REVISIONS = [COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION];
+const boundedSavedRevision = revision => [PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(revision);
+const literalAuthorityRevision = revision => [PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(revision);
 const FAILURE_CODES = new Set(["stream_oversized", "stream_truncated", "line_oversized", "malformed_jsonl", "malformed_event",
   "duplicate_terminal_turn", "sequence_reversal", "event_drop", "runtime_item_error", "turn_failed", "missing_item_id",
   "duplicate_item_id", "invalid_started_status", "completed_without_started", "command_drift", "unknown_status",
@@ -124,7 +125,8 @@ function closesCommandAuthority(command, authority, parserRevision) {
       const word = restoreLiteralBashWord(authority.canonical_script, command.literal_word_encoding);
       const decoded = parseLiteralBashWord(word);
       return decoded.script === authority.canonical_script && decoded.encoding === command.literal_word_encoding
-        && sha256(Buffer.from(SHELL_PREFIX + word)) === command.rendered_event_command_digest;
+        && (parserRevision !== PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION || ['/bin/bash', '/bin/zsh'].includes(command.runtime_shell_executable))
+        && sha256(Buffer.from((parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION ? command.runtime_shell_executable + ' -lc ' : SHELL_PREFIX) + word)) === command.rendered_event_command_digest;
     } catch { return false; }
   }
   return authorityRenderDigests(authority, parserRevision).includes(command.rendered_event_command_digest);
@@ -275,9 +277,9 @@ function decodePosixSingleQuotedWord(value) {
 }
 
 export function commandEvidenceFailureReason(error, { parserRevision } = {}) {
-  const v6 = parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION;
+  const v6 = [PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(parserRevision);
   const code = error instanceof CommandEvidenceError && (FAILURE_CODES.has(error.code) || v6 && PRIMARY_SAVED_COMMAND_EVIDENCE_V6_FAILURE_CODES.includes(error.code)) ? error.code : 'unclassified';
-  if ([PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION].includes(parserRevision)) {
+  if ([PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(parserRevision)) {
     if (['unsupported_event', 'unsupported_shell', 'unsupported_command', 'overlapping_commands', 'change_context_unavailable', ...(v6 ? ['auxiliary_read_context_unavailable', 'auxiliary_read_path_unavailable'] : [])].includes(code)) return 'capture_unsupported:' + code;
     if (code === 'unsafe_command') return 'capture_unsafe:' + code;
   }
@@ -285,7 +287,7 @@ export function commandEvidenceFailureReason(error, { parserRevision } = {}) {
 }
 
 export function commandEvidenceFailureDiagnostic(error, { parserRevision } = {}) {
-  if (parserRevision !== PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION) return null;
+  if (![PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(parserRevision)) return null;
   const reason = error instanceof CommandEvidenceError && PRIMARY_SAVED_COMMAND_EVIDENCE_V6_FAILURE_CODES.includes(error.code) ? error.code : 'unclassified';
   return { reason, line: null, event_type: null, event_line_digest: null, runtime_item_id_digest: null,
     rendered_event_command_digest: null, ...(v6Failures.get(error) ?? {}) };
@@ -387,14 +389,15 @@ function restoreLiteralBashWord(script, encoding) {
 
 function classifyRuntimeCommand(rawCommand, contract, parserRevision, readContext = null) {
   if (typeof rawCommand !== "string" || rawCommand.length === 0) throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified");
-  if (literalAuthorityRevision(parserRevision) && rawCommand.startsWith(SHELL_PREFIX)) {
-    const decoded = parseLiteralBashWord(rawCommand.slice(SHELL_PREFIX.length));
+  const actualPrefix = (parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION ? [SHELL_PREFIX, '/bin/zsh -lc '] : [SHELL_PREFIX]).find(prefix => rawCommand.startsWith(prefix));
+  if (literalAuthorityRevision(parserRevision) && actualPrefix) {
+    const decoded = parseLiteralBashWord(rawCommand.slice(actualPrefix.length));
     const exact = contract?.commands.find(command => command.execution_form === 'codex_shell_command'
       && command.shell_family === 'posix_bash' && command.shell_envelope?.executable === '/bin/bash'
       && stableCanonicalJson(command.shell_envelope.arguments) === stableCanonicalJson(['-lc'])
       && command.canonical_script === decoded.script);
     if (exact) return { execution_form: exact.execution_form, logical_digest: exact.logical_command_digest,
-      rendered_digest: sha256(Buffer.from(rawCommand)), script: exact.canonical_script, literal_word_encoding: decoded.encoding };
+      rendered_digest: sha256(Buffer.from(rawCommand)), script: exact.canonical_script, literal_word_encoding: decoded.encoding, ...(parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION ? { runtime_shell_executable: actualPrefix.slice(0, -5) } : {}) };
   }
   if (parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION) {
     const exact = contract?.commands.find(command => authorityRenderDigests(command, parserRevision).includes(sha256(Buffer.from(rawCommand))));
@@ -403,7 +406,7 @@ function classifyRuntimeCommand(rawCommand, contract, parserRevision, readContex
   }
   const direct = contract?.commands.filter(({ execution_form }) => execution_form === "direct_argv").find((command) => renderCommandEvent(command) === rawCommand);
   if (direct) return { execution_form: "direct_argv", logical_digest: direct.logical_command_digest, rendered_digest: sha256(Buffer.from(rawCommand)), script: null };
-  if (parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION) {
+  if ([PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(parserRevision)) {
     const prefix = [SHELL_PREFIX, '/bin/zsh -lc '].find(value => rawCommand.startsWith(value));
     if (!prefix) throw new CommandEvidenceError('unsupported_shell', 'auxiliary shell envelope is outside the finite contract');
     const { script } = parseLiteralBashWord(rawCommand.slice(prefix.length));
@@ -452,12 +455,13 @@ function commandAuthority(rawCommand, contract, parserRevision, readContext = nu
   const classified = classifyRuntimeCommand(rawCommand, contract, parserRevision, readContext);
   const candidate = { execution_form: classified.execution_form, logical_command_digest: classified.logical_digest,
     rendered_event_command_digest: classified.rendered_digest,
-    ...(literalAuthorityRevision(parserRevision) ? { literal_word_encoding: classified.literal_word_encoding ?? null } : {}) };
+    ...(literalAuthorityRevision(parserRevision) ? { literal_word_encoding: classified.literal_word_encoding ?? null } : {}),
+    ...(parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION ? { runtime_shell_executable: classified.runtime_shell_executable ?? null } : {}) };
   const matches = contract?.commands.filter(command => closesCommandAuthority(candidate, command, parserRevision)) ?? [];
   if (boundedSavedRevision(parserRevision)) {
     if (matches.length > 1) throw new CommandEvidenceError("ambiguous_command_match", "multiple public command IDs match one invocation");
     const declaredBody = contract?.commands.some(command => command.execution_form === classified.execution_form && command.logical_command_digest === classified.logical_digest);
-    const auxiliaryRead = parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION ? classified.auxiliary_read === true
+    const auxiliaryRead = [PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(parserRevision) ? classified.auxiliary_read === true
       : [PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION].includes(parserRevision) ? boundedAuxiliaryReadV4(classified.script)
       : parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION ? boundedAuxiliaryReadV3(classified.script) : boundedAuxiliaryRead(classified.script);
     // V2 retained a declared body under a different envelope as unmatched. V3
@@ -484,6 +488,7 @@ function commandEvidenceBase({ sequence, started, completed, contract, parserRev
     logical_command_digest: classified.logical_digest,
     rendered_event_command_digest: classified.rendered_digest,
     ...(literalAuthorityRevision(parserRevision) ? { literal_word_encoding: classified.literal_word_encoding ?? null } : {}),
+    ...(parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION ? { runtime_shell_executable: classified.runtime_shell_executable ?? null } : {}),
     working_directory: { status: "unavailable", classification: null, value: null, digest: null, source: "codex_exec_jsonl_cwd_not_exposed" },
     status: outcome.status,
     exit_code: outcome.exitCode,
@@ -581,7 +586,7 @@ function parseClosedCodexCommandEvents({ stream, identity, contract, parserRevis
     || posix.normalize(candidateWorkspaceRoot) !== candidateWorkspaceRoot || candidateWorkspaceRoot === '/' || candidateWorkspaceRoot.endsWith('/'))) {
     throw new CommandEvidenceError('change_context_unavailable', 'exact canonical arm-root context is required');
   }
-  const v6 = parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION;
+  const v6 = [PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(parserRevision);
   const readContext = v6 ? auxiliaryReadContextV6(auxiliaryReadInputManifest, contract, candidateWorkspaceRoot) : null;
   const canonicalChanges = changes => {
     const result = changes.map(change => {
@@ -680,7 +685,7 @@ function parseClosedCodexCommandEvents({ stream, identity, contract, parserRevis
 
 export function parseCodexCommandEvents({ stream, identity, contract, parserRevision = COMMAND_EVIDENCE_PARSER_REVISION, candidateChangePaths = [], candidateChanges = [], candidateWorkspaceRoot = null, auxiliaryReadInputManifest = null }) {
   assertParserRevision(parserRevision);
-  if ([PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION].includes(parserRevision)) return parseClosedCodexCommandEvents({stream,identity,contract,parserRevision,candidateChangePaths,candidateChanges,candidateWorkspaceRoot,auxiliaryReadInputManifest});
+  if ([PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(parserRevision)) return parseClosedCodexCommandEvents({stream,identity,contract,parserRevision,candidateChangePaths,candidateChanges,candidateWorkspaceRoot,auxiliaryReadInputManifest});
   const v3 = parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION;
   if (v3 && (!Array.isArray(candidateChangePaths) || candidateChangePaths.some(path => typeof path !== 'string'
     || path === '.' || !/^[A-Za-z0-9._/-]+$/u.test(path) || posix.isAbsolute(path)
@@ -818,7 +823,7 @@ export function buildUnavailableCommandEvidence({ identity, support, probe, reas
       parser_revision: support === "supported" ? parserRevision : null,
       contract_probe_evidence: probe,
       downgrade_reason: reason,
-      ...(parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION ? { failure_diagnostic: failureDiagnostic } : {}),
+      ...([PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(parserRevision) ? { failure_diagnostic: failureDiagnostic } : {}),
     },
     stream: { bytes: bytes.length, digest: sha256(bytes) },
     command_event_count: 0,
@@ -838,7 +843,7 @@ export function buildCodexCommandEvidence({ identity, stream, contract, parserRe
       parser_revision: parserRevision,
       contract_probe_evidence: "runtime_event_shell_authority",
       downgrade_reason: null,
-      ...(parserRevision === PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION ? { failure_diagnostic: null } : {}),
+      ...([PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(parserRevision) ? { failure_diagnostic: null } : {}),
     },
     ...parsed,
   });
@@ -860,9 +865,9 @@ export function validateCommandEvidenceManifest(manifest, { root, contract = nul
   if (manifest.manifest_digest !== canonicalDigest(withoutField(manifest, "manifest_digest"))) throw new Error("command evidence manifest digest mismatch");
   if (expectedContractDigest !== manifest.verification_command_contract_digest) throw new Error("command evidence contract binding mismatch");
   assertCaptureSemantics(manifest);
-  if (Object.hasOwn(manifest.capture, 'failure_diagnostic') && manifest.capture.parser_revision !== PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION
+  if (Object.hasOwn(manifest.capture, 'failure_diagnostic') && ![PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(manifest.capture.parser_revision)
     && manifest.capture.failure_diagnostic !== null) throw new Error('non-v6 capture cannot carry an event diagnostic');
-  if (manifest.capture.parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION) {
+  if ([PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(manifest.capture.parser_revision)) {
     const diagnostic = manifest.capture.failure_diagnostic;
     if (manifest.capture.evidence_level === 'executed' && diagnostic !== null) throw new Error('executed capture cannot carry a failure diagnostic');
     if (diagnostic !== null) {
@@ -877,12 +882,14 @@ export function validateCommandEvidenceManifest(manifest, { root, contract = nul
   if (manifest.command_event_count !== manifest.commands.length) throw new Error("command evidence event count mismatch");
   if (manifest.capture.evidence_level === "unavailable" && (manifest.command_event_count !== 0 || manifest.commands.length !== 0)) throw new Error("unavailable command evidence must have zero events");
   const commandById = new Map(contract?.commands.map((command) => [command.command_id, command]) ?? []);
-  const closedActions = [PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION].includes(manifest.capture.parser_revision);
+  const closedActions = [PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION].includes(manifest.capture.parser_revision);
   const v5 = literalAuthorityRevision(manifest.capture.parser_revision);
   if (closedActions) assertUnique(manifest.commands.flatMap(command => [command.event_sequence.started, command.event_sequence.completed]), 'command event positions');
   const latestCompletion = new Map();
   let previousCompleted = 0;
   for (const command of manifest.commands) {
+    if (manifest.capture.parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION
+      && (command.execution_form === 'direct_argv' || command.match_state === 'unmatched') && command.runtime_shell_executable !== null) throw new Error('non-authority command must not carry a runtime shell witness');
     if (v5 && (command.execution_form === 'direct_argv' || command.match_state === 'unmatched') && command.literal_word_encoding !== null) throw new Error('non-authority command must not carry literal word encoding');
     const base = withoutField(withoutField(withoutField(command, "command_evidence_id"), "command_evidence_digest"), "bytes");
     const digest = canonicalDigest({ ...manifestIdentity(manifest), ...base });

@@ -70,7 +70,7 @@ test('explicit source-only build closes the helper and additive schemas without 
   assert.deepEqual(deriveEvaluatorDependencyGraph({ root, baseRevision: revision }), old);
 });
 
-for (const [commandEvidenceParserRevision, version] of [['1.6.0-primary-saved', 'v3'], ['1.7.0-primary-saved', 'v4'], ['1.8.0-primary-saved', 'v5'], ['1.9.0-primary-saved', 'v6']]) test(`AC-CLOSURE explicit ${commandEvidenceParserRevision} source construction selects only saved-${version} schemas without authority`, () => {
+for (const [commandEvidenceParserRevision, version] of [['1.6.0-primary-saved', 'v3'], ['1.7.0-primary-saved', 'v4'], ['1.8.0-primary-saved', 'v5'], ['1.9.0-primary-saved', 'v6'], ['1.10.0-primary-saved', 'v7']]) test(`AC-CLOSURE explicit ${commandEvidenceParserRevision} source construction selects only saved-${version} schemas without authority`, () => {
   const selected = { root, baseRevision: revision, commandEvidenceParserRevision };
   const old = deriveEvaluatorDependencyGraph({ root, baseRevision: revision });
   scope.withPrimaryProcessingSourceBuild(selected, () => {
@@ -79,8 +79,9 @@ for (const [commandEvidenceParserRevision, version] of [['1.6.0-primary-saved', 
     for (const path of schemas) {
       assert.equal(graph.node_inventory.some(node => node.path === path), false);
       assert.equal(graph.node_inventory.find(node => node.path === path.replace('saved-v2-', `saved-${version}-`)).file_type, 'authority_data');
-      for (const other of ['v2', 'v3', 'v4', 'v5', 'v6'].filter(other => other !== version)) assert.equal(graph.node_inventory.some(node => node.path === path.replace('saved-v2-', `saved-${other}-`)), false);
+      for (const other of ['v2', 'v3', 'v4', 'v5', 'v6', 'v7'].filter(other => other !== version)) assert.equal(graph.node_inventory.some(node => node.path === path.replace('saved-v2-', `saved-${other}-`)), false);
     }
+    if (version === 'v7') for (const prefix of ['primary', 'primary-k2']) assert.equal(graph.node_inventory.find(node => node.path === `benchmarks/schemas/${prefix}-saved-v7-evaluator-result-envelope.schema.json`)?.file_type, 'authority_data');
     assert.equal(scope.activePrimaryProducer(), false);
     assert.equal(scope.primaryAdapterSourceDigest(), null);
     assert.throws(() => scope.withPrimaryEvaluationProducer({}, () => {}), /source_build_no_producer_authority/u);
