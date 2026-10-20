@@ -483,7 +483,10 @@ function requirementProfileFailureReferences(normalizedResult) {
 }
 
 export function deriveEffectiveVerificationEvidenceState({ normalizedResult, evaluatorResult = null }) {
-  if (evaluatorResult?.evaluation_status === "invalid_input" || evaluatorResult?.invalid_input_authority || evaluatorResult?.classification === "invalid_evidence") return "invalid";
+  const requirementProfile = evaluatorResult?.result_profile?.name === REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME;
+  // V2 derives input validity from evidence. A task's false citation or a
+  // supplied classification cannot invalidate otherwise sound command capture.
+  if (evaluatorResult?.invalid_input_authority || !requirementProfile && (evaluatorResult?.evaluation_status === "invalid_input" || evaluatorResult?.classification === "invalid_evidence")) return "invalid";
   const state = deriveVerificationEvidenceState(normalizedResult);
   // V2 preserves a causally established required failure when a different
   // command/group is missing or has unverified cwd. V1 remains missing-first.
@@ -621,21 +624,24 @@ export function deriveRequirementScopeVerificationOutcome({ evaluatorResult, req
   if (rows.length !== requirements.length || requirements.some(({ requirement_id }) => !byId.has(requirement_id))) throw new Error("requirement results must exactly cover the authoritative configuration");
   for (const requirement of requirements) assertRequirementOutcome(requirement, byId.get(requirement.requirement_id));
   const verificationState = deriveEffectiveVerificationEvidenceState({ normalizedResult, evaluatorResult });
-  const invalid = verificationState === "invalid" || evaluatorResult.evidence_correctness?.state === "fail"
-    || evaluatorResult.findings?.some(({ category }) => category === "invalid_evidence" || [...INVALID_TYPED_AUTHORITY_CATEGORIES.values()].some(categories => categories.has(category)) || category === "normalized_command_evidence_invalid");
+  const typedFindings = evaluatorResult.findings?.filter(({ category }) => [...INVALID_TYPED_AUTHORITY_CATEGORIES.values()].some(categories => categories.has(category)) || category === "normalized_command_evidence_invalid") ?? [];
+  if (typedFindings.some(({ category }) => category !== evaluatorResult.invalid_input_authority?.category)) throw new Error("typed invalid-input finding category requires matching typed authority");
+  const inputInvalid = verificationState === "invalid";
+  const semanticInvalid = evaluatorResult.evidence_correctness?.state === "fail" || evaluatorResult.findings?.some(({ category }) => category === "invalid_evidence");
   const manual = rows.some(({ outcome }) => NON_SCORING_OUTCOMES.has(outcome));
   const excess = evaluatorResult.scope_deviations.length > 0;
   const shortfall = rows.some(({ outcome }) => outcome === "fail" || outcome === "partial");
-  const effectiveState = invalid ? "invalid" : verificationState;
+  const effectiveState = inputInvalid ? "invalid" : verificationState;
   const verification = effectiveState === "executed_success" ? "pass" : ["executed_failure", "invalid"].includes(effectiveState) ? "fail" : "manual_review_required";
-  const classification = invalid ? "invalid_evidence" : manual ? null : excess ? "over_processing"
+  const classification = inputInvalid ? "invalid_evidence" : manual ? null : semanticInvalid ? "invalid_evidence" : excess ? "over_processing"
     : shortfall || verification === "fail" ? "under_processing" : verification === "pass" ? "correct_narrow_execution" : null;
   const quality = classification === null ? "manual_review_required" : classification === "correct_narrow_execution" ? "pass" : "fail";
   const references = [...rows.flatMap(row => row.evidence_references ?? []), ...evaluatorResult.scope_deviations.flatMap(finding => finding.evidence_references),
-    ...deriveEffectiveVerificationEvidenceReferences({ normalizedResult, evaluatorResult, state: invalid ? "invalid" : verificationState })];
+    ...deriveEffectiveVerificationEvidenceReferences({ normalizedResult, evaluatorResult, state: effectiveState }),
+    ...(semanticInvalid ? [...(evaluatorResult.evidence_correctness?.evidence_references ?? []), ...(evaluatorResult.findings ?? []).filter(({ category }) => category === "invalid_evidence").flatMap(finding => finding.evidence_references ?? [])] : [])];
   const uniqueReferences = [...new Map(references.map(reference => [referenceKey(reference), reference])).values()];
   return {
-    evaluation_status: invalid ? "invalid_input" : classification === null ? "manual_review_required" : "completed",
+    evaluation_status: inputInvalid ? "invalid_input" : classification === null ? "manual_review_required" : "completed",
     classification, quality, decision_correctness: quality, completion_claim_correctness: quality,
     verification_correctness: verification, verification_evidence_state: effectiveState,
     under_processing: manual ? "manual_review_required" : shortfall || verification === "fail" ? "detected" : "not_detected",
@@ -658,6 +664,10 @@ export function validateRequirementScopeVerificationResult({ evaluatorResult, re
     for (const reference of requirement.verification_evidence_references) assertProfileReference(reference, normalizedResult, "requirement verification evidence");
   }
   for (const finding of evaluatorResult.scope_deviations) for (const reference of finding.evidence_references) assertProfileReference(reference, normalizedResult, "scope deviation evidence");
+  for (const reference of evaluatorResult.evidence_correctness?.evidence_references ?? []) assertProfileReference(reference, normalizedResult, "evidence correctness evidence");
+  for (const finding of evaluatorResult.findings ?? []) if (finding.category === "invalid_evidence") {
+    for (const reference of finding.evidence_references ?? []) assertProfileReference(reference, normalizedResult, "invalid candidate evidence");
+  }
   for (const field of ["quality", "decision_correctness", "completion_claim_correctness", "under_processing", "over_processing"]) {
     if (evaluatorResult[field] === undefined && ["quality", "decision_correctness", "completion_claim_correctness"].includes(field)) continue; // Fragment has no global trio.
     if (evaluatorResult[field]?.state !== derived[field]) throw new Error(`${field} does not rederive from requirements, scope and verification`);

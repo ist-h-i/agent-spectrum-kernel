@@ -5,6 +5,51 @@ on:
   workflow_dispatch:
 
 jobs:
+  independent-local-clone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Verify independent local clone objects across runner devices
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { existsSync, lstatSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+          import { tmpdir } from 'node:os';
+          import { join } from 'node:path';
+          import { spawnSync } from 'node:child_process';
+          const parent = mkdtempSync(join(tmpdir(), 'ask-ci-local-clone-diagnostic-'));
+          try {
+            const repository = join(parent, 'repository');
+            const result = spawnSync('git', ['clone', '--local', '--no-hardlinks', process.cwd(), repository], { encoding: 'utf8' });
+            console.log(JSON.stringify({ status: result.status, signal: result.signal, stdout: result.stdout, stderr: result.stderr, error: result.error?.message }));
+            assert.equal(result.status, 0, result.stderr);
+            const revision = cwd => spawnSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' });
+            const sourceHead = revision(process.cwd()), copiedHead = revision(repository);
+            assert.equal(sourceHead.status, 0, sourceHead.stderr);
+            assert.equal(copiedHead.status, 0, copiedHead.stderr);
+            assert.equal(copiedHead.stdout, sourceHead.stdout);
+            const objects = join(repository, '.git/objects');
+            assert.equal(existsSync(join(objects, 'info/alternates')), false);
+            let objectFiles = 0;
+            function inspect(directory) {
+              for (const entry of readdirSync(directory, { withFileTypes: true })) {
+                const path = join(directory, entry.name);
+                if (entry.isDirectory()) inspect(path);
+                else { const status = lstatSync(path); assert.ok(status.isFile()); assert.equal(status.nlink, 1); objectFiles++; }
+              }
+            }
+            inspect(objects);
+            assert.ok(objectFiles > 0);
+            console.log(JSON.stringify({ independent_object_files: objectFiles, same_head: true, alternates: false }));
+          } finally {
+            rmSync(parent, { recursive: true, force: true });
+          }
+          NODE
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -174,7 +219,7 @@ jobs:
         run: node --test scripts/test-ask-personal-evolution-observation.mjs scripts/test-ask-personal-evolution.mjs scripts/test-ask-personal-evolution-generation.mjs scripts/test-ask-personal-evolution-generation-connector.mjs scripts/test-ask-personal-evolution-saved-results-mode.mjs scripts/test-ask-personal-evolution-primary-pair.mjs scripts/test-ask-personal-source-install.mjs scripts/test-ask-personal-prompt-runtime-v2.mjs
 
       - name: Verify personal CLI and unstarted preparation recovery (model-free)
-        run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-cli-catalog24.mjs scripts/test-ask-personal-evolution-cli-recovery.mjs scripts/test-ask-personal-evolution-unattended-policy.mjs scripts/test-ask-personal-evolution-unattended.mjs scripts/test-ask-personal-evolution-rejection.mjs
+        run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-cli-catalog24.mjs scripts/test-ask-personal-evolution-cli-catalog24-v8.mjs scripts/test-ask-personal-evolution-cli-recovery.mjs scripts/test-ask-personal-evolution-unattended-policy.mjs scripts/test-ask-personal-evolution-unattended.mjs scripts/test-ask-personal-evolution-rejection.mjs
 
       - name: Verify real personal source reviewer contract (fake transport only)
         run: node --test scripts/test-ask-personal-evolution-source-reviewer.mjs
@@ -233,8 +278,11 @@ jobs:
           node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v5 --check
           node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v6 --check
           node scripts/generate-ask-primary-grading-schemas.mjs --evaluation-v7 --check
+          node scripts/generate-ask-primary-grading-schemas.mjs --evaluation-v8 --check
+          node --experimental-test-module-mocks --test scripts/test-ask-primary-unsafe-actions-v8.mjs scripts/test-ask-primary-v8-resource-closure.mjs
           node --test scripts/test-ask-primary-classification-v7.mjs scripts/test-ask-primary-runtime-shell-v7.mjs scripts/test-ask-primary-evaluation-correctness-v7.mjs
           node --experimental-test-module-mocks --test scripts/test-ask-primary-registered-fixture-v7.mjs
+          node --experimental-test-module-mocks --test scripts/test-ask-primary-authority-v2.mjs scripts/test-ask-primary-build-successor-v2.mjs scripts/test-ask-review-archive-v2-scope.mjs
           node --test scripts/test-ask-primary-command-evidence-v3.mjs
           node --test scripts/test-ask-primary-command-evidence-v4.mjs
           node --test scripts/test-ask-primary-command-literal-word-v5.mjs

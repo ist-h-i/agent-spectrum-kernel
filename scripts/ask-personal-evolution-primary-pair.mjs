@@ -13,7 +13,7 @@ import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-res
 import { verifyPortfolioScoringRootLineage } from "./ask-benchmark-evaluator-boundary.mjs";
 import { primaryScoringRoot, readPrimaryScoringVersion } from "./ask-primary-scoring-version.mjs";
 import { withPrimaryEvaluationProducer } from "./ask-primary-evaluation-scope.mjs";
-import { validatePortfolioEngineeringResult } from "./ask-benchmark-portfolio-score.mjs";
+import { validatePrimaryEngineeringResult } from "./ask-primary-engineering-safety.mjs";
 import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS, assertPrimaryFixtureInventory, primaryFixtureIdsForSet } from "./ask-primary-fixture-recipe.mjs";
 import { inspectPersonalEvolution } from "./ask-personal-evolution.mjs";
 import { verifyPersonalPromptMaterialization } from "./ask-personal-prompt-materialization.mjs";
@@ -62,10 +62,10 @@ export function validatePersonalEvolutionEvaluationSelection(evaluation, ids) {
   const fixtureSet = validatePersonalEvolutionFixtureSelection(ids, Object.hasOwn(evaluation, "fixtureSet") ? evaluation.fixtureSet : "legacy9");
   if (fixtureSet !== "catalog24") return fixtureSet;
   const selector = evaluation.scoringVersion;
-  assertPersonalEvolutionFields(selector, ["path", "digest"], "catalog24 requires a fixed v7 selector");
+  assertPersonalEvolutionFields(selector, ["path", "digest"], "catalog24 requires a fixed versioned selector");
   assert.equal(comparisonHash(raw(selector.path)), selector.digest, "catalog24 scoring selector changed");
   const manifest = json(selector.path);
-  assert.equal(manifest.kind, "ask_primary_scoring_version_v7", "catalog24 requires v7");
+  assert.ok(["ask_primary_scoring_version_v7", "ask_primary_scoring_version_v8"].includes(manifest.kind), "catalog24 requires explicit v7 or v8");
   assert.equal(manifest.fixture_set, "catalog24", "catalog24 selector inventory required");
   assertPersonalEvolutionFields(evaluation.gradingResources, roles, "separate role resources");
   const configs = roles.map(role => {
@@ -83,7 +83,7 @@ export function validatePersonalEvolutionEvaluationSelection(evaluation, ids) {
   for (const id of ids) {
     const selected = readPrimaryScoringVersion(selector, id, { verifyResourceFiles: true });
     const expected = { frozenSourceRoot: selected.root, ...selected.fixture.resource };
-    for (const config of configs) assert.ok(equal(config.fixtures[id], expected), `catalog24 role resource differs from v7 selection: ${id}`);
+    for (const config of configs) assert.ok(equal(config.fixtures[id], expected), `catalog24 role resource differs from versioned selection: ${id}`);
   }
   return fixtureSet;
 }
@@ -352,7 +352,7 @@ export function verifyPersonalEvolutionPromptPairResults(options) {
       const engineeringRaw = raw(saved.engineering_result.path); assert.equal(comparisonHash(engineeringRaw), saved.engineering_result.digest);
       assert.ok(options.trustedSavedEngineeringResultDigests?.includes(saved.engineering_result.digest), "separate saved grading provenance required; file metadata is not authority");
       const engineering = parseJsonRejectDuplicateKeys(engineeringRaw.toString("utf8"));
-      withPrimaryEvaluationProducer(saved.producer, () => validatePortfolioEngineeringResult(engineering));
+      withPrimaryEvaluationProducer(saved.producer, () => validatePrimaryEngineeringResult(engineering,{normalizedResult:normalized,resultPath:saved.engineering_result.path}));
       assert.equal(engineering.normalized_result_digest, normalized.normalized_result_digest);
       assert.equal(engineering.normalized_result_id, normalized.normalized_result_id);
       assert.equal(engineering.normalized_outcome, normalized.outcome, "saved grading outcome differs from fresh execution");

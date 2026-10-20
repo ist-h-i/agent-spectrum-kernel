@@ -1,3 +1,4 @@
+import * as scoringContract from "./ask-benchmark-scoring-contract.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
@@ -305,7 +306,7 @@ function buildAdmissionReview({ inputDigest, bundle, visiblePaths }) {
   return { ...base, review_package_digest: canonicalDigest(base) };
 }
 
-function generateInPlace({ root, privateRoot, evaluatorRevision, generationDate }) {
+function generateInPlace({ root, privateRoot, evaluatorRevision, generationDate, resultProfileName = BINARY_SCOPE_VERIFICATION_PROFILE_NAME }) {
   validateMpIacRollbackDesignInputClosure({ root });
   if (!/^[a-f0-9]{40}$/u.test(evaluatorRevision ?? "")) throw new Error("mp-iac-rollback evaluator revision is invalid");
   const fixtureRoot = resolve(root, MP_IAC_ROLLBACK_FIXTURE_ROOT);
@@ -343,7 +344,7 @@ function generateInPlace({ root, privateRoot, evaluatorRevision, generationDate 
     evaluator_public_reference_path: `${MP_IAC_ROLLBACK_FIXTURE_ROOT}/evaluator-reference.json`, evaluator_public_reference_digest: reference.public_metadata_digest,
     verification_command_contract_path: `${MP_IAC_ROLLBACK_FIXTURE_ROOT}/verification-command-contract.json`, verification_command_contract_digest: verification.contract_digest,
     scope_boundary_authority_path: `${MP_IAC_ROLLBACK_FIXTURE_ROOT}/evidence-map.json`, scope_boundary_authority_digest: authority.evidenceMap.scope_boundary_authority.authority_digest,
-    result_profile: { name: BINARY_SCOPE_VERIFICATION_PROFILE_NAME, digest: computeResultProfileDigest() }, declares_findings: false, ...authorityBinding,
+    result_profile: { name: resultProfileName, digest: computeResultProfileDigest({ name: resultProfileName }) }, declares_findings: false, ...authorityBinding,
   };
   const output = { ...outputBase, output_contract_digest: computeOutputContractDigest(outputBase) };
   writeJson(resolve(fixtureRoot, "output-contract.json"), output);
@@ -401,7 +402,8 @@ function validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoo
   if (resourceAssetsOnly && typeof evaluatorBoundary.verifyPrivateEvaluatorResourceAssets !== "function") throw new Error("resource-assets-only validation requires verifyPrivateEvaluatorResourceAssets");
 }
 
-export function writeMpIacRollbackDesignProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots = null, resourceAssetsOnly = false }) {
+export function writeMpIacRollbackDesignProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots = null, resourceAssetsOnly = false, resultProfileName = BINARY_SCOPE_VERIFICATION_PROFILE_NAME }) {
+  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, scoringContract.REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(resultProfileName)) throw new Error("unknown primary result profile");
   validateResourceAssetsMode(resourceAssetsOnly, privateRoot, boundaryRoots);
   if (!privateRoot || !existsSync(privateRoot) || !lstatSync(privateRoot).isDirectory() || lstatSync(privateRoot).isSymbolicLink()) throw new Error("mp-iac-rollback writer requires an existing non-symlink private root");
   assertPrivateRootOutsideRepository(root, privateRoot);
@@ -426,7 +428,7 @@ export function writeMpIacRollbackDesignProductionAuthority({ root = ROOT, priva
     worktreeAdded = true;
     cpSync(privateDirectory, stagedPrivate, { recursive: true, force: false, errorOnExist: true });
     assertFlatRegularAuthorityDirectory(stagedPrivate, "mp-iac-rollback staged private root");
-    generateInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate });
+    generateInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate, resultProfileName });
     validateMpIacRollbackDesignProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots, resourceAssetsOnly });
     if (!inputBefore.equals(readFileSync(resolve(stagedRepository, MP_IAC_ROLLBACK_FIXTURE_ROOT, "input-manifest.json"))) || !verificationBefore.equals(readFileSync(resolve(stagedRepository, MP_IAC_ROLLBACK_FIXTURE_ROOT, "verification-command-contract.json"))) || stableCanonicalJson(frozenBefore) !== stableCanonicalJson(agentVisibleFiles(resolve(stagedRepository, MP_IAC_ROLLBACK_FIXTURE_ROOT)))) throw new Error("mp-iac-rollback production generation changed frozen agent-visible inputs");
     const transaction = randomUUID();
@@ -460,6 +462,7 @@ export function validateMpIacRollbackDesignProductionAuthority({ root = ROOT, pr
   validatePortfolioPolicyArtifacts({ root });
   const requirement = artifacts["requirement-record.json"];
   const output = artifacts["output-contract.json"];
+  if (![BINARY_SCOPE_VERIFICATION_PROFILE_NAME, scoringContract.REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(output.result_profile?.name) || output.result_profile.digest !== computeResultProfileDigest(output.result_profile)) throw new Error("unknown or invalid primary result profile");
   const admission = artifacts["final-admission-record.json"];
   const reference = artifacts["evaluator-reference.json"];
   const manifest = artifacts["evaluator-authority-manifest.json"];

@@ -1,3 +1,4 @@
+import * as unsafeActionContract from './ask-primary-unsafe-action-contract.mjs';
 // Explicit evaluation-only successor selection. This verifies static identity and
 // preserved task/scoring semantics; it grants no start, worker or admission authority.
 import assert from 'node:assert/strict';
@@ -19,12 +20,14 @@ const digest = value => assert.match(value, /^sha256:[a-f0-9]{64}$/u);
 const keys = (value, expected) => assert.deepEqual(Object.keys(value).sort(), [...expected].sort(), 'closed scoring version fields required');
 const safe = path => typeof path === 'string' && !path.startsWith('/') && !path.includes('\\') && !path.includes('\0') && path.split('/').every(part => part && part !== '.' && part !== '..');
 const resourcePaths = ['privateRoot', 'manifestPath', 'admissionDecisionPath', 'admissionReviewAuthorityPath', 'admissionReviewArchivePath'];
-const scoringVersionKinds = Object.freeze(Array.from({ length: 7 }, (_, i) => `ask_primary_scoring_version_v${i + 1}`));
+const scoringVersionKinds = Object.freeze(Array.from({ length: 8 }, (_, i) => `ask_primary_scoring_version_v${i + 1}`));
 const V7_KIND = 'ask_primary_scoring_version_v7';
+const V8_KIND = 'ask_primary_scoring_version_v8';
+const registeredVersion = kind => [V7_KIND,V8_KIND].includes(kind);
 /** The optional catalog API is supplied by the registered-task recipe version.
  * Without it this implementation remains closed over the historical nine. */
 export function isPrimaryScoringFixtureId(fixtureId, { evaluationVersion = null } = {}) {
-  return PRIMARY_FIXTURE_IDS.includes(fixtureId) || (evaluationVersion === V7_KIND
+  return PRIMARY_FIXTURE_IDS.includes(fixtureId) || (registeredVersion(evaluationVersion)
     && typeof primaryFixtureRecipes.isRegisteredPrimaryFixtureId === 'function'
     && primaryFixtureRecipes.isRegisteredPrimaryFixtureId(fixtureId) === true);
 }
@@ -33,7 +36,7 @@ export function isPrimaryScoringFixtureId(fixtureId, { evaluationVersion = null 
 export function validatePrimaryScoringVersionFixtureInventory(manifest) {
   assert.ok(scoringVersionKinds.includes(manifest.kind), 'unknown primary scoring version');
   const ids = Object.keys(manifest.fixtures);
-  if (manifest.kind !== V7_KIND) {
+  if (!registeredVersion(manifest.kind)) {
     assert.ok(!Object.hasOwn(manifest, 'fixture_set'), 'historical scoring version cannot select a fixture set');
     keys(manifest.fixtures, PRIMARY_FIXTURE_IDS);
   } else if (!Object.hasOwn(manifest, 'fixture_set')) {
@@ -72,7 +75,17 @@ export const PRIMARY_PROCESSING_V7_SOURCE_PATHS = Object.freeze(['scripts/ask-be
   PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH,
   'benchmarks/schemas/primary-saved-v7-portfolio-command-evidence.schema.json', 'benchmarks/schemas/primary-k2-saved-v7-portfolio-command-evidence.schema.json',
   'benchmarks/schemas/primary-saved-v7-evaluator-result-envelope.schema.json', 'benchmarks/schemas/primary-k2-saved-v7-evaluator-result-envelope.schema.json']);
+export const PRIMARY_PROCESSING_V8_SOURCE_PATHS = Object.freeze([
+  'scripts/ask-benchmark-command-evidence.mjs', 'scripts/ask-benchmark-scoring-contract.mjs',
+  'scripts/ask-primary-unsafe-action-contract.mjs', 'scripts/ask-benchmark-normalized-results.mjs',
+  'scripts/ask-benchmark-evaluator-boundary.mjs', 'scripts/ask-benchmark-portfolio-score.mjs', 'scripts/ask-primary-engineering-safety.mjs',
+  'scripts/ask-primary-evaluation-producer.mjs', 'scripts/ask-primary-evaluation-private-grading.mjs', 'scripts/ask-primary-evaluation-grading.mjs', 'scripts/ask-primary-evaluation-scope.mjs', 'scripts/ask-benchmark-runtime-observation.mjs', 'scripts/generate-ask-primary-grading-schemas.mjs',
+  PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH,
+  ...['primary','primary-k2'].flatMap(prefix=>['portfolio-command-evidence','normalized-portfolio-result','evaluator-result-envelope','portfolio-engineering-result']
+    .map(name=>`benchmarks/schemas/${prefix}-saved-v8-${name}.schema.json`)),
+]);
 function processingSourcePaths(commandEvidenceParserRevision) {
+  if (commandEvidenceParserRevision === '1.11.0-primary-saved') return PRIMARY_PROCESSING_V8_SOURCE_PATHS;
   if (commandEvidenceParserRevision === '1.10.0-primary-saved') return PRIMARY_PROCESSING_V7_SOURCE_PATHS;
   if (commandEvidenceParserRevision === '1.9.0-primary-saved') return PRIMARY_PROCESSING_V6_SOURCE_PATHS;
   if (commandEvidenceParserRevision === '1.8.0-primary-saved') return PRIMARY_PROCESSING_V5_SOURCE_PATHS;
@@ -112,6 +125,13 @@ function fixedPath(path, directory = false) {
 export function verifyPrimaryScoringSemantics(fixtureId, selectedRoot, { root = ROOT, evaluationVersion = null } = {}) {
   assert.ok(isPrimaryScoringFixtureId(fixtureId, { evaluationVersion }), 'unknown primary fixture');
   const base = `benchmarks/fixtures/checkpoint-b2/${fixtureId}`;
+  if (evaluationVersion === V8_KIND) {
+    const basis = unsafeActionContract.PRIMARY_UNSAFE_ACTION_AUTHORIZATION[fixtureId];
+    if (basis) {
+      assert.equal(hash(read(join(selectedRoot,basis.task_path))),basis.task_sha256,'v8 unsafe action task authorization basis changed');
+      assert.equal(json(join(selectedRoot,base,'verification-command-contract.json')).contract_digest,basis.verification_command_contract_digest,'v8 unsafe action command authorization basis changed');
+    }
+  }
   const old = name => json(join(root, base, `${name}.json`));
   const fresh = name => json(join(selectedRoot, base, `${name}.json`));
   for (const name of ['input-manifest', 'verification-command-contract'])
@@ -140,7 +160,7 @@ export function verifyPrimaryScoringSemantics(fixtureId, selectedRoot, { root = 
     assert.equal(bytes.length, file.bytes, 'preserved input size changed');
     assert.equal(hash(bytes), `sha256:${file.sha256}`, 'preserved input bytes changed');
   }
-  const v7 = evaluationVersion === 'ask_primary_scoring_version_v7';
+  const v7 = registeredVersion(evaluationVersion);
   const expectedProfile = { name: REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME, digest: computeResultProfileDigest({ name: REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME }) };
   if (v7) {
     assert.deepEqual(fresh('output-contract').result_profile, expectedProfile, 'v7 output requires its explicit new result profile');
@@ -169,7 +189,7 @@ export function readPrimaryScoringVersion(selector, fixtureId, { root = ROOT, ve
   assert.ok(scoringVersionKinds.includes(manifest.kind), 'unknown primary scoring version');
   const processing = manifest.kind !== 'ask_primary_scoring_version_v1';
   keys(manifest, ['kind', 'scoring_version_id', 'fixtures', ...(processing ? ['processing'] : []),
-    ...(manifest.kind === V7_KIND && Object.hasOwn(manifest, 'fixture_set') ? ['fixture_set'] : [])]);
+    ...(registeredVersion(manifest.kind) && Object.hasOwn(manifest, 'fixture_set') ? ['fixture_set'] : [])]);
   assert.match(manifest.scoring_version_id, /^[a-z][a-z0-9_-]{1,127}$/u);
   validatePrimaryScoringVersionFixtureInventory(manifest);
   assert.ok(isPrimaryScoringFixtureId(fixtureId, { evaluationVersion: manifest.kind }), 'unknown primary fixture');
@@ -178,7 +198,7 @@ export function readPrimaryScoringVersion(selector, fixtureId, { root = ROOT, ve
   keys(fixture, ['frozen_source_root', 'selected', 'resource', 'resource_file_digests']);
   fixedPath(fixture.frozen_source_root, true);
   if (processing) verifyProcessingDescriptor(manifest.processing, fixture.frozen_source_root, root,
-    manifest.kind === 'ask_primary_scoring_version_v7' ? '1.10.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v6' ? '1.9.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v5' ? '1.8.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v4' ? '1.7.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v3' ? '1.6.0-primary-saved' : '1.5.0-primary-saved');
+    manifest.kind === V8_KIND ? '1.11.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v7' ? '1.10.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v6' ? '1.9.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v5' ? '1.8.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v4' ? '1.7.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v3' ? '1.6.0-primary-saved' : '1.5.0-primary-saved');
   keys(fixture.resource, PRIMARY_SCORING_VERSION_RESOURCE_FIELDS);
   keys(fixture.resource_file_digests, PRIMARY_SCORING_VERSION_FILE_FIELDS);
   digest(fixture.resource.admissionReviewAuthoritySourceDigest);

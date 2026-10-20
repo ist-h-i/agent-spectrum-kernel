@@ -196,7 +196,7 @@ function publicSummary(fixtures) {
     suite_counts: Object.fromEntries([...new Set(fixtures.map(row => row.suite))].map(suite => [suite, fixtures.filter(row => row.suite === suite).length])),
     public_input_status: fixtures.every(row => ["valid", "prepared"].includes(row.public_input_status)) ? "complete" : "partial",
     semantic_grading_status: "not_evaluated", fixtures, limitations: ["Public closure validation does not establish semantic quality, private evaluator admission, or ASK effectiveness.",
-      "The existing primary comparison/grading authority is still the closed nine-task set. Missing or ungraded tasks retain null quality."] };
+      "Public-only preparation selects no comparison/grading authority. Explicit catalog24 selection and independently admitted resources are required; missing or ungraded tasks retain null quality."] };
 }
 export function inspectPrimaryPublicInputs({ root = resolve(SOURCE) } = {}) {
   canonicalDirectory(root);

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { validateReviewArchiveProductionAuthority } from "./ask-benchmark-review-archive-identity.mjs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
@@ -244,7 +245,7 @@ export function generateMpDataMigrationHandoffReviewArchive({ root = ROOT, priva
     const result = spawnSync("git", ["-C", repositoryRoot, ...args]);
     if (result.status !== 0) throw new Error("review archive repository tracked bytes differ from the reviewed HEAD");
   }
-  const authority = validateMpDataMigrationHandoffProductionAuthority({ root: repositoryRoot });
+  const authority = validateReviewArchiveProductionAuthority({ root: repositoryRoot, fixtureId: FIXTURE_ID, sourceRevision }, () => validateMpDataMigrationHandoffProductionAuthority({ root: repositoryRoot }));
   const identity = establishReviewArchiveIdentity({ root: repositoryRoot, runtimeRoot: ROOT, reviewedHead, sourceRevision, evaluatorRevision: authority.evaluatorRevision, generatorPath: GENERATOR_PATH });
   const fixtureReference = readJson(resolve(repositoryRoot, FIXTURE_PATH, "evaluator-reference.json"), "review archive evaluator reference");
   const bundle = readJson(resolve(privateDirectory, "private-evaluator-bundle.json"), "review archive private evaluator bundle");

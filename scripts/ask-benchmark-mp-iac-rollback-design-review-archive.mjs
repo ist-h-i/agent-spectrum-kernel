@@ -7,6 +7,8 @@ import { computeEvaluatorBundleDigest, computeEvaluatorBundleId } from "./ask-be
 import { assertPrivateRootOutsideRepository } from "./ask-benchmark-mn-build-option-update.mjs";
 import { validateMpIacRollbackDesignProductionAuthority } from "./ask-benchmark-mp-iac-rollback-design-authority.mjs";
 import { validateMpPerformanceInvestigationProductionAuthority } from "./ask-benchmark-mp-performance-investigation-authority.mjs";
+import { validatePfPerformanceProductionAuthority } from "./ask-benchmark-pf-performance-authority.mjs";
+import { validateMnDocConfigCorrectionProductionAuthority } from "./ask-benchmark-mn-doc-config-correction-authority.mjs";
 import {
   addUniqueReviewArchiveEntries,
   establishReviewArchiveIdentity,
@@ -16,6 +18,7 @@ import {
   reviewArchiveSha256,
   validateReviewArchiveCases,
   validateReviewArchivePrivateBundle,
+  validateReviewArchiveProductionAuthority,
   walkReviewArchiveRoot,
 } from "./ask-benchmark-review-archive-identity.mjs";
 
@@ -59,6 +62,8 @@ function revisionEntry(root, revision, path, prefix = "repository") {
 function productionAuthority(fixtureId, root) {
   if (fixtureId === "mp-iac-rollback-design") return validateMpIacRollbackDesignProductionAuthority({ root });
   if (fixtureId === "mp-performance-investigation") return validateMpPerformanceInvestigationProductionAuthority({ root });
+  if (fixtureId === "pf-performance-regression") return validatePfPerformanceProductionAuthority({ root });
+  if (fixtureId === "mn-doc-config-correction") return validateMnDocConfigCorrectionProductionAuthority({ root });
   throw new Error(`review archive fixture is unsupported: ${fixtureId}`);
 }
 
@@ -142,7 +147,7 @@ function generateConfiguredFreshSuccessorReviewArchive({ fixtureId, program, gen
   const fixtureRoot = resolve(repository, `benchmarks/fixtures/checkpoint-b2/${fixtureId}`);
   const bundle = JSON.parse(readFileSync(resolve(privateDirectory, "private-evaluator-bundle.json")));
   const reference = JSON.parse(readFileSync(resolve(fixtureRoot, "evaluator-reference.json")));
-  const authority = productionAuthority(fixtureId, repository);
+  const authority = validateReviewArchiveProductionAuthority({ root: repository, fixtureId, sourceRevision }, () => productionAuthority(fixtureId, repository));
   const identity = establishReviewArchiveIdentity({ root: repository, runtimeRoot: ROOT, reviewedHead, sourceRevision, evaluatorRevision: authority.evaluatorRevision, generatorPath });
   const privateEntries = walkReviewArchiveRoot(privateDirectory, "private");
   const caseEntries = walkReviewArchiveRoot(caseDirectory, "cases");
@@ -206,6 +211,14 @@ export function generateMpIacRollbackDesignReviewArchive(options) {
 
 export function generateMpPerformanceInvestigationReviewArchiveFromShared(options) {
   return generateConfiguredFreshSuccessorReviewArchive({ fixtureId: "mp-performance-investigation", program: "mp_performance_investigation_private_review_archive", generatorPath: "scripts/ask-benchmark-mp-performance-investigation-review-archive.mjs" }, options);
+}
+
+export function generatePfPerformanceReviewArchiveFromShared(options) {
+  return generateConfiguredFreshSuccessorReviewArchive({ fixtureId: "pf-performance-regression", program: "pf_performance_regression_private_review_archive", generatorPath: "scripts/ask-benchmark-pf-performance-review-archive.mjs" }, options);
+}
+
+export function generateMnDocSelfContainedReviewArchiveFromShared(options) {
+  return generateConfiguredFreshSuccessorReviewArchive({ fixtureId: "mn-doc-config-correction", program: "mn_doc_config_correction_private_review_archive", generatorPath: "scripts/ask-benchmark-mn-doc-config-correction-review-archive.mjs" }, options);
 }
 
 function parse(argv) {

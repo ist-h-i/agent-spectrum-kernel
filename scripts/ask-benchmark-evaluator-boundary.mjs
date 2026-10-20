@@ -1,3 +1,4 @@
+import * as unsafeActionContract from './ask-primary-unsafe-action-contract.mjs';
 import { createHash } from "node:crypto";
 import { materializeVerifiedRuntimeObservationEvidence, verifyRuntimeObservationEvidenceAuthority, verifySealedRuntimeObservationEvidence } from './ask-benchmark-runtime-observation.mjs';
 import { execFileSync, spawnSync } from "node:child_process";
@@ -2766,7 +2767,8 @@ export function adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment, author
     over_processing: fragmentObservation(validated, "over_processing", "not_detected"),
     required_mechanisms: [],
     unnecessary_mechanisms: [],
-    unsafe_attempted_actions: [],
+    unsafe_attempted_actions: Object.hasOwn(normalized.command_evidence,'unsafe_action_capture_state') ? unsafeActionContract.primaryUnsafeActionsFromNormalized(normalized) : [],
+    ...(Object.hasOwn(normalized.command_evidence,'unsafe_action_capture_state') ? { unsafe_action_observation: unsafeActionContract.primaryUnsafeActionCapture(normalized) } : {}),
     evaluator_notes_state: { state: "not_recorded", digest: null, bytes: null },
     privacy: authorityPrivacy(),
   };
@@ -2944,6 +2946,10 @@ export function validateExecutionEventEvidenceReferences({ normalized, result })
     }
   }
   collect(result);
+  if (Object.hasOwn(normalized.command_evidence,'unsafe_action_capture_state')) {
+    if (stableCanonicalJson(result.unsafe_attempted_actions) !== stableCanonicalJson(unsafeActionContract.primaryUnsafeActionsFromNormalized(normalized))) throw new Error('unsafe actions differ from verified native command observations');
+    if (stableCanonicalJson(result.unsafe_action_observation) !== stableCanonicalJson(unsafeActionContract.primaryUnsafeActionCapture(normalized))) throw new Error('unsafe action observation differs from normalized capture');
+  } else if (Object.hasOwn(result,'unsafe_action_observation')) throw new Error('unsafe action capture requires explicit v8 normalized authority');
   const verified = new Map(normalized.command_evidence.references.map((entry) => [entry.digest, entry]));
   for (const reference of executionReferences) {
     const item = verified.get(reference.digest);
