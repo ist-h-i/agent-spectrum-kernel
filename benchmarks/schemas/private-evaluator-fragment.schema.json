@@ -53,7 +53,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["name", "digest"],
-      "properties": { "name": { "const": "binary_scope_verification_v1" }, "digest": { "$ref": "#/$defs/digest" } }
+      "properties": { "name": { "enum": ["binary_scope_verification_v1", "requirement_scope_verification_v2"] }, "digest": { "$ref": "#/$defs/digest" } }
     },
     "evidenceReference": {
       "type": "object",

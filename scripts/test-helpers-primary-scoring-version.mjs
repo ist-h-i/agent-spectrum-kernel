@@ -12,13 +12,13 @@ const mode = scoringVersionFixtureMode;
 const processingFiles = ['scripts/ask-benchmark-command-evidence.mjs', 'scripts/ask-review-target-requirement.mjs',
   'benchmarks/schemas/primary-saved-v2-portfolio-command-evidence.schema.json',
   'benchmarks/schemas/primary-k2-saved-v2-portfolio-command-evidence.schema.json'];
-export function setupPrimaryScoringVersion(t, { processingV2 = false, processingV3 = false, processingV4 = false, processingV5 = false, processingV6 = false } = {}) {
+export function setupPrimaryScoringVersion(t, { processingV2 = false, processingV3 = false, processingV4 = false, processingV5 = false, processingV6 = false, fixtureIds = PRIMARY_FIXTURE_IDS } = {}) {
   const processing = processingV2 || processingV3 || processingV4 || processingV5 || processingV6, version = processingV6 ? 'v6' : processingV5 ? 'v5' : processingV4 ? 'v4' : processingV3 ? 'v3' : 'v2';
   const sourcePaths = processingFiles.map(path => path.replace('saved-v2-', `saved-${version}-`));
   const parent = realpathSync(mkdtempSync(join(tmpdir(), 'ask-scoring-version-'))), runtime = join(parent, 'runtime'), privateRoot = join(parent, 'private');
   mkdirSync(runtime); mkdirSync(privateRoot);
   t.after(() => { mode(parent, true); rmSync(parent, { recursive: true, force: true }); });
-  for (const id of PRIMARY_FIXTURE_IDS) cpSync(join(ROOT, 'benchmarks/fixtures/checkpoint-b2', id), join(runtime, 'benchmarks/fixtures/checkpoint-b2', id), { recursive: true });
+  for (const id of fixtureIds) cpSync(join(ROOT, 'benchmarks/fixtures/checkpoint-b2', id), join(runtime, 'benchmarks/fixtures/checkpoint-b2', id), { recursive: true });
   for (const name of ['portfolio-catalog', 'portfolio-policy-manifest', 'portfolio-scoring-policy']) cpSync(join(ROOT, 'benchmarks', `${name}.json`), join(runtime, 'benchmarks', `${name}.json`));
   mkdirSync(join(runtime, 'scripts')); cpSync(join(ROOT, 'scripts/ask-benchmark-portfolio-score.mjs'), join(runtime, 'scripts/ask-benchmark-portfolio-score.mjs'));
   if (processing) for (const path of sourcePaths) {
@@ -32,7 +32,7 @@ export function setupPrimaryScoringVersion(t, { processingV2 = false, processing
   const seal = () => {
     mode(runtime, true); mode(privateRoot, true);
     const fixtures = {};
-    for (const id of PRIMARY_FIXTURE_IDS) {
+    for (const id of fixtureIds) {
       const base = `benchmarks/fixtures/checkpoint-b2/${id}`, freezePath = `${base}/scoring-input-freeze-manifest.json`, freeze = json(join(runtime, freezePath));
       const pins = Object.values(freeze).filter(value => value && typeof value === 'object' && value.path && value.raw_byte_digest);
       for (const pin of pins) pin.raw_byte_digest = hash(readFileSync(join(runtime, pin.path)));

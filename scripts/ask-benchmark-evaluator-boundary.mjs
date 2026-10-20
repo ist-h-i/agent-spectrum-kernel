@@ -27,7 +27,7 @@ import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { withCoreGradingAuthority, assertCoreGradingVerified } from "./ask-core-grading-authority.mjs";
 import { readStableJsonFile } from "./ask-benchmark-duplicate-key-json.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
-import { PRIMARY_PROCESSING_SOURCE_PATHS, PRIMARY_PROCESSING_V3_SOURCE_PATHS, PRIMARY_PROCESSING_V4_SOURCE_PATHS, PRIMARY_PROCESSING_V5_SOURCE_PATHS, PRIMARY_PROCESSING_V6_SOURCE_PATHS } from './ask-primary-scoring-version.mjs';
+import { PRIMARY_PROCESSING_SOURCE_PATHS, PRIMARY_PROCESSING_V3_SOURCE_PATHS, PRIMARY_PROCESSING_V4_SOURCE_PATHS, PRIMARY_PROCESSING_V5_SOURCE_PATHS, PRIMARY_PROCESSING_V6_SOURCE_PATHS, PRIMARY_PROCESSING_V7_SOURCE_PATHS } from './ask-primary-scoring-version.mjs';
 import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
@@ -46,11 +46,13 @@ import {
   computeScoringInputFreezeManifestDigest,
   computeScoringPolicyDigest,
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
+  REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME,
+  deriveRequirementScopeVerificationOutcome,
   deriveEffectiveVerificationEvidenceReferences,
   deriveEffectiveVerificationEvidenceState,
   FINAL_ADMISSION_RECORD_SCHEMA_PATH,
   SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH,
-  validateBinaryScopeVerificationResult,
+  validateResultProfile,
   validateFrozenFinalAdmissionRecordContract,
   validateEvaluatorAuthorityBindings,
   validateRequirementRecordContract,
@@ -1438,7 +1440,7 @@ export function validateSealedRepositoryAuthorityBytes({
     // Explicit saved-processing graphs select their pinned schema pair. Recognizing these
     // existing authority-data types does not add paths to default/v1 graphs.
     const expectedType = dependencyFileType(node.path, [...EVALUATOR_AUTHORITY_PATHS,
-      ...[...PRIMARY_PROCESSING_SOURCE_PATHS, ...PRIMARY_PROCESSING_V3_SOURCE_PATHS, ...PRIMARY_PROCESSING_V4_SOURCE_PATHS, ...PRIMARY_PROCESSING_V5_SOURCE_PATHS, ...PRIMARY_PROCESSING_V6_SOURCE_PATHS].filter(path => path.endsWith('.schema.json'))]);
+      ...[...PRIMARY_PROCESSING_SOURCE_PATHS, ...PRIMARY_PROCESSING_V3_SOURCE_PATHS, ...PRIMARY_PROCESSING_V4_SOURCE_PATHS, ...PRIMARY_PROCESSING_V5_SOURCE_PATHS, ...PRIMARY_PROCESSING_V6_SOURCE_PATHS, ...PRIMARY_PROCESSING_V7_SOURCE_PATHS].filter(path => path.endsWith('.schema.json'))]);
     if (node.file_type !== expectedType) throw new Error(`${label} source graph file type is invalid at ${node.path}`);
   }
   for (const fixture of descriptor.fixture_authority) {
@@ -2651,9 +2653,10 @@ export function validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy
   // Direct legacy callers retain the binary contract. The generic path is available only
   // through an explicit, matching public authority for a calibration fixture.
   if (outputContract === undefined || outputContract.result_profile !== undefined || freezeManifest.result_profile !== undefined) {
+    if (outputContract === undefined && fragment.result_profile?.name === REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME) throw new Error("new requirement profile requires explicit output and freeze authority");
     if (outputContract !== undefined && stableCanonicalJson(outputContract.result_profile) !== stableCanonicalJson(freezeManifest.result_profile)) throw new Error("private fragment public result profile binding drift");
     if (outputContract !== undefined && stableCanonicalJson(fragment.result_profile) !== stableCanonicalJson(outputContract.result_profile)) throw new Error("private fragment result profile differs from public authority");
-    validateBinaryScopeVerificationResult({ evaluatorResult: envelopeView, requirementRecord, normalizedResult });
+    validateResultProfile({ evaluatorResult: envelopeView, requirementRecord, normalizedResult });
   } else {
     if (normalizedResult?.lineage?.suite !== "calibration" || !calibrationSourceIdForFixture(normalizedResult.lineage.fixture_id)) throw new Error("profile-free private fragment requires a bound calibration fixture");
     if (Object.hasOwn(fragment, "result_profile") || Object.hasOwn(fragment, "classification")) throw new Error("profile-free calibration fragment must not contain binary profile or classification");
@@ -2708,6 +2711,9 @@ export function adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment, author
     outputContract: authority.outputContract,
     freezeManifest: authority.freezeManifest,
   });
+  const derived = validated.result_profile?.name === REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME
+    ? deriveRequirementScopeVerificationOutcome({ evaluatorResult: fragmentEnvelopeView(validated), requirementRecord: authority.requirementRecord, normalizedResult: normalized }) : null;
+  const observation = field => derived ? { state: derived[field], evidence_references: structuredClone(derived.evidence_references) } : fragmentObservation(validated, "verification_correctness", "fail");
   const lineage = normalized.lineage;
   const manifest = authority.bundleManifest;
   const result = {
@@ -2746,16 +2752,16 @@ export function adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment, author
     requirement_results: structuredClone(validated.requirement_results),
     ...(validated.result_profile === undefined ? {} : { result_profile: structuredClone(validated.result_profile) }),
     ...(validated.classification === undefined ? {} : { classification: validated.classification }),
-    quality: fragmentObservation(validated, "verification_correctness", "fail"),
+    quality: observation("quality"),
     safety: fragmentObservation(validated, "evidence_correctness", "fail"),
     findings: structuredClone(validated.findings),
     false_positives: [],
     scope_deviations: structuredClone(validated.scope_deviations),
-    decision_correctness: fragmentObservation(validated, "verification_correctness", "fail"),
+    decision_correctness: observation("decision_correctness"),
     verification_correctness: fragmentObservation(validated, "verification_correctness", "fail"),
     evidence_correctness: fragmentObservation(validated, "evidence_correctness", "fail"),
     approval_correctness: fragmentObservation(validated, "evidence_correctness", "fail"),
-    completion_claim_correctness: fragmentObservation(validated, "verification_correctness", "fail"),
+    completion_claim_correctness: observation("completion_claim_correctness"),
     under_processing: fragmentObservation(validated, "under_processing", "not_detected"),
     over_processing: fragmentObservation(validated, "over_processing", "not_detected"),
     required_mechanisms: [],
@@ -3630,7 +3636,7 @@ function verifyEvaluatorAuthorityCore({
   if (privateResultBindingCount !== 0 && privateResultBindingCount !== privateResultBindingFields.length) {
     throw new Error("evaluator result private authority binding is incomplete");
   }
-  const requiresPrivateAuthority = result.result_profile?.name === BINARY_SCOPE_VERIFICATION_PROFILE_NAME || privateResultBindingCount > 0;
+  const requiresPrivateAuthority = [BINARY_SCOPE_VERIFICATION_PROFILE_NAME, REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME].includes(result.result_profile?.name) || privateResultBindingCount > 0;
   if (requiresPrivateAuthority && privateAuthorityCount !== privateAuthorityPaths.length) {
     throw new Error("private evaluator authority requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together");
   }

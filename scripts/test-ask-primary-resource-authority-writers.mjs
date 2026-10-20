@@ -33,6 +33,33 @@ const git = (root, ...args) => {
   const result = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: 16777216 });
   assert.equal(result.status, 0, `synthetic test Git command failed: ${result.stderr}`); return result.stdout.trim();
 };
+test('O7-CHAIN handoff writer prepares a separate v7 profile with pending admission and no worker', t => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), 'ask-v7-resource-authority-'))), repository = join(parent, 'repository'), privateRoot = join(parent, 'private');
+  t.after(() => rmSync(parent, { recursive: true, force: true }));
+  const cloned = spawnSync('git', ['clone', '--no-hardlinks', '--no-checkout', ROOT, repository], { encoding: 'utf8', maxBuffer: 16777216 });
+  assert.equal(cloned.status, 0, cloned.stderr);
+  const revision = git(ROOT, 'rev-parse', 'HEAD'); git(repository, 'checkout', '--detach', revision); mkdirSync(privateRoot);
+  for (const name of ['oracle.json', 'scope-boundaries.json', 'false-positive-boundaries.json']) writeFileSync(join(privateRoot, name), '{"synthetic_static_assets_only":true}\n');
+  for (const name of ['rubric.md', 'human-instructions.md']) writeFileSync(join(privateRoot, name), 'Anonymous static resource test. No runtime admission.\n');
+  const marker = join(parent, 'worker-started');
+  writeFileSync(join(privateRoot, 'hidden-evaluator.mjs'), `import { writeFileSync } from 'node:fs';\nexport function evaluateCandidateSafe() { writeFileSync(${JSON.stringify(marker)}, 'unexpected'); throw new Error('inert artificial evaluator'); }\n`);
+  const base = join(repository, 'benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff');
+  const before = Object.fromEntries(['input-manifest.json', 'verification-command-contract.json', 'requirement-record.json', 'evidence-map.json'].map(name => [name, readFileSync(join(base, name))]));
+  const { writer, validator } = apis.find(api => api.fixtureId === 'mp-data-migration-handoff');
+  withPrimaryProcessingSourceBuild({ root: repository, baseRevision: revision, commandEvidenceParserRevision: '1.10.0-primary-saved' }, () => {
+    const generated = writer({ root: repository, privateRoot, evaluatorRevision: revision, generationDate: '2026-10-19', resourceAssetsOnly: true, resultProfileName: 'requirement_scope_verification_v2' });
+    assert.equal(generated.validation_scope, 'resource_assets_only'); assert.equal(generated.execution_authority, false); assert.equal(generated.scoringReady, false);
+    assert.equal(generated.reviewStatus, 'pending_independent_review');
+    assert.equal(validator({ root: repository, privateRoot, resourceAssetsOnly: true }).execution_authority, false);
+  });
+  for (const name of ['input-manifest.json', 'verification-command-contract.json', 'evidence-map.json']) assert.deepEqual(readFileSync(join(base, name)), before[name], `${name} remains the frozen public contract`);
+  const requirement = JSON.parse(readFileSync(join(base, 'requirement-record.json'))), original = JSON.parse(before['requirement-record.json']);
+  assert.deepEqual(requirement.requirements, original.requirements); assert.equal(requirement.requirement_set_digest, original.requirement_set_digest);
+  const output = JSON.parse(readFileSync(join(base, 'output-contract.json'))), freeze = JSON.parse(readFileSync(join(base, 'scoring-input-freeze-manifest.json')));
+  assert.equal(output.result_profile.name, 'requirement_scope_verification_v2'); assert.deepEqual(output.result_profile, freeze.result_profile);
+  assert.equal(existsSync(marker), false); assert.equal(existsSync(join(repository, 'control/start.json')), false);
+  assert.equal(JSON.parse(readFileSync(join(ROOT, 'benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/output-contract.json'))).result_profile.name, 'binary_scope_verification_v1');
+});
 test('all authority modules retain default validation with their historical boundary and reject unavailable resource-only verification', t => {
   const parent = realpathSync(mkdtempSync(join(tmpdir(), 'ask-historical-resource-authority-'))), repository = join(parent, 'repository');
   t.after(() => rmSync(parent, { recursive: true, force: true }));
