@@ -12,7 +12,7 @@
 既存9件も、この点検だけで正常例・不良例の意味採点が確認済みになるわけではない。
 
 2026-10-20追記: primary evaluation batchの明示`catalog24`と共通v7 APIは接続済み。
-個人ループCLIは従来9件内の選択を維持する。以下のmain比較・候補PR点検は当時の記録であり、
+個人ループCLIにも明示`catalog24`を接続し、省略時は従来9件内の選択を維持する。以下のmain比較・候補PR点検は当時の記録であり、
 現在の未完一覧は[組立状況](primary-24-task-assembly.md)を参照する。性能consumerは実装済みだが、
 新しいprivate authorityの固定とnative受入は未完である。
 

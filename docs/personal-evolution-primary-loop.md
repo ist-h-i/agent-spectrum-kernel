@@ -126,7 +126,7 @@ active file は1つ、残りの登録ファイルは exact reference data とし
 `overallTimeoutMs: 14400000`（4時間/child）、`tokenBudget: 5000000` を固定する。
 各 block は `grading.timeout_ms: PRIMARY_GRADING_RESERVATION_MS`（185分）も持つ。
 本来の grader factory の preflight はこの reservation を要求する。
-pair 全体の limits は既存 `sealPersonalEvolutionPromptPair` が9課題から導出し、
+pair 全体の limits は既存 `sealPersonalEvolutionPromptPair` が選択集合から導出し、
 別の短い独自上限へ置き換えない。
 
 既存 `buildEvolutionExperiment` / `publishEvolutionExperiment` で、候補、両 role、
@@ -135,6 +135,13 @@ pre-result に固定する。モデル/CLI/runtime/環境の宣言値、差と u
 採点条件や thresholds を結果から選ばない。実 grading には、両 role の独立した
 output root と、同じ固定資産 map を持つ本来の grading resource config を用意し、
 block の `grading.resources` と既存の grading reservation に結び付ける。
+
+既定の9件内選択を保ち、管理JSONの`evaluation.fixtureSet: "catalog24"`で正本24件を明示選択できる。
+blueprintのfixture IDsは正本順24件を必須とし、部分集合・順序変更・未知集合は拒否する。
+selectorは明示catalog24のv7、両role resourceは同じ24件mapかつselectorが選ぶsource/private fileを
+正確に指す必要がある。pair登録へ集合を固定し、既存driverを再利用する。
+両role合計48 child／144条件枠、240M tokens／340時間を予約する。無人実行policyにも同じ予約を要求し、
+足りなければgeneration/review/comparison dispatch前に停止する。この設定は実行許可やnative受入ではない。
 
 `sealPersonalEvolutionPromptPair` に preparation、experiment、blocks、fresh outputRoot
 を渡し、返された pair object digest を独立に確認・pin する。子の start が一つでも

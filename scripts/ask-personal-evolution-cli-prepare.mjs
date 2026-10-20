@@ -11,7 +11,7 @@ import { PRIMARY_GRADING_RESERVATION_MS } from "./ask-primary-evaluation-batch.m
 import { readPrimaryScoringVersion } from "./ask-primary-scoring-version.mjs";
 import { buildEvolutionExperiment, publishEvolutionExperiment, computePromptV2ExactProjectionDigests } from "./evolution-loop.mjs";
 import { planPersonalEvolutionBaselineAlignment, applyPersonalEvolutionBaselineAlignment } from "./ask-personal-evolution-alignment.mjs";
-import { sealPersonalEvolutionPromptPair } from "./ask-personal-evolution-primary-pair.mjs";
+import { sealPersonalEvolutionPromptPair, validatePersonalEvolutionEvaluationSelection } from "./ask-personal-evolution-primary-pair.mjs";
 
 const ROOT = resolve(import.meta.dirname, ".."), roles = ["baseline", "challenger"];
 const read = (storeRoot, digest) => readContentAddressedJson({ storeRoot, digest }).value;
@@ -20,6 +20,7 @@ const json = path => parseJsonRejectDuplicateKeys(bytes(path).toString("utf8"));
 
 export function preparePersonalEvolutionCliPair({ profile, cycleRoot, preparationObjectDigest, cycleId }) {
   const { storeRoot, trust, evaluation } = profile;
+  const fixtureSet = validatePersonalEvolutionEvaluationSelection(evaluation, profile.blueprint.evaluation_scope.fixture_ids);
   const alignmentInput = { storeRoot, ...trust, preparationObjectDigest,
     baselineRevision: `${cycleId}-baseline`, challengerRevision: `${cycleId}-challenger`,
     portfolioAuthority: profile.portfolioAuthority };
@@ -107,7 +108,7 @@ export function preparePersonalEvolutionCliPair({ profile, cycleRoot, preparatio
             profile_id: "primary_principles_v2_single_shot_v1" } } });
     }
   }
-  const sealed = sealPersonalEvolutionPromptPair({ ...input, blocks, outputRoot: join(cycleRoot, "pair-output") });
+  const sealed = sealPersonalEvolutionPromptPair({ ...input, fixtureSet, blocks, outputRoot: join(cycleRoot, "pair-output") });
   return { input: { ...input, pairRegistrationObjectDigest: sealed.object_digest,
     trustedPairRegistrationObjectDigests: [sealed.object_digest] }, outputRoot: sealed.registration.output_root };
 }

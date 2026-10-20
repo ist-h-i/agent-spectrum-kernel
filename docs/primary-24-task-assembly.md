@@ -19,7 +19,8 @@ archive helper・試験をそのまま取り込んだ。新しい課題を作り
 | hi-versioned-migration-safety | #364 / cf95a81330858e441a1b447ee5b7d01f4678bfdb | 公開資産・既存rubricと例あり。whole admission未完 |
 
 公開入力・成果物・要件契約・portfolio登録は24件。既存primary evaluation batch入口を
-明示選択`catalog24`で24件へ拡張した。個人ループCLI/pair/driverは別経路で、従来9件内の選択のままである。
+明示選択`catalog24`で24件へ拡張した。個人ループCLIの別経路にも同じ明示選択を接続し、
+正本24件・v7 selector・両role resourceを検査して既存pair登録/driverへ渡す。
 既定の`legacy9`は元の9件・順序・予算を維持する。
 公開点検の成功、採点処理のdeveloper control成功、固定resourceとの接続、独立admission、
 一括比較の動作を別々に確認する。24件の完成とはまだ報告しない。
@@ -148,7 +149,7 @@ carrierは人工値であり認証済み実計測の受入証拠にはしない�
 | 実装済み・統合済み | recipe/batch/prepare/gradingとv2公開task bindingの正本24件対応 | 実公開入力とv7 selectorを使う72枠準備2/2、recipe/batch fake43/43。モデル・grader起動なし |
 | 実装済み・共通source固定と受入待ち | 性能のsealed stdout consumerと未凍結private処理 | 既存evaluationInputEvidenceRoot経由のrecord/body、normalized lineage、command digest、loaded source digest、最終source、raw samplesを照合。pure8/8、人工private control9/9。別の証拠経路は作らない |
 | 実装済み・統合済み | PR408の分類・shell parser・v7登録集合API | 実APIで3/3。24件すべての選択resource検証と新15件のうち1件のproducer/scope接続を確認。v1〜v6は9件限定を維持 |
-| 後続の実装 | 個人ループCLI/pair/driverの24件選択 | primary batch拡張は自動伝播しない。v7 selector・全24件の集合・両role resource・予算を整合させて既存driverへ接続する必要がある |
+| 実装済み・非モデル検証中 | 個人ループCLI/pair/driverの24件選択 | `evaluation.fixtureSet`の明示catalog24、v7 selector・全24件の集合・両role resourceを照合しpairへ固定。metadata・集合・240M tokens／340時間予約・拒否後lock解放の4試験を確認。全24 CLI roundtripは検証中 |
 | 通常権限での検証待ち | client r10の既存隔離による正常・不良例 | 拒否対象を権限変更や隔離外経路で再実行しない。通常権限の受入証拠を別途取得するまで未検証 |
 | 通常権限での検証待ち | focused-regressionの13固定例の挙動受入 | 通常権限の固定正常1件はcoverage manual/null。既存隔離で観測が成立するまでは未検証 |
 | 実装不足／通常権限での検証待ち | 候補7件の課題別安全・rollback観測とwhole admission | carrierの存在を安全証明にせず、対応付けを実装し、観測不足はunknownのまま独立reviewへ渡す |
@@ -175,6 +176,30 @@ fake試験は既存batchのprepare/start/reportを使う。成果物、検証失
 課題×条件に保持し、通常の検証失敗やmanual gradingの後も次課題へ進む。状態不明のchildや
 incomplete gradingは既存の停止規則に従う。未評価を品質0へ補完しない。
 
+個人ループCLIでは管理設定JSONの`evaluation.fixtureSet`を`"catalog24"`にし、
+`blueprint.evaluation_scope.fixture_ids`を正本順24件に固定する。省略時は従来9件内の選択。
+`evaluation.scoringVersion`は明示catalog24のv7 selector、`gradingResources.baseline/challenger`は
+同じ24件の固定資産mapと別々のconfig pathを必要とする。新private authorityが不足すれば開始をblockする。
+pair登録に集合を固定し、既存driver/runnerへ渡す。両roleの48 child／144条件枠、240M tokens／340時間を
+予約し、無人実行のpolicyも同じ全体枠を満たさなければdispatch前に停止する。
+
+## 新v7 private authorityに必要な残件
+
+現公開24件の`output-contract.json`はv1、admissionはpendingのまま保持する。
+新規source rootで要件点・公開意味を保持しながら、v2 output/freeze/referenceを整合生成する必要がある。
+`ask-benchmark-mp-data-migration-handoff-authority.mjs`だけがv2 `resultProfileName`のopt-inを持つ。
+残る22 production writerと、buildの`ask-benchmark-mn-build-option-update-successor-authority.mjs`／
+`ask-benchmark-mn-build-option-update.mjs`の生成/validator接続が不足する。
+追加15件のwriterには既存の`resourceAssetsOnly`相当のsource-only opt-inがなく、
+`pf-performance-regression`のreview archive helperも未接続である。
+
+課題ごとに新しい`hidden-evaluator.mjs`等のasset inventory、`private-evaluator-bundle.json`、
+source/dependency/independence pins、独立review archive・sealed review authority・admission decisionを固定し、
+最後に`ask_primary_scoring_version_v7` selectorと両roleのgrading-resource manifestを作る。
+body候補の存在や人工control成功だけでは、これらの固定・reviewを完了扱いにしない。
+必要なreviewは全24件のv2分類/要件点/evidence保持・manual/null・正常/不良/欠損/範囲逸脱、
+課題別安全/rollback、client r10とfocusedの許可された隔離での受入、性能のsealed計測とsource bytes対応である。
+
 ## 統合後の基盤実装の検証契約
 
 Artifact ID: `verification-primary-24-assembly-20261020`
@@ -189,6 +214,7 @@ Upstream refs: Issues #207・#379、PR407、通常マージ済みPR408、正本`
 | 明示catalog24と共通v7の接続、過去versionの互換性 | `test-ask-primary-registered-fixture-v7.mjs`。集合・順序・未知ID負例、全24resource、新規課題のproducer/scope、selectorなし拒否 |
 | 既存入口でv7 selector付き72枠を未実行のまま準備する | `test-ask-primary-principles-v2-connection.mjs`。実公開入力、選択freeze digest、モデル0、品質null、旧renderer維持と追加依存の改変拒否 |
 | 一部失敗・manualを品質0と混同せず保存し、後続課題を処理する | `test-ask-primary-evaluation-batch.mjs`。24件fake、課題×条件の成果物・ログ・要件・理由、明確なfail0とmanual/null、24件目の成功 |
+| 個人CLIで24件を選び両roleの結果を保存し、再読で重複dispatchしない | `test-ask-personal-evolution-cli-catalog24.mjs`。実configure/prepare/pair/driver/producerとfake transport/grader、v7と両role資産mapの負例、48 child/144条件、saved readout。既存scopeのCLI試験でdecision/receipt/nextを維持。予算試験はpairと無人実行の同一予約を確認 |
 | 計測値とsourceの対応を検査し、欠損・改ざん・不確実を成功へ補完しない | `test-ask-benchmark-pf-performance-measurement.mjs`、既存carrier fake試験。人工データでありnative性能・認証・安全の証明ではない |
 | 最終source・生成物・既存入口の整合性 | runtime bundleの`--write`後`--check`、repository validation、既存general benchmark、共通v7試験、関連CIの最終head結果と独立レビュー |
 

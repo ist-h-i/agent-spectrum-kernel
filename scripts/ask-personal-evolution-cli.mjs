@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { assertNoSymlinkPathSegments, canonicalDigest, parseJsonRejectDuplicateKeys,
   putContentAddressedJson, readContentAddressedJson, readStableBytes } from "./content-addressed-store.mjs";
 import { publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
-import { PRIMARY_FIXTURE_IDS } from "./ask-primary-fixture-recipe.mjs";
+import { validatePersonalEvolutionEvaluationSelection } from "./ask-personal-evolution-primary-pair.mjs";
 import { readPrimaryScoringVersion } from "./ask-primary-scoring-version.mjs";
 import { registerAsset, buildAssetLifecycleAuthorityContext, exportAssetRegistryReference } from "./asset-registry.mjs";
 import { preparePersonalEvolutionCandidate, verifyPersonalEvolutionParent, inspectPersonalEvolution } from "./ask-personal-evolution.mjs";
@@ -54,7 +54,8 @@ function configure(configPath, profileRoot) {
   absolute(config.storeRoot); exact(config.trust, TRUST_KEYS, "existing trust inputs");
   for (const key of TRUST_KEYS) assert.ok(Array.isArray(config.trust[key]), key);
   exact(config.generation, ["executable", "timeoutMs"], "generation inputs");
-  exact(config.evaluation, ["publicInputRoot", "cliBin", "cliVersion", "model", "reasoning", "evidenceKind", "scoringVersion", "gradingResources"], "evaluation inputs");
+  exact(config.evaluation, ["publicInputRoot", "cliBin", "cliVersion", "model", "reasoning", "evidenceKind", "scoringVersion", "gradingResources",
+    ...(Object.hasOwn(config.evaluation, "fixtureSet") ? ["fixtureSet"] : [])], "evaluation inputs");
   absolute(config.evaluation.publicInputRoot);
   assert.ok(["observed", "synthetic"].includes(config.evaluation.evidenceKind));
   exact(config.evaluation.gradingResources, ["baseline", "challenger"], "separate role resources");
@@ -64,9 +65,9 @@ function configure(configPath, profileRoot) {
   }
   assert.notEqual(config.evaluation.gradingResources.baseline.path, config.evaluation.gradingResources.challenger.path);
   const ids = config.blueprint.evaluation_scope.fixture_ids;
-  assert.ok(ids.length && ids.length <= 9 && new Set(ids).size === ids.length && ids.every(id => PRIMARY_FIXTURE_IDS.includes(id)), "existing primary fixtures only");
   exact(config.evaluation.scoringVersion, ["path", "digest"], "fixed scoring version selector required");
   absolute(config.evaluation.scoringVersion.path);
+  validatePersonalEvolutionEvaluationSelection(config.evaluation, ids);
   for (const id of ids) readPrimaryScoringVersion(config.evaluation.scoringVersion, id, { verifyResourceFiles: true });
   assert.equal(config.blueprint.parent_asset.asset_type, "prompt", "rendered Codex Prompt target required");
   verifyPersonalEvolutionParent({ storeRoot: config.storeRoot, candidate: config.blueprint, ...config.trust });
