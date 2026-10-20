@@ -48,6 +48,10 @@ const historicalEntries = Object.freeze(['scripts/ask-benchmark-evaluator-bounda
 // Consume the checked finite descriptor only after the existing version /
 // producer / scope import cycle has initialized.
 const processingSchemas = processing => Object.keys(processing.source_file_digests).filter(path => path.endsWith('.schema.json'));
+// The v8 schema generator is build-time authority, never a private runtime import.
+const processingSourceAuthorities = processing => [...processingSchemas(processing),
+  ...(processing.command_evidence_parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION
+    ? ['scripts/generate-ask-primary-grading-schemas.mjs'] : [])];
 const sourceGit = (root, ...args) => execFileSync('git', ['-C', root, 'rev-parse', ...args],
   { encoding: 'utf8', maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const sourceCommonDirectory = root => realpathSync(sourceGit(root, '--path-format=absolute', '--git-common-dir'));
@@ -130,7 +134,7 @@ export function primaryEvaluatorDependencyGraphParameters({root,baseRevision,def
     if (JSON.stringify(primaryProcessingDescriptor({ root, commandEvidenceParserRevision: resource.processing.command_evidence_parser_revision })) !== JSON.stringify(resource.processing)) throw new Error('primary_source_build_processing_source_changed');
     if (!defaults || JSON.stringify([...defaults.entryPaths].sort()) !== JSON.stringify(historicalEntries)) throw new Error('primary_source_build_default_entries_changed');
     return { root, baseRevision, entryPaths: [...defaults.entryPaths, PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH].sort(),
-      authorityPaths: [...new Set([...defaults.authorityPaths, ...processingSchemas(resource.processing)])].sort(),
+      authorityPaths: [...new Set([...defaults.authorityPaths, ...processingSourceAuthorities(resource.processing)])].sort(),
       privateEntryPaths: [...new Set([...defaults.privateEntryPaths, PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH])].sort() };
   }
   let selected;

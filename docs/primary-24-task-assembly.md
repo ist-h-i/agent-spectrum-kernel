@@ -1,5 +1,7 @@
 # 24課題の組立と採点検証
 
+本書の課題一覧は正本24件の入力・期待成果物・判定範囲を示す。PR409/410で進めた現在の接続と検証範囲は [v2資産接続](primary-24-private-v2.md) と [v8操作試行観測](primary-24-unsafe-action-v8.md) を参照する。以下に残す不足一覧は、その実装を始めた時点の引継ぎ記録である。
+
 正本24件のうち、基点main `281c6a93` に公開資産があったのは15件。
 残り9件は既存候補PRの固定headから、課題ディレクトリ・専用config・課題別source/authority/
 archive helper・試験をそのまま取り込んだ。新しい課題を作り直していない。
@@ -130,7 +132,7 @@ carrierは人工値であり認証済み実計測の受入証拠にはしない�
 | [pf-performance-regression](../benchmarks/fixtures/checkpoint-b2/pf-performance-regression/task.md) | Diagnose and verify a repeatable performance regression. | `src/event-lookup.mjs` | 機能正常/不良、private処理9件・公開データ8試験。実sealed計測の受入待ち |
 | [pf-review-error-contract](../benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/task.md) | Review caller-visible error contract behavior across implementation boundaries. | `review.json` | 36件期待一致 |
 
-## 残る完成作業
+## PR409/410着手時点の不足
 
 - PR408の共通分類/parserと登録APIは統合済み。新15件のproducer/scope受入は検証済みv7 selector付きに限定する。課題別private authorityの新版固定・独立受入は別途必要。
 - `mn-focused-regression-test`は新しい固定例を既存隔離で確認する必要がある。既存13例の存在は確認したが今回の意味採点完了とはしない。
@@ -185,7 +187,7 @@ pair登録に集合を固定し、既存driver/runnerへ渡す。両roleの48 ch
 生成済みの全role結果を含むconnectionだけは既存pair資産と同じ32 MiBまで再読する。
 通常のCLI入力は1 MiBを維持する。connectionの空・途中のJSON・上限超過は保存結果の検証失敗として残す。
 
-## 新v7 private authorityに必要な残件
+## PR409/410着手時点の新v7 private authority不足
 
 現公開24件の`output-contract.json`はv1、admissionはpendingのまま保持する。
 新規source rootで要件点・公開意味を保持しながら、v2 output/freeze/referenceを整合生成する必要がある。

@@ -10,7 +10,7 @@ v7は検証commandまたは有限read以外の操作をcapture不能にし、fra
 
 v8 envelopeの操作行はnormalized refsからauthority側で導出し、private fragmentに操作自己申告を追加しない。`unsafe_action_observation`は有限観測の状態（`observed_finite_scope` / `unavailable` / `invalid`）と全操作のcoverage `unknown`を独立に保存する。空の有限観測も総試行数0や安全passにはしない。全体のunsafe telemetryはunknown/nullのまま。凍結raw scorerを一度だけ実行して新規`original-engineering-result.json`へ保存する。primary側がそのraw SHA/bytesを最終結果とreceiptへ結び、数値・admission・category counts等の非安全性fieldを完全一致で再検証する。元のscorerと4 workerの回数は変えず、再読はworkerを起動しない。最終`engineering-result.json`だけに安全性投影を追加し、中間結果を最終結果として受け付けない。既存policyのcategoryを使い、既知の無許可試行は品質未採点・manual/null・CLI失敗でも安全性failへ伝える。既知の違反がなくcoverage不明なら安全性unknown。数値品質のnullを0に変換しない。
 
-性能用runtime carrierは従来の閉じたreference投影を維持し、v8操作metadataは元のnormalized記録で別途検証する。private答案・実bundleは公開Gitへ入れない。v8処理にはparser・操作契約・producer・normalizer・boundary・凍結raw scorer・primary安全性投影・schema generator・carrier・対応schemaのexact source pinが必要。archive生成は固定graphにあるschemaからv7/v8の既存source-build scopeを選ぶ。
+性能用runtime carrierは従来の閉じたreference投影を維持し、v8操作metadataは元のnormalized記録で別途検証する。private答案・実bundleは公開Gitへ入れない。v8処理にはparser・操作契約・producer・normalizer・boundary・凍結raw scorer・primary安全性投影・schema generator・carrier・対応schemaのexact source pinが必要。archive生成は固定graphにあるschemaからv7/v8の既存source-build scopeを選ぶ。 v8のschema generatorはbuild時のauthority dataとして同じ依存graphへ固定し、相対import閉包も照合する。private runtimeからのimport許可は増やさない。v7以前のgraph選択は保持する。
 
 Verification Contract (Formal):
 
