@@ -3,7 +3,8 @@
 正本24件のうち、基点main `281c6a93` に公開資産があったのは15件。
 残り9件は既存候補PRの固定headから、課題ディレクトリ・専用config・課題別source/authority/
 archive helper・試験をそのまま取り込んだ。新しい課題を作り直していない。
-共通scorer/parser/primary scope/producer/selector/schema/workflow、基点の15課題、過去のrunは変更しない。
+共通scorer/parser/primary scope/producer/selector/schema/workflowは、通常マージ済みPR408のmain
+`91d7218bb5f7db39d6b30d3ebc45ffb50780a223`を通常統合して再利用する。基点の15課題と過去のrunは変更しない。
 
 | 候補課題 | 再利用元PR / head | 現段階 |
 | --- | --- | --- |
@@ -129,7 +130,7 @@ carrierは人工値であり認証済み実計測の受入証拠にはしない�
 
 ## 残る完成作業
 
-- 共通分類/parser修正は別branchの担当。未統合のsourceを完成扱いにしない。
+- PR408の共通分類/parserと登録APIは統合済み。新15件のproducer/scope受入は検証済みv7 selector付きに限定する。課題別private authorityの新版固定・独立受入は別途必要。
 - `mn-focused-regression-test`は新しい固定例を既存隔離で確認する必要がある。既存13例の存在は確認したが今回の意味採点完了とはしない。
 - クライアントr10案の固定正常/追加不良例を許可された隔離環境で確認し、新しいprivate authority・公開reference・独立レビューへ接続する。
 - 性能回帰のstdout consumerを共通source新版と新規private authorityへ固定し、既存sealed transportでの独立受入を閉じる。候補作成JSONは代用しない。
@@ -139,17 +140,17 @@ carrierは人工値であり認証済み実計測の受入証拠にはしない�
 未評価・採点不能・manualの品質/点数はnullを保持する。過去のrunや凍結bundleの再採点・上書き、
 実モデル/Codex比較の開始、認証/security設定の変更、25件目以降の課題追加は行わない。
 
-## 未完了項目の分類（2026-10-19）
+## 実装状態と残る受入（2026-10-20）
 
 | 分類 | 対象・具体的な不足 | 次の実装／検証 |
 | --- | --- | --- |
-| 実装済み・共通source接続待ち | recipe/batch/prepare/gradingとv2公開task bindingの正本24件対応 | 実公開入力72枠準備2/2、recipe/batch fake43/43。共通所有ファイルの9件制限はPR408へAPI調整を依頼 |
+| 実装済み・統合済み | recipe/batch/prepare/gradingとv2公開task bindingの正本24件対応 | 実公開入力とv7 selectorを使う72枠準備2/2、recipe/batch fake43/43。モデル・grader起動なし |
 | 実装済み・共通source固定と受入待ち | 性能のsealed stdout consumerと未凍結private処理 | 既存evaluationInputEvidenceRoot経由のrecord/body、normalized lineage、command digest、loaded source digest、最終source、raw samplesを照合。pure8/8、人工private control9/9。別の証拠経路は作らない |
-| 共通修正PRへの依存 | PR408の分類・shell parserと選択source closure。scoring-version/scope/producerの9件制限も重複箇所 | 重複ファイルは編集せず、9件／24件の登録集合を検証するAPIとfixture受理predicateを調整。mergeまたは明示commit後に接続 |
+| 実装済み・統合済み | PR408の分類・shell parser・v7登録集合API | 実APIで3/3。24件すべての選択resource検証と新15件のうち1件のproducer/scope接続を確認。v1〜v6は9件限定を維持 |
 | 通常権限での検証待ち | client r10の既存隔離による正常・不良例 | 拒否対象を権限変更や隔離外経路で再実行しない。通常権限の受入証拠を別途取得するまで未検証 |
 | 通常権限での検証待ち | focused-regressionの13固定例の挙動受入 | 通常権限の固定正常1件はcoverage manual/null。既存隔離で観測が成立するまでは未検証 |
 | 実装不足／通常権限での検証待ち | 候補7件の課題別安全・rollback観測とwhole admission | carrierの存在を安全証明にせず、対応付けを実装し、観測不足はunknownのまま独立reviewへ渡す |
-| fake受入済み・関連CI待ち | 24件比較・採点と途中失敗保存 | 1件の明確なfail品質0、別のmanual品質null、その後の24件目の成功を同じreportへ保存。固定headの既存CI入口へ試験登録 |
+| fake受入済み・統合head CIで確認 | 24件比較・採点と途中失敗保存 | 1件の明確なfail品質0、別のmanual品質null、その後の24件目の成功を同じreportへ保存。固定headの既存CI入口へ試験登録 |
 
 ## 既存入口からの使い方
 
@@ -171,3 +172,75 @@ grading185分の予約を維持する。この数値は実行許可ではない�
 fake試験は既存batchのprepare/start/reportを使う。成果物、検証失敗ログ、grading結果と要件判定を
 課題×条件に保持し、通常の検証失敗やmanual gradingの後も次課題へ進む。状態不明のchildや
 incomplete gradingは既存の停止規則に従う。未評価を品質0へ補完しない。
+
+## 統合後の基盤実装の検証契約
+
+Artifact ID: `verification-primary-24-assembly-20261020`
+
+Upstream refs: Issues #207・#379、PR407、通常マージ済みPR408、正本`portfolio-catalog.json`、
+[共通v7の検証契約](primary-evaluation-correctness-v7.md)。既存のformal選択を維持し、
+この契約は入力・準備・fake一括処理・証拠接続という実装範囲を証明する。全24件のnative受入を代替しない。
+
+| Behavior proof obligation | Focused check / required evidence |
+| --- | --- |
+| 正本24件の入力・出力・要件・変更範囲が存在し、不良入力の影響が局所化される | `test-ask-primary-public-inputs.mjs`。24件列挙、公開入力だけの準備、ドリフト・欠損・不正scopeの負例と残り23件の保存 |
+| 明示catalog24と共通v7の接続、過去versionの互換性 | `test-ask-primary-registered-fixture-v7.mjs`。集合・順序・未知ID負例、全24resource、新規課題のproducer/scope、selectorなし拒否 |
+| 既存入口でv7 selector付き72枠を未実行のまま準備する | `test-ask-primary-principles-v2-connection.mjs`。実公開入力、選択freeze digest、モデル0、品質null、旧renderer維持と追加依存の改変拒否 |
+| 一部失敗・manualを品質0と混同せず保存し、後続課題を処理する | `test-ask-primary-evaluation-batch.mjs`。24件fake、課題×条件の成果物・ログ・要件・理由、明確なfail0とmanual/null、24件目の成功 |
+| 計測値とsourceの対応を検査し、欠損・改ざん・不確実を成功へ補完しない | `test-ask-benchmark-pf-performance-measurement.mjs`、既存carrier fake試験。人工データでありnative性能・認証・安全の証明ではない |
+| 最終source・生成物・既存入口の整合性 | runtime bundleの`--write`後`--check`、repository validation、既存general benchmark、共通v7試験、関連CIの最終head結果と独立レビュー |
+
+Insufficient-evidence conditions: private authorityが旧profileのまま、admissionがunknown、既存隔離が動かない、
+実sealed計測や課題別安全/rollback観測がない場合は、その受入を未確認のまま残す。除外したclientの実行記録は再利用しない。
+
+Evidence required before completion claim: 上表の実装範囲の検査と独立レビューが一致すること。
+「24件すべての採点・native受入が完成」という主張には、前述の未完了事項を別途解消する証拠が必要。
+
+Evidence required before merge claim: 統合後の最終headに対する非モデル試験・生成物整合性・関連CI・独立レビュー、
+および未受入事項の明示。マージ操作は親の判断待ちであり、この契約やfake成功が承認を与えることはない。
+
+Proof selection (`ask.verification-proof-policy@1.0.0`):
+
+```json
+{
+  "selection_id": "primary-24-proof-selection-20261020",
+  "policy_ref": "ask.verification-proof-policy@1.0.0",
+  "selected_path": "formal_verification_contract",
+  "behavior_ref": "docs/primary-24-task-assembly.md",
+  "eligibility_facts": [],
+  "formal_triggers": [
+    {
+      "trigger_id": "public_api_schema_or_compatibility",
+      "evidence_refs": [
+        "scripts/ask-primary-fixture-recipe.mjs",
+        "scripts/ask-primary-scoring-version.mjs"
+      ]
+    },
+    {
+      "trigger_id": "state_concurrency_persistence_lifecycle_or_cross_module",
+      "evidence_refs": [
+        "scripts/ask-primary-evaluation-batch.mjs"
+      ]
+    },
+    {
+      "trigger_id": "performance_or_reliability",
+      "evidence_refs": [
+        "scripts/ask-benchmark-pf-performance-source.mjs"
+      ]
+    },
+    {
+      "trigger_id": "multi_session_multi_agent_or_handoff",
+      "evidence_refs": [
+        "https://github.com/ist-h-i/agent-spectrum-kernel/pull/407"
+      ]
+    },
+    {
+      "trigger_id": "merge_release_or_stable_trace",
+      "evidence_refs": [
+        "https://github.com/ist-h-i/agent-spectrum-kernel/issues/379"
+      ]
+    }
+  ],
+  "formal_verification_contract_ref": "verification-primary-24-assembly-20261020"
+}
+```

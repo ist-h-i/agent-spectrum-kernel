@@ -92,8 +92,8 @@ export function preparePrimaryEvaluation(publicParent, options) {
     kernel_candidate_decision: `${profile.kernel_condition} selected for this practical evaluation; old v1 and candidate preserved; not product adoption` };
 }
 // Public source preparation is deliberately separate from private grading admission.
-// It consumes the canonical 24-ID catalog; the existing nine-task producer and
-// scoring-version authority remain unchanged.
+// It consumes the canonical 24-ID catalog. Comparison/scoring authority still
+// requires its separately selected version and independently admitted resources.
 const PUBLIC_KIND = "ask_primary_public_inputs_v1";
 const publicContracts = ["input-manifest.json", "verification-command-contract.json", "output-contract.json", "requirement-record.json", "evidence-map.json"];
 const canonicalDirectory = path => {
