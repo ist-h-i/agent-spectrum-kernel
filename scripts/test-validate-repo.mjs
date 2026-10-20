@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { chmodSync, cpSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -4890,8 +4890,10 @@ EOF
   chmodSync(riskCodexLauncher, 0o755);
   writeFileSync(resolve(riskPackageRoot, "package.json"), `${JSON.stringify({ name: "@openai/codex", version: "1.2.3", bin: { codex: "bin/codex.js" } }, null, 2)}\n`);
   writeFileSync(resolve(riskPlatformRoot, "package.json"), `${JSON.stringify({ name: "@openai/codex", version: `1.2.3-${process.platform}-${process.arch}`, os: [process.platform], cpu: [process.arch] }, null, 2)}\n`);
+  // cpSync retains the executable source mode; this no-op fixture never needs
+  // an executable-permission mutation after copying a platform binary.
   cpSync("/usr/bin/true", riskCodexNative);
-  chmodSync(riskCodexNative, 0o755);
+  assert.ok(statSync(riskCodexNative).mode & 0o111, "copied no-op fixture must remain executable");
   const riskActionPath = resolve(fixtureRoot, "codex-runner-risk-action.json");
   writeFileSync(riskActionPath, `${JSON.stringify({
     schema_version: "1.0.0",
