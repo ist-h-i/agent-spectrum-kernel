@@ -55,6 +55,24 @@ test("partial/invalid saved evidence and unsupported positive application remain
   assert.equal(result.status, "needs_action"); assert.equal(result.reason, "saved_comparison_incomplete");
   assert.equal(result.report.incomplete_role_count, 1); assert.equal(result.evidence.dimensions.quality.conclusion, "unknown");
   assert.ok(!result.next_command.includes("confirm-evaluation"));
+  const connectionPath = join(output, "invocation/saved-result-connection.json");
+  // A catalog24 connection contains all 48 role reports; its diagnostic payload
+  // can exceed ordinary command input limits without granting result authority.
+  write(connectionPath, { savedResults: {}, trusted_grade_receipt_digests: [], report: { diagnostic_context: "x".repeat(2 * 1024 * 1024) } });
+  assert.equal((await run(["status", "--cycle", cycle])).reason, "saved_comparison_incomplete", "large saved report still requires verified complete evidence");
+  write(connectionPath, { savedResults: {}, trusted_grade_receipt_digests: [], report: { diagnostic_context: "x".repeat(32 * 1024 * 1024) } });
+  const oversized = await run(["status", "--cycle", cycle]);
+  assert.equal(oversized.reason, "saved_state_verification_failed");
+  assert.match(oversized.detail, /bounded non-empty file/);
+  writeFileSync(connectionPath, "");
+  assert.equal((await run(["status", "--cycle", cycle])).reason, "saved_state_verification_failed", "empty saved connection remains invalid");
+  writeFileSync(connectionPath, '{"savedResults":');
+  assert.equal((await run(["status", "--cycle", cycle])).reason, "saved_state_verification_failed", "partial JSON remains invalid");
+  write(connectionPath, { savedResults: {}, trusted_grade_receipt_digests: [] });
+  const inputPath = join(cycle, "input.json"), originalInput = readFileSync(inputPath);
+  write(inputPath, { diagnostic_context: "x".repeat(2 * 1024 * 1024) });
+  await assert.rejects(run(["status", "--cycle", cycle]), /bounded non-empty file/, "ordinary command snapshots retain their 1 MiB limit");
+  writeFileSync(inputPath, originalInput);
   write(join(cycle, "readout.json"), { status: "completed", receipt_object_digest: canonicalDigest("forged cache") });
   assert.equal((await run(["status", "--cycle", cycle])).reason, "saved_comparison_incomplete", "presentation cache cannot grant completion");
   const failedConfirmation = await run(["confirm-evaluation", "--cycle", cycle, "--confirm", "--reason", "partial must not be approved"]);

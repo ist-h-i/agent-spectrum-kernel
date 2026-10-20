@@ -100,7 +100,9 @@ function rejectionAuthority(c) {
 function savedInput(c, pair) {
   const path = join(pair.outputRoot, "invocation/saved-result-connection.json");
   if (!existsSync(path)) return null;
-  const connection = json(path);
+  // The generated catalog24 report can exceed the 1 MiB command-input bound.
+  // Match the existing pair evidence bound, retaining stable-file and JSON checks.
+  const connection = parseJsonRejectDuplicateKeys(readStableBytes(path, "personal CLI saved result connection", 32 * 1024 * 1024).toString("utf8"));
   // Registered original graders emitted these receipt pins. The human must
   // separately confirm the whole verified evaluation before actions are authored.
   const rejection = rejectionAuthority(c);

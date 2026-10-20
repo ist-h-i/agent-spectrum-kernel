@@ -182,6 +182,8 @@ incomplete gradingは既存の停止規則に従う。未評価を品質0へ補�
 同じ24件の固定資産mapと別々のconfig pathを必要とする。新private authorityが不足すれば開始をblockする。
 pair登録に集合を固定し、既存driver/runnerへ渡す。両roleの48 child／144条件枠、240M tokens／340時間を
 予約し、無人実行のpolicyも同じ全体枠を満たさなければdispatch前に停止する。
+生成済みの全role結果を含むconnectionだけは既存pair資産と同じ32 MiBまで再読する。
+通常のCLI入力は1 MiBを維持する。connectionの空・途中のJSON・上限超過は保存結果の検証失敗として残す。
 
 ## 新v7 private authorityに必要な残件
 
