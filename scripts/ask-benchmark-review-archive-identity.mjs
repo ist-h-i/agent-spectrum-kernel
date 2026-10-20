@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, relative, resolve, sep } from "node:path";
+import * as primaryScope from "./ask-primary-evaluation-scope.mjs";
 import {
   computeEvaluatorBundleDigest,
   computeEvaluatorBundleId,
@@ -9,6 +10,23 @@ import {
 } from "./ask-benchmark-evaluator-boundary.mjs";
 
 const REPOSITORY_IDENTITY = "ist-h-i/agent-spectrum-kernel";
+
+// A new primary profile has a distinct, pinned processing closure. Select it
+// only while validating static public resource authority, then leave the scope
+// before deriving the archive generator's independent exact-head closure.
+export function validateReviewArchiveProductionAuthority({ root, fixtureId, sourceRevision }, validate) {
+  const folder = resolve(root, "benchmarks/fixtures/checkpoint-b2", fixtureId);
+  const output = JSON.parse(readFileSync(resolve(folder, "output-contract.json")));
+  if (output.result_profile?.name !== "requirement_scope_verification_v2") return validate();
+  const reference = JSON.parse(readFileSync(resolve(folder, "evaluator-reference.json")));
+  if (reference.evaluator_revision !== sourceRevision) throw new Error("review archive processing source revision differs from evaluator source");
+  if (typeof primaryScope.withPrimaryProcessingSourceBuild !== "function") throw new Error("review archive primary processing source construction is unavailable");
+  return primaryScope.withPrimaryProcessingSourceBuild({ root: realpathSync(root), baseRevision: sourceRevision, commandEvidenceParserRevision: "1.10.0-primary-saved" }, () => {
+    const result = validate();
+    if (result?.then) throw new Error("review archive public resource validation must be synchronous");
+    return result;
+  });
+}
 
 export function reviewArchiveSha256(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;

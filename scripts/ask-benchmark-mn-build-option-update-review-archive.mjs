@@ -4,6 +4,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertPrivateRootOutsideRepository } from "./ask-benchmark-mn-build-option-update.mjs";
+import { validateReviewArchiveCases } from "./ask-benchmark-review-archive-identity.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FIXTURE_ID = "mn-build-option-update";
@@ -86,11 +88,22 @@ function evaluatorSourceEntries(root, bundle) {
   });
 }
 
-export function generateMnBuildOptionUpdateReviewArchive({ root = ROOT, privateRoot, outputPath, reviewedHead } = {}) {
+export function generateMnBuildOptionUpdateReviewArchive({ root = ROOT, privateRoot, caseRoot = null, outputPath, reviewedHead } = {}) {
   if (!privateRoot || !outputPath || !/^[a-f0-9]{40}$/u.test(reviewedHead ?? "")) throw new Error("mn-build review archive requires privateRoot, outputPath, and reviewedHead");
   const repository = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
   if (privateDirectory === repository || privateDirectory.startsWith(`${repository}/`)) throw new Error("mn-build review archive private root must stay outside the repository");
+  let caseEntries = [], caseSummary = null;
+  if (caseRoot !== null) {
+    if (!existsSync(caseRoot) || lstatSync(caseRoot).isSymbolicLink() || !lstatSync(caseRoot).isDirectory()) throw new Error("mn-build review archive case root must be a non-symlink directory");
+    const caseDirectory = realpathSync(caseRoot);
+    assertPrivateRootOutsideRepository(repository, caseDirectory);
+    if (caseDirectory === privateDirectory || caseDirectory.startsWith(`${privateDirectory}${sep}`) || privateDirectory.startsWith(`${caseDirectory}${sep}`)) throw new Error("mn-build review archive private and case roots must be disjoint");
+    const target = resolve(outputPath);
+    if (target === caseDirectory || target.startsWith(`${caseDirectory}${sep}`)) throw new Error("mn-build review archive output must stay outside case root");
+    caseEntries = walk(caseDirectory, "cases");
+    caseSummary = validateReviewArchiveCases({ fixtureId: FIXTURE_ID, caseEntries, casePrefix: "cases", singleton: true });
+  }
   const head = execFileSync("git", ["-C", repository, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   if (head !== reviewedHead) throw new Error("mn-build review archive reviewedHead differs from repository HEAD");
   const bundle = readJson(resolve(privateDirectory, "private-evaluator-bundle.json"), "mn-build private bundle");
@@ -104,13 +117,14 @@ export function generateMnBuildOptionUpdateReviewArchive({ root = ROOT, privateR
   const review = readJson(resolve(fixtureRoot, "admission-review.json"), "mn-build admission review");
   if (reference.evaluator_bundle_id !== bundle.evaluator_bundle_id || reference.evaluator_bundle_digest !== bundle.evaluator_bundle_digest || reference.evaluator_revision !== bundle.evaluator_revision) throw new Error("mn-build review archive private/public evaluator identity differs");
   if (admission.admission_status !== "admission_pending" || review.reviewer_status !== "pending_independent_review" || review.author_self_approval !== false) throw new Error("mn-build review archive requires pending independent review authority");
-  const entries = [...walk(fixtureRoot, `repository/${FIXTURE_PATH}`), ...evaluatorSourceEntries(repository, bundle), ...walk(privateDirectory, "private-evaluator")];
+  const entries = [...walk(fixtureRoot, `repository/${FIXTURE_PATH}`), ...evaluatorSourceEntries(repository, bundle), ...walk(privateDirectory, "private-evaluator"), ...caseEntries];
   const unique = new Map();
   for (const entry of entries) {
     if (unique.has(entry.path)) throw new Error(`mn-build review archive contains duplicate entry: ${entry.path}`);
     unique.set(entry.path, entry);
   }
   const manifest = {
+    ...(caseSummary ? { private_case_count: caseSummary.caseCount, private_case_paths: caseSummary.casePaths } : {}),
     schema_version: "1.0.0",
     program: "mn_build_option_update_private_review_archive",
     fixture_id: FIXTURE_ID,

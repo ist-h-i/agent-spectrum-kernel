@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { validateReviewArchiveProductionAuthority } from "./ask-benchmark-review-archive-identity.mjs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
@@ -24,6 +25,7 @@ import {
   validateEvaluatorSourceIdentity,
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import { validateMnDocConfigCorrectionProductionAuthority } from "./ask-benchmark-mn-doc-config-correction-authority.mjs";
+import { generateMnDocSelfContainedReviewArchiveFromShared } from "./ask-benchmark-mp-iac-rollback-design-review-archive.mjs";
 import {
   establishReviewArchiveIdentity,
   evaluatorSourceReviewEntries,
@@ -567,7 +569,9 @@ export function verifyMnDocConfigCorrectionReviewArchive({ archivePath, root = R
   }
 }
 
-export function generateMnDocConfigCorrectionReviewArchive({ root = ROOT, privateRoot, caseRoot, outputPath, reviewedHead, sourceRevision, pullRequest = null, issue = null }) {
+export function generateMnDocConfigCorrectionReviewArchive({ root = ROOT, privateRoot, caseRoot, outputPath, reviewedHead, sourceRevision, pullRequest = null, issue = null, caseFormat = "frozen_workspace_v1" }) {
+  if (!["frozen_workspace_v1", "self_contained_v2"].includes(caseFormat)) throw new Error("mn-doc review archive case format is unknown");
+  if (caseFormat === "self_contained_v2") return generateMnDocSelfContainedReviewArchiveFromShared({ root, privateRoot, caseRoot, outputPath, reviewedHead, sourceRevision });
   const repository = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
   const caseAuthority = validateMnDocReviewCaseRoot(caseRoot);
@@ -580,7 +584,7 @@ export function generateMnDocConfigCorrectionReviewArchive({ root = ROOT, privat
   if (reviewedHead !== head || !/^[a-f0-9]{40}$/u.test(reviewedHead)) throw new Error("review archive reviewed HEAD differs from repository HEAD");
   const reference = readJsonBytes(reviewArchiveCommitEntry(repository, reviewedHead, `${FIXTURE_ROOT}/evaluator-reference.json`, "reviewed-public").bytes, "mn-doc evaluator reference");
   const identity = establishReviewArchiveIdentity({ root: repository, runtimeRoot: ROOT, reviewedHead, sourceRevision, evaluatorRevision: reference.evaluator_revision, generatorPath: ZIP_GENERATOR_SOURCE_PATH });
-  const productionAuthority = validateMnDocConfigCorrectionProductionAuthority({ root: repository });
+  const productionAuthority = validateReviewArchiveProductionAuthority({ root: repository, fixtureId: FIXTURE_ID, sourceRevision }, () => validateMnDocConfigCorrectionProductionAuthority({ root: repository }));
   if (productionAuthority.evaluatorRevision !== reference.evaluator_revision) throw new Error("review archive checked-out public authority differs from reviewed Git object authority");
   const bundle = readJson(resolve(privateDirectory, "private-evaluator-bundle.json"), "mn-doc private evaluator bundle");
   const privateSummary = validateReviewArchivePrivateBundle({ fixtureId: FIXTURE_ID, bundle, authority: productionAuthority, privateEntries: privateEntriesForIdentity, privatePrefix: "private" });

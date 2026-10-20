@@ -19,7 +19,7 @@ jobs:
       - name: Observe host prerequisites without Codex or auth
         run: node scripts/ask-local-eval.mjs preflight
       - name: Primary authority profile and static resource boundaries (no workers)
-        run: node --experimental-test-module-mocks --test scripts/test-ask-primary-authority-v2.mjs scripts/test-ask-primary-build-successor-v2.mjs
+        run: node --experimental-test-module-mocks --test scripts/test-ask-primary-authority-v2.mjs scripts/test-ask-primary-build-successor-v2.mjs scripts/test-ask-review-archive-v2-scope.mjs
       - name: Nine-primary-fixture personal roundtrip (fake provider/runner/grading only)
         run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-primary-loop.mjs
       - name: Personal user command loop and resume (fake dispatch only)

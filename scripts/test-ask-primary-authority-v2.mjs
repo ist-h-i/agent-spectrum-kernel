@@ -2,17 +2,22 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { CANONICAL_PRIMARY_FIXTURE_IDS, PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { withPrimaryProcessingSourceBuild } from './ask-primary-evaluation-scope.mjs';
 import { syntheticFocusedScope } from './test-helpers-primary-authority-v2.mjs';
 import { finalizeMnBuildOptionUpdateSuccessorAuthority } from './ask-benchmark-mn-build-option-update-successor-authority.mjs';
 import { generatePfPerformanceReviewArchive } from './ask-benchmark-pf-performance-review-archive.mjs';
+import { generateMnDocConfigCorrectionReviewArchive } from './ask-benchmark-mn-doc-config-correction-review-archive.mjs';
 
 test('performance archive uses the existing complete exact-head configuration boundary', () => {
   assert.throws(() => generatePfPerformanceReviewArchive(), /complete exact-head configuration/u);
+});
+
+test('doc successor archive keeps its legacy case layout and explicitly selects self-contained cases', () => {
+  assert.throws(() => generateMnDocConfigCorrectionReviewArchive({ caseFormat: 'unknown-format' }), /case format is unknown/u);
+  assert.throws(() => generateMnDocConfigCorrectionReviewArchive({ caseFormat: 'self_contained_v2' }), /complete exact-head configuration/u);
 });
 
 test('build successor: unknown profile rejects before filesystem/publication', () => {
@@ -57,13 +62,14 @@ test('all 23 production writers close new v2 resource identities without executi
   };
   git('clone', '--no-local', '--no-checkout', root, repository);
   const revision = git('-C', root, 'rev-parse', 'HEAD'); git('-C', repository, 'checkout', '--detach', revision);
+  const { withPrimaryProcessingSourceBuild } = await import(pathToFileURL(join(repository, 'scripts/ask-primary-evaluation-scope.mjs')));
   const marker = join(area, 'unexpected-evaluator-start');
   for (const id of CANONICAL_PRIMARY_FIXTURE_IDS.filter(id => id !== 'mn-build-option-update')) {
     const privateRoot = join(area, id); mkdirSync(privateRoot);
-    const module = await import(`./ask-benchmark-${aliases[id] ?? id}-authority.mjs`);
+    const module = await import(pathToFileURL(join(repository, `scripts/ask-benchmark-${aliases[id] ?? id}-authority.mjs`)));
     const writer = Object.entries(module).find(([name]) => /^write.*ProductionAuthority$/u.test(name))[1];
     const validator = Object.entries(module).find(([name]) => /^validate.*ProductionAuthority$/u.test(name))[1];
-    for (const name of ['oracle.json', 'scope-boundaries.json', ...(['mn-client-compatibility-fix', 'mp-data-migration-handoff'].includes(id) ? ['false-positive-boundaries.json'] : [])])
+    for (const name of ['oracle.json', 'scope-boundaries.json', ...(id === 'mn-client-compatibility-fix' || id.startsWith('mp-') ? ['false-positive-boundaries.json'] : [])])
       writeFileSync(join(privateRoot, name), '{"synthetic_static_asset":true}\n');
     for (const name of ['rubric.md', 'human-instructions.md']) writeFileSync(join(privateRoot, name), 'Inert artificial static resource test. No admission.\n');
     if (id === 'mn-focused-regression-test') {

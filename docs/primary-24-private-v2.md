@@ -21,4 +21,8 @@ Verification Contract (Formal、既存formal pathを維持):
 
 v2では入力破損を実際のtyped authorityまたはnormalized command evidenceから導く。候補の虚偽引用などtask evidenceの不良は、全要件が採点可能なら`completed / invalid_evidence`として保存し、command verificationとは独立に判定する。未確認要件が混在する場合は既存の`manual_review_required`、分類省略、null点を保持し、既知のevidence fail・finding・採点済み点を消さない。typed input invalidの優先度とv1解釈は保持する。供給済みstatus/classificationを入力破損の根拠にせず、semantic causal referencesも元のfinal output等へ閉じる。
 
+v2 archiveの公開資産検証は、既存`withPrimaryProcessingSourceBuild`を同期validator呼出しの間だけ選び、archive generator自身のexact-head依存閉包を導く前に解除する。source revision不一致・処理sourceのdrift・async validatorは拒否する。旧profileの呼出しは従来の文脈を保つ。docの既定archiveは既存workspace形式を維持し、新しい自己完結casepackだけ`caseFormat: self_contained_v2`で既存共有ZIP生成へ接続する。buildは任意の新規`caseRoot`を既存archiveへ含められる。いずれもarchive生成だけでは独立レビューやadmissionを承認しない。
+
+非実行検証では、レビュー課題の自由記述で認識できない検証叙述をmanualに残す。a11y/frontendの従来positive/equivalent例はその境界を含むため、認識可能な正確な検証叙述とsupported commandを組み合わせた正常例も別に確認する。client/focusedのnative受入と性能の認証済み実計測は、合成観測の成功から推定しない。
+
 Proof selection: `ask.verification-proof-policy@1.0.0` の `formal_verification_contract`。formal triggersは公開互換性、cross-module/persistence、multi-session、merge trace。選択refは本書のArtifact ID。既存formalからのdowngradeは行わない。

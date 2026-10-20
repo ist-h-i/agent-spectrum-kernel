@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { validateReviewArchiveProductionAuthority } from "./ask-benchmark-review-archive-identity.mjs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
@@ -157,7 +158,7 @@ export function generateMpCiEvidenceGapReviewArchive({ root = ROOT, privateRoot,
   if (privateDirectory === caseDirectory || privateDirectory.startsWith(`${caseDirectory}${sep}`) || caseDirectory.startsWith(`${privateDirectory}${sep}`)) throw new Error("review archive private and case roots must be disjoint");
   const archiveTarget = resolveReviewArchiveOutput({ repositoryRoot, privateRoot: privateDirectory, caseRoot: caseDirectory, outputPath });
   if (git(repositoryRoot, ["rev-parse", "HEAD"], "reviewed HEAD lookup") !== reviewedHead) throw new Error("review archive reviewed HEAD does not match repository HEAD");
-  const authority = validateMpCiEvidenceGapProductionAuthority({ root: repositoryRoot });
+  const authority = validateReviewArchiveProductionAuthority({ root: repositoryRoot, fixtureId: FIXTURE_ID, sourceRevision }, () => validateMpCiEvidenceGapProductionAuthority({ root: repositoryRoot }));
   const identity = establishReviewArchiveIdentity({ root: repositoryRoot, runtimeRoot: ROOT, reviewedHead, sourceRevision, evaluatorRevision: authority.evaluatorRevision, generatorPath: GENERATOR_PATH });
   const bundle = readJson(resolve(privateDirectory, "private-evaluator-bundle.json"), "private evaluator bundle");
   if (bundle.evaluator_bundle_id !== authority.evaluatorBundleId || bundle.evaluator_bundle_digest !== authority.evaluatorBundleDigest) throw new Error("review archive private bundle differs from public reference");
