@@ -1,701 +1,138 @@
 # Agent Spectrum Kernel
 
-A layered intelligence kernel for evidence-based routing, verification, review, and reusable memory in AI coding agents.
+**ASKは、AIによる開発を必要な手順と検証の証拠で導き、その手順自体も評価・改善するための基盤です。**
 
-For the [Mac/Codex install and recovery quickstart](docs/quickstart-mac-codex-ja.md),
-ASK supplies project-local instructions and selected verification/handoff assets.
-Installation alone proves neither an operational Codex workflow nor improved
-engineering outcomes. The [October release package](docs/release-package-2026-10.md)
-records the current source, evidence and remaining v1.0 gates.
+ルールやSkillを集めるだけでなく、依頼とリポジトリに応じて必要な工程を選び、変更範囲・検証結果・未確認事項を揃えて次の判断につなげます。手順を増やすことが目的ではありません。効果のない工程は減らし、小さな作業は軽く進めることも目指します。
 
-Mac / Codex の導入で得られるものは、プロジェクト内の判断方針と選択した
-検証・handoff 資料です。実務での動作と成果改善は別の証拠が必要です。
-導入・復旧手順と12月までの目標は上記リンクにまとめています。
-導入後の一件を具体化する [Mac 初回開発受入の準備](docs/first-workflow-mac-codex-ja.md)
-では、公開人工タスク・軽量 bypass 入力・未実行の受入記録をローカルに用意できます。
+初めて使う場合は [はじめ方](#はじめ方) へ。Mac / Codexでは [導入・復旧ガイド](docs/quickstart-mac-codex-ja.md) から始められます。実装やテストが存在することと、実務成果が改善したことは区別します。
 
-[個人ループの生成状態確認](docs/personal-evolution-generation-status.md) では、
-生成要求のIDから未開始、終了不明、候補登録済み、保留を読み取り専用で確認できます。
-開始印を保持して次の扱いを示し、実生成・評価・適用の完了や権限は補いません。
+## 何を解決したいか
 
-[既存24課題の公開入力点検](docs/primary-24-public-inputs.md) は、同じbenchmark入口から
-24件の列挙・入力準備・再検証と、不足理由・未評価の72枠の保存を行います。
-公開入力・契約・portfolio登録は24件で、primary evaluation batchは明示`catalog24`で72枠を準備できます。
-個人ループCLIも明示`catalog24`で両roleの24件を選択します。既定は従来9件内の選択を維持し、
-全24件のprivate採点・native受入は別途必要です。
-[24課題の組立・採点検証状況](docs/primary-24-task-assembly.md) に課題別の完成作業を記録します。
+AIへの依頼では、必要な文脈を読まずに変更する、範囲を広げすぎる、テストの成功を完成と取り違える、引き継ぎ時に根拠が失われる、といった問題が起こり得ます。一方、すべての作業に重い計画・レビュー・記録を要求すると、時間やトークンだけが増える可能性があります。
 
-[既存9課題で個人ループを一巡する手順](docs/personal-evolution-primary-loop.md) は、
-候補・比較条件の事前固定、保存結果の受渡し、独立した採否判断と次の要求を接続します。
-公開検証は fake provider/runner/grading による人工の保留経路で、実運用の成功は未確認です。
+ASKは、共通の判断原則、必要時に使う工程、プロジェクト固有の規約を分け、**今回の作業に何が必要で、何を確かめれば完了と言えるか**を明示するために使います。安全性や品質を一律に保証する仕組みではなく、成果と負担を証拠に照らして見直すための仕組みです。
 
-[個人ループ CLI](docs/personal-evolution-cli.md) は、一度の管理設定後、問題の公開要約と
-対象 Prompt を入力し、生成・source review・保存比較・評価確認・人の判断を同じ入口で
-扱います。再開は既存記録を使い、完了した生成・比較を重複起動しません。
-実モデルの開始は本人の直接承認が必要で、採用の実適用・Mac 設定の更新は別段階です。
+## どう使い、何を受け取るか
 
-[Codex 候補生成 adapter](docs/personal-evolution-codex-generation.md) は、公開入力の固定・確認から
-既存の一度限りの生成入口へ接続します。検証は fake transport のみで、実開始には本人の
-新しい直接指示が必要です。global/CLI context と実生成の有効性は Unknown のままです。
+導入後は、Skill名を覚えるより、対象・目的・制約を自然文で伝えます。
 
-[利用者 repo の三条件比較手順](docs/user-repository-comparison-mac-codex-ja.md) では、
-指定 commit から P／K／F を準備し、内容確認後の明示的な開始を既存 Codex runner に
-つなぎます。途中の失敗・未開始を含む結果は指定した保存先から再表示できます。
-準備・表示はモデルを起動せず、開発検証は fake runner による合成試験です。
-実モデルの比較は未実行で、人間が内容と正規の権限を確認して開始する別段階です。
+| やりたいこと | 依頼の例 | 期待する成果物・判断材料 |
+| --- | --- | --- |
+| 変更する | 「このチケットを進めて。既存の規約を確認し、変更範囲を絞って検証してください」 | 必要な要件確認、差分、実行した検証と結果、未確認事項 |
+| 原因を調べる | 「このバグを調べて。再現と仮説の反証を示してください」 | 再現条件、確かめた仮説、原因の根拠、次の確認 |
+| レビューする | 「このPRをレビューして。必要な観点を選び、指摘の根拠を示してください」 | 根拠付きの指摘、判断に足りない証拠、要求した場合の最終判断 |
+| 引き継ぐ | 「次のAgentが続けられる形にしてください」 | 現在地、許可された範囲、確認済みの証拠、次の作業と停止条件 |
+| 手順を見直す | 「この作業で手順が重すぎた理由を調べ、改善候補と比較方法を提案してください。適用はしないでください」 | 問題の整理、候補、比較条件、採否に必要な証拠 |
 
-[実利用に近い探索的評価](docs/pragmatic-evaluation.md) では、global 設定の不明や
-環境・CLI 版の差を記録し、local ASK 追加なし／Kernelのみ／Full の観測を比較します。
-完全隔離・完全一致は開始条件にせず、既存集計を使うオフライン報告で失敗や unknown も
-改善へつなげます。実行許可や正式評価・release gate の代わりにはなりません。
+これは依頼と出力の使い方であり、モデルが毎回正しく手順を適用するという実測結果ではありません。利用できる工程は、導入したprofileとツールに依存します。例文は [依頼レシピ](docs/prompt-recipes-ja.md)、工程の選び方は [利用ガイド](docs/usage-ja.md) を参照してください。
 
-For the model-free local eval entry point, platform route decisions and remaining
-live-validation limits, see [Local eval distribution](docs/local-eval-distribution.md).
-For model-free plain/Kernel/Full package preparation and its admission limits,
-see [Static Full preparation](docs/local-full-static-preparation.md).
-The reference supplement and model-free three-condition protocol are described in
-[Three-condition comparison](docs/local-three-arm-comparison.md).
-The next adapter slice and its unexercised live admission boundary are described in
-[Local Codex connection](docs/local-codex-connection.md) and
-[split probe/evaluation admission](docs/local-codex-admission.md).
+## 二つのループ
 
-AIエージェントが扱う要件・設計・実装・検証・レビュー・知識蓄積の複数スペクトラムを、証拠ベースで接続するKernel。
+### 1. 開発を進める
 
-狙いは「AIにたくさん書かせる」ことではなく、AIの開発行動を次の方向へ固定することです。
+1. 依頼、既存コード、規約、関連する証拠を理解する。
+2. 必要な工程だけを選ぶ。小さな修正にすべてのSkillを使わない。
+3. 変更範囲を決め、実装・検証・レビューを進める。権限や証拠が足りなければ止める。
+4. 変更内容、確認結果、残る不確実性を示して完了を判断し、必要なら引き継ぐ。
+
+共通の判断は [Kernel](AGENTS.md)、工程の選択は [ルーティングモデル](docs/routing-model.md)、成果物の責任分担は [ライフサイクル契約](docs/lifecycle-artifact-contract.md) に定義しています。READMEで契約を重ねて定義しません。
+
+### 2. 手順自体を評価・改善する
+
+1. 実作業の失敗、抜け、過剰な工程を問題として記録する。
+2. Skill / Promptの改善候補を作る。
+3. 結果を見る前に、比較対象・課題・評価基準・予算を決める。
+4. 評価し、品質だけでなく負担、失敗、未確認事項も確認する。
+5. 採用・修正・保留・却下を判断する。実際の適用は別途承認する。
+
+開発で得た問題を改善候補にし、評価で必要性を確かめた手順を開発へ戻す構想です。候補やSkillを増やすこと自体を成功とは扱いません。不要な工程の削減も改善に含めます。
+
+[Evolutionの契約](docs/evolution-loop-contract.md) は候補・比較・判断・適用の責任を分けます。現在の [個人改善CLI](docs/personal-evolution-cli.md) は **Promptを対象とする入口**で、事前の管理設定後に問題要約、候補生成、ソース確認、保存比較、評価確認、人の判断をつなぎます。任意のSkillを自律的に改善したり、Macへ自動適用したりする機能ではありません。実モデルの生成・比較を始めるには本人の直接承認が必要です。公開された一巡の検証はfake provider / runner / gradingによる合成試験であり、実運用の成功とは区別します。
+
+## Kernel・Skills・プロジェクト固有設定
+
+| 層 | 役割 | 正本・入口 |
+| --- | --- | --- |
+| Kernel | 常時参照する判断原則。文脈、範囲、証拠、承認、完了判断を扱う | [AGENTS.md](AGENTS.md) |
+| Skills | 必要時に選ぶ要件確認、設計、実装、検証、レビューなどの工程 | [skills/](skills/)、[Skill一覧](docs/skill-matrix.md) |
+| Project overlay | 対象repoの規約、コマンド、業務・技術固有の制約 | [導入ガイドのoverlay説明](docs/quickstart-ja.md#project-overlay-rules)、[技術別overlay契約](docs/stack-implementation-overlay-contract.md) |
+| Adapter | ツールが読める配置・prompt・runnerへ投影する接続部分 | [Codex](adapters/codex/README.md)、[Claude Code](adapters/claude-code/README.md)、[能力と証拠の対応表](docs/adapter-capability-matrix.md) |
+
+共通Kernelに個々のプロジェクトの規約を詰め込まず、工程選択後に該当するoverlayを使います。Adapterがファイルを配置できることと、実行時にモデルが読み、手順を適用したことも別です。
+
+### 「Kernelだけ」と呼ばれる構成の違い
+
+| 構成 | 内容・用途 | 混同しない点 |
+| --- | --- | --- |
+| 従来のAGENTS.md単体 | 小さな作業向けに判断原則だけを置く入口 | 全工程・依存契約を含む導入ではない。追加工程が必要なら対応する構成を選ぶ |
+| ASK Core Bundle | opt-inの別製品。`core` はSkillゼロで必須の契約・実行資産を含み、`full` は同じcoreにSkill等を追加 | [Core Bundle実装・導入](docs/ask-core-bundle-implementation.md)。従来installerの既定動作を置き換えない |
+| K-principles v2 | 共通原則を抽出した、`kernel_principles_v2` という別IDの評価条件 | [評価入口](docs/kernel-principles-v2-adoption.md)。専門Skillや形式手順を提供・実行したことにはならず、必須手順が欠ければ開始できない |
+
+過去のbenchmarkのKernel-onlyと、現在のCore BundleやK-principles v2を同一条件として比較しません。[三条件比較の定義](docs/local-three-arm-comparison.md) と [v2のprimary接続](docs/primary-principles-v2-connection.md) で、対象の条件を確認してください。
+
+## はじめ方
+
+導入時間の一律の目安は設けていません。まず、対象repoと利用ツールを決めます。
+
+1. **Mac / Codex:** [導入・復旧ガイド](docs/quickstart-mac-codex-ja.md) の使い捨てrepoで、導入計画と変更差分を確認します。検証対象はmacOS・Node 24.x・Git・完全なASK checkoutです。
+2. **ほかの構成:** [共通導入ガイド](docs/quickstart-ja.md) から、Skill対応 / 非対応ツールやClaude Codeの手順を選びます。
+3. **最初の作業:** [Mac初回開発受入の準備](docs/first-workflow-mac-codex-ja.md) または [依頼レシピ](docs/prompt-recipes-ja.md) で、対象・制約・期待する証拠を指定します。
+
+Mac / Codex向けに、まずモデル通信なしで導入・復旧の処理を確認する場合は、ASK checkoutで次を実行できます。
+
+```bash
+git clone https://github.com/ist-h-i/agent-spectrum-kernel.git
+cd agent-spectrum-kernel
+node scripts/test-release-install-recovery.mjs
+```
+
+この確認は自分で作成した人工repoだけを操作し、最後に削除します。実プロジェクトへの導入や開発タスクの実行ではありません。実際の導入では [setupの計画](docs/adoption-setup.md) と [確認した計画の適用](docs/adoption-apply.md) に従い、`inspect → recommend → plan → check → dry-run → apply → doctor` を進めます。`recommend` は能力に基づく候補で、効果実測済みの推奨ではありません。
+
+導入後の依頼例:
 
 ```text
-Repository-aware
-Scope-disciplined
-Evidence-driven
-Verification-first
-Handoff-ready
-Risk-gated
+このrepoのAGENTS.mdと利用可能なSkillを確認し、この依頼に必要な工程だけで進めてください。
+対象は〇〇です。変更してよい範囲は△△です。
+実行した検証と結果、未確認事項、次に必要な判断を最後に示してください。
 ```
 
-## 設計判断
+`doctor` の導入整合性の成功だけで、実務での稼働や効果を判定しません。`Installed`、`Activated`、`Operational` の区別は [導入・運用の判定基準](docs/adapter-deployment-governance.md) を参照してください。
 
-```text
-Kernel = 常時発火する判断OS
-Operating mode router = delivery / adoption / observability / operation の上位分類
-Skills = 必要時だけ呼ぶ工程・レビュー・検証プロセス
-Project overlay = リポジトリ固有の規約・コマンド・禁止範囲
-```
+## 現在使えるものと検証中のもの
 
-`AGENTS.md` は1ファイルに統合します。ここには、常に有効であるべき原則だけを置きます。上位の運用モード選択は `skills/operating-mode-router/SKILL.md`、delivery/quality 内のルーティング正本は `skills/skill-router/SKILL.md` です。
+以下は **2026-10-20、main [`4c0b9d3`](https://github.com/ist-h-i/agent-spectrum-kernel/commit/4c0b9d348cc5c705ba1a72f20df3a79660a9d857) 時点**の実装・記録の要約です。日々の進捗はリンク先で確認してください。
 
-`skills/operating-mode-router/SKILL.md` は、通常のdelivery/quality作業と、project adoption、observability/metrics、operation/automationを先に分ける上位routerです。`skills/skill-router/SKILL.md` はdelivery/quality内のrouterとして使います。
+| 領域 | 存在する実装・記録 | そこからは言えないこと・残る確認 |
+| --- | --- | --- |
+| 開発手順と導入 | Kernel、Skill、adapter、setup / doctor、モデル不要の導入復旧試験 | 導入先での工程適用、実務上の品質改善、全環境での動作 |
+| 証拠と採否判断 | 証拠再利用、Asset Registry、Portfolio、Evolutionの契約と実装 | 保存・登録・採用判断だけで実適用や有効性が成立すること |
+| 個人改善CLI | Prompt候補から比較・確認・人の判断へつなぐ入口と合成試験 | 任意Skillの自律改善、Mac設定への自動適用、実運用の成功 |
+| 24課題評価 | 公開入力・契約・portfolio登録24件。明示`catalog24`によるP / K2 / Fの72枠準備、CLIでの選択、fake比較・採点処理 | 全24課題のprivate採点・native受入の完成、実モデルでの比較結果 |
 
-共通の制御メタデータ（route、evidence status、stop reason、next action）の正本は `docs/execution-envelope-contract.md` です。router、adapter、session state はこの Execution Envelope を意味のあるworkflow境界で一度だけ出し、個別SkillはRequirement Contract、Spec、Compact Proof / Formal Verification Contract、Implementation Summary、Review Findingsなどの固有artifactに集中します。検証pathは `ask.verification-proof-policy@1.0.0` が観測済みtask/risk factsから選択し、compactからformalへの昇格だけを許します。Metrics event candidate は明示的なopt-in時だけ任意で出します。
+24課題の基盤はPR407/408でmainへ統合済みです。この確認時点で [PR409](https://github.com/ist-h-i/agent-spectrum-kernel/pull/409) は開発中のDraftで、採点・受入の追加作業が残っています。課題別の根拠と残件は [組立・採点検証状況](docs/primary-24-task-assembly.md)、公開入力と未実行枠の扱いは [公開入力点検](docs/primary-24-public-inputs.md) を参照してください。
 
-claim に必要な lifecycle evidence の接続は `docs/lifecycle-traceability-contract.md` が正本です。Requirement から Release Readiness までを stable item ref と observed revision で必要な範囲だけ結び、stale・contradictory・claim-relevant missing evidence を検出します。release gap は acceptance / verification / review / approval / rollback を区別します。trivial/localized task のtrace免除には観測事実が必要で、approvalやrisk gateは免除されません。中央serverやworkflow databaseは不要です。
+実装の存在、合成試験、実モデルの測定、実務での効果はそれぞれ別の証拠です。[リリース判定資料](docs/release-package-2026-10.md) も対象revisionと日付を持つ記録であり、その後の開発を自動的に完成扱いにはしません。
 
-`manifest.json.routing` は routing の正本や workflow engine ではありません。machine-readable defaults / validation mirror として、route reference、override、risk-gate surface、adapter capability downgrade の静的検査を支えます。人間向けの手順は `SKILL.md` に残し、route mismatch は risk-gate 以外の自動blockにしません。
+## 評価結果と限界
 
-`manifest.json.skill_planes` は各canonical Skillを `execution`、`knowledge`、`control` のいずれか1つに分類します。通常作業はexecution/control内で完結し、knowledgeへの遷移には明示的なlifecycle trigger、destination、evidence boundary、owner、stop conditionが必要です。単に実装やレビューが完了しただけではledgerを更新しません。`manifest.json.projection_packs` は、knowledge planeを省いた `daily_delivery` と、明示的な組織知運用向けの `organizational_intelligence` を定義します。
+手順を追加すると品質が上がる、という前提は置きません。過去の測定には、Fullを広げる根拠にならなかった結果もあります。
 
-Pack profileは厳密な発見境界です。`full` / `organizational` から `daily` への縮小にはadapter installerの `--prune` が必要で、未指定時は書込み前に停止します。install stateは実際の集合から `selected_planes` / `installed_planes` を分けて算出し、`--skills` はcustom selectionとして記録します。routerはactive stateの `selected_skills` にないSkillへ進まず、`capability_missing` で必要profileまたはoverrideを案内します。
+| 過去の測定 | 記録された結果 | 解釈の範囲 |
+| --- | --- | --- |
+| [Checkpoint B2](benchmarks/results/checkpoint-b2-report.md) | 4課題すべてでFull ASKはKernel-onlyに対する品質上積みなし。トークンはすべて2倍超 | 当時の固定条件の測定。Kernel-onlyは難しい実装課題1件で改善したが、他の3件では品質改善なし |
+| [Checkpoint C](benchmarks/results/checkpoint-c-report.md) | Fullは`retain` 1件、`simplify` 3件、`expand` 0件 | レビュー1件の得点改善もトークン増で拡大基準を満たさず。別の実装課題ではKernel-only / Fullとも未検証の完了主張が記録された |
 
-`skills/*/SKILL.md` は分割します。Grill、Spec、ADR、検証、レビュー、Handoffのような重い手順を常時ルールに混ぜないためです。
+これらは固定された人工課題での限定的な実モデル測定です。反復が少なく、モデル・CLI・adapter・repo等の差があるため、現行構成の効果や一般的な因果関係には拡張できません。**進行中の24課題評価の結果でもありません。** 人の修正時間、再作業、金銭費用など、測定されていない値も推測しません。
 
-## File layout
+現在の比較を準備する場合は [利用者repoでの三条件比較](docs/user-repository-comparison-mac-codex-ja.md)、環境差や不明点を残して観測する場合は [探索的評価](docs/pragmatic-evaluation.md) を参照してください。準備・報告の処理と実モデルの実行承認は別です。
 
-```text
-AGENTS.md
-CUSTOM_INSTRUCTIONS.md
-manifest.json
-README.md
-CHANGELOG.md
-docs/
-  adr/0001-verification-evidence-trust-boundary.md
-  adr/0002-epic-admission-work-package-plan-authority.md
-  adr/0003-asset-registry-authority-boundary.md
-  adr/0004-portfolio-activation-authority-boundary.md
-  adr/0005-evolution-authority-boundary.md
-  routing-model.md
-  lifecycle-artifact-contract.md
-  lifecycle-traceability-contract.md
-  verification-evidence-contract.md
-  epic-admission-work-package-plan-contract.md
-  asset-registry-contract.md
-  fixtures/asset-registry/reference.json
-  fixtures/asset-registry/store/objects/sha256/
-  portfolio-manager-contract.md
-  fixtures/portfolio-manager/reference.json
-  fixtures/portfolio-manager/store/objects/sha256/
-  evolution-loop-contract.md
-  evolution-loop-sample-prompt-candidate.md
-  fixtures/evolution-loop/reference.json
-  fixtures/evolution-loop/store/objects/sha256/
-  prompt-v2-execution-handoff.md
-  fixtures/prompt-v2-preregistration/binding.json
-  fixtures/prompt-v2-preregistration/reference.json
-  fixtures/prompt-v2-preregistration/rendered/
-  fixtures/prompt-v2-preregistration/store/objects/sha256/
-  fixtures/lifecycle-artifact-chains.json
-  fixtures/lifecycle-traceability-chains.json
-  agent-session-state-contract.md
-  metrics-event-contract.md
-  observability-runtime-contract.md
-  operation-automation-contract.md
-  debt-lifecycle-contract.md
-  adapter-conformance-contract.md
-  adapter-capability-matrix.md
-  adapter-runtime-boundary-contract.md
-  adapter-runtime-migration.md
-  adapter-cross-conformance-report.md
-  fixtures/adapter-runtime-bundle.json
-  fixtures/adapter-cross-conformance.json
-  fixtures/adapter-runtime-profiles.json
-  fixtures/adapter-runtime-evidence.json
-  claude-github-review-setup.md
-  ai/review-context.md
-  ai/implementation-context.md
-  ai/architecture-decision-memory.md
-  ai/documentation-knowledge-ledger.md
-  ai/engineering-capability-ledger.md
-  ai/engineering-pattern-ledger.md
-  ai/improvement-ledger.md
-  ai/domain-rule-ledger.md
-  ai/review-rule-ledger.md
-  ai/skill-adoption-metrics.md
-  ai/verification-pattern-ledger.md
-  ai/adoption-report-template.md
-  ai/stakeholder-readiness-report-template.md
-  ai/observability-config.yml
-  ai/metrics/README.md
-  ai/reports/README.md
-  quickstart-ja.md
-  prompt-recipes-ja.md
-  glossary-ja.md
-  skill-matrix.md
-  usage-ja.md
-  workflow-examples.md
-  project-overlay-template.md
-  stack-implementation-overlay-contract.md
-  customization-guide.md
-  quality-rubric.md
-  validation-report.md
-  references.md
-examples/
-  01-small-change.md
-  02-new-feature.md
-  03-bug-fix.md
-  04-design-grill.md
-  05-pr-review.md
-  06-handoff-to-agent.md
-  07-mr-readme.md
-  08-code-health-review.md
-  09-improvement-ledger-update.md
-  10-safe-refactor.md
-  11-prevention-rule-feedback.md
-  12-claude-adapter-adoption.md
-schemas/
-  metrics-event.schema.json
-  adapter-runtime-profile.schema.json
-  adapter-runtime-evidence.schema.json
-  adapter-runtime-event.schema.json
-  normalized-event-schema-registry.json
-  adoption-report.schema.json
-  improvement-ledger-entry.schema.json
-  domain-rule-ledger-entry.schema.json
-  architecture-decision-memory-entry.schema.json
-  documentation-knowledge-ledger-entry.schema.json
-  engineering-capability-ledger-entry.schema.json
-  engineering-pattern-ledger-entry.schema.json
-  review-rule-ledger-entry.schema.json
-  verification-pattern-ledger-entry.schema.json
-  verification-evidence.schema.json
-  verification-evidence-transfer.schema.json
-  verification-reuse-plan.schema.json
-  epic-admission-policy.schema.json
-  epic-admission-decision.schema.json
-  work-package-plan-validation-context.schema.json
-  work-package-plan.schema.json
-  asset-content.schema.json
-  asset-record.schema.json
-  asset-registry-snapshot.schema.json
-  asset-lifecycle-authority-context.schema.json
-  portfolio-manifest.schema.json
-  portfolio-lock.schema.json
-  portfolio-authority-context.schema.json
-  portfolio-selection-context.schema.json
-  portfolio-selection.schema.json
-adapters/
-  claude-code/
-    project/.claude/
-    github-actions/
-    plugin/
-  codex/
-    project/.agents/skills/
-    prompts/
-    commands/
-scripts/
-  ask-doctor.mjs
-  ask-sensors.mjs
-  content-addressed-store.mjs
-  asset-registry.mjs
-  asset-registry-samples.mjs
-  portfolio-manager.mjs
-  portfolio-manager-samples.mjs
-  evolution-loop.mjs
-  evolution-loop-samples.mjs
-  ask-benchmark-prompt-v2.mjs
-  prompt-v2-preregistration-samples.mjs
-  execution-envelope.mjs
-  verification-evidence.mjs
-  epic-admission-work-package-plan.mjs
-  adapter-runtime-event.mjs
-  adapter-runtime-smoke.mjs
-  adapter-runtime-bundle.mjs
-  adapter-cross-conformance.mjs
-  codex-exec-runner.mjs
-  install-kernel.mjs
-  install-codex-adapter.mjs
-  install-claude-adapter.mjs
-  ai-metrics-record.mjs
-  ai-metrics-summarize.mjs
-  ai-ledger-refresh.mjs
-  ask-benchmark.mjs
-  test-verification-evidence.mjs
-  test-content-addressed-store.mjs
-  test-asset-registry.mjs
-  test-portfolio-manager.mjs
-  test-evolution-loop.mjs
-  test-evolution-loop-integration.mjs
-  test-ask-benchmark.mjs
-benchmarks/
-  README.md
-  protocol.md
-  protocol-prompt-v2.md
-  prompt-v2-preregistration.json
-  checkpoint-b.config.json
-  schemas/
-  fixtures/
-  results/
-skills/
-  operating-mode-router/SKILL.md
-  skill-router/SKILL.md
-  angular-implementation-architecture/SKILL.md
-  application-boundary-architecture/SKILL.md
-  architecture-decision-memory/SKILL.md
-  repository-orientation/SKILL.md
-  grill-design/SKILL.md
-  grill-with-docs/SKILL.md
-  spec-driven-development/SKILL.md
-  planning-with-files/SKILL.md
-  project-adoption-pack-generation/SKILL.md
-  scope-control/SKILL.md
-  controlled-implementation/SKILL.md
-  documentation-knowledge-compiler/SKILL.md
-  domain-rule-ledger/SKILL.md
-  engineering-capability-evaluation/SKILL.md
-  engineering-pattern-ledger/SKILL.md
-  test-first-verification/SKILL.md
-  verification-pattern-ledger/SKILL.md
-  release-readiness-gate/SKILL.md
-  review-router/SKILL.md
-  review-adversarial-risk/SKILL.md
-  review-automated-gate/SKILL.md
-  review-ai-quality/SKILL.md
-  review-architecture-impact/SKILL.md
-  review-context-generation/SKILL.md
-  review-code-health/SKILL.md
-  review-domain-impact/SKILL.md
-  review-finding-compiler/SKILL.md
-  review-output-quality/SKILL.md
-  review-final-merge-gate/SKILL.md
-  risk-gate/SKILL.md
-  skill-effectiveness-evaluation/SKILL.md
-  skill-adoption-metrics/SKILL.md
-  adr-review/SKILL.md
-  doubt-driven-development/SKILL.md
-  evidence-ledger/SKILL.md
-  handoff-generation/SKILL.md
-  improvement-ledger/SKILL.md
-  implementation-context-generation/SKILL.md
-  mr-readme-generation/SKILL.md
-  next-best-change-finder/SKILL.md
-  refactor-implementation/SKILL.md
-  requirement-grill/SKILL.md
-  review-to-rule-compiler/SKILL.md
-  work-package-compiler/SKILL.md
-```
+## 目的から資料を探す
 
-## Verification evidence exact reuse
-
-`docs/verification-evidence-contract.md` defines the local-first bounded evidence state for Issue #274 Slice 1. It stores canonical structured results in a shared content-addressed JSON layout, verifies exact material identity, Ed25519 producer provenance, accepted producer authority, and required obligation coverage before reuse, keeps independent judgment separate, transfers only exportable bounded evidence, and blocks coverage when a required gate remains uncovered. Raw command arguments are excluded; exact identity uses only public argument identities and opaque, non-secret secret-version references.
-
-The initial planner is intentionally `exact_only`. It does not infer dependencies, emit `reuse_scoped`, replace CI/review/approval, or change benchmark evaluator and scoring authority.
-
-Run the focused contract tests with:
-
-```bash
-node scripts/test-verification-evidence.mjs
-```
-
-The CLI supports explicit `put`, `verify`, `plan`, `export`, and `import` operations:
-
-```bash
-node scripts/verification-evidence.mjs verify \
-  --store /path/to/local-store \
-  --evidence-id verification-evidence-<sha256>
-```
-
-See the contract and `docs/adr/0001-verification-evidence-trust-boundary.md` for the strict schemas, CAS layout, trusted ingress, producer attestation, transfer rules, and full command forms.
-
-## AI Engineering Asset Registry
-
-`docs/asset-registry-contract.md` defines a local immutable registry for exact Skill, Prompt template, and public evaluator-reference Assets. It reuses the generic `objects/sha256` CAS; it does not create a second store or a mutable latest pointer.
-
-The states are deliberately separate: content stored does not mean Asset registered; registered does not mean validated, admitted, or `current`; registry `current` does not mean Portfolio `active`; and neither state proves installation, execution, safety, or effectiveness. Registration creates `candidate` entries only. Lifecycle transitions beyond `candidate` require a separate exact caller-supplied authority context, while Issue #277 remains responsible for Portfolio activation.
-
-The checked-in sample contains exactly three public candidate Assets: `test-first-verification` Skill, the unrendered Codex `skill-verify` Prompt template with an exact Skill dependency, and the public `mn-build-option-update` evaluator reference. It contains no lifecycle-authority context, private evaluator content, runtime selection, or effectiveness claim.
-
-```bash
-node scripts/test-content-addressed-store.mjs
-node scripts/test-asset-registry.mjs
-node scripts/asset-registry-samples.mjs --check
-```
-
-`node scripts/asset-registry-samples.mjs --write` deterministically rebuilds the sample after an intentional source or contract change. See `docs/adr/0003-asset-registry-authority-boundary.md` for the storage, lifecycle-authority, and Portfolio boundary decision.
-
-## Evidence-conditioned Portfolio Manager
-
-`docs/portfolio-manager-contract.md` defines the local versioned Portfolio plane above the Asset Registry. Immutable manifests and full predecessor-closed locks share the same canonical JSON CAS. A stored manifest is not current, a current manifest is not an executed Asset set, and verification-evidence, evaluator, producer, Asset owner, or digest identity does not grant Portfolio activation or rollback authority.
-
-Resolution uses a manifest-sealed pre-result vocabulary, exact Registry and Asset identities, exact verification-reuse plans, unique exact current-state references, explicit selectors and capability differences, known-or-unknown budgets, and typed `selected` / `bypass` / `downgrade` / `stop` outcomes. High-impact activation needs an exact grant from a separately trusted approval authority, while rollback uses a separate exact rollback authority, keeps the active manifest's exact rollback target available, and preserves every historical object.
-
-```bash
-node scripts/test-portfolio-manager.mjs
-node scripts/portfolio-manager-samples.mjs --check
-```
-
-The checked fixture represents an explicit zero-Asset Kernel-only selection and a candidate-only Adaptive ASK shadow challenger that downgrades on missing evidence and unknown safety. It never implies installation, execution, effectiveness, mutable-latest resolution, or a change to frozen benchmark results. `node scripts/portfolio-manager-samples.mjs --write` regenerates it deterministically after an intentional contract change. See `docs/adr/0004-portfolio-activation-authority-boundary.md` for the authority decision.
-
-## Governed Evolution loop
-
-`docs/evolution-loop-contract.md` defines the Issue #278 plane above exact Asset, Portfolio, and evaluation/report identities. Candidate, pre-result experiment, evaluation recommendation, Portfolio action proposal, human decision, and application receipt are six separate shared-CAS objects. Experiment verification exact-binds the candidate-reserved authority, factor identities, and evaluation scope; evaluation authority remains distinct from generation, experiment, and decision roles. Recommendation never becomes mutation authority; an approved canary change still requires an exact separately trusted #277 activation context whose authority evidence binds the human-decision object digest.
-
-The bridge preserves quality, safety, cost, variance, mechanism, and external outcome evidence as separate typed dimensions with closed source vocabularies. Unsupported causal attribution cannot carry credit, and all-incomplete evidence can only produce `insufficient_evidence`, which cannot be remapped to implicit retention or rejection. It performs no raw scoring or arbitrary Asset comparison. A candidate without an exact #197 projection stops as `evaluation_projection_unavailable` instead of being aliased to a frozen benchmark condition.
-
-```bash
-node scripts/test-evolution-loop.mjs
-node scripts/test-evolution-loop-integration.mjs
-node scripts/evolution-loop-samples.mjs --check
-```
-
-The checked generic sample proves deterministic parent/candidate lineage, exact baseline/challenger pre-result selection, a bounded human-approved canary Portfolio successor, and preserved rollback history. Its prompt bytes are not Prompt v2 from Issues #227-#235. The separate Issue #234 preregistration fixture described below supplies exact Prompt Assets and an evaluation projection without changing this generic sample or creating a post-result decision. The fixture is non-product, makes no external-outcome claim, does not autonomously mutate an organizational current head, and leaves frozen benchmark results unchanged. See `docs/adr/0005-evolution-authority-boundary.md`.
-
-## Prompt v2 result-blind canary preregistration
-
-`benchmarks/prompt-v2-preregistration.json` freezes a two-arm `current_prompt` / `prompt_v2` comparison before any measured output is accessed. It keeps Codex and Claude as separate tracks, projects both roles to the existing #197 `full_ask` raw-scoring authority, and expands four protected calibration fixtures to exactly 56 balanced cases. The checked fixture binds adapter-specific rendered Prompt bundles, distinct shadow Portfolio selections, exact rollback targets, and pre-result Evolution candidates/experiments in the shared CAS.
-
-The frozen local environment has an available Codex track and a typed-unavailable Claude track. Unavailable or incomplete evidence remains `insufficient_evidence`; it is never converted to zero, pass, tie, or inferred parity. Registration and preregistration do not authorize measured execution, result access, recommendation, activation, lifecycle mutation, or external publication. Issue #235 must follow the exact handoff in `docs/prompt-v2-execution-handoff.md` before any measured run.
-
-```bash
-node scripts/test-ask-benchmark-prompt-v2.mjs
-node scripts/test-prompt-v2-preregistration-samples.mjs
-node scripts/prompt-v2-preregistration-samples.mjs --check
-```
-
-See `benchmarks/protocol-prompt-v2.md` and `docs/adr/0011-prompt-v2-result-blind-canary-authority.md` for the frozen thresholds, result-access boundary, authority separation, and stop conditions.
-
-## Epic admission and Work Package Plans
-
-`docs/epic-admission-work-package-plan-contract.md` defines the Issue #275 Slice 1 control plane that runs before repository mutation. Evidence-backed policy evaluation returns `ordinary_execution_allowed`, `work_package_plan_required`, or `human_decision_required`; AI-estimated complexity is recorded but cannot decide admission by itself.
-
-Before admission policy computation, the evaluator validates caller-supplied subject, signal, revision, and override input and throws a typed `EPIC_ADMISSION_INPUT_INVALID` error instead of returning an allowed outcome from malformed data. Plan and repository validation likewise validates required decision and historical dependency artifacts before dereferencing their bindings, returning typed issues for valid-JSON malformed inputs. When a plan is required, the repository validator checks the current external authority context, deterministic ID/digest, exact plan-content binding, canonical-and-byte-pinned r1/r2 lineage, package DAG, typed allowed/forbidden artifact scope, complete acceptance-condition ownership, stack/base and integration order, reconstructable publication/review units, non-whitespace exact non-overridable gate procedures/purposes, focused cadence, full checkpoints, blockers, decisions, context-owned approval status/evidence, non-whitespace exact-basis override-grant evidence, revision-preserving lifecycle Work Package projection, stale state, tamper, and cross-plan/repository transplant.
-
-```bash
-node scripts/test-epic-admission-work-package-plan.mjs
-node scripts/epic-admission-work-package-plan.mjs --check
-```
-
-Admission is not implementation approval. A valid plan is not correctness proof, independent review, CI evidence, or merge readiness. The accepted dogfood plan covers only the post-validator WP3-WP6 remainder; the earlier bootstrap plan is not retroactively validated. Accepted r1 and r2 are preserved byte-for-byte as historical audit evidence, while the current lineage-bound r3 records the review-driven authority and lifecycle corrections instead of rewriting either predecessor. See `docs/adr/0002-epic-admission-work-package-plan-authority.md` for the external-currentness decision.
-
-## Comparative benchmark
-
-`benchmarks/` contains the preregistered Checkpoint B comparison for Plain Agent, Kernel-only, and Full ASK. It covers review and medium-complexity implementation fixtures, keeps raw prompts and full outputs outside the repository, records unavailable measurements as `null`, and compares Full ASK directly against Kernel-only.
-
-```bash
-node scripts/ask-benchmark.mjs validate
-node scripts/test-ask-benchmark.mjs
-```
-
-See `benchmarks/protocol.md` for frozen thresholds, blinding, evaluator rules, privacy boundaries, and the separate post-#179 Checkpoint C rerun.
-
-The first measured Checkpoint B result is in `benchmarks/results/checkpoint-b-report.md`; its normalized machine-readable evidence is in `benchmarks/results/checkpoint-b-2026-07-12.json`.
-
-Checkpoint B2 adds two medium-hard and two hard fixtures to test cross-file contracts, concurrency, atomic rollback, idempotency, false-positive control, and scope discipline without overwriting the original baseline:
-
-```bash
-node scripts/ask-benchmark.mjs validate --config benchmarks/checkpoint-b2.config.json
-node scripts/test-ask-benchmark.mjs
-```
-
-The measured B2 result is in `benchmarks/results/checkpoint-b2-report.md`. In this bounded run, Kernel-only improved the hard transfer fixture from 76.9% to 100%, while Full ASK added no quality over Kernel-only and more than doubled tokens on all four fixtures.
-
-Checkpoint C reuses the frozen B2 inputs after #179 and records the dual-runtime bundle digest plus architecture/model/CLI/adapter/repository attribution before execution:
-
-```bash
-node scripts/ask-benchmark.mjs validate --config benchmarks/checkpoint-c.config.json
-```
-
-See `benchmarks/protocol-c.md` and `benchmarks/checkpoint-c.config.json` for the frozen post-architecture comparison contract.
-
-The measured Checkpoint C result is in `benchmarks/results/checkpoint-c-report.md`. Full ASK received one `retain` and three `simplify` decisions; no tested fixture met the frozen `expand` threshold.
-
-## Minimum setup
-
-1. Put `AGENTS.md` at the repository root or project instruction location.
-2. Install or paste only the `SKILL.md` files your tool can use.
-3. For small tasks, use only the kernel.
-4. For non-trivial tasks, use `operating-mode-router` when the operating layer is unclear, then use `skill-router` for delivery/quality work or invoke an explicitly requested specific skill directly.
-5. Add project-specific rules and skills as a separate overlay, not by bloating the kernel.
-
-From this repository, the generic core installer can project and later update the kernel, canonical skills, immutable contracts/schemas, and dependency-complete shared semantic runtime in an adopting repository:
-
-```bash
-node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
-```
-
-When this repository is updated, pull the new revision and rerun the installer:
-
-```bash
-git pull
-node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
-```
-
-The installer writes only local files, records `.agent-spectrum-kernel/install-state.json`, reports stale managed skill projections, and uses three-way update safety: managed files are updated only when the target still matches the previous managed hash, unless `--force` is used. Core-owned `scripts/json-schema-validation.mjs` and `scripts/skill-effectiveness-outcome.mjs` are tracked as `immutable_runtime`; adapters consume them but do not own or delete them. `--check`, `--dry-run`, `--prune`, `--rollback`, and `--detach` are supported lifecycle commands. `--detach` removes ASK execution surfaces while preserving project-owned content.
-
-For tools that only support a single custom instruction field, use `CUSTOM_INSTRUCTIONS.md`.
-
-## Claude Code adapter
-
-For Claude Code, use the local-first adapter instead of changing core skills.
-
-```bash
-node scripts/install-kernel.mjs --target /path/to/project --merge-agents
-node scripts/install-claude-adapter.mjs --target /path/to/project
-```
-
-Recommended adoption path:
-
-```text
-1. Install the core kernel, skills, immutable contracts, and shared semantic runtime with `scripts/install-kernel.mjs`.
-2. Install the Claude project adapter or optional plugin.
-3. Enable local hooks for project-local observability.
-4. Use Pattern B @claude review GitHub Actions only when PR-level shared review is needed.
-5. Generate local weekly/monthly adoption and debt reports.
-```
-
-The Claude installer requires the core install state, then updates profile-selected `.claude/skills`, `.claude/commands`, command-required docs/assets, local runtime scripts, and managed hooks in `.claude/settings.json`. It does not use `.claude/hooks/hooks.json` as the project hook source of truth.
-
-The Claude adapter records `.agent-spectrum-kernel/claude-install-state.json` with the same lifecycle schema as the core and Codex installers, including managed hook identifiers and partial-file hashes for `.claude/settings.json`. It supports `--check`, `--dry-run`, `--prune`, `--force`, `--rollback`, and `--detach`; detach removes projected Claude execution surfaces and adapter-owned hooks while preserving local metrics, reports, and ledgers by default.
-
-Supported Claude profiles are `daily`, `organizational`, `implementation`, `investigation`, `review`, `observability`, and `full`. `daily` projects the manifest `daily_delivery` pack; `organizational` projects `organizational_intelligence`. The default remains `full` for compatibility; narrow profiles are closed over command requirements and router-reachable skills. Use `--skills <csv>` only as an advanced override; the installer fails before writing files when the override is not closed.
-
-`--skip-runtime` also skips/removes adapter-owned metrics hooks. `--skip-hooks` skips/removes hooks but still installs runtime scripts. The optional plugin may be combined with the project adapter; plugin hooks resolve through `CLAUDE_PLUGIN_ROOT` and no-op when the project runtime is absent.
-
-Defaults are project-local: no external publication, no raw prompt storage, no secrets/customer/personal data storage, and no full file contents or full command output in metrics events.
-
-Deployment readiness is stateful. File projection only proves `Installed`; `Activated` and `Operational` require profile selection, approval boundaries, runtime health, and task evidence as defined in `docs/adapter-deployment-governance.md`.
-
-## Codex adapter
-
-For Codex, use the prompt-driven adapter in `adapters/codex/`.
-
-The Codex adapter projects the core `AGENTS.md`, selected canonical skills, and generated compact explicit-entry profiles into Codex-compatible repository surfaces, including `.agents/skills`, `.agents/prompts`, and `codex exec` command patterns.
-
-```bash
-node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
-node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
-```
-
-The core installer owns `AGENTS.md`, canonical contracts/schemas, and shared immutable runtime; the Codex installer updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, adapter-owned runner files such as `scripts/execution-envelope.mjs`, and `.agent-spectrum-kernel/codex-install-state.json`. The default profile is `implementation`, not every manifest skill. Supported profiles are `daily`, `organizational`, `minimal`, `implementation`, `investigation`, `review`, `adoption`, `observability`, and `full`.
-
-Use `--profile <name>` for normal installs. Use `--skills <csv>` only as an advanced override; the installer fails before writing files when the override is not closed over required skills for the selected prompts, commands, router-reachable routes, and dependencies of the specified skills.
-
-The Codex installer uses the shared lifecycle semantics: `--check`, `--dry-run`, `--prune`, `--force`, `--rollback`, and `--detach` are available, and locally modified managed files are not overwritten without `--force`.
-
-Implementation, investigation, review, verification, and handoff prompt profiles bind canonical revision/source digests and critical fallback controls. A fixed entry skips unnecessary upper routers; the runner reports requested, projected, compact-profile load, unavailable Codex Skill-load evidence, and applied output-contract evidence separately.
-
-The Codex adapter is intentionally smaller than the Claude Code adapter: no hooks, no local metrics sidecar, no shared PR workflow, and no external publication path are provided. Capability claims are downgraded in `docs/adapter-capability-matrix.md`.
-
-## Dual-runtime generation and conformance
-
-The canonical source can generate one deterministic bundle covering the common Claude/Codex profiles without treating either adapter projection as a second workflow truth:
-
-```bash
-node scripts/adapter-runtime-bundle.mjs --check
-node scripts/adapter-runtime-bundle.mjs --write
-node scripts/adapter-cross-conformance.mjs
-node scripts/test-adapter-runtime-event.mjs
-node scripts/test-adapter-runtime-migration.mjs
-```
-
-`docs/fixtures/adapter-runtime-bundle.json` binds the common profile projections to one canonical union digest while retaining each adapter's own subset digest, renderer fingerprint, and managed inventory. The nine same-fixture checks independently derive normalized contract meaning from each renderer's generated command or prompt bytes before comparing the results. Mutation fixtures remove approval/stop, verification, final-review, executable-handoff, and knowledge-promotion bytes and must fail closed. Claude metrics events and Codex runner reports are mapped through `scripts/adapter-runtime-event.mjs` and validated against `schemas/adapter-runtime-event.schema.json`. Their current conformance evidence level is `projected`; external runtime loading and behavioral conformance remain unavailable until bounded Claude/Codex runs are captured.
-
-Upgrade, rollback, profile shrink, coexistence, and detach guidance is in `docs/adapter-runtime-migration.md`. The post-architecture Checkpoint C handoff preserves the B/B2 baselines and requires architecture, model, CLI, adapter, and repository changes to be attributed separately.
-
-## Doctor and sensors
-
-Use `ask-doctor` after first adoption, kernel updates, adapter installation, skill projection refresh, or suspected installation drift:
-
-```bash
-node scripts/ask-doctor.mjs --target /path/to/adopting-repo
-node scripts/ask-doctor.mjs --target /path/to/adopting-repo --runtime-probe
-```
-
-Doctor reports installation health. It is not a per-task gate, and a failure downgrades setup/readiness claims rather than blocking read-only investigation or local verification. Exit code 1 means installation health failed; it does not prohibit normal read-only investigation or local verification.
-
-The optional runtime probe adds local/static/dry-run adapter conformance checks for projected command/template directories, skill readability, adapter config shape, visible command/template references, hook executable resolution, event-store availability, and report inputs. Runtime probe findings are reported separately from installation health and downgrade runtime conformance/readiness claims only. Passing the probe is not proof that Claude, Codex, GitHub Actions, deployment, network, or product/client readiness works.
-
-Use the explicit smoke runner when you want a local runtime write check:
-
-```bash
-node scripts/adapter-runtime-smoke.mjs --target /path/to/adopting-repo --adapter claude
-```
-
-For Codex non-interactive runs, use the installed bounded runner instead of invoking `codex exec` directly:
-
-```bash
-cd /path/to/adopting-repo
-node ./scripts/codex-exec-runner.mjs --prompt skill-implement.md --mode implementation
-```
-
-The Codex runner can report `executed` after capturing output and running `ask-sensors`; this evidences only the inspected output contract. It does not prove workflow, risk/approval, or verification-contract application, business correctness, product readiness, or no regression.
-
-After classifying the task, pass `--gates-observed` when no task-specific gate applies. For review, repeat `--observed-signal <exact-id>` and let the canonical registry derive every additional gate; bare `--required-gate` is rejected in review mode. For non-review entries, `--required-gate <id>` remains available. Every review run includes one `review-ai-quality` baseline. Add `--final-decision` only when the run must make a final merge decision; this runs `review-final-merge-gate` last. Missing gate observation is recorded as missing evidence; a derived or non-review-required `risk-gate` without specific-action approval stops before Codex invocation.
-
-Use `ask-sensors` to classify control risks in an implementation or review output:
-
-```bash
-node scripts/ask-sensors.mjs --target /path/to/repo --mode implementation --input final-output.txt
-node scripts/ask-sensors.mjs --target /path/to/repo --mode review --input review-output.txt
-```
-
-Sensors are initial report-only checks. They detect control failures such as missing completion sections, missing review decision/signal-gate sections, risk surfaces, unsupported adapter capability claims, and evidence phrases without evidence. They do not prove business correctness. `fail` restricts unsupported completion/readiness/safety/merge claims; `hard_stop` is limited to AGENTS approval-required actions.
-
-## 3分で使う / Quick start
-
-First-time users should start with `docs/quickstart-ja.md`.
-
-- `docs/quickstart-ja.md`: minimum install path, skill-aware / non-skill-aware setup, first prompts.
-- `docs/prompt-recipes-ja.md`: copy-paste requests organized by what the user wants to do.
-- `docs/glossary-ja.md`: operational definitions for Kernel, Skill, Gate, overlay, context, and contract terms.
-- `docs/routing-model.md`: operating-mode routing and skill group model.
-- `docs/execution-envelope-contract.md`: shared Execution Envelope source of truth for routing, evidence, stop reasons, and next actions.
-- `docs/usage-ja.md`: representative usage guide for common operating patterns.
-- `docs/skill-matrix.md`: reference matrix for workflow selection.
-- `docs/adapter-conformance-contract.md`, `docs/adapter-capability-matrix.md`, `docs/adapter-deployment-governance.md`, and `docs/adapter-runtime-migration.md`: adapter portability, capability evidence, supported deployment profiles, migration, rollback, and operational governance.
-- Full-layer intelligence ledger templates: `docs/ai/engineering-pattern-ledger.md`, `docs/ai/verification-pattern-ledger.md`, `docs/ai/review-rule-ledger.md`, `docs/ai/documentation-knowledge-ledger.md`, `docs/ai/architecture-decision-memory.md`, and `docs/ai/engineering-capability-ledger.md`.
-- `docs/ai/stakeholder-readiness-report-template.md`: stakeholder-specific readiness reports that separate internal quality, release readiness, and client-value readiness.
-- `docs/ai/reports/examples/`: fixture-backed stakeholder-readiness samples for senior engineering, development management, business unit, and AI promotion views.
-
-## Skill名を知らない入口
-
-通常の利用者はSkill名を覚える必要はありません。やりたい作業を自然文で依頼し、内部では `operating-mode-router` と `skill-router` が必要なrouteを選びます。
-
-```text
-この作業を適切なルートで進めてください。
-```
-
-より明示したい場合:
-
-```text
-この依頼を、必要なルートを選んで進めてください。
-既存のdocs、repo、domain rules、context、ledgerで判断できるものは吸収し、
-人間判断が必要なものだけ明示してください。
-作業が進められる場合は、次に必要な実装・検証・レビュー・ドキュメント作成まで案内してください。
-```
-
-| User wants to... | Say this | System should route to... |
-|---|---|---|
-| Move a ticket forward | このチケットを進めて | requirement / work package / implementation route |
-| Review a PR | このPRをレビューして | review-router, mandatory baseline, and exact-signal additional gates |
-| Investigate a bug | このバグを調べて | doubt-driven-development and verification route |
-| Refine a design | この設計を詰めて | design / architecture route |
-| Prepare agent work | Codexに渡せる形にして | work-package route |
-| Preserve lessons | この指摘を次に活かして | finding / ledger / documentation route |
-
-Default outputs should describe the selected work mode, user-facing route, missing evidence, human-decision points, internal route, and next action. Skill names may appear in the internal route for debugging, but the user-facing route should stay in work terms.
-
-## Recommended workflows
-
-`skills/operating-mode-router/SKILL.md` first separates delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation. `skills/skill-router/SKILL.md` is the procedural delivery/quality routing source. The table below is a reference summary.
-
-| Task | Use |
-|---|---|
-| 軽微な修正 | `AGENTS.md` only |
-| operating mode が曖昧 | `operating-mode-router` |
-| project adoption / first-time rollout | `operating-mode-router` → `project-adoption-pack-generation` |
-| 初見repo | `repository-orientation`（対象境界が曖昧なら `scope-control`、セッション/Agentを跨ぐかdurable stateが必要なら `planning-with-files`） |
-| 次にやるべき変更候補探索 | `next-best-change-finder` → 原則 `requirement-grill` |
-| 業務意図・成功条件・責任境界が曖昧 | `requirement-grill` |
-| 確定済み要件をAgent-ready taskへ変換 | `work-package-compiler` |
-| 実装方針の壁打ち | `grill-design` |
-| docs/ADR/用語体系に関わる設計 | `grill-with-docs` |
-| 実装前に未解決のアプリケーション境界・依存方向・DTO/Error/async lifetime判断 | `application-boundary-architecture` → 通常の実装ルートへ戻る |
-| 再利用可能な実装patternを台帳化 | `engineering-pattern-ledger` |
-| 再利用可能な検証patternを台帳化 | `verification-pattern-ledger` |
-| ADR未満のarchitecture decision memory | `architecture-decision-memory`（ADRが必要なら `adr-review`） |
-| 新機能・挙動変更 | `spec-driven-development` → `test-first-verification` selects Compact Proof or Formal Verification Contract → `controlled-implementation` references it → evidence |
-| バグ・原因不明 | `doubt-driven-development` → `test-first-verification` selects Formal Verification Contract for reproduction/regression → `controlled-implementation` → regression proof |
-| 承認済みリファクタ実装 | `refactor-implementation` → `test-first-verification` for regression proof |
-| スコープが広がりそう | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → mandatory baseline → exact-signal additional gates） |
-| 危険操作・外部影響 | `risk-gate` before the selected workflow proceeds to action |
-| 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
-| PR/diffレビュー | `review-router` → 必須の`review-ai-quality` baseline → exact-signal additional gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ 最終判断を要求した場合だけ`review-final-merge-gate` |
-| 繰り返し/高impact review findingsを予防知識へ変換 | `review-finding-compiler` |
-| 既存要件・業務ルールとの照合 | `review-domain-impact`（Requirement Contract / Work Package / Domain Rule Ledger を入力にできる） |
-| リリース候補のready判定 | `release-readiness-gate`（deploy / publish / migration / external notification / release execution は `risk-gate` と明示承認が先） |
-| 負債・スメル・リファクタ候補レビュー | `review-router` → `review-code-health` when applicable |
-| non-blockingな改善候補の台帳化 | `improvement-ledger` |
-| 業務ルール台帳の作成・更新 | `domain-rule-ledger` |
-| レビューや人間の訂正から業務ルール候補を抽出 | `review-to-rule-compiler` |
-| skill選択やworkflow効果のふりかえり | `operating-mode-router` → `skill-effectiveness-evaluation` |
-| adoption maturity / instruction quality / adoption impact measurement | `operating-mode-router` → `skill-adoption-metrics` |
-| full-layer engineering capabilityを証拠付きで評価 | `operating-mode-router` → `engineering-capability-evaluation` |
-| weekly/monthly adoption report | `operation_automation` layer + report templates; scheduling is external |
-| 繰り返しレビュー文脈の固定 | `review-context-generation`（既定: `docs/ai/review-context.md`） |
-| MR/PR README・PR説明・変更文脈固定 | `mr-readme-generation` |
-| docs/ADR/PR/handoffからdurable knowledgeを抽出 | `documentation-knowledge-compiler` |
-| 次のAgentへ渡す | `handoff-generation` |
-
-Use `ask.claim-evidence-status@1.0.0` inline for ordinary claims. Use `evidence-ledger` only for its closed formal-audit triggers: explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs.
-
-## What changed from v1
-
-- Added `operating-mode-router` and `docs/routing-model.md` so the system first separates delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation.
-- Added skill group metadata to `manifest.json` and validation coverage for unclassified, unknown, duplicate, and unsupported multi-group skills.
-- Added `project-adoption-pack-generation` for first-time repository or team rollout.
-- Added `skill-effectiveness-evaluation` for one-task workflow retrospective evaluation.
-- Added `skill-adoption-metrics`, `docs/metrics-event-contract.md`, `docs/ai/skill-adoption-metrics.md`, and adoption report templates for opt-in adoption measurement.
-- Added `release-readiness-gate` for release package readiness checks across scope, validation, rollback, monitoring, post-release verification, customer impact, communication, approvals, and residual risks.
-- Added `application-boundary-architecture` for unresolved framework-agnostic boundary, dependency direction, DTO/error trust boundary, async lifetime, feature public API, and architecture guard decisions before returning to the normal implementation route.
-- Added `review-context-generation`, `review-output-quality`, and `review-adversarial-risk` so context-heavy review layers have dedicated gates instead of being collapsed into AI quality review.
-- Added `implementation-context-generation` so repeated implementation tasks can reuse evidence-labeled stack, command, pattern, boundary, and stop-condition context without embedding framework-specific rules.
-- Added the Requirement-to-Rule Loop: `next-best-change-finder`, `requirement-grill`, `work-package-compiler`, `review-to-rule-compiler`, `domain-rule-ledger`, and enhanced `review-domain-impact` input handling.
-- Added `Safety and External Effects` to the kernel.
-- Added a minimal routing gate inside `AGENTS.md` that sends operating-mode ambiguity to `operating-mode-router` and delivery/quality workflow selection to `skill-router`.
-- Added `risk-gate` for destructive, irreversible, external, production, auth, secret, billing, dependency, and infra risks.
-- Added `controlled-implementation` to cover the actual implementation loop between planning and verification.
-- Split PR review from one all-purpose skill into router, automated evidence, AI quality, domain impact, and final merge gates.
-- Strengthened every skill with exit criteria, failure modes, and evidence requirements.
-- Added Japanese usage docs and workflow examples for personal/team adoption.
-- Kept the original skill names from v1 where possible to avoid migration friction.
-
-## Boundary
-
-The kernel and generic workflows are intentionally stack-agnostic. They do not encode Angular, React, Python, finance, infra, internal naming, branch strategy, or CI-specific conventions as always-on rules.
-
-Add those as project overlays or stack implementation overlays. The included `angular-implementation-architecture` skill is the first concrete stack overlay and is selected only after the generic workflow when Angular signals apply. Do not put stack-specific rules into the global kernel unless they must apply to every repository.
-
-When a project overlay contains framework/domain-specific skills, route in layered steps:
-
-```text
-operating mode selection via operating-mode-router when needed
--> generic delivery/quality workflow selection via skill-router
--> project overlay skill selection when the overlay signal applies
-```
+| 目的 | 読む資料 |
+| --- | --- |
+| 導入して最初の依頼をする | [Mac / Codex導入](docs/quickstart-mac-codex-ja.md)、[共通導入](docs/quickstart-ja.md)、[依頼レシピ](docs/prompt-recipes-ja.md) |
+| 用語や工程の選び方を知る | [用語集](docs/glossary-ja.md)、[ルーティング](docs/routing-model.md)、[Skill一覧](docs/skill-matrix.md) |
+| 改善候補を評価して判断する | [個人改善CLI](docs/personal-evolution-cli.md)、[個人ループの手順](docs/personal-evolution-primary-loop.md)、[Evolution契約](docs/evolution-loop-contract.md) |
+| 評価の根拠・未完事項を調べる | [24課題の状況](docs/primary-24-task-assembly.md)、[過去の測定](benchmarks/results/)、[リリース判定](docs/release-package-2026-10.md) |
+| 運用の説明・報告を作る | [readiness報告テンプレート](docs/ai/stakeholder-readiness-report-template.md)、[人工データによる報告例](docs/ai/reports/examples/) |
+| 契約・実装・詳細手順を探す | [文書索引](docs/README.md)、[manifest](manifest.json)、[変更履歴](CHANGELOG.md) |
