@@ -5,17 +5,18 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync,
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { comparisonHash, inventoryUserTree, prepareUserComparison } from './ask-user-comparison-prepare.mjs';
-import { PRIMARY_BATCH_LIMITS, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_FIXTURE_IDS, inspectPrimaryEvaluationBatch, preparePrimaryEvaluationBatch, reportPrimaryEvaluationBatch, startPrimaryEvaluationBatch } from './ask-primary-evaluation-batch.mjs';
+import { PRIMARY_BATCH_LIMITS, primaryBatchLimitsForSet, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_FIXTURE_IDS, inspectPrimaryEvaluationBatch, preparePrimaryEvaluationBatch, reportPrimaryEvaluationBatch, startPrimaryEvaluationBatch } from './ask-primary-evaluation-batch.mjs';
+import { primaryFixtureIdsForSet } from './ask-primary-fixture-recipe.mjs';
 const hash = value => comparisonHash(value);
 function git(root, args) {
   const result = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], { cwd: root, encoding: 'utf8',
     env: { PATH: process.env.PATH, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' } });
   assert.equal(result.status, 0, result.stderr); return result.stdout.trim();
 }
-function fixture(t) {
+function fixture(t, fixtureSet = 'legacy9') {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'ask-primary-batch-')));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const blocks = PRIMARY_FIXTURE_IDS.map((fixture_id, index) => {
+  const blocks = primaryFixtureIdsForSet(fixtureSet).map((fixture_id, index) => {
     const publicRoot = join(root, `public-${index}`), source = join(root, `seed-${index}`);
     mkdirSync(publicRoot); mkdirSync(join(publicRoot, 'workspace'));
     writeFileSync(join(publicRoot, 'task.md'), 'Update workspace/value.mjs to 1.\n');
@@ -43,7 +44,7 @@ function fixture(t) {
     for (const block of blocks) if (existsSync(join(block.root, 'control/slots/.synthetic-batch-receipts')))
       rmSync(join(block.root, 'control/slots'), { recursive: true });
     const value = edit({ kind: 'ask_primary_evaluation_batch_manifest_v1', batch_id: `fake-${++number}`, root: join(root, `batch-${number}`),
-      conditions: ['plain', 'kernel_only', 'full_ask'], limits: PRIMARY_BATCH_LIMITS, blocks: structuredClone(blocks) });
+      conditions: ['plain', 'kernel_only', 'full_ask'], ...(fixtureSet === 'catalog24' ? { fixture_set: fixtureSet } : {}), limits: primaryBatchLimitsForSet(fixtureSet), blocks: structuredClone(blocks) });
     const path = join(root, `manifest-${number}.json`); writeFileSync(path, JSON.stringify(value)); return { path, value, digest: hash(readFileSync(path)) };
   } };
 }
@@ -257,4 +258,43 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
     assert.equal(failed.state, 'consumption_unknown'); assert.equal(failed.terminal.state, 'stopped');
     assert.equal(failed.usage.missing_requested_report_count, 1); assert.equal(failed.slots.filter(slot => slot.state === 'unknown').length, 3);
   });
+});
+
+
+test('catalog24 uses the existing batch entrance and preserves task failures, manual requirements and later results', async t => {
+  const f = fixture(t, 'catalog24'), m = f.manifest(), a = adapters();
+  const baseStart = a.startComparison;
+  a.startComparison = async (root, digest) => {
+    const report = await baseStart(root, digest), index = f.blocks.findIndex(block => block.root === root);
+    if (index === 3) { report.overall.state = 'task_failed'; for (const slot of report.slots) {
+      slot.state = 'verification_failed'; slot.verification.checks[0].status = 'fail'; slot.verification.checks[0].exit_code = 1;
+      slot.verification.checks[0].logs = ['retained-fixed-failure.log'];
+      const folder = join(root, 'control/slots', slot.condition), raw = JSON.stringify(slot), value = hash(raw);
+      writeFileSync(join(folder, 'retained-fixed-failure.log'), 'intentional fixed verification failure\n');
+      writeFileSync(join(folder, 'result.json'), raw); writeFileSync(join(folder, 'result.digest'), value);
+      report.execution.history.snapshot.slots[slot.condition].terminal_digest = value;
+    }}
+    return report;
+  };
+  a.gradingAdapter.grade = async (block) => {
+    a.grades.push(block.fixture_id); const index = f.blocks.findIndex(item => item.fixture_id === block.fixture_id);
+    const outcome = index === 3 ? 'fail' : index === 7 ? 'manual_review_required' : 'pass';
+    return { status: 'completed', conditions: m.value.conditions.map(condition => ({ condition, status: 'completed',
+      quality: outcome === 'manual_review_required' ? null : outcome === 'fail' ? 0 : 1,
+      requirement_judgments: [{ requirement_id: 'fixed-control', outcome, earned_points: outcome === 'manual_review_required' ? null : outcome === 'fail' ? 0 : 1 }],
+      failure_reasons: outcome === 'pass' ? [] : [outcome === 'fail' ? 'intentional_fixed_task_failure' : 'fixed_measurement_unavailable'] })) };
+  };
+  const prepared = preparePrimaryEvaluationBatch(m.path, a);
+  assert.equal(prepared.slot_count, 72); assert.equal(prepared.slots.length, 72);
+  assert.ok(prepared.slots.every(slot => slot.quality === null));
+  const report = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
+  assert.equal(report.state, 'completed'); assert.equal(a.calls.length, 24); assert.equal(a.grades.length, 24);
+  assert.equal(report.slots.length, 72); assert.equal(report.limits.token_budget, 120000000);
+  assert.ok(report.limits.overall_timeout_ms >= 24*(14400000+PRIMARY_GRADING_RESERVATION_MS));
+  assert.ok(report.slots.filter(slot=>slot.fixture_id===f.blocks[3].fixture_id).every(slot=>slot.quality===0 && slot.child_report.slots.every(s=>s.verification.checks[0].logs.length===1)));
+  assert.ok(report.slots.filter(slot=>slot.fixture_id===f.blocks[7].fixture_id).every(slot=>slot.quality===null && slot.grading.conditions.every(s=>s.requirement_judgments[0].outcome==='manual_review_required')));
+  assert.ok(report.slots.filter(slot=>slot.fixture_id===f.blocks[23].fixture_id).every(slot=>slot.quality===1));
+  for (const mutate of [value=>value.blocks.pop(), value=>value.fixture_set='legacy9', value=>value.blocks.reverse()]) {
+    const bad=f.manifest(value=>{mutate(value);return value;}); assert.throws(()=>preparePrimaryEvaluationBatch(bad.path,a));
+  }
 });

@@ -8,10 +8,11 @@ import { join } from "node:path";
 import { canonicalDigest, putContentAddressedJson } from "./content-addressed-store.mjs";
 import { comparisonHash } from "./ask-user-comparison-prepare.mjs";
 import { runUnattendedPersonalEvolution } from "./ask-personal-evolution-unattended.mjs";
+import { CANONICAL_PRIMARY_FIXTURE_IDS } from "./ask-primary-fixture-recipe.mjs";
 
 const save = (path, value) => writeFileSync(path, JSON.stringify({ value, digest: canonicalDigest(value) }));
 function fixture(t, { phase = "needs_evaluation_confirmation", review = "approved", actions = ["insufficient_evidence"],
-  allowExistingApproval = false, maxCycles = 1 } = {}) {
+  allowExistingApproval = false, maxCycles = 1, fixtureSet = "legacy9", fixtureIds, maxDurationMs = 604800000, maxComparisonTokens = 90000000 } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "personal-unattended-policy-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const output = join(root, "run"), cycle = join(output, "cycle-1"), profileRoot = join(root, "profile"), storeRoot = join(root, "store");
@@ -23,8 +24,10 @@ function fixture(t, { phase = "needs_evaluation_confirmation", review = "approve
     files: [{ path: "prompt.md", before: "old", after: "new" }] };
   const policy = { allowedPaths: ["prompt.md"], sourceReview: { command: [process.execPath, sourcePath], timeoutMs: 1000,
     source: { path: sourcePath, digest: comparisonHash(readFileSync(sourcePath)) }, allowExistingApproval },
-    decisionActions: actions, maxCycles, maxDurationMs: 604800000, maxComparisonTokens: 90000000 };
-  const profile = { storeRoot, blueprint: { parent_asset: asset, evaluation_scope: { fixture_ids: ["mn-build-option-update"] } },
+    decisionActions: actions, maxCycles, maxDurationMs, maxComparisonTokens };
+  const profile = { storeRoot, blueprint: { parent_asset: asset, evaluation_scope: {
+    fixture_ids: fixtureIds ?? (fixtureSet === "catalog24" ? CANONICAL_PRIMARY_FIXTURE_IDS : ["mn-build-option-update"]) } },
+    ...(fixtureSet !== "legacy9" ? { evaluation: { fixtureSet } } : {}),
     trust: {}, generation: { timeoutMs: 1000 }, unattended: policy };
   save(join(profileRoot, "profile.json"), profile);
   save(join(output, "run-input.json"), { profileRoot, profileDigest: canonicalDigest(profile), policyDigest: canonicalDigest(policy),
@@ -85,4 +88,28 @@ test("a completed authorized cycle remains readable without execution after the 
   const file = join(f.output, "run-input.json"), fixed = JSON.parse(readFileSync(file)).value;
   fixed.startedAtMs = 1; save(file, fixed);
   assert.equal((await f.run()).status, "completed"); assert.deepEqual(f.calls, ["status", "review-source"]);
+});
+test("catalog24 unattended admission reserves the same complete two-role limits as its pair", async t => {
+  for (const budget of [
+    { maxComparisonTokens: 90000000, maxDurationMs: 1224060000, reason: /comparison admission budget/ },
+    { maxComparisonTokens: 240000000, maxDurationMs: 604800000, reason: /reserve full comparison/ },
+  ]) {
+    const f = fixture(t, { fixtureSet: "catalog24", ...budget });
+    const result = await f.run(); assert.equal(result.status, "needs_action"); assert.match(result.detail, budget.reason);
+    assert.deepEqual(f.calls, [], "insufficient budget must stop before generation/review/comparison callbacks");
+  }
+  const complete = fixture(t, { fixtureSet: "catalog24", maxComparisonTokens: 240000000, maxDurationMs: 1224060000 });
+  assert.equal((await complete.run()).status, "completed");
+});
+test("invalid explicit fixture selection leaves no unattended lock and starts nothing", async t => {
+  for (const selection of [{ fixtureSet: "unknown" }, { fixtureSet: null },
+    { fixtureSet: "catalog24", fixtureIds: CANONICAL_PRIMARY_FIXTURE_IDS.slice(1) }]) {
+    const f = fixture(t, selection);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = await f.run(); assert.equal(result.status, "needs_action");
+      assert.notEqual(result.reason, "run_in_progress_or_interrupted");
+      assert.equal(existsSync(join(f.output, ".command-lock")), false);
+      assert.deepEqual(f.calls, []);
+    }
+  }
 });

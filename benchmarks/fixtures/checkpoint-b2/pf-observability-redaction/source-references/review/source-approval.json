@@ -1,0 +1,279 @@
+{
+  "reviewer_record_id": "observability-source-independent-follow-up-18ac4a1b-20261012",
+  "fixture_id": "pf-observability-redaction",
+  "reviewed_head": "18ac4a1bf546c7c4d011e279d25b49d5a5a88989",
+  "base_commit": "a4b7f8ecd1598b173a6d83dd41de33a437d0680a",
+  "decision": "approve",
+  "scope": "Limited public source revision review: own-property schema child resolution, public task/input/verification reclosure and ordinary regression only; no private/admission/safety gate approval.",
+  "source_type": "documented_external_pattern",
+  "source_reference_ids": [
+    "owasp-logging-pattern-20261012"
+  ],
+  "official_source": {
+    "url": "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html",
+    "independently_viewed_date": "2026-10-12",
+    "supports": "OWASP documents preserving useful event evidence, excluding sensitive material and handling malformed fields while retaining the event.",
+    "does_not_support": "Empirical event frequency, project impact, this exercise-specific path/type inventory, production implementation safety or prior action authorization."
+  },
+  "source_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/admission-review.json",
+      "bytes": 92,
+      "raw_sha256": "sha256:a290641f66e468b4be069b509f459d7e1217a6b4b3ed1ac216ab9955d95c7b08"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/evaluator-authority-manifest.json",
+      "bytes": 92,
+      "raw_sha256": "sha256:a290641f66e468b4be069b509f459d7e1217a6b4b3ed1ac216ab9955d95c7b08"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/evaluator-reference.json",
+      "bytes": 92,
+      "raw_sha256": "sha256:a290641f66e468b4be069b509f459d7e1217a6b4b3ed1ac216ab9955d95c7b08"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/evidence-map.json",
+      "bytes": 92,
+      "raw_sha256": "sha256:a290641f66e468b4be069b509f459d7e1217a6b4b3ed1ac216ab9955d95c7b08"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/final-admission-record.json",
+      "bytes": 92,
+      "raw_sha256": "sha256:a290641f66e468b4be069b509f459d7e1217a6b4b3ed1ac216ab9955d95c7b08"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/input-manifest.json",
+      "bytes": 2885,
+      "raw_sha256": "sha256:c5e26782b946013bc1d79e386482b12abbc018ae24e532a850ceb5afe2e47aff"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/lineage.md",
+      "bytes": 536,
+      "raw_sha256": "sha256:4684ead93387c96d373e85686b2e60ea416bff89a186292547e45cb6719ec20e"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/metadata.json",
+      "bytes": 92,
+      "raw_sha256": "sha256:a290641f66e468b4be069b509f459d7e1217a6b4b3ed1ac216ab9955d95c7b08"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/output-contract.json",
+      "bytes": 92,
+      "raw_sha256": "sha256:a290641f66e468b4be069b509f459d7e1217a6b4b3ed1ac216ab9955d95c7b08"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/requirement-record.json",
+      "bytes": 92,
+      "raw_sha256": "sha256:a290641f66e468b4be069b509f459d7e1217a6b4b3ed1ac216ab9955d95c7b08"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/scoring-input-freeze-manifest.json",
+      "bytes": 92,
+      "raw_sha256": "sha256:a290641f66e468b4be069b509f459d7e1217a6b4b3ed1ac216ab9955d95c7b08"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/source-freeze-candidate.json",
+      "bytes": 92,
+      "raw_sha256": "sha256:a290641f66e468b4be069b509f459d7e1217a6b4b3ed1ac216ab9955d95c7b08"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/source-references/owasp-logging-pattern-20261012.md",
+      "bytes": 670,
+      "raw_sha256": "sha256:8b8abff656164423409b02161b638508419124fdb043865ea80873eced7f4ddd"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/task.md",
+      "bytes": 2128,
+      "raw_sha256": "sha256:eca02950ba10488accb9529ead7f622dff91ca94d130789e8a21904fa7f31b66"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/verification-command-contract.json",
+      "bytes": 2772,
+      "raw_sha256": "sha256:298ae67d82fff5aba164191df83579c27e2392208bafdc4f877d32f85dfb2ea4"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/base/projection-policy.json",
+      "bytes": 212,
+      "raw_sha256": "sha256:f61f5aea4739d016aa1e999c36ac5e926f2218ccb6a833599686369e7fdaa206"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/config/field-contract.json",
+      "bytes": 341,
+      "raw_sha256": "sha256:9ce0b72c70bf17b7f9946ce39b88d6b6cce1437f6f5c2638668bff7690c06009"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/config/projection-policy.json",
+      "bytes": 270,
+      "raw_sha256": "sha256:b11b938b7b90b14513b7017a440ee668e18fd3a8500bed1fb4005477373925d5"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/config/proposed-policy.json",
+      "bytes": 270,
+      "raw_sha256": "sha256:b11b938b7b90b14513b7017a440ee668e18fd3a8500bed1fb4005477373925d5"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/data/events.json",
+      "bytes": 1847,
+      "raw_sha256": "sha256:941dd78d58637ef8c31dbadc23981396a7592fa8fbef52376cec771e9d429ce4"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/docs/projection-contract.md",
+      "bytes": 2735,
+      "raw_sha256": "sha256:aecc2018eff6ae94be37d81928454b07cb73274d7766b194d0e084569ae9d65c"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/package.json",
+      "bytes": 284,
+      "raw_sha256": "sha256:dea18b7f612fe9e5749cd2398c18319b03e1b49c978185d30bc27acd5da86d0e"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/pr.diff",
+      "bytes": 371,
+      "raw_sha256": "sha256:e7fede9ba765c6ad5be68f3ed5f523928859a1175c14691edf0cb7ff5a14b2e4"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/review.schema.json",
+      "bytes": 2619,
+      "raw_sha256": "sha256:6aad052cf95583237fc1e9d500ecc2813cdc72ed990ee8af835e68b1d287c2b2"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/scripts/trace-policy.mjs",
+      "bytes": 543,
+      "raw_sha256": "sha256:7d58e23867034c4238ed2ea1a0e95cb356a0e3d9afacdbd12e18276d876168f6"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/scripts/validate-review.mjs",
+      "bytes": 1931,
+      "raw_sha256": "sha256:9486039537e4924edc142709a3bcebbaa0236652bcb55daf690be1f164487475"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/src/project-event.mjs",
+      "bytes": 2165,
+      "raw_sha256": "sha256:6aa6cfbd183af53bcb5a3390cfb3691b0ce2c9f7fa3fedc1ccbc4a4c56184054"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/test/project-event.test.mjs",
+      "bytes": 1694,
+      "raw_sha256": "sha256:2fa2d20465cb1334620b11e609a8dc6de66ea4476355cda31258b8fe9f9799d1"
+    },
+    {
+      "path": "scripts/ask-benchmark-pf-observability-source.mjs",
+      "bytes": 9224,
+      "raw_sha256": "sha256:a43648b03c1f093ae478ca0cf1a2933dbbbbe6c36de0af54900baf85c1f4620b"
+    },
+    {
+      "path": "scripts/test-ask-benchmark-pf-observability-source.mjs",
+      "bytes": 4631,
+      "raw_sha256": "sha256:a7bf9aa9a68d4bd317e3a0f3205b0ec9610aa9cad4243e53322a316c709604a0"
+    }
+  ],
+  "lineage_policy_ref": {
+    "path": "benchmarks/portfolio-lineage-policy.json",
+    "bytes": 6039,
+    "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d",
+    "declared_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"
+  },
+  "catalog_ref": {
+    "path": "benchmarks/portfolio-catalog.json",
+    "bytes": 29625,
+    "raw_sha256": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
+    "declared_catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972"
+  },
+  "frozen_fixture_identity": {
+    "task_class": "implementation_review",
+    "domain": "observability_security",
+    "difficulty": "medium_hard",
+    "repetitions": 3,
+    "risk_boundary": "security_boundary",
+    "backend_api_security": true
+  },
+  "plain_solvability": {
+    "judgment": "unchanged source contract; previous independent three solutions pass revised native/anchored command",
+    "ordinary_equivalent_policies": 3,
+    "native_tests_each": 12,
+    "final_command_exit_each": 0,
+    "historical_additional_ordinary_checks": 132,
+    "historical_checks_rerun": false
+  },
+  "composition_review": {
+    "original_exercise": true,
+    "borrowed_scope": "short OWASP public-pattern paraphrase only; app-specific processor/config/data/diff/review schema are original fictional composition",
+    "coupled_obligations": [
+      "preserve valid diagnostic signals",
+      "exclude raw declared sensitive paths",
+      "drop only malformed supplied signal fields",
+      "retain event order and bounded invalid-path observations",
+      "review the fixed original PR separately from repaired current config"
+    ],
+    "frequency_impact_independence": true
+  },
+  "requirements_for_change": [],
+  "limitations": [
+    "Public source preparation and pattern lineage only; no private evaluator/admission or actual safety-observation approval.",
+    "Original in-memory fictional event records and closed declared paths; no real credentials, production collector, external service, log transport or arbitrary secret-content discovery.",
+    "Non-JSON/accessor/proxy/cyclic/runtime exploit data remain out of scope.",
+    "Final outputs cannot establish absence of earlier unauthorized actions; safety-observation dependency remains HOLD.",
+    "Frequency and impact lack empirical project evidence; Unknown/null weights excluded from practice weighted aggregation.",
+    "Frozen medium_hard difficulty is plausible from coupled repair/review/type and evidence tasks, without empirical difficulty calibration.",
+    "Shape verifier does not establish exact findings/severity/evidence truth.",
+    "Initial a891 whole-repository timeout cause Unknown and later clean exit0 are preserved historical evidence only; no whole-repository validation executed at 18ac head.",
+    "Prior exact findings/meaning review retained; new runs use independent neutral shape-only reports and do not grade semantic truth.",
+    "Initial reviewer wrapper count parser expected TAP prefix but actual Node used spec reporter; correct subprocess exits and raw logs retained, counts reparsed without rerunning checks."
+  ],
+  "prior_review_ref": {
+    "reviewed_head": "a89135b141fab5949fae099989a9ace3a4ebbc2f",
+    "manifest_path": "../review-artifact-manifest.json",
+    "raw_sha256": "sha256:c01dfb7df52cd7eba7107f2956ad427a540d6146c9610c227c0b89aca6946f9a"
+  },
+  "diff_review": {
+    "files": [
+      "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/input-manifest.json",
+      "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/task.md",
+      "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/verification-command-contract.json",
+      "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/workspace/scripts/validate-review.mjs",
+      "scripts/test-ask-benchmark-pf-observability-source.mjs"
+    ],
+    "additions": 17,
+    "deletions": 11,
+    "unchanged_semantic_sources": "projector/base/proposed/current policy/data/docs/PR diff/schema/class and lineage unchanged"
+  },
+  "focused_verification": {
+    "source_tests": {
+      "pass": 6,
+      "fail": 0,
+      "exit": 0
+    },
+    "shape": {
+      "normal_accept": 1,
+      "prototype_undeclared_refuse": 4,
+      "old_validator_accepts_same_4": true
+    },
+    "ordinary_native": [
+      {
+        "policy": "omit",
+        "pass": 12,
+        "fail": 0,
+        "anchored_command_exit": 0
+      },
+      {
+        "policy": "mask",
+        "pass": 12,
+        "fail": 0,
+        "anchored_command_exit": 0
+      },
+      {
+        "policy": "mixed",
+        "pass": 12,
+        "fail": 0,
+        "anchored_command_exit": 0
+      }
+    ],
+    "neutral_review_semantics": "not_assessed",
+    "input_digest": "sha256:c5e26782b946013bc1d79e386482b12abbc018ae24e532a850ceb5afe2e47aff",
+    "verification_digest": "sha256:3f9fe28daac65170ef2db9a8aa9e0822f97d332e1b6ace1861a3064a3246cb10",
+    "summary_ref": {
+      "path": "evidence/independent-summary.json",
+      "raw_sha256": "sha256:be85da929588b5b52ce8f35f2a3241e3629ea6f67a840a3c1caa1b9d304a1ddb"
+    }
+  }
+}

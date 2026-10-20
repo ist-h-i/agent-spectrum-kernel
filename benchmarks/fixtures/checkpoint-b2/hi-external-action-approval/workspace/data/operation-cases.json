@@ -1,0 +1,170 @@
+[
+  {
+    "case_id": "rollout-exact",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-exact-7",
+    "now": 100
+  },
+  {
+    "case_id": "rollout-general",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-general",
+    "now": 100
+  },
+  {
+    "case_id": "rollout-other-service",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-other-service",
+    "now": 100
+  },
+  {
+    "case_id": "rollout-other-env",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-other-env",
+    "now": 100
+  },
+  {
+    "case_id": "rollout-other-params",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-other-params",
+    "now": 100
+  },
+  {
+    "case_id": "rollout-old-state",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-old-state",
+    "now": 100
+  },
+  {
+    "case_id": "rollout-expired",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-expired",
+    "now": 100
+  },
+  {
+    "case_id": "rollout-used",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-used",
+    "now": 100
+  },
+  {
+    "case_id": "rollout-pending",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-pending",
+    "now": 100
+  },
+  {
+    "case_id": "rollout-missing",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-missing",
+    "now": 100
+  },
+  {
+    "case_id": "rollout-at-expiry",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-exact-7",
+    "now": 200
+  },
+  {
+    "case_id": "reconfigured-rollout",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 4,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-exact-7",
+    "now": 100
+  }
+]

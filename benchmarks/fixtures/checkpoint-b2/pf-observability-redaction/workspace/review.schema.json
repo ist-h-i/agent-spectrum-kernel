@@ -1,0 +1,120 @@
+{
+  "type": "object",
+  "required": [
+    "decision",
+    "findings",
+    "verification"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "decision": {
+      "enum": [
+        "request_changes",
+        "approve",
+        "comment"
+      ]
+    },
+    "findings": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "required": [
+          "issue_kind",
+          "severity",
+          "affected_paths",
+          "evidence"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "issue_kind": {
+            "enum": [
+              "diagnostic_loss",
+              "sensitive_data_exposure"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "affected_paths": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "event_type",
+                "request_id",
+                "outcome",
+                "status",
+                "duration_ms",
+                "method",
+                "route_template",
+                "error.code",
+                "headers",
+                "body",
+                "user",
+                "error.message",
+                "error.stack",
+                "raw_path"
+              ]
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "path",
+                "line"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "line": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "required": [
+        "state",
+        "commands"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "passed",
+            "failed",
+            "not_run"
+          ]
+        },
+        "commands": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "npm test",
+              "npm run trace",
+              "npm run validate:review"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

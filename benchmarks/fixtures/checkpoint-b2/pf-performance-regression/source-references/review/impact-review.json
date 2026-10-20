@@ -1,0 +1,31 @@
+{
+  "reviewer_record_id": "performance-impact-independent-review-final-02c527f6-20261012",
+  "fixture_id": "pf-performance-regression",
+  "reviewed_head": "02c527f64d8fc9b3e19a117d328e8100d2dafb10",
+  "decision": "approve",
+  "judgment": "unknown_classification_approved",
+  "impact_band": "unknown",
+  "impact_weight": null,
+  "impact_evidence_status": "insufficient_evidence",
+  "impact_evidence_ids": [],
+  "practice_weighted_aggregate_eligible": false,
+  "reason": "Actual elapsed timings on fictional workloads demonstrate only local relative cost. No real project/customer incident, latency budget, operational burden or engineering rework is measured. Large local speedup, locality and risk none do not establish a positive empirical impact band; frequency cannot replace impact evidence.",
+  "reviewed_refs": [
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/lineage.md",
+      "bytes": 620,
+      "raw_sha256": "sha256:72d7a636d591b426ff88bf681294c054e3730b10954964f1ed3349c35ddeb33e"
+    },
+    {
+      "path": "benchmarks/fixtures/checkpoint-b2/pf-performance-regression/source-references/node-perf-hooks-docs-20261012.md",
+      "bytes": 612,
+      "raw_sha256": "sha256:6d60901cfeac4ff263667e729c51fe5911dc8804081c0044f69f8d3cfc31d1a1"
+    },
+    {
+      "path": "benchmarks/portfolio-lineage-policy.json",
+      "bytes": 6039,
+      "raw_sha256": "sha256:295f2837da063cf8b2f009c303768bf83d7adc4642ec3a38b9d90158889dc88d"
+    }
+  ],
+  "scope": "Separate unknown impact review only, without positive empirical band, fixture admission or frozen catalog base aggregate change."
+}

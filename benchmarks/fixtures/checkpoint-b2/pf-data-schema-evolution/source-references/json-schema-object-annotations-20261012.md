@@ -1,0 +1,3 @@
+# Public documented pattern
+Checked 2026-10-12: https://json-schema.org/understanding-json-schema/reference/object and https://json-schema.org/understanding-json-schema/reference/annotations
+JSON Schema documents separately declared required properties, the handling of extra properties, and default as an annotation that does not insert missing data during validation. These concepts motivate a local authored backward-compatible field evolution and explicit migration/rollback. The fixture uses a documented limited validator subset and fictional records, not a complete validator, real migrations or operational frequency/impact evidence. No documentation example code or private business data is copied.

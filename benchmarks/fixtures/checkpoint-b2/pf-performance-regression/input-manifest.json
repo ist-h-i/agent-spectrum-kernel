@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "pf-performance-regression": {
+      "class": "performance_investigation_implementation",
+      "difficulty": "hard",
+      "target_minutes": 45,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "5cc8c8ea485e46b9931006a75ccc7cbf9ba971e915757ae7737c167df87d8465",
+          "bytes": 1679
+        },
+        {
+          "path": "workspace/data/measurement-config.json",
+          "sha256": "39c99ef4f2862e8a3bbff704d95d96e216ea66482c977468a54d5f11df33fa94",
+          "bytes": 366
+        },
+        {
+          "path": "workspace/docs/lookup-contract.md",
+          "sha256": "95ff21fa7c5fb4486b692b0516a35e4d2ab56d79e64d31ecd0392220a969a374",
+          "bytes": 2734
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "5f9aaa8750bc6a5c6966526f363b3d076b38c0b5ba22d599130103d31cf8ae20",
+          "bytes": 225
+        },
+        {
+          "path": "workspace/reference/scan-lookup.mjs",
+          "sha256": "a29942b5523324e7f05b5f72901e31bebfd6fdce776401970c1b51da56772eff",
+          "bytes": 527
+        },
+        {
+          "path": "workspace/scripts/generate-data.mjs",
+          "sha256": "86c05e9d5a1cd67ae7984edb5f2bbdc27c34ca266653b5552fbbd1cdad68a2c3",
+          "bytes": 512
+        },
+        {
+          "path": "workspace/scripts/measure-lookup.mjs",
+          "sha256": "3a0b6d74951510e6109770e99236eaa8db676ef799cdf0617e051accf16ae34d",
+          "bytes": 2756
+        },
+        {
+          "path": "workspace/src/event-lookup.mjs",
+          "sha256": "a29942b5523324e7f05b5f72901e31bebfd6fdce776401970c1b51da56772eff",
+          "bytes": 527
+        },
+        {
+          "path": "workspace/test/event-lookup.test.mjs",
+          "sha256": "338bcd006cc6c30bb7190053141bbc7620ff051dc3cfb18af370cef765cfdd30",
+          "bytes": 3988
+        }
+      ]
+    }
+  }
+}

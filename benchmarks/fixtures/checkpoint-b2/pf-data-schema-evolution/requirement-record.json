@@ -1,0 +1,68 @@
+{
+  "requirement_record_id": "requirement-record-pf-data-schema-evolution",
+  "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+  "requirement_record_path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/requirement-record.json",
+  "fixture_id": "pf-data-schema-evolution",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+  "admission_record_digest": "sha256:ab693c558b054efe88063fa1376fbeb438245bafe748c3bd81f2c4ed48c0b538",
+  "requirements": [
+    {
+      "requirement_id": "schema-evolution-correctness",
+      "requirement_kind": "weighted",
+      "max_points": 5,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "schema-evolution-basis"
+      ],
+      "mutation_ids": [
+        "remove-schema-evolution-evidence"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-schema-evolution"
+      ],
+      "finding_group_id": "schema-evolution-correctness-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:c55c12623187fb249722433b0692bf6b211ed512dc42c76428ac37a2852fbfc0"
+    },
+    {
+      "requirement_id": "request-scope-discipline",
+      "requirement_kind": "weighted",
+      "max_points": 3,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "focused-change-boundary"
+      ],
+      "mutation_ids": [
+        "remove-focused-scope-evidence"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-focused-change"
+      ],
+      "finding_group_id": "request-scope-discipline-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:70504f5d45b3c26f08412adbdf582593c870b42a9227ce21a43dc8478e8f7155"
+    },
+    {
+      "requirement_id": "verification-evidence",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "repository-verification-route"
+      ],
+      "mutation_ids": [
+        "remove-verification-route"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-focused-verification"
+      ],
+      "finding_group_id": "verification-evidence-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:48bfd71c2c8142417f225d5751fb88e3c57aa18fd6865a8fdde366082ca25afd"
+    }
+  ],
+  "requirement_set_digest": "sha256:3df2fa7febd8bbd601d95c1e3796024b005d3ce134e9179502e8e88dab7cf711",
+  "requirement_record_digest": "sha256:1dfc6d00abac101e638266fb300783cad36f35aad49e539d925a25362116daac"
+}

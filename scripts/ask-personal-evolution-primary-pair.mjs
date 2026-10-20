@@ -11,17 +11,17 @@ import { exportPrimaryEvaluationGradingRequest, isPrimaryEvaluationGradingAdapte
 import { verifyPrimaryEvaluationProducer, primaryProducerSources } from "./ask-primary-evaluation-producer.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { verifyPortfolioScoringRootLineage } from "./ask-benchmark-evaluator-boundary.mjs";
-import { primaryScoringRoot } from "./ask-primary-scoring-version.mjs";
+import { primaryScoringRoot, readPrimaryScoringVersion } from "./ask-primary-scoring-version.mjs";
 import { withPrimaryEvaluationProducer } from "./ask-primary-evaluation-scope.mjs";
 import { validatePortfolioEngineeringResult } from "./ask-benchmark-portfolio-score.mjs";
-import { buildPrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
+import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS, assertPrimaryFixtureInventory, primaryFixtureIdsForSet } from "./ask-primary-fixture-recipe.mjs";
 import { inspectPersonalEvolution } from "./ask-personal-evolution.mjs";
 import { verifyPersonalPromptMaterialization } from "./ask-personal-prompt-materialization.mjs";
 import { computeEvolutionArtifactInventoryDigest, deriveEvolutionRecommendation } from "./evolution-loop.mjs";
 import { assertPersonalEvolutionFields, freezePersonalEvolutionValue } from "./ask-personal-evolution-observation.mjs";
 import { publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
 import { PRIMARY_GRADING_RESERVATION_MS } from "./ask-primary-evaluation-grading.mjs";
-import { PRIMARY_BATCH_LIMITS } from "./ask-primary-evaluation-batch.mjs";
+import { PRIMARY_BATCH_LIMITS, primaryBatchLimitsForSet } from "./ask-primary-evaluation-batch.mjs";
 import { verifyPortfolioSelection } from "./portfolio-manager.mjs";
 
 const raw = path => readStableFile(path, "personal pair public evidence", 33554432).bytes;
@@ -49,9 +49,51 @@ function controllerSources() {
   }
   return Object.fromEntries(Object.entries(source).sort(([a], [b]) => a.localeCompare(b)));
 }
-function limitsFor(count) {
-  return { overall_timeout_ms: Math.ceil(PRIMARY_BATCH_LIMITS.overall_timeout_ms * 2 * count / 9),
-    token_budget: PRIMARY_BATCH_LIMITS.token_budget * 2 * count / 9, retries: 0, resume: "forbidden", concurrency: 1 };
+export function validatePersonalEvolutionFixtureSelection(ids, fixtureSet = "legacy9") {
+  primaryFixtureIdsForSet(fixtureSet);
+  if (fixtureSet === "catalog24") assertPrimaryFixtureInventory(ids, fixtureSet);
+  else assert.ok(Array.isArray(ids) && ids.length > 0 && ids.length <= 9 && new Set(ids).size === ids.length
+    && ids.every(id => PRIMARY_FIXTURE_IDS.includes(id)), "closed primary fixture population only");
+  return fixtureSet;
+}
+// Public resource identity checks only. The original factory still owns private
+// authority/admission validation; valid metadata cannot grant execution authority.
+export function validatePersonalEvolutionEvaluationSelection(evaluation, ids) {
+  const fixtureSet = validatePersonalEvolutionFixtureSelection(ids, Object.hasOwn(evaluation, "fixtureSet") ? evaluation.fixtureSet : "legacy9");
+  if (fixtureSet !== "catalog24") return fixtureSet;
+  const selector = evaluation.scoringVersion;
+  assertPersonalEvolutionFields(selector, ["path", "digest"], "catalog24 requires a fixed v7 selector");
+  assert.equal(comparisonHash(raw(selector.path)), selector.digest, "catalog24 scoring selector changed");
+  const manifest = json(selector.path);
+  assert.equal(manifest.kind, "ask_primary_scoring_version_v7", "catalog24 requires v7");
+  assert.equal(manifest.fixture_set, "catalog24", "catalog24 selector inventory required");
+  assertPersonalEvolutionFields(evaluation.gradingResources, roles, "separate role resources");
+  const configs = roles.map(role => {
+    const ref = evaluation.gradingResources[role];
+    assertPersonalEvolutionFields(ref, ["path", "digest"], "fixed role grading resource reference");
+    assert.equal(comparisonHash(raw(ref.path)), ref.digest, "configured grading resource template drift");
+    const config = json(ref.path);
+    assertPersonalEvolutionFields(config, ["kind", "output_root", "fixtures"], "grading resource metadata");
+    assert.equal(config.kind, "ask_primary_grading_resources_v1");
+    assertPrimaryFixtureInventory(Object.keys(config.fixtures).sort(), fixtureSet);
+    return config;
+  });
+  assert.notEqual(evaluation.gradingResources.baseline.path, evaluation.gradingResources.challenger.path, "separate role grading configurations required");
+  assert.ok(equal(configs[0].fixtures, configs[1].fixtures), "role grading fixed asset maps differ");
+  for (const id of ids) {
+    const selected = readPrimaryScoringVersion(selector, id, { verifyResourceFiles: true });
+    const expected = { frozenSourceRoot: selected.root, ...selected.fixture.resource };
+    for (const config of configs) assert.ok(equal(config.fixtures[id], expected), `catalog24 role resource differs from v7 selection: ${id}`);
+  }
+  return fixtureSet;
+}
+export function personalEvolutionPairLimits(count, fixtureSet = "legacy9") {
+  primaryFixtureIdsForSet(fixtureSet);
+  assert.ok(Number.isSafeInteger(count) && (fixtureSet === "catalog24" ? count === primaryFixtureIdsForSet(fixtureSet).length : count > 0 && count <= 9),
+    "closed primary fixture population only");
+  const batch = fixtureSet === "catalog24" ? primaryBatchLimitsForSet(fixtureSet) : PRIMARY_BATCH_LIMITS;
+  return { overall_timeout_ms: fixtureSet === "catalog24" ? batch.overall_timeout_ms * 2 : Math.ceil(batch.overall_timeout_ms * 2 * count / 9),
+    token_budget: fixtureSet === "catalog24" ? batch.token_budget * 2 : batch.token_budget * 2 * count / 9, retries: 0, resume: "forbidden", concurrency: 1 };
 }
 function outputBoundary(outputRoot, storeRoot, bindings, existing) {
   assert.equal(resolve(outputRoot), outputRoot); assert.equal(realpathSync(dirname(outputRoot)), dirname(outputRoot));
@@ -143,6 +185,14 @@ function context(options) {
 }
 export function describePersonalEvolutionPromptPair(options) {
   const ctx = context(options), bindings = {};
+  const fixtureSet = validatePersonalEvolutionFixtureSelection(ctx.experiment.protocol.fixture_ids, Object.hasOwn(options, "fixtureSet") ? options.fixtureSet : "legacy9");
+  if (fixtureSet === "catalog24") {
+    const first = options.blocks?.baseline?.[0];
+    validatePersonalEvolutionEvaluationSelection({ fixtureSet, scoringVersion: first?.grading?.scoring_version,
+      gradingResources: Object.fromEntries(roles.map(role => [role, options.blocks?.[role]?.[0]?.grading?.resources])) }, ctx.experiment.protocol.fixture_ids);
+    for (const role of roles) for (const block of options.blocks[role])
+      assert.ok(equal(block.grading.scoring_version, first.grading.scoring_version), "catalog24 scoring selector differs across role/task");
+  }
   for (const role of roles) {
     assert.ok(Array.isArray(options.blocks?.[role]) && options.blocks[role].length > 0);
     bindings[role] = options.blocks[role].map(block => capture(ctx, role, block)).sort((a, b) => a.fixture_id.localeCompare(b.fixture_id));
@@ -150,7 +200,6 @@ export function describePersonalEvolutionPromptPair(options) {
   }
   assert.equal(ctx.experiment.protocol.repetitions, 1, "single-shot pair has one preregistered repetition");
   const all = roles.flatMap(role => bindings[role]);
-  assert.ok(bindings.baseline.length <= 9, "closed primary fixture population only");
   assert.equal(new Set(all.map(item => item.config.evidence_kind)).size, 1, "observed/synthetic pair mixing forbidden");
   assert.equal(new Set(all.map(item => item.run_id)).size, all.length, "distinct fresh role runs required");
   assert.equal(new Set(all.map(item => item.block.root)).size, all.length);
@@ -181,7 +230,8 @@ export function describePersonalEvolutionPromptPair(options) {
   for (let i = 0; i < bindings.baseline.length; i++) assert.ok(equal(parity(bindings.baseline[i]), parity(bindings.challenger[i])), "pair task/criterion/runtime/budget mismatch");
   for (let i = 0; i < bindings.baseline.length; i++) assert.equal(bindings.baseline[i].cost_policy ?? null,
     bindings.challenger[i].cost_policy ?? null, "pair baseline/challenger cost policy mismatch");
-  return freezePersonalEvolutionValue({ bindings, producer_sources: primaryProducerSources(), controller_sources: controllerSources(),
+  return freezePersonalEvolutionValue({ ...(fixtureSet === "catalog24" ? { fixture_set: fixtureSet } : {}),
+    bindings, producer_sources: primaryProducerSources(), controller_sources: controllerSources(),
     evidence_kind: all[0].config.evidence_kind, candidate_digest: ctx.candidate.candidate_digest,
     experiment_digest: ctx.experiment.experiment_digest, comparison_scope: "fresh_parent_candidate_full_ask_with_P_K_F_context",
     formal_aggregate_eligible: false, models_started: false });
@@ -217,7 +267,7 @@ export function sealPersonalEvolutionPromptPair(options) {
   const body = { kind: lifecyclePlans ? "personal_pre_result_prompt_pair_v2" : "personal_pre_result_prompt_pair_v1",
     ...(lifecyclePlans ? { lifecycle_plan_object_digests: lifecyclePlans } : {}), preparation_object_digest: options.preparationObjectDigest,
     experiment_object_digest: options.experimentObjectDigest, description, output_root: options.outputRoot,
-    limits: limitsFor(count), authority_implied: false };
+    limits: personalEvolutionPairLimits(count, description.fixture_set), authority_implied: false };
   const registration = { ...body, pair_digest: canonicalDigest(body) };
   return freezePersonalEvolutionValue({ registration, object_digest: putContentAddressedJson({ storeRoot: options.storeRoot, artifact: registration }).digest,
     status: "NOT_RUN", recommendation: "insufficient_evidence", quality: null, authority_implied: false });
@@ -233,10 +283,10 @@ function registered(options) {
   assert.equal(options.preparationObjectDigest, registration.preparation_object_digest);
   assert.equal(options.experimentObjectDigest, registration.experiment_object_digest);
   const blocks = Object.fromEntries(roles.map(role => [role, registration.description.bindings[role].map(item => item.block)]));
-  const ctx = context(options), description = describePersonalEvolutionPromptPair({ ...options, blocks });
+  const ctx = context(options), description = describePersonalEvolutionPromptPair({ ...options, blocks, fixtureSet: registration.description.fixture_set ?? "legacy9" });
   if (v2) pinnedLifecyclePlans(ctx, registration.lifecycle_plan_object_digests);
   assert.ok(equal(description, registration.description), "pair pre-result bindings/source drift");
-  assert.ok(equal(registration.limits, limitsFor(description.bindings.baseline.length)), "pair derived limits drift");
+  assert.ok(equal(registration.limits, personalEvolutionPairLimits(description.bindings.baseline.length, description.fixture_set)), "pair derived limits drift");
   outputBoundary(registration.output_root, options.storeRoot, description.bindings, true);
   return { ...ctx, registration, blocks };
 }

@@ -21,7 +21,7 @@ jobs:
       - name: Nine-primary-fixture personal roundtrip (fake provider/runner/grading only)
         run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-primary-loop.mjs
       - name: Personal user command loop and resume (fake dispatch only)
-        run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-unattended-policy.mjs scripts/test-ask-personal-evolution-unattended.mjs
+        run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-cli-catalog24.mjs scripts/test-ask-personal-evolution-unattended-policy.mjs scripts/test-ask-personal-evolution-unattended.mjs
       - name: Personal candidate generation adapter (fake transport only)
         run: node --test scripts/test-ask-personal-evolution-codex-generation.mjs
       - name: Personal source reviewer adapter (fake transport only)

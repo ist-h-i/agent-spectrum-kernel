@@ -18,6 +18,13 @@ Mac / Codex の導入で得られるものは、プロジェクト内の判断�
 生成要求のIDから未開始、終了不明、候補登録済み、保留を読み取り専用で確認できます。
 開始印を保持して次の扱いを示し、実生成・評価・適用の完了や権限は補いません。
 
+[既存24課題の公開入力点検](docs/primary-24-public-inputs.md) は、同じbenchmark入口から
+24件の列挙・入力準備・再検証と、不足理由・未評価の72枠の保存を行います。
+公開入力・契約・portfolio登録は24件で、primary evaluation batchは明示`catalog24`で72枠を準備できます。
+個人ループCLIも明示`catalog24`で両roleの24件を選択します。既定は従来9件内の選択を維持し、
+全24件のprivate採点・native受入は別途必要です。
+[24課題の組立・採点検証状況](docs/primary-24-task-assembly.md) に課題別の完成作業を記録します。
+
 [既存9課題で個人ループを一巡する手順](docs/personal-evolution-primary-loop.md) は、
 候補・比較条件の事前固定、保存結果の受渡し、独立した採否判断と次の要求を接続します。
 公開検証は fake provider/runner/grading による人工の保留経路で、実運用の成功は未確認です。

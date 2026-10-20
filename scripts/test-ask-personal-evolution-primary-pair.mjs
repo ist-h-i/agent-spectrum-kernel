@@ -14,7 +14,8 @@ import { buildEvolutionExperiment, publishEvolutionExperiment, computePromptV2Ex
   buildEvolutionHumanDecision, publishEvolutionHumanDecision } from "./evolution-loop.mjs";
 import { buildPersonalPromptMaterialization, personalPromptInput } from "./ask-personal-prompt-materialization.mjs";
 import { applyPersonalEvolutionLoopPortfolioAction } from "./ask-personal-evolution-driver.mjs";
-import { describePersonalEvolutionPromptPair, sealPersonalEvolutionPromptPair, verifyPersonalEvolutionPromptPairResults, startPersonalEvolutionPromptPair } from "./ask-personal-evolution-primary-pair.mjs";
+import { describePersonalEvolutionPromptPair, sealPersonalEvolutionPromptPair, verifyPersonalEvolutionPromptPairResults, startPersonalEvolutionPromptPair,
+  personalEvolutionPairLimits, validatePersonalEvolutionFixtureSelection } from "./ask-personal-evolution-primary-pair.mjs";
 import { preparePersonalEvolutionSavedResultActions, finishPersonalEvolutionSavedResultNoop } from "./ask-personal-evolution-saved-results.mjs";
 import { comparisonHash, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 import { readUserComparisonPlan, userCodexInvocation } from "./ask-user-comparison.mjs";
@@ -25,7 +26,7 @@ import { prepareAggregateV2FileFixture } from "./test-ask-benchmark-portfolio-ag
 import { withPrimaryEvaluationProducer } from "./ask-primary-evaluation-scope.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { primaryScoringRoot } from "./ask-primary-scoring-version.mjs";
-import { buildPrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
+import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS, CANONICAL_PRIMARY_FIXTURE_IDS } from "./ask-primary-fixture-recipe.mjs";
 
 import { setup, blocksFor, collectSyntheticTerminal, fakeEngineeringTemplate, collectSyntheticGrade, bindSyntheticRoleGrading } from "./test-helpers-personal-evolution-primary-pair.mjs";
 
@@ -36,6 +37,23 @@ const write = (path, value) => { mkdirSync(dirname(path), { recursive: true }); 
 const assetRef = record => Object.fromEntries(["asset_type", "stable_id", "version", "record_digest", "content_digest"].map(key => [key, record[key]]));
 const ref = publication => Object.fromEntries(["portfolio_id", "revision", "manifest_digest", "asset_set_digest"].map(key => [key, publication[key]]));
 const inventory = root => listContentAddressedJson({ storeRoot: root }).map(item => item.digest);
+
+test("personal catalog24 fixes its complete inventory and reserves both original batch budgets", () => {
+  assert.equal(validatePersonalEvolutionFixtureSelection(CANONICAL_PRIMARY_FIXTURE_IDS, "catalog24"), "catalog24");
+  assert.equal(validatePersonalEvolutionFixtureSelection(["mn-build-option-update"]), "legacy9");
+  for (const ids of [CANONICAL_PRIMARY_FIXTURE_IDS.slice(1), [...CANONICAL_PRIMARY_FIXTURE_IDS].reverse(), PRIMARY_FIXTURE_IDS])
+    assert.throws(() => validatePersonalEvolutionFixtureSelection(ids, "catalog24"));
+  assert.throws(() => validatePersonalEvolutionFixtureSelection(CANONICAL_PRIMARY_FIXTURE_IDS));
+  assert.throws(() => validatePersonalEvolutionFixtureSelection(["pf-review-error-contract"]));
+  assert.throws(() => validatePersonalEvolutionFixtureSelection(PRIMARY_FIXTURE_IDS, "unknown"));
+  assert.throws(() => validatePersonalEvolutionFixtureSelection(PRIMARY_FIXTURE_IDS, null));
+  assert.deepEqual(personalEvolutionPairLimits(24, "catalog24"), { overall_timeout_ms: 1224000000,
+    token_budget: 240000000, retries: 0, resume: "forbidden", concurrency: 1 });
+  assert.equal(personalEvolutionPairLimits(9).overall_timeout_ms, 604800000);
+  assert.equal(personalEvolutionPairLimits(9).token_budget, 90000000);
+  for (const count of [0, 1, 9, 23, 25]) assert.throws(() => personalEvolutionPairLimits(count, "catalog24"));
+  assert.throws(() => personalEvolutionPairLimits(24));
+});
 
 
 test("new registration aligns before freeze with explicit trust; unstarted fresh pair is NOT_RUN/hold", t => {

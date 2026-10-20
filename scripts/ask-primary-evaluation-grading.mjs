@@ -7,8 +7,8 @@ import { canonicalDigest, parseJsonRejectDuplicateKeys } from './content-address
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { comparisonHash } from './ask-user-comparison-prepare.mjs';
 import { readUserComparisonPlan, reportUserComparison } from './ask-user-comparison.mjs';
-import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
-import { producePrimaryEvaluationArtifacts } from './ask-primary-evaluation-producer.mjs';
+import { buildPrimaryFixtureRecipe, primaryFixtureIdsForSet, isRegisteredPrimaryFixtureId } from './ask-primary-fixture-recipe.mjs';
+import { producePrimaryEvaluationArtifacts, normalizePrimaryRuntimeObservationCarrier } from './ask-primary-evaluation-producer.mjs';
 import { preflightPrimaryEvaluationGradingResources, runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
 
 import { primaryScoringRoot, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
@@ -67,7 +67,7 @@ function publicReadoutAuthority(fixtureId, root) {
 function publicBinding(block, loaded, root) {
   const { plan, plan_digest } = loaded;
   assert.equal(loaded.root, resolve(block.root), 'controller root substitution');
-  assert.ok(PRIMARY_FIXTURE_IDS.includes(block.fixture_id), 'unknown primary fixture');
+  assert.ok(isRegisteredPrimaryFixtureId(block.fixture_id), 'unknown primary fixture');
   assert.equal(plan.policy.execution_contract, 'single_shot_v1', 'grading export requires single_shot_v1');
   const profile = primaryProfileForKernel(plan.config.kernel_condition);
   assert.deepEqual(Object.keys(plan.arms).sort(), [...profile.conditions].sort(), 'actual condition IDs required');
@@ -297,7 +297,9 @@ function loadResources(path, expectedDigest, root) {
   const resources = parse(raw);
   assert.deepEqual(Object.keys(resources).sort(), ['kind', 'output_root', 'fixtures'].sort());
   assert.equal(resources.kind, 'ask_primary_grading_resources_v1');
-  assert.deepEqual(Object.keys(resources.fixtures).sort(), [...PRIMARY_FIXTURE_IDS].sort());
+  const ids = Object.keys(resources.fixtures).sort();
+  const fixtureSet = ids.length === primaryFixtureIdsForSet('catalog24').length ? 'catalog24' : 'legacy9';
+  assert.deepEqual(ids, [...primaryFixtureIdsForSet(fixtureSet)].sort(), 'complete registered grading resource inventory required');
   assert.equal(resolve(resources.output_root), resources.output_root);
   assert.equal(realpathSync(dirname(resources.output_root)), dirname(resources.output_root));
   assert.ok(!existsSync(resources.output_root), 'grading output already exists');
@@ -364,12 +366,15 @@ export function createPrimaryEvaluationGradingAdapter({ root = ROOT, resourcesPa
         mkdirSync(configuration.output_root, { recursive: true, mode: 0o700 }); mkdirSync(output, { mode: 0o700 });
         const produced = await producePrimaryEvaluationArtifacts(block, join(output, 'producer'));
         const producerOptions = { recordRoot: produced.output_root, externalDigest: produced.external_digest };
+        const runtimeObservationRoot = block.fixture_id === 'pf-performance-regression' ? join(output, 'runtime-observations') : null;
+        if (runtimeObservationRoot) normalizePrimaryRuntimeObservationCarrier(producerOptions, { observationRoot: runtimeObservationRoot });
         const conditions = [];
         for (const condition of profile.conditions) {
           assert.ok(!signal?.aborted);
           const privateEvaluationRoot = join(output, `private-${condition}`); mkdirSync(privateEvaluationRoot, { mode: 0o700 });
           started = true;
           const graded = runPrimaryEvaluationPrivateGrading(producerOptions, { ...resource, condition,
+            ...(runtimeObservationRoot ? { runtimeObservationRoot } : {}),
             privateEvaluationRoot, publicResultRoot: join(output, `public-${condition}`) },
           { signal, deadlineAtMs: deadline_at_ms });
           conditions.push(graded);

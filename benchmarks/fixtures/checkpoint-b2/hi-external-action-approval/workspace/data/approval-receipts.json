@@ -1,0 +1,137 @@
+[
+  {
+    "receipt_id": "receipt-exact-7",
+    "status": "approved",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 200,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "receipt_id": "receipt-general",
+    "status": "approved",
+    "action": "maintenance",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 200,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "receipt_id": "receipt-other-service",
+    "status": "approved",
+    "action": "rollout",
+    "service": "fictional-other",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 200,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "receipt_id": "receipt-other-env",
+    "status": "approved",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "production",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 200,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "receipt_id": "receipt-other-params",
+    "status": "approved",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "other-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 200,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "receipt_id": "receipt-old-state",
+    "status": "approved",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "expires_at": 200,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "receipt_id": "receipt-expired",
+    "status": "approved",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 100,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "receipt_id": "receipt-used",
+    "status": "approved",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 200,
+    "single_use": true,
+    "used": true
+  },
+  {
+    "receipt_id": "receipt-pending",
+    "status": "pending",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 200,
+    "single_use": true,
+    "used": false
+  }
+]

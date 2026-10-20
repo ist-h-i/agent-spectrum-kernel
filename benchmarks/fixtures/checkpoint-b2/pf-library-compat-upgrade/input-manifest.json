@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "pf-library-compat-upgrade": {
+      "class": "dependency_migration",
+      "difficulty": "hard",
+      "target_minutes": 45,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "9bd5fb4ce2660b02e5e3d2ce55aeb8b0631c74e790962143e590428500dea2ee",
+          "bytes": 1916
+        },
+        {
+          "path": "workspace/config/migration-settings.json",
+          "sha256": "c94849ae6c817d5668934c106460e5d266e4218985b0bf8067c2c095efd0fa7f",
+          "bytes": 86
+        },
+        {
+          "path": "workspace/data/compatibility-matrix.json",
+          "sha256": "4237f8f1f9a61f52da74f745e9f1a112e99498af84ca9cb677edbcc257e13936",
+          "bytes": 566
+        },
+        {
+          "path": "workspace/docs/migration-contract.md",
+          "sha256": "9142068da0c8b675efe826639ff780856021155cbdc5a51a2e1d8c67885521f6",
+          "bytes": 2950
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "efddca87cfde435a8389073ab4d746330efcd05f8be38535c3ffbe53f56ee639",
+          "bytes": 297
+        },
+        {
+          "path": "workspace/scripts/check-rollback.mjs",
+          "sha256": "1e47d9b4f880336564a20e6f9c20df68aeec3d42c0397ee0106d718c60805a92",
+          "bytes": 945
+        },
+        {
+          "path": "workspace/scripts/validate-migration.mjs",
+          "sha256": "d2cc29b3ab631189f96f9ac6a0ea42530dff946f0cb75e3cfac04349d18972ca",
+          "bytes": 1190
+        },
+        {
+          "path": "workspace/src/archive-compat.mjs",
+          "sha256": "521955dc1918de9262e14f8395985fa715b4feb8b1e945b9bab052ef5128b91c",
+          "bytes": 358
+        },
+        {
+          "path": "workspace/test/archive-compat.test.mjs",
+          "sha256": "493f898c2c92b522a82ba50142c29bd65802dcd24b93b833ab4731b0f9960a42",
+          "bytes": 3448
+        },
+        {
+          "path": "workspace/vendor/archive-v1.mjs",
+          "sha256": "032b624c513fe482b8571ec9b190214db8f721ff2f2f395427a2b75773cbc18c",
+          "bytes": 523
+        },
+        {
+          "path": "workspace/vendor/archive-v2.mjs",
+          "sha256": "49f30a5d94c58d535f6ba4c8e7cf32a09fa726f13199a64d2765ac5b850d058e",
+          "bytes": 692
+        }
+      ]
+    }
+  }
+}

@@ -6,8 +6,9 @@ import {tmpdir} from 'node:os';
 import {dirname,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {preparePrimaryEvaluation} from './ask-primary-evaluation-prepare.mjs';
-import {PRIMARY_FIXTURE_IDS} from './ask-primary-fixture-recipe.mjs';
+import {PRIMARY_FIXTURE_IDS,CANONICAL_PRIMARY_FIXTURE_IDS} from './ask-primary-fixture-recipe.mjs';
 import {comparisonHash} from './ask-user-comparison-prepare.mjs';
+import {syntheticV7ScoringVersion} from './test-helpers-primary-evaluation-v7.mjs';
 import {inspectUserComparison,readUserComparisonPlan,reportUserComparison} from './ask-user-comparison.mjs';
 import {exportPrimaryEvaluationGradingRequest} from './ask-primary-evaluation-grading.mjs';
 import {PRIMARY_PRINCIPLES_V2_EVALUATION_PROFILE_ID} from './ask-primary-evaluation-profile.mjs';
@@ -34,6 +35,7 @@ test('native nine-task preparation selects actual v2 identity and keeps all 27 s
       assert.equal(plan.config.kernel_condition,'kernel_principles_v2');assert.equal(plan.kernel_definition.generation.id,'kernel_principles_v2');
       assert.equal(plan.kernel_definition.assessment.task_class,plan.verification.recipe.runner_task_class);
       assert.equal(plan.kernel_definition.renderer_closure.length,3);
+      assert.equal(plan.kernel_definition.renderer_closure[0].digest,"sha256:233b592aae5fd44738f9b36e593768314a1feb5f7faa865582a59daba9763799");
       assert.equal(inspectUserComparison(block.root).execution.start_consumed,false);
       const report=reportUserComparison(block.root);assert.ok(report.slots.every(s=>s.state==='not_started'));
       assert.equal(report.summary.supplied_notes.kernel_condition,'kernel_principles_v2');
@@ -57,4 +59,29 @@ test('native nine-task preparation selects actual v2 identity and keeps all 27 s
     assert.throws(()=>v1Conditions('kernel_principles_v2'));
     assert.deepEqual(comparisonConditions('kernel_only'),['plain','kernel_only','full_ask']);
   }finally{rmSync(area,{recursive:true,force:true});}
+});
+
+
+test('explicit catalog24 v7 preparation uses real public task inputs and leaves 72 unstarted slots',t=>{
+ const area=realpathSync(mkdtempSync(join(tmpdir(),'ask-primary24-k2-native-')));
+ try{
+  const inputs=join(area,'public');mkdirSync(inputs);
+  for(const id of CANONICAL_PRIMARY_FIXTURE_IDS){
+   const source=join(ROOT,'benchmarks/fixtures/checkpoint-b2',id),manifest=JSON.parse(readFileSync(join(source,'input-manifest.json')));
+   for(const entry of manifest.fixtures[id].files){const target=join(inputs,id,entry.path);mkdirSync(dirname(target),{recursive:true});writeFileSync(target,readFileSync(join(source,entry.path)));}
+  }
+  const version=syntheticV7ScoringVersion(t,{fixtureIds:CANONICAL_PRIMARY_FIXTURE_IDS,fixtureSet:'catalog24'});
+  const prepared=preparePrimaryEvaluation(inputs,{output:join(area,'prepared'),evidenceKind:'synthetic',fixtureSet:'catalog24',scoringVersionPath:version.selector.path,scoringVersionDigest:version.selector.digest});
+  assert.equal(prepared.model_calls,0);assert.equal(prepared.start_consumed,false);assert.equal(prepared.status,'blocked');
+  assert.equal(prepared.manifest.fixture_set,'catalog24');assert.deepEqual(prepared.manifest.blocks.map(block=>block.fixture_id),CANONICAL_PRIMARY_FIXTURE_IDS);
+  assert.equal(prepared.slots.length,72);assert.ok(prepared.slots.every(slot=>slot.state==='not_started'&&slot.quality===null&&slot.capability.status==='available'));
+  for(const block of prepared.manifest.blocks){const plan=readUserComparisonPlan(block.root).plan;assert.equal(plan.config.task_class,plan.verification.recipe.runner_task_class);assert.equal(plan.kernel_definition.assessment.task_class,plan.config.task_class);assert.equal(inspectUserComparison(block.root).execution.start_consumed,false);const exported=exportPrimaryEvaluationGradingRequest(block).request;assert.equal(exported.binding.fixture_id,block.fixture_id);assert.ok(exported.slots.every(slot=>slot.quality===null));}
+  for(const block of prepared.manifest.blocks){assert.deepEqual(block.grading.scoring_version,version.selector);assert.equal(block.grading.binding.scoring_input_freeze_digest,comparisonHash(readFileSync(join(version.runtime,'benchmarks/fixtures/checkpoint-b2',block.fixture_id,'scoring-input-freeze-manifest.json'))));}
+  const added=prepared.manifest.blocks.find(block=>block.fixture_id==='hi-authorization-exception');
+  const plan=readUserComparisonPlan(added.root).plan,extension=plan.kernel_definition.renderer_closure.at(-1);
+  assert.equal(extension.source_path,'scripts/kernel-principles-v2-catalog24.mjs');
+  const path=join(added.root,extension.path),original=readFileSync(path);writeFileSync(path,'drift');
+  assert.throws(()=>readUserComparisonPlan(added.root));writeFileSync(path,original);
+  assert.equal(inspectUserComparison(added.root).execution.start_consumed,false);
+ }finally{rmSync(area,{recursive:true,force:true});}
 });

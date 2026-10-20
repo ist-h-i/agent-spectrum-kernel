@@ -1,0 +1,77 @@
+{
+  "$schema": "./schemas/portfolio-config.schema.json",
+  "schema_version": "3.0.0",
+  "program": "adaptive_ask_portfolio",
+  "protocol_path": "benchmarks/protocol-adaptive.md",
+  "protocol_status": "foundation",
+  "conditions": [
+    {
+      "id": "plain",
+      "role": "context_baseline",
+      "instruction_surface": "fixture context without ASK"
+    },
+    {
+      "id": "kernel_only",
+      "role": "default_product",
+      "instruction_surface": "canonical Kernel only"
+    },
+    {
+      "id": "adaptive_ask",
+      "role": "primary_product",
+      "instruction_surface": "Kernel plus pre-result evidence-selected mechanisms"
+    },
+    {
+      "id": "full_ask",
+      "role": "diagnostic_maximum",
+      "instruction_surface": "full selected adapter profile"
+    }
+  ],
+  "adapter_tracks": [
+    {
+      "id": "codex",
+      "runtime_status": "unverified"
+    },
+    {
+      "id": "claude",
+      "runtime_status": "unverified"
+    }
+  ],
+  "pool_adapter_results": false,
+  "fixture_root": "benchmarks/fixtures/checkpoint-b2",
+  "fixtures": [
+    {
+      "id": "pf-data-schema-evolution",
+      "suite": "practice_frequency",
+      "task_class": "implementation_verification",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/input-manifest.json",
+      "input_manifest_sha256": "391d06c142ff90c5a4aaf811d551cbe62b87490db9499da77db3fecfc89d03b4",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/verification-command-contract.json",
+        "sha256": "e7d18974dcfe0f704490570c1a9a8cb29c301e84d43d27b1569b92fe7cc6e8f8"
+      }
+    }
+  ],
+  "ordering": {
+    "strategy": "seeded_balanced_rotation",
+    "condition_count": 4
+  },
+  "execution_plan": {
+    "schema_path": "benchmarks/schemas/execution-plan.schema.json",
+    "schema_version": "1.2.0"
+  },
+  "adaptive_selection": {
+    "schema_path": "benchmarks/schemas/adaptive-selection.schema.json",
+    "must_precede_result": true,
+    "digest_algorithm": "sha256"
+  },
+  "privacy": {
+    "store_raw_prompts": false,
+    "store_full_outputs": false,
+    "store_full_event_streams": false,
+    "store_full_source": false,
+    "store_secrets_customer_or_personal_data": false
+  }
+}

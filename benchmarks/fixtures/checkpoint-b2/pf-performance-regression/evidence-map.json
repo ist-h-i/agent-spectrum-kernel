@@ -1,0 +1,84 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "pf-performance-regression",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/src/event-lookup.mjs"
+    ],
+    "required_candidate_paths": [
+      "workspace/src/event-lookup.mjs"
+    ],
+    "protected_candidate_paths": [
+      "workspace/data/measurement-config.json",
+      "workspace/docs/lookup-contract.md",
+      "workspace/package.json",
+      "workspace/reference/scan-lookup.mjs",
+      "workspace/scripts/generate-data.mjs",
+      "workspace/scripts/measure-lookup.mjs",
+      "workspace/test/event-lookup.test.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "unrecognized_candidate_meaning": "manual_review_required",
+    "authority_digest": "sha256:eb7fbd3f4c4fd413046f2894864806c64d45a43293effc912d84f5c11103c1d7"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "performance-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/data/measurement-config.json",
+        "workspace/docs/lookup-contract.md",
+        "workspace/package.json",
+        "workspace/reference/scan-lookup.mjs",
+        "workspace/scripts/generate-data.mjs",
+        "workspace/scripts/measure-lookup.mjs",
+        "workspace/src/event-lookup.mjs",
+        "workspace/test/event-lookup.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "focused-change-boundary",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/docs/lookup-contract.md"
+      ]
+    },
+    {
+      "evidence_map_id": "repository-verification-route",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/data/measurement-config.json",
+        "workspace/docs/lookup-contract.md",
+        "workspace/package.json",
+        "workspace/reference/scan-lookup.mjs",
+        "workspace/scripts/generate-data.mjs",
+        "workspace/scripts/measure-lookup.mjs",
+        "workspace/test/event-lookup.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-performance-evidence",
+      "target_evidence_map_id": "performance-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:b1f88d45a8074d74391bee6c03dac5cb8727cf8a876d9aaa9aa78bc5708b4c61"
+    },
+    {
+      "mutation_id": "remove-focused-scope-evidence",
+      "target_evidence_map_id": "focused-change-boundary",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:227548c36e68cb13b062b3c913d259f9ec4ea038bdb4fbe005a06872841f86c8"
+    },
+    {
+      "mutation_id": "remove-verification-route",
+      "target_evidence_map_id": "repository-verification-route",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:8fca2df10f99916ef1213decd13ecb5466ed6de7b2dab044af88c27b833ccda9"
+    }
+  ]
+}

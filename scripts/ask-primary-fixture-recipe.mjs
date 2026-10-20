@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
+import { PRIMARY_FIXTURE_REGISTRY } from "./ask-primary-fixture-registry.mjs";
 import { validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
 
 export const PRIMARY_RECIPE_KIND = "ask_primary_fixture_recipe_v1";
@@ -13,16 +14,30 @@ export const PRIMARY_FIXTURE_IDS = Object.freeze([
   "mp-accessibility-interaction-review", "mp-frontend-state-review", "mp-iac-rollback-design",
   "mp-performance-investigation", "mn-build-option-update", "mn-doc-config-correction",
 ]);
+// Historical nine-task records keep their exact order. New preparations may select
+// the canonical catalog inventory explicitly; arbitrary subsets are never authority.
+export const CANONICAL_PRIMARY_FIXTURE_IDS = Object.freeze(PRIMARY_FIXTURE_REGISTRY.map(row => row[0]));
+export function primaryFixtureIdsForSet(fixtureSet = "legacy9") {
+  assert.ok(["legacy9", "catalog24"].includes(fixtureSet), "unknown primary fixture set");
+  return fixtureSet === "catalog24" ? CANONICAL_PRIMARY_FIXTURE_IDS : PRIMARY_FIXTURE_IDS;
+}
+export const isRegisteredPrimaryFixtureId = fixtureId => CANONICAL_PRIMARY_FIXTURE_IDS.includes(fixtureId);
+export function assertPrimaryFixtureInventory(ids, fixtureSet = "legacy9") {
+  assert.deepEqual(ids, primaryFixtureIdsForSet(fixtureSet), "complete registered primary fixture set required in fixed order");
+  return primaryFixtureIdsForSet(fixtureSet);
+}
 const hash = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const parse = bytes => parseJsonRejectDuplicateKeys(bytes.toString("utf8"));
 const SOURCE = fileURLToPath(new URL("../", import.meta.url));
 const CLASSES = Object.freeze({ review_verification: "review", pr_review: "review",
   handoff_resume: "handoff", design_gate: "design", investigation: "investigation",
-  verification_only: "implementation", configuration: "implementation", documentation: "trivial" });
+  verification_only: "implementation", configuration: "implementation", documentation: "trivial", local_implementation: "implementation", local_bug_fix: "implementation",
+  small_feature: "implementation", implementation_verification: "implementation", investigation_implementation: "implementation",
+  dependency_migration: "implementation", implementation_review: "review", operation_boundary: "design", migration_design: "design" });
 
 /** Exact existing public command bytes, scoped to the unchanged fixture layout. */
 export function buildPrimaryFixtureRecipe(fixtureId, { root = SOURCE } = {}) {
-  assert.ok(PRIMARY_FIXTURE_IDS.includes(fixtureId), "unknown primary fixture");
+  assert.ok(isRegisteredPrimaryFixtureId(fixtureId), "unknown primary fixture");
   const base = join(root, "benchmarks/fixtures/checkpoint-b2", fixtureId);
   const read = name => readFileSync(join(base, `${name}.json`));
   const inputBytes = read("input-manifest"), commandBytes = read("verification-command-contract");
@@ -44,6 +59,7 @@ export function buildPrimaryFixtureRecipe(fixtureId, { root = SOURCE } = {}) {
       cwd: "workspace", contract_command_digest: command.command_contract_digest };
   });
   assert.equal(new Set(checks.map(check => check.id)).size, checks.length);
+  assert.ok(CLASSES[metadata.task_class], "primary task class has no existing runner mapping");
   return { kind: PRIMARY_RECIPE_KIND, fixture_id: fixtureId, task_class: metadata.task_class,
     runner_task_class: CLASSES[metadata.task_class], input_manifest_digest: hash(inputBytes),
     command_contract_raw_digest: hash(commandBytes), command_contract_digest: commands.contract_digest,

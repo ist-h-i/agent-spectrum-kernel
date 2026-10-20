@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "hi-authorization-exception",
+  "fixture_input_digest": "sha256:b5e1aeb49f71d8fde3e58f553b93e57b73beda92c44dc713b89f6959b1de0592",
+  "commands": [
+    {
+      "command_id": "authorization-exception-validation",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"base/authorization.mjs\":\"d309499d88e4a26a07eb2c213cf4f94d124af02a70b989ad45dedcf3274783ab\",\"data/access-cases.json\":\"75a02b0d0eec26816cbe04820b3a04d55142a810f31a8cff62b8d38c9f5ad93b\",\"docs/ownership-contract.md\":\"9e4e640a30fda00d28d99116d6a38a3af59d3e5d0da4453c47386845cfd686f7\",\"package.json\":\"5183d1b158e0d43e6d5775193b40dd8dceb57238f864240092bb14736008e7eb\",\"pr.diff\":\"6cd8938c1c4e2126b0c555f87b85ee80dd3a65f497056fc82b4b171ea19a2de5\",\"review.schema.json\":\"ccb9b5e08df42f1c1ec4a6184cefceeb63d6141fadbf0cd390597a14d2a83914\",\"scripts/trace-access.mjs\":\"613d2d77bed0831a111f4d5a6c4f519d06b2c39b7d23987aca2259388c1ee3ae\",\"scripts/validate-review.mjs\":\"9486039537e4924edc142709a3bcebbaa0236652bcb55daf690be1f164487475\",\"src/authorization.mjs\":\"1513a26035db0002c4c4cbfb19a5b353d8fbf08095bae1cedd18b63c6222c721\",\"test/access-subset.test.mjs\":\"997710eb46664ada0f764cbe8a320943ec53acb8d7c235de32afe6cc25164528\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm test && npm run trace && npm run validate:review",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:eef4003473ef14e60e72d8d024476d9e418bb1869b1f2c9648e6f5a3e41b3ea4",
+      "rendered_event_command_digest": "sha256:a0a94579313d587830146ee5c7a80a4ec12f72c83e0cd54d9f18d6b231c8529e",
+      "command_contract_digest": "sha256:5856fa088ada8981cae0f66eb1769d754676f2335b96891aa67e850b0ce8ef8b"
+    }
+  ],
+  "contract_digest": "sha256:14ebc316b9d4c9117b137134d096442f6822cf55ceb938af300ecdc8c52517d0"
+}

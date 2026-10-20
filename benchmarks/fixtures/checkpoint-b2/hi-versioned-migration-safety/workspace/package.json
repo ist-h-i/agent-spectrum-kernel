@@ -1,0 +1,13 @@
+{
+  "name": "fictional-versioned-migration",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "dry-run": "node scripts/dry-run.mjs",
+    "validate:plan": "node scripts/validate-plan.mjs"
+  }
+}

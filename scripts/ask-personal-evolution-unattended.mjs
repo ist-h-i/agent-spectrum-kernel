@@ -7,7 +7,7 @@ import { canonicalDigest, readStableBytes, parseJsonRejectDuplicateKeys, readCon
 import { publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
 import { comparisonHash } from "./ask-user-comparison-prepare.mjs";
 import { executeCodexSession } from "./codex-exec-runner.mjs";
-import { PRIMARY_BATCH_LIMITS } from "./ask-primary-evaluation-batch.mjs";
+import { personalEvolutionPairLimits, validatePersonalEvolutionFixtureSelection } from "./ask-personal-evolution-primary-pair.mjs";
 
 const ROOT = resolve(import.meta.dirname, ".."), ACTIONS = ["retain_current", "revise_candidate", "insufficient_evidence", "reject_candidate"];
 const json = path => parseJsonRejectDuplicateKeys(readStableBytes(path, "unattended input").toString("utf8"));
@@ -134,8 +134,6 @@ export async function runUnattendedPersonalEvolution(options, command) {
   try { mkdirSync(lock, { mode: 0o700 }); } catch (error) { if (error.code === "EEXIST") return { status: "needs_action", reason: "run_in_progress_or_interrupted" }; throw error; }
   const deadline = fixed.startedAtMs + policy.maxDurationMs, summaries = [];
   const invoke = args => command(args, { deadlineAtMs: deadline });
-  const count = profile.blueprint.evaluation_scope.fixture_ids.length;
-  const tokens = PRIMARY_BATCH_LIMITS.token_budget * 2 * count / 9, duration = Math.ceil(PRIMARY_BATCH_LIMITS.overall_timeout_ms * 2 * count / 9);
   let cycle;
   const allowedAction = state => {
     const pair = snapshot(join(cycle, "pair.json")), experiment = read(profile, pair.input.experimentObjectDigest);
@@ -144,6 +142,10 @@ export async function runUnattendedPersonalEvolution(options, command) {
     return mapping[0];
   };
   try {
+    const count = profile.blueprint.evaluation_scope.fixture_ids.length;
+    const fixtureSet = validatePersonalEvolutionFixtureSelection(profile.blueprint.evaluation_scope.fixture_ids,
+      profile.evaluation && Object.hasOwn(profile.evaluation, "fixtureSet") ? profile.evaluation.fixtureSet : "legacy9");
+    const limits = personalEvolutionPairLimits(count, fixtureSet), tokens = limits.token_budget, duration = limits.overall_timeout_ms;
     for (let index = 1; index <= policy.maxCycles; index++) {
       cycle = join(output, `cycle-${index}`);
       const complete = existsSync(join(cycle, "completion.json"));

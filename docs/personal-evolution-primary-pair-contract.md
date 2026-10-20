@@ -19,7 +19,7 @@ Skill Asset、unrendered template、非Codex bundle、空/非UTF8のrendered fil
 3. 作成・適用の両入口でRegistryが旧baselineの子孫であること、candidate評価履歴がnot_evaluatedであること、high-impact別経路でないことを公開前に再検査する。自己digestと外部pinだけを計画作成手順の実施証拠にしない。独立したalignment object pinと **全体が一致する** 外部Portfolio authority contextsを受け、`applyPersonalEvolutionBaselineAlignment` を使う。runtime trustを返却metadataから自動生成しない。旧heads・Asset bytes・globalポインタは変更しない。CASは非transactionalなので、停止時も承認済みimmutable lock/selection metadataが残る場合がある。
 4. aligned baselineをparent/rollbackとして同じobservationからfresh prepを作る。既存 `buildEvolutionExperiment/publishEvolutionExperiment` を使い、固定roles、実code commit/tree、CLI/model、task scope、採点policy、repetition=1、recommendation/action mappingを事前固定する。各formal task classにはそのclassのexact pre-result eligible selectionが必要。
 5. 各role/fixtureに既存 `prepareUserComparison` の `personalPrompt` optionを渡す。closed fieldsは `storeRoot,registrySnapshotDigest,asset,entrypoint,trustedAssetAuthorityContexts`。task inputは先頭にそのまま保ち、登録済み公開bundleの全UTF8ファイルをentrypoint優先・残りpath順・pathラベル付きでF stdinへ渡す。control snapshotだけを全bundleが渡った証拠にしない。P/K inputは従来のtask入力。実際のmodel read/効果/因果関係はUnknown。
-6. `sealPersonalEvolutionPromptPair` は未開始の1–9既存fixtureを受け、fresh run/plan/source/input/criteria/role Asset/materialization/selection/runtime/予算/controller code closureを結ぶ。旧結果後の固定を拒否。全rolesはobservedかsyntheticのどちらかに統一する。登録を独立pinし、後からbindingを再解釈しない。
+6. `sealPersonalEvolutionPromptPair` は既定で未開始の1–9既存fixture、明示`fixtureSet:"catalog24"`では正本順24件を受け、fresh run/plan/source/input/criteria/role Asset/materialization/selection/runtime/予算/controller code closureを結ぶ。catalog24はv7 selectorと両roleの完全24件resource mapを照合し、descriptionへ集合を固定する。旧結果後の固定を拒否。全rolesはobservedかsyntheticのどちらかに統一する。登録を独立pinし、後からbindingを再解釈しない。
 
 観測実行のseedは独立`.git` directoryが必要でworktree `.git` file/alternatesを拒否する。`git clone --no-local --no-hardlinks`等の独立copyを使い、条件workspace・public入力・CAS・producer/grading/outputを開発領域と分離する。共通Git refs/prune/cleanupを共有しない。既存runnerのworkspace制限とpath検査はOS単位の完全隔離ではなく、親controllerやglobal指示/CLIの差を消さない。差を記録し、実際に影響する解釈のみ限定する。private evaluator/正解を公開Prompt sourceへ入れない。
 
@@ -34,6 +34,10 @@ Skill Asset、unrendered template、非Codex bundle、空/非UTF8のrendered fil
 | 1 | 2 / 6 | 18時間40分 | 10M tokens |
 | 3 | 6 / 18 | 56時間 | 30M tokens |
 | 9 | 18 / 54 | 168時間 | 90M tokens |
+| 明示catalog24 | 48 / 144 | 340時間 | 240M tokens |
+
+catalog24は既存24件batchの170時間／120Mを両role分予約する。無人実行の開始判断も
+同じ`personalEvolutionPairLimits`を使い、従来9件式を24件へ暗黙延長しない。
 
 これはstart間のadmission予算で、モデルproviderの厳密な課金上限を保証しない。既知tokens下限と全child+採点時間reservationを確認する。未知usage、global指示、CLI差を隠さない。
 

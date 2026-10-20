@@ -10,6 +10,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   rmSync,
   statSync,
@@ -165,6 +166,9 @@ function help() {
   console.log(`Usage: node scripts/ask-benchmark.mjs <command> [options]
 
 Commands:
+  list-primary-inputs [--output <absent-report.json>]
+  prepare-primary-inputs --output <absent-directory>
+  verify-primary-inputs --input <prepared-directory> [--output <absent-report.json>]
   validate [--config <config.json>]
   validate-portfolio-catalog [--catalog <catalog.json>] [--similarity <similarity.json>]
   validate-portfolio-policy [--policy-manifest <manifest.json>] [--admission-policy <policy.json>] [--scoring-policy <policy.json>] [--lineage-policy <policy.json>]
@@ -1274,7 +1278,19 @@ function verifyLegacyCalibrationMigrationCommand(args) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) try {
   const args = parseArgs(process.argv.slice(2));
-  if (args.command === "validate") {
+  if (["list-primary-inputs", "prepare-primary-inputs", "verify-primary-inputs"].includes(args.command)) {
+    const { inspectPrimaryPublicInputs, preparePrimaryPublicInputs, verifyPrimaryPublicInputs } = await import("./ask-primary-evaluation-prepare.mjs");
+    if (args.command === "prepare-primary-inputs" && !args.output) throw new Error("prepare-primary-inputs requires --output absent-directory");
+    if (args.command === "verify-primary-inputs" && !args.input) throw new Error("verify-primary-inputs requires --input prepared-directory");
+    if (args.command === "verify-primary-inputs" && args.output && (args.output === args.input || args.output.startsWith(`${args.input}/`))) throw new Error("verification report must be outside prepared input");
+    const report = args.command === "list-primary-inputs" ? inspectPrimaryPublicInputs()
+      : args.command === "prepare-primary-inputs" ? preparePrimaryPublicInputs(args.output) : verifyPrimaryPublicInputs(args.input);
+    const raw = `${JSON.stringify(report, null, 2)}\n`;
+    if (args.output && args.command !== "prepare-primary-inputs" && realpathSync(dirname(args.output)) !== dirname(args.output)) throw new Error("canonical report parent required");
+    if (args.output && args.command !== "prepare-primary-inputs") writeFileSync(args.output, raw, { flag: "wx", mode: 0o600 });
+    console.log(raw.trimEnd());
+    if (args.command !== "list-primary-inputs" && report.fixtures.some(row => !["valid", "prepared"].includes(row.public_input_status))) process.exitCode = 2;
+  } else if (args.command === "validate") {
     validateProtocol(args.configPath);
     validatePortfolioPolicyArtifacts();
     validatePortfolioDesignAdmissionArtifacts();

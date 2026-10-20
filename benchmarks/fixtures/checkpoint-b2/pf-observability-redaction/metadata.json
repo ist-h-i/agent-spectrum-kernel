@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "pf-observability-redaction",
+  "fixture_role": "primary",
+  "suite": "practice_frequency",
+  "task_class": "implementation_review",
+  "domain": "observability_security",
+  "difficulty": "medium_hard",
+  "repetitions": 3,
+  "risk_boundary": "security_boundary",
+  "capability_families": [
+    "data_minimization",
+    "review_precision"
+  ],
+  "evidence_topologies": [
+    "observability_signals",
+    "review_diff_and_tests"
+  ],
+  "outcome_dimensions": [
+    "data_minimization",
+    "operational_safety"
+  ],
+  "output_contract_type": "findings_producing",
+  "requirement_record_id": "requirement-record-pf-observability-redaction",
+  "output_contract_id": "output-contract-pf-observability-redaction",
+  "evaluator_bundle_id": "evaluator-2d79614c5539592e380bedf63596702b09b0693cbd0e1baa4cc1ad7ebb71bf78",
+  "evaluator_bundle_digest": "sha256:50340952358b206888f8be588e120f6d0d33897547fc5f652a27912b7e06c1d4",
+  "evaluator_byte_count": 396988,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:277f5477d50743e2413992d1786100c5866d6574ba2d149b03556548c95c13cd"
+}
