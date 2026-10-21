@@ -53,7 +53,7 @@ node scripts/ask-personal-evolution-cli.mjs result --cycle /absolute/saved-run/c
 
 ## 4. 次サイクルへ引き継ぐ
 
-完了receiptと不足した証拠・次の問題を確認し、新しい公開用要約と未使用の保存先を用意します。次の`next`は新しい要求をローカルに作る操作で、モデルを開始する操作ではありません。元のreceiptや結果は残します。
+完了receiptと不足した証拠・次の問題を確認し、新しい公開用要約と未使用の保存先を用意します。次の`next`は新しい要求をローカルに作る操作で、モデルを開始する操作ではありません。元のreceiptや結果は残しますが、固定CASへの追加書込みと元cycleの表示cache更新を伴います。原本を保全する場合は、実行前に独立した準備先と書込み範囲を確認してください。
 
 ```sh
 node scripts/ask-personal-evolution-cli.mjs next --cycle /absolute/saved-run/cycle-1 --output /absolute/new-cycle --problem /absolute/next-public-problem.txt
@@ -61,7 +61,7 @@ node scripts/ask-personal-evolution-cli.mjs next --cycle /absolute/saved-run/cyc
 
 この入口は完了したno-opまたは対応する候補棄却receiptを前提にします。次requestが準備されたことと、次サイクルが実行されたことは別です。新しい生成・比較の開始は別途条件と本人の直接指示を確認し、[CLIの次サイクル手順](personal-evolution-cli.md#user-procedure)に従います。既存`run`の範囲・問題を変える場合は新runとして扱います。
 
-保存済み`run-main-1`では、次のreceipt参照はありますが、次requestの作成も次サイクル開始も確認されていません。今回の資料作成でも実行しません。
+`run-main-1`の元終端記録では、次requestは未作成でした。2026-10-21の受入では原本を保持し、独立先でC1 receiptを引き継ぐ次requestを`prepared / NOT_RUN`まで確認しました。旧source・採点版のpinは維持され、次サイクルの生成・比較は未開始です。旧requestやprofileを書き換えて現在sourceの実行へ流用しないでください。今回の文書作業では実行しません。
 
 ## 失敗・中断したとき
 
@@ -76,4 +76,4 @@ node scripts/ask-personal-evolution-cli.mjs next --cycle /absolute/saved-run/cyc
 
 正常な応答消失からの継続と、消費済みで終端不明の処理の再試行は違います。`run --output`は読取り専用ではなく、残る許可済み処理を進め得ます。先に保存状態を確認し、[既存run手順](personal-evolution-unattended.md#configuration-and-one-shot-procedure)の条件を満たす場合だけ扱います。拒否されたnative検証・モデル実行を、隔離外や設定変更でやり直す手順は提供しません。
 
-継続運用・停止復旧の最終受入はA5.4/A3.1の確認待ちです。このガイドが存在することをその受入成功としません。
+原本の再読込・次request準備と、限定された模擬停止・復旧回帰は確認済みです。準備専用の復旧入口は生成完了と既存source承認を前提とし、比較の全枠が未開始の準備だけを扱います。消費済みの比較や終端不明の処理は保守的に拒否します。最終source/profileのOperational判断や、上記の実次サイクル終端・軽量bypass・採用時の実target適用は、[範囲案の残作業](personal-v1-release-preparation-ja.md#既存v1目標に照らした残作業)に分けて残します。強制host障害や子孫/provider停止を保証する手順ではありません。
