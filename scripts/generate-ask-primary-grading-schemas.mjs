@@ -188,8 +188,22 @@ export function generatePrimaryEvaluationV8Schemas({ check = false, root = ROOT 
     else writeFileSync(path, bytes, {flag:'wx'});
   }
 }
+export function generatePrimaryEvaluationV9Schemas({ check = false, root = ROOT } = {}) {
+  for (const prefix of ['primary','primary-k2']) for (const name of ['portfolio-command-evidence','normalized-portfolio-result','evaluator-result-envelope','portfolio-engineering-result']) {
+    const value = JSON.parse(readFileSync(resolve(root, `benchmarks/schemas/${prefix}-saved-v8-${name}.schema.json`)));
+    function select(item) {
+      if (!item || typeof item !== 'object') return;
+      if (item.const === '1.11.0-primary-saved') item.const = '1.12.0-primary-saved';
+      for (const child of Object.values(item)) select(child);
+    }
+    select(value); value.title += ' (explicit finite discovery processing v9)';
+    const path = resolve(root, `benchmarks/schemas/${prefix}-saved-v9-${name}.schema.json`), bytes = Buffer.from(JSON.stringify(value,null,2)+'\n');
+    if (check) { if (!readFileSync(path).equals(bytes)) throw new Error(`stale primary v9 schema: ${name}`); }
+    else writeFileSync(path, bytes, {flag:'wx'});
+  }
+}
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const generate = process.argv.includes('--evaluation-v8') ? generatePrimaryEvaluationV8Schemas : process.argv.includes('--evaluation-v7') ? generatePrimaryEvaluationV7Schemas : process.argv.includes('--command-evidence-v6') ? generatePrimaryCommandEvidenceV6Schemas : process.argv.includes('--command-evidence-v5') ? generatePrimaryCommandEvidenceV5Schemas : process.argv.includes('--command-evidence-v4') ? generatePrimaryCommandEvidenceV4Schemas : process.argv.includes('--command-evidence-v3') ? generatePrimaryCommandEvidenceV3Schemas
+  const generate = process.argv.includes('--evaluation-v9') ? generatePrimaryEvaluationV9Schemas : process.argv.includes('--evaluation-v8') ? generatePrimaryEvaluationV8Schemas : process.argv.includes('--evaluation-v7') ? generatePrimaryEvaluationV7Schemas : process.argv.includes('--command-evidence-v6') ? generatePrimaryCommandEvidenceV6Schemas : process.argv.includes('--command-evidence-v5') ? generatePrimaryCommandEvidenceV5Schemas : process.argv.includes('--command-evidence-v4') ? generatePrimaryCommandEvidenceV4Schemas : process.argv.includes('--command-evidence-v3') ? generatePrimaryCommandEvidenceV3Schemas
     : process.argv.includes('--command-evidence-v2') ? generatePrimaryCommandEvidenceV2Schemas : generatePrimaryGradingSchemas;
   generate({ check: process.argv.includes('--check') }); console.log('Primary grading schemas verified');
 }
