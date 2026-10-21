@@ -90,6 +90,7 @@ jobs:
           node --test scripts/test-ask-primary-public-runtime-v2.mjs
           node --test scripts/test-ask-primary-protocol-catalog-probe.mjs
           node --test scripts/test-ask-primary-stderr-diagnostics.mjs
+          node --test scripts/test-ask-primary-sqlite-startup-diagnostics-v3.mjs
           node --test scripts/test-ask-primary-scoring-version.mjs scripts/test-ask-primary-processing-source.mjs scripts/test-ask-primary-resource-authority-writers.mjs scripts/test-ask-primary-runner-async-local-storage.mjs scripts/test-ask-primary-evaluation-private-grading.mjs scripts/test-ask-primary-evaluation-grading.mjs scripts/test-ask-benchmark-frozen-authority-modes.mjs
           node --experimental-test-module-mocks --test scripts/test-ask-primary-saved-scoring.mjs
 

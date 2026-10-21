@@ -35,12 +35,11 @@ const allowedSignal = value => ['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGH
 
 /** Raw DTOs/errors remain inside this I/O boundary; only a finite projection
  * leaves it. The existing runner owns deadline, cancellation and group cleanup. */
-export async function collectPrimaryCatalogProtocol(invocation, { spawnProcess, runtime = {}, timeoutMs = 60000, signal } = {}) {
+async function collectCatalogProtocolWithDiagnostics(invocation, { spawnProcess, runtime = {}, timeoutMs = 60000, signal } = {}, stderr, version) {
   assert.ok(Number.isSafeInteger(timeoutMs) && timeoutMs > 0 && timeoutMs <= 60000);
   const controller = new AbortController();
   let channel, stage = 0, failure = null, bytes = 0, lines = 0;
   let stdout = Buffer.alloc(0), advertised = null, hasMore = false;
-  const stderr = createPrimaryStderrDiagnostics();
   const sent = [], received = [];
   const stop = reason => { failure ??= reason; controller.abort(); };
   const abort = () => stop('interrupted');
@@ -112,14 +111,22 @@ export async function collectPrimaryCatalogProtocol(invocation, { spawnProcess, 
   // Drop every raw stream/reference and every arbitrary child error/metadata.
   stdout = Buffer.alloc(0);
   const diagnostics = stderr.summary();
-  return { kind: 'ask_primary_catalog_observation_v2', status: observed ? 'observed' : 'unavailable', reason: failure,
+  return { kind: version === 3 ? 'ask_primary_catalog_observation_v3' : 'ask_primary_catalog_observation_v2', status: observed ? 'observed' : 'unavailable', reason: failure,
     sent: sent.map(index => ({ method: CATALOG_REQUESTS[index].method, ...(CATALOG_REQUESTS[index].id ? { id: CATALOG_REQUESTS[index].id } : {}) })),
-    replies: received, output_bytes: bytes, output_lines: lines, known_path_warning_count: diagnostics.path_alias_warning_count, stderr_diagnostics: diagnostics,
+    replies: received, ...(version === 2 ? { output_bytes: bytes, output_lines: lines } : { stdout_lines: lines }), known_path_warning_count: diagnostics.path_alias_warning_count, stderr_diagnostics: diagnostics,
     spawn_observed: result.spawnObserved === true, exit_code: Number.isInteger(result.exitCode) && result.exitCode >= 0 && result.exitCode <= 255 ? result.exitCode : null,
     signal: allowedSignal(result.signal), error_code: allowedError(result.error?.code), termination: terminated,
     elapsed_ms: Number.isFinite(result.durationMs) && result.durationMs >= 0 ? Math.ceil(result.durationMs) : null,
     settings: SETTINGS.map((value, index) => ({ ...value, status: observed && advertised[index] ? 'advertised' : 'not_observed' })),
     catalog_has_more: observed ? hasMore : null, model_calls: 0, runtime_attestation: 'unknown', scoring_authority: false };
+}
+
+export function collectPrimaryCatalogProtocol(invocation, options) {
+  return collectCatalogProtocolWithDiagnostics(invocation, options, createPrimaryStderrDiagnostics(), 2);
+}
+export async function collectPrimarySqliteCatalogProtocolV3(invocation, references, options) {
+  const {createPrimarySqliteStderrDiagnosticsV3} = await import('./ask-primary-sqlite-startup-diagnostics-v3.mjs');
+  return collectCatalogProtocolWithDiagnostics(invocation, options, createPrimarySqliteStderrDiagnosticsV3(references), 3);
 }
 
 function pin(path, max = 512 * 1024 * 1024) {
