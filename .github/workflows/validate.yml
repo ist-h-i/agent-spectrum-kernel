@@ -110,6 +110,12 @@ jobs:
           diff -u docs/fixtures/adapter-runtime-bundle.json "$RUNNER_TEMP/ask-expected-runtime-bundle.json"
           exit 1
 
+      - name: Verify bounded full-target streaming snapshots (artificial only)
+        run: node --test scripts/test-target-snapshot-streaming.mjs
+
+      - name: Rehearse parent rollback and return to pre-install absence (artificial only)
+        run: node --test scripts/test-personal-prompt-preinstall-return.mjs
+
       - name: Run synthetic JSON pilot fake-only regressions
         run: node --test scripts/test-ask-synthetic-json-pilot.mjs
 
