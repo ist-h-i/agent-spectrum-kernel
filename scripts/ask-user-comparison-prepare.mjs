@@ -1,4 +1,5 @@
 // Exploratory user-repository preparation. This module never starts Codex.
+import assert from 'node:assert/strict';
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { preparationGitOperation } from "./ask-preparation-git-diagnostic.mjs";
@@ -14,7 +15,8 @@ import { KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } fr
 import { comparisonConditions, isKernelPrinciplesCondition } from "./ask-comparison-conditions.mjs";
 import { KERNEL_PRINCIPLES_V2_ID, renderKernelPrinciplesV2 } from "./kernel-principles-v2.mjs";
 import {kernelPrinciplesV2FixtureDescriptor, principlesV2Capability, kernelPrinciplesV2DescriptorSourcePaths} from "./kernel-principles-v2-catalog24.mjs";
-import { isPrimaryFixtureRecipe, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
+import { buildPrimaryFixtureRecipe, isPrimaryFixtureRecipe, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
+import { PRIMARY_EXECUTION_INPUT_CONTRACT, buildPrimaryExecutionInputContract, renderPrimaryExecutionInputBoundary } from './ask-primary-execution-input.mjs';
 import { buildPersonalPromptMaterialization, personalPromptInput } from "./ask-personal-prompt-materialization.mjs";
 
 const SOURCE = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
@@ -330,6 +332,15 @@ function sourceDistribution() {
   return { manifest, corePaths, projection, extra, allPaths, supplementDigest: comparisonHash(supplementBytes) };
 }
 
+// Re-derived only from fixed public fixture bytes and this source-owned Full
+// distribution. No caller-supplied auxiliary root/file is opened or admitted.
+export function derivePreparedPrimaryExecutionInput(plan) {
+  const recipe = buildPrimaryFixtureRecipe(plan.verification.recipe.fixture_id);
+  return buildPrimaryExecutionInputContract(plan, { recipe,
+    manifestBytes: readRegular(join(SOURCE, 'benchmarks/fixtures/checkpoint-b2', recipe.fixture_id, 'input-manifest.json'), 'primary input authority'),
+    auxiliaryPaths: sourceDistribution().allPaths.filter(path => path !== 'AGENTS.md') });
+}
+
 function skillRecordPath(path, item, prefix) {
   if (typeof item.skill !== "string" || !NAME.test(item.skill) || !path.startsWith(`${prefix}/${item.skill}/`)) return false;
   const suffix = path.slice(`${prefix}/${item.skill}/`.length);
@@ -465,9 +476,14 @@ function kernelCapability(inventory, config) {
 
 function validateOptions(options) {
   if (!plainObject(options)) fail("options_object_required");
-  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf", "kernelCondition", "executionContract", "personalPrompt"];
+  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf", "kernelCondition", "executionContract", "personalPrompt", "primaryInputContract"];
   if (Object.keys(options).some(key => !allowed.includes(key))) fail("unknown_preparation_option");
   comparisonExecutionPolicy(options.executionContract);
+  if (options.primaryInputContract !== undefined) {
+    assert.equal(options.primaryInputContract, PRIMARY_EXECUTION_INPUT_CONTRACT, 'unknown primary input contract');
+    assert.equal(options.executionContract, SINGLE_SHOT_CONTRACT, 'closed primary input requires single-shot');
+    assert.equal(options.personalPrompt, undefined, 'closed primary input does not support personal Prompt substitution');
+  }
   for (const name of ["repo", "output"]) if (typeof options[name] !== "string" || !isAbsolute(options[name]) || resolve(options[name]) !== options[name]) fail(`absolute_${name}_required`);
   if (realpathSync(options.repo) !== options.repo || !lstatSync(options.repo).isDirectory()) fail("canonical_repository_root_required");
   if (existsSync(options.output)) fail("output_exists_use_new_run_directory");
@@ -481,7 +497,8 @@ function validateOptions(options) {
     task_class: options.taskClass ?? "implementation", global_capabilities: options.globalCapabilities ?? [], global_ask_presence: options.globalAskPresence ?? "unknown",
     evidence_kind: options.evidenceKind ?? "observed", platform: `${process.platform}/${process.arch}`,
     node_version: process.version, os_release: release(),
-    ...(options.kernelCondition === undefined ? {} : { kernel_condition: options.kernelCondition }) };
+    ...(options.kernelCondition === undefined ? {} : { kernel_condition: options.kernelCondition }),
+    ...(options.primaryInputContract === undefined ? {} : { primary_input_contract: options.primaryInputContract }) };
   comparisonConditions(config.kernel_condition);
   if (typeof config.cli_bin !== "string" || !(config.cli_bin === "codex" || isAbsolute(config.cli_bin)) || /[\u0000-\u001f\u007f]/u.test(config.cli_bin)) fail("invalid_cli_binary");
   for (const field of ["cli_version", "model", "reasoning"]) if (config[field] !== null && (typeof config[field] !== "string" || !config[field].trim() || /[\u0000-\u001f\u007f]/u.test(config[field]))) fail(`invalid_${field}`);
@@ -520,6 +537,9 @@ export function prepareUserComparison(options = {}) {
   }
   const recipe = validateRecipe(parseJson(verificationBytes, "verification"), original);
   const primaryRecipe = isPrimaryFixtureRecipe(recipe);
+  if (options.primaryInputContract !== undefined) {
+    assert.ok(primaryRecipe && isKernelPrinciplesCondition(config.kernel_condition), 'closed input contract requires authenticated primary principles recipe');
+  }
   if (primaryRecipe) validatePrimaryFixtureRecipe(recipe, original, { taskBytes, mutablePaths: mutable, taskClass: config.task_class });
   else if (["design", "handoff"].includes(config.task_class)) fail("advanced_task_class_requires_primary_fixture_recipe");
   const personalPrompt = options.personalPrompt === undefined ? null : buildPersonalPromptMaterialization(options.personalPrompt,
@@ -671,6 +691,15 @@ export function prepareUserComparison(options = {}) {
       "Non-empty root AGENTS.override.md is unsupported because it takes precedence over K/F's canonical AGENTS.md; the source override is preserved and preparation stops.",
       "Committed .agents/runs, .agent-spectrum-kernel/runtime or ask-runtime records are refused rather than copied into model input or deleted as managed assets.",
       "Preparation uses local Git and current Node installers only; Codex/model launch count is zero.", "One exploratory task cannot prove general ASK effectiveness or operational promotion."] };
+  if (options.primaryInputContract !== undefined) {
+    plan.primary_execution_input = derivePreparedPrimaryExecutionInput(plan);
+    for (const id of comparisonConditions(config.kernel_condition)) {
+      const input = Buffer.from(prompt + renderPrimaryExecutionInputBoundary(plan.primary_execution_input, id));
+      const declaration = plan.primary_execution_input.conditions[id].input;
+      assert.equal(comparisonHash(input), declaration.digest);
+      writeNew(root, declaration.path, input);
+    }
+  }
   const serialized = serializeComparisonPlan(plan), planDigest = comparisonHash(serialized);
   writeNew(root, "control/plan.json", serialized);
   writeNew(root, "control/plan.digest", Buffer.from(`${planDigest}\n`));

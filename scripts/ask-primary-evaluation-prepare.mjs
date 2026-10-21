@@ -16,17 +16,19 @@ import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { computeOutputContractDigest, computeRequirementDigest, computeRequirementRecordDigest, computeRequirementSetDigest } from "./ask-benchmark-scoring-contract.mjs";
 import { PRIMARY_FIXTURE_REGISTRY } from "./ask-benchmark-portfolio-catalog.mjs";
 import { primaryProfileForKernel } from "./ask-primary-evaluation-profile.mjs";
+import { PRIMARY_EXECUTION_INPUT_CONTRACT } from './ask-primary-execution-input.mjs';
 import { preparePrimaryEvaluationBatch, PRIMARY_GRADING_RESERVATION_MS, primaryBatchLimitsForSet } from "./ask-primary-evaluation-batch.mjs";
 
 const SOURCE = fileURLToPath(new URL("../", import.meta.url));
 const read = path => readStableFile(path, "fixed public primary input", 32 * 1024 * 1024).bytes;
 const json = path => parseJsonRejectDuplicateKeys(read(path).toString("utf8"));
-const closedOptions = ["output", "cliBin", "cliVersion", "model", "reasoning", "globalAskPresence", "evidenceKind", "gradingResourcesPath", "gradingResourcesDigest", "kernelCondition", "scoringVersionPath", "scoringVersionDigest", "fixtureSet"];
+const closedOptions = ["output", "cliBin", "cliVersion", "model", "reasoning", "globalAskPresence", "evidenceKind", "gradingResourcesPath", "gradingResourcesDigest", "kernelCondition", "scoringVersionPath", "scoringVersionDigest", "fixtureSet", "primaryInputContract"];
 const save = (path, value) => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx", mode: 0o600 });
 
 export function preparePrimaryEvaluation(publicParent, options) {
   assert.ok(options && typeof options === "object" && !Array.isArray(options));
   assert.ok(Object.keys(options).every(key => closedOptions.includes(key)), "primary preparation options are closed");
+  if (options.primaryInputContract !== undefined) assert.equal(options.primaryInputContract, PRIMARY_EXECUTION_INPUT_CONTRACT, 'unknown primary input contract');
   assert.equal(options.scoringVersionPath == null, options.scoringVersionDigest == null, "scoring version path and digest supplied together");
   const scoringVersion = options.scoringVersionPath == null ? null : { path: options.scoringVersionPath, digest: options.scoringVersionDigest };
   const fixtureSet = options.fixtureSet ?? "legacy9", fixtureIds = primaryFixtureIdsForSet(fixtureSet);
@@ -58,6 +60,7 @@ export function preparePrimaryEvaluation(publicParent, options) {
     const prepared = prepareUserComparison({ repo: seed, commit: seedCommit, taskFile: join(publicRoot, "task.md"),
       verificationFile: recipePath, output: join(output, "blocks", fixtureId), mutablePaths: recipe.mutable_paths,
       taskClass: recipe.runner_task_class, kernelCondition: profile.kernel_condition, executionContract: "single_shot_v1",
+      ...(options.primaryInputContract === undefined ? {} : { primaryInputContract: options.primaryInputContract }),
       cliBin: options.cliBin ?? "codex", cliVersion: options.cliVersion ?? null, model: options.model ?? "gpt-6.1-sol",
       reasoning: options.reasoning ?? "high", globalAskPresence: options.globalAskPresence ?? "unknown",
       evidenceKind: options.evidenceKind ?? "observed", timeoutMs: 3600000, verificationTimeoutMs: 300000,

@@ -66,6 +66,7 @@ function publicReadoutAuthority(fixtureId, root) {
 
 function publicBinding(block, loaded, root) {
   const { plan, plan_digest } = loaded;
+  assert.equal(plan.primary_execution_input, undefined, 'closed primary input processing requires a separately reviewed version');
   assert.equal(loaded.root, resolve(block.root), 'controller root substitution');
   assert.ok(isRegisteredPrimaryFixtureId(block.fixture_id), 'unknown primary fixture');
   assert.equal(plan.policy.execution_contract, 'single_shot_v1', 'grading export requires single_shot_v1');
@@ -122,7 +123,10 @@ function publicBinding(block, loaded, root) {
  * Caller fields such as grading.status/ready/admitted cannot authorize dispatch. */
 export function preflightPrimaryEvaluationGrading(block, { root = ROOT } = {}) {
   try {
-    const loaded = readUserComparisonPlan(block.root), { binding } = publicBinding(block, loaded, root);
+    const loaded = readUserComparisonPlan(block.root);
+    if (loaded.plan.primary_execution_input) return { ...notReady(['closed_primary_input_processing_unconfigured']), binding: null,
+      timeout_ms: block.grading?.timeout_ms ?? PRIMARY_GRADING_RESERVATION_MS };
+    const { binding } = publicBinding(block, loaded, root);
     return { ...notReady(['private_original_bundle_authority_unavailable', 'private_admission_review_authority_unavailable',
       'frozen_scoring_runtime_not_configured', 'private_evaluator_runtime_unverified']), binding, timeout_ms: block.grading?.timeout_ms ?? PRIMARY_GRADING_RESERVATION_MS };
   } catch {

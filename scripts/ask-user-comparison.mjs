@@ -19,7 +19,8 @@ import { acquireComparisonOwner, checkpointComparison, comparisonOwnershipDiagno
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPragmaticEvaluationReport } from "./ask-pragmatic-evaluation-report.mjs";
-import { COMPARISON_RECORD_BYTE_LIMIT, comparisonExecutionPolicy, comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, isSingleShotComparison, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
+import { COMPARISON_RECORD_BYTE_LIMIT, comparisonExecutionPolicy, comparisonHash, derivePreparedPrimaryExecutionInput, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, isSingleShotComparison, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
+import { PRIMARY_EXECUTION_INPUT_CONTRACT, primaryExecutionInputPreflight, renderPrimaryExecutionInputBoundary } from './ask-primary-execution-input.mjs';
 import { buildPrimaryFixtureRecipe, isPrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 
 export const USER_CONDITIONS = Object.freeze(["plain", "kernel_only", "full_ask"]);
@@ -157,6 +158,15 @@ export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
   assert.equal(plan.verification.path, "control/verification.json");
   assert.equal(plan.verification.reporter.path, "control/node-test-reporter.mjs");
   assert.equal(plan.verification.reporter.format, "ask_node_summary_jsonl_v1");
+  if (Object.hasOwn(plan.config, 'primary_input_contract')) {
+    assert.equal(plan.config.primary_input_contract, PRIMARY_EXECUTION_INPUT_CONTRACT);
+    assert.deepEqual(plan.primary_execution_input, derivePreparedPrimaryExecutionInput(plan), 'primary input contract changed');
+    for (const [id, condition] of Object.entries(plan.primary_execution_input.conditions)) {
+      const input = readStableFile(join(root, condition.input.path), 'primary condition input', LIMIT).bytes;
+      assert.equal(input.length, condition.input.bytes); assert.equal(comparisonHash(input), condition.input.digest);
+      assert.equal(input.toString('utf8'), plan.prompt + renderPrimaryExecutionInputBoundary(plan.primary_execution_input, id), 'primary condition prompt changed');
+    }
+  } else assert.equal(plan.primary_execution_input, undefined, 'unselected primary input contract');
   verifyPersonalPromptMaterialization({ plan, read: path => readStableFile(join(root, path), "personal Prompt input", LIMIT).bytes, hash: comparisonHash });
   if (!ignoreStart && !existsSync(join(root,"control/start.json")) && (existsSync(join(root,"control/start.digest")) || existsSync(join(root,"control/leases")) || existsSync(join(root,"control/history")))) throw fault(10,"start record missing from an existing execution; state corrupt");
   if (!ignoreStart && existsSync(join(root, "control/start.json"))) {
@@ -178,6 +188,13 @@ export function userCodexInvocation(root, plan, condition) {
   if (plan.config.model !== null) argv.push("--model", plan.config.model);
   if (plan.config.reasoning !== null) argv.push("--config", `model_reasoning_effort=${JSON.stringify(plan.config.reasoning)}`);
   argv.push("-");
+  if (plan.primary_execution_input) {
+    const selected = plan.primary_execution_input.conditions[condition];
+    const raw = readStableFile(join(root, selected.input.path), 'primary condition invocation', LIMIT).bytes;
+    assert.equal(comparisonHash(raw), selected.input.digest, 'primary invocation input changed');
+    return { executable: plan.config.cli_bin, argv, cwd: selected.launch_cwd,
+      input: raw.toString('utf8'), inputDigest: selected.input.digest, timeoutMs: plan.config.timeout_ms };
+  }
   return { executable: plan.config.cli_bin, argv, cwd: join(root, plan.arms[condition].path),
     input: condition === "full_ask" && plan.arms.full_ask.personal_prompt
       ? readStableFile(join(root, plan.arms.full_ask.personal_prompt.input_path), "personal Prompt invocation", LIMIT).bytes.toString("utf8")
@@ -195,6 +212,7 @@ export function inspectUserComparison(output) {
     cwd: "a fresh verification copy for each launched condition",
     timeout_ms: plan.config.verification_timeout_ms }, execution: inspectComparisonExecution(root, plan, loaded.plan_digest),
   limits: comparisonLimits(plan),
+  ...(plan.primary_execution_input ? { primary_execution_input: primaryExecutionInputPreflight(plan.primary_execution_input) } : {}),
   transmission: { input: "same task prompt, committed repository files, condition instructions, ordinary Codex conversation/tool context",
     provider_and_authentication: "inherited ordinary Codex configuration; not inspected by ASK; operator must confirm permission and destination before start",
     unknown: ["future tool-selected context", "resolved provider/model when not reported", "global instructions and configuration"] },
@@ -549,6 +567,7 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
     "injected fake runners require synthetic evidence; synthetic plans cannot use the real launcher");
   assert.ok(plan.config.evidence_kind === "synthetic" || verifier === executeCodexSession, "injected verifiers require synthetic evidence");
   assert.equal(confirmedDigest, plan_digest, "inspect and confirm the exact plan digest before start/resume");
+  if (plan.primary_execution_input) throw fault(9, 'closed primary execution input runtime/capture connection is unqualified; no model dispatch or start consumption');
   validateInputs(root, plan);
   const audit = inspectComparisonExecution(root, plan, plan_digest);
   if (singleShot && audit.start_consumed) throw fault(9, "single-shot start consumed or unknown; this run cannot be executed again");
@@ -626,7 +645,7 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
     checkpointComparison(context,"launch_intent",{condition:id,slot:{phase:"launch_intent",attempts:1}});
     const conditionStarted = Date.now();
     saveLaunchReceipt(root, id, "request", { condition: id, run_id: plan.run_id, plan_digest, requested_at: new Date().toISOString(),
-      executable: invocation.executable, argv: invocation.argv, cwd: invocation.cwd, prompt_digest: plan.input.digest,
+      executable: invocation.executable, argv: invocation.argv, cwd: invocation.cwd, prompt_digest: invocation.inputDigest ?? plan.input.digest,
       timeout_ms: invocation.timeoutMs, timeout_semantics:"pre-persistence ceiling; dispatch clips to the remaining overall deadline", evidence_kind: plan.config.evidence_kind });
     let value, modelDispatched=false;
     try {
