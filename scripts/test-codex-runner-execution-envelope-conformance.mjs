@@ -51,6 +51,16 @@ function assertPass(label, result) {
   assert.equal(result.status, 0, `${label} failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
 }
 
+function runnerFailureDetails(result, report) {
+  return JSON.stringify({
+    exit_status: result.status,
+    signal: result.signal,
+    error: result.error ? { code: result.error.code, message: result.error.message } : null,
+    stderr: result.stderr,
+    failures: report.failures,
+  });
+}
+
 function structuredResult(responseMarkdown, control = {}) {
   return {
     schema_version: "1.0.0",
@@ -299,12 +309,39 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 if [ -n "$ASK_FAKE_INVOCATION_PATH" ]; then printf '%s\n' "invoked" >> "$ASK_FAKE_INVOCATION_PATH"; fi
-if [ -n "$ASK_FAKE_STDIN_PATH" ]; then cat > "$ASK_FAKE_STDIN_PATH"; fi
+if [ -n "$ASK_FAKE_STDIN_PATH" ]; then cat > "$ASK_FAKE_STDIN_PATH"; else cat > /dev/null; fi
 if [ -z "$ASK_FAKE_RESULT_PATH" ]; then exit 3; fi
 cp "$ASK_FAKE_RESULT_PATH" "$output"
 `,
   );
   chmodSync(fakeCodex, 0o755);
+  // The managed runner supplies a prompt even when this fake does not capture it.
+  // Exceed pipe capacity so an early-exiting fake cannot hide an incomplete write.
+  const stdinProbeResult = resolve(fixtureRoot, "stdin-probe-result.json");
+  writeFileSync(stdinProbeResult, "{}\n");
+  for (const bytes of [64 * 1024, 1024 * 1024]) {
+    for (const capture of [false, true]) {
+      const prompt = "x".repeat(bytes);
+      const output = resolve(fixtureRoot, `stdin-probe-${bytes}-${capture}.json`);
+      const captured = resolve(fixtureRoot, `stdin-probe-${bytes}-${capture}.txt`);
+      const result = spawnSync(fakeCodex, ["exec", "--output-last-message", output], {
+        cwd: target,
+        input: prompt,
+        encoding: "utf8",
+        env: {
+          PATH: "/usr/bin:/bin",
+          ASK_FAKE_RESULT_PATH: stdinProbeResult,
+          ASK_FAKE_STDIN_PATH: capture ? captured : "",
+        },
+      });
+      const label = `fake consumes ${bytes} stdin bytes, capture=${capture}`;
+      assert.ifError(result.error);
+      assertPass(label, result);
+      assert.equal(readFileSync(output, "utf8"), "{}\n", `${label} fixed result`);
+      if (capture) assert.equal(readFileSync(captured, "utf8"), prompt, `${label} exact capture`);
+      else assert.equal(existsSync(captured), false, `${label} no optional capture`);
+    }
+  }
   mkdirSync(dirname(riskCodexLauncher), { recursive: true });
   mkdirSync(dirname(riskNativeCodex), { recursive: true });
   writeFileSync(riskCodexLauncher, "#!/usr/bin/env node\nthrow new Error('risk test launcher must never execute');\n");
@@ -768,7 +805,7 @@ Layer summary:
     const report = JSON.parse(result.stdout);
     if (fixture.expectedPass) {
       assertPass(`installed review decision semantics: ${fixture.label}`, result);
-      assert.equal(report.status, "executed", `${fixture.label} runner status`);
+      assert.equal(report.status, "executed", `${fixture.label} runner status\n${runnerFailureDetails(result, report)}`);
       assert.equal(report.sensor_status, "pass", `${fixture.label} sensor status`);
       assert.equal(report.execution_envelope_record?.persisted, true, `${fixture.label} record persistence`);
       assert.equal(existsSync(resolve(target, outputRelative)), true, `${fixture.label} output publication`);
@@ -778,7 +815,7 @@ Layer summary:
       }
     } else {
       assert.notEqual(result.status, 0, `${fixture.label} must fail closed`);
-      assert.equal(report.status, "insufficient_evidence", `${fixture.label} runner status`);
+      assert.equal(report.status, "insufficient_evidence", `${fixture.label} runner status\n${runnerFailureDetails(result, report)}`);
       assert.equal(report.sensor_status, "fail", `${fixture.label} sensor status`);
       assert.equal(report.execution_envelope_record?.persisted, false, `${fixture.label} record persistence`);
       assert.equal(existsSync(resolve(target, outputRelative)), false, `${fixture.label} output publication`);
