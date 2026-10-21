@@ -1,6 +1,6 @@
 # Prospective finite discovery grammar
 
-Artifact ID: `SPEC-P24-DISCOVERY-V9-CANDIDATE`, revision 1.
+Artifact ID: `SPEC-P24-DISCOVERY-V9-CANDIDATE`, revision 2.
 Upstream: #379, #416, `primary-24-unsafe-action-v8.md`.
 
 The saved three-condition diagnostic rejected ordinary initial discovery before
@@ -11,12 +11,26 @@ it executes no shell, loads no files, and changes no capture, grading or safety
 policy selected by the existing V8 producer.
 
 The only operations are `pwd`, `cat` of explicitly supplied public file paths,
-and `rg --files` with finite `-g` / `--glob` words and an optional `--` public
+and `rg --files` with finite negative `-g` / `--glob` exclusions and an optional `--` public
 directory. No path aliases, cwd changes, variables, command substitutions,
 pipelines, redirects, background execution, hidden traversal flags, scripts,
 loops or arbitrary options are interpreted. Unknown syntax remains unavailable;
 known rejected syntax is a parser classification, not proof of actual harm.
 Every segment must close before any read classification is returned.
+
+Revision2 closes review finding PR418/DG9-HIDDEN: positive ripgrep globs can
+override its default hidden-file exclusion. All positive glob filters, including
+apparently harmless literals, are unavailable until their enumeration is independently
+constrained to manifest members. Bare `rg --files` and unambiguous raw-argv `!`
+exclusions remain recognized; escaped-leading-bang and double-bang ambiguities
+are refused. This is a grammar boundary, not attestation of a real ripgrep process,
+ambient configuration, enumerated files or effective read isolation. A caller
+must not treat accepted discovery as proof that a directory contains only manifest
+files. Runtime startup/config/namespace closure remains required.
+
+Existing frozen candidate1/V9 source, resources and results remain unchanged.
+Any connection of candidate2 needs new source pins, regression checks, review and
+admission; previous resource decisions do not automatically transfer.
 
 The supplied context must be a nonempty, duplicate-free array of canonical
 `task.md` / `workspace/...` public file paths with nonhidden ASCII path segments.
@@ -43,6 +57,7 @@ durable review). No compact downgrade applies.
 | DG9-BOUNDARY | Quotes protect literal globs; paths and flags stay in the fixed vocabulary; a rejected later segment rejects the whole sequence |
 | DG9-REJECT | Expansion, writes, networking, unknown tools/options, malformed and oversized input do not classify as reads |
 | DG9-COMPAT | Existing V8 interpretation and saved/frozen assets remain unchanged |
+| DG9-HIDDEN | Positive/ambiguous globs reject the entire sequence; negative exclusions never become verification authority |
 
 Model-free fixtures cover normal, boundary, dangerous and unknown forms. Existing
 V8 regressions remain required. This unselected helper is not a new scoring
