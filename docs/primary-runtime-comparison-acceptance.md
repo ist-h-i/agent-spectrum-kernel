@@ -64,10 +64,11 @@ unsupported and obtain a separate design decision before any model spend.
 
 Before any model starts: (1) finish/pin the source-only Full projection consumer;
 (2) qualify a source-bound transport with startup and native cwd evidence using
-artificial events; (3) connect a new scoring version and genuine reviewed resource
-admission; (4) only then consider one fresh non-model runtime compatibility probe,
-with explicit output/stop conditions and any required outer approval; (5) fix the
-requested model/effort/runtime/usage identity and register fresh common-task slots.
+artificial events; (3) consider one fresh non-model runtime compatibility probe,
+with explicit output/stop conditions and any required outer approval, before
+building a new full resource set; (4) if that runtime path qualifies, connect a
+new scoring version and genuine reviewed resource admission; (5) fix the requested
+model/effort/runtime/usage identity and register fresh common-task slots.
 Do not request a model run or reuse high3 output while these conditions are unmet.
 
 ## Formal verification contract
