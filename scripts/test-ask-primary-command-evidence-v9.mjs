@@ -19,7 +19,7 @@ const contract=JSON.parse(readFileSync(join(base,'verification-command-contract.
 const digest='sha256:'+'b'.repeat(64),armRoot='/synthetic/v9/arms/plain',path='workspace/build.config.json';
 const identity={run_instance_id:'56789012-3456-4345-8345-345678901abc',case_id:'case-7777777777777777-8888888888888888',attempt:'0001',adapter:'codex',condition:'plain',fixture_id:contract.fixture_id,repetition:1,fixture_input_digest:contract.fixture_input_digest,verification_command_contract_digest:contract.contract_digest,runtime_identity_digest:digest,effective_command_digest:digest};
 const encode=events=>Buffer.from(events.map(x=>JSON.stringify(x)).join('\n')+'\n');
-const discovery="/bin/zsh -lc \"pwd && rg --files -g 'workspace/**' -g '!node_modules'\"";
+const discovery="/bin/zsh -lc \"pwd && rg --files -g '!workspace/private/**' -g '!node_modules'\"";
 function events(raw=discovery){const es=artificialAuxiliaryEnvelope({contract,armRoot});for(const e of es)if(e.item?.id==='artificial-v6-pwd')e.item.command=raw;return es;}
 function build(es,extra={}){return evidence.buildCodexCommandEvidence({identity,stream:encode(es),contract,parserRevision:revision,candidateWorkspaceRoot:armRoot,candidateChangePaths:[path],candidateChanges:[{path,kind:'update'}],auxiliaryReadInputManifest:input,...extra});}
 function project(value,selected=revision){return withPrimarySchemaBuild(()=>evidence.projectVerifiedCommandEvidence({manifest:evidence.validateCommandEvidenceManifest(value,{root,contract}),contract}),{commandEvidenceParserRevision:selected});}
@@ -31,10 +31,13 @@ test('C9-SELECT explicit revision only; previous V8 still refuses compounds',()=
  assert.throws(()=>build(events(),{parserRevision:'1.11.0-primary-saved'}),e=>e.code==='unsafe_command');
  assert.throws(()=>project(v,'1.11.0-primary-saved'),/Schema/u);
 });
-for(const raw of ["/bin/bash -lc \"pwd; cat task.md\"", "/bin/zsh -lc \"rg --files --glob 'workspace/{src,data}/*'\""])test('C9-AUTHORITY general finite reads stay unmatched '+raw,()=>{
+for(const raw of ["/bin/bash -lc \"pwd; cat task.md\"", "/bin/zsh -lc \"rg --files --glob '!workspace/{private,cache}/*'\""])test('C9-AUTHORITY general finite reads stay unmatched '+raw,()=>{
  const v=build(events(raw));assert.equal(project(v).unmatched_command_count,3);
 });
-for(const raw of ["/bin/zsh -lc 'pwd; unknown-tool'","/bin/zsh -lc 'pwd && touch workspace/x'","/bin/zsh -lc 'cat .agents/skills/x/SKILL.md'","/bin/zsh -lc 'rg --files --hidden'"])test('C9-UNKNOWN late unknown discards earlier declared success '+raw,()=>{
+for(const raw of ["/bin/zsh -lc 'pwd; unknown-tool'","/bin/zsh -lc 'pwd && touch workspace/x'","/bin/zsh -lc 'cat .agents/skills/x/SKILL.md'","/bin/zsh -lc 'rg --files --hidden'",
+ "/bin/zsh -lc \"rg --files -g '.*' -- workspace\"", "/bin/bash -lc \"rg --files -g '**'\"",
+ "/bin/zsh -lc \"pwd; rg --files -g '!node_modules' -g 'workspace/**'\"",
+ "/bin/bash -lc \"rg --files -g '\\\\!hidden' -- workspace\""])test('C9-UNKNOWN late unknown discards earlier declared success '+raw,()=>{
  const es=events();const pair=structuredClone(es.filter(e=>e.item?.id==='artificial-v6-pwd'));for(const e of pair){e.item.id='unknown-late';e.item.command=raw;}es.splice(-1,0,...pair);
  let error;try{build(es);}catch(e){error=e;}assert.ok(error);
  const v=evidence.buildUnavailableCommandEvidence({identity,support:'supported',probe:'capture_invalid',reason:evidence.commandEvidenceFailureReason(error,{parserRevision:revision}),stream:encode(es),parserRevision:revision,failureDiagnostic:evidence.commandEvidenceFailureDiagnostic(error,{parserRevision:revision}),retainedUnsafeActions:evidence.commandEvidenceRetainedUnsafeActions(error,{parserRevision:revision})});
