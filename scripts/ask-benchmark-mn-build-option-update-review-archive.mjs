@@ -4,12 +4,20 @@ import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { assertPrivateRootOutsideRepository } from "./ask-benchmark-mn-build-option-update.mjs";
-import { resolveReviewArchiveOutput, validateReviewArchiveCases } from "./ask-benchmark-review-archive-identity.mjs";
+import { assertPrivateRootOutsideRepository, validateMnBuildOptionUpdatePublicFixture } from "./ask-benchmark-mn-build-option-update.mjs";
+import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import {
+  addUniqueReviewArchiveEntries, establishReviewArchiveIdentity, evaluatorSourceReviewEntries,
+  resolveReviewArchiveOutput, reviewArchiveCommitEntry, reviewArchiveCommitTreeEntries,
+  validateReviewArchiveCases, validateReviewArchivePrivateBundle,
+  validateReviewArchiveProductionAuthority, walkReviewArchiveRoot,
+} from "./ask-benchmark-review-archive-identity.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FIXTURE_ID = "mn-build-option-update";
 const FIXTURE_PATH = `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`;
+const GENERATOR_PATH = "scripts/ask-benchmark-mn-build-option-update-review-archive.mjs";
+const V2_FORMAT = "mn-build-closed-source-store-zip.v2";
 const DOS_TIME = 0;
 const DOS_DATE = 0x0021;
 const UTF8_FLAG = 0x0800;
@@ -151,6 +159,69 @@ export function generateMnBuildOptionUpdateReviewArchive({ root = ROOT, privateR
   return Object.freeze({ fixtureId: FIXTURE_ID, reviewedHead, evaluatorRevision: bundle.evaluator_revision, bundleId: bundle.evaluator_bundle_id, bundleDigest: bundle.evaluator_bundle_digest, evaluatorAuthorityDigest: authority.manifest_digest, requirementRecordDigest: requirement.requirement_record_digest, requirementSetDigest: requirement.requirement_set_digest, outputContractDigest: output.output_contract_digest, sourceFreezeDigest: candidate.candidate_digest, inputDigest: reference.fixture_input_digest, archivePath: archiveTarget, archiveSha256: sha256(archiveBytes), archiveBytes: archiveBytes.length, entryCount: unique.size + 1 });
 }
 
+// Explicit successor: legacy API/format above intentionally remain unchanged.
+export function generateMnBuildOptionUpdateReviewArchiveV2({ root = ROOT, privateRoot, caseRoot, outputPath, reviewedHead, sourceRevision } = {}) {
+  if (!privateRoot || !caseRoot || !outputPath || !/^[a-f0-9]{40}$/u.test(reviewedHead ?? "") || !/^[a-f0-9]{40}$/u.test(sourceRevision ?? "")) throw new Error("mn-build V2 review archive requires privateRoot, caseRoot, outputPath, reviewedHead, and sourceRevision");
+  const repository = realpathSync(root);
+  const external = (path) => {
+    if (!existsSync(path) || lstatSync(path).isSymbolicLink() || !lstatSync(path).isDirectory()) throw new Error("mn-build V2 review archive source root must be a non-symlink directory");
+    const directory = realpathSync(path);
+    assertPrivateRootOutsideRepository(repository, directory);
+    return directory;
+  };
+  const privateDirectory = external(privateRoot), caseDirectory = external(caseRoot);
+  if (caseDirectory === privateDirectory || caseDirectory.startsWith(`${privateDirectory}${sep}`) || privateDirectory.startsWith(`${caseDirectory}${sep}`)) throw new Error("mn-build V2 review archive private and case roots must be disjoint");
+  const archiveTarget = resolveReviewArchiveOutput({ repositoryRoot: repository, privateRoot: privateDirectory, caseRoot: caseDirectory, outputPath });
+  const publicJson = (name) => readJson(resolve(repository, FIXTURE_PATH, name), `mn-build V2 ${name}`);
+  const reference = publicJson("evaluator-reference.json");
+  const identity = establishReviewArchiveIdentity({ root: repository, runtimeRoot: ROOT, reviewedHead, sourceRevision, evaluatorRevision: reference.evaluator_revision, generatorPath: GENERATOR_PATH });
+  validateReviewArchiveProductionAuthority({ root: repository, fixtureId: FIXTURE_ID, sourceRevision }, () => validateMnBuildOptionUpdatePublicFixture({ root: repository }));
+  const authorityManifest = publicJson("evaluator-authority-manifest.json"), requirement = publicJson("requirement-record.json");
+  const output = publicJson("output-contract.json"), candidate = publicJson("source-freeze-candidate.json");
+  const admission = publicJson("final-admission-record.json"), review = publicJson("admission-review.json");
+  if (admission.admission_status !== "admission_pending" || review.reviewer_status !== "pending_independent_review" || review.author_self_approval !== false) throw new Error("mn-build V2 review archive requires pending independent review authority");
+  const bundle = readJson(resolve(privateDirectory, "private-evaluator-bundle.json"), "mn-build V2 private bundle");
+  const privateEntries = walkReviewArchiveRoot(privateDirectory, "private-evaluator");
+  const privateSummary = validateReviewArchivePrivateBundle({ fixtureId: FIXTURE_ID, bundle, authority: { evaluatorRevision: reference.evaluator_revision, evaluatorBundleId: reference.evaluator_bundle_id, evaluatorBundleDigest: reference.evaluator_bundle_digest }, privateEntries, privatePrefix: "private-evaluator" });
+  if (canonicalDigest(bundle.evaluator_source_identity) !== canonicalDigest(reference.evaluator_source_identity) || canonicalDigest(bundle.dependency_graph) !== canonicalDigest(reference.evaluator_source_identity?.dependency_graph)) throw new Error("mn-build V2 review archive private/public evaluator source identity differs");
+  const caseEntries = walkReviewArchiveRoot(caseDirectory, "cases");
+  const caseSummary = validateReviewArchiveCases({ fixtureId: FIXTURE_ID, caseEntries, casePrefix: "cases", singleton: true });
+  const unique = new Map();
+  addUniqueReviewArchiveEntries(unique, [
+    ...reviewArchiveCommitTreeEntries({ root: repository, revision: reviewedHead, path: FIXTURE_PATH, prefix: "repository" }),
+    reviewArchiveCommitEntry(repository, reviewedHead, GENERATOR_PATH, "repository"),
+    reviewArchiveCommitEntry(repository, reviewedHead, `benchmarks/portfolio-design-admission-records/${FIXTURE_ID}.json`, "repository"),
+    ...evaluatorSourceReviewEntries({ root: repository, sourceRevision, sourceIdentity: bundle.evaluator_source_identity }),
+    ...identity.generatorEntries, ...privateEntries, ...caseEntries,
+  ]);
+  const folded = new Set();
+  for (const path of unique.keys()) {
+    const key = path.toLocaleLowerCase("en-US");
+    if (folded.has(key)) throw new Error("mn-build V2 review archive contains case-colliding entries");
+    folded.add(key);
+  }
+  const manifest = {
+    schema_version: "1.0.0", program: "mn_build_option_update_private_review_archive_v2", fixture_id: FIXTURE_ID,
+    reviewed_repository_head: reviewedHead, evaluator_source_revision: sourceRevision,
+    evaluator_bundle_id: reference.evaluator_bundle_id, evaluator_bundle_digest: reference.evaluator_bundle_digest,
+    evaluator_source_tree_digest: bundle.evaluator_source_identity.source_tree_digest,
+    evaluator_dependency_graph_digest: bundle.dependency_graph.graph_digest,
+    archive_generator_source_identity: identity.generatorSourceIdentity,
+    private_asset_bytes: privateSummary.privateAssetBytes, private_asset_count: privateSummary.privateAssetCount,
+    private_case_count: caseSummary.caseCount, private_case_paths: caseSummary.casePaths,
+    evaluator_authority_digest: authorityManifest.manifest_digest,
+    requirement_record_digest: requirement.requirement_record_digest, requirement_set_digest: requirement.requirement_set_digest,
+    output_contract_digest: output.output_contract_digest, source_freeze_candidate_digest: candidate.candidate_digest,
+    input_digest: reference.fixture_input_digest, independent_review_status: "pending", reviewer_status: "pending_independent_review",
+    admission_status: "admission_pending", author_self_approval: false, scoring_ready: false, measured_execution: false, scoring_published: false,
+    archive_format: { revision: V2_FORMAT, compression_method: "store", fixed_timestamp: "1980-01-01T00:00:00", generator_source_digest: sha256(unique.get(`repository/${GENERATOR_PATH}`).bytes), generator_source_inventory: identity.generatorSourceIdentity.node_inventory },
+    entries: [...unique.values()].sort((left, right) => left.path.localeCompare(right.path)).map(({ path, bytes, mode }) => ({ path, bytes: bytes.length, sha256: sha256(bytes), mode })),
+  };
+  const archiveBytes = zip([...unique.values(), { path: "REVIEW-MANIFEST.json", bytes: Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`), mode: 0o644 }]);
+  writeFileSync(archiveTarget, archiveBytes, { flag: "wx", mode: 0o644 });
+  return Object.freeze({ fixtureId: FIXTURE_ID, reviewedHead, evaluatorSourceRevision: sourceRevision, bundleId: reference.evaluator_bundle_id, bundleDigest: reference.evaluator_bundle_digest, archivePath: archiveTarget, archiveSha256: sha256(archiveBytes), archiveBytes: archiveBytes.length, entryCount: unique.size + 1, privateCaseCount: caseSummary.caseCount, scoringReady: false });
+}
+
 function parseArgs(argv) {
   const args = { root: ROOT };
   for (let index = 0; index < argv.length; index += 1) {
@@ -159,15 +230,20 @@ function parseArgs(argv) {
     else if (flag === "--private-root" && value) args.privateRoot = resolve(value);
     else if (flag === "--output" && value) args.outputPath = resolve(value);
     else if (flag === "--reviewed-head" && value) args.reviewedHead = value;
+    else if (flag === "--format" && value === "v2") args.format = value;
+    else if (flag === "--source-revision" && value) args.sourceRevision = value;
+    else if (flag === "--case-root" && value) args.caseRoot = resolve(value);
     else throw new Error(`unknown or incomplete argument: ${flag}`);
     index += 1;
   }
+  if (args.format !== "v2" && (args.sourceRevision || args.caseRoot)) throw new Error("source-revision and case-root CLI options require --format v2");
   return args;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    process.stdout.write(`${JSON.stringify(generateMnBuildOptionUpdateReviewArchive(parseArgs(process.argv.slice(2))))}\n`);
+    const { format, ...args } = parseArgs(process.argv.slice(2));
+    process.stdout.write(`${JSON.stringify((format === "v2" ? generateMnBuildOptionUpdateReviewArchiveV2 : generateMnBuildOptionUpdateReviewArchive)(args))}\n`);
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
