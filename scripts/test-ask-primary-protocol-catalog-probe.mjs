@@ -72,6 +72,19 @@ test('unknown stderr is not retained or returned', async () => {
   const transport = fakeTransport(() => {}, { stderr: secret });
   const result = await run(transport); assert.equal(result.status, 'unavailable'); assert.ok(!JSON.stringify(result).includes(secret));
 });
+for (const [name, raw, kind, reason] of [
+  ['sqlite', `Error: failed to initialize sqlite state runtime under /private/${secret}: ${secret} (os error 1)\n`, 'sqlite_state_runtime_error', 'stderr_startup_error'],
+  ['otel', `Error: error loading otel config: ${secret}\n`, 'otel_configuration_error', 'stderr_startup_error'],
+  ['cleanup warning', `WARNING: failed to clean up stale arg0 temp dirs: ${secret}\n`, 'arg0_cleanup_warning', 'stderr_known_warning_requires_review'],
+  ['unknown trace', `2026-10-21T00:00:00Z WARN codex_app_server: ${secret}\n`, 'unknown', 'stderr_unknown'],
+]) test(`typed stderr ${name} remains unavailable and private`, async () => {
+  const transport = fakeTransport(() => {}, { stderr: raw });
+  const result = await run(transport);
+  assert.equal(result.kind, 'ask_primary_catalog_observation_v2'); assert.equal(result.reason, reason); assert.equal(result.status, 'unavailable');
+  assert.equal(result.stderr_diagnostics.records[0].kind, kind);
+  assert.ok(result.sent.every(item => item.method === 'initialize')); assert.ok(!JSON.stringify(result).includes(secret));
+  assert.ok(result.settings.every(value => value.status === 'not_observed'));
+});
 test('fixed RPCs cannot be mutated into another method or body', () => {
   assert.throws(() => { CATALOG_REQUESTS[0].params.clientInfo.name = 'other'; });
   assert.throws(() => { CATALOG_REQUESTS[2].method = 'turn/start'; });
