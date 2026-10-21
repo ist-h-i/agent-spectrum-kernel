@@ -42,7 +42,8 @@ The plan records a closed primary_execution_input contract with:
   renderers and checks actual baseline/arm bytes plus pins. Matching two forged
   metadata hashes does not establish source identity. The public source baseline
   is checked against the unchanged fixture bytes too. Source-owned arm/baseline
-  locations are validated before any prepared-file read.
+  locations are validated before any prepared-file read. Actual executable bits
+  must match the source-owned non-executable input mode, not just the metadata.
 - Model launch cwd arms/<condition>/workspace. Original task path names are
   explicitly relative to the arm root; workspace/foo refers to foo from this
   launch directory. Canonical arm paths never contain traversal; their fixed

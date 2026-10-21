@@ -360,6 +360,7 @@ export function derivePreparedPrimaryExecutionInput(plan) {
     const actual = readRegular(path, label, FILE_LIMIT, true);
     assert.ok(actual.equals(raw), `${label} source-owned auxiliary/public bytes changed`);
     assert.deepEqual(inventory, record(raw), `${label} source-owned byte pin changed`);
+    assert.equal(lstatSync(path).mode & 0o111 ? '100755' : '100644', '100644', `${label} source-owned file mode changed`);
   };
   for (const id of comparisonConditions(plan.config.kernel_condition)) {
     const arm = plan.arms[id];

@@ -173,6 +173,14 @@ test('I1/I4/I6 existing single-task entry prepares, inspects and refuses closed-
   writeFileSync(baselinePath, fake); writeFileSync(armPath, fake);
   assert.throws(() => derivePreparedPrimaryExecutionInput(altered), /source-owned.*(?:bytes|pin).*changed/);
   writeFileSync(baselinePath, baselineBefore); writeFileSync(armPath, armBefore);
+  for (const [path, bytes] of [[baselinePath, baselineBefore], [armPath, armBefore]]) {
+    rmSync(path); writeFileSync(path, bytes, { flag: 'wx', mode: 0o700 });
+  }
+  assert.throws(() => derivePreparedPrimaryExecutionInput(JSON.parse(raw)), /source-owned file mode changed/);
+  for (const [path, bytes] of [[baselinePath, baselineBefore], [armPath, armBefore]]) {
+    rmSync(path); writeFileSync(path, bytes, { flag: 'wx', mode: 0o600 });
+  }
+  assert.deepEqual(derivePreparedPrimaryExecutionInput(JSON.parse(raw)), contract);
   const badPath = JSON.parse(raw); badPath.arms.full_ask.baseline_path = '/synthetic/host';
   assert.throws(() => derivePreparedPrimaryExecutionInput(badPath), /source-owned primary baseline path required/);
   assert.throws(() => preparePrimaryEvaluation(repo, { output: join(area, 'invalid'), primaryInputContract: 'untrusted' }), /unknown primary input contract/);
