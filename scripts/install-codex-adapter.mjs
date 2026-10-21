@@ -8,6 +8,7 @@ import { skillAssets } from "./skill-assets.mjs";
 import { CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
 import { ADAPTER_RENDERER_METADATA, CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 import { codexCompactCanonicalContractForPaths, codexCompactProfileCanonicalPaths, codexDirectTriggersForPrompt, renderCodexCompactProfile } from "./codex-runtime-profile.mjs";
+import { personalPromptTargetActive, withPersonalPromptTargetLock } from "./ask-personal-prompt-target-lock.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
@@ -1477,6 +1478,14 @@ function buildPlan(args) {
   return { operations, staleSkills, stalePrompts, staleCommands, staleAssets, state, recommendedSkills };
 }
 
+// Pure validation projection for an explicit owner handover/return. Keep normal
+// byte rendering and complete inventory checks in this installer, never a second mapper.
+export function inspectCodexFullInstallation(target) {
+  const plan = buildPlan(parseArgs(["--target", target, "--profile", "full", "--check"]));
+  if (plan.operations.some(operation => !operation.unchanged)) throw new Error("current complete Codex full installation required");
+  return plan.state;
+}
+
 function printPlan(args, plan) {
   const label = args.check ? "Codex adapter installer check" : args.dryRun ? "Codex adapter installer dry run" : "Codex adapter installed";
   console.log(`${label}: ${args.target}`);
@@ -1507,6 +1516,14 @@ function printPlan(args, plan) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
+  // Preserve pure argument/core-prerequisite diagnostics for an absent target.
+  // Never reuse this preflight plan: mutations still lock, guard and replan.
+  if (!existsSync(args.target) && !args.rollback && !args.detach) buildPlan(args);
+  return withPersonalPromptTargetLock(args.target, () => {
+  const owner = lifecycle.readJsonIfExists(resolve(args.target, STATE_PATH));
+  if (personalPromptTargetActive(args.target, { excludeOwnedLock: true }) || owner?.personal_prompt_delegation) {
+    throw new Error("personal Prompt ownership or partial operation requires explicit owner return; ordinary Codex mutation refused");
+  }
   if (args.rollback) {
     const operations = lifecycle.rollbackLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force, preserve: CORE_PRESERVE_PATHS });
     console.log(`${args.dryRun || args.check ? "Codex adapter rollback dry run" : "Codex adapter rolled back"}: ${args.target}`);
@@ -1522,6 +1539,7 @@ function main() {
   const plan = buildPlan(args);
   lifecycle.applyLifecyclePlan({ target: args.target, statePath: STATE_PATH, operations: plan.operations, state: plan.state, dryRun: args.dryRun || args.check });
   printPlan(args, plan);
+  });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
