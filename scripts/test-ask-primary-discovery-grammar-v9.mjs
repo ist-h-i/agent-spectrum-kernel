@@ -9,11 +9,22 @@ const render=(script,shell='/bin/bash')=>shell+' -lc '+quote(script);
 const classify=(script,options={})=>classifyPrimaryDiscoveryCommandV9(render(script),{publicFiles,...options});
 const rejects=(script,code,options={})=>assert.throws(()=>classify(script,options),error=>error instanceof PrimaryDiscoveryGrammarError&&error.code===code);
 
+for(const pattern of ['.*','**','*.json','workspace/**','workspace/{public,.env}','[.]env','\\.env','README.md','\\!hidden','!!**'])test('DG9-HIDDEN positive or ambiguous glob cannot whitelist undeclared hidden paths '+pattern,()=>{
+ rejects('rg --files -g '+quote(pattern)+' -- workspace','auxiliary_read_path_unavailable');
+ rejects('pwd; rg --files -g '+quote(pattern)+' -- workspace','auxiliary_read_path_unavailable');
+});
+test('DG9-HIDDEN one later positive glob rejects mixed filters and valid prefixes',()=>{
+ for(const script of ["rg --files -g '!**/.git/**' -g '.*' -- workspace",
+  "pwd && rg --files --glob '!node_modules' --glob '*.json' -- workspace"])
+  rejects(script,'auxiliary_read_path_unavailable');
+ assert.equal(classify("rg --files -g '!\\!foo' -- workspace").operations.length,1);
+});
+
 for(const shell of ['/bin/bash','/bin/zsh'])for(const script of [
- 'pwd', 'pwd && rg --files', "pwd; rg --files -g 'README*' -g '!**/.git/**'",
- "rg --files --glob 'workspace/{src,data}/*' -- workspace", "cat task.md workspace/README.md",
- "cat -- 'workspace/src/check.mjs'", 'rg --files -g README.md',
- "rg --files -g '!'node_modules -g '\\[a-z\\]'", "rg --files -g 'workspace/**' -g '!'\"**/.git/**\"",
+ 'pwd', 'pwd && rg --files', "pwd; rg --files -g '!README*' -g '!**/.git/**'",
+ "rg --files --glob '!workspace/{src,data}/*' -- workspace", "cat task.md workspace/README.md",
+ "cat -- 'workspace/src/check.mjs'", "rg --files -g '!README.md'",
+ "rg --files -g '!'node_modules -g '!\\[a-z\\]'", "rg --files -g '!workspace/**' -g '!'\"**/.git/**\"",
 ])test('DG9-READ finite discovery '+shell+' '+script,()=>{
  const raw=render(script,shell),value=classifyPrimaryDiscoveryCommandV9(raw,{publicFiles});
  assert.equal(value.kind,'finite_public_read_vocabulary');assert.equal(value.verification_authority,false);
@@ -23,11 +34,11 @@ for(const shell of ['/bin/bash','/bin/zsh'])for(const script of [
  assert.equal(Object.hasOwn(value,'succeeded_command_ids'),false);
 });
 test('DG9-LITERAL equivalent outer literal renderings and inner concatenation',()=>{
- const script="pwd && rg --files -g '!node_modules' -g 'workspace/**'";
+ const script="pwd && rg --files -g '!node_modules' -g '!workspace/**'";
  const a=classify(script),b=classifyPrimaryDiscoveryCommandV9('/bin/zsh -lc "'+script+'"',{publicFiles});
  assert.deepEqual(a.operations,b.operations);assert.notEqual(a.rendered_command_digest,b.rendered_command_digest);
- assert.deepEqual(classify("rg --files -g 'work'\"space/\"'**'").operations,[{tool:'rg',argv:['--files','-g','workspace/**'],enumeration_target:'.'}]);
- assert.deepEqual(classify('rg --files -g workspace/\\*\\*').operations,classify("rg --files -g 'workspace/**'").operations);
+ assert.deepEqual(classify("rg --files -g '!work'\"space/\"'**'").operations,[{tool:'rg',argv:['--files','-g','!workspace/**'],enumeration_target:'.'}]);
+ assert.deepEqual(classify('rg --files -g \\!workspace/\\*\\*').operations,classify("rg --files -g '!workspace/**'").operations);
 });
 test('DG9-BOUNDARY separators inside quotes are not executable separators',()=>{
  rejects("rg --files -g 'x;y'",'unsupported_command');rejects("rg --files -g 'x&&y'",'unsupported_command');

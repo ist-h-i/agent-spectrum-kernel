@@ -1,6 +1,6 @@
 # Explicit primary command capture V9
 
-Artifact ID: `SPEC-P24-CAPTURE-V9-CONNECTION`, revision 1.
+Artifact ID: `SPEC-P24-CAPTURE-V9-CONNECTION`, revision 2.
 Upstream: #379, #416, #418, `primary-discovery-grammar-v9-candidate.md`.
 
 V9 is an explicit processing contract: parser `1.12.0-primary-saved`, selector
@@ -9,6 +9,17 @@ It adds the reviewed finite discovery grammar only after exact declared public
 verification matching. P/K/F use the same selected processing descriptor and
 digest-checked public manifest. Both existing primary profiles have distinct V9
 schema mirrors. No default, V1–V8 schema, frozen resource or saved result changes.
+
+Revision2 explicitly integrates the reviewed candidate2 repair from PR418.
+Positive or ambiguous ripgrep glob filters reject the entire capture, including
+any earlier public-check success. Only bare enumeration and unambiguous negative
+exclusions remain in the finite discovery vocabulary; they attest no enumeration
+contents or ambient configuration. Normal integration fixtures now use negative
+exclusions; hidden, positive, mixed and escaped-leading-bang regressions prove
+rejection through the real V9 capture/normalizer path, not only the helper.
+This is a new exact source identity. Candidate1 frozen resources/selectors,
+archives, decisions, diagnostics and saved results remain untouched and cannot
+qualify this source. New source/resource pins, review and admission remain required.
 
 ## Trust boundary
 
