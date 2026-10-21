@@ -2,7 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-10-21
-- Upstream: ADR0004, ADR0005, ADR0011; SPEC-PERSONAL-TARGET-1@1; PV1-1/6
+- Upstream: ADR0004, ADR0005, ADR0011; SPEC-PERSONAL-TARGET-1@1/@2; PV1-1/6
 - Supersedes: None
 
 ## Context
@@ -24,10 +24,14 @@ inferred from retained bytes. Source, scoring and organizational authority are n
 created by this adapter.
 
 Own one dedicated state and the closed five Prompt paths. Refuse known competing
-owners instead of changing Codex/kernel ownership or doctor semantics. The initial
-normal-target implementation supports no-conflict standalone/kernel-only targets;
-handover of an existing Codex-owned Prompt surface requires a later reviewed
-ownership integration and is not silently included.
+owners by default. The explicit current-full Codex extension verifies complete
+normal ownership through the existing installer planner, transfers exactly five
+records into a paired lease, and shares a target lock with ordinary Codex entry
+points. It preserves all other files/runtime metadata and retains conservative
+doctor checks. Exact owner return requires current independently trusted parent
+selection and the original owner-state pin. Immutable non-owning history prevents
+old-plan replay. Paired-owner write interruption preserves both raw states and
+stops; this decision does not authorize automatic repair of that different journal.
 
 ## Alternatives and consequences
 
@@ -43,7 +47,14 @@ filesystem/power-loss guarantees follow from process-level fixture success.
 
 ## Review trigger
 
-Revisit before supporting other assets, existing-adapter ownership handover,
+The2026-10-21 continuation explicitly selects review of partial recovery and
+Codex ownership handover under SPEC-PERSONAL-TARGET-1@2. Recovery uses a private
+original-plan-bound journal and the existing immutable CAS publisher; fresh
+external rollback authority is still required. Codex ownership is never silently
+overlapped. Existing compact controls and conservative doctor/installer behavior
+must remain intact; actual historical AH14/C1 inputs are not new approvals.
+
+Revisit before supporting other assets or ownership shapes, paired-owner repair,
 cross-version schema migration, automatic adoption, generic retry, remote targets
 or a different rollback authority. Number0014 was checked free at integration
 base5f3d574b; reconcile again if another architecture decision lands first.

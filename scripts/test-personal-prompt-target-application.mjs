@@ -10,6 +10,7 @@ import { captureApplyTarget } from "./ask-setup-apply-state.mjs";
 import { syntheticClosure } from "./test-helpers-personal-prompt-adoption.mjs";
 import { planPersonalPromptTargetApply, applyPersonalPromptTargetPlan, planPersonalPromptTargetRestore,
   restorePersonalPromptTargetPlan, inspectPersonalPromptTarget, PERSONAL_PROMPT_TARGET_STATE } from "./ask-personal-prompt-target.mjs";
+import { planPersonalPromptTargetRecovery, recoverPersonalPromptTargetPlan } from "./ask-personal-prompt-target.mjs";
 
 const repo = resolve(import.meta.dirname, ".."), cli = join(repo, "scripts/ask-personal-prompt-target-cli.mjs");
 function project(t) {
@@ -165,5 +166,78 @@ const original=fs.writeFileSync; fs.writeFileSync=(path,...args)=>{
     const partialRestore = captureApplyTarget(z.root).binding;
     assert.throws(() => restorePersonalPromptTargetPlan(mutate(restore)), /personal_target_recovery_required/);
     assert.deepEqual(captureApplyTarget(z.root).binding, partialRestore);
+  });
+});
+
+test("explicit recovery aborts partial apply or completes restore without retrying adoption", async t => {
+  const f = syntheticClosure(t);
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "ask-owned-recovery-fault-"))); t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const preload = join(dir, "fault.mjs");
+  writeFileSync(preload, `import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module';
+const original=fs.writeFileSync; fs.writeFileSync=(path,...args)=>{
+ if(typeof path==='string'&&path.endsWith('/.agents/prompts/skill-review.md')) throw Object.assign(new Error('owned fixture recovery fault'),{code:'EIO'});
+ return original(path,...args);}; syncBuiltinESMExports();\n`);
+  for (const phase of ["initial", "candidate", "restore"]) await t.test(phase, () => {
+    const x = project(t), statePath = join(x.root, PERSONAL_PROMPT_TARGET_STATE);
+    const rollbackTrust = f.closure.trustedPortfolioAuthorityContexts.filter(context => context.authority.kind === "external_portfolio_rollback_authority");
+    assert.equal(rollbackTrust.length, 1);
+    const closure = phase === "restore" ? f.closure : { ...f.closure, trustedPortfolioAuthorityContexts:
+      f.closure.trustedPortfolioAuthorityContexts.filter(context => context.authority.kind !== "external_portfolio_rollback_authority") };
+    const opts = role => ({ targetRoot: x.root, closure, role, selectionObjectDigest: role === "parent" ? f.parentSelection : f.candidateSelection });
+    const mut = prepared => ({ prepared, closure, confirmedDigest: prepared.digest, authorized: true });
+    if (phase !== "initial") applyPersonalPromptTargetPlan(mut(planPersonalPromptTargetApply(opts("parent"))));
+    if (phase === "restore") applyPersonalPromptTargetPlan(mut(planPersonalPromptTargetApply(opts("candidate"))));
+    const original = phase === "restore" ? planPersonalPromptTargetRestore({ targetRoot: x.root, closure, rollbackSelectionObjectDigest: f.rollbackSelection })
+      : planPersonalPromptTargetApply(opts(phase === "initial" ? "parent" : "candidate"));
+    const command = phase === "restore" ? "restore" : "apply";
+    assert.equal(child(t, command, { prepared: original, closure }, ["--authorized", "--confirm", original.digest], 1, preload).reason_code, "personal_target_recovery_required");
+    const authority = { originalPlanDigest: original.digest, rollbackTrustedPortfolioAuthorityContexts: rollbackTrust };
+    const request = { targetRoot: x.root, closure, rollbackSelectionObjectDigest: f.rollbackSelection, ...authority };
+    const before = captureApplyTarget(x.root).binding;
+    assert.throws(() => planPersonalPromptTargetRecovery({ ...request, originalPlanDigest: canonicalDigest("forged original plan") }), /personal_target_/);
+    assert.deepEqual(captureApplyTarget(x.root).binding, before);
+    if (phase === "candidate") {
+      const saved = readFileSync(statePath); writeFileSync(statePath, "{truncated"); const broken = captureApplyTarget(x.root).binding;
+      assert.throws(() => planPersonalPromptTargetRecovery(request), /personal_target_/); assert.deepEqual(captureApplyTarget(x.root).binding, broken); writeFileSync(statePath, saved);
+    }
+    if (phase === "initial") {
+      const retained = join(dir, "retained-original-operation.json"); renameSync(`${statePath}.operation.json`, retained);
+      const legacy = captureApplyTarget(x.root).binding;
+      assert.throws(() => planPersonalPromptTargetRecovery(request), /personal_target_/); assert.deepEqual(captureApplyTarget(x.root).binding, legacy);
+      renameSync(retained, `${statePath}.operation.json`);
+    }
+    let recovery = child(t, "plan-recover", request);
+    assert.throws(() => recoverPersonalPromptTargetPlan({ ...mut(recovery), ...authority, authorized: false }), /personal_target_/);
+    assert.throws(() => recoverPersonalPromptTargetPlan({ ...mut(recovery), ...authority, originalPlanDigest: canonicalDigest("wrong independent pin") }), /personal_target_/);
+    assert.throws(() => recoverPersonalPromptTargetPlan(mut(recovery)), /personal_target_/);
+    if (phase === "initial") {
+      const app = join(x.root, "app.txt"), bytes = readFileSync(app);
+      writeFileSync(app, "unrelated project edit"); const drifted = captureApplyTarget(x.root).binding;
+      assert.throws(() => planPersonalPromptTargetRecovery(request), /personal_target_/); assert.deepEqual(captureApplyTarget(x.root).binding, drifted); writeFileSync(app, bytes);
+      const prompt = join(x.root, ".agents/prompts/skill-implement.md"), saved = readFileSync(prompt);
+      writeFileSync(prompt, "unknown partial bytes"); const unknown = captureApplyTarget(x.root).binding;
+      assert.throws(() => planPersonalPromptTargetRecovery(request), /personal_target_/); assert.deepEqual(captureApplyTarget(x.root).binding, unknown); writeFileSync(prompt, saved);
+      for (const fault of ["unlink", "cleanup"]) {
+        const faultPath = join(dir, `${fault}.mjs`);
+        writeFileSync(faultPath, `import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';
+const method='${fault === "unlink" ? "unlinkSync" : "rmdirSync"}', original=fs[method];fs[method]=(path,...args)=>{
+if(typeof path==='string'&&path.endsWith('${fault === "unlink" ? "/.agents/prompts/skill-implement.md" : "/.agents/prompts"}'))throw Object.assign(new Error('owned recovery failure'),{code:'EIO'});
+return original(path,...args);};syncBuiltinESMExports();\n`);
+        const failed = child(t, "recover", { prepared: recovery, closure, ...authority }, ["--authorized", "--confirm", recovery.digest], 1, faultPath);
+        assert.equal(failed.reason_code, "personal_target_recovery_required");
+        assert.equal(existsSync(`${statePath}.operation.json`), true); assert.equal(existsSync(`${statePath}.in-progress.json`), true);
+        assert.throws(() => inspectPersonalPromptTarget({ targetRoot: x.root }), /personal_target_recovery_required/);
+        assert.throws(() => recoverPersonalPromptTargetPlan({ ...mut(recovery), ...authority }), /personal_target_/);
+        recovery = child(t, "plan-recover", request);
+      }
+    }
+    const result = child(t, "recover", { prepared: recovery, closure, ...authority }, ["--authorized", "--confirm", recovery.digest]);
+    assert.equal(result.status, phase === "restore" ? "recovered_restore" : "recovered_apply_abort");
+    assert.equal(existsSync(`${statePath}.in-progress.json`), false); assert.equal(existsSync(`${statePath}.operation.json`), false);
+    assert.equal(inspectPersonalPromptTarget({ targetRoot: x.root }).status, phase === "initial" ? "not_installed" : "installed");
+    if (phase !== "initial") assert.equal(JSON.parse(readFileSync(statePath)).personal_prompt.installed_lock_digest,
+      result.installed_lock_digest);
+    assert.ok(result.evidence_object_digest.startsWith("sha256:"));
+    assert.throws(() => recoverPersonalPromptTargetPlan({ ...mut(recovery), ...authority }), /personal_target_/);
   });
 });

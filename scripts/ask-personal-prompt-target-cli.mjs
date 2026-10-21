@@ -5,9 +5,13 @@ import { parseJsonRejectDuplicateKeys, readStableBytes } from "./content-address
 import { comparisonHash } from "./ask-user-comparison-prepare.mjs";
 import { pathInside } from "./ask-setup-inputs.mjs";
 import { planPersonalPromptTargetApply, applyPersonalPromptTargetPlan, planPersonalPromptTargetRestore,
-  restorePersonalPromptTargetPlan, inspectPersonalPromptTarget } from "./ask-personal-prompt-target.mjs";
+  restorePersonalPromptTargetPlan, inspectPersonalPromptTarget, planPersonalPromptTargetRecovery, recoverPersonalPromptTargetPlan,
+  planPersonalPromptCodexHandover, handoverPersonalPromptCodexPlan, planPersonalPromptCodexReturn, returnPersonalPromptCodexPlan } from "./ask-personal-prompt-target.mjs";
 const commands = { "plan-apply": planPersonalPromptTargetApply, apply: applyPersonalPromptTargetPlan,
-  "plan-restore": planPersonalPromptTargetRestore, restore: restorePersonalPromptTargetPlan, status: inspectPersonalPromptTarget };
+  "plan-restore": planPersonalPromptTargetRestore, restore: restorePersonalPromptTargetPlan, status: inspectPersonalPromptTarget,
+  "plan-recover": planPersonalPromptTargetRecovery, recover: recoverPersonalPromptTargetPlan,
+  "plan-handover": planPersonalPromptCodexHandover, handover: handoverPersonalPromptCodexPlan,
+  "plan-return": planPersonalPromptCodexReturn, "return": returnPersonalPromptCodexPlan };
 export function runPersonalPromptTargetCli(argv) {
   try {
     const [command, ...args] = argv, options = {};
@@ -16,7 +20,7 @@ export function runPersonalPromptTargetCli(argv) {
       const flag = args.shift(); if (!["--request", "--request-digest", "--confirm", "--authorized"].includes(flag) || Object.hasOwn(options, flag)) throw new Error();
       options[flag] = flag === "--authorized" ? true : args.shift();
     }
-    const mutation = ["apply", "restore"].includes(command);
+    const mutation = ["apply", "restore", "recover", "handover", "return"].includes(command);
     if (mutation !== (options["--authorized"] === true) || mutation !== (typeof options["--confirm"] === "string")) throw new Error();
     const path = resolve(options["--request"]);
     for (let cursor = path; ; cursor = dirname(cursor)) {
@@ -27,7 +31,9 @@ export function runPersonalPromptTargetCli(argv) {
     if (comparisonHash(bytes) !== options["--request-digest"]) throw new Error();
     const request = parseJsonRejectDuplicateKeys(bytes), target = request.targetRoot ?? request.prepared?.plan?.target_root;
     if (typeof target !== "string" || pathInside(realpathSync(target), path) || pathInside(resolve(import.meta.dirname, ".."), path)) throw new Error();
-    if (mutation && (Object.keys(request).sort().join(",") !== "closure,prepared")) throw new Error();
+    if (mutation && Object.keys(request).sort().join(",") !== (command === "recover"
+      ? "closure,originalPlanDigest,prepared,rollbackTrustedPortfolioAuthorityContexts" : ["handover", "return"].includes(command)
+        ? "closure,ownerStateDigest,prepared" : "closure,prepared")) throw new Error();
     const input = mutation ? { ...request, authorized: true, confirmedDigest: options["--confirm"] } : request;
     return { exitCode: 0, result: commands[command](input) };
   } catch (error) {

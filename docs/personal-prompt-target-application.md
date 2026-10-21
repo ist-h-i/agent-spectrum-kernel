@@ -1,5 +1,11 @@
 # Personal Prompt target application and persistent restoration
 
+The extension SPEC/IMP/FVC-PERSONAL-TARGET-1@2 is documented in
+[personal-prompt-target-recovery-handover.md](personal-prompt-target-recovery-handover.md).
+It adds explicit retained-partial apply/restore recovery and opt-in current full
+Codex ownership handover/return. Default overlap refusal remains. Paired owner
+write interruption remains an evidence-preserving stop, not automatic repair.
+
 Spec: SPEC-PERSONAL-TARGET-1@1. Upstream: Issue379 PV1-1/6, the owner's
 2026-10-21 local implementation delegation, ADR0004/0005/0011 and
 SPEC/IMPL-PERSONAL-SOURCE-INSTALL. The requirement remains actual-target adoption

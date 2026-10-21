@@ -75,10 +75,7 @@ function projection(owned, closure, selectionObjectDigest, role) {
     return { path: `.agents/prompts/${basename(file.path)}`, text, digest: comparisonHash(bytes), source_path: file.path };
   }).sort((a, b) => a.path.localeCompare(b.path)) };
 }
-export function verifyRestoreState({ root, statePath, state, owned, closure, rollbackSelectionObjectDigest }) {
-  assert.ok(state?.previous_successful_state && state.personal_prompt.role === "candidate", "candidate rollback snapshot required");
-  assert.equal(state.personal_prompt.receipt_object_digest, owned.receiptObjectDigest);
-  assert.ok(same(state.personal_prompt.asset, closure.candidate.candidate_asset));
+export function verifyRollbackSelection({ owned, closure, rollbackSelectionObjectDigest }) {
   const selected = verifyPortfolioSelection({ ...owned, selectionObjectDigest: rollbackSelectionObjectDigest }).selection;
   assert.equal(selected.decision, "selected");
   assert.ok(selected.selected_assets.some(item => same(item.asset, closure.candidate.parent_asset)));
@@ -88,6 +85,13 @@ export function verifyRestoreState({ root, statePath, state, owned, closure, rol
   const authority = read(owned.storeRoot, lock.authority_context_digest);
   assert.equal(authority.authority.kind, "external_portfolio_rollback_authority");
   assert.ok(same(authority.rollback_target, closure.receipt.rollback_anchor));
+  return { selection: selected, lock };
+}
+export function verifyRestoreSnapshot({ state, owned, closure, rollbackSelectionObjectDigest }) {
+  assert.ok(state?.previous_successful_state && state.personal_prompt.role === "candidate", "candidate rollback snapshot required");
+  assert.equal(state.personal_prompt.receipt_object_digest, owned.receiptObjectDigest);
+  assert.ok(same(state.personal_prompt.asset, closure.candidate.candidate_asset));
+  const { selection, lock } = verifyRollbackSelection({ owned, closure, rollbackSelectionObjectDigest });
   assert.ok(same(state.previous_successful_state.personal_prompt.asset, closure.candidate.parent_asset));
   assert.deepEqual(Object.keys(state.managed_files).sort(), PATHS);
   assert.deepEqual(Object.keys(state.rollback.files).sort(), PATHS);
@@ -101,7 +105,6 @@ export function verifyRestoreState({ root, statePath, state, owned, closure, rol
   const candidate = read(owned.storeRoot, closure.candidate.candidate_asset.content_digest);
   for (const file of candidate.files) {
     const path = `.agents/prompts/${basename(file.path)}`;
-    assert.equal(comparisonHash(readFileSync(join(root, path))), file.raw_digest, "installed candidate byte drift");
     assert.equal(`sha256:${state.managed_files[path].sha256}`, file.raw_digest, "installed candidate state drift");
     assert.equal(`sha256:${state.managed_files[path].canonical_sha256}`, file.raw_digest, "installed candidate canonical state drift");
   }
@@ -112,7 +115,12 @@ export function verifyRestoreState({ root, statePath, state, owned, closure, rol
     assert.equal(`sha256:${state.previous_successful_state.managed_files[path].sha256}`, file.raw_digest, "previous parent state transplant");
     assert.equal(`sha256:${state.previous_successful_state.managed_files[path].canonical_sha256}`, file.raw_digest, "previous parent canonical state transplant");
   }
+  return { selection, lock, parent, candidate };
+}
+export function verifyRestoreState({ root, statePath, state, owned, closure, rollbackSelectionObjectDigest }) {
+  const verified = verifyRestoreSnapshot({ state, owned, closure, rollbackSelectionObjectDigest });
+  for (const file of verified.candidate.files) assert.equal(comparisonHash(readFileSync(join(root, `.agents/prompts/${basename(file.path)}`))), file.raw_digest, "installed candidate byte drift");
   const operations = rollbackLifecycleState({ target: root, statePath, dryRun: true });
-  return { selection: selected, lock, operations };
+  return { ...verified, operations };
 }
 export { fields, ownJson, verifiedInputs, projection };
