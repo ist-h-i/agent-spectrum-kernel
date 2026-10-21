@@ -255,10 +255,15 @@ export function inspectSuppliedPrimaryAppServerVerification(contract, condition,
       assert.equal(params.threadId, identity.threadId); assert.equal(params.turnId, identity.turnId);
       const timestamp = params[started ? 'startedAtMs' : 'completedAtMs']; assert.ok(Number.isSafeInteger(timestamp) && timestamp >= 0);
       const item = params.item;
-      assert.deepEqual(Object.keys(item).sort(), ['type', 'id', 'pluginId', 'scriptPath', 'command', 'cwd', 'processId', 'source', 'status', 'commandActions', 'aggregatedOutput', 'exitCode', 'durationMs'].sort());
-      assert.equal(item.type, 'commandExecution'); assert.equal(item.source, 'agent');
-      assert.equal(item.pluginId, null); assert.equal(item.scriptPath, null);
-      assert.ok(item.processId === null || (typeof item.processId === 'string' && item.processId.length <= 128));
+      const required = ['type', 'id', 'command', 'cwd', 'status', 'commandActions'];
+      const optional = ['pluginId', 'scriptPath', 'processId', 'source', 'aggregatedOutput', 'exitCode', 'durationMs'];
+      assert.ok(required.every(key => Object.hasOwn(item, key)) && Object.keys(item).every(key => required.includes(key) || optional.includes(key)));
+      assert.equal(item.type, 'commandExecution');
+      // 0.162.1's generated wire schema declares default source=agent. This is
+      // metadata decoding only; a supplied segment still has no authority.
+      if (Object.hasOwn(item, 'source')) assert.equal(item.source, 'agent');
+      for (const key of ['pluginId', 'scriptPath']) if (Object.hasOwn(item, key)) assert.equal(item[key], null);
+      assert.ok(item.processId === undefined || item.processId === null || (typeof item.processId === 'string' && item.processId.length <= 128));
       // Parsed actions are descriptive metadata only. They cannot turn an
       // undeclared command into verification; the exact command check follows.
       assert.ok(Array.isArray(item.commandActions) && item.commandActions.length <= 64);
@@ -269,18 +274,19 @@ export function inspectSuppliedPrimaryAppServerVerification(contract, condition,
         for (const [key, value] of Object.entries(action)) assert.ok(typeof value === 'string'
           || (['path', 'query'].includes(key) && action.type !== 'read' && value === null));
       }
-      assert.ok(item.aggregatedOutput === null || typeof item.aggregatedOutput === 'string');
+      assert.ok(item.aggregatedOutput === undefined || item.aggregatedOutput === null || typeof item.aggregatedOutput === 'string');
       if (started) {
-        assert.equal(item.status, 'inProgress'); assert.equal(item.exitCode, null); assert.equal(item.durationMs, null);
+        assert.equal(item.status, 'inProgress'); assert.ok(item.exitCode === undefined || item.exitCode === null);
+        assert.ok(item.durationMs === undefined || item.durationMs === null);
         assert.ok(!rawPairs.has(item.id)); rawPairs.set(item.id, { start_timestamp: timestamp, start_line: index + 1, start_digest: hash(Buffer.from(line)) });
       } else {
         assert.equal(item.status, 'completed'); assert.equal(item.exitCode, 0);
-        assert.ok(item.durationMs === null || (Number.isSafeInteger(item.durationMs) && item.durationMs >= 0));
+        assert.ok(item.durationMs === undefined || item.durationMs === null || (Number.isSafeInteger(item.durationMs) && item.durationMs >= 0));
         const pair = rawPairs.get(item.id); assert.ok(pair && pair.completion_line === undefined && timestamp >= pair.start_timestamp);
         Object.assign(pair, { completion_line: index + 1, completion_digest: hash(Buffer.from(line)) });
       }
       normalized.push({ type: started ? 'item.started' : 'item.completed', item: { type: 'command_execution', id: item.id,
-        command: item.command, cwd: item.cwd, status: started ? 'in_progress' : 'completed', exit_code: item.exitCode } });
+        command: item.command, cwd: item.cwd, status: started ? 'in_progress' : 'completed', exit_code: started ? null : item.exitCode } });
     }
     const result = inspectSuppliedPrimaryVerificationProvenance(contract, condition, Buffer.from(normalized.map(item => JSON.stringify(item)).join('\n') + '\n'));
     assert.equal(result.status, 'supplied_verification_segment_complete');

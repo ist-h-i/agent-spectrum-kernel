@@ -104,6 +104,26 @@ function suppliedFixture(condition = 'plain') {
   return { contract, identity, events };
 }
 const encode = events => Buffer.from(events.map(value => JSON.stringify(value)).join('\n') + '\n');
+test('R6 wire required/optional fields are pinned to the installed binary public schema, not TypeScript nullability', () => {
+  const observed = JSON.parse(readFileSync(join(ROOT, 'docs/fixtures/primary-codex-command-wire-01621.json')));
+  assert.equal(observed.observation_scope, 'offline_binary_generated_schema_only'); assert.equal(observed.runtime_events_observed, false);
+  for (const schema of observed.schemas) {
+    assert.deepEqual(schema.command_required, ['command', 'commandActions', 'cwd', 'id', 'status', 'type']);
+    assert.equal(schema.source_default, 'agent');
+  }
+});
+for (const condition of ['plain', 'kernel_principles_v2', 'full_ask']) test(`R6 documented wire metadata omission ${condition} is non-authoritative`, () => {
+  const f = suppliedFixture(condition);
+  for (const event of f.events) for (const field of ['pluginId', 'scriptPath', 'processId', 'source', 'durationMs', 'aggregatedOutput']) delete event.params.item[field];
+  delete f.events[0].params.item.exitCode;
+  const result = inputs.inspectSuppliedPrimaryAppServerVerification(f.contract, condition, encode(f.events), f.identity);
+  assert.equal(result.status, 'supplied_verification_segment_complete'); assert.equal(result.runtime_attestation, 'unknown');
+  assert.equal(result.execution_authority, false); assert.equal(result.scoring_authority, false);
+  assert.equal(result.observations[0].start_digest, comparisonHash(Buffer.from(JSON.stringify(f.events[0]))));
+  delete f.events[1].params.item.exitCode;
+  const missingExit = inputs.inspectSuppliedPrimaryAppServerVerification(f.contract, condition, encode(f.events), f.identity);
+  assert.equal(missingExit.status, 'unavailable'); assert.deepEqual(missingExit.observations, []);
+});
 for (const condition of ['plain', 'kernel_principles_v2', 'full_ask']) test(`R5 supplied app-server segment ${condition} never attests installed runtime`, () => {
   const f = suppliedFixture(condition), result = inputs.inspectSuppliedPrimaryAppServerVerification(f.contract, condition, encode(f.events), f.identity);
   assert.equal(result.status, 'supplied_verification_segment_complete'); assert.equal(result.observations.length, 1);
@@ -131,6 +151,12 @@ const badSegments = {
   caller_authority: f => { f.events[0].params.authority = true; },
   plugin_execution: f => { f.events[0].params.item.pluginId = 'arbitrary-plugin'; },
   user_shell: f => { f.events[0].params.item.source = 'userShell'; },
+  null_source: f => { f.events[0].params.item.source = null; },
+  missing_id: f => { delete f.events[0].params.item.id; },
+  missing_type: f => { delete f.events[0].params.item.type; },
+  missing_status: f => { delete f.events[0].params.item.status; },
+  missing_command: f => { delete f.events[0].params.item.command; },
+  missing_actions: f => { delete f.events[0].params.item.commandActions; },
 };
 for (const [name, mutate] of Object.entries(badSegments)) test(`R5 refuses supplied app-server ${name}`, () => {
   const f = suppliedFixture(); mutate(f);
