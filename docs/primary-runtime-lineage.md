@@ -32,6 +32,14 @@ identity, no execution/scoring authority and no real dispatch;
 L5: timeout/interruption/unknown output/late events/cleanup failures unavailable;
 L6: existing V10 preparation, launch and scoring guards remain in place for P/K/F
 and both profiles. Tests run Node fake processes only, never a native binary.
+The shared producer must also remain importable in the sealed historical Full
+test context. Current runner and preparation dependencies are loaded only by the
+explicit synthetic collection entry. The module-owned receipt retains the
+original inventory function for synchronous verification; callers cannot supply
+or replace it. Historical renderer/runner bytes and manifest pins are unchanged.
+A small named-export support module preserves ESM linking before dependency
+evaluation: missing historical APIs reject before any old runner top-level code
+can evaluate, even if synthetic collection is explicitly selected.
 
 This connects executable collection and diagnostic consumption, not another
 preparation contract. Unknown startup instructions/tools/plugins/global inputs,

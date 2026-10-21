@@ -5,9 +5,7 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { posix, join, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { executeCodexSession } from './codex-exec-runner.mjs';
 import { canonicalDigest, parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
-import { inventoryUserTree } from './ask-user-comparison-prepare.mjs';
 import { buildPrimaryRuntimeV10Binding } from './ask-primary-runtime-v10.mjs';
 import { inspectSuppliedPrimaryAppServerVerification } from './ask-primary-execution-input.mjs';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
@@ -44,6 +42,10 @@ export async function collectPrimaryRuntimeLineageForTest({ plan, planDigest, co
   assert.equal(plan.config.evidence_kind, 'synthetic', 'fake transport requires a synthetic plan');
   assert.ok(typeof spawnProcess === 'function' && spawnProcess !== spawn, 'explicit fake transport required');
   assert.ok(Number.isSafeInteger(timeoutMs) && timeoutMs >= 1 && timeoutMs <= 2147483647);
+  // Historical Full consumers import the shared producer with sealed renderer /
+  // runner modules. Load current collection-only dependencies only on this
+  // explicit synthetic entry, without changing those historical modules.
+  const { executeCodexSession, inventoryUserTree } = await import('./ask-primary-runtime-collection-support.mjs');
   const binding = buildPrimaryRuntimeV10Binding({ plan, planDigest });
   const arm = binding.conditions[condition]; assert.ok(arm, 'unknown condition');
   assert.equal(typeof input, 'string'); assert.equal(hash(input), arm.stdin.digest); assert.equal(Buffer.byteLength(input), arm.stdin.bytes);
@@ -306,7 +308,7 @@ export async function collectPrimaryRuntimeLineageForTest({ plan, planDigest, co
     termination_confirmed: terminated, duration_ms: Number.isFinite(result.durationMs) && result.durationMs >= 0 ? result.durationMs : null,
     runtime_attestation: 'unknown', execution_authority: false, scoring_authority: false, quality: null, missing_runtime_evidence: [...missing] };
   const receipt = Object.freeze({ kind: 'ask_primary_runtime_lineage_owned_receipt_v1', evidence_kind: 'synthetic' });
-  owned.set(receipt, { projection, binding, plan: structuredClone(plan), input, armRoot, before, finalInventory, retained, sourceDigests, fixedTrees, nativeRows, requestBytes, itemProjection });
+  owned.set(receipt, { projection, binding, plan: structuredClone(plan), input, armRoot, before, finalInventory, retained, sourceDigests, fixedTrees, nativeRows, requestBytes, itemProjection, inventoryUserTree });
   return receipt;
 }
 
@@ -318,7 +320,7 @@ export function verifyPrimaryRuntimeLineageReceipt(receipt) {
   assert.equal(hash(record.input), record.binding.conditions[record.projection.condition].stdin.digest);
   for (const [path, digest] of Object.entries(record.retained)) assert.equal(hash(read(path)), digest, 'retained runtime plan/input changed');
   for (const [path, digest] of Object.entries(record.sourceDigests)) assert.equal(hash(read(join(SOURCE_ROOT, path))), digest, 'runtime source changed');
-  for (const [root, inventory] of Object.entries(record.fixedTrees)) assert.deepEqual(inventoryUserTree(root), inventory, 'prepared source/baseline changed');
+  for (const [root, inventory] of Object.entries(record.fixedTrees)) assert.deepEqual(record.inventoryUserTree(root), inventory, 'prepared source/baseline changed');
   assert.equal(hash(record.requestBytes.join('')), record.projection.request_stream_digest);
   assert.equal(hash(Buffer.concat(record.nativeRows.map(row => Buffer.concat([row.raw, Buffer.from('\n')])))), record.projection.recorded_native_stream_digest);
   // Independently rebuild paired native observations from privately retained bytes.
@@ -348,7 +350,7 @@ export function verifyPrimaryRuntimeLineageReceipt(receipt) {
   }
   assert.deepEqual(pairs, record.projection.item_pairs); assert.deepEqual(edits, record.projection.edits);
   assert.deepEqual(response, record.projection.final_response); assert.deepEqual(usage, record.projection.usage);
-  if (record.finalInventory !== null) assert.deepEqual(inventoryUserTree(record.armRoot), record.finalInventory, 'final runtime workspace changed');
+  if (record.finalInventory !== null) assert.deepEqual(record.inventoryUserTree(record.armRoot), record.finalInventory, 'final runtime workspace changed');
   return publicResult(record.projection);
 }
 

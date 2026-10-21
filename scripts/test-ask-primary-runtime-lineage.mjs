@@ -5,7 +5,7 @@ import { PassThrough, Writable } from 'node:stream';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { prepareUserComparison, prepareGitBaseline } from './ask-user-comparison-prepare.mjs';
 import { collectUserComparisonRuntimeLineageForTest, startUserComparison } from './ask-user-comparison.mjs';
 import { buildPrimaryFixtureRecipe } from './ask-primary-fixture-recipe.mjs';
@@ -14,6 +14,16 @@ import { producePrimaryRuntimeLineageArtifacts, verifyPrimaryRuntimeLineageArtif
 const ROOT = fileURLToPath(new URL('../', import.meta.url)), ID = 'mn-build-option-update';
 const secret = 'SECRET_AUTH_HOST_CONFIGURATION_SENTINEL';
 const read = path => readFileSync(path, 'utf8');
+for (const missing of ['runner', 'inventory']) test('L6 lazy support rejects missing historical '+missing+' exports before evaluation', async t => {
+  const area = realpathSync(mkdtempSync(join(tmpdir(), 'ask-lineage-lazy-link-'))); t.after(() => rmSync(area, { recursive: true, force: true }));
+  const marker = join(area, 'evaluated');
+  writeFileSync(join(area, 'support.mjs'), readFileSync(join(ROOT, 'scripts/ask-primary-runtime-collection-support.mjs')));
+  const sideEffect = 'import {writeFileSync} from "node:fs"; writeFileSync('+JSON.stringify(marker)+',"unexpected evaluation");\n';
+  writeFileSync(join(area, 'codex-exec-runner.mjs'), sideEffect + (missing === 'runner' ? 'export const historicalRunner = true;' : 'export function executeCodexSession() {}'));
+  writeFileSync(join(area, 'ask-user-comparison-prepare.mjs'), sideEffect + (missing === 'inventory' ? 'export const historicalPrepare = true;' : 'export function inventoryUserTree() {}'));
+  await assert.rejects(import(pathToFileURL(join(area, 'support.mjs')).href), {name:'SyntaxError'});
+  assert.equal(existsSync(marker),false,'link failure must precede either module evaluation');
+});
 function fixture(t, kernelCondition = 'kernel_principles_v2') {
   const area = realpathSync(mkdtempSync(join(tmpdir(), 'ask-runtime-lineage-'))); t.after(() => rmSync(area, { recursive: true, force: true }));
   const repo = join(area, 'seed'), base = join(ROOT, 'benchmarks/fixtures/checkpoint-b2', ID);
