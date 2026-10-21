@@ -293,6 +293,7 @@ jobs:
           node --test scripts/test-ask-primary-command-evidence-v9.mjs
           node scripts/generate-ask-primary-grading-schemas.mjs --evaluation-v10 --check
           node --test scripts/test-ask-primary-runtime-v10.mjs
+          node --test scripts/test-ask-primary-runtime-lineage.mjs
           node --test scripts/test-ask-primary-command-literal-word-v5.mjs
           node --test scripts/test-ask-primary-auxiliary-shell-v6.mjs
           node --test scripts/test-ask-primary-evidence-recognition-v2.mjs scripts/test-ask-review-target-requirement-v2.mjs

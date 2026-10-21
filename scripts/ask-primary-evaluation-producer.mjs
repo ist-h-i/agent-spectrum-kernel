@@ -1,4 +1,5 @@
 import {PRIMARY_RUNTIME_V10_REVISION, buildPrimaryRuntimeV10Binding, assertPrimaryRuntimeV10ScoringAuthority} from './ask-primary-runtime-v10.mjs';
+import {verifyPrimaryRuntimeLineageReceipt, assertPrimaryRuntimeLineageOutput} from './ask-primary-runtime-lineage.mjs';
 // Faithful offline conversion of retained single-shot bytes. No model, shell,
 // private evaluator, ownership recovery, grant or admission mutation occurs.
 import assert from 'node:assert/strict';
@@ -318,6 +319,36 @@ export async function verifyPrimaryRuntimeV10Preparation(options) {
   const raw=read(join(target,'producer.json'));assert.equal(hash(raw),options.externalDigest,'V10 external producer pin changed');
   const manifest=parseJsonRejectDuplicateKeys(raw.toString('utf8'));assert.equal(manifest.kind,'ask_primary_evaluation_producer_v10');
   return verifyV10(manifest,target);
+}
+
+/** Owned collector -> verifier -> diagnostic producer. Serialized artifact
+ * records cannot issue an execution producer token or replace the live handle. */
+export function producePrimaryRuntimeLineageArtifacts(receipt, outputRoot) {
+  const observation = verifyPrimaryRuntimeLineageReceipt(receipt), target = resolve(outputRoot);
+  assert.equal(observation.evidence_kind, 'synthetic');
+  assertPrimaryRuntimeLineageOutput(receipt, target);
+  assert.ok(!existsSync(target)); assert.equal(realpathSync(dirname(target)), dirname(target));
+  mkdirSync(target, { mode: 0o700 });
+  write(target, 'runtime-lineage.json', observation);
+  const manifest = { kind: 'ask_primary_runtime_lineage_producer_v1', evidence_kind: 'synthetic',
+    condition: observation.condition, run_id: observation.run_id, plan_digest: observation.plan_digest,
+    binding_digest: observation.binding_digest, source_digests: primaryProducerSources(), artifact_inventory: entries(target),
+    execution_authority: false, scoring_ready: false, runtime_attestation: 'unknown', quality: null };
+  write(target, 'producer.json', manifest);
+  return { recordRoot: target, externalDigest: hash(bytes(manifest)), evidence_kind: 'synthetic', scoring_ready: false };
+}
+
+export function verifyPrimaryRuntimeLineageArtifacts(options, receipt) {
+  const observation = verifyPrimaryRuntimeLineageReceipt(receipt), target = resolve(options.recordRoot);
+  assert.equal(realpathSync(target), target); assert.deepEqual(readdirSync(target).sort(), ['producer.json', 'runtime-lineage.json']);
+  const raw = read(join(target, 'producer.json')); assert.equal(hash(raw), options.externalDigest);
+  const manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
+  assert.deepEqual(manifest, { kind: 'ask_primary_runtime_lineage_producer_v1', evidence_kind: 'synthetic',
+    condition: observation.condition, run_id: observation.run_id, plan_digest: observation.plan_digest,
+    binding_digest: observation.binding_digest, source_digests: primaryProducerSources(), artifact_inventory: entries(target),
+    execution_authority: false, scoring_ready: false, runtime_attestation: 'unknown', quality: null });
+  assert.deepEqual(read(join(target, 'runtime-lineage.json')), bytes(observation));
+  return { observation, execution_authority: false, scoring_ready: false, runtime_attestation: 'unknown', quality: null };
 }
 export function verifyPrimaryEvaluationProducer(options) {
   assert.deepEqual(Object.keys(options).sort(), ['externalDigest', 'recordRoot']);
