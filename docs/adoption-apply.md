@@ -77,7 +77,7 @@ rollback / detach は ASK 管理範囲の操作です。initialize-once の proj
 
 raw prompt、secret values、installer stdout / stderr、rollback contents は結果へ出力しません。parser 例外も入力断片を転記せず固定 reason にします。子プロセスには必要な環境変数だけを渡し、`NODE_OPTIONS`、`NODE_PATH`、Git trace / config overrides、任意の secret 環境変数を継承しません。global 認証を探索しません。
 
-既知の secret file / credential directory は内容を読まず metadata だけで変化を検知します。その他は bytes の hash と mode を内部観測し、作業ツリー一覧や無関係なパスを結果へ公開しません。snapshot は最大 100,000 entries、通常ファイル 64 MiB、合計 512 MiB に制限し、超過は fail closed です。
+既知の secret file / credential directory は内容を読まず metadata だけで変化を検知します。その他は bytes の hash と mode を内部観測し、作業ツリー一覧や無関係なパスを結果へ公開しません。snapshot は最大 100,000 entries、通常ファイル 64 MiB、合計 8 GiB の固定作業予算に制限し、超過は fail closed です。全域 metadata の予算確認後、通常ファイルを共用 64 KiB buffer で安定読取・hash し、合計 bytes 分のメモリを確保しません。従来の合計 512 MiB からの意図的な製品契約改訂と検証条件は [bounded snapshot contract](bounded-target-snapshot.md) を参照してください。ignored/untracked、node_modules、output、reports も従来どおり観測し、除外や任意の上限変更オプションはありません。
 
 計画・適用中に別プロセスで source / target を変更しないでください。静的 path 検査、安定読取、phase 間照合は OS-level isolation や悪意ある並行 writer に対する atomic transaction ではありません。途中の並行変更を検出した場合も、すでに書き込まれた内容を隠しません。
 

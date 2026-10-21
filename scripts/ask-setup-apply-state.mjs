@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
-  closeSync, constants, fstatSync, lstatSync, openSync, readFileSync,
+  closeSync, constants, fstatSync, lstatSync, openSync, opendirSync, readFileSync, readSync,
   readdirSync, readlinkSync, realpathSync,
 } from "node:fs";
 import { basename, dirname, isAbsolute, resolve } from "node:path";
@@ -15,7 +16,10 @@ export const SETUP_INSTALLERS = Object.freeze({
 export const SETUP_STATE_PATHS = Object.freeze(Object.values(SETUP_INSTALLERS).map((entry) => entry.state));
 const MAX_ENTRIES = 100000;
 const MAX_FILE_BYTES = 64 * 1024 * 1024;
-const MAX_TREE_BYTES = 512 * 1024 * 1024;
+// Fixed observation-work policy, not a caller override or path exclusion.
+// Keep per-file/entry limits; bound hashing memory independently of total bytes.
+const MAX_TREE_BYTES = 8 * 1024 * 1024 * 1024;
+const HASH_CHUNK_BYTES = 64 * 1024;
 const DIGEST = /^sha256:[a-f0-9]{64}$/u;
 const comparePath = (a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
 const sortEntries = (entries) => [...entries].sort(comparePath);
@@ -96,42 +100,89 @@ function sensitive(path) {
     || path.split("/").some((part) => [".ssh", ".aws", ".azure", ".gnupg"].includes(part));
 }
 
+function fileIdentity(stat) {
+  return { dev: stat.dev, ino: stat.ino, size: stat.size, mode: stat.mode,
+    mtime: stat.mtimeMs, ctime: stat.ctimeMs };
+}
+function sameFile(a, b) {
+  return a.dev === b.dev && a.ino === b.ino && a.size === b.size && a.mode === b.mode
+    && a.mtime === b.mtime && a.ctime === b.ctime;
+}
+function stableFileHash(path, scanned, buffer) {
+  const before = lstatSync(path);
+  applyAssert(before.isFile() && sameFile(scanned, fileIdentity(before)), "file_changed_during_read");
+  // Recheck after the metadata pass; O_NONBLOCK also prevents a racing FIFO
+  // substitution between this lstat and open from waiting for a writer.
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+  try {
+    const opened = fstatSync(fd);
+    applyAssert(opened.isFile() && sameFile(scanned, fileIdentity(opened)), "file_changed_during_read");
+    const hash = createHash("sha256"); let offset = 0;
+    while (offset < scanned.size) {
+      const count = readSync(fd, buffer, 0, Math.min(buffer.length, scanned.size - offset), null);
+      applyAssert(count > 0, "file_changed_during_read");
+      hash.update(buffer.subarray(0, count)); offset += count;
+    }
+    applyAssert(readSync(fd, buffer, 0, 1, null) === 0, "file_changed_during_read");
+    const after = fstatSync(fd), named = lstatSync(path);
+    applyAssert(after.isFile() && named.isFile() && sameFile(scanned, fileIdentity(after))
+      && sameFile(scanned, fileIdentity(named)), "file_changed_during_read");
+    return hash.digest("hex");
+  } finally {
+    closeSync(fd);
+  }
+}
+
 // Entries are internal observations, never the serialized plan/report. Secret
 // files use metadata only. Non-sensitive bytes are hashed, not copied/emitted.
 // Unrelated symlinks and special files are observed without following/reading;
 // installer input/write paths are separately rejected by assertSetupWritePaths.
 export function captureApplyTree(target) {
   const root = realpathSync(target);
-  const entries = [];
+  const entries = [], files = [], directories = [{ directory: root, prefix: "" }];
   let totalBytes = 0;
-  function visit(directory, prefix) {
-    for (const name of readdirSync(directory).sort()) {
-      const path = prefix ? `${prefix}/${name}` : name;
-      if (name === ".git") {
-        if (prefix) entries.push({ path, type: "nested_git", metadata_digest: jsonDigest(gitBinding(directory)) });
-        continue;
+  // Bound metadata enumeration before hashing any ordinary bytes. A directory
+  // iterator cannot first allocate an unbounded array of names via readdir.
+  while (directories.length) {
+    const { directory, prefix } = directories.pop(), handle = opendirSync(directory);
+    try {
+      for (let child; (child = handle.readSync()) !== null;) {
+        const name = child.name;
+        const path = prefix ? `${prefix}/${name}` : name;
+        if (name === ".git") {
+          if (prefix) {
+            applyAssert(entries.length < MAX_ENTRIES, "target_snapshot_limit");
+            entries.push({ path, type: "nested_git", metadata_digest: jsonDigest(gitBinding(directory)) });
+          }
+          continue;
+        }
+        applyAssert(entries.length < MAX_ENTRIES, "target_snapshot_limit");
+        const absolute = resolve(directory, name);
+        const stat = lstatSync(absolute);
+        const mode = stat.mode & 0o777;
+        if (stat.isSymbolicLink()) {
+          entries.push({ path, type: "symlink", mode, sha256: sha256(readlinkSync(absolute)) });
+        } else if (sensitive(path)) {
+          entries.push({ path, type: "opaque", mode, metadata_digest: jsonDigest({ size: stat.size, mtime: stat.mtimeMs, ctime: stat.ctimeMs, kind: stat.mode & 0o170000 }) });
+        } else if (stat.isDirectory()) {
+          entries.push({ path, type: "directory", mode });
+          directories.push({ directory: absolute, prefix: path });
+        } else if (stat.isFile()) {
+          applyAssert(stat.size <= MAX_FILE_BYTES, "unsafe_or_oversized_file");
+          totalBytes += stat.size;
+          applyAssert(totalBytes <= MAX_TREE_BYTES, "target_snapshot_limit");
+          const entry = { path, type: "file", mode, sha256: null };
+          entries.push(entry); files.push({ absolute, entry, scanned: fileIdentity(stat) });
+        } else {
+          entries.push({ path, type: "special", mode, metadata_digest: jsonDigest({ kind: stat.mode & 0o170000, size: stat.size, mtime: stat.mtimeMs, ctime: stat.ctimeMs }) });
+        }
       }
-      const absolute = resolve(directory, name);
-      const stat = lstatSync(absolute);
-      applyAssert(entries.length < MAX_ENTRIES, "target_snapshot_limit");
-      const mode = stat.mode & 0o777;
-      if (stat.isSymbolicLink()) {
-        entries.push({ path, type: "symlink", mode, sha256: sha256(readlinkSync(absolute)) });
-      } else if (sensitive(path)) {
-        entries.push({ path, type: "opaque", mode, metadata_digest: jsonDigest({ size: stat.size, mtime: stat.mtimeMs, ctime: stat.ctimeMs, kind: stat.mode & 0o170000 }) });
-      } else if (stat.isDirectory()) {
-        entries.push({ path, type: "directory", mode });
-        visit(absolute, path);
-      } else if (stat.isFile()) {
-        totalBytes += stat.size;
-        applyAssert(totalBytes <= MAX_TREE_BYTES, "target_snapshot_limit");
-        entries.push({ path, type: "file", mode, sha256: sha256(safeBytes(absolute)) });
-      } else {
-        entries.push({ path, type: "special", mode, metadata_digest: jsonDigest({ kind: stat.mode & 0o170000, size: stat.size, mtime: stat.mtimeMs, ctime: stat.ctimeMs }) });
-      }
+    } finally {
+      handle.closeSync();
     }
   }
-  visit(root, "");
+  const buffer = Buffer.allocUnsafe(HASH_CHUNK_BYTES);
+  for (const file of files) file.entry.sha256 = stableFileHash(file.absolute, file.scanned, buffer);
   return sortEntries(entries);
 }
 

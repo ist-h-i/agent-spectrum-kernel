@@ -50,11 +50,11 @@
         "adapters/codex/commands/codex-exec.md",
         "scripts/install-codex-adapter.mjs"
       ],
-      "subject_digest": "sha256:a7a1dbb52cd21d9fe7f6b4c25da315b344de471e9e5cae7069bd9743416b480e",
+      "subject_digest": "sha256:f1803c5342b28bb9672b2f072a1f683a67b282945ca38a574ae5b1e38a6013fb",
       "scope": "profile_projection",
       "profile_id": "codex-local-projection-v1",
       "renderer_profile": "implementation",
-      "profile_fingerprint": "sha256:d97eb7f8ae668a96778e2a58f529ed34d85b7d7395e6a5856a7ba1dba7a55142"
+      "profile_fingerprint": "sha256:767d1595066e28234244bacd2157031176597cb0175f083851afc38b672c4c02"
     },
     {
       "record_id": "claude-canonical-metrics-collector",
@@ -86,7 +86,7 @@
         "scripts/test-adapter-runtime-event.mjs",
         "scripts/test-claude-metrics-collector.mjs"
       ],
-      "subject_digest": "sha256:061232728d16ff32f4f4f01189ad1262471c658735af6fd5c7d1fd7a217eb60e",
+      "subject_digest": "sha256:2f6314fe325e87fe874beb28b25a6b9f004f0dcf62986aafb3ab593001065c7e",
       "verification": {
         "verifier_path": "scripts/test-claude-metrics-collector.mjs",
         "fixture_id": "claude-canonical-metrics-collector",

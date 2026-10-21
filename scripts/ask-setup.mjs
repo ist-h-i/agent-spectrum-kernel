@@ -19,6 +19,7 @@ import { skillAssets } from "./skill-assets.mjs";
 import { readSetupRepositoryId, validateSetupGitMetadata } from "./ask-setup-git.mjs";
 import { readSetupJson, sanitizeSetupDoctorReport, summarizeSetupProcessFailure } from "./ask-setup-diagnostics.mjs";
 import { validateSetupDoctorInputs } from "./ask-setup-doctor-inputs.mjs";
+import { personalPromptTargetActive } from "./ask-personal-prompt-target-lock.mjs";
 import {
   KERNEL_SETUP_INPUTS,
   buildSetupSourceIdentity,
@@ -427,6 +428,7 @@ export function planDigestPayload(plan) {
 export async function createAdoptionPlan({ target, adapter, profile, purpose = null, risk = "normal", requiredCapabilities = [], portfolioPath = null }) {
   const root = realpathSync(target);
   if (!ADAPTERS.includes(adapter)) throw new Error(`Unknown adapter: ${adapter}`);
+  if (adapter === "codex" && personalPromptTargetActive(root)) throw new Error("personal_prompt_owner_active");
   const beforeInspection = await inspectRepository(root);
   const applyBefore = captureApplyTarget(root);
   assertNoSetupInProgress(root);
