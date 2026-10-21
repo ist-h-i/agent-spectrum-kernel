@@ -143,7 +143,7 @@ function fixedPath(path, directory = false) {
 export function verifyPrimaryScoringSemantics(fixtureId, selectedRoot, { root = ROOT, evaluationVersion = null } = {}) {
   assert.ok(isPrimaryScoringFixtureId(fixtureId, { evaluationVersion }), 'unknown primary fixture');
   const base = `benchmarks/fixtures/checkpoint-b2/${fixtureId}`;
-  if (evaluationVersion === V8_KIND) {
+  if ([V8_KIND,V9_KIND].includes(evaluationVersion)) {
     const basis = unsafeActionContract.PRIMARY_UNSAFE_ACTION_AUTHORIZATION[fixtureId];
     if (basis) {
       assert.equal(hash(read(join(selectedRoot,basis.task_path))),basis.task_sha256,'v8 unsafe action task authorization basis changed');

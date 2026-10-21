@@ -9,7 +9,7 @@ import {syntheticPrimarySource} from './test-helpers-primary-evaluation-producer
 import {artificialAuxiliaryEnvelope} from './test-helpers-primary-auxiliary-shell-v6.mjs';
 import {producePrimaryEvaluationArtifacts,verifyPrimaryEvaluationProducer,buildPrimaryEvaluationScoringInputs} from './ask-primary-evaluation-producer.mjs';
 import {syntheticV9ScoringVersion} from './test-helpers-primary-evaluation-v9.mjs';
-import {readPrimaryScoringVersion,validatePrimaryScoringVersionFixtureInventory} from './ask-primary-scoring-version.mjs';
+import {readPrimaryScoringVersion,validatePrimaryScoringVersionFixtureInventory,verifyPrimaryScoringSemantics} from './ask-primary-scoring-version.mjs';
 import {comparisonHash} from './ask-user-comparison-prepare.mjs';
 import {deriveEvaluatorDependencyGraph,validateSealedRepositoryAuthorityBytes} from './ask-benchmark-evaluator-boundary.mjs';
 import {withPrimaryProcessingSourceBuild} from './ask-primary-evaluation-scope.mjs';
@@ -60,6 +60,12 @@ test('C9-SELECT exact selector kind/revision/source closure and semantics',t=>{
  }
  const v={...value,fixture_set:'catalog24'};assert.throws(()=>validatePrimaryScoringVersionFixtureInventory(v),/inventory|complete|fixture/u);
 });
+test('C9-AUTHORITY inherits the exact unsafe-action task authorization basis',t=>{
+ const id='hi-authorization-exception',f=syntheticV9ScoringVersion(t,{fixtureIds:[id]});
+ verifyPrimaryScoringSemantics(id,f.runtime,{evaluationVersion:'ask_primary_scoring_version_v9'});
+ const path=join(f.runtime,'benchmarks/fixtures/checkpoint-b2',id,'task.md');chmodSync(path,0o600);writeFileSync(path,readFileSync(path)+'\nchanged task\n');chmodSync(path,0o400);
+ assert.throws(()=>verifyPrimaryScoringSemantics(id,f.runtime,{evaluationVersion:'ask_primary_scoring_version_v9'}),/unsafe action task authorization basis changed/u);
+});
 test('C9-AUTHORITY actual source graph keeps helper a module and all closed authority data sealed',()=>{
  const baseRevision=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
  const processing=primaryProcessingDescriptor({commandEvidenceParserRevision:revision});
@@ -69,14 +75,15 @@ test('C9-AUTHORITY actual source graph keeps helper a module and all closed auth
   const node=graph.node_inventory.find(n=>n.path===path);assert.ok(node,path);assert.equal(node.sha256,hash);assert.equal(node.file_type,authorities.has(path)?'authority_data':'module');
   if(authorities.has(path))validateSealedRepositoryAuthorityBytes(path,readFileSync(join(root,path)));
  }
- assert.ok(graph.edge_inventory.some(e=>e.kind==='module_import'&&e.to==='scripts/ask-primary-discovery-grammar-v9.mjs'));
+ assert.ok(graph.edge_inventory.some(e=>e.to==='scripts/ask-primary-discovery-grammar-v9.mjs'&&e.kind!=='authority_read'&&e.kind!=='runtime_private_import'));
 });
 for(const kernelCondition of ['kernel_principles_v1','kernel_principles_v2'])test('C9-PARITY/LINEAGE synthetic producer applies the same revision to all three conditions '+kernelCondition,async t=>{
  const source=syntheticPrimarySource(t,{kernelCondition,command:'missing',mutate:true,nativeEvents:({armRoot,contract})=>{const es=artificialAuxiliaryEnvelope({armRoot,contract});for(const e of es)if(e.item?.id==='artificial-v6-pwd')e.item.command=discovery;return es;}});
  const produced=await producePrimaryEvaluationArtifacts(source.block,join(source.root,'v9-derived'),{commandEvidenceParserRevision:revision});
  const options={recordRoot:produced.output_root,externalDigest:produced.external_digest};
  const verified=verifyPrimaryEvaluationProducer(options);assert.equal(verified.commandEvidenceParserRevision,revision);
- assert.equal(JSON.parse(readFileSync(join(produced.output_root,'producer.json'))).kind,'ask_primary_evaluation_producer_v9');
+ const producerPath=join(produced.output_root,'producer.json'),manifest=JSON.parse(readFileSync(producerPath));assert.equal(manifest.kind,'ask_primary_evaluation_producer_v9');
+ assert.equal(Object.keys(manifest.source_digests).filter(p=>p.includes('saved-v9-')).length,8);
  for(const condition of ['plain',kernelCondition,'full_ask']){
   const normalized=buildPrimaryEvaluationScoringInputs(options,{condition}).normalizedResult;
   assert.deepEqual(normalized.command_evidence.succeeded_command_ids,contract.commands.map(c=>c.command_id));
@@ -84,4 +91,7 @@ for(const kernelCondition of ['kernel_principles_v1','kernel_principles_v2'])tes
  }
  assert.equal(produced.model_calls,0);assert.equal(produced.grader_process_starts,0);
  await assert.rejects(()=>producePrimaryEvaluationArtifacts(source.block,join(source.root,'override'),{commandEvidenceParserRevision:revision,publicFiles:['task.md']}),/override refused/u);
+ delete manifest.source_digests['benchmarks/schemas/primary-saved-v9-portfolio-command-evidence.schema.json'];
+ writeFileSync(producerPath,JSON.stringify(manifest,null,2)+'\n');
+ assert.throws(()=>verifyPrimaryEvaluationProducer({recordRoot:produced.output_root,externalDigest:comparisonHash(readFileSync(producerPath))}),/producer sources changed/u);
 });

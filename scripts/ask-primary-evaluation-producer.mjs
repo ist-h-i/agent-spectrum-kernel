@@ -57,6 +57,7 @@ export function primaryProducerSources() {
     'benchmarks/schemas/primary-saved-v6-portfolio-command-evidence.schema.json', 'benchmarks/schemas/primary-k2-saved-v6-portfolio-command-evidence.schema.json',
     'benchmarks/schemas/primary-saved-v7-portfolio-command-evidence.schema.json', 'benchmarks/schemas/primary-k2-saved-v7-portfolio-command-evidence.schema.json',
     ...['primary','primary-k2'].flatMap(prefix=>['portfolio-command-evidence','normalized-portfolio-result','evaluator-result-envelope','portfolio-engineering-result'].map(name=>`benchmarks/schemas/${prefix}-saved-v8-${name}.schema.json`)),
+    ...['primary','primary-k2'].flatMap(prefix=>['portfolio-command-evidence','normalized-portfolio-result','evaluator-result-envelope','portfolio-engineering-result'].map(name=>`benchmarks/schemas/${prefix}-saved-v9-${name}.schema.json`)),
     'benchmarks/schemas/primary-saved-v7-evaluator-result-envelope.schema.json', 'benchmarks/schemas/primary-k2-saved-v7-evaluator-result-envelope.schema.json'];
   const all=new Set([...paths,'scripts/ask-primary-fixture-recipe.mjs','benchmarks/adaptive-portfolio.config.json',
     'benchmarks/schemas/runtime-observation-carrier.schema.json',
