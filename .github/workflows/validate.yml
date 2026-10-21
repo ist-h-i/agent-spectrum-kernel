@@ -84,6 +84,9 @@ jobs:
       - name: Run offline pragmatic evaluation report regressions
         run: node --test scripts/test-ask-pragmatic-evaluation-report.mjs
 
+      - name: Verify prospective performance probe (synthetic controls only)
+        run: node --test scripts/test-ask-benchmark-pf-performance-probe.mjs
+
       - name: Verify explicit primary scoring-version connection (model-free)
         run: |
           node --test scripts/test-ask-primary-execution-input.mjs
@@ -110,6 +113,12 @@ jobs:
           node scripts/adapter-runtime-bundle.mjs > "$RUNNER_TEMP/ask-expected-runtime-bundle.json"
           diff -u docs/fixtures/adapter-runtime-bundle.json "$RUNNER_TEMP/ask-expected-runtime-bundle.json"
           exit 1
+
+      - name: Verify bounded full-target streaming snapshots (artificial only)
+        run: node --test scripts/test-target-snapshot-streaming.mjs
+
+      - name: Rehearse parent rollback and return to pre-install absence (artificial only)
+        run: node --test scripts/test-personal-prompt-preinstall-return.mjs
 
       - name: Run synthetic JSON pilot fake-only regressions
         run: node --test scripts/test-ask-synthetic-json-pilot.mjs
@@ -216,8 +225,11 @@ jobs:
       - name: Run governed Evolution full-closure integration tests
         run: node scripts/test-evolution-loop-integration.mjs
 
+      - name: Verify opt-in Prompt repetition recommendation bridge (artificial only)
+        run: node --experimental-test-module-mocks --test scripts/test-personal-prompt-repetition-statistics.mjs scripts/test-personal-prompt-repetition-evaluation.mjs scripts/test-personal-prompt-repetition-driver.mjs
+
       - name: Run personal observation and generated candidate contracts (model-free)
-        run: node --test scripts/test-ask-personal-evolution-observation.mjs scripts/test-ask-personal-evolution.mjs scripts/test-ask-personal-evolution-generation.mjs scripts/test-ask-personal-evolution-generation-connector.mjs scripts/test-ask-personal-evolution-saved-results-mode.mjs scripts/test-ask-personal-evolution-primary-pair.mjs scripts/test-ask-personal-source-install.mjs scripts/test-ask-personal-prompt-runtime-v2.mjs
+        run: node --test scripts/test-ask-personal-evolution-observation.mjs scripts/test-ask-personal-evolution.mjs scripts/test-ask-personal-evolution-generation.mjs scripts/test-ask-personal-evolution-generation-connector.mjs scripts/test-ask-personal-evolution-saved-results-mode.mjs scripts/test-ask-personal-evolution-primary-pair.mjs scripts/test-ask-personal-source-install.mjs scripts/test-ask-personal-prompt-runtime-v2.mjs scripts/test-personal-prompt-target-application.mjs scripts/test-personal-prompt-codex-handover.mjs scripts/test-personal-prompt-owner-manual-recovery.mjs scripts/test-codex-installer-preflight-order.mjs
 
       - name: Verify personal CLI and unstarted preparation recovery (model-free)
         run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-cli-catalog24.mjs scripts/test-ask-personal-evolution-cli-catalog24-v8.mjs scripts/test-ask-personal-evolution-cli-recovery.mjs scripts/test-ask-personal-evolution-unattended-policy.mjs scripts/test-ask-personal-evolution-unattended.mjs scripts/test-ask-personal-evolution-rejection.mjs

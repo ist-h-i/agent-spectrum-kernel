@@ -47,7 +47,7 @@ ASKは、共通の判断原則、必要時に使う工程、プロジェクト�
 
 開発で得た問題を改善候補にし、評価で必要性を確かめた手順を開発へ戻す構想です。候補やSkillを増やすこと自体を成功とは扱いません。不要な工程の削減も改善に含めます。
 
-[Evolutionの契約](docs/evolution-loop-contract.md) は候補・比較・判断・適用の責任を分けます。現在の [個人改善CLI](docs/personal-evolution-cli.md) は **Promptを対象とする入口**で、事前の管理設定後に問題要約、候補生成、ソース確認、保存比較、評価確認、人の判断をつなぎます。任意のSkillを自律的に改善したり、Macへ自動適用したりする機能ではありません。実モデルの生成・比較を始めるには本人の直接承認が必要です。公開された一巡の検証はfake provider / runner / gradingによる合成試験であり、実運用の成功とは区別します。
+[Evolutionの契約](docs/evolution-loop-contract.md) は候補・比較・判断・適用の責任を分けます。現在の [個人改善CLI](docs/personal-evolution-cli.md) は **Promptを対象とする入口**で、事前の管理設定後に問題要約、候補生成、ソース確認、保存比較、評価確認、人の判断をつなぎます。任意のSkillを自律的に改善したり、Macへ自動適用したりする機能ではありません。実モデルの生成・比較を始めるには本人の直接承認が必要です。公開の合成試験と [保存済み一巡の説明](docs/demos/personal-loop-saved-demo-ja.md) は区別して確認します。保存runの処理完了は、品質改善や反復運用の受入を示しません。
 
 ## Kernel・Skills・プロジェクト固有設定
 
@@ -73,6 +73,8 @@ ASKは、共通の判断原則、必要時に使う工程、プロジェクト�
 ## はじめ方
 
 導入時間の一律の目安は設けていません。まず、対象repoと利用ツールを決めます。
+
+個人で改善候補を比較する場合は、[準備→開始→結果確認→次回の手順](docs/personal-loop-quickstart-ja.md) と [v1の範囲・制約の準備版](docs/personal-v1-release-preparation-ja.md) を確認してください。最終受入・公開可否の判定はまだ完了していません。
 
 1. **Mac / Codex:** [導入・復旧ガイド](docs/quickstart-mac-codex-ja.md) の使い捨てrepoで、導入計画と変更差分を確認します。検証対象はmacOS・Node 24.x・Git・完全なASK checkoutです。
 2. **ほかの構成:** [共通導入ガイド](docs/quickstart-ja.md) から、Skill対応 / 非対応ツールやClaude Codeの手順を選びます。
@@ -133,6 +135,7 @@ node scripts/test-release-install-recovery.mjs
 | 導入して最初の依頼をする | [Mac / Codex導入](docs/quickstart-mac-codex-ja.md)、[共通導入](docs/quickstart-ja.md)、[依頼レシピ](docs/prompt-recipes-ja.md) |
 | 用語や工程の選び方を知る | [用語集](docs/glossary-ja.md)、[ルーティング](docs/routing-model.md)、[Skill一覧](docs/skill-matrix.md) |
 | 改善候補を評価して判断する | [個人改善CLI](docs/personal-evolution-cli.md)、[個人ループの手順](docs/personal-evolution-primary-loop.md)、[Evolution契約](docs/evolution-loop-contract.md) |
+| 個人向けv1の手順・制約・デモを確認する | [操作手順の準備版](docs/personal-loop-quickstart-ja.md)、[範囲と公開準備](docs/personal-v1-release-preparation-ja.md)、[保存結果のデモ](docs/demos/personal-loop-saved-demo-ja.md) |
 | 評価の根拠・未完事項を調べる | [24課題の状況](docs/primary-24-task-assembly.md)、[過去の測定](benchmarks/results/)、[リリース判定](docs/release-package-2026-10.md) |
 | 運用の説明・報告を作る | [readiness報告テンプレート](docs/ai/stakeholder-readiness-report-template.md)、[人工データによる報告例](docs/ai/reports/examples/) |
 | 契約・実装・詳細手順を探す | [文書索引](docs/README.md)、[manifest](manifest.json)、[変更履歴](CHANGELOG.md) |
