@@ -65,7 +65,7 @@ export function validatePersonalEvolutionEvaluationSelection(evaluation, ids) {
   assertPersonalEvolutionFields(selector, ["path", "digest"], "catalog24 requires a fixed versioned selector");
   assert.equal(comparisonHash(raw(selector.path)), selector.digest, "catalog24 scoring selector changed");
   const manifest = json(selector.path);
-  assert.ok(["ask_primary_scoring_version_v7", "ask_primary_scoring_version_v8"].includes(manifest.kind), "catalog24 requires explicit v7 or v8");
+  assert.ok(["ask_primary_scoring_version_v7", "ask_primary_scoring_version_v8", "ask_primary_scoring_version_v9"].includes(manifest.kind), "catalog24 requires explicit v7, v8 or v9");
   assert.equal(manifest.fixture_set, "catalog24", "catalog24 selector inventory required");
   assertPersonalEvolutionFields(evaluation.gradingResources, roles, "separate role resources");
   const configs = roles.map(role => {
