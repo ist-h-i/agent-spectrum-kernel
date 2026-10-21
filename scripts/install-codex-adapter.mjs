@@ -932,6 +932,25 @@ export function codexManagedAssetsForProfile(profileName) {
   return buildCodexProjectionPlan({ profileName }).projectedManagedAssets;
 }
 
+/** Read-only expected projection bytes using the installer's own renderers.
+ * No target, installation state, host configuration or mutation is involved. */
+export function codexProjectedAssetContentsForProfile(profileName) {
+  const plan = buildCodexProjectionPlan({ profileName }), contents = new Map();
+  const set = (path, content) => {
+    const bytes = Buffer.from(content);
+    if (contents.has(path) && !contents.get(path).equals(bytes)) throw new Error(`conflicting projected public asset: ${path}`);
+    contents.set(path, bytes);
+  };
+  for (const file of plan.skillFiles) set(`.agents/skills/${file.skill}/${file.relativePath}`, readText(resolve(REPO_ROOT, file.sourcePath)));
+  for (const artifact of plan.compactProfileArtifacts) set(`.agents/prompts/${artifact.metadata.prompt_name}`, artifact.content);
+  for (const command of plan.commands) set(`.agents/commands/${command}`, commandContent(command, plan.prompts));
+  if (plan.commands.includes('codex-exec.md')) for (const file of CODEX_RUNTIME_FILES) set(file.target, readText(resolve(REPO_ROOT, file.source)));
+  for (const path of plan.requiredAssets.filter(path => !CORE_OWNED_IMMUTABLE_ASSETS.includes(path))) set(path, readText(resolve(REPO_ROOT, path)));
+  const expected = plan.projectedManagedAssets.map(asset => asset.path).sort();
+  if (JSON.stringify([...contents.keys()].sort()) !== JSON.stringify(expected)) throw new Error('projected public asset content inventory differs');
+  return contents;
+}
+
 function recommendedSkillsForPrompts(prompts) {
   return prompts.flatMap((prompt) => PROMPT_METADATA[prompt]?.recommendedSkills ?? []);
 }

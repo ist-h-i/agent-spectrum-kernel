@@ -8,7 +8,7 @@ import { devNull, release } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
-import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
+import { buildCodexProjectionPlan, codexProjectedAssetContentsForProfile } from "./install-codex-adapter.mjs";
 import { buildAgentsBlock, coreImmutableAssetKind, CORE_OWNED_IMMUTABLE_ASSETS, MANAGED_START, MANAGED_END } from "./installer-lifecycle.mjs";
 import { skillAssets } from "./skill-assets.mjs";
 import { KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } from "./kernel-principles.mjs";
@@ -335,10 +335,48 @@ function sourceDistribution() {
 // Re-derived only from fixed public fixture bytes and this source-owned Full
 // distribution. No caller-supplied auxiliary root/file is opened or admitted.
 export function derivePreparedPrimaryExecutionInput(plan) {
+  assert.ok(typeof plan.root === 'string' && isAbsolute(plan.root) && realpathSync(plan.root) === plan.root
+    && lstatSync(plan.root).isDirectory(), 'canonical prepared primary root required');
+  assert.deepEqual(Object.keys(plan.arms).sort(), [...comparisonConditions(plan.config.kernel_condition)].sort(), 'closed primary arms required');
+  for (const id of comparisonConditions(plan.config.kernel_condition)) {
+    assert.equal(plan.arms[id].path, `arms/${id}`, 'source-owned primary arm path required');
+    assert.equal(plan.arms[id].baseline_path, `control/baselines/${id}`, 'source-owned primary baseline path required');
+  }
   const recipe = buildPrimaryFixtureRecipe(plan.verification.recipe.fixture_id);
-  return buildPrimaryExecutionInputContract(plan, { recipe,
-    manifestBytes: readRegular(join(SOURCE, 'benchmarks/fixtures/checkpoint-b2', recipe.fixture_id, 'input-manifest.json'), 'primary input authority'),
-    auxiliaryPaths: sourceDistribution().allPaths.filter(path => path !== 'AGENTS.md') });
+  const manifestBytes = readRegular(join(SOURCE, 'benchmarks/fixtures/checkpoint-b2', recipe.fixture_id, 'input-manifest.json'), 'primary input authority');
+  const manifest = parseJson(manifestBytes, 'primary input authority'), distribution = sourceDistribution();
+  const full = new Map(distribution.corePaths.map(path => [path, readRegular(join(SOURCE, path), 'public Full source', FILE_LIMIT)]));
+  const merge = (path, raw) => {
+    if (full.has(path)) assert.ok(full.get(path).equals(raw), `conflicting source-owned public asset: ${path}`);
+    full.set(path, raw);
+  };
+  for (const [path, raw] of codexProjectedAssetContentsForProfile('full')) merge(path, raw);
+  for (const [path, entry] of distribution.extra) merge(path, entry.bytes);
+  assert.deepEqual([...full.keys()].sort(), distribution.allPaths);
+  const canonical = readRegular(join(SOURCE, 'AGENTS.md'), 'primary canonical instruction');
+  const principles = plan.config.kernel_condition === KERNEL_PRINCIPLES_V2_ID
+    ? renderKernelPrinciplesV2(canonical).body : renderKernelPrinciples(canonical).body;
+  const assertBytes = (path, raw, inventory, label) => {
+    const actual = readRegular(path, label, FILE_LIMIT, true);
+    assert.ok(actual.equals(raw), `${label} source-owned auxiliary/public bytes changed`);
+    assert.deepEqual(inventory, record(raw), `${label} source-owned byte pin changed`);
+  };
+  for (const id of comparisonConditions(plan.config.kernel_condition)) {
+    const arm = plan.arms[id];
+    for (const file of manifest.fixtures[recipe.fixture_id].files) {
+      const raw = readRegular(join(SOURCE, 'benchmarks/fixtures/checkpoint-b2', recipe.fixture_id, file.path), 'fixed public input', FILE_LIMIT, true);
+      assertBytes(join(plan.root, arm.baseline_path, file.path), raw, arm.baseline_inventory[file.path], 'primary baseline');
+    }
+    const expected = id === 'plain' ? new Map() : id === 'full_ask'
+      ? new Map([['AGENTS.md', Buffer.from(buildAgentsBlock(UTF8.decode(canonical)))], ...full])
+      : new Map([['AGENTS.md', Buffer.from(buildAgentsBlock(principles))]]);
+    for (const [path, raw] of expected) {
+      assertBytes(join(plan.root, arm.baseline_path, path), raw, arm.baseline_inventory[path], 'primary auxiliary baseline');
+      assertBytes(join(plan.root, arm.path, path), raw, arm.baseline_inventory[path], 'primary auxiliary arm');
+    }
+  }
+  return buildPrimaryExecutionInputContract(plan, { recipe, manifestBytes,
+    auxiliaryPaths: distribution.allPaths.filter(path => path !== 'AGENTS.md') });
 }
 
 function skillRecordPath(path, item, prefix) {

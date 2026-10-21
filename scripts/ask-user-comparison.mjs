@@ -147,13 +147,13 @@ export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
   assert.deepEqual(plan.policy, comparisonExecutionPolicy(plan.policy?.execution_contract));
   if (isSingleShotComparison(plan)) assert.equal(plan.execution_protocol?.resume, "forbidden", "single-shot protocol must forbid resume");
   assert.deepEqual(Object.keys(plan.arms).sort(), comparisonConditions(plan.config.kernel_condition).sort(), "unknown comparison arm");
-  if (isKernelPrinciplesCondition(plan.config.kernel_condition)) validatePrinciplesDefinition(root, plan);
-  else assert.equal(plan.kernel_definition, undefined, "legacy condition cannot carry a principles definition");
   for (const id of comparisonConditions(plan.config.kernel_condition)) {
     assert.equal(plan.arms[id].path, `arms/${id}`);
     assert.equal(plan.arms[id].baseline_path, `control/baselines/${id}`);
     assert.ok(["available", "capability_missing"].includes(plan.arms[id].capability.status));
   }
+  if (isKernelPrinciplesCondition(plan.config.kernel_condition)) validatePrinciplesDefinition(root, plan);
+  else assert.equal(plan.kernel_definition, undefined, "legacy condition cannot carry a principles definition");
   assert.equal(plan.input.path, "inputs/prompt.md");
   assert.equal(plan.verification.path, "control/verification.json");
   assert.equal(plan.verification.reporter.path, "control/node-test-reporter.mjs");
@@ -166,7 +166,10 @@ export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
       assert.equal(input.length, condition.input.bytes); assert.equal(comparisonHash(input), condition.input.digest);
       assert.equal(input.toString('utf8'), plan.prompt + renderPrimaryExecutionInputBoundary(plan.primary_execution_input, id), 'primary condition prompt changed');
     }
-  } else assert.equal(plan.primary_execution_input, undefined, 'unselected primary input contract');
+  } else {
+    assert.equal(plan.primary_execution_input, undefined, 'unselected primary input contract');
+    assert.ok(!existsSync(join(root, 'inputs/primary-conditions')), 'orphaned closed primary input artifacts; no downgrade to legacy execution');
+  }
   verifyPersonalPromptMaterialization({ plan, read: path => readStableFile(join(root, path), "personal Prompt input", LIMIT).bytes, hash: comparisonHash });
   if (!ignoreStart && !existsSync(join(root,"control/start.json")) && (existsSync(join(root,"control/start.digest")) || existsSync(join(root,"control/leases")) || existsSync(join(root,"control/history")))) throw fault(10,"start record missing from an existing execution; state corrupt");
   if (!ignoreStart && existsSync(join(root, "control/start.json"))) {

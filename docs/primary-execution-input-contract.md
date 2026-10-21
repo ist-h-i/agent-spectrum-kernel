@@ -38,6 +38,11 @@ The plan records a closed primary_execution_input contract with:
   from runtime records. Installation
   identity and runtime/controller/secret surfaces are excluded from readable
   auxiliary inputs, even if harness-owned metadata exists elsewhere.
+  Readback re-renders projected assets using the installer's own current-source
+  renderers and checks actual baseline/arm bytes plus pins. Matching two forged
+  metadata hashes does not establish source identity. The public source baseline
+  is checked against the unchanged fixture bytes too. Source-owned arm/baseline
+  locations are validated before any prepared-file read.
 - Model launch cwd arms/<condition>/workspace. Original task path names are
   explicitly relative to the arm root; workspace/foo refers to foo from this
   launch directory. Canonical arm paths never contain traversal; their fixed
@@ -68,6 +73,14 @@ This preparation slice deliberately provides no runtime admission API. A later
 independently reviewed source-bound runtime/capture connection is necessary;
 it must not change authentication, CODEX_HOME, managed policy or permission
 settings as a hidden implementation detail.
+
+Dropping both selection fields while the prepared condition-input namespace
+exists is refused as an orphaned-contract downgrade, even after rehashing plan
+metadata. Ordinary old plans never have that namespace. Local self-digests are
+integrity checks, not signatures against an owner who rewrites/deletes an entire
+preparation. A different plan digest is not the previously confirmed identity;
+future formal experiment admission must independently pin the closed contract
+and plan rather than accepting a relabelled legacy experiment.
 
 Full's current workflow can require excluded install-state metadata. That
 dependency closure is unqualified, explicitly reported as an additional Full
