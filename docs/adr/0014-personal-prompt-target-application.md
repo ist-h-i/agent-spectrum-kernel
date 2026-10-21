@@ -2,7 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-10-21
-- Upstream: ADR0004, ADR0005, ADR0011; SPEC-PERSONAL-TARGET-1@1/@2; PV1-1/6
+- Upstream: ADR0004, ADR0005, ADR0011; SPEC-PERSONAL-TARGET-1@1/@2/@3; PV1-1/6
 - Supersedes: None
 
 ## Context
@@ -32,6 +32,11 @@ doctor checks. Exact owner return requires current independently trusted parent
 selection and the original owner-state pin. Immutable non-owning history prevents
 old-plan replay. Paired-owner write interruption preserves both raw states and
 stops; this decision does not authorize automatic repair of that different journal.
+The PV1-7 @3 extension documents a separately reviewed, incident-authorized
+manual parent/original-owner recovery procedure and synthetic failure drill.
+It requires independent pre-operation pins, current rollback authority, raw
+incident evidence, shared locking, exact endpoint/mode checks and normal-owner
+post-verification. No new production repair API or target authorization follows.
 
 ## Alternatives and consequences
 
@@ -54,7 +59,7 @@ external rollback authority is still required. Codex ownership is never silently
 overlapped. Existing compact controls and conservative doctor/installer behavior
 must remain intact; actual historical AH14/C1 inputs are not new approvals.
 
-Revisit before supporting other assets or ownership shapes, paired-owner repair,
+Revisit before supporting other assets or ownership shapes, automatic paired-owner repair or manual endpoints outside @3,
 cross-version schema migration, automatic adoption, generic retry, remote targets
 or a different rollback authority. Number0014 was checked free at integration
 base5f3d574b; reconcile again if another architecture decision lands first.

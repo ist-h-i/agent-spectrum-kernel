@@ -1,6 +1,8 @@
 # Personal Prompt target recovery and Codex ownership handover
 
 SPEC-PERSONAL-TARGET-1@2 / IMP-PERSONAL-TARGET-1@2.
+The human-controlled PV1-7 extension is SPEC/IMP/FVC-PERSONAL-TARGET-1@3,
+M1-6 in [the owner-pair manual recovery procedure](personal-prompt-codex-owner-manual-recovery.md); it adds no production repair API.
 Upstream: SPEC-PERSONAL-TARGET-1@1; PV1-1/6; A5.4/A3.1; ADR0014;
 the owner's2026-10-21 explicit continuation. Formal verification remains
 FVC-PERSONAL-TARGET-1@2, extendingO1-6 rather than downgrading after findings.
@@ -110,8 +112,9 @@ mutation or external request is needed by physical recovery.
 The first ownership implementation deliberately leaves a partial paired-owner
 operation stopped: its distinct owner-operation journal retains both raw states,
 and ordinary personal/Codex operations refuse. The apply/restore recovery API
-does not accept this different journal schema. An owner-pair recovery contract
-must be independently reviewed before any such repair; no automatic rollback,
+does not accept this different journal schema. Only the independently reviewed, incident-authorized manual procedure above
+may repair its known parent endpoints; other cases remain stopped. There is
+no production owner-pair repair API; no automatic rollback,
 force override, owner-state normalization or successful return is inferred.
 Initial handover supports current full Codex with no managed partial files,
 hooks or managed blocks; other ownership shapes refuse. A completed return
