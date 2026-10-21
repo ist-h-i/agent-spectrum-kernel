@@ -224,6 +224,9 @@ jobs:
       - name: Run governed Evolution full-closure integration tests
         run: node scripts/test-evolution-loop-integration.mjs
 
+      - name: Verify opt-in Prompt repetition recommendation bridge (artificial only)
+        run: node --experimental-test-module-mocks --test scripts/test-personal-prompt-repetition-statistics.mjs scripts/test-personal-prompt-repetition-evaluation.mjs scripts/test-personal-prompt-repetition-driver.mjs
+
       - name: Run personal observation and generated candidate contracts (model-free)
         run: node --test scripts/test-ask-personal-evolution-observation.mjs scripts/test-ask-personal-evolution.mjs scripts/test-ask-personal-evolution-generation.mjs scripts/test-ask-personal-evolution-generation-connector.mjs scripts/test-ask-personal-evolution-saved-results-mode.mjs scripts/test-ask-personal-evolution-primary-pair.mjs scripts/test-ask-personal-source-install.mjs scripts/test-ask-personal-prompt-runtime-v2.mjs scripts/test-personal-prompt-target-application.mjs scripts/test-personal-prompt-codex-handover.mjs scripts/test-personal-prompt-owner-manual-recovery.mjs scripts/test-codex-installer-preflight-order.mjs
 

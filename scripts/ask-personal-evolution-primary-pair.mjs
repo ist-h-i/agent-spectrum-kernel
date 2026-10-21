@@ -24,6 +24,8 @@ import { PRIMARY_GRADING_RESERVATION_MS } from "./ask-primary-evaluation-grading
 import { PRIMARY_BATCH_LIMITS, primaryBatchLimitsForSet } from "./ask-primary-evaluation-batch.mjs";
 import { verifyPortfolioSelection } from "./portfolio-manager.mjs";
 
+import { readPromptRepetitionBinding } from "./ask-personal-prompt-repetition-binding.mjs";
+
 const raw = path => readStableFile(path, "personal pair public evidence", 33554432).bytes;
 const json = path => parseJsonRejectDuplicateKeys(raw(path).toString("utf8"));
 const read = (root, digest) => readContentAddressedJson({ storeRoot: root, digest }).value;
@@ -332,7 +334,11 @@ export function verifyPersonalEvolutionPromptPairResults(options) {
       if (report.execution.start_consumed === false) { assert.equal(saved, undefined, "an unstarted candidate cannot claim historical saved results"); pending++; continue; }
       if (ctx.registration.kind === "personal_pre_result_prompt_pair_v2") {
         const invocation = json(join(ctx.registration.output_root, "invocation/request.json"));
-        assertPersonalEvolutionFields(invocation, ["pair_object_digest", "started_at_ms", "deadline_at_ms"], "pair invocation request");
+        assertPersonalEvolutionFields(invocation, ["pair_object_digest", "started_at_ms", "deadline_at_ms", ...(Object.hasOwn(invocation,"repetition_plan_object_digest") ? ["repetition_plan_object_digest"] : [])], "pair invocation request");
+        if (Object.hasOwn(invocation,"repetition_plan_object_digest")) {
+          assert.equal(invocation.repetition_plan_object_digest, options.repetitionPlanObjectDigest, "fixed repetition invocation binding required");
+          readPromptRepetitionBinding(options, options.pairRegistrationObjectDigest);
+        }
         assert.equal(invocation.pair_object_digest, options.pairRegistrationObjectDigest, "post-result pair/plan registration transplant");
       }
       if (!saved) { incomplete++; continue; }
@@ -404,7 +410,7 @@ export function verifyPersonalEvolutionPromptPairResults(options) {
 export async function startPersonalEvolutionPromptPair(options) {
   const verificationKeys = ["storeRoot", "preparationObjectDigest", "experimentObjectDigest", "pairRegistrationObjectDigest",
     "trustedAssetAuthorityContexts", "trustedPortfolioAuthorityContexts", "trustedHighImpactApprovalGrants",
-    "trustedExperimentAuthorities", "trustedExperimentObjectDigests", "trustedPairRegistrationObjectDigests", "evaluationAuthority"];
+    "trustedExperimentAuthorities", "trustedExperimentObjectDigests", "trustedPairRegistrationObjectDigests", "evaluationAuthority", "repetitionPlanObjectDigest", "trustedRepetitionPlanObjectDigests"];
   const verificationInputs = freezePersonalEvolutionValue(structuredClone(Object.fromEntries(verificationKeys
     .filter(key => Object.hasOwn(options, key)).map(key => [key, options[key]]))));
   const confirmedPairObjectDigest = options.confirmedPairObjectDigest;
@@ -441,10 +447,12 @@ export async function startPersonalEvolutionPromptPair(options) {
     }
   };
   inspect();
+  if (Object.hasOwn(verificationInputs,"repetitionPlanObjectDigest")) readPromptRepetitionBinding(verificationInputs, verificationInputs.pairRegistrationObjectDigest);
   const consumption = join(registration.output_root, "invocation"); mkdirSync(consumption, { mode: 0o700 });
   const save = (name, artifact) => publishJsonAtomicNoReplace({ outputPath: join(consumption, name), artifact, label: "personal pair invocation evidence" });
   const started = now(), deadline = started + registration.limits.overall_timeout_ms;
-  save("request.json", { pair_object_digest: verificationInputs.pairRegistrationObjectDigest, started_at_ms: started, deadline_at_ms: deadline });
+  save("request.json", { pair_object_digest: verificationInputs.pairRegistrationObjectDigest, started_at_ms: started, deadline_at_ms: deadline,
+    ...(Object.hasOwn(verificationInputs,"repetitionPlanObjectDigest") ? {repetition_plan_object_digest: verificationInputs.repetitionPlanObjectDigest} : {}) });
   const controller = new AbortController(), relay = () => controller.abort();
   signal?.addEventListener("abort", relay, { once: true }); if (signal?.aborted) relay();
   const timer = setTimeout(relay, registration.limits.overall_timeout_ms); timer.unref();

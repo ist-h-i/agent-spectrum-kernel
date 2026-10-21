@@ -1,0 +1,9 @@
+# ADR-0015: Keep opt-in Prompt repetition analysis outside Evolution authority
+
+Status: Proposed. Date:2026-10-21. Composes with ADR0001/0004/0005/0011; supersedes none.
+
+The existing Prompt pair is single-shot and observational. Portfolio aggregatev2 is a different fixed_b1_exact/adaptive_vs_kernel protocol and cannot be relabeled. A new read-only evaluation adapter may summarize the original verified Prompt F/F scores across a separately pinned full pre-result repetition population, then supply typed dimensions to the normal Evolution recommendation API. It does not produce new task grades, raw model results or causal credit, modify existing scorers, or manufacture trust. Explicit invocation binding prevents late attachment of a favorable repetition population. Missing/failed observations stay in coverage; invalid provenance refuses.
+
+Alternatives: repeat only the current observational readout (cannot express the proposed aggregate); reinterpret Portfolio v2 (violates exact protocol); add an automatic adoption runner (out of scope and conflates evidence/authority). Choose a separate opt-in evaluation module plus the smallest backward-compatible binding in the existing driver/pair request. Existing independent single-shot workflows are unchanged.
+
+All six typed dimensions and the existing whole-evaluation/experiment/human/Portfolio/rollback authority boundaries remain. Normal publication needs exact caller-trusted whole evidence; a report hash, synthetic receipt or private source review never supplies that trust. No new authority kind or security/global setting is introduced. Any future raw-scoring, protocol, default repetition count or actual target-operation change requires separate review. Artificial focused/integration and independent final source review are prerequisites; real evaluation remains a later directly authorized action.
