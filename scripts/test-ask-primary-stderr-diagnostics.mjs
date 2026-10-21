@@ -40,3 +40,24 @@ test('invalid UTF8, incomplete line and bounded storage all stop', () => {
   assert.equal(incomplete.finish(), 'stderr_unterminated');
   const large = createPrimaryStderrDiagnostics(); assert.equal(large.push(Buffer.from('Error: error loading otel config: ' + secret.repeat(500))), 'stderr_limit');
 });
+test('all finite startup templates classify only text, not actual root cause', () => {
+  for (const [prefix, kind] of [
+    ['Error: error parsing -c overrides: ', 'config_overrides_error'],
+    ['Error: error loading default config after config error: ', 'default_config_error'],
+    ['Error: error loading otel config: ', 'otel_configuration_error'],
+  ]) for (const [suffix, os_error_text] of [[' (os error 13)', 'permission_text'], [' (os error 2)', 'missing_resource_text'], [' (os error 999)', 'not_classified']]) {
+    const value = classifyPrimaryStderrLine(prefix + secret + suffix);
+    assert.deepEqual(value, { kind, severity: 'startup_error_text', os_error_text }); assert.ok(!JSON.stringify(value).includes(secret));
+  }
+});
+test('control/ANSI/prefix spoofing stays unknown, while split Unicode tails remain private', () => {
+  for (const raw of [`\u001b[31mError: error loading otel config: ${secret}`, `prefix Error: error loading otel config: ${secret}`,
+    `Error: error loading otel config: ${secret}\nnext`, `Error: error loading otel config: ${secret}\u0000`, 'Error: error loading otel config: '])
+    assert.equal(classifyPrimaryStderrLine(raw).kind, 'unknown');
+  const parser = createPrimaryStderrDiagnostics(), bytes = Buffer.from(`Error: error loading otel config: 個人情報${secret}\n`);
+  let stopped;
+  for (const byte of bytes) { stopped = parser.push(Buffer.from([byte])); if (stopped) break; }
+  assert.equal(stopped, 'stderr_startup_error'); const snapshot = parser.summary();
+  assert.ok(!JSON.stringify(snapshot).includes(secret)); assert.ok(!JSON.stringify(snapshot).includes('個人情報'));
+  snapshot.records[0].kind = secret; assert.equal(parser.summary().records[0].kind, 'otel_configuration_error');
+});

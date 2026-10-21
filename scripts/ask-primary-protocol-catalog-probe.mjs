@@ -147,7 +147,7 @@ export async function runPrimaryCatalogProbe(planPath, output, confirm) {
   assert.ok(isAbsolute(output) && resolve(output) === output && realpathSync(dirname(output)) === dirname(output), 'unsafe protocol output');
   mkdirSync(output, { mode: 0o700 }); // exclusive creation is the attempt marker; never resume/reuse
   const cwd = join(output, 'workspace'); mkdirSync(cwd, { mode: 0o700 });
-  writeNew(join(output, 'intent.json'), { kind: 'ask_primary_catalog_probe_intent_v1', plan_digest: confirm,
+  writeNew(join(output, 'intent.json'), { kind: 'ask_primary_catalog_probe_intent_v2', diagnostic_policy: 'closed_stderr_diagnostics_v2', plan_digest: confirm,
     pins: [plan.node, plan.launcher, plan.native, plan.platform_package].map(value => value.digest), source_pins: plan.source_pins,
     attempt: 1, retry: 0, timeout_ms: 60000, maximum_output_bytes: MAX_BYTES });
   const controller = new AbortController(), abort = () => controller.abort();
