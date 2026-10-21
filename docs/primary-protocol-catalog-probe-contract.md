@@ -44,6 +44,8 @@ only reports catalog-advertised support for gpt-6.1-sol high/low and gpt-6-luna
 max. It does not establish a turn's resolved model, startup effective-input
 closure, command cwd, edit lineage, usage/cost, native acceptance or quality.
 Runtime attestation remains unknown and scoring authority false in every result.
+The fixed model_calls0 field counts this collector's requested turns; it is not
+a trace of all server background network activity.
 
 Model-free verification uses artificial streams and ordinary Node fake servers
 (no Codex server/provider): ordering, unknown/auth/tool requests, secrets, byte/
