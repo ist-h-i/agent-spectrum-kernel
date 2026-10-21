@@ -116,6 +116,17 @@ test('late unknown output discards catalog matches', async () => {
   const result = await run(transport); assert.equal(result.status, 'unavailable');
   assert.ok(result.settings.every(value => value.status === 'not_observed'));
 });
+test('BOM-prefixed stdout is not silently decoded as a valid reply', async () => {
+  for (const split of [false, true]) {
+    const transport = fakeTransport((request, child) => { if (request.id === 1) queueMicrotask(() => {
+      const bom = Buffer.from([0xef, 0xbb, 0xbf]), reply = Buffer.from(JSON.stringify(init) + '\n');
+      if (split) { child.stdout.write(bom); child.stdout.write(reply); }
+      else child.stdout.write(Buffer.concat([bom, reply]));
+    }); });
+    const result = await run(transport); assert.equal(result.status, 'unavailable'); assert.equal(result.reason, 'invalid_json');
+    assert.equal(transport.writes.length, 1); assert.deepEqual(result.replies, []);
+  }
+});
 test('split bytes, one-page absence and ambiguous catalog are not invented support', async () => {
   for (const rows of [[], [row('gpt-6.1-sol'), row('gpt-6.1-sol')]]) {
     const transport = fakeTransport((request, child) => {

@@ -50,6 +50,16 @@ test('all finite startup templates classify only text, not actual root cause', (
     assert.deepEqual(value, { kind, severity: 'startup_error_text', os_error_text }); assert.ok(!JSON.stringify(value).includes(secret));
   }
 });
+test('UTF8 BOM cannot turn an inexact warning into an exact continuation', () => {
+  const bom = Buffer.from([0xef, 0xbb, 0xbf]), raw = Buffer.concat([bom, Buffer.from(warning)]);
+  for (const chunks of [[raw], [bom, Buffer.from(warning)], [...raw].map(byte => Buffer.from([byte]))]) {
+    const parser = createPrimaryStderrDiagnostics(); let stopped;
+    for (const chunk of chunks) { stopped = parser.push(chunk); if (stopped) break; }
+    assert.equal(stopped, 'stderr_unknown'); assert.equal(parser.summary().path_alias_warning_count, 0);
+    assert.equal(parser.summary().records[0].kind, 'unknown');
+  }
+  const normal = createPrimaryStderrDiagnostics(); assert.equal(normal.push(Buffer.from(warning)), null); assert.equal(normal.finish(), null);
+});
 test('control/ANSI/prefix spoofing stays unknown, while split Unicode tails remain private', () => {
   for (const raw of [`\u001b[31mError: error loading otel config: ${secret}`, `prefix Error: error loading otel config: ${secret}`,
     `Error: error loading otel config: ${secret}\nnext`, `Error: error loading otel config: ${secret}\u0000`, 'Error: error loading otel config: '])

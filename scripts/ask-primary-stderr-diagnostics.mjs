@@ -26,7 +26,7 @@ export function createPrimaryStderrDiagnostics() {
   const refuse = (code, value = unknown()) => { if (!reason) { reason = code; records.push(value); pending = Buffer.alloc(0); } return reason; };
   const complete = raw => {
     let line;
-    try { line = new TextDecoder('utf-8', { fatal: true }).decode(raw); }
+    try { line = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(raw); }
     catch { return refuse('stderr_invalid_encoding'); }
     const value = classifyPrimaryStderrLine(line);
     if (value.kind === 'path_alias_warning') {

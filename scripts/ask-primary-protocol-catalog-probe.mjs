@@ -86,7 +86,7 @@ export async function collectPrimaryCatalogProtocol(invocation, { spawnProcess, 
       if (end < 0) { if (stdout.length > MAX_LINE) stop('line_limit'); return; }
       if (end > MAX_LINE || ++lines > 8) return stop('line_limit');
       const raw = stdout.subarray(0, end); stdout = stdout.subarray(end + 1);
-      try { accept(parseJsonRejectDuplicateKeys(new TextDecoder('utf-8', { fatal: true }).decode(raw))); }
+      try { accept(parseJsonRejectDuplicateKeys(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(raw))); }
       catch { stop('invalid_json'); }
       if (failure) return;
     }
