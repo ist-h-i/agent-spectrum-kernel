@@ -8,7 +8,8 @@ import { buildPrimaryExecutionInputContract, primaryExecutionInputPreflight, ren
   inspectSuppliedPrimaryVerificationProvenance } from './ask-primary-execution-input.mjs';
 import { artificialPrimaryVerificationEvents } from './test-fixtures/primary-execution-input-events.mjs';
 import { buildPrimaryFixtureRecipe, CANONICAL_PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
-import { prepareGitBaseline, prepareUserComparison, comparisonHash, derivePreparedPrimaryExecutionInput } from './ask-user-comparison-prepare.mjs';
+import { prepareGitBaseline, prepareUserComparison, comparisonHash, derivePreparedPrimaryExecutionInput,
+  derivePreparedPrimaryPublicCapabilities } from './ask-user-comparison-prepare.mjs';
 import { readUserComparisonPlan, userCodexInvocation, inspectUserComparison, startUserComparison } from './ask-user-comparison.mjs';
 import { preflightPrimaryEvaluationGrading } from './ask-primary-evaluation-grading.mjs';
 import { preparePrimaryEvaluation } from './ask-primary-evaluation-prepare.mjs';
@@ -149,6 +150,36 @@ test('I1/I4/I6 existing single-task entry prepares, inspects and refuses closed-
   assert.equal(legacy.plan.primary_execution_input, undefined);
   assert.equal(userCodexInvocation(legacy.root, legacy.plan, 'plain').cwd, join(legacy.root, 'arms/plain'));
   assert.equal(Object.hasOwn(userCodexInvocation(legacy.root, legacy.plan, 'plain'), 'inputDigest'), false);
+  await t.test('C1-C4 source-only Full capability proposal excludes management state and grants no authority', () => {
+    const proposal = derivePreparedPrimaryPublicCapabilities(loaded.plan);
+    assert.equal(proposal.status, 'proposal_only');
+    assert.equal(proposal.binding.input_contract_digest, contract.contract_digest);
+    assert.equal(proposal.document.runtime_enabled_selection, 'unobserved');
+    assert.equal(proposal.document.routing_authority, false);
+    assert.equal(proposal.document.execution_authority, false);
+    assert.equal(proposal.document.scoring_authority, false);
+    assert.equal(proposal.document.formal_aggregate_eligible, false);
+    assert.equal(proposal.document_digest, comparisonHash(Buffer.from(JSON.stringify(proposal.document))));
+    assert.deepEqual(Object.keys(proposal.document).sort(), ['adapter', 'kind', 'profile', 'projection_fingerprint',
+      'selected_skills', 'skill_assets', 'runtime_enabled_selection', 'routing_authority', 'execution_authority', 'scoring_authority', 'formal_aggregate_eligible'].sort());
+    assert.deepEqual(proposal.document.selected_skills, proposal.document.selected_skills.toSorted());
+    assert.equal(proposal.document.selected_skills.length, proposal.document.skill_assets.length);
+    for (const asset of proposal.document.skill_assets) {
+      assert.equal(asset.path, `.agents/skills/${asset.skill}/SKILL.md`);
+      const pin = contract.conditions.full_ask.auxiliary_inputs[asset.path];
+      assert.deepEqual({ digest: asset.digest, bytes: asset.bytes, mode: asset.mode }, { digest: pin.digest, bytes: pin.bytes, mode: pin.mode });
+    }
+    const extra = structuredClone(loaded.plan);
+    extra.raw_install_state = { selected_skills: ['artificial-unselected'], auth_token: 'ARTIFICIAL-SECRET', target: '/synthetic/host' };
+    assert.deepEqual(derivePreparedPrimaryPublicCapabilities(extra), proposal);
+    assert.ok(!JSON.stringify(proposal.document).includes('ARTIFICIAL-SECRET'));
+    assert.ok(!JSON.stringify(proposal.document).includes(prepared.root));
+    for (const [model, reasoning] of [['gpt-6.1-sol', 'high'], ['gpt-6.1-sol', 'low'], ['gpt-6-luna', 'max']]) {
+      const setting = structuredClone(loaded.plan); Object.assign(setting.config, { model, reasoning });
+      assert.deepEqual(derivePreparedPrimaryPublicCapabilities(setting).document, proposal.document);
+    }
+    assert.throws(() => derivePreparedPrimaryPublicCapabilities(legacy.plan), /closed primary input contract required/);
+  });
   const rawPath = join(prepared.root, 'control/plan.json'), digestPath = join(prepared.root, 'control/plan.digest');
   const raw = readFileSync(rawPath), digest = readFileSync(digestPath), forged = JSON.parse(raw);
   forged.primary_execution_input.execution_authority = true;
@@ -168,6 +199,7 @@ test('I1/I4/I6 existing single-task entry prepares, inspects and refuses closed-
   const asset = altered.arms.full_ask.assets.find(asset => asset.path === assetPath);
   Object.assign(asset, fakePin); altered.arms.full_ask.baseline_inventory[assetPath] = fakePin;
   assert.throws(() => derivePreparedPrimaryExecutionInput(altered), /source-owned.*(?:bytes|pin).*changed/);
+  assert.throws(() => derivePreparedPrimaryPublicCapabilities(altered), /source-owned.*(?:bytes|pin).*changed/);
   const baselinePath = join(prepared.root, altered.arms.full_ask.baseline_path, assetPath), armPath = join(prepared.root, altered.arms.full_ask.path, assetPath);
   const baselineBefore = readFileSync(baselinePath), armBefore = readFileSync(armPath);
   writeFileSync(baselinePath, fake); writeFileSync(armPath, fake);
@@ -177,6 +209,7 @@ test('I1/I4/I6 existing single-task entry prepares, inspects and refuses closed-
     rmSync(path); writeFileSync(path, bytes, { flag: 'wx', mode: 0o700 });
   }
   assert.throws(() => derivePreparedPrimaryExecutionInput(JSON.parse(raw)), /source-owned file mode changed/);
+  assert.throws(() => derivePreparedPrimaryPublicCapabilities(JSON.parse(raw)), /source-owned file mode changed/);
   for (const [path, bytes] of [[baselinePath, baselineBefore], [armPath, armBefore]]) {
     rmSync(path); writeFileSync(path, bytes, { flag: 'wx', mode: 0o600 });
   }

@@ -380,6 +380,29 @@ export function derivePreparedPrimaryExecutionInput(plan) {
     auxiliaryPaths: distribution.allPaths.filter(path => path !== 'AGENTS.md') });
 }
 
+/** Public source-selection proposal only. Never read/serialize installation
+ * state, runtime configuration or host data, and never grant route authority.
+ * The opaque experiment binding is kept outside the deterministic document. */
+export function derivePreparedPrimaryPublicCapabilities(plan) {
+  assert.equal(plan?.config?.primary_input_contract, PRIMARY_EXECUTION_INPUT_CONTRACT, 'closed primary input contract required');
+  const contract = derivePreparedPrimaryExecutionInput(plan);
+  const projection = buildCodexProjectionPlan({ profileName: 'full' });
+  const selected = [...projection.skills].sort();
+  const document = {
+    kind: 'ask_primary_public_capability_selection_v1', adapter: 'codex', profile: 'full',
+    projection_fingerprint: projection.fingerprint, selected_skills: selected,
+    skill_assets: selected.map(skill => {
+      const path = `.agents/skills/${skill}/SKILL.md`, asset = contract.conditions.full_ask.auxiliary_inputs[path];
+      assert.ok(asset, 'source-selected public Skill entry unavailable');
+      return { skill, path, digest: asset.digest, bytes: asset.bytes, mode: asset.mode };
+    }),
+    runtime_enabled_selection: 'unobserved', routing_authority: false,
+    execution_authority: false, scoring_authority: false, formal_aggregate_eligible: false,
+  };
+  return { status: 'proposal_only', document, document_digest: comparisonHash(Buffer.from(JSON.stringify(document))),
+    binding: { kind: 'ask_primary_public_capability_proposal_binding_v1', condition: 'full_ask', input_contract_digest: contract.contract_digest } };
+}
+
 function skillRecordPath(path, item, prefix) {
   if (typeof item.skill !== "string" || !NAME.test(item.skill) || !path.startsWith(`${prefix}/${item.skill}/`)) return false;
   const suffix = path.slice(`${prefix}/${item.skill}/`.length);
