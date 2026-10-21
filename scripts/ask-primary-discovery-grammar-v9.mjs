@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 
 // Prospective helper only. No existing producer or selector imports this module.
-export const PRIMARY_DISCOVERY_GRAMMAR_V9_CANDIDATE_REVISION='primary-discovery-grammar-v9-candidate-1';
+export const PRIMARY_DISCOVERY_GRAMMAR_V9_CANDIDATE_REVISION='primary-discovery-grammar-v9-candidate-2';
 const MAX_BYTES=16*1024,MAX_WORDS=512,MAX_OPERATIONS=32;
 const digest=value=>'sha256:'+createHash('sha256').update(value).digest('hex');
 export class PrimaryDiscoveryGrammarError extends Error {
@@ -57,6 +57,10 @@ function publicContext(files){
 
 function globWord(value){
  if(!value||value.length>512||!/^[A-Za-z0-9_.*?{}\[\],!\\/-]+$/u.test(value))fail('unsupported_command');
+ // Positive ripgrep overrides can whitelist hidden files despite --files'
+ // default hidden exclusion. Only explicit negative argv filters are qualified;
+ // never infer exclusion from an escaped leading bang or ambiguous double bang.
+ if(!value.startsWith('!')||value.startsWith('!!'))fail('auxiliary_read_path_unavailable');
  // Tool-level escaped glob characters remain literal argv, never shell syntax.
  // Validate their decoded path vocabulary too; escaped dots cannot hide '..'.
  if(/\\(?![.\[\]{}*?!,\\])/u.test(value))fail('unsupported_command');
