@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { preparationGitOperation } from "./ask-preparation-git-diagnostic.mjs";
-import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { devNull, release } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,8 +16,11 @@ import { comparisonConditions, isKernelPrinciplesCondition } from "./ask-compari
 import { KERNEL_PRINCIPLES_V2_ID, renderKernelPrinciplesV2 } from "./kernel-principles-v2.mjs";
 import {kernelPrinciplesV2FixtureDescriptor, principlesV2Capability, kernelPrinciplesV2DescriptorSourcePaths} from "./kernel-principles-v2-catalog24.mjs";
 import { buildPrimaryFixtureRecipe, isPrimaryFixtureRecipe, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
-import { PRIMARY_EXECUTION_INPUT_CONTRACT, buildPrimaryExecutionInputContract, renderPrimaryExecutionInputBoundary } from './ask-primary-execution-input.mjs';
+import { PRIMARY_EXECUTION_INPUT_CONTRACT, PRIMARY_EXECUTION_INPUT_CONTRACT_V2, PRIMARY_PUBLIC_CAPABILITIES_PATH, PRIMARY_PUBLIC_CAPABILITIES_SCHEMA_PATH,
+  isPrimaryExecutionInputContract, buildPrimaryExecutionInputContract, renderPrimaryExecutionInputBoundary,
+  buildPrimaryPublicCapabilitiesV2, renderPrimaryPublicRouterV2 } from './ask-primary-execution-input.mjs';
 import { buildPersonalPromptMaterialization, personalPromptInput } from "./ask-personal-prompt-materialization.mjs";
+import { assertBenchmarkSchemaInstance } from './ask-benchmark-schema.mjs';
 
 const SOURCE = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 const CORE_STATE = ".agent-spectrum-kernel/install-state.json";
@@ -332,9 +335,34 @@ function sourceDistribution() {
   return { manifest, corePaths, projection, extra, allPaths, supplementDigest: comparisonHash(supplementBytes) };
 }
 
+function primaryPublicFullFiles(distribution, v2) {
+  const full = new Map(distribution.corePaths.map(path => [path, readRegular(join(SOURCE, path), 'public Full source', FILE_LIMIT)]));
+  const merge = (path, raw) => {
+    if (full.has(path)) assert.ok(full.get(path).equals(raw), `conflicting source-owned public asset: ${path}`);
+    full.set(path, raw);
+  };
+  for (const [path, raw] of codexProjectedAssetContentsForProfile('full')) merge(path, raw);
+  for (const [path, entry] of distribution.extra) merge(path, entry.bytes);
+  assert.deepEqual([...full.keys()].sort(), distribution.allPaths);
+  if (v2) {
+    for (const name of ['skill-router', 'operating-mode-router', 'review-router']) {
+      for (const prefix of ['skills', '.agents/skills']) {
+        const path = `${prefix}/${name}/SKILL.md`;
+        full.set(path, renderPrimaryPublicRouterV2(name, full.get(path)));
+      }
+    }
+    assert.ok(!full.has(PRIMARY_PUBLIC_CAPABILITIES_PATH));
+    const capabilities = buildPrimaryPublicCapabilitiesV2(distribution.projection, full);
+    assertBenchmarkSchemaInstance(parseJson(capabilities, 'public routing selection'), { schemaPath: join(SOURCE, PRIMARY_PUBLIC_CAPABILITIES_SCHEMA_PATH) });
+    full.set(PRIMARY_PUBLIC_CAPABILITIES_PATH, capabilities);
+  }
+  return full;
+}
+
 // Re-derived only from fixed public fixture bytes and this source-owned Full
 // distribution. No caller-supplied auxiliary root/file is opened or admitted.
 export function derivePreparedPrimaryExecutionInput(plan) {
+  assert.ok(isPrimaryExecutionInputContract(plan.config.primary_input_contract), 'unknown primary input contract');
   assert.ok(typeof plan.root === 'string' && isAbsolute(plan.root) && realpathSync(plan.root) === plan.root
     && lstatSync(plan.root).isDirectory(), 'canonical prepared primary root required');
   assert.deepEqual(Object.keys(plan.arms).sort(), [...comparisonConditions(plan.config.kernel_condition)].sort(), 'closed primary arms required');
@@ -345,14 +373,7 @@ export function derivePreparedPrimaryExecutionInput(plan) {
   const recipe = buildPrimaryFixtureRecipe(plan.verification.recipe.fixture_id);
   const manifestBytes = readRegular(join(SOURCE, 'benchmarks/fixtures/checkpoint-b2', recipe.fixture_id, 'input-manifest.json'), 'primary input authority');
   const manifest = parseJson(manifestBytes, 'primary input authority'), distribution = sourceDistribution();
-  const full = new Map(distribution.corePaths.map(path => [path, readRegular(join(SOURCE, path), 'public Full source', FILE_LIMIT)]));
-  const merge = (path, raw) => {
-    if (full.has(path)) assert.ok(full.get(path).equals(raw), `conflicting source-owned public asset: ${path}`);
-    full.set(path, raw);
-  };
-  for (const [path, raw] of codexProjectedAssetContentsForProfile('full')) merge(path, raw);
-  for (const [path, entry] of distribution.extra) merge(path, entry.bytes);
-  assert.deepEqual([...full.keys()].sort(), distribution.allPaths);
+  const full = primaryPublicFullFiles(distribution, plan.config.primary_input_contract === PRIMARY_EXECUTION_INPUT_CONTRACT_V2);
   const canonical = readRegular(join(SOURCE, 'AGENTS.md'), 'primary canonical instruction');
   const principles = plan.config.kernel_condition === KERNEL_PRINCIPLES_V2_ID
     ? renderKernelPrinciplesV2(canonical).body : renderKernelPrinciples(canonical).body;
@@ -364,6 +385,10 @@ export function derivePreparedPrimaryExecutionInput(plan) {
   };
   for (const id of comparisonConditions(plan.config.kernel_condition)) {
     const arm = plan.arms[id];
+    if (plan.config.primary_input_contract === PRIMARY_EXECUTION_INPUT_CONTRACT_V2) {
+      for (const state of [CORE_STATE, CODEX_STATE]) assert.ok(!existsSync(join(plan.root, arm.path, state)), 'management state in V2 arm');
+      if (id !== 'full_ask') assert.ok(!existsSync(join(plan.root, arm.path, PRIMARY_PUBLIC_CAPABILITIES_PATH)), 'Full selection in P/K arm');
+    }
     for (const file of manifest.fixtures[recipe.fixture_id].files) {
       const raw = readRegular(join(SOURCE, 'benchmarks/fixtures/checkpoint-b2', recipe.fixture_id, file.path), 'fixed public input', FILE_LIMIT, true);
       assertBytes(join(plan.root, arm.baseline_path, file.path), raw, arm.baseline_inventory[file.path], 'primary baseline');
@@ -377,7 +402,15 @@ export function derivePreparedPrimaryExecutionInput(plan) {
     }
   }
   return buildPrimaryExecutionInputContract(plan, { recipe, manifestBytes,
-    auxiliaryPaths: distribution.allPaths.filter(path => path !== 'AGENTS.md') });
+    auxiliaryPaths: [...full.keys()].filter(path => path !== 'AGENTS.md').sort(),
+    ...(plan.config.primary_input_contract === PRIMARY_EXECUTION_INPUT_CONTRACT_V2 ? { sourceBinding: {
+      kind: 'ask_primary_public_routing_source_binding_v2', processing_status: 'not_admitted_for_scoring',
+      schema: { path: PRIMARY_PUBLIC_CAPABILITIES_SCHEMA_PATH,
+        digest: comparisonHash(readRegular(join(SOURCE, PRIMARY_PUBLIC_CAPABILITIES_SCHEMA_PATH), 'public routing schema')) },
+      source_files: Object.fromEntries(['scripts/ask-primary-execution-input.mjs', 'scripts/ask-user-comparison-prepare.mjs',
+        'scripts/install-codex-adapter.mjs', ...['skill-router', 'operating-mode-router', 'review-router'].map(name => `skills/${name}/SKILL.md`)]
+        .map(path => [path, comparisonHash(readRegular(join(SOURCE, path), 'public routing source', FILE_LIMIT))])),
+    } } : {}) });
 }
 
 /** Public source-selection proposal only. Never read/serialize installation
@@ -542,7 +575,7 @@ function validateOptions(options) {
   if (Object.keys(options).some(key => !allowed.includes(key))) fail("unknown_preparation_option");
   comparisonExecutionPolicy(options.executionContract);
   if (options.primaryInputContract !== undefined) {
-    assert.equal(options.primaryInputContract, PRIMARY_EXECUTION_INPUT_CONTRACT, 'unknown primary input contract');
+    assert.ok(isPrimaryExecutionInputContract(options.primaryInputContract), 'unknown primary input contract');
     assert.equal(options.executionContract, SINGLE_SHOT_CONTRACT, 'closed primary input requires single-shot');
     assert.equal(options.personalPrompt, undefined, 'closed primary input does not support personal Prompt substitution');
   }
@@ -674,13 +707,28 @@ export function prepareUserComparison(options = {}) {
           if (!readFileSync(join(armRoot, file)).equals(value.bytes)) fail(`live_supplement_collision:${file}`);
         } else writeNew(armRoot, file, value.bytes);
       }
+      if (options.primaryInputContract === PRIMARY_EXECUTION_INPUT_CONTRACT_V2) {
+        // Only records created by the two installers in this new, owned arm
+        // are relocated. Old runs and source installations are never changed.
+        for (const state of [CORE_STATE, CODEX_STATE]) {
+          writeNew(root, `control/full-installation/${basename(state)}`, readRegular(join(armRoot, state), 'new installer identity', FILE_LIMIT));
+          unlinkSync(join(armRoot, state));
+        }
+        for (const [file, raw] of primaryPublicFullFiles(distribution, true)) {
+          if (existsSync(join(armRoot, file))) writeFileSync(join(armRoot, file), raw, { mode: 0o600 });
+          else writeNew(armRoot, file, raw);
+        }
+      }
     }
     const baseline = inventoryUserTree(armRoot);
     const assetPaths = id === "plain" ? [] : id !== "full_ask" ? ["AGENTS.md"]
-      : [...new Set(["AGENTS.md", CORE_STATE, CODEX_STATE, ...distribution.allPaths])].sort();
+      : [...new Set(["AGENTS.md", ...(options.primaryInputContract === PRIMARY_EXECUTION_INPUT_CONTRACT_V2
+        ? [PRIMARY_PUBLIC_CAPABILITIES_PATH] : [CORE_STATE, CODEX_STATE]), ...distribution.allPaths])].sort();
     const assets = assetPaths.map(file => ({ path: file, ...baseline[file],
       kind: file === "AGENTS.md" ? isKernelPrinciplesCondition(id) ? "generated_principles_with_preserved_custom_instructions" : "canonical_kernel_with_preserved_custom_instructions" : file.endsWith("install-state.json") ? "install_identity" : "full_ask_asset",
-      origin: isKernelPrinciplesCondition(id) ? "canonical_principles_projection" : distribution.extra.has(file) ? "live_classified_reference_supplement" : id === "kernel_only" ? "canonical_agents" : "live_core_and_codex_full_installers" }));
+      origin: options.primaryInputContract === PRIMARY_EXECUTION_INPUT_CONTRACT_V2 && id === 'full_ask'
+        && (file === PRIMARY_PUBLIC_CAPABILITIES_PATH || /^(?:skills|\.agents\/skills)\/(?:skill-router|operating-mode-router|review-router)\/SKILL\.md$/u.test(file))
+        ? 'source_public_routing_projection_v2' : isKernelPrinciplesCondition(id) ? "canonical_principles_projection" : distribution.extra.has(file) ? "live_classified_reference_supplement" : id === "kernel_only" ? "canonical_agents" : "live_core_and_codex_full_installers" }));
     const baselineCommit = prepareGitBaseline(armRoot);
     // Every regular file belongs in the explicit baseline; no task/controller
     // file is placed inside an arm, even during Git initialization.
