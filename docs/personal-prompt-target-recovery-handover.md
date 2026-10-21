@@ -22,6 +22,8 @@ the real target's personal ownership metadata.
   tree entries/state/file presence, target identity, source, receipt and selected
   role. The ordinary lifecycle pending marker remains separate. Journal data is
   not target-write, adoption or rollback authority.
+  The original plan also seals the creation file mode. A journal value cannot
+  redefine that mode to explain a later chmod.
 - R2: recovery is explicit plan/recover, with independently supplied original
   plan digest, current caller-trusted adoption closure, fresh explicit rollback
   selection and separate exact recovery-plan authorization. Do not infer the
@@ -46,8 +48,9 @@ the real target's personal ownership metadata.
   a later separately authorized recovery must revalidate all inputs again.
 - R6: only after verifying exact recovered files/state may recovery remove its
   known marker and journal. Preserve unknown/replaced evidence. Delete only
-  registered Prompt files proven absent before bootstrap and only newly created
-  empty Prompt directories; do not remove project files or original directories.
+  registered Prompt files proven absent before bootstrap; do not remove project
+  files or any Prompt directory. Empty directories remain because original
+  absence cannot establish ownership of a directory now occupying that path.
   Target-local immutable recovery evidence intentionally remains.
 
 ## Explicit local interfaces

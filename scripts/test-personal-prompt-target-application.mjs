@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { canonicalDigest } from "./content-addressed-store.mjs";
@@ -217,19 +217,28 @@ const original=fs.writeFileSync; fs.writeFileSync=(path,...args)=>{
       const prompt = join(x.root, ".agents/prompts/skill-implement.md"), saved = readFileSync(prompt);
       writeFileSync(prompt, "unknown partial bytes"); const unknown = captureApplyTarget(x.root).binding;
       assert.throws(() => planPersonalPromptTargetRecovery(request), /personal_target_/); assert.deepEqual(captureApplyTarget(x.root).binding, unknown); writeFileSync(prompt, saved);
+      const journalPath = `${statePath}.operation.json`, journalBytes = readFileSync(journalPath), journal = JSON.parse(journalBytes);
+      const mode = lstatSync(prompt).mode & 0o777; journal.new_file_mode = mode ^ 0o100;
+      chmodSync(prompt, journal.new_file_mode); writeFileSync(journalPath, JSON.stringify(journal)); const resealedMode = captureApplyTarget(x.root).binding;
+      assert.throws(() => planPersonalPromptTargetRecovery(request), /personal_target_/); assert.deepEqual(captureApplyTarget(x.root).binding, resealedMode);
+      chmodSync(prompt, mode); writeFileSync(journalPath, journalBytes);
       for (const fault of ["unlink", "cleanup"]) {
         const faultPath = join(dir, `${fault}.mjs`);
         writeFileSync(faultPath, `import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';
-const method='${fault === "unlink" ? "unlinkSync" : "rmdirSync"}', original=fs[method];fs[method]=(path,...args)=>{
-if(typeof path==='string'&&path.endsWith('${fault === "unlink" ? "/.agents/prompts/skill-implement.md" : "/.agents/prompts"}'))throw Object.assign(new Error('owned recovery failure'),{code:'EIO'});
+const method='unlinkSync', original=fs[method];fs[method]=(path,...args)=>{
+if(typeof path==='string'&&path.endsWith('${fault === "unlink" ? "/.agents/prompts/skill-implement.md" : `/${PERSONAL_PROMPT_TARGET_STATE}.operation.json`}'))throw Object.assign(new Error('owned recovery failure'),{code:'EIO'});
 return original(path,...args);};syncBuiltinESMExports();\n`);
         const failed = child(t, "recover", { prepared: recovery, closure, ...authority }, ["--authorized", "--confirm", recovery.digest], 1, faultPath);
         assert.equal(failed.reason_code, "personal_target_recovery_required");
-        assert.equal(existsSync(`${statePath}.operation.json`), true); assert.equal(existsSync(`${statePath}.in-progress.json`), true);
+        assert.equal(existsSync(`${statePath}.operation.json`), true); assert.equal(existsSync(`${statePath}.in-progress.json`), fault === "unlink");
         assert.throws(() => inspectPersonalPromptTarget({ targetRoot: x.root }), /personal_target_recovery_required/);
         assert.throws(() => recoverPersonalPromptTargetPlan({ ...mut(recovery), ...authority }), /personal_target_/);
         recovery = child(t, "plan-recover", request);
       }
+      const prompts = join(x.root, ".agents/prompts");
+      if (existsSync(prompts)) renameSync(prompts, join(dir, "retained-original-prompt-directory"));
+      mkdirSync(prompts, { recursive: true }); x.replacementPromptDirectoryIdentity = lstatSync(prompts).ino;
+      recovery = child(t, "plan-recover", request);
     }
     const result = child(t, "recover", { prepared: recovery, closure, ...authority }, ["--authorized", "--confirm", recovery.digest]);
     assert.equal(result.status, phase === "restore" ? "recovered_restore" : "recovered_apply_abort");
@@ -238,6 +247,7 @@ return original(path,...args);};syncBuiltinESMExports();\n`);
     if (phase !== "initial") assert.equal(JSON.parse(readFileSync(statePath)).personal_prompt.installed_lock_digest,
       result.installed_lock_digest);
     assert.ok(result.evidence_object_digest.startsWith("sha256:"));
+    if (phase === "initial") assert.equal(lstatSync(join(x.root, ".agents/prompts")).ino, x.replacementPromptDirectoryIdentity);
     assert.throws(() => recoverPersonalPromptTargetPlan({ ...mut(recovery), ...authority }), /personal_target_/);
   });
 });

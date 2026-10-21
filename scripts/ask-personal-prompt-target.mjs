@@ -2,7 +2,7 @@
 // neither a saved plan nor local state is authority to make a Portfolio decision.
 import assert from "node:assert/strict";
 import { types } from "node:util";
-import { lstatSync, readdirSync, realpathSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { lstatSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { canonicalDigest, parseJsonRejectDuplicateKeys, readStableBytes, putContentAddressedJson, listContentAddressedJson } from "./content-addressed-store.mjs";
 import { comparisonHash } from "./ask-user-comparison-prepare.mjs";
@@ -233,6 +233,7 @@ function prepare(input, kind, ownedLock = null, ownerPin = null) {
   assert.equal(sourceIdentity(), source, "source changed while planning");
   const plan = { schema: "ask.personal-prompt-target-plan@1", operation: kind, role, target_root: t.root,
     target_identity: t.targetIdentity, target_before: t.binding, metadata_existed: t.metadataExisted,
+    creation_file_mode: 0o666 & ~process.umask(),
     source_identity_digest: source, closure_digest: canonicalDigest(owned), receipt_object_digest: owned.receiptObjectDigest,
     selection_object_digest: selection, asset, inventory_digest: canonicalDigest(inventory), state_digest: canonicalDigest(state), models_started: false };
   return { prepared: { plan, digest: canonicalDigest(plan) }, operations, state, before: t };
@@ -263,7 +264,7 @@ function execute(value, kind) {
       try {
         const journal = { schema: "ask.personal-prompt-operation@1", original: p,
           before_entries: live.before.entries, before_state_base64: rawFile(root, STATE)?.toString("base64") ?? null,
-          pending_state: live.state, new_file_mode: 0o666 & ~process.umask() };
+          pending_state: live.state, new_file_mode: p.plan.creation_file_mode };
         const bytes = Buffer.from(`${JSON.stringify(journal)}\n`); assert.ok(bytes.length <= 32 * 1024 * 1024);
         writeFileSync(join(root, JOURNAL), bytes, { flag: "wx", mode: 0o600 });
         mutated = true;
@@ -344,6 +345,7 @@ function prepareRecovery(input, ownedLock = null) {
   for (const entry of j.before_entries.filter(e => evidencePath(e.path))) assert.ok(same(entry, t.entries.find(e => e.path === entry.path)));
   if (present(join(root, EVIDENCE))) listContentAddressedJson({ storeRoot: join(root, EVIDENCE), maximumBytes: 96 * 1024 * 1024 });
   assert.ok(Number.isInteger(j.new_file_mode) && j.new_file_mode >= 0 && j.new_file_mode <= 0o777);
+  assert.equal(j.new_file_mode, p.creation_file_mode, "journal cannot supply original creation mode");
   const operations = [], expectedFiles = [];
   for (const file of parent.files) {
     const originalEntry = before.get(file.path), liveEntry = t.entries.find(e => e.path === file.path);
@@ -410,7 +412,8 @@ export function recoverPersonalPromptTargetPlan(value) {
         if (live.finalState) checkState(live.finalState, root);
         assert.ok(rawFile(root, JOURNAL).equals(live.journalBytes));
         assert.ok(rawFile(root, MARKER).equals(recoveryMarker));
-        for (const path of [...live.newDirs].reverse()) if (path !== META && present(join(root, path)) && readdirSync(join(root, path)).length === 0) rmdirSync(join(root, path));
+        // Original absence does not prove ownership of a directory now at this
+        // path. Keep empty Prompt directories, including sequential replacements.
         unlinkSync(join(root, MARKER)); unlinkSync(join(root, JOURNAL));
         return { status: p.plan.action === "complete_restore" ? "recovered_restore" : "recovered_apply_abort", plan_digest: p.digest,
           evidence_object_digest: evidence.digest, installed_lock_digest: live.finalState?.personal_prompt.installed_lock_digest ?? null,
