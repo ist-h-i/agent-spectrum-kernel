@@ -1516,6 +1516,9 @@ function printPlan(args, plan) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
+  // Preserve pure argument/core-prerequisite diagnostics for an absent target.
+  // Never reuse this preflight plan: mutations still lock, guard and replan.
+  if (!existsSync(args.target) && !args.rollback && !args.detach) buildPlan(args);
   return withPersonalPromptTargetLock(args.target, () => {
   const owner = lifecycle.readJsonIfExists(resolve(args.target, STATE_PATH));
   if (personalPromptTargetActive(args.target, { excludeOwnedLock: true }) || owner?.personal_prompt_delegation) {
