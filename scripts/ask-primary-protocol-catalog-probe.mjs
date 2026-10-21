@@ -86,7 +86,12 @@ export async function collectPrimaryCatalogProtocol(invocation, { spawnProcess, 
       if (end < 0) { if (stdout.length > MAX_LINE) stop('line_limit'); return; }
       if (end > MAX_LINE || ++lines > 8) return stop('line_limit');
       const raw = stdout.subarray(0, end); stdout = stdout.subarray(end + 1);
-      try { accept(parseJsonRejectDuplicateKeys(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(raw))); }
+      try {
+        // The shared artifact parser also decodes UTF8. Reject at this protocol
+        // boundary before any decoder can silently discard a leading BOM.
+        if (raw.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))) throw new Error('unexpected JSON prefix');
+        accept(parseJsonRejectDuplicateKeys(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(raw)));
+      }
       catch { stop('invalid_json'); }
       if (failure) return;
     }
