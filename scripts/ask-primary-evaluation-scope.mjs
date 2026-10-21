@@ -1,4 +1,4 @@
-import {PRIMARY_RUNTIME_V10_REVISION, assertPrimaryRuntimeV10ScoringAuthority} from './ask-primary-runtime-v10.mjs';
+import {PRIMARY_RUNTIME_V10_REVISION} from './ask-primary-runtime-v10.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -166,7 +166,6 @@ export function primaryGradingConditions(legacy) {
 export function withPrimaryEvaluationProducer(options, callback, { grading = false } = {}) {
   if (resourceGraphState.getStore()?.active && resourceGraphState.getStore().sourceBuild) throw new Error('primary_source_build_no_producer_authority');
   const verified = verifyPrimaryEvaluationProducer(options);
-  if (verified.preparationOnly) assertPrimaryRuntimeV10ScoringAuthority(verified.binding);
   return run({ options: Object.freeze({ ...options }), verified, grading, profile: primaryProfileForRequest(verified.request), commandEvidenceParserRevision: verified.commandEvidenceParserRevision }, callback);
 }
 export function primaryProducerInspection(options) {

@@ -35,3 +35,32 @@ independently reviewed in parallel with runtime qualification. Resource readines
 is not runtime readiness. Existing resources/results/review decisions are frozen
 and are not re-pinned, regraded or relabeled. Real runtime/native acceptance,
 startup/global closure, resolved model and official quality remain unknown.
+
+Candidate readback uses async verifyPrimaryRuntimeV10Preparation, which re-loads
+the source-owned public preparation and compares all retained input/source pins.
+The existing synchronous verifyPrimaryEvaluationProducer rejects V10 before it
+can supply an execution producer token. This also keeps the comparison reader's
+existing import cycle lazy. No capture is accepted or normalized by this slice;
+raw-pair/thread/turn/edit/final fields are required slots fixed unobserved, not
+synthetic event attestations. Generated mirrors are constraints for future
+records and are not emitted as successful normalized or evaluator records here.
+
+Asset-only writer handoff: the new revision is now accepted by
+withPrimaryProcessingSourceBuild and primaryProcessingDescriptor, both profile
+schema mappings and archive inference select V10's actual schema nodes, and
+boundary byte typing uses the existing shared closed authority-path API. Reuse
+23 existing write*/validate*ProductionAuthority APIs in fresh independent source
+and private roots, with resourceAssetsOnly:true and
+resultProfileName:requirement_scope_verification_v2. The build task retains its
+explicit assembly/finalizer route. This implementation has not run any real
+private writer, generated any24 bundles, or issued review/admission decisions.
+Those steps still require exact new source/candidate revisions, unchanged
+public semantics/budgets/private assets, source/case/ZIP closure and fresh
+independent decisions. They may run in parallel with runtime qualification.
+Static resource preflight cannot authorize execution or scoring.
+
+Compatibility here means old selected path lists, schemas, parsing/criteria and
+file-type classification remain unchanged. Shared modules have new source bytes
+and new static imports in this tree, so complete fresh dependency graphs are not
+byte-identical to frozen old graphs. Old resources use their exact frozen source;
+no old selector can be silently repinned to this implementation.

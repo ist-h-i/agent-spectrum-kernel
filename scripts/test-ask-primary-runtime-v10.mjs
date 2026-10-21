@@ -7,7 +7,7 @@ const digest='sha256:'+'a'.repeat(64);
 function plan(kernel='kernel_principles_v2') {
  const ids=['plain',kernel,'full_ask'];
  const contract={kind:'ask_primary_execution_inputs_v2',mode:'closed_primary_inputs_v2',root:'/synthetic/v10',fixture_id:'hi-authorization-exception',
- source_digest:digest,public_recipe_digest:digest,public_routing_source:{processing_status:'not_admitted_for_scoring',schema:{path:'benchmarks/schemas/primary-public-capability-selection-v2.schema.json',digest}},
+ source_digest:digest,fixture_input_digest:digest,public_recipe_digest:digest,public_routing_source:{processing_status:'not_admitted_for_scoring',schema:{path:'benchmarks/schemas/primary-public-capability-selection-v2.schema.json',digest}},
  public_inputs:{'task.md':{arm_relative_path:'task.md',launch_relative_path:'../task.md',digest,bytes:5,mode:'100644'}},
  conditions:Object.fromEntries(ids.map(id=>[id,{arm_root:'arms/'+id,launch_cwd:'/synthetic/v10/arms/'+id+'/workspace',
  input:{path:'inputs/primary-conditions/'+id+'.md',digest,bytes:20},auxiliary_inputs:id==='plain'?{}:{'AGENTS.md':{arm_relative_path:'AGENTS.md',launch_relative_path:'../AGENTS.md',digest,bytes:5,mode:'100644'}},
@@ -57,7 +57,7 @@ import {deriveEvaluatorDependencyGraph} from './ask-benchmark-evaluator-boundary
 import {execFileSync} from 'node:child_process';
 import {buildPrimaryFixtureRecipe} from './ask-primary-fixture-recipe.mjs';
 import {prepareGitBaseline,prepareUserComparison,comparisonHash} from './ask-user-comparison-prepare.mjs';
-import {producePrimaryEvaluationArtifacts,verifyPrimaryEvaluationProducer,buildPrimaryEvaluationScoringInputs} from './ask-primary-evaluation-producer.mjs';
+import {producePrimaryEvaluationArtifacts,verifyPrimaryEvaluationProducer,verifyPrimaryRuntimeV10Preparation,buildPrimaryEvaluationScoringInputs} from './ask-primary-evaluation-producer.mjs';
 import {preflightPrimaryEvaluationGrading,exportPrimaryEvaluationGradingRequest} from './ask-primary-evaluation-grading.mjs';
 const ROOT=resolve(import.meta.dirname,'..');
 test('T10-SELECT fixed selector and both profile additive schema mapping',t=>{
@@ -82,7 +82,7 @@ for(const kernelCondition of ['kernel_principles_v1','kernel_principles_v2'])tes
  taskClass:recipe.runner_task_class,kernelCondition,executionContract:'single_shot_v1',evidenceKind:'synthetic',cliBin:'/synthetic/never-start',primaryInputContract:'closed_primary_inputs_v2'});
  const block={root:prepared.root,run_id:prepared.plan.run_id,plan_digest:prepared.plan_digest,fixture_id:fixtureId,grading:{scoring_version:fixed.selector}};
  const target=join(area,'producer'),made=await producePrimaryEvaluationArtifacts(block,target);assert.equal(made.preparation_only,true);assert.equal(made.normalized,null);
- const options={recordRoot:target,externalDigest:made.external_digest},verified=verifyPrimaryEvaluationProducer(options);
+ const options={recordRoot:target,externalDigest:made.external_digest},verified=await verifyPrimaryRuntimeV10Preparation(options);
  assert.equal(verified.preparationOnly,true);assert.deepEqual(Object.keys(verified.binding.conditions),['plain',kernelCondition,'full_ask']);
  assert.equal(existsSync(join(prepared.root,'control/start.json')),false);
  assert.throws(()=>withPrimaryEvaluationProducer(options,()=>assert.fail('scope granted')),/v10_runtime_authority_unqualified/);
@@ -92,9 +92,9 @@ for(const kernelCondition of ['kernel_principles_v1','kernel_principles_v2'])tes
  await assert.rejects(()=>producePrimaryEvaluationArtifacts(block,join(area,'override'),{commandEvidenceParserRevision:'1.12.0-primary-saved'}),/override refused/);
  assert.equal(existsSync(join(area,'override')),false);
  const bindingPath=join(target,'runtime-binding.json'),original=readFileSync(bindingPath);writeFileSync(bindingPath,Buffer.from(original.toString().replace('unqualified','qualified')));
- assert.throws(()=>verifyPrimaryEvaluationProducer(options),/inventory changed/);writeFileSync(bindingPath,original);
+ await assert.rejects(()=>verifyPrimaryRuntimeV10Preparation(options),/inventory changed/);writeFileSync(bindingPath,original);
  const stdin=join(prepared.root,prepared.plan.primary_execution_input.conditions.plain.input.path);writeFileSync(stdin,'changed input');
- assert.throws(()=>verifyPrimaryEvaluationProducer(options));
+ await assert.rejects(()=>verifyPrimaryRuntimeV10Preparation(options));
  assert.equal(made.model_calls,0);assert.equal(made.grader_process_starts,0);
 });
 

@@ -19,7 +19,7 @@ export function buildPrimaryRuntimeV10Binding({plan,planDigest,...unknown}) {
  assert.equal(c.root,plan.root);assert.ok(posix.isAbsolute(plan.root)&&posix.normalize(plan.root)===plan.root&&plan.root!=='/');
  for(const key of ['execution_authority','scoring_authority','formal_aggregate_eligible'])assert.equal(c[key],false);
  assert.equal(c.runtime_attestation,'unknown');assert.equal(c.public_routing_source.processing_status,'not_admitted_for_scoring');
- digest(c.source_digest);digest(c.public_recipe_digest);
+ digest(c.source_digest);digest(c.public_recipe_digest);digest(c.fixture_input_digest);assert.ok(typeof c.fixture_id==='string'&&/^[a-z0-9][a-z0-9-]*$/u.test(c.fixture_id));
  const profile=primaryProfileForKernel(plan.config.kernel_condition);keys(c.conditions,profile.conditions);
  const conditions=Object.fromEntries(profile.conditions.map(id=>{
   const arm=c.conditions[id];assert.equal(arm.arm_root,'arms/'+id);assert.equal(arm.launch_cwd,posix.join(plan.root,arm.arm_root,'workspace'));
@@ -37,7 +37,7 @@ export function buildPrimaryRuntimeV10Binding({plan,planDigest,...unknown}) {
   return [id,{launch_cwd:arm.launch_cwd,stdin:{path:arm.input.path,...pin(arm.input)},initial_inputs:inputs,work_products:products,verification:checks,
    required_native_lineage:[...lineage],runtime:{status:'unqualified',binary_digest:null,startup_inventory_digest:null,thread_id:null,turn_id:null,raw_stream_digest:null,raw_pairs:[],edit_events_digest:null,final_snapshot_digest:null,receipt_digest:null}}];
  }));
- const value={kind:'ask_primary_runtime_v10_binding',parser_revision:PRIMARY_RUNTIME_V10_REVISION,input_mode:c.mode,profile_id:profile.id,run_id:plan.run_id,plan_digest:planDigest,input_contract_digest:contract_digest,
+ const value={kind:'ask_primary_runtime_v10_binding',parser_revision:PRIMARY_RUNTIME_V10_REVISION,input_mode:c.mode,fixture_id:c.fixture_id,fixture_input_digest:c.fixture_input_digest,profile_id:profile.id,run_id:plan.run_id,plan_digest:planDigest,input_contract_digest:contract_digest,
   public_recipe_digest:c.public_recipe_digest,public_routing_source_digest:canonicalDigest(c.public_routing_source),source_digest:c.source_digest,conditions,
   runtime_attestation:'unknown',execution_authority:false,scoring_authority:false,formal_aggregate_eligible:false};
  return {...value,binding_digest:canonicalDigest(value)};
@@ -52,7 +52,7 @@ export function primaryRuntimeV10BindingSchema() {
  const condition=object({launch_cwd:str,stdin:object({path:str,digest:hash,bytes}),initial_inputs:{type:'array',items:object({arm_relative_path:str,launch_relative_path:str,digest:hash,bytes,mode:{enum:['100644','100755']}})},
  work_products:{type:'array',items:object({arm_relative_path:str,launch_relative_path:str,initial_input_digest:nullableHash,provenance:{const:'candidate_edit_and_final_snapshot_required'}})},
  verification:{type:'array',minItems:1,items:object({command_id:str,cwd:str,executable:{const:'/bin/bash'},argv:{type:'array',minItems:2,maxItems:2,items:{type:'string'}},contract_command_digest:hash,rendered_event_command:str})},required_native_lineage:{const:lineage},runtime});
- const value=object({kind:{const:'ask_primary_runtime_v10_binding'},parser_revision:{const:PRIMARY_RUNTIME_V10_REVISION},input_mode:{const:'closed_primary_inputs_v2'},profile_id:{enum:['primary_single_shot_v1','primary_principles_v2_single_shot_v1']},run_id:str,plan_digest:hash,input_contract_digest:hash,public_recipe_digest:hash,public_routing_source_digest:hash,source_digest:hash,
+ const value=object({kind:{const:'ask_primary_runtime_v10_binding'},parser_revision:{const:PRIMARY_RUNTIME_V10_REVISION},input_mode:{const:'closed_primary_inputs_v2'},fixture_id:str,fixture_input_digest:hash,profile_id:{enum:['primary_single_shot_v1','primary_principles_v2_single_shot_v1']},run_id:str,plan_digest:hash,input_contract_digest:hash,public_recipe_digest:hash,public_routing_source_digest:hash,source_digest:hash,
  conditions:{oneOf:[object({plain:condition,kernel_principles_v1:condition,full_ask:condition}),object({plain:condition,kernel_principles_v2:condition,full_ask:condition})]},runtime_attestation:{const:'unknown'},execution_authority:{const:false},scoring_authority:{const:false},formal_aggregate_eligible:{const:false},binding_digest:hash});
  value.allOf=['kernel_principles_v1','kernel_principles_v2'].map((id,index)=>({if:{properties:{profile_id:{const:index===0?'primary_single_shot_v1':'primary_principles_v2_single_shot_v1'}}},then:{properties:{conditions:object({plain:condition,[id]:condition,full_ask:condition})}}}));
  return {$schema:'https://json-schema.org/draft/2020-12/schema',title:'V10 source/asset binding only; runtime unqualified',...value};

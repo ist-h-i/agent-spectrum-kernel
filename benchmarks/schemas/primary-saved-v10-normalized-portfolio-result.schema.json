@@ -628,6 +628,8 @@
         "kind",
         "parser_revision",
         "input_mode",
+        "fixture_id",
+        "fixture_input_digest",
         "profile_id",
         "run_id",
         "plan_digest",
@@ -651,6 +653,14 @@
         },
         "input_mode": {
           "const": "closed_primary_inputs_v2"
+        },
+        "fixture_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixture_input_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
         },
         "profile_id": {
           "enum": [
