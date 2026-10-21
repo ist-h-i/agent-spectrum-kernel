@@ -297,6 +297,7 @@ jobs:
           node --experimental-test-module-mocks --test scripts/test-ask-primary-authority-v2.mjs scripts/test-ask-primary-build-successor-v2.mjs scripts/test-ask-review-archive-v2-scope.mjs
           node --test scripts/test-ask-primary-command-evidence-v3.mjs
           node --test scripts/test-ask-primary-command-evidence-v4.mjs
+          node --test scripts/test-ask-primary-discovery-grammar-v9.mjs
           node --test scripts/test-ask-primary-command-literal-word-v5.mjs
           node --test scripts/test-ask-primary-auxiliary-shell-v6.mjs
           node --test scripts/test-ask-primary-evidence-recognition-v2.mjs scripts/test-ask-review-target-requirement-v2.mjs

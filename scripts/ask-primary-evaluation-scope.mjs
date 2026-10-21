@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { verifyPrimaryEvaluationProducer } from './ask-primary-evaluation-producer.mjs';
 import { primaryScoringRoot, primaryProcessingDescriptor, readPrimaryScoringVersion,
-  PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH, isPrimaryScoringFixtureId } from './ask-primary-scoring-version.mjs';
+  PRIMARY_REVIEW_RECOGNITION_SOURCE_PATH, isPrimaryScoringFixtureId, primaryProcessingAuthorityPaths } from './ask-primary-scoring-version.mjs';
 import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_EVALUATION_CONDITIONS, getPrimaryEvaluationProfile, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 import { PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION } from './ask-benchmark-command-evidence.mjs';
 
@@ -49,9 +49,7 @@ const historicalEntries = Object.freeze(['scripts/ask-benchmark-evaluator-bounda
 // producer / scope import cycle has initialized.
 const processingSchemas = processing => Object.keys(processing.source_file_digests).filter(path => path.endsWith('.schema.json'));
 // The v8 schema generator is build-time authority, never a private runtime import.
-const processingSourceAuthorities = processing => [...processingSchemas(processing),
-  ...(processing.command_evidence_parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION
-    ? ['scripts/generate-ask-primary-grading-schemas.mjs'] : [])];
+const processingSourceAuthorities = processing => primaryProcessingAuthorityPaths(processing.command_evidence_parser_revision);
 const sourceGit = (root, ...args) => execFileSync('git', ['-C', root, 'rev-parse', ...args],
   { encoding: 'utf8', maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const sourceCommonDirectory = root => realpathSync(sourceGit(root, '--path-format=absolute', '--git-common-dir'));

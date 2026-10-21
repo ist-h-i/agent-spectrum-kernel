@@ -96,6 +96,9 @@ async function verify({ exitCode = 0, outputLimited = false, terminationConfirme
     assert.deepEqual(calls[0].argv, recipe.checks[0].argv);
     assert.equal(calls[0].cwd, join(area, "verification/plain/workspace"));
     assert.equal(calls[0].terminationScope, "direct_child");
+    assert.equal(calls[0].env.HOME, process.env.HOME, 'login-shell verification retains ordinary HOME for runtime resolution');
+    assert.equal(result.runtime.scope, 'comparison_controller');
+    assert.equal(result.runtime.shell_node_version, null, 'controller Node metadata cannot establish the shell-selected Node');
     assert.equal(result.independent_process, false);
     assert.equal(result.execution_origin, "synthetic_injected_verifier");
     assert.equal(result.checks[0].semantic_quality, "unknown");
@@ -107,6 +110,16 @@ async function verify({ exitCode = 0, outputLimited = false, terminationConfirme
 }
 test("controller native command fake transport preserves editable test and unknown semantic quality", async () => {
   assert.equal((await verify()).checks[0].status, "pass");
+});
+test('verification HOME inheritance remains narrowly sanitized', async () => {
+  const {buildUserComparisonVerificationEnvironment}=await import('./ask-user-comparison.mjs');
+  const supplied={PATH:'/test/bin',HOME:'/test/user',CODEX_HOME:'/credential-store',OPENAI_API_KEY:'must-not-inherit',NODE_OPTIONS:'--require unsafe',BASH_ENV:'/unsafe/startup',ENV:'/unsafe/env',GIT_CONFIG_GLOBAL:'/unsafe/git'};
+  const shell=buildUserComparisonVerificationEnvironment(true,supplied);
+  assert.equal(shell.HOME,supplied.HOME);assert.equal(shell.PATH,supplied.PATH);
+  for(const key of ['CODEX_HOME','OPENAI_API_KEY','NODE_OPTIONS','BASH_ENV','ENV'])assert.equal(Object.hasOwn(shell,key),false);
+  assert.equal(shell.GIT_CONFIG_GLOBAL,'/dev/null');assert.equal(shell.GIT_CONFIG_SYSTEM,'/dev/null');
+  assert.equal(Object.hasOwn(buildUserComparisonVerificationEnvironment(false,supplied),'HOME'),false);
+  assert.equal(Object.hasOwn(buildUserComparisonVerificationEnvironment(true,{PATH:'/test/bin'}),'HOME'),false);
 });
 test("native exit failure is retained separately from oracle score", async () => {
   assert.equal((await verify({ exitCode: 1 })).checks[0].status, "fail");

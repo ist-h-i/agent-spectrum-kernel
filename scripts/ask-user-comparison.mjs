@@ -374,11 +374,24 @@ export function inspectNodeVerification(stdout, expectedFiles = []) {
       && runSeen && runSuccess && allPassed(reported) && files.every(file => file.success && allPassed(file.counts)) };
 }
 
+// Login-shell fixture commands need the ordinary HOME to resolve their normal
+// runtime startup. Inherit only that non-secret path in addition to the existing
+// sanitized environment; never inherit credential keys or startup injection vars.
+export function buildUserComparisonVerificationEnvironment(primary, environment = process.env) {
+  return { PATH: environment.PATH ?? '', LANG:'C', LC_ALL:'C', GIT_CONFIG_GLOBAL:devNull,
+    GIT_CONFIG_SYSTEM:devNull, GIT_CONFIG_NOSYSTEM:'1',
+    ...(primary && typeof environment.HOME === 'string' && environment.HOME.length ? {HOME:environment.HOME} : {}) };
+}
+
 async function verifyCondition(root, plan, condition, signal, execute, remaining = () => Infinity, context) {
   const cwd = join(root, "verification", condition);
   mkdirSync(dirname(cwd), { recursive: true, mode: 0o700 });
   copyRegularTree(join(root, plan.arms[condition].path), cwd);
   const primary = isPrimaryFixtureRecipe(plan.verification.recipe);
+  const environment = buildUserComparisonVerificationEnvironment(primary);
+  const environmentEvidence = { policy:primary?'sanitized_shell_home_v1':'sanitized_node_v1',
+    home:primary && environment.HOME?'inherited':'not_inherited',
+    digest:comparisonHash(Buffer.from(JSON.stringify(environment))) };
   const checks = primary ? plan.verification.recipe.checks.map(check => ({ ...check,
     command: [check.executable, ...check.argv] })) : [{ id: "task-tests", command: plan.verification.recipe.command },
     ...plan.verification.recipe.requirements.filter(item => item.command).map(item => ({ id: item.id, command: item.command }))];
@@ -391,6 +404,7 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
     const executable = primary ? check.executable : process.execPath;
     const checkCwd = primary ? join(cwd, check.cwd) : cwd;
     const request={condition,run_id:plan.run_id,plan_digest:context?.plan_digest,executable,argv,cwd:checkCwd,evidence_kind:plan.config.evidence_kind,
+      verification_environment:environmentEvidence,
       ...(primary ? { command_id: check.id, command_contract_digest: check.contract_command_digest,
         fixture_input_digest: plan.verification.recipe.input_manifest_digest, observation_origin: "controller_native_fixture_command" } : {}), requested_at:new Date().toISOString()};
     if(context) { checkpointComparison(context,"verification_intent",{condition,slot:{phase:"verifying",verification_index:index}});saveLaunchReceipt(root,condition,`verification-${index}.request`,request); }
@@ -407,8 +421,7 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
         context.active_child=`verification-${index}.spawn`;
         checkpointComparison(context,"verification_running",{condition,slot:{phase:"verifying",verification_index:index}}); } : undefined,
       timeoutMs: Math.floor(Math.min(plan.config.verification_timeout_ms, dispatchRemaining)), signal,
-      env: { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C", GIT_CONFIG_GLOBAL: devNull,
-        GIT_CONFIG_SYSTEM: devNull, GIT_CONFIG_NOSYSTEM: "1" } });
+      env: environment });
     if (context && childEnded(plan, value)) context.active_child=null;
     if (isSingleShotComparison(plan) && !childEnded(plan, value)) value.cleanupError ??= { code: "CHILD_TERMINATION_UNKNOWN", message: "verification child termination unknown; no later process may start" };
     const log = `verification-${index}.log`;
@@ -436,7 +449,10 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
   return { independent_process: execute === executeCodexSession,
     execution_origin: execute === executeCodexSession ? primary ? "controller_native_fixture_process" : "controller_node_process" : "synthetic_injected_verifier",
     common_frozen_recipe: true,
-    runtime: { executable: process.execPath, node_version: process.version, reporter_digest: plan.verification.reporter.digest }, checks: results,
+    runtime: { executable: process.execPath, node_version: process.version, reporter_digest: plan.verification.reporter.digest,
+      scope:primary?'comparison_controller':'direct_node_verifier',
+      ...(primary?{shell_node_version:null,shell_runtime_observation:'not_captured'}:{}),
+      verification_environment:environmentEvidence }, checks: results,
     requirements: plan.verification.recipe.requirements.map(item => ({ id: item.id, description: item.description,
       status: item.command ? results.find(result => result.id === item.id)?.status ?? "unknown" : "unknown" })),
     limitations: ["Node test-case receipts do not measure assertion count or prove that tests cover the requirement; the operator must check coverage", "human/semantic criteria without a command remain unknown", "verification executes repository test code in a fresh copy; this is not a security sandbox"] };

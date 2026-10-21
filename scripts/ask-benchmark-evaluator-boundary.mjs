@@ -28,7 +28,7 @@ import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { withCoreGradingAuthority, assertCoreGradingVerified } from "./ask-core-grading-authority.mjs";
 import { readStableJsonFile } from "./ask-benchmark-duplicate-key-json.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
-import { PRIMARY_PROCESSING_SOURCE_PATHS, PRIMARY_PROCESSING_V3_SOURCE_PATHS, PRIMARY_PROCESSING_V4_SOURCE_PATHS, PRIMARY_PROCESSING_V5_SOURCE_PATHS, PRIMARY_PROCESSING_V6_SOURCE_PATHS, PRIMARY_PROCESSING_V7_SOURCE_PATHS } from './ask-primary-scoring-version.mjs';
+import { PRIMARY_PROCESSING_AUTHORITY_PATHS } from './ask-primary-scoring-version.mjs';
 import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
@@ -1440,8 +1440,7 @@ export function validateSealedRepositoryAuthorityBytes({
     if (!inventoryEntry || inventoryEntry.file_type !== "file" || inventoryEntry.bytes !== node.bytes || inventoryEntry.sha256 !== node.sha256) throw new Error(`${label} source graph node is not cross-bound to executable bytes at ${node.path}`);
     // Explicit saved-processing graphs select their pinned schema pair. Recognizing these
     // existing authority-data types does not add paths to default/v1 graphs.
-    const expectedType = dependencyFileType(node.path, [...EVALUATOR_AUTHORITY_PATHS,
-      ...[...PRIMARY_PROCESSING_SOURCE_PATHS, ...PRIMARY_PROCESSING_V3_SOURCE_PATHS, ...PRIMARY_PROCESSING_V4_SOURCE_PATHS, ...PRIMARY_PROCESSING_V5_SOURCE_PATHS, ...PRIMARY_PROCESSING_V6_SOURCE_PATHS, ...PRIMARY_PROCESSING_V7_SOURCE_PATHS].filter(path => path.endsWith('.schema.json'))]);
+    const expectedType = dependencyFileType(node.path, [...EVALUATOR_AUTHORITY_PATHS, ...PRIMARY_PROCESSING_AUTHORITY_PATHS]);
     if (node.file_type !== expectedType) throw new Error(`${label} source graph file type is invalid at ${node.path}`);
   }
   for (const fixture of descriptor.fixture_authority) {
