@@ -285,6 +285,9 @@ export function inspectSuppliedPrimaryAppServerVerification(contract, condition,
     const result = inspectSuppliedPrimaryVerificationProvenance(contract, condition, Buffer.from(normalized.map(item => JSON.stringify(item)).join('\n') + '\n'));
     assert.equal(result.status, 'supplied_verification_segment_complete');
     return { ...result, evidence_class: 'supplied_unattested_app_server_segment', source_stream_digest: hash(stream),
+      observations: result.observations.map(observation => ({ ...observation,
+        start_digest: hash(Buffer.from(lines[observation.start_line - 1])),
+        completion_digest: hash(Buffer.from(lines[observation.completion_line - 1])) })),
       source_contract: 'openai/codex@092d3acd6bec3e3a14bdc7e7a2810ab628ab759d', raw_pair_pins: [...rawPairs.values()] };
   } catch { return fail(); }
 }

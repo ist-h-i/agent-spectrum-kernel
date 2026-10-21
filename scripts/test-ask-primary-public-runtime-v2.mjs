@@ -108,6 +108,9 @@ for (const condition of ['plain', 'kernel_principles_v2', 'full_ask']) test(`R5 
   const f = suppliedFixture(condition), result = inputs.inspectSuppliedPrimaryAppServerVerification(f.contract, condition, encode(f.events), f.identity);
   assert.equal(result.status, 'supplied_verification_segment_complete'); assert.equal(result.observations.length, 1);
   assert.equal(result.raw_pair_pins.length, 1); assert.equal(result.runtime_attestation, 'unknown');
+  assert.equal(result.source_stream_digest, comparisonHash(encode(f.events)));
+  assert.equal(result.observations[0].start_digest, comparisonHash(Buffer.from(JSON.stringify(f.events[0]))));
+  assert.equal(result.observations[0].completion_digest, comparisonHash(Buffer.from(JSON.stringify(f.events[1]))));
   assert.equal(result.scoring_authority, false); assert.equal(result.execution_authority, false); assert.equal(result.formal_aggregate_eligible, false);
   assert.ok(!JSON.stringify(result).includes('Artificial test output'));
 });
