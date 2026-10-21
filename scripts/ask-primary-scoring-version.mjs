@@ -94,6 +94,17 @@ function processingSourcePaths(commandEvidenceParserRevision) {
   assert.equal(commandEvidenceParserRevision, '1.6.0-primary-saved', 'unknown primary processing command revision');
   return PRIMARY_PROCESSING_V3_SOURCE_PATHS;
 }
+/** Closed build-time authority data, shared by graph construction and sealed
+ * byte validation. Runtime modules in the processing closure stay modules. */
+export function primaryProcessingAuthorityPaths(commandEvidenceParserRevision) {
+  const selected = processingSourcePaths(commandEvidenceParserRevision);
+  return selected.filter(path => path.endsWith('.schema.json') ||
+    (commandEvidenceParserRevision === '1.11.0-primary-saved' && path === 'scripts/generate-ask-primary-grading-schemas.mjs'));
+}
+export const PRIMARY_PROCESSING_AUTHORITY_PATHS = Object.freeze([...new Set([
+  '1.5.0-primary-saved','1.6.0-primary-saved','1.7.0-primary-saved','1.8.0-primary-saved',
+  '1.9.0-primary-saved','1.10.0-primary-saved','1.11.0-primary-saved',
+].flatMap(primaryProcessingAuthorityPaths))]);
 /** Source bytes only. This descriptor supplies no admission or execution authority. */
 export function primaryProcessingDescriptor({ root = ROOT, commandEvidenceParserRevision = '1.5.0-primary-saved' } = {}) {
   return { command_evidence_parser_revision: commandEvidenceParserRevision, review_recognition_revision: '2',

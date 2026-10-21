@@ -136,7 +136,7 @@ test('async source construction has isolated lifetime and cannot retain a later 
 });
 
 // Bytes-only public validation. No private bundle or evaluator is opened.
-test('v1 through v6 source graphs pass sealed byte validation with exact known file types', () => {
+test('v1 through v8 source graphs pass sealed byte validation with exact known file types', () => {
   const hash = b => 'sha256:' + createHash('sha256').update(b).digest('hex');
   const fixtureId = 'mn-build-option-update';
   const fixturePaths = evaluatorAuthorityPathsForFixture(fixtureId).fixturePaths;
@@ -163,12 +163,25 @@ test('v1 through v6 source graphs pass sealed byte validation with exact known f
   // The same public manifest, fixture bytes, descriptor rules and generator pass
   // without the v2 source-only selection.
   assert.ok(validate(deriveEvaluatorDependencyGraph({root,baseRevision:revision})));
-  for (const commandEvidenceParserRevision of ['1.5.0-primary-saved', '1.6.0-primary-saved', '1.7.0-primary-saved', '1.8.0-primary-saved', '1.9.0-primary-saved']) {
+  for (const [commandEvidenceParserRevision,version] of [
+    ['1.5.0-primary-saved','v2'],['1.6.0-primary-saved','v3'],['1.7.0-primary-saved','v4'],
+    ['1.8.0-primary-saved','v5'],['1.9.0-primary-saved','v6'],['1.10.0-primary-saved','v7'],['1.11.0-primary-saved','v8'],
+  ]) {
     const graph = scope.withPrimaryProcessingSourceBuild({root,baseRevision:revision,commandEvidenceParserRevision}, () => deriveEvaluatorDependencyGraph({root,baseRevision:revision}));
-    const version = commandEvidenceParserRevision === '1.9.0-primary-saved' ? 'v6' : commandEvidenceParserRevision === '1.8.0-primary-saved' ? 'v5' : commandEvidenceParserRevision === '1.7.0-primary-saved' ? 'v4' : commandEvidenceParserRevision === '1.6.0-primary-saved' ? 'v3' : 'v2';
     const selectedSchemas = schemas.map(path => path.replace('saved-v2-', `saved-${version}-`));
     for (const path of selectedSchemas) assert.equal(graph.node_inventory.find(node => node.path === path).file_type, 'authority_data');
     assert.ok(validate(graph));
+    if(version === 'v8') {
+      const dataPaths=graph.node_inventory.filter(node=>node.path.includes('-saved-v8-')).map(node=>node.path);
+      const generator='scripts/generate-ask-primary-grading-schemas.mjs';
+      assert.equal(dataPaths.length,8);assert.equal(graph.node_inventory.find(node=>node.path===generator).file_type,'authority_data');
+      for(const path of [...dataPaths,generator]) {
+        const changed=structuredClone(graph);changed.node_inventory.find(node=>node.path===path).file_type=path===generator?'module':'json';
+        const {graph_digest,...base}=changed;changed.graph_digest=canonicalDigest(base);
+        assert.throws(()=>validate(changed),/source graph file type is invalid/u);
+      }
+      assert.ok(!graph.edge_inventory.some(edge=>edge.kind==='private_entry_import'&&edge.to===generator));
+    }
     for (const path of [selectedSchemas[0], helper]) {
       const changed = structuredClone(graph); changed.node_inventory.find(node => node.path === path).file_type = path === helper ? 'authority_data' : 'json';
       const { graph_digest, ...base } = changed; changed.graph_digest = canonicalDigest(base);
