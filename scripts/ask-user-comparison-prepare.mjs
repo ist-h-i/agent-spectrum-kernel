@@ -1,21 +1,26 @@
 // Exploratory user-repository preparation. This module never starts Codex.
+import assert from 'node:assert/strict';
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { preparationGitOperation } from "./ask-preparation-git-diagnostic.mjs";
-import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { devNull, release } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
-import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
+import { buildCodexProjectionPlan, codexProjectedAssetContentsForProfile } from "./install-codex-adapter.mjs";
 import { buildAgentsBlock, coreImmutableAssetKind, CORE_OWNED_IMMUTABLE_ASSETS, MANAGED_START, MANAGED_END } from "./installer-lifecycle.mjs";
 import { skillAssets } from "./skill-assets.mjs";
 import { KERNEL_PRINCIPLES_ID, principlesCapability, renderKernelPrinciples } from "./kernel-principles.mjs";
 import { comparisonConditions, isKernelPrinciplesCondition } from "./ask-comparison-conditions.mjs";
 import { KERNEL_PRINCIPLES_V2_ID, renderKernelPrinciplesV2 } from "./kernel-principles-v2.mjs";
 import {kernelPrinciplesV2FixtureDescriptor, principlesV2Capability, kernelPrinciplesV2DescriptorSourcePaths} from "./kernel-principles-v2-catalog24.mjs";
-import { isPrimaryFixtureRecipe, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
+import { buildPrimaryFixtureRecipe, isPrimaryFixtureRecipe, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
+import { PRIMARY_EXECUTION_INPUT_CONTRACT, PRIMARY_EXECUTION_INPUT_CONTRACT_V2, PRIMARY_PUBLIC_CAPABILITIES_PATH, PRIMARY_PUBLIC_CAPABILITIES_SCHEMA_PATH,
+  isPrimaryExecutionInputContract, buildPrimaryExecutionInputContract, renderPrimaryExecutionInputBoundary,
+  buildPrimaryPublicCapabilitiesV2, renderPrimaryPublicRouterV2 } from './ask-primary-execution-input.mjs';
 import { buildPersonalPromptMaterialization, personalPromptInput } from "./ask-personal-prompt-materialization.mjs";
+import { assertBenchmarkSchemaInstance } from './ask-benchmark-schema.mjs';
 
 const SOURCE = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 const CORE_STATE = ".agent-spectrum-kernel/install-state.json";
@@ -330,6 +335,107 @@ function sourceDistribution() {
   return { manifest, corePaths, projection, extra, allPaths, supplementDigest: comparisonHash(supplementBytes) };
 }
 
+function primaryPublicFullFiles(distribution, v2) {
+  const full = new Map(distribution.corePaths.map(path => [path, readRegular(join(SOURCE, path), 'public Full source', FILE_LIMIT)]));
+  const merge = (path, raw) => {
+    if (full.has(path)) assert.ok(full.get(path).equals(raw), `conflicting source-owned public asset: ${path}`);
+    full.set(path, raw);
+  };
+  for (const [path, raw] of codexProjectedAssetContentsForProfile('full')) merge(path, raw);
+  for (const [path, entry] of distribution.extra) merge(path, entry.bytes);
+  assert.deepEqual([...full.keys()].sort(), distribution.allPaths);
+  if (v2) {
+    for (const name of ['skill-router', 'operating-mode-router', 'review-router']) {
+      for (const prefix of ['skills', '.agents/skills']) {
+        const path = `${prefix}/${name}/SKILL.md`;
+        full.set(path, renderPrimaryPublicRouterV2(name, full.get(path)));
+      }
+    }
+    assert.ok(!full.has(PRIMARY_PUBLIC_CAPABILITIES_PATH));
+    const capabilities = buildPrimaryPublicCapabilitiesV2(distribution.projection, full);
+    assertBenchmarkSchemaInstance(parseJson(capabilities, 'public routing selection'), { schemaPath: join(SOURCE, PRIMARY_PUBLIC_CAPABILITIES_SCHEMA_PATH) });
+    full.set(PRIMARY_PUBLIC_CAPABILITIES_PATH, capabilities);
+  }
+  return full;
+}
+
+// Re-derived only from fixed public fixture bytes and this source-owned Full
+// distribution. No caller-supplied auxiliary root/file is opened or admitted.
+export function derivePreparedPrimaryExecutionInput(plan) {
+  assert.ok(isPrimaryExecutionInputContract(plan.config.primary_input_contract), 'unknown primary input contract');
+  assert.ok(typeof plan.root === 'string' && isAbsolute(plan.root) && realpathSync(plan.root) === plan.root
+    && lstatSync(plan.root).isDirectory(), 'canonical prepared primary root required');
+  assert.deepEqual(Object.keys(plan.arms).sort(), [...comparisonConditions(plan.config.kernel_condition)].sort(), 'closed primary arms required');
+  for (const id of comparisonConditions(plan.config.kernel_condition)) {
+    assert.equal(plan.arms[id].path, `arms/${id}`, 'source-owned primary arm path required');
+    assert.equal(plan.arms[id].baseline_path, `control/baselines/${id}`, 'source-owned primary baseline path required');
+  }
+  const recipe = buildPrimaryFixtureRecipe(plan.verification.recipe.fixture_id);
+  const manifestBytes = readRegular(join(SOURCE, 'benchmarks/fixtures/checkpoint-b2', recipe.fixture_id, 'input-manifest.json'), 'primary input authority');
+  const manifest = parseJson(manifestBytes, 'primary input authority'), distribution = sourceDistribution();
+  const full = primaryPublicFullFiles(distribution, plan.config.primary_input_contract === PRIMARY_EXECUTION_INPUT_CONTRACT_V2);
+  const canonical = readRegular(join(SOURCE, 'AGENTS.md'), 'primary canonical instruction');
+  const principles = plan.config.kernel_condition === KERNEL_PRINCIPLES_V2_ID
+    ? renderKernelPrinciplesV2(canonical).body : renderKernelPrinciples(canonical).body;
+  const assertBytes = (path, raw, inventory, label) => {
+    const actual = readRegular(path, label, FILE_LIMIT, true);
+    assert.ok(actual.equals(raw), `${label} source-owned auxiliary/public bytes changed`);
+    assert.deepEqual(inventory, record(raw), `${label} source-owned byte pin changed`);
+    assert.equal(lstatSync(path).mode & 0o111 ? '100755' : '100644', '100644', `${label} source-owned file mode changed`);
+  };
+  for (const id of comparisonConditions(plan.config.kernel_condition)) {
+    const arm = plan.arms[id];
+    if (plan.config.primary_input_contract === PRIMARY_EXECUTION_INPUT_CONTRACT_V2) {
+      for (const state of [CORE_STATE, CODEX_STATE]) assert.ok(!existsSync(join(plan.root, arm.path, state)), 'management state in V2 arm');
+      if (id !== 'full_ask') assert.ok(!existsSync(join(plan.root, arm.path, PRIMARY_PUBLIC_CAPABILITIES_PATH)), 'Full selection in P/K arm');
+    }
+    for (const file of manifest.fixtures[recipe.fixture_id].files) {
+      const raw = readRegular(join(SOURCE, 'benchmarks/fixtures/checkpoint-b2', recipe.fixture_id, file.path), 'fixed public input', FILE_LIMIT, true);
+      assertBytes(join(plan.root, arm.baseline_path, file.path), raw, arm.baseline_inventory[file.path], 'primary baseline');
+    }
+    const expected = id === 'plain' ? new Map() : id === 'full_ask'
+      ? new Map([['AGENTS.md', Buffer.from(buildAgentsBlock(UTF8.decode(canonical)))], ...full])
+      : new Map([['AGENTS.md', Buffer.from(buildAgentsBlock(principles))]]);
+    for (const [path, raw] of expected) {
+      assertBytes(join(plan.root, arm.baseline_path, path), raw, arm.baseline_inventory[path], 'primary auxiliary baseline');
+      assertBytes(join(plan.root, arm.path, path), raw, arm.baseline_inventory[path], 'primary auxiliary arm');
+    }
+  }
+  return buildPrimaryExecutionInputContract(plan, { recipe, manifestBytes,
+    auxiliaryPaths: [...full.keys()].filter(path => path !== 'AGENTS.md').sort(),
+    ...(plan.config.primary_input_contract === PRIMARY_EXECUTION_INPUT_CONTRACT_V2 ? { sourceBinding: {
+      kind: 'ask_primary_public_routing_source_binding_v2', processing_status: 'not_admitted_for_scoring',
+      schema: { path: PRIMARY_PUBLIC_CAPABILITIES_SCHEMA_PATH,
+        digest: comparisonHash(readRegular(join(SOURCE, PRIMARY_PUBLIC_CAPABILITIES_SCHEMA_PATH), 'public routing schema')) },
+      source_files: Object.fromEntries(['scripts/ask-primary-execution-input.mjs', 'scripts/ask-user-comparison-prepare.mjs',
+        'scripts/install-codex-adapter.mjs', ...['skill-router', 'operating-mode-router', 'review-router'].map(name => `skills/${name}/SKILL.md`)]
+        .map(path => [path, comparisonHash(readRegular(join(SOURCE, path), 'public routing source', FILE_LIMIT))])),
+    } } : {}) });
+}
+
+/** Public source-selection proposal only. Never read/serialize installation
+ * state, runtime configuration or host data, and never grant route authority.
+ * The opaque experiment binding is kept outside the deterministic document. */
+export function derivePreparedPrimaryPublicCapabilities(plan) {
+  assert.equal(plan?.config?.primary_input_contract, PRIMARY_EXECUTION_INPUT_CONTRACT, 'closed primary input contract required');
+  const contract = derivePreparedPrimaryExecutionInput(plan);
+  const projection = buildCodexProjectionPlan({ profileName: 'full' });
+  const selected = [...projection.skills].sort();
+  const document = {
+    kind: 'ask_primary_public_capability_selection_v1', adapter: 'codex', profile: 'full',
+    projection_fingerprint: projection.fingerprint, selected_skills: selected,
+    skill_assets: selected.map(skill => {
+      const path = `.agents/skills/${skill}/SKILL.md`, asset = contract.conditions.full_ask.auxiliary_inputs[path];
+      assert.ok(asset, 'source-selected public Skill entry unavailable');
+      return { skill, path, digest: asset.digest, bytes: asset.bytes, mode: asset.mode };
+    }),
+    runtime_enabled_selection: 'unobserved', routing_authority: false,
+    execution_authority: false, scoring_authority: false, formal_aggregate_eligible: false,
+  };
+  return { status: 'proposal_only', document, document_digest: comparisonHash(Buffer.from(JSON.stringify(document))),
+    binding: { kind: 'ask_primary_public_capability_proposal_binding_v1', condition: 'full_ask', input_contract_digest: contract.contract_digest } };
+}
+
 function skillRecordPath(path, item, prefix) {
   if (typeof item.skill !== "string" || !NAME.test(item.skill) || !path.startsWith(`${prefix}/${item.skill}/`)) return false;
   const suffix = path.slice(`${prefix}/${item.skill}/`.length);
@@ -465,9 +571,14 @@ function kernelCapability(inventory, config) {
 
 function validateOptions(options) {
   if (!plainObject(options)) fail("options_object_required");
-  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf", "kernelCondition", "executionContract", "personalPrompt"];
+  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf", "kernelCondition", "executionContract", "personalPrompt", "primaryInputContract"];
   if (Object.keys(options).some(key => !allowed.includes(key))) fail("unknown_preparation_option");
   comparisonExecutionPolicy(options.executionContract);
+  if (options.primaryInputContract !== undefined) {
+    assert.ok(isPrimaryExecutionInputContract(options.primaryInputContract), 'unknown primary input contract');
+    assert.equal(options.executionContract, SINGLE_SHOT_CONTRACT, 'closed primary input requires single-shot');
+    assert.equal(options.personalPrompt, undefined, 'closed primary input does not support personal Prompt substitution');
+  }
   for (const name of ["repo", "output"]) if (typeof options[name] !== "string" || !isAbsolute(options[name]) || resolve(options[name]) !== options[name]) fail(`absolute_${name}_required`);
   if (realpathSync(options.repo) !== options.repo || !lstatSync(options.repo).isDirectory()) fail("canonical_repository_root_required");
   if (existsSync(options.output)) fail("output_exists_use_new_run_directory");
@@ -481,7 +592,8 @@ function validateOptions(options) {
     task_class: options.taskClass ?? "implementation", global_capabilities: options.globalCapabilities ?? [], global_ask_presence: options.globalAskPresence ?? "unknown",
     evidence_kind: options.evidenceKind ?? "observed", platform: `${process.platform}/${process.arch}`,
     node_version: process.version, os_release: release(),
-    ...(options.kernelCondition === undefined ? {} : { kernel_condition: options.kernelCondition }) };
+    ...(options.kernelCondition === undefined ? {} : { kernel_condition: options.kernelCondition }),
+    ...(options.primaryInputContract === undefined ? {} : { primary_input_contract: options.primaryInputContract }) };
   comparisonConditions(config.kernel_condition);
   if (typeof config.cli_bin !== "string" || !(config.cli_bin === "codex" || isAbsolute(config.cli_bin)) || /[\u0000-\u001f\u007f]/u.test(config.cli_bin)) fail("invalid_cli_binary");
   for (const field of ["cli_version", "model", "reasoning"]) if (config[field] !== null && (typeof config[field] !== "string" || !config[field].trim() || /[\u0000-\u001f\u007f]/u.test(config[field]))) fail(`invalid_${field}`);
@@ -520,6 +632,9 @@ export function prepareUserComparison(options = {}) {
   }
   const recipe = validateRecipe(parseJson(verificationBytes, "verification"), original);
   const primaryRecipe = isPrimaryFixtureRecipe(recipe);
+  if (options.primaryInputContract !== undefined) {
+    assert.ok(primaryRecipe && isKernelPrinciplesCondition(config.kernel_condition), 'closed input contract requires authenticated primary principles recipe');
+  }
   if (primaryRecipe) validatePrimaryFixtureRecipe(recipe, original, { taskBytes, mutablePaths: mutable, taskClass: config.task_class });
   else if (["design", "handoff"].includes(config.task_class)) fail("advanced_task_class_requires_primary_fixture_recipe");
   const personalPrompt = options.personalPrompt === undefined ? null : buildPersonalPromptMaterialization(options.personalPrompt,
@@ -592,13 +707,28 @@ export function prepareUserComparison(options = {}) {
           if (!readFileSync(join(armRoot, file)).equals(value.bytes)) fail(`live_supplement_collision:${file}`);
         } else writeNew(armRoot, file, value.bytes);
       }
+      if (options.primaryInputContract === PRIMARY_EXECUTION_INPUT_CONTRACT_V2) {
+        // Only records created by the two installers in this new, owned arm
+        // are relocated. Old runs and source installations are never changed.
+        for (const state of [CORE_STATE, CODEX_STATE]) {
+          writeNew(root, `control/full-installation/${basename(state)}`, readRegular(join(armRoot, state), 'new installer identity', FILE_LIMIT));
+          unlinkSync(join(armRoot, state));
+        }
+        for (const [file, raw] of primaryPublicFullFiles(distribution, true)) {
+          if (existsSync(join(armRoot, file))) writeFileSync(join(armRoot, file), raw, { mode: 0o600 });
+          else writeNew(armRoot, file, raw);
+        }
+      }
     }
     const baseline = inventoryUserTree(armRoot);
     const assetPaths = id === "plain" ? [] : id !== "full_ask" ? ["AGENTS.md"]
-      : [...new Set(["AGENTS.md", CORE_STATE, CODEX_STATE, ...distribution.allPaths])].sort();
+      : [...new Set(["AGENTS.md", ...(options.primaryInputContract === PRIMARY_EXECUTION_INPUT_CONTRACT_V2
+        ? [PRIMARY_PUBLIC_CAPABILITIES_PATH] : [CORE_STATE, CODEX_STATE]), ...distribution.allPaths])].sort();
     const assets = assetPaths.map(file => ({ path: file, ...baseline[file],
       kind: file === "AGENTS.md" ? isKernelPrinciplesCondition(id) ? "generated_principles_with_preserved_custom_instructions" : "canonical_kernel_with_preserved_custom_instructions" : file.endsWith("install-state.json") ? "install_identity" : "full_ask_asset",
-      origin: isKernelPrinciplesCondition(id) ? "canonical_principles_projection" : distribution.extra.has(file) ? "live_classified_reference_supplement" : id === "kernel_only" ? "canonical_agents" : "live_core_and_codex_full_installers" }));
+      origin: options.primaryInputContract === PRIMARY_EXECUTION_INPUT_CONTRACT_V2 && id === 'full_ask'
+        && (file === PRIMARY_PUBLIC_CAPABILITIES_PATH || /^(?:skills|\.agents\/skills)\/(?:skill-router|operating-mode-router|review-router)\/SKILL\.md$/u.test(file))
+        ? 'source_public_routing_projection_v2' : isKernelPrinciplesCondition(id) ? "canonical_principles_projection" : distribution.extra.has(file) ? "live_classified_reference_supplement" : id === "kernel_only" ? "canonical_agents" : "live_core_and_codex_full_installers" }));
     const baselineCommit = prepareGitBaseline(armRoot);
     // Every regular file belongs in the explicit baseline; no task/controller
     // file is placed inside an arm, even during Git initialization.
@@ -671,6 +801,15 @@ export function prepareUserComparison(options = {}) {
       "Non-empty root AGENTS.override.md is unsupported because it takes precedence over K/F's canonical AGENTS.md; the source override is preserved and preparation stops.",
       "Committed .agents/runs, .agent-spectrum-kernel/runtime or ask-runtime records are refused rather than copied into model input or deleted as managed assets.",
       "Preparation uses local Git and current Node installers only; Codex/model launch count is zero.", "One exploratory task cannot prove general ASK effectiveness or operational promotion."] };
+  if (options.primaryInputContract !== undefined) {
+    plan.primary_execution_input = derivePreparedPrimaryExecutionInput(plan);
+    for (const id of comparisonConditions(config.kernel_condition)) {
+      const input = Buffer.from(prompt + renderPrimaryExecutionInputBoundary(plan.primary_execution_input, id));
+      const declaration = plan.primary_execution_input.conditions[id].input;
+      assert.equal(comparisonHash(input), declaration.digest);
+      writeNew(root, declaration.path, input);
+    }
+  }
   const serialized = serializeComparisonPlan(plan), planDigest = comparisonHash(serialized);
   writeNew(root, "control/plan.json", serialized);
   writeNew(root, "control/plan.digest", Buffer.from(`${planDigest}\n`));
