@@ -1,3 +1,5 @@
+import {PRIMARY_RUNTIME_V10_REVISION, buildPrimaryRuntimeV10Binding} from './ask-primary-runtime-v10.mjs';
+import {readUserComparisonPlan as readV10ComparisonPlan} from './ask-user-comparison.mjs';
 // Faithful offline conversion of retained single-shot bytes. No model, shell,
 // private evaluator, ownership recovery, grant or admission mutation occurs.
 import assert from 'node:assert/strict';
@@ -58,6 +60,8 @@ export function primaryProducerSources() {
     'benchmarks/schemas/primary-saved-v7-portfolio-command-evidence.schema.json', 'benchmarks/schemas/primary-k2-saved-v7-portfolio-command-evidence.schema.json',
     ...['primary','primary-k2'].flatMap(prefix=>['portfolio-command-evidence','normalized-portfolio-result','evaluator-result-envelope','portfolio-engineering-result'].map(name=>`benchmarks/schemas/${prefix}-saved-v8-${name}.schema.json`)),
     ...['primary','primary-k2'].flatMap(prefix=>['portfolio-command-evidence','normalized-portfolio-result','evaluator-result-envelope','portfolio-engineering-result'].map(name=>`benchmarks/schemas/${prefix}-saved-v9-${name}.schema.json`)),
+    ...['primary','primary-k2'].flatMap(prefix=>['portfolio-command-evidence','normalized-portfolio-result','evaluator-result-envelope','portfolio-engineering-result'].map(name=>`benchmarks/schemas/${prefix}-saved-v10-${name}.schema.json`)),
+    'benchmarks/schemas/primary-runtime-v10-binding.schema.json',
     'benchmarks/schemas/primary-saved-v7-evaluator-result-envelope.schema.json', 'benchmarks/schemas/primary-k2-saved-v7-evaluator-result-envelope.schema.json'];
   const all=new Set([...paths,'scripts/ask-primary-fixture-recipe.mjs','benchmarks/adaptive-portfolio.config.json',
     'benchmarks/schemas/runtime-observation-carrier.schema.json',
@@ -229,10 +233,48 @@ function derive(target, source, parserRevision = PRIMARY_SAVED_COMMAND_EVIDENCE_
     adapter_identities: new Map([['codex', adapter]]), cases: inspected } };
 }
 
+// A source-bound candidate record, not the historical execution producer token.
+function v10Source(block) {
+  assert.equal(primaryProcessingSelection(block)?.command_evidence_parser_revision, PRIMARY_RUNTIME_V10_REVISION, 'V10 fixed selector required');
+  const loaded=readV10ComparisonPlan(block.root);
+  assert.equal(loaded.plan_digest,block.plan_digest,'V10 plan identity changed');
+  assert.equal(loaded.plan.run_id,block.run_id,'V10 run identity changed');
+  assert.equal(loaded.plan.verification.recipe.fixture_id,block.fixture_id,'V10 fixture changed');
+  const binding=buildPrimaryRuntimeV10Binding({plan:loaded.plan,planDigest:loaded.plan_digest});
+  const paths=['control/plan.json','control/plan.digest',...Object.values(loaded.plan.primary_execution_input.conditions).map(c=>c.input.path)];
+  const references=Object.fromEntries(paths.map(path=>{const v=readStableFile(join(loaded.root,path),'V10 prepared input',LIMIT);return[path,{digest:hash(v.bytes),bytes:v.bytes.length,mode:v.evidence.finalPath.mode}];}));
+  return {binding,references,loaded};
+}
+function produceV10(block,outputRoot) {
+  const source=v10Source(block),target=resolve(outputRoot);assert.ok(!existsSync(target));assert.equal(realpathSync(dirname(target)),dirname(target));
+  for(const input of [ROOT,source.loaded.root,source.loaded.plan.source.repo,primaryScoringRoot(block)].filter(Boolean)){
+    const path=realpathSync(input);assert.ok(target!==path&&!target.startsWith(path+'/'),'V10 output overlaps an input');
+  }
+  mkdirSync(target,{mode:0o700});write(target,'runtime-binding.json',source.binding);
+  const manifest={kind:'ask_primary_evaluation_producer_v10',command_evidence_parser_revision:PRIMARY_RUNTIME_V10_REVISION,preparation_only:true,block,
+    binding_digest:source.binding.binding_digest,retained_input_references:source.references,source_digests:primaryProducerSources(),artifact_inventory:entries(target),
+    runtime_attestation:'unknown',execution_permission:false,scoring_ready:false,formal_aggregate_eligible:false,model_calls:0,grader_process_starts:0};
+  write(target,'producer.json',manifest);
+  return {output_root:target,external_digest:hash(bytes(manifest)),normalized:null,preparation_only:true,scoring_ready:false,formal_aggregate_eligible:false,model_calls:0,grader_process_starts:0};
+}
+function verifyV10(manifest,target) {
+  assert.deepEqual(readdirSync(target).sort(),['producer.json','runtime-binding.json'],'V10 candidate output is closed');
+  assert.deepEqual(Object.keys(manifest).sort(),['kind','command_evidence_parser_revision','preparation_only','block','binding_digest','retained_input_references','source_digests','artifact_inventory','runtime_attestation','execution_permission','scoring_ready','formal_aggregate_eligible','model_calls','grader_process_starts'].sort());
+  assert.equal(manifest.command_evidence_parser_revision,PRIMARY_RUNTIME_V10_REVISION);assert.equal(manifest.preparation_only,true);assert.equal(manifest.runtime_attestation,'unknown');
+  for(const name of ['execution_permission','scoring_ready','formal_aggregate_eligible'])assert.equal(manifest[name],false);
+  assert.equal(manifest.model_calls,0);assert.equal(manifest.grader_process_starts,0);
+  const source=v10Source(manifest.block);
+  assert.deepEqual(manifest.retained_input_references,source.references,'V10 retained input pins changed');
+  assert.deepEqual(manifest.source_digests,primaryProducerSources(),'V10 producer source changed');assert.deepEqual(manifest.artifact_inventory,entries(target),'V10 artifact inventory changed');
+  assert.deepEqual(read(join(target,'runtime-binding.json')),bytes(source.binding),'V10 runtime binding changed');assert.equal(manifest.binding_digest,source.binding.binding_digest);
+  return {preparationOnly:true,binding:source.binding,block:manifest.block,commandEvidenceParserRevision:PRIMARY_RUNTIME_V10_REVISION,execution_permission:false,scoring_ready:false};
+}
+
 export async function producePrimaryEvaluationArtifacts(block, outputRoot, { commandEvidenceParserRevision, ...unknown } = {}) {
   const processing = primaryProcessingSelection(block);
   commandEvidenceParserRevision ??= processing?.command_evidence_parser_revision ?? PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
   if (processing) assert.equal(commandEvidenceParserRevision, processing.command_evidence_parser_revision, 'primary processing selector override refused');
+  if(commandEvidenceParserRevision===PRIMARY_RUNTIME_V10_REVISION){assert.deepEqual(Object.keys(unknown),[],'V10 caller context override refused');return produceV10(block,outputRoot);}
   assert.ok([PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V9_PARSER_REVISION].includes(commandEvidenceParserRevision), 'unsupported primary command evidence revision');
   if ([PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V9_PARSER_REVISION].includes(commandEvidenceParserRevision)) assert.deepEqual(Object.keys(unknown), [], 'primary caller context override refused');
   const source = await checkedSource(block, processing?.command_evidence_parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V9_PARSER_REVISION ? 'ask_primary_scoring_version_v9' : processing?.command_evidence_parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION ? 'ask_primary_scoring_version_v8' : processing?.command_evidence_parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION
@@ -274,6 +316,7 @@ export function verifyPrimaryEvaluationProducer(options) {
   const target = resolve(options.recordRoot); assert.equal(realpathSync(target), target);
   const raw = read(join(target, 'producer.json')); assert.equal(hash(raw), options.externalDigest, 'primary external producer pin changed');
   const manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
+  if(manifest.kind==='ask_primary_evaluation_producer_v10')return verifyV10(manifest,target);
   assert.ok(['ask_primary_evaluation_producer_v1', 'ask_primary_evaluation_producer_v2', 'ask_primary_evaluation_producer_v3', 'ask_primary_evaluation_producer_v4', 'ask_primary_evaluation_producer_v5', 'ask_primary_evaluation_producer_v6', 'ask_primary_evaluation_producer_v7', 'ask_primary_evaluation_producer_v8', 'ask_primary_evaluation_producer_v9'].includes(manifest.kind), 'unknown primary producer version');
   const commandEvidenceParserRevision = manifest.kind !== 'ask_primary_evaluation_producer_v1' ? manifest.command_evidence_parser_revision : PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
   if (manifest.kind === 'ask_primary_evaluation_producer_v9') assert.equal(commandEvidenceParserRevision, PRIMARY_SAVED_COMMAND_EVIDENCE_V9_PARSER_REVISION, 'primary v9 parser revision changed');

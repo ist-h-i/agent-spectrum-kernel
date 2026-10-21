@@ -27,7 +27,7 @@ export function validateReviewArchiveProductionAuthority({ root, fixtureId, sour
   if (reference.evaluator_revision !== sourceRevision) throw new Error("review archive processing source revision differs from evaluator source");
   if (typeof primaryScope?.withPrimaryProcessingSourceBuild !== "function") throw new Error("review archive primary processing source construction is unavailable");
   const nodes = reference.evaluator_source_identity?.dependency_graph?.node_inventory ?? [];
-  const commandEvidenceParserRevision = nodes.some(node => node.path === 'benchmarks/schemas/primary-saved-v9-normalized-portfolio-result.schema.json') ? '1.12.0-primary-saved' : nodes.some(node => node.path === 'benchmarks/schemas/primary-saved-v8-normalized-portfolio-result.schema.json')
+  const commandEvidenceParserRevision = nodes.some(node => node.path === 'benchmarks/schemas/primary-saved-v10-normalized-portfolio-result.schema.json') ? '1.13.0-primary-app-server' : nodes.some(node => node.path === 'benchmarks/schemas/primary-saved-v9-normalized-portfolio-result.schema.json') ? '1.12.0-primary-saved' : nodes.some(node => node.path === 'benchmarks/schemas/primary-saved-v8-normalized-portfolio-result.schema.json')
     ? '1.11.0-primary-saved' : '1.10.0-primary-saved';
   return primaryScope.withPrimaryProcessingSourceBuild({ root: realpathSync(root), baseRevision: sourceRevision, commandEvidenceParserRevision }, () => {
     const result = validate();

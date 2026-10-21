@@ -20,11 +20,12 @@ const digest = value => assert.match(value, /^sha256:[a-f0-9]{64}$/u);
 const keys = (value, expected) => assert.deepEqual(Object.keys(value).sort(), [...expected].sort(), 'closed scoring version fields required');
 const safe = path => typeof path === 'string' && !path.startsWith('/') && !path.includes('\\') && !path.includes('\0') && path.split('/').every(part => part && part !== '.' && part !== '..');
 const resourcePaths = ['privateRoot', 'manifestPath', 'admissionDecisionPath', 'admissionReviewAuthorityPath', 'admissionReviewArchivePath'];
-const scoringVersionKinds = Object.freeze(Array.from({ length: 9 }, (_, i) => `ask_primary_scoring_version_v${i + 1}`));
+const scoringVersionKinds = Object.freeze(Array.from({ length: 10 }, (_, i) => `ask_primary_scoring_version_v${i + 1}`));
 const V7_KIND = 'ask_primary_scoring_version_v7';
 const V8_KIND = 'ask_primary_scoring_version_v8';
 const V9_KIND = 'ask_primary_scoring_version_v9';
-const registeredVersion = kind => [V7_KIND,V8_KIND,V9_KIND].includes(kind);
+const V10_KIND = 'ask_primary_scoring_version_v10';
+const registeredVersion = kind => [V7_KIND,V8_KIND,V9_KIND,V10_KIND].includes(kind);
 /** The optional catalog API is supplied by the registered-task recipe version.
  * Without it this implementation remains closed over the historical nine. */
 export function isPrimaryScoringFixtureId(fixtureId, { evaluationVersion = null } = {}) {
@@ -90,7 +91,15 @@ export const PRIMARY_PROCESSING_V9_SOURCE_PATHS = Object.freeze([
   ...['primary','primary-k2'].flatMap(prefix=>['portfolio-command-evidence','normalized-portfolio-result','evaluator-result-envelope','portfolio-engineering-result']
     .map(name=>`benchmarks/schemas/${prefix}-saved-v9-${name}.schema.json`)),
 ]);
+export const PRIMARY_PROCESSING_V10_SOURCE_PATHS = Object.freeze([
+  ...PRIMARY_PROCESSING_V9_SOURCE_PATHS, 'scripts/ask-primary-runtime-v10.mjs',
+  'scripts/ask-primary-execution-input.mjs', 'scripts/ask-user-comparison-prepare.mjs', 'scripts/ask-user-comparison.mjs', 'scripts/install-codex-adapter.mjs',
+  'benchmarks/schemas/primary-public-capability-selection-v2.schema.json', 'benchmarks/schemas/primary-runtime-v10-binding.schema.json',
+  ...['primary','primary-k2'].flatMap(prefix=>['portfolio-command-evidence','normalized-portfolio-result','evaluator-result-envelope','portfolio-engineering-result']
+    .map(name=>`benchmarks/schemas/${prefix}-saved-v10-${name}.schema.json`)),
+]);
 function processingSourcePaths(commandEvidenceParserRevision) {
+  if (commandEvidenceParserRevision === '1.13.0-primary-app-server') return PRIMARY_PROCESSING_V10_SOURCE_PATHS;
   if (commandEvidenceParserRevision === '1.12.0-primary-saved') return PRIMARY_PROCESSING_V9_SOURCE_PATHS;
   if (commandEvidenceParserRevision === '1.11.0-primary-saved') return PRIMARY_PROCESSING_V8_SOURCE_PATHS;
   if (commandEvidenceParserRevision === '1.10.0-primary-saved') return PRIMARY_PROCESSING_V7_SOURCE_PATHS;
@@ -106,11 +115,11 @@ function processingSourcePaths(commandEvidenceParserRevision) {
 export function primaryProcessingAuthorityPaths(commandEvidenceParserRevision) {
   const selected = processingSourcePaths(commandEvidenceParserRevision);
   return selected.filter(path => path.endsWith('.schema.json') ||
-    (['1.11.0-primary-saved','1.12.0-primary-saved'].includes(commandEvidenceParserRevision) && path === 'scripts/generate-ask-primary-grading-schemas.mjs'));
+    (['1.11.0-primary-saved','1.12.0-primary-saved','1.13.0-primary-app-server'].includes(commandEvidenceParserRevision) && path === 'scripts/generate-ask-primary-grading-schemas.mjs'));
 }
 export const PRIMARY_PROCESSING_AUTHORITY_PATHS = Object.freeze([...new Set([
   '1.5.0-primary-saved','1.6.0-primary-saved','1.7.0-primary-saved','1.8.0-primary-saved',
-  '1.9.0-primary-saved','1.10.0-primary-saved','1.11.0-primary-saved','1.12.0-primary-saved',
+  '1.9.0-primary-saved','1.10.0-primary-saved','1.11.0-primary-saved','1.12.0-primary-saved','1.13.0-primary-app-server',
 ].flatMap(primaryProcessingAuthorityPaths))]);
 /** Source bytes only. This descriptor supplies no admission or execution authority. */
 export function primaryProcessingDescriptor({ root = ROOT, commandEvidenceParserRevision = '1.5.0-primary-saved' } = {}) {
@@ -143,7 +152,7 @@ function fixedPath(path, directory = false) {
 export function verifyPrimaryScoringSemantics(fixtureId, selectedRoot, { root = ROOT, evaluationVersion = null } = {}) {
   assert.ok(isPrimaryScoringFixtureId(fixtureId, { evaluationVersion }), 'unknown primary fixture');
   const base = `benchmarks/fixtures/checkpoint-b2/${fixtureId}`;
-  if ([V8_KIND,V9_KIND].includes(evaluationVersion)) {
+  if ([V8_KIND,V9_KIND,V10_KIND].includes(evaluationVersion)) {
     const basis = unsafeActionContract.PRIMARY_UNSAFE_ACTION_AUTHORIZATION[fixtureId];
     if (basis) {
       assert.equal(hash(read(join(selectedRoot,basis.task_path))),basis.task_sha256,'v8 unsafe action task authorization basis changed');
@@ -216,7 +225,7 @@ export function readPrimaryScoringVersion(selector, fixtureId, { root = ROOT, ve
   keys(fixture, ['frozen_source_root', 'selected', 'resource', 'resource_file_digests']);
   fixedPath(fixture.frozen_source_root, true);
   if (processing) verifyProcessingDescriptor(manifest.processing, fixture.frozen_source_root, root,
-    manifest.kind === V9_KIND ? '1.12.0-primary-saved' : manifest.kind === V8_KIND ? '1.11.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v7' ? '1.10.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v6' ? '1.9.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v5' ? '1.8.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v4' ? '1.7.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v3' ? '1.6.0-primary-saved' : '1.5.0-primary-saved');
+    manifest.kind === V10_KIND ? '1.13.0-primary-app-server' : manifest.kind === V9_KIND ? '1.12.0-primary-saved' : manifest.kind === V8_KIND ? '1.11.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v7' ? '1.10.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v6' ? '1.9.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v5' ? '1.8.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v4' ? '1.7.0-primary-saved' : manifest.kind === 'ask_primary_scoring_version_v3' ? '1.6.0-primary-saved' : '1.5.0-primary-saved');
   keys(fixture.resource, PRIMARY_SCORING_VERSION_RESOURCE_FIELDS);
   keys(fixture.resource_file_digests, PRIMARY_SCORING_VERSION_FILE_FIELDS);
   digest(fixture.resource.admissionReviewAuthoritySourceDigest);
