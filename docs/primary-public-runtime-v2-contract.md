@@ -65,7 +65,8 @@ source contract at OpenAI Codex commit
 - `CommandAction.ts` blob `91c92c9cbf8b2a42a6a5a3da756655a43c93ad82`.
 
 These files are under `codex-rs/app-server-protocol/schema/typescript/v2/`
-in the official repository. No CLI binary was invoked. The diagnostic checks
+in the official repository. The original V2 implementation used source evidence
+only. The diagnostic checks
 closed event fields, matching supplied thread/turn IDs, monotonic pair timestamps,
 command/cwd/start/completion/zero exit and raw event pins. Descriptive commandActions
 never authorize commands; unknown commands and any non-command/unknown notification
@@ -75,6 +76,33 @@ result and grants no runtime, execution, admission or scoring authority.
 
 Verification uses normal local Node preparation and artificial event fixtures,
 no Codex process or model. Independent review and exact-head CI are required.
+
+### Binary public-schema observation and optional wire metadata
+
+Follow-up SPEC-P24-CODEX-WIRE-01621 / formal requirement R6 uses only installed
+binary version/help/schema generation in normal permissions, without a live
+server, thread, turn, model, auth RPC or configuration override. The observed
+CLI is 0.162.1, native digest
+`sha256:74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0`.
+The public fixture `docs/fixtures/primary-codex-command-wire-01621.json` records
+the generated notification schema digests and closed command field inventory.
+This observes a binary's declared protocol, not actual runtime event emission.
+
+R6: accept omission only of schema-documented nullable/descriptive command
+metadata. The wire requires command, commandActions, cwd, id, status and type;
+its source default is agent. Missing source therefore follows that pinned wire
+default. Explicit unknown/null/non-agent sources remain unavailable. Missing
+plugin/script/process/output/duration metadata cannot become verification or
+permission evidence. Start exit may be absent/null, but successful completion
+requires an explicitly observed zero exit; an omitted completion exit is unknown.
+Unknown fields, missing required fields, command/cwd/identity mismatches, edits
+and incomplete/failed pairs still reject the whole segment. Raw line digests
+continue to refer to the original bytes, never a synthesized defaulted event.
+
+Artificial normal omission fixtures cover P/K/F equally; negative cases cover
+every required field and missing completion exit. V1/V8/V9 and official grading
+are unchanged. All existing startup/launch/scoring guards stay closed. The new
+source binding changes for fresh preparations; old plans/results are not repinned.
 
 ## Remaining connection
 
