@@ -114,7 +114,9 @@ regular single-link request file outside target/source, using `--request PATH`
 and independently supplied raw SHA-256 `--request-digest sha256:…`. The request is
 the corresponding API input. Mutating CLI requests contain only `prepared` and
 `closure`; `--authorized --confirm sha256:…` supplies authorization separately.
-They do not read a global current pointer, start a process/model, or accept force.
+They do not read a global current pointer, start generation/comparison/model
+runs, or accept force. Existing setup binding may invoke read-only local Git
+metadata probes; it does not request remote data.
 Public failures expose only `personal_target_refused` or
 `personal_target_recovery_required`, with exit1. Closure data and raw filesystem
 errors are never copied to those responses. The private request digest protects
