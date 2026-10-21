@@ -16,7 +16,7 @@ import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { computeOutputContractDigest, computeRequirementDigest, computeRequirementRecordDigest, computeRequirementSetDigest } from "./ask-benchmark-scoring-contract.mjs";
 import { PRIMARY_FIXTURE_REGISTRY } from "./ask-benchmark-portfolio-catalog.mjs";
 import { primaryProfileForKernel } from "./ask-primary-evaluation-profile.mjs";
-import { PRIMARY_EXECUTION_INPUT_CONTRACT } from './ask-primary-execution-input.mjs';
+import { isPrimaryExecutionInputContract } from './ask-primary-execution-input.mjs';
 import { preparePrimaryEvaluationBatch, PRIMARY_GRADING_RESERVATION_MS, primaryBatchLimitsForSet } from "./ask-primary-evaluation-batch.mjs";
 
 const SOURCE = fileURLToPath(new URL("../", import.meta.url));
@@ -28,7 +28,7 @@ const save = (path, value) => writeFileSync(path, `${JSON.stringify(value, null,
 export function preparePrimaryEvaluation(publicParent, options) {
   assert.ok(options && typeof options === "object" && !Array.isArray(options));
   assert.ok(Object.keys(options).every(key => closedOptions.includes(key)), "primary preparation options are closed");
-  if (options.primaryInputContract !== undefined) assert.equal(options.primaryInputContract, PRIMARY_EXECUTION_INPUT_CONTRACT, 'unknown primary input contract');
+  if (options.primaryInputContract !== undefined) assert.ok(isPrimaryExecutionInputContract(options.primaryInputContract), 'unknown primary input contract');
   assert.equal(options.scoringVersionPath == null, options.scoringVersionDigest == null, "scoring version path and digest supplied together");
   const scoringVersion = options.scoringVersionPath == null ? null : { path: options.scoringVersionPath, digest: options.scoringVersionDigest };
   const fixtureSet = options.fixtureSet ?? "legacy9", fixtureIds = primaryFixtureIdsForSet(fixtureSet);

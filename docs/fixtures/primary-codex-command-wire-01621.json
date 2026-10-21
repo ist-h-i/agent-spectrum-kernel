@@ -1,0 +1,78 @@
+{
+  "kind": "ask_primary_codex_public_wire_observation_v1",
+  "cli_version": "codex-cli 0.162.1",
+  "binary_digest": "sha256:74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+  "observation_scope": "offline_binary_generated_schema_only",
+  "runtime_events_observed": false,
+  "model_calls": 0,
+  "schemas": [
+    {
+      "name": "ItemStartedNotification",
+      "file_digest": "sha256:692c5876f44a4c12a9b9211912860ceddb65d34497ab4fe9aa46cbebe1a63166",
+      "notification_required": [
+        "item",
+        "startedAtMs",
+        "threadId",
+        "turnId"
+      ],
+      "command_required": [
+        "command",
+        "commandActions",
+        "cwd",
+        "id",
+        "status",
+        "type"
+      ],
+      "command_properties": [
+        "aggregatedOutput",
+        "command",
+        "commandActions",
+        "cwd",
+        "durationMs",
+        "exitCode",
+        "id",
+        "pluginId",
+        "processId",
+        "scriptPath",
+        "source",
+        "status",
+        "type"
+      ],
+      "source_default": "agent"
+    },
+    {
+      "name": "ItemCompletedNotification",
+      "file_digest": "sha256:940dcfba0740e86a7e62b0eacf1bb53c634fdbe8b75fa3163b6e366a55f85fae",
+      "notification_required": [
+        "completedAtMs",
+        "item",
+        "threadId",
+        "turnId"
+      ],
+      "command_required": [
+        "command",
+        "commandActions",
+        "cwd",
+        "id",
+        "status",
+        "type"
+      ],
+      "command_properties": [
+        "aggregatedOutput",
+        "command",
+        "commandActions",
+        "cwd",
+        "durationMs",
+        "exitCode",
+        "id",
+        "pluginId",
+        "processId",
+        "scriptPath",
+        "source",
+        "status",
+        "type"
+      ],
+      "source_default": "agent"
+    }
+  ]
+}

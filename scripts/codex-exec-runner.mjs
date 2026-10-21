@@ -37,7 +37,7 @@ const MANAGED_CODEX_RUNTIME_FILES = [
 function hashText(value) { return createHash("sha256").update(value).digest("hex"); }
 
 /** One explicit session request; configuration/authentication remain owned by Codex. */
-export async function executeCodexSession({ executable, argv, cwd, input, timeoutMs, signal, onSpawn, onOutput, env, terminationScope = "process_group" }, spawnProcess = spawn,
+export async function executeCodexSession({ executable, argv, cwd, input, timeoutMs, signal, onSpawn, onOutput, onStdinReady, retainOutput = true, env, terminationScope = "process_group" }, spawnProcess = spawn,
   { now = Date.now, setTimer = setTimeout, clearTimer = clearTimeout, platform = process.platform, signalProcess = process.kill } = {}) {
   if (typeof executable !== "string" || !executable || executable.includes("\0")
     || !Array.isArray(argv) || argv.some(value => typeof value !== "string" || value.includes("\0"))
@@ -47,7 +47,8 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
     || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2147483647
     || (signal !== undefined && (!signal || typeof signal.aborted !== "boolean" || typeof signal.addEventListener !== "function" || typeof signal.removeEventListener !== "function"))
     || !["process_group", "direct_child"].includes(terminationScope)
-    || (onSpawn !== undefined && typeof onSpawn !== "function") || (onOutput !== undefined && typeof onOutput !== "function") || typeof spawnProcess !== "function") {
+    || (onSpawn !== undefined && typeof onSpawn !== "function") || (onOutput !== undefined && typeof onOutput !== "function")
+    || (onStdinReady !== undefined && (typeof onStdinReady !== "function" || Buffer.byteLength(input) !== 0)) || typeof retainOutput !== "boolean" || typeof spawnProcess !== "function") {
     throw new Error("a bounded Codex session request requires executable, argv, cwd, input and timeoutMs");
   }
   const directChild = terminationScope === "direct_child", started = now();
@@ -104,11 +105,35 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
       result.error ??= { code: "ABORT_ERR", message: "session interrupted" };
       terminate();
     };
+    // Optional programmatic protocol input; ordinary sessions still end their
+    // fixed stdin once. The channel expires with this owned child's lifetime.
+    let protocolInputBytes = 0, protocolInputClosed = false;
+    const startInput = () => {
+      if (!onStdinReady) {
+        if (Buffer.byteLength(input) === 0) child.stdin.end(); else child.stdin.end(input);
+        return;
+      }
+      const writable = () => {
+        if (protocolInputClosed || finishing || rootExited || terminatingAt !== null) throw new Error("session protocol input is closed");
+      };
+      const observed = onStdinReady(Object.freeze({
+        write(value) {
+          writable();
+          if (!(typeof value === "string" || Buffer.isBuffer(value)) || protocolInputBytes + Buffer.byteLength(value) > 64 * 1024) throw new Error("session protocol input exceeded its bound");
+          protocolInputBytes += Buffer.byteLength(value); return child.stdin.write(value);
+        },
+        end() { writable(); protocolInputClosed = true; child.stdin.end(); },
+      }));
+      if (observed && typeof observed.then === "function") {
+        Promise.resolve(observed).catch(() => {});
+        throw new Error("session stdin observer must be synchronous");
+      }
+    };
     const collect = (stream, chunk) => {
       if (directChild && finishing) return;
       const bytes = Buffer.from(chunk), used = stream === "stdout" ? stdoutBytes : stderrBytes;
       const accepted = bytes.subarray(0, Math.max(0, limit - used));
-      if (accepted.length) (stream === "stdout" ? stdout : stderr).push(accepted);
+      if (accepted.length && retainOutput) (stream === "stdout" ? stdout : stderr).push(accepted);
       if (stream === "stdout") stdoutBytes += accepted.length;
       else stderrBytes += accepted.length;
       if (accepted.length && onOutput && !observerFailed) {
@@ -151,8 +176,8 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
         result.cleanupError ??= cleanupFailure;
       }
       if (forced) { child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy(); child.unref(); }
-      result.stdout = Buffer.concat(stdout, stdoutBytes);
-      result.stderr = Buffer.concat(stderr, stderrBytes);
+      result.stdout = retainOutput ? Buffer.concat(stdout, stdoutBytes) : Buffer.alloc(0);
+      result.stderr = retainOutput ? Buffer.concat(stderr, stderrBytes) : Buffer.alloc(0);
       result.durationMs = now() - started;
       resolveResult(result);
     };
@@ -181,7 +206,7 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
             throw new Error("direct-child spawn observer must be synchronous");
           }
           if (!finishing && !rootExited && terminatingAt === null) {
-            if (Buffer.byteLength(input) === 0) child.stdin.end(); else child.stdin.end(input);
+            startInput();
           } else if (!finishing && terminatingAt !== null) killTree(escalated ? "SIGKILL" : "SIGTERM");
         } catch (error) { result.error ??= errorRecord(error); terminate(); }
         return;
@@ -191,8 +216,7 @@ export async function executeCodexSession({ executable, argv, cwd, input, timeou
           // A receipt observer can outlive a fast verification child. An empty
           // chunk still performs a pipe write and can report EPIPE after exit;
           // no input means closing stdin without writing any chunk.
-          if (Buffer.byteLength(input) === 0) child.stdin.end();
-          else child.stdin.end(input);
+          startInput();
         }
       }).catch(error => { result.error ??= errorRecord(error); terminate(); });
     });

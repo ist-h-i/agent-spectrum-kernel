@@ -20,7 +20,7 @@ import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPragmaticEvaluationReport } from "./ask-pragmatic-evaluation-report.mjs";
 import { COMPARISON_RECORD_BYTE_LIMIT, comparisonExecutionPolicy, comparisonHash, derivePreparedPrimaryExecutionInput, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, isSingleShotComparison, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
-import { PRIMARY_EXECUTION_INPUT_CONTRACT, primaryExecutionInputPreflight, renderPrimaryExecutionInputBoundary } from './ask-primary-execution-input.mjs';
+import { isPrimaryExecutionInputContract, primaryExecutionInputPreflight, renderPrimaryExecutionInputBoundary } from './ask-primary-execution-input.mjs';
 import { buildPrimaryFixtureRecipe, isPrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 
 export const USER_CONDITIONS = Object.freeze(["plain", "kernel_only", "full_ask"]);
@@ -159,7 +159,7 @@ export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
   assert.equal(plan.verification.reporter.path, "control/node-test-reporter.mjs");
   assert.equal(plan.verification.reporter.format, "ask_node_summary_jsonl_v1");
   if (Object.hasOwn(plan.config, 'primary_input_contract')) {
-    assert.equal(plan.config.primary_input_contract, PRIMARY_EXECUTION_INPUT_CONTRACT);
+    assert.ok(isPrimaryExecutionInputContract(plan.config.primary_input_contract), 'unknown primary input contract');
     assert.deepEqual(plan.primary_execution_input, derivePreparedPrimaryExecutionInput(plan), 'primary input contract changed');
     for (const [id, condition] of Object.entries(plan.primary_execution_input.conditions)) {
       const input = readStableFile(join(root, condition.input.path), 'primary condition input', LIMIT).bytes;
