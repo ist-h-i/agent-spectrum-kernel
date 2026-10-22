@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   context-rollover:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out repository
@@ -18,21 +18,13 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: "24"
+          node-version: "24.19.0"
       - name: Test runtime boundary and matched evaluation
         run: node --test scripts/test-context-rollover.mjs
-      - name: Preserve checkpoint and admission authority
-        run: |
-          node scripts/test-session-checkpoint.mjs
-          node scripts/test-epic-admission-work-package-plan.mjs
-      - name: Preserve evidence and current coverage boundaries
-        run: |
-          node scripts/test-verification-evidence.mjs
-          node scripts/test-verification-scoped-reuse.mjs
-          node --test scripts/test-verification-reuse-completion.mjs
-      - name: Validate schemas and repository
-        run: |
-          node scripts/test-json-schema-validation.mjs
-          node scripts/validate-repo.mjs
+      # Shared checkpoint/admission/schema/evidence tests are owned by Validate/common;
+      # real-Git completion tests are owned by verification-completion. Require both
+      # owner checks for PR completion; this workflow alone is not full verification.
+      - name: Validate repository
+        run: node scripts/validate-repo.mjs
       - name: Check whitespace
         run: git diff --check "origin/${{ github.base_ref }}...HEAD"

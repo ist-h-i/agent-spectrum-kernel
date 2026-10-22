@@ -10,8 +10,9 @@ invocations**: the 140 inherited from #439 plus eight controls (one plan, one
 new plan/receipt regression command, five receipt producers and one gate).
 Local-eval retains **25** registrations. Counts include the preserved conditional
 failure diagnostic; they are inventory counts, not a claim every conditional
-command executes on a green run. No workflow, flag or source-fetch change is
-introduced by this documentation update.
+command executes on a green run. PR #441 synchronized documentation only; the
+subsequent cross-workflow change below leaves these Validate/local-eval counts
+and their workflow bytes unchanged.
 
 Docs-checks now owns the complete validator, whitespace and CI/control checks;
 plan plus five workers feed the fixed six-dependency validate gate. The original
@@ -28,6 +29,61 @@ consumer-closure/docs-v1 observation limits, see
 [the verified shadow state](ci-shadow-and-os-boundaries.md#verified-state-after-pr-440).
 Selection remains disabled; an ordinary change to these two CI documents is
 outside the closed docs allowlist and therefore proposes full execution.
+
+## Cross-workflow duplicate reduction
+
+Baseline: main `e54baee215ee613227baba337da13bb8b5268537` after #441.
+Context-rollover and verification-completion now use Ubuntu 24.04 and Node
+24.19.0, matching Validate/common before equating any calls. All three use
+checkout@v5 with full history and the default PR merge ref, repository-root cwd,
+and no custom environment on the affected tests. No new workflow or job is
+added: the four automatic workflows and eleven checks remain.
+
+| Exact invocation | Sole owner | Removed duplicate calls |
+| --- | --- | --- |
+| `node scripts/test-session-checkpoint.mjs` | Validate/common | context-rollover: 1 |
+| `node scripts/test-epic-admission-work-package-plan.mjs` | Validate/common | context-rollover: 1 |
+| `node scripts/test-json-schema-validation.mjs` | Validate/common | context-rollover: 1 |
+| `node scripts/test-verification-evidence.mjs` | Validate/common | context-rollover: 1; verification-completion: 1 |
+| `node scripts/test-verification-scoped-reuse.mjs` | Validate/common | context-rollover: 1; verification-completion: 1 |
+| `node --test scripts/test-verification-reuse-completion.mjs` | verification-completion | context-rollover: 1 |
+
+This removes eight duplicate Node test invocations per full PR run: six from
+context-rollover and two from verification-completion. In the original inventory
+extractor's units, context-rollover has 2 Node script registrations instead of 8;
+verification-completion has 6 instead of 8 (its unchanged conditional validator
+and inline result printer are not extra test invocations). Validate remains 148
+and local-eval 25. The original table below is historical, not the current total.
+
+The affected tests independently create/clean temporary fixtures or read inline
+and canonical fixtures. JSON-schema tests use a unique temporary directory under
+the checkout and remove it in `finally`; it is not an input to later suites.
+Epic admission's branch/GITHUB_HEAD_REF check still sees the same PR event.
+None exports step outputs, environment or a shared fixture consumed by a later
+step. There is no stdout/artifact transfer between these calls. Flags and source
+revisions are preserved, not replaced by similar-looking tests. Absolute temporary
+paths and workflow-specific Actions identifiers are not claimed byte-identical.
+
+Context's unique runtime-boundary/matched-evaluation suite stays. Verification's
+measurement-core/false-blocking, paired measurement/handoff, decision-core and
+real-Git completion suites stay, as do fixture-provider measurement, its result
+summary and always-uploaded bounded JSON artifacts. Both workflows retain their
+validators and whitespace checks; triggers, permissions and timeouts stay fixed.
+
+Common's five owners remain unconditional and bound to the existing strict
+receipt and fixed validate aggregate. The completion owner remains an
+unconditional verification-completion step. Context success alone is insufficient:
+completion still requires same-HEAD validate and verification-completion success
+plus all other required checks. No protection rule or cross-workflow gate is
+changed or added. `test-ci-full-run.mjs` checks exact ownership, flags, pinned
+setup and retained unique coverage, with cheap negative fixtures for missing
+owners, duplicates, flag/runtime/cwd drift, skipped completion and lost artifacts.
+
+This source-level reduction does not establish a hosted elapsed-time or cost
+improvement. Pinning the former floating runtime is part of the change; earlier
+floating-runtime durations are not an equivalent before/after comparison.
+Hosted verification of this follow-up is not yet recorded. Mac boundaries,
+selective execution, consumer closure and real evaluation are unchanged.
 
 ## Historical stage-1 baseline
 
@@ -108,10 +164,11 @@ synthetic-json-pilot. Flags match. Synthetic JSON is split from its former Mac
 multi-file invocation; per-file coverage is preserved. Historical working-directory
 suites are never equated to current HEAD.
 
-Context-rollover and verification-completion remain unchanged. Their floating
-Node 24 and Ubuntu latest are not treated as equivalent to pinned Node/OS;
-apparent duplicates remain for a later slice. No path filters, model triggers,
-concurrency cancellation, protection or permissions changes are introduced.
+At #440/#441, context-rollover and verification-completion retained floating
+Node 24 and Ubuntu latest; they were not treated as equivalent to pinned Node/OS.
+The cross-workflow slice above pins those runtimes before removing eight audited
+duplicate calls. No path filters, model triggers, concurrency cancellation,
+protection or permissions changes are introduced.
 
 ## Command inventory
 
