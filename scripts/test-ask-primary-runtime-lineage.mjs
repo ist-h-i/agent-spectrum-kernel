@@ -10,10 +10,44 @@ import { prepareUserComparison, prepareGitBaseline } from './ask-user-comparison
 import { collectUserComparisonRuntimeLineageForTest, startUserComparison } from './ask-user-comparison.mjs';
 import { buildPrimaryFixtureRecipe } from './ask-primary-fixture-recipe.mjs';
 import { collectPrimaryRuntimeLineage, verifyPrimaryRuntimeLineageReceipt } from './ask-primary-runtime-lineage.mjs';
-import { producePrimaryRuntimeLineageArtifacts, verifyPrimaryRuntimeLineageArtifacts, verifyPrimaryEvaluationProducer } from './ask-primary-evaluation-producer.mjs';
+import { producePrimaryRuntimeLineageArtifacts, verifyPrimaryRuntimeLineageArtifacts, verifyPrimaryEvaluationProducer, producePrimaryEvaluationArtifacts, verifyPrimaryRuntimeV10Preparation } from './ask-primary-evaluation-producer.mjs';
+import { syntheticV10ScoringVersion } from './test-helpers-primary-evaluation-v10.mjs';
 const ROOT = fileURLToPath(new URL('../', import.meta.url)), ID = 'mn-build-option-update';
 const secret = 'SECRET_AUTH_HOST_CONFIGURATION_SENTINEL';
 const read = path => readFileSync(path, 'utf8');
+
+for (const kernel of ['kernel_principles_v1', 'kernel_principles_v2']) test('V-R1/R2/R3 owned runtime evidence joins exact V10 conditions, with missing/failure retained '+kernel, async t => {
+  const fixed = syntheticV10ScoringVersion(t, { fixtureIds: [ID] }), f = fixture(t, kernel);
+  const block = { root: f.root, run_id: f.plan.run_id, plan_digest: f.plan_digest, fixture_id: ID, grading: { scoring_version: fixed.selector } };
+  const plain = await collect(f, 'plain', transport(f, 'plain'));
+  const failed = await collect(f, 'full_ask', transport(f, 'full_ask', { fail: 'stderr' }));
+  const receipts = { plain, full_ask: failed }, target = join(f.area, 'v10-with-runtime');
+  const made = await producePrimaryEvaluationArtifacts(block, target, { runtimeLineageReceipts: receipts });
+  const options = { recordRoot: target, externalDigest: made.external_digest };
+  const verified = await verifyPrimaryRuntimeV10Preparation(options, { runtimeLineageReceipts: receipts });
+  assert.equal(verified.runtimeEvidenceVerification, 'owned_receipts_reverified');
+  assert.equal(verified.runtimeEvidence.conditions.plain.status, 'collected_synthetic');
+  assert.equal(verified.runtimeEvidence.conditions[kernel].status, 'not_collected');
+  assert.equal(verified.runtimeEvidence.conditions.full_ask.status, 'unavailable');
+  assert.equal(verified.runtimeEvidence.conditions.plain.observation.semantic_replay_coverage, 'sent_requests_thread_turn_replies_and_accepted_item_terminal_usage_frames');
+  assert.equal(verified.binding.conditions.plain.runtime.thread_id, null);
+  assert.equal(verified.binding.scoring_authority, false); assert.equal(made.normalized, null);
+  assert.equal((await verifyPrimaryRuntimeV10Preparation(options)).runtimeEvidenceVerification, 'artifact_integrity_only');
+  assert.throws(() => verifyPrimaryEvaluationProducer(options), /v10_runtime_authority_unqualified/);
+  for (const invalid of [{ [kernel]: plain }, { plain: structuredClone(plain) }, { other: plain }]) {
+    const out = join(f.area, 'rejected-'+Object.keys(invalid)[0]);
+    await assert.rejects(() => producePrimaryEvaluationArtifacts(block, out, { runtimeLineageReceipts: invalid }));
+    assert.equal(existsSync(out), false);
+  }
+  const foreign = fixture(t, kernel), foreignReceipt = await collect(foreign, 'plain', transport(foreign, 'plain'));
+  await assert.rejects(() => producePrimaryEvaluationArtifacts(block, join(f.area, 'foreign'), { runtimeLineageReceipts: { plain: foreignReceipt } }));
+  assert.equal(existsSync(join(f.area, 'foreign')), false);
+  await assert.rejects(() => verifyPrimaryRuntimeV10Preparation(options, { runtimeLineageReceipts: { plain } }), /runtime evidence|receipts/);
+  const audit = join(target, 'runtime-lineage.json'), original = readFileSync(audit);
+  writeFileSync(audit, '{}'); await assert.rejects(() => verifyPrimaryRuntimeV10Preparation(options)); writeFileSync(audit, original);
+  assert.ok(!read(audit).includes(secret));
+  assert.equal(existsSync(join(f.root, 'control/start.json')), false);
+});
 for (const missing of ['runner', 'inventory']) test('L6 lazy support rejects missing historical '+missing+' exports before evaluation', async t => {
   const area = realpathSync(mkdtempSync(join(tmpdir(), 'ask-lineage-lazy-link-'))); t.after(() => rmSync(area, { recursive: true, force: true }));
   const marker = join(area, 'evaluated');
@@ -35,7 +69,7 @@ function fixture(t, kernelCondition = 'kernel_principles_v2') {
     model: 'gpt-6.1-sol', reasoning: 'high', primaryInputContract: 'closed_primary_inputs_v2' });
   return { ...made, area };
 }
-function transport(f, condition, { mutate = (value) => value, fail = null, chunked = false, extra = false, missingEdit = false, lateEdit = false, changeInput = false, mismatchSnapshot = false, afterVerification = false, iteration = false } = {}) {
+function transport(f, condition, { mutate = (value) => value, fail = null, chunked = false, extra = false, missingEdit = false, lateEdit = false, changeInput = false, mismatchSnapshot = false, afterVerification = false, iteration = false, failWriteAt = null } = {}) {
   const writes = [], signals = []; let frames = 0;
   const selected = f.plan.primary_execution_input.conditions[condition], cwd = selected.launch_cwd;
   const items = [], clock = () => 1000 + ++frames;
@@ -98,11 +132,35 @@ function transport(f, condition, { mutate = (value) => value, fail = null, chunk
       }
       callback();
     }, final(callback) { queueMicrotask(() => close(0, null)); callback(); } });
+    if (failWriteAt !== null) {
+      const write = child.stdin.write.bind(child.stdin); let count = 0;
+      child.stdin.write = (...args) => { if (++count === failWriteAt) throw Error('artificial stdin failure'); return write(...args); };
+    }
     queueMicrotask(() => child.emit('spawn')); return child;
   };
   return { spawn, writes, signals };
 }
 const collect = (f, condition, fake, options = {}) => collectUserComparisonRuntimeLineageForTest(f.root, condition, { spawnProcess: fake.spawn, timeoutMs: 1000, ...options });
+
+for (const failure of ['pre-aborted', 'spawn-failed']) test('V-R1 zero-request unavailable receipts survive producer '+failure, async t => {
+  const f = fixture(t), controller = new AbortController(); let starts = 0;
+  if (failure === 'pre-aborted') controller.abort();
+  const receipt = await collect(f, 'plain', { spawn() { starts++; throw Error('artificial spawn failure'); } }, { signal: controller.signal });
+  const observation = verifyPrimaryRuntimeLineageReceipt(receipt);
+  assert.equal(starts, failure === 'pre-aborted' ? 0 : 1);
+  assert.equal(observation.status, 'unavailable'); assert.deepEqual(observation.requests, []);
+  assert.equal(observation.native_configuration, null); assert.equal(observation.quality, null);
+  const made = producePrimaryRuntimeLineageArtifacts(receipt, join(f.area, 'zero-request-producer'));
+  assert.equal(verifyPrimaryRuntimeLineageArtifacts(made, receipt).observation.status, 'unavailable');
+});
+test('V-R1 partial request prefix survives stdin failure without collection authority', async t => {
+  const f = fixture(t), receipt = await collect(f, 'plain', transport(f, 'plain', { failWriteAt: 2 }));
+  const observation = verifyPrimaryRuntimeLineageReceipt(receipt);
+  assert.equal(observation.status, 'unavailable'); assert.equal(observation.requests.length, 2);
+  assert.equal(observation.native_configuration, null); assert.equal(observation.quality, null);
+  const made = producePrimaryRuntimeLineageArtifacts(receipt, join(f.area, 'partial-request-producer'));
+  assert.equal(verifyPrimaryRuntimeLineageArtifacts(made, receipt).observation.status, 'unavailable');
+});
 
 for (const kernel of ['kernel_principles_v1', 'kernel_principles_v2']) for (const condition of ['plain', kernel, 'full_ask'])
   test('L1-L4 existing runner -> owned receipt -> producer/readback ' + kernel + '/' + condition, async t => {

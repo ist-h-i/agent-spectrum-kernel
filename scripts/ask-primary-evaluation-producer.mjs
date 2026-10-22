@@ -1,5 +1,5 @@
 import {PRIMARY_RUNTIME_V10_REVISION, buildPrimaryRuntimeV10Binding, assertPrimaryRuntimeV10ScoringAuthority} from './ask-primary-runtime-v10.mjs';
-import {verifyPrimaryRuntimeLineageReceipt, assertPrimaryRuntimeLineageOutput} from './ask-primary-runtime-lineage.mjs';
+import {verifyPrimaryRuntimeLineageReceipt, assertPrimaryRuntimeLineageOutput, PRIMARY_RUNTIME_LINEAGE_CONTRACT} from './ask-primary-runtime-lineage.mjs';
 // Faithful offline conversion of retained single-shot bytes. No model, shell,
 // private evaluator, ownership recovery, grant or admission mutation occurs.
 import assert from 'node:assert/strict';
@@ -246,21 +246,63 @@ async function v10Source(block) {
   const references=Object.fromEntries(paths.map(path=>{const v=readStableFile(join(loaded.root,path),'V10 prepared input',LIMIT);return[path,{digest:hash(v.bytes),bytes:v.bytes.length,mode:v.evidence.finalPath.mode}];}));
   return {binding,references,loaded};
 }
-async function produceV10(block,outputRoot) {
+function runtimeEvidence(binding, receipts) {
+  assert.ok(receipts && typeof receipts === 'object' && !Array.isArray(receipts), 'runtime evidence receipts map required');
+  assert.deepEqual(Object.getOwnPropertySymbols(receipts), []);
+  assert.ok(Object.keys(receipts).every(condition => Object.hasOwn(binding.conditions, condition)), 'unknown runtime evidence condition');
+  const conditions = Object.fromEntries(Object.entries(binding.conditions).map(([condition, arm]) => {
+    if (!Object.hasOwn(receipts, condition)) return [condition, { status: 'not_collected', quality: null }];
+    const observation = verifyPrimaryRuntimeLineageReceipt(receipts[condition]);
+    checkRuntimeObservation(binding, condition, observation);
+    assert.equal(observation.input_digest, arm.stdin.digest);
+    return [condition, { status: observation.status, quality: null, observation }];
+  }));
+  return { kind: PRIMARY_RUNTIME_LINEAGE_CONTRACT, binding_digest: binding.binding_digest, conditions, runtime_attestation: 'unknown', scoring_ready: false, quality: null };
+}
+function checkRuntimeObservation(binding, condition, observation) {
+  assert.equal(observation.kind, 'ask_primary_runtime_lineage_v2'); assert.equal(observation.contract, PRIMARY_RUNTIME_LINEAGE_CONTRACT);
+  assert.equal(observation.evidence_kind, 'synthetic'); assert.ok(['collected_synthetic', 'unavailable'].includes(observation.status));
+  for (const key of ['run_id', 'plan_digest', 'profile_id', 'binding_digest']) assert.equal(observation[key], binding[key], 'runtime evidence '+key+' changed');
+  assert.equal(observation.condition, condition, 'runtime evidence condition changed'); assert.equal(observation.input_digest, binding.conditions[condition].stdin.digest);
+  for (const key of ['execution_authority', 'scoring_authority']) assert.equal(observation[key], false);
+  assert.equal(observation.runtime_attestation, 'unknown'); assert.equal(observation.quality, null);
+}
+function checkRuntimeEvidence(binding, evidence) {
+  assert.deepEqual(Object.keys(evidence).sort(), ['kind', 'binding_digest', 'conditions', 'runtime_attestation', 'scoring_ready', 'quality'].sort());
+  assert.equal(evidence.kind, PRIMARY_RUNTIME_LINEAGE_CONTRACT); assert.equal(evidence.binding_digest, binding.binding_digest);
+  assert.equal(evidence.runtime_attestation, 'unknown'); assert.equal(evidence.scoring_ready, false); assert.equal(evidence.quality, null);
+  assert.deepEqual(Object.keys(evidence.conditions).sort(), Object.keys(binding.conditions).sort());
+  for (const [condition, value] of Object.entries(evidence.conditions)) {
+    assert.equal(value.quality, null);
+    if (value.status === 'not_collected') assert.deepEqual(value, { status: 'not_collected', quality: null });
+    else {
+      assert.deepEqual(Object.keys(value).sort(), ['status', 'quality', 'observation'].sort());
+      checkRuntimeObservation(binding, condition, value.observation); assert.equal(value.status, value.observation.status);
+    }
+  }
+}
+async function produceV10(block,outputRoot,runtimeLineageReceipts) {
   const source=await v10Source(block),target=resolve(outputRoot);assert.ok(!existsSync(target));assert.equal(realpathSync(dirname(target)),dirname(target));
+  // Join module-owned evidence to the independently reloaded whole-plan binding
+  // before the first write. A receipt for one arm never represents the others.
+  const evidence = runtimeLineageReceipts === undefined ? null : runtimeEvidence(source.binding, runtimeLineageReceipts);
+  if (evidence) for (const receipt of Object.values(runtimeLineageReceipts)) assertPrimaryRuntimeLineageOutput(receipt, target);
   for(const input of [ROOT,source.loaded.root,source.loaded.plan.source.repo,primaryScoringRoot(block)].filter(Boolean)){
     const path=realpathSync(input);assert.ok(target!==path&&!target.startsWith(path+'/'),'V10 output overlaps an input');
   }
   mkdirSync(target,{mode:0o700});write(target,'runtime-binding.json',source.binding);
+  if (evidence) write(target, 'runtime-lineage.json', evidence);
   const manifest={kind:'ask_primary_evaluation_producer_v10',command_evidence_parser_revision:PRIMARY_RUNTIME_V10_REVISION,preparation_only:true,block,
+    ...(evidence ? { runtime_lineage_contract: PRIMARY_RUNTIME_LINEAGE_CONTRACT } : {}),
     binding_digest:source.binding.binding_digest,retained_input_references:source.references,source_digests:primaryProducerSources(),artifact_inventory:entries(target),
     runtime_attestation:'unknown',execution_permission:false,scoring_ready:false,formal_aggregate_eligible:false,model_calls:0,grader_process_starts:0};
   write(target,'producer.json',manifest);
   return {output_root:target,external_digest:hash(bytes(manifest)),normalized:null,preparation_only:true,scoring_ready:false,formal_aggregate_eligible:false,model_calls:0,grader_process_starts:0};
 }
-async function verifyV10(manifest,target) {
-  assert.deepEqual(readdirSync(target).sort(),['producer.json','runtime-binding.json'],'V10 candidate output is closed');
-  assert.deepEqual(Object.keys(manifest).sort(),['kind','command_evidence_parser_revision','preparation_only','block','binding_digest','retained_input_references','source_digests','artifact_inventory','runtime_attestation','execution_permission','scoring_ready','formal_aggregate_eligible','model_calls','grader_process_starts'].sort());
+async function verifyV10(manifest,target,runtimeLineageReceipts) {
+  const hasRuntime = Object.hasOwn(manifest, 'runtime_lineage_contract');
+  assert.deepEqual(readdirSync(target).sort(),['producer.json','runtime-binding.json',...(hasRuntime ? ['runtime-lineage.json'] : [])].sort(),'V10 candidate output is closed');
+  assert.deepEqual(Object.keys(manifest).sort(),['kind','command_evidence_parser_revision','preparation_only','block','binding_digest','retained_input_references','source_digests','artifact_inventory','runtime_attestation','execution_permission','scoring_ready','formal_aggregate_eligible','model_calls','grader_process_starts',...(hasRuntime ? ['runtime_lineage_contract'] : [])].sort());
   assert.equal(manifest.command_evidence_parser_revision,PRIMARY_RUNTIME_V10_REVISION);assert.equal(manifest.preparation_only,true);assert.equal(manifest.runtime_attestation,'unknown');
   for(const name of ['execution_permission','scoring_ready','formal_aggregate_eligible'])assert.equal(manifest[name],false);
   assert.equal(manifest.model_calls,0);assert.equal(manifest.grader_process_starts,0);
@@ -268,14 +310,22 @@ async function verifyV10(manifest,target) {
   assert.deepEqual(manifest.retained_input_references,source.references,'V10 retained input pins changed');
   assert.deepEqual(manifest.source_digests,primaryProducerSources(),'V10 producer source changed');assert.deepEqual(manifest.artifact_inventory,entries(target),'V10 artifact inventory changed');
   assert.deepEqual(read(join(target,'runtime-binding.json')),bytes(source.binding),'V10 runtime binding changed');assert.equal(manifest.binding_digest,source.binding.binding_digest);
-  return {preparationOnly:true,binding:source.binding,block:manifest.block,commandEvidenceParserRevision:PRIMARY_RUNTIME_V10_REVISION,execution_permission:false,scoring_ready:false};
+  let evidence = null;
+  if (hasRuntime) {
+    assert.equal(manifest.runtime_lineage_contract, PRIMARY_RUNTIME_LINEAGE_CONTRACT);
+    evidence = json(join(target, 'runtime-lineage.json')); checkRuntimeEvidence(source.binding, evidence);
+    if (runtimeLineageReceipts !== undefined) assert.deepEqual(evidence, runtimeEvidence(source.binding, runtimeLineageReceipts), 'runtime evidence receipts changed');
+  } else assert.equal(runtimeLineageReceipts, undefined, 'runtime evidence was not retained');
+  return {preparationOnly:true,binding:source.binding,block:manifest.block,commandEvidenceParserRevision:PRIMARY_RUNTIME_V10_REVISION,execution_permission:false,scoring_ready:false,
+    ...(hasRuntime ? { runtimeEvidence: evidence, runtimeEvidenceVerification: runtimeLineageReceipts === undefined ? 'artifact_integrity_only' : 'owned_receipts_reverified' } : {})};
 }
 
-export async function producePrimaryEvaluationArtifacts(block, outputRoot, { commandEvidenceParserRevision, ...unknown } = {}) {
+export async function producePrimaryEvaluationArtifacts(block, outputRoot, { commandEvidenceParserRevision, runtimeLineageReceipts, ...unknown } = {}) {
   const processing = primaryProcessingSelection(block);
   commandEvidenceParserRevision ??= processing?.command_evidence_parser_revision ?? PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION;
   if (processing) assert.equal(commandEvidenceParserRevision, processing.command_evidence_parser_revision, 'primary processing selector override refused');
-  if(commandEvidenceParserRevision===PRIMARY_RUNTIME_V10_REVISION){assert.deepEqual(Object.keys(unknown),[],'V10 caller context override refused');return produceV10(block,outputRoot);}
+  if(commandEvidenceParserRevision===PRIMARY_RUNTIME_V10_REVISION){assert.deepEqual(Object.keys(unknown),[],'V10 caller context override refused');return produceV10(block,outputRoot,runtimeLineageReceipts);}
+  assert.equal(runtimeLineageReceipts, undefined, 'runtime evidence requires explicit V10 processing');
   assert.ok([PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V9_PARSER_REVISION].includes(commandEvidenceParserRevision), 'unsupported primary command evidence revision');
   if ([PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V9_PARSER_REVISION].includes(commandEvidenceParserRevision)) assert.deepEqual(Object.keys(unknown), [], 'primary caller context override refused');
   const source = await checkedSource(block, processing?.command_evidence_parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V9_PARSER_REVISION ? 'ask_primary_scoring_version_v9' : processing?.command_evidence_parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION ? 'ask_primary_scoring_version_v8' : processing?.command_evidence_parser_revision === PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION
@@ -313,12 +363,13 @@ export async function producePrimaryEvaluationArtifacts(block, outputRoot, { com
   return { output_root: target, external_digest: options.externalDigest, normalized, scoring_ready: false, formal_aggregate_eligible: false, model_calls: 0, grader_process_starts: 0 };
 }
 /** Candidate consistency readback only; never the verified execution producer token. */
-export async function verifyPrimaryRuntimeV10Preparation(options) {
+export async function verifyPrimaryRuntimeV10Preparation(options, { runtimeLineageReceipts, ...unknown } = {}) {
+  assert.deepEqual(Object.keys(unknown), [], 'V10 readback override refused');
   assert.deepEqual(Object.keys(options).sort(),['externalDigest','recordRoot']);
   const target=resolve(options.recordRoot);assert.equal(realpathSync(target),target);
   const raw=read(join(target,'producer.json'));assert.equal(hash(raw),options.externalDigest,'V10 external producer pin changed');
   const manifest=parseJsonRejectDuplicateKeys(raw.toString('utf8'));assert.equal(manifest.kind,'ask_primary_evaluation_producer_v10');
-  return verifyV10(manifest,target);
+  return verifyV10(manifest,target,runtimeLineageReceipts);
 }
 
 /** Owned collector -> verifier -> diagnostic producer. Serialized artifact
@@ -326,11 +377,12 @@ export async function verifyPrimaryRuntimeV10Preparation(options) {
 export function producePrimaryRuntimeLineageArtifacts(receipt, outputRoot) {
   const observation = verifyPrimaryRuntimeLineageReceipt(receipt), target = resolve(outputRoot);
   assert.equal(observation.evidence_kind, 'synthetic');
+  assert.equal(observation.contract, PRIMARY_RUNTIME_LINEAGE_CONTRACT);
   assertPrimaryRuntimeLineageOutput(receipt, target);
   assert.ok(!existsSync(target)); assert.equal(realpathSync(dirname(target)), dirname(target));
   mkdirSync(target, { mode: 0o700 });
   write(target, 'runtime-lineage.json', observation);
-  const manifest = { kind: 'ask_primary_runtime_lineage_producer_v1', evidence_kind: 'synthetic',
+  const manifest = { kind: 'ask_primary_runtime_lineage_producer_v2', runtime_lineage_contract: PRIMARY_RUNTIME_LINEAGE_CONTRACT, evidence_kind: 'synthetic',
     condition: observation.condition, run_id: observation.run_id, plan_digest: observation.plan_digest,
     binding_digest: observation.binding_digest, source_digests: primaryProducerSources(), artifact_inventory: entries(target),
     execution_authority: false, scoring_ready: false, runtime_attestation: 'unknown', quality: null };
@@ -343,7 +395,7 @@ export function verifyPrimaryRuntimeLineageArtifacts(options, receipt) {
   assert.equal(realpathSync(target), target); assert.deepEqual(readdirSync(target).sort(), ['producer.json', 'runtime-lineage.json']);
   const raw = read(join(target, 'producer.json')); assert.equal(hash(raw), options.externalDigest);
   const manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
-  assert.deepEqual(manifest, { kind: 'ask_primary_runtime_lineage_producer_v1', evidence_kind: 'synthetic',
+  assert.deepEqual(manifest, { kind: 'ask_primary_runtime_lineage_producer_v2', runtime_lineage_contract: PRIMARY_RUNTIME_LINEAGE_CONTRACT, evidence_kind: 'synthetic',
     condition: observation.condition, run_id: observation.run_id, plan_digest: observation.plan_digest,
     binding_digest: observation.binding_digest, source_digests: primaryProducerSources(), artifact_inventory: entries(target),
     execution_authority: false, scoring_ready: false, runtime_attestation: 'unknown', quality: null });

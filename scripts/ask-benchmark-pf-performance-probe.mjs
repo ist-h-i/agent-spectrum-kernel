@@ -3,10 +3,13 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { inspectPfPerformanceMeasurement, sha256 } from './ask-benchmark-pf-performance-source.mjs';
-import { parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
+import { canonicalDigest, parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
 
 export const PF_PERFORMANCE_PROBE_VERSION = 'isolated-private-timing-v1';
+export const PF_PERFORMANCE_PRIVATE_AUDIT_VERSION = 'private-performance-probe-audit-v1';
+export const PF_PERFORMANCE_PRIVATE_BODY_HEADER = `export const performanceProbeVersion = ${JSON.stringify(PF_PERFORMANCE_PROBE_VERSION)};\n`;
 const fixture = 'benchmarks/fixtures/checkpoint-b2/pf-performance-regression/workspace';
+const nativeQualificationEvidence = null;
 
 // Serialized into the isolated child. No candidate object leaves this child.
 // Candidate callables receive realm-created data only; host validates data
@@ -198,13 +201,70 @@ export function inspectPfPerformanceProbeOutput(bytes, { candidateSource, config
   } catch { return unavailable('probe_output_invalid'); }
 }
 
+// This is a lossless private carrier, not an issuer or an isolation admission.
+// Only the controller-owned launcher may supply it to a production worker.
+export function createPfPerformancePrivateAudit({ raw = null, candidateSource, config }) {
+  const stream = bytes => {
+    if (!Buffer.isBuffer(bytes) || bytes.length > 1024*1024) throw new Error('invalid private probe stream');
+    return {base64:bytes.toString('base64'),bytes:bytes.length,digest:sha256(bytes)};
+  };
+  return {audit_version:PF_PERFORMANCE_PRIVATE_AUDIT_VERSION,probe_version:PF_PERFORMANCE_PROBE_VERSION,
+    candidate_source_digest:sha256(candidateSource),config_digest:canonicalDigest(config),
+    raw:raw===null?null:{stdout:stream(raw.stdout),stderr:stream(raw.stderr),exit_code:raw.exit_code,signal:raw.signal,error_code:raw.error_code}};
+}
+
+export function inspectPfPerformancePrivateAudit(audit, { candidateSource, config }) {
+  const unavailable = () => ({state:'unavailable',reason:'private_probe_evidence_unavailable',quality:null});
+  try {
+    if (audit?.audit_version!==PF_PERFORMANCE_PRIVATE_AUDIT_VERSION || audit.probe_version!==PF_PERFORMANCE_PROBE_VERSION ||
+      audit.candidate_source_digest!==sha256(candidateSource) || audit.config_digest!==canonicalDigest(config) || !audit.raw) return unavailable();
+    const decode = stream => {
+      if (typeof stream?.base64!=='string' || stream.base64.length>1398104) throw new Error('invalid stream');
+      const bytes=Buffer.from(stream.base64,'base64');
+      if (bytes.length>1024*1024 || bytes.toString('base64')!==stream.base64 || bytes.length!==stream.bytes || sha256(bytes)!==stream.digest) throw new Error('changed stream');
+      return bytes;
+    };
+    const stdout=decode(audit.raw.stdout);decode(audit.raw.stderr);
+    if (audit.raw.exit_code!==0 || audit.raw.signal!==null || audit.raw.error_code!==null) return unavailable();
+    const result=inspectPfPerformanceProbeOutput(stdout,{candidateSource,config});
+    return {state:result.state,reason:result.reason,quality:null};
+  } catch { return unavailable(); }
+}
+
+export function pfPerformancePrivateProbeRoute(hiddenSource) {
+  const source=Buffer.isBuffer(hiddenSource)?hiddenSource.toString('utf8'):hiddenSource;
+  if (typeof source!=='string') throw new Error('private performance body source missing');
+  if (!source.startsWith('export const performanceProbeVersion = ')) return null;
+  if (!source.startsWith(PF_PERFORMANCE_PRIVATE_BODY_HEADER)) throw new Error('unknown private performance probe version');
+  return PF_PERFORMANCE_PROBE_VERSION;
+}
+
+// There is no qualified native probe evidence in the current source revision.
+// A caller flag, admission assertion, supplied report or synthetic test cannot
+// close that obligation. Keep the production connection inert until reviewed
+// native qualification supplies a separately reviewed source change.
+export function runQualifiedPfPerformancePrivateProbe({ candidateSource, config, referenceSource, dataSource }) {
+  if(nativeQualificationEvidence===null)return {observation:{probe_version:PF_PERFORMANCE_PROBE_VERSION,candidate_source_digest:sha256(candidateSource),
+    state:'unavailable',reason:'native_probe_qualification_unavailable',quality:null},
+    audit:createPfPerformancePrivateAudit({candidateSource,config})};
+  const result=launchPfPerformanceProbe({candidateSource,config,referenceSource,dataSource});
+  const audit=createPfPerformancePrivateAudit({candidateSource,config,raw:result.raw??null});
+  return {observation:{probe_version:PF_PERFORMANCE_PROBE_VERSION,candidate_source_digest:sha256(candidateSource),
+    ...inspectPfPerformancePrivateAudit(audit,{candidateSource,config})},audit};
+}
+
 // No runner injection or unsandboxed fallback is available on this path. Read
 // trusted public reference/config from a pinned source root, never candidate cwd.
 export function runPfPerformanceProbe({ sourceRoot, candidateSource }) {
   if (process.platform !== 'darwin' || process.version !== 'v24.19.0') return {state:'unavailable',reason:'platform_or_runtime_not_qualified',quality:null,report:null};
   const root = resolve(sourceRoot, fixture);
   const config = JSON.parse(readFileSync(resolve(root,'data/measurement-config.json')));
-  const script = buildPfPerformanceProbeSource({referenceSource:readFileSync(resolve(root,'reference/scan-lookup.mjs'),'utf8'),dataSource:readFileSync(resolve(root,'scripts/generate-data.mjs'),'utf8'),config});
+  return launchPfPerformanceProbe({candidateSource,config,referenceSource:readFileSync(resolve(root,'reference/scan-lookup.mjs'),'utf8'),dataSource:readFileSync(resolve(root,'scripts/generate-data.mjs'),'utf8')});
+}
+
+function launchPfPerformanceProbe({candidateSource,config,referenceSource,dataSource}) {
+  if (process.platform !== 'darwin' || process.version !== 'v24.19.0') return {state:'unavailable',reason:'platform_or_runtime_not_qualified',quality:null,report:null};
+  const script = buildPfPerformanceProbeSource({referenceSource,dataSource,config});
   const scratch = mkdtempSync(resolve(tmpdir(),'ask-performance-probe-'));
   try {
     const literal = value => JSON.stringify(value);

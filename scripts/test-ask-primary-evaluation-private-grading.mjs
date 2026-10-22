@@ -1,16 +1,19 @@
 // Synthetic diagnostic records only. No private worker, model, or CLI starts.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { syntheticPrimarySource } from './test-helpers-primary-evaluation-producer.mjs';
 import { producePrimaryEvaluationArtifacts, buildPrimaryEvaluationScoringInputs } from './ask-primary-evaluation-producer.mjs';
 import { preflightPrimaryEvaluationGradingResources, primaryPrivateGradingBudget, primaryPrivateGradingExecutionStatus, runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
-import { activePrimaryProducer, primaryAdapterSourceDigest, primaryEvaluatorLogFailureReceipts, primaryGradingSchemaPath, withPrimaryHistoricalEvaluatorResources, withPrimaryEvaluatorLogCapture, capturePrimaryEvaluatorChildStreams } from './ask-primary-evaluation-scope.mjs';
+import { activePrimaryProducer, primaryAdapterSourceDigest, primaryEvaluatorLogFailureReceipts, primaryGradingSchemaPath, withPrimaryHistoricalEvaluatorResources, withPrimaryEvaluatorLogCapture, capturePrimaryEvaluatorChildStreams,
+  primaryEvaluatorProbeCaptureAvailable,capturePrimaryEvaluatorProbeAudit } from './ask-primary-evaluation-scope.mjs';
 import { createHash } from 'node:crypto';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 import { deriveEvaluatorDependencyGraph, validateEvaluatorSourceIdentity, verifyPublicEvaluatorReference } from './ask-benchmark-evaluator-boundary.mjs';
+import { PF_PERFORMANCE_PROBE_VERSION,createPfPerformancePrivateAudit,inspectPfPerformancePrivateAudit } from './ask-benchmark-pf-performance-probe.mjs';
+import { buildPfPerformanceProspectiveEvaluatorSource } from './ask-benchmark-pf-performance-authority.mjs';
 
 test('original worker budget is preserved for initial and validation pairs, including the existing eleven-minute fixture', () => {
   assert.deepEqual(primaryPrivateGradingBudget(660000), { worker_timeout_ms: 660000, condition_reservation_ms: 2640000 });
@@ -108,6 +111,67 @@ test('verified synthetic capture preserves private stream bytes with exclusive r
     assert.deepEqual(readFileSync(join(outputRoot,receipt.stderr.path)),Buffer.from(child.stderr));assert.equal(JSON.stringify(receipt).includes(child.stderr.trim()),false);}
   assert.equal(activePrimaryProducer(),false);
   assert.throws(()=>withPrimaryEvaluatorLogCapture(f.options,{outputRoot,normalizedResult:f.normalizedResult},()=>capturePrimaryEvaluatorChildStreams(child,payload(f.normalizedResult))),/EEXIST/);
+});
+
+test('synthetic controller probe raw evidence is retained beside private worker streams with lineage receipts',async t=>{
+  const f=await fixture(t),outputRoot=join(f.root,'private-probe-logs');mkdirSync(outputRoot,{mode:0o700});
+  // Positive component proof with invented timing data, not a production probe
+  // observation. The real controller route still has a null qualification gate.
+  const candidateSource=Buffer.from('export function lookupEvents(){return [];}\n'),sourceDigest=digest(candidateSource);
+  const config={workloads:[{name:'sparse',events:16,requests:4},{name:'dense',events:16,requests:4}],samples:5,minimum_baseline_ms:12,maximum_dispersion_ratio:12,maximum_candidate_median_ratio:0.4};
+  const report={measurement_version:'1.0.0',candidate_source_digest:sourceDigest,clock:'performance.now',fictional_local_workloads:true,measured_external_service:false,
+    records:config.workloads.map(workload=>({workload:workload.name,event_count:16,request_count:4,output_count:8,consumed:80,durations_ms:{candidate:Array(5).fill(4),reference:Array(5).fill(20)},reference_median_ms:20,candidate_median_ms:4,candidate_to_reference_ratio:0.2,state:'within_local_target'}))};
+  const stdout=Buffer.from(JSON.stringify({probe_version:PF_PERFORMANCE_PROBE_VERSION,candidate_source_digest:sourceDigest,state:'measured',reason:null,functional_observations:24,report})),stderr=Buffer.from([0,255,10]);
+  const audit=createPfPerformancePrivateAudit({candidateSource,config,
+    raw:{stdout,stderr,exit_code:0,signal:null,error_code:null}});
+  assert.equal(primaryEvaluatorProbeCaptureAvailable(),false);assert.equal(capturePrimaryEvaluatorProbeAudit(audit),null);
+  const saved=withPrimaryEvaluatorLogCapture(f.options,{outputRoot,normalizedResult:f.normalizedResult},()=>{
+    assert.equal(primaryEvaluatorProbeCaptureAvailable(),true);
+    const retained=capturePrimaryEvaluatorProbeAudit(audit);
+    assert.deepEqual(retained,audit);assert.equal(readdirSync(outputRoot).includes('0001.performance-probe.json'),true);
+    const checked=inspectPfPerformancePrivateAudit(retained,{candidateSource,config});assert.equal(checked.state,'within_local_target');
+    capturePrimaryEvaluatorChildStreams(child,payload(f.normalizedResult));
+    return checked;
+  });
+  const receipt=saved.receipts[0],raw=readFileSync(join(outputRoot,receipt.performance_probe.path)),retained=JSON.parse(raw);
+  assert.equal(receipt.evidence_kind,'synthetic');assert.equal(receipt.normalized_result_digest,f.normalizedResult.normalized_result_digest);
+  assert.equal(receipt.performance_probe.digest,digest(raw));assert.equal(receipt.performance_probe.bytes,raw.length);
+  assert.deepEqual(Buffer.from(retained.raw.stdout.base64,'base64'),stdout);assert.deepEqual(Buffer.from(retained.raw.stderr.base64,'base64'),stderr);
+  assert.equal(receipt.log_capture_status,'complete');
+  const candidateWorkspace=join(f.root,'component-candidate');mkdirSync(join(candidateWorkspace,'src'),{recursive:true});writeFileSync(join(candidateWorkspace,'src/event-lookup.mjs'),candidateSource);
+  const body=await import('data:text/javascript;base64,'+Buffer.from(buildPfPerformanceProspectiveEvaluatorSource({probeVersion:PF_PERFORMANCE_PROBE_VERSION})).toString('base64'));
+  const component=await body.evaluateCandidateSafe({repositoryRoot:fileURLToPath(new URL('../',import.meta.url)),candidateWorkspace,normalizedResult:f.normalizedResult,
+    repositoryDiffArtifact:{artifact_digest:digest('artificial diff'),artifact_bytes:1,diff_entries:[{path:'src/event-lookup.mjs',before:{sha256:digest('before')},after:{sha256:sourceDigest,file_type:'file',mode:0o644}}]},
+    privatePerformanceProbe:{probe_version:PF_PERFORMANCE_PROBE_VERSION,candidate_source_digest:sourceDigest,...saved.result}});
+  assert.equal(component.requirement_results[0].outcome,'pass');assert.equal(component.requirement_results[0].earned_points,5);
+  assert.throws(()=>withPrimaryEvaluatorLogCapture(f.options,{outputRoot,normalizedResult:f.normalizedResult},()=>capturePrimaryEvaluatorProbeAudit(audit)),/EEXIST/);
+  for(const [name,tamper] of [['drift',path=>writeFileSync(path,'changed suspect audit\n')],
+    ['missing',path=>renameSync(path,join(f.root,'removed-probe.json'))]]){
+    const outputRoot=join(f.root,`${name}-probe-logs`);mkdirSync(outputRoot,{mode:0o700});let failure;
+    try{withPrimaryEvaluatorLogCapture(f.options,{outputRoot,normalizedResult:f.normalizedResult},()=>{
+      capturePrimaryEvaluatorProbeAudit(audit);tamper(join(outputRoot,'0001.performance-probe.json'));
+      capturePrimaryEvaluatorChildStreams(child,payload(f.normalizedResult));
+    });}catch(error){failure=error;}
+    const receipts=primaryEvaluatorLogFailureReceipts(failure);
+    assert.equal(receipts.length,1,'a completed child receipt must survive invalid probe evidence');
+    assert.equal(receipts[0].spawn_observed,true);assert.equal(receipts[0].process_completed,true);assert.equal(receipts[0].exit_code,0);
+    assert.equal(receipts[0].log_capture_status,'complete');assert.equal(Object.hasOwn(receipts[0],'performance_probe'),false);
+    assert.deepEqual(receipts[0].invalid_performance_probe_binding,{status:'invalid',code:'primary_private_probe_binding_invalid',expected_reference:receipt.performance_probe});
+    assert.deepEqual(readFileSync(join(outputRoot,receipts[0].stdout.path)),Buffer.from(child.stdout));
+    assert.deepEqual(readFileSync(join(outputRoot,receipts[0].stderr.path)),Buffer.from(child.stderr));
+    assert.deepEqual(JSON.parse(readFileSync(join(outputRoot,'0001.receipt.json'))),receipts[0]);
+    assert.equal(JSON.stringify(receipts).includes('suspect audit'),false);
+    assert.equal(failure.message,'primary_private_probe_binding_invalid');
+  }
+  const blockedRoot=join(f.root,'blocked-probe-logs');mkdirSync(blockedRoot,{mode:0o700});let blockedFailure;
+  try{withPrimaryEvaluatorLogCapture(f.options,{outputRoot:blockedRoot,normalizedResult:f.normalizedResult},()=>{
+    capturePrimaryEvaluatorProbeAudit(audit);writeFileSync(join(blockedRoot,'0001.performance-probe.json'),'changed suspect audit\n');
+    writeFileSync(join(blockedRoot,'0001.stdout.log'),'occupied');capturePrimaryEvaluatorChildStreams(child,payload(f.normalizedResult));
+  });}catch(error){blockedFailure=error;}
+  assert.match(blockedFailure.message,/EEXIST/);const incomplete=primaryEvaluatorLogFailureReceipts(blockedFailure);
+  assert.equal(incomplete.length,1);assert.equal(incomplete[0].process_completed,true);assert.equal(incomplete[0].log_capture_status,'incomplete');
+  assert.equal(Object.hasOwn(incomplete[0],'performance_probe'),false);assert.equal(incomplete[0].invalid_performance_probe_binding.status,'invalid');
+  assert.equal(readFileSync(join(blockedRoot,'0001.stdout.log'),'utf8'),'occupied');assert.equal(existsSync(join(blockedRoot,'0001.receipt.json')),false);
 });
 test('capture rejects async leakage, transplanted payloads, unknown termination and stream save failures',async t=>{
   const f=await fixture(t),log=name=>{const outputRoot=join(f.root,name);mkdirSync(outputRoot,{mode:0o700});return{outputRoot,normalizedResult:f.normalizedResult};};

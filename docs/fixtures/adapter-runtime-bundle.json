@@ -557,7 +557,7 @@
       "scoring_contract_validator_path": "scripts/ask-benchmark-scoring-contract.mjs",
       "scoring_contract_validator_file_sha256": "2327b427da687ad784a96b97a2fa49d03ed9d35016e23a1f8bc655cff24afc0f",
       "scoring_authority_validator_path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-      "scoring_authority_validator_file_sha256": "a3997244b405f1ad3855aebbba507b1ee1b5daa4d3b595f8a173cafce2bdb9ca",
+      "scoring_authority_validator_file_sha256": "9502088df2f0531dac29af87ad2b4704c5f20685309fcc29b242e3889d31a48d",
       "engineering_result_schema_path": "benchmarks/schemas/portfolio-engineering-result.schema.json",
       "engineering_result_schema_file_sha256": "af1ea7698d3981705c64f184dcddb418b80ec75ab2917c7991f2f574802db76f",
       "scoring_implementation_path": "scripts/ask-benchmark-portfolio-score.mjs",

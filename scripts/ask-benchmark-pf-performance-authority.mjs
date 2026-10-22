@@ -1,4 +1,5 @@
 import * as scoringContract from "./ask-benchmark-scoring-contract.mjs";
+import { PF_PERFORMANCE_PROBE_VERSION, PF_PERFORMANCE_PRIVATE_BODY_HEADER } from './ask-benchmark-pf-performance-probe.mjs';
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { constants, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -57,6 +58,59 @@ import {
 export const PF_PERFORMANCE_FIXTURE_ID = "pf-performance-regression";
 export const PF_PERFORMANCE_FIXTURE_ROOT = `benchmarks/fixtures/checkpoint-b2/${PF_PERFORMANCE_FIXTURE_ID}`;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+// A separately generated, prospective body. Existing private roots and the
+// default writer are never rewritten or silently upgraded by this builder.
+export function buildPfPerformanceProspectiveEvaluatorSource({ probeVersion } = {}) {
+  if (probeVersion !== PF_PERFORMANCE_PROBE_VERSION) throw new Error('explicit prospective performance probe version required');
+  return PF_PERFORMANCE_PRIVATE_BODY_HEADER+
+    `import {readFileSync,lstatSync} from 'node:fs';\nimport {resolve} from 'node:path';\nimport {pathToFileURL} from 'node:url';\nimport {createHash} from 'node:crypto';\n`+
+    `export const evaluateCandidateSafe = ${prospectivePerformanceEvaluator.toString()};\n`;
+}
+
+async function prospectivePerformanceEvaluator({repositoryRoot,candidateWorkspace,normalizedResult,repositoryDiffArtifact,privatePerformanceProbe=null}) {
+  const scoring=await import(pathToFileURL(resolve(repositoryRoot,'scripts/ask-benchmark-scoring-contract.mjs')).href);
+  const record=JSON.parse(readFileSync(resolve(repositoryRoot,'benchmarks/fixtures/checkpoint-b2/pf-performance-regression/requirement-record.json'),'utf8'));
+  if (record.requirements.map(row=>`${row.requirement_id}:${row.max_points}`).join(',')!==
+    'performance-correctness:5,request-scope-discipline:3,verification-evidence:2') throw new Error('prospective performance requirements drifted');
+  const refs=[{kind:'repository_diff',digest:repositoryDiffArtifact.artifact_digest,bytes:repositoryDiffArtifact.artifact_bytes}];
+  let observed='unavailable';
+  try {
+    const source=readFileSync(resolve(candidateWorkspace,'src/event-lookup.mjs'));
+    const digest='sha256:'+createHash('sha256').update(source).digest('hex');
+    if (privatePerformanceProbe?.probe_version===performanceProbeVersion && privatePerformanceProbe.candidate_source_digest===digest &&
+      privatePerformanceProbe.quality===null && Object.keys(privatePerformanceProbe).sort().join(',')==='candidate_source_digest,probe_version,quality,reason,state' &&
+      ['within_local_target','local_regression','fail','inconclusive','unavailable'].includes(privatePerformanceProbe.state)) observed=privatePerformanceProbe.state;
+  } catch {}
+  const performanceOutcome=observed==='within_local_target'?'pass':['local_regression','fail'].includes(observed)?'fail':'manual_review_required';
+  const diff=repositoryDiffArtifact.diff_entries;
+  const present=(()=>{try{const stat=lstatSync(resolve(candidateWorkspace,'src/event-lookup.mjs'));return stat.isFile()&&!stat.isSymbolicLink()&&(stat.mode&0o111)===0;}catch{return false;}})();
+  const changed=diff.some(entry=>entry.path==='src/event-lookup.mjs'&&entry.before?.sha256!==entry.after?.sha256);
+  const forbidden=diff.some(entry=>entry.path!=='src/event-lookup.mjs'||entry.after?.file_type!=='file'||(entry.after.mode&0o111)!==0);
+  const scope=present&&changed&&!forbidden?'pass':'fail';
+  const verification=scoring.deriveVerificationEvidenceState(normalizedResult),verificationRefs=scoring.deriveVerificationEvidenceReferences(normalizedResult,verification);
+  const scopeFinding={finding_id:'performance-scope-outcome',category:'request_scope',severity:'medium',evidence_references:refs};
+  const invalidFinding={finding_id:'performance-command-input-invalid',category:'normalized_command_evidence_invalid',severity:'high',evidence_references:verificationRefs};
+  const outcomes={'performance-correctness':performanceOutcome,'request-scope-discipline':scope,'verification-evidence':verification==='executed_success'?'pass':'fail'};
+  const profile={name:scoring.REQUIREMENT_SCOPE_VERIFICATION_PROFILE_NAME};
+  const result={schema_version:'1.0.0',schema_path:'benchmarks/schemas/private-evaluator-fragment.schema.json',program:'adaptive_ask_private_evaluator_fragment',
+    evaluation_status:'manual_review_required',scoring_ready:false,result_profile:{...profile,digest:scoring.computeResultProfileDigest(profile)},
+    requirement_results:record.requirements.map(row=>{
+      const outcome=outcomes[row.requirement_id],isVerification=row.requirement_id==='verification-evidence',isScope=row.requirement_id==='request-scope-discipline';
+      return {requirement_id:row.requirement_id,outcome,earned_points:outcome==='manual_review_required'?null:outcome==='pass'?row.max_points:0,
+        matched_equivalence_class_ids:outcome==='pass'?row.equivalence_class_ids:[],finding_ids:isScope&&scope==='fail'?[scopeFinding.finding_id]:isVerification&&verification==='invalid'?[invalidFinding.finding_id]:[],
+        evidence_references:isVerification?verificationRefs:refs,scope_deviation_references:isScope&&scope==='fail'?[scopeFinding.finding_id]:[],
+        verification_evidence_references:isVerification?verificationRefs:[],...(isVerification?{verification_evidence_state:verification}:{})};
+    }),findings:verification==='invalid'?[invalidFinding]:[],scope_deviations:scope==='fail'?[scopeFinding]:[],
+    evidence_correctness:{state:verification==='invalid'?'fail':'pass',evidence_references:verification==='invalid'?verificationRefs:refs}};
+  if(verification==='invalid')result.invalid_input_authority={layer:'command_evidence',category:'normalized_command_evidence_invalid',code:'performance-command-evidence-invalid',evidence_references:verificationRefs};
+  const derived=scoring.deriveRequirementScopeVerificationOutcome({evaluatorResult:result,requirementRecord:record,normalizedResult});
+  result.evaluation_status=derived.evaluation_status;if(derived.classification!==null)result.classification=derived.classification;
+  for(const field of ['under_processing','over_processing'])result[field]={state:derived[field],evidence_references:derived.evidence_references};
+  result.verification_correctness={state:derived.verification_correctness,evidence_references:scoring.deriveEffectiveVerificationEvidenceReferences({normalizedResult,evaluatorResult:result,state:derived.verification_evidence_state})};
+  scoring.validateRequirementScopeVerificationResult({evaluatorResult:result,requirementRecord:record,normalizedResult});
+  return result;
+}
 const PRIVATE_ASSETS = Object.freeze([
   ["equivalent_solution_rules", "equivalent-solutions.json", "application/json"],
   ["evaluator_dependency_graph", "dependency-graph.json", "application/json"],
