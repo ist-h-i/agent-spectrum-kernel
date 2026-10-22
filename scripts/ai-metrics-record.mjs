@@ -2,7 +2,7 @@
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { inspectExecutionEnvelope, validateMetricsEvent } from "./execution-envelope.mjs";
 import { DEFAULT_RUNTIME_EVENT_STORE, resolveObservabilityPath } from "./observability-paths.mjs";
 import { mapClaudeMetricsEvent } from "./adapter-runtime-event.mjs";
@@ -1053,6 +1053,14 @@ function upsertEvent(eventStore, event) {
   });
 }
 
+// Adapter collectors own privacy projection; this boundary validates the shared
+// metrics type and reuses the same locked, atomic persistence as Claude hooks.
+export function recordMetricsEvent(eventStore, event) {
+  const errors = validateMetricsEvent(event);
+  if (errors.length) throw new Error("invalid metrics event");
+  return upsertEvent(eventStore, event);
+}
+
 function withRuntimeFileLock(path, operation) {
   const lockPath = `${path}.lock`;
   for (let attempt = 0; attempt < 200; attempt += 1) {
@@ -1284,6 +1292,7 @@ function capabilityEvidence(evidenceLevel) {
   };
 }
 
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
 let runtimeArgs = null;
 try {
   runtimeArgs = parseArgs(process.argv.slice(2));
@@ -1295,6 +1304,7 @@ try {
   }
   console.error(`ai-metrics-record failed: ${error.message}`);
   process.exit(1);
+}
 }
 
 function recordRuntimeHealthFailure(error, args) {

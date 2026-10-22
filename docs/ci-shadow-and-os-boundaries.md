@@ -1,6 +1,6 @@
 # CI shadow classification and OS boundaries
 
-Spec `SPEC-CI433-2`, revision 1; upstream: Issue #433 and the approved
+Spec `SPEC-CI433-2`, revision 2; upstream: Issue #433 and the approved
 2026-10-22 next-stage delegation. Starting main: `7a44f734d72f3080d4005d48308f8adf0e05e564`.
 
 - CI433-SHADOW: record a proposed classification and test-job selection in the
@@ -16,18 +16,21 @@ Spec `SPEC-CI433-2`, revision 1; upstream: Issue #433 and the approved
 - CI433-OS: inspect actual test bodies before changing Mac ownership. Preserve
   startup, process exit/timeout, path, permission/sandbox and historical source
   boundaries. An unproven OS-independence claim never removes a Mac check.
+- CI433-REGISTRATION: after #435/#436 source integration, run both new focused
+  commands unconditionally in the existing full common job. Missing files fail;
+  no existence-based skip is permitted.
 
-Formal Verification Contract `FVC-CI433-2`, revision 1; upstream
-`SPEC-CI433-2@1`. Formal path is selected for regression proof, infrastructure,
+Formal Verification Contract `FVC-CI433-2`, revision 2; upstream
+`SPEC-CI433-2@2`. Formal path is selected for regression proof, infrastructure,
 multiple actors and a stable merge claim under `ask.verification-proof-policy@1.0.0`.
 Obligations: category/deletion/rename/multi-scope/base-delta and malformed-diff
 regressions; local real-Git comparison; no-selection wiring/strict aggregate
 preservation; OS coverage inventory and hosted exact-HEAD full checks;
-independent source/docs/automated/final merge review. Failed or missing evidence
+both integrated focused suites; independent source/docs/automated/final merge review. Failed or missing evidence
 blocks the relevant claim. Unknown old local sessions are not rerun.
 
-Implementation Contract `IMPL-CI433-2`, revision 1; upstream
-`SPEC-CI433-2@1`, `FVC-CI433-2@1`. Boundary: classifier, its tests, bounded CI
+Implementation Contract `IMPL-CI433-2`, revision 2; upstream
+`SPEC-CI433-2@2`, `FVC-CI433-2@2`. Boundary: classifier, its tests, bounded CI
 recording, OS test ownership and this documentation. No runtime product,
 generated bundle, classifier-based skip, real-model execution, cancellation,
 protection or permission change. Explicit user approval covers this scoped CI
@@ -99,6 +102,24 @@ Future shadow/full comparisons must examine completed exact-HEAD outcomes and
 review exclusions; this PR does not enable selection, automatic real evaluation,
 periodic real runs, or concurrency cancellation.
 
-Source integrations #435/#436 are pending. Add their focused commands together
-only after the source files exist in the actual integrated tree. Do not add
-conditional missing-file skips. No claim is made about their owners' ongoing CI.
+## Integrated source registration
+
+Revision-2 delta (approved source-owner and coordinator handoffs, 2026-10-22):
+#435 merged as `985b4accdfd977b83a5c35c721047e57c68db7f5`; #436 merged as
+`318ad1fc06ff11973738badd2f014d29d9ce0716`. A single ordinary main merge brings
+both into this CI branch without rebase. Their eighteen source/document/generated
+files are inherited unchanged from main; this PR does not regenerate them.
+Two unconditional commands are added together to Validate/common:
+
+```sh
+node --test scripts/test-ask-personal-evolution-trace.mjs
+node --test scripts/test-codex-metrics-collector.mjs
+```
+
+Trace reads public artificial fixtures. Metrics exercises a temporary installed
+runner with an explicit artificial executable, never a real Codex CLI/provider;
+it neither opts the repository into collection nor repairs an external store.
+Both exact files exist in the composed tree. No missing-file skip is added.
+The previous `4c680085` head's nine hosted successes and mixed/full shadow record
+are historical; the composed registration head requires its own full checks and
+independent final review. No new-head success is inferred from a source PR's CI.

@@ -9,7 +9,8 @@ const baseline = JSON.parse(readFileSync(new URL('../docs/fixtures/ci-full-run-i
 const commands = text => text.split('\n').map(line => line.trim().replace(/^run: /, '')).filter(line => /^node (?:--\S+ )*scripts\//.test(line)).sort();
 
 test('all original validate commands remain, including flags and frozen sources', () => {
-  const additions = ['node --test scripts/test-ci-full-run.mjs', 'node --test scripts/test-ci-change-shadow.mjs', 'node scripts/ci-change-shadow.mjs'];
+  const additions = ['node --test scripts/test-ci-full-run.mjs', 'node --test scripts/test-ci-change-shadow.mjs', 'node scripts/ci-change-shadow.mjs', 'node --test scripts/test-ask-personal-evolution-trace.mjs', 'node --test scripts/test-codex-metrics-collector.mjs'];
+  for (const command of additions) assert.equal(commands(validate).filter(c => c === command).length, 1, command);
   assert.deepEqual(commands(validate).filter(c => !additions.includes(c)), baseline.validate_commands);
   assert.match(validate, /git fetch --no-tags origin a06e96f8/);
 });

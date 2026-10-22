@@ -14,6 +14,9 @@ owners), and kernel-principles gets a separate Ubuntu-only local-eval step.
 Every other Mac file/flag and historical working-directory invocation remains.
 Validate/common additionally tests and records the shadow classifier; its output
 never selects execution. The full four-dependency aggregate remains unchanged.
+After both source integrations at main `318ad1fc`, common also runs
+`node --test scripts/test-ask-personal-evolution-trace.mjs` and
+`node --test scripts/test-codex-metrics-collector.mjs` unconditionally.
 
 ## Dependencies and OS boundaries
 

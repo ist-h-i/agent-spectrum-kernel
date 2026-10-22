@@ -23,7 +23,7 @@ Levels:
 | Bounded adapter execution runner | unsupported | behavior_verified | unknown | unknown | unknown | unknown |
 | Compact explicit-entry profile rendering | unsupported | behavior_verified | unknown | unknown | unknown | unknown |
 | Same-fixture projection conformance | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
-| Local metrics event recording | behavior_verified | unsupported | unknown | unknown | unknown | unknown |
+| Local metrics event recording | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
 | Hidden telemetry disabled by default | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
 | External publication disabled by default | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
 | Upgrade/idempotent project install | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
@@ -50,7 +50,8 @@ Codex:
 - Supported areas: the adapter ships no hidden telemetry, webhook, publication, deploy, release, or external notification path by default.
 - Behaviorally evidenced boundary: repository fixtures verify deterministic Claude/Codex fixed-entry rendering, exact registered Asset provenance, required fallback controls, upper-router removal, and byte/route-depth reduction. They do not prove an external runtime loaded a Skill or applied the contract correctly.
 - Projected/runtime boundary: risk gates, verification, and evidence outputs remain projected until a run occurs. The runner separately reports requested, projected, compact-profile load, unavailable Skill-load evidence, and applied output-contract evidence; a passing sensor result is not business correctness.
-- Unsupported areas: local metrics event recording, shared PR workflow, and fork/comment-trigger guardrails are not implemented by this adapter. Do not claim them for Codex from this repository evidence.
+- Local metrics recording: `scripts/test-codex-metrics-collector.mjs` verifies opt-in managed-runner collection, canonical/privacy validation, identity/replay/concurrency, frozen-source delayed capture, Unknown/null aggregation, failure isolation, read-only cleanliness and installed runtime dependencies. See [collector procedure and limits](codex-metrics-collector.md). This is model-free fixture evidence; ordinary conversations, arbitrary CLI sessions, live operation and effectiveness remain unverified.
+- Unsupported areas: shared PR workflow and fork/comment-trigger guardrails are not implemented by this adapter. Do not claim them for Codex from this repository evidence.
 
 Cross-adapter boundary:
 

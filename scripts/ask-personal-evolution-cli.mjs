@@ -25,6 +25,8 @@ import { verifyPersonalEvolutionSavedResults, preparePersonalEvolutionSavedResul
 import { buildEvolutionHumanDecision, publishEvolutionHumanDecision, applyApprovedEvolutionCandidateRejection } from "./evolution-loop.mjs";
 import { reportUserComparison } from "./ask-user-comparison.mjs";
 import { runUnattendedPersonalEvolution, validatePersonalEvolutionRunPolicy } from "./ask-personal-evolution-unattended.mjs";
+import { inspectPersonalEvolutionTrace } from "./ask-personal-evolution-trace.mjs";
+import { comparisonHash } from "./ask-user-comparison-prepare.mjs";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const TRUST_KEYS = ["trustedAssetAuthorityContexts", "trustedPortfolioAuthorityContexts", "trustedHighImpactApprovalGrants"];
@@ -360,6 +362,7 @@ function next(c, output, summary) {
 }
 
 const COMMANDS = {
+  trace: ["input", "input-digest"],
   run: ["profile", "output", "target", "problem", "confirmed-policy-digest"],
   "recover-preparation": ["cycle", "output", "source", "input-digest", "source-review-digest"],
   configure: ["config", "profile"], start: ["cycle", "profile", "target", "problem"], status: ["cycle"], result: ["cycle"],
@@ -382,6 +385,13 @@ export async function runPersonalEvolutionCommand(argv, controls = {}) {
   const deadlineAtMs = controls.deadlineAtMs ?? null;
   if (deadlineAtMs !== null) assert.ok(Number.isSafeInteger(deadlineAtMs) && deadlineAtMs > 0);
   const { command, values: v } = parse(argv);
+  // Deliberately before cycle loading, locks and readout publication. This is a
+  // read-only verifier input, with caller-owned independent trust, not a start.
+  if (command === "trace") {
+    const bytes = readStableBytes(absolute(v.input), "personal trace input");
+    assert.equal(comparisonHash(bytes), v["input-digest"], "trace input bytes changed");
+    return inspectPersonalEvolutionTrace(parseJsonRejectDuplicateKeys(bytes.toString("utf8")));
+  }
   if (command === "run") return runUnattendedPersonalEvolution({ profile: v.profile, output: v.output,
     target: v.target, problem: v.problem, confirmedPolicyDigest: v["confirmed-policy-digest"] }, runPersonalEvolutionCommand);
   if (command === "recover-preparation") {

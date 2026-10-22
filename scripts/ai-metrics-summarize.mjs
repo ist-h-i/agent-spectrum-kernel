@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { DEFAULT_RUNTIME_EVENT_STORE, resolveObservabilityPath } from "./observability-paths.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -142,7 +142,7 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))].sort();
 }
 
-function summarize(events, invalidLines, args) {
+export function summarize(events, invalidLines, args) {
   const filtered = events.filter((event) => inPeriod(event, args.periodStart, args.periodEnd));
   const tasks = aggregateTasks(filtered);
   const skills = unique(tasks.flatMap((task) => task.skills_used));
@@ -154,10 +154,11 @@ function summarize(events, invalidLines, args) {
   const insufficientEvidence = tasks.filter((task) => taskHasInsufficientEvidence(task)).length;
   const latestInventorySnapshot = latestSnapshot(filtered, "debt_inventory_snapshot");
   const reviewQuality = summarizeReviewQuality(tasks);
-  const gateDecisionSummary = summarizeGateDecisions(tasks);
-  const routingWarnings = routingDeviationWarnings(tasks);
+  const observedGateTasks = aggregateTasks(filtered.filter(event => !event.evidence_references?.includes("adapter:codex")));
+  const gateDecisionSummary = summarizeGateDecisions(observedGateTasks);
+  const routingWarnings = routingDeviationWarnings(observedGateTasks);
 
-  return {
+  const report = {
     schema_version: "1.0.0",
     report_type: args.reportType,
     generated_at: new Date().toISOString(),
@@ -227,6 +228,18 @@ function summarize(events, invalidLines, args) {
       invalid_jsonl_lines: invalidLines,
     },
   };
+  // Codex runner completion is process/contract evidence, not business success,
+  // observed Skill use, verification execution or a review verdict. Do not turn
+  // absent observations into zero in either Codex-only or mixed reports.
+  if (filtered.some(event => event.evidence_references?.includes("adapter:codex"))) {
+    report.observation_gaps = ["skill_usage", "gate_execution", "task_business_success", "validation", "command_attempts", "verification_commands", "review_quality", "debt_movement", "usage", "cost", "duration"];
+    for (const key of ["completed_tasks", "validation_passed", "validation_failed", "command_attempts", "verification_commands"]) report.summary[key] = null;
+    for (const key of ["required_gate_coverage", "over_processing_count", "under_processing_count"]) report.skill_usage[key] = null;
+    for (const key of Object.keys(report.debt_movement)) report.debt_movement[key] = null;
+    for (const key of ["review_tasks", "required_fixes_count", "insufficient_evidence_tasks"]) report.review_quality[key] = null;
+    for (const key of Object.keys(report.review_quality.decisions)) report.review_quality.decisions[key] = null;
+  }
+  return report;
 }
 
 function aggregateTasks(events) {
@@ -952,18 +965,18 @@ Period: ${report.period.start} to ${report.period.end}
 
 - Tasks reviewed: ${report.summary.tasks_reviewed}
 - Events reviewed: ${report.summary.event_count}
-- Completed tasks: ${report.summary.completed_tasks}
-- Validation passed: ${report.summary.validation_passed}
-- Validation failed: ${report.summary.validation_failed}
+- Completed tasks: ${formatUnknownNumber(report.summary.completed_tasks)}
+- Validation passed: ${formatUnknownNumber(report.summary.validation_passed)}
+- Validation failed: ${formatUnknownNumber(report.summary.validation_failed)}
 - Insufficient evidence: ${report.summary.insufficient_evidence}
 
 ## Skill Usage
 
-- Skills used: ${report.skill_usage.skills_used.length > 0 ? report.skill_usage.skills_used.join(", ") : "none"}
+- Skills used: ${report.observation_gaps?.includes("skill_usage") ? "Unknown" : report.skill_usage.skills_used.length > 0 ? report.skill_usage.skills_used.join(", ") : "none"}
 - Correct routing rate: ${formatUnknownNumber(report.skill_usage.correct_routing_rate)}
 - Required gate coverage: ${formatUnknownNumber(report.skill_usage.required_gate_coverage)}
-- Over-processing warnings: ${report.skill_usage.over_processing_count}
-- Under-processing warnings: ${report.skill_usage.under_processing_count}
+- Over-processing warnings: ${formatUnknownNumber(report.skill_usage.over_processing_count)}
+- Under-processing warnings: ${formatUnknownNumber(report.skill_usage.under_processing_count)}
 - Missing evidence count: ${report.skill_usage.missing_evidence_count}
 - Missing skip reason count: ${report.gate_decision_summary.missing_skip_reason_count}
 - Skipped gate categories: ${formatCountList(report.gate_decision_summary.skipped_by_reason_category, "category")}
@@ -973,10 +986,10 @@ Period: ${report.period.start} to ${report.period.end}
 
 ## Review Quality
 
-- Review tasks: ${report.review_quality.review_tasks}
-- Decisions: ${Object.entries(report.review_quality.decisions).map(([decision, count]) => `${decision}=${count}`).join(", ")}
-- Required fixes count: ${report.review_quality.required_fixes_count}
-- Insufficient evidence tasks: ${report.review_quality.insufficient_evidence_tasks}
+- Review tasks: ${formatUnknownNumber(report.review_quality.review_tasks)}
+- Decisions: ${Object.entries(report.review_quality.decisions).map(([decision, count]) => `${decision}=${formatUnknownNumber(count)}`).join(", ")}
+- Required fixes count: ${formatUnknownNumber(report.review_quality.required_fixes_count)}
+- Insufficient evidence tasks: ${formatUnknownNumber(report.review_quality.insufficient_evidence_tasks)}
 - Insufficient evidence layers: ${report.review_quality.insufficient_evidence_layers.length > 0 ? report.review_quality.insufficient_evidence_layers.join(", ") : "none"}
 
 ## Debt Movement
@@ -1062,9 +1075,11 @@ function main() {
   }
 }
 
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
 try {
   main();
 } catch (error) {
   console.error(`ai-metrics-summarize failed: ${error.message}`);
   process.exit(1);
+}
 }
