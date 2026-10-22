@@ -5,7 +5,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  independent-local-clone:
+  plan:
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -14,7 +16,23 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "24.19.0"
+      - name: Record strict full-execution shadow plan
+        id: plan
+        run: node scripts/ci-execution-plan.mjs plan
+
+  independent-local-clone:
+    runs-on: ubuntu-24.04
+    outputs:
+      receipt: ${{ steps.ci_receipt.outputs.receipt }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.19.0"
       - name: Verify independent local clone objects across runner devices
+        id: ci_8f05758e0028
         run: |
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
@@ -50,8 +68,18 @@ jobs:
             rmSync(parent, { recursive: true, force: true });
           }
           NODE
-  common:
+
+      - name: Record required step completion
+        id: ci_receipt
+        env:
+          CI_RECEIPT_JOB: independent-local-clone
+          CI_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: node scripts/ci-execution-plan.mjs receipt
+
+  docs-checks:
     runs-on: ubuntu-24.04
+    outputs:
+      receipt: ${{ steps.ci_receipt.outputs.receipt }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -64,25 +92,24 @@ jobs:
           node-version: "24.19.0"
 
       - name: Verify CI coverage preservation and strict aggregate
+        id: ci_ff7b72596cb1
         run: node --test scripts/test-ci-full-run.mjs
 
       - name: Verify conservative change classification (shadow only)
+        id: ci_889971cec7d7
         run: node --test scripts/test-ci-change-shadow.mjs
 
       - name: Record proposed change classification (all verification still runs)
+        id: ci_bc9c194b2ff7
         run: node scripts/ci-change-shadow.mjs
 
-      - name: Verify integrated personal trace (public artificial fixtures only)
-        run: node --test scripts/test-ask-personal-evolution-trace.mjs
-
-      - name: Verify integrated opt-in metrics (artificial runner only)
-        run: node --test scripts/test-codex-metrics-collector.mjs
-
       - name: Run autonomous development control tests
+        id: ci_10b10140dde0
         run: node scripts/test-ask-autonomous-development.mjs
 
       # Exercise exact apply and no-write boundaries before long fixture suites.
       - name: Check whitespace errors
+        id: ci_8ed91715b74a
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             git diff --check "origin/${{ github.base_ref }}...HEAD"
@@ -90,25 +117,79 @@ jobs:
             git diff --check
           fi
 
+      - name: Validate repository consistency
+        id: repository_consistency
+        run: node scripts/validate-repo.mjs
+
+      - name: Show generated validation report diff on failure
+        id: ci_0d0bb20d25f0
+        if: ${{ failure() && steps.repository_consistency.outcome == 'failure' }}
+        run: |
+          # Diagnostics only: retain the failed gate and never commit generated output.
+          node scripts/validate-repo.mjs --write-report
+          git diff -- docs/validation-report.md
+          exit 1
+
+      - name: Verify strict shadow plan and execution receipts
+        id: ci_37a2daccda76
+        run: node --test scripts/test-ci-execution-plan.mjs
+
+      - name: Record required step completion
+        id: ci_receipt
+        env:
+          CI_RECEIPT_JOB: docs-checks
+          CI_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: node scripts/ci-execution-plan.mjs receipt
+
+  common:
+    runs-on: ubuntu-24.04
+    outputs:
+      receipt: ${{ steps.ci_receipt.outputs.receipt }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24.19.0"
+
+      - name: Verify integrated personal trace (public artificial fixtures only)
+        id: ci_e9979875906b
+        run: node --test scripts/test-ask-personal-evolution-trace.mjs
+
+      - name: Verify integrated opt-in metrics (artificial runner only)
+        id: ci_1e7b0c755908
+        run: node --test scripts/test-codex-metrics-collector.mjs
+
       - name: Run ASK setup planning and exact apply tests
+        id: ci_91932c193cf5
         run: node scripts/test-ask-setup.mjs
 
       - name: Run model-free install and recovery release smoke
+        id: ci_2b6f2e1f2d57
         run: node scripts/test-release-install-recovery.mjs
 
       - name: Run public first-workflow preparation regressions
+        id: ci_7ffa0b95a48d
         run: node --test scripts/test-first-workflow-preparation.mjs
 
       - name: Run offline pragmatic evaluation report regressions
+        id: ci_c2ef8b11143a
         run: node --test scripts/test-ask-pragmatic-evaluation-report.mjs
 
       - name: Verify prospective performance probe (synthetic controls only)
+        id: ci_f18afc493ad6
         run: node --test scripts/test-ask-benchmark-pf-performance-probe.mjs
 
       - name: Verify prospective performance condition lifetime (artificial Node processes only)
+        id: ci_d45a1d2d5bf0
         run: node --test scripts/test-ask-primary-performance-execution.mjs scripts/test-ask-primary-performance-lifetime.mjs
 
       - name: Verify explicit primary scoring-version connection (model-free)
+        id: ci_e3dfa91f2692
         run: |
           node --test scripts/test-ask-primary-execution-input.mjs
           node --test scripts/test-ask-primary-public-runtime-v2.mjs
@@ -119,17 +200,21 @@ jobs:
           node --experimental-test-module-mocks --test scripts/test-ask-primary-saved-scoring.mjs
 
       - name: Qualify prospective rule-batch contract and frozen preparation (model-free)
+        id: ci_0ba708036923
         run: node --test scripts/test-rule-batch-contract-v2.mjs scripts/test-rule-batch-comparison-preparation.mjs
 
       - name: Run UI harness and Skill-reference regressions
+        id: ci_710e1d9bb8c7
         run: |
           node --test scripts/test-codex-skill-reference-preflight.mjs scripts/test-skill-assets.mjs scripts/test-skill-reference-canonical.mjs scripts/test-ui-ux-adapter-assets.mjs docs/fixtures/ui-ux-design/fixture-state.test.mjs scripts/test-prompt-v2-historical-renderer.mjs
 
       - name: Run dependency-free scenario visual review regressions
+        id: ci_5e627b2593c4
         run: node --test scripts/test-scenario-visual-review.mjs
 
       # Fail before expensive suites, retaining the generator's exact-byte check.
       - name: Check adapter runtime bundle freshness
+        id: ci_fca4104bfa46
         run: |
           if node scripts/adapter-runtime-bundle.mjs --check; then
             exit 0
@@ -140,28 +225,35 @@ jobs:
           exit 1
 
       - name: Verify bounded full-target streaming snapshots (artificial only)
+        id: ci_1771372ab1e1
         run: node --test scripts/test-target-snapshot-streaming.mjs
 
       - name: Rehearse parent rollback and return to pre-install absence (artificial only)
+        id: ci_2f9aab34eee2
         run: node --test scripts/test-personal-prompt-preinstall-return.mjs
 
       - name: Run synthetic JSON pilot fake-only regressions
+        id: ci_ac1eac2fa7b0
         run: node --test scripts/test-ask-synthetic-json-pilot.mjs
 
       # Catch bounded aggregate regressions before the long repository suites.
       - name: Run portfolio aggregate v2 component sensitivity tests
+        id: ci_d695474f2851
         run: node scripts/test-ask-benchmark-portfolio-aggregate-result-v2.mjs
 
       - name: Run portfolio consumer sensitivity detail tests
+        id: ci_fbda7415c9d3
         run: node scripts/test-ask-benchmark-portfolio-consumer-report.mjs
 
       - name: Run nondegenerate high-impact sensitivity and exact Evolution tests
+        id: ci_c42a8576d7b4
         run: |
           node --version
           node scripts/test-ask-benchmark-portfolio-high-impact-sensitivity.mjs
           node scripts/test-evolution-loop-integration.mjs --high-impact-population
 
       - name: Run successor snapshot and source-session regressions (current HEAD)
+        id: ci_235e31d60b06
         run: |
           # The real source-drift regression below needs PFci's exact public base.
           git fetch --no-tags origin a06e96f8a493b0ae70d3910c73c644b0da13fa25
@@ -170,136 +262,161 @@ jobs:
           node --test scripts/test-ask-benchmark-prompt-successor-integration.mjs scripts/test-ask-benchmark-successor-input-snapshot.mjs scripts/test-ask-benchmark-evaluator-root-manifest.mjs
 
       - name: Run bounded successor scoring authority regressions (current HEAD)
+        id: ci_5fdd8e17811c
         run: |
           node --test scripts/test-ask-benchmark-prompt-successor-input-guards.mjs
           node --test scripts/test-ask-benchmark-prompt-successor-scoring-contract.mjs
 
       # Exercise checkpoint boundaries before the expensive repository suite.
       - name: Run session checkpoint and resume tests
+        id: ci_116a110c6ee8
         run: node scripts/test-session-checkpoint.mjs
 
       # Reject generated-report drift before running the expensive suites.
-      - name: Validate repository consistency
-        id: repository_consistency
-        run: node scripts/validate-repo.mjs
-
-      - name: Show generated validation report diff on failure
-        if: ${{ failure() && steps.repository_consistency.outcome == 'failure' }}
-        run: |
-          # Diagnostics only: retain the failed gate and never commit generated output.
-          node scripts/validate-repo.mjs --write-report
-          git diff -- docs/validation-report.md
-          exit 1
-
       - name: Run baseline semantic review route contract tests
+        id: ci_9061812f2b69
         run: node scripts/test-review-route.mjs
 
       - name: Run Execution Envelope record contract tests
+        id: ci_0bc0db5fe5fc
         run: node scripts/test-execution-envelope-record.mjs
 
       - name: Run installed Codex runner Execution Envelope conformance tests
+        id: ci_86109d041187
         run: node scripts/test-codex-runner-execution-envelope-conformance.mjs
 
       - name: Run managed JSON Schema validation tests
+        id: ci_8dc29c4710c5
         run: node scripts/test-json-schema-validation.mjs
 
       - name: Run exact Codex risk approval tests
+        id: ci_2553ce483c21
         run: node scripts/test-codex-risk-approval.mjs
 
       - name: Run review decision matrix tests
+        id: ci_c6a3ebae5ab7
         run: node scripts/test-review-decision-matrix.mjs
 
       - name: Run claim evidence status contract tests
+        id: ci_eb7774fb5327
         run: node scripts/test-claim-evidence-status.mjs
 
       - name: Run one-task Skill effectiveness outcome contract tests
+        id: ci_a7601d78a4ab
         run: node scripts/test-skill-effectiveness-outcome.mjs
 
       - name: Run verification proof policy contract tests
+        id: ci_71e142c569a8
         run: node scripts/test-verification-proof-policy.mjs
 
       - name: Run epic admission and Work Package Plan contract tests
+        id: ci_5f8c3e07fd82
         run: node scripts/test-epic-admission-work-package-plan.mjs
 
       - name: Run generic content-addressed store tests
+        id: ci_eeeb5f4ee052
         run: node scripts/test-content-addressed-store.mjs
 
       - name: Run Asset Registry contract tests
+        id: ci_9563ec485adc
         run: node scripts/test-asset-registry.mjs
 
       - name: Check the exact candidate-only Asset Registry sample
+        id: ci_0dd0a25ac399
         run: node scripts/asset-registry-samples.mjs --check
 
       - name: Run evidence-conditioned Portfolio Manager contract tests
+        id: ci_6f6047223972
         run: |
           node scripts/test-portfolio-manager.mjs
           node --test scripts/test-portfolio-subscription-policy.mjs
 
       - name: Check the exact Portfolio Manager sample
+        id: ci_c853e0ea2569
         run: node scripts/portfolio-manager-samples.mjs --check
 
       - name: Run governed Evolution contract tests
+        id: ci_c5c91abce53f
         run: node scripts/test-evolution-loop.mjs
 
       - name: Run governed Evolution full-closure integration tests
+        id: ci_03d015271360
         run: node scripts/test-evolution-loop-integration.mjs
 
       - name: Verify opt-in Prompt repetition recommendation bridge (artificial only)
+        id: ci_084c95de7000
         run: node --experimental-test-module-mocks --test scripts/test-personal-prompt-repetition-statistics.mjs scripts/test-personal-prompt-repetition-evaluation.mjs scripts/test-personal-prompt-repetition-driver.mjs
 
       - name: Run personal observation and generated candidate contracts (model-free)
+        id: ci_77f287136037
         run: node --test scripts/test-ask-personal-evolution-observation.mjs scripts/test-ask-personal-evolution.mjs scripts/test-ask-personal-evolution-generation.mjs scripts/test-ask-personal-evolution-generation-connector.mjs scripts/test-ask-personal-evolution-saved-results-mode.mjs scripts/test-ask-personal-evolution-primary-pair.mjs scripts/test-ask-personal-source-install.mjs scripts/test-ask-personal-prompt-runtime-v2.mjs scripts/test-personal-prompt-target-application.mjs scripts/test-personal-prompt-codex-handover.mjs scripts/test-personal-prompt-owner-manual-recovery.mjs scripts/test-codex-installer-preflight-order.mjs
 
       - name: Verify real personal source reviewer contract (fake transport only)
+        id: ci_777eea02a8e4
         run: node --test scripts/test-ask-personal-evolution-source-reviewer.mjs
 
       - name: Check the exact governed Evolution sample
+        id: ci_956c80957585
         run: node scripts/evolution-loop-samples.mjs --check
 
       - name: Run portfolio catalog tests
+        id: ci_6e620eddaf3f
         run: node scripts/test-ask-benchmark-portfolio-catalog.mjs
 
       - name: Run portfolio policy tests
+        id: ci_97543d675e7e
         run: node scripts/test-ask-benchmark-portfolio-policy.mjs
 
       - name: Run prospective task evidence partial readout tests (model-free)
+        id: ci_1c00c6556488
         run: |
           node --test scripts/test-ask-task-evidence-profile.mjs
           node scripts/test-ask-benchmark-portfolio-result-set.mjs --task-evidence-readout-only
 
       - name: Run portfolio design pre-admission tests
+        id: ci_df8a3025dba4
         run: node scripts/test-ask-benchmark-design-admission.mjs
 
       - name: Run portfolio independent design review tests
+        id: ci_03f5171d2e9b
         run: node scripts/test-ask-benchmark-design-review.mjs
 
       - name: Run portfolio admission decision overlay tests
+        id: ci_165c909083f4
         run: node scripts/test-ask-benchmark-admission-decision.mjs
 
       - name: Fetch public reviewed heads for admitted fixture invariance
+        id: ci_50c676d44a51
         run: |
           git fetch --no-tags origin e51eeddf5e5675660205e7f70bcdba202b57e77c
           git fetch --no-tags origin 277d5d7bca619bb7dca17190aa4f9f99bfbbe23a
 
       - name: Guard admitted fixture invariance
+        id: ci_ea049ac083cb
         run: node scripts/test-ask-benchmark-admitted-fixture-invariance.mjs
 
       - name: Run general benchmark tests
+        id: ci_cae8a56c0efc
         run: node scripts/test-ask-benchmark.mjs
 
       - name: Run adaptive portfolio execution tests
+        id: ci_9add71c25807
         run: node scripts/test-ask-benchmark-execution.mjs
 
       - name: Run admitted portfolio propagation preparation tests
+        id: ci_b270a55d157d
         run: node scripts/test-ask-benchmark-admission-propagation.mjs
 
       - name: Run verification command evidence contract tests
+        id: ci_8a6b35086fcf
         run: node scripts/test-ask-benchmark-command-evidence.mjs
 
       - name: Verify read-only saved primary command capture
+        id: ci_a54af67ce513
         run: node --test scripts/test-ask-primary-saved-command-capture.mjs
 
       - name: Verify prospective primary evidence and public review recognition (artificial inputs only)
+        id: ci_7c3aafceb25f
         run: |
           node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v2 --check
           node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v3 --check
@@ -325,39 +442,51 @@ jobs:
           node --test scripts/test-ask-primary-evidence-recognition-v2.mjs scripts/test-ask-review-target-requirement-v2.mjs
 
       - name: Verify literal body and review target diagnostics (no execution)
+        id: ci_977dda0a851e
         run: node --test scripts/test-ask-saved-command-body-observation.mjs scripts/test-ask-review-target-requirement.mjs
 
       - name: Verify bounded private runtime observation transport
+        id: ci_3ba351475f0e
         run: node --test scripts/test-ask-benchmark-runtime-observation.mjs
 
       - name: Run verification evidence exact-reuse tests
+        id: ci_166413d212db
         run: node scripts/test-verification-evidence.mjs
 
       - name: Run verification scoped reuse and coverage tests
+        id: ci_1015fe67b052
         run: node scripts/test-verification-scoped-reuse.mjs
 
       - name: Run adaptive portfolio normalized result tests
+        id: ci_6ecd94b2dcbf
         run: node scripts/test-ask-benchmark-normalized-results.mjs
 
       - name: Run terminal inventory protocol ordering regressions
+        id: ci_97f6cde7b47a
         run: node --test scripts/test-ask-benchmark-terminal-inventory-order.mjs
 
       - name: Run evaluator isolation boundary tests
+        id: ci_dd5b41facaf8
         run: node scripts/test-ask-benchmark-evaluator-boundary.mjs
 
       - name: Run build-option fixture contract tests
+        id: ci_5c51d19fb34a
         run: node scripts/test-ask-benchmark-mn-build-option-update.mjs
 
       - name: Run schema-field public source tests (current HEAD)
+        id: ci_06d3b92e8e00
         run: node --test scripts/test-ask-benchmark-mn-schema-field-source.mjs
 
       - name: Run frontend-default public source tests (current HEAD)
+        id: ci_548828dd21f8
         run: node --test scripts/test-ask-benchmark-mn-frontend-default-source.mjs
 
       - name: Run practice-frequency public source tests (current HEAD)
+        id: ci_798c0342280a
         run: node --test scripts/test-ask-benchmark-pf-api-pagination-source.mjs scripts/test-ask-benchmark-pf-frontend-async-source.mjs scripts/test-ask-benchmark-pf-ci-cache-source.mjs
 
       - name: Run practice-frequency fixture source-freeze tests
+        id: ci_4119a259933b
         run: |
           # Exact declared evaluator sources; no current-runtime/admission claim.
           git fetch --no-tags origin a762daf43bdfe254c6ecd6e0b49f3cef78d0e9ec
@@ -370,96 +499,133 @@ jobs:
       # Frozen fixture contracts run against their declared source closure, not
       # the evolving runner. Current-HEAD runtime/scorer gates remain above/below.
       - name: Run schema-field fixture source-freeze tests
+        id: ci_49abe5f9c73a
         run: |
           # The fixture pins the public pre-squash source, outside main ancestry.
           git fetch --no-tags origin 2c498d974681f8b5092759386f39abd7601e4fb4
           node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mn-schema-field-alignment.mjs
 
       - name: Run frontend-default fixture source-freeze tests
+        id: ci_810347cdafe5
         run: |
           git fetch --no-tags origin b290feb25cc1aa2fe3b04bebbd001558cc7846e1
           node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mn-frontend-default-fix.mjs
 
       - name: Run documentation/config fixture source-freeze tests
+        id: ci_c49022aa48f2
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mn-doc-config-correction.mjs
 
       - name: Run focused regression fixture source-freeze tests
+        id: ci_9584b216c17d
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mn-focused-regression-test.mjs
 
       - name: Run CI-evidence review fixture source-freeze tests
+        id: ci_120795cf786d
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-ci-evidence-gap.mjs
 
       - name: Run accessibility interaction review fixture source-freeze tests
+        id: ci_dc083a719709
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-accessibility-interaction-review.mjs
 
       - name: Run data migration handoff fixture source-freeze tests
+        id: ci_478a75bfba29
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-data-migration-handoff.mjs
 
       - name: Run frontend state review fixture source-freeze tests
+        id: ci_44ce49332dae
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-frontend-state-review.mjs
 
       - name: Run IaC rollback design fixture source-freeze tests
+        id: ci_e81a2fc5e721
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-iac-rollback-design.mjs
 
       - name: Run performance investigation fixture source-freeze tests
+        id: ci_33e79f062368
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-performance-investigation.mjs
 
       - name: Run CI-evidence review archive contract tests
+        id: ci_e5fd4d886dc1
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-ci-evidence-gap-review-archive.mjs
 
       - name: Run accessibility interaction review archive contract tests
+        id: ci_803a5b0603af
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-accessibility-interaction-review-review-archive.mjs
 
       - name: Run data migration handoff review archive contract tests
+        id: ci_fe83050877c1
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-data-migration-handoff-review-archive.mjs
 
       - name: Run frontend state review archive contract tests
+        id: ci_b9f387df80a2
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-frontend-state-review-archive.mjs
 
       - name: Run IaC rollback design review archive contract tests
+        id: ci_1b2fb23f7088
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-iac-rollback-design-review-archive.mjs
 
       - name: Run performance investigation review archive contract tests
+        id: ci_b0f833b5868e
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-performance-investigation-review-archive.mjs
 
       - name: Run evaluator-authority integration contract tests
+        id: ci_67dd1ed031ab
         run: node scripts/test-ask-benchmark-portfolio-evaluator-result.mjs
 
       - name: Run portfolio raw engineering result score tests
+        id: ci_471b86a392c1
         run: node scripts/test-ask-benchmark-portfolio-score.mjs
 
       - name: Run portfolio engineering result-set tests
+        id: ci_7395d24b6541
         run: node scripts/test-ask-benchmark-portfolio-result-set.mjs
 
       - name: Run portfolio repetition report tests
+        id: ci_8655828042ac
         run: node scripts/test-ask-benchmark-portfolio-repetition-report.mjs
 
       - name: Run portfolio paired comparison report tests
+        id: ci_409deb5ccdc9
         run: node scripts/test-ask-benchmark-portfolio-paired-comparison-report.mjs
 
       - name: Run portfolio aggregate result tests
+        id: ci_e3651f30d982
         run: node scripts/test-ask-benchmark-portfolio-aggregate-result.mjs
 
       - name: Run portfolio directional outcome report tests
+        id: ci_adee415cf454
         run: node scripts/test-ask-benchmark-portfolio-directional-outcome-report.mjs
 
       - name: Run portfolio mechanism observation scorecard tests
+        id: ci_f8020bb7404e
         run: node scripts/test-ask-benchmark-portfolio-mechanism-scorecard.mjs
 
       - name: Run legacy calibration migration tests
+        id: ci_48496abcae67
         run: node scripts/test-ask-benchmark-portfolio-legacy-calibration-migration.mjs
 
       - name: Run Prompt v2 preregistration contract tests
+        id: ci_fa42baa57285
         run: node scripts/test-ask-benchmark-prompt-v2.mjs
 
       - name: Run Prompt v2 preregistration authority fixture tests
+        id: ci_f8831378fa74
         run: node scripts/test-prompt-v2-preregistration-samples.mjs
 
       - name: Check Prompt v2 preregistration authority fixture freshness
+        id: ci_6b47644819a4
         run: node scripts/prompt-v2-preregistration-samples.mjs --check
+
+      - name: Record required step completion
+        id: ci_receipt
+        env:
+          CI_RECEIPT_JOB: common
+          CI_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: node scripts/ci-execution-plan.mjs receipt
 
   repository-tests:
     runs-on: ubuntu-24.04
+    outputs:
+      receipt: ${{ steps.ci_receipt.outputs.receipt }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -468,11 +634,20 @@ jobs:
         with:
           node-version: "24.19.0"
       - name: Run repository validation tests
+        id: ci_29e2de4dbe38
         run: node scripts/test-validate-repo.mjs
 
+      - name: Record required step completion
+        id: ci_receipt
+        env:
+          CI_RECEIPT_JOB: repository-tests
+          CI_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: node scripts/ci-execution-plan.mjs receipt
 
   personal-cli:
     runs-on: ubuntu-24.04
+    outputs:
+      receipt: ${{ steps.ci_receipt.outputs.receipt }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -481,24 +656,28 @@ jobs:
         with:
           node-version: "24.19.0"
       - name: Verify personal CLI and unstarted preparation recovery (model-free)
+        id: ci_b23f8d7dc12d
         run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-cli-catalog24.mjs scripts/test-ask-personal-evolution-cli-catalog24-v8.mjs scripts/test-ask-personal-evolution-cli-recovery.mjs scripts/test-ask-personal-evolution-unattended-policy.mjs scripts/test-ask-personal-evolution-unattended.mjs scripts/test-ask-personal-evolution-rejection.mjs
 
+      - name: Record required step completion
+        id: ci_receipt
+        env:
+          CI_RECEIPT_JOB: personal-cli
+          CI_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: node scripts/ci-execution-plan.mjs receipt
 
   validate:
     if: ${{ always() }}
-    needs: [independent-local-clone, common, repository-tests, personal-cli]
+    needs: [plan, independent-local-clone, docs-checks, common, repository-tests, personal-cli]
     runs-on: ubuntu-24.04
     steps:
-      - name: Require every full-run job to succeed
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.19.0"
+      - name: Require full execution and bound completion evidence
         env:
-          RESULTS: ${{ toJSON(needs) }}
-        run: |
-          node <<'NODE'
-          const needs = JSON.parse(process.env.RESULTS);
-          const expected = ['independent-local-clone', 'common', 'repository-tests', 'personal-cli'];
-          if (Object.keys(needs).length !== expected.length ||
-              expected.some(id => needs[id]?.result !== 'success')) {
-            console.error('Full-run jobs must all succeed', needs);
-            process.exit(1);
-          }
-          NODE
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/ci-execution-plan.mjs gate

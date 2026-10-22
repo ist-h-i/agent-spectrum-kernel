@@ -62,7 +62,7 @@ test('shadow recording is unconditional and never controls full-run/aggregate ex
   const workflow = readFileSync(new URL('../.github/workflows/validate.yml', import.meta.url), 'utf8');
   assert.match(workflow, /run: node scripts\/ci-change-shadow\.mjs/);
   assert.ok(!/needs[^\n]*shadow|if:[^\n]*(?:proposal|classif|shadow)|fromJSON/.test(workflow));
-  assert.match(workflow, /needs: \[independent-local-clone, common, repository-tests, personal-cli\]/);
+  assert.match(workflow, /needs: \[plan, independent-local-clone, docs-checks, common, repository-tests, personal-cli\]/);
 });
 
 test('historical regression paths retain their full detection owners in shadow proposals', () => {

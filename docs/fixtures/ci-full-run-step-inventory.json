@@ -1,0 +1,540 @@
+{
+  "source_head": "ce89336b236c6a8f4d5e144197fabc008cd3b4bb",
+  "steps": [
+    {
+      "name": "Verify independent local clone objects across runner devices",
+      "run_sha256": "f130664410d670734d24e87ce0b8145d5bad89e37252f60cc414cefda569952b",
+      "cwd": "."
+    },
+    {
+      "name": "Verify CI coverage preservation and strict aggregate",
+      "run_sha256": "42c1fa3558d43b84a36c7a60a8d904c50b7366b973df7ebf54eb544c97bd151d",
+      "cwd": "."
+    },
+    {
+      "name": "Verify conservative change classification (shadow only)",
+      "run_sha256": "4d49c841ab91aae4ed07167f87c800ac9c85fef701b8a18dce36bb838e350d60",
+      "cwd": "."
+    },
+    {
+      "name": "Record proposed change classification (all verification still runs)",
+      "run_sha256": "46d017c912aef26ffe78fa78a793f63b015449652d0c787072efc1ef6e0f5ac9",
+      "cwd": "."
+    },
+    {
+      "name": "Verify integrated personal trace (public artificial fixtures only)",
+      "run_sha256": "e0e211eb698740100e0c6aa8b29b11c0c31a2d4c546aa7277bc0f850b6c77566",
+      "cwd": "."
+    },
+    {
+      "name": "Verify integrated opt-in metrics (artificial runner only)",
+      "run_sha256": "eecbf7ad66f458c8974c5e48d9867aa5c96b8c0152ec8634cfbb80dad6fc4214",
+      "cwd": "."
+    },
+    {
+      "name": "Run autonomous development control tests",
+      "run_sha256": "6125d7781e86c86228115f0ea5613a46a966a9f211d77000aaabbb76fe2f70af",
+      "cwd": "."
+    },
+    {
+      "name": "Check whitespace errors",
+      "run_sha256": "cf4fe117bca14bcf227cdb33280cc86a47e20c8049ba8c6957b2a3073ecb82ae",
+      "cwd": "."
+    },
+    {
+      "name": "Run ASK setup planning and exact apply tests",
+      "run_sha256": "b542303cf9cbf27aa2f0d9759d4c57dfca7ae49b5c7620ecf26c9f70e019211d",
+      "cwd": "."
+    },
+    {
+      "name": "Run model-free install and recovery release smoke",
+      "run_sha256": "ca5d996c17816d5d890e0863071133fb4f35f5754be6b7faf2325d1b3182aea4",
+      "cwd": "."
+    },
+    {
+      "name": "Run public first-workflow preparation regressions",
+      "run_sha256": "5840b6ac36a188b3cd2912e96c3f84993232742a1fc66fc32bb071c61eb5e45a",
+      "cwd": "."
+    },
+    {
+      "name": "Run offline pragmatic evaluation report regressions",
+      "run_sha256": "cb083a011c1e9bb29456ee0919b65c706078b697ce69b76ad97a9b5da8d6c77d",
+      "cwd": "."
+    },
+    {
+      "name": "Verify prospective performance probe (synthetic controls only)",
+      "run_sha256": "c29caf396b8b202edd6ff3385eb8cb443b5e93bc17c29e697d3532095e8e6697",
+      "cwd": "."
+    },
+    {
+      "name": "Verify prospective performance condition lifetime (artificial Node processes only)",
+      "run_sha256": "65ef4046389f4828bfdf7e597e52810991dc4b6d0ed8c77ab90cdf794a01c16b",
+      "cwd": "."
+    },
+    {
+      "name": "Verify explicit primary scoring-version connection (model-free)",
+      "run_sha256": "66f14821bb272a85830d8ad9400f869ed07da04e14ae768aaef95b6af939f78f",
+      "cwd": "."
+    },
+    {
+      "name": "Qualify prospective rule-batch contract and frozen preparation (model-free)",
+      "run_sha256": "839af522700c1eadebb3c0175de4193bc6f4d040038ccd48360e9b0cd4515acb",
+      "cwd": "."
+    },
+    {
+      "name": "Run UI harness and Skill-reference regressions",
+      "run_sha256": "d0b93f62ea3ca563e1e7130483bd72a8e316766b6e2b7404ed9a36e6d700d641",
+      "cwd": "."
+    },
+    {
+      "name": "Run dependency-free scenario visual review regressions",
+      "run_sha256": "8472cb95be5ed82a0bc79d386279bb9695bd5d20d066a81073934513c84c850e",
+      "cwd": "."
+    },
+    {
+      "name": "Check adapter runtime bundle freshness",
+      "run_sha256": "1814e6e9025215c87fe6cf245fa5181b764ab1f87a872762d23b9fbae882d9cb",
+      "cwd": "."
+    },
+    {
+      "name": "Verify bounded full-target streaming snapshots (artificial only)",
+      "run_sha256": "1032f681b55eebda4ca5ca591e9ff3c58631ff2c74cbbca4ffba27a35ef181c5",
+      "cwd": "."
+    },
+    {
+      "name": "Rehearse parent rollback and return to pre-install absence (artificial only)",
+      "run_sha256": "5ceaa95e9ed6d776916a8c8864a279fb2076e661d9d8df5852d493c3de1f4477",
+      "cwd": "."
+    },
+    {
+      "name": "Run synthetic JSON pilot fake-only regressions",
+      "run_sha256": "e0de5149770ab614e4fce33534c2515cb9650ec0de85409464101dd123a57593",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio aggregate v2 component sensitivity tests",
+      "run_sha256": "fc68b2541c6d4ede010abce77c2bb88d16107da866eaa3c36770897782750663",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio consumer sensitivity detail tests",
+      "run_sha256": "2b7766b800c8ff3c375ecb4621259c61273972ff1505c3d6bc4a100d84496b72",
+      "cwd": "."
+    },
+    {
+      "name": "Run nondegenerate high-impact sensitivity and exact Evolution tests",
+      "run_sha256": "f3d81037c8b0d6706a1917a9110877dc41a49f208a4c88bfa8b824835848cb9e",
+      "cwd": "."
+    },
+    {
+      "name": "Run successor snapshot and source-session regressions (current HEAD)",
+      "run_sha256": "8abae90695f0e40a20db1e50685f6a3f951dc93befb3710507f31775b0f985fe",
+      "cwd": "."
+    },
+    {
+      "name": "Run bounded successor scoring authority regressions (current HEAD)",
+      "run_sha256": "7cfb8cd7f5b355a0493466c4cf805970ca7ac729876a6ebf3112f57c50c5f8a9",
+      "cwd": "."
+    },
+    {
+      "name": "Run session checkpoint and resume tests",
+      "run_sha256": "4a1db12faa61afc97ecf2fd1d5841a5622c22de6a22dfb65f888dddbe6f677ef",
+      "cwd": "."
+    },
+    {
+      "name": "Validate repository consistency",
+      "run_sha256": "d548e47e9512ea1d7bfe9b368a2708be89980ab75c2c6bc5ded8c787a16f6401",
+      "cwd": "."
+    },
+    {
+      "name": "Show generated validation report diff on failure",
+      "run_sha256": "d868ecee8a3bbdee6078515ba361fc00109fd4c8e26dae7a6f544f4ad98adf23",
+      "cwd": "."
+    },
+    {
+      "name": "Run baseline semantic review route contract tests",
+      "run_sha256": "58fabe1a766e40acd9bd11073b6199c9c5e94febc8f287773fa4fb39f72ae832",
+      "cwd": "."
+    },
+    {
+      "name": "Run Execution Envelope record contract tests",
+      "run_sha256": "bd3ba010766cd16399d321f1f6168b09d2ffef3d6c645d71300942513d6a59c2",
+      "cwd": "."
+    },
+    {
+      "name": "Run installed Codex runner Execution Envelope conformance tests",
+      "run_sha256": "5cd1e0602c9b5e4f279dc0fc58af182b0dd3d5f1547aab028f31a8e04f9afe17",
+      "cwd": "."
+    },
+    {
+      "name": "Run managed JSON Schema validation tests",
+      "run_sha256": "d85607b6dc28e6ae1dab5a249d76b724821a67fd426c9cfba548ea9da6ecc02f",
+      "cwd": "."
+    },
+    {
+      "name": "Run exact Codex risk approval tests",
+      "run_sha256": "dc7c09bc18c6df78a7c64835406dfe57cada2ce4fb9f01d65d5e25ea63c4b94a",
+      "cwd": "."
+    },
+    {
+      "name": "Run review decision matrix tests",
+      "run_sha256": "1c8dfd1316bbacff41be2ae307dffdae727177ec0fb1deb395e9872d1232a2b5",
+      "cwd": "."
+    },
+    {
+      "name": "Run claim evidence status contract tests",
+      "run_sha256": "710bdf76d51373d73087a8d1af39c7179a03af8d431172b3281b2fc09bc14630",
+      "cwd": "."
+    },
+    {
+      "name": "Run one-task Skill effectiveness outcome contract tests",
+      "run_sha256": "e464b859abfd56b25b2bc4ad207b00f5baabd45858c61a26e0199e43cdaad59b",
+      "cwd": "."
+    },
+    {
+      "name": "Run verification proof policy contract tests",
+      "run_sha256": "69441486b052d08e12f8d820a0acaffd78cfebac70c6c1cc7095c294cc3fe647",
+      "cwd": "."
+    },
+    {
+      "name": "Run epic admission and Work Package Plan contract tests",
+      "run_sha256": "5d98244d5f13c1b29f61cedb3d1a5bd509da8f1d92155c7d1698d270b6eadebe",
+      "cwd": "."
+    },
+    {
+      "name": "Run generic content-addressed store tests",
+      "run_sha256": "15810c176553ba993ff607c8b8a3017af0689de133bf670ed26b8bc125075572",
+      "cwd": "."
+    },
+    {
+      "name": "Run Asset Registry contract tests",
+      "run_sha256": "b6991d24cbfc2c4d2c9fb9aa127bd07711779b94e808e5f01a5a652eaa078fd9",
+      "cwd": "."
+    },
+    {
+      "name": "Check the exact candidate-only Asset Registry sample",
+      "run_sha256": "c61f0bb9c866ff1091f20b8ae5edd30c563cda589dfc96e6dae8caa66f5ff77b",
+      "cwd": "."
+    },
+    {
+      "name": "Run evidence-conditioned Portfolio Manager contract tests",
+      "run_sha256": "1df31d0e9791b2a99e5a4f62b88ed174ae2b022b61af1352da6796bb9908ab70",
+      "cwd": "."
+    },
+    {
+      "name": "Check the exact Portfolio Manager sample",
+      "run_sha256": "39fbf46227b94cae11a4c8b72c8419050512c01d6331de405f193b169a3de965",
+      "cwd": "."
+    },
+    {
+      "name": "Run governed Evolution contract tests",
+      "run_sha256": "c22cff7fde852ee06851cb56ce97e8e44179d55bbb819c58cc1553e1af12dee5",
+      "cwd": "."
+    },
+    {
+      "name": "Run governed Evolution full-closure integration tests",
+      "run_sha256": "a4b4d2eace229395707470ca655f2e5bea450d3fb00403ea733cb62fc2169266",
+      "cwd": "."
+    },
+    {
+      "name": "Verify opt-in Prompt repetition recommendation bridge (artificial only)",
+      "run_sha256": "c97b7eeff961e565c54df366f45eef181e52abdd6dca224c83070509f8293740",
+      "cwd": "."
+    },
+    {
+      "name": "Run personal observation and generated candidate contracts (model-free)",
+      "run_sha256": "2500b686146a5b14447ca60b4cadd163579648729d29d777faedf61cf6023bd3",
+      "cwd": "."
+    },
+    {
+      "name": "Verify real personal source reviewer contract (fake transport only)",
+      "run_sha256": "4e13c5cced129f9302f0e1dfae8d9c50891764da5e139b3ec54d979265901c3b",
+      "cwd": "."
+    },
+    {
+      "name": "Check the exact governed Evolution sample",
+      "run_sha256": "316beff6daa7c9d6762a7f18cbb6217ae0a2b13a178283d108bdb8c576c40825",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio catalog tests",
+      "run_sha256": "83cbe23e7a5585c77720b2b685cc1249cf5fbb7d20294ea46c8d3ff602ade09a",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio policy tests",
+      "run_sha256": "95c1ff8e0c3c54602542d84f159945f2e2187b7666fb17e1cb4da9b728eae492",
+      "cwd": "."
+    },
+    {
+      "name": "Run prospective task evidence partial readout tests (model-free)",
+      "run_sha256": "3f8f26bed5948869b6a43fe5576eb7c2bc5cc4ef394c056964a666850d656cff",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio design pre-admission tests",
+      "run_sha256": "c2c6052e0fbf6f0d5493fff07efb55351d7eaf22bd20c690175f353f62910fe7",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio independent design review tests",
+      "run_sha256": "5070968002d3a0d0e4ba2fa0f7184099d180cbf3f46c1e0e6cb573f27484c97d",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio admission decision overlay tests",
+      "run_sha256": "19983133d9d49e4fb5788d55c3a1e166b05beda4c75f5e4d94b0e8ba83b35bb3",
+      "cwd": "."
+    },
+    {
+      "name": "Fetch public reviewed heads for admitted fixture invariance",
+      "run_sha256": "fb4dfed28823ae0a53432314361a13b7405458b70f2e977add9f6725d5451f87",
+      "cwd": "."
+    },
+    {
+      "name": "Guard admitted fixture invariance",
+      "run_sha256": "5aee70f0149bfdc2a9378bc574c5559284945b6c40e8bdc376cbb3c0c3257b14",
+      "cwd": "."
+    },
+    {
+      "name": "Run general benchmark tests",
+      "run_sha256": "777f8c0ff67754ea00277eb4030d82d2f3295f75af759a9c3edccecd48ae7b15",
+      "cwd": "."
+    },
+    {
+      "name": "Run adaptive portfolio execution tests",
+      "run_sha256": "1a7b2b43248c0cd2076f578798ff5a8970ff3d469434b31e71ae04fbf267c9f2",
+      "cwd": "."
+    },
+    {
+      "name": "Run admitted portfolio propagation preparation tests",
+      "run_sha256": "e3302473d22326075006bd63241dcfc376551642acca730a7dc61567be2732ac",
+      "cwd": "."
+    },
+    {
+      "name": "Run verification command evidence contract tests",
+      "run_sha256": "460c1a81788bfc9f1b5946a8d412bdcab723fa174bbf5316ed499d6f00a83ef4",
+      "cwd": "."
+    },
+    {
+      "name": "Verify read-only saved primary command capture",
+      "run_sha256": "cf492bb2de5196fe04826b28c993693f2d994cfa32ced78a9bffad89de849172",
+      "cwd": "."
+    },
+    {
+      "name": "Verify prospective primary evidence and public review recognition (artificial inputs only)",
+      "run_sha256": "0a6c0982dd50626940db8b528c57ce789ad1d962a4dffc3e462772c37d069726",
+      "cwd": "."
+    },
+    {
+      "name": "Verify literal body and review target diagnostics (no execution)",
+      "run_sha256": "7374a99ebb9e4f4580416b0e54a31c6ed7ed809f1a1b75ef797dd7ffc69252b7",
+      "cwd": "."
+    },
+    {
+      "name": "Verify bounded private runtime observation transport",
+      "run_sha256": "41f85735b00de960fa1069a02dcf83a708024f2878ba198069ca2590123c2bb1",
+      "cwd": "."
+    },
+    {
+      "name": "Run verification evidence exact-reuse tests",
+      "run_sha256": "f7cc43b3940f9a313352cd892d955b905bd00c11a0fe08fe6dbe8436e73654c3",
+      "cwd": "."
+    },
+    {
+      "name": "Run verification scoped reuse and coverage tests",
+      "run_sha256": "9e2a38c22e79e1d9e8e4aef83ae92501fcc8083776a69a22850b812a0b7c3818",
+      "cwd": "."
+    },
+    {
+      "name": "Run adaptive portfolio normalized result tests",
+      "run_sha256": "9ce5186ca0b0bae998e3af9f73af70e86eefe5fb672ca413fe05a12a1d86a9f4",
+      "cwd": "."
+    },
+    {
+      "name": "Run terminal inventory protocol ordering regressions",
+      "run_sha256": "d698c8617f3bf8ca446a87958bcea7daadcb97664b81c070f7e16246a53252b4",
+      "cwd": "."
+    },
+    {
+      "name": "Run evaluator isolation boundary tests",
+      "run_sha256": "7750212389d4b68100c841d604ae4226c32369afa4156d3439d573e0ec98db54",
+      "cwd": "."
+    },
+    {
+      "name": "Run build-option fixture contract tests",
+      "run_sha256": "a150dcff609f059a0702474aec83d271a0d08ec457a94771f5ed08d85ce4f68c",
+      "cwd": "."
+    },
+    {
+      "name": "Run schema-field public source tests (current HEAD)",
+      "run_sha256": "4fc4b0f5614f6162d7f53d266d498a9119ff5bfcbd070664720070a06415060c",
+      "cwd": "."
+    },
+    {
+      "name": "Run frontend-default public source tests (current HEAD)",
+      "run_sha256": "03026e361eb0cffa866d6a35716058304d1fad9c9c3fdf1eb61e21b7d8298424",
+      "cwd": "."
+    },
+    {
+      "name": "Run practice-frequency public source tests (current HEAD)",
+      "run_sha256": "88c4a8a59c6a40004687bb4238aebe1e419605c104807d5c17bd150f6888cbb2",
+      "cwd": "."
+    },
+    {
+      "name": "Run practice-frequency fixture source-freeze tests",
+      "run_sha256": "76840bc9195975cb3de5f69091b2a7f54fb79ea3f52e3d9ffe3f279ce3b76430",
+      "cwd": "."
+    },
+    {
+      "name": "Run schema-field fixture source-freeze tests",
+      "run_sha256": "1f0801f93f5df88261ca344ce3574d6267b3a0ac1a474378b8756b515ef8577a",
+      "cwd": "."
+    },
+    {
+      "name": "Run frontend-default fixture source-freeze tests",
+      "run_sha256": "5eff8b9356400edb3291b8e70a4b8e36fe741e85827ddec500e3852041c4e5d0",
+      "cwd": "."
+    },
+    {
+      "name": "Run documentation/config fixture source-freeze tests",
+      "run_sha256": "c6a2284bb332af8722aa0402a5253019b82480b0061a6bc168eec8bd7bc63081",
+      "cwd": "."
+    },
+    {
+      "name": "Run focused regression fixture source-freeze tests",
+      "run_sha256": "d53cbd48d1d314c5245b0730c571071d1fd86161c34585988487c0ef5daef3c9",
+      "cwd": "."
+    },
+    {
+      "name": "Run CI-evidence review fixture source-freeze tests",
+      "run_sha256": "267ee2bd3bbe2609aad0f2267b2271b58039aeedfc4f443fd40f2b4503c94f2f",
+      "cwd": "."
+    },
+    {
+      "name": "Run accessibility interaction review fixture source-freeze tests",
+      "run_sha256": "c87c2a90472562440927c17ba51207eb9d41364c4bb8bc91a2db27939c515580",
+      "cwd": "."
+    },
+    {
+      "name": "Run data migration handoff fixture source-freeze tests",
+      "run_sha256": "f1a20fc50d97085890f6e7cf28dfdf2b9981dcc4645792b4a5d9cb79e2617f19",
+      "cwd": "."
+    },
+    {
+      "name": "Run frontend state review fixture source-freeze tests",
+      "run_sha256": "821bb8edb84862736ebe7a7d0bd5307046eadfdd86529e26f9a88416855db76c",
+      "cwd": "."
+    },
+    {
+      "name": "Run IaC rollback design fixture source-freeze tests",
+      "run_sha256": "4acb8017e389b5f0a3c969234a38acffd941acd288043259e5026c36f15d7def",
+      "cwd": "."
+    },
+    {
+      "name": "Run performance investigation fixture source-freeze tests",
+      "run_sha256": "fce9d0ddce8cff4db1b22408d7719e1b090428ca546318e06ebda63c4f0bb3c1",
+      "cwd": "."
+    },
+    {
+      "name": "Run CI-evidence review archive contract tests",
+      "run_sha256": "705f5a312e81a0491ae244f544fe8a6792543d70b64e243088e5ce78d2777a0a",
+      "cwd": "."
+    },
+    {
+      "name": "Run accessibility interaction review archive contract tests",
+      "run_sha256": "62dee3f2bf80739903adb913a9038d9b3a154a14bf909d73dbff76d4b0a71d2c",
+      "cwd": "."
+    },
+    {
+      "name": "Run data migration handoff review archive contract tests",
+      "run_sha256": "8f8ada85d82b95548cf8e8691afa50411555b58d98b52fb27106d58714f425cd",
+      "cwd": "."
+    },
+    {
+      "name": "Run frontend state review archive contract tests",
+      "run_sha256": "ba424b43198939633438c21b4414bdeded6a40de7a15b0ec54e9cbc9bff7fca7",
+      "cwd": "."
+    },
+    {
+      "name": "Run IaC rollback design review archive contract tests",
+      "run_sha256": "ab8ed7840e9e10fc7c77c1daeb16263ce1909ccf1f53e2eda7101d669bdbce9c",
+      "cwd": "."
+    },
+    {
+      "name": "Run performance investigation review archive contract tests",
+      "run_sha256": "9aaee47ec712ccbb4f7b57855461c54f09ed657fd69fcc33b0052572b04df311",
+      "cwd": "."
+    },
+    {
+      "name": "Run evaluator-authority integration contract tests",
+      "run_sha256": "b75a79a6ed4dceafa878d83d2bb06a2ae66883b593bfd0dfbbf3c74ea8b66193",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio raw engineering result score tests",
+      "run_sha256": "3776b25ae6d34ac7b564077726ec30a27f3c4891bcb8a112125df99219ba3148",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio engineering result-set tests",
+      "run_sha256": "095cdfad3a340fefa3922d3e474e20f85d52d8d6eb0d10dc5f5a16ec8e873f07",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio repetition report tests",
+      "run_sha256": "d32840206e03998f87cec78b8192994418e61eefbf728a10101743407cd1adab",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio paired comparison report tests",
+      "run_sha256": "4cc2f8256c481b829c8cf9d76b4a5d04fc8df499965f1e1d1f3cb4267292d86e",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio aggregate result tests",
+      "run_sha256": "0c7bacba6098876fa20106862641d7cc834d1420d3df39cb4099aa6a192ec3c7",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio directional outcome report tests",
+      "run_sha256": "9710c57bf061190e8a7080833c9b3126bb8faa6e8526b2c3d069802ee6d8f475",
+      "cwd": "."
+    },
+    {
+      "name": "Run portfolio mechanism observation scorecard tests",
+      "run_sha256": "90d74a6a8eaa4091bb953d99dbab900fa30c85f81239c7b23268aea1c09cd2f5",
+      "cwd": "."
+    },
+    {
+      "name": "Run legacy calibration migration tests",
+      "run_sha256": "f6eedc0970f9961683b8149a2906f94c67185a1fe0f87b9014eb3b7412789d2b",
+      "cwd": "."
+    },
+    {
+      "name": "Run Prompt v2 preregistration contract tests",
+      "run_sha256": "fc844fbdd0b6df8a75b5732a6e9cf0ae62ca0ad2b7bb54ce65eb53a302173d2e",
+      "cwd": "."
+    },
+    {
+      "name": "Run Prompt v2 preregistration authority fixture tests",
+      "run_sha256": "ad39984b0c3055ccf1fb6660361d92232deb38fac44437cc3716d118cc4c6fa8",
+      "cwd": "."
+    },
+    {
+      "name": "Check Prompt v2 preregistration authority fixture freshness",
+      "run_sha256": "12a82c145c66cceee6b00b1eff0a9ca0d84e78c44e5d9d92308a370e3094577b",
+      "cwd": "."
+    },
+    {
+      "name": "Run repository validation tests",
+      "run_sha256": "c5c4cb81e4a857704c5cce435e894aa8e603f4c520f96b15411118df14eacb9d",
+      "cwd": "."
+    },
+    {
+      "name": "Verify personal CLI and unstarted preparation recovery (model-free)",
+      "run_sha256": "e7b980045ae3174455b1038316892d2643cbb5b524124b0ee3c406065d7ea31d",
+      "cwd": "."
+    }
+  ]
+}
