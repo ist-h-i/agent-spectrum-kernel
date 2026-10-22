@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { requireSuccessfulJobs } from './ci-execution-plan.mjs';
 import test from 'node:test';
 
 const validate = readFileSync(new URL('../.github/workflows/validate.yml', import.meta.url), 'utf8');
@@ -10,8 +10,8 @@ const lifetimeCommand = 'node --test scripts/test-ask-primary-performance-execut
 const commands = text => text.split('\n').map(line => line.trim().replace(/^run: /, '')).filter(line => /^node (?:--\S+ )*scripts\//.test(line)).sort();
 
 test('all original validate commands remain, including flags and frozen sources', () => {
-  const additions = [lifetimeCommand, 'node --test scripts/test-ci-full-run.mjs', 'node --test scripts/test-ci-change-shadow.mjs', 'node scripts/ci-change-shadow.mjs', 'node --test scripts/test-ask-personal-evolution-trace.mjs', 'node --test scripts/test-codex-metrics-collector.mjs'];
-  for (const command of additions) assert.equal(commands(validate).filter(c => c === command).length, 1, command);
+  const additions = [lifetimeCommand, 'node --test scripts/test-ci-full-run.mjs', 'node --test scripts/test-ci-change-shadow.mjs', 'node scripts/ci-change-shadow.mjs', 'node --test scripts/test-ask-personal-evolution-trace.mjs', 'node --test scripts/test-codex-metrics-collector.mjs', 'node --test scripts/test-ci-execution-plan.mjs', 'node scripts/ci-execution-plan.mjs plan', 'node scripts/ci-execution-plan.mjs gate', 'node scripts/ci-execution-plan.mjs receipt'];
+  for (const command of additions) assert.equal(commands(validate).filter(c => c === command).length, command.endsWith(' receipt') ? 5 : 1, command);
   assert.deepEqual(commands(validate).filter(c => !additions.includes(c)), baseline.validate_commands);
   assert.match(validate, /git fetch --no-tags origin a06e96f8/);
 });
@@ -52,11 +52,10 @@ test('original coverage remains except two audited Mac-only fake logic files, wi
 
 test('fixed aggregate rejects failure, skip, cancel, missing and malformed results', () => {
   assert.match(validate, /  validate:\n    if: \$\{\{ always\(\) \}\}/);
-  assert.match(validate, /needs: \[independent-local-clone, common, repository-tests, personal-cli\]/);
-  const code = validate.split("node <<'NODE'\n").at(-1).split('\n          NODE')[0];
-  const ids = ['independent-local-clone', 'common', 'repository-tests', 'personal-cli'];
+  assert.match(validate, /needs: \[plan, independent-local-clone, docs-checks, common, repository-tests, personal-cli\]/);
+  const ids = ['plan', 'independent-local-clone', 'docs-checks', 'common', 'repository-tests', 'personal-cli'];
   const valid = Object.fromEntries(ids.map(id => [id, { result: 'success' }]));
-  const check = value => spawnSync(process.execPath, ['-e', code], { env: { ...process.env, RESULTS: JSON.stringify(value) } }).status;
+  const check = value => { try { requireSuccessfulJobs(value, ids); return 0; } catch { return 1; } };
   assert.equal(check(valid), 0);
   for (const id of ids) {
     for (const result of ['failure', 'skipped', 'cancelled', null, '']) assert.equal(check({ ...valid, [id]: { result } }), 1);

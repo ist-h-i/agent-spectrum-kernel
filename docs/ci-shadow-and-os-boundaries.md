@@ -144,3 +144,118 @@ both OS owners. The preceding 139 Validate invocations are retained, making 140;
 local-eval has 25 invocations (preceding 24 plus the new Mac owner). The strict coverage guard admits only this exact new command in
 each owner; the historical snapshot, shadow-only behavior and aggregate remain.
 Artificial controls do not qualify a native sandbox or enable its closed gate.
+
+## Local next stage: docs-checks and strict shadow control
+
+Spec `SPEC-CI433-3@1`, upstream Issue #433 and `DESIGN-CI433-SELECT-1@1`:
+CI433-PLAN binds a closed shadow/full execution plan to exact Git identity,
+policy and derived workflow inventory. CI433-DOCS moves existing consistency,
+whitespace and CI controls into an always-required docs-checks job without
+removing any of the 140 inventoried invocations, flags, cwd or source fetches.
+CI433-GATE requires every full-run worker, rejects invalid plans and skipped,
+cancelled, failed or missing execution, and checks actual required-step outcomes.
+CI433-NOSELECT forbids activating selection: candidate docs jobs are observations
+only. Other three workflows are unchanged. Push/PR/hosted CI await coordinator
+integration ordering after local verification and independent review.
+
+Formal Verification Contract `FVC-CI433-3@1`, upstream `SPEC-CI433-3@1`:
+formal path under ask.verification-proof-policy@1.0.0 for infrastructure,
+regression and multi-actor handoff. Required local proof: exact command multiset
+and run-block/cwd/fetch preservation, strict plan/identity/schema cases, each
+worker's failure/skip/cancel/missing and false completion, hypothetical planned
+skip versus missing, default full on observation failure, validator and YAML
+checks, independent source/docs review. Hosted job/output binding remains
+unverified until an approved future push; no merge-readiness claim from local tests.
+
+Implementation Contract `IMPL-CI433-3@1`, upstream `SPEC-CI433-3@1`,
+`FVC-CI433-3@1`: local CI-only module/tests/workflow/docs, in separate worktree
+from main8d6fac7b. No product runtime, generated assets, external permissions,
+real models, cancellation or existing unknown sessions are changed.
+
+### Audited consumers and execution ownership
+
+At main `8d6fac7b`, both allowlisted documents are manifest entries. The complete
+`node scripts/validate-repo.mjs` is retained in docs-checks: its recipe section
+checks (lines897–929), adapter adoption guidance checks (4719–4737), manifest
+path/report checks (1595–1620,4100–4131), recursive Markdown stale phrase/count
+scan (3982–4062), and Claude Action reference restriction (4703–4711) consume
+their bytes or inventory. Link checking alone cannot replace these checks.
+The outcome fixture suite reads its own cases, not the recipe's bytes.
+
+Projection inspection found explicit Skill SKILL.md/reference inventories
+(`skill-assets.mjs:8–44`), immutable installer assets, and bounded canonical
+renderer inputs; listing a document in manifest.docs does not copy every listed
+document into the product. Sealed product inventories and the runtime bundle
+contain neither target path. This combines inspected mechanisms with inventory
+membership checks; a search miss alone is insufficient evidence. No mutation
+probe or generator run proves an unchanged digest. Complete consumer closure,
+computed reads, external consumers and human instruction correctness remain
+unknown. All existing suites still run, and independent document review remains
+necessary before any future selection enablement.
+
+### Plan, receipts and limits
+
+The plan job and all five workers run independently on Ubuntu24.04/Node24.19.0.
+Docs-checks owns existing CI controls, whitespace, autonomous control tests and
+the complete consistency validator, including its original failure diagnostic.
+Common retains every remaining regression. The other three workflow files are
+unchanged. A derived registry hashes each required step's full run block and cwd,
+including flags and fixed Git fetches. A historical step-hash fixture records
+base8d6fac7b preservation evidence; it is not a second execution catalog.
+
+Each worker records the exact required step IDs/descriptors only after GitHub
+reports both outcome and conclusion as success. The final fixed validate gate
+recomputes the plan and receipt contract from its checkout and binds checkout
+commit/tree/parents, run ID/attempt, runtime, policy and registry. Missing,
+malformed, extra, stale, skipped, cancelled and failed dependencies fail closed.
+A valid final marker or step count alone cannot establish completion. This is
+not a hostile-code attestation: repository contributors can change workflow and
+control code together; normal source review and branch protection remain needed.
+Actual hosted output transport is still unverified in this local-only stage.
+
+A docs proposal requires exact event base/head, a single merge base equal to
+base, checkout merge parents matching base/head, two-sided ordinary100644 blobs,
+and the candidate head blob present in checkout. Only modified usage/recipe
+allowlist files qualify. Skill, core, CI/control, unknown, deletion, rename,
+base drift, missing event, unavailable Git or unverified file types propose full.
+An unavailable checkout identity prevents producing a valid plan; workers are
+independent of the plan so their full verification is not suppressed.
+The hypothetical gate accepts explicit skipped entries only for the proposed
+non-selected jobs, while rejecting missing/cancelled entries. It is a fixture-only
+export with no CLI activation path. The actual gate always requires every worker.
+
+Future enablement requires consumer closure or explicit conservative ownership,
+all negative fixture cases passing, no unexplained excluded-suite failure, an
+actual eligible exact-HEAD full run under the same policy and job partition,
+reviewed shadow/full comparison, rollback design and independent review. The
+existing three observations were revisions of one mixed/full PR; none is an
+eligible docs-positive observation. One future positive observation can prove
+wiring, not a statistical miss rate. Skill/core and other workflows remain full;
+this stage establishes no wall-clock or cost improvement measurement.
+
+Required execution syntax is deliberately restricted: unsupported global/job
+shell/environment defaults, folded/implicit run syntax, conditional required
+steps and unregistered actions are rejected. Checkout/setup-node descriptors are
+also included in the registry digest. Candidate documents must be actual regular
+files whose disk hash equals the candidate head blob, and tracked checkout
+changes force a full proposal and prevent a completion receipt. This detects
+ordinary tracked drift, not malicious index flags, hidden ignored/untracked
+inputs, or a process that changes and restores bytes between observations.
+The isolated CLI fixture commits its own artificial inputs before recording
+receipts; the unfinished implementation worktree is not called clean evidence.
+
+
+### Local composition with lifecycle PR #439
+
+Composition delta for `SPEC-CI433-3@1` / `FVC-CI433-3@1` / `IMPL-CI433-3@1`:
+PR #439 head `ce89336b236c6a8f4d5e144197fabc008cd3b4bb`, based on main
+`61e32104b9dd14611502fdb03377c63c34d9cbc9`, is the inherited source boundary.
+Its lifecycle command stays exactly once in Validate/common and exactly once
+in the Mac-only local-eval owner, with both test files and flags intact.
+The 140 inherited Validate invocations plus eight new shadow control invocations
+give 148; local-eval retains all 25. The historical 134-command snapshot is
+unchanged. The full-run step preservation fixture now records all 107 inherited
+run blocks from this exact #439 head, including its failure-only diagnostic.
+Other three workflows and lifecycle source/generated files are unchanged relative
+to #439. This separate worktree is a local composition, not #439 CI evidence or
+a publication. Shadow PR publication waits for lifecycle integration ordering.
