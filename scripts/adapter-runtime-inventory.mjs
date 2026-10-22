@@ -15,6 +15,9 @@ export const CLAUDE_RUNTIME_FILES = Object.freeze([
 ]);
 
 export const CODEX_RUNTIME_FILES = Object.freeze([
+  { name: "codex-metrics-collector.mjs", source: "scripts/codex-metrics-collector.mjs", target: "scripts/codex-metrics-collector.mjs", assetKind: "runner" },
+  { name: "ai-metrics-record.mjs", source: "scripts/ai-metrics-record.mjs", target: "scripts/ai-metrics-record.mjs", assetKind: "runner" },
+  { name: "ai-metrics-summarize.mjs", source: "scripts/ai-metrics-summarize.mjs", target: "scripts/ai-metrics-summarize.mjs", assetKind: "runner" },
   { name: "codex-exec-runner.mjs", source: "scripts/codex-exec-runner.mjs", target: "scripts/codex-exec-runner.mjs", assetKind: "runner" },
   { name: "ask-sensors.mjs", source: "scripts/ask-sensors.mjs", target: "scripts/ask-sensors.mjs", assetKind: "runner" },
   { name: "ask-shared.mjs", source: "scripts/ask-shared.mjs", target: "scripts/ask-shared.mjs", assetKind: "runner" },

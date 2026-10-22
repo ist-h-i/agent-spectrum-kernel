@@ -419,6 +419,9 @@ ${profileLines}
 Default mode is three-way update safe: managed files are updated only when the
 target still matches the previous managed hash, unless --force is used.
 AGENTS.md is owned by the core installer. Install or update core before this adapter.
+Managed-runner metrics runtime is projected with codex-exec. Collection stays
+disabled until project-local .agent-spectrum-kernel/codex-metrics.json explicitly
+sets schema_version: "1.0.0" and enabled: true. See docs/codex-metrics-collector.md.
 
 Use --profile for normal installs. Use --skills only for advanced overrides; the
 installer fails before writing files when the override is not closed over required

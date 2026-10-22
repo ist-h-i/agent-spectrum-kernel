@@ -4415,10 +4415,11 @@ function assertDoctorScript() {
 
   const unsupportedClaimTarget = resolve(fixtureRoot, "doctor-unsupported-claim");
   assertRuntimePass("doctor setup unsupported claim install", runRepoScript([installer, "--target", unsupportedClaimTarget, "--skills", "operating-mode-router"]));
-  writeFileSync(resolve(unsupportedClaimTarget, "README.md"), "# Claim\n\nCodex local metrics event recording is supported.\n");
+  // Keep the negative fixture on a capability that this adapter still lacks.
+  writeFileSync(resolve(unsupportedClaimTarget, "README.md"), "# Claim\n\nCodex PR shared review workflow is supported.\n");
   const unsupportedClaimResult = runRepoScript([doctorScript, "--target", unsupportedClaimTarget]);
   assertRuntimePass("doctor unsupported capability warning", unsupportedClaimResult);
-  if (!unsupportedClaimResult.stdout.includes("ASK doctor: warn") || !unsupportedClaimResult.stdout.includes("Local metrics event recording evidence level is unsupported")) {
+  if (!unsupportedClaimResult.stdout.includes("ASK doctor: warn") || !unsupportedClaimResult.stdout.includes("PR shared review workflow evidence level is unsupported")) {
     throw new Error(`doctor should warn on unsupported adapter capability claims\n${unsupportedClaimResult.stdout}\n${unsupportedClaimResult.stderr}`);
   }
 
@@ -6234,7 +6235,7 @@ ${validEnvelopeBlock}
   }
 
   const unsupportedTarget = cloneFixture("sensors-unsupported-target");
-  writeFileSync(resolve(unsupportedTarget, "README.md"), "# Claim\n\nCodex local metrics event recording is supported.\n");
+  writeFileSync(resolve(unsupportedTarget, "README.md"), "# Claim\n\nCodex PR shared review workflow is supported.\n");
   const unsupportedResult = runRepoScript([sensorsScript, "--target", unsupportedTarget, "--mode", "implementation", "--input", implementationPass]);
   assertRuntimePass("sensors unsupported capability is report-only", unsupportedResult);
   if (!unsupportedResult.stdout.includes("ASK sensors: fail") || !unsupportedResult.stdout.includes("Adapter capability overclaims")) {

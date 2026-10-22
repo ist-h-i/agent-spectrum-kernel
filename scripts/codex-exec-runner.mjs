@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { closeSync, fstatSync, openSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -21,6 +21,9 @@ const MANAGED_CODEX_RUNTIME_FILES = [
   "ask-shared.mjs",
   "execution-envelope.mjs",
   "adapter-runtime-event.mjs",
+  "codex-metrics-collector.mjs",
+  "ai-metrics-record.mjs",
+  "ai-metrics-summarize.mjs",
   "codex-risk-approval.mjs",
   "codex-risk-workspace.mjs",
   "observability-paths.mjs",
@@ -1112,9 +1115,29 @@ function printResult(report, json) {
   }
 }
 
+export function createRunnerMetricsBoundary({ sourcePath = fileURLToPath(import.meta.url) } = {}) {
+  const boundary = { task_id: randomUUID(), run_id: randomUUID(), source: null };
+  try {
+    boundary.source = `source:codex-exec-runner:sha256:${createHash("sha256").update(JSON.stringify(readFileSync(sourcePath, "utf8"))).digest("hex")}`;
+  } catch { /* Optional metrics must never prevent normal runner execution. */ }
+  return boundary;
+}
+
+export async function recordCodexRunnerBoundary(report, { projectRoot, boundary, attempted = false } = {}) {
+  if (!attempted) return { status: "skip", reason: "no_execution_boundary" };
+  try {
+    const { collectCodexRunnerMetrics } = await import("./codex-metrics-collector.mjs");
+    return collectCodexRunnerMetrics({ projectRoot, report, boundary });
+  } catch {
+    return { status: "degraded", reason: "collector_unavailable" };
+  }
+}
+
 async function main() {
 try {
   const args = parseArgs(process.argv.slice(2));
+  // Freeze before preflight/child execution, with optional failure isolated.
+  const metricsBoundary = createRunnerMetricsBoundary();
   const preflightResult = preflight(args);
   let codexResult = null;
   let sensorResult = null;
@@ -1441,6 +1464,10 @@ try {
   report.normalized_adapter_event = existsSync(normalizedEventSchemaPath)
     ? mapCodexRunnerResult(report, { schemaPath: normalizedEventSchemaPath })
     : null;
+  report.metrics_collection = await recordCodexRunnerBoundary(report, {
+    projectRoot: args.target, attempted: !args.dryRun && codexResult !== null,
+    boundary: { ...metricsBoundary, occurred_at: new Date().toISOString() },
+  });
   printResult(report, args.json);
   process.exit(normalized.status === "executed" ? 0 : normalized.status === "execution_failed" ? 1 : 2);
 } catch (error) {
