@@ -136,7 +136,7 @@ test('async source construction has isolated lifetime and cannot retain a later 
 });
 
 // Bytes-only public validation. No private bundle or evaluator is opened.
-test('v1 through v9 source graphs pass sealed byte validation with exact known file types', () => {
+test('v1 through v10 source graphs pass sealed byte validation with exact known file types', () => {
   const hash = b => 'sha256:' + createHash('sha256').update(b).digest('hex');
   const fixtureId = 'mn-build-option-update';
   const fixturePaths = evaluatorAuthorityPathsForFixture(fixtureId).fixturePaths;
@@ -165,7 +165,7 @@ test('v1 through v9 source graphs pass sealed byte validation with exact known f
   assert.ok(validate(deriveEvaluatorDependencyGraph({root,baseRevision:revision})));
   for (const [commandEvidenceParserRevision,version] of [
     ['1.5.0-primary-saved','v2'],['1.6.0-primary-saved','v3'],['1.7.0-primary-saved','v4'],
-    ['1.8.0-primary-saved','v5'],['1.9.0-primary-saved','v6'],['1.10.0-primary-saved','v7'],['1.11.0-primary-saved','v8'],['1.12.0-primary-saved','v9'],
+    ['1.8.0-primary-saved','v5'],['1.9.0-primary-saved','v6'],['1.10.0-primary-saved','v7'],['1.11.0-primary-saved','v8'],['1.12.0-primary-saved','v9'],['1.13.0-primary-app-server','v10'],
   ]) {
     const graph = scope.withPrimaryProcessingSourceBuild({root,baseRevision:revision,commandEvidenceParserRevision}, () => deriveEvaluatorDependencyGraph({root,baseRevision:revision}));
     const selectedSchemas = schemas.map(path => path.replace('saved-v2-', `saved-${version}-`));

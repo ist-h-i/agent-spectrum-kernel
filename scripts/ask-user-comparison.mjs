@@ -204,6 +204,17 @@ export function userCodexInvocation(root, plan, condition) {
       : plan.prompt, timeoutMs: plan.config.timeout_ms };
 }
 
+/** Exercise the same bounded runtime collector with an explicitly synthetic
+ * prepared plan. This never consumes a comparison start or enables live runs. */
+export async function collectUserComparisonRuntimeLineageForTest(output, condition, options) {
+  const { root, plan, plan_digest } = readUserComparisonPlan(output);
+  assert.equal(plan.config.evidence_kind, 'synthetic', 'runtime fake requires a synthetic prepared plan');
+  assert.equal(plan.config.primary_input_contract, 'closed_primary_inputs_v2');
+  const invocation = userCodexInvocation(root, plan, condition);
+  const { collectPrimaryRuntimeLineageForTest } = await import('./ask-primary-runtime-lineage.mjs');
+  return collectPrimaryRuntimeLineageForTest({ plan, planDigest: plan_digest, condition, input: invocation.input }, options);
+}
+
 export function inspectUserComparison(output) {
   const loaded = readUserComparisonPlan(output), { root, plan } = loaded;
   const primary = isPrimaryFixtureRecipe(plan.verification.recipe);
