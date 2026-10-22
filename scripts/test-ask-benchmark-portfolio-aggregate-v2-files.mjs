@@ -265,10 +265,14 @@ export function prepareAggregateV2FileFixture({ root, target, fixtureId = FIXTUR
     scoring_policy_digest: authorities.verified_scoring_policy.policy_digest,
     classification_records: classificationRecords, lineage_records: lineageRecords,
   };
+  const prepareInputs = ({ mutateNormalized = null, mutateEngineering = null } = {}) =>
+    buildFileInputs(root, target, authorities, { fixtures, adapter, sourceRevision, mutateNormalized, mutateEngineering });
   return {
     execution: freezeJson(execution),
-    collect({ mutateNormalized = null, mutateEngineering = null } = {}) {
-      const inputs = buildFileInputs(root, target, authorities, { fixtures, adapter, sourceRevision, mutateNormalized, mutateEngineering });
+    // Synthetic input records alone confer no aggregate/report authority.
+    prepareInputs,
+    collect(mutations = {}) {
+      const inputs = prepareInputs(mutations);
       const options = {
         ...inputs, ...classification,
         resultSetPath: resolve(target, "result-set.json"), repetitionReportPath: resolve(target, "repetition.json"),
@@ -297,6 +301,8 @@ export function runAggregateV2FileRegressions({ root, work, check }) {
   let verified;
   let identity;
   check("v2 files pass real upstream verifiers publication and aggregate reverification", () => {
+    const templatePath = resolve(inputs.engineeringResultsPath, FIXTURE, "full_ask/01.json");
+    const templateBytes = readFileSync(templatePath);
     collectEngineeringResults({ ...inputs, outputPath: resultSetPath });
     reportEngineeringResultRepetitions({ ...inputs, inputPath: resultSetPath, outputPath: repetitionReportPath });
     reportEngineeringPairedComparisons({ ...options, outputPath: comparisonReportPath });
@@ -311,6 +317,7 @@ export function runAggregateV2FileRegressions({ root, work, check }) {
     identity = portfolioAggregateEvolutionEvidenceIdentity(verified);
     assert.deepEqual(identity, { source_kind: "portfolio_aggregate_result", artifact_id: artifact.aggregate_result_id, artifact_digest: artifact.aggregate_result_digest, result_status: "complete" });
     assert.deepEqual(JSON.parse(readFileSync(aggregateResultPath, "utf8")), artifact);
+    assert.deepEqual(readFileSync(templatePath), templateBytes, "aggregate publication must not change synthetic engineering input bytes");
   });
   check("issued aggregate authority cannot be replaced and copied wrappers are untrusted", () => {
     assert.ok(Object.isFrozen(verified));
