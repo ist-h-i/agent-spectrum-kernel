@@ -27,6 +27,20 @@ const text = value => assert.ok(typeof value === 'string' && value.length <= MAX
 const changed = (before, after) => [...new Set([...Object.keys(before), ...Object.keys(after)])].sort()
   .filter(path => canonicalDigest(before[path] ?? null) !== canonicalDigest(after[path] ?? null));
 const publicResult = value => structuredClone(value);
+export const PRIMARY_RUNTIME_LINEAGE_CONTRACT = 'owned_runtime_lineage_v2';
+const replayCoverage = 'sent_requests_thread_turn_replies_and_accepted_item_terminal_usage_frames';
+const initializeRequest = () => ({ id: 1, method: 'initialize', params: { clientInfo: { name: 'ask_primary_runtime_lineage', version: '1' }, capabilities: { experimentalApi: false, requestAttestation: false } } });
+const threadRequest = (plan, workspace) => ({ id: 2, method: 'thread/start', params: { model: plan.config.model, cwd: workspace, sandbox: 'workspace-write', ephemeral: true } });
+const turnRequest = (plan, input, threadId) => ({ id: 3, method: 'turn/start', params: { threadId, input: [{ type: 'text', text: input, text_elements: [] }], effort: plan.config.reasoning } });
+function projectThreadConfiguration(result, plan, workspace) {
+  closed(result, ['thread', 'model', 'modelProvider', 'cwd', 'approvalPolicy', 'approvalsReviewer', 'sandbox'],
+    ['reasoningEffort', 'serviceTier', 'sessionId', 'activePermissionProfile']);
+  assert.equal(result.model, plan.config.model); assert.equal(result.cwd, workspace); assert.equal(result.sandbox?.type, 'workspaceWrite');
+  assert.ok(typeof result.modelProvider === 'string' && /^[a-zA-Z0-9_-]{1,128}$/u.test(result.modelProvider));
+  identifier(result.thread.id); assert.equal(result.thread.cwd, workspace); assert.deepEqual(result.thread.turns, []); assert.equal(result.thread.ephemeral, true);
+  return { requested_model: plan.config.model, thread_model: result.model, provider: result.modelProvider, requested_effort: plan.config.reasoning,
+    per_turn_resolved_model: null, per_turn_resolved_effort: null, native_cwd: workspace };
+}
 
 /** Deliberately no production dispatch entry: missing startup evidence is a
  * pre-spawn failure, not an option/caller flag or an inferred empty inventory. */
@@ -69,12 +83,12 @@ export async function collectPrimaryRuntimeLineageForTest({ plan, planDigest, co
   let threadStarted = false, turnStarted = false, turnCompleted = false, finalResponse = null, usage = null, finalInventory = null;
   const pending = new Map(), completed = new Map(), commandLines = [], commandIndexes = [], edits = [], requests = [];
   let threadConfiguration = null, verificationInventory = null, terminalInventory = null;
-  const nativeRows = [], requestBytes = [];
+  const nativeRows = [], replyRows = [], requestBytes = [];
   const stdoutHash = createHash('sha256'); let stdoutBytes = 0;
   const retainNative = raw => nativeRows.push({ line: lines, raw: Buffer.from(raw) });
   const stop = reason => { failure ??= reason; controller.abort(); };
   const interrupt = () => stop('interrupted');
-  const send = request => { const bytes = JSON.stringify(request) + '\n'; requestBytes.push(bytes); requests.push({ method: request.method, ...(Object.hasOwn(request, 'id') ? { id: request.id } : {}), digest: hash(bytes) }); channel.write(bytes); };
+  const send = request => { const bytes = JSON.stringify(request) + '\n'; assert.ok(requestBytes.length < 4 && requestBytes.reduce((sum, row) => sum + Buffer.byteLength(row), 0) + Buffer.byteLength(bytes) <= MAX_BYTES, 'request limit'); requestBytes.push(bytes); requests.push({ method: request.method, ...(Object.hasOwn(request, 'id') ? { id: request.id } : {}), digest: hash(bytes) }); channel.write(bytes); };
   const verifyIdentity = params => { assert.equal(params.threadId, threadId); assert.equal(params.turnId, turnId); };
   const turn = value => {
     closed(value, ['id', 'items', 'status'], ['error', 'itemsView', 'rootTurnId', 'startedAt', 'completedAt', 'durationMs']);
@@ -156,22 +170,18 @@ export async function collectPrimaryRuntimeLineageForTest({ plan, planDigest, co
         text(message.result.codexHome); text(message.result.userAgent);
         assert.ok(['unix', 'windows'].includes(message.result.platformFamily) && ['macos', 'linux', 'windows'].includes(message.result.platformOs));
         stage = 'thread'; send({ method: 'initialized' });
-        send({ id: 2, method: 'thread/start', params: { model: plan.config.model, cwd: workspace, sandbox: 'workspace-write', ephemeral: true } }); return;
+        send(threadRequest(plan, workspace)); return;
       }
       if (stage === 'thread' && message.id === 2) {
         const result = message.result;
-        closed(result, ['thread', 'model', 'modelProvider', 'cwd', 'approvalPolicy', 'approvalsReviewer', 'sandbox'],
-          ['reasoningEffort', 'serviceTier', 'sessionId', 'activePermissionProfile']);
-        thread(result.thread); assert.equal(result.model, plan.config.model); assert.equal(result.cwd, workspace); assert.equal(result.sandbox?.type, 'workspaceWrite');
-        assert.ok(typeof result.modelProvider === 'string' && /^[a-zA-Z0-9_-]{1,128}$/u.test(result.modelProvider));
+        thread(result.thread); threadConfiguration = projectThreadConfiguration(result, plan, workspace);
         threadId = result.thread.id;
-        threadConfiguration = { requested_model: plan.config.model, thread_model: result.model, provider: result.modelProvider, requested_effort: plan.config.reasoning,
-          per_turn_resolved_model: null, per_turn_resolved_effort: null, native_cwd: workspace };
-        stage = 'turn'; send({ id: 3, method: 'turn/start', params: { threadId, input: [{ type: 'text', text: input, text_elements: [] }], effort: plan.config.reasoning } }); return;
+        replyRows.push({ line: lines, raw: Buffer.from(raw) });
+        stage = 'turn'; send(turnRequest(plan, input, threadId)); return;
       }
       assert.ok(stage === 'turn' && message.id === 3); closed(message.result, ['turn']); turn(message.result.turn);
       assert.equal(message.result.turn.status, 'inProgress'); assert.deepEqual(message.result.turn.items, []);
-      turnId = message.result.turn.id; stage = 'items'; return;
+      turnId = message.result.turn.id; replyRows.push({ line: lines, raw: Buffer.from(raw) }); stage = 'items'; return;
     }
     closed(message, ['method', 'params']); const params = message.params;
     if (message.method === 'thread/started') {
@@ -273,7 +283,7 @@ export async function collectPrimaryRuntimeLineageForTest({ plan, planDigest, co
   try {
     result = await executeCodexSession({ executable: plan.config.cli_bin, argv: ['app-server', '--listen', 'stdio://'], cwd: workspace,
       input: '', retainOutput: false, terminationScope: 'direct_child', timeoutMs, signal: controller.signal, onOutput: output,
-      onStdinReady(value) { channel = value; send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'ask_primary_runtime_lineage', version: '1' }, capabilities: { experimentalApi: false, requestAttestation: false } } }); } }, spawnProcess, runtime);
+      onStdinReady(value) { channel = value; send(initializeRequest()); } }, spawnProcess, runtime);
   } finally { signal?.removeEventListener('abort', interrupt); }
   const terminated = result.terminationConfirmed === true && !result.cleanupError;
   if (!failure && (!terminated || result.error || result.exitCode !== 0 || result.signal || result.outputLimited || !turnCompleted || wire.length)) failure = 'transport_or_lifecycle_incomplete';
@@ -298,17 +308,18 @@ export async function collectPrimaryRuntimeLineageForTest({ plan, planDigest, co
     if (arm.work_products.some(product => !finalInventory[product.arm_relative_path])) failure ??= 'work_product_missing';
   } catch { failure ??= 'final_snapshot_unavailable'; }
   wire = Buffer.alloc(0);
-  const projection = { kind: 'ask_primary_runtime_lineage_v1', evidence_kind: 'synthetic', status: failure ? 'unavailable' : 'collected_synthetic', reason: failure,
+  const projection = { kind: 'ask_primary_runtime_lineage_v2', contract: PRIMARY_RUNTIME_LINEAGE_CONTRACT, evidence_kind: 'synthetic', status: failure ? 'unavailable' : 'collected_synthetic', reason: failure,
     observed_stdout_digest: `sha256:${stdoutHash.digest('hex')}`, observed_stdout_bytes: stdoutBytes,
-    semantic_replay_coverage: 'accepted_item_terminal_usage_frames_only', condition, profile_id: binding.profile_id, run_id: binding.run_id, plan_digest: planDigest, binding_digest: binding.binding_digest, input_digest: arm.stdin.digest,
+    semantic_replay_coverage: replayCoverage, condition, profile_id: binding.profile_id, run_id: binding.run_id, plan_digest: planDigest, binding_digest: binding.binding_digest, input_digest: arm.stdin.digest,
     thread_id: threadId, turn_id: turnId, requests, request_stream_digest: hash(requestBytes.join('')), native_configuration: threadConfiguration,
+    native_reply_stream_digest: hash(Buffer.concat(replyRows.map(row => Buffer.concat([row.raw, Buffer.from('\n')])))),
     item_pairs: [...completed.values()], verification, edits, recorded_native_stream_digest: hash(Buffer.concat(nativeRows.map(row => Buffer.concat([row.raw, Buffer.from('\n')])))),
     final_response: finalResponse, usage, verification_snapshot_digest: verificationInventory === null ? null : canonicalDigest(verificationInventory),
     terminal_snapshot_digest: terminalInventory === null ? null : canonicalDigest(terminalInventory), final_snapshot_digest: finalInventory === null ? null : canonicalDigest(finalInventory),
     termination_confirmed: terminated, duration_ms: Number.isFinite(result.durationMs) && result.durationMs >= 0 ? result.durationMs : null,
     runtime_attestation: 'unknown', execution_authority: false, scoring_authority: false, quality: null, missing_runtime_evidence: [...missing] };
-  const receipt = Object.freeze({ kind: 'ask_primary_runtime_lineage_owned_receipt_v1', evidence_kind: 'synthetic' });
-  owned.set(receipt, { projection, binding, plan: structuredClone(plan), input, armRoot, before, finalInventory, retained, sourceDigests, fixedTrees, nativeRows, requestBytes, itemProjection, inventoryUserTree });
+  const receipt = Object.freeze({ kind: 'ask_primary_runtime_lineage_owned_receipt_v2', evidence_kind: 'synthetic' });
+  owned.set(receipt, { projection, binding, plan: structuredClone(plan), input, armRoot, before, finalInventory, retained, sourceDigests, fixedTrees, nativeRows, replyRows, requestBytes, itemProjection, inventoryUserTree });
   return receipt;
 }
 
@@ -322,6 +333,31 @@ export function verifyPrimaryRuntimeLineageReceipt(receipt) {
   for (const [path, digest] of Object.entries(record.sourceDigests)) assert.equal(hash(read(join(SOURCE_ROOT, path))), digest, 'runtime source changed');
   for (const [root, inventory] of Object.entries(record.fixedTrees)) assert.deepEqual(record.inventoryUserTree(root), inventory, 'prepared source/baseline changed');
   assert.equal(hash(record.requestBytes.join('')), record.projection.request_stream_digest);
+  assert.equal(hash(Buffer.concat(record.replyRows.map(row => Buffer.concat([row.raw, Buffer.from('\n')])))), record.projection.native_reply_stream_digest);
+  // Replay the accepted native replies independently of the parser's cached
+  // configuration. Initialize private fields are deliberately not retained.
+  let nativeConfiguration = null, threadId = null, turnId = null;
+  for (const [index, row] of record.replyRows.entries()) {
+    const message = parseJsonRejectDuplicateKeys(new TextDecoder('utf-8', { fatal: true }).decode(row.raw));
+    closed(message, ['id', 'result'], ['jsonrpc']); assert.ok(message.jsonrpc === undefined || message.jsonrpc === '2.0');
+    if (index === 0) {
+      assert.equal(message.id, 2); nativeConfiguration = projectThreadConfiguration(message.result, record.plan, current.conditions[record.projection.condition].launch_cwd);
+      threadId = message.result.thread.id;
+    } else {
+      assert.equal(index, 1); assert.equal(message.id, 3); closed(message.result, ['turn']);
+      const turn = message.result.turn; closed(turn, ['id', 'items', 'status'], ['error', 'itemsView', 'rootTurnId', 'startedAt', 'completedAt', 'durationMs']);
+      assert.ok(turn.error === undefined || turn.error === null); identifier(turn.id); assert.equal(turn.status, 'inProgress'); assert.deepEqual(turn.items, []); turnId = turn.id;
+    }
+  }
+  assert.deepEqual(nativeConfiguration, record.projection.native_configuration); assert.equal(threadId, record.projection.thread_id); assert.equal(turnId, record.projection.turn_id);
+  const expectedRequests = [initializeRequest(), { method: 'initialized' }, threadRequest(record.plan, current.conditions[record.projection.condition].launch_cwd), turnRequest(record.plan, record.input, threadId)];
+  assert.ok(record.requestBytes.length >= 0 && record.requestBytes.length <= 4);
+  if (threadId !== null) assert.equal(record.requestBytes.length, 4);
+  if (record.projection.status === 'collected_synthetic') { assert.equal(record.requestBytes.length, 4); assert.equal(record.replyRows.length, 2); }
+  assert.deepEqual(record.requestBytes.map(raw => parseJsonRejectDuplicateKeys(raw)), expectedRequests.slice(0, record.requestBytes.length));
+  assert.deepEqual(record.requestBytes.map(raw => { const message = parseJsonRejectDuplicateKeys(raw); return { method: message.method, ...(Object.hasOwn(message, 'id') ? { id: message.id } : {}), digest: hash(raw) }; }), record.projection.requests);
+  assert.equal(record.projection.kind, 'ask_primary_runtime_lineage_v2'); assert.equal(record.projection.contract, PRIMARY_RUNTIME_LINEAGE_CONTRACT);
+  assert.equal(record.projection.semantic_replay_coverage, replayCoverage);
   assert.equal(hash(Buffer.concat(record.nativeRows.map(row => Buffer.concat([row.raw, Buffer.from('\n')])))), record.projection.recorded_native_stream_digest);
   // Independently rebuild paired native observations from privately retained bytes.
   // The live parser's cached projections are never their own replay authority.

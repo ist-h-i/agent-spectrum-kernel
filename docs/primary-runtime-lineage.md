@@ -70,3 +70,42 @@ must agree. Original source and all prepared baseline inventories are rechecked.
 Producer placement refuses overlap with source/plan/baseline trees before writes.
 Normal exploration commands and unobserved asynchronous notification variants
 remain unsupported, rather than being silently classified as safe or accepted.
+
+## Prospective custody and V10 connection
+
+Spec SPEC-P24-RUNTIME-CONNECTION, revision 1; upstream #379 (PV1-3/4/5/7)
+and SPEC-P24-RUNTIME-LINEAGE-1. This extends the same collector and producer.
+R1: independently replay exact sent requests and accepted thread/start and
+turn/start replies from bounded module-private bytes. Re-derive native cwd,
+requested/thread model, provider, effort and thread/turn IDs; do not treat the
+thread model as the unobserved per-turn resolved model. Initialize response
+private fields remain discarded; its hash is not startup-closure evidence.
+R2: an explicit V10-only runtimeLineageReceipts condition map joins owned
+receipts to the fixed selector's independently reloaded plan/binding before any
+write. Wrong run/plan/profile/condition/input/source and serialized receipts
+reject. Missing conditions remain not_collected and failures unavailable.
+R3: the existing producer retains finite projections, never raw private bytes.
+Readback without live handles verifies artifact integrity only; an explicit
+same-process readback rechecks all provided owned receipts and current inputs.
+The runtime-binding schema remains unchanged and unqualified. No observation,
+synthetic result or approval supplies execution/scoring authority.
+
+Formal Verification Contract FVC-P24-RUNTIME-CONNECTION, revision 1 selects
+formal_verification_contract under ask.verification-proof-policy@1.0.0:
+state_concurrency_persistence_lifecycle_or_cross_module,
+public_api_schema_or_compatibility, multi_session_multi_agent_or_handoff,
+merge_release_or_stable_trace. Obligations V-R1/R2/R3 map respectively to
+R1/R2/R3 in the existing test-ask-primary-runtime-lineage.mjs suite. Exercise
+both profiles and P/K/F, malformed/partial replies, foreign/forged handles,
+missing/failed conditions, retained input drift, output tampering and all live
+start/scoring rejection paths. Additional V10/schema/producer/Full regression
+checks protect unchanged consumers. No actual CLI/model/native test is proof
+for this change; actual startup/runtime acceptance remains missing.
+
+Implementation Contract IMPL-P24-RUNTIME-CONNECTION, revision 1 references
+SPEC-P24-RUNTIME-CONNECTION@1 and FVC-P24-RUNTIME-CONNECTION@1.
+Changes C-R1 (collector/replay), C-R2 (existing producer join/readback) and
+C-R3 (artificial regression) are confined to the existing modules/tests.
+No workflow, frozen asset, old run, binding schema or scoring gate changes.
+Shared generated files are integrated once after the parallel performance
+slice; final exact-source checks and independent review precede the one PR.
