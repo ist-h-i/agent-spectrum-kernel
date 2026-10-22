@@ -50,3 +50,14 @@ test('async private authority rejects same-byte fragment replacement across the 
   writeFileSync(join(root,'replacement.json'),fragmentRead.bytes);renameSync(join(root,'replacement.json'),fragmentPath);
   assert.throws(()=>boundary.assertAsyncPrivateAuthorityUnchangedForTest(snapshot),/authority.*changed|fragment.*inode/u);
 });
+
+test('partial worker stdio cannot replace an owned unknown count or completion with a successful prefix',()=>{
+  const stdio=[{spawn_observed:true,process_completed:true}];
+  const workers=[{kind:'ask_primary_condition_process_v1',stage:'worker',spawn_observed:true,process_completed:true},
+    {kind:'ask_primary_condition_process_v1',stage:'worker',spawn_observed:null,process_completed:false}];
+  const terminal={kind:'ask_primary_condition_lifetime_v1',worker_starts:null};
+  assert.deepEqual(grading.primaryPrivateGradingFailureProcessState(stdio,[...workers,terminal],{requested:true}),{starts:null,completed:null});
+  assert.deepEqual(grading.primaryPrivateGradingFailureProcessState(stdio,[],{requested:true}),{starts:1,completed:true});
+  assert.deepEqual(grading.primaryPrivateGradingFailureProcessState([],[],{requested:true}),{starts:null,completed:null});
+  assert.deepEqual(grading.primaryPrivateGradingFailureProcessState([],[]),{starts:0,completed:false});
+});

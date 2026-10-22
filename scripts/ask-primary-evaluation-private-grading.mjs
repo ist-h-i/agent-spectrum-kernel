@@ -152,6 +152,19 @@ export function primaryPrivateGradingBudget(executionBudgetMs) {
   return {worker_timeout_ms:executionBudgetMs,condition_reservation_ms:4*executionBudgetMs};
 }
 
+// Diagnostic projection only. A complete owned condition ledger takes
+// precedence over a partial prefix of old worker stdio receipts. Null remains
+// unknown; this helper supplies no execution or grading authority.
+export function primaryPrivateGradingFailureProcessState(receipts,lifecycle,{requested=false}={}){
+  const terminal=lifecycle.find(receipt=>receipt.kind==='ask_primary_condition_lifetime_v1');
+  const workers=lifecycle.filter(receipt=>receipt.kind==='ask_primary_condition_process_v1'&&receipt.stage==='worker');
+  const starts=terminal?terminal.worker_starts:receipts.length?receipts.filter(receipt=>receipt.spawn_observed).length
+    :lifecycle.length?(workers.some(receipt=>receipt.spawn_observed===null)?null:workers.filter(receipt=>receipt.spawn_observed===true).length):requested?null:0;
+  const completed=terminal?(terminal.worker_starts===null?null:workers.length>0&&workers.every(receipt=>receipt.process_completed))
+    :receipts.length?receipts.every(receipt=>receipt.process_completed):lifecycle.length?(workers.length>0&&workers.every(receipt=>receipt.process_completed)):requested?null:false;
+  return {starts,completed};
+}
+
 // A successfully verified/saved original score may truthfully remain unknown.
 // Only the explicitly selected fresh practical version separates that semantic
 // status from completed grading execution; legacy behavior is retained.
@@ -175,12 +188,8 @@ function runPrimaryEvaluationPrivateGradingInternal(producerOptions,runtimeInput
     // Only module-owned receipt summaries survive partial execution failure.
     const receipts=primaryEvaluatorLogFailureReceipts(error)??[];
     const lifecycle=asynchronous?primaryEvaluatorExecutionFailureReceipts(error)??[]:[];
-    const workers=lifecycle.filter(receipt=>receipt.kind==='ask_primary_condition_process_v1'&&receipt.stage==='worker');
     const terminal=lifecycle.find(receipt=>receipt.kind==='ask_primary_condition_lifetime_v1');
-    const starts=receipts.length?receipts.filter(receipt=>receipt.spawn_observed).length
-      :terminal?terminal.worker_starts:lifecycle.length?(workers.some(receipt=>receipt.spawn_observed===null)?null:workers.filter(receipt=>receipt.spawn_observed===true).length):requested?null:0;
-    const completed=receipts.length?receipts.every(receipt=>receipt.process_completed)
-      :lifecycle.length?(workers.length>0&&workers.every(receipt=>receipt.process_completed)):requested?null:false;
+    const {starts,completed}=primaryPrivateGradingFailureProcessState(receipts,lifecycle,{requested});
     return {status:requested?'unknown':'blocked',scoring_status:'not_scoring_ready',quality:null,blockers:['original_private_pipeline_unverified'],
       condition:profile?.conditions.includes(runtimeInputs?.condition)?runtimeInputs.condition:null,evidence_kind:evidenceKind,
       model_calls:0,grader_process_starts:starts,grader_process_completed:completed,worker_receipts:receipts,
