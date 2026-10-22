@@ -1,5 +1,58 @@
 # CI shadow classification and OS boundaries
 
+## Verified state after PR #440
+
+Implementation baseline: [PR #440](https://github.com/ist-h-i/agent-spectrum-kernel/pull/440),
+reviewed/tested head `d3a67907a089ab16009072bf0be0dbcdff250bdc`, normally merged
+as main `331389222488ff296607a3c0b00a0a70b1cde36d` on 2026-10-22 10:46:05 UTC.
+The checked merge `5c755dc26e738306d1f35f7c79b3dbea1f232a0b` and merged main
+have identical tree `05d6939a2cee11f588036277e867b1fda712a40f`. This is evidence
+for that tested composition, not an assertion of later-commit or post-merge CI.
+The current implementation follows `SPEC-CI433-3@1`, `FVC-CI433-3@1` and
+`IMPL-CI433-3@1`; earlier contracts and local-stage records below are history.
+
+- Validate has 148 registered Node script invocations: 140 inherited from #439
+  plus eight controls. Local-eval retains 25. The original 134-command snapshot
+  remains intact. See [the current inventory](ci-suite-inventory.md).
+- Plan and five independent workers use Ubuntu24.04/Node24.19.0 and full-history
+  checkouts. Docs-checks owns the complete validator, whitespace and CI/control
+  checks. Fixed validate always requires six predecessors: plan and all five
+  workers, with exact success and closed plan/receipt validation.
+- All 11 hosted checks passed on the same head, attempt 1:
+  [Validate](https://github.com/ist-h-i/agent-spectrum-kernel/actions/runs/39754132064),
+  [Local fake](https://github.com/ist-h-i/agent-spectrum-kernel/actions/runs/39754131869),
+  [Context](https://github.com/ist-h-i/agent-spectrum-kernel/actions/runs/39754131984),
+  [Verification](https://github.com/ist-h-i/agent-spectrum-kernel/actions/runs/39754131833).
+  Plan, all five receipts and the actual final gate agreed on checkout
+  commit/tree/parents, run/attempt, runtime, policy and registry. The 107 required
+  descriptors were common97/docs7/clone1/repository1/CLI1. Their actual step
+  completion was checked, and replay against the exact Git diff and current
+  policy/registry reproduced the hosted gate JSON. The unchanged failure-only
+  diagnostic is excluded from successful-completion receipts, not deleted.
+- Local focused controls passed 23/23 with no skips; validator, YAML and
+  preservation checks passed. Independent final merge review approved with no
+  unresolved findings or missing evidence. No cancellation, manual CI rerun,
+  protection change, admin bypass or real-model execution was used.
+
+The single batch took 84m55s from workflow creation to last job completion;
+11 jobs totaled 257m07s unweighted runner time (not billed cost). Common took
+84m34s and Mac84m14s. These are n=1 absolute values. Different source conditions
+and insufficient samples prevent a causal improvement, stable median/p95 or cost
+claim. They do not establish the provisional docs/core turnaround targets.
+
+Selection is still disabled (`selection_enabled=false`); every actual worker
+runs. This #440 observation proposed full, not docs-v1. There is **no actual
+eligible-docs hosted shadow/full observation under this policy/job partition**.
+The temporary Git docs-positive fixture proves its tested wiring only. Complete consumer/dependency closure and demonstrated historical regression
+retention remain unestablished. Any unexplained failure in a proposed excluded
+suite blocks enablement. Real selection/non-selection workflow wiring, sufficient
+measurements, periodic full-run/recovery and limited-concurrency policy remain
+unfinished. Fake/ordinary-process controls do not qualify real LLM quality or a
+native sandbox. None of these CI observations adds a personal-V1/real-evaluation
+start gate. Real-model automatic execution stays disabled.
+
+## Historical stage-2 contract — PR #437
+
 Spec `SPEC-CI433-2`, revision 2; upstream: Issue #433 and the approved
 2026-10-22 next-stage delegation. Starting main: `7a44f734d72f3080d4005d48308f8adf0e05e564`.
 
@@ -46,7 +99,7 @@ against completed full-run checks and known historical regression cases, retaini
 the exact source/runtime and sample period. A missing comparison is Unknown;
 one green run cannot establish recall, median/p95 or a speed/cost improvement.
 
-## Mac ownership audit
+## Historical Mac ownership audit — PR #437
 
 Read-only independent audit and direct test-body inspection distinguish actual
 OS operations from injected transports. Three files move to Ubuntu ownership:
@@ -75,7 +128,7 @@ no test-name regex can silently match zero cases. Stage-1's eleven Ubuntu
 duplications remain removed; this delta removes three Mac file invocations only.
 The reduction is structural; its runtime effect has not been measured.
 
-## Shadow operations
+## Historical shadow operations — PR #437
 
 Every pull_request and manual workflow continues the full job graph. The common
 job records JSON after its focused classifier tests; logs and the step summary
@@ -102,7 +155,7 @@ Future shadow/full comparisons must examine completed exact-HEAD outcomes and
 review exclusions; this PR does not enable selection, automatic real evaluation,
 periodic real runs, or concurrency cancellation.
 
-## Integrated source registration
+## Historical integrated source registration
 
 Revision-2 delta (approved source-owner and coordinator handoffs, 2026-10-22):
 #435 merged as `985b4accdfd977b83a5c35c721047e57c68db7f5`; #436 merged as
@@ -145,7 +198,7 @@ local-eval has 25 invocations (preceding 24 plus the new Mac owner). The strict 
 each owner; the historical snapshot, shadow-only behavior and aggregate remain.
 Artificial controls do not qualify a native sandbox or enable its closed gate.
 
-## Local next stage: docs-checks and strict shadow control
+## Historical local stage: docs-checks and strict shadow control
 
 Spec `SPEC-CI433-3@1`, upstream Issue #433 and `DESIGN-CI433-SELECT-1@1`:
 CI433-PLAN binds a closed shadow/full execution plan to exact Git identity,
@@ -155,8 +208,9 @@ removing any of the 140 inventoried invocations, flags, cwd or source fetches.
 CI433-GATE requires every full-run worker, rejects invalid plans and skipped,
 cancelled, failed or missing execution, and checks actual required-step outcomes.
 CI433-NOSELECT forbids activating selection: candidate docs jobs are observations
-only. Other three workflows are unchanged. Push/PR/hosted CI await coordinator
-integration ordering after local verification and independent review.
+only. The other three workflows were unchanged. At this local stage,
+publication awaited coordinator integration ordering; the verified #440 result
+above supersedes that pending publication state.
 
 Formal Verification Contract `FVC-CI433-3@1`, upstream `SPEC-CI433-3@1`:
 formal path under ask.verification-proof-policy@1.0.0 for infrastructure,
@@ -164,8 +218,9 @@ regression and multi-actor handoff. Required local proof: exact command multiset
 and run-block/cwd/fetch preservation, strict plan/identity/schema cases, each
 worker's failure/skip/cancel/missing and false completion, hypothetical planned
 skip versus missing, default full on observation failure, validator and YAML
-checks, independent source/docs review. Hosted job/output binding remains
-unverified until an approved future push; no merge-readiness claim from local tests.
+checks, independent source/docs review. At this stage hosted job/output binding
+was unverified. The later #440 result above established full-run transport; local
+tests alone did not establish merge readiness.
 
 Implementation Contract `IMPL-CI433-3@1`, upstream `SPEC-CI433-3@1`,
 `FVC-CI433-3@1`: local CI-only module/tests/workflow/docs, in separate worktree
@@ -201,7 +256,8 @@ the complete consistency validator, including its original failure diagnostic.
 Common retains every remaining regression. The other three workflow files are
 unchanged. A derived registry hashes each required step's full run block and cwd,
 including flags and fixed Git fetches. A historical step-hash fixture records
-base8d6fac7b preservation evidence; it is not a second execution catalog.
+the final #439 head `ce89336b` preservation evidence described below. Initial
+local work used base `8d6fac7b`; neither baseline is a second execution catalog.
 
 Each worker records the exact required step IDs/descriptors only after GitHub
 reports both outcome and conclusion as success. The final fixed validate gate
@@ -211,7 +267,8 @@ malformed, extra, stale, skipped, cancelled and failed dependencies fail closed.
 A valid final marker or step count alone cannot establish completion. This is
 not a hostile-code attestation: repository contributors can change workflow and
 control code together; normal source review and branch protection remain needed.
-Actual hosted output transport is still unverified in this local-only stage.
+This local-only stage did not establish hosted transport. The #440 full-run
+transport proof above does not establish selective execution.
 
 A docs proposal requires exact event base/head, a single merge base equal to
 base, checkout merge parents matching base/head, two-sided ordinary100644 blobs,
@@ -228,10 +285,11 @@ Future enablement requires consumer closure or explicit conservative ownership,
 all negative fixture cases passing, no unexplained excluded-suite failure, an
 actual eligible exact-HEAD full run under the same policy and job partition,
 reviewed shadow/full comparison, rollback design and independent review. The
-existing three observations were revisions of one mixed/full PR; none is an
+three earlier #437 observations were revisions of one mixed/full PR; none is an
 eligible docs-positive observation. One future positive observation can prove
 wiring, not a statistical miss rate. Skill/core and other workflows remain full;
-this stage establishes no wall-clock or cost improvement measurement.
+the local stage established no wall-clock or cost improvement measurement.
+The later #440 single-batch absolute values above do not establish improvement.
 
 Required execution syntax is deliberately restricted: unsupported global/job
 shell/environment defaults, folded/implicit run syntax, conditional required
@@ -242,7 +300,7 @@ changes force a full proposal and prevent a completion receipt. This detects
 ordinary tracked drift, not malicious index flags, hidden ignored/untracked
 inputs, or a process that changes and restores bytes between observations.
 The isolated CLI fixture commits its own artificial inputs before recording
-receipts; the unfinished implementation worktree is not called clean evidence.
+receipts; the original unfinished worktree was not called clean evidence.
 
 
 ### Local composition with lifecycle PR #439
@@ -256,6 +314,7 @@ The 140 inherited Validate invocations plus eight new shadow control invocations
 give 148; local-eval retains all 25. The historical 134-command snapshot is
 unchanged. The full-run step preservation fixture now records all 107 inherited
 run blocks from this exact #439 head, including its failure-only diagnostic.
-Other three workflows and lifecycle source/generated files are unchanged relative
-to #439. This separate worktree is a local composition, not #439 CI evidence or
-a publication. Shadow PR publication waits for lifecycle integration ordering.
+Other three workflows and lifecycle source/generated files were unchanged
+relative to #439. This was a local composition, not #439 CI evidence or a
+publication. After lifecycle integration, only its seven-file delta was carried
+onto main `e68432bb` and published as #440; the verified result is recorded above.

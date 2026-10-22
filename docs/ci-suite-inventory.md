@@ -1,4 +1,35 @@
-# CI suite inventory — Issue #433 first slice
+# CI suite inventory — Issue #433
+
+## Current implementation after PR #440
+
+Verified implementation baseline: main
+`331389222488ff296607a3c0b00a0a70b1cde36d`, tree
+`05d6939a2cee11f588036277e867b1fda712a40f`. The historical counts below are
+stage-specific, not the current total. Validate has **148 registered Node script
+invocations**: the 140 inherited from #439 plus eight controls (one plan, one
+new plan/receipt regression command, five receipt producers and one gate).
+Local-eval retains **25** registrations. Counts include the preserved conditional
+failure diagnostic; they are inventory counts, not a claim every conditional
+command executes on a green run. No workflow, flag or source-fetch change is
+introduced by this documentation update.
+
+Docs-checks now owns the complete validator, whitespace and CI/control checks;
+plan plus five workers feed the fixed six-dependency validate gate. The original
+134-command snapshot and table remain historical evidence. The separate
+[step preservation fixture](fixtures/ci-full-run-step-inventory.json) records the
+107 inherited run blocks from #439 head `ce89336b`, including its failure-only
+diagnostic. The active receipt registry also has 107 required descriptors, but
+its set excludes that failure-only diagnostic and includes the new plan/receipt
+regression step. Neither fixture replaces the current workflow as execution
+authority.
+
+For the exact #440 hosted proof, single-batch measurements and remaining
+consumer-closure/docs-v1 observation limits, see
+[the verified shadow state](ci-shadow-and-os-boundaries.md#verified-state-after-pr-440).
+Selection remains disabled; an ordinary change to these two CI documents is
+outside the closed docs allowlist and therefore proposes full execution.
+
+## Historical stage-1 baseline
 
 Source baseline: `a6d71c6c81973f585fe1aa27e4524a5a62889846`.
 The command inventory also includes the additive PR #427 registrations from
@@ -6,31 +37,32 @@ The command inventory also includes the additive PR #427 registrations from
 runtime lineage, and the V2 build archive. Its `source_head` identifies that
 134-command input; local-eval commands and the strict aggregate are preserved.
 The table below is the historical stage-1 command-ownership snapshot, including
-unchanged workflows. Current additive registrations are listed in the next-stage
-delta and retained in the machine-readable inventory and workflow.
+unchanged workflows. Subsequent registrations are recorded in the historical deltas below; the
+current registration count and ownership are summarized first.
 Manual model workflows remain manual; presence is not execution authorization.
 Fake/synthetic checks are infrastructure evidence, not real LLM quality.
 
-## Next-stage delta from main 7a44f734
+## Historical delta from main 7a44f734
 
-The table below remains the historical stage-1 snapshot. Current ownership differs
-only as described in [the shadow/OS inventory](ci-shadow-and-os-boundaries.md):
+The table below remains the historical stage-1 snapshot. At that stage ownership differed
+as described in [the shadow/OS inventory](ci-shadow-and-os-boundaries.md):
 Mac omits build-successor-v2 and unattended-policy (existing Validate Ubuntu
 owners), and kernel-principles gets a separate Ubuntu-only local-eval step.
 Every other Mac file/flag and historical working-directory invocation remains.
 Validate/common additionally tests and records the shadow classifier; its output
-never selects execution. The full four-dependency aggregate remains unchanged.
+never selected execution. The four-dependency aggregate was unchanged at that
+stage; #440 later introduced the six-dependency gate described below.
 After both source integrations at main `318ad1fc`, common also runs
 `node --test scripts/test-ask-personal-evolution-trace.mjs` and
 `node --test scripts/test-codex-metrics-collector.mjs` unconditionally.
-The latest main `0b94087b` also retains #427's V10 schema/runtime/lineage commands
+The then-current main `0b94087b` also retains #427's V10 schema/runtime/lineage commands
 and build-review-archive file. The composed workflow has 139 inventoried Node
 script invocations:
 the unchanged 134-command main inventory plus five explicitly allowed CI additions
 (coverage guard, classifier test, shadow record and the two focused commands).
 Per-command multiset checks prevent loss and duplicate registration.
 
-## Prospective performance lifetime addition after PR #438
+## Historical lifecycle addition — PR #439 after PR #438
 
 Main `61e32104` includes the runtime/performance evidence connection. Its follow-up
 adds exactly one command to Validate/common (Ubuntu 24.04) and the same command to
@@ -40,8 +72,8 @@ the Mac-only local-eval step (macOS 15), both using Node 24.19.0:
 
 The tests use artificial clocks/transports and ordinary owned Node children,
 process groups and files. Both OS owners matter for termination and inode checks;
-they do not run Codex, a model or the native sandbox probe. Current Validate inventory is
-140 Node script invocations (preceding 139 plus one); local-eval has 25
+they do not run Codex, a model or the native sandbox probe. At #439 the Validate
+inventory was 140 Node script invocations (preceding 139 plus one); local-eval had 25
 (preceding 24 plus the explicit Mac owner).
 The closed coverage guard preserves every preceding invocation/flag and the
 strict aggregate. The historical 134-command fixture/table remains unchanged.
@@ -49,12 +81,21 @@ Native qualification remains unavailable until genuine runtime evidence exists.
 
 ## Dependencies and OS boundaries
 
-Validate repository uses independent full-history checkouts for
-independent-local-clone, common, repository-tests and personal-cli, with Node
-24.19.0 and Ubuntu 24.04. The moved suites create temporary fixture roots and
-consume no common-job outputs. Source fetches, generated-consistency diagnostics
-and frozen wrappers retain their ordering in common. Fixed validate always
-evaluates all four predecessors and accepts only exact success from each.
+Validate repository has an independent plan job and five full-run workers:
+independent-local-clone, docs-checks, common, repository-tests and personal-cli.
+Each uses a full-history checkout, Node 24.19.0 and Ubuntu 24.04. Workers do not
+wait on the plan or consume another worker's output; a plan failure cannot
+suppress full verification. Docs-checks owns the complete repository validator,
+its unchanged failure-only diagnostic, whitespace and existing CI/control checks.
+Common retains the remaining regressions, fixed source fetches and frozen
+wrappers in their existing relative order.
+
+Fixed validate has its own checkout/runtime and always evaluates six predecessors:
+plan plus all five workers. It requires each exact job result to be success,
+recomputes the plan, and checks the complete worker receipts against checkout
+identity, run/attempt, runtime, policy and registry. Missing/extra/stale/malformed
+plans or receipts and required job failure/skip/cancel are rejected. The proposed
+docs profile does not control execution; all five workers remain required.
 
 Both local-eval matrix entries retain host preflight, synthetic process lifecycle,
 timeouts, path/permission checks, historical-root isolation, immutable Full/Core
