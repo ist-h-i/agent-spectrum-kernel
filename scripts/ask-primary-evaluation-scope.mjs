@@ -1,4 +1,5 @@
 import {PRIMARY_RUNTIME_V10_REVISION} from './ask-primary-runtime-v10.mjs';
+import {primaryClientFocusedProbeProfile,verifyPrimaryNativeControllerAudit} from './ask-primary-client-focused-controller.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -251,17 +252,20 @@ export function primaryEvaluatorExecutionControl(){const current=active();return
 const PROBE_LIMIT_MS=300000,CLEANUP_ALLOWANCE_MS=4000,PROCESS_BUFFER_LIMIT=10*1024*1024;
 const executionError=code=>new Error(code);
 function createPerformanceExecution(options,dependencies,isCurrent=()=>true,logs=null){
-  const {workerTimeoutMs,deadlineAtMs=null,signal,outputRoot,...unknown}=options;
+  const {workerTimeoutMs,deadlineAtMs=null,signal,outputRoot,nativeProbeBody=null,nativeProbeFixture=null,...unknown}=options;
   const {now=Date.now,monotonicNow=()=>performance.now(),executeSession,loadSession,signalProcess=process.kill,platform=process.platform,setTimer=setTimeout,clearTimer=clearTimeout,...extra}=dependencies;
   if(Object.keys(unknown).length||Object.keys(extra).length||!Number.isSafeInteger(workerTimeoutMs)||workerTimeoutMs<1||workerTimeoutMs>900000
     ||typeof now!=='function'||typeof monotonicNow!=='function'||typeof setTimer!=='function'||typeof clearTimer!=='function'||(executeSession!==undefined&&typeof executeSession!=='function')||(loadSession!==undefined&&typeof loadSession!=='function')||typeof signalProcess!=='function'
     ||(signal!==undefined&&(!signal||typeof signal.aborted!=='boolean'||typeof signal.addEventListener!=='function'||typeof signal.removeEventListener!=='function')))
     throw executionError('primary_condition_arguments_invalid');
-  const reservation=4*(PROBE_LIMIT_MS+workerTimeoutMs+2*CLEANUP_ALLOWANCE_MS),started=now(),monoStart=monotonicNow();
+  const nativeProfile=nativeProbeBody===null?null:primaryClientFocusedProbeProfile(nativeProbeBody,nativeProbeFixture);
+  const nativeBodyDigest=nativeProbeBody===null?null:rawDigest(nativeProbeBody);
+  if(nativeProbeBody!==null&&!nativeProfile)throw executionError('primary_native_probe_profile_invalid');
+  const reservation=nativeProfile?4*(nativeProfile.maxProbes*(nativeProfile.timeoutMs+CLEANUP_ALLOWANCE_MS)+workerTimeoutMs+CLEANUP_ALLOWANCE_MS):4*(PROBE_LIMIT_MS+workerTimeoutMs+2*CLEANUP_ALLOWANCE_MS),started=now(),monoStart=monotonicNow();
   if(!Number.isFinite(started)||!Number.isFinite(monoStart)||(deadlineAtMs!==null&&(!Number.isFinite(deadlineAtMs)||deadlineAtMs-started<reservation)))throw executionError('primary_condition_reservation_unavailable');
   if(signal?.aborted)throw executionError('primary_condition_cancelled');
   if(outputRoot!==undefined){const stat=lstatSync(outputRoot);if(realpathSync(outputRoot)!==outputRoot||!stat.isDirectory()||(stat.mode&0o777)!==0o700||stat.uid!==process.getuid())throw executionError('primary_condition_log_root_invalid');}
-  const receipts=logs?.lifecycleReceipts??[],owner={open:true,failed:null,inflight:null,controller:null,probe:0,worker:0,probePending:false,sequence:0,lastMono:monoStart,closing:null};
+  const receipts=logs?.lifecycleReceipts??[],owner={open:true,failed:null,inflight:null,controller:null,probe:0,worker:0,roundProbes:0,nativeBound:false,nativeAuditReady:false,probePending:false,sequence:0,lastMono:monoStart,closing:null};
   const remaining=()=>{const wall=now(),mono=monotonicNow();if(!Number.isFinite(wall)||!Number.isFinite(mono)||mono<owner.lastMono){owner.failed??='primary_condition_clock_invalid';owner.controller?.abort();throw executionError(owner.failed);}owner.lastMono=mono;return Math.min(reservation-(mono-monoStart),(deadlineAtMs??started+reservation)-wall);};
   const latch=code=>{owner.failed??=code;owner.controller?.abort();};
   const reject=code=>{latch(code);throw executionError(code);};
@@ -288,15 +292,60 @@ function createPerformanceExecution(options,dependencies,isCurrent=()=>true,logs
       receipt.log_capture_status='complete';
     }catch{reject('primary_condition_capture_failed');}
   };
-  const starts=stage=>{const rows=receipts.filter(row=>row.kind==='ask_primary_condition_process_v1'&&row.stage===stage),attempts=stage==='probe'?owner.probe:owner.worker;
+  const starts=stage=>{const rows=receipts.filter(row=>(row.kind==='ask_primary_condition_process_v1'||row.kind==='ask_primary_native_probe_process_v3')&&row.stage===stage),attempts=stage==='probe'?owner.probe:owner.worker;
     return rows.length<attempts||rows.some(row=>row.spawn_observed===null)?null:rows.filter(row=>row.spawn_observed===true).length;};
   const summary=()=>({status:owner.open?(owner.failed?'failed':'active'):'closed',failure_code:owner.failed,
     condition_reservation_ms:reservation,probe_attempts:owner.probe,worker_attempts:owner.worker,
     probe_starts:starts('probe'),worker_starts:starts('worker'),lifecycle_receipts:structuredClone(receipts)});
   const control=Object.freeze({assertReady,summary,
+    bindNativeProbeBody(body,fixture){assertReady();if(!nativeProfile||fixture!==nativeProbeFixture||rawDigest(body)!==nativeBodyDigest)reject('primary_native_probe_body_detached');owner.nativeBound=true;},
+    captureNativeControllerAudit(audit){
+      if(!owner.open||!isCurrent())throw executionError('primary_condition_expired');
+      if(!nativeProfile||!owner.nativeBound||!audit||Object.keys(audit).sort().join(',')!=='body_digest,kind,owner_binding,profile,qualification,quality,round,steps'
+        ||audit.kind!=='ask_primary_native_controller_audit_v3'||audit.body_digest!==nativeBodyDigest||audit.round!==owner.worker+1||audit.profile!==nativeProfile.kind
+        ||audit.quality!==null||audit.qualification!==false||!/^sha256:[a-f0-9]{64}$/u.test(audit.owner_binding)||!Array.isArray(audit.steps)||audit.steps.length>nativeProfile.maxProbes
+        ||audit.steps.some(row=>typeof row.step_id!=='string'||!/^[a-z0-9-]{1,64}$/u.test(row.step_id)||!['observed','skipped','unavailable','not_started'].includes(row.status)
+          ||Object.keys(row).some(key=>!['step_id','status','receipt_reference','failure_reference','reason'].includes(key))
+          ||(row.status==='observed'?!/^sha256:[a-f0-9]{64}$/u.test(row.receipt_reference?.digest):row.receipt_reference!==undefined)
+          ||(row.reason!==undefined&&!['native_controller_probe_unavailable','native_controller_qualification_unavailable'].includes(row.reason))))reject('primary_native_probe_audit_invalid');
+      for(const row of audit.steps)if(row.failure_reference){const ref=row.failure_reference;
+        if(!/^native-[0-9]{4}\.failure\.json$/u.test(ref.path??'')||!Number.isSafeInteger(ref.bytes)||ref.bytes<1||ref.bytes>131072||!/^sha256:[a-f0-9]{64}$/u.test(ref.digest))reject('primary_native_probe_audit_invalid');
+        try{const raw=readStableFile(join(outputRoot,ref.path),'native private failure',131072).bytes;if(raw.length!==ref.bytes||rawDigest(raw)!==ref.digest)throw new Error();}catch{reject('primary_native_probe_audit_invalid');}}
+      const bytes=Buffer.from(JSON.stringify(audit)+'\n'),reference={path:`native-round-${audit.round}.controller.json`,bytes:bytes.length,digest:rawDigest(bytes)};
+      try{writeFileSync(join(outputRoot,reference.path),bytes,{flag:'wx',mode:0o600});}catch{reject('primary_condition_capture_failed');}
+      receipts.push({kind:'ask_primary_native_controller_audit_ref_v3',round:audit.round,reference});
+      owner.nativeAuditReady=audit.steps.some(row=>row.status==='observed')&&audit.steps.every(row=>['observed','skipped'].includes(row.status));
+      if(logs)logs.pendingNativeProbeAudit=reference;
+      return reference;
+    },
+    executeNativeProbe(callback){
+      assertReady();
+      if(!nativeProfile||!owner.nativeBound||typeof callback!=='function'||!outputRoot||owner.worker>=4||owner.roundProbes>=nativeProfile.maxProbes)reject('primary_native_probe_stage_invalid');
+      const round=owner.worker+1,sequence=++owner.sequence,controller=new AbortController();owner.controller=controller;owner.probe++;owner.roundProbes++;
+      const context=Object.freeze({outputRoot,trialId:`native-${String(sequence).padStart(4,'0')}`,signal:controller.signal,deadlineAtMs:now()+remaining()});
+      const lifecycle={kind:'ask_primary_native_probe_process_v3',stage:'probe',round,sequence,profile:nativeProfile.kind,qualification:false,spawn_observed:null,process_completed:null,termination_confirmed:null,failure_code:null};receipts.push(lifecycle);
+      const observeReceipt=receipt=>{if(receipt?.kind!=='ask_native_probe_lifetime_v2'||![context.trialId,context.trialId+'-1'].includes(receipt.trial_id))return false;
+        lifecycle.spawn_observed=[true,false,null].includes(receipt.spawn_observed)?receipt.spawn_observed:null;
+        lifecycle.process_completed=typeof receipt.process_completed==='boolean'?receipt.process_completed:null;
+        lifecycle.termination_confirmed=typeof receipt.termination_confirmed==='boolean'?receipt.termination_confirmed:null;return true;};
+      // Queue callback after ownership registration, including synchronous
+      // reentry/throw. close() owns this same promise and AbortController.
+      const task=Promise.resolve().then(async()=>{
+        assertCurrent();
+        let value;
+        try{value=await callback(context);if(!observeReceipt(value?.lifecycle_receipt))throw executionError('primary_native_probe_receipt_missing');}
+        catch(error){if(error?.code==='native_controller_qualification_unavailable'){lifecycle.spawn_observed=false;lifecycle.process_completed=false;lifecycle.termination_confirmed=true;lifecycle.failure_code='native_qualification_unavailable';}
+          else{observeReceipt(error?.receipt);lifecycle.failure_code='native_probe_unavailable';}latch('primary_native_probe_failed');throw error;}
+        assertCurrent();return value;
+      });
+      const assertCurrent=()=>{if(!owner.open||!isCurrent()||owner.failed||signal?.aborted||controller.signal.aborted||remaining()<=CLEANUP_ALLOWANCE_MS){latch(owner.failed??'primary_native_probe_expired');throw executionError(owner.failed);}};
+      owner.inflight=task;
+      const settled=task.finally(()=>{if(owner.inflight===task){owner.inflight=null;owner.controller=null;}});settled.catch(()=>{});
+      return settled;
+    },
     async executeProcess(stage,request){
       assertReady();
-      if(!['probe','worker'].includes(stage)||owner.worker>=4||(stage==='probe'&&owner.probePending))reject('primary_condition_stage_invalid');
+      if(!['probe','worker'].includes(stage)||owner.worker>=4||(stage==='probe'&&(nativeProfile||owner.probePending))||(stage==='worker'&&nativeProfile&&!owner.nativeAuditReady))reject('primary_condition_stage_invalid');
       if(!request||typeof request!=='object'||Array.isArray(request)||Object.keys(request).sort().join(',')!=='args,cwd,env,executable,input,max_buffer_bytes,timeout_ms')reject('primary_condition_request_invalid');
       const {executable,args,input,cwd,env,timeout_ms,max_buffer_bytes}=request,cap=stage==='probe'?PROBE_LIMIT_MS:workerTimeoutMs;
       if(typeof executable!=='string'||!executable||executable.includes('\0')||!Array.isArray(args)||args.some(v=>typeof v!=='string'||v.includes('\0'))
@@ -304,7 +353,7 @@ function createPerformanceExecution(options,dependencies,isCurrent=()=>true,logs
         ||!Number.isSafeInteger(timeout_ms)||timeout_ms<1||timeout_ms>cap||!Number.isSafeInteger(max_buffer_bytes)||max_buffer_bytes<1||max_buffer_bytes>PROCESS_BUFFER_LIMIT)reject('primary_condition_request_invalid');
       const timeout=Math.min(timeout_ms,Math.floor(remaining()-CLEANUP_ALLOWANCE_MS));if(timeout<1)reject('primary_condition_deadline');
       const inputBytes=Buffer.from(input),argv=[...args],environment={...env};
-      if(stage==='probe'){owner.probe++;owner.probePending=true;}else{owner.worker++;owner.probePending=false;}
+      if(stage==='probe'){owner.probe++;owner.probePending=true;}else{owner.worker++;owner.probePending=false;owner.roundProbes=0;owner.nativeAuditReady=false;}
       const sequence=++owner.sequence,stem=`lifecycle-${String(sequence).padStart(4,'0')}.${stage}`,controller=new AbortController();owner.controller=controller;
       const intent=Buffer.from(JSON.stringify({kind:'ask_primary_condition_process_intent_v1',...lineage,stage,sequence,timeout_ms:timeout,max_buffer_bytes})+'\n');
       const intentReference={path:`${stem}.intent.json`,bytes:intent.length,digest:rawDigest(intent)};
@@ -400,7 +449,7 @@ function createPerformanceExecution(options,dependencies,isCurrent=()=>true,logs
 /** Explicit artificial transport/lifetime harness. It creates no producer,
  * schema, grading, probe qualification or native execution authority. */
 export function createPrimaryPerformanceExecutionForTest(options,dependencies={}){return createPerformanceExecution(options,dependencies);}
-export async function withPrimaryEvaluatorLogCaptureAsync(options,{outputRoot,normalizedResult,signal,deadlineAtMs=null,workerTimeoutMs,...unknown},callback){
+export async function withPrimaryEvaluatorLogCaptureAsync(options,{outputRoot,normalizedResult,signal,deadlineAtMs=null,workerTimeoutMs,nativeProbeBody=null,...unknown},callback){
   if(Object.keys(unknown).length||typeof callback!=='function'||active()||resourceGraphState.getStore()?.active)throw executionError('primary_condition_scope_invalid');
   const verified=verifyPrimaryEvaluationProducer(options),stat=lstatSync(outputRoot);
   if(realpathSync(outputRoot)!==outputRoot||!stat.isDirectory()||(stat.mode&0o777)!==0o700||stat.uid!==process.getuid())throw executionError('primary_private_log_root_invalid');
@@ -409,7 +458,7 @@ export async function withPrimaryEvaluatorLogCaptureAsync(options,{outputRoot,no
   if(!a||c.entry.condition!==l.condition||verified.inspection.identity.run_instance_id!==l.run_instance_id||a.evidence.request_digest!==l.request_digest||a.evidence.result_digest!==l.raw_result_digest||a.evidence.commit_digest!==l.terminal_commit_digest)throw executionError('primary_private_log_binding_invalid');
   const current={active:true,asyncLogCapture:true,options:Object.freeze({...options}),verified,grading:true,profile:primaryProfileForRequest(verified.request),commandEvidenceParserRevision:verified.commandEvidenceParserRevision,
     logs:{outputRoot,normalizedResult,receipts:[],lifecycleReceipts:[]}};
-  current.executionControl=createPerformanceExecution({outputRoot,signal,deadlineAtMs,workerTimeoutMs},{},()=>active()===current,current.logs);
+  current.executionControl=createPerformanceExecution({outputRoot,signal,deadlineAtMs,workerTimeoutMs,nativeProbeBody,nativeProbeFixture:l.fixture_id},{},()=>active()===current,current.logs);
   return state.run(current,async()=>{
     let value,failure,didFail=false;
     const ownedError=error=>error!==null&&(typeof error==='object'||typeof error==='function')?error:executionError('primary_condition_callback_failed');
@@ -463,6 +512,15 @@ export function capturePrimaryEvaluatorChildStreams(child,payload) {
       probeBindingInvalid=true;receipt.invalid_performance_probe_binding={status:'invalid',code:'primary_private_probe_binding_invalid',expected_reference:{...reference}};
     }
     delete current.logs.pendingProbeAudit;
+  }
+  if(current.logs.pendingNativeProbeAudit){
+    const reference=current.logs.pendingNativeProbeAudit;
+    try{
+      verifyPrimaryNativeControllerAudit({outputRoot:current.logs.outputRoot,reference,ownerBinding:payload.private_native_probe_binding,
+        round:current.executionControl.summary().worker_attempts,bodyDigest:hash(Buffer.from(payload.modules.find(row=>row.path.endsWith('/hidden-evaluator.mjs')).source_base64,'base64'))});
+      receipt.native_probe=reference;
+    }catch{probeBindingInvalid=true;receipt.invalid_native_probe_binding={status:'invalid',code:'primary_private_probe_binding_invalid',expected_reference:{...reference}};}
+    delete current.logs.pendingNativeProbeAudit;
   }
   current.logs.receipts.push(receipt);
   for(const [name,raw]of [[receipt.stdout.path,stdout],[receipt.stderr.path,stderr]])writeFileSync(join(current.logs.outputRoot,name),raw,{flag:'wx',mode:0o600});

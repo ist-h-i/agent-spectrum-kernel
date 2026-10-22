@@ -596,6 +596,9 @@ async function execute(payload, authority) {
     // Controller-owned, digest-bound, sanitized state only. Raw timing and
     // diagnostics are retained by the existing parent private log capture.
     ...(payload.private_performance_probe?{privatePerformanceProbe:payload.private_performance_probe}:{}),
+    ...(payload.private_client_probe?{privateClientProbe:payload.private_client_probe}:{}),
+    ...(payload.private_focused_probe?{privateFocusedProbe:payload.private_focused_probe}:{}),
+    ...(payload.private_native_probe_binding?{privateNativeProbeBinding:payload.private_native_probe_binding}:{}),
   });
   process.stdout.write(`${JSON.stringify(fragment)}\n`);
 }
