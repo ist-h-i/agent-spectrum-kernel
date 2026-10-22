@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { requireSuccessfulJobs } from './ci-execution-plan.mjs';
+import { parseRegistry, requireSuccessfulJobs } from './ci-execution-plan.mjs';
 import test from 'node:test';
 
 const validate = readFileSync(new URL('../.github/workflows/validate.yml', import.meta.url), 'utf8');
 const local = readFileSync(new URL('../.github/workflows/local-eval.yml', import.meta.url), 'utf8');
+const rollover = readFileSync(new URL('../.github/workflows/context-rollover.yml', import.meta.url), 'utf8');
+const completion = readFileSync(new URL('../.github/workflows/verification-completion.yml', import.meta.url), 'utf8');
 const baseline = JSON.parse(readFileSync(new URL('../docs/fixtures/ci-full-run-inventory.json', import.meta.url)));
 const lifetimeCommand = 'node --test scripts/test-ask-primary-performance-execution.mjs scripts/test-ask-primary-performance-lifetime.mjs';
 const commands = text => text.split('\n').map(line => line.trim().replace(/^run: /, '')).filter(line => /^node (?:--\S+ )*scripts\//.test(line)).sort();
@@ -63,4 +65,52 @@ test('fixed aggregate rejects failure, skip, cancel, missing and malformed resul
   }
   assert.equal(check({ ...valid, unexpected: { result: 'success' } }), 1);
   assert.notEqual(check(null), 0);
+});
+
+test('cross-workflow duplicates have one pinned, unconditional owner and unique suites remain', () => {
+  const shared = ['session-checkpoint', 'epic-admission-work-package-plan', 'json-schema-validation', 'verification-evidence', 'verification-scoped-reuse'].map(name => `node scripts/test-${name}.mjs`);
+  const completionCommand = 'node --test scripts/test-verification-reuse-completion.mjs';
+  const retainedCompletion = [
+    'node scripts/validate-repo.mjs --write-report',
+    'node --test scripts/test-verification-reuse-measurement-core.mjs scripts/test-verification-reuse-false-blocking.mjs',
+    'node --test scripts/test-verification-reuse-measurement.mjs',
+    'node scripts/verification-reuse-measurement.mjs --provider fixture --repetitions 2 --output "$RUNNER_TEMP/verification-reuse-measurement" > /dev/null',
+    'node --test scripts/test-verification-decision-core.mjs', completionCommand,
+  ].sort();
+  const check = (main, context, verification) => {
+    const common = parseRegistry(main).jobs.common.steps.flatMap(step => commands(step.run));
+    for (const command of shared) assert.equal(common.filter(value => value === command).length, 1, command);
+    assert.equal(commands(main).filter(command => command === completionCommand).length, 0);
+    assert.deepEqual(commands(context), ['node --test scripts/test-context-rollover.mjs', 'node scripts/validate-repo.mjs'].sort());
+    assert.deepEqual(commands(verification), retainedCompletion);
+    assert.match(context, /jobs:\n  context-rollover:\n/);
+    assert.match(verification, /jobs:\n  verification-completion:\n/);
+    for (const text of [context, verification]) {
+      assert.match(text, /on:\n  pull_request:/);
+      assert.match(text, /    runs-on: ubuntu-24\.04\n/);
+      assert.match(text, /          node-version: "24\.19\.0"\n/);
+      assert.match(text, /uses: actions\/checkout@v5\n        with:\n          fetch-depth: 0\n/);
+      assert.ok(!/ubuntu-latest|node-version: "24"|(?:^|\n)\s+(?:env|defaults|working-directory|ref|continue-on-error|needs):|paths(?:-ignore)?:|cancel-in-progress:/.test(text));
+      assert.match(text, /run: git diff --check "origin\/\$\{\{ github.base_ref \}\}\.\.\.HEAD"/);
+    }
+    assert.ok(!/^\s+if:/m.test(context));
+    assert.deepEqual(verification.match(/^\s+if:.*$/gm)?.map(line => line.trim()), ['if: always()']);
+    assert.match(verification, /if node scripts\/validate-repo.mjs; then\n            exit 0\n          fi\n          node scripts\/validate-repo.mjs --write-report\n          git diff -- docs\/validation-report.md\n          exit 1/);
+    assert.match(verification, /uses: actions\/upload-artifact@v4\n        with:\n          name: verification-reuse-measurement\n          path: \$\{\{ runner.temp \}\}\/verification-reuse-measurement\/\*\.json\n          if-no-files-found: ignore\n          retention-days: 14/);
+    assert.match(verification, /head:process.env.GITHUB_SHA,baseline:r.baseline,reuse:r.reuse,delta:r.delta,complete:r.complete,issue_decision:r.issue_decision/);
+    assert.match(main, /needs: \[plan, independent-local-clone, docs-checks, common, repository-tests, personal-cli\]/);
+  };
+  check(validate, rollover, completion);
+  // Cheap negative fixtures: a removed owner, flag drift, restored duplicate,
+  // floating runtime, cwd change, skipped owner or lost artifact must fail.
+  for (const command of shared) assert.throws(() => check(validate.replace(command, command.replace('node ', 'node --test ')), rollover, completion));
+  assert.throws(() => check(validate, rollover + '\n      - name: Restored duplicate\n        run: ' + shared[0] + '\n', completion));
+  assert.throws(() => check(validate, rollover.replace('ubuntu-24.04', 'ubuntu-latest'), completion));
+  assert.throws(() => check(validate, rollover, completion.replace('24.19.0', '24')));
+  assert.throws(() => check(validate, rollover, completion.replace(completionCommand, completionCommand.replace('--test ', ''))));
+  assert.throws(() => check(validate, rollover.replace('node --test scripts/test-context-rollover.mjs', ''), completion));
+  assert.throws(() => check(validate, rollover, completion.replace('node --test scripts/test-verification-decision-core.mjs', '')));
+  assert.throws(() => check(validate, rollover, completion.replace('    steps:', '    defaults:\n      run:\n        working-directory: elsewhere\n    steps:')));
+  assert.throws(() => check(validate, rollover, completion.replace('        run: ' + completionCommand, '        if: false\n        run: ' + completionCommand)));
+  assert.throws(() => check(validate, rollover, completion.replace('retention-days: 14', 'retention-days: 1')));
 });

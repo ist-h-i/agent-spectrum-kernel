@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   verification-completion:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out repository
@@ -18,7 +18,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: "24"
+          node-version: "24.19.0"
       - name: Validate repository consistency before fixture suites
         run: |
           if node scripts/validate-repo.mjs; then
@@ -47,9 +47,7 @@ jobs:
         run: node --test scripts/test-verification-decision-core.mjs
       - name: Run real-Git multirevision and completion tests
         run: node --test scripts/test-verification-reuse-completion.mjs
-      - name: Preserve exact and scoped evidence compatibility
-        run: |
-          node scripts/test-verification-evidence.mjs
-          node scripts/test-verification-scoped-reuse.mjs
+      # Exact/scoped evidence compatibility tests are owned by Validate/common,
+      # whose success remains required in the fixed validate aggregate.
       - name: Check whitespace
         run: git diff --check "origin/${{ github.base_ref }}...HEAD"
