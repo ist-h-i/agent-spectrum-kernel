@@ -78,6 +78,7 @@ regression, private-data and multi-agent proof obligations).
 | C3-FAILURE | Partial raw and finite sidecar retained; unknown/cancel/save-failure suppress subsequent starts |
 | C3-JOIN | Saved audit/receipt/raw re-read; packet tamper/reorder/replay/missing evidence rejected |
 | C3-WORKER | Artificial transport through the existing sealed boundary and ordinary Node worker consumes the packet |
+| C3-ALS | Verified synthetic producer enters the existing ALS scope; matching audit joins the worker receipt; changed audit/raw saves invalid receipt and worker streams before rejection |
 
 New focused checks use only the new lifetime/client/focused/controller test
 files and the separately recorded new sealed-boundary test. Each terminal
@@ -98,6 +99,13 @@ the pending native audit to worker-receipt join is covered by separate unit
 checks and source review, not by those two worker tests. Positive and changed
 audit cases inside a genuine production owner/admission scope remain required
 before claiming that production log connection has been observed.
+
+The follow-up `test-ask-primary-native-als-join.mjs` targets C3-ALS with the
+existing verified synthetic producer and active ALS API, fake focused probe
+transport and a fixed ordinary Node worker. It requires normal audit binding
+and changed-audit/raw refusal, retained worker streams/receipts, and no later
+worker after scope closure. These artificial observations cannot qualify a
+native probe, establish a genuine runtime, select resources or grant admission.
 
 ## Real acceptance and diagnostic V4
 
