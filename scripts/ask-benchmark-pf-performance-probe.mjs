@@ -253,6 +253,64 @@ export function runQualifiedPfPerformancePrivateProbe({ candidateSource, config,
     ...inspectPfPerformancePrivateAudit(audit,{candidateSource,config})},audit};
 }
 
+function asyncProbeUnavailable(inputs,reason,lifecycle,raw=null) {
+  return {observation:{probe_version:PF_PERFORMANCE_PROBE_VERSION,candidate_source_digest:sha256(inputs.candidateSource),state:'unavailable',reason,quality:null},
+    audit:createPfPerformancePrivateAudit({...inputs,raw}),lifecycle};
+}
+
+const noProbeProcess=()=>({cleanup_status:'not_created',scratch_path:null,spawn_observed:false,termination_confirmed:null,cancelled:false});
+const removeProbeScratch=path=>rmSync(path,{recursive:true,force:true});
+
+export async function runQualifiedPfPerformancePrivateProbeAsync({candidateSource,config,referenceSource,dataSource,executeProcess}) {
+  const inputs={candidateSource,config,referenceSource,dataSource};
+  // Transport injection is not qualification: the module-owned gate is checked
+  // before construction, scratch creation or any call to the owned executor.
+  if(nativeQualificationEvidence===null)return asyncProbeUnavailable(inputs,'native_probe_qualification_unavailable',noProbeProcess());
+  if(process.platform!=='darwin'||process.version!=='v24.19.0')return asyncProbeUnavailable(inputs,'platform_or_runtime_not_qualified',noProbeProcess());
+  return launchPfPerformanceProbeAsync({...inputs,executeProcess},removeProbeScratch);
+}
+
+// Explicit artificial construction/transport seam. This cannot change the
+// production gate and is never selected by a private evaluator/controller.
+export async function runPfPerformancePrivateProbeAsyncForTest(inputs,{removeScratch=removeProbeScratch}={}) {
+  return {...await launchPfPerformanceProbeAsync(inputs,removeScratch),evidence_kind:'synthetic'};
+}
+
+async function launchPfPerformanceProbeAsync({candidateSource,config,referenceSource,dataSource,executeProcess},removeScratch) {
+  const inputs={candidateSource:Buffer.from(candidateSource),config:structuredClone(config),referenceSource,dataSource};
+  if(typeof executeProcess!=='function')return asyncProbeUnavailable(inputs,'probe_executor_unavailable',noProbeProcess());
+  const request=buildPfPerformanceProbeRequest(inputs),scratch=mkdtempSync(resolve(tmpdir(),'ask-performance-probe-'));
+  request.cwd=scratch;
+  let child;
+  try{child=await executeProcess('probe',request);}catch{
+    // The executor owns any partial raw capture. A rejected result establishes
+    // neither an absent process nor termination, so never delete its scratch.
+    return asyncProbeUnavailable(inputs,'probe_execution_result_unavailable',{
+      cleanup_status:'retained_termination_unconfirmed',scratch_path:scratch,spawn_observed:null,termination_confirmed:null,cancelled:null});
+  }
+  const spawnObserved=Number.isSafeInteger(child?.pid)&&child.pid>0?true:typeof child?.spawn_observed==='boolean'?child.spawn_observed:null;
+  const terminationConfirmed=typeof child?.termination_confirmed==='boolean'?child.termination_confirmed:null;
+  const cancelled=typeof child?.cancelled==='boolean'?child.cancelled:null;
+  const lifecycle={cleanup_status:'retained_termination_unconfirmed',scratch_path:scratch,spawn_observed:spawnObserved,termination_confirmed:terminationConfirmed,cancelled};
+  if(terminationConfirmed===true){
+    try{removeScratch(scratch);lifecycle.cleanup_status='removed';lifecycle.scratch_path=null;}
+    catch{lifecycle.cleanup_status='retained_cleanup_failed';}
+  }
+  const streamsValid=Buffer.isBuffer(child?.stdout)&&Buffer.isBuffer(child?.stderr)&&child.stdout.length<=1048576&&child.stderr.length<=1048576;
+  const statusValid=child?.status===null||Number.isSafeInteger(child?.status);
+  const signalValid=child?.signal===null||typeof child?.signal==='string'&&/^SIG[A-Z0-9]{1,32}$/u.test(child.signal);
+  const errorValid=child?.error_code===null||typeof child?.error_code==='string'&&/^[A-Z0-9_]{1,40}$/u.test(child.error_code);
+  const raw=streamsValid?{stdout:Buffer.from(child.stdout),stderr:Buffer.from(child.stderr),exit_code:statusValid?child.status:null,
+    signal:signalValid?child.signal:'unknown',error_code:errorValid?child.error_code:'unknown'}:null;
+  const reason=terminationConfirmed!==true?'probe_termination_unconfirmed':lifecycle.cleanup_status!=='removed'?'probe_cleanup_unavailable':
+    cancelled===true?'probe_cancelled':!streamsValid||!statusValid||!signalValid||!errorValid||cancelled!==false||spawnObserved!==true?'probe_process_result_invalid':
+    raw.exit_code!==0||raw.signal!==null||raw.error_code!==null||child.error?'isolated_probe_unavailable':null;
+  if(reason)return asyncProbeUnavailable(inputs,reason,lifecycle,raw);
+  const audit=createPfPerformancePrivateAudit({...inputs,raw});
+  return {observation:{probe_version:PF_PERFORMANCE_PROBE_VERSION,candidate_source_digest:sha256(inputs.candidateSource),
+    ...inspectPfPerformancePrivateAudit(audit,inputs)},audit,lifecycle};
+}
+
 // No runner injection or unsandboxed fallback is available on this path. Read
 // trusted public reference/config from a pinned source root, never candidate cwd.
 export function runPfPerformanceProbe({ sourceRoot, candidateSource }) {
@@ -262,15 +320,21 @@ export function runPfPerformanceProbe({ sourceRoot, candidateSource }) {
   return launchPfPerformanceProbe({candidateSource,config,referenceSource:readFileSync(resolve(root,'reference/scan-lookup.mjs'),'utf8'),dataSource:readFileSync(resolve(root,'scripts/generate-data.mjs'),'utf8')});
 }
 
+function buildPfPerformanceProbeRequest({candidateSource,config,referenceSource,dataSource}) {
+  const script = buildPfPerformanceProbeSource({referenceSource,dataSource,config});
+  const literal = value => JSON.stringify(value);
+  const policy = `(version 1)(deny default)(allow process*)(allow sysctl-read)(allow mach-lookup)(allow file-read*)(deny file-read-data (require-all (subpath "/Users") (require-not (subpath ${literal(dirname(process.execPath))}))) (subpath "/private/tmp") (subpath "/private/var/folders"))`;
+  return {executable:'/usr/bin/sandbox-exec',args:['-p',policy,process.execPath,'--permission','--experimental-vm-modules','-e',script],
+    input:candidateSource,env:{PATH:'/usr/bin:/bin',LANG:'C',TZ:'UTC'},timeout_ms:300000,max_buffer_bytes:1048576};
+}
+
 function launchPfPerformanceProbe({candidateSource,config,referenceSource,dataSource}) {
   if (process.platform !== 'darwin' || process.version !== 'v24.19.0') return {state:'unavailable',reason:'platform_or_runtime_not_qualified',quality:null,report:null};
-  const script = buildPfPerformanceProbeSource({referenceSource,dataSource,config});
+  const request=buildPfPerformanceProbeRequest({candidateSource,config,referenceSource,dataSource});
   const scratch = mkdtempSync(resolve(tmpdir(),'ask-performance-probe-'));
   try {
-    const literal = value => JSON.stringify(value);
-    const policy = `(version 1)(deny default)(allow process*)(allow sysctl-read)(allow mach-lookup)(allow file-read*)(deny file-read-data (require-all (subpath "/Users") (require-not (subpath ${literal(dirname(process.execPath))}))) (subpath "/private/tmp") (subpath "/private/var/folders"))`;
-    const child = spawnSync('/usr/bin/sandbox-exec',['-p',policy,process.execPath,'--permission','--experimental-vm-modules','-e',script],{
-      input:candidateSource,cwd:scratch,env:{PATH:'/usr/bin:/bin',LANG:'C',TZ:'UTC'},timeout:300000,maxBuffer:1024*1024,encoding:null,stdio:['pipe','pipe','pipe']});
+    const child = spawnSync(request.executable,request.args,{
+      input:request.input,cwd:scratch,env:request.env,timeout:request.timeout_ms,maxBuffer:request.max_buffer_bytes,encoding:null,stdio:['pipe','pipe','pipe']});
     const raw = {stdout:child.stdout ?? Buffer.alloc(0),stderr:child.stderr ?? Buffer.alloc(0),exit_code:child.status,signal:child.signal ?? null,error_code:child.error?.code ?? null};
     if (child.error || child.status !== 0) return {state:'unavailable',reason:'isolated_probe_unavailable',quality:null,report:null,raw};
     return {...inspectPfPerformanceProbeOutput(raw.stdout,{candidateSource,config}),raw};

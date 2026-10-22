@@ -9,7 +9,8 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { writeMpCiEvidenceGapProductionAuthority } from './ask-benchmark-mp-ci-evidence-gap-authority.mjs';
-import { createSealedEvaluatorExecutionForTest, executeSealedEvaluatorForTest, readEvaluatorAuthorityAnchorFromFreeze } from './ask-benchmark-evaluator-boundary.mjs';
+import { createSealedEvaluatorExecutionForTest, executeSealedEvaluatorForTest, executeSealedEvaluatorAsyncForTest, readEvaluatorAuthorityAnchorFromFreeze } from './ask-benchmark-evaluator-boundary.mjs';
+import { createPrimaryPerformanceExecutionForTest } from './ask-primary-evaluation-scope.mjs';
 import { comparisonHash } from './ask-user-comparison-prepare.mjs';
 import { PF_PERFORMANCE_PRIVATE_BODY_HEADER } from './ask-benchmark-pf-performance-probe.mjs';
 const ROOT = resolve(fileURLToPath(new URL('../', import.meta.url))), fixtureBase = 'benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap';
@@ -25,13 +26,13 @@ function fixture(t) {
   const clone = spawnSync('git', ['clone', '--no-hardlinks', '--no-checkout', ROOT, root], { encoding: 'utf8', maxBuffer: 16777216 });
   assert.equal(clone.status, 0, clone.stderr); git(root, 'checkout', '--detach', git(ROOT, 'rev-parse', 'HEAD'));
   // Bind the actual working runner bytes in this isolated test Git repository.
-  const currentSources = ['scripts/ask-benchmark-private-evaluator-runner.mjs', 'scripts/ask-primary-evaluation-grading.mjs', 'scripts/ask-primary-evaluation-private-grading.mjs', 'scripts/ask-benchmark-evaluator-boundary.mjs','scripts/ask-benchmark-pf-performance-probe.mjs','scripts/ask-primary-evaluation-scope.mjs'];
+  const currentSources = ['scripts/ask-benchmark-private-evaluator-runner.mjs', 'scripts/ask-primary-evaluation-grading.mjs', 'scripts/ask-primary-evaluation-private-grading.mjs', 'scripts/ask-primary-engineering-safety.mjs', 'scripts/ask-benchmark-evaluator-boundary.mjs','scripts/ask-benchmark-pf-performance-probe.mjs','scripts/ask-primary-evaluation-scope.mjs'];
   for (const path of currentSources) cpSync(join(ROOT, path), join(root, path));
   git(root, 'add', ...currentSources);
   git(root, '-c', 'user.name=ASK synthetic test', '-c', 'user.email=ask-synthetic-test@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-m', 'Synthetic AsyncLocalStorage runner source snapshot');
   const revision = git(root, 'rev-parse', 'HEAD'); assert.equal(existsSync(join(root, '.git/objects/info/alternates')), false);
   let next = 0;
-  const run = (source,{performanceFixture=false,candidateMissing=false}={}) => {
+  const run = (source,{performanceFixture=false,candidateMissing=false,executionControl=null}={}) => {
     const index = ++next, privateRoot = join(parent, `private-${index}`), authorityRoot = join(parent, `authority-${index}`);
     mkdirSync(privateRoot); mkdirSync(authorityRoot);
     for (const name of ['oracle.json', 'scope-boundaries.json', 'false-positive-boundaries.json']) writeFileSync(join(privateRoot, name), '{"synthetic_standard_library_test":true}\n');
@@ -55,7 +56,8 @@ function fixture(t) {
     if(performanceFixture)lineage.fixture_id='pf-performance-regression';
     const execution = createSealedEvaluatorExecutionForTest({ root, privateEvaluationRoot: authorityRoot, privateRoot, hiddenAsset,
       frozenWorkspace, candidateWorkspace, evaluationInputRoot, evaluationLineage: lineage, evaluatorRevision: revision, externalAuthorityAnchor });
-    return executeSealedEvaluatorForTest({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized: { lineage }, label: 'synthetic standard library compatibility' });
+    const options={ execution, externalAuthorityAnchor, repositoryRoot: root, normalized: { lineage }, timeout:executionControl?120000:60000,label: 'synthetic standard library compatibility' };
+    return executionControl?executeSealedEvaluatorAsyncForTest(options,{executionControl}):executeSealedEvaluatorForTest(options);
   };
   return { run };
 }
@@ -74,6 +76,21 @@ export async function evaluateCandidateSafe() {
   assert.deepEqual(result.firstFragment, { exports: ['AsyncLocalStorage'], before: null, propagated: 'worker-local-context', after: null });
   assert.deepEqual(result.firstFragment, result.secondFragment); assert.deepEqual(result.firstBytes, result.secondBytes);
   assert.equal(parentScope.getStore(), undefined);
+});
+
+test('prospective async sealed TEST retains original pair verification using owned ordinary Node children',async t=>{
+  const f=fixture(t),control=createPrimaryPerformanceExecutionForTest({workerTimeoutMs:120000});
+  try{
+    const body=PF_PERFORMANCE_PRIVATE_BODY_HEADER+'export function evaluateCandidateSafe(input){return {probe:input.privatePerformanceProbe??null};}';
+    const result=await f.run(body,{performanceFixture:true,executionControl:control});
+    assert.deepEqual(result.firstFragment,result.secondFragment);
+    assert.equal(result.firstFragment.probe.reason,'private_probe_capture_unavailable');
+    assert.equal(result.firstFragment.probe.quality,null);
+    assert.equal(control.summary().worker_starts,2);
+    assert.equal(control.summary().probe_starts,0);
+    assert.ok(control.summary().lifecycle_receipts.every(item=>item.termination_confirmed===true));
+  }finally{await control.close();}
+  assert.throws(()=>control.assertReady(),/expired/);
 });
 
 test('sealed TEST controller selects only the explicit private performance route and gives worker sanitized unavailable state',t=>{

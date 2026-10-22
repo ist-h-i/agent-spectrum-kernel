@@ -30,6 +30,23 @@ the unchanged 134-command main inventory plus five explicitly allowed CI additio
 (coverage guard, classifier test, shadow record and the two focused commands).
 Per-command multiset checks prevent loss and duplicate registration.
 
+## Prospective performance lifetime addition after PR #438
+
+Main `61e32104` includes the runtime/performance evidence connection. Its follow-up
+adds exactly one command to Validate/common (Ubuntu 24.04) and the same command to
+the Mac-only local-eval step (macOS 15), both using Node 24.19.0:
+
+`node --test scripts/test-ask-primary-performance-execution.mjs scripts/test-ask-primary-performance-lifetime.mjs`
+
+The tests use artificial clocks/transports and ordinary owned Node children,
+process groups and files. Both OS owners matter for termination and inode checks;
+they do not run Codex, a model or the native sandbox probe. Current Validate inventory is
+140 Node script invocations (preceding 139 plus one); local-eval has 25
+(preceding 24 plus the explicit Mac owner).
+The closed coverage guard preserves every preceding invocation/flag and the
+strict aggregate. The historical 134-command fixture/table remains unchanged.
+Native qualification remains unavailable until genuine runtime evidence exists.
+
 ## Dependencies and OS boundaries
 
 Validate repository uses independent full-history checkouts for

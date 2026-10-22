@@ -105,6 +105,9 @@ jobs:
       - name: Verify prospective performance probe (synthetic controls only)
         run: node --test scripts/test-ask-benchmark-pf-performance-probe.mjs
 
+      - name: Verify prospective performance condition lifetime (artificial Node processes only)
+        run: node --test scripts/test-ask-primary-performance-execution.mjs scripts/test-ask-primary-performance-lifetime.mjs
+
       - name: Verify explicit primary scoring-version connection (model-free)
         run: |
           node --test scripts/test-ask-primary-execution-input.mjs

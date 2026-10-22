@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -149,6 +149,128 @@ test('PFP-ROUTE: only the explicit pinned prospective body selects the controlle
   const gated=probeApi.runQualifiedPfPerformancePrivateProbe({candidateSource:Buffer.from(referenceSource),config,qualified:true,report:{state:'within_local_target'}});
   assert.equal(gated.observation.state,'unavailable');assert.equal(gated.observation.reason,'native_probe_qualification_unavailable');
   assert.equal(gated.observation.quality,null);assert.equal(gated.audit.raw,null);
+});
+
+test('PFP-ASYNC-GATE: production async probe stays unavailable without invoking even a supplied successful transport',async()=>{
+  let calls=0;
+  for(const executeProcess of [undefined,async()=>{calls++;throw new Error('must not execute');},async()=>{calls++;return {status:0,stdout:Buffer.from('forged success'),termination_confirmed:true};}]){
+    const result=await probeApi.runQualifiedPfPerformancePrivateProbeAsync({candidateSource:Buffer.from(referenceSource),config,referenceSource,dataSource,
+      executeProcess,qualified:true,nativeQualificationEvidence:{approved:true},report:{state:'within_local_target'}});
+    assert.equal(result.observation.state,'unavailable');assert.equal(result.observation.reason,'native_probe_qualification_unavailable');
+    assert.equal(result.observation.quality,null);assert.equal(result.audit.raw,null);
+    assert.deepEqual(result.lifecycle,{cleanup_status:'not_created',scratch_path:null,spawn_observed:false,termination_confirmed:null,cancelled:false});
+  }
+  assert.equal(calls,0);
+});
+
+function artificialAsyncPacket(candidateSource,measurementConfig){
+  const digest=sha256(candidateSource),report={measurement_version:'1.0.0',candidate_source_digest:digest,clock:'performance.now',fictional_local_workloads:true,measured_external_service:false,
+    records:measurementConfig.workloads.map(workload=>({workload:workload.name,event_count:workload.events,request_count:workload.requests,output_count:1,consumed:measurementConfig.samples*2,
+      durations_ms:{candidate:Array(measurementConfig.samples).fill(4),reference:Array(measurementConfig.samples).fill(20)},reference_median_ms:20,candidate_median_ms:4,candidate_to_reference_ratio:0.2,state:'within_local_target'}))};
+  return Buffer.from(JSON.stringify({probe_version:probeApi.PF_PERFORMANCE_PROBE_VERSION,candidate_source_digest:digest,state:'measured',reason:null,functional_observations:24,report}));
+}
+
+test('PFP-ASYNC-OWNED: artificial executor receives the unchanged isolated request; scratch survives until confirmed completion',async()=>{
+  const candidateSource=Buffer.from(referenceSource),measurementConfig={...config,minimum_baseline_ms:12};
+  const stdout=artificialAsyncPacket(candidateSource,measurementConfig),stderr=Buffer.from([0,255,10]);
+  let request,release;const processResult=new Promise(resolve=>{release=resolve;});let completed=false;
+  const running=probeApi.runPfPerformancePrivateProbeAsyncForTest({candidateSource,config:measurementConfig,referenceSource,dataSource,
+    executeProcess:async(stage,value)=>{assert.equal(stage,'probe');request=value;return processResult;}}).then(result=>{completed=true;return result;});
+  assert.equal(request.executable,'/usr/bin/sandbox-exec');assert.equal(request.args[0],'-p');
+  assert.match(request.args[1],/^\(version 1\)\(deny default\)/);assert.match(request.args[1],/\(deny file-read-data/);
+  assert.deepEqual(request.args.slice(2,6),[process.execPath,'--permission','--experimental-vm-modules','-e']);
+  assert.equal(request.args[6],buildPfPerformanceProbeSource({referenceSource,dataSource,config:measurementConfig}));
+  assert.deepEqual(request.input,candidateSource);assert.notEqual(request.input,candidateSource);
+  assert.deepEqual(request.env,{PATH:'/usr/bin:/bin',LANG:'C',TZ:'UTC'});
+  assert.equal(request.timeout_ms,300000);assert.equal(request.max_buffer_bytes,1048576);
+  assert.equal(existsSync(request.cwd),true);await Promise.resolve();assert.equal(completed,false);
+  release({stdout,stderr,status:0,signal:null,error_code:null,pid:123,termination_confirmed:true,cancelled:false});
+  const result=await running;
+  assert.equal(result.evidence_kind,'synthetic');assert.equal(result.observation.state,'within_local_target');assert.equal(result.observation.quality,null);
+  assert.equal(result.audit.audit_version,probeApi.PF_PERFORMANCE_PRIVATE_AUDIT_VERSION);
+  assert.deepEqual(Buffer.from(result.audit.raw.stdout.base64,'base64'),stdout);assert.deepEqual(Buffer.from(result.audit.raw.stderr.base64,'base64'),stderr);
+  assert.deepEqual(result.lifecycle,{cleanup_status:'removed',scratch_path:null,spawn_observed:true,termination_confirmed:true,cancelled:false});
+  assert.equal(existsSync(request.cwd),false);
+});
+
+test('PFP-ASYNC-FAIL: artificial failures and cancellation retain exact raw and never produce accepted candidate state',async()=>{
+  const candidateSource=Buffer.from(referenceSource),measurementConfig={...config,minimum_baseline_ms:12};
+  const stdout=artificialAsyncPacket(candidateSource,measurementConfig),stderr=Buffer.from('artificial diagnostic\n');
+  for(const changed of [{status:7},{signal:'SIGTERM',status:null},{error_code:'ETIMEDOUT'},{cancelled:true}]){
+    let scratch;
+    const result=await probeApi.runPfPerformancePrivateProbeAsyncForTest({candidateSource,config:measurementConfig,referenceSource,dataSource,
+      executeProcess:async(_stage,request)=>{scratch=request.cwd;return {stdout,stderr,status:0,signal:null,error_code:null,pid:123,termination_confirmed:true,cancelled:false,...changed};}});
+    assert.equal(result.observation.state,'unavailable');assert.equal(result.observation.quality,null);
+    assert.deepEqual(Buffer.from(result.audit.raw.stdout.base64,'base64'),stdout);assert.deepEqual(Buffer.from(result.audit.raw.stderr.base64,'base64'),stderr);
+    assert.equal(result.lifecycle.cleanup_status,'removed');assert.equal(existsSync(scratch),false);
+    assert.equal(result.audit.raw.exit_code,changed.status===undefined?0:changed.status);
+  }
+});
+
+test('PFP-ASYNC-UNKNOWN: uncertain or rejected fake executor keeps scratch and returns finite unavailable evidence',async()=>{
+  const candidateSource=Buffer.from(referenceSource),measurementConfig={...config,minimum_baseline_ms:12},stdout=artificialAsyncPacket(candidateSource,measurementConfig);
+  for(const kind of ['unconfirmed','missing_confirmation','rejected']){
+    let scratch;
+    try{
+      const result=await probeApi.runPfPerformancePrivateProbeAsyncForTest({candidateSource,config:measurementConfig,referenceSource,dataSource,
+        executeProcess:async(_stage,request)=>{scratch=request.cwd;if(kind==='rejected')throw new Error('private rejected message must not escape');
+          return {stdout,stderr:Buffer.alloc(0),status:0,signal:null,error_code:null,pid:123,cancelled:false,...(kind==='unconfirmed'?{termination_confirmed:false}:{})};}});
+      assert.equal(result.observation.state,'unavailable');assert.equal(result.observation.quality,null);
+      assert.equal(result.lifecycle.cleanup_status,'retained_termination_unconfirmed');assert.equal(result.lifecycle.scratch_path,scratch);assert.equal(existsSync(scratch),true);
+      assert.equal(result.lifecycle.termination_confirmed,kind==='unconfirmed'?false:null);
+      assert.equal(JSON.stringify(result).includes('private rejected message'),false);
+      if(kind==='rejected'){assert.equal(result.audit.raw,null);assert.equal(result.lifecycle.spawn_observed,null);}
+      else assert.deepEqual(Buffer.from(result.audit.raw.stdout.base64,'base64'),stdout);
+    }finally{
+      // This executor is artificial and never owns a process. Fixture cleanup
+      // does not stand in for production termination confirmation.
+      if(scratch)rmSync(scratch,{recursive:true,force:true});
+    }
+  }
+});
+
+test('PFP-ASYNC-CLEANUP: fake confirmed termination cannot admit success when scratch cleanup fails',async()=>{
+  const candidateSource=Buffer.from(referenceSource),measurementConfig={...config,minimum_baseline_ms:12},stdout=artificialAsyncPacket(candidateSource,measurementConfig);let scratch;
+  try{
+    const result=await probeApi.runPfPerformancePrivateProbeAsyncForTest({candidateSource,config:measurementConfig,referenceSource,dataSource,
+      executeProcess:async(_stage,request)=>{scratch=request.cwd;return {stdout,stderr:Buffer.alloc(0),status:0,signal:null,error_code:null,pid:123,termination_confirmed:true,cancelled:false};}},
+      {removeScratch:()=>{throw new Error('private cleanup message must not escape');}});
+    assert.equal(result.observation.state,'unavailable');assert.equal(result.observation.quality,null);
+    assert.equal(result.lifecycle.cleanup_status,'retained_cleanup_failed');assert.equal(result.lifecycle.scratch_path,scratch);assert.equal(existsSync(scratch),true);
+    assert.equal(result.lifecycle.termination_confirmed,true);assert.equal(JSON.stringify(result).includes('private cleanup message'),false);
+  }finally{if(scratch)rmSync(scratch,{recursive:true,force:true});}
+});
+
+test('PFP-ASYNC-INVALID: malformed artificial process results cannot admit a successful packet',async()=>{
+  const candidateSource=Buffer.from(referenceSource),measurementConfig={...config,minimum_baseline_ms:12},stdout=artificialAsyncPacket(candidateSource,measurementConfig);
+  for(const changed of [{stdout:'not a Buffer'},{stderr:Buffer.alloc(1048577)},{status:undefined},{status:0.5},{signal:'private diagnostic'},
+    {error_code:'private diagnostic'},{cancelled:undefined},{pid:undefined},{pid:undefined,spawn_observed:false}]){
+    let scratch;
+    const result=await probeApi.runPfPerformancePrivateProbeAsyncForTest({candidateSource,config:measurementConfig,referenceSource,dataSource,
+      executeProcess:async(_stage,request)=>{scratch=request.cwd;return {stdout,stderr:Buffer.alloc(0),status:0,signal:null,error_code:null,pid:123,termination_confirmed:true,cancelled:false,...changed};}});
+    assert.equal(result.observation.state,'unavailable');assert.equal(result.observation.reason,'probe_process_result_invalid');assert.equal(result.observation.quality,null);
+    assert.equal(result.lifecycle.cleanup_status,'removed');assert.equal(existsSync(scratch),false);
+    assert.equal(JSON.stringify(result).includes('private diagnostic'),false);
+    if(changed.stdout!==undefined||changed.stderr!==undefined)assert.equal(result.audit.raw,null);
+    else assert.deepEqual(Buffer.from(result.audit.raw.stdout.base64,'base64'),stdout);
+  }
+  const absent=await probeApi.runPfPerformancePrivateProbeAsyncForTest({candidateSource,config:measurementConfig,referenceSource,dataSource});
+  assert.equal(absent.observation.reason,'probe_executor_unavailable');assert.equal(absent.lifecycle.cleanup_status,'not_created');assert.equal(absent.audit.raw,null);
+});
+
+test('PFP-ASYNC-SNAPSHOT: source and trusted configuration stay bound to the request across the artificial await',async()=>{
+  const candidateSource=Buffer.from(referenceSource),measurementConfig=structuredClone({...config,minimum_baseline_ms:12});
+  const beforeSource=Buffer.from(candidateSource),beforeConfig=structuredClone(measurementConfig),stdout=artificialAsyncPacket(beforeSource,beforeConfig);
+  const result=await probeApi.runPfPerformancePrivateProbeAsyncForTest({candidateSource,config:measurementConfig,referenceSource,dataSource,
+    executeProcess:async(_stage,request)=>{
+      candidateSource.fill(0);measurementConfig.samples=101;measurementConfig.workloads[0].events=999;
+      assert.deepEqual(request.input,beforeSource);
+      assert.equal(request.args[6],buildPfPerformanceProbeSource({referenceSource,dataSource,config:beforeConfig}));
+      return {stdout,stderr:Buffer.alloc(0),status:0,signal:null,error_code:null,pid:123,termination_confirmed:true,cancelled:false};
+    }});
+  assert.equal(result.observation.state,'within_local_target');assert.equal(result.observation.quality,null);
+  assert.equal(result.observation.candidate_source_digest,sha256(beforeSource));
+  assert.equal(probeApi.inspectPfPerformancePrivateAudit(result.audit,{candidateSource:beforeSource,config:beforeConfig}).state,'within_local_target');
 });
 
 test('PFP-BODY: artificial normal, bad, unknown and distinct controls retain task requirements and verification separation',async()=>{

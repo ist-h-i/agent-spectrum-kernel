@@ -36,6 +36,10 @@ jobs:
         run: node --test scripts/test-ask-personal-evolution-source-reviewer.mjs
       - name: Fake lifecycle and failure regressions (no model calls)
         run: node --test scripts/test-ask-local-eval.mjs scripts/test-ask-local-codex.mjs scripts/test-ask-local-codex-time-budget.mjs
+      # Ordinary Node process-group and inode boundaries also require Mac coverage.
+      - name: Prospective performance condition lifetime (artificial Node processes only)
+        if: matrix.os == 'macos-15'
+        run: node --test scripts/test-ask-primary-performance-execution.mjs scripts/test-ask-primary-performance-lifetime.mjs
       - name: Synthetic JSON pilot (Ubuntu covered by Validate repository)
         if: matrix.os == 'macos-15'
         run: node --test scripts/test-ask-synthetic-json-pilot.mjs

@@ -8,7 +8,7 @@ import { syntheticPrimarySource } from './test-helpers-primary-evaluation-produc
 import { producePrimaryEvaluationArtifacts, buildPrimaryEvaluationScoringInputs } from './ask-primary-evaluation-producer.mjs';
 import { preflightPrimaryEvaluationGradingResources, primaryPrivateGradingBudget, primaryPrivateGradingExecutionStatus, runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
 import { activePrimaryProducer, primaryAdapterSourceDigest, primaryEvaluatorLogFailureReceipts, primaryGradingSchemaPath, withPrimaryHistoricalEvaluatorResources, withPrimaryEvaluatorLogCapture, capturePrimaryEvaluatorChildStreams,
-  primaryEvaluatorProbeCaptureAvailable,capturePrimaryEvaluatorProbeAudit } from './ask-primary-evaluation-scope.mjs';
+  primaryEvaluatorProbeCaptureAvailable,capturePrimaryEvaluatorProbeAudit,withPrimaryEvaluatorLogCaptureAsync,primaryEvaluatorExecutionControl,primaryEvaluatorExecutionFailureReceipts } from './ask-primary-evaluation-scope.mjs';
 import { createHash } from 'node:crypto';
 import { PRIMARY_FIXTURE_IDS } from './ask-primary-fixture-recipe.mjs';
 import { deriveEvaluatorDependencyGraph, validateEvaluatorSourceIdentity, verifyPublicEvaluatorReference } from './ask-benchmark-evaluator-boundary.mjs';
@@ -111,6 +111,43 @@ test('verified synthetic capture preserves private stream bytes with exclusive r
     assert.deepEqual(readFileSync(join(outputRoot,receipt.stderr.path)),Buffer.from(child.stderr));assert.equal(JSON.stringify(receipt).includes(child.stderr.trim()),false);}
   assert.equal(activePrimaryProducer(),false);
   assert.throws(()=>withPrimaryEvaluatorLogCapture(f.options,{outputRoot,normalizedResult:f.normalizedResult},()=>capturePrimaryEvaluatorChildStreams(child,payload(f.normalizedResult))),/EEXIST/);
+});
+
+test('explicit async log scope expires descendant authority and keeps legacy sync Promise rejection',async t=>{
+  const f=await fixture(t),outputRoot=join(f.root,'async-private-logs');mkdirSync(outputRoot,{mode:0o700});
+  assert.equal(primaryEvaluatorExecutionControl(),null);let retained,release,descendant;
+  const captured=await withPrimaryEvaluatorLogCaptureAsync(f.options,{outputRoot,normalizedResult:f.normalizedResult,workerTimeoutMs:100},async()=>{
+    retained=primaryEvaluatorExecutionControl();assert.ok(retained);assert.equal(activePrimaryProducer(),true);
+    await Promise.resolve();assert.equal(primaryEvaluatorExecutionControl(),retained);
+    const gate=new Promise(resolve=>{release=resolve;});descendant=gate.then(()=>{
+      assert.equal(activePrimaryProducer(),false);assert.equal(primaryEvaluatorExecutionControl(),null);assert.throws(()=>retained.assertReady(),/expired/);
+    });
+    capturePrimaryEvaluatorChildStreams(child,payload(f.normalizedResult));retained.assertReady();return 'synthetic async completion';
+  });
+  release();await descendant;assert.equal(captured.result,'synthetic async completion');assert.equal(captured.receipts.length,1);
+  assert.equal(captured.lifecycle_receipts.length,1);assert.equal(captured.lifecycle_receipts[0].kind,'ask_primary_condition_lifetime_v1');assert.equal(captured.lifecycle_receipts[0].status,'completed');
+  assert.equal(activePrimaryProducer(),false);assert.equal(primaryEvaluatorExecutionControl(),null);
+  const legacyRoot=join(f.root,'legacy-promise-logs');mkdirSync(legacyRoot,{mode:0o700});
+  assert.throws(()=>withPrimaryEvaluatorLogCapture(f.options,{outputRoot:legacyRoot,normalizedResult:f.normalizedResult},()=>Promise.resolve()),/async_scope_forbidden/);
+  assert.equal(activePrimaryProducer(),false);
+  for(const [index,value]of [0,null,undefined].entries()){
+    const failRoot=join(f.root,`falsy-callback-${index}`);mkdirSync(failRoot,{mode:0o700});let rejected=false;
+    try{await withPrimaryEvaluatorLogCaptureAsync(f.options,{outputRoot:failRoot,normalizedResult:f.normalizedResult,workerTimeoutMs:100},async()=>{
+      capturePrimaryEvaluatorChildStreams(child,payload(f.normalizedResult));throw value;
+    });}catch(error){rejected=true;assert.ok(error instanceof Error);assert.equal(error.message,'primary_condition_callback_failed');assert.equal(primaryEvaluatorLogFailureReceipts(error).length,1);
+      assert.equal(primaryEvaluatorExecutionFailureReceipts(error).at(-1).failure_code,'primary_condition_callback_failed');}
+    assert.equal(rejected,true);assert.equal(readFileSync(join(failRoot,'0001.stdout.log'),'utf8'),child.stdout);assert.equal(activePrimaryProducer(),false);
+  }
+  const savedError=new Error('ARTIFICIAL_ERROR_SENTINEL'),errorRoot=join(f.root,'object-callback-error');mkdirSync(errorRoot,{mode:0o700});
+  await assert.rejects(()=>withPrimaryEvaluatorLogCaptureAsync(f.options,{outputRoot:errorRoot,normalizedResult:f.normalizedResult,workerTimeoutMs:100},async()=>{throw savedError;}),error=>error===savedError);
+  assert.ok(!JSON.stringify(primaryEvaluatorExecutionFailureReceipts(savedError)).includes('ARTIFICIAL_ERROR_SENTINEL'));
+  const collisionRoot=join(f.root,'final-ledger-collision');mkdirSync(collisionRoot,{mode:0o700});let saveFailure;
+  try{await withPrimaryEvaluatorLogCaptureAsync(f.options,{outputRoot:collisionRoot,normalizedResult:f.normalizedResult,workerTimeoutMs:100},async()=>{
+    capturePrimaryEvaluatorChildStreams(child,payload(f.normalizedResult));writeFileSync(join(collisionRoot,'condition-lifetime.json'),'occupied immutable ledger');return 'cannot complete';
+  });}catch(error){saveFailure=error;}
+  assert.equal(saveFailure.message,'primary_condition_capture_failed');assert.equal(primaryEvaluatorLogFailureReceipts(saveFailure).length,1);
+  assert.equal(primaryEvaluatorExecutionFailureReceipts(saveFailure).at(-1).log_capture_status,'incomplete');
+  assert.equal(readFileSync(join(collisionRoot,'0001.stdout.log'),'utf8'),child.stdout);assert.equal(readFileSync(join(collisionRoot,'condition-lifetime.json'),'utf8'),'occupied immutable ledger');
 });
 
 test('synthetic controller probe raw evidence is retained beside private worker streams with lineage receipts',async t=>{

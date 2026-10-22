@@ -1,5 +1,6 @@
+import { primaryEvaluatorExecutionControl } from './ask-primary-evaluation-scope.mjs';
 import * as unsafeActionContract from './ask-primary-unsafe-action-contract.mjs';
-import { PF_PERFORMANCE_PROBE_VERSION, pfPerformancePrivateProbeRoute, runQualifiedPfPerformancePrivateProbe, inspectPfPerformancePrivateAudit } from './ask-benchmark-pf-performance-probe.mjs';
+import { PF_PERFORMANCE_PROBE_VERSION, pfPerformancePrivateProbeRoute, runQualifiedPfPerformancePrivateProbe, runQualifiedPfPerformancePrivateProbeAsync, inspectPfPerformancePrivateAudit } from './ask-benchmark-pf-performance-probe.mjs';
 import { createHash } from "node:crypto";
 import { materializeVerifiedRuntimeObservationEvidence, verifyRuntimeObservationEvidenceAuthority, verifySealedRuntimeObservationEvidence } from './ask-benchmark-runtime-observation.mjs';
 import { execFileSync, spawnSync } from "node:child_process";
@@ -2489,6 +2490,89 @@ function executeAuthorityOwnedEvaluatorChild({ runnerSource, payload, timeout, l
   return parseRunnerFragment(child.stdout, `${label} child output`);
 }
 
+// The prospective async path shares the original payload/fragment authority.
+// A caller-supplied control is accepted only by the explicit TEST entry below.
+async function executeAuthorityOwnedEvaluatorChildAsync({runnerSource,payload,timeout,label,control}) {
+  control.assertReady();
+  const hidden=payload.modules.find(module=>module.path===PRIVATE_EVALUATOR_VIRTUAL_PATH);
+  const route=pfPerformancePrivateProbeRoute(Buffer.from(hidden.source_base64,'base64'));
+  if(!route)throw new Error('async evaluator requires the pinned prospective performance body');
+  const normalized=JSON.parse(Buffer.from(payload.normalized_result.source_base64,'base64'));
+  if(normalized.lineage.fixture_id!=='pf-performance-regression')throw new Error('private performance probe fixture mismatch');
+  const source=(kind,path,optional=false)=>{
+    const entry=payload.authority_roots.find(root=>root.kind===kind)?.entries.find(entry=>entry.path===path);
+    if(optional&&entry?.file_type!=='file')return null;
+    if(entry?.file_type!=='file')throw new Error('private performance probe source missing');
+    return Buffer.from(entry.content_base64,'base64');
+  };
+  const candidateSource=source('candidate','src/event-lookup.mjs',true)??Buffer.alloc(0);
+  const config=JSON.parse(source('frozen','data/measurement-config.json'));
+  let observation={probe_version:PF_PERFORMANCE_PROBE_VERSION,candidate_source_digest:rawByteDigest(candidateSource),
+    state:'unavailable',reason:'private_probe_capture_unavailable',quality:null};
+  if(primaryEvaluatorProbeCaptureAvailable()){
+    const probe=await runQualifiedPfPerformancePrivateProbeAsync({candidateSource,config,
+      referenceSource:source('frozen','reference/scan-lookup.mjs').toString('utf8'),
+      dataSource:source('frozen','scripts/generate-data.mjs').toString('utf8'),
+      executeProcess:(stage,request)=>control.executeProcess(stage,request)});
+    const saved=capturePrimaryEvaluatorProbeAudit(probe.audit);
+    control.recordProbeLifecycle(probe.lifecycle);
+    const checked=inspectPfPerformancePrivateAudit(saved,{candidateSource,config});
+    observation={probe_version:PF_PERFORMANCE_PROBE_VERSION,candidate_source_digest:rawByteDigest(candidateSource),...checked,
+      ...(saved.raw===null?{reason:probe.observation.reason}:{})};
+    control.assertReady();
+    if(probe.lifecycle?.cleanup_status?.startsWith('retained'))throw new Error('private performance probe cleanup unverified');
+  }
+  const {payload_digest,...base}=payload,next={...base,private_performance_probe:observation};
+  payload={...next,payload_digest:canonicalDigest(next)};
+  control.assertReady();
+  const result=await control.executeProcess('worker',{executable:AUTHORITY_NODE_EXECUTABLE,
+    args:['--experimental-vm-modules','--input-type=module','--eval',runnerSource],
+    input:Buffer.from(`${AUTHORITY_JSON_STRINGIFY(payload)}\n`),cwd:process.cwd(),
+    env:{PATH:'/usr/bin:/bin',LANG:'C',TZ:'UTC'},timeout_ms:timeout,max_buffer_bytes:10*1024*1024});
+  const child={pid:result.pid,status:result.status,signal:result.signal,stdout:result.stdout,stderr:result.stderr,
+    ...(result.error_code?{error:{code:result.error_code}}:{})};
+  capturePrimaryEvaluatorChildStreams(child,payload);
+  control.assertReady();
+  if(!result.termination_confirmed||result.status!==0||result.error_code)throw new Error('async evaluator child completion unverified');
+  return parseRunnerFragment(result.stdout,label+' child output');
+}
+
+async function executeSealedEvaluatorAsync({execution,externalAuthorityAnchor,repositoryRoot,normalized,normalizedBytes=null,
+  timeout=60000,barrier=null,label='async private evaluator sealed execution'},control) {
+  control.assertReady();
+  const prepared=prepareSealedEvaluatorExecutionAuthority({execution,externalAuthorityAnchor,repositoryRoot,normalized,normalizedBytes,barrier,label});
+  const run=runIndex=>executeAuthorityOwnedEvaluatorChildAsync({runnerSource:prepared.runnerSource,
+    payload:runIndex===1?prepared.firstPayload:prepared.secondPayload,timeout,label,control});
+  const stateA=captureSealedExecutionState(execution,label+' before run');
+  const firstFragment=await run(1);
+  control.assertReady();
+  const stateB=captureSealedExecutionState(execution,label+' after first run');
+  const secondFragment=await run(2);
+  control.assertReady();
+  const stateC=captureSealedExecutionState(execution,label+' after second run');
+  if(barrier)assertPortableSealedExecutionStatesEqual([stateA,stateB,stateC],label);
+  else assertSealedExecutionStatesEqual([stateA,stateB,stateC],label);
+  if(stableCanonicalJson(firstFragment)!==stableCanonicalJson(secondFragment))throw new Error(label+' fragment is nondeterministic');
+  return {firstFragment,secondFragment,firstBytes:stableFragmentBytes(firstFragment),secondBytes:stableFragmentBytes(secondFragment),
+    before:stateA,afterFirst:stateB,afterSecond:stateC};
+}
+
+export async function executeSealedEvaluatorAsyncForTest(options,{executionControl}={}) {
+  if(PRODUCTION_EXECUTION_AUTHORITIES.has(options.execution))throw new Error('TEST execution cannot consume production authority');
+  if(!executionControl?.assertReady||!executionControl?.executeProcess)throw new Error('owned TEST process control required');
+  return executeSealedEvaluatorAsync(options,executionControl);
+}
+
+export async function executeProductionSealedEvaluatorAsync(options={}) {
+  const control=primaryEvaluatorExecutionControl();
+  if(!control)throw new Error('owned primary async condition scope required');
+  const authority=PRODUCTION_EXECUTION_AUTHORITIES.get(options.execution);
+  if(!authority)throw new Error('async evaluator requires a module-owned verified terminal candidate authority');
+  if(stableCanonicalJson(options.execution.originalWorkspaceAuthority?.candidateAuthority)!==stableCanonicalJson(authority.candidateAuthority))
+    throw new Error('async evaluator terminal candidate authority is detached');
+  return executeSealedEvaluatorAsync({...options,normalized:authority.normalized,normalizedBytes:authority.normalizedBytes},control);
+}
+
 function executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot, normalized, normalizedBytes = null, timeout = 60_000, barrier = null, label = "private evaluator sealed execution" } = {}) {
   const prepared = prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthorityAnchor, repositoryRoot, normalized, normalizedBytes, barrier, label });
   const run = (runIndex) => {
@@ -3090,7 +3174,25 @@ function validatePrivateEvaluationEvidenceArtifacts({ root, privateEvaluationRoo
   return { canonicalEvaluationRoot, artifacts, repositoryDiffArtifact };
 }
 
-function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, verified, normalized, normalizedBytes, result, scoringInputs, runtimeObservationOptions = null }) {
+function assertAsyncPrivateAuthorityUnchanged({canonicalEvaluationRoot,recordInfo,fragmentInfo,recordRead,fragmentRead,record}){
+  if(assertRealDirectory(canonicalEvaluationRoot,'private evaluation authority root')!==canonicalEvaluationRoot)
+    throw new Error('private evaluation authority root changed during async execution');
+  const freshRecordPath=authorityRelativePathForSupplied(canonicalEvaluationRoot,recordInfo.authoritativePath,'private evaluation record');
+  const freshFragmentPath=authorityRelativePathForSupplied(canonicalEvaluationRoot,fragmentInfo.authoritativePath,'private evaluator fragment');
+  const freshRecord=readJsonArtifact(freshRecordPath.authoritativePath,'private evaluation record');
+  const freshFragment=readJsonArtifact(freshFragmentPath.authoritativePath,'private evaluator fragment');
+  if(stableCanonicalJson(freshRecordPath)!==stableCanonicalJson(recordInfo)
+    ||stableCanonicalJson(freshFragmentPath)!==stableCanonicalJson(fragmentInfo)
+    ||!freshRecord.bytes.equals(recordRead.bytes)||!freshFragment.bytes.equals(fragmentRead.bytes)
+    ||stableCanonicalJson(freshRecord.evidence.finalPath)!==stableCanonicalJson(recordRead.evidence.finalPath)
+    ||stableCanonicalJson(freshFragment.evidence.finalPath)!==stableCanonicalJson(fragmentRead.evidence.finalPath)
+    ||freshFragment.evidence.finalPath.ino!==record.private_fragment_inode)
+    throw new Error('private evaluation authority changed during async execution');
+}
+// Read-only invariant harness; it supplies no worker, producer or scoring authority.
+export const assertAsyncPrivateAuthorityUnchangedForTest=options=>assertAsyncPrivateAuthorityUnchanged(options);
+
+function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, verified, normalized, normalizedBytes, result, scoringInputs, runtimeObservationOptions = null }, asynchronous = false) {
   if (!privateEvaluationRoot || !privateEvaluationRecordPath || !privateFragmentPath) throw new Error("private evaluation record, root, and fragment paths are required for durable evaluator verification");
   const canonicalEvaluationRoot = assertRealDirectory(privateEvaluationRoot, "private evaluation authority root");
   if (pathsOverlap(canonicalEvaluationRoot, bundle.canonicalPrivateRoot)) throw new Error("private evaluation authority root must not overlap the static evaluator bundle");
@@ -3351,7 +3453,9 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
     },
   };
   ORIGINAL_EXECUTION_AUTHORITIES.set(execution, privateOriginalWorkspaceSnapshot(originalFrozenInventory, originalCandidateInventory, { run_instance_id: record.run_instance_id, case_id: record.case_id, attempt: record.attempt }, record.candidate_authority));
-  const executed = executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, timeout: executionBudgetMs, label: "private hidden evaluator" });
+  const options={execution,externalAuthorityAnchor,repositoryRoot:root,normalized,normalizedBytes,timeout:executionBudgetMs,label:'private hidden evaluator'};
+  const finishExecuted=executed=>{
+  if(asynchronous)assertAsyncPrivateAuthorityUnchanged({canonicalEvaluationRoot,recordInfo,fragmentInfo,recordRead,fragmentRead,record});
   const actualFragment = executed.firstFragment;
   const repeatedFragment = executed.secondFragment;
   const firstBytes = executed.firstBytes;
@@ -3404,6 +3508,10 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   if (result.private_fragment_digest !== record.private_fragment_sha256 || result.private_fragment_bytes !== record.private_fragment_bytes || result.private_evaluation_record_digest !== record.evaluation_record_digest) throw new Error("public evaluator envelope private authority bindings are inconsistent");
   if (!evidence.repositoryDiffArtifact || record.frozen_workspace_inventory_digest !== evidence.repositoryDiffArtifact.frozen_workspace_tree_digest || record.candidate_workspace_inventory_digest !== evidence.repositoryDiffArtifact.candidate_workspace_tree_digest) throw new Error("private evaluation record workspace authority is incomplete");
   return { record, fragment, canonicalEvaluationRoot };
+  };
+  return asynchronous
+    ? executeSealedEvaluatorAsync(options,primaryEvaluatorExecutionControl()).then(finishExecuted)
+    : finishExecuted(executeSealedEvaluator(options));
 }
 
 function readScoringInputSources({
@@ -3607,10 +3715,10 @@ function verifyEvaluatorAuthorityCore({
   runDir,
   normalizedResultsPath,
   publicArtifactRoot = null,
-}) {
+}, asynchronous = false) {
   const bundle = verifyPrivateEvaluatorBundle({ root, referencePath, privateRoot, manifestPath, materializedPath, selectionState, runDir, normalizedResultsPath, publicArtifactRoot });
   if (!resultPath || pathsOverlap(resultPath, privateRoot)) throw new Error("public evaluator result must not overlap the private evaluator root");
-  const { value: result } = readJsonArtifact(resultPath, "evaluator result envelope", { publicArtifact: true });
+  const resultRead = readJsonArtifact(resultPath, "evaluator result envelope", { publicArtifact: true }),result=resultRead.value;
   assertBenchmarkSchemaInstance(result, { schemaPath: resolve(root, EVALUATOR_RESULT_SCHEMA_PATH), label: "evaluator result envelope" });
   assertPublicArtifactTree(result, "evaluator result envelope");
   assertResultCollectionIdentity(result);
@@ -3681,12 +3789,29 @@ function verifyEvaluatorAuthorityCore({
   if (!requiresPrivateAuthority && privateAuthorityCount !== 0 && privateAuthorityCount !== privateAuthorityPaths.length) {
     throw new Error("private evaluation root, record, and fragment paths must be supplied together");
   }
+  const finishAuthority=()=>{
+    if(asynchronous){
+      const freshInputs=readScoringInputSources({root,catalogPath,policyManifestPath,scoringPolicyPath,admissionRecordPath,
+        requirementRecordPath,outputContractPath,referencePath,freezeManifestPath:scoringInputFreezeManifestPath,
+        freezeManifestSourceDigest:scoringInputFreezeManifestSourceDigest});
+      const freshBundle=verifyPrivateEvaluatorBundle({root,referencePath,privateRoot,manifestPath,materializedPath,selectionState,runDir,normalizedResultsPath,publicArtifactRoot});
+      const freshNormalized=verifyNormalizedPortfolioResults({root,outputPath:normalizedResultsPath,sourceSnapshotDigest:result.source_snapshot_digest});
+      if(stableCanonicalJson(freshInputs)!==stableCanonicalJson(scoringInputs)
+        ||stableCanonicalJson(freshBundle.manifest)!==stableCanonicalJson(bundle.manifest)
+        ||stableCanonicalJson(freshNormalized.manifest)!==stableCanonicalJson(verified.manifest)
+        ||!readNormalizedRecord({verified:freshNormalized,result}).bytes.equals(normalizedSource.bytes)
+        ||!readJsonArtifact(resultPath,'evaluator result envelope',{publicArtifact:true}).bytes.equals(resultRead.bytes))
+        throw new Error('evaluator authority changed during async verification');
+    }
+    return { bundle, normalized, result, verified, scoringInputs, ...readiness };
+  };
   if (requiresPrivateAuthority) {
-    verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, verified, normalized, normalizedBytes: normalizedSource.bytes, result, scoringInputs,
+    const checked=verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, verified, normalized, normalizedBytes: normalizedSource.bytes, result, scoringInputs,
       runtimeObservationOptions: runtimeObservationRoot === null ? null : { root, config, planPath, materializedPath, selectionState, runDir, normalizedResultsPath,
-        executionAdmissionEvidenceByFixture, observationRoot: runtimeObservationRoot } });
+        executionAdmissionEvidenceByFixture, observationRoot: runtimeObservationRoot } },asynchronous);
+    if(asynchronous)return checked.then(finishAuthority);
   }
-  return { bundle, normalized, result, verified, scoringInputs, ...readiness };
+  return finishAuthority();
 }
 
 /** Public pre-result inputs only: no private bundle or result is opened. */
@@ -3697,6 +3822,18 @@ export function verifyPortfolioScoringInputs(options) {
 export function verifyEvaluatorAuthority(options) {
   return withPrimaryEvaluatorAuthority(options, () => withCoreGradingAuthority(options,
     () => assertPrimaryEvaluatorVerified(assertCoreGradingVerified(verifyEvaluatorAuthorityCore(options)))));
+}
+
+export async function verifyEvaluatorAuthorityAsync(options) {
+  const control=primaryEvaluatorExecutionControl();
+  if(!control)throw new Error('owned primary async condition scope required');
+  control.assertReady();
+  return withPrimaryEvaluatorAuthority(options,async()=>{
+    if(options.coreGradingAuthority||options.coreControllerGradingContext||options.coreCaptureProducer)throw new Error('async primary/core authority mix refused');
+    const verified=await verifyEvaluatorAuthorityCore(options,true);
+    control.assertReady();
+    return assertPrimaryEvaluatorVerified(verified);
+  });
 }
 
 export function verifyEvaluatorResult(options) {

@@ -1,7 +1,7 @@
 // Versioned safety projection in the existing primary grading chain. Numeric
 // grading/admission remain the frozen original scorer's responsibility.
 import assert from 'node:assert/strict';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import * as originalScorer from './ask-benchmark-portfolio-score.mjs';
@@ -11,6 +11,9 @@ import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { parseJsonRejectDuplicateKeys, stableCanonicalJson } from './content-addressed-store.mjs';
 import { validateNormalizedPortfolioResult } from './ask-benchmark-normalized-results.mjs';
 import { primaryUnsafeActionCapture, primaryUnsafeActionsFromNormalized } from './ask-primary-unsafe-action-contract.mjs';
+import { verifyEvaluatorAuthorityAsync } from './ask-benchmark-evaluator-boundary.mjs';
+import { primaryEvaluatorExecutionControl } from './ask-primary-evaluation-scope.mjs';
+import { resolveEffectiveAdmissionAuthority, resolveEffectiveAdmissionAuthorityFromFiles } from './ask-benchmark-admission-decision.mjs';
 const ROOT=resolve(fileURLToPath(new URL('../',import.meta.url))), ORIGINAL_NAME='original-engineering-result.json';
 const hash=bytes=>'sha256:'+createHash('sha256').update(bytes).digest('hex');
 const same=(a,b)=>stableCanonicalJson(a)===stableCanonicalJson(b);
@@ -83,4 +86,62 @@ export function scorePrimaryEvaluatorResult(options,normalized){
   assert.notEqual(finalPath,originalPath);
   const original=originalScorer.scoreEvaluatorResult({...options,outputPath:originalPath});
   return publishPrimaryEngineeringSafety(original,normalized,options);
+}
+
+// Explicit prospective primary companion. The frozen raw scorer bytes and
+// numeric builder are unchanged; fresh async verification replaces only the
+// synchronous worker orchestration. No caller-provided verified value is used.
+export async function scorePrimaryEvaluatorResultAsync(options,normalized){
+  const control=primaryEvaluatorExecutionControl();
+  if(!control)throw new Error('owned primary async condition scope required');
+  control.assertReady();
+  options=Object.freeze({...options});
+  const suppliedNormalized=normalized,suppliedSnapshot=structuredClone(normalized);
+  const finalPath=assertAtomicOutputAbsent(options.outputPath,'engineering result output');
+  const verified=await verifyEvaluatorAuthorityAsync(options),s=verified.scoringInputs;
+  assert.ok(same(suppliedNormalized,suppliedSnapshot),'caller normalized changed during verification');
+  assert.ok(same(suppliedSnapshot,verified.normalized),'caller normalized differs from authoritative normalized');
+  normalized=structuredClone(verified.normalized);
+  const refined=Object.hasOwn(normalized.command_evidence??{},'unsafe_action_capture_state');
+  const originalPath=refined?join(dirname(finalPath),ORIGINAL_NAME):finalPath;
+  if(refined)assert.notEqual(finalPath,originalPath);
+  const inputKeys=['catalogPath','policyManifestPath','scoringPolicyPath','admissionRecordPath','requirementRecordPath',
+    'outputContractPath','scoringInputFreezeManifestPath','referencePath','manifestPath','resultPath','privateEvaluationRecordPath',
+    'privateFragmentPath','admissionDecisionPath','admissionReviewAuthorityPath','admissionReviewArchivePath'];
+  // Same complete output/input overlap checks as the frozen score entry, for
+  // both siblings. Recheck immediately before the synchronous publication.
+  const outputBoundary=()=>{
+    for(const output of new Set([finalPath,originalPath])){
+      assertAtomicOutputAbsent(output,'engineering result output');
+      for(const key of ['privateRoot','privateEvaluationRoot','materializedPath','selectionState','runDir','normalizedResultsPath']){
+        if(options[key]){const root=resolve(options[key]);assert.ok(output!==root&&!output.startsWith(root+sep),'engineering result output overlaps authority');}
+      }
+      for(const key of inputKeys)if(options[key])assert.notEqual(resolve(options[key]),output,'engineering result output overwrites input');
+    }
+  };
+  outputBoundary();
+  const frozenAuthority={frozenAdmissionRecord:s.admissionRecord,frozenAdmissionSource:s.sources.admissionRecord,
+    requirementRecord:s.requirementRecord,requirementRecordSource:s.sources.requirementRecord,evaluatorReference:s.evaluatorReference,
+    scoringInputFreezeManifest:s.freezeManifest,scoringInputFreezeManifestSource:s.freezeManifestSource,root:options.root};
+  const decisionFields=['admissionDecisionPath','admissionReviewAuthorityPath','admissionReviewAuthoritySourceDigest','admissionReviewArchivePath'];
+  const some=decisionFields.some(key=>Boolean(options[key])),all=decisionFields.every(key=>Boolean(options[key]));
+  assert.ok(!some||all,'admission decision scoring requires all four authority inputs');
+  const effectiveAdmissionAuthority=all?resolveEffectiveAdmissionAuthorityFromFiles({...frozenAuthority,
+    decisionPath:options.admissionDecisionPath,reviewAuthorityPath:options.admissionReviewAuthorityPath,
+    reviewAuthoritySourceDigest:options.admissionReviewAuthoritySourceDigest,reviewArchivePath:options.admissionReviewArchivePath})
+    :resolveEffectiveAdmissionAuthority({frozenAdmissionRecord:s.admissionRecord,requirementRecord:s.requirementRecord,
+      evaluatorReference:s.evaluatorReference,root:options.root});
+  const artifact=originalScorer.buildPortfolioEngineeringResult({...verified,effectiveAdmissionAuthority},{root:options.root});
+  outputBoundary();control.assertReady();
+  // Commit point: no await between the final deadline/cancellation check and
+  // original/final atomic publication. A failed second publish retains the
+  // original immutable artifact and cannot be reported as a completed grade.
+  const published=publishJsonAtomicNoReplace({outputPath:originalPath,artifact,label:'engineering result output',
+    forbiddenByteValues:[options.privateRoot,options.privateEvaluationRoot,options.manifestPath].filter(Boolean).map(path=>resolve(path))});
+  const original={artifact,bytes:published.bytes,outputPath:originalPath};
+  const result=refined?publishPrimaryEngineeringSafety(original,normalized,options):original;
+  // Publication has happened and remains immutable even if synchronous I/O
+  // exhausted the condition budget. Refuse completion; retain both artifacts.
+  control.assertReady();
+  return result;
 }
