@@ -1,4 +1,5 @@
 import * as unsafeActionContract from './ask-primary-unsafe-action-contract.mjs';
+import { PF_PERFORMANCE_PROBE_VERSION, pfPerformancePrivateProbeRoute, runQualifiedPfPerformancePrivateProbe, inspectPfPerformancePrivateAudit } from './ask-benchmark-pf-performance-probe.mjs';
 import { createHash } from "node:crypto";
 import { materializeVerifiedRuntimeObservationEvidence, verifyRuntimeObservationEvidenceAuthority, verifySealedRuntimeObservationEvidence } from './ask-benchmark-runtime-observation.mjs';
 import { execFileSync, spawnSync } from "node:child_process";
@@ -2445,6 +2446,38 @@ function prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthority
 }
 
 function executeAuthorityOwnedEvaluatorChild({ runnerSource, payload, timeout, label }) {
+  // Selection is made from the pinned private body, never candidate syntax or
+  // caller-supplied stdout. Raw observations stay outside the worker payload.
+  const hidden=payload.modules.find(module=>module.path===PRIVATE_EVALUATOR_VIRTUAL_PATH);
+  const route=pfPerformancePrivateProbeRoute(Buffer.from(hidden.source_base64,'base64'));
+  if (route) {
+    const normalized=JSON.parse(Buffer.from(payload.normalized_result.source_base64,'base64'));
+    if (normalized.lineage.fixture_id!=='pf-performance-regression') throw new Error('private performance probe fixture mismatch');
+    const source=(kind,path,optional=false)=>{
+      const entry=payload.authority_roots.find(root=>root.kind===kind)?.entries.find(entry=>entry.path===path);
+      if(optional&&entry?.file_type!=='file')return null;
+      if (entry?.file_type!=='file') throw new Error('private performance probe source missing');
+      return Buffer.from(entry.content_base64,'base64');
+    };
+    // Missing/deleted candidate bytes must still reach the task's scope check.
+    // The empty placeholder can never match a missing file in the body.
+    const candidateSource=source('candidate','src/event-lookup.mjs',true)??Buffer.alloc(0);
+    const config=JSON.parse(source('frozen','data/measurement-config.json'));
+    let observation={probe_version:PF_PERFORMANCE_PROBE_VERSION,candidate_source_digest:rawByteDigest(candidateSource),
+      state:'unavailable',reason:'private_probe_capture_unavailable',quality:null};
+    if(primaryEvaluatorProbeCaptureAvailable()){
+      const probe=runQualifiedPfPerformancePrivateProbe({candidateSource,config,
+        referenceSource:source('frozen','reference/scan-lookup.mjs').toString('utf8'),
+        dataSource:source('frozen','scripts/generate-data.mjs').toString('utf8')});
+      const saved=capturePrimaryEvaluatorProbeAudit(probe.audit);
+      const checked=inspectPfPerformancePrivateAudit(saved,{candidateSource,config});
+      observation={probe_version:PF_PERFORMANCE_PROBE_VERSION,candidate_source_digest:rawByteDigest(candidateSource),...checked,
+        ...(saved.raw===null?{reason:probe.observation.reason}:{} )};
+    }
+    const {payload_digest,...base}=payload;
+    const next={...base,private_performance_probe:observation};
+    payload={...next,payload_digest:canonicalDigest(next)};
+  }
   const child = AUTHORITY_SPAWN_SYNC(AUTHORITY_NODE_EXECUTABLE, ["--experimental-vm-modules", "--input-type=module", "--eval", runnerSource], {
     encoding: "utf8",
     input: `${AUTHORITY_JSON_STRINGIFY(payload)}\n`,
@@ -3685,4 +3718,5 @@ export function verifyEvaluatorBoundary(options) {
   return verifyEvaluatorResult(options);
 }
 import { withPrimaryEvaluatorAuthority, assertPrimaryEvaluatorVerified, primaryFinalResponseRelativePath, validatePrimaryRawFinalResponse,
-  primaryAdapterSourceDigest, capturePrimaryEvaluatorChildStreams, primaryEvaluatorDependencyGraphParameters } from './ask-primary-evaluation-scope.mjs';
+  primaryAdapterSourceDigest, capturePrimaryEvaluatorChildStreams, primaryEvaluatorProbeCaptureAvailable, capturePrimaryEvaluatorProbeAudit,
+  primaryEvaluatorDependencyGraphParameters } from './ask-primary-evaluation-scope.mjs';
