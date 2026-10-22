@@ -66,6 +66,18 @@ jobs:
       - name: Verify CI coverage preservation and strict aggregate
         run: node --test scripts/test-ci-full-run.mjs
 
+      - name: Verify conservative change classification (shadow only)
+        run: node --test scripts/test-ci-change-shadow.mjs
+
+      - name: Record proposed change classification (all verification still runs)
+        run: node scripts/ci-change-shadow.mjs
+
+      - name: Verify integrated personal trace (public artificial fixtures only)
+        run: node --test scripts/test-ask-personal-evolution-trace.mjs
+
+      - name: Verify integrated opt-in metrics (artificial runner only)
+        run: node --test scripts/test-codex-metrics-collector.mjs
+
       - name: Run autonomous development control tests
         run: node scripts/test-ask-autonomous-development.mjs
 
@@ -92,6 +104,9 @@ jobs:
 
       - name: Verify prospective performance probe (synthetic controls only)
         run: node --test scripts/test-ask-benchmark-pf-performance-probe.mjs
+
+      - name: Verify prospective performance condition lifetime (artificial Node processes only)
+        run: node --test scripts/test-ask-primary-performance-execution.mjs scripts/test-ask-primary-performance-lifetime.mjs
 
       - name: Verify explicit primary scoring-version connection (model-free)
         run: |

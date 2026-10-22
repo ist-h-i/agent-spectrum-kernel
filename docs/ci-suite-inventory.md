@@ -5,9 +5,46 @@ The command inventory also includes the additive PR #427 registrations from
 `2e19d583f885e1eedfab7429c0314dfd9a502414`: V10 schema, runtime binding,
 runtime lineage, and the V2 build archive. Its `source_head` identifies that
 134-command input; local-eval commands and the strict aggregate are preserved.
-This table records proposed command ownership, including unchanged workflows.
+The table below is the historical stage-1 command-ownership snapshot, including
+unchanged workflows. Current additive registrations are listed in the next-stage
+delta and retained in the machine-readable inventory and workflow.
 Manual model workflows remain manual; presence is not execution authorization.
 Fake/synthetic checks are infrastructure evidence, not real LLM quality.
+
+## Next-stage delta from main 7a44f734
+
+The table below remains the historical stage-1 snapshot. Current ownership differs
+only as described in [the shadow/OS inventory](ci-shadow-and-os-boundaries.md):
+Mac omits build-successor-v2 and unattended-policy (existing Validate Ubuntu
+owners), and kernel-principles gets a separate Ubuntu-only local-eval step.
+Every other Mac file/flag and historical working-directory invocation remains.
+Validate/common additionally tests and records the shadow classifier; its output
+never selects execution. The full four-dependency aggregate remains unchanged.
+After both source integrations at main `318ad1fc`, common also runs
+`node --test scripts/test-ask-personal-evolution-trace.mjs` and
+`node --test scripts/test-codex-metrics-collector.mjs` unconditionally.
+The latest main `0b94087b` also retains #427's V10 schema/runtime/lineage commands
+and build-review-archive file. The composed workflow has 139 inventoried Node
+script invocations:
+the unchanged 134-command main inventory plus five explicitly allowed CI additions
+(coverage guard, classifier test, shadow record and the two focused commands).
+Per-command multiset checks prevent loss and duplicate registration.
+
+## Prospective performance lifetime addition after PR #438
+
+Main `61e32104` includes the runtime/performance evidence connection. Its follow-up
+adds exactly one command to Validate/common (Ubuntu 24.04) and the same command to
+the Mac-only local-eval step (macOS 15), both using Node 24.19.0:
+
+`node --test scripts/test-ask-primary-performance-execution.mjs scripts/test-ask-primary-performance-lifetime.mjs`
+
+The tests use artificial clocks/transports and ordinary owned Node children,
+process groups and files. Both OS owners matter for termination and inode checks;
+they do not run Codex, a model or the native sandbox probe. Current inventory is
+141 Node script invocations: the preceding 139 plus these two explicit owners.
+The closed coverage guard preserves every preceding invocation/flag and the
+strict aggregate. The historical 134-command fixture/table remains unchanged.
+Native qualification remains unavailable until genuine runtime evidence exists.
 
 ## Dependencies and OS boundaries
 
@@ -21,7 +58,7 @@ evaluates all four predecessors and accepts only exact success from each.
 Both local-eval matrix entries retain host preflight, synthetic process lifecycle,
 timeouts, path/permission checks, historical-root isolation, immutable Full/Core
 preparation, receiver, native boundaries, controller attribution and capture
-producer checks. All Mac test-file invocations remain. Eleven current-HEAD
+producer checks. At stage 1, all Mac test-file invocations remained. Eleven current-HEAD
 Ubuntu invocations are instead owned by common/personal-cli: authority-v2,
 build-successor-v2, review-archive-v2-scope, unsafe-actions-v8, personal CLI,
 catalog24, catalog24-v8, unattended-policy, unattended, source-reviewer and
