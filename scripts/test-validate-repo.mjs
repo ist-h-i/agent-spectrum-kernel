@@ -6235,7 +6235,7 @@ ${validEnvelopeBlock}
   }
 
   const unsupportedTarget = cloneFixture("sensors-unsupported-target");
-  writeFileSync(resolve(unsupportedTarget, "README.md"), "# Claim\n\nCodex local metrics event recording is supported.\n");
+  writeFileSync(resolve(unsupportedTarget, "README.md"), "# Claim\n\nCodex PR shared review workflow is supported.\n");
   const unsupportedResult = runRepoScript([sensorsScript, "--target", unsupportedTarget, "--mode", "implementation", "--input", implementationPass]);
   assertRuntimePass("sensors unsupported capability is report-only", unsupportedResult);
   if (!unsupportedResult.stdout.includes("ASK sensors: fail") || !unsupportedResult.stdout.includes("Adapter capability overclaims")) {
