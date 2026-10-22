@@ -145,17 +145,33 @@ test('synthetic controller probe raw evidence is retained beside private worker 
     privatePerformanceProbe:{probe_version:PF_PERFORMANCE_PROBE_VERSION,candidate_source_digest:sourceDigest,...saved.result}});
   assert.equal(component.requirement_results[0].outcome,'pass');assert.equal(component.requirement_results[0].earned_points,5);
   assert.throws(()=>withPrimaryEvaluatorLogCapture(f.options,{outputRoot,normalizedResult:f.normalizedResult},()=>capturePrimaryEvaluatorProbeAudit(audit)),/EEXIST/);
-  const driftRoot=join(f.root,'drift-probe-logs');mkdirSync(driftRoot,{mode:0o700});
-  assert.throws(()=>withPrimaryEvaluatorLogCapture(f.options,{outputRoot:driftRoot,normalizedResult:f.normalizedResult},()=>{
-    capturePrimaryEvaluatorProbeAudit(audit);writeFileSync(join(driftRoot,'0001.performance-probe.json'),'changed audit\n');
-    capturePrimaryEvaluatorChildStreams(child,payload(f.normalizedResult));
-  }),/saved_bytes_changed/);
-  const missingRoot=join(f.root,'missing-probe-logs');mkdirSync(missingRoot,{mode:0o700});
-  assert.throws(()=>withPrimaryEvaluatorLogCapture(f.options,{outputRoot:missingRoot,normalizedResult:f.normalizedResult},()=>{
-    capturePrimaryEvaluatorProbeAudit(audit);const path=join(missingRoot,'0001.performance-probe.json');
-    // Renaming within this artificial scope simulates a missing retained file.
-    renameSync(path,join(missingRoot,'removed-probe.json'));capturePrimaryEvaluatorChildStreams(child,payload(f.normalizedResult));
-  }),/primary private probe receipt does not exist/);
+  for(const [name,tamper] of [['drift',path=>writeFileSync(path,'changed suspect audit\n')],
+    ['missing',path=>renameSync(path,join(f.root,'removed-probe.json'))]]){
+    const outputRoot=join(f.root,`${name}-probe-logs`);mkdirSync(outputRoot,{mode:0o700});let failure;
+    try{withPrimaryEvaluatorLogCapture(f.options,{outputRoot,normalizedResult:f.normalizedResult},()=>{
+      capturePrimaryEvaluatorProbeAudit(audit);tamper(join(outputRoot,'0001.performance-probe.json'));
+      capturePrimaryEvaluatorChildStreams(child,payload(f.normalizedResult));
+    });}catch(error){failure=error;}
+    const receipts=primaryEvaluatorLogFailureReceipts(failure);
+    assert.equal(receipts.length,1,'a completed child receipt must survive invalid probe evidence');
+    assert.equal(receipts[0].spawn_observed,true);assert.equal(receipts[0].process_completed,true);assert.equal(receipts[0].exit_code,0);
+    assert.equal(receipts[0].log_capture_status,'complete');assert.equal(Object.hasOwn(receipts[0],'performance_probe'),false);
+    assert.deepEqual(receipts[0].invalid_performance_probe_binding,{status:'invalid',code:'primary_private_probe_binding_invalid',expected_reference:receipt.performance_probe});
+    assert.deepEqual(readFileSync(join(outputRoot,receipts[0].stdout.path)),Buffer.from(child.stdout));
+    assert.deepEqual(readFileSync(join(outputRoot,receipts[0].stderr.path)),Buffer.from(child.stderr));
+    assert.deepEqual(JSON.parse(readFileSync(join(outputRoot,'0001.receipt.json'))),receipts[0]);
+    assert.equal(JSON.stringify(receipts).includes('suspect audit'),false);
+    assert.equal(failure.message,'primary_private_probe_binding_invalid');
+  }
+  const blockedRoot=join(f.root,'blocked-probe-logs');mkdirSync(blockedRoot,{mode:0o700});let blockedFailure;
+  try{withPrimaryEvaluatorLogCapture(f.options,{outputRoot:blockedRoot,normalizedResult:f.normalizedResult},()=>{
+    capturePrimaryEvaluatorProbeAudit(audit);writeFileSync(join(blockedRoot,'0001.performance-probe.json'),'changed suspect audit\n');
+    writeFileSync(join(blockedRoot,'0001.stdout.log'),'occupied');capturePrimaryEvaluatorChildStreams(child,payload(f.normalizedResult));
+  });}catch(error){blockedFailure=error;}
+  assert.match(blockedFailure.message,/EEXIST/);const incomplete=primaryEvaluatorLogFailureReceipts(blockedFailure);
+  assert.equal(incomplete.length,1);assert.equal(incomplete[0].process_completed,true);assert.equal(incomplete[0].log_capture_status,'incomplete');
+  assert.equal(Object.hasOwn(incomplete[0],'performance_probe'),false);assert.equal(incomplete[0].invalid_performance_probe_binding.status,'invalid');
+  assert.equal(readFileSync(join(blockedRoot,'0001.stdout.log'),'utf8'),'occupied');assert.equal(existsSync(join(blockedRoot,'0001.receipt.json')),false);
 });
 test('capture rejects async leakage, transplanted payloads, unknown termination and stream save failures',async t=>{
   const f=await fixture(t),log=name=>{const outputRoot=join(f.root,name);mkdirSync(outputRoot,{mode:0o700});return{outputRoot,normalizedResult:f.normalizedResult};};

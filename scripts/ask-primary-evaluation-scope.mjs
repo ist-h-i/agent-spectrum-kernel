@@ -271,14 +271,22 @@ export function capturePrimaryEvaluatorChildStreams(child,payload) {
     run_instance_id:expected.lineage.run_instance_id,normalized_result_id:expected.normalized_result_id,normalized_result_digest:expected.normalized_result_digest,
     stdout:{path:`${prefix}.stdout.log`,bytes:stdout.length,digest:hash(stdout)},stderr:{path:`${prefix}.stderr.log`,bytes:stderr.length,digest:hash(stderr)},
     spawn_observed:spawned,process_completed:completed,exit_code:s,signal,error_code:child.error?(/^[A-Z0-9_]{1,40}$/u.test(child.error.code??'')?child.error.code:'unknown'):null,log_capture_status:'incomplete'};
+  let probeBindingInvalid=false;
   if(current.logs.pendingProbeAudit){
-    const reference=current.logs.pendingProbeAudit,bytes=readStableFile(join(current.logs.outputRoot,reference.path),'primary private probe receipt',3*1024*1024).bytes;
-    if(reference.path!==`${prefix}.performance-probe.json`||bytes.length!==reference.bytes||hash(bytes)!==reference.digest)throw new Error('primary_private_probe_saved_bytes_changed');
-    receipt.performance_probe=reference;delete current.logs.pendingProbeAudit;
+    const reference=current.logs.pendingProbeAudit;
+    try{
+      const bytes=readStableFile(join(current.logs.outputRoot,reference.path),'primary private probe receipt',3*1024*1024).bytes;
+      if(reference.path!==`${prefix}.performance-probe.json`||bytes.length!==reference.bytes||hash(bytes)!==reference.digest)throw new Error('primary_private_probe_binding_invalid');
+      receipt.performance_probe=reference;
+    }catch{
+      probeBindingInvalid=true;receipt.invalid_performance_probe_binding={status:'invalid',code:'primary_private_probe_binding_invalid',expected_reference:{...reference}};
+    }
+    delete current.logs.pendingProbeAudit;
   }
   current.logs.receipts.push(receipt);
   for(const [name,raw]of [[receipt.stdout.path,stdout],[receipt.stderr.path,stderr]])writeFileSync(join(current.logs.outputRoot,name),raw,{flag:'wx',mode:0o600});
   writeFileSync(join(current.logs.outputRoot,`${prefix}.receipt.json`),Buffer.from(JSON.stringify({...receipt,log_capture_status:'complete'})+'\n'),{flag:'wx',mode:0o600});
   receipt.log_capture_status='complete';
+  if(probeBindingInvalid)throw new Error('primary_private_probe_binding_invalid');
   if(!completed)throw new Error('primary_private_child_completion_unknown');
 }
