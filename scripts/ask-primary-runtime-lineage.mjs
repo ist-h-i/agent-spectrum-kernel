@@ -352,7 +352,8 @@ export function verifyPrimaryRuntimeLineageReceipt(receipt) {
   assert.deepEqual(nativeConfiguration, record.projection.native_configuration); assert.equal(threadId, record.projection.thread_id); assert.equal(turnId, record.projection.turn_id);
   const expectedRequests = [initializeRequest(), { method: 'initialized' }, threadRequest(record.plan, current.conditions[record.projection.condition].launch_cwd), turnRequest(record.plan, record.input, threadId)];
   assert.ok(record.requestBytes.length >= 0 && record.requestBytes.length <= 4);
-  if (threadId !== null) assert.equal(record.requestBytes.length, 4);
+  if (record.replyRows.length >= 1) assert.ok(record.requestBytes.length >= 3);
+  if (record.replyRows.length === 2) assert.equal(record.requestBytes.length, 4);
   if (record.projection.status === 'collected_synthetic') { assert.equal(record.requestBytes.length, 4); assert.equal(record.replyRows.length, 2); }
   assert.deepEqual(record.requestBytes.map(raw => parseJsonRejectDuplicateKeys(raw)), expectedRequests.slice(0, record.requestBytes.length));
   assert.deepEqual(record.requestBytes.map(raw => { const message = parseJsonRejectDuplicateKeys(raw); return { method: message.method, ...(Object.hasOwn(message, 'id') ? { id: message.id } : {}), digest: hash(raw) }; }), record.projection.requests);
