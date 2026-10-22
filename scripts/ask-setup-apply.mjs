@@ -1,5 +1,6 @@
 import { realpathSync } from "node:fs";
 import { canonicalJson, jsonDigest, pathInside } from "./ask-setup-inputs.mjs";
+import { personalPromptTargetActive } from "./ask-personal-prompt-target-lock.mjs";
 import {
   SetupApplyError, applyAssert, assertNoSetupInProgress, assertSetupWritePaths,
   captureApplyTarget, invokeSetupInstaller, managedSetupIdentities,
@@ -189,6 +190,7 @@ export async function applyAdoptionPlan(input, { target, adapter = null, authori
   try {
     plan = structuredClone(input);
     root = realpathSync(target);
+    applyAssert(!((adapter === "codex" || plan.selection?.adapter === "codex") && personalPromptTargetActive(root)), "personal_prompt_owner_active");
     runtime = await import("./ask-setup.mjs");
     applyAssert(!pathInside(root, runtime.REPO_ROOT) && !pathInside(runtime.REPO_ROOT, root), "source_target_overlap");
     const { validateJsonSchema } = await import("./json-schema-validation.mjs");

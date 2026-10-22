@@ -9,6 +9,8 @@
 | Mac / Codexの導入・復旧、最初の作業 | [導入・復旧](quickstart-mac-codex-ja.md)、[初回開発受入の準備](first-workflow-mac-codex-ja.md) |
 | ツール別の導入・自然文の依頼 | [共通導入](quickstart-ja.md)、[依頼レシピ](prompt-recipes-ja.md)、[利用ガイド](usage-ja.md)、[用語集](glossary-ja.md) |
 | setupの計画・適用・診断 | [導入計画](adoption-setup.md)、[計画の適用・復旧](adoption-apply.md) |
+| 個人ループの準備・開始・再読込・次回・失敗対応 | [操作ガイドの準備版](personal-loop-quickstart-ja.md) |
+| 個人向けv1の範囲と公開準備 | [提供範囲・制約・未確定事項](personal-v1-release-preparation-ja.md) |
 | Codexのprofile・prompt・runner | [Codex adapter](../adapters/codex/README.md) |
 | Claudeのprofile・hooks・任意plugin・PR共有 | [Claude Code adapter](../adapters/claude-code/README.md)、[GitHub review setup](claude-github-review-setup.md) |
 | 能力、導入状態、更新・縮小・共存・復旧 | [能力と証拠](adapter-capability-matrix.md)、[導入判定](adapter-deployment-governance.md)、[移行](adapter-runtime-migration.md) |
@@ -33,6 +35,7 @@
 | 調べたいこと | 資料 |
 | --- | --- |
 | Promptの個人改善を始める・再開する | [個人改善CLI](personal-evolution-cli.md)、[一巡の手順](personal-evolution-primary-loop.md)、[保存結果](personal-evolution-saved-results.md) |
+| 保存された一巡を説明する | [生成から判断保存・次回までのデモ素材](demos/personal-loop-saved-demo-ja.md) |
 | 生成の準備・実行接続・状態を調べる | [生成契約](personal-evolution-generation.md)、[connector](personal-evolution-generation-connector.md)、[Codex接続](personal-evolution-codex-generation.md)、[状態確認](personal-evolution-generation-status.md) |
 | 独立した候補確認・比較処理の接続 | [source reviewer](personal-evolution-source-reviewer.md)、[pair契約](personal-evolution-primary-pair-contract.md)、[driver](personal-evolution-driver.md)、[bridge](personal-evolution-bridge.md)、[無人処理の範囲](personal-evolution-unattended.md) |
 | Prompt v2の事前登録と実行境界 | [固定protocol](../benchmarks/protocol-prompt-v2.md)、[事前登録](../benchmarks/prompt-v2-preregistration.json)、[実行handoff](prompt-v2-execution-handoff.md)、[権限ADR](adr/0011-prompt-v2-result-blind-canary-authority.md) |

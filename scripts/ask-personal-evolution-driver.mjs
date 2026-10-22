@@ -12,12 +12,14 @@ import { verifyPersonalEvolutionSavedResults } from "./ask-personal-evolution-sa
 import { importPersonalEvolutionGenerationResult } from "./ask-personal-evolution-generation.mjs";
 import { planPersonalEvolutionBaselineAlignment, applyPersonalEvolutionBaselineAlignment } from "./ask-personal-evolution-alignment.mjs";
 
+import { verifyPersonalPromptRepetitionPlan } from "./ask-personal-prompt-repetition-evaluation.mjs";
+
 const ROOT = fileURLToPath(new URL("../", import.meta.url)).replace(/\/$/, "");
 const contexts = new WeakMap();
 const required = ["storeRoot", "preparationObjectDigest", "experimentObjectDigest", "pairRegistrationObjectDigest",
   "trustedExperimentObjectDigests", "trustedPairRegistrationObjectDigests", "trustedExperimentAuthorities",
   "trustedPortfolioAuthorityContexts", "evaluationAuthority"];
-const optional = ["trustedAssetAuthorityContexts", "trustedHighImpactApprovalGrants"];
+const optional = ["trustedAssetAuthorityContexts", "trustedHighImpactApprovalGrants", "repetitionPlanObjectDigest", "trustedRepetitionPlanObjectDigests"];
 function ownJson(value, ancestors = new Set()) {
   // Parsing rejects duplicate keys. The API accepts only detached JSON artifacts,
   // not provider callbacks, model controls, approval factories or accessors.
@@ -43,8 +45,16 @@ function inputs(value) {
   assert.ok(required.every(key => Object.hasOwn(owned, key)), "missing driver option");
   return owned;
 }
+function inspectRepetition(owned) {
+  if (Object.hasOwn(owned, "repetitionPlanObjectDigest")) {
+    const rootPlan = readContentAddressedJson({storeRoot: owned.storeRoot, digest: owned.repetitionPlanObjectDigest}).value;
+    const verified = verifyPersonalPromptRepetitionPlan({...owned, experimentObjectDigest: rootPlan.experiment_object_digest});
+    assert.ok(verified.plan.members.some(member => member.pair_registration_object_digest === owned.pairRegistrationObjectDigest), "selected pair outside fixed repetition population");
+  } else assert.equal(Object.hasOwn(owned, "trustedRepetitionPlanObjectDigests"), false, "repetition plan digest missing");
+}
 export function inspectPreparedPersonalEvolutionLoop(value) {
   const owned = inputs(value);
+  inspectRepetition(owned);
   const checked = verifyPersonalEvolutionPromptPairResults(owned);
   assert.equal(checked.status, "NOT_RUN", "driver preparation accepts only a fresh unstarted pair");
   const registration = readContentAddressedJson({storeRoot: owned.storeRoot, digest: owned.pairRegistrationObjectDigest}).value;
@@ -76,6 +86,7 @@ export async function startPreparedPersonalEvolutionLoop(handle, confirmedPairOb
   const owned = contexts.get(handle); assert.ok(owned, "opaque prepared driver handle required");
   assert.equal(confirmedPairObjectDigest, owned.inputs.pairRegistrationObjectDigest, "human must confirm fixed pair digest");
   contexts.delete(handle); // attempted start cannot reuse an in-process capability
+  inspectRepetition(owned.inputs); // Revalidate the complete population before any durable invocation or dispatch.
   return await startPersonalEvolutionPromptPair({...owned.inputs, confirmedPairObjectDigest, gradingAdapters: owned.graders});
 }
 // Generation output is an artifact produced by the supervising Codex agent from

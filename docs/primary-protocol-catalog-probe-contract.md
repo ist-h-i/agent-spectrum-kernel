@@ -1,5 +1,10 @@
 # One-shot installed AppServer catalog probe
 
+The follow-up `primary-stderr-diagnostics-v2-contract.md` versions plans/results
+and adds a closed diagnostic projection. This V1 contract describes the first
+collector and its preserved unavailable live result; it is not silently amended
+to qualify that result or allow an additional live launch.
+
 SPEC-P24-CATALOG-PROBE-1 / VERIFICATION-P24-CATALOG-PROBE-1 is a formal local
 protocol-observation contract following #379/#424. It is not an evaluation
 manager or a model/scoring transport. Existing evaluation start/grading guards,

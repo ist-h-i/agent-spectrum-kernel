@@ -9,10 +9,10 @@ import { fileURLToPath } from 'node:url';
 import { executeCodexSession } from './codex-exec-runner.mjs';
 import { parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
+import { createPrimaryStderrDiagnostics } from './ask-primary-stderr-diagnostics.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MAX_BYTES = 2 * 1024 * 1024, MAX_LINE = 128 * 1024;
-const PATH_WARNING = 'WARNING: proceeding, even though we could not create PATH aliases: Operation not permitted (os error 1)\n';
 const SETTINGS = Object.freeze([
   Object.freeze({ model: 'gpt-6.1-sol', effort: 'high' }),
   Object.freeze({ model: 'gpt-6.1-sol', effort: 'low' }),
@@ -35,11 +35,11 @@ const allowedSignal = value => ['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGH
 
 /** Raw DTOs/errors remain inside this I/O boundary; only a finite projection
  * leaves it. The existing runner owns deadline, cancellation and group cleanup. */
-export async function collectPrimaryCatalogProtocol(invocation, { spawnProcess, runtime = {}, timeoutMs = 60000, signal } = {}) {
+async function collectCatalogProtocolWithDiagnostics(invocation, { spawnProcess, runtime = {}, timeoutMs = 60000, signal } = {}, stderr, version) {
   assert.ok(Number.isSafeInteger(timeoutMs) && timeoutMs > 0 && timeoutMs <= 60000);
   const controller = new AbortController();
-  let channel, stage = 0, failure = null, bytes = 0, lines = 0, warningCount = 0;
-  let stdout = Buffer.alloc(0), stderr = Buffer.alloc(0), advertised = null, hasMore = false;
+  let channel, stage = 0, failure = null, bytes = 0, lines = 0;
+  let stdout = Buffer.alloc(0), advertised = null, hasMore = false;
   const sent = [], received = [];
   const stop = reason => { failure ??= reason; controller.abort(); };
   const abort = () => stop('interrupted');
@@ -76,12 +76,7 @@ export async function collectPrimaryCatalogProtocol(invocation, { spawnProcess, 
     bytes += chunk.length;
     if (bytes > MAX_BYTES) return stop('output_limit');
     if (stream === 'stderr') {
-      stderr = Buffer.concat([stderr, chunk]);
-      // Exactly one already-observed public PATH warning is recognized. No
-      // dynamic path/error regex, redaction or arbitrary stderr log retention.
-      const expected = Buffer.from(PATH_WARNING);
-      if (warningCount || stderr.length > expected.length || !expected.subarray(0, stderr.length).equals(stderr)) return stop('unexpected_stderr');
-      if (stderr.length === expected.length) { warningCount++; stderr = Buffer.alloc(0); }
+      const reason = stderr.push(chunk); if (reason) stop(reason);
       return;
     }
     stdout = Buffer.concat([stdout, chunk]);
@@ -90,7 +85,12 @@ export async function collectPrimaryCatalogProtocol(invocation, { spawnProcess, 
       if (end < 0) { if (stdout.length > MAX_LINE) stop('line_limit'); return; }
       if (end > MAX_LINE || ++lines > 8) return stop('line_limit');
       const raw = stdout.subarray(0, end); stdout = stdout.subarray(end + 1);
-      try { accept(parseJsonRejectDuplicateKeys(new TextDecoder('utf-8', { fatal: true }).decode(raw))); }
+      try {
+        // The shared artifact parser also decodes UTF8. Reject at this protocol
+        // boundary before any decoder can silently discard a leading BOM.
+        if (raw.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))) throw new Error('unexpected JSON prefix');
+        accept(parseJsonRejectDuplicateKeys(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(raw)));
+      }
       catch { stop('invalid_json'); }
       if (failure) return;
     }
@@ -104,14 +104,16 @@ export async function collectPrimaryCatalogProtocol(invocation, { spawnProcess, 
   } catch { result = { spawnObserved: spawnSeen, exitCode: null, signal: null, error: null, cleanupError: true, durationMs: 0 }; stop('transport_error'); }
   finally { signal?.removeEventListener('abort', abort); }
   const terminated = !result.spawnObserved ? 'not_spawned' : !result.cleanupError && (Number.isInteger(result.exitCode) || allowedSignal(result.signal)) ? 'confirmed' : 'unknown';
-  if (!failure && (stdout.length || stderr.length)) failure = 'unterminated_output';
+  failure ??= stderr.finish();
+  if (!failure && stdout.length) failure = 'unterminated_output';
   if (!failure && (stage !== 3 || result.error || result.exitCode !== 0 || result.signal || terminated !== 'confirmed')) failure = result.timedOut ? 'timeout' : 'transport_incomplete';
   const observed = failure === null;
   // Drop every raw stream/reference and every arbitrary child error/metadata.
-  stdout = stderr = Buffer.alloc(0);
-  return { kind: 'ask_primary_catalog_observation_v1', status: observed ? 'observed' : 'unavailable', reason: failure,
+  stdout = Buffer.alloc(0);
+  const diagnostics = stderr.summary();
+  return { kind: version === 3 ? 'ask_primary_catalog_observation_v3' : 'ask_primary_catalog_observation_v2', status: observed ? 'observed' : 'unavailable', reason: failure,
     sent: sent.map(index => ({ method: CATALOG_REQUESTS[index].method, ...(CATALOG_REQUESTS[index].id ? { id: CATALOG_REQUESTS[index].id } : {}) })),
-    replies: received, output_bytes: bytes, output_lines: lines, known_path_warning_count: warningCount,
+    replies: received, ...(version === 2 ? { output_bytes: bytes, output_lines: lines } : { stdout_lines: lines }), known_path_warning_count: diagnostics.path_alias_warning_count, stderr_diagnostics: diagnostics,
     spawn_observed: result.spawnObserved === true, exit_code: Number.isInteger(result.exitCode) && result.exitCode >= 0 && result.exitCode <= 255 ? result.exitCode : null,
     signal: allowedSignal(result.signal), error_code: allowedError(result.error?.code), termination: terminated,
     elapsed_ms: Number.isFinite(result.durationMs) && result.durationMs >= 0 ? Math.ceil(result.durationMs) : null,
@@ -119,11 +121,19 @@ export async function collectPrimaryCatalogProtocol(invocation, { spawnProcess, 
     catalog_has_more: observed ? hasMore : null, model_calls: 0, runtime_attestation: 'unknown', scoring_authority: false };
 }
 
+export function collectPrimaryCatalogProtocol(invocation, options) {
+  return collectCatalogProtocolWithDiagnostics(invocation, options, createPrimaryStderrDiagnostics(), 2);
+}
+export async function collectPrimarySqliteCatalogProtocolV3(invocation, references, options) {
+  const {createPrimarySqliteStderrDiagnosticsV3} = await import('./ask-primary-sqlite-startup-diagnostics-v3.mjs');
+  return collectCatalogProtocolWithDiagnostics(invocation, options, createPrimarySqliteStderrDiagnosticsV3(references), 3);
+}
+
 function pin(path, max = 512 * 1024 * 1024) {
   const value = readStableFile(path, 'protocol executable pin', max, { allowEmpty: false });
   return { path: value.canonicalPath, digest: value.rawByteDigest };
 }
-function sourcePins() { return ['ask-primary-protocol-catalog-probe.mjs', 'codex-exec-runner.mjs', 'content-addressed-store.mjs', 'ask-benchmark-stable-file.mjs']
+function sourcePins() { return ['ask-primary-protocol-catalog-probe.mjs', 'ask-primary-stderr-diagnostics.mjs', 'codex-exec-runner.mjs', 'content-addressed-store.mjs', 'ask-benchmark-stable-file.mjs']
   .map(name => ({ name, digest: pin(join(HERE, name), MAX_BYTES).digest })); }
 function platformNative(launcher) {
   const target = { 'darwin-arm64': ['codex-darwin-arm64', 'aarch64-apple-darwin'], 'darwin-x64': ['codex-darwin-x64', 'x86_64-apple-darwin'],
@@ -137,8 +147,8 @@ export function preparePrimaryCatalogProbe(launcher) {
   const known = JSON.parse(readFileSync(join(HERE, '../docs/fixtures/primary-codex-command-wire-01621.json'), 'utf8'));
   assert.equal(native.native.digest, known.binary_digest, 'installed binary changed since offline observation');
   assert.equal(source.digest, 'sha256:61b0194f3bb6534439c8d26a3ed57d0805f84b884588b761795323eeb92fcf70', 'installed launcher changed since offline observation');
-  return { kind: 'ask_primary_catalog_probe_plan_v1', cli_version: known.cli_version, platform: process.platform, arch: process.arch,
-    node: pin(process.execPath), launcher: source, ...native, source_pins: sourcePins(), policy: 'initialize_catalog_only_normal_permissions_v1' };
+  return { kind: 'ask_primary_catalog_probe_plan_v2', cli_version: known.cli_version, platform: process.platform, arch: process.arch,
+    node: pin(process.execPath), launcher: source, ...native, source_pins: sourcePins(), policy: 'initialize_catalog_only_closed_stderr_diagnostics_v2' };
 }
 function writeNew(path, value) { const fd = openSync(path, 'wx', 0o600); try { writeFileSync(fd, serialize(value)); fsyncSync(fd); } finally { closeSync(fd); } }
 export async function runPrimaryCatalogProbe(planPath, output, confirm) {
@@ -149,7 +159,7 @@ export async function runPrimaryCatalogProbe(planPath, output, confirm) {
   assert.ok(isAbsolute(output) && resolve(output) === output && realpathSync(dirname(output)) === dirname(output), 'unsafe protocol output');
   mkdirSync(output, { mode: 0o700 }); // exclusive creation is the attempt marker; never resume/reuse
   const cwd = join(output, 'workspace'); mkdirSync(cwd, { mode: 0o700 });
-  writeNew(join(output, 'intent.json'), { kind: 'ask_primary_catalog_probe_intent_v1', plan_digest: confirm,
+  writeNew(join(output, 'intent.json'), { kind: 'ask_primary_catalog_probe_intent_v2', diagnostic_policy: 'closed_stderr_diagnostics_v2', plan_digest: confirm,
     pins: [plan.node, plan.launcher, plan.native, plan.platform_package].map(value => value.digest), source_pins: plan.source_pins,
     attempt: 1, retry: 0, timeout_ms: 60000, maximum_output_bytes: MAX_BYTES });
   const controller = new AbortController(), abort = () => controller.abort();
@@ -167,5 +177,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     assert.ok(args.length === 5 && args[0] === 'run' && args[3] === '--confirm', 'expected run PLAN OUTPUT --confirm DIGEST');
     const result = await runPrimaryCatalogProbe(args[1], args[2], args[4]);
     console.log(JSON.stringify(result)); process.exitCode = result.status === 'observed' ? 0 : 1;
-  } catch { console.log(JSON.stringify({ kind: 'ask_primary_catalog_probe_refusal_v1', status: 'unavailable', reason: 'preflight_or_persistence_refused', model_calls: 0 })); process.exitCode = 1; }
+  } catch { console.log(JSON.stringify({ kind: 'ask_primary_catalog_probe_refusal_v2', status: 'unavailable', reason: 'preflight_or_persistence_refused', model_calls: 0 })); process.exitCode = 1; }
 }

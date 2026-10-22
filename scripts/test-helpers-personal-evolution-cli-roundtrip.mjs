@@ -2,9 +2,10 @@
 // roundtrip remains the population regression. All dispatch here is synthetic.
 import assert from "node:assert/strict";
 import test from "node:test";
+import { spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync, renameSync, rmdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { canonicalDigest, readContentAddressedJson } from "./content-addressed-store.mjs";
 import { setup, fakeEngineeringTemplate, collectSyntheticGrade } from "./test-helpers-personal-evolution-primary-pair.mjs";
@@ -30,7 +31,7 @@ function files(root) { return Object.fromEntries(readdirSync(root, { withFileTyp
 export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7" } = {}) {
   assert.ok(["v7","v8"].includes(scoringVersion));
   const scope = fixtureSet === "catalog24" ? "configured target → source review → saved comparison/readout"
-    : "configured target → source review → saved comparison → explicit hold → fresh request";
+    : "configured target → source review → saved comparison → explicit hold → fresh request/source-review pause";
   test(`same CLI ${fixtureSet}/${scoringVersion}: ${scope}; lost returns never repeat dispatch`, async t => {
     const fixtureIds = fixtureSet === "catalog24" ? CANONICAL_PRIMARY_FIXTURE_IDS : [fixtureId];
     const scoring = fixtureSet === "catalog24" ? (scoringVersion === "v8" ? syntheticV8ScoringVersion : syntheticV7ScoringVersion)(t, { fixtureIds, fixtureSet }) : setupPrimaryScoringVersion(t);
@@ -228,11 +229,70 @@ export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7" } = {})
     const contradicted = await run(["decide", "--cycle", cycle, "--decline", "--reason", "Cannot replace an already recorded decision."]);
     assert.equal(contradicted.status, "needs_action"); assert.match(contradicted.detail, /already recorded/);
     assert.equal(json(join(cycle, "decision.json")).value.decision.disposition, "approved");
-    const nextRoot = join(pending.root, "cycle-2"), fresh = await run(["next", "--cycle", cycle, "--output", nextRoot, "--problem", problem]);
+    // A fresh Node process has no test-module substitutions. These commands are
+    // read-only; generation/comparison starts remain inside the fake adapters.
+    const coldRead = (command, root = cycle) => {
+      assert.ok(["status", "result"].includes(command));
+      const before = files(root), child = spawnSync(process.execPath,
+        [join(ROOT, "scripts/ask-personal-evolution-cli.mjs"), command, "--cycle", root],
+        { encoding: "utf8", shell: false, timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
+      assert.equal(child.status, 0, child.stderr || String(child.error));
+      const result = JSON.parse(child.stdout);
+      assert.deepEqual(files(root), before, "cold readout must not write cycle records");
+      assert.equal(result.models_started_by_readout, false);
+      return result;
+    };
+    await t.test("A54-RELOAD: fresh processes rebuild saved completion across presentation-cache faults", () => {
+      const before = files(cycle), cache = join(cycle, "readout.json"), backup = join(pending.root, "original-readout.json");
+      const check = () => {
+        for (const command of ["status", "result"]) {
+          const result = coldRead(command);
+          assert.equal(result.status, "completed", JSON.stringify(result));
+          assert.equal(result.receipt_object_digest, done.receipt_object_digest);
+          assert.equal(result.decision_reason, humanReason);
+          assert.equal(result.evidence.dimensions.cost.conclusion, "unknown");
+          assert.equal(result.installation_performed, false);
+        }
+      };
+      check();
+      renameSync(cache, backup);
+      try {
+        for (const value of [null, '{"status":', JSON.stringify({
+          status: "completed", receipt_object_digest: canonicalDigest("forged presentation cache"), models_started_by_readout: true,
+        })]) {
+          if (value !== null) writeFileSync(cache, value);
+          check();
+        }
+      } finally { renameSync(backup, cache); }
+      assert.deepEqual(files(cycle), before, "all original bytes are restored after test-owned cache faults");
+    });
+    await t.test("A54-STOP: a consumed comparison without its saved connection never dispatches again", async () => {
+      const path = join(pair.outputRoot, "invocation/saved-result-connection.json"), backup = join(pending.root, "original-saved-connection.json");
+      const counts = { providers, comparisons, sessions, grades };
+      renameSync(path, backup);
+      try {
+        for (const command of ["status", "result"]) {
+          const result = coldRead(command);
+          assert.equal(result.status, "needs_action");
+          assert.equal(result.reason, "comparison_consumed_without_complete_saved_result");
+        }
+        const stopped = await run(["start", "--cycle", cycle]);
+        assert.equal(stopped.reason, "comparison_consumed_without_complete_saved_result");
+        assert.deepEqual({ providers, comparisons, sessions, grades }, counts);
+        assert.equal(existsSync(path), false, "resume cannot manufacture a missing saved result");
+      } finally { renameSync(backup, path); }
+      assert.equal(coldRead("result").receipt_object_digest, done.receipt_object_digest);
+      assert.deepEqual(files(join(cycle, "pair-output/invocation")), terminal);
+    });
+    const nextProblem = join(pending.root, "next-problem.txt");
+    writeFileSync(nextProblem, "A new artificial observation for the next scoped instruction revision.");
+    const nextRoot = join(pending.root, "cycle-2"), fresh = await run(["next", "--cycle", cycle, "--output", nextRoot, "--problem", nextProblem]);
     assert.equal(fresh.status, "prepared", JSON.stringify(fresh)); assert.notEqual(fresh.request_object_digest, done.request_object_digest);
     const nextInput = json(join(nextRoot, "input.json")).value;
     assert.equal(nextInput.predecessorReceiptObjectDigest, done.receipt_object_digest);
     assert.equal(nextInput.observationInput.evidence_refs.at(-1).digest, done.receipt_object_digest);
+    assert.notEqual(nextInput.cycleId, json(join(cycle, "input.json")).value.cycleId);
+    assert.equal(nextInput.observationInput.correction, readFileSync(nextProblem, "utf8"));
     assert.deepEqual(files(join(cycle, "pair-output/invocation")), terminal);
     assert.deepEqual({ providers, comparisons, sessions, grades }, { providers: 1, comparisons: fixtureIds.length * 2, sessions: fixtureIds.length * 6, grades: fixtureIds.length * 2 });
     const gen = (await run(["result", "--cycle", cycle])).generation;
@@ -242,8 +302,29 @@ export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7" } = {})
     assert.equal(original.safety.status, "not_evaluated"); assert.equal(original.maintenance.stale_status, "not_assessed");
     assert.equal(reviewedRecord.evaluation_history.status, "not_evaluated");
     assert.equal(reviewedRecord.provenance.owner.status, "unknown"); assert.equal(reviewedAsset.content_digest, gen.candidate_asset.content_digest);
+    await t.test("A54-NEXT: a locked fresh request stays unstarted; explicit fake start requires its own source approval", async () => {
+      assert.equal(coldRead("status", nextRoot).status, "prepared");
+      const lock = join(nextRoot, ".command-lock"); mkdirSync(lock);
+      try {
+        assert.equal((await run(["start", "--cycle", nextRoot])).reason, "command_in_progress_or_interrupted");
+        assert.equal(existsSync(lock), true, "the command never removes another owner's lock");
+        assert.equal(coldRead("result", nextRoot).status, "prepared");
+        assert.equal(providers, 1);
+      } finally { rmdirSync(lock); } // This test created the lock; no child owned it.
+      const started = await run(["start", "--cycle", nextRoot]);
+      assert.equal(started.status, "needs_source_review", JSON.stringify(started));
+      assert.equal(started.request_object_digest, fresh.request_object_digest);
+      assert.equal(existsSync(join(nextRoot, "source-review.json")), false);
+      assert.equal(existsSync(join(nextRoot, "pair.json")), false);
+      for (let repeat = 0; repeat < 2; repeat++)
+        assert.equal((await run(["start", "--cycle", nextRoot])).status, "needs_source_review");
+      assert.equal(coldRead("result", nextRoot).status, "needs_source_review");
+      assert.deepEqual({ providers, comparisons, sessions, grades }, { providers: 2, comparisons: 2, sessions: 6, grades: 2 });
+      assert.equal(coldRead("status").receipt_object_digest, done.receipt_object_digest);
+      assert.deepEqual(files(join(cycle, "pair-output/invocation")), terminal);
+    });
     assert.equal(existsSync(join(pending.root, "must-never-launch-codex")), false);
-    t.diagnostic(`1 fake provider, ${fixtureIds.length * 2} role starts, ${fixtureIds.length * 6} fake sessions, ${fixtureIds.length * 2} synthetic grades; explicit hold, unchanged terminal files, unstarted next request; no real CLI/provider/Mac operation`);
+    t.diagnostic(`2 fake providers across distinct requests, ${fixtureIds.length * 2} role starts, ${fixtureIds.length * 6} fake sessions, ${fixtureIds.length * 2} synthetic grades; old terminal bytes retained, cold reload/cache faults, consumed-result stop and next-request source-review pause; no actual Codex/model dispatch or Mac application`);
   });
 
 }

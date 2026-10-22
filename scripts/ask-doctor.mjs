@@ -192,6 +192,10 @@ function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, 
   }
 
   const state = stateResult.value;
+  if (installerName === "agent-spectrum-codex-adapter" && (state?.personal_prompt_delegation || existsSync(resolve(target, ".agent-spectrum-kernel/personal-prompt-target-state.json"))
+    || existsSync(resolve(target, ".agent-spectrum-kernel/personal-prompt-target-state.json.operation.json")))) {
+    report.failures.push("Codex Prompt ownership is delegated or partial; explicit verified owner return is required before ordinary Codex health can be established");
+  }
   if (
     !state || typeof state !== "object" || state.schema_version !== 3 || state.installer !== installerName ||
     !state.adapter || state.adapter.name !== installerName || !Array.isArray(state.installed_skills) ||
