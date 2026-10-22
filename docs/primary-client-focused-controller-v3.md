@@ -121,4 +121,4 @@ succeed. Actual nine-condition model comparison does require a genuine Codex
 runtime/transport acceptance, in addition to the relevant task qualification
 and admission. V4's historical unknown verification and consumed live-start
 approvals remain unchanged; this work neither diagnoses SQLite's cause nor
-authorizes another Codex/native/model start. Push and PR publication are held.
+authorizes another Codex/native/model start. PR publication requires separate parent authorization.

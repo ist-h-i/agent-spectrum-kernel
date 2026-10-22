@@ -94,4 +94,4 @@ These are unresolved enabling requirements, not established runtime behavior.
 No real native, Codex, model or key generation is run for this work. No runtime
 acceptance or score is claimed. Existing sessions 92279 / 25371 / 26799 and
 their missing results remain untouched and unknown; the new artificial checks
-do not replace their evidence. PR publication is held by the parent.
+do not replace their evidence. PR publication requires the parent's separate authorization.
