@@ -6,14 +6,14 @@ on:
 
 jobs:
   independent-local-clone:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version: "24.19.0"
       - name: Verify independent local clone objects across runner devices
         run: |
           node --input-type=module <<'NODE'
@@ -50,8 +50,8 @@ jobs:
             rmSync(parent, { recursive: true, force: true });
           }
           NODE
-  validate:
-    runs-on: ubuntu-latest
+  common:
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -61,7 +61,13 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: "24"
+          node-version: "24.19.0"
+
+      - name: Verify CI coverage preservation and strict aggregate
+        run: node --test scripts/test-ci-full-run.mjs
+
+      - name: Run autonomous development control tests
+        run: node scripts/test-ask-autonomous-development.mjs
 
       # Exercise exact apply and no-write boundaries before long fixture suites.
       - name: Check whitespace errors
@@ -170,9 +176,6 @@ jobs:
           git diff -- docs/validation-report.md
           exit 1
 
-      - name: Run repository validation tests
-        run: node scripts/test-validate-repo.mjs
-
       - name: Run baseline semantic review route contract tests
         run: node scripts/test-review-route.mjs
 
@@ -199,9 +202,6 @@ jobs:
 
       - name: Run verification proof policy contract tests
         run: node scripts/test-verification-proof-policy.mjs
-
-      - name: Run autonomous development control tests
-        run: node scripts/test-ask-autonomous-development.mjs
 
       - name: Run epic admission and Work Package Plan contract tests
         run: node scripts/test-epic-admission-work-package-plan.mjs
@@ -234,9 +234,6 @@ jobs:
 
       - name: Run personal observation and generated candidate contracts (model-free)
         run: node --test scripts/test-ask-personal-evolution-observation.mjs scripts/test-ask-personal-evolution.mjs scripts/test-ask-personal-evolution-generation.mjs scripts/test-ask-personal-evolution-generation-connector.mjs scripts/test-ask-personal-evolution-saved-results-mode.mjs scripts/test-ask-personal-evolution-primary-pair.mjs scripts/test-ask-personal-source-install.mjs scripts/test-ask-personal-prompt-runtime-v2.mjs scripts/test-personal-prompt-target-application.mjs scripts/test-personal-prompt-codex-handover.mjs scripts/test-personal-prompt-owner-manual-recovery.mjs scripts/test-codex-installer-preflight-order.mjs
-
-      - name: Verify personal CLI and unstarted preparation recovery (model-free)
-        run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-cli-catalog24.mjs scripts/test-ask-personal-evolution-cli-catalog24-v8.mjs scripts/test-ask-personal-evolution-cli-recovery.mjs scripts/test-ask-personal-evolution-unattended-policy.mjs scripts/test-ask-personal-evolution-unattended.mjs scripts/test-ask-personal-evolution-rejection.mjs
 
       - name: Verify real personal source reviewer contract (fake transport only)
         run: node --test scripts/test-ask-personal-evolution-source-reviewer.mjs
@@ -445,3 +442,48 @@ jobs:
 
       - name: Check Prompt v2 preregistration authority fixture freshness
         run: node scripts/prompt-v2-preregistration-samples.mjs --check
+
+  repository-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.19.0"
+      - name: Run repository validation tests
+        run: node scripts/test-validate-repo.mjs
+
+
+  personal-cli:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.19.0"
+      - name: Verify personal CLI and unstarted preparation recovery (model-free)
+        run: node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-cli-catalog24.mjs scripts/test-ask-personal-evolution-cli-catalog24-v8.mjs scripts/test-ask-personal-evolution-cli-recovery.mjs scripts/test-ask-personal-evolution-unattended-policy.mjs scripts/test-ask-personal-evolution-unattended.mjs scripts/test-ask-personal-evolution-rejection.mjs
+
+
+  validate:
+    if: ${{ always() }}
+    needs: [independent-local-clone, common, repository-tests, personal-cli]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every full-run job to succeed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node <<'NODE'
+          const needs = JSON.parse(process.env.RESULTS);
+          const expected = ['independent-local-clone', 'common', 'repository-tests', 'personal-cli'];
+          if (Object.keys(needs).length !== expected.length ||
+              expected.some(id => needs[id]?.result !== 'success')) {
+            console.error('Full-run jobs must all succeed', needs);
+            process.exit(1);
+          }
+          NODE
