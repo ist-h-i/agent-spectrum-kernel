@@ -10,7 +10,7 @@ import { comparisonHash } from './ask-user-comparison-prepare.mjs';
 import { readUserComparisonPlan, reportUserComparison } from './ask-user-comparison.mjs';
 import { buildPrimaryFixtureRecipe, primaryFixtureIdsForSet, isRegisteredPrimaryFixtureId } from './ask-primary-fixture-recipe.mjs';
 import { producePrimaryEvaluationArtifacts, normalizePrimaryRuntimeObservationCarrier } from './ask-primary-evaluation-producer.mjs';
-import { preflightPrimaryEvaluationGradingResources, runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
+import { preflightPrimaryEvaluationGradingResources, runPrimaryEvaluationPrivateGrading, runPrimaryEvaluationPrivateGradingAsync } from './ask-primary-evaluation-private-grading.mjs';
 
 import { primaryProcessingSelection, primaryScoringRoot, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
 
@@ -371,7 +371,8 @@ export function createPrimaryEvaluationGradingAdapter({ root = ROOT, resourcesPa
     async grade(block, _report, { signal = null, deadline_at_ms = null } = {}) {
       let started = false;
       try {
-        assert.equal(adapter.preflight(block).status, 'ready', 'grading resource preflight required');
+        const readiness=adapter.preflight(block);
+        assert.equal(readiness.status, 'ready', 'grading resource preflight required');
         assert.ok(!signal?.aborted);
         const profile = primaryProfileForKernel(readUserComparisonPlan(block.root).plan.config.kernel_condition);
         const resource = resourceFor(block), output = join(configuration.output_root, block.fixture_id);
@@ -385,7 +386,8 @@ export function createPrimaryEvaluationGradingAdapter({ root = ROOT, resourcesPa
           assert.ok(!signal?.aborted);
           const privateEvaluationRoot = join(output, `private-${condition}`); mkdirSync(privateEvaluationRoot, { mode: 0o700 });
           started = true;
-          const graded = runPrimaryEvaluationPrivateGrading(producerOptions, { ...resource, condition,
+          const grade=readiness.execution_mode==='prospective_async_v1'?runPrimaryEvaluationPrivateGradingAsync:runPrimaryEvaluationPrivateGrading;
+          const graded = await grade(producerOptions, { ...resource, condition,
             ...(runtimeObservationRoot ? { runtimeObservationRoot } : {}),
             privateEvaluationRoot, publicResultRoot: join(output, `public-${condition}`) },
           { signal, deadlineAtMs: deadline_at_ms });

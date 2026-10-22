@@ -12,7 +12,7 @@ import { primaryScoringRoot, primaryProcessingDescriptor, readPrimaryScoringVers
 import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_EVALUATION_CONDITIONS, getPrimaryEvaluationProfile, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 import { PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V2_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V3_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V4_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V5_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V6_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V7_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V8_PARSER_REVISION, PRIMARY_SAVED_COMMAND_EVIDENCE_V9_PARSER_REVISION } from './ask-benchmark-command-evidence.mjs';
 
-const state = new AsyncLocalStorage(), resourceGraphState = new AsyncLocalStorage(), logFailures = new WeakMap(), ROOT = fileURLToPath(new URL('../', import.meta.url));
+const state = new AsyncLocalStorage(), resourceGraphState = new AsyncLocalStorage(), logFailures = new WeakMap(), executionFailures = new WeakMap(), ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const PRIMARY_PROFILE_CONDITIONS = PRIMARY_EVALUATION_CONDITIONS;
 export const PRIMARY_PROFILE_SCHEMAS = Object.freeze(['normalized-portfolio-result', 'normalized-portfolio-run',
   'evaluator-result-envelope', 'portfolio-engineering-result', 'original-workspace-authority',
@@ -244,6 +244,187 @@ export function withPrimaryEvaluatorLogCapture(options,{outputRoot,normalizedRes
   },{grading:true});
 }
 export function primaryEvaluatorLogFailureReceipts(error){return logFailures.has(error)?structuredClone(logFailures.get(error)):null;}
+export function primaryEvaluatorExecutionFailureReceipts(error){return executionFailures.has(error)?structuredClone(executionFailures.get(error)):null;}
+// This object owns lifetime/diagnostics only. It never qualifies the probe,
+// supplies producer authority or changes a frozen evaluator's worker budget.
+export function primaryEvaluatorExecutionControl(){const current=active();return current?.asyncLogCapture?current.executionControl:null;}
+const PROBE_LIMIT_MS=300000,CLEANUP_ALLOWANCE_MS=4000,PROCESS_BUFFER_LIMIT=10*1024*1024;
+const executionError=code=>new Error(code);
+function createPerformanceExecution(options,dependencies,isCurrent=()=>true,logs=null){
+  const {workerTimeoutMs,deadlineAtMs=null,signal,outputRoot,...unknown}=options;
+  const {now=Date.now,monotonicNow=()=>performance.now(),executeSession,loadSession,signalProcess=process.kill,platform=process.platform,setTimer=setTimeout,clearTimer=clearTimeout,...extra}=dependencies;
+  if(Object.keys(unknown).length||Object.keys(extra).length||!Number.isSafeInteger(workerTimeoutMs)||workerTimeoutMs<1||workerTimeoutMs>900000
+    ||typeof now!=='function'||typeof monotonicNow!=='function'||typeof setTimer!=='function'||typeof clearTimer!=='function'||(executeSession!==undefined&&typeof executeSession!=='function')||(loadSession!==undefined&&typeof loadSession!=='function')||typeof signalProcess!=='function'
+    ||(signal!==undefined&&(!signal||typeof signal.aborted!=='boolean'||typeof signal.addEventListener!=='function'||typeof signal.removeEventListener!=='function')))
+    throw executionError('primary_condition_arguments_invalid');
+  const reservation=4*(PROBE_LIMIT_MS+workerTimeoutMs+2*CLEANUP_ALLOWANCE_MS),started=now(),monoStart=monotonicNow();
+  if(!Number.isFinite(started)||!Number.isFinite(monoStart)||(deadlineAtMs!==null&&(!Number.isFinite(deadlineAtMs)||deadlineAtMs-started<reservation)))throw executionError('primary_condition_reservation_unavailable');
+  if(signal?.aborted)throw executionError('primary_condition_cancelled');
+  if(outputRoot!==undefined){const stat=lstatSync(outputRoot);if(realpathSync(outputRoot)!==outputRoot||!stat.isDirectory()||(stat.mode&0o777)!==0o700||stat.uid!==process.getuid())throw executionError('primary_condition_log_root_invalid');}
+  const receipts=logs?.lifecycleReceipts??[],owner={open:true,failed:null,inflight:null,controller:null,probe:0,worker:0,probePending:false,sequence:0,lastMono:monoStart,closing:null};
+  const remaining=()=>{const wall=now(),mono=monotonicNow();if(!Number.isFinite(wall)||!Number.isFinite(mono)||mono<owner.lastMono){owner.failed??='primary_condition_clock_invalid';owner.controller?.abort();throw executionError(owner.failed);}owner.lastMono=mono;return Math.min(reservation-(mono-monoStart),(deadlineAtMs??started+reservation)-wall);};
+  const latch=code=>{owner.failed??=code;owner.controller?.abort();};
+  const reject=code=>{latch(code);throw executionError(code);};
+  const assertReady=()=>{
+    if(!owner.open||!isCurrent())throw executionError('primary_condition_expired');
+    if(owner.failed)throw executionError(owner.failed);
+    if(owner.inflight)reject('primary_condition_concurrent_process');
+    if(signal?.aborted)reject('primary_condition_cancelled');
+    if(remaining()<=CLEANUP_ALLOWANCE_MS)reject('primary_condition_deadline');
+  };
+  const abort=()=>latch('primary_condition_cancelled');signal?.addEventListener('abort',abort,{once:true});
+  // The condition budget also expires between process calls, independently of
+  // the caller returning to assertReady. Per-child timers still reserve cleanup.
+  const budgetTimer=setTimer(()=>latch('primary_condition_deadline'),Math.max(1,Math.ceil(remaining()-CLEANUP_ALLOWANCE_MS)));budgetTimer?.unref?.();
+  const lineage=logs?{condition:logs.normalizedResult.lineage.condition,run_instance_id:logs.normalizedResult.lineage.run_instance_id,
+    normalized_result_id:logs.normalizedResult.normalized_result_id,normalized_result_digest:logs.normalizedResult.normalized_result_digest}:{};
+  const persist=(receipt,stdout,stderr)=>{
+    receipts.push(receipt);
+    try{
+      if(outputRoot!==undefined){
+        if(stdout!==undefined)for(const [ref,bytes]of [[receipt.stdout,stdout],[receipt.stderr,stderr]])writeFileSync(join(outputRoot,ref.path),bytes,{flag:'wx',mode:0o600});
+        writeFileSync(join(outputRoot,receipt.receipt_path),JSON.stringify({...receipt,log_capture_status:'complete'})+'\n',{flag:'wx',mode:0o600});
+      }
+      receipt.log_capture_status='complete';
+    }catch{reject('primary_condition_capture_failed');}
+  };
+  const starts=stage=>{const rows=receipts.filter(row=>row.kind==='ask_primary_condition_process_v1'&&row.stage===stage),attempts=stage==='probe'?owner.probe:owner.worker;
+    return rows.length<attempts||rows.some(row=>row.spawn_observed===null)?null:rows.filter(row=>row.spawn_observed===true).length;};
+  const summary=()=>({status:owner.open?(owner.failed?'failed':'active'):'closed',failure_code:owner.failed,
+    condition_reservation_ms:reservation,probe_attempts:owner.probe,worker_attempts:owner.worker,
+    probe_starts:starts('probe'),worker_starts:starts('worker'),lifecycle_receipts:structuredClone(receipts)});
+  const control=Object.freeze({assertReady,summary,
+    async executeProcess(stage,request){
+      assertReady();
+      if(!['probe','worker'].includes(stage)||owner.worker>=4||(stage==='probe'&&owner.probePending))reject('primary_condition_stage_invalid');
+      if(!request||typeof request!=='object'||Array.isArray(request)||Object.keys(request).sort().join(',')!=='args,cwd,env,executable,input,max_buffer_bytes,timeout_ms')reject('primary_condition_request_invalid');
+      const {executable,args,input,cwd,env,timeout_ms,max_buffer_bytes}=request,cap=stage==='probe'?PROBE_LIMIT_MS:workerTimeoutMs;
+      if(typeof executable!=='string'||!executable||executable.includes('\0')||!Array.isArray(args)||args.some(v=>typeof v!=='string'||v.includes('\0'))
+        ||!Buffer.isBuffer(input)||typeof cwd!=='string'||!cwd||cwd.includes('\0')||!env||typeof env!=='object'||Array.isArray(env)||Object.values(env).some(v=>typeof v!=='string'||v.includes('\0'))
+        ||!Number.isSafeInteger(timeout_ms)||timeout_ms<1||timeout_ms>cap||!Number.isSafeInteger(max_buffer_bytes)||max_buffer_bytes<1||max_buffer_bytes>PROCESS_BUFFER_LIMIT)reject('primary_condition_request_invalid');
+      const timeout=Math.min(timeout_ms,Math.floor(remaining()-CLEANUP_ALLOWANCE_MS));if(timeout<1)reject('primary_condition_deadline');
+      const inputBytes=Buffer.from(input),argv=[...args],environment={...env};
+      if(stage==='probe'){owner.probe++;owner.probePending=true;}else{owner.worker++;owner.probePending=false;}
+      const sequence=++owner.sequence,stem=`lifecycle-${String(sequence).padStart(4,'0')}.${stage}`,controller=new AbortController();owner.controller=controller;
+      const intent=Buffer.from(JSON.stringify({kind:'ask_primary_condition_process_intent_v1',...lineage,stage,sequence,timeout_ms:timeout,max_buffer_bytes})+'\n');
+      const intentReference={path:`${stem}.intent.json`,bytes:intent.length,digest:rawDigest(intent)};
+      try{if(outputRoot!==undefined)writeFileSync(join(outputRoot,intentReference.path),intent,{flag:'wx',mode:0o600});}catch{reject('primary_condition_capture_failed');}
+      const buffers={stdout:[],stderr:[]},sizes={stdout:0,stderr:0};let overflow=false,observedPid=null,transportFailure=false,groupSignalFailed=false,observerFailure=false;
+      const task=(async()=>{
+        let result,dispatchRefusal=null,dispatched=false,dispatchTimeout=null;
+        try{
+          const runSession=loadSession?await loadSession():executeSession??(await import('./codex-exec-runner.mjs')).executeCodexSession;
+          // Loading an implementation can yield. The owned scope/deadline may
+          // have expired meanwhile; never dispatch with the earlier timeout.
+          if(!owner.open||!isCurrent()){latch('primary_condition_expired');dispatchRefusal='SCOPE_EXPIRED';}
+          else if(owner.failed||signal?.aborted||controller.signal.aborted){dispatchRefusal=owner.failed==='primary_condition_deadline'?'ETIMEDOUT':'ABORT_ERR';latch(owner.failed??'primary_condition_cancelled');}
+          else{dispatchTimeout=Math.min(timeout_ms,Math.floor(remaining()-CLEANUP_ALLOWANCE_MS));if(dispatchTimeout<1){latch('primary_condition_deadline');dispatchRefusal='ETIMEDOUT';}}
+          if(dispatchRefusal)result={spawnObserved:false,error:{code:dispatchRefusal}};
+          else{
+          dispatched=true;
+          result=await runSession({executable,argv,cwd,env:environment,input:inputBytes,timeoutMs:dispatchTimeout,signal:controller.signal,retainOutput:false,terminationScope:'process_group',
+            onSpawn:({pid})=>{observedPid=Number.isInteger(pid)&&pid>0?pid:null;},onOutput:({stream,chunk})=>{
+              if(!['stdout','stderr'].includes(stream)||!Buffer.isBuffer(chunk)){observerFailure=true;throw executionError('primary_condition_output_invalid');}
+              const accepted=chunk.subarray(0,Math.max(0,max_buffer_bytes-sizes[stream]));if(accepted.length){buffers[stream].push(Buffer.from(accepted));sizes[stream]+=accepted.length;}
+              if(accepted.length!==chunk.length){overflow=true;throw Object.assign(executionError('primary_condition_output_limit'),{code:'ENOBUFS'});}
+            }},undefined,{signalProcess:(pid,value)=>{try{return signalProcess(pid,value);}catch(error){if(error?.code!=='ESRCH')groupSignalFailed=true;throw error;}},platform});
+          }
+        }catch{transportFailure=true;result={};}
+        if(!result||typeof result!=='object'||Array.isArray(result)){transportFailure=true;result={};}
+        const pid=Number.isInteger(result?.pid)&&result.pid>0?result.pid:observedPid;
+        const spawned=result?.spawnObserved===true||observedPid!==null?true:transportFailure&&dispatched?null:false;
+        let groupGone=false;if(platform!=='win32'&&pid!==null)try{signalProcess(-pid,0);}catch(error){if(error?.code==='ESRCH')groupGone=true;else groupSignalFailed=true;}
+        const status=Number.isInteger(result?.exitCode)&&result.exitCode>=0&&result.exitCode<=255?result.exitCode:null;
+        const exitSignal=['SIGTERM','SIGKILL','SIGINT','SIGABRT','SIGHUP','SIGSEGV','SIGBUS','SIGPIPE','SIGILL','SIGTRAP','SIGFPE','SIGQUIT','SIGUSR1','SIGUSR2','SIGXCPU','SIGXFSZ','SIGALRM'].includes(result?.signal)?result.signal:null;
+        const confirmed=spawned===true&&(status!==null||exitSignal!==null)&&groupGone&&!groupSignalFailed&&!result.cleanupError;
+        const cancelled=signal?.aborted===true||result?.interrupted===true||controller.signal.aborted;
+        const errorCodes=['ABORT_ERR','ETIMEDOUT','ENOBUFS','EPIPE','ENOENT','EACCES','EPERM','EIO','ENOMEM','EAGAIN','EMFILE','ENFILE','ENOSPC','ENOTDIR','EISDIR','EINVAL','ESRCH'];
+        const code=dispatchRefusal??(overflow||result?.outputLimited?'ENOBUFS':observerFailure?'OUTPUT_INVALID':transportFailure?'TRANSPORT_ERROR':result.cleanupError||groupSignalFailed?'CLEANUP_UNCONFIRMED':result?.timedOut?'ETIMEDOUT':errorCodes.includes(result.error?.code)?result.error.code:result.error?'PROCESS_ERROR':!confirmed?'TERMINATION_UNCONFIRMED':cancelled?'ABORT_ERR':null);
+        const stdout=Buffer.concat(buffers.stdout),stderr=Buffer.concat(buffers.stderr),reference=(name,bytes)=>({path:`${stem}.${name}.log`,bytes:bytes.length,digest:rawDigest(bytes)});
+        const receipt={kind:'ask_primary_condition_process_v1',...lineage,stage,sequence,round:owner.worker+(stage==='probe'?1:0),
+          dispatch_status:dispatched?'dispatched':'not_dispatched',timeout_ms:dispatchTimeout,
+          spawn_observed:spawned,process_completed:spawned===true&&(status!==null||exitSignal!==null),exit_code:status,signal:exitSignal,error_code:code,
+          termination_confirmed:confirmed,cancelled,timed_out:result?.timedOut===true,intent_reference:intentReference,stdout:reference('stdout',stdout),stderr:reference('stderr',stderr),receipt_path:`${stem}.receipt.json`,log_capture_status:'incomplete'};
+        persist(receipt,stdout,stderr);
+        if(code||status!==0||cancelled||result?.timedOut||result?.outputLimited)latch('primary_condition_process_failed');
+        return {stdout,stderr,status,signal:exitSignal,error_code:code,termination_confirmed:confirmed,cancelled,spawn_observed:spawned,...(pid===null?{}:{pid})};
+      })();
+      owner.inflight=task;try{return await task;}finally{owner.inflight=null;owner.controller=null;}
+    },
+    recordProbeLifecycle(value){
+      if(!owner.open||!isCurrent())throw executionError('primary_condition_expired');
+      if(!value||Object.keys(value).sort().join(',')!=='cancelled,cleanup_status,scratch_path,spawn_observed,termination_confirmed'
+        ||!['not_created','removed','retained_termination_unconfirmed','retained_cleanup_failed'].includes(value.cleanup_status)
+        ||[value.spawn_observed,value.termination_confirmed,value.cancelled].some(v=>v!==null&&typeof v!=='boolean')
+        ||(['not_created','removed'].includes(value.cleanup_status)?value.scratch_path!==null:typeof value.scratch_path!=='string'||!value.scratch_path.startsWith('/')||value.scratch_path.includes('\0')))
+        reject('primary_condition_probe_lifecycle_invalid');
+      const sequence=++owner.sequence,stem=`lifecycle-${String(sequence).padStart(4,'0')}.probe-cleanup`,raw=Buffer.from(JSON.stringify(value)+'\n');
+      const reference={path:`${stem}.json`,bytes:raw.length,digest:rawDigest(raw)};
+      const receipt={kind:'ask_primary_probe_lifecycle_v1',...lineage,cleanup_status:value.cleanup_status,spawn_observed:value.spawn_observed,
+        termination_confirmed:value.termination_confirmed,cancelled:value.cancelled,scratch_retained:value.scratch_path!==null,
+        private_lifecycle_reference:reference,receipt_path:`${stem}.receipt.json`,log_capture_status:'incomplete'};
+      // Only the owner-private sidecar contains the retained scratch location.
+      // Returned/failure/summary receipts contain finite fields and relative pins.
+      try{if(outputRoot!==undefined)writeFileSync(join(outputRoot,reference.path),raw,{flag:'wx',mode:0o600});}catch{receipts.push(receipt);reject('primary_condition_capture_failed');}
+      persist(receipt);
+      if(value.cleanup_status.startsWith('retained_')||(value.spawn_observed===true&&value.termination_confirmed===false)||value.cancelled===true)latch('primary_condition_probe_cleanup_failed');
+    },
+    close(callbackFailure){
+      if(owner.closing)return owner.closing;
+      if(callbackFailure!==undefined&&callbackFailure!=='primary_condition_callback_failed')throw executionError('primary_condition_close_invalid');
+      if(logs&&isCurrent())latch('primary_condition_closed_before_callback');
+      if(callbackFailure)latch(callbackFailure);
+      owner.open=false;clearTimer(budgetTimer);signal?.removeEventListener('abort',abort);
+      const pending=owner.inflight;if(pending)latch('primary_condition_unawaited_process');
+      owner.closing=(async()=>{
+        if(pending)try{await pending;}catch{/* Retain incomplete process capture and finalize its finite condition cause. */}
+        const record={kind:'ask_primary_condition_lifetime_v1',...lineage,status:owner.failed?'failed':'completed',failure_code:owner.failed,
+          condition_reservation_ms:reservation,probe_attempts:owner.probe,worker_attempts:owner.worker,
+          probe_starts:starts('probe'),worker_starts:starts('worker'),unawaited_process:Boolean(pending),callback_failed:Boolean(callbackFailure),log_capture_status:'complete'};
+        const bytes=Buffer.from(JSON.stringify(record)+'\n'),reference={path:'condition-lifetime.json',bytes:bytes.length,digest:rawDigest(bytes)};
+        const receipt={...record,private_lifetime_reference:reference,log_capture_status:'incomplete'};receipts.push(receipt);
+        try{if(outputRoot!==undefined)writeFileSync(join(outputRoot,reference.path),bytes,{flag:'wx',mode:0o600});receipt.log_capture_status='complete';}
+        catch{
+          latch('primary_condition_capture_failed');receipt.status='failed';receipt.failure_code=owner.failed;receipt.capture_failure_code='primary_condition_capture_failed';
+          receipt.expected_lifetime_reference=reference;delete receipt.private_lifetime_reference;
+          throw executionError('primary_condition_capture_failed');
+        }
+        return summary();
+      })();
+      // A caller may close while owned work is still settling. Suppress no
+      // error at the API, but keep an ignored close from becoming unhandled.
+      owner.closing.catch(()=>{});return owner.closing;
+    }
+  });return control;
+}
+/** Explicit artificial transport/lifetime harness. It creates no producer,
+ * schema, grading, probe qualification or native execution authority. */
+export function createPrimaryPerformanceExecutionForTest(options,dependencies={}){return createPerformanceExecution(options,dependencies);}
+export async function withPrimaryEvaluatorLogCaptureAsync(options,{outputRoot,normalizedResult,signal,deadlineAtMs=null,workerTimeoutMs,...unknown},callback){
+  if(Object.keys(unknown).length||typeof callback!=='function'||active()||resourceGraphState.getStore()?.active)throw executionError('primary_condition_scope_invalid');
+  const verified=verifyPrimaryEvaluationProducer(options),stat=lstatSync(outputRoot);
+  if(realpathSync(outputRoot)!==outputRoot||!stat.isDirectory()||(stat.mode&0o777)!==0o700||stat.uid!==process.getuid())throw executionError('primary_private_log_root_invalid');
+  for(const root of [ROOT.replace(/\/$/u,''),options.recordRoot])if(outputRoot===root||outputRoot.startsWith(`${root}/`)||root.startsWith(`${outputRoot}/`))throw executionError('primary_private_log_root_overlaps_source');
+  const l=normalizedResult.lineage,c=verified.inspection.cases.find(item=>item.entry.case_id===l.case_id),a=c?.attempts.find(item=>item.attempt===l.attempt);
+  if(!a||c.entry.condition!==l.condition||verified.inspection.identity.run_instance_id!==l.run_instance_id||a.evidence.request_digest!==l.request_digest||a.evidence.result_digest!==l.raw_result_digest||a.evidence.commit_digest!==l.terminal_commit_digest)throw executionError('primary_private_log_binding_invalid');
+  const current={active:true,asyncLogCapture:true,options:Object.freeze({...options}),verified,grading:true,profile:primaryProfileForRequest(verified.request),commandEvidenceParserRevision:verified.commandEvidenceParserRevision,
+    logs:{outputRoot,normalizedResult,receipts:[],lifecycleReceipts:[]}};
+  current.executionControl=createPerformanceExecution({outputRoot,signal,deadlineAtMs,workerTimeoutMs},{},()=>active()===current,current.logs);
+  return state.run(current,async()=>{
+    let value,failure,didFail=false;
+    const ownedError=error=>error!==null&&(typeof error==='object'||typeof error==='function')?error:executionError('primary_condition_callback_failed');
+    try{value=await callback(verified);}catch(error){didFail=true;failure=ownedError(error);}
+    current.active=false;
+    let final;
+    try{final=await current.executionControl.close(didFail?'primary_condition_callback_failed':undefined);}
+    catch(error){if(!didFail){didFail=true;failure=ownedError(error);}}
+    // The callback owns its final synchronous publication commitpoint. Do not
+    // reinterpret a late cancellation after it returns as missing publication.
+    if(!didFail&&final?.failure_code&&final.failure_code!=='primary_condition_cancelled'){didFail=true;failure=executionError(final.failure_code);}
+    if(didFail){logFailures.set(failure,structuredClone(current.logs.receipts));executionFailures.set(failure,structuredClone(current.logs.lifecycleReceipts));throw failure;}
+    return {result:value,receipts:structuredClone(current.logs.receipts),lifecycle_receipts:structuredClone(current.logs.lifecycleReceipts)};
+  });
+}
 export const primaryEvaluatorProbeCaptureAvailable=()=>Boolean(active()?.logs);
 // The existing per-condition log scope owns the file and next worker receipt.
 // Save/re-read before the controller may forward a derived candidate state.

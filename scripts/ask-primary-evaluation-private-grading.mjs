@@ -1,3 +1,4 @@
+import { pfPerformancePrivateProbeRoute } from './ask-benchmark-pf-performance-probe.mjs';
 // Original private constructor/worker/record/scorer chain. No alternative grader.
 // This API is called only after separate start authority and restored originals.
 import assert from 'node:assert/strict';
@@ -7,11 +8,11 @@ import { createHash } from 'node:crypto';
 import { canonicalDigest, stableCanonicalJson } from './content-addressed-store.mjs';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { buildPrimaryEvaluationScoringInputs, createPrimaryEvaluationSealedEvaluatorExecution, verifyPrimaryEvaluationProducer } from './ask-primary-evaluation-producer.mjs';
-import { withPrimaryHistoricalEvaluatorResources, withPrimaryEvaluatorLogCapture, primaryAdapterSourceDigest, primaryEvaluatorLogFailureReceipts } from './ask-primary-evaluation-scope.mjs';
-import { verifyPortfolioScoringInputs, verifyPrivateEvaluatorBundle, readEvaluatorAuthorityAnchorFromFreeze, executeProductionSealedEvaluator,
+import { withPrimaryHistoricalEvaluatorResources, withPrimaryEvaluatorLogCapture, withPrimaryEvaluatorLogCaptureAsync, primaryEvaluatorExecutionControl, primaryEvaluatorExecutionFailureReceipts, primaryAdapterSourceDigest, primaryEvaluatorLogFailureReceipts } from './ask-primary-evaluation-scope.mjs';
+import { verifyPortfolioScoringInputs, verifyPrivateEvaluatorBundle, readEvaluatorAuthorityAnchorFromFreeze, executeProductionSealedEvaluator, executeProductionSealedEvaluatorAsync,
   adaptPrivateEvaluatorFragmentToEnvelope, computeAdapterResultEnvelopeDigest, computePrivateEvaluationRecordDigest, readStableWorkspaceInventory } from './ask-benchmark-evaluator-boundary.mjs';
 import { deriveEffectiveVerificationEvidenceState } from './ask-benchmark-scoring-contract.mjs';
-import { scorePrimaryEvaluatorResult } from './ask-primary-engineering-safety.mjs';
+import { scorePrimaryEvaluatorResult, scorePrimaryEvaluatorResultAsync } from './ask-primary-engineering-safety.mjs';
 import { verifyPublicEvaluatorReference, verifyPrivateEvaluatorResourceAssets } from './ask-benchmark-evaluator-boundary.mjs';
 import { resolveEffectiveAdmissionAuthorityFromFiles } from './ask-benchmark-admission-decision.mjs';
 import { primaryProcessingSelection, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
@@ -57,10 +58,22 @@ export function preflightPrimaryEvaluationGradingResources(block,resource) {
       reviewAuthoritySourceDigest:resource.admissionReviewAuthoritySourceDigest,reviewArchivePath:resource.admissionReviewArchivePath});
     assert.equal(admission.effective_admission_status,'admitted');admissionReady=true;
     return{status:'ready',blockers:[],public_metadata_verified:true,original_assets_verified:true,admission_ready:true,
+      ...(prospectivePerformanceBundle(assets)?{execution_mode:'prospective_async_v1'}:{}),
       worker_timeout_ms:assets.manifest.execution_budget_ms,runtime_compatibility:'unknown',execution_isolation_authority:false,model_calls:0,grader_process_starts:0};
     });
   }catch{return{status:'blocked',blockers:[`original_grading_resources_${stage}_unverified`],public_metadata_verified:publicMetadataVerified,
     original_assets_verified:originalAssetsVerified,admission_ready:admissionReady,runtime_compatibility:'unknown',execution_isolation_authority:false,model_calls:0,grader_process_starts:0};}
+}
+
+function prospectivePerformanceBundle(bundle){
+  const asset=bundle.manifest.asset_inventory.find(item=>item.role==='hidden_tests');
+  assert.ok(asset,'hidden evaluator asset required');
+  const bytes=read(join(bundle.canonicalPrivateRoot,asset.path));
+  assert.equal(hash(bytes),asset.sha256,'prospective hidden source changed');
+  assert.equal(bytes.length,asset.bytes,'prospective hidden bytes changed');
+  const route=pfPerformancePrivateProbeRoute(bytes);
+  if(route)assert.equal(bundle.manifest.fixture_identity.fixture_id,'pf-performance-regression');
+  return Boolean(route);
 }
 
 function persistEvidence(authorityRoot,normalized,bundle,execution,fragment) {
@@ -149,14 +162,36 @@ export function primaryPrivateGradingExecutionStatus(scoringStatus, receipts, { 
   assert.ok(receipts.every(receipt => receipt.process_completed === true && receipt.exit_code === 0), 'original worker completion is unverified');
   return scoringStatus === 'complete' || freshVersion ? 'completed' : 'unknown';
 }
-export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs,{signal=null,deadlineAtMs=null,...unknownControls}={}) {
+export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs,controls={}) {
+  return runPrimaryEvaluationPrivateGradingInternal(producerOptions,runtimeInputs,controls,false);
+}
+export async function runPrimaryEvaluationPrivateGradingAsync(producerOptions,runtimeInputs,controls={}) {
+  return await runPrimaryEvaluationPrivateGradingInternal(producerOptions,runtimeInputs,controls,true);
+}
+function runPrimaryEvaluationPrivateGradingInternal(producerOptions,runtimeInputs,{signal=null,deadlineAtMs=null,...unknownControls}={},asynchronous=false) {
   let requested=false,evidenceKind='unknown',profile=null;
+  const failed=error=>{
+    // Private stream content and caught Error.message never cross this API.
+    // Only module-owned receipt summaries survive partial execution failure.
+    const receipts=primaryEvaluatorLogFailureReceipts(error)??[];
+    const lifecycle=asynchronous?primaryEvaluatorExecutionFailureReceipts(error)??[]:[];
+    const workers=lifecycle.filter(receipt=>receipt.kind==='ask_primary_condition_process_v1'&&receipt.stage==='worker');
+    const terminal=lifecycle.find(receipt=>receipt.kind==='ask_primary_condition_lifetime_v1');
+    const starts=receipts.length?receipts.filter(receipt=>receipt.spawn_observed).length
+      :terminal?terminal.worker_starts:lifecycle.length?(workers.some(receipt=>receipt.spawn_observed===null)?null:workers.filter(receipt=>receipt.spawn_observed===true).length):requested?null:0;
+    const completed=receipts.length?receipts.every(receipt=>receipt.process_completed)
+      :lifecycle.length?(workers.length>0&&workers.every(receipt=>receipt.process_completed)):requested?null:false;
+    return {status:requested?'unknown':'blocked',scoring_status:'not_scoring_ready',quality:null,blockers:['original_private_pipeline_unverified'],
+      condition:profile?.conditions.includes(runtimeInputs?.condition)?runtimeInputs.condition:null,evidence_kind:evidenceKind,
+      model_calls:0,grader_process_starts:starts,grader_process_completed:completed,worker_receipts:receipts,
+      ...(asynchronous?{lifecycle_receipts:lifecycle,condition_failure_code:terminal?.failure_code??null}:{}),formal_aggregate_eligible:false};
+  };
   try {
     assert.equal(Object.keys(unknownControls).length,0,'original worker budget cannot be overridden');
     assert.ok(!signal?.aborted,'primary private grade aborted');
     // Reserve the original API maximum before construction; the verified bundle
     // supplies the unchanged actual timeout for initial and validation runs.
-    if(deadlineAtMs!==null)assert.ok(Number.isFinite(deadlineAtMs)&&Date.now()+4*900000<=deadlineAtMs,'primary private grade reservation unavailable');
+    if(!asynchronous&&deadlineAtMs!==null)assert.ok(Number.isFinite(deadlineAtMs)&&Date.now()+4*900000<=deadlineAtMs,'primary private grade reservation unavailable');
     const producer=verifyPrimaryEvaluationProducer(producerOptions);evidenceKind=producer.evidence_kind;profile=primaryProfileForRequest(producer.request);
     const processing=primaryProcessingSelection(producer.block);
     assert.equal(producer.commandEvidenceParserRevision,processing?.command_evidence_parser_revision??PRIMARY_SAVED_COMMAND_EVIDENCE_PARSER_REVISION,'private grading requires the fixed processing selection');
@@ -167,16 +202,25 @@ export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs
     for(const path of [producerOptions.recordRoot,runtimeInputs.frozenSourceRoot,runtimeInputs.privateRoot,authorityRoot])assert.ok(publicRoot!==resolve(path)&&!publicRoot.startsWith(`${resolve(path)}/`)&&!resolve(path).startsWith(`${publicRoot}/`),'primary public output overlaps authority');
     const execution=createPrimaryEvaluationSealedEvaluatorExecution(producerOptions,runtimeInputs);
     const logs=join(authorityRoot,'worker-logs');mkdirSync(logs,{mode:0o700});
-    const captured=withPrimaryEvaluatorLogCapture(producerOptions,{outputRoot:logs,normalizedResult:n},()=>{
+    let verifiedWorkerBudget=null;
+    if(asynchronous){
+      const verifiedBundle=verifyPrivateEvaluatorBundle(s);
+      assert.ok(prospectivePerformanceBundle(verifiedBundle),'async grading requires fixed prospective performance body');
+      verifiedWorkerBudget=verifiedBundle.manifest.execution_budget_ms;
+    }
+    const capture=asynchronous?withPrimaryEvaluatorLogCaptureAsync:withPrimaryEvaluatorLogCapture;
+    const captured=capture(producerOptions,{outputRoot:logs,normalizedResult:n,...(asynchronous?{signal:signal??undefined,deadlineAtMs,workerTimeoutMs:verifiedWorkerBudget}:{})},()=>{
       const scoring=verifyPortfolioScoringInputs({root:s.root,catalogPath:s.catalogPath,policyManifestPath:s.policyManifestPath,scoringPolicyPath:s.scoringPolicyPath,
         admissionRecordPath:s.admissionRecordPath,requirementRecordPath:s.requirementRecordPath,outputContractPath:s.outputContractPath,referencePath:s.referencePath,
         freezeManifestPath:s.scoringInputFreezeManifestPath,freezeManifestSourceDigest:s.scoringInputFreezeManifestSourceDigest});
       const bundle=verifyPrivateEvaluatorBundle(s),anchor=readEvaluatorAuthorityAnchorFromFreeze({root:s.root,freezeManifestPath:s.scoringInputFreezeManifestPath,
         freezeManifestSourceDigest:s.scoringInputFreezeManifestSourceDigest,referencePath:s.referencePath});
       const budget=primaryPrivateGradingBudget(bundle.manifest.execution_budget_ms);
-      if(deadlineAtMs!==null)assert.ok(Date.now()+budget.condition_reservation_ms<=deadlineAtMs,'original private grade reservation unavailable');
+      if(!asynchronous&&deadlineAtMs!==null)assert.ok(Date.now()+budget.condition_reservation_ms<=deadlineAtMs,'original private grade reservation unavailable');
       assert.ok(!signal?.aborted,'primary private grade aborted');requested=true;
-      const executed=executeProductionSealedEvaluator({execution,externalAuthorityAnchor:anchor,repositoryRoot:s.root,timeout:budget.worker_timeout_ms});
+      const execute=asynchronous?executeProductionSealedEvaluatorAsync:executeProductionSealedEvaluator;
+      const finishExecuted=executed=>{
+      if(asynchronous)primaryEvaluatorExecutionControl().assertReady();
       assert.deepEqual(executed.firstBytes,executed.secondBytes);
       const fragmentPath=join(authorityRoot,'authority-chain/private-fragment.json');write(fragmentPath,executed.firstBytes);
       const authority={...scoring,evaluatorReference:bundle.reference,normalizedResult:n,sourceSnapshotDigest:s.sourceSnapshotDigest,bundleManifest:bundle.manifest,
@@ -194,23 +238,21 @@ export function runPrimaryEvaluationPrivateGrading(producerOptions,runtimeInputs
       assert.ok(!signal?.aborted,'primary private grade aborted');
       // This invokes the original verifier once; its existing private-record
       // validation performs two more runs. Do not separately verify again.
-      return scorePrimaryEvaluatorResult({...s,resultPath,privateEvaluationRecordPath:recordPath,privateFragmentPath:fragmentPath,outputPath:join(publicRoot,'engineering-result.json')},n);
+      const score=asynchronous?scorePrimaryEvaluatorResultAsync:scorePrimaryEvaluatorResult;
+      return score({...s,resultPath,privateEvaluationRecordPath:recordPath,privateFragmentPath:fragmentPath,outputPath:join(publicRoot,'engineering-result.json')},n);
+      };
+      const executed=execute({execution,externalAuthorityAnchor:anchor,repositoryRoot:s.root,timeout:budget.worker_timeout_ms});
+      return asynchronous?executed.then(finishExecuted):finishExecuted(executed);
     });
+    const finishCaptured=captured=>{
     assert.equal(captured.receipts.length,4,'primary original private worker count changed');assert.ok(captured.receipts.every(receipt=>receipt.process_completed&&receipt.exit_code===0));
     return {status:primaryPrivateGradingExecutionStatus(captured.result.artifact.scoring_status,captured.receipts,{freshVersion:Boolean(producer.request.scoring_version)}),scoring_status:captured.result.artifact.scoring_status,
       scoring_reason:captured.result.artifact.scoring_reason,quality:captured.result.artifact.requirement_score.normalized_requirement_score,
       condition:runtimeInputs.condition,evidence_kind:producer.evidence_kind,formal_aggregate_eligible:false,model_calls:0,grader_process_starts:4,grader_process_completed:true,
       public_artifacts:{evaluator_result:{path:join(publicRoot,'evaluator-result.json'),digest:hash(read(join(publicRoot,'evaluator-result.json')))},
         engineering_result:{path:captured.result.outputPath??join(publicRoot,'engineering-result.json'),digest:hash(read(join(publicRoot,'engineering-result.json')))},
-        ...(captured.result.originalArtifact?{original_engineering_result:{path:captured.result.originalArtifact.path,digest:captured.result.originalArtifact.digest}}:{})},worker_receipts:captured.receipts};
-  }catch(error){
-    // Private stream content and caught Error.message never cross this API.
-    // Only module-owned receipt summaries survive partial execution failure.
-    const receipts=primaryEvaluatorLogFailureReceipts(error)??[];
-    const starts=receipts.length?receipts.filter(receipt=>receipt.spawn_observed).length:requested?null:0;
-    const completed=receipts.length?receipts.every(receipt=>receipt.process_completed):requested?null:false;
-    return {status:requested?'unknown':'blocked',scoring_status:'not_scoring_ready',quality:null,blockers:['original_private_pipeline_unverified'],
-      condition:profile?.conditions.includes(runtimeInputs?.condition)?runtimeInputs.condition:null,evidence_kind:evidenceKind,
-      model_calls:0,grader_process_starts:starts,grader_process_completed:completed,worker_receipts:receipts,formal_aggregate_eligible:false};
-  }
+        ...(captured.result.originalArtifact?{original_engineering_result:{path:captured.result.originalArtifact.path,digest:captured.result.originalArtifact.digest}}:{})},worker_receipts:captured.receipts,...(asynchronous?{lifecycle_receipts:captured.lifecycle_receipts}: {})};
+    };
+    return asynchronous?Promise.resolve(captured).then(finishCaptured).catch(failed):finishCaptured(captured);
+  }catch(error){return failed(error);}
 }

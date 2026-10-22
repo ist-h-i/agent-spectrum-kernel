@@ -113,3 +113,64 @@ Upstream refs: `SPEC-PERFORMANCE-PROBE-20261021` revision 2,
 No frozen body, old result, default writer, resource map or admission is changed
 by this implementation slice. A future v2 profile/source/reference/archive and
 admission remain separate, explicit work with genuine native qualification.
+
+## Prospective condition lifetime
+
+Spec `SPEC-PFP-LIFETIME-20261022@1`, Formal Verification Contract
+`FVC-PFP-LIFETIME-20261022@1`, Implementation
+`IMPL-PFP-LIFETIME-20261022@1`. This is an explicit asynchronous primary
+connection; the frozen raw scorer, old synchronous APIs, inputs, budgets and
+results stay unchanged. Native qualification remains absent. No artificial
+transport, caller boolean or lifecycle receipt grants it.
+
+The condition owns one absolute deadline across four probe/worker pairs and
+their termination allowance. Reserve four times (300000 ms probe + verified
+worker budget + two 4000 ms cleanup allowances), then bound each launch by its
+stage cap and the remaining deadline excluding cleanup. Validate the entire
+reservation before starting. Check cancellation and remaining time between
+stages, again after asynchronous code loading immediately before dispatch, and
+before publication. Reclip each launch timeout at that final dispatch check.
+Abort, timeout, output overflow, unconfirmed
+termination, capture failure or other launch failure suppresses later starts
+and cannot produce a completed score. A missing native gate still yields an
+unavailable probe observation, without starting the probe.
+
+Reuse the existing owned process-group execution primitive. Keep condition
+ownership in the existing primary scope; do not make serialized observations
+or a caller's transport into scoring authority. Retain bounded partial raw
+streams, finite lifecycle status and failures exclusively in the existing
+private worker-log directory. Capture failure is itself a failure. Remove
+probe scratch only after confirmed owned termination; retain it on uncertainty.
+Expired asynchronous continuations must not retain active producer/log scope.
+Only the verified prospective private body selects this route; reserve its full
+four slots even while the native gate is absent. Its worker stream bound is
+10 MiB per stream, matching the reused owned process primitive. Legacy
+synchronous limits and budgets are unchanged.
+
+The primary async companion uses the unchanged original numeric builder and
+admission all-or-none/overlay/fallback checks with the same private, input and
+output guards and atomic publication. Only the freshly verified normalized
+record determines its safety projection; mismatched or changed caller data is
+refused. Awaited verification rechecks authority bytes, canonical paths and
+stable file identity, including the recorded fragment inode.
+
+Check the condition before the synchronous original/final publication commit
+and after its validation/readback. If synchronous work exceeds the completion
+budget, retain any immutable artifacts and return unknown/null rather than
+completed. A signal arriving after accepted completion does not erase those
+artifacts. The cleanup allowance is accounting and bounded process-control
+evidence, not a hard real-time guarantee under stalled event loops, synchronous
+filesystem I/O or unqualified native sandbox behavior.
+
+| Obligation | Implementation boundary | Required checks |
+|---|---|---|
+| L1 total reservation/deadline | primary grading and condition scope | exact arithmetic, insufficient/expired deadline, elapsed probe reduces worker allowance |
+| L2 cancellation and launch suppression | condition scope and existing process primitive | pre-abort, abort during probe/worker, later starts refused, clock boundary |
+| L3 owned termination and partial evidence | process primitive, probe, existing private capture | normal artificial Node child/grandchild, escalation, unknown termination, partial stdout/stderr, exclusive write failure |
+| L4 existing grading semantics | asynchronous boundary/primary scoring companions | unchanged numeric builder/admission/output guards, four runs, legacy synchronous compatibility |
+| L5 no artificial qualification | private native gate and fresh source selection | caller override refused, missing gate/no capture starts no native probe, unknown quality remains null |
+
+Artificial clocks/transports establish the control decisions; ordinary Node
+fixtures establish only their observed host-process behavior. Neither proves
+the production native sandbox's isolation, cleanup or timing. Real native
+acceptance and prospective resource/admission selection remain separate.
