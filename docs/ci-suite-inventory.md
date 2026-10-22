@@ -40,8 +40,9 @@ the Mac-only local-eval step (macOS 15), both using Node 24.19.0:
 
 The tests use artificial clocks/transports and ordinary owned Node children,
 process groups and files. Both OS owners matter for termination and inode checks;
-they do not run Codex, a model or the native sandbox probe. Current inventory is
-141 Node script invocations: the preceding 139 plus these two explicit owners.
+they do not run Codex, a model or the native sandbox probe. Current Validate inventory is
+140 Node script invocations (preceding 139 plus one); local-eval has 25
+(preceding 24 plus the explicit Mac owner).
 The closed coverage guard preserves every preceding invocation/flag and the
 strict aggregate. The historical 134-command fixture/table remains unchanged.
 Native qualification remains unavailable until genuine runtime evidence exists.

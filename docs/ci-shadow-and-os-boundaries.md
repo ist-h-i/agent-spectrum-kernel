@@ -140,7 +140,7 @@ Prospective performance lifetime follow-up after main `61e32104`: one additional
 command runs the execution and lifetime test files in Validate/common on Ubuntu
 24.04 and in an explicit Mac-only local-eval step on macOS 15 (Node 24.19.0).
 Ordinary owned Node process/group termination and file identity checks justify
-both OS owners. The preceding 139 invocations are retained, making 141 current
-invocations. The strict coverage guard admits only this exact new command in
+both OS owners. The preceding 139 Validate invocations are retained, making 140;
+local-eval has 25 invocations (preceding 24 plus the new Mac owner). The strict coverage guard admits only this exact new command in
 each owner; the historical snapshot, shadow-only behavior and aggregate remain.
 Artificial controls do not qualify a native sandbox or enable its closed gate.
