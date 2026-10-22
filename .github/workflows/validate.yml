@@ -66,6 +66,12 @@ jobs:
       - name: Verify CI coverage preservation and strict aggregate
         run: node --test scripts/test-ci-full-run.mjs
 
+      - name: Verify conservative change classification (shadow only)
+        run: node --test scripts/test-ci-change-shadow.mjs
+
+      - name: Record proposed change classification (all verification still runs)
+        run: node scripts/ci-change-shadow.mjs
+
       - name: Run autonomous development control tests
         run: node scripts/test-ask-autonomous-development.mjs
 
