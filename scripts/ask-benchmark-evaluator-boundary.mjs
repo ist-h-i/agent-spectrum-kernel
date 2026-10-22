@@ -1,4 +1,5 @@
 import { primaryEvaluatorExecutionControl } from './ask-primary-evaluation-scope.mjs';
+import {primaryClientFocusedProbeProfile,preparePrimaryClientFocusedProbe,preparePrimaryClientFocusedProbeForTest} from './ask-primary-client-focused-controller.mjs';
 import * as unsafeActionContract from './ask-primary-unsafe-action-contract.mjs';
 import { PF_PERFORMANCE_PROBE_VERSION, pfPerformancePrivateProbeRoute, runQualifiedPfPerformancePrivateProbe, runQualifiedPfPerformancePrivateProbeAsync, inspectPfPerformancePrivateAudit } from './ask-benchmark-pf-performance-probe.mjs';
 import { createHash } from "node:crypto";
@@ -2492,12 +2493,19 @@ function executeAuthorityOwnedEvaluatorChild({ runnerSource, payload, timeout, l
 
 // The prospective async path shares the original payload/fragment authority.
 // A caller-supplied control is accepted only by the explicit TEST entry below.
-async function executeAuthorityOwnedEvaluatorChildAsync({runnerSource,payload,timeout,label,control}) {
+async function executeAuthorityOwnedEvaluatorChildAsync({runnerSource,payload,timeout,label,control,nativeProbeLaunchers=null}) {
   control.assertReady();
   const hidden=payload.modules.find(module=>module.path===PRIVATE_EVALUATOR_VIRTUAL_PATH);
-  const route=pfPerformancePrivateProbeRoute(Buffer.from(hidden.source_base64,'base64'));
-  if(!route)throw new Error('async evaluator requires the pinned prospective performance body');
+  const hiddenBody=Buffer.from(hidden.source_base64,'base64');
   const normalized=JSON.parse(Buffer.from(payload.normalized_result.source_base64,'base64'));
+  const nativeProfile=primaryClientFocusedProbeProfile(hiddenBody,normalized.lineage.fixture_id);
+  if(nativeProfile){
+    const prepare=nativeProbeLaunchers?options=>preparePrimaryClientFocusedProbeForTest(options,nativeProbeLaunchers):preparePrimaryClientFocusedProbe;
+    const observed=await prepare({payload,hiddenBody,control,round:control.summary().worker_attempts+1});
+    const {payload_digest,...base}=payload,next={...base,[observed.field]:observed.packet,private_native_probe_binding:observed.ownerBinding};payload={...next,payload_digest:canonicalDigest(next)};
+  }else{
+  const route=pfPerformancePrivateProbeRoute(hiddenBody);
+  if(!route)throw new Error('async evaluator requires a pinned prospective body');
   if(normalized.lineage.fixture_id!=='pf-performance-regression')throw new Error('private performance probe fixture mismatch');
   const source=(kind,path,optional=false)=>{
     const entry=payload.authority_roots.find(root=>root.kind===kind)?.entries.find(entry=>entry.path===path);
@@ -2524,6 +2532,7 @@ async function executeAuthorityOwnedEvaluatorChildAsync({runnerSource,payload,ti
   }
   const {payload_digest,...base}=payload,next={...base,private_performance_probe:observation};
   payload={...next,payload_digest:canonicalDigest(next)};
+  }
   control.assertReady();
   const result=await control.executeProcess('worker',{executable:AUTHORITY_NODE_EXECUTABLE,
     args:['--experimental-vm-modules','--input-type=module','--eval',runnerSource],
@@ -2538,11 +2547,11 @@ async function executeAuthorityOwnedEvaluatorChildAsync({runnerSource,payload,ti
 }
 
 async function executeSealedEvaluatorAsync({execution,externalAuthorityAnchor,repositoryRoot,normalized,normalizedBytes=null,
-  timeout=60000,barrier=null,label='async private evaluator sealed execution'},control) {
+  timeout=60000,barrier=null,label='async private evaluator sealed execution'},control,nativeProbeLaunchers=null) {
   control.assertReady();
   const prepared=prepareSealedEvaluatorExecutionAuthority({execution,externalAuthorityAnchor,repositoryRoot,normalized,normalizedBytes,barrier,label});
   const run=runIndex=>executeAuthorityOwnedEvaluatorChildAsync({runnerSource:prepared.runnerSource,
-    payload:runIndex===1?prepared.firstPayload:prepared.secondPayload,timeout,label,control});
+    payload:runIndex===1?prepared.firstPayload:prepared.secondPayload,timeout,label,control,nativeProbeLaunchers});
   const stateA=captureSealedExecutionState(execution,label+' before run');
   const firstFragment=await run(1);
   control.assertReady();
@@ -2557,10 +2566,10 @@ async function executeSealedEvaluatorAsync({execution,externalAuthorityAnchor,re
     before:stateA,afterFirst:stateB,afterSecond:stateC};
 }
 
-export async function executeSealedEvaluatorAsyncForTest(options,{executionControl}={}) {
+export async function executeSealedEvaluatorAsyncForTest(options,{executionControl,nativeProbeLaunchers=null}={}) {
   if(PRODUCTION_EXECUTION_AUTHORITIES.has(options.execution))throw new Error('TEST execution cannot consume production authority');
   if(!executionControl?.assertReady||!executionControl?.executeProcess)throw new Error('owned TEST process control required');
-  return executeSealedEvaluatorAsync(options,executionControl);
+  return executeSealedEvaluatorAsync(options,executionControl,nativeProbeLaunchers);
 }
 
 export async function executeProductionSealedEvaluatorAsync(options={}) {

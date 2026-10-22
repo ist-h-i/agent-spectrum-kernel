@@ -175,3 +175,144 @@ export async function runMnFocusedProbeV2ForTest({source='synthetic-source',test
     return {observation:checkedFocusedObservation(value.result),receipt:value.receipt,evidence_kind:'synthetic',runtime_attestation:'unknown',quality:null};
   }catch(error){return {observation:unavailable(),reason:finiteFailureCode(error),receipt:ownedFailureReceipt(error),evidence_kind:'synthetic',runtime_attestation:'unknown',quality:null};}
 }
+
+// Controller-joined version. Private recipe values come only from the pinned
+// private source. This code neither evaluates that source nor issues authority.
+export const MN_FOCUSED_CONTROLLER_VERSION='focused-controller-observation-v3';
+const digest=value=>'sha256:'+hash(value);
+function privateLiteral(text){
+  if(/^"(?:[^"\\]|\\.)*"$/u.test(text)){const value=JSON.parse(text);if(typeof value==='string')return value;}
+  if(/^'[^'\\\r\n]*'$/u.test(text))return text.slice(1,-1);
+  throw refusal('focused_private_literal_invalid');
+}
+function parseControllerPlan(source){
+  const header=source.match(/^function run\(([^\n]*)\)\{/mu);
+  const defaultMatch=header?.[1].match(/,([A-Za-z_$][\w$]*)=((?:'[^'\\\r\n]*')|(?:"[^"\\\r\n]*"))$/u);
+  const transform=source.match(/const weakened=source\.replace\(((?:'[^'\\\r\n]*')|(?:"[^"\\\r\n]*")),((?:'[^'\\\r\n]*')|(?:"[^"\\\r\n]*"))\)/u);
+  const start=source.indexOf('function existingObservableCoverage('),middle=source.indexOf('function focusedEvaluate(',start),end=source.indexOf('export async function evaluateLegacyCandidateSafe(',middle);
+  if(!defaultMatch||!transform||start<0||middle<0||end<0)throw refusal('focused_private_plan_shape_invalid');
+  const existing=source.slice(start,middle),focused=source.slice(middle,end);
+  const loop=existing.match(/for\(const ([A-Za-z_$][\w$]*) of (\[[^\]\r\n]*\])\)\{/u);
+  const control=existing.match(/if\(([A-Za-z_$][\w$]*)\.status!==((?:'[^'\\\r\n]*')|(?:"[^"\\\r\n]*"))\)return/u);
+  const calibration=existing.match(/if\(([A-Za-z_$][\w$]*)\.status!==((?:'[^'\\\r\n]*')|(?:"[^"\\\r\n]*"))\|\|!([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\)/u);
+  if(!loop||!control||!calibration||calibration[1]!==calibration[3]||calibration[4]!=='assertion_failure')throw refusal('focused_private_plan_guard_invalid');
+  const tokens=loop[2].slice(1,-1).split(',');if(tokens.length!==3)throw refusal('focused_private_plan_shape_invalid');
+  const variants=tokens.map(privateLiteral),defaultVariant=privateLiteral(defaultMatch[2]);
+  const calls=region=>[...region.matchAll(/\brun\(([^()\n]*)\)/gu)].map(match=>match[1].split(','));
+  const e=calls(existing),f=calls(focused);
+  if(e.length!==6||f.length!==5||[...e,...f].some(args=>args.length<3||args.length>4||args.some(x=>!/^[$A-Za-z_][\w$]*$/u.test(x))))throw refusal('focused_private_plan_calls_invalid');
+  const steps=[];
+  const add=(args,site,context,requires=[])=>{
+    if(!['source','weakened'].includes(args[0])||!['oldTest','test'].includes(args[1])||args[2]!=='loader'||(args[3]!==undefined&&args[3]!==loop[1]))throw refusal('focused_private_plan_selector_invalid');
+    const step={step_id:'s'+steps.length,site,loop_context:context,source_selector:args[0],test_selector:args[1],variant:args[3]===undefined?defaultVariant:context,requires};steps.push(step);return step.step_id;
+  };
+  f.forEach((args,index)=>add(args,index+6,null));
+  const controlStep=add(e[0],0,null);
+  for(const variant of variants){
+    const controlGuard=[{step_id:controlStep,field:'status',equals:privateLiteral(control[2])}];
+    const calibrationStep=add(e[1],1,variant,controlGuard);
+    const guards=[...controlGuard,{step_id:calibrationStep,field:'status',equals:privateLiteral(calibration[2])},{step_id:calibrationStep,field:calibration[4],equals:true}];
+    e.slice(2).forEach((args,index)=>add(args,index+2,variant,guards));
+  }
+  if(steps.length!==21)throw refusal('focused_private_plan_size_invalid');
+  return {version:MN_FOCUSED_CONTROLLER_VERSION,legacy_source_digest:digest(source),default_variant:defaultVariant,source_transform:{kind:'replace_once',needle:privateLiteral(transform[1]),replacement:privateLiteral(transform[2])},steps};
+}
+export function buildMnFocusedControllerPlanV3({legacySource}){return parseControllerPlan(legacyText(legacySource));}
+/** Fabricated text only; never qualifies its plan or observations. */
+export function buildMnFocusedControllerPlanForTest({legacySource}){return parseControllerPlan(legacyText(legacySource,true));}
+function focusedBindingFields(plan,candidateDigest,normalizedResultDigest,ownerBinding){
+  return {probe_version:MN_FOCUSED_CONTROLLER_VERSION,candidate_source_digest:candidateDigest,legacy_source_digest:plan.legacy_source_digest,plan_digest:digest(JSON.stringify(plan)),normalized_result_digest:normalizedResultDigest,owner_binding:ownerBinding};
+}
+function focusedRequestDigest(step,source,test,loader){
+  return digest(JSON.stringify({site:step.site,loop_context:step.loop_context,source_digest:digest(source),test_digest:digest(test),loader_digest:digest(loader),variant:step.variant}));
+}
+export function buildMnFocusedRequestBindingsV3({plan,source,oldTest,test,loader,normalizedResultDigest,ownerBinding}){
+  if(plan?.version!==MN_FOCUSED_CONTROLLER_VERSION||!Array.isArray(plan.steps)||plan.steps.length!==21||[source,oldTest,test,loader,normalizedResultDigest,ownerBinding].some(x=>typeof x!=='string')||plan.source_transform?.kind!=='replace_once'||!/^sha256:[a-f0-9]{64}$/u.test(normalizedResultDigest)||!/^sha256:[a-f0-9]{64}$/u.test(ownerBinding))throw refusal('focused_controller_bindings_invalid');
+  const fields=focusedBindingFields(plan,digest(test),normalizedResultDigest,ownerBinding),weakened=source.replace(plan.source_transform.needle,plan.source_transform.replacement);
+  const requests=plan.steps.map(step=>{const requestSource=step.source_selector==='source'?source:step.source_selector==='weakened'?weakened:null,requestTest=step.test_selector==='test'?test:step.test_selector==='oldTest'?oldTest:null;if(requestSource===null||requestTest===null)throw refusal('focused_controller_bindings_invalid');return {...step,source:requestSource,test:requestTest,loader,request_digest:focusedRequestDigest(step,requestSource,requestTest,loader)};});
+  return {...fields,binding_digest:digest(JSON.stringify(fields)),requests};
+}
+function focusedClosed(value,fields){return value!==null&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join(',')===fields;}
+function focusedFiniteResult(value){
+  if(!focusedClosed(value,'assertion_failure,authenticated_mixed_boundary,exit_code,observed,requests,status')||!['succeeded','failed','unavailable'].includes(value.status)
+    ||[value.observed,value.assertion_failure,value.authenticated_mixed_boundary].some(x=>typeof x!=='boolean')||!Number.isInteger(value.requests)||value.requests<0||value.requests>1000
+    ||(value.exit_code!==null&&(!Number.isInteger(value.exit_code)||value.exit_code<0||value.exit_code>255))
+    ||value.authenticated_mixed_boundary!==value.observed||value.status==='succeeded'&&value.exit_code!==0||value.status==='failed'&&!(value.exit_code>0))return false;
+  return true;
+}
+function validateFocusedPacket(packet,bindings){
+  if(!focusedClosed(packet,'binding_digest,candidate_source_digest,legacy_source_digest,normalized_result_digest,observations,owner_binding,plan_digest,probe_version')||!Array.isArray(packet.observations))throw refusal('focused_controller_packet_invalid');
+  for(const field of ['probe_version','candidate_source_digest','legacy_source_digest','plan_digest','normalized_result_digest','owner_binding','binding_digest'])if(packet[field]!==bindings[field])throw refusal('focused_controller_packet_binding_invalid');
+  const rows=new Map();let stopped=false;
+  for(const row of packet.observations){
+    if(!focusedClosed(row,'loop_context,receipt_digest,request_digest,result,site,step_id')||!/^sha256:[a-f0-9]{64}$/u.test(row.receipt_digest)||!focusedFiniteResult(row.result)||rows.has(row.step_id))throw refusal('focused_controller_packet_invalid');rows.set(row.step_id,row);
+  }
+  let executedIndex=0;
+  for(const step of bindings.requests){
+    const enabled=!stopped&&step.requires.every(guard=>rows.has(guard.step_id)&&rows.get(guard.step_id).result[guard.field]===guard.equals),row=rows.get(step.step_id);
+    if(enabled!==Boolean(row))throw refusal('focused_controller_packet_recipe_invalid');
+    if(!row)continue;
+    if(packet.observations[executedIndex++]!==row)throw refusal('focused_controller_packet_order_invalid');
+    if(row.site!==step.site||row.loop_context!==step.loop_context||row.request_digest!==step.request_digest)throw refusal('focused_controller_packet_binding_invalid');
+    if(row.result.status==='unavailable')stopped=true;
+  }
+  if([...rows.keys()].some(key=>!bindings.requests.some(step=>step.step_id===key)))throw refusal('focused_controller_packet_invalid');
+  return packet;
+}
+export function createMnFocusedControllerPacketV3({bindings,observations}){
+  const packet=Object.fromEntries(['probe_version','candidate_source_digest','legacy_source_digest','plan_digest','normalized_result_digest','owner_binding','binding_digest'].map(key=>[key,bindings[key]]));packet.observations=observations;
+  validateFocusedPacket(packet,bindings);return JSON.parse(JSON.stringify(packet));
+}
+export function inspectMnFocusedControllerPacketV3({bindings,packet}){validateFocusedPacket(packet,bindings);return {valid:true,observations:packet.observations.length,authority:false,quality:null};}
+function focusedControllerInitialize(c,source,oldTest,test,loader){
+  const state=focusedV2Sequences.get(c);if(!state)throw refusal('focused_controller_sequence_inactive');
+  try{
+    const bindings=buildMnFocusedRequestBindingsV3({plan:FOCUSED_CONTROLLER_PLAN,source,oldTest,test,loader,normalizedResultDigest:c.normalizedResult?.normalized_result_digest,ownerBinding:c.privateNativeProbeBinding});
+    const packet=validateFocusedPacket(c.privateFocusedProbe,bindings);state.packet=JSON.parse(JSON.stringify(packet));state.bindings=bindings;state.consumed=new Set();
+  }catch{state.stopped=true;}
+}
+function focusedControllerFinalize(c){
+  const state=focusedV2Sequences.get(c);
+  try{if(state?.packet&&state.consumed.size!==state.packet.observations.length)throw refusal('focused_controller_observations_unconsumed');}
+  finally{focusedV2Sequences.delete(c);}
+}
+function controllerBodyV3(source,synthetic){
+  const plan=parseControllerPlan(source),loop=source.match(/for\(const ([A-Za-z_$][\w$]*) of (\[[^\]\r\n]*\])\)\{/u)[1];
+  let body=evaluatorSourceV2(source,synthetic);
+  body=body.replace(/^export const nativeProbeVersion=[^\n]*\n/u,'export const nativeProbeVersion='+JSON.stringify(synthetic?'synthetic-focused-controller-v3':MN_FOCUSED_CONTROLLER_VERSION)+';\nconst FOCUSED_CONTROLLER_PLAN='+JSON.stringify(plan)+';\n');
+  const header=source.match(/^function run\(([^\n]*)\)\{/mu)[1];
+  const helpers=[focusedBindingFields,focusedRequestDigest,buildMnFocusedRequestBindingsV3,focusedClosed,focusedFiniteResult,validateFocusedPacket,focusedControllerInitialize,focusedControllerFinalize].map(fn=>fn.toString().replace(/^export /u,'')).join('\n');
+  const bridge=`const MN_FOCUSED_CONTROLLER_VERSION=${JSON.stringify(MN_FOCUSED_CONTROLLER_VERSION)};
+const refusal=code=>Object.assign(new Error(code),{code});
+${helpers}
+const focusedV2Sequences=new WeakMap();
+async function run(c,site,loopContext,${header}){
+ const state=focusedV2Sequences.get(c);if(!state||state.stopped||!state.bindings)return {status:'unavailable'};
+ try{
+  const step=state.bindings.requests.find(item=>item.site===site&&item.loop_context===loopContext);
+  if(!step||state.consumed.has(step.step_id)||step.request_digest!==focusedRequestDigest({...step,variant:existingBehaviorVariant},source,test,loader))throw Error();
+  const row=state.packet.observations.find(item=>item.step_id===step.step_id);if(!row)throw Error();
+  state.consumed.add(step.step_id);if(row.result.status==='unavailable')state.stopped=true;return {...row.result};
+ }catch{state.stopped=true;return {status:'unavailable'};}
+}
+`;
+  const start=body.indexOf('const focusedV2Sequences='),end=body.indexOf('// Proof of preserved frozen-suite',start);if(start<0||end<0)throw refusal('focused_controller_body_shape_invalid');body=body.slice(0,start)+bridge+body.slice(end);
+  const regionStart=body.indexOf('async function existingObservableCoverage('),regionEnd=body.indexOf('export async function evaluateLegacyCandidateSafe(',regionStart);
+  let count=0,region=body.slice(regionStart,regionEnd).replace(/await run\(c,([^()\n]*)\)/gu,(_match,args)=>{const site=count++;return 'await run(c,'+site+','+(site>=1&&site<=5?loop:'null')+','+args+')';});
+  if(count!==11&&!synthetic)throw refusal('focused_controller_body_shape_invalid');
+  region=replaceOnce(region,' const baseline=',' focusedControllerInitialize(c,source,oldTest,test,loader);\n const baseline=');
+  region=replaceOnce(region,'}finally{focusedV2Sequences.delete(c); }','}finally{focusedControllerFinalize(c); }');
+  body=body.slice(0,regionStart)+region+body.slice(regionEnd);return body;
+}
+export function buildMnFocusedControllerEvaluatorSourceV3({legacySource,probeVersion}){
+  if(probeVersion!==MN_FOCUSED_CONTROLLER_VERSION)throw refusal('focused_controller_explicit_version_required');return controllerBodyV3(legacyText(legacySource),false);
+}
+export function buildMnFocusedControllerEvaluatorSourceForTest({legacySource}){return controllerBodyV3(legacyText(legacySource,true),true);}
+// Filled from the exact private pin by pure transformation, never by execution.
+export const MN_FOCUSED_CONTROLLER_BODY_SHA256='4362dbe89544af88f527e1f276bc635e0fabea0a59d2d4467cbc4a8ab8dcd4e7';
+export function inspectMnFocusedControllerRouteV3({bodySource}){
+  const bytes=Buffer.isBuffer(bodySource)?bodySource:Buffer.from(bodySource??'');if(hash(bytes)!==MN_FOCUSED_CONTROLLER_BODY_SHA256)throw refusal('focused_controller_body_pin_invalid');
+  const source=new TextDecoder('utf-8',{fatal:true}).decode(bytes),line=source.split('\n').find(x=>x.startsWith('const FOCUSED_CONTROLLER_PLAN='));if(!line?.endsWith(';'))throw refusal('focused_controller_body_shape_invalid');
+  const plan=JSON.parse(line.slice('const FOCUSED_CONTROLLER_PLAN='.length,-1));if(plan.version!==MN_FOCUSED_CONTROLLER_VERSION||plan.legacy_source_digest!=='sha256:'+MN_FOCUSED_LEGACY_BODY_SHA256)throw refusal('focused_controller_body_pin_invalid');
+  return {version:MN_FOCUSED_CONTROLLER_VERSION,plan,parentSource:parentLiteral(source).value,body_digest:digest(bytes),authority:false};
+}

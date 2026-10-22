@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto';
 import { lstatSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { readStableFile } from './ask-benchmark-stable-file.mjs';
 
 const CLEANUP_MS = 4000;
 const SIGNALS = new Set(['SIGTERM','SIGKILL','SIGINT','SIGABRT','SIGHUP','SIGSEGV','SIGBUS','SIGPIPE']);
@@ -180,4 +181,53 @@ export async function runOwnedPrivateNativeProbeForTest(options,dependencies){
   const {executeSession,...rest}=dependencies??{};
   if(typeof executeSession!=='function')throw fail('native_probe_fake_transport_required');
   return run(options,{...rest,executeSession},true);
+}
+
+// Retention only: a finite failure sidecar cannot qualify a process or replace
+// missing observations. Raw/control/input data never enters this projection.
+export function capturePrimaryNativeProbeFailure(context,receipt){
+  try{
+    const outputRoot=context?.outputRoot,trialId=context?.trialId,root=lstatSync(outputRoot);
+    if(typeof trialId!=='string'||!/^[a-z0-9][a-z0-9-]{0,63}$/u.test(trialId)||!root.isDirectory()||realpathSync(outputRoot)!==outputRoot
+      ||(root.mode&0o777)!==0o700||root.uid!==process.getuid())throw new Error();
+    const codes=new Set(['native_probe_arguments_invalid','native_probe_log_root_invalid','native_probe_transport_invalid','native_probe_cancelled','native_probe_deadline',
+      'native_probe_capture_failed','native_probe_preflight_failed','native_probe_output_limit','native_probe_output_invalid','native_probe_parent_stderr','native_probe_frame_invalid',
+      'native_probe_frame_limit','native_probe_clock_invalid','native_probe_timeout','native_probe_transport_failed','native_probe_termination_unknown','native_probe_process_failed',
+      'native_probe_frame_incomplete','native_probe_cleanup_failed']);
+    const boolean=value=>typeof value==='boolean',nullableBoolean=value=>value===null||boolean(value);
+    const validators={synthetic:boolean,qualification:value=>value===false,dispatch_status:value=>['dispatched','not_dispatched'].includes(value),spawn_observed:nullableBoolean,
+      process_completed:nullableBoolean,termination_confirmed:nullableBoolean,cleanup_status:value=>['not_created','removed','retained_termination_unknown','retained_cleanup_failed'].includes(value),
+      exit_code:value=>value===null||Number.isInteger(value)&&value>=0&&value<=255,signal:value=>value===null||SIGNALS.has(value),cancelled:boolean,timed_out:boolean,
+      error_code:value=>value===null||codes.has(value),log_capture_status:value=>['complete','incomplete'].includes(value)};
+    let receiptStatus=receipt==null?'unavailable':'invalid',metadata=null,owned=null;
+    try{
+      const kind=receipt?.kind,id=receipt?.trial_id;
+      if(kind==='ask_native_probe_lifetime_v2'&&(id===trialId||id===trialId+'-1')){
+        owned={trialId:id,stdout:receipt.stdout,stderr:receipt.stderr};
+        const candidate={kind,trial_id:id};let valid=true;
+        for(const [field,check]of Object.entries(validators)){const value=receipt[field];if(!check(value)){valid=false;break;}candidate[field]=value;}
+        const postCaptureFailure=receipt.post_capture_failure_code;
+        if(postCaptureFailure!==undefined){if(!codes.has(postCaptureFailure))valid=false;else candidate.post_capture_failure_code=postCaptureFailure;}
+        if(valid){receiptStatus='available';metadata=candidate;}
+      }
+    }catch{/* Unknown metadata remains invalid; never infer false or zero. */}
+    const inspectStream=name=>{
+      let reference=null;
+      try{
+        const supplied=owned?.[name];
+        if(supplied){const value={path:supplied.path,bytes:supplied.bytes,digest:supplied.digest};
+          if(value.path===owned.trialId+'.'+name+'.log'&&Number.isSafeInteger(value.bytes)&&value.bytes>=0&&value.bytes<=1048576
+            &&typeof value.digest==='string'&&/^sha256:[a-f0-9]{64}$/u.test(value.digest))reference=value;}
+        if(reference){const saved=readStableFile(join(outputRoot,reference.path),'native failure retained stream',1048576);
+          if(saved.bytes.length===reference.bytes&&saved.rawByteDigest===reference.digest)return {status:'saved_verified',reference};}
+      }catch{/* A partial capture remains usable even when its peer is missing. */}
+      return {status:'missing_or_changed',expected_reference:reference};
+    };
+    const record={kind:'ask_primary_native_probe_failure_v1',trial_id:trialId,receipt_status:receiptStatus,receipt:metadata,stdout:inspectStream('stdout'),stderr:inspectStream('stderr')};
+    const path=trialId+'.failure.json',bytes=Buffer.from(JSON.stringify(record)+'\n');
+    writeFileSync(join(outputRoot,path),bytes,{flag:'wx',mode:0o600});
+    const saved=readStableFile(join(outputRoot,path),'native failure sidecar',16384);
+    if(saved.rawByteDigest!==hash(bytes)||saved.bytes.length!==bytes.length||(saved.evidence.finalPath.mode&0o777)!==0o600)throw new Error();
+    return Object.freeze({path,bytes:bytes.length,digest:hash(bytes)});
+  }catch{throw fail('native_controller_capture_failed');}
 }

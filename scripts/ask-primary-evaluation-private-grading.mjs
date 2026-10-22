@@ -1,4 +1,5 @@
 import { pfPerformancePrivateProbeRoute } from './ask-benchmark-pf-performance-probe.mjs';
+import {primaryClientFocusedProbeProfile} from './ask-primary-client-focused-controller.mjs';
 // Original private constructor/worker/record/scorer chain. No alternative grader.
 // This API is called only after separate start authority and restored originals.
 import assert from 'node:assert/strict';
@@ -73,7 +74,7 @@ function prospectivePerformanceBundle(bundle){
   assert.equal(bytes.length,asset.bytes,'prospective hidden bytes changed');
   const route=pfPerformancePrivateProbeRoute(bytes);
   if(route)assert.equal(bundle.manifest.fixture_identity.fixture_id,'pf-performance-regression');
-  return Boolean(route);
+  return Boolean(route||primaryClientFocusedProbeProfile(bytes,bundle.manifest.fixture_identity.fixture_id));
 }
 
 function persistEvidence(authorityRoot,normalized,bundle,execution,fragment) {
@@ -211,14 +212,16 @@ function runPrimaryEvaluationPrivateGradingInternal(producerOptions,runtimeInput
     for(const path of [producerOptions.recordRoot,runtimeInputs.frozenSourceRoot,runtimeInputs.privateRoot,authorityRoot])assert.ok(publicRoot!==resolve(path)&&!publicRoot.startsWith(`${resolve(path)}/`)&&!resolve(path).startsWith(`${publicRoot}/`),'primary public output overlaps authority');
     const execution=createPrimaryEvaluationSealedEvaluatorExecution(producerOptions,runtimeInputs);
     const logs=join(authorityRoot,'worker-logs');mkdirSync(logs,{mode:0o700});
-    let verifiedWorkerBudget=null;
+    let verifiedWorkerBudget=null,verifiedNativeProbeBody=null;
     if(asynchronous){
       const verifiedBundle=verifyPrivateEvaluatorBundle(s);
-      assert.ok(prospectivePerformanceBundle(verifiedBundle),'async grading requires fixed prospective performance body');
+      assert.ok(prospectivePerformanceBundle(verifiedBundle),'async grading requires fixed prospective body');
       verifiedWorkerBudget=verifiedBundle.manifest.execution_budget_ms;
+      const hidden=verifiedBundle.manifest.asset_inventory.find(item=>item.role==='hidden_tests'),bytes=read(join(verifiedBundle.canonicalPrivateRoot,hidden.path));
+      if(primaryClientFocusedProbeProfile(bytes,verifiedBundle.manifest.fixture_identity.fixture_id))verifiedNativeProbeBody=bytes;
     }
     const capture=asynchronous?withPrimaryEvaluatorLogCaptureAsync:withPrimaryEvaluatorLogCapture;
-    const captured=capture(producerOptions,{outputRoot:logs,normalizedResult:n,...(asynchronous?{signal:signal??undefined,deadlineAtMs,workerTimeoutMs:verifiedWorkerBudget}:{})},()=>{
+    const captured=capture(producerOptions,{outputRoot:logs,normalizedResult:n,...(asynchronous?{signal:signal??undefined,deadlineAtMs,workerTimeoutMs:verifiedWorkerBudget,nativeProbeBody:verifiedNativeProbeBody}:{})},()=>{
       const scoring=verifyPortfolioScoringInputs({root:s.root,catalogPath:s.catalogPath,policyManifestPath:s.policyManifestPath,scoringPolicyPath:s.scoringPolicyPath,
         admissionRecordPath:s.admissionRecordPath,requirementRecordPath:s.requirementRecordPath,outputContractPath:s.outputContractPath,referencePath:s.referencePath,
         freezeManifestPath:s.scoringInputFreezeManifestPath,freezeManifestSourceDigest:s.scoringInputFreezeManifestSourceDigest});

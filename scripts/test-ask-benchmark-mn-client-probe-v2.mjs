@@ -10,10 +10,15 @@ import * as client from './ask-benchmark-mn-client-probe-v2.mjs';
 // it only. Portable fixtures contain no private scoring or candidate criteria.
 const localLegacyPath=resolve(import.meta.dirname,'../../primary24-runtime-v10-assets-1/private/mn-client-compatibility-fix/hidden-evaluator.mjs');
 const syntheticLegacySource=`// synthetic template; no evaluator/native authority
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, resolve } from 'node:path';
 const probeScript = 'synthetic';
 function runBehavior(source) { throw Error('synthetic, never executed'); }
 
 export async function evaluateLegacyCandidateSafe({ repositoryRoot, originalWorkspaceAuthority, repositoryDiffArtifact }) {
+  const source = readFileSync(resolve(candidateWorkspace, 'src/preferences.mjs'), 'utf8');
   const behavioral = runBehavior(source);
   return behavioral;
 }
@@ -22,9 +27,9 @@ const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 
 test('C2-PIN: portable synthetic template transforms only the explicit async bridge',()=>{
   const built=client.buildMnClientProbeV2EvaluatorSourceForTest({syntheticLegacySource});
-  assert.ok(built.startsWith('export const nativeProbeVersion = "client-private-native-v2";\n'));
-  assert.match(built,/await runBehavior\(source, repositoryRoot, privateNativeProbeContext\)/u);
-  assert.match(built,/runQualifiedMnClientProbeV2/u);
+  assert.ok(built.startsWith('export const nativeProbeVersion = "client-controller-observation-v3";\n'));
+  assert.match(built,/runBehavior\(source, normalizedResult, privateClientProbe, privateNativeProbeBinding\)/u);
+  assert.equal(built.includes('runQualifiedMnClientProbeV2'),false);assert.equal(built.includes('privateNativeProbeContext'),false);assert.equal(built.includes('spawnSync'),false);
   assert.throws(()=>client.buildMnClientProbeV2EvaluatorSource({legacySource:syntheticLegacySource}),/client_v2_legacy_source_pin_invalid/u);
   assert.throws(()=>client.buildMnClientProbeV2EvaluatorSourceForTest({syntheticLegacySource:'unknown template'}),/client_v2_template_invalid/u);
 });
@@ -35,12 +40,24 @@ test('C2-PIN: optional private legacy pin/script survive pure construction',{ski
   const script=client.extractMnClientProbeV2Script({legacySource});
   assert.equal(Buffer.byteLength(script),4686);assert.equal(sha(script),'acfb3b1ba13a0c2be84aaea801c0ea7a482ad616f5b0a829b285f63d8465f72f');
   const built=client.buildMnClientProbeV2EvaluatorSource({legacySource});
-  assert.ok(built.startsWith('export const nativeProbeVersion = "client-private-native-v2";\n'));
-  assert.match(built,/await runBehavior\(source, repositoryRoot, privateNativeProbeContext\)/u);
-  const untouchedStart=legacySource.toString().slice(0,legacySource.toString().indexOf('function runBehavior(source) {'));
-  assert.equal(built.slice(built.indexOf('\n')+1).startsWith(untouchedStart),true);
+  assert.ok(built.startsWith('export const nativeProbeVersion = "client-controller-observation-v3";\n'));
+  assert.match(built,/runBehavior\(source, normalizedResult, privateClientProbe, privateNativeProbeBinding\)/u);
+  assert.equal(built.includes('runQualifiedMnClientProbeV2'),false);assert.equal(built.includes('node:child_process'),false);
+  assert.equal(sha(built),client.MN_CLIENT_PROBE_V3_BODY_SHA256);
+  assert.equal(client.mnClientProbeV2Route(built),'client-controller-observation-v3');
+  assert.equal(client.extractMnClientProbeV2ControllerScript({hiddenSource:built}),script);
+  assert.equal(client.mnClientProbeV2Route(legacySource),null);
+  assert.throws(()=>client.mnClientProbeV2Route(built+'\n'),/client_v2_body_source_pin_invalid/u);
   assert.equal(sha(readFileSync(localLegacyPath)),before);
   assert.throws(()=>client.buildMnClientProbeV2EvaluatorSource({legacySource:Buffer.concat([legacySource,Buffer.from('\n')])}),/client_v2_legacy_source_pin_invalid/u);
+});
+
+test('C3-ROUTE: header-only and unknown client versions never select a native consumer',()=>{
+  assert.equal(client.mnClientProbeV2Route('export function ordinary(){}'),null);
+  assert.throws(()=>client.mnClientProbeV2Route(client.MN_CLIENT_PROBE_V3_BODY_HEADER+'// fabricated body'),/client_v2_body_source_pin_invalid/u);
+  assert.throws(()=>client.mnClientProbeV2Route('export const nativeProbeVersion = "client-private-native-v2";\n'),/client_v2_body_version_unknown/u);
+  assert.throws(()=>client.mnClientProbeV2Route('export const nativeProbeVersion = "client-unknown";\n'),/client_v2_body_version_unknown/u);
+  assert.throws(()=>client.extractMnClientProbeV2ControllerScript({hiddenSource:'export function arbitrary(){}'}),/client_v2_body_source_pin_invalid/u);
 });
 
 test('C2-GATE: production null qualification refuses caller assertions before scratch or transport',async()=>{
@@ -199,4 +216,38 @@ test('C2-RAW: accessor transport uses the function checked before dependency cop
     assert.equal(result.state,'pass');assert.equal(checkedCalls,1);assert.equal(substitutedCalls,0);assert.equal(getterReads,1);
     rawSaved(outputRoot,'accessor',stdout,stderr);
   }finally{rmSync(area,{recursive:true,force:true});}
+});
+
+
+// C3: invented packet data only. This pure converter/consumer pair does not
+// issue native observations; production controller construction remains gated.
+function artificialControllerInput(){
+  return {candidateSource:Buffer.from('artificial candidate, never evaluated'),normalizedResultDigest:'sha256:'+sha('artificial normalized'),
+    ownerBinding:'sha256:'+sha('artificial round1'),receiptDigest:'sha256:'+sha('artificial saved receipt'),
+    result:{state:'pass',code:'bounded_behavior_observation',quality:null,observation_digest:'sha256:'+sha('artificial stdout'),observations:[[true],[true]]}};
+}
+test('C3-BIND: controller packet is finite immutable source/normalized/owner/receipt bound',()=>{
+  const input=artificialControllerInput(),observation=client.createMnClientProbeV2Observation(input);
+  assert.equal(Object.isFrozen(observation),true);assert.equal(Object.isFrozen(observation.result),true);assert.equal(Object.isFrozen(observation.result.observations[0]),true);
+  assert.equal(observation.receipt_digest,input.receiptDigest);assert.equal(Object.hasOwn(observation,'raw'),false);
+  assert.equal(client.inspectMnClientProbeV2Observation({...input,observation}).state,'pass');
+  for(const result of [{...input.result,state:'fail'},{state:'manual_review_required',code:'candidate_observation_invalid',quality:null}]){
+    const next=client.createMnClientProbeV2Observation({...input,result});assert.equal(client.inspectMnClientProbeV2Observation({...input,observation:next}).state,result.state);
+  }
+  input.result.observations[0][0]=false;assert.equal(observation.result.observations[0][0],true);
+});
+test('C3-BIND: packet drift, wrong owner/normalized/source, extra raw and missing receipt stay unavailable',()=>{
+  const input=artificialControllerInput(),original=client.createMnClientProbeV2Observation(input);
+  for(const mutate of [o=>o.candidate_source_digest='sha256:'+sha('drift'),o=>o.normalized_result_digest='sha256:'+sha('drift'),o=>o.owner_binding='sha256:'+sha('round2'),
+    o=>o.legacy_source_digest='sha256:'+sha('drift'),o=>o.probe_script_digest='sha256:'+sha('drift'),o=>o.request_digest='sha256:'+sha('drift'),o=>o.probe_version='unknown',
+    o=>o.receipt_digest=null,o=>o.raw={stdout:'forged'},o=>o.result.raw={},o=>o.result.observations=[[1]],o=>o.result.quality=1]){
+    const changed=structuredClone(original);mutate(changed);
+    const checked=client.inspectMnClientProbeV2Observation({...input,observation:changed});assert.equal(checked.state,'manual_review_required');assert.equal(checked.quality,null);
+  }
+  for(const changed of [{candidateSource:Buffer.from('different')},{normalizedResultDigest:'sha256:'+sha('different')},{ownerBinding:'sha256:'+sha('round2')}]){
+    assert.equal(client.inspectMnClientProbeV2Observation({...input,...changed,observation:original}).state,'manual_review_required');
+  }
+  assert.throws(()=>client.createMnClientProbeV2Observation({...input,receiptDigest:null}),/client_v2_observation_invalid/u);
+  const absent=client.createMnClientProbeV2Observation({...input,receiptDigest:null,result:{state:'manual_review_required',code:'native_client_probe_qualification_unavailable',quality:null}});
+  assert.equal(client.inspectMnClientProbeV2Observation({...input,observation:absent}).state,'manual_review_required');
 });

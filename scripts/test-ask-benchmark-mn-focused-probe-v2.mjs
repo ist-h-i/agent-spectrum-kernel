@@ -88,3 +88,66 @@ test('pure synthetic builder preserves surrounding criteria/wrapper and requires
   assert.throws(()=>buildMnFocusedProspectiveEvaluatorSourceV2({legacySource:source}),{code:'focused_v2_explicit_version_required'});
   assert.throws(()=>buildMnFocusedProspectiveEvaluatorSourceV2({legacySource:source,probeVersion:MN_FOCUSED_PROBE_VERSION}),{code:'focused_v2_legacy_pin_changed'});
 });
+
+import {buildMnFocusedControllerPlanForTest,buildMnFocusedRequestBindingsV3,createMnFocusedControllerPacketV3,inspectMnFocusedControllerPacketV3,buildMnFocusedControllerEvaluatorSourceForTest,inspectMnFocusedControllerRouteV3} from './ask-benchmark-mn-focused-probe-v2.mjs';
+// Fabricated selectors/labels only. This is parser input, never evaluated.
+function controllerFixture(){
+  return structuralFixture().replace('function existingObservableCoverage(source,oldTest,test,loader){return run(source,test,loader);}',`function existingObservableCoverage(source,oldTest,test,loader){
+ const control=run(source,oldTest,loader);const candidateTrials=[];
+ if(control.status!=='succeeded')return {state:null,candidateTrials};
+ for(const syntheticLabel of ['synthetic-a','synthetic-b','synthetic-c']){
+  const calibration=run(source,oldTest,loader,syntheticLabel);
+  if(calibration.status!=='failed'||!calibration.assertion_failure)continue;
+  const trials=[run(source,test,loader),run(source,test,loader,syntheticLabel),run(source,test,loader,syntheticLabel),run(source,test,loader)];
+ }
+}`).replace('function focusedEvaluate(c,scoring){return existingObservableCoverage(source,oldTest,test,loader);}',`function focusedEvaluate(c,scoring){
+ const weakened=source.replace('synthetic-needle','');
+ const baseline=run(weakened,oldTest,loader);const trials=[run(source,test,loader),run(weakened,test,loader),run(weakened,test,loader),run(source,test,loader)];
+ const existing=existingObservableCoverage(source,oldTest,test,loader);
+}`);
+}
+function controllerBindings(){
+  const plan=buildMnFocusedControllerPlanForTest({legacySource:controllerFixture()});
+  return buildMnFocusedRequestBindingsV3({plan,source:'synthetic-source-synthetic-needle',oldTest:'synthetic-old',test:'synthetic-new',loader:'synthetic-loader',normalizedResultDigest:'sha256:'+'a'.repeat(64),ownerBinding:'sha256:'+'b'.repeat(64)});
+}
+function fakeController(bindings,override=()=>undefined){
+  const observations=[],results=new Map();
+  for(const step of bindings.requests){
+    if(!step.requires.every(guard=>results.get(guard.step_id)?.[guard.field]===guard.equals))continue;
+    const result=override(step)??observation(step.site===1?'failed':'succeeded');
+    results.set(step.step_id,result);observations.push({step_id:step.step_id,site:step.site,loop_context:step.loop_context,request_digest:step.request_digest,result,receipt_digest:'sha256:'+'c'.repeat(64)});
+    if(result.status==='unavailable')break;
+  }
+  return observations;
+}
+
+test('adaptive private recipe preserves21max, distinct loop identities and skips four noncalibrated trials',()=>{
+  const bindings=controllerBindings();assert.equal(bindings.requests.length,21);
+  assert.equal(fakeController(bindings).length,21);
+  const skipped=fakeController(bindings,step=>step.site===1&&step.loop_context==='synthetic-a'?observation('failed',false,false):undefined);
+  assert.equal(skipped.length,17);
+  const packet=createMnFocusedControllerPacketV3({bindings,observations:skipped});assert.equal(inspectMnFocusedControllerPacketV3({bindings,packet}).valid,true);
+  assert.equal(skipped.filter(row=>row.site===2).length,2);
+  assert.notEqual(bindings.requests.filter(row=>row.site===2)[0].request_digest,bindings.requests.filter(row=>row.site===2)[1].request_digest);
+  assert.equal(fakeController(bindings,step=>step.site===0?observation('failed',false):undefined).length,6);
+  assert.equal(fakeController(bindings,()=>observation('unavailable',false)).length,1);
+});
+
+test('closed source/owner/receipt binding refuses missing, duplicate, disabled, unknown or changed rows',()=>{
+  const bindings=controllerBindings(),packet=createMnFocusedControllerPacketV3({bindings,observations:fakeController(bindings)});
+  for(const mutate of [p=>p.observations.reverse(),p=>p.observations.pop(),p=>p.observations.push(p.observations[0]),p=>p.owner_binding='changed',p=>p.observations[0].receipt_digest='unknown',p=>p.observations[0].request_digest='sha256:'+'d'.repeat(64),p=>p.observations[0].result.extra=true,p=>p.extra=true]){
+    const changed=structuredClone(packet);mutate(changed);assert.throws(()=>inspectMnFocusedControllerPacketV3({bindings,packet:changed}));
+  }
+  const other=controllerBindings();other.owner_binding='different-round';assert.throws(()=>inspectMnFocusedControllerPacketV3({bindings:other,packet}));
+  const disabled=fakeController(bindings,step=>step.site===0?observation('failed',false):undefined);
+  disabled.push(fakeController(bindings)[6]);assert.throws(()=>createMnFocusedControllerPacketV3({bindings,observations:disabled}));
+});
+
+test('new synthetic body consumes records inline and cannot use production route identity',()=>{
+  const body=buildMnFocusedControllerEvaluatorSourceForTest({legacySource:controllerFixture()});
+  const bridge=body.slice(body.indexOf('const MN_FOCUSED_CONTROLLER_VERSION='),body.indexOf('// Proof of preserved frozen-suite'));
+  assert.equal(bridge.includes('import('),false);assert.equal(bridge.includes('runQualified'),false);assert.equal(bridge.includes('randomBytes'),false);assert.equal(bridge.includes('spawn'),false);
+  assert.match(bridge,/state.consumed.has/);assert.match(bridge,/privateFocusedProbe/);assert.match(bridge,/privateNativeProbeBinding/);
+  assert.match(body,/focusedControllerInitialize\(c,source,oldTest,test,loader\)/);assert.match(body,/finally\{focusedControllerFinalize\(c\);/);assert.match(bridge,/state.consumed.size!==state.packet.observations.length/);
+  assert.throws(()=>inspectMnFocusedControllerRouteV3({bodySource:body}),{code:'focused_controller_body_pin_invalid'});
+});

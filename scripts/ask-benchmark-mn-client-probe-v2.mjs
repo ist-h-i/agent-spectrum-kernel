@@ -4,6 +4,9 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
 export const MN_CLIENT_PROBE_V2_VERSION='client-private-native-v2';
+export const MN_CLIENT_PROBE_V3_BODY_VERSION='client-controller-observation-v3';
+export const MN_CLIENT_PROBE_V3_BODY_HEADER='export const nativeProbeVersion = \"client-controller-observation-v3\";\n';
+export const MN_CLIENT_PROBE_V3_BODY_SHA256='0ccb03aa47c9468516eaa9ca184eeea75e91ec34ea79e8a0f7dadad3e7d0b770';
 export const MN_CLIENT_PROBE_V2_LEGACY_SHA256='d540b6064b23fa4b4f69e184aaa51189de30563907b30dca2bb8fdfc85c2faee';
 const SCRIPT_SHA256='acfb3b1ba13a0c2be84aaea801c0ea7a482ad616f5b0a829b285f63d8465f72f';
 const nativeQualificationEvidence=null;
@@ -19,7 +22,10 @@ function pinnedLegacyText(legacySource){
   return Buffer.isBuffer(legacySource)?legacySource.toString('utf8'):legacySource;
 }
 export function extractMnClientProbeV2Script({legacySource}){
-  const text=pinnedLegacyText(legacySource),marker='const probeScript = String.raw`',start=text.indexOf(marker)+marker.length;
+  return c2ExtractScript(pinnedLegacyText(legacySource));
+}
+function c2ExtractScript(text){
+  const marker='const probeScript = String.raw`',start=text.indexOf(marker)+marker.length;
   let end=start;
   for(;end<text.length;end++){
     if(text[end]!=='`')continue;
@@ -48,19 +54,75 @@ export function buildMnClientProbeV2EvaluatorSourceForTest({syntheticLegacySourc
   if(typeof syntheticLegacySource!=='string'||!syntheticLegacySource.startsWith('// synthetic template; no evaluator/native authority\n'))throw new Error('client_v2_template_invalid');
   return transformLegacyClientBody(syntheticLegacySource);
 }
+const C2_CLIENT_BINDING_META=Object.freeze({probe_version:MN_CLIENT_PROBE_V2_VERSION,legacy_source_digest:'sha256:'+MN_CLIENT_PROBE_V2_LEGACY_SHA256,probe_script_digest:'sha256:'+SCRIPT_SHA256});
+function c2ClientBinding({candidateSource,normalizedResultDigest,ownerBinding,receiptDigest=null}){
+  const isDigest=value=>typeof value==='string'&&/^sha256:[a-f0-9]{64}$/u.test(value);
+  if(!Buffer.isBuffer(candidateSource)||!isDigest(normalizedResultDigest)||!isDigest(ownerBinding)||(receiptDigest!==null&&!isDigest(receiptDigest)))throw new Error('client_v2_observation_invalid');
+  // Fixed lexical order is exactly the canonical JSON order for these seven
+  // scalar fields. The root computes ownerBinding from verified round identity.
+  return {candidate_source_digest:'sha256:'+createHash('sha256').update(candidateSource).digest('hex'),legacy_source_digest:C2_CLIENT_BINDING_META.legacy_source_digest,
+    normalized_result_digest:normalizedResultDigest,owner_binding:ownerBinding,probe_script_digest:C2_CLIENT_BINDING_META.probe_script_digest,
+    probe_version:C2_CLIENT_BINDING_META.probe_version,receipt_digest:receiptDigest};
+}
+function c2ClientResult(value){
+  if(!value||typeof value!=='object'||value.quality!==null)return null;
+  const fields=Object.keys(value).sort().join(',');
+  if(value.state==='manual_review_required'&&fields==='code,quality,state'&&typeof value.code==='string'&&/^[a-z][a-z0-9_]{0,79}$/u.test(value.code))
+    return Object.freeze({state:value.state,code:value.code,quality:null});
+  if(!['pass','fail'].includes(value.state)||fields!=='code,observation_digest,observations,quality,state'||value.code!=='bounded_behavior_observation'
+    ||typeof value.observation_digest!=='string'||!/^sha256:[a-f0-9]{64}$/u.test(value.observation_digest)||!Array.isArray(value.observations)||value.observations.length>2
+    ||value.observations.some(row=>!Array.isArray(row)||row.length>18||row.some(item=>typeof item!=='boolean')))return null;
+  return Object.freeze({state:value.state,code:value.code,quality:null,observation_digest:value.observation_digest,
+    observations:Object.freeze(value.observations.map(row=>Object.freeze([...row])))});
+}
+// Pure conversion/inspection is not an issuer. Only the controller may supply
+// these packets after its own capture/pin checks and module-private gate.
+export function createMnClientProbeV2Observation({candidateSource,normalizedResultDigest,ownerBinding,receiptDigest=null,result}){
+  const binding=c2ClientBinding({candidateSource,normalizedResultDigest,ownerBinding,receiptDigest}),checked=c2ClientResult(result);
+  if(!checked||(receiptDigest===null&&(checked.state!=='manual_review_required'||checked.code!=='native_client_probe_qualification_unavailable')))throw new Error('client_v2_observation_invalid');
+  return Object.freeze({...binding,request_digest:'sha256:'+createHash('sha256').update(JSON.stringify(binding)).digest('hex'),result:checked});
+}
+export function inspectMnClientProbeV2Observation({candidateSource,normalizedResultDigest,ownerBinding,observation}={}){
+  try{
+    if(!observation||Object.keys(observation).sort().join(',')!=='candidate_source_digest,legacy_source_digest,normalized_result_digest,owner_binding,probe_script_digest,probe_version,receipt_digest,request_digest,result')throw new Error();
+    const binding=c2ClientBinding({candidateSource,normalizedResultDigest,ownerBinding,receiptDigest:observation.receipt_digest});
+    if(Object.entries(binding).some(([key,value])=>observation[key]!==value)||observation.request_digest!=='sha256:'+createHash('sha256').update(JSON.stringify(binding)).digest('hex'))throw new Error();
+    const checked=c2ClientResult(observation.result);
+    if(!checked||(binding.receipt_digest===null&&(checked.state!=='manual_review_required'||checked.code!=='native_client_probe_qualification_unavailable')))throw new Error();
+    return checked;
+  }catch{return {state:'manual_review_required',code:'private_client_probe_observation_unavailable',quality:null};}
+}
+export function mnClientProbeV2Route(hiddenSource){
+  if(!(typeof hiddenSource==='string'||Buffer.isBuffer(hiddenSource)))throw new Error('client_v2_body_source_pin_invalid');
+  const text=Buffer.isBuffer(hiddenSource)?hiddenSource.toString('utf8'):hiddenSource;
+  if(!text.startsWith(MN_CLIENT_PROBE_V3_BODY_HEADER)){
+    if(text.startsWith('export const nativeProbeVersion = "client-'))throw new Error('client_v2_body_version_unknown');
+    return null;
+  }
+  if(sha(hiddenSource)!==MN_CLIENT_PROBE_V3_BODY_SHA256)throw new Error('client_v2_body_source_pin_invalid');
+  return MN_CLIENT_PROBE_V3_BODY_VERSION;
+}
+export function extractMnClientProbeV2ControllerScript({hiddenSource}){
+  if(mnClientProbeV2Route(hiddenSource)!==MN_CLIENT_PROBE_V3_BODY_VERSION)throw new Error('client_v2_body_source_pin_invalid');
+  return c2ExtractScript(Buffer.isBuffer(hiddenSource)?hiddenSource.toString('utf8'):hiddenSource);
+}
 function transformLegacyClientBody(original){
   const start=original.indexOf('function runBehavior(source) {'),end=original.indexOf('export async function evaluateLegacyCandidateSafe');
   if(start<0||end<start)throw new Error('client_v2_template_invalid');
-  const replacement=`async function runBehavior(source, repositoryRoot, context) {
-  const { runQualifiedMnClientProbeV2 } = await import(pathToFileURL(resolve(repositoryRoot, 'scripts/ask-benchmark-mn-client-probe-v2.mjs')).href);
-  return await runQualifiedMnClientProbeV2({ candidateSource: Buffer.from(source), probeScript, privateNativeProbeContext: context });
+  const replacement='const C2_CLIENT_BINDING_META = '+JSON.stringify(C2_CLIENT_BINDING_META)+';\n'+c2ClientBinding.toString()+'\n'+c2ClientResult.toString()+'\n'+inspectMnClientProbeV2Observation.toString()+`\nfunction runBehavior(source, normalizedResult, observation, ownerBinding) {
+  return inspectMnClientProbeV2Observation({ candidateSource: source, normalizedResultDigest: normalizedResult?.normalized_result_digest, observation, ownerBinding });
 }
 
 `;
   let result=original.slice(0,start)+replacement+original.slice(end);
-  result=replaceOnce(result,'originalWorkspaceAuthority, repositoryDiffArtifact }) {','originalWorkspaceAuthority, repositoryDiffArtifact, privateNativeProbeContext }) {');
-  result=replaceOnce(result,'const behavioral = runBehavior(source);','const behavioral = await runBehavior(source, repositoryRoot, privateNativeProbeContext);');
-  return 'export const nativeProbeVersion = '+JSON.stringify(MN_CLIENT_PROBE_V2_VERSION)+';\n'+result;
+  result=replaceOnce(result,"import { spawnSync } from 'node:child_process';\n",'');
+  result=replaceOnce(result,"import { mkdtempSync, readFileSync, rmSync } from 'node:fs';","import { readFileSync } from 'node:fs';");
+  result=replaceOnce(result,"import { tmpdir } from 'node:os';\n",'');
+  result=replaceOnce(result,"import { dirname, resolve } from 'node:path';","import { resolve } from 'node:path';");
+  result=replaceOnce(result,'originalWorkspaceAuthority, repositoryDiffArtifact }) {','originalWorkspaceAuthority, repositoryDiffArtifact, privateClientProbe, privateNativeProbeBinding }) {');
+  result=replaceOnce(result,"const source = readFileSync(resolve(candidateWorkspace, 'src/preferences.mjs'), 'utf8');","const source = readFileSync(resolve(candidateWorkspace, 'src/preferences.mjs'));");
+  result=replaceOnce(result,'const behavioral = runBehavior(source);','const behavioral = runBehavior(source, normalizedResult, privateClientProbe, privateNativeProbeBinding);');
+  return MN_CLIENT_PROBE_V3_BODY_HEADER+result;
 }
 
 // C2-GATE: no caller assertion/transport/context can qualify native execution.
