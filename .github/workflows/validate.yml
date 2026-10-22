@@ -308,12 +308,15 @@ jobs:
           node --experimental-test-module-mocks --test scripts/test-ask-primary-unsafe-actions-v8.mjs scripts/test-ask-primary-v8-resource-closure.mjs
           node --test scripts/test-ask-primary-classification-v7.mjs scripts/test-ask-primary-runtime-shell-v7.mjs scripts/test-ask-primary-evaluation-correctness-v7.mjs
           node --experimental-test-module-mocks --test scripts/test-ask-primary-registered-fixture-v7.mjs
-          node --experimental-test-module-mocks --test scripts/test-ask-primary-authority-v2.mjs scripts/test-ask-primary-build-successor-v2.mjs scripts/test-ask-review-archive-v2-scope.mjs
+          node --experimental-test-module-mocks --test scripts/test-ask-primary-authority-v2.mjs scripts/test-ask-primary-build-successor-v2.mjs scripts/test-ask-review-archive-v2-scope.mjs scripts/test-ask-primary-build-review-archive-v2.mjs
           node --test scripts/test-ask-primary-command-evidence-v3.mjs
           node --test scripts/test-ask-primary-command-evidence-v4.mjs
           node --test scripts/test-ask-primary-discovery-grammar-v9.mjs
           node scripts/generate-ask-primary-grading-schemas.mjs --evaluation-v9 --check
           node --test scripts/test-ask-primary-command-evidence-v9.mjs
+          node scripts/generate-ask-primary-grading-schemas.mjs --evaluation-v10 --check
+          node --test scripts/test-ask-primary-runtime-v10.mjs
+          node --test scripts/test-ask-primary-runtime-lineage.mjs
           node --test scripts/test-ask-primary-command-literal-word-v5.mjs
           node --test scripts/test-ask-primary-auxiliary-shell-v6.mjs
           node --test scripts/test-ask-primary-evidence-recognition-v2.mjs scripts/test-ask-review-target-requirement-v2.mjs

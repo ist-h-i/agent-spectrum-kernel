@@ -1,8 +1,8 @@
 {
-  "source_head": "a6d71c6c81973f585fe1aa27e4524a5a62889846",
+  "source_head": "2e19d583f885e1eedfab7429c0314dfd9a502414",
   "validate_commands": [
     "node --experimental-test-module-mocks --test scripts/test-ask-personal-evolution-cli.mjs scripts/test-ask-personal-evolution-cli-catalog24.mjs scripts/test-ask-personal-evolution-cli-catalog24-v8.mjs scripts/test-ask-personal-evolution-cli-recovery.mjs scripts/test-ask-personal-evolution-unattended-policy.mjs scripts/test-ask-personal-evolution-unattended.mjs scripts/test-ask-personal-evolution-rejection.mjs",
-    "node --experimental-test-module-mocks --test scripts/test-ask-primary-authority-v2.mjs scripts/test-ask-primary-build-successor-v2.mjs scripts/test-ask-review-archive-v2-scope.mjs",
+    "node --experimental-test-module-mocks --test scripts/test-ask-primary-authority-v2.mjs scripts/test-ask-primary-build-successor-v2.mjs scripts/test-ask-review-archive-v2-scope.mjs scripts/test-ask-primary-build-review-archive-v2.mjs",
     "node --experimental-test-module-mocks --test scripts/test-ask-primary-registered-fixture-v7.mjs",
     "node --experimental-test-module-mocks --test scripts/test-ask-primary-saved-scoring.mjs",
     "node --experimental-test-module-mocks --test scripts/test-ask-primary-unsafe-actions-v8.mjs scripts/test-ask-primary-v8-resource-closure.mjs",
@@ -33,6 +33,8 @@
     "node --test scripts/test-ask-primary-execution-input.mjs",
     "node --test scripts/test-ask-primary-protocol-catalog-probe.mjs",
     "node --test scripts/test-ask-primary-public-runtime-v2.mjs",
+    "node --test scripts/test-ask-primary-runtime-lineage.mjs",
+    "node --test scripts/test-ask-primary-runtime-v10.mjs",
     "node --test scripts/test-ask-primary-saved-command-capture.mjs",
     "node --test scripts/test-ask-primary-scoring-version.mjs scripts/test-ask-primary-processing-source.mjs scripts/test-ask-primary-resource-authority-writers.mjs scripts/test-ask-primary-runner-async-local-storage.mjs scripts/test-ask-primary-evaluation-private-grading.mjs scripts/test-ask-primary-evaluation-grading.mjs scripts/test-ask-benchmark-frozen-authority-modes.mjs",
     "node --test scripts/test-ask-primary-sqlite-startup-diagnostics-v3.mjs",
@@ -55,6 +57,7 @@
     "node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v4 --check",
     "node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v5 --check",
     "node scripts/generate-ask-primary-grading-schemas.mjs --command-evidence-v6 --check",
+    "node scripts/generate-ask-primary-grading-schemas.mjs --evaluation-v10 --check",
     "node scripts/generate-ask-primary-grading-schemas.mjs --evaluation-v7 --check",
     "node scripts/generate-ask-primary-grading-schemas.mjs --evaluation-v8 --check",
     "node scripts/generate-ask-primary-grading-schemas.mjs --evaluation-v9 --check",

@@ -1,7 +1,13 @@
 # CI suite inventory — Issue #433 first slice
 
 Source baseline: `a6d71c6c81973f585fe1aa27e4524a5a62889846`.
-This table is the stage-1 command-ownership snapshot, including unchanged workflows.
+The command inventory also includes the additive PR #427 registrations from
+`2e19d583f885e1eedfab7429c0314dfd9a502414`: V10 schema, runtime binding,
+runtime lineage, and the V2 build archive. Its `source_head` identifies that
+134-command input; local-eval commands and the strict aggregate are preserved.
+The table below is the historical stage-1 command-ownership snapshot, including
+unchanged workflows. Current additive registrations are listed in the next-stage
+delta and retained in the machine-readable inventory and workflow.
 Manual model workflows remain manual; presence is not execution authorization.
 Fake/synthetic checks are infrastructure evidence, not real LLM quality.
 
@@ -17,6 +23,12 @@ never selects execution. The full four-dependency aggregate remains unchanged.
 After both source integrations at main `318ad1fc`, common also runs
 `node --test scripts/test-ask-personal-evolution-trace.mjs` and
 `node --test scripts/test-codex-metrics-collector.mjs` unconditionally.
+The latest main `0b94087b` also retains #427's V10 schema/runtime/lineage commands
+and build-review-archive file. The composed workflow has 139 inventoried Node
+script invocations:
+the unchanged 134-command main inventory plus five explicitly allowed CI additions
+(coverage guard, classifier test, shadow record and the two focused commands).
+Per-command multiset checks prevent loss and duplicate registration.
 
 ## Dependencies and OS boundaries
 

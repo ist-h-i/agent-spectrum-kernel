@@ -1,3 +1,4 @@
+import {PRIMARY_RUNTIME_V10_REVISION, PRIMARY_RUNTIME_V10_BLOCKER, buildPrimaryRuntimeV10Binding} from './ask-primary-runtime-v10.mjs';
 // Public offline export plus the fixed original grading adapter. CLI stays offline.
 import assert from 'node:assert/strict';
 import { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
@@ -11,7 +12,7 @@ import { buildPrimaryFixtureRecipe, primaryFixtureIdsForSet, isRegisteredPrimary
 import { producePrimaryEvaluationArtifacts, normalizePrimaryRuntimeObservationCarrier } from './ask-primary-evaluation-producer.mjs';
 import { preflightPrimaryEvaluationGradingResources, runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
 
-import { primaryScoringRoot, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
+import { primaryProcessingSelection, primaryScoringRoot, verifyPrimaryScoringVersionResource } from './ask-primary-scoring-version.mjs';
 
 import { PRIMARY_EVALUATION_PROFILE_ID, PRIMARY_EVALUATION_CONDITIONS, primaryProfileForKernel, primaryProfileForRequest } from './ask-primary-evaluation-profile.mjs';
 
@@ -124,8 +125,15 @@ function publicBinding(block, loaded, root) {
 export function preflightPrimaryEvaluationGrading(block, { root = ROOT } = {}) {
   try {
     const loaded = readUserComparisonPlan(block.root);
-    if (loaded.plan.primary_execution_input) return { ...notReady(['closed_primary_input_processing_unconfigured']), binding: null,
-      timeout_ms: block.grading?.timeout_ms ?? PRIMARY_GRADING_RESERVATION_MS };
+    if (loaded.plan.primary_execution_input) {
+      const processing=primaryProcessingSelection(block,{root});
+      if(processing?.command_evidence_parser_revision===PRIMARY_RUNTIME_V10_REVISION){
+        assert.equal(block.plan_digest,loaded.plan_digest);assert.equal(block.run_id,loaded.plan.run_id);assert.equal(block.fixture_id,loaded.plan.verification.recipe.fixture_id);
+        return {...notReady([PRIMARY_RUNTIME_V10_BLOCKER,'v10_trusted_runtime_receipt_connection_missing']),binding:null,
+        preparation_binding:buildPrimaryRuntimeV10Binding({plan:loaded.plan,planDigest:loaded.plan_digest}),timeout_ms:block.grading?.timeout_ms??PRIMARY_GRADING_RESERVATION_MS};
+      }
+      return { ...notReady(['closed_primary_input_processing_unconfigured']), binding: null,timeout_ms: block.grading?.timeout_ms ?? PRIMARY_GRADING_RESERVATION_MS };
+    }
     const { binding } = publicBinding(block, loaded, root);
     return { ...notReady(['private_original_bundle_authority_unavailable', 'private_admission_review_authority_unavailable',
       'frozen_scoring_runtime_not_configured', 'private_evaluator_runtime_unverified']), binding, timeout_ms: block.grading?.timeout_ms ?? PRIMARY_GRADING_RESERVATION_MS };

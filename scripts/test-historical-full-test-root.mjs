@@ -17,6 +17,12 @@ test("isolated sealed assets preserve current helpers/tests and the source check
   }
   assert.equal(existsSync(resolve(target, "skills/ui-ux-design/references/ui-capability-contract.md")), false);
   assert.deepEqual(readFileSync(resolve(ROOT, "skills/ui-ux-design/references/ui-capability-contract.md")), original);
+  // Current shared producer imports must link against the deliberately sealed
+  // historical renderer/runner, which do not export modern collection APIs.
+  // Merely retaining the current helper bytes does not prove this closure.
+  execFileSync(process.execPath, ["--input-type=module", "--eval",
+    'await import("./scripts/ask-local-three-arm.mjs"); await import("./scripts/ask-local-three-arm-qualification.mjs");'],
+  { cwd: target, timeout: 60000, stdio: ["ignore", "pipe", "pipe"] });
   assert.throws(() => prepareHistoricalFullTestRoot(ROOT, target), /must be new/);
 });
 test("historical manifest drift fails before creating a checkout", t => {

@@ -29,7 +29,7 @@ preservation; OS coverage inventory and hosted exact-HEAD full checks;
 both integrated focused suites; independent source/docs/automated/final merge review. Failed or missing evidence
 blocks the relevant claim. Unknown old local sessions are not rerun.
 
-Implementation Contract `IMPL-CI433-2`, revision 2; upstream
+Implementation Contract `IMPL-CI433-2`, revision 3; upstream
 `SPEC-CI433-2@2`, `FVC-CI433-2@2`. Boundary: classifier, its tests, bounded CI
 recording, OS test ownership and this documentation. No runtime product,
 generated bundle, classifier-based skip, real-model execution, cancellation,
@@ -123,3 +123,14 @@ Both exact files exist in the composed tree. No missing-file skip is added.
 The previous `4c680085` head's nine hosted successes and mixed/full shadow record
 are historical; the composed registration head requires its own full checks and
 independent final review. No new-head success is inferred from a source PR's CI.
+
+Implementation revision-3 delta: #427 was subsequently integrated as main
+`0b94087bcd99a070a2c61b744df6658aff40e433`. A merge-tree check found
+one concrete content conflict in the inventory introduction: #427's 134-command
+description overlapped this PR's historical-snapshot clarification. Both are
+retained. The workflow combines automatically; the 134-command main inventory
+is inherited unchanged, plus five explicit CI additions (including both focused
+commands), giving 139 inventoried Node script invocations. This conflict requires one
+ordinary main merge and a new tested HEAD; it is not a cosmetic rebase. The
+already-running `27d0f381` CI is retained without cancellation or manual rerun,
+and its results remain historical rather than new-head evidence.
