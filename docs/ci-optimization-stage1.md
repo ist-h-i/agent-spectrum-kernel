@@ -63,6 +63,20 @@ This is a projection, not measured post-change improvement. Mac is preserved and
 may become the limiter. Extra jobs add setup overhead; latency and total runner
 duration must be compared separately after exact-head CI.
 
+Actual baseline logs subsequently established that old validate used Ubuntu
+26.04 image 20261012.163.1 and Node 24.21.0. Its historical duration and arithmetic
+projection cannot be used as a same-condition speedup comparison against the
+pinned Ubuntu 24.04 / Node 24.19.0 workflow. Old local-eval Ubuntu used image
+20261012.334.1 and Node 24.19.0; a descriptive comparison of that narrower job
+requires checking the current image, source and suite scope as well. The baseline
+8d9844c and starting main a6d71c6 have no file differences.
+
+Initial eae70ba6 local-eval Ubuntu completed successfully in 18m38s. Logs confirm
+Node 24.19.0 and Ubuntu 24.04, but image version 20261018.339.1 differs from the
+baseline 20261012.334.1. These absolute observations do not isolate this PR's
+latency effect; no causal percentage or steady-state saving is claimed. The
+verified structural reduction is eleven duplicate file invocations.
+
 ## Verification status and interruption
 
 Verified before connection loss: focused regression 3/3, Ruby YAML parsing of both
@@ -77,6 +91,22 @@ id. Completion remains Unknown. They have not been stopped or rerun. Hosted CI
 and merge readiness are not established by this note. Independent automated gate
 remains insufficient evidence pending local results and exact-head hosted checks.
 Later verified evidence belongs in the PR record.
+
+Approved proof delta: equivalent-or-stronger hosted proof at the final PR HEAD
+may discharge the moved-suite obligation. Local Unknown is not converted into
+success and is not a permanent merge prerequisite. The mapping is:
+
+| Unknown local invocation | Hosted proof | Limit |
+| --- | --- | --- |
+| Node 24.19.0 repository fixture suite | repository-tests: identical command/Node and independent full-history Ubuntu checkout | Intended Ubuntu CI relocation; Darwin-specific synthetic fake-package tuple is not newly proven |
+| Node 24.19.0 seven-file CLI command with module-mocks flags | personal-cli: identical seven files/flags/Node; Mac fake retains five-file overlap | Recovery/rejection add fake state/identity checks without Darwin-specific branches; no new Mac-runtime or real-model claim |
+
+Initial hosted run at eae70ba6: repository-tests passed; common failed at the
+autonomous-development workflow guard because it expected floating Node "24".
+The guard now checks the explicit 24.19.0 pin, preserving the check. This cheap
+guard is moved before long suites so future workflow-shape drift fails early.
+All original common commands remain present once. Initial failed/unfinished
+results remain historical evidence; they are not treated as final-HEAD success.
 
 ## Operation and remaining work
 

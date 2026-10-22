@@ -723,7 +723,7 @@ assert.equal(failureArtifacts.patch, "");
 const validateWorkflow = readFileSync(resolve(root, ".github/workflows/validate.yml"), "utf8");
 assert.match(validateWorkflow, /actions\/checkout@v5/);
 assert.match(validateWorkflow, /actions\/setup-node@v5/);
-assert.match(validateWorkflow, /node-version: "24"/);
+assert.match(validateWorkflow, /node-version: "24\.19\.0"/);
 assert.match(validateWorkflow, /Run autonomous development control tests/);
 for (const required of ["portfolio catalog", "portfolio policy", "portfolio design pre-admission", "portfolio independent design review", "general benchmark", "adaptive portfolio execution", "adaptive portfolio normalized result", "evaluator isolation boundary", "portfolio raw engineering result score", "repository consistency", "whitespace"]) {
   assert.match(validateWorkflow.toLowerCase(), new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "u"));

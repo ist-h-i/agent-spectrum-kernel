@@ -66,6 +66,9 @@ jobs:
       - name: Verify CI coverage preservation and strict aggregate
         run: node --test scripts/test-ci-full-run.mjs
 
+      - name: Run autonomous development control tests
+        run: node scripts/test-ask-autonomous-development.mjs
+
       # Exercise exact apply and no-write boundaries before long fixture suites.
       - name: Check whitespace errors
         run: |
@@ -199,9 +202,6 @@ jobs:
 
       - name: Run verification proof policy contract tests
         run: node scripts/test-verification-proof-policy.mjs
-
-      - name: Run autonomous development control tests
-        run: node scripts/test-ask-autonomous-development.mjs
 
       - name: Run epic admission and Work Package Plan contract tests
         run: node scripts/test-epic-admission-work-package-plan.mjs
