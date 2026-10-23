@@ -32,14 +32,32 @@ const replayCoverage = 'sent_requests_thread_turn_replies_and_accepted_item_term
 const initializeRequest = () => ({ id: 1, method: 'initialize', params: { clientInfo: { name: 'ask_primary_runtime_lineage', version: '1' }, capabilities: { experimentalApi: false, requestAttestation: false } } });
 const threadRequest = (plan, workspace) => ({ id: 2, method: 'thread/start', params: { model: plan.config.model, cwd: workspace, sandbox: 'workspace-write', ephemeral: true } });
 const turnRequest = (plan, input, threadId) => ({ id: 3, method: 'turn/start', params: { threadId, input: [{ type: 'text', text: input, text_elements: [] }], effort: plan.config.reasoning } });
+// Native optional metadata is a partial observation, not proof that no other
+// instructions/capabilities were loaded. In particular schema defaults must
+// never turn an omitted list into an observed empty list.
+function projectNativeStartupMetadata(result) {
+  const list = key => {
+    if (!Object.hasOwn(result, key)) return { status: 'not_reported', count: null, digest: null };
+    const value = result[key];
+    assert.ok(Array.isArray(value) && value.length <= 1024, 'invalid native startup metadata list');
+    for (const entry of value) assert.ok(typeof entry === 'string' && entry.length > 0 && entry.length <= 8192
+      && entry.isWellFormed() && !/[\u0000-\u001f\u007f]/u.test(entry), 'invalid native startup metadata entry');
+    // Keep exact native ordering/duplicates in the digest; do not normalize,
+    // resolve or open a host path, or persist raw host paths/plugin IDs.
+    return { status: 'reported', count: value.length, digest: canonicalDigest(value) };
+  };
+  return { instruction_sources: list('instructionSources'), disabled_plugin_ids: list('disabledPluginIds'),
+    effective_input_closure: 'unverified', plugin_capability_filtering: 'unverified' };
+}
 function projectThreadConfiguration(result, plan, workspace) {
   closed(result, ['thread', 'model', 'modelProvider', 'cwd', 'approvalPolicy', 'approvalsReviewer', 'sandbox'],
-    ['reasoningEffort', 'serviceTier', 'sessionId', 'activePermissionProfile']);
+    ['reasoningEffort', 'serviceTier', 'sessionId', 'activePermissionProfile', 'instructionSources', 'disabledPluginIds']);
   assert.equal(result.model, plan.config.model); assert.equal(result.cwd, workspace); assert.equal(result.sandbox?.type, 'workspaceWrite');
   assert.ok(typeof result.modelProvider === 'string' && /^[a-zA-Z0-9_-]{1,128}$/u.test(result.modelProvider));
   identifier(result.thread.id); assert.equal(result.thread.cwd, workspace); assert.deepEqual(result.thread.turns, []); assert.equal(result.thread.ephemeral, true);
   return { requested_model: plan.config.model, thread_model: result.model, provider: result.modelProvider, requested_effort: plan.config.reasoning,
-    per_turn_resolved_model: null, per_turn_resolved_effort: null, native_cwd: workspace };
+    per_turn_resolved_model: null, per_turn_resolved_effort: null, native_cwd: workspace,
+    startup_metadata: projectNativeStartupMetadata(result) };
 }
 
 /** Deliberately no production dispatch entry: missing startup evidence is a
