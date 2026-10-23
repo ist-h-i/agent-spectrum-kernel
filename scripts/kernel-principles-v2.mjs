@@ -23,7 +23,7 @@ export function renderKernelPrinciplesV2(source) {
   assert.deepEqual(generation.dependencies, [], "v2 candidate instruction dependency changed");
   assert.deepEqual(generation.supported_task_classes, supported, "v2 candidate scope changed");
   return { body, generation: { ...generation, id: KERNEL_PRINCIPLES_V2_ID,
-    renderer_revision: 1, generated_digest: hash(body), adoption_scope: "selected_evaluation_only",
+    generated_digest: hash(body), adoption_scope: "selected_evaluation_only",
     contract_delta: { ...generation.contract_delta, admission_descriptor: "kernel_principles_v2.task_signal@1" },
   } };
 }

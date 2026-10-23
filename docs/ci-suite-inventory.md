@@ -9,7 +9,8 @@ stage-specific, not the current total. Validate has **148 registered Node script
 invocations**: the 140 inherited from #439 plus eight controls (one plan, one
 new plan/receipt regression command, five receipt producers and one gate).
 The manual-comparison follow-up adds one unconditional common invocation for its
-two lightweight artificial test files, so the current total is **149**. No
+two lightweight artificial test files, reaching **149**. The sufficient-scope
+regression adds one more common invocation, so the current total is **150**. No
 workflow or job is added. Local-eval retains **25** registrations. Counts include the preserved conditional
 failure diagnostic; they are inventory counts, not a claim every conditional
 command executes on a green run. PR #441 synchronized documentation only; the
@@ -24,9 +25,9 @@ plan plus five workers feed the fixed six-dependency validate gate. The original
 diagnostic. The active receipt registry also has 107 required descriptors, but
 its set excludes that failure-only diagnostic and includes the new plan/receipt
 regression step. The manual-comparison follow-up brings the active required
-registry to **108** descriptors while preserving every historical fixture block
-unchanged. Neither fixture replaces the current workflow as execution
-authority.
+registry to **108** descriptors; the sufficient-scope regression brings it to
+**109**, while preserving every historical fixture block unchanged. Neither
+fixture replaces the current workflow as execution authority.
 
 For the exact #440 hosted proof, single-batch measurements and remaining
 consumer-closure/docs-v1 observation limits, see
@@ -42,6 +43,15 @@ is not added again. `test-ci-full-run.mjs` checks unique unconditional ownership
 unchanged workers and absence of cross-workflow duplicates. Existing receipt
 and strict aggregate rules include the new step automatically. Historical command
 and step inventories remain preserved baselines rather than regenerated totals.
+
+## Sufficient-scope regression coverage
+
+The sufficient-scope change adds one unconditional command to the existing
+Validate/common job: `node --test scripts/test-sufficient-change-scope-fixtures.mjs`.
+It calibrates local artificial behavior checks for incomplete scope, incorrect
+policy sharing and a follow-up change. It starts no model and adds no workflow
+or job. The historical inventories and measurements below remain unchanged;
+the current workflow and receipt registry include this additional command.
 
 ## Cross-workflow duplicate reduction
 

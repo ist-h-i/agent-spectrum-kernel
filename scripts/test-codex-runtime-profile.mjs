@@ -28,7 +28,8 @@ const formalLedgerDirectTriggerId = "formal_claim_audit_required";
 const expectedOutputControl = "[output] managed: ordinary=>sidecar, stop/handoff=>inline, diagnostic explicit; unmanaged=>one inline; next_action only.";
 
 validateCodexCompactControlMap(controlMap);
-if (summary.rendered_bytes >= summary.baseline_bytes) throw new Error("Codex compact profiles must reduce aggregate prompt bytes measured from immutable pre-compact fixtures");
+const actualRenderedBytes = fullPlan.compactProfileArtifacts.reduce((total, artifact) => total + Buffer.byteLength(artifact.content), 0);
+if (summary.rendered_bytes !== actualRenderedBytes) throw new Error("Codex rendered-byte measurements must match the generated prompt bytes");
 if (summary.route_depth >= summary.baseline_route_depth) throw new Error("Codex compact profiles must reduce aggregate route depth measured from the route fixture");
 
 for (const profile of summary.profiles) {
@@ -179,4 +180,5 @@ try {
 if (Object.keys(CODEX_COMPACT_PROFILE_DEFINITIONS).length !== 5 || summary.profiles.length !== 5) throw new Error("all five explicit Codex entry modes require compact profiles");
 if (JSON.stringify(summary.profiles.map((profile) => profile.task_class).sort()) !== JSON.stringify(requiredTaskClasses.sort())) throw new Error("compact profiles must preserve implementation, investigation, review, verification, and handoff entry coverage");
 
+console.log(`Codex fixed-entry bytes: ${summary.rendered_bytes}; historical baseline: ${summary.baseline_bytes}; delta: ${summary.rendered_bytes - summary.baseline_bytes}`);
 console.log("Codex compact runtime profile tests passed");

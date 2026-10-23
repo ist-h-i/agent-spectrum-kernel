@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { comparisonHash, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 import { aggregateUserComparisons, inspectNodeVerification, inspectUserComparison, parseUserCodexTelemetry, readUserComparisonPlan,
   reportUserComparison, sanitizeComparisonLog, startUserComparison, userCodexInvocation } from "./ask-user-comparison.mjs";
@@ -73,6 +74,56 @@ test("K-principles uses the generated-only entry while old K and Full remain int
   const collection = aggregateUserComparisons([p.root, old.root]);
   assert.equal(collection.groups.length, 2);
   assert.ok(collection.groups.every(group => group.summary.blocks.length === 1));
+});
+
+test("K-principles aggregation separates source revisions and pools the same generation", async t => {
+  const f = fixture(t, { taskClass: "implementation", kernelCondition: KERNEL_PRINCIPLES_ID });
+  const source = fileURLToPath(new URL("../", import.meta.url)), historicalSource = join(f.root, "historical-ask");
+  const revision = "5f36081e6f89072482ef721efbbc210849845838";
+  git(source, ["--no-replace-objects", "worktree", "add", "--detach", historicalSource, revision]);
+  try {
+    assert.equal(git(historicalSource, ["--no-replace-objects", "rev-parse", "HEAD"]), revision);
+    const { prepareUserComparison: prepareHistorical } = await import(pathToFileURL(join(historicalSource, "scripts/ask-user-comparison-prepare.mjs")).href);
+    const historical = prepareHistorical({ ...f.options, output: join(f.root, "historical-run") });
+    const current = f.prepare(), repeated = prepareUserComparison({ ...f.options, output: join(f.root, "repeated-run") });
+    const prepared = [historical, current, repeated];
+    const saved = prepared.map(value => [readFileSync(join(value.root, "control/plan.json")), readFileSync(join(value.root, "control/plan.digest"))]);
+    for (const value of prepared) {
+      assert.equal(value.plan.config.kernel_condition, KERNEL_PRINCIPLES_ID);
+      assert.deepEqual(value.plan.source, current.plan.source);
+      assert.equal(value.plan.task.digest, current.plan.task.digest);
+      assert.equal(value.plan.verification.digest, current.plan.verification.digest);
+    }
+    assert.equal(historical.plan.kernel_definition.generation.renderer_revision, 1);
+    assert.equal(current.plan.kernel_definition.generation.renderer_revision, 2);
+    const collection = aggregateUserComparisons(prepared.map(value => value.root));
+    assert.equal(collection.groups.length, 2);
+    assert.equal(collection.mixed_kernel_generations_pooled, false);
+    const identity = value => {
+      const { source_digest, generated_digest, renderer_revision } = value.plan.kernel_definition.generation;
+      return { source_digest, generated_digest, renderer_revision };
+    };
+    assert.deepEqual(collection.groups.map(group => group.kernel_generation), [identity(historical), identity(current)]);
+    assert.deepEqual(collection.groups.map(group => group.summary.blocks.map(block => block.block_id)),
+      [[historical.plan.run_id], [current.plan.run_id, repeated.plan.run_id]]);
+    assert.ok(collection.groups[1].summary.summaries.every(row => row.block_ids.length === 2));
+    for (const [index, value] of prepared.entries()) {
+      assert.deepEqual(collection.reports[index].kernel_generation, identity(value));
+      assert.equal(collection.reports[index].evidence_kind, "plan");
+      assert.ok(collection.reports[index].slots.every(slot => slot.state === "not_started"));
+      assert.equal(existsSync(join(value.root, "control/start.json")), false);
+      assert.deepEqual(readFileSync(join(value.root, "control/plan.json")), saved[index][0]);
+      assert.deepEqual(readFileSync(join(value.root, "control/plan.digest")), saved[index][1]);
+    }
+    for (const value of [historical, current]) {
+      const result = spawnSync(process.execPath, [fileURLToPath(new URL("./ask-user-comparison.mjs", import.meta.url)), "report", value.root], { encoding: "utf8" });
+      assert.equal(result.status, 7, result.stderr);
+      const generation = identity(value);
+      assert.ok(result.stdout.includes(`Kernel generation: ${KERNEL_PRINCIPLES_ID}; renderer_revision=${generation.renderer_revision}; source_digest=${generation.source_digest}; generated_digest=${generation.generated_digest}`));
+    }
+  } finally {
+    git(source, ["worktree", "remove", "--force", historicalSource]);
+  }
 });
 
 test("K-principles never declares unsupported specialized task classes available", async t => {

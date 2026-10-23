@@ -36,7 +36,8 @@ test('catalog selection of the historical nine tasks keeps actual v2 identity an
       assert.equal(plan.config.kernel_condition,'kernel_principles_v2');assert.equal(plan.kernel_definition.generation.id,'kernel_principles_v2');
       assert.equal(plan.kernel_definition.assessment.task_class,plan.verification.recipe.runner_task_class);
       assert.equal(plan.kernel_definition.renderer_closure.length,3);
-      assert.equal(plan.kernel_definition.renderer_closure[0].digest,"sha256:233b592aae5fd44738f9b36e593768314a1feb5f7faa865582a59daba9763799");
+      assert.equal(plan.kernel_definition.renderer_closure[0].source_path,'scripts/kernel-principles-v2.mjs');
+      assert.equal(plan.kernel_definition.renderer_closure[0].digest,comparisonHash(readFileSync(join(ROOT,'scripts/kernel-principles-v2.mjs'))));
       assert.equal(inspectUserComparison(block.root).execution.start_consumed,false);
       const report=reportUserComparison(block.root);assert.ok(report.slots.every(s=>s.state==='not_started'));
       assert.equal(report.summary.supplied_notes.kernel_condition,'kernel_principles_v2');

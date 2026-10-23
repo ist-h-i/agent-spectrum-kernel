@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { PROMPT_V2_RENDERER_SOURCE } from "./prompt-v2-historical-renderer.mjs";
+import { PROMPT_V2_RENDERER_SOURCE, withHistoricalPromptV2Source } from "./prompt-v2-historical-renderer.mjs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -351,23 +351,8 @@ function verifyRenderedArchiveFiles({ fixtureRoot }) {
 }
 
 function withDetachedSource({ sourceRevision, sourceTree }, callback) {
-  assertGitIdentity(sourceRevision, "Prompt v2 source revision");
-  assertGitIdentity(sourceTree, "Prompt v2 source tree");
-  const temporaryRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-prompt-v2-source-")));
-  const sourceRoot = resolve(temporaryRoot, "source");
-  let added = false;
-  try {
-    execFileSync("git", ["worktree", "add", "--detach", sourceRoot, sourceRevision], { cwd: repositoryRoot, stdio: "pipe" });
-    added = true;
-    const actualRevision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: sourceRoot, encoding: "utf8" }).trim();
-    const actualTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: sourceRoot, encoding: "utf8" }).trim();
-    if (actualRevision !== sourceRevision || actualTree !== sourceTree) throw new Error("Prompt v2 detached source revision/tree mismatch");
-    if (execFileSync("git", ["status", "--porcelain"], { cwd: sourceRoot, encoding: "utf8" }) !== "") throw new Error("Prompt v2 detached source worktree is not clean");
-    return callback({ sourceRoot, temporaryRoot });
-  } finally {
-    if (added) execFileSync("git", ["worktree", "remove", "--force", sourceRoot], { cwd: repositoryRoot, stdio: "pipe" });
-    rmSync(temporaryRoot, { recursive: true, force: true });
-  }
+  if (sourceRevision !== PROMPT_V2_SOURCE_REVISION || sourceTree !== PROMPT_V2_SOURCE_TREE) throw new Error("Prompt v2 detached source requires frozen source A");
+  return withHistoricalPromptV2Source(repositoryRoot, callback);
 }
 
 function verifySourceArchiveReproduction({ sourceRoot, scratchRoot }) {
@@ -1226,9 +1211,15 @@ export function verifyPromptV2PreregistrationFixture({ root }) {
   if (!root) throw new Error("Prompt v2 preregistration fixture root is required");
   const fixtureRoot = resolve(root);
   assertNoSymlinkPathSegments(fixtureRoot, "Prompt v2 preregistration fixture root");
-  // Historical fixture integrity is checked at its frozen renderer revision.
-  // This does not certify or activate the current adapter implementation.
-  const preregistration = loadPromptV2Preregistration({ root: repositoryRoot, rendererSource: "frozen_renderer_source" });
+  // All preregistration authorities belong to source A, including source maps.
+  // Validate their exact bytes there; this does not certify the live projection.
+  const { preregistration, preregistrationRawDigest } = withDetachedSource({
+    sourceRevision: PROMPT_V2_SOURCE_REVISION,
+    sourceTree: PROMPT_V2_SOURCE_TREE,
+  }, ({ sourceRoot }) => ({
+    preregistration: loadPromptV2Preregistration({ root: sourceRoot }),
+    preregistrationRawDigest: rawDigest(readFileSync(resolve(sourceRoot, PREREGISTRATION_PATH))),
+  }));
   const binding = readJsonFileStrict(resolve(fixtureRoot, "binding.json"), "Prompt v2 preregistration binding");
   const reference = readJsonFileStrict(resolve(fixtureRoot, "reference.json"), "Prompt v2 preregistration reference");
   if (reference.reference_digest !== canonicalDigest(without(reference, ["reference_digest"]))) throw new Error("Prompt v2 preregistration reference digest mismatch");
@@ -1237,7 +1228,11 @@ export function verifyPromptV2PreregistrationFixture({ root }) {
   if (reference.source.repository_revision !== binding.source.repository_revision || reference.source.repository_tree !== binding.source.repository_tree) throw new Error("Prompt v2 reference/binding source identity mismatch");
   if (reference.source.repository_revision !== PROMPT_V2_SOURCE_REVISION || reference.source.repository_tree !== PROMPT_V2_SOURCE_TREE) throw new Error("Prompt v2 fixture source A identity drifted");
   if (reference.binding.binding_digest !== binding.binding_digest || reference.binding.raw_digest !== rawDigest(readFileSync(resolve(fixtureRoot, "binding.json")))) throw new Error("Prompt v2 reference binding identity mismatch");
-  if (reference.preregistration.preregistration_digest !== preregistration.preregistration_digest || reference.preregistration.raw_digest !== rawDigest(readFileSync(resolve(repositoryRoot, PREREGISTRATION_PATH)))) throw new Error("Prompt v2 preregistration config binding drifted");
+  if (reference.preregistration.preregistration_digest !== preregistration.preregistration_digest
+    || reference.preregistration.raw_digest !== preregistrationRawDigest
+    || rawDigest(readFileSync(resolve(repositoryRoot, PREREGISTRATION_PATH))) !== preregistrationRawDigest) {
+    throw new Error("Prompt v2 preregistration config binding drifted");
+  }
   const rendered = verifyRenderedArchiveFiles({ fixtureRoot });
   if (rendered.reference.archive_digest !== reference.rendered_archive.archive_digest || rendered.inventory_digest !== reference.rendered_archive.inventory_digest || rendered.inventory_digest !== binding.source.rendered_source_inventory_digest) throw new Error("Prompt v2 rendered archive binding drifted");
   const storeRoot = resolve(fixtureRoot, "store");

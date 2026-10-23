@@ -309,6 +309,10 @@ jobs:
         id: ci_a7601d78a4ab
         run: node scripts/test-skill-effectiveness-outcome.mjs
 
+      - name: Calibrate sufficient-scope and follow-up behavior checks
+        id: ci_sufficient_scope
+        run: node --test scripts/test-sufficient-change-scope-fixtures.mjs
+
       - name: Run verification proof policy contract tests
         id: ci_71e142c569a8
         run: node scripts/test-verification-proof-policy.mjs

@@ -8,7 +8,7 @@ Optimize for reliable engineering outcomes, not for producing code quickly.
 
 The agent must:
 - understand the relevant repository context before changing code,
-- keep the change boundary narrow,
+- establish a sufficient change boundary before keeping it narrow,
 - separate verified facts from hypotheses,
 - avoid unsupported claims,
 - verify behavior before declaring completion,
@@ -63,7 +63,7 @@ Prefer repository conventions over generic best practices. Existing code is evid
 
 ## 3. Scope discipline
 
-Touch only what the task requires.
+Derive the required change boundary from current behavior, invariants, owners, and affected providers/consumers. Cover the authorized outcome without touching unrelated systems.
 
 Do not:
 - refactor adjacent systems opportunistically,
@@ -73,7 +73,7 @@ Do not:
 - change architecture, style, dependencies, or build systems as a side effect,
 - mix cleanup with behavior change unless required for the requested outcome.
 
-If a broader issue is discovered, report it separately instead of silently expanding scope.
+Necessary structural cleanup belongs to the requested outcome; unrelated improvements do not. Re-plan when evidence changes the necessary scope, without requesting approval again for work already authorized. Report unrelated broader issues separately; pause affected work when the revised scope crosses an explicit forbidden boundary or requires an unresolved decision or authorization.
 
 ## 4. Safety and external effects
 
@@ -98,7 +98,7 @@ When in doubt, stop and report:
 
 ## 5. Smallest valid change
 
-Prefer the smallest change that satisfies the requirement and preserves existing behavior.
+An adequate option satisfies the requested behavior and preserves unaffected behavior, invariants, and contracts within authorization. Compare adequate options by the lasting work needed to understand, change, verify, and operate them, considering change risk and verification cost, then prefer a small, reversible diff. Fewer lines or files alone do not prove a simpler system. Do not omit required structural work to minimize the diff or invent future needs to justify cleanup.
 
 Default choices:
 - reuse existing abstractions,
@@ -109,6 +109,8 @@ Default choices:
 - keep generated, vendored, and build-output files untouched unless they are the target.
 
 New abstractions require an observed duplication, volatility, lifecycle, ownership, or boundary problem in the repository.
+
+Retire paths, state, and configuration made obsolete by this change after checking affected consumers. Retention needs a current compatibility or rollout reason and a retirement condition; unknown usage calls for investigation, not blind deletion or an invented compatibility claim.
 
 ## 6. Assumption handling
 

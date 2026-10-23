@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
+import { computePromptV2AuthorityBindingDigest } from "./ask-benchmark-prompt-v2.mjs";
 import {
   canonicalDigest,
   listContentAddressedJson,
@@ -191,6 +192,8 @@ function main() {
   assert.equal(fixtureSummary.results_accessed, false);
   assert.equal(fixtureSummary.runtime_activation_implied, false);
   assert.equal(fixtureSummary.object_count, 57);
+  assert.throws(() => checkPromptV2RenderedArchive({ fixtureRoot: canonicalFixtureRoot }), /drifted/u,
+    "a valid historical fixture must not certify the changed live renderer projection");
 
   const binding = readJson(resolve(canonicalFixtureRoot, "binding.json"));
   const reference = readJson(resolve(canonicalFixtureRoot, "reference.json"));
@@ -261,6 +264,24 @@ function main() {
     tamperedBinding.boundaries.runtime_activation_implied = true;
     writeJson(resolve(bindingTamperRoot, "binding.json"), tamperedBinding);
     assert.throws(() => verifyPromptV2PreregistrationFixture({ root: bindingTamperRoot }), /digest|runtime_activation|forbidden post-result/u);
+
+    const sourceTamperRoot = resolve(fullFixtureTemporaryRoot, "source-tamper");
+    copyFixture(sourceTamperRoot);
+    const sourceBinding = readJson(resolve(sourceTamperRoot, "binding.json"));
+    sourceBinding.source.repository_revision = "0".repeat(40);
+    sourceBinding.source.repository_tree = "0".repeat(40);
+    sourceBinding.binding_digest = computePromptV2AuthorityBindingDigest(sourceBinding);
+    writeJson(resolve(sourceTamperRoot, "binding.json"), sourceBinding);
+    const sourceReference = readJson(resolve(sourceTamperRoot, "reference.json"));
+    sourceReference.source.repository_revision = sourceBinding.source.repository_revision;
+    sourceReference.source.repository_tree = sourceBinding.source.repository_tree;
+    sourceReference.binding.binding_digest = sourceBinding.binding_digest;
+    sourceReference.binding.raw_digest = digest(readFileSync(resolve(sourceTamperRoot, "binding.json")));
+    sourceReference.reference_digest = canonicalDigest(Object.fromEntries(
+      Object.entries(sourceReference).filter(([key]) => key !== "reference_digest"),
+    ));
+    writeJson(resolve(sourceTamperRoot, "reference.json"), sourceReference);
+    assert.throws(() => verifyPromptV2PreregistrationFixture({ root: sourceTamperRoot }), /source A identity drifted/u);
 
     const objectTamperRoot = resolve(fullFixtureTemporaryRoot, "object-tamper");
     copyFixture(objectTamperRoot);

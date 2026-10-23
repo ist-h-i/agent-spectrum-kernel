@@ -16,8 +16,8 @@
       "source_refs": ["AGENTS.md", "skills/scope-control/SKILL.md"],
       "required_inputs": ["workspace", "nearby_implementation", "tests", "docs", "public_contract"],
       "missing_input_behavior": "stop_or_insufficient_evidence",
-      "change_boundary": "smallest_task_required",
-      "cleanup_boundary": "separate"
+      "change_boundary": "sufficient_scope_then_maintenance_burden_then_diff",
+      "cleanup_boundary": "task_required_cleanup_and_retirement_inside_unrelated_separate"
     },
     "verification": {
       "source_refs": ["AGENTS.md", "docs/verification-proof-policy-contract.md", "schemas/verification-proof-policy.schema.json", "skills/test-first-verification/SKILL.md"],

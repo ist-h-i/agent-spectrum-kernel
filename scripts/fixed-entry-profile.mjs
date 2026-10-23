@@ -64,7 +64,7 @@ export function validateFixedEntryControlMap(controlMap = readJson(FIXED_ENTRY_C
   const scope = controlMap.controls.scope;
   exactKeys(scope, ["source_refs", "required_inputs", "missing_input_behavior", "change_boundary", "cleanup_boundary"], "scope control");
   if (!Array.isArray(scope.source_refs) || !Array.isArray(scope.required_inputs) || scope.required_inputs.length === 0) throw new Error("scope control requires source_refs and required_inputs");
-  if (scope.missing_input_behavior !== "stop_or_insufficient_evidence" || scope.change_boundary !== "smallest_task_required" || scope.cleanup_boundary !== "separate") throw new Error("scope control weakens canonical stop or change-boundary semantics");
+  if (scope.missing_input_behavior !== "stop_or_insufficient_evidence" || scope.change_boundary !== "sufficient_scope_then_maintenance_burden_then_diff" || scope.cleanup_boundary !== "task_required_cleanup_and_retirement_inside_unrelated_separate") throw new Error("scope control weakens canonical evidence, sufficiency, or cleanup semantics");
 
   const verification = controlMap.controls.verification;
   exactKeys(verification, ["source_refs", "proof_policy_ref", "proof_policy_schema_ref", "proof_path_selected_before_implementation_claim", "focused_check_first", "broader_checks_proportional_to_risk", "exact_results_required", "compact_to_formal_upgrade_required"], "verification control");
@@ -159,7 +159,7 @@ export function fixedEntryCanonicalPaths(entryName, controlMap = validateFixedEn
 }
 
 function renderControl(controlId, control) {
-  if (controlId === "scope") return "[scope] repo/code/tests/docs/API; missing=>stop|insufficient; minimal diff; cleanup separate";
+  if (controlId === "scope") return "[scope] inspect repo/code/tests/docs/API; derive sufficient scope for the authorized outcome from current requirements/contracts/invariants and evidenced affected owners/providers/consumers; missing=>stop|insufficient; among sufficient options minimize maintenance burden, then diff; include cleanup and retirement required by this change; check consumers before retiring obsolete paths/state/config; retain only with a current compatibility/rollout reason and retirement condition; unrelated cleanup separate.";
   if (controlId === "verification") return `[verification] ${control.proof_policy_ref}: ${VERIFICATION_PROOF_PATHS.join("|")} before claim; focused->risk-based; exact; trigger=>formal.`;
   if (controlId === "risk_approval") return "[risk_approval] exact action/risk/impact/reversibility/visibility/alternative/preconditions; unapproved=>stop; approved-only.";
   if (controlId === "evidence") return `[evidence] ${canonicalClaimEvidenceStatuses().join("|")}@${control.contract_ref}; inline; closed formal=>evidence-ledger; unsupported=>downgrade.`;
@@ -169,6 +169,7 @@ function renderControl(controlId, control) {
 }
 
 export function renderFixedEntryControls(controlMap = validateFixedEntryControlMap()) {
+  validateFixedEntryControlMap(controlMap);
   return controlMap.required_control_ids.map((controlId) => `- ${renderControl(controlId, controlMap.controls[controlId])}`).join("\n");
 }
 
@@ -201,6 +202,7 @@ export function renderFixedEntryTemplate(entryName, sourceBody, { controlMap = v
 }
 
 export function validateRenderedFixedEntryControls(content, controlMap = validateFixedEntryControlMap()) {
+  validateFixedEntryControlMap(controlMap);
   for (const controlId of controlMap.required_control_ids) {
     const expected = `- ${renderControl(controlId, controlMap.controls[controlId])}`;
     if (!content.includes(expected)) throw new Error(`rendered fixed entry does not preserve canonical ${controlId} semantics`);

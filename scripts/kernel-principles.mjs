@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 
 export const KERNEL_PRINCIPLES_ID = "kernel_principles_v1";
-export const KERNEL_PRINCIPLES_SOURCE_DIGEST = "sha256:173b0ae1cbb3a92cb434b60c5d233dbd0e2b68b75be9732818d8b53cbb3b5d6c";
+export const KERNEL_PRINCIPLES_SOURCE_DIGEST = "sha256:9246ccde37219850da235544c158100efd0b473112ad59c7b692fc930e4538ee";
+// Retain the reviewed 5f36081 source for replay; new sources never inherit a seal.
+const reviewedSourceRevisions = new Map([
+  ["sha256:173b0ae1cbb3a92cb434b60c5d233dbd0e2b68b75be9732818d8b53cbb3b5d6c", 1],
+  [KERNEL_PRINCIPLES_SOURCE_DIGEST, 2],
+]);
 const hash = value => `sha256:${createHash("sha256").update(value).digest("hex")}`;
 
 /** Two closed three-condition sets; absent selection preserves legacy plans. */
@@ -15,7 +20,9 @@ export function comparisonConditions(kernelCondition = "kernel_only") {
 // The complete source seal catches new rules even in excluded paragraphs.
 // Updating it requires reviewing the mapping, not blindly refreshing a digest.
 export function renderKernelPrinciples(source) {
-  assert.equal(hash(source), KERNEL_PRINCIPLES_SOURCE_DIGEST, "kernel principles canonical source changed; review extraction boundaries");
+  const sourceDigest = hash(source);
+  const rendererRevision = reviewedSourceRevisions.get(sourceDigest);
+  assert.ok(rendererRevision, "kernel principles canonical source changed; review extraction boundaries");
   const text = new TextDecoder("utf-8", { fatal: true }).decode(source);
   const sections = new Map(text.split("\n## ").slice(1).map(section => {
     const newline = section.indexOf("\n");
@@ -49,8 +56,8 @@ export function renderKernelPrinciples(source) {
   ].join("\n\n") + "\n";
   assert.ok(!/(?:skills|docs|schemas|scripts)\/|SKILL\.md|ask\.[a-z-]+@|`(?:operating-mode-router|skill-router|controlled-implementation|test-first-verification|risk-gate|evidence-ledger)`/u.test(body), "external principles dependency");
   included.push({ section: "0. Task classification", paragraphs: [3], part: "first sentence" });
-  return { body, generation: { id: KERNEL_PRINCIPLES_ID, renderer_revision: 1, source_path: "AGENTS.md",
-    source_digest: hash(source), generated_digest: hash(body), included,
+  return { body, generation: { id: KERNEL_PRINCIPLES_ID, renderer_revision: rendererRevision, source_path: "AGENTS.md",
+    source_digest: sourceDigest, generated_digest: hash(body), included,
     excluded: ["AGENTS preamble", "0:mode router and Skill invocation", "1:machine-readable contract reference", "7:formal proof policy", "7.5:formal state contract reference", "8:Skill routing", "10:formal output protocols"],
     dependencies: [], supported_task_classes: ["implementation", "trivial"] } };
 }

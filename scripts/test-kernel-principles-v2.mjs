@@ -103,13 +103,34 @@ test("unknown fixtures and arbitrary task prose never receive an automatic compl
   }
 });
 
-test("old v1 and unadopted candidate source identities remain immutable", () => {
-  assert.equal(digest(read("scripts/kernel-principles.mjs")), "e63b711af8e4431ec48318a4932f8a50a13b896949141a2f2ce7b11cbcaed741");
-  assert.equal(digest(read("scripts/kernel-principles-candidate-v2.mjs")), "389c9478a2141b08f380859bb3fd3d1147b7ab1041771f1ed0457d9ae345650d");
-  assert.equal(digest(read("scripts/test-kernel-principles-candidate-v2.mjs")), "255e4e489fdc2ef4d6f13f03fb7416da03b84c5ff99d6280c1ef04102b83a504");
-  assert.equal(renderKernelPrinciples(source).generation.generated_digest, "sha256:e9b15717e9c257f44639a7bb56b6450574f93976631fa3840b84574ad1caf3c8");
-  const candidate = renderKernelPrinciplesV2Candidate(source);
+test("historical source retains exact v1, candidate and v2 body and generation identities", () => {
+  const historicalSource = read("docs/fixtures/kernel-principles-source-5f36081.md");
+  assert.equal(digest(historicalSource), "173b0ae1cbb3a92cb434b60c5d233dbd0e2b68b75be9732818d8b53cbb3b5d6c");
+  for (const [render, expected] of [
+    [renderKernelPrinciples, "06ca47b28967a24f9acd54b69d5dd3a18cfec3005331dc546aa2fcf36e8f8db5"],
+    [renderKernelPrinciplesV2Candidate, "f9551b86755ed217ea47d4b3b5d59067ae97f0e0ff0cd39bf63bb78517dcba44"],
+    [renderKernelPrinciplesV2, "6c709d52a23c44a754e2cdb72423702ff00b843dcdf43eab5077b8de4f217019"],
+  ]) {
+    const entry = render(historicalSource);
+    assert.equal(digest(JSON.stringify(entry)), expected);
+    assert.equal(entry.generation.renderer_revision, 1);
+    assert.throws(() => render(Buffer.concat([historicalSource, Buffer.from("\n")])), /canonical source changed/u);
+  }
+  const candidate = renderKernelPrinciplesV2Candidate(historicalSource);
   assert.equal(candidate.generation.id, "kernel_principles_v2_candidate");
   assert.equal(candidate.generation.proposal_status, "unadopted");
   assert.match(candidate.body, /proposed, unadopted/u);
+});
+
+test("current scope principles use a distinct reviewed revision without new procedure dependencies", () => {
+  for (const render of [renderKernelPrinciples, renderKernelPrinciplesV2Candidate, renderKernelPrinciplesV2]) {
+    const entry = render(source);
+    assert.equal(entry.generation.renderer_revision, 2);
+    assert.equal(entry.generation.source_digest, `sha256:${digest(source)}`);
+    assert.match(entry.body, /sufficient change boundary before keeping it narrow/u);
+    assert.match(entry.body, /Retire paths, state, and configuration made obsolete by this change/u);
+    assert.match(entry.body, /Fewer lines or files alone do not prove a simpler system/u);
+    assert.deepEqual(entry.generation.dependencies, []);
+    assert.throws(() => render(Buffer.from(source.toString().replace("current behavior", "hypothetical behavior"))), /canonical source changed/u);
+  }
 });

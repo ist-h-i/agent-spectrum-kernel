@@ -68,7 +68,7 @@ node scripts/install-claude-adapter.mjs --target /path/to/project --detach
 
 ## Verification and evidence boundary
 
-The repository fixture `scripts/test-adapter-runtime-migration.mjs` verifies all selected fixed-entry metadata and exact Asset refs, current installer idempotence, profile expansion, rollback, pruned shrink, coexistence, detach isolation, and project-owned content preservation in a temporary repository. `scripts/test-fixed-entry-profiles.mjs` separately verifies the five shared primary mappings, six generated controls, direct triggers, fail-closed text, generated Claude project/plugin bytes, and deterministic byte/route-depth reduction. Existing Codex fixtures separately cover pre-compact prompt replacement and rollback.
+The repository fixture `scripts/test-adapter-runtime-migration.mjs` verifies all selected fixed-entry metadata and exact Asset refs, current installer idempotence, profile expansion, rollback, pruned shrink, coexistence, detach isolation, and project-owned content preservation in a temporary repository. `scripts/test-fixed-entry-profiles.mjs` separately verifies the five shared primary mappings, six generated controls, direct triggers, fail-closed text, generated Claude project/plugin bytes, exact byte comparisons against historical baselines, and reduced route depth. Whole-prompt bytes can increase when required controls grow. Existing Codex fixtures separately cover pre-compact prompt replacement and rollback.
 
 For adapter-only maintenance that must not read benchmark handoff inputs, use `node scripts/adapter-runtime-bundle.mjs --check-adapters` (or `--write-adapters` when regeneration is intended). The full `--check` remains the repository-wide bundle gate and includes benchmark handoff inputs.
 
@@ -83,12 +83,15 @@ For #229, the repository additionally verifies deterministic projection selectio
 For #231, `scripts/test-verification-proof-policy.mjs` verifies the closed two-path
 selection policy, Compact Proof result binding, protected-claim rejection,
 monotonic compact-to-formal upgrade, exact legacy-formal fixture bytes, and the
-bounded 97-byte versus 287-byte artifact-shape proxy, plus the separate 2043-byte
-generated Codex verification prompt versus its immutable 2291-byte pre-compact
-fixture. Adapter conformance verifies the same selected path across current Claude
-and Codex projections. These static and local checks do not establish that an
-external runtime loaded the projection, nor do the byte counts establish token,
-latency, quality, or effectiveness gains.
+bounded 97-byte versus 287-byte artifact-shape proxy. The separate generated
+Codex verification prompt now measures 2461 bytes against its immutable
+2291-byte pre-compact fixture, 170 bytes above that historical baseline after
+the scope controls were expanded. Its bytes and digest remain checked against
+the current projection; the whole-prompt comparison is descriptive and does not measure
+Compact Proof's individual contribution. Adapter conformance verifies the same
+selected path across current Claude and Codex projections. These static and
+local checks do not establish that an external runtime loaded the projection,
+nor do the byte counts establish token, latency, quality, or effectiveness gains.
 
 For #230, `scripts/test-review-route.mjs` verifies baseline cardinality, exact
 signal-to-additional-gate routing, requested-only final-gate ordering, missing
@@ -116,3 +119,10 @@ For #229, the repository additionally verifies deterministic projection selectio
 ## Checkpoint C handoff
 
 Issue #171 should copy a frozen Checkpoint B/B2 config after this migration lands, retain the original baselines, and record the dual-runtime bundle digest. The Checkpoint C report must attribute architecture, model, CLI, adapter, and repository changes separately. It must not treat projection conformance as runtime effectiveness.
+
+Historical Prompt v2 consumers use `loadHistoricalPromptV2Preregistration` to
+validate every binding against the pinned source A commit/tree, while requiring
+the checked-in preregistration to retain its exact historical bytes. Successor
+parent reconstruction and archive checks share the existing temporary detached
+checkout scope. Ordinary validation and renderer-only historical validation
+continue to reject live authority drift; neither path activates a runtime.
