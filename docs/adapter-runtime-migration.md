@@ -119,3 +119,10 @@ For #229, the repository additionally verifies deterministic projection selectio
 ## Checkpoint C handoff
 
 Issue #171 should copy a frozen Checkpoint B/B2 config after this migration lands, retain the original baselines, and record the dual-runtime bundle digest. The Checkpoint C report must attribute architecture, model, CLI, adapter, and repository changes separately. It must not treat projection conformance as runtime effectiveness.
+
+Historical Prompt v2 consumers use `loadHistoricalPromptV2Preregistration` to
+validate every binding against the pinned source A commit/tree, while requiring
+the checked-in preregistration to retain its exact historical bytes. Successor
+parent reconstruction and archive checks share the existing temporary detached
+checkout scope. Ordinary validation and renderer-only historical validation
+continue to reject live authority drift; neither path activates a runtime.

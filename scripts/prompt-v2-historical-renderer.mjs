@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 
 // Source A is the source of the frozen rendered archive, not the older
 // execution_repository used for the evaluation workspace. These are the same
@@ -32,4 +35,27 @@ export function verifyHistoricalRenderer(root, repository, binding) {
   const bytes = git(["cat-file", "blob", match[2]]);
   const digest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
   if (digest !== binding.raw_byte_digest) throw new Error(`Historical renderer raw byte digest mismatch: ${binding.path}`);
+}
+
+// Synchronous scope for validators that need every frozen authority, not only
+// the renderer. Callbacks must finish before the temporary checkout is removed.
+export function withHistoricalPromptV2Source(root, callback) {
+  const { revision, tree } = PROMPT_V2_RENDERER_SOURCE;
+  const temporaryRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-prompt-v2-source-")));
+  const sourceRoot = resolve(temporaryRoot, "source");
+  const git = (args) => execFileSync("git", ["--no-replace-objects", ...args], { cwd: root, encoding: "utf8", stdio: "pipe" });
+  let added = false;
+  try {
+    git(["worktree", "add", "--detach", sourceRoot, revision]);
+    added = true;
+    if (git(["-C", sourceRoot, "rev-parse", "HEAD"]).trim() !== revision
+      || git(["-C", sourceRoot, "rev-parse", "HEAD^{tree}"]).trim() !== tree) {
+      throw new Error("Prompt v2 detached source revision/tree mismatch");
+    }
+    if (git(["-C", sourceRoot, "status", "--porcelain"]) !== "") throw new Error("Prompt v2 detached source worktree is not clean");
+    return callback({ sourceRoot, temporaryRoot });
+  } finally {
+    if (added) git(["worktree", "remove", "--force", sourceRoot]);
+    rmSync(temporaryRoot, { recursive: true, force: true });
+  }
 }

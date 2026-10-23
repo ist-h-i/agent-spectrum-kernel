@@ -754,15 +754,15 @@
       "implementations": [
         {
           "path": "scripts/ask-benchmark-prompt-v2.mjs",
-          "file_sha256": "ded983159273b893a569b533923722647bf3a92fafaa68affe28ec5aa25a425f"
+          "file_sha256": "87e32af1f69e3609fbedb8e66ac613377c4f0cdd733b465690a3d95554d292c2"
         },
         {
           "path": "scripts/test-ask-benchmark-prompt-v2.mjs",
-          "file_sha256": "b083fee24edeb0cf4e28b40a4b7a12aac5d676e0449bb2ff4d01573e0b9c87bb"
+          "file_sha256": "0967766d38ee5415f2de47e5fb4c8bf8ad96b05bb09fb4b271e24f04429fa819"
         },
         {
           "path": "scripts/prompt-v2-preregistration-samples.mjs",
-          "file_sha256": "68656b127b4599104e70897e8860169fa103d7e968edecf6c9e496989a4e1f1c"
+          "file_sha256": "eba810b6b322378e871e4da1a41349e8c0f3082e6daa4ef0c4856cff8b628621"
         },
         {
           "path": "scripts/test-prompt-v2-preregistration-samples.mjs",

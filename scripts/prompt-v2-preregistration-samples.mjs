@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { PROMPT_V2_RENDERER_SOURCE } from "./prompt-v2-historical-renderer.mjs";
+import { PROMPT_V2_RENDERER_SOURCE, withHistoricalPromptV2Source } from "./prompt-v2-historical-renderer.mjs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -351,23 +351,8 @@ function verifyRenderedArchiveFiles({ fixtureRoot }) {
 }
 
 function withDetachedSource({ sourceRevision, sourceTree }, callback) {
-  assertGitIdentity(sourceRevision, "Prompt v2 source revision");
-  assertGitIdentity(sourceTree, "Prompt v2 source tree");
-  const temporaryRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-prompt-v2-source-")));
-  const sourceRoot = resolve(temporaryRoot, "source");
-  let added = false;
-  try {
-    execFileSync("git", ["--no-replace-objects", "worktree", "add", "--detach", sourceRoot, sourceRevision], { cwd: repositoryRoot, stdio: "pipe" });
-    added = true;
-    const actualRevision = execFileSync("git", ["--no-replace-objects", "rev-parse", "HEAD"], { cwd: sourceRoot, encoding: "utf8" }).trim();
-    const actualTree = execFileSync("git", ["--no-replace-objects", "rev-parse", "HEAD^{tree}"], { cwd: sourceRoot, encoding: "utf8" }).trim();
-    if (actualRevision !== sourceRevision || actualTree !== sourceTree) throw new Error("Prompt v2 detached source revision/tree mismatch");
-    if (execFileSync("git", ["--no-replace-objects", "status", "--porcelain"], { cwd: sourceRoot, encoding: "utf8" }) !== "") throw new Error("Prompt v2 detached source worktree is not clean");
-    return callback({ sourceRoot, temporaryRoot });
-  } finally {
-    if (added) execFileSync("git", ["worktree", "remove", "--force", sourceRoot], { cwd: repositoryRoot, stdio: "pipe" });
-    rmSync(temporaryRoot, { recursive: true, force: true });
-  }
+  if (sourceRevision !== PROMPT_V2_SOURCE_REVISION || sourceTree !== PROMPT_V2_SOURCE_TREE) throw new Error("Prompt v2 detached source requires frozen source A");
+  return withHistoricalPromptV2Source(repositoryRoot, callback);
 }
 
 function verifySourceArchiveReproduction({ sourceRoot, scratchRoot }) {

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PROMPT_V2_RENDERER_SOURCE, verifyHistoricalRenderer } from "./prompt-v2-historical-renderer.mjs";
+import { PROMPT_V2_RENDERER_SOURCE, verifyHistoricalRenderer, withHistoricalPromptV2Source } from "./prompt-v2-historical-renderer.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import {
   canonicalDigest as canonicalDigestBase,
@@ -309,6 +309,18 @@ export function validatePromptV2Preregistration(value, { root = ROOT, verifyRepo
 export function loadPromptV2Preregistration({ root = ROOT, path = PROMPT_V2_PREREGISTRATION_PATH, verifyRepositoryBindings = true, rendererSource = "current_checkout" } = {}) {
   assertPortablePath(path, "preregistration path");
   return validatePromptV2Preregistration(readJson(resolve(root, path)), { root, verifyRepositoryBindings, rendererSource });
+}
+
+// Read the historical experiment against all source-A bindings. The live
+// preregistration itself must still be the exact frozen bytes.
+export function loadHistoricalPromptV2Preregistration({ root = ROOT } = {}) {
+  return withHistoricalPromptV2Source(root, ({ sourceRoot }) => {
+    const path = PROMPT_V2_PREREGISTRATION_PATH;
+    if (!readFileSync(resolve(root, path)).equals(readFileSync(resolve(sourceRoot, path)))) {
+      fail("historical preregistration raw bytes drifted");
+    }
+    return loadPromptV2Preregistration({ root: sourceRoot });
+  });
 }
 
 function validateExactAsset(asset, stableId, label) {

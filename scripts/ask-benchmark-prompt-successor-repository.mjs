@@ -46,7 +46,7 @@ export async function readSuccessorParent({ root = ROOT } = {}) {
   // Import the real historical validator, not a caller-supplied validation hook.
   const legacy = await import("./ask-benchmark-prompt-v2.mjs");
   // Parent identity refers to the historical experiment, not a new rendering.
-  const preregistration = legacy.loadPromptV2Preregistration({ root, rendererSource: "frozen_renderer_source" });
+  const preregistration = legacy.loadHistoricalPromptV2Preregistration({ root });
   successorExact(preregistration.preregistration_digest, HISTORICAL_PREREGISTRATION_DIGEST, "historical preregistration");
   const binding = readJsonFileStrict(resolve(root, HISTORICAL_BINDING_PATH), "historical binding");
   legacy.validatePromptV2AuthorityBinding(binding, { preregistration });

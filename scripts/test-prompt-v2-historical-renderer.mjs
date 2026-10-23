@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { PROMPT_V2_RENDERER_SOURCE, verifyHistoricalRenderer } from "./prompt-v2-historical-renderer.mjs";
-import { loadPromptV2Preregistration } from "./ask-benchmark-prompt-v2.mjs";
+import { loadPromptV2Preregistration, loadHistoricalPromptV2Preregistration } from "./ask-benchmark-prompt-v2.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -80,4 +80,26 @@ test("historical renderer identity resolves the real source without accepting li
     }));
   }
   assert.throws(() => loadPromptV2Preregistration({ rendererSource: "frozen_renderer_source" }), /canonical Prompt v2 source map raw byte digest mismatch/);
+});
+
+test("full historical preregistration validates source A despite changed live maps", () => {
+  const value = loadHistoricalPromptV2Preregistration({ root: repositoryRoot });
+  assert.equal(value.expected_case_count, 56);
+  assert.throws(() => loadPromptV2Preregistration({ root: repositoryRoot }), /raw byte digest mismatch/);
+});
+
+test("full historical read rejects live preregistration drift and removes its temporary checkout", (t) => {
+  const root = mkdtempSync(resolve(tmpdir(), "ask-historical-preregistration-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => {
+    const result = spawnSync("git", args, { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout;
+  };
+  git("clone", "--local", "--no-hardlinks", repositoryRoot, root);
+  const file = resolve(root, "benchmarks/prompt-v2-preregistration.json");
+  writeFileSync(file, readFileSync(file, "utf8") + "\n");
+  const before = git("-C", root, "worktree", "list", "--porcelain");
+  assert.throws(() => loadHistoricalPromptV2Preregistration({ root }), /historical preregistration raw bytes drifted/);
+  assert.equal(git("-C", root, "worktree", "list", "--porcelain"), before);
 });

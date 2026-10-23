@@ -11,7 +11,7 @@ import {
   computePromptV2AuthorityBindingDigest,
   computePromptV2PreregistrationDigest,
   createPromptV2ResumeState,
-  loadPromptV2Preregistration,
+  loadHistoricalPromptV2Preregistration,
   pendingPromptV2Cases,
   validatePromptV2AuthorityBinding,
   validatePromptV2ComparisonReport,
@@ -23,7 +23,7 @@ import {
 } from "./ask-benchmark-prompt-v2.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const preregistration = loadPromptV2Preregistration({ root, rendererSource: "frozen_renderer_source" });
+const preregistration = loadHistoricalPromptV2Preregistration({ root });
 let checks = 0;
 
 function check(name, body) {
@@ -123,7 +123,7 @@ function buildAuthorityBinding() {
 const authorityBinding = buildAuthorityBinding();
 
 check("checked-in preregistration closes exact result-blind authorities and thresholds", () => {
-  assert.equal(validatePromptV2Preregistration(preregistration, { root, rendererSource: "frozen_renderer_source" }), preregistration);
+  assert.deepEqual(loadHistoricalPromptV2Preregistration({ root }), preregistration);
   assert.equal(preregistration.phase, "pre_result");
   assert.equal(preregistration.results_accessed, false);
   assert.equal(preregistration.expected_case_count, 56);
