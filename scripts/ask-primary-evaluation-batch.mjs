@@ -293,9 +293,14 @@ export function reportPrimaryEvaluationBatch(root) {
 }
 async function main() {
   const [command, path] = process.argv.slice(2);
+  if (command === 'start') {
+    const { runPrimaryEvaluationStartCommand } = await import('./ask-primary-evaluation-start.mjs');
+    const { exitCode, report } = await runPrimaryEvaluationStartCommand(process.argv.slice(3));
+    console.log(JSON.stringify(report, null, 2)); process.exitCode = exitCode; return;
+  }
   assert.equal(process.argv.length, 4, 'prepare MANIFEST | inspect ROOT | report ROOT');
   const value = command === 'prepare' ? preparePrimaryEvaluationBatch(path) : command === 'inspect' ? inspectPrimaryEvaluationBatch(path)
-    : command === 'report' ? reportPrimaryEvaluationBatch(path) : assert.fail('only model-free prepare/inspect/report are available in CLI; start needs explicit programmatic grading connection');
+    : command === 'report' ? reportPrimaryEvaluationBatch(path) : assert.fail('prepare MANIFEST | inspect ROOT | report ROOT | start ROOT --confirm DIGEST');
   console.log(JSON.stringify(value, null, 2));
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error => { console.error(error.message); process.exitCode = 10; });

@@ -41,6 +41,13 @@ source inventory, private baselines, pending workspaces and Git metadata are
 checked without launching a model. Preexisting start artifacts, output,
 changed inputs, duplicate slots/IDs and incomplete publication refuse dispatch.
 
+The 172800000-ms limit shown in the original manifest description above is a
+historical preparation example, not the current creation limit. Current
+`primaryBatchLimitsForSet` requires 302400000 ms / 45M tokens for legacy9 and
+612000000 ms / 120M tokens for catalog24, with the unchanged four-hour child and
+185-minute grading reservation per task. Use that source-owned function for a
+new manifest; old plans/results stay readable and are never rewritten to fit.
+
 ## Model-free commands and programmatic connection
 
 ```sh
@@ -49,10 +56,17 @@ node scripts/ask-primary-evaluation-batch.mjs inspect /absolute/batch-root
 node scripts/ask-primary-evaluation-batch.mjs report /absolute/batch-root
 ```
 
-The CLI intentionally exposes only model-free actions. Preparation copies exact
+The three commands above are model-free. Preparation copies exact
 external manifest bytes and saves its digest plus preparation blockers. Report
 retains every one of the 27 slots, including missing output, null quality,
 unknown usage and null cost. A missing grader is a blocker, not a zero score.
+
+The additional human command `start ROOT --confirm sha256:MANIFEST_DIGEST`
+uses the registered factory adapter with the identical resource reference already
+pinned in every manifest block, then invokes the existing start API below once.
+It adds no readiness override, retry/resume or alternate runner. Existing runtime,
+native qualification and grading blockers still refuse dispatch. See
+[the command and offline report contract](primary-manual-comparison.md).
 
 Programmatic `startPrimaryEvaluationBatch(root, confirmedManifestDigest,
 {gradingAdapter,signal})` requires the human-confirmed external manifest digest,

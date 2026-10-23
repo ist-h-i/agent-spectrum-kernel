@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { comparisonHash, inventoryUserTree, prepareUserComparison } from './ask-user-comparison-prepare.mjs';
 import { PRIMARY_BATCH_LIMITS, primaryBatchLimitsForSet, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_FIXTURE_IDS, inspectPrimaryEvaluationBatch, preparePrimaryEvaluationBatch, reportPrimaryEvaluationBatch, startPrimaryEvaluationBatch } from './ask-primary-evaluation-batch.mjs';
 import { primaryFixtureIdsForSet } from './ask-primary-fixture-recipe.mjs';
+import { runPrimaryEvaluationStartCommand } from './ask-primary-evaluation-start.mjs';
 const hash = value => comparisonHash(value);
 function git(root, args) {
   const result = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], { cwd: root, encoding: 'utf8',
@@ -77,12 +78,24 @@ function adapters(overrides = {}) {
 test('primary batch is model-free until a digest-bound, grading-connected, fake-only start', async t => {
   const f = fixture(t);
   t.afterEach(() => f.blocks.forEach(block => rmSync(join(block.root, 'control/slots'), { recursive: true, force: true })));
-  await t.test('prepare/inspect/report preserve all 27 unknown slots and missing grading blockers', () => {
+  await t.test('prepare/inspect/report preserve all 27 unknown slots and missing grading blockers', async () => {
     const m = f.manifest(), p = preparePrimaryEvaluationBatch(m.path);
     assert.equal(p.status, 'blocked'); assert.equal(p.slots.length, 27);
     assert.equal(inspectPrimaryEvaluationBatch(m.value.root).start_consumed, false);
     const report = reportPrimaryEvaluationBatch(m.value.root);
     assert.equal(report.state, 'not_started'); assert.ok(report.slots.every(slot => slot.state === 'not_started' && slot.quality === null && slot.cost === null));
+    await assert.rejects(runPrimaryEvaluationStartCommand([m.value.root, '--confirm', m.digest]), /fixed grading resources/);
+    assert.equal(existsSync(join(m.value.root, 'consumption')), false, 'CLI refusal cannot consume a real batch');
+  });
+  await t.test('CLI uses the real factory and cannot turn artificial resource declarations into grading authority', async () => {
+    const m = f.manifest(value => ({ ...value, blocks: value.blocks.map(block => ({ ...block,
+      grading: { ...block.grading, resources: { path: join(f.root, 'unavailable-artificial-resources.json'), digest: hash('artificial resources') } } })) }));
+    preparePrimaryEvaluationBatch(m.path);
+    const result = await runPrimaryEvaluationStartCommand([m.value.root, '--confirm', m.digest]);
+    assert.equal(result.exitCode, 9); assert.equal(result.report.status, 'blocked');
+    assert.ok(result.report.blockers.length > 0);
+    assert.equal(existsSync(join(m.value.root, 'consumption')), false);
+    assert.ok(reportPrimaryEvaluationBatch(m.value.root).slots.every(slot => slot.state === 'not_started' && slot.quality === null));
   });
   await t.test('fixed nine IDs, order, duplicate run, source digest, condition aliases are rejected', () => {
     for (const edit of [m => { m.blocks.pop(); }, m => { m.blocks.reverse(); }, m => { m.blocks[1].run_id = m.blocks[0].run_id; },
