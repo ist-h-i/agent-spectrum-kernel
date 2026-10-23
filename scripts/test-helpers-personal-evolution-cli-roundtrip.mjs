@@ -125,9 +125,11 @@ export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7", fixtur
             assert.throws(() => pairApi.sealPersonalEvolutionPromptPair({ ...input, outputRoot: overlap }), /overlap/);
             assert.equal(existsSync(overlap), false);
           }
-          const history = join(first.root, "control/history"); mkdirSync(history);
+          // Empty slot output reaches the writer's post-result guard; an orphan
+          // history directory is rejected earlier as a corrupt start record.
+          const slots = join(first.root, "control/slots"); mkdirSync(slots);
           try { assert.throws(() => pairApi.sealPersonalEvolutionPromptPair(input), /post-result/); }
-          finally { rmdirSync(history); }
+          finally { rmdirSync(slots); }
           assert.equal(existsSync(outputRoot), false, "current writer negative cases must not publish artifacts");
           currentWriterChecked = true;
         }
@@ -146,7 +148,10 @@ export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7", fixtur
         ["legacy-set", value => { value.evaluation.fixtureSet = "legacy9"; }],
         ["unknown-set", value => { value.evaluation.fixtureSet = "unknown"; }],
         ["null-set", value => { value.evaluation.fixtureSet = null; }],
-        ["reversed", value => { value.blueprint.evaluation_scope.fixture_ids = [...fixtureIds].reverse(); }],
+        // A singleton reverse is unchanged input, not an invalid selection.
+        ...(fixtureIds.length > 1
+          ? [["reversed", value => { value.blueprint.evaluation_scope.fixture_ids = [...fixtureIds].reverse(); }]]
+          : [["unknown-fixture", value => { value.blueprint.evaluation_scope.fixture_ids = ["unknown-task"]; }]]),
         ["old-version", value => {
           const manifest = json(scoring.selector.path); manifest.kind = "ask_primary_scoring_version_v6";
           const path = join(pending.root, "old-version-selector.json"); write(path, manifest);
