@@ -14,7 +14,7 @@ import { buildEvolutionExperiment, publishEvolutionExperiment, computePromptV2Ex
   buildEvolutionHumanDecision, publishEvolutionHumanDecision } from "./evolution-loop.mjs";
 import { buildPersonalPromptMaterialization, personalPromptInput } from "./ask-personal-prompt-materialization.mjs";
 import { applyPersonalEvolutionLoopPortfolioAction } from "./ask-personal-evolution-driver.mjs";
-import { describePersonalEvolutionPromptPair, sealPersonalEvolutionPromptPair, verifyPersonalEvolutionPromptPairResults, startPersonalEvolutionPromptPair,
+import { describePersonalEvolutionPromptPair, sealPersonalEvolutionPromptPair as sealCurrentPersonalPair, verifyPersonalEvolutionPromptPairResults, startPersonalEvolutionPromptPair,
   personalEvolutionPairLimits, validatePersonalEvolutionFixtureSelection } from "./ask-personal-evolution-primary-pair.mjs";
 import { preparePersonalEvolutionSavedResultActions, finishPersonalEvolutionSavedResultNoop } from "./ask-personal-evolution-saved-results.mjs";
 import { comparisonHash, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
@@ -28,7 +28,7 @@ import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-res
 import { primaryScoringRoot } from "./ask-primary-scoring-version.mjs";
 import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS, CANONICAL_PRIMARY_FIXTURE_IDS } from "./ask-primary-fixture-recipe.mjs";
 
-import { setup, blocksFor, collectSyntheticTerminal, fakeEngineeringTemplate, collectSyntheticGrade, bindSyntheticRoleGrading } from "./test-helpers-personal-evolution-primary-pair.mjs";
+import { historicalPersonalPairFixture as sealPersonalEvolutionPromptPair, setup, blocksFor, collectSyntheticTerminal, fakeEngineeringTemplate, collectSyntheticGrade, bindSyntheticRoleGrading } from "./test-helpers-personal-evolution-primary-pair.mjs";
 
 const repository = resolve(import.meta.dirname, ".."), fixture = join(repository, "docs/fixtures/prompt-v2-preregistration");
 const reference = JSON.parse(readFileSync(join(fixture, "reference.json"))), adapter = reference.adapters[0];
@@ -38,21 +38,21 @@ const assetRef = record => Object.fromEntries(["asset_type", "stable_id", "versi
 const ref = publication => Object.fromEntries(["portfolio_id", "revision", "manifest_digest", "asset_set_digest"].map(key => [key, publication[key]]));
 const inventory = root => listContentAddressedJson({ storeRoot: root }).map(item => item.digest);
 
-test("personal catalog24 fixes its complete inventory and reserves both original batch budgets", () => {
-  assert.equal(validatePersonalEvolutionFixtureSelection(CANONICAL_PRIMARY_FIXTURE_IDS, "catalog24"), "catalog24");
-  assert.equal(validatePersonalEvolutionFixtureSelection(["mn-build-option-update"]), "legacy9");
-  for (const ids of [CANONICAL_PRIMARY_FIXTURE_IDS.slice(1), [...CANONICAL_PRIMARY_FIXTURE_IDS].reverse(), PRIMARY_FIXTURE_IDS])
-    assert.throws(() => validatePersonalEvolutionFixtureSelection(ids, "catalog24"));
-  assert.throws(() => validatePersonalEvolutionFixtureSelection(CANONICAL_PRIMARY_FIXTURE_IDS));
-  assert.throws(() => validatePersonalEvolutionFixtureSelection(["pf-review-error-contract"]));
+test("personal selection uses one catalog with explicit historical compatibility", () => {
+  assert.equal(validatePersonalEvolutionFixtureSelection(CANONICAL_PRIMARY_FIXTURE_IDS), "catalog24");
+  assert.equal(validatePersonalEvolutionFixtureSelection(["mn-build-option-update"]), "catalog24");
+  assert.equal(validatePersonalEvolutionFixtureSelection(["pf-review-error-contract"]), "catalog24");
+  assert.equal(validatePersonalEvolutionFixtureSelection(PRIMARY_FIXTURE_IDS, "legacy9"), "legacy9");
+  for (const ids of [[], [...CANONICAL_PRIMARY_FIXTURE_IDS].reverse(), ["unknown-task"], [CANONICAL_PRIMARY_FIXTURE_IDS[0], CANONICAL_PRIMARY_FIXTURE_IDS[0]]])
+    assert.throws(() => validatePersonalEvolutionFixtureSelection(ids));
   assert.throws(() => validatePersonalEvolutionFixtureSelection(PRIMARY_FIXTURE_IDS, "unknown"));
   assert.throws(() => validatePersonalEvolutionFixtureSelection(PRIMARY_FIXTURE_IDS, null));
-  assert.deepEqual(personalEvolutionPairLimits(24, "catalog24"), { overall_timeout_ms: 1224000000,
+  assert.deepEqual(personalEvolutionPairLimits(24), { overall_timeout_ms: 1224000000,
     token_budget: 240000000, retries: 0, resume: "forbidden", concurrency: 1 });
-  assert.equal(personalEvolutionPairLimits(9).overall_timeout_ms, 604800000);
-  assert.equal(personalEvolutionPairLimits(9).token_budget, 90000000);
-  for (const count of [0, 1, 9, 23, 25]) assert.throws(() => personalEvolutionPairLimits(count, "catalog24"));
-  assert.throws(() => personalEvolutionPairLimits(24));
+  assert.equal(personalEvolutionPairLimits(1).overall_timeout_ms, 51000000);
+  assert.equal(personalEvolutionPairLimits(1).token_budget, 10000000);
+  assert.equal(personalEvolutionPairLimits(9, "legacy9").overall_timeout_ms, 604800000);
+  for (const count of [0,25]) assert.throws(() => personalEvolutionPairLimits(count));
 });
 
 
@@ -407,4 +407,9 @@ test("v2 registration fixes lifecycle plans while NOT_RUN and rejects foreign pa
   const late = putContentAddressedJson({storeRoot: f.storeRoot, artifact: {...lifecycle, reason_codes: ["late"]}}).digest;
   assert.throws(() => applyPersonalEvolutionLoopPortfolioAction({saved, application: {}, lifecyclePlanObjectDigest: late,
     trustedLifecyclePlanObjectDigests: [late]}), /not fixed in the invoked pair/);
+});
+
+
+test("new pair writer rejects historical mode before creating artifacts", () => {
+  assert.throws(() => sealCurrentPersonalPair({ fixtureSet: "legacy9" }), /requires migration/);
 });

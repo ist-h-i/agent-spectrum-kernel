@@ -58,6 +58,7 @@ function configure(configPath, profileRoot) {
   exact(config.generation, ["executable", "timeoutMs"], "generation inputs");
   exact(config.evaluation, ["publicInputRoot", "cliBin", "cliVersion", "model", "reasoning", "evidenceKind", "scoringVersion", "gradingResources",
     ...(Object.hasOwn(config.evaluation, "fixtureSet") ? ["fixtureSet"] : [])], "evaluation inputs");
+  assert.equal(Object.hasOwn(config.evaluation, "fixtureSet") ? config.evaluation.fixtureSet : "catalog24", "catalog24", "legacy fixture-set configuration requires migration: select current catalog task IDs in a fresh profile");
   absolute(config.evaluation.publicInputRoot);
   assert.ok(["observed", "synthetic"].includes(config.evaluation.evidenceKind));
   exact(config.evaluation.gradingResources, ["baseline", "challenger"], "separate role resources");
@@ -76,7 +77,10 @@ function configure(configPath, profileRoot) {
   const template = read(config.storeRoot, config.experimentTemplateObjectDigest);
   assert.equal(template.projection.mode, "prompt_v2_exact");
   const revision = sourceRevision();
-  const profile = { ...config, sourceRevision: revision, selectorContext: { ...config.selectorContext, source_revision: revision } };
+  // Persist the new catalog selection explicitly; old profiles without this field
+  // continue through the compatibility reader without expanding their tasks.
+  const evaluation = { ...config.evaluation, fixtureSet: "catalog24", fixtureIds: ids };
+  const profile = { ...config, evaluation, sourceRevision: revision, selectorContext: { ...config.selectorContext, source_revision: revision } };
   mkdirSync(absolute(profileRoot), { mode: 0o700 }); save(join(profileRoot, "profile.json"), snapshot(profile));
   return { status: "configured", target: config.blueprint.parent_asset.stable_id, fixture_ids: ids,
     model_execution: "Unknown", models_started: false, installation_performed: false,
@@ -209,7 +213,12 @@ function status(c, alreadyVerified = null) {
     next_command: "preserve records and investigate the inconsistent evidence; do not repeat an invocation" }; }
 }
 function problem(path) { const text = readStableBytes(absolute(path), "public problem summary").toString("utf8"); return reason(text.trim()); }
+function assertCurrentCatalogProfile(profile) {
+  assert.equal(profile.evaluation?.fixtureSet, "catalog24", "saved profile requires migration before a new request/cycle; configure a fresh catalog profile");
+  assert.deepEqual(profile.evaluation.fixtureIds, profile.blueprint.evaluation_scope.fixture_ids, "saved profile requires migration to an explicit catalog selection before a new request/cycle");
+}
 function initializeCycle({ profile, cycleRoot, target, text, predecessor = null }) {
+  assertCurrentCatalogProfile(profile);
   assert.equal(target, profile.blueprint.parent_asset.stable_id, "target differs from configured Prompt");
   const cycleId = `personal-${randomUUID()}`, blueprint = { ...profile.blueprint, candidate_id: cycleId };
   const observationInput = { observation_id: cycleId, repository_id: blueprint.registry.repository_id,
@@ -345,6 +354,7 @@ function decide(c, disposition, humanReason) {
   return status(c, verified);
 }
 function next(c, output, summary) {
+  assertCurrentCatalogProfile(c.profile);
   const done = pointer(c, "completion"); assert.ok(done, "completed personal receipt required for this next-cycle connector");
   assert.equal(status(c).status, "completed", "verified completion required before next cycle");
   const pair = pointer(c, "pair"), prep = read(c.profile.storeRoot, pair.input.preparationObjectDigest);

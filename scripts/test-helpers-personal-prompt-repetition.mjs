@@ -5,11 +5,10 @@ import {canonicalDigest,readContentAddressedJson,putContentAddressedJson,listCon
 import {buildEvolutionExperiment,publishEvolutionExperiment}from'./evolution-loop.mjs';
 import {buildVerificationRequirements}from'./verification-evidence.mjs';
 import {publishPortfolioManifest,computePortfolioSelectionBasisDigest}from'./portfolio-manager.mjs';
-import {sealPersonalEvolutionPromptPair}from'./ask-personal-evolution-primary-pair.mjs';
 import {comparisonHash}from'./ask-user-comparison-prepare.mjs';
 import {repetitionRecommendationPolicy,sealPersonalPromptRepetitionPlan}from'./ask-personal-prompt-repetition-evaluation.mjs';
 import {PROMPT_REPETITION_POLICY}from'./ask-personal-prompt-repetition-statistics.mjs';
-import {setup,blocksFor,bindSyntheticRoleGrading}from'./test-helpers-personal-evolution-primary-pair.mjs';
+import {historicalPersonalPairFixture as sealPersonalEvolutionPromptPair,setup,blocksFor,bindSyntheticRoleGrading}from'./test-helpers-personal-evolution-primary-pair.mjs';
 const read=(root,d)=>readContentAddressedJson({storeRoot:root,digest:d}).value;
 export function buildFixture(t,{withGrading=false}={}){
  const f=setup(t),base=read(f.storeRoot,f.args.experimentObjectDigest),members=[],args={...f.args,trustedExperimentObjectDigests:[]};

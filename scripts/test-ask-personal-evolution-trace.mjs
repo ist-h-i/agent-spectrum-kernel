@@ -7,9 +7,8 @@ import { canonicalDigest, contentAddressedObjectPath, putContentAddressedJson, r
 import { registerAsset, verifyAssetRegistry } from "./asset-registry.mjs";
 import { buildPersonalEvolutionTraceBinding, inspectPersonalEvolutionTrace } from "./ask-personal-evolution-trace.mjs";
 import { runPersonalEvolutionCommand } from "./ask-personal-evolution-cli.mjs";
-import { sealPersonalEvolutionPromptPair } from "./ask-personal-evolution-primary-pair.mjs";
 import { comparisonHash } from "./ask-user-comparison-prepare.mjs";
-import { setup, blocksFor, collectSyntheticTerminal, fakeEngineeringTemplate, collectSyntheticGrade } from "./test-helpers-personal-evolution-primary-pair.mjs";
+import { historicalPersonalPairFixture as sealPersonalEvolutionPromptPair, setup, blocksFor, collectSyntheticTerminal, fakeEngineeringTemplate, collectSyntheticGrade } from "./test-helpers-personal-evolution-primary-pair.mjs";
 
 const read = (f, digest) => readContentAddressedJson({ storeRoot: f.storeRoot, digest }).value;
 const publish = (f, artifact) => putContentAddressedJson({ storeRoot: f.storeRoot, artifact }).digest;

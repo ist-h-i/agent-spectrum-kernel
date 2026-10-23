@@ -107,5 +107,37 @@ SPEC-P24-RUNTIME-CONNECTION@1 and FVC-P24-RUNTIME-CONNECTION@1.
 Changes C-R1 (collector/replay), C-R2 (existing producer join/readback) and
 C-R3 (artificial regression) are confined to the existing modules/tests.
 No workflow, frozen asset, old run, binding schema or scoring gate changes.
+
+## Native thread metadata compatibility
+
+SPEC-P24-RUNTIME-STARTUP-METADATA-1 and FVC-P24-RUNTIME-STARTUP-METADATA-1
+extend the existing formal connection contract. The retained installed 0.162.1
+ThreadStartResponse schema (SHA256
+7247cd531d3f78174444f8262fd3090d5acf8ab74084547b4e0a831d74e77c9a)
+declares root optional, non-nullable instructionSources and disabledPluginIds
+string arrays. Their schema defaults are not observations. The first describes
+environment-native paths of currently loaded instruction files; the latter is
+explicitly a saved list that does not yet filter plugin capabilities.
+
+V-S1: accept those exact fields through the existing native reply parser,
+module-owned receipt, independent reply replay and diagnostic producer. Project
+only reported/not_reported, count and exact-list digest. Missing is null; an
+actually reported empty array is count0 with its own digest. Never open those
+paths, copy their contents, or persist raw host paths/plugin IDs. Preserve exact
+ordering/duplicates in the digest, without inferring meaning from either.
+V-S2: refuse null/scalar/non-string/control/oversized inputs and unknown closure
+claims; cap each list at1024 entries and each nonempty entry at8192 code units.
+V-S3: keep full effective input closure and plugin capability filtering
+unverified, per-turn resolved model/effort unknown, runtime/start/scoring guards
+closed and quality null for every P/K/F condition. Neither an empty list, source
+schema, artificial transport nor approval supplies missing runtime authority.
+
+The implementation is a bounded native DTO/replay compatibility correction. It
+does not establish that the installed binary emits the fields, that their list
+is complete over Skills/tools/plugins/later discovery, or that a production
+dispatch path is qualified. Validation uses artificial protocol frames only.
+The change alters processing source bytes: existing frozen assets/selectors and
+old results remain bound to their original sources. Formal admission of a new
+source requires genuine version-specific archive/reviewer/candidate identities.
 Shared generated files are integrated once after the parallel performance
 slice; final exact-source checks and independent review precede the one PR.

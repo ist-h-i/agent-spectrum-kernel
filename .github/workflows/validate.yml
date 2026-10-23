@@ -180,6 +180,10 @@ jobs:
         id: ci_c2ef8b11143a
         run: node --test scripts/test-ask-pragmatic-evaluation-report.mjs
 
+      - name: Verify manual primary start and offline nine-condition reports (artificial only)
+        id: ci_5d68fd6260e0
+        run: node --test scripts/test-ask-primary-evaluation-start.mjs scripts/test-ask-primary-nine-condition-report.mjs
+
       - name: Verify prospective performance probe (synthetic controls only)
         id: ci_f18afc493ad6
         run: node --test scripts/test-ask-benchmark-pf-performance-probe.mjs

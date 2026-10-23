@@ -24,8 +24,13 @@ test("catalog24 metadata requires explicit exact v7 selection and both fixed rol
   for (const fixtureSet of [null, "unknown", "legacy9"])
     assert.throws(() => validatePersonalEvolutionEvaluationSelection({ ...evaluation, fixtureSet }, ids));
   const omitted = structuredClone(evaluation); delete omitted.fixtureSet;
-  assert.throws(() => validatePersonalEvolutionEvaluationSelection(omitted, ids));
-  for (const selected of [ids.slice(1), [...ids].reverse()])
+  assert.equal(validatePersonalEvolutionEvaluationSelection(omitted, ids), "catalog24");
+  const selected = ["hi-authorization-exception", "mn-build-option-update"];
+  assert.equal(validatePersonalEvolutionEvaluationSelection(omitted, selected), "catalog24");
+  assert.deepEqual(selected, ["hi-authorization-exception", "mn-build-option-update"], "selection validation preserves the requested cross-suite subset");
+  assert.equal(Object.hasOwn(omitted, "fixtureSet"), false, "implicit catalog selection does not require a legacy set switch");
+  assert.throws(() => validatePersonalEvolutionEvaluationSelection(omitted, [...selected].reverse()));
+  for (const selected of [[], [...ids].reverse(), [ids[0], ids[0]]])
     assert.throws(() => validatePersonalEvolutionEvaluationSelection(evaluation, selected));
   const old = JSON.parse(readFileSync(f.selector.path)); old.kind = "ask_primary_scoring_version_v6";
   assert.throws(() => validatePersonalEvolutionEvaluationSelection({ ...evaluation,
@@ -41,3 +46,8 @@ test("catalog24 metadata requires explicit exact v7 selection and both fixed rol
 });
 
 personalCliRoundtrip("catalog24");
+
+// One dispatch roundtrip per process: the CLI and its dependencies retain the
+// module-mock bindings from their first import. Cross-suite subset validation is
+// checked above; the separate single-task CLI suite checks implicit configure,
+// current writer rejections and the complete decision/next-cycle lifecycle.

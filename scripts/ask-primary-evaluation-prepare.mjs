@@ -6,7 +6,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
-import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS, primaryFixtureIdsForSet, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
+import { buildPrimaryFixtureRecipe, selectPrimaryFixtureIds, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 import { comparisonHash, inventoryUserTree, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 import { createPrimaryEvaluationGradingAdapter, preflightPrimaryEvaluationGrading, PRIMARY_GRADING_PROFILE_ID } from "./ask-primary-evaluation-grading.mjs";
 import { readPrimaryScoringVersion } from "./ask-primary-scoring-version.mjs";
@@ -17,12 +17,12 @@ import { computeOutputContractDigest, computeRequirementDigest, computeRequireme
 import { PRIMARY_FIXTURE_REGISTRY } from "./ask-benchmark-portfolio-catalog.mjs";
 import { primaryProfileForKernel } from "./ask-primary-evaluation-profile.mjs";
 import { isPrimaryExecutionInputContract } from './ask-primary-execution-input.mjs';
-import { preparePrimaryEvaluationBatch, PRIMARY_GRADING_RESERVATION_MS, primaryBatchLimitsForSet } from "./ask-primary-evaluation-batch.mjs";
+import { preparePrimaryEvaluationBatch, PRIMARY_GRADING_RESERVATION_MS, primaryBatchLimitsForSelection } from "./ask-primary-evaluation-batch.mjs";
 
 const SOURCE = fileURLToPath(new URL("../", import.meta.url));
 const read = path => readStableFile(path, "fixed public primary input", 32 * 1024 * 1024).bytes;
 const json = path => parseJsonRejectDuplicateKeys(read(path).toString("utf8"));
-const closedOptions = ["output", "cliBin", "cliVersion", "model", "reasoning", "globalAskPresence", "evidenceKind", "gradingResourcesPath", "gradingResourcesDigest", "kernelCondition", "scoringVersionPath", "scoringVersionDigest", "fixtureSet", "primaryInputContract"];
+const closedOptions = ["output", "cliBin", "cliVersion", "model", "reasoning", "globalAskPresence", "evidenceKind", "gradingResourcesPath", "gradingResourcesDigest", "kernelCondition", "scoringVersionPath", "scoringVersionDigest", "fixtureSet", "fixtureIds", "primaryInputContract"];
 const save = (path, value) => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx", mode: 0o600 });
 
 export function preparePrimaryEvaluation(publicParent, options) {
@@ -31,7 +31,9 @@ export function preparePrimaryEvaluation(publicParent, options) {
   if (options.primaryInputContract !== undefined) assert.ok(isPrimaryExecutionInputContract(options.primaryInputContract), 'unknown primary input contract');
   assert.equal(options.scoringVersionPath == null, options.scoringVersionDigest == null, "scoring version path and digest supplied together");
   const scoringVersion = options.scoringVersionPath == null ? null : { path: options.scoringVersionPath, digest: options.scoringVersionDigest };
-  const fixtureSet = options.fixtureSet ?? "legacy9", fixtureIds = primaryFixtureIdsForSet(fixtureSet);
+  const fixtureSet = Object.hasOwn(options, "fixtureSet") ? options.fixtureSet : "catalog24";
+  assert.equal(fixtureSet, "catalog24", "legacy fixture-set configuration requires migration: select fixtureIds from the current catalog");
+  const fixtureIds = selectPrimaryFixtureIds(options.fixtureIds);
   // Validate every selected fixture before creating any preparation output.
   if (scoringVersion) for (const fixtureId of fixtureIds) readPrimaryScoringVersion(scoringVersion, fixtureId);
   const profile = primaryProfileForKernel(options.kernelCondition ?? "kernel_principles_v2");
@@ -84,10 +86,10 @@ export function preparePrimaryEvaluation(publicParent, options) {
     block.grading.blockers = gradingPreflight.blockers;
     blocks.push(block);
   }
-  const manifest = { kind: "ask_primary_evaluation_batch_manifest_v1", batch_id: fixtureSet === "legacy9" ? "primary-nine-prepared-v4" : "primary-catalog24-prepared-v1",
-    ...(fixtureSet === "catalog24" ? { fixture_set: fixtureSet } : {}),
+  const manifest = { kind: "ask_primary_evaluation_batch_manifest_v1", batch_id: "primary-catalog-selection-prepared-v1",
+    fixture_set: "catalog24", fixture_ids: fixtureIds,
     root: join(output, "batch"), conditions: [...profile.conditions],
-    limits: { ...primaryBatchLimitsForSet(fixtureSet) }, blocks };
+    limits: { ...primaryBatchLimitsForSelection(fixtureIds) }, blocks };
   const manifestPath = join(output, "batch-manifest.json"); save(manifestPath, manifest);
   const result = preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter });
   save(join(output, "preparation-result.json"), result);
@@ -199,7 +201,7 @@ function publicSummary(fixtures) {
     suite_counts: Object.fromEntries([...new Set(fixtures.map(row => row.suite))].map(suite => [suite, fixtures.filter(row => row.suite === suite).length])),
     public_input_status: fixtures.every(row => ["valid", "prepared"].includes(row.public_input_status)) ? "complete" : "partial",
     semantic_grading_status: "not_evaluated", fixtures, limitations: ["Public closure validation does not establish semantic quality, private evaluator admission, or ASK effectiveness.",
-      "Public-only preparation selects no comparison/grading authority. Explicit catalog24 selection and independently admitted resources are required; missing or ungraded tasks retain null quality."] };
+      "Public-only preparation selects no comparison/grading authority. A fixed catalog task selection and independently admitted resources are required; missing or ungraded tasks retain null quality."] };
 }
 export function inspectPrimaryPublicInputs({ root = resolve(SOURCE) } = {}) {
   canonicalDirectory(root);
@@ -208,8 +210,8 @@ export function inspectPrimaryPublicInputs({ root = resolve(SOURCE) } = {}) {
     const base = join(root, "benchmarks/fixtures/checkpoint-b2", row.fixture_id);
     const checked = checkPublicInput(row.fixture_id, base, base, null, root);
     return { fixture_id: row.fixture_id, suite: row.suite, task_class: row.task_class, public_intent: row.public_intent,
-      primary_comparison_registered: PRIMARY_FIXTURE_IDS.includes(row.fixture_id), portfolio_registered: configured.some(entry => entry.id === row.fixture_id),
-      ...checked, comparison_blockers: [PRIMARY_FIXTURE_IDS.includes(row.fixture_id) ? "private_grading_resources_not_checked" : "primary_comparison_not_registered", "semantic_controls_not_run"],
+      primary_comparison_registered: true, portfolio_registered: configured.some(entry => entry.id === row.fixture_id),
+      ...checked, comparison_blockers: ["private_grading_resources_not_checked", "semantic_controls_not_run"],
       slots: publicSlots(row.fixture_id, checked.requirements, checked.failures) };
   }));
   return { ...report, catalog_digest: comparisonHash(raw) };

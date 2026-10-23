@@ -6,9 +6,9 @@ import { buildAssetLifecycleAuthorityContext, verifyAssetRegistry } from "./asse
 import { buildEvolutionExperiment, publishEvolutionExperiment, buildEvolutionHumanDecision,
   publishEvolutionHumanDecision, applyApprovedEvolutionCandidateRejection, verifyEvolutionApplicationReceipt,
   buildEvolutionApplicationReceipt, publishEvolutionApplicationReceipt } from "./evolution-loop.mjs";
-import { sealPersonalEvolutionPromptPair, verifyPersonalEvolutionPromptPairResults } from "./ask-personal-evolution-primary-pair.mjs";
+import { verifyPersonalEvolutionPromptPairResults } from "./ask-personal-evolution-primary-pair.mjs";
 import { preparePersonalEvolutionSavedResultActions } from "./ask-personal-evolution-saved-results.mjs";
-import { setup, blocksFor, collectSyntheticTerminal, fakeEngineeringTemplate, collectSyntheticGrade } from "./test-helpers-personal-evolution-primary-pair.mjs";
+import { historicalPersonalPairFixture as sealPersonalEvolutionPromptPair, setup, blocksFor, collectSyntheticTerminal, fakeEngineeringTemplate, collectSyntheticGrade } from "./test-helpers-personal-evolution-primary-pair.mjs";
 
 test("approved rejection retires only the exact candidate and verifies its receipt without changing the Portfolio", async t => {
   const f = setup(t), read = digest => readContentAddressedJson({ storeRoot: f.storeRoot, digest }).value;

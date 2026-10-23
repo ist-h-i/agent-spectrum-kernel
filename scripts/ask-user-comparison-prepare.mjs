@@ -31,6 +31,27 @@ const FILE_LIMIT = 32 * 1024 * 1024;
 const TREE_LIMIT = 256 * 1024 * 1024;
 export const COMPARISON_RECORD_BYTE_LIMIT = 16 * 1024 * 1024;
 export const SINGLE_SHOT_CONTRACT = "single_shot_v1";
+export const PRIMARY_PUBLIC_VERIFICATION_CONTRACT = "macos_public_verification_v1";
+// Pins only the intended verifier runtime. This is not native acceptance or
+// private grading authority, and preparation never executes either binary.
+export function primaryPublicVerificationRuntime() {
+  const pin = path => {
+    assert.equal(realpathSync(path), path, 'canonical verification runtime required');
+    const stat = lstatSync(path);
+    assert.ok(stat.isFile() && stat.size <= 256 * 1024 * 1024, 'bounded verification runtime required');
+    return { path, bytes: stat.size, digest: comparisonHash(readFileSync(path)) };
+  };
+  assert.equal(process.platform, 'darwin', 'public verification sandbox requires macOS');
+  assert.equal(basename(dirname(process.execPath)), 'bin', 'fixed Node bin runtime required');
+  const npmEntry = realpathSync(join(dirname(process.execPath), 'npm'));
+  const npmRoot = dirname(dirname(npmEntry));
+  assert.equal(npmEntry, join(npmRoot, 'bin/npm-cli.js'), 'fixed npm entry required');
+  return { contract: PRIMARY_PUBLIC_VERIFICATION_CONTRACT, node: pin(process.execPath), sandbox: pin('/usr/bin/sandbox-exec'),
+    npm: { entry: pin(npmEntry), root: npmRoot, package: pin(join(npmRoot, 'package.json')),
+      runtime_roots: ['bin', 'lib', 'node_modules'].map(name => { const path = join(npmRoot, name);
+        return { path, inventory_digest: comparisonHash(Buffer.from(JSON.stringify(inventoryUserTree(path)))) }; }) },
+    controller_source_digest: comparisonHash(readFileSync(join(SOURCE, 'scripts/ask-user-comparison.mjs'))) };
+}
 export const isSingleShotComparison = plan => plan.policy?.execution_contract === SINGLE_SHOT_CONTRACT;
 export function comparisonExecutionPolicy(contract) {
   if (contract !== undefined && contract !== SINGLE_SHOT_CONTRACT) fail("unknown_execution_contract");
@@ -571,9 +592,14 @@ function kernelCapability(inventory, config) {
 
 function validateOptions(options) {
   if (!plainObject(options)) fail("options_object_required");
-  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf", "kernelCondition", "executionContract", "personalPrompt", "primaryInputContract"];
+  const allowed = ["repo", "commit", "taskFile", "verificationFile", "output", "mutablePaths", "cliBin", "cliVersion", "model", "reasoning", "timeoutMs", "verificationTimeoutMs", "overallTimeoutMs", "tokenBudget", "taskClass", "globalCapabilities", "globalAskPresence", "evidenceKind", "rerunOf", "kernelCondition", "executionContract", "personalPrompt", "primaryInputContract", "publicVerificationContract", "referenceReviewProtocolDigest"];
   if (Object.keys(options).some(key => !allowed.includes(key))) fail("unknown_preparation_option");
   comparisonExecutionPolicy(options.executionContract);
+  if (options.referenceReviewProtocolDigest !== undefined) assert.match(options.referenceReviewProtocolDigest, /^sha256:[a-f0-9]{64}$/u, 'reference review protocol digest required');
+  if (options.publicVerificationContract !== undefined) {
+    assert.equal(options.publicVerificationContract, PRIMARY_PUBLIC_VERIFICATION_CONTRACT, 'unknown public verification contract');
+    assert.equal(options.executionContract, SINGLE_SHOT_CONTRACT, 'public verification sandbox requires single-shot');
+  }
   if (options.primaryInputContract !== undefined) {
     assert.ok(isPrimaryExecutionInputContract(options.primaryInputContract), 'unknown primary input contract');
     assert.equal(options.executionContract, SINGLE_SHOT_CONTRACT, 'closed primary input requires single-shot');
@@ -593,7 +619,8 @@ function validateOptions(options) {
     evidence_kind: options.evidenceKind ?? "observed", platform: `${process.platform}/${process.arch}`,
     node_version: process.version, os_release: release(),
     ...(options.kernelCondition === undefined ? {} : { kernel_condition: options.kernelCondition }),
-    ...(options.primaryInputContract === undefined ? {} : { primary_input_contract: options.primaryInputContract }) };
+    ...(options.primaryInputContract === undefined ? {} : { primary_input_contract: options.primaryInputContract }),
+    ...(options.publicVerificationContract === undefined ? {} : { public_verification: primaryPublicVerificationRuntime() }) };
   comparisonConditions(config.kernel_condition);
   if (typeof config.cli_bin !== "string" || !(config.cli_bin === "codex" || isAbsolute(config.cli_bin)) || /[\u0000-\u001f\u007f]/u.test(config.cli_bin)) fail("invalid_cli_binary");
   for (const field of ["cli_version", "model", "reasoning"]) if (config[field] !== null && (typeof config[field] !== "string" || !config[field].trim() || /[\u0000-\u001f\u007f]/u.test(config[field]))) fail(`invalid_${field}`);
@@ -632,6 +659,7 @@ export function prepareUserComparison(options = {}) {
   }
   const recipe = validateRecipe(parseJson(verificationBytes, "verification"), original);
   const primaryRecipe = isPrimaryFixtureRecipe(recipe);
+  if (options.publicVerificationContract !== undefined) assert.ok(primaryRecipe, 'public verification sandbox requires a fixed primary recipe');
   if (options.primaryInputContract !== undefined) {
     assert.ok(primaryRecipe && isKernelPrinciplesCondition(config.kernel_condition), 'closed input contract requires authenticated primary principles recipe');
   }
@@ -762,6 +790,7 @@ export function prepareUserComparison(options = {}) {
   }
   const sourceInventory = Object.fromEntries([...original].sort(([a], [b]) => a.localeCompare(b)).map(([path, value]) => [path, record(value.bytes, value.mode)]));
   const plan = { schema_version: 1, kind: "ask_user_comparison_plan_v1", run_id: randomUUID(), created_at: new Date().toISOString(),
+    ...(options.referenceReviewProtocolDigest === undefined ? {} : { reference_review_protocol_digest: options.referenceReviewProtocolDigest }),
     rerun_of: options.rerunOf ?? null, root, source: { repo: options.repo, commit: options.commit, inventory: sourceInventory, digest: comparisonHash(jsonBytes(sourceInventory)) },
     task: { path: "control/task.md", digest: comparisonHash(taskBytes), source_path: options.taskFile },
     verification: { path: "control/verification.json", digest: comparisonHash(verificationBytes), recipe, source_path: options.verificationFile,
