@@ -9,20 +9,29 @@ import { PRIMARY_FIXTURE_REGISTRY } from "./ask-primary-fixture-registry.mjs";
 import { validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
 
 export const PRIMARY_RECIPE_KIND = "ask_primary_fixture_recipe_v1";
+// Deprecated compatibility export: immutable historical scoring records only.
 export const PRIMARY_FIXTURE_IDS = Object.freeze([
   "mp-ci-evidence-gap", "mp-data-migration-handoff", "mn-focused-regression-test",
   "mp-accessibility-interaction-review", "mp-frontend-state-review", "mp-iac-rollback-design",
   "mp-performance-investigation", "mn-build-option-update", "mn-doc-config-correction",
 ]);
-// Historical nine-task records keep their exact order. New preparations may select
-// the canonical catalog inventory explicitly; arbitrary subsets are never authority.
+// Historical records keep their original nine-task order for read compatibility.
+// New selections use the single canonical catalog; selection is not authority.
 export const CANONICAL_PRIMARY_FIXTURE_IDS = Object.freeze(PRIMARY_FIXTURE_REGISTRY.map(row => row[0]));
-export function primaryFixtureIdsForSet(fixtureSet = "legacy9") {
+export function primaryFixtureIdsForSet(fixtureSet = "catalog24") {
   assert.ok(["legacy9", "catalog24"].includes(fixtureSet), "unknown primary fixture set");
   return fixtureSet === "catalog24" ? CANONICAL_PRIMARY_FIXTURE_IDS : PRIMARY_FIXTURE_IDS;
 }
 export const isRegisteredPrimaryFixtureId = fixtureId => CANONICAL_PRIMARY_FIXTURE_IDS.includes(fixtureId);
-export function assertPrimaryFixtureInventory(ids, fixtureSet = "legacy9") {
+/** Select tasks from one catalog without changing any task or grading contract. */
+export function selectPrimaryFixtureIds(ids = CANONICAL_PRIMARY_FIXTURE_IDS) {
+  assert.ok(Array.isArray(ids) && ids.length > 0 && ids.length <= CANONICAL_PRIMARY_FIXTURE_IDS.length
+    && new Set(ids).size === ids.length && ids.every(isRegisteredPrimaryFixtureId), "nonempty unique registered fixture selection required");
+  const selected = CANONICAL_PRIMARY_FIXTURE_IDS.filter(id => ids.includes(id));
+  assert.deepEqual(ids, selected, "fixture selection must use canonical catalog order");
+  return selected;
+}
+export function assertPrimaryFixtureInventory(ids, fixtureSet = "catalog24") {
   assert.deepEqual(ids, primaryFixtureIdsForSet(fixtureSet), "complete registered primary fixture set required in fixed order");
   return primaryFixtureIdsForSet(fixtureSet);
 }

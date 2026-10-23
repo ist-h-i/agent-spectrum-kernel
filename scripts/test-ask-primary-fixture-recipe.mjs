@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { buildPrimaryFixtureRecipe, CANONICAL_PRIMARY_FIXTURE_IDS, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
+import { buildPrimaryFixtureRecipe, CANONICAL_PRIMARY_FIXTURE_IDS, PRIMARY_FIXTURE_IDS, primaryFixtureIdsForSet, selectPrimaryFixtureIds, validatePrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 import {kernelPrinciplesV2FixtureDescriptor,principlesV2Capability,kernelPrinciplesV2DescriptorSourcePaths} from "./kernel-principles-v2-catalog24.mjs";
 import { verifyUserComparisonConditionForTest } from "./ask-user-comparison.mjs";
 
@@ -129,4 +129,15 @@ test("truncated or unknown-ended native child cannot establish verification", as
   const result = await verify({ terminationConfirmed: false });
   assert.equal(result.checks[0].status, "unknown");
   assert.equal(result.checks[0].cleanup_error.code, "CHILD_TERMINATION_UNKNOWN");
+});
+
+
+test("one catalog is the new default and task subsets do not imply grading authority", () => {
+  assert.deepEqual(primaryFixtureIdsForSet(), CANONICAL_PRIMARY_FIXTURE_IDS);
+  assert.deepEqual(selectPrimaryFixtureIds(), CANONICAL_PRIMARY_FIXTURE_IDS);
+  const selected = ["hi-authorization-exception", "pf-review-error-contract"];
+  assert.deepEqual(selectPrimaryFixtureIds(selected), selected);
+  for (const ids of [[], [...selected].reverse(), [selected[0], selected[0]], ["not-registered"]])
+    assert.throws(() => selectPrimaryFixtureIds(ids));
+  assert.deepEqual(primaryFixtureIdsForSet("legacy9"), PRIMARY_FIXTURE_IDS, "historical record order is preserved explicitly");
 });

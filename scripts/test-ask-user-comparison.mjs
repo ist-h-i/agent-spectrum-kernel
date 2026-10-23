@@ -325,6 +325,10 @@ test("telemetry keeps missing values, actual difference and reported failure; sa
   assert.equal(value.metrics.cached_tokens, null); assert.deepEqual(value.errors, ["rejected"]);
   const partial = parseUserCodexTelemetry('{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":2,"cached_input_tokens":0}}\n{"type":"turn.completed","usage":{"input_tokens":3}}\n');
   assert.deepEqual(partial.metrics, { input_tokens: 13, output_tokens: null, cached_tokens: null });
+  const detail = parseUserCodexTelemetry(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 10, cached_input_tokens: 8, output_tokens: 5, reasoning_output_tokens: 3, cache_write_input_tokens: 1 } }));
+  assert.deepEqual(detail.usage_components, { reasoning_output_tokens: 3, cache_write_input_tokens: 1 });
+  assert.equal(detail.usage_lower_bound.known_tokens, 15, 'reasoning and cache components are not added to totals');
+  assert.deepEqual(partial.usage_components, { reasoning_output_tokens: null, cache_write_input_tokens: null });
   const log = sanitizeComparisonLog("Authorization: Bearer abc\nCookie: sid=abc\napi_key=foo\nsk-abcdefghijklmnopqrstuvwxyz\n");
   assert.ok(!log.includes("Bearer abc") && !log.includes("sid=abc") && !log.includes("=foo") && !log.includes("sk-abc"));
 });

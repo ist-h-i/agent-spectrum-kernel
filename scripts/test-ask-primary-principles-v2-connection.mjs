@@ -16,7 +16,7 @@ import {comparisonConditions} from './ask-comparison-conditions.mjs';
 import {comparisonConditions as v1Conditions} from './kernel-principles.mjs';
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 
-test('native nine-task preparation selects actual v2 identity and keeps all 27 slots unstarted',()=>{
+test('catalog selection of the historical nine tasks keeps actual v2 identity and 27 slots unstarted',()=>{
   const area=realpathSync(mkdtempSync(join(tmpdir(),'ask-primary-k2-native-')));
   try{
     const inputs=join(area,'public');mkdirSync(inputs);
@@ -25,7 +25,8 @@ test('native nine-task preparation selects actual v2 identity and keeps all 27 s
       for(const entry of manifest.fixtures[id].files){const target=join(inputs,id,entry.path);mkdirSync(dirname(target),{recursive:true});writeFileSync(target,readFileSync(join(source,entry.path)));}
     }
     assert.throws(()=>preparePrimaryEvaluation(inputs,{output:join(area,'unknown'),kernelCondition:'kernel_principles_v2_candidate'}),/aliases/);
-    const prepared=preparePrimaryEvaluation(inputs,{output:join(area,'prepared'),evidenceKind:'synthetic'});
+    for (const fixtureSet of ['legacy9', null, 'unknown']) assert.throws(()=>preparePrimaryEvaluation(inputs,{output:join(area,'legacy-rejected'),fixtureSet}),/migration/);
+    const prepared=preparePrimaryEvaluation(inputs,{output:join(area,'prepared'),evidenceKind:'synthetic',fixtureIds:[...PRIMARY_FIXTURE_IDS].sort()});
     assert.equal(prepared.status,'blocked');assert.equal(prepared.start_consumed,false);assert.equal(prepared.model_calls,0);
     assert.deepEqual(prepared.manifest.conditions,['plain','kernel_principles_v2','full_ask']);
     assert.equal(prepared.slots.length,27);assert.ok(prepared.slots.every(s=>s.state==='not_started'&&s.quality===null&&s.capability.status==='available'));
@@ -63,7 +64,7 @@ test('native nine-task preparation selects actual v2 identity and keeps all 27 s
 });
 
 
-test('explicit catalog24 v7 preparation uses real public task inputs and leaves 72 unstarted slots',t=>{
+test('default single catalog v7 preparation uses real public task inputs and leaves 72 unstarted slots',t=>{
  const area=realpathSync(mkdtempSync(join(tmpdir(),'ask-primary24-k2-native-')));
  try{
   const inputs=join(area,'public');mkdirSync(inputs);
@@ -72,12 +73,16 @@ test('explicit catalog24 v7 preparation uses real public task inputs and leaves 
    for(const entry of manifest.fixtures[id].files){const target=join(inputs,id,entry.path);mkdirSync(dirname(target),{recursive:true});writeFileSync(target,readFileSync(join(source,entry.path)));}
   }
   const version=syntheticV7ScoringVersion(t,{fixtureIds:CANONICAL_PRIMARY_FIXTURE_IDS,fixtureSet:'catalog24'});
-  const prepared=preparePrimaryEvaluation(inputs,{output:join(area,'prepared'),evidenceKind:'synthetic',fixtureSet:'catalog24',scoringVersionPath:version.selector.path,scoringVersionDigest:version.selector.digest});
+  const prepared=preparePrimaryEvaluation(inputs,{output:join(area,'prepared'),evidenceKind:'synthetic',scoringVersionPath:version.selector.path,scoringVersionDigest:version.selector.digest});
   assert.equal(prepared.model_calls,0);assert.equal(prepared.start_consumed,false);assert.equal(prepared.status,'blocked');
-  assert.equal(prepared.manifest.fixture_set,'catalog24');assert.deepEqual(prepared.manifest.blocks.map(block=>block.fixture_id),CANONICAL_PRIMARY_FIXTURE_IDS);
+  assert.equal(prepared.manifest.fixture_set,'catalog24');assert.deepEqual(prepared.manifest.fixture_ids,CANONICAL_PRIMARY_FIXTURE_IDS);assert.deepEqual(prepared.manifest.blocks.map(block=>block.fixture_id),CANONICAL_PRIMARY_FIXTURE_IDS);
   assert.equal(prepared.slots.length,72);assert.ok(prepared.slots.every(slot=>slot.state==='not_started'&&slot.quality===null&&slot.capability.status==='available'));
   for(const block of prepared.manifest.blocks){const plan=readUserComparisonPlan(block.root).plan;assert.equal(plan.config.task_class,plan.verification.recipe.runner_task_class);assert.equal(plan.kernel_definition.assessment.task_class,plan.config.task_class);assert.equal(inspectUserComparison(block.root).execution.start_consumed,false);const exported=exportPrimaryEvaluationGradingRequest(block).request;assert.equal(exported.binding.fixture_id,block.fixture_id);assert.ok(exported.slots.every(slot=>slot.quality===null));}
   for(const block of prepared.manifest.blocks){assert.deepEqual(block.grading.scoring_version,version.selector);assert.equal(block.grading.binding.scoring_input_freeze_digest,comparisonHash(readFileSync(join(version.runtime,'benchmarks/fixtures/checkpoint-b2',block.fixture_id,'scoring-input-freeze-manifest.json'))));}
+  const subsetIds=['hi-authorization-exception','mn-client-compatibility-fix'];
+  const subset=preparePrimaryEvaluation(inputs,{output:join(area,'subset'),evidenceKind:'synthetic',fixtureIds:subsetIds,scoringVersionPath:version.selector.path,scoringVersionDigest:version.selector.digest});
+  assert.deepEqual(subset.manifest.fixture_ids,subsetIds);assert.equal(subset.slots.length,6);assert.equal(subset.model_calls,0);
+  assert.equal(subset.manifest.limits.token_budget,10000000);assert.ok(subset.slots.every(slot=>slot.quality===null));
   const added=prepared.manifest.blocks.find(block=>block.fixture_id==='hi-authorization-exception');
   const plan=readUserComparisonPlan(added.root).plan,extension=plan.kernel_definition.renderer_closure.at(-1);
   assert.equal(extension.source_path,'scripts/kernel-principles-v2-catalog24.mjs');

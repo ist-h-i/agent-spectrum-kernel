@@ -12,9 +12,55 @@ import { buildPrimaryFixtureRecipe } from './ask-primary-fixture-recipe.mjs';
 import { collectPrimaryRuntimeLineage, verifyPrimaryRuntimeLineageReceipt } from './ask-primary-runtime-lineage.mjs';
 import { producePrimaryRuntimeLineageArtifacts, verifyPrimaryRuntimeLineageArtifacts, verifyPrimaryEvaluationProducer, producePrimaryEvaluationArtifacts, verifyPrimaryRuntimeV10Preparation } from './ask-primary-evaluation-producer.mjs';
 import { syntheticV10ScoringVersion } from './test-helpers-primary-evaluation-v10.mjs';
+import { canonicalDigest } from './content-addressed-store.mjs';
 const ROOT = fileURLToPath(new URL('../', import.meta.url)), ID = 'mn-build-option-update';
 const secret = 'SECRET_AUTH_HOST_CONFIGURATION_SENTINEL';
 const read = path => readFileSync(path, 'utf8');
+
+for (const condition of ['plain', 'kernel_principles_v2', 'full_ask']) for (const [name, metadata] of [
+  ['absent', {}], ['empty', { instructionSources: [], disabledPluginIds: [] }],
+  ['reported', { instructionSources: ['/host/' + secret + '/AGENTS.md', '/host/' + secret + '/other.md', '/host/' + secret + '/AGENTS.md'],
+    disabledPluginIds: ['host-' + secret, 'another', 'host-' + secret] }],
+]) test('V-S1 native startup metadata stays partial through owned replay and producer '+condition+'/'+name, async t => {
+  const f = fixture(t), fake = transport(f, condition, { mutate(value) { if (value.id === 2) Object.assign(value.result, metadata); return value; } });
+  const receipt = await collect(f, condition, fake), observation = verifyPrimaryRuntimeLineageReceipt(receipt);
+  assert.equal(observation.status, 'collected_synthetic');
+  const startup = observation.native_configuration.startup_metadata;
+  assert.equal(startup.effective_input_closure, 'unverified');
+  assert.equal(startup.plugin_capability_filtering, 'unverified');
+  for (const [source, target] of [['instructionSources', 'instruction_sources'], ['disabledPluginIds', 'disabled_plugin_ids']]) {
+    assert.equal(startup[target].status, name === 'absent' ? 'not_reported' : 'reported');
+    assert.equal(startup[target].count, name === 'absent' ? null : metadata[source].length);
+    if (name === 'absent') assert.equal(startup[target].digest, null);
+    else assert.equal(startup[target].digest, canonicalDigest(metadata[source]), 'preserve exact native ordering and duplicates');
+  }
+  assert.equal(observation.runtime_attestation, 'unknown'); assert.equal(observation.scoring_authority, false); assert.equal(observation.quality, null);
+  assert.ok(observation.missing_runtime_evidence.includes('effective_startup_input_closure_unverified'));
+  assert.ok(!JSON.stringify(observation).includes(secret));
+  const made = producePrimaryRuntimeLineageArtifacts(receipt, join(f.area, 'startup-metadata'));
+  assert.deepEqual(verifyPrimaryRuntimeLineageArtifacts(made, receipt).observation.native_configuration.startup_metadata, startup);
+  assert.ok(!read(join(made.recordRoot, 'runtime-lineage.json')).includes(secret));
+  assert.throws(() => verifyPrimaryEvaluationProducer({ recordRoot: made.recordRoot, externalDigest: made.externalDigest }), /unknown primary producer version/);
+  startup.instruction_sources.digest = 'sha256:'+'0'.repeat(64);
+  assert.notDeepEqual(verifyPrimaryRuntimeLineageReceipt(receipt).native_configuration.startup_metadata, startup, 'returned projections do not mutate owned evidence');
+  assert.equal(existsSync(join(f.root, 'control/start.json')), false);
+});
+for (const field of ['instructionSources', 'disabledPluginIds']) for (const [name, value] of [
+  ['null', null], ['scalar', 'untrusted'], ['non-string', [7]], ['empty-string', ['']],
+  ['control', ['invalid\u0000metadata']], ['oversized-string', ['a'.repeat(8193)]], ['too-many', Array(1025).fill('x')],
+]) test('V-S2 invalid native startup metadata rejects '+field+'/'+name, async t => {
+  const f = fixture(t), receipt = await collect(f, 'plain', transport(f, 'plain', { mutate(message) {
+    if (message.id === 2) message.result[field] = value; return message;
+  } }));
+  const observation = verifyPrimaryRuntimeLineageReceipt(receipt);
+  assert.equal(observation.status, 'unavailable'); assert.equal(observation.scoring_authority, false); assert.equal(observation.quality, null);
+});
+test('V-S2 additional startup claim is not an allowed native reply field', async t => {
+  const f = fixture(t), receipt = await collect(f, 'plain', transport(f, 'plain', { mutate(message) {
+    if (message.id === 2) Object.assign(message.result, { instructionSources: [], startupClosureVerified: true }); return message;
+  } }));
+  assert.equal(verifyPrimaryRuntimeLineageReceipt(receipt).status, 'unavailable');
+});
 
 for (const kernel of ['kernel_principles_v1', 'kernel_principles_v2']) test('V-R1/R2/R3 owned runtime evidence joins exact V10 conditions, with missing/failure retained '+kernel, async t => {
   const fixed = syntheticV10ScoringVersion(t, { fixtureIds: [ID] }), f = fixture(t, kernel);

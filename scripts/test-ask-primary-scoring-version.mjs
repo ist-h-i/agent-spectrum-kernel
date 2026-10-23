@@ -327,7 +327,7 @@ test('model-free prepare binds explicit version in all blocks and exported reado
     }
   }
   const output = join(f.parent, 'prepared');
-  const prepared = preparePrimaryEvaluation(publicParent, { output, evidenceKind: 'synthetic', scoringVersionPath: f.selector.path, scoringVersionDigest: f.selector.digest });
+  const prepared = preparePrimaryEvaluation(publicParent, { output, evidenceKind: 'synthetic', fixtureIds: [...PRIMARY_FIXTURE_IDS].sort(), scoringVersionPath: f.selector.path, scoringVersionDigest: f.selector.digest });
   assert.equal(prepared.model_calls, 0); assert.equal(prepared.old_ownership_diagnostics, 0);
   const manifest = json(prepared.manifest_path);
   for (const block of manifest.blocks) {

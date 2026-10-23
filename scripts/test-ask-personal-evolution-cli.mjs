@@ -8,10 +8,10 @@ import { tmpdir, devNull } from "node:os";
 import { join, resolve } from "node:path";
 import { canonicalDigest, readContentAddressedJson } from "./content-addressed-store.mjs";
 import { setup, bindSyntheticRoleGrading } from "./test-helpers-personal-evolution-primary-pair.mjs";
-import { PRIMARY_FIXTURE_IDS } from "./ask-primary-fixture-recipe.mjs";
+import { PRIMARY_FIXTURE_IDS, CANONICAL_PRIMARY_FIXTURE_IDS } from "./ask-primary-fixture-recipe.mjs";
 import { preparePersonalEvolutionCliPair } from "./ask-personal-evolution-cli-prepare.mjs";
 import { comparisonHash } from "./ask-user-comparison-prepare.mjs";
-import { setupPrimaryScoringVersion } from "./test-helpers-primary-scoring-version.mjs";
+import { syntheticV7ScoringVersion } from "./test-helpers-primary-evaluation-v7.mjs";
 import * as pairApi from "./ask-personal-evolution-primary-pair.mjs";
 import * as savedApi from "./ask-personal-evolution-saved-results.mjs";
 import * as connectorApi from "./ask-personal-evolution-generation-connector.mjs";
@@ -21,7 +21,7 @@ const json = path => JSON.parse(readFileSync(path));
 const write = (path, value) => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 const read = (storeRoot, digest) => readContentAddressedJson({ storeRoot, digest }).value;
 import { personalCliRoundtrip } from "./test-helpers-personal-evolution-cli-roundtrip.mjs";
-personalCliRoundtrip("legacy9");
+personalCliRoundtrip("catalog24", { fixtureIds: [fixtureId], implicitCatalog: true, exerciseLifecycle: true });
 
 // Narrow consumer contract tests: the saved verifier is controlled here, while
 // the roundtrip above exercises its real implementation and genuine receipts.
@@ -95,15 +95,17 @@ test("partial/invalid saved evidence and unsupported positive application remain
   assert.equal((await run(["start", "--cycle", cycle])).reason, "command_in_progress_or_interrupted");
 });
 
-test("CLI preparation seals all existing nine primary recipes and exact role Prompt bindings without dispatch", t => {
-  const scoring = setupPrimaryScoringVersion(t);
+test("CLI preparation seals a catalog selection of the historical nine recipes and exact role Prompt bindings without dispatch", t => {
+  const scoring = syntheticV7ScoringVersion(t, { fixtureIds: CANONICAL_PRIMARY_FIXTURE_IDS, fixtureSet: "catalog24" });
   const revision = spawnSync("git", ["-c", `core.hooksPath=${devNull}`, "rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8",
     env: { PATH: process.env.PATH, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_SYSTEM: devNull, GIT_CONFIG_NOSYSTEM: "1" } });
   assert.equal(revision.status, 0);
   const f = setup(t, { fixtureIds: PRIMARY_FIXTURE_IDS, sourceRevision: revision.stdout.trim() });
   bindSyntheticRoleGrading(f, { baseline: [], challenger: [] });
   const gradingResources = Object.fromEntries(["baseline", "challenger"].map(role => {
-    const path = join(f.root, `grading-${role}.json`); return [role, { path, digest: comparisonHash(readFileSync(path)) }];
+    const path = join(f.root, `grading-${role}.json`), config = json(path);
+    config.fixtures = Object.fromEntries(CANONICAL_PRIMARY_FIXTURE_IDS.map(id => [id, { frozenSourceRoot: scoring.runtime, ...scoring.resource }]));
+    write(path, config); return [role, { path, digest: comparisonHash(readFileSync(path)) }];
   }));
   const reference = json(join(ROOT, "docs/fixtures/prompt-v2-preregistration/reference.json")), cycleRoot = join(f.root, "nine-cli-cycle");
   mkdirSync(cycleRoot);
@@ -112,6 +114,7 @@ test("CLI preparation seals all existing nine primary recipes and exact role Pro
     portfolioAuthority: f.authority, selectorContext: f.alignArgs.selectorContext, sourceRevision: revision.stdout.trim(),
     experimentTemplateObjectDigest: reference.adapters[0].evolution.experiment_object_digest, evaluationAuthority: f.args.evaluationAuthority,
     evaluation: { publicInputRoot: join(ROOT, "benchmarks/fixtures/checkpoint-b2"), cliBin: join(f.root, "must-never-launch-codex"),
+      fixtureSet: "catalog24", fixtureIds: [...PRIMARY_FIXTURE_IDS].sort(),
       cliVersion: "fake-not-launched", model: "gpt-5.6-sol", reasoning: "high", evidenceKind: "synthetic",
       scoringVersion: scoring.selector, gradingResources } },
     cycleRoot, cycleId: "synthetic-nine-cli", preparationObjectDigest: f.args.preparationObjectDigest });
@@ -135,4 +138,19 @@ test("CLI preparation seals all existing nine primary recipes and exact role Pro
   assert.equal(pairApi.verifyPersonalEvolutionPromptPairResults(prepared.input).status, "NOT_RUN");
   assert.equal(existsSync(join(prepared.outputRoot, "invocation")), false);
   assert.equal(existsSync(join(f.root, "must-never-launch-codex")), false);
+});
+
+
+test("old profile reads do not authorize new requests, cycles or pair creation", async t => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "personal-cli-legacy-migration-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const profileRoot = join(root, "profile"); mkdirSync(profileRoot);
+  const historical = { evaluation: {}, blueprint: { parent_asset: { stable_id: "synthetic-target" }, evaluation_scope: { fixture_ids: [fixtureId] } } };
+  const profilePath = join(profileRoot, "profile.json"), problem = join(root, "problem.txt"), cycle = join(root, "new-cycle");
+  write(profilePath, { value: historical, digest: canonicalDigest(historical) }); writeFileSync(problem, "Public synthetic correction.");
+  const before = readFileSync(profilePath);
+  const { runPersonalEvolutionCommand: run } = await import("./ask-personal-evolution-cli.mjs?legacy-migration");
+  await assert.rejects(run(["start", "--profile", profileRoot, "--cycle", cycle, "--target", "synthetic-target", "--problem", problem]), /requires migration/);
+  assert.throws(() => preparePersonalEvolutionCliPair({ profile: historical, cycleRoot: cycle }), /requires migration/);
+  assert.equal(existsSync(cycle), false); assert.deepEqual(readFileSync(profilePath), before);
 });

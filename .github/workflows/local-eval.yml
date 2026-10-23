@@ -44,7 +44,7 @@ jobs:
         if: matrix.os == 'macos-15'
         run: node --test scripts/test-ask-synthetic-json-pilot.mjs
       - name: User repository comparison preparation and execution (fake runner only)
-        run: node --test scripts/test-ask-user-comparison-prepare.mjs scripts/test-ask-user-comparison.mjs scripts/test-ask-user-comparison-logs.mjs scripts/test-ask-user-comparison-unattended.mjs scripts/test-codex-output-observer.mjs
+        run: node --test scripts/test-ask-user-comparison-prepare.mjs scripts/test-ask-user-comparison.mjs scripts/test-ask-user-comparison-logs.mjs scripts/test-ask-user-comparison-unattended.mjs scripts/test-codex-output-observer.mjs scripts/test-ask-user-comparison-public-sandbox.mjs
       # Pure render/condition checks; Mac OS boundaries are covered by the real
       # process/path/permission suites above and below (see CI OS inventory).
       - name: Kernel principles common logic (Ubuntu owner)

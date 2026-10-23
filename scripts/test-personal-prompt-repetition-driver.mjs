@@ -12,7 +12,10 @@ test('opt-in driver refuses foreign member and drift in another repeat before an
  t.mock.module('./ask-primary-evaluation-grading.mjs',{exports:{...grading,createPrimaryEvaluationGradingAdapter:()=>({preflight:()=>{preflights++;return{status:'ready',blockers:[]};}})}});
  t.mock.module('./ask-personal-evolution-primary-pair.mjs',{exports:{...pair,startPersonalEvolutionPromptPair:()=>{dispatches++;throw new Error('artificial dispatch must never occur');}}});
  const driver=await import('./ask-personal-evolution-driver.mjs?repetition-boundary-fixture');
- const selected=f.members[0],input={...f.args,experimentObjectDigest:selected.experimentObjectDigest,pairRegistrationObjectDigest:selected.pairRegistrationObjectDigest};
+ // Historical selection metadata belongs to the fixture/pair reader, not the strict driver API.
+ const {fixtureSet,...driverArgs}=f.args;assert.equal(fixtureSet,'legacy9');
+ const selected=f.members[0],input={...driverArgs,experimentObjectDigest:selected.experimentObjectDigest,pairRegistrationObjectDigest:selected.pairRegistrationObjectDigest};
+ assert.throws(()=>driver.inspectPreparedPersonalEvolutionLoop({...input,fixtureSet}),/unknown driver option/);assert.equal(preflights,0);assert.equal(dispatches,0);
  assert.throws(()=>driver.inspectPreparedPersonalEvolutionLoop({...input,pairRegistrationObjectDigest:canonicalDigest('foreign pair')}),/outside fixed repetition population/);assert.equal(preflights,0);
  const inspected=driver.inspectPreparedPersonalEvolutionLoop(input);assert.equal(inspected.models_started,false);assert.equal(preflights,2);assert.equal(dispatches,0);
  const other=f.members[1].blocks.challenger[0].grading.resources.path,bytes=readFileSync(other);writeFileSync(other,Buffer.concat([bytes,Buffer.from('\n')]));

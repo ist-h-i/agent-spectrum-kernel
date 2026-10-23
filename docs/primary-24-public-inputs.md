@@ -11,6 +11,11 @@
 性能回帰の独立admissionと計測証拠の接続は保留。[課題の組立・採点検証](primary-24-task-assembly.md)を継続する。
 既存9件も、この点検だけで正常例・不良例の意味採点が確認済みになるわけではない。
 
+2026-10-23更新: 新規設定は単一の24課題catalogから課題IDを選ぶ。旧9件への切替は不要。
+全24件が比較登録済みだが、登録はnative受入・意味採点の合格ではない。旧profileの省略fieldは互換読取りで旧選択を保ち、
+新規profileへの移行は新しい出力先へのconfigureで行う。保存済み証跡は変更しない。
+
+以下の2026-10-20追記と表の「個人」は当時の登録状態の記録である。
 2026-10-20追記: primary evaluation batchの明示`catalog24`と共通v7 APIは接続済み。
 個人ループCLIにも明示`catalog24`を接続し、省略時は従来9件内の選択を維持する。以下のmain比較・候補PR点検は当時の記録であり、
 現在の未完一覧は[組立状況](primary-24-task-assembly.md)を参照する。性能consumerは実装済みだが、
@@ -63,7 +68,7 @@ new-primary-inputs/
 | `requirements` | 元の要件ID、配点、根拠参照。追加の採点基準は作らない |
 | `verification_commands` | 既存の公開検証契約。ここでは実行しない |
 | `portfolio_registered` | 既存のadaptive configにIDがある。実行許可・admissionの証明ではない |
-| `primary_comparison_registered` | 既存の閉じた9課題への登録。private resource preflightの成功ではない |
+| `primary_comparison_registered` | 単一catalogの24課題への登録。選択・private resource preflightの成功ではない |
 | `semantic_controls.status` | この入口では常に `not_run`。mutationの宣言数は実行済み証拠ではない |
 | `slots` | 課題×plain / kernel_principles_v2 / full_ask。未開始または入力不備によるblocked |
 | `quality` / `points` | すべて `null`。未評価・採点不能を品質0へ変換しない |
@@ -77,7 +82,8 @@ scopeと要件根拠の公開範囲を検査する。private evaluatorの正当�
 
 ## 24件の内訳と期待する成果物
 
-以下の「公開」はmainに入力と契約があること、「個人」は既存9課題の比較登録を表す。
+以下の歴史的な表では「公開」は当時mainに入力と契約があったこと、「個人」は当時の9課題の比較登録を表す。
+現在の製品登録は全24件であり、課題選択と実受入・採点状況は別に確認する。
 正常例・不良例の意味採点は別の固定private評価と独立レビューが必要。
 今回の入口は、全24件についてその状態を `not_run` と報告する。
 

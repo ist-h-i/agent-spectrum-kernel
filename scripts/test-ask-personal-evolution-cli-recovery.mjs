@@ -9,7 +9,8 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, r
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { setup } from "./test-helpers-personal-evolution-primary-pair.mjs";
-import { setupPrimaryScoringVersion } from "./test-helpers-primary-scoring-version.mjs";
+import { syntheticV7ScoringVersion } from "./test-helpers-primary-evaluation-v7.mjs";
+import { CANONICAL_PRIMARY_FIXTURE_IDS } from "./ask-primary-fixture-recipe.mjs";
 import { canonicalDigest, readContentAddressedJson } from "./content-addressed-store.mjs";
 import { comparisonHash } from "./ask-user-comparison-prepare.mjs";
 import { reportUserComparison } from "./ask-user-comparison.mjs";
@@ -40,7 +41,7 @@ async function failChallengerRead(action) {
 }
 
 test("approved interrupted preparation recovers through existing seal/inspect APIs without dispatch or changing old files", async t => {
-  const scoring = setupPrimaryScoringVersion(t);
+  const scoring = syntheticV7ScoringVersion(t, { fixtureIds: CANONICAL_PRIMARY_FIXTURE_IDS, fixtureSet: "catalog24" });
   const f = setup(t, { fixtureIds: [id], deferGeneration: true,
     portfolioBudgets: { cost_policy: "subscription_no_additional_spend_v1" },
     entryCostEstimate: { token_count: { status: "known", value: 1 }, duration_ms: { status: "known", value: 1 }, cost_microunits: { status: "unknown", value: null } },
@@ -56,7 +57,7 @@ test("approved interrupted preparation recovers through existing seal/inspect AP
   }
   const resources = Object.fromEntries(["baseline", "challenger"].map(role => {
     const path = join(f.root, `${role}-template.json`);
-    write(path, { kind: "ask_primary_grading_resources_v1", output_root: join(f.root, `unused-${role}`), fixtures: {} });
+    write(path, { kind: "ask_primary_grading_resources_v1", output_root: join(f.root, `unused-${role}`), fixtures: Object.fromEntries(CANONICAL_PRIMARY_FIXTURE_IDS.map(fixtureId => [fixtureId, { frozenSourceRoot: scoring.runtime, ...scoring.resource }])) });
     return [role, { path, digest: comparisonHash(readFileSync(path)) }];
   }));
   const config = join(f.root, "management.json"), profile = join(f.root, "profile"), cycle = join(f.root, "cycle");

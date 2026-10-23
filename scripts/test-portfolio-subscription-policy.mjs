@@ -9,9 +9,9 @@ import { buildPortfolioManifest, validatePortfolioManifest, createEmptyPortfolio
   resolvePortfolioSelection, verifyPortfolioSelection, computePortfolioSelectionDigest } from "./portfolio-manager.mjs";
 import { buildEvolutionExperiment, publishEvolutionExperiment, verifyEvolutionExperiment,
   computePromptV2ExactProjectionDigests } from "./evolution-loop.mjs";
-import { describePersonalEvolutionPromptPair, sealPersonalEvolutionPromptPair,
+import { describePersonalEvolutionPromptPair,
   verifyPersonalEvolutionPromptPairResults, startPersonalEvolutionPromptPair } from "./ask-personal-evolution-primary-pair.mjs";
-import { setup, blocksFor, bindSyntheticRoleGrading } from "./test-helpers-personal-evolution-primary-pair.mjs";
+import { historicalPersonalPairFixture as sealPersonalEvolutionPromptPair, setup, blocksFor, bindSyntheticRoleGrading } from "./test-helpers-personal-evolution-primary-pair.mjs";
 
 const mode = "subscription_no_additional_spend_v1";
 const known = value => ({ status: "known", value });
