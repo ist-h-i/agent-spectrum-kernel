@@ -1,6 +1,6 @@
 // Exercises the public personal commands with artificial targets and fake
-// provider/comparison/grading only. The separate nine-fixture test owns coverage
-// of the full primary population; this test owns bounded composition/resume.
+// provider/comparison/grading only. The separate catalog24 roundtrip owns
+// full-population coverage; this test selects one task for bounded composition/resume.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { EventEmitter } from "node:events";
@@ -10,7 +10,8 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { canonicalDigest, readContentAddressedJson } from "./content-addressed-store.mjs";
 import { setup, fakeEngineeringTemplate, collectSyntheticGrade } from "./test-helpers-personal-evolution-primary-pair.mjs";
-import { setupPrimaryScoringVersion } from "./test-helpers-primary-scoring-version.mjs";
+import { syntheticV7ScoringVersion } from "./test-helpers-primary-evaluation-v7.mjs";
+import { CANONICAL_PRIMARY_FIXTURE_IDS } from "./ask-primary-fixture-recipe.mjs";
 import { comparisonHash } from "./ask-user-comparison-prepare.mjs";
 import { readUserComparisonPlan, startUserComparison } from "./ask-user-comparison.mjs";
 import { renderCommandEvent } from "./ask-benchmark-command-evidence.mjs";
@@ -87,7 +88,8 @@ test("bounded personal run uses the existing commands, exact reviews and origina
     } } });
   const { runPersonalEvolutionCommand: run } = await import("./ask-personal-evolution-cli.mjs");
   async function fixture(st, options = {}) {
-    const scoring = setupPrimaryScoringVersion(st), f = setup(st, { deferGeneration: true,
+    const scoring = syntheticV7ScoringVersion(st, { fixtureIds: CANONICAL_PRIMARY_FIXTURE_IDS, fixtureSet: "catalog24" });
+    const f = setup(st, { fixtureIds: [fixtureId], deferGeneration: true,
       portfolioBudgets: { cost_policy: "subscription_no_additional_spend_v1" },
       entryCostEstimate: { token_count: { status: "known", value: 1 }, duration_ms: { status: "known", value: 1 }, cost_microunits: { status: "unknown", value: null } },
       availableBudget: { token_count: { status: "known", value: 90000000 }, duration_ms: { status: "known", value: 604800000 }, cost_microunits: { status: "unknown", value: null } } });
@@ -100,7 +102,8 @@ test("bounded personal run uses the existing commands, exact reviews and origina
     const resources = {};
     for (const role of ["baseline", "challenger"]) {
       const path = join(f.root, `resource-template-${role}.json`);
-      write(path, { kind: "ask_primary_grading_resources_v1", output_root: join(f.root, `unused-template-output-${role}`), fixtures: {} });
+      write(path, { kind: "ask_primary_grading_resources_v1", output_root: join(f.root, `unused-template-output-${role}`),
+        fixtures: Object.fromEntries(CANONICAL_PRIMARY_FIXTURE_IDS.map(id => [id, { frozenSourceRoot: scoring.runtime, ...scoring.resource }])) });
       resources[role] = { path, digest: comparisonHash(readFileSync(path)) };
     }
     let experimentDigest = adapter.evolution.experiment_object_digest;
@@ -161,6 +164,9 @@ writeFileSync(process.argv[process.argv.indexOf("--output-last-message")+1],r.st
       unattended: policy });
     const configured = await run(["configure", "--config", f.config, "--profile", f.profile]);
     assert.equal(configured.unattended_policy_digest, canonicalDigest(policy));
+    assert.deepEqual(configured.fixture_ids, [fixtureId]);
+    assert.equal(value(join(f.profile, "profile.json")).evaluation.fixtureSet, "catalog24");
+    assert.deepEqual(value(join(f.profile, "profile.json")).evaluation.fixtureIds, [fixtureId]);
     f.start = () => run(["run", "--profile", f.profile, "--output", f.output, "--target", f.parentAsset.stable_id,
       "--problem", f.problem, "--confirmed-policy-digest", configured.unattended_policy_digest]);
     f.resume = () => run(["run", "--output", f.output]);
