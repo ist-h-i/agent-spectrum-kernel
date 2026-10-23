@@ -9,13 +9,25 @@ const rollover = readFileSync(new URL('../.github/workflows/context-rollover.yml
 const completion = readFileSync(new URL('../.github/workflows/verification-completion.yml', import.meta.url), 'utf8');
 const baseline = JSON.parse(readFileSync(new URL('../docs/fixtures/ci-full-run-inventory.json', import.meta.url)));
 const lifetimeCommand = 'node --test scripts/test-ask-primary-performance-execution.mjs scripts/test-ask-primary-performance-lifetime.mjs';
+const manualComparisonCommand = 'node --test scripts/test-ask-primary-evaluation-start.mjs scripts/test-ask-primary-nine-condition-report.mjs';
 const commands = text => text.split('\n').map(line => line.trim().replace(/^run: /, '')).filter(line => /^node (?:--\S+ )*scripts\//.test(line)).sort();
 
 test('all original validate commands remain, including flags and frozen sources', () => {
-  const additions = [lifetimeCommand, 'node --test scripts/test-ci-full-run.mjs', 'node --test scripts/test-ci-change-shadow.mjs', 'node scripts/ci-change-shadow.mjs', 'node --test scripts/test-ask-personal-evolution-trace.mjs', 'node --test scripts/test-codex-metrics-collector.mjs', 'node --test scripts/test-ci-execution-plan.mjs', 'node scripts/ci-execution-plan.mjs plan', 'node scripts/ci-execution-plan.mjs gate', 'node scripts/ci-execution-plan.mjs receipt'];
+  const additions = [lifetimeCommand, manualComparisonCommand, 'node --test scripts/test-ci-full-run.mjs', 'node --test scripts/test-ci-change-shadow.mjs', 'node scripts/ci-change-shadow.mjs', 'node --test scripts/test-ask-personal-evolution-trace.mjs', 'node --test scripts/test-codex-metrics-collector.mjs', 'node --test scripts/test-ci-execution-plan.mjs', 'node scripts/ci-execution-plan.mjs plan', 'node scripts/ci-execution-plan.mjs gate', 'node scripts/ci-execution-plan.mjs receipt'];
   for (const command of additions) assert.equal(commands(validate).filter(c => c === command).length, command.endsWith(' receipt') ? 5 : 1, command);
   assert.deepEqual(commands(validate).filter(c => !additions.includes(c)), baseline.validate_commands);
   assert.match(validate, /git fetch --no-tags origin a06e96f8/);
+});
+
+test('manual start and saved-report tests have one unconditional common owner without new jobs', () => {
+  const registry = parseRegistry(validate), owners = Object.entries(registry.jobs).flatMap(([job, value]) =>
+    value.steps.filter(step => step.run === manualComparisonCommand).map(step => job));
+  assert.deepEqual(owners, ['common']);
+  for (const file of ['scripts/test-ask-primary-evaluation-start.mjs', 'scripts/test-ask-primary-nine-condition-report.mjs']) {
+    assert.equal(commands(validate).filter(command => command.split(' ').includes(file)).length, 1);
+    for (const other of [local, rollover, completion]) assert.ok(!other.includes(file), 'no cross-workflow duplicate');
+  }
+  assert.deepEqual(Object.keys(registry.jobs).sort(), ['independent-local-clone', 'docs-checks', 'common', 'repository-tests', 'personal-cli'].sort());
 });
 
 test('original coverage remains except two audited Mac-only fake logic files, with three Mac omissions explicitly owned on Ubuntu', () => {

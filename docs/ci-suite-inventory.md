@@ -8,7 +8,9 @@ Verified implementation baseline: main
 stage-specific, not the current total. Validate has **148 registered Node script
 invocations**: the 140 inherited from #439 plus eight controls (one plan, one
 new plan/receipt regression command, five receipt producers and one gate).
-Local-eval retains **25** registrations. Counts include the preserved conditional
+The manual-comparison follow-up adds one unconditional common invocation for its
+two lightweight artificial test files, so the current total is **149**. No
+workflow or job is added. Local-eval retains **25** registrations. Counts include the preserved conditional
 failure diagnostic; they are inventory counts, not a claim every conditional
 command executes on a green run. PR #441 synchronized documentation only; the
 subsequent cross-workflow change below leaves these Validate/local-eval counts
@@ -21,7 +23,9 @@ plan plus five workers feed the fixed six-dependency validate gate. The original
 107 inherited run blocks from #439 head `ce89336b`, including its failure-only
 diagnostic. The active receipt registry also has 107 required descriptors, but
 its set excludes that failure-only diagnostic and includes the new plan/receipt
-regression step. Neither fixture replaces the current workflow as execution
+regression step. The manual-comparison follow-up brings the active required
+registry to **108** descriptors while preserving every historical fixture block
+unchanged. Neither fixture replaces the current workflow as execution
 authority.
 
 For the exact #440 hosted proof, single-batch measurements and remaining
@@ -29,6 +33,15 @@ consumer-closure/docs-v1 observation limits, see
 [the verified shadow state](ci-shadow-and-os-boundaries.md#verified-state-after-pr-440).
 Selection remains disabled; an ordinary change to these two CI documents is
 outside the closed docs allowlist and therefore proposes full execution.
+
+The single new common command is
+`node --test scripts/test-ask-primary-evaluation-start.mjs scripts/test-ask-primary-nine-condition-report.mjs`.
+It exercises the CLI through artificial module mocks and saved synthetic JSON;
+it starts no real Codex/model/native qualification. The existing batch regression
+is not added again. `test-ci-full-run.mjs` checks unique unconditional ownership,
+unchanged workers and absence of cross-workflow duplicates. Existing receipt
+and strict aggregate rules include the new step automatically. Historical command
+and step inventories remain preserved baselines rather than regenerated totals.
 
 ## Cross-workflow duplicate reduction
 
