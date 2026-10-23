@@ -206,8 +206,10 @@ export function collectSyntheticTerminal(t, target, scenario = "completed") {
   write(history, event); writeFileSync(join(dirname(history), "record.digest"), comparisonHash(readFileSync(history)));
 }
 export function fakeEngineeringTemplate(root, fixtureId = "mn-build-option-update") {
-  const files = prepareAggregateV2FileFixture({ root: repository, target: join(root, `engineering-template-${fixtureId}`), fixtureId }).collect();
-  return JSON.parse(readFileSync(join(files.options.engineeringResultsPath, `${fixtureId}/full_ask/01.json`)));
+  // Only the synthetic input JSON is consumed here. Aggregate publication and
+  // reverification belong to the aggregate regressions, not each role template.
+  const inputs = prepareAggregateV2FileFixture({ root: repository, target: join(root, `engineering-template-${fixtureId}`), fixtureId }).prepareInputs();
+  return JSON.parse(readFileSync(join(inputs.engineeringResultsPath, `${fixtureId}/full_ask/01.json`)));
 }
 export async function collectSyntheticGrade(t, f, block, template, { quality = 0.5, safety = "pass", outcomeOverride = null, outputParent = f.root } = {}) {
   const folder = join(outputParent, `producer-${block.run_id}`);

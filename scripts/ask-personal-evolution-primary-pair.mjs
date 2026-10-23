@@ -8,7 +8,7 @@ import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { comparisonHash } from "./ask-user-comparison-prepare.mjs";
 import { readUserComparisonPlan, reportUserComparison, startUserComparison } from "./ask-user-comparison.mjs";
 import { exportPrimaryEvaluationGradingRequest, isPrimaryEvaluationGradingAdapter } from "./ask-primary-evaluation-grading.mjs";
-import { verifyPrimaryEvaluationProducer, primaryProducerSources } from "./ask-primary-evaluation-producer.mjs";
+import { primaryProducerSources } from "./ask-primary-evaluation-producer.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { verifyPortfolioScoringRootLineage } from "./ask-benchmark-evaluator-boundary.mjs";
 import { primaryScoringRoot, readPrimaryScoringVersion } from "./ask-primary-scoring-version.mjs";
@@ -343,14 +343,13 @@ export function verifyPersonalEvolutionPromptPairResults(options) {
       }
       if (!saved) { incomplete++; continue; }
       assertPersonalEvolutionFields(saved, ["producer", "engineering_result"], "saved Prompt pair result");
-      const producer = verifyPrimaryEvaluationProducer(saved.producer);
-      assert.equal(producer.block.run_id, block.run_id); assert.equal(producer.block.plan_digest, block.plan_digest);
-      assert.ok(equal(producer.block, block), "foreign/old producer result cannot become candidate evidence");
-      const verifiedNormalized = withPrimaryEvaluationProducer(saved.producer, verified => {
+      const { producer, verifiedNormalized } = withPrimaryEvaluationProducer(saved.producer, verified => {
+        assert.equal(verified.block.run_id, block.run_id); assert.equal(verified.block.plan_digest, block.plan_digest);
+        assert.ok(equal(verified.block, block), "foreign/old producer result cannot become candidate evidence");
         const outputPath = join(saved.producer.recordRoot, "normalized");
         const result = verifyNormalizedPortfolioResults({ ...verified.executionOptions, outputPath });
         verifyPortfolioScoringRootLineage({ ...verified.executionOptions, normalizedResultsPath: outputPath }, result);
-        return result;
+        return { producer: verified, verifiedNormalized: result };
       });
       const normalizedEntry = verifiedNormalized.manifest.cases.find(item => item.condition === "full_ask")?.normalized_attempts[0];
       assert.ok(normalizedEntry, "fresh full_ask normalized result required");

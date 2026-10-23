@@ -23,7 +23,7 @@ import { syntheticPrimarySource } from "./test-helpers-primary-evaluation-produc
 import { producePrimaryEvaluationArtifacts, verifyPrimaryEvaluationProducer } from "./ask-primary-evaluation-producer.mjs";
 import { computeEngineeringResultId, computeEngineeringResultDigest } from "./ask-benchmark-portfolio-score.mjs";
 import { prepareAggregateV2FileFixture } from "./test-ask-benchmark-portfolio-aggregate-v2-files.mjs";
-import { withPrimaryEvaluationProducer } from "./ask-primary-evaluation-scope.mjs";
+import { activePrimaryProducer, withPrimaryEvaluationProducer } from "./ask-primary-evaluation-scope.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { primaryScoringRoot } from "./ask-primary-scoring-version.mjs";
 import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS, CANONICAL_PRIMARY_FIXTURE_IDS } from "./ask-primary-fixture-recipe.mjs";
@@ -125,7 +125,9 @@ test("saved fresh pair connects public grading without scorer execution; negativ
   assert.equal(result.evidence.dimensions.variance.status, "unavailable"); assert.equal(result.evidence.dimensions.mechanism.status, "unavailable");
   assert.equal(result.recommendation.recommendation, "insufficient_evidence"); assert.deepEqual(inventory(f.storeRoot), before);
   assert.throws(() => verifyPersonalEvolutionPromptPairResults({ ...options, savedResults, trustedSavedEngineeringResultDigests: [] }), /separate saved grading/);
+  assert.equal(activePrimaryProducer(), false);
   assert.throws(() => verifyPersonalEvolutionPromptPairResults({ ...options, savedResults: { ...savedResults, challenger: savedResults.baseline }, trustedSavedEngineeringResultDigests: trusted }), /run_id|foreign|Expected/);
+  assert.equal(activePrimaryProducer(), false, "foreign block rejection must release producer scope");
   const grade = savedResults.challenger["mn-build-option-update"], originalBytes = readFileSync(grade.engineering_result.path);
   for (const key of ["evaluator_revision", "frozen_admission_record_digest", "requirement_authority_digest", "requirement_set_digest"]) {
     const changed = JSON.parse(originalBytes); changed[key] = key === "evaluator_revision" ? "a".repeat(40) : canonicalDigest("foreign criterion");
@@ -134,8 +136,17 @@ test("saved fresh pair connects public grading without scorer execution; negativ
     write(grade.engineering_result.path, changed); const digest = comparisonHash(readFileSync(grade.engineering_result.path));
     assert.throws(() => verifyPersonalEvolutionPromptPairResults({ ...options, savedResults: { ...savedResults, challenger: {
       "mn-build-option-update": { ...grade, engineering_result: { ...grade.engineering_result, digest } } } }, trustedSavedEngineeringResultDigests: [...trusted, digest] }), /saved criterion/);
+    assert.equal(activePrimaryProducer(), false, "criterion rejection must release producer scope");
   }
   writeFileSync(grade.engineering_result.path, originalBytes);
+  const producerPlan = join(grade.producer.recordRoot, "plan.json"), originalPlan = readFileSync(producerPlan);
+  try {
+    writeFileSync(producerPlan, "changed after the prior saved-result verification");
+    assert.throws(() => verifyPersonalEvolutionPromptPairResults({ ...options, savedResults, trustedSavedEngineeringResultDigests: trusted }), /artifact inventory|artifact_inventory/);
+    assert.equal(activePrimaryProducer(), false, "later producer drift must reject without retaining scope");
+  } finally { writeFileSync(producerPlan, originalPlan); }
+  assert.equal(verifyPersonalEvolutionPromptPairResults({ ...options, savedResults, trustedSavedEngineeringResultDigests: trusted }).status, "saved_pair_verified");
+  assert.equal(activePrimaryProducer(), false);
 });
 
 function resealRegistration(f, sealed, mutate) {
