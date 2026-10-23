@@ -73,6 +73,14 @@ test('producer source/artifact/transplant changes and async authority leakage ar
   const p=await produce(t);withPrimaryEvaluationProducer(p.options,()=>{assert.equal(activePrimaryProducer(),true);assert.throws(()=>verifyEvaluatorAuthority({}),/cannot_authorize_scoring/);});
   let descendant;withPrimaryEvaluationProducer(p.options,()=>{descendant=new Promise(resolve=>queueMicrotask(()=>resolve(activePrimaryProducer())));});assert.equal(await descendant,false);
   assert.throws(()=>withPrimaryEvaluationProducer(p.options,()=>Promise.resolve()),/async_scope/);
+  assert.equal(activePrimaryProducer(),false);
+  assert.throws(()=>withPrimaryEvaluationProducer(p.options,()=>{throw new Error('synthetic callback failure');}),/synthetic callback failure/);
+  assert.equal(activePrimaryProducer(),false);
+  withPrimaryEvaluationProducer(p.options,()=>{
+    assert.throws(()=>withPrimaryEvaluationProducer(p.options,()=>assert.fail('nested callback must not run')),/nested_scope/);
+    assert.equal(activePrimaryProducer(),true,'inner refusal must preserve the owning outer scope');
+  });
+  assert.equal(activePrimaryProducer(),false);
   assert.throws(()=>verifyPrimaryEvaluationProducer({...p.options,externalDigest:'sha256:'+'a'.repeat(64)}),/pin/);
   writeFileSync(join(p.options.recordRoot,'plan.json'),'changed');assert.throws(()=>verifyPrimaryEvaluationProducer(p.options),/artifact_inventory|artifact inventory/);
 });

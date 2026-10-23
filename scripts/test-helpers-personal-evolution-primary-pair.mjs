@@ -1,7 +1,7 @@
 // Shared artificial fixtures for personal pair and roundtrip tests. No model,
 // provider transport, private evaluator or production authority is exercised.
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { canonicalDigest, readContentAddressedJson, putContentAddressedJson } from "./content-addressed-store.mjs";
@@ -22,6 +22,8 @@ import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-res
 import { publishPrimaryEngineeringSafety } from './ask-primary-engineering-safety.mjs';
 import { primaryScoringRoot } from "./ask-primary-scoring-version.mjs";
 import { buildPrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
+import { describePersonalEvolutionPromptPair, personalEvolutionPairLimits } from "./ask-personal-evolution-primary-pair.mjs";
+import { reportUserComparison } from "./ask-user-comparison.mjs";
 
 const repository = resolve(import.meta.dirname, ".."), fixture = join(repository, "docs/fixtures/prompt-v2-preregistration");
 const reference = JSON.parse(readFileSync(join(fixture, "reference.json"))), adapter = reference.adapters[0];
@@ -149,7 +151,7 @@ export function finishPersonalPairSetup(pending, imported, { sourceClassified = 
   draft.protocol.cli.version = "fake-not-launched";
   Object.assign(draft.projection, computePromptV2ExactProjectionDigests(aligned.roles));
   const experiment = publishEvolutionExperiment({ storeRoot, experiment: buildEvolutionExperiment(draft) });
-  const args = { storeRoot, preparationObjectDigest: aligned.prepared.preparation_object_digest, experimentObjectDigest: experiment.object_digest,
+  const args = { fixtureSet: "legacy9", storeRoot, preparationObjectDigest: aligned.prepared.preparation_object_digest, experimentObjectDigest: experiment.object_digest,
     trustedExperimentObjectDigests: [experiment.object_digest], trustedExperimentAuthorities: [draft.authority], trustedPortfolioAuthorityContexts: alignedTrust,
     evaluationAuthority: { authority_id: "synthetic-saved-grading-controller", authority_revision: 1, authority_evidence_digest: canonicalDigest("synthetic") } };
   return { ...pending, planned, alignArgs, aligned, args, imported, sourceReview,
@@ -206,8 +208,10 @@ export function collectSyntheticTerminal(t, target, scenario = "completed") {
   write(history, event); writeFileSync(join(dirname(history), "record.digest"), comparisonHash(readFileSync(history)));
 }
 export function fakeEngineeringTemplate(root, fixtureId = "mn-build-option-update") {
-  const files = prepareAggregateV2FileFixture({ root: repository, target: join(root, `engineering-template-${fixtureId}`), fixtureId }).collect();
-  return JSON.parse(readFileSync(join(files.options.engineeringResultsPath, `${fixtureId}/full_ask/01.json`)));
+  // Only the synthetic input JSON is consumed here. Aggregate publication and
+  // reverification belong to the aggregate regressions, not each role template.
+  const inputs = prepareAggregateV2FileFixture({ root: repository, target: join(root, `engineering-template-${fixtureId}`), fixtureId }).prepareInputs();
+  return JSON.parse(readFileSync(join(inputs.engineeringResultsPath, `${fixtureId}/full_ask/01.json`)));
 }
 export async function collectSyntheticGrade(t, f, block, template, { quality = 0.5, safety = "pass", outcomeOverride = null, outputParent = f.root } = {}) {
   const folder = join(outputParent, `producer-${block.run_id}`);
@@ -266,4 +270,50 @@ export function bindSyntheticRoleGrading(f, blocks, mutate = () => {}) {
     configs[role] = config;
   }
   return configs;
+}
+
+
+// Historical synthetic record fixture only. New product writers reject legacy9;
+// compatibility readers must still verify original old-format records. This
+// helper grants no observed evidence and is never imported by production code.
+export function historicalPersonalPairFixture(options) {
+  const description = describePersonalEvolutionPromptPair({ ...options, fixtureSet: "legacy9" });
+  assert.equal(description.evidence_kind, "synthetic", "historical fixtures are synthetic only");
+  const lifecyclePlans = Object.hasOwn(options, "lifecyclePlanObjectDigests") ? [...options.lifecyclePlanObjectDigests] : null;
+  if (lifecyclePlans) {
+    assert.ok(lifecyclePlans.length <= 8 && new Set(lifecyclePlans).size === lifecyclePlans.length);
+    assert.deepEqual(lifecyclePlans, [...lifecyclePlans].sort());
+    const preparation = read(options.storeRoot, options.preparationObjectDigest);
+    const candidate = read(options.storeRoot, preparation.candidate_object_digest), { lock_digest, ...parent } = candidate.parent_portfolio;
+    for (const pin of lifecyclePlans) {
+      const plan = read(options.storeRoot, pin);
+      assert.equal(plan.base_registry_snapshot_digest, candidate.registry.snapshot_digest);
+      assert.equal(plan.base_portfolio_lock_digest, lock_digest);
+      assert.equal(canonicalDigest(plan.base_current_manifest), canonicalDigest(parent));
+      assert.equal(canonicalDigest(plan.rollback_anchor), canonicalDigest(parent));
+    }
+  }
+  const items = ["baseline", "challenger"].flatMap(role => description.bindings[role]);
+  const overlap = (a, b) => a === b || a.startsWith(b + "/") || b.startsWith(a + "/");
+  assert.equal(resolve(options.outputRoot), options.outputRoot);
+  assert.equal(realpathSync(dirname(options.outputRoot)), dirname(options.outputRoot));
+  assert.equal(existsSync(options.outputRoot), false);
+  for (const path of [repository, options.storeRoot, ...items.flatMap(item => [item.block.root, item.block.public_input_root,
+    ...(item.source_repository ? [item.source_repository] : []), ...(item.grading_resources ? [item.grading_resources.output_root,
+      item.grading_resources.path, ...item.grading_resources.fixed_resource_paths] : [])])])
+    assert.ok(!overlap(options.outputRoot, resolve(path)), "historical fixture output overlap");
+  for (const item of items) {
+    if (item.grading_resources) assert.equal(existsSync(item.grading_resources.output_root), false);
+    for (const name of ["start.json", "start.digest", "slots", "leases", "history"])
+      assert.equal(existsSync(join(item.block.root, "control", name)), false, "post-result pair registration forbidden");
+    assert.equal(reportUserComparison(item.block.root).execution.start_consumed, false);
+  }
+  mkdirSync(options.outputRoot, { mode: 0o700 });
+  const body = { kind: lifecyclePlans ? "personal_pre_result_prompt_pair_v2" : "personal_pre_result_prompt_pair_v1",
+    ...(lifecyclePlans ? { lifecycle_plan_object_digests: lifecyclePlans } : {}), preparation_object_digest: options.preparationObjectDigest,
+    experiment_object_digest: options.experimentObjectDigest, description, output_root: options.outputRoot,
+    limits: personalEvolutionPairLimits(description.bindings.baseline.length, "legacy9"), authority_implied: false };
+  const registration = { ...body, pair_digest: canonicalDigest(body) };
+  return { registration, object_digest: putContentAddressedJson({ storeRoot: options.storeRoot, artifact: registration }).digest,
+    status: "NOT_RUN", recommendation: "insufficient_evidence", quality: null, authority_implied: false };
 }

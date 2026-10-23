@@ -28,13 +28,14 @@ function files(root) { return Object.fromEntries(readdirSync(root, { withFileTyp
   const path = join(root, entry.name); return entry.isDirectory() ? Object.entries(files(path)) : [[path, comparisonHash(readFileSync(path))]];
 })); }
 
-export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7" } = {}) {
+export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7", fixtureIds: selectedFixtureIds = null, implicitCatalog = false, exerciseLifecycle = false } = {}) {
   assert.ok(["v7","v8"].includes(scoringVersion));
-  const scope = fixtureSet === "catalog24" ? "configured target → source review → saved comparison/readout"
+  const scope = !exerciseLifecycle ? "configured target → source review → saved comparison/readout"
     : "configured target → source review → saved comparison → explicit hold → fresh request/source-review pause";
-  test(`same CLI ${fixtureSet}/${scoringVersion}: ${scope}; lost returns never repeat dispatch`, async t => {
-    const fixtureIds = fixtureSet === "catalog24" ? CANONICAL_PRIMARY_FIXTURE_IDS : [fixtureId];
-    const scoring = fixtureSet === "catalog24" ? (scoringVersion === "v8" ? syntheticV8ScoringVersion : syntheticV7ScoringVersion)(t, { fixtureIds, fixtureSet }) : setupPrimaryScoringVersion(t);
+  test(`same CLI ${fixtureSet}/${scoringVersion}${selectedFixtureIds ? " selected-subset" : ""}: ${scope}; lost returns never repeat dispatch`, async t => {
+    const fixtureIds = selectedFixtureIds ?? (fixtureSet === "catalog24" ? CANONICAL_PRIMARY_FIXTURE_IDS : [fixtureId]);
+    const resourceFixtureIds = fixtureSet === "catalog24" ? CANONICAL_PRIMARY_FIXTURE_IDS : fixtureIds;
+    const scoring = fixtureSet === "catalog24" ? (scoringVersion === "v8" ? syntheticV8ScoringVersion : syntheticV7ScoringVersion)(t, { fixtureIds: resourceFixtureIds, fixtureSet }) : setupPrimaryScoringVersion(t);
     const pending = setup(t, { fixtureIds, deferGeneration: true, portfolioBudgets: { cost_policy: "subscription_no_additional_spend_v1" },
       entryCostEstimate: { token_count: { status: "known", value: 1 }, duration_ms: { status: "known", value: 1 }, cost_microunits: { status: "unknown", value: null } },
       availableBudget: { token_count: { status: "known", value: 90000000 }, duration_ms: { status: "known", value: 604800000 }, cost_microunits: { status: "unknown", value: null } } });
@@ -45,7 +46,7 @@ export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7" } = {})
     const resources = {};
     for (const role of ["baseline", "challenger"]) {
       const path = join(pending.root, `resource-template-${role}.json`);
-      write(path, { kind: "ask_primary_grading_resources_v1", output_root: join(pending.root, `unused-template-output-${role}`), fixtures: fixtureSet === "catalog24" ? Object.fromEntries(fixtureIds.map(id => [id, { frozenSourceRoot: scoring.runtime, ...scoring.resource }])) : {} });
+      write(path, { kind: "ask_primary_grading_resources_v1", output_root: join(pending.root, `unused-template-output-${role}`), fixtures: fixtureSet === "catalog24" ? Object.fromEntries(resourceFixtureIds.map(id => [id, { frozenSourceRoot: scoring.runtime, ...scoring.resource }])) : {} });
       resources[role] = { path, digest: comparisonHash(readFileSync(path)) };
     }
     const configPath = join(pending.root, "management.json"), profile = join(pending.root, "profile"), cycle = join(pending.root, "cycle-1");
@@ -57,8 +58,8 @@ export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7" } = {})
       generation: { executable: "must-never-launch-codex", timeoutMs: 3600000 },
       evaluation: { publicInputRoot: join(ROOT, "benchmarks/fixtures/checkpoint-b2"), cliBin: join(pending.root, "must-never-launch-codex"),
         cliVersion: "fake-not-launched", model: "gpt-5.6-sol", reasoning: "high", evidenceKind: "synthetic",
-        scoringVersion: scoring.selector, gradingResources: resources, ...(fixtureSet === "catalog24" ? { fixtureSet } : {}) } });
-    let providers = 0, comparisons = 0, sessions = 0, grades = 0, loseGenerationReturn = true, loseComparisonReturn = true;
+        scoringVersion: scoring.selector, gradingResources: resources, ...(implicitCatalog ? {} : { fixtureSet }) } });
+    let providers = 0, comparisons = 0, sessions = 0, grades = 0, loseGenerationReturn = true, loseComparisonReturn = true, currentWriterChecked = false;
     t.mock.module("./ask-personal-evolution-codex-generation.mjs", { exports: { ...codexApi,
       inspectPreparedPersonalEvolutionCodexGeneration: value => codexApi.inspectPreparedPersonalEvolutionCodexGeneration(value, {
         spawnProcess: (executable, argv, options) => {
@@ -111,6 +112,25 @@ export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7" } = {})
     };
     t.mock.module("./ask-personal-evolution-primary-pair.mjs", { exports: { ...pairApi,
       startPersonalEvolutionPromptPair: async options => {
+        if (!currentWriterChecked && selectedFixtureIds) {
+          const registration = read(options.storeRoot, options.pairRegistrationObjectDigest);
+          const blocks = Object.fromEntries(["baseline", "challenger"].map(role => [role, registration.description.bindings[role].map(item => item.block)]));
+          const outputRoot = join(pending.root, "current-writer-negative-output");
+          const input = { ...options, fixtureSet: "catalog24", fixtureIds, blocks, outputRoot };
+          assert.throws(() => pairApi.sealPersonalEvolutionPromptPair({ ...input, fixtureIds: [] }), /selection differs/);
+          assert.throws(() => pairApi.sealPersonalEvolutionPromptPair({ ...input, lifecyclePlanObjectDigests: [options.preparationObjectDigest] }), /lifecycle plan/);
+          const first = blocks.baseline[0], refs = json(first.grading.resources.path).fixtures[first.fixture_id];
+          for (const root of [first.public_input_root, refs.privateRoot]) {
+            const overlap = join(root, "current-writer-must-not-create");
+            assert.throws(() => pairApi.sealPersonalEvolutionPromptPair({ ...input, outputRoot: overlap }), /overlap/);
+            assert.equal(existsSync(overlap), false);
+          }
+          const history = join(first.root, "control/history"); mkdirSync(history);
+          try { assert.throws(() => pairApi.sealPersonalEvolutionPromptPair(input), /post-result/); }
+          finally { rmdirSync(history); }
+          assert.equal(existsSync(outputRoot), false, "current writer negative cases must not publish artifacts");
+          currentWriterChecked = true;
+        }
         const result = await pairApi.startPersonalEvolutionPromptPair({ ...options, startComparison });
         if (loseComparisonReturn) { loseComparisonReturn = false; throw new Error("synthetic lost comparison return after saved results"); } return result;
       } } });
@@ -123,10 +143,9 @@ export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7" } = {})
       ["missing-file", value => { value.evaluation.scoringVersion.path = join(pending.root, "missing-selector.json"); }],
       ["wrong-digest", value => { value.evaluation.scoringVersion.digest = canonicalDigest("wrong selector bytes"); }],
       ...(fixtureSet === "catalog24" ? [
-        ["missing-set", value => { delete value.evaluation.fixtureSet; }],
+        ["legacy-set", value => { value.evaluation.fixtureSet = "legacy9"; }],
         ["unknown-set", value => { value.evaluation.fixtureSet = "unknown"; }],
         ["null-set", value => { value.evaluation.fixtureSet = null; }],
-        ["subset", value => { value.blueprint.evaluation_scope.fixture_ids = fixtureIds.slice(1); }],
         ["reversed", value => { value.blueprint.evaluation_scope.fixture_ids = [...fixtureIds].reverse(); }],
         ["old-version", value => {
           const manifest = json(scoring.selector.path); manifest.kind = "ask_primary_scoring_version_v6";
@@ -187,8 +206,8 @@ export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7" } = {})
     }
     if (fixtureSet === "catalog24") {
       assert.equal(registration.description.fixture_set, fixtureSet);
-      assert.equal(registration.limits.overall_timeout_ms, 1224000000);
-      assert.equal(registration.limits.token_budget, 240000000);
+      assert.equal(registration.limits.overall_timeout_ms, fixtureIds.length * 51000000);
+      assert.equal(registration.limits.token_budget, fixtureIds.length * 10000000);
     }
     const terminal = files(join(cycle, "pair-output/invocation"));
     const resumed = await run(["start", "--cycle", cycle]);
@@ -197,16 +216,16 @@ export function personalCliRoundtrip(fixtureSet, { scoringVersion = "v7" } = {})
     const connection = json(join(cycle, "pair-output/invocation/saved-result-connection.json"));
     assert.equal(connection.report.observations.length, fixtureIds.length * 2);
     for (const role of ["baseline", "challenger"]) assert.deepEqual(Object.keys(connection.savedResults[role]), fixtureIds);
-    if (fixtureSet === "catalog24") {
+    if (fixtureSet === "catalog24" && !exerciseLifecycle) {
       // Population coverage ends at the actual saved CLI readout. The unchanged
       // legacy case below owns decision/receipt/next-cycle lifecycle coverage.
       assert.equal(connection.report.status, "saved_pair_verified");
       assert.equal(connection.report.evidence_kind, "synthetic");
       assert.equal(connection.models_started_by_report, false); assert.equal(connection.authority_implied, false);
       assert.deepEqual(files(join(cycle, "pair-output/invocation")), terminal);
-      assert.deepEqual({ providers, comparisons, sessions, grades }, { providers: 1, comparisons: 48, sessions: 144, grades: 48 });
+      assert.deepEqual({ providers, comparisons, sessions, grades }, { providers: 1, comparisons: fixtureIds.length * 2, sessions: fixtureIds.length * 6, grades: fixtureIds.length * 2 });
       assert.equal(existsSync(join(pending.root, "must-never-launch-codex")), false);
-      t.diagnostic("catalog24: 48 real prepared role plans, 144 fake sessions with saved logs, 48 synthetic grades and verified saved CLI readout; no real CLI/model/private admission");
+      t.diagnostic(`catalog selection: ${fixtureIds.length * 2} prepared role plans, ${fixtureIds.length * 6} fake sessions with saved logs, ${fixtureIds.length * 2} synthetic grades and verified saved CLI readout; no real CLI/model/private admission`);
       return;
     }
     assert.equal(resumed.recommendation.recommendation, "insufficient_evidence");

@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { buildPrimaryNineConditionReport, writePrimaryNineConditionReport, runPrimaryNineConditionReportCommand, NINE_REPORT_SETTINGS, NINE_REPORT_CONDITIONS } from './ask-primary-nine-condition-report.mjs';
 
+import { PRIMARY_FIXTURE_REGISTRY } from './ask-primary-fixture-registry.mjs';
+
 const hash = value => `sha256:${createHash('sha256').update(value).digest('hex')}`;
 const fixtureID = 'hi-authorization-exception';
 const prices = () => ({ currency: 'USD', as_of: '2026-10-23', source: 'https://example.invalid/operator-supplied-test-rates',
@@ -274,4 +276,129 @@ test('rates must be explicit, finite, closed and inventory/date/source bound', a
     const f = fixture(inner), value = prices(); mutate(value); f.manifest.api_equivalent_prices = value; f.save();
     assert.throws(() => buildPrimaryNineConditionReport(f.path));
   });
+});
+
+function nativeFixture(t) {
+  const f = fixture(t), protocols = [];
+  f.manifest.kind = 'ask_primary_nine_condition_report_input_v2';
+  f.values.splice(0, f.values.length, ...f.values.map(value => value.slots[0].child_report));
+  for (const [index, entry] of f.reports.entries()) {
+    entry.fixture_id = fixtureID;
+    const child = f.values[index];
+    const plan = { run_id: child.run_id, config: child.configuration, source: child.source,
+      input: { digest: hash('same prompt') }, prompt: 'same prompt', mutable_paths: ['src/**'], policy: { retries: 0 }, execution_protocol: { resume: 'forbidden' },
+      task: { digest: hash('same task') }, verification: { digest: hash('same verification') },
+      kernel_definition: { source_commit: 'a'.repeat(40), digest: hash('K2 instruction') },
+      full_definition: { source_commit: 'a'.repeat(40), digest: hash('Full instruction') } };
+    const planRaw = JSON.stringify(plan), planPath = join(f.root, `plan-${index}.json`);
+    writeFileSync(planPath, planRaw); child.plan_digest = hash(planRaw);
+    entry.plan = { path: planPath, digest: hash(planRaw) };
+    for (const slot of child.slots) slot.artifacts = { 'last-message.txt': hash(`answer-${index}-${slot.condition}`) };
+    const protocol = { kind: 'ask_reference_review_protocol_v1', fixture_id: fixtureID,
+      source_digest: child.source.digest, task_digest: plan.task.digest, verification_digest: plan.verification.digest,
+      criteria: [{ id: 'REQ-1', weight: 1, description: 'Public requirement one' }, { id: 'REQ-2', weight: 1, description: 'Public requirement two' }],
+      limitations: ['Artificial fixed public criteria.'] };
+    const protocolRaw = JSON.stringify(protocol), protocolPath = join(f.root, `protocol-${index}.json`);
+    writeFileSync(protocolPath, protocolRaw); protocols.push(protocol);
+    entry.reference_protocol = { path: protocolPath, digest: hash(protocolRaw) };
+    plan.reference_review_protocol_digest = hash(protocolRaw);
+    const pinnedPlanRaw = JSON.stringify(plan); writeFileSync(planPath, pinnedPlanRaw);
+    entry.plan.digest = hash(pinnedPlanRaw); child.plan_digest = hash(pinnedPlanRaw);
+    const review = { kind: 'ask_reference_review_v1', evidence_kind: 'synthetic', fixture_id: fixtureID,
+      run_id: child.run_id, plan_digest: child.plan_digest, protocol_digest: hash(protocolRaw),
+      conditions: child.slots.map(slot => ({ condition: slot.condition, artifacts: slot.artifacts,
+        judgments: [{ criterion_id: 'REQ-1', outcome: index === 0 ? 'fail' : 'pass', evidence: [hash('artificial review evidence')] },
+          { criterion_id: 'REQ-2', outcome: 'fail', evidence: [hash('artificial review evidence')] }],
+        diagnostics: { detected: index, missed: 2 - index, false_positives: 0 } })) };
+    const reviewPath = join(f.root, `review-${index}.json`), raw = JSON.stringify(review); writeFileSync(reviewPath, raw);
+    entry.reference_review = { path: reviewPath, digest: hash(raw) };
+  }
+  f.save(); return f;
+}
+
+test('native saved reports share measurement rows and keep formal/reference evidence distinct', t => {
+  const f = nativeFixture(t), report = buildPrimaryNineConditionReport(f.path);
+  assert.equal(report.slots.length, 9); assert.ok(report.slots.every(row => row.quality === null));
+  assert.equal(report.slots[0].reference_score, 0); assert.equal(report.slots[3].reference_score, 0.5);
+  assert.ok(report.slots.every(row => row.measurement_kind === 'ask_comparison_measurement_v1'));
+  assert.equal(report.panels.formal.fixture_ids.length, 0); assert.deepEqual(report.panels.reference.fixture_ids, [fixtureID]);
+  assert.equal(report.panels.reference.groups[0].score_100, 0);
+  assert.equal(report.panels.reference.groups[0].total_tokens, 120);
+  const out = join(f.root, 'unified'); writePrimaryNineConditionReport(f.path, out);
+  const html = readFileSync(join(out, 'report.html'), 'utf8');
+  assert.match(html, /参考レビュー/u); assert.match(html, /指定設定/u); assert.match(html, /9\/9/u);
+  assert.match(html, /data-model=/u); assert.match(html, /data-condition=/u); assert.doesNotMatch(html, /protocol-0.json/u);
+});
+
+test('reference protocol, answer binding and unknown outcomes cannot invent scores', async t => {
+  for (const change of ['protocol', 'answer', 'unknown', 'missing_evidence', 'instruction', 'input', 'budget', 'plan_protocol']) await t.test(change, inner => {
+    const f = nativeFixture(inner), entry = f.reports[0];
+    if (['instruction', 'input', 'budget', 'plan_protocol'].includes(change)) {
+      const plan = JSON.parse(readFileSync(entry.plan.path));
+      if (change === 'instruction') plan.full_definition.digest = hash('different instruction');
+      if (change === 'input') { plan.prompt = 'different prompt'; plan.input.digest = hash(plan.prompt); }
+      if (change === 'budget') plan.config.timeout_ms = 1;
+      if (change === 'plan_protocol') plan.reference_review_protocol_digest = hash('different protocol');
+      const raw = JSON.stringify(plan); writeFileSync(entry.plan.path, raw); entry.plan.digest = hash(raw); f.values[0].plan_digest = hash(raw);
+      f.values[0].configuration = structuredClone(plan.config);
+      delete entry.reference_review; f.save(); assert.throws(() => buildPrimaryNineConditionReport(f.path), /instruction|protocol/u); return;
+    }
+    const review = JSON.parse(readFileSync(entry.reference_review.path));
+    if (change === 'protocol') review.protocol_digest = hash('different protocol');
+    if (change === 'answer') review.conditions[0].artifacts['last-message.txt'] = hash('different answer');
+    if (change === 'unknown') review.conditions[0].judgments[0].outcome = 'unknown';
+    if (change === 'missing_evidence') review.conditions[0].judgments[0].evidence = [];
+    const raw = JSON.stringify(review); writeFileSync(entry.reference_review.path, raw); entry.reference_review.digest = hash(raw); f.save();
+    if (change === 'unknown') {
+      const report = buildPrimaryNineConditionReport(f.path); assert.equal(report.slots[0].reference_score, null);
+      assert.equal(report.panels.reference.fixture_ids.length, 0, 'missing score removes task from all nine comparison groups');
+    } else assert.throws(() => buildPrimaryNineConditionReport(f.path));
+  });
+});
+
+test('full24 planned inventory remains 216 missing measurements and no invented points', t => {
+  const f = fixture(t); f.manifest.reports = [];
+  // Canonical catalog order is shared with the existing recipe registry.
+  f.manifest.fixture_ids = PRIMARY_FIXTURE_REGISTRY.map(row => row[0]); f.save();
+  const report = buildPrimaryNineConditionReport(f.path);
+  assert.equal(report.slots.length, 216); assert.equal(report.coverage.expected, 216);
+  assert.equal(report.coverage.measured, 0); assert.equal(report.coverage.formal_scored, 0);
+  assert.equal(report.panels.reference.fixture_ids.length, 0);
+  const output = join(f.root, 'empty24'); writePrimaryNineConditionReport(f.path, output);
+  assert.match(readFileSync(join(output, 'report.html'), 'utf8'), /0\/216/u);
+});
+
+test('artificial24×9 normalize once, compare equal task scores and sum costs over the identical task set', t => {
+  const f = nativeFixture(t), templates = f.reports.map((entry, i) => ({ entry: structuredClone(entry), child: structuredClone(f.values[i]),
+    plan: JSON.parse(readFileSync(entry.plan.path)), protocol: JSON.parse(readFileSync(entry.reference_protocol.path)), review: JSON.parse(readFileSync(entry.reference_review.path)) }));
+  f.reports.splice(0); f.values.splice(0); f.manifest.fixture_ids = PRIMARY_FIXTURE_REGISTRY.map(row => row[0]);
+  for (const [taskIndex, id] of f.manifest.fixture_ids.entries()) for (const [settingIndex, template] of templates.entries()) {
+    const { entry, child, plan, protocol, review } = structuredClone(template), suffix = `${taskIndex}-${settingIndex}`;
+    entry.path = join(f.root, `native-${suffix}.json`); entry.fixture_id = id;
+    child.run_id = `fake-${suffix}`; plan.run_id = child.run_id;
+    plan.source.digest = hash(`source-${id}`); child.source = structuredClone(plan.source);
+    plan.task.digest = hash(`task-${id}`); plan.verification.digest = hash(`verify-${id}`);
+    for (const trial of child.summary.supplied_notes.trials) Object.assign(trial, { block_id: child.run_id, task_ref: plan.task.digest, success_criteria_ref: plan.verification.digest });
+    const save = (name, value) => { const path = join(f.root, `${name}-${suffix}.json`), raw = JSON.stringify(value); writeFileSync(path, raw); return { path, digest: hash(raw) }; };
+    entry.plan = save('plan-all', plan); child.plan_digest = entry.plan.digest;
+    Object.assign(protocol, { fixture_id: id, source_digest: plan.source.digest, task_digest: plan.task.digest, verification_digest: plan.verification.digest });
+    entry.reference_protocol = save('protocol-all', protocol);
+    plan.reference_review_protocol_digest = entry.reference_protocol.digest; entry.plan = save('plan-all', plan); child.plan_digest = entry.plan.digest;
+    Object.assign(review, { fixture_id: id, run_id: child.run_id, plan_digest: child.plan_digest, protocol_digest: entry.reference_protocol.digest });
+    entry.reference_review = save('review-all', review);
+    f.reports.push(entry); f.values.push(child);
+  }
+  f.save(); const report = buildPrimaryNineConditionReport(f.path);
+  assert.equal(report.slots.length, 216); assert.equal(report.coverage.measured, 216);
+  assert.equal(report.coverage.reference_scored, 216); assert.equal(report.coverage.formal_scored, 0);
+  assert.equal(report.panels.reference.fixture_ids.length, 24);
+  assert.equal(report.panels.reference.groups[0].attempt_duration_ms, 24 * 50);
+  assert.equal(report.panels.reference.groups[0].total_tokens, 24 * 120);
+  assert.equal(report.panels.reference.groups[3].score_100, 50);
+  // One unavailable task in one condition removes exactly this task from ALL nine plotted groups.
+  f.values[0].slots[0].metrics.input_tokens = null; f.save();
+  const partial = buildPrimaryNineConditionReport(f.path);
+  assert.equal(partial.panels.reference.fixture_ids.length, 23);
+  assert.equal(partial.panels.reference.groups[3].total_tokens, 23 * 121);
+  assert.equal(partial.coverage.reference_scored, 216, 'missing usage is not missing quality');
 });

@@ -9,6 +9,7 @@ const rollover = readFileSync(new URL('../.github/workflows/context-rollover.yml
 const completion = readFileSync(new URL('../.github/workflows/verification-completion.yml', import.meta.url), 'utf8');
 const baseline = JSON.parse(readFileSync(new URL('../docs/fixtures/ci-full-run-inventory.json', import.meta.url)));
 const lifetimeCommand = 'node --test scripts/test-ask-primary-performance-execution.mjs scripts/test-ask-primary-performance-lifetime.mjs';
+const publicSandboxFile = 'scripts/test-ask-user-comparison-public-sandbox.mjs';
 const manualComparisonCommand = 'node --test scripts/test-ask-primary-evaluation-start.mjs scripts/test-ask-primary-nine-condition-report.mjs';
 const commands = text => text.split('\n').map(line => line.trim().replace(/^run: /, '')).filter(line => /^node (?:--\S+ )*scripts\//.test(line)).sort();
 
@@ -38,13 +39,13 @@ test('original coverage remains except two audited Mac-only fake logic files, wi
   }).sort();
   const moved = ['scripts/test-ask-primary-build-successor-v2.mjs', 'scripts/test-ask-personal-evolution-unattended-policy.mjs'];
   assert.equal(commands(local).filter(command => command === lifetimeCommand).length, 1);
-  assert.deepEqual(expand(commands(local).filter(command => command !== lifetimeCommand)), expand(baseline.local_commands).filter(command => !moved.some(file => command.endsWith(file))));
+  assert.deepEqual(expand(commands(local).filter(command => command !== lifetimeCommand)).filter(command => !command.endsWith(publicSandboxFile)), expand(baseline.local_commands).filter(command => !moved.some(file => command.endsWith(file))));
   for (const file of moved) assert.ok(commands(validate).some(command => command.split(' ').includes(file)), file);
   assert.match(local, /if: matrix.os == 'ubuntu-24.04'\n        run: node --test scripts\/test-kernel-principles.mjs/);
   assert.equal(local.match(/^\s+if:/gm).length, 6, 'only the explicit additional Mac lifetime owner is conditional');
   const macCommands = local.split(/\n      - /).filter(step => !step.includes("if: matrix.os == 'ubuntu-24.04'")).flatMap(commands);
   const macOmissions = [...moved, 'scripts/test-kernel-principles.mjs'];
-  assert.deepEqual(expand(macCommands.filter(command => command !== lifetimeCommand)), expand(baseline.local_commands).filter(command => !macOmissions.some(file => command.endsWith(file))), 'all other Mac file/flag coverage retained');
+  assert.deepEqual(expand(macCommands.filter(command => command !== lifetimeCommand)).filter(command => !command.endsWith(publicSandboxFile)), expand(baseline.local_commands).filter(command => !macOmissions.some(file => command.endsWith(file))), 'all other Mac file/flag coverage retained');
   const conditional = [...local.matchAll(/        if: matrix.os == 'macos-15'\n        run: (.+)/g)].map(m => m[1]);
   assert.equal(conditional.length, 5);
   assert.ok(conditional.includes(lifetimeCommand));
@@ -125,4 +126,10 @@ test('cross-workflow duplicates have one pinned, unconditional owner and unique 
   assert.throws(() => check(validate, rollover, completion.replace('    steps:', '    defaults:\n      run:\n        working-directory: elsewhere\n    steps:')));
   assert.throws(() => check(validate, rollover, completion.replace('        run: ' + completionCommand, '        if: false\n        run: ' + completionCommand)));
   assert.throws(() => check(validate, rollover, completion.replace('retention-days: 14', 'retention-days: 1')));
+});
+
+
+test('public sandbox artificial requests reuse the existing OS matrix step exactly once', () => {
+  assert.equal(commands(local).filter(command => command.split(' ').includes(publicSandboxFile)).length, 1);
+  for (const workflow of [validate, rollover, completion]) assert.ok(!workflow.includes(publicSandboxFile));
 });

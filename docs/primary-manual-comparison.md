@@ -53,7 +53,7 @@ outer constraints apply. No sandbox disabling, HOME/auth changes or old-grant re
 The smallest 9-slot measurement smoke and full 24×9 comparison are different
 plans. Measurement-only smoke can retain quality null; a quality smoke needs
 the selected task's grading evidence. All need their applicable runtime contract.
-Native3 is required for full24, not unrelated-task measurement alone. Repetition
+Native3 is required for qualified full24 private scores, not for unrelated-task measurement. Exploratory full24 may retain unqualified scores as unknown, but candidate-code verification still needs its actual isolation boundary. Repetition
 count, total time/token reservation and provider/model compatibility remain
 fixed-plan decisions, not inferred from this command or a synthetic test.
 
@@ -139,3 +139,74 @@ safe fresh outputs, explicit-rate arithmetic and labeled graphs. Synthetic obser
 software behavior. No test qualifies runtime, native3, real model quality or cost.
 Source/contract/bundle checks and an independent final diff review are required
 before the bounded implementation completion claim; publication is held.
+
+## Unified saved measurements (revision 2)
+
+SPEC-P24-MEASUREMENTS-2 / FVC-P24-MEASUREMENTS-2: delivery implementation;
+formal verification contract (public API compatibility, multiple checks and
+independent handoff). Reuse this module and its existing command for formal
+batch reports and exploratory single-task reports; do not add a launcher.
+
+- Both inputs become the same per-task/setting/condition measurement rows.
+  `quality` remains the retained formal score; `reference_score` is separately
+  derived from a digest-pinned public-criteria protocol and review. Neither
+  public test success nor missing formal grades becomes a formal score.
+- Exploratory inputs additionally pin the original plan and its declared K/Full
+  instruction identities. Source/task/verification/protocol drift rejects.
+  Resolved model, runtime qualification and native admission remain unverified
+  where the saved evidence does not establish them.
+- Score protocols are fixed before the new measurement, identical across all
+  settings, and include every public requirement used for the reference score.
+  Unknown criterion outcomes make the task score unknown. Diagnostic counts are
+  supplemental and never silently replace the fixed task weighting.
+- Charts use task-normalized 0–100 scores with equal task weight, model-setting
+  colors and P/K2/F shapes. Formal/reference panels are separate. Each panel
+  uses the intersection of tasks with score and both time/token observations
+  in all nine groups; its denominator and excluded tasks are shown. X is summed
+  attempt time or summed input+output, not parallel elapsed time or money.
+- The Japanese HTML contains all planned rows, a task×nine-condition heatmap,
+  completion/missing/unscorable counts and limitations. No price is guessed;
+  cached input and reported reasoning are never added again to input/output.
+- Preserve existing v1 input and formal validation. Add v2 input for multiple
+  task reports per setting. Offline reads never start a model/native process,
+  grant admission or edit a saved run. Keep the existing CLI and CI job.
+
+Verification before completion: existing report/start tests; new artificial
+24×9 rows, native report normalization, protocol/answer identity rejection,
+zero/unknown separation, common-task chart denominator, escaping and fresh-output
+checks; independent diff review. Synthetic checks are not runtime acceptance.
+
+
+Revision 2 uses the same command with `kind:ask_primary_nine_condition_report_input_v2`.
+Each report entry binds one retained `ask_user_comparison_report_v1` by path/digest,
+model/reasoning/repetition and fixture_id, plus the original plan path/digest in
+`plan`. Multiple task reports per setting are supported. No fake batch execution
+or private grade is manufactured to ingest an exploratory run.
+
+Optional `reference_protocol` and `reference_review` are each a path/digest pair.
+The original execution plan must contain `reference_review_protocol_digest`
+matching the protocol; prepare with `referenceReviewProtocolDigest` before start.
+Old plans without this pin retain measurements but no plan-pinned reference score.
+Offline consistency is not independent proof of when an operator created a plan.
+Keep original start/terminal receipts for audit; no report grants authority.
+
+Protocol fields are kind (`ask_reference_review_protocol_v1`), fixture_id,
+source_digest, task_digest, verification_digest, criteria and limitations. Each
+criterion has id, positive weight and a public-requirement description. Review
+fields are kind (`ask_reference_review_v1`), evidence_kind, fixture_id, run_id,
+plan_digest, protocol_digest and conditions in P/K2/F order. Each condition binds
+the saved artifact digest map and has judgments (criterion_id, pass/fail/unknown,
+nonempty evidence digests for decided outcomes) plus supplemental diagnostics.
+All criteria must be decided for a reference score; unknown is not zero.
+Diagnostics may count detected/missed/false_positives/duplicates/factual_or_locator_errors;
+they do not silently alter the fixed weighted score. Native acceptance and
+performance claims still require the applicable genuine observations.
+
+Both input versions use one measurement schema and renderer, including Japanese
+`report.html`, task×nine heatmap and reference-time/reference-tokens SVGs. Future
+reports use this path rather than separate one-off Python reducers. Historical
+HTML/data/scripts outside Git remain preserved, not reinterpreted as new runs.
+
+The start adapter is an imported helper, not a second executable CLI. Human
+starts stay on the existing batch command; exploratory starts stay on the
+existing user-comparison command. Neither creates another execution engine.

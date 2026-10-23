@@ -10,7 +10,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync
 import { devNull } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { canonicalDigest, listContentAddressedJson, readContentAddressedJson } from "./content-addressed-store.mjs";
-import { setup, finishPersonalPairSetup, bindSyntheticRoleGrading, fakeEngineeringTemplate,
+import { historicalPersonalPairFixture, setup, finishPersonalPairSetup, bindSyntheticRoleGrading, fakeEngineeringTemplate,
   collectSyntheticGrade } from "./test-helpers-personal-evolution-primary-pair.mjs";
 import { verifyPersonalEvolutionGenerationExecution,
   inspectPersonalEvolutionGenerationStatus } from "./ask-personal-evolution-generation-connector.mjs";
@@ -140,9 +140,10 @@ test("nine primary fixtures: fake generation → prepared driver → saved hold 
   assert.equal(f.sourceReview.generated_content_unchanged, true);
   assert.notDeepEqual(f.sourceReview.reviewed_asset, generated.receipt.candidate_asset);
   const blocks = prepareNineBlocks(f), resourceConfigs = bindSyntheticRoleGrading(f, blocks);
-  const sealed = pairApi.sealPersonalEvolutionPromptPair({ ...f.args, blocks, outputRoot: join(f.root, "pair-output") });
+  const sealed = historicalPersonalPairFixture({ ...f.args, blocks, outputRoot: join(f.root, "pair-output") });
   const savedInput = { ...f.args, pairRegistrationObjectDigest: sealed.object_digest,
     trustedPairRegistrationObjectDigests: [sealed.object_digest] };
+  delete savedInput.fixtureSet; // Historical selection is already pinned by the sealed registration; not a driver option.
   assert.equal(pairApi.verifyPersonalEvolutionPromptPairResults(savedInput).status, "NOT_RUN");
   assert.deepEqual(sealed.registration.description.bindings.baseline.map(item => item.fixture_id), [...PRIMARY_FIXTURE_IDS].sort());
   for (const role of roles) for (const binding of sealed.registration.description.bindings[role]) {

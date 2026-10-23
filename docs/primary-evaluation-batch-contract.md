@@ -1,7 +1,8 @@
 # Primary evaluation batch connection
 
-`SPEC-PRIMARY-BATCH-1` binds the nine prepared single-task comparisons in
-`PRIMARY_FIXTURE_IDS` order, once each, to 27 slots. It is a thin coordinator over
+`SPEC-PRIMARY-BATCH-1`, catalog-selection revision, binds a fixed task selection
+from the canonical 24-task catalog, once each, to three condition slots per task.
+Omitting a selection in new preparation means all 24 tasks (72 slots). It is a thin coordinator over
 `readUserComparisonPlan`, `inspectUserComparison`, `startUserComparison` and the
 native single-task reports. It does not create a runner, OS process manager,
 source grader, retry mechanism or condition alias.
@@ -9,8 +10,10 @@ source grader, retry mechanism or condition alias.
 ## Fixed manifest
 
 The external JSON has `kind: ask_primary_evaluation_batch_manifest_v1`, a fixed
-`batch_id`, canonical new output `root`, `conditions`, exact `limits` and nine
-ordered `blocks`. `limits` is `{overall_timeout_ms:172800000,
+`batch_id`, canonical new output `root`, `conditions`, exact `limits`, fixed
+`fixture_ids`, and matching ordered `blocks`. Old manifests without fixture IDs
+retain their historical full-inventory interpretation. The original nine-task
+manifest example used `{overall_timeout_ms:172800000,
 token_budget:45000000,retries:0,concurrency:1,resume:"forbidden"}`. Conditions must
 match the actual IDs in every child plan. Neither legacy Kernel nor a future
 candidate is silently renamed. The currently installed child-plan reader must
@@ -43,10 +46,12 @@ changed inputs, duplicate slots/IDs and incomplete publication refuse dispatch.
 
 The 172800000-ms limit shown in the original manifest description above is a
 historical preparation example, not the current creation limit. Current
-`primaryBatchLimitsForSet` requires 302400000 ms / 45M tokens for legacy9 and
-612000000 ms / 120M tokens for catalog24, with the unchanged four-hour child and
-185-minute grading reservation per task. Use that source-owned function for a
-new manifest; old plans/results stay readable and are never rewritten to fit.
+`primaryBatchLimitsForSelection` reserves 25500000 ms / 5M tokens per selected
+task (612000000 ms / 120M tokens for all 24), with the unchanged four-hour child
+and 185-minute grading reservation. Historical legacy9 budgets remain accepted
+by the saved-manifest compatibility reader. New task preparation and configure
+reject the old legacy9 switch with a migration message; choose its task IDs as a
+catalog subset instead. Old plans/results stay readable and are never rewritten.
 
 ## Model-free commands and programmatic connection
 
@@ -58,7 +63,7 @@ node scripts/ask-primary-evaluation-batch.mjs report /absolute/batch-root
 
 The three commands above are model-free. Preparation copies exact
 external manifest bytes and saves its digest plus preparation blockers. Report
-retains every one of the 27 slots, including missing output, null quality,
+retains every selected task/condition slot, including missing output, null quality,
 unknown usage and null cost. A missing grader is a blocker, not a zero score.
 
 The additional human command `start ROOT --confirm sha256:MANIFEST_DIGEST`
@@ -161,3 +166,20 @@ without shared runner/schema/CI changes. Focused command:
 are unverified and remain blocked until the owning connections and a new exact
 human start instruction exist. Parent-owned native recipe and condition-candidate
 changes are separate review boundaries.
+
+
+## Catalog selection for new preparations
+
+New preparations use the single canonical 24-task registry by default.
+`preparePrimaryEvaluation` accepts optional `fixtureIds` in canonical order for
+a nonempty registered subset; omitting it selects all 24. New manifests retain
+`fixture_set: catalog24` as a wire-compatibility label and explicitly pin
+`fixture_ids`; their blocks must exactly match that fixed selection. The total
+budget reserves one unchanged child plus grading allowance per selected task.
+
+Manifests without `fixture_ids` remain historical full-inventory records; a
+missing/reordered task cannot be reinterpreted as a newly chosen subset. The
+old `legacy9` label, export order and frozen budgets exist only for compatibility
+with saved inputs and explicit migration checks. No saved manifest, receipt or
+source asset is rewritten. Task selection alone confers no runtime/admission or
+adoption authority.

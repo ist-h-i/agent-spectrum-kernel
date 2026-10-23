@@ -1,8 +1,5 @@
-#!/usr/bin/env node
 // Human command adapter only; all dispatch/admission/consumption stays in the batch API.
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { inspectPrimaryEvaluationBatch, startPrimaryEvaluationBatch } from './ask-primary-evaluation-batch.mjs';
 import { createPrimaryEvaluationGradingAdapter } from './ask-primary-evaluation-grading.mjs';
 
@@ -34,10 +31,4 @@ export async function runPrimaryEvaluationStartCommand(argv) {
   } finally {
     process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop);
   }
-}
-
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  runPrimaryEvaluationStartCommand(process.argv.slice(2)).then(({ exitCode, report }) => {
-    console.log(JSON.stringify(report, null, 2)); process.exitCode = exitCode;
-  }, error => { console.error(error.message); process.exitCode = 10; });
 }

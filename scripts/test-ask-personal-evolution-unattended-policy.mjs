@@ -103,7 +103,7 @@ test("catalog24 unattended admission reserves the same complete two-role limits 
 });
 test("invalid explicit fixture selection leaves no unattended lock and starts nothing", async t => {
   for (const selection of [{ fixtureSet: "unknown" }, { fixtureSet: null },
-    { fixtureSet: "catalog24", fixtureIds: CANONICAL_PRIMARY_FIXTURE_IDS.slice(1) }]) {
+    { fixtureSet: "catalog24", fixtureIds: [CANONICAL_PRIMARY_FIXTURE_IDS[0], CANONICAL_PRIMARY_FIXTURE_IDS[0]] }]) {
     const f = fixture(t, selection);
     for (let attempt = 0; attempt < 2; attempt++) {
       const result = await f.run(); assert.equal(result.status, "needs_action");

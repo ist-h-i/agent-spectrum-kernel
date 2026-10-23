@@ -9,12 +9,12 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const scratch = () => realpathSync(mkdtempSync(join(tmpdir(), 'ask-primary-public-')));
 const json = path => JSON.parse(readFileSync(path));
 
-test('canonical 24 tasks expose public readiness independently of nine-task scoring authority', () => {
+test('single catalog exposes all 24 registrations independently of scoring authority', () => {
   const report = inspectPrimaryPublicInputs();
   assert.equal(report.fixtures.length, 24);
   assert.deepEqual(report.suite_counts, { high_impact: 4, mechanism_negative: 6, mechanism_positive: 6, practice_frequency: 8 });
   assert.equal(report.fixtures.filter(x => x.public_input_status === 'valid').length, 24);
-  assert.equal(report.fixtures.filter(x => x.primary_comparison_registered).length, 9);
+  assert.equal(report.fixtures.filter(x => x.primary_comparison_registered).length, 24);
   assert.equal(report.fixtures.filter(x => x.portfolio_registered).length, 24);
   assert.ok(report.fixtures.every(x => x.quality === null && x.semantic_controls.status === 'not_run'));
   const good = report.fixtures.find(x => x.fixture_id === 'mp-ci-evidence-gap');
@@ -167,6 +167,6 @@ test('24 artificial source packages use the same preparation loop, without confe
     assert.equal(verified.fixtures.flatMap(x => x.slots).length, 72);
     assert.equal(verified.semantic_grading_status, 'not_evaluated');
     assert.equal(verified.comparison_start_allowed, false);
-    assert.equal(verified.fixtures.filter(x => x.primary_comparison_registered).length, 9);
+    assert.equal(verified.fixtures.filter(x => x.primary_comparison_registered).length, 24);
   } finally { rmSync(area, { recursive: true, force: true }); }
 });

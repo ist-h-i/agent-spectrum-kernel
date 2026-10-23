@@ -98,6 +98,56 @@ floating-runtime durations are not an equivalent before/after comparison.
 Hosted verification of this follow-up is not yet recorded. Mac boundaries,
 selective execution, consumer closure and real evaluation are unchanged.
 
+## Local fixture and producer follow-up after #443
+
+This local candidate preserves the four workflows and the 148 Validate / 25
+local-eval registrations. No new job, selection mode or verification cache is
+introduced. It combines two independent changes:
+
+- The personal-pair synthetic engineering template reads the existing aggregate
+  fixture's input-building result directly, instead of publishing and fully
+  reverifying result-set, repetition, paired and aggregate reports just to read
+  an input JSON. The original `collect()` path and aggregate regressions remain;
+  report publication is asserted to preserve input bytes. Actual pair producer,
+  normalized, safety and saved-result checks remain. A paired local comparison
+  across all 24 fixtures observed 65.79s versus 2.81s in total, with every template
+  byte-identical and no aggregate authority returned by the input-only path.
+- Saved pair verification uses its existing producer scope's verified object for
+  run/plan/full-block checks before normalized verification. This replaces an
+  immediate standalone verification followed by the same scope-entry verification.
+  The later engineering scope and recursive drift rechecks remain. Explicit
+  outer producer calls per complete saved role/pass become 3→2; the current
+  catalog24 roundtrip's two complete passes over 48 roles become 288→192 calls.
+  These counts exclude internal additional checks and are static path counts.
+
+A separate physical checkout with independent Git metadata measured only the
+producer change, without the template change: the same one-fixture/two-role
+saved-pair regression passed before 29.32s / 29.06s and after 25.93s / 25.98s in ABBA
+order on Darwin / Node 24.19.0, with profiling enabled equally. The observed mean
+reduction was 3.24s (11.1%) for that limited test, n=2 per version. The initial
+profile's removed direct-verification branch accounted for about 2.79s of samples.
+This is local evidence, not a hosted CI reduction or an estimate for catalog24.
+Source pins differ with candidate bytes; each process creates its own artifacts.
+
+The #443 hosted Mac personal-CLI group took 2362.64s; overlapping catalog24/v8,
+v7 and unattended tests took 1373.37s, 1317.25s and 987.80s respectively. Their
+internal producer timings were not logged, and these durations cannot be added.
+The full local profile and two earlier fixture-suite sessions have unknown
+outcomes after transport loss. They were not stopped, restarted or credited as
+successful; the new isolated limited runs provide separate evidence only.
+
+Foreign blocks, missing grading provenance, criterion transplants and later
+producer-byte drift must reject, with inactive authority after return/failure.
+Nested refusal must leave the owning outer scope active until it exits; thrown
+callbacks and thenables must not leak scope. Source-build/nested refusal is
+retained, though which rejecting error wins first can differ. There is no
+cross-role/command producer reuse or actual model/private-admission claim.
+
+The earlier `--no-local` clone-overhead candidate remains outside this combined
+diff; its subsecond measurement alone did not justify another hosted batch.
+Full integrated/hosted timing and publication remain pending. Historical
+inventory below is retained unchanged.
+
 ## Historical stage-1 baseline
 
 Source baseline: `a6d71c6c81973f585fe1aa27e4524a5a62889846`.
@@ -372,3 +422,11 @@ authoritative in the workflow files. Manual workflows in this table are unchange
 | `verification-completion.yml` / `verification-completion` | Run real-Git multirevision and completion tests | `node --test scripts/test-verification-reuse-completion.mjs` |
 | `verification-completion.yml` / `verification-completion` | Preserve exact and scoped evidence compatibility | `node scripts/test-verification-evidence.mjs` |
 | `verification-completion.yml` / `verification-completion` | Preserve exact and scoped evidence compatibility | `node scripts/test-verification-scoped-reuse.mjs` |
+
+
+The public-verification sandbox request/receipt regressions are appended once to
+the existing Local eval fake comparison matrix command. Mac checks only construct
+requests and use artificial transports; Linux records the explicit platform skip.
+No native sandbox, model, new job or workflow is started by those regressions.
+The historical inventory remains unchanged; the CI test accounts explicitly for
+this one additional file while retaining all earlier coverage.

@@ -24,8 +24,9 @@ test("catalog24 metadata requires explicit exact v7 selection and both fixed rol
   for (const fixtureSet of [null, "unknown", "legacy9"])
     assert.throws(() => validatePersonalEvolutionEvaluationSelection({ ...evaluation, fixtureSet }, ids));
   const omitted = structuredClone(evaluation); delete omitted.fixtureSet;
-  assert.throws(() => validatePersonalEvolutionEvaluationSelection(omitted, ids));
-  for (const selected of [ids.slice(1), [...ids].reverse()])
+  assert.equal(validatePersonalEvolutionEvaluationSelection(omitted, ids), "catalog24");
+  assert.equal(validatePersonalEvolutionEvaluationSelection(omitted, [ids[0], ids.at(-1)]), "catalog24");
+  for (const selected of [[], [...ids].reverse(), [ids[0], ids[0]]])
     assert.throws(() => validatePersonalEvolutionEvaluationSelection(evaluation, selected));
   const old = JSON.parse(readFileSync(f.selector.path)); old.kind = "ask_primary_scoring_version_v6";
   assert.throws(() => validatePersonalEvolutionEvaluationSelection({ ...evaluation,
@@ -41,3 +42,6 @@ test("catalog24 metadata requires explicit exact v7 selection and both fixed rol
 });
 
 personalCliRoundtrip("catalog24");
+
+// New management input needs no set switch and may choose tasks across suites.
+personalCliRoundtrip("catalog24", { fixtureIds: ["hi-authorization-exception", "mn-build-option-update"], implicitCatalog: true });

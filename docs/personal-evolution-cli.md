@@ -63,8 +63,9 @@ arrays), `portfolioAuthority`, `selectorContext`, `experimentTemplateObjectDiges
 (`publicInputRoot`, `cliBin`, `cliVersion`, `model`, `reasoning`, `evidenceKind`,
 `scoringVersion` with the existing fixed manifest `path` and raw `digest`,
 `gradingResources` with distinct `baseline` and `challenger` path/digest refs).
-The blueprint selects only existing primary fixtures (normally all nine); the
-unrelated eight-task profile is not included. Evaluation resources remain local.
+The blueprint selects a nonempty, duplicate-free subset of the single 24-task
+primary catalog in catalog order using `blueprint.evaluation_scope.fixture_ids`.
+There is no new-user nine-task mode. Evaluation resources remain local.
 The template retains its predeclared recommendation and action policy.
 The scoring selector is required and checked through the existing scoring-version
 verifier, including pinned resource bytes, before a profile is saved. Both roles
@@ -201,3 +202,37 @@ as needs-action, not converted to a hold or auto-approved.
 
 For bounded unattended composition of these same operations, see
 [the run policy and procedure](personal-evolution-unattended.md).
+
+
+## Single-catalog task selection and old-profile compatibility
+
+New `configure` inputs select registered tasks through
+`blueprint.evaluation_scope.fixture_ids`; omitting the old `evaluation.fixtureSet`
+means the canonical 24-task catalog. The saved profile explicitly pins that
+selection. Selecting one or several tasks does not select a different rubric,
+relax private-resource admission, authorize adoption/apply, or start evaluation.
+The fixed v7/v8/v9 selector and separate role resource maps still bind the
+canonical catalog; the selected tasks must match those exact resources.
+
+Old immutable profiles/Prompt pairs/batch reports retain their old meaning. A
+saved profile that omitted `fixtureSet` is read as its historical nine-task
+selection, never silently expanded to 24; explicit old fields and historical
+order/budgets are compatibility inputs only. To move to current catalog
+selection, copy the management inputs, choose the desired catalog task IDs and
+current matching scoring resources, omit the legacy selector field, then run
+`configure --config NEW_CONFIG --profile NEW_PROFILE` into a fresh directory.
+This creates a new snapshot and starts no model. Keep the old profile/cycles and
+all saved results. A source upgrade already requires a fresh profile; do not edit
+an old profile or relabel an old score to migrate it.
+
+Verification: default full catalog and mixed-subset preparation, no model calls,
+unknown/missing evidence preserved, invalid/duplicate/reordered IDs rejected,
+separate role resource pins and saved-profile compatibility. These software
+checks do not qualify native execution, private grading or model quality.
+
+New request/cycle creation (`start --profile` and `next`) and new pair sealing
+require the current explicitly pinned catalog selection. Reading an old profile
+does not grant permission to create another old-format cycle/pair; these writers
+stop with a migration message before creating output or applying alignment.
+Existing cycle status/results and verification of already sealed old pairs keep
+their original read path. Never migrate a pair by changing its saved fixture IDs.

@@ -19,7 +19,7 @@ import { acquireComparisonOwner, checkpointComparison, comparisonOwnershipDiagno
 import { parseJsonRejectDuplicateKeys } from "./content-addressed-store.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildPragmaticEvaluationReport } from "./ask-pragmatic-evaluation-report.mjs";
-import { COMPARISON_RECORD_BYTE_LIMIT, comparisonExecutionPolicy, comparisonHash, derivePreparedPrimaryExecutionInput, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, isSingleShotComparison, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
+import { COMPARISON_RECORD_BYTE_LIMIT, PRIMARY_PUBLIC_VERIFICATION_CONTRACT, primaryPublicVerificationRuntime, comparisonExecutionPolicy, comparisonHash, derivePreparedPrimaryExecutionInput, inventoryComparisonGitMetadata, inventoryUserTree, isComparisonInstructionPath, isSingleShotComparison, prepareGitBaseline, prepareUserComparison } from "./ask-user-comparison-prepare.mjs";
 import { isPrimaryExecutionInputContract, primaryExecutionInputPreflight, renderPrimaryExecutionInputBoundary } from './ask-primary-execution-input.mjs';
 import { buildPrimaryFixtureRecipe, isPrimaryFixtureRecipe } from "./ask-primary-fixture-recipe.mjs";
 
@@ -142,8 +142,13 @@ export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {
     "saved plan changed; prepare a new run instead of editing history");
   const plan = parseJsonRejectDuplicateKeys(raw.toString("utf8"));
   assert.equal(plan.kind, "ask_user_comparison_plan_v1");
+  if (Object.hasOwn(plan, 'reference_review_protocol_digest')) assert.match(plan.reference_review_protocol_digest, /^sha256:[a-f0-9]{64}$/u, 'reference review protocol digest required');
   assert.equal(plan.root, root, "moving a prepared workspace is unsupported");
   assert.ok(["synthetic", "observed"].includes(plan.config.evidence_kind));
+  if (Object.hasOwn(plan.config, 'public_verification')) {
+    assert.equal(plan.config.public_verification?.contract, PRIMARY_PUBLIC_VERIFICATION_CONTRACT, 'unknown public verification contract');
+    assert.ok(isPrimaryFixtureRecipe(plan.verification.recipe) && isSingleShotComparison(plan), 'sandboxed public verification requires fixed single-shot primary recipe');
+  }
   assert.deepEqual(plan.policy, comparisonExecutionPolicy(plan.policy?.execution_contract));
   if (isSingleShotComparison(plan)) assert.equal(plan.execution_protocol?.resume, "forbidden", "single-shot protocol must forbid resume");
   assert.deepEqual(Object.keys(plan.arms).sort(), comparisonConditions(plan.config.kernel_condition).sort(), "unknown comparison arm");
@@ -347,6 +352,7 @@ function copyRegularTree(source, destination) {
 
 export function parseUserCodexTelemetry(stdout) {
   const metrics = { input_tokens: null, output_tokens: null, cached_tokens: null }, errors = [], missing = new Set();
+  const usage_components = { reasoning_output_tokens: null, cache_write_input_tokens: null };
   let session_id = null, model = null, interaction = null, knownLowerBound = 0, turns = 0;
   for (const line of String(stdout).split(/\r?\n/u)) {
     let event;
@@ -369,9 +375,14 @@ export function parseUserCodexTelemetry(stdout) {
         if (target !== "cached_tokens") knownLowerBound = Math.min(Number.MAX_SAFE_INTEGER, knownLowerBound + value);
       } else missing.add(target);
     }
+    for (const key of Object.keys(usage_components)) {
+      const value = event.usage?.[key], total = (usage_components[key] ?? 0) + value;
+      if (Number.isSafeInteger(value) && value >= 0 && Number.isSafeInteger(total)) usage_components[key] = total;
+      else missing.add(key);
+    }
   }
-  for (const field of missing) metrics[field] = null;
-  return { metrics, session_id, model, errors, interaction, cost: null, request_count: null,
+  for (const field of missing) { if (Object.hasOwn(metrics, field)) metrics[field] = null; else usage_components[field] = null; }
+  return { metrics, usage_components, session_id, model, errors, interaction, cost: null, request_count: null,
     usage_lower_bound: { known_tokens: knownLowerBound, complete: turns > 0 && !missing.has("input_tokens") && !missing.has("output_tokens") } };
 }
 
@@ -415,13 +426,55 @@ export function buildUserComparisonVerificationEnvironment(primary, environment 
     ...(primary && typeof environment.HOME === 'string' && environment.HOME.length ? {HOME:environment.HOME} : {}) };
 }
 
+export function primaryPublicVerificationNeedsSandbox(recipe) {
+  const canonical = buildPrimaryFixtureRecipe(recipe.fixture_id);
+  assert.deepEqual(recipe, canonical, 'public verification recipe must match the canonical fixture');
+  // Only the catalog's explicit JSON/Markdown outputs are data-only. Unknown
+  // extensions, directories, aliases and future executable formats fail closed.
+  return canonical.mutable_paths.some(path => !/\.(?:json|md)(?:#[a-zA-Z0-9_-]+)?$/u.test(path));
+}
+
+/** Fixed OS envelope over the original public command, not another executor.
+ * This records the requested boundary; only real allow/deny acceptance can
+ * establish that the target OS supports it. There is no unsandboxed fallback. */
+export function buildPrimaryPublicVerificationEnvelope(plan, workspace) {
+  assert.ok(isPrimaryFixtureRecipe(plan.verification.recipe) && isSingleShotComparison(plan));
+  const pinned = plan.config.public_verification;
+  assert.deepEqual(pinned, primaryPublicVerificationRuntime(), 'public verification runtime changed');
+  assert.equal(realpathSync(workspace), workspace, 'canonical verification copy required');
+  const runtimeRoots = pinned.npm.runtime_roots.map(entry => entry.path);
+  for (const runtimeRoot of [...runtimeRoots, dirname(pinned.node.path)])
+    assert.ok(workspace !== runtimeRoot && !workspace.startsWith(runtimeRoot + '/') && !runtimeRoot.startsWith(workspace + '/'), 'verification runtime/workspace overlap');
+  const literal = value => {
+    assert.ok(typeof value === 'string' && value.length && !/[\u0000-\u001f\u007f]/u.test(value), 'invalid sandbox path');
+    return JSON.stringify(value);
+  };
+  // Do not copy the historical private probe policy: public tests need local
+  // workspace/cache writes, but never user state, network or arbitrary IPC.
+  const systemRead = ['/System/Library', '/usr/lib', '/usr/share/locale', '/usr/share/zoneinfo'];
+  const executables = ['/bin/bash', '/bin/sh', '/usr/bin/env', pinned.node.path, pinned.npm.entry.path];
+  const devices = ['/dev/null', '/dev/random', '/dev/urandom'];
+  const policy = ['(version 1)', '(deny default)', '(deny network*)', '(allow process-fork)',
+    `(allow process-exec ${executables.map(path => `(literal ${literal(path)})`).join(' ')})`,
+    `(allow file-read* (subpath ${literal(workspace)}) ${[...runtimeRoots, ...systemRead].map(path => `(subpath ${literal(path)})`).join(' ')} ${[...executables, ...devices, pinned.npm.package.path, join(dirname(pinned.node.path), 'npm')].map(path => `(literal ${literal(path)})`).join(' ')})`,
+    `(allow file-write* (subpath ${literal(workspace)}) (literal "/dev/null"))`, '(allow sysctl-read)'].join('\n');
+  const environment = { PATH: `${dirname(pinned.node.path)}:/usr/bin:/bin`, LANG: 'C', LC_ALL: 'C', TZ: 'UTC',
+    GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_SYSTEM: devNull, GIT_CONFIG_NOSYSTEM: '1',
+    NPM_CONFIG_USERCONFIG: devNull, NPM_CONFIG_GLOBALCONFIG: devNull,
+    NPM_CONFIG_CACHE: join(workspace, '.verification-npm-cache'), NPM_CONFIG_UPDATE_NOTIFIER: 'false', NPM_CONFIG_AUDIT: 'false', NPM_CONFIG_FUND: 'false' };
+  return { executable: pinned.sandbox.path, prefix: ['-p', policy], environment, terminationScope: 'process_group',
+    observation: { contract: pinned.contract, policy_digest: comparisonHash(Buffer.from(policy)),
+      runtime: pinned, network: 'deny', writable_root: workspace, native_acceptance: 'unverified', private_grading_authority: false } };
+}
+
 async function verifyCondition(root, plan, condition, signal, execute, remaining = () => Infinity, context) {
   const cwd = join(root, "verification", condition);
   mkdirSync(dirname(cwd), { recursive: true, mode: 0o700 });
   copyRegularTree(join(root, plan.arms[condition].path), cwd);
   const primary = isPrimaryFixtureRecipe(plan.verification.recipe);
-  const environment = buildUserComparisonVerificationEnvironment(primary);
-  const environmentEvidence = { policy:primary?'sanitized_shell_home_v1':'sanitized_node_v1',
+  const sandbox = plan.config.public_verification ? buildPrimaryPublicVerificationEnvelope(plan, join(cwd, 'workspace')) : null;
+  const environment = sandbox?.environment ?? buildUserComparisonVerificationEnvironment(primary);
+  const environmentEvidence = { policy:sandbox ? PRIMARY_PUBLIC_VERIFICATION_CONTRACT : primary?'sanitized_shell_home_v1':'sanitized_node_v1',
     home:primary && environment.HOME?'inherited':'not_inherited',
     digest:comparisonHash(Buffer.from(JSON.stringify(environment))) };
   const checks = primary ? plan.verification.recipe.checks.map(check => ({ ...check,
@@ -432,11 +485,14 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
     if (signal?.aborted || remaining() < 1) break;
     assert.equal(comparisonHash(readStableFile(join(root, plan.verification.reporter.path), "Node test reporter", LIMIT).bytes),
       plan.verification.reporter.digest, "Node test reporter changed");
-    const argv = primary ? check.argv : verificationArgv(root, plan, check.command);
-    const executable = primary ? check.executable : process.execPath;
+    const originalArgv = primary ? check.argv : verificationArgv(root, plan, check.command);
+    const originalExecutable = primary ? check.executable : process.execPath;
+    const argv = sandbox ? [...sandbox.prefix, originalExecutable, ...originalArgv] : originalArgv;
+    const executable = sandbox?.executable ?? originalExecutable;
     const checkCwd = primary ? join(cwd, check.cwd) : cwd;
     const request={condition,run_id:plan.run_id,plan_digest:context?.plan_digest,executable,argv,cwd:checkCwd,evidence_kind:plan.config.evidence_kind,
       verification_environment:environmentEvidence,
+      ...(sandbox ? { public_verification_boundary: sandbox.observation, original_command: [originalExecutable, ...originalArgv] } : {}),
       ...(primary ? { command_id: check.id, command_contract_digest: check.contract_command_digest,
         fixture_input_digest: plan.verification.recipe.input_manifest_digest, observation_origin: "controller_native_fixture_command" } : {}), requested_at:new Date().toISOString()};
     if(context) { checkpointComparison(context,"verification_intent",{condition,slot:{phase:"verifying",verification_index:index}});saveLaunchReceipt(root,condition,`verification-${index}.request`,request); }
@@ -446,16 +502,19 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
     const dispatchRemaining = remaining();
     if (signal?.aborted || dispatchRemaining < 1) break;
     const value = await execute({ executable, argv, cwd: checkCwd, input: "",
-      ...(isSingleShotComparison(plan) ? { terminationScope: "direct_child" } : {}),
+      ...(sandbox ? { terminationScope: sandbox.terminationScope } : isSingleShotComparison(plan) ? { terminationScope: "direct_child" } : {}),
       onSpawn:context ? observed=>{const pid=typeof observed==="number"?observed:observed.pid; context.active_child=`verification-${index}.spawn`;
         saveLaunchReceipt(root,condition,`verification-${index}.spawn`,{...request,pid,observed_at:new Date().toISOString(),
-          ...(isSingleShotComparison(plan) ? { termination_scope: "direct_child", process_group: false } : { owner:observeComparisonProcess(pid),process_group:true })});
+          ...(sandbox ? { termination_scope: 'process_group', process_group: true } : isSingleShotComparison(plan) ? { termination_scope: "direct_child", process_group: false } : { owner:observeComparisonProcess(pid),process_group:true })});
         context.active_child=`verification-${index}.spawn`;
         checkpointComparison(context,"verification_running",{condition,slot:{phase:"verifying",verification_index:index}}); } : undefined,
       timeoutMs: Math.floor(Math.min(plan.config.verification_timeout_ms, dispatchRemaining)), signal,
       env: environment });
-    if (context && childEnded(plan, value)) context.active_child=null;
-    if (isSingleShotComparison(plan) && !childEnded(plan, value)) value.cleanupError ??= { code: "CHILD_TERMINATION_UNKNOWN", message: "verification child termination unknown; no later process may start" };
+    const ended = sandbox ? value.spawnObserved === true && (Number.isInteger(value.exitCode) || value.signal != null) && !value.cleanupError : childEnded(plan, value);
+    if (context && ended) context.active_child=null;
+    if (isSingleShotComparison(plan) && !ended) value.cleanupError ??= { code: "CHILD_TERMINATION_UNKNOWN", message: "verification child termination unknown; no later process may start" };
+    if (sandbox && (value.exitCode === 71 || /^sandbox-exec:/mu.test(String(value.stderr ?? ''))))
+      value.error ??= { code: 'PUBLIC_VERIFICATION_SANDBOX_UNAVAILABLE', message: 'sandbox wrapper unavailable; cause unverified; no later or unsandboxed command may start' };
     const log = `verification-${index}.log`;
     const stdoutLog = `verification-${index}.stdout.${primary ? "log" : "jsonl"}`, stderrLog = `verification-${index}.stderr.log`;
     const bounded = boundedVerificationLogs(value.stdout, value.stderr,
@@ -468,6 +527,7 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
       : value.exitCode !== 0 ? "fail" : primary || testSummary.tests_observed ? "pass" : "unknown";
     const evidenceIncomplete = !bounded.metadata.full_evidence_available || value.error || value.cleanupError || value.outputLimited;
     results.push({ id: check.id, command: [executable, ...argv], cwd:checkCwd, log, logs: [stdoutLog, stderrLog, log], log_metadata: bounded.metadata, test_summary: testSummary,
+      ...(sandbox ? { public_verification_boundary: sandbox.observation, original_command: [originalExecutable, ...originalArgv], termination_scope: 'process_group', termination_confirmed: ended } : {}),
       ...(primary ? { command_id: check.id, command_contract_digest: check.contract_command_digest,
         fixture_input_digest: plan.verification.recipe.input_manifest_digest, verification_kind: "native_public_command",
         semantic_quality: "unknown" } : {}),
@@ -484,10 +544,10 @@ async function verifyCondition(root, plan, condition, signal, execute, remaining
     runtime: { executable: process.execPath, node_version: process.version, reporter_digest: plan.verification.reporter.digest,
       scope:primary?'comparison_controller':'direct_node_verifier',
       ...(primary?{shell_node_version:null,shell_runtime_observation:'not_captured'}:{}),
-      verification_environment:environmentEvidence }, checks: results,
+      verification_environment:environmentEvidence, ...(sandbox ? { public_verification_boundary: sandbox.observation } : {}) }, checks: results,
     requirements: plan.verification.recipe.requirements.map(item => ({ id: item.id, description: item.description,
       status: item.command ? results.find(result => result.id === item.id)?.status ?? "unknown" : "unknown" })),
-    limitations: ["Node test-case receipts do not measure assertion count or prove that tests cover the requirement; the operator must check coverage", "human/semantic criteria without a command remain unknown", "verification executes repository test code in a fresh copy; this is not a security sandbox"] };
+    limitations: ["Node test-case receipts do not measure assertion count or prove that tests cover the requirement; the operator must check coverage", "human/semantic criteria without a command remain unknown", sandbox ? "Fixed macOS sandbox boundary requested; native allow/deny acceptance and private grading qualification remain separate" : "verification executes repository test code in a fresh copy; this is not a security sandbox"] };
 }
 
 // Exercise the same branch without exposing an unowned production verifier.
@@ -582,6 +642,10 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
   assert.ok(plan.config.evidence_kind === "synthetic" || verifier === executeCodexSession, "injected verifiers require synthetic evidence");
   assert.equal(confirmedDigest, plan_digest, "inspect and confirm the exact plan digest before start/resume");
   if (plan.primary_execution_input) throw fault(9, 'closed primary execution input runtime/capture connection is unqualified; no model dispatch or start consumption');
+  if (plan.config.public_verification) assert.deepEqual(plan.config.public_verification, primaryPublicVerificationRuntime(), 'public verification runtime changed before model dispatch');
+  else if (plan.config.evidence_kind === 'observed' && isPrimaryFixtureRecipe(plan.verification.recipe)
+    && primaryPublicVerificationNeedsSandbox(plan.verification.recipe))
+    throw fault(9, 'candidate executable public verification requires a fixed sandbox contract; no model dispatch or start consumption');
   validateInputs(root, plan);
   const audit = inspectComparisonExecution(root, plan, plan_digest);
   if (singleShot && audit.start_consumed) throw fault(9, "single-shot start consumed or unknown; this run cannot be executed again");
@@ -758,7 +822,7 @@ async function executeUserComparison(output, confirmedDigest, { signal: external
       cleanup_error: value.cleanupError ? { code: value.cleanupError.code ?? "unknown", message: sanitizeComparisonLog(value.cleanupError.message ?? "unknown") } : null,
       output_limited: value.outputLimited ?? false,
       session_id: telemetry.session_id, actual_model: telemetry.model, configured_model: plan.config.model,
-      metrics: { duration_ms: Date.now() - conditionStarted, ...telemetry.metrics }, process_duration_ms: value.durationMs ?? null,
+      metrics: { duration_ms: Date.now() - conditionStarted, ...telemetry.metrics }, usage_components: telemetry.usage_components, process_duration_ms: value.durationMs ?? null,
       process_timeout_ms:modelDispatched?invocation.timeoutMs:null,
       verification_duration_ms: verification && verification.checks.length && verification.checks.every(check => check.duration_ms !== null)
         ? verification.checks.reduce((total, check) => total + check.duration_ms, 0) : null,

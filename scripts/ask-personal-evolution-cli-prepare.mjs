@@ -19,6 +19,8 @@ const bytes = path => readStableBytes(path, "fixed personal evaluation input");
 const json = path => parseJsonRejectDuplicateKeys(bytes(path).toString("utf8"));
 
 export function preparePersonalEvolutionCliPair({ profile, cycleRoot, preparationObjectDigest, cycleId }) {
+  assert.equal(profile.evaluation?.fixtureSet, "catalog24", "saved profile requires migration before creating a new pair; preserve existing cycles and configure a fresh catalog profile");
+  assert.deepEqual(profile.evaluation.fixtureIds, profile.blueprint.evaluation_scope.fixture_ids, "saved profile requires migration to an explicit catalog selection before creating a new pair");
   const { storeRoot, trust, evaluation } = profile;
   const fixtureSet = validatePersonalEvolutionEvaluationSelection(evaluation, profile.blueprint.evaluation_scope.fixture_ids);
   const alignmentInput = { storeRoot, ...trust, preparationObjectDigest,
@@ -108,7 +110,7 @@ export function preparePersonalEvolutionCliPair({ profile, cycleRoot, preparatio
             profile_id: "primary_principles_v2_single_shot_v1" } } });
     }
   }
-  const sealed = sealPersonalEvolutionPromptPair({ ...input, fixtureSet, blocks, outputRoot: join(cycleRoot, "pair-output") });
+  const sealed = sealPersonalEvolutionPromptPair({ ...input, fixtureSet, ...(evaluation.fixtureIds ? { fixtureIds: evaluation.fixtureIds } : {}), blocks, outputRoot: join(cycleRoot, "pair-output") });
   return { input: { ...input, pairRegistrationObjectDigest: sealed.object_digest,
     trustedPairRegistrationObjectDigests: [sealed.object_digest] }, outputRoot: sealed.registration.output_root };
 }

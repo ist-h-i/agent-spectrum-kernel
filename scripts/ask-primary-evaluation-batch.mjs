@@ -10,15 +10,20 @@ import { isPrimaryEvaluationGradingAdapter, PRIMARY_GRADING_RESERVATION_MS } fro
 import { comparisonHash, inventoryComparisonGitMetadata, inventoryUserTree } from './ask-user-comparison-prepare.mjs';
 import { inspectUserComparison, readUserComparisonPlan, reportUserComparison, startUserComparison } from './ask-user-comparison.mjs';
 
-import { PRIMARY_FIXTURE_IDS, primaryFixtureIdsForSet, assertPrimaryFixtureInventory } from './ask-primary-fixture-recipe.mjs';
+import { PRIMARY_FIXTURE_IDS, primaryFixtureIdsForSet, assertPrimaryFixtureInventory, selectPrimaryFixtureIds } from './ask-primary-fixture-recipe.mjs';
 export { PRIMARY_FIXTURE_IDS };
 export { PRIMARY_GRADING_RESERVATION_MS };
 export const PRIMARY_BATCH_LIMITS = Object.freeze({ overall_timeout_ms: 302400000, token_budget: 45000000, retries: 0, concurrency: 1, resume: 'forbidden' });
-export function primaryBatchLimitsForSet(fixtureSet = 'legacy9') {
+export function primaryBatchLimitsForSet(fixtureSet = 'catalog24') {
   const ids = primaryFixtureIdsForSet(fixtureSet);
   return fixtureSet === 'legacy9' ? PRIMARY_BATCH_LIMITS : Object.freeze({ ...PRIMARY_BATCH_LIMITS,
     overall_timeout_ms: ids.length * (14400000 + PRIMARY_GRADING_RESERVATION_MS), token_budget: ids.length * 5000000 });
 }
+export function primaryBatchLimitsForSelection(ids) {
+  const selected = selectPrimaryFixtureIds(ids);
+  return Object.freeze({ ...PRIMARY_BATCH_LIMITS, overall_timeout_ms: selected.length * (14400000 + PRIMARY_GRADING_RESERVATION_MS), token_budget: selected.length * 5000000 });
+}
+const limitsForManifest = manifest => Object.hasOwn(manifest, 'fixture_ids') ? primaryBatchLimitsForSelection(manifest.fixture_ids) : primaryBatchLimitsForSet(fixtureSetOf(manifest));
 const fixtureSetOf = manifest => manifest.fixture_set ?? 'legacy9';
 const LIMIT = 16 * 1024 * 1024;
 const bytes = value => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
@@ -110,10 +115,15 @@ function checkBlock(block, conditions, pending) {
 function validateManifest(manifest, pending) {
   assert.equal(manifest.kind, 'ask_primary_evaluation_batch_manifest_v1');
   assert.ok(typeof manifest.batch_id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/u.test(manifest.batch_id));
-  const fixtureSet = fixtureSetOf(manifest), limits = primaryBatchLimitsForSet(fixtureSet);
+  const fixtureSet = fixtureSetOf(manifest), limits = limitsForManifest(manifest);
   assert.deepEqual(manifest.limits, fixtureSet === 'legacy9' && [172800000, 216000000].includes(manifest.limits?.overall_timeout_ms)
     ? { ...limits, overall_timeout_ms: manifest.limits.overall_timeout_ms } : limits, 'unknown primary batch budget');
-  const ids = assertPrimaryFixtureInventory(manifest.blocks.map(block => block.fixture_id), fixtureSet);
+  const ids = Object.hasOwn(manifest, 'fixture_ids') ? selectPrimaryFixtureIds(manifest.fixture_ids)
+    : assertPrimaryFixtureInventory(manifest.blocks.map(block => block.fixture_id), fixtureSet);
+  if (Object.hasOwn(manifest, 'fixture_ids')) {
+    assert.equal(fixtureSet, 'catalog24', 'new selections use the single catalog');
+    assert.deepEqual(manifest.blocks.map(block => block.fixture_id), ids, 'selected batch inventory differs');
+  }
   assert.equal(manifest.conditions.length, 3); assert.equal(new Set(manifest.conditions).size, 3);
   assert.equal(new Set(manifest.blocks.map(block => block.run_id)).size, ids.length, 'duplicate run ID');
   const loaded = manifest.blocks.map(block => checkBlock(block, manifest.conditions, pending));
@@ -153,7 +163,7 @@ export function preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter } =
   const raw = stable(manifestPath), manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
   assert.ok(isAbsolute(manifest.root) && resolve(manifest.root) === manifest.root); canonical(dirname(manifest.root));
   assert.ok(!existsSync(manifest.root), 'batch output exists; never reuse');
-  assert.deepEqual(manifest.limits, primaryBatchLimitsForSet(fixtureSetOf(manifest)), 'new preparation must use the current budget');
+  assert.deepEqual(manifest.limits, limitsForManifest(manifest), 'new preparation must use the current budget');
   const loaded = validateManifest(manifest, true);
   for (const value of loaded) assert.ok(!overlap(manifestPath, value.root) && !overlap(manifestPath, value.plan.source.repo), 'external manifest overlaps execution source');
   assert.ok(!overlap(manifestPath, manifest.root));
@@ -177,7 +187,7 @@ export function inspectPrimaryEvaluationBatch(root, { gradingAdapter } = {}) {
   const batch = readBatch(root), consumed = existsSync(join(root, 'consumption'));
   const loaded = validateManifest(batch.manifest, !consumed);
   const blockers = gradingPreflight(batch.manifest, loaded, gradingAdapter);
-  if (batch.manifest.limits.overall_timeout_ms !== primaryBatchLimitsForSet(fixtureSetOf(batch.manifest)).overall_timeout_ms)
+  if (batch.manifest.limits.overall_timeout_ms !== limitsForManifest(batch.manifest).overall_timeout_ms)
     blockers.push({ fixture_id: null, reason: 'historical_preparation_budget_requires_new_plan' });
   return { ...batch, status: consumed ? 'consumed' : blockers.length ? 'blocked' : 'prepared', blockers, start_consumed: consumed,
     slot_count: batch.manifest.blocks.length * batch.manifest.conditions.length, slots: batch.manifest.blocks.flatMap((block, index) => batch.manifest.conditions.map(condition => ({ fixture_id: block.fixture_id, run_id: block.run_id, condition, state: consumed ? 'unknown' : 'not_started', quality: null, capability: loaded[index].plan.arms[condition].capability }))) };

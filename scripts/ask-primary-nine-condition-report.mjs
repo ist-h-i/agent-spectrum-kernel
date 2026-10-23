@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Offline projection of retained comparison reports. Never imports a launcher or grader.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -48,7 +49,8 @@ const readJson = (path, expected = null) => {
 
 function validateManifest(value) {
   keys(value, ['kind', 'evidence_kind', 'fixture_ids', 'repetitions', 'reports', ...(Object.hasOwn(value, 'api_equivalent_prices') ? ['api_equivalent_prices'] : [])], 'report manifest');
-  assert.equal(value.kind, 'ask_primary_nine_condition_report_input_v1');
+  assert.ok(['ask_primary_nine_condition_report_input_v1', 'ask_primary_nine_condition_report_input_v2'].includes(value.kind));
+  const native = value.kind.endsWith('_v2');
   assert.ok(['observed', 'synthetic'].includes(value.evidence_kind), 'explicit evidence kind required');
   const catalog = PRIMARY_FIXTURE_REGISTRY.map(row => row[0]);
   assert.ok(Array.isArray(value.fixture_ids) && value.fixture_ids.length > 0, 'explicit task scope required');
@@ -56,13 +58,18 @@ function validateManifest(value) {
   assert.ok(Array.isArray(value.repetitions) && value.repetitions.length > 0 && value.repetitions.length <= 100);
   assert.ok(value.repetitions.every(n => Number.isSafeInteger(n) && n > 0));
   same(value.repetitions, [...new Set(value.repetitions)].sort((a, b) => a - b), 'unique ordered repetitions required');
-  assert.ok(Array.isArray(value.reports) && value.reports.length <= NINE_REPORT_SETTINGS.length * value.repetitions.length);
+  assert.ok(Array.isArray(value.reports) && value.reports.length <= NINE_REPORT_SETTINGS.length * value.repetitions.length * (native ? value.fixture_ids.length : 1));
   const seen = new Set(), paths = new Set();
   for (const entry of value.reports) {
-    keys(entry, ['path', 'digest', 'model', 'reasoning', 'repetition'], 'saved report reference'); digest(entry.digest);
+    keys(entry, ['path', 'digest', 'model', 'reasoning', 'repetition', ...(native ? ['fixture_id', 'plan', ...(Object.hasOwn(entry, 'reference_protocol') ? ['reference_protocol'] : []), ...(Object.hasOwn(entry, 'reference_review') ? ['reference_review'] : [])] : [])], 'saved report reference'); digest(entry.digest);
+    if (native) {
+      assert.ok(value.fixture_ids.includes(entry.fixture_id));
+      for (const key of ['plan', 'reference_protocol', 'reference_review']) if (entry[key]) { keys(entry[key], ['path', 'digest'], key); digest(entry[key].digest); }
+      assert.ok(entry.plan && (!entry.reference_review || entry.reference_protocol), 'review needs a fixed protocol');
+    }
     assert.ok(NINE_REPORT_SETTINGS.some(setting => settingKey(setting) === settingKey(entry)), 'unsupported model/effort setting');
     assert.ok(value.repetitions.includes(entry.repetition));
-    const key = `${settingKey(entry)}/${entry.repetition}`;
+    const key = `${settingKey(entry)}/${entry.repetition}/${native ? entry.fixture_id : ''}`;
     assert.ok(!seen.has(key) && !paths.has(entry.path), 'duplicate model/repetition or report path');
     seen.add(key); paths.add(entry.path);
   }
@@ -100,7 +107,8 @@ function projectSlot(slot, entry, manifest, provenance, sourcePins, scoringPins,
   const row = { model: entry.model, reasoning: entry.reasoning, repetition: entry.repetition, fixture_id: slot.fixture_id,
     condition: slot.condition, state: slot.state, run_id: slot.run_id, plan_digest: slot.plan_digest, quality: quality(slot.quality),
     evidence_kind: manifest.evidence_kind, input_tokens: null, output_tokens: null, cached_tokens: null,
-    duration_ms: null, cost: null, strict_requirement_success: null, success: null,
+    duration_ms: null, cost: null, strict_requirement_success: null, success: null, process_completed: null,
+    usage_components: { reasoning_output_tokens: null, cache_write_input_tokens: null }, reference_protocol_status: 'not_supplied',
     grading_execution_status: slot.grading?.status ?? 'unknown', grading_execution_complete: slot.grading?.status === 'completed',
     success_limitation: 'safety/blocker aggregates are not embedded in the retained batch report; no adoption or full pass inferred',
     actual_model: null, actual_model_status: 'unobserved', source_digest: null, task_digest: null, verification_digest: null,
@@ -122,6 +130,7 @@ function projectSlot(slot, entry, manifest, provenance, sourcePins, scoringPins,
   assert.ok(Array.isArray(child.slots));
   same(child.slots.map(value => value.condition), NINE_REPORT_CONDITIONS, 'child condition set/order changed');
   const native = child.slots.find(value => value.condition === row.condition);
+  row.process_completed = native.process_completed ?? null;
   assert.equal(native.state, row.state, 'batch and child state differ');
   assert.ok(native.cost == null, 'unsupported native monetary value');
   same(slot.usage, native.metrics ?? null, 'batch and child usage differ');
@@ -133,6 +142,7 @@ function projectSlot(slot, entry, manifest, provenance, sourcePins, scoringPins,
     assert.equal(native.actual_model, row.model, 'observed model differs; separate experiment required');
   }
   for (const key of metricKeys) row[key] = nonnegative(native.metrics?.[key], key, key !== 'duration_ms');
+  row.usage_components = Object.fromEntries(['reasoning_output_tokens', 'cache_write_input_tokens'].map(key => [key, nonnegative(native.usage_components?.[key], key, true)]));
   assert.ok(row.cached_tokens === null || row.input_tokens === null || row.cached_tokens <= row.input_tokens, 'cached input exceeds input total');
   if (native.state === 'not_started') assert.ok(metricKeys.every(key => row[key] === null), 'unstarted slot has measured usage/time');
   const sameRun = runReports.get(row.run_id), childDigest = canonicalDigest(child);
@@ -189,6 +199,118 @@ function projectSlot(slot, entry, manifest, provenance, sourcePins, scoringPins,
   return row;
 }
 
+const canonicalPromptDigest = value => { assert.equal(typeof value, 'string', 'fixed prompt required'); return `sha256:${createHash('sha256').update(value).digest('hex')}`; };
+
+function normalizeNativeReport(child, entry) {
+  assert.equal(child.kind, 'ask_user_comparison_report_v1');
+  const retained = readJson(entry.plan.path, entry.plan.digest), plan = retained.value;
+  assert.equal(entry.plan.digest, child.plan_digest, 'report/plan digest mismatch');
+  assert.equal(plan.run_id, child.run_id); same(plan.config, child.configuration, 'plan configuration differs');
+  same(plan.source, child.source, 'plan source differs');
+  assert.ok(plan.kernel_definition && plan.full_definition, 'fixed instruction identities required');
+  assert.equal(plan.input?.digest, canonicalPromptDigest(plan.prompt), 'saved prompt/input digest differs');
+  assert.ok(Array.isArray(plan.mutable_paths) && plan.policy && plan.execution_protocol, 'fixed scope/budget/policy required');
+  const trials = child.summary?.supplied_notes?.trials;
+  assert.ok(Array.isArray(trials));
+  for (const trial of trials) {
+    assert.equal(trial.task_ref, plan.task?.digest); assert.equal(trial.success_criteria_ref, plan.verification?.digest);
+  }
+  return { kind: 'ask_primary_evaluation_batch_report_v1', batch_id: child.run_id, manifest_digest: entry.plan.digest,
+    state: child.overall?.state ?? 'unknown', errors: [],
+    instruction_identity: { kernel: plan.kernel_definition, full: plan.full_definition },
+    comparison_identity: { input_digest: plan.input.digest, policy: plan.policy, execution_protocol: plan.execution_protocol, mutable_paths: plan.mutable_paths,
+      config: Object.fromEntries(Object.entries(plan.config).filter(([key]) => !['model', 'reasoning'].includes(key))),
+      personal_inputs: Object.fromEntries(Object.entries(plan.arms ?? {}).map(([id, arm]) => [id, arm.personal_prompt?.input_digest ?? null])) },
+    reference_protocol_digest: plan.reference_review_protocol_digest ?? null,
+    slots: child.slots.map(native => ({ fixture_id: entry.fixture_id, run_id: child.run_id, plan_digest: child.plan_digest,
+      condition: native.condition, state: native.state, quality: null, usage: native.metrics ?? null, cost: null,
+      grading: { status: 'unknown' }, child_report: child })) };
+}
+
+function applyReferenceReview(row, slot, entry, normalized, evidenceKind) {
+  if (!entry.reference_protocol) return;
+  const protocol = readJson(entry.reference_protocol.path, entry.reference_protocol.digest).value;
+  keys(protocol, ['kind', 'fixture_id', 'source_digest', 'task_digest', 'verification_digest', 'criteria', 'limitations'], 'reference protocol');
+  assert.equal(protocol.kind, 'ask_reference_review_protocol_v1'); assert.equal(protocol.fixture_id, row.fixture_id);
+  for (const key of ['source_digest', 'task_digest', 'verification_digest']) assert.equal(protocol[key], row[key], 'reference/public input differs');
+  assert.ok(Array.isArray(protocol.criteria) && protocol.criteria.length > 0 && protocol.criteria.length <= 1000);
+  const ids = new Set();
+  for (const criterion of protocol.criteria) {
+    keys(criterion, ['id', 'weight', 'description'], 'public criterion'); safeID(criterion.id);
+    assert.ok(!ids.has(criterion.id)); ids.add(criterion.id);
+    assert.ok(nonnegative(criterion.weight, 'criterion weight') > 0);
+    assert.ok(typeof criterion.description === 'string' && criterion.description.length > 0 && criterion.description.length <= 4000);
+  }
+  assert.ok(Array.isArray(protocol.limitations) && protocol.limitations.every(value => typeof value === 'string' && value.length <= 4000));
+  row.reference_protocol_digest = entry.reference_protocol.digest;
+  row.reference_protocol_status = normalized.reference_protocol_digest === null ? 'not_plan_pinned' : 'plan_pinned';
+  if (normalized.reference_protocol_digest === null) return;
+  assert.equal(normalized.reference_protocol_digest, entry.reference_protocol.digest, 'reference protocol differs from fixed execution plan');
+  if (!entry.reference_review) return;
+  const review = readJson(entry.reference_review.path, entry.reference_review.digest).value;
+  keys(review, ['kind', 'evidence_kind', 'fixture_id', 'run_id', 'plan_digest', 'protocol_digest', 'conditions'], 'reference review');
+  assert.equal(review.kind, 'ask_reference_review_v1'); assert.equal(review.evidence_kind, evidenceKind);
+  for (const key of ['fixture_id', 'run_id', 'plan_digest']) assert.equal(review[key], row[key], 'reference run identity mismatch');
+  assert.equal(review.protocol_digest, entry.reference_protocol.digest, 'reference protocol mismatch');
+  same(review.conditions.map(value => value.condition), NINE_REPORT_CONDITIONS, 'reference condition inventory differs');
+  const result = review.conditions.find(value => value.condition === row.condition);
+  keys(result, ['condition', 'artifacts', 'judgments', 'diagnostics'], 'reference condition');
+  const native = slot.child_report.slots.find(value => value.condition === row.condition);
+  same(result.artifacts, native.artifacts, 'reference answer artifacts differ');
+  assert.ok(Object.keys(result.artifacts).length > 0, 'review needs retained answer artifacts');
+  for (const value of Object.values(result.artifacts)) digest(value);
+  assert.equal(native.receipt_integrity, 'valid'); assert.equal(native.process_completed, true);
+  assert.equal(native.unresolved_child, false); assert.equal(native.scope?.status, 'pass');
+  assert.ok(['completed', 'verification_failed'].includes(native.state), 'unfinished answer cannot receive reference score');
+  same(result.judgments.map(value => value.criterion_id), protocol.criteria.map(value => value.id), 'criterion inventory differs');
+  let earned = 0, possible = 0, unknown = false;
+  for (const [index, judgment] of result.judgments.entries()) {
+    keys(judgment, ['criterion_id', 'outcome', 'evidence'], 'reference judgment');
+    assert.ok(['pass', 'fail', 'unknown'].includes(judgment.outcome));
+    assert.ok(Array.isArray(judgment.evidence) && (judgment.outcome === 'unknown' || judgment.evidence.length > 0), 'decided reference criterion needs evidence');
+    judgment.evidence.forEach(digest);
+    const weight = protocol.criteria[index].weight; possible += weight;
+    if (judgment.outcome === 'unknown') unknown = true;
+    if (judgment.outcome === 'pass') earned += weight;
+  }
+  assert.ok(Number.isFinite(possible) && possible > 0 && Number.isFinite(earned), 'reference weights overflow');
+  row.reference_score = unknown ? null : earned / possible;
+  keys(result.diagnostics, Object.keys(result.diagnostics), 'reference diagnostics');
+  const allowed = ['detected', 'missed', 'false_positives', 'duplicates', 'factual_or_locator_errors'];
+  assert.ok(Object.keys(result.diagnostics).every(key => allowed.includes(key)));
+  for (const value of Object.values(result.diagnostics)) assert.ok(nonnegative(value, 'diagnostic count', true) !== null);
+  row.reference_diagnostics = result.diagnostics;
+  row.reference_review_digest = entry.reference_review.digest;
+}
+
+// Same complete task set across all nine groups, equal weight per task. No
+// observed-only means masquerade as full24, and formal/reference never pool.
+function comparisonPanel(rows, manifest, scoreKey) {
+  const eligible = manifest.fixture_ids.filter(fixture => {
+    const population = rows.filter(row => row.fixture_id === fixture);
+    return population.every(row => row[scoreKey] !== null && row.duration_ms !== null && row.input_tokens !== null && row.output_tokens !== null)
+      && (scoreKey !== 'reference_score' || new Set(population.map(row => row.reference_protocol_digest)).size === 1);
+  });
+  if (scoreKey === 'reference_score') for (const fixture of manifest.fixture_ids) {
+    const pins = rows.filter(row => row.fixture_id === fixture && row.reference_protocol_digest).map(row => row.reference_protocol_digest);
+    assert.ok(new Set(pins).size <= 1, 'reference protocol differs across settings or repetitions');
+  }
+  const groups = NINE_REPORT_SETTINGS.flatMap(setting => NINE_REPORT_CONDITIONS.map(condition => {
+    const members = rows.filter(row => eligible.includes(row.fixture_id) && settingKey(row) === settingKey(setting) && row.condition === condition);
+    const total = key => members.length ? sum(members.map(row => row[key])).known_sum : null;
+    const perTask = eligible.map(fixture => {
+      const values = members.filter(row => row.fixture_id === fixture).map(row => row[scoreKey]);
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    });
+    return { ...setting, condition, score_100: eligible.length ? perTask.reduce((a, b) => a + b, 0) / eligible.length * 100 : null,
+      attempt_duration_ms: total('duration_ms'), total_tokens: members.length ? sum(members.map(row => row.input_tokens + row.output_tokens)).known_sum : null };
+  }));
+  return { score_basis: scoreKey === 'quality' ? 'formal_retained_score' : 'public_reference_review',
+    fixture_ids: eligible, excluded_fixture_ids: manifest.fixture_ids.filter(id => !eligible.includes(id)),
+    planned_tasks: manifest.fixture_ids.length, repetitions: manifest.repetitions.length,
+    aggregation: 'equal task weight, normalized 0–100; summed attempts on identical task intersection', groups };
+}
+
 function sum(values) {
   const known = values.filter(value => value !== null), result = known.reduce((total, value) => total + value, 0);
   assert.ok(Number.isFinite(result) && result <= Number.MAX_SAFE_INTEGER, 'aggregate overflow');
@@ -199,7 +321,8 @@ export function buildPrimaryNineConditionReport(manifestPath) {
   const input = readJson(manifestPath), manifest = input.value; validateManifest(manifest);
   const rows = new Map(), taskRuns = new Map(), runOwners = new Map(), sourcePins = new Map(), scoringPins = new Map(), runReports = new Map(), inputs = [];
   for (const entry of manifest.reports) {
-    const saved = readJson(entry.path, entry.digest), report = saved.value;
+    const saved = readJson(entry.path, entry.digest);
+    const report = manifest.kind.endsWith('_v2') ? normalizeNativeReport(saved.value, entry) : saved.value;
     assert.equal(report.kind, 'ask_primary_evaluation_batch_report_v1'); safeID(report.batch_id); digest(report.manifest_digest);
     assert.ok(Array.isArray(report.slots) && Array.isArray(report.errors), 'batch slots/errors required');
     inputs.push({ digest: entry.digest, model: entry.model, reasoning: entry.reasoning, repetition: entry.repetition, batch_manifest_digest: report.manifest_digest,
@@ -207,6 +330,14 @@ export function buildPrimaryNineConditionReport(manifestPath) {
     for (const slot of report.slots) {
       if (report.errors.length) assert.equal(slot.quality, null, 'batch integrity errors cannot carry numeric quality');
       const row = projectSlot(slot, entry, manifest, saved, sourcePins, scoringPins, runReports);
+      row.measurement_kind = 'ask_comparison_measurement_v1';
+      row.reference_score = null; row.reference_protocol_digest = null; row.reference_diagnostics = null;
+      if (manifest.kind.endsWith('_v2')) {
+        const pin = canonicalDigest({ instruction: report.instruction_identity, comparison: report.comparison_identity });
+        const key = `instruction/${row.fixture_id}`;
+        if (sourcePins.has(key)) assert.equal(sourcePins.get(key), pin, 'instruction/input/scope/budget differs across settings'); else sourcePins.set(key, pin);
+        applyReferenceReview(row, slot, entry, report, manifest.evidence_kind);
+      }
       row.api_equivalent_reported_component_cost = componentCost(row, manifest.api_equivalent_prices);
       const key = rowKey(row), taskKey = `${settingKey(row)}/${row.repetition}/${row.fixture_id}`;
       assert.ok(!rows.has(key), 'duplicate task/condition/repetition slot');
@@ -223,6 +354,8 @@ export function buildPrimaryNineConditionReport(manifestPath) {
       return existing ?? { ...expected, state: 'not_reported', quality: null, input_tokens: null, output_tokens: null, cached_tokens: null,
         duration_ms: null, cost: null, api_equivalent_reported_component_cost: null, success: null, strict_requirement_success: null, evidence_kind: manifest.evidence_kind,
         grading_execution_status: 'not_reported', grading_execution_complete: false,
+        measurement_kind: 'ask_comparison_measurement_v1', reference_score: null, reference_protocol_digest: null, reference_diagnostics: null,
+        process_completed: null, reference_protocol_status: 'not_supplied', usage_components: { reasoning_output_tokens: null, cache_write_input_tokens: null },
         actual_model: null, actual_model_status: 'unobserved', run_id: null, plan_digest: null, report_digest: null };
     }));
     ordered.push(...members);
@@ -242,7 +375,16 @@ export function buildPrimaryNineConditionReport(manifestPath) {
       api_equivalent_reported_component_cost: sum(members.map(row => row.api_equivalent_reported_component_cost)),
       cost: null, cost_per_success: null, cost_per_success_status: 'undefined_missing_monetary_and_safety_evidence' });
   }
-  return { kind: 'ask_primary_nine_condition_report_v1', evidence_kind: manifest.evidence_kind,
+  const coverage = { expected: ordered.length, reported: ordered.filter(row => row.state !== 'not_reported').length,
+    measured: ordered.filter(row => row.duration_ms !== null).length,
+    completed: ordered.filter(row => row.state === 'completed' && row.process_completed === true).length,
+    not_started: ordered.filter(row => ['not_started', 'not_reported'].includes(row.state)).length,
+    formal_scored: ordered.filter(row => row.quality !== null).length,
+    reference_scored: ordered.filter(row => row.reference_score !== null).length,
+    unscorable: ordered.filter(row => !['not_started', 'not_reported'].includes(row.state) && row.quality === null && row.reference_score === null).length,
+    missing: ordered.filter(row => row.state === 'not_reported').length };
+  return { kind: 'ask_primary_nine_condition_report_v1', evidence_kind: manifest.evidence_kind, coverage,
+    panels: { formal: comparisonPanel(ordered, manifest, 'quality'), reference: comparisonPanel(ordered, manifest, 'reference_score') },
     evidence_label: manifest.evidence_kind === 'synthetic' ? 'SYNTHETIC FIXTURE — NOT REAL QUALITY' : 'OBSERVED REPORT PROJECTION — NOT RUNTIME QUALIFICATION',
     manifest_digest: input.digest, fixture_ids: manifest.fixture_ids, repetitions: manifest.repetitions, inputs, slots: ordered, groups,
     api_equivalent_prices: manifest.api_equivalent_prices ?? null,
@@ -255,45 +397,81 @@ export function buildPrimaryNineConditionReport(manifestPath) {
       'Input+output excludes cached tokens as an additional charge; cached input is a subset and is never added again.',
       'Duration is the retained model-condition duration, not total grader/setup/provider wall time.',
       'Actual monetary cost, included ChatGPT quota consumption and full pass remain unknown. Optional operator-supplied prices are unverified, date/source-labeled API-equivalent estimates of reported input/cached/output components only; cache-write, tools, setup/review, grader and other charges are not measured or included.',
+      'One repetition and fixed execution order do not estimate variance or establish superiority; cache/provider/session effects remain possible confounders.',
+      'Native/runtime/admission acceptance is not established by a public check or this report; missing native-dependent scores remain unknown.',
       'Synthetic fixtures are development evidence only and cannot be pooled with observed results.'] };
 }
 
 const xml = value => String(value).replace(/[&<>"']/gu, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[char]);
 const markdownText = value => xml(value).replace(/[`\\[\]()*_!~|]/gu, char => char === '`' ? '&#96;' : `\\${char}`);
 const short = group => `${group.model === 'gpt-6-luna' ? 'luna' : 'sol'} ${group.reasoning} ${group.condition === 'plain' ? 'P' : group.condition === 'full_ask' ? 'F' : 'K2'}`;
-function chart(report, axis) {
-  const config = axis === 'cost' ? { title: 'Quality / API-equivalent reported-component estimate',
-    label: report.api_equivalent_prices ? `API equivalent ${report.api_equivalent_prices.currency} per planned slot — not actual billing or total cost` : 'Monetary estimate unavailable — no explicit operator-supplied prices',
-    value: group => report.api_equivalent_prices && group.api_equivalent_reported_component_cost.complete ? group.api_equivalent_reported_component_cost.known_sum / group.expected_slots : null }
-    : axis === 'tokens' ? { title: 'Quality / reported tokens', label: 'Input + output tokens per planned slot', value: group => group.total_tokens.complete ? group.total_tokens.known_sum / group.expected_slots : null }
-      : { title: 'Quality / model-condition duration', label: 'Model-condition milliseconds per planned slot (excludes grading)', value: group => group.model_duration_ms.complete ? group.model_duration_ms.known_sum / group.expected_slots : null };
-  const points = report.groups.filter(group => group.quality.complete && config.value(group) !== null);
-  const maximum = Math.max(0, ...points.map(config.value)) || 1;
-  const scope = `${report.fixture_ids.length} tasks × ${report.repetitions.length} repetitions; ${report.fixture_ids.length * report.repetitions.length} planned slots/group`;
+// One renderer for both evidence classes; no score or missing metric is inferred.
+function chart(report, axis, basis = 'formal') {
+  const panel = report.panels[basis];
+  const selected = report.slots.filter(row => panel.fixture_ids.includes(row.fixture_id));
+  const amount = group => {
+    if (axis === 'time') return group.attempt_duration_ms === null ? null : group.attempt_duration_ms / 1000;
+    if (axis === 'tokens') return group.total_tokens;
+    const members = selected.filter(row => settingKey(row) === settingKey(group) && row.condition === group.condition);
+    const total = sum(members.map(row => row.api_equivalent_reported_component_cost));
+    return members.length && total.complete ? total.known_sum : null;
+  };
+  const points = panel.groups.filter(group => group.score_100 !== null && amount(group) !== null);
+  const maximum = Math.max(0, ...points.map(amount)) || 1;
+  const label = axis === 'cost' ? report.api_equivalent_prices ? `API equivalent ${report.api_equivalent_prices.currency} — not actual billing or total cost` : 'Monetary estimate unavailable — no explicit operator-supplied prices'
+    : axis === 'tokens' ? 'Summed input + output tokens (cached input is a subset)' : 'Summed attempt seconds (not parallel wall time; excludes separate grading)';
   const clusters = new Map();
-  for (const group of points) {
-    const key = JSON.stringify([config.value(group), group.quality.mean_of_known]);
-    if (!clusters.has(key)) clusters.set(key, { id: clusters.size + 1, value: config.value(group), quality: group.quality.mean_of_known, groups: [] });
-    clusters.get(key).groups.push(group);
+  for (const point of points) {
+    const key = JSON.stringify([amount(point), point.score_100]);
+    if (!clusters.has(key)) clusters.set(key, { id: clusters.size + 1, groups: [] });
+    clusters.get(key).groups.push(point);
   }
-  const dots = [...clusters.values()].map(cluster => {
-    const x = 75 + cluster.value / maximum * 650, y = 370 - cluster.quality * 270;
-    return `<circle cx="${x}" cy="${y}" r="5" fill="#2b6cb0"><title>${xml(cluster.groups.map(short).join(' / '))}</title></circle><text x="${x + 7}" y="${y - 7}" font-size="12">${cluster.id}</text>`;
+  const colors = ['#0072B2', '#D55E00', '#009E73'];
+  const dots = points.map(group => {
+    const x = 75 + amount(group) / maximum * 650, y = 370 - group.score_100 * 2.7;
+    const index = NINE_REPORT_SETTINGS.findIndex(value => settingKey(value) === settingKey(group)), fill = colors[index];
+    const shape = group.condition === 'plain' ? `<circle cx="${x}" cy="${y}" r="6"/>`
+      : group.condition === 'full_ask' ? `<rect x="${x - 5}" y="${y - 5}" width="10" height="10"/>`
+        : `<path d="M${x} ${y - 7} L${x - 6} ${y + 5} L${x + 6} ${y + 5} Z"/>`;
+    return `<g data-model="${xml(settingKey(group))}" data-condition="${xml(group.condition)}" fill="${fill}" fill-opacity="0.6" stroke="${fill}"><title>${xml(short(group))}: score ${group.score_100}, x ${amount(group)}</title>${shape}</g>`;
   }).join('');
+  const coordinateLabels = [...clusters.values()].map(cluster => { const point = cluster.groups[0]; return `<text x="${83 + amount(point) / maximum * 650}" y="${363 - point.score_100 * 2.7}" font-size="12">${cluster.id}</text>`; }).join('');
   let legendRow = 0;
   const legend = [...clusters.values()].flatMap(cluster => cluster.groups.map(group => `<text x="780" y="${122 + 22 * legendRow++}" font-size="12">${cluster.id}: ${xml(short(group))}</text>`)).join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="535" viewBox="0 0 1000 535"><rect width="1000" height="535" fill="white"/><g font-family="sans-serif" fill="#1a202c"><text x="30" y="32" font-size="20">${xml(config.title)}</text><text x="30" y="57" font-size="13">${xml(report.evidence_label)}</text><text x="30" y="78" font-size="12">${xml(scope)}</text><path d="M75 90 V370 H750" fill="none" stroke="#718096"/><text x="40" y="103">1</text><text x="40" y="373">0</text><text x="75" y="400">0</text><text x="700" y="400">${axis === 'cost' && !points.length ? 'unknown' : maximum.toPrecision(4)}</text><text x="75" y="431">${xml(config.label)}</text><text x="780" y="100" font-size="12">Shared ID = tied coordinates</text><text x="30" y="464" font-size="12">Quality: normalized requirement score [0,1]. Only complete quality + x coverage is plotted.</text><text x="30" y="486" font-size="12">${xml(points.length ? `${points.length}/9 groups plotted; ${clusters.size} distinct coordinate markers. Plotted groups are listed in the legend; no jitter.` : 'No comparable measured points. Unknown values are not zero; no cost or quality points were invented.')}</text><text x="30" y="510" font-size="11">${xml(axis === 'cost' && report.api_equivalent_prices ? `Operator-supplied, not verified. As of ${report.api_equivalent_prices.as_of}; source: ${report.api_equivalent_prices.source}` : 'No runtime, grading or adoption authority is issued by this offline report.')}</text>${dots}${legend}</g></svg>\n`;
+  const scope = `${report.fixture_ids.length} tasks × ${report.repetitions.length} repetitions; ${report.fixture_ids.length * report.repetitions.length} planned slots/group`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="555" viewBox="0 0 1000 555"><rect width="1000" height="555" fill="white"/><g font-family="sans-serif" fill="#1a202c"><text x="30" y="30" font-size="20">${basis === 'formal' ? 'Formal retained score' : 'Public reference review score'} / ${xml(axis)}</text><text x="30" y="52" font-size="12">${xml(report.evidence_label)}</text><text x="30" y="72" font-size="12">${xml(scope)}</text><path d="M75 90 V370 H750" fill="none" stroke="#718096"/><text x="33" y="104">100</text><text x="42" y="373">0</text><text x="75" y="400">0</text><text x="680" y="400">${axis === 'cost' && !points.length ? 'unknown' : maximum.toPrecision(4)}</text><text x="75" y="424" font-size="12">${xml(label)}</text><text x="780" y="100" font-size="12">Shared ID = tied coordinates</text><text x="30" y="453" font-size="12">Common scored tasks: ${panel.fixture_ids.length}/${panel.planned_tasks}; equal task weight; score 0–100.</text><text x="30" y="475" font-size="12">${xml(points.length ? `${points.length}/9 groups plotted; ${clusters.size} distinct coordinate markers. No jitter; coincident groups remain in the table.` : 'No comparable measured points. Unknown values are not zero; no cost or quality points were invented.')}</text><text x="30" y="497" font-size="12">Color: sol high blue / sol low orange / luna max green. Shape: P circle / K2 triangle / F square.</text><text x="30" y="519" font-size="11">${xml(axis === 'cost' && report.api_equivalent_prices ? `Operator-supplied, not verified. As of ${report.api_equivalent_prices.as_of}; source: ${report.api_equivalent_prices.source}` : 'Requested settings; resolved model may be unobserved. No execution, scoring or adoption authority.')}</text>${dots}${coordinateLabels}${legend}</g></svg>\n`;
+}
+
+export function renderPrimaryNineConditionHtml(report) {
+  const number = value => value === null || value === undefined ? '未取得' : Number(value).toLocaleString('ja-JP', { maximumFractionDigits: 2 });
+  const score = value => value === null ? '—' : number(value * 100);
+  const sections = ['formal', 'reference'].map(basis => {
+    const panel = report.panels[basis];
+    return `<section><h2>${basis === 'formal' ? '正式採点（保存された得点）' : '参考レビュー（公開要件の固定基準）'}</h2><p>比較共通集合：${panel.fixture_ids.length}/${panel.planned_tasks}課題。課題内を0–100へ正規化し課題を等重み。全9条件で得点・時間・tokenが揃う課題だけを同じ分母で比較します。</p><p>対象：${xml(panel.fixture_ids.join(', ') || 'なし')}。除外：${xml(panel.excluded_fixture_ids.join(', ') || 'なし')}。</p>${chart(report, 'time', basis)}${chart(report, 'tokens', basis)}</section>`;
+  }).join('');
+  const heatmap = report.fixture_ids.map(id => `<tr><th>${xml(id)}</th>${NINE_REPORT_SETTINGS.flatMap(setting => NINE_REPORT_CONDITIONS.map(condition => {
+    const rows = report.slots.filter(row => row.fixture_id === id && settingKey(row) === settingKey(setting) && row.condition === condition);
+    const known = key => rows.every(row => row[key] !== null) ? rows.reduce((total, row) => total + row[key], 0) / rows.length : null;
+    const formal = known('quality'), reference = known('reference_score');
+    const tone = reference ?? formal;
+    return `<td style="background:${tone === null ? '#f2f4f5' : `hsl(${reference === null ? 40 : 190} 45% ${96 - tone * 25}%)`}">正式 ${score(formal)}<br>参考 ${score(reference)}</td>`;
+  })).join('')}</tr>`).join('');
+  const headers = NINE_REPORT_SETTINGS.flatMap(setting => NINE_REPORT_CONDITIONS.map(condition => `<th>${xml(short({ ...setting, condition }))}</th>`)).join('');
+  const rows = report.slots.map(row => `<tr><th>${xml(row.fixture_id)}</th><td>${xml(short(row))}</td><td>${row.repetition}</td><td>${xml(row.state)}</td><td>${score(row.quality)}</td><td>${score(row.reference_score)}</td><td>${number(row.duration_ms === null ? null : row.duration_ms / 1000)}</td><td>${number(row.input_tokens)}</td><td>${number(row.cached_tokens)}</td><td>${number(row.output_tokens)}</td><td>${number(row.usage_components?.reasoning_output_tokens)}</td><td>${number(row.usage_components?.cache_write_input_tokens)}</td><td>${xml(row.actual_model ?? '不明')}</td><td>${xml(row.reference_diagnostics ? JSON.stringify(row.reference_diagnostics) : '未取得')}</td></tr>`).join('');
+  return `<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ASK ${report.fixture_ids.length}課題・9条件比較</title><style>body{font-family:system-ui,sans-serif;max-width:1200px;margin:auto;padding:24px;color:#183042;background:#fff}h1,h2{line-height:1.4}.scroll{overflow:auto}table{border-collapse:collapse;font-size:13px;width:100%}th,td{border:1px solid #d8e1e6;padding:8px;text-align:left;white-space:nowrap}svg{display:block;width:100%;height:auto;min-width:650px}section{margin:32px 0}.notice{padding:16px;background:#eef4f6}li{margin:8px 0}</style><h1>ASK 指定設定別・9条件比較</h1><p>${xml(report.evidence_label)}</p><div class="notice">${report.fixture_ids.length}課題 × 9条件 × ${report.repetitions.length}反復。実行完了 ${report.coverage.completed}/${report.coverage.expected}、時間取得 ${report.coverage.measured}/${report.coverage.expected}、正式得点 ${report.coverage.formal_scored}/${report.coverage.expected}、参考得点 ${report.coverage.reference_scored}/${report.coverage.expected}、未開始 ${report.coverage.not_started}（うち未報告 ${report.coverage.missing}）、採点不能 ${report.coverage.unscorable}。未取得・未実行は0点・0費用ではありません。</div><p>金額費用は不明。横軸は同一課題集合の試行時間合計／input+output合計です。並列の全体経過時間とは区別します。cached inputはinputの内数、reasoningはoutputへ再加算しません。正式採点と参考レビューの得点は混ぜません。1反復の場合、統計的優位を主張しません。native/runtime/admission未達はこの図で解消しません。</p>${sections}<h2>課題×9条件ヒートマップ（0–100）</h2><p>セル内の正式・参考を別に記載。背景は参考値があれば青、参考欠測で正式値だけなら黄、両方未取得は灰色です。</p><div class="scroll"><table><tr><th>課題</th>${headers}</tr>${heatmap}</table></div><h2>全試行の内訳</h2><div class="scroll"><table><tr><th>課題</th><th>指定設定・方式</th><th>反復</th><th>状態</th><th>正式</th><th>参考</th><th>秒</th><th>input</th><th>cached内数</th><th>output</th><th>reported reasoning</th><th>reported cache write</th><th>resolved model</th><th>参考診断</th></tr>${rows}</table></div><h2>比較条件と限界</h2><ul>${report.limitations.map(value => `<li>${xml(value)}</li>`).join('')}</ul></html>\n`;
 }
 
 export function writePrimaryNineConditionReport(manifestPath, output) {
   assert.ok(isAbsolute(output) && resolve(output) === output && realpathSync(dirname(output)) === dirname(output), 'fresh canonical output required');
   assert.equal(existsSync(output), false, 'output exists; never overwrite');
   const input = readJson(manifestPath); validateManifest(input.value);
-  for (const path of [manifestPath, ...input.value.reports.map(entry => entry.path)]) assert.ok(path !== output && !path.startsWith(`${output}/`), 'output overlaps an input');
+  for (const path of [manifestPath, ...input.value.reports.flatMap(entry => [entry.path, ...['plan', 'reference_protocol', 'reference_review'].filter(key => entry[key]).map(key => entry[key].path)])]) assert.ok(path !== output && !path.startsWith(`${output}/`), 'output overlaps an input');
   const report = buildPrimaryNineConditionReport(manifestPath);
   assert.equal(report.manifest_digest, input.digest, 'manifest changed while preparing report');
   mkdirSync(output, { mode: 0o700 });
   const save = (name, value) => writeFileSync(`${output}/${name}`, value, { flag: 'wx', mode: 0o600 });
+  save('report.html', renderPrimaryNineConditionHtml(report));
+  for (const axis of ['tokens', 'time']) save(`reference-${axis}.svg`, chart(report, axis, 'reference'));
   save('report.json', `${JSON.stringify(report, null, 2)}\n`);
   for (const axis of ['cost', 'tokens', 'time']) save(`quality-${axis}.svg`, chart(report, axis));
   const number = value => value === null ? 'unknown' : String(value);
