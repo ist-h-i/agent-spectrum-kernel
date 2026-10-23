@@ -161,6 +161,8 @@ function gradingPreflight(manifest, loaded, adapter) {
 export function preparePrimaryEvaluationBatch(manifestPath, { gradingAdapter } = {}) {
   canonical(manifestPath);
   const raw = stable(manifestPath), manifest = parseJsonRejectDuplicateKeys(raw.toString('utf8'));
+  assert.equal(manifest.fixture_set, 'catalog24', 'legacy batch preparation requires migration: use catalog24 and explicit fixture_ids');
+  assert.ok(Object.hasOwn(manifest, 'fixture_ids'), 'new batch preparation requires explicit catalog fixture_ids');
   assert.ok(isAbsolute(manifest.root) && resolve(manifest.root) === manifest.root); canonical(dirname(manifest.root));
   assert.ok(!existsSync(manifest.root), 'batch output exists; never reuse');
   assert.deepEqual(manifest.limits, limitsForManifest(manifest), 'new preparation must use the current budget');

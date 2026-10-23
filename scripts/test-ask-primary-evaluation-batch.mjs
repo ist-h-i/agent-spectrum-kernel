@@ -5,7 +5,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync,
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { comparisonHash, inventoryUserTree, prepareUserComparison } from './ask-user-comparison-prepare.mjs';
-import { PRIMARY_BATCH_LIMITS, primaryBatchLimitsForSet, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_FIXTURE_IDS, inspectPrimaryEvaluationBatch, preparePrimaryEvaluationBatch, reportPrimaryEvaluationBatch, startPrimaryEvaluationBatch } from './ask-primary-evaluation-batch.mjs';
+import { PRIMARY_BATCH_LIMITS, primaryBatchLimitsForSelection, PRIMARY_GRADING_RESERVATION_MS, PRIMARY_FIXTURE_IDS, inspectPrimaryEvaluationBatch, preparePrimaryEvaluationBatch, reportPrimaryEvaluationBatch, startPrimaryEvaluationBatch } from './ask-primary-evaluation-batch.mjs';
 import { primaryFixtureIdsForSet } from './ask-primary-fixture-recipe.mjs';
 import { runPrimaryEvaluationStartCommand } from './ask-primary-evaluation-start.mjs';
 const hash = value => comparisonHash(value);
@@ -14,10 +14,10 @@ function git(root, args) {
     env: { PATH: process.env.PATH, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' } });
   assert.equal(result.status, 0, result.stderr); return result.stdout.trim();
 }
-function fixture(t, fixtureSet = 'legacy9') {
+function fixture(t, fixtureIds = [...PRIMARY_FIXTURE_IDS].sort()) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'ask-primary-batch-')));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const blocks = primaryFixtureIdsForSet(fixtureSet).map((fixture_id, index) => {
+  const blocks = fixtureIds.map((fixture_id, index) => {
     const publicRoot = join(root, `public-${index}`), source = join(root, `seed-${index}`);
     mkdirSync(publicRoot); mkdirSync(join(publicRoot, 'workspace'));
     writeFileSync(join(publicRoot, 'task.md'), 'Update workspace/value.mjs to 1.\n');
@@ -45,7 +45,8 @@ function fixture(t, fixtureSet = 'legacy9') {
     for (const block of blocks) if (existsSync(join(block.root, 'control/slots/.synthetic-batch-receipts')))
       rmSync(join(block.root, 'control/slots'), { recursive: true });
     const value = edit({ kind: 'ask_primary_evaluation_batch_manifest_v1', batch_id: `fake-${++number}`, root: join(root, `batch-${number}`),
-      conditions: ['plain', 'kernel_only', 'full_ask'], ...(fixtureSet === 'catalog24' ? { fixture_set: fixtureSet } : {}), limits: primaryBatchLimitsForSet(fixtureSet), blocks: structuredClone(blocks) });
+      conditions: ['plain', 'kernel_only', 'full_ask'], fixture_set: 'catalog24', fixture_ids: [...fixtureIds],
+      limits: primaryBatchLimitsForSelection(fixtureIds), blocks: structuredClone(blocks) });
     const path = join(root, `manifest-${number}.json`); writeFileSync(path, JSON.stringify(value)); return { path, value, digest: hash(readFileSync(path)) };
   } };
 }
@@ -97,10 +98,25 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
     assert.equal(existsSync(join(m.value.root, 'consumption')), false);
     assert.ok(reportPrimaryEvaluationBatch(m.value.root).slots.every(slot => slot.state === 'not_started' && slot.quality === null));
   });
-  await t.test('fixed nine IDs, order, duplicate run, source digest, condition aliases are rejected', () => {
+  await t.test('fixed selected IDs, order, duplicate run, source digest, condition aliases are rejected', () => {
     for (const edit of [m => { m.blocks.pop(); }, m => { m.blocks.reverse(); }, m => { m.blocks[1].run_id = m.blocks[0].run_id; },
       m => { m.blocks[0].source_digest = hash('wrong'); }, m => { m.conditions[1] = 'kernel_principles_v1'; }, m => { m.root = m.blocks[0].root; }]) {
       const m = f.manifest(m => { edit(m); return m; }); assert.throws(() => preparePrimaryEvaluationBatch(m.path));
+    }
+  });
+  await t.test('new writer requires explicit catalog selection and refuses legacy manifests without output', () => {
+    for (const edit of [
+      value => { delete value.fixture_set; delete value.fixture_ids; value.blocks = PRIMARY_FIXTURE_IDS.map(id => value.blocks.find(block => block.fixture_id === id)); value.limits = { ...PRIMARY_BATCH_LIMITS }; },
+      value => { value.fixture_set = 'legacy9'; delete value.fixture_ids; value.blocks = PRIMARY_FIXTURE_IDS.map(id => value.blocks.find(block => block.fixture_id === id)); value.limits = { ...PRIMARY_BATCH_LIMITS }; },
+      value => { delete value.fixture_ids; },
+      value => { value.fixture_set = null; },
+      value => { value.fixture_ids = null; },
+      value => { value.fixture_ids = []; },
+    ]) {
+      const m = f.manifest(value => { edit(value); return value; }), a = adapters();
+      assert.throws(() => preparePrimaryEvaluationBatch(m.path, a));
+      assert.equal(existsSync(m.value.root), false, 'writer rejection cannot publish batch output');
+      assert.equal(a.calls.length, 0); assert.equal(a.grades.length, 0);
     }
   });
   await t.test('bad digest and disconnected grading dispatch no fake block', async () => {
@@ -115,11 +131,14 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
     assert.equal(PRIMARY_GRADING_RESERVATION_MS, 11100000); assert.equal(PRIMARY_BATCH_LIMITS.overall_timeout_ms, 302400000);
     const a = adapters(), m = f.manifest(v => ({ ...v, blocks: v.blocks.map(block => ({ ...block, grading: { ...block.grading, timeout_ms: PRIMARY_GRADING_RESERVATION_MS } })) }));
     preparePrimaryEvaluationBatch(m.path, a);
-    assert.equal(reportPrimaryEvaluationBatch(m.value.root).limits.overall_timeout_ms, 302400000);
+    assert.equal(reportPrimaryEvaluationBatch(m.value.root).limits.overall_timeout_ms, 229500000);
     const invalid = f.manifest(v => ({ ...v, blocks: v.blocks.map(block => ({ ...block, grading: { ...block.grading, timeout_ms: PRIMARY_GRADING_RESERVATION_MS + 1 } })) }));
     assert.throws(() => preparePrimaryEvaluationBatch(invalid.path, a), /185 minutes/);
     for (const oldTime of [172800000, 216000000]) {
-      const old = { ...m.value, limits: { ...PRIMARY_BATCH_LIMITS, overall_timeout_ms: oldTime } }, raw = JSON.stringify(old);
+      const old = { ...m.value, limits: { ...PRIMARY_BATCH_LIMITS, overall_timeout_ms: oldTime },
+        blocks: PRIMARY_FIXTURE_IDS.map(id => m.value.blocks.find(block => block.fixture_id === id)) };
+      delete old.fixture_set; delete old.fixture_ids;
+      const raw = JSON.stringify(old);
       // Only synthetic temporary records simulate prior budgets; actual r2/r3 records are never rewritten.
       writeFileSync(m.path, raw); writeFileSync(join(m.value.root, 'manifest.json'), raw);
       const preparedPath = join(m.value.root, 'prepared.json'), prepared = JSON.parse(readFileSync(preparedPath)); prepared.manifest_digest = hash(raw);
@@ -223,7 +242,7 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
     assert.equal(report.terminal.stop, 'usage_budget_exhausted'); assert.equal(a.calls.length, 1); assert.equal(a.grades.length, 0);
     const n = f.manifest(), b = adapters(); preparePrimaryEvaluationBatch(n.path, b);
     let tick = 0;
-    const timed = await startPrimaryEvaluationBatch(n.value.root, n.digest, { ...b, now: () => ++tick <= 2 ? 1000 : PRIMARY_BATCH_LIMITS.overall_timeout_ms });
+    const timed = await startPrimaryEvaluationBatch(n.value.root, n.digest, { ...b, now: () => ++tick <= 2 ? 1000 : n.value.limits.overall_timeout_ms });
     assert.equal(timed.terminal.stop, 'insufficient_deadline_reservation'); assert.equal(b.calls.length, 0);
   });
   await t.test('manifest drift, mutable workspace, prior starts and preexisting output cannot dispatch', async () => {
@@ -273,6 +292,18 @@ test('primary batch is model-free until a digest-bound, grading-connected, fake-
   });
 });
 
+test('one explicit catalog task keeps the existing three-condition fake start', async t => {
+  const f = fixture(t, ['hi-authorization-exception']), m = f.manifest(), a = adapters();
+  const prepared = preparePrimaryEvaluationBatch(m.path, a);
+  assert.equal(prepared.slots.length, 3);
+  assert.equal(reportPrimaryEvaluationBatch(m.value.root).slots.length, 3);
+  const report = await startPrimaryEvaluationBatch(m.value.root, m.digest, a);
+  assert.equal(report.state, 'completed'); assert.equal(a.calls.length, 1); assert.equal(a.grades.length, 1);
+  assert.equal(report.slots.length, 3); assert.ok(report.slots.every(slot => slot.quality === null));
+  assert.equal(report.limits.overall_timeout_ms, 14400000 + PRIMARY_GRADING_RESERVATION_MS);
+  assert.equal(report.limits.token_budget, 5000000);
+});
+
 function resealEditedSlots(report, root) {
   for (const slot of report.slots) {
     const folder = join(root, 'control/slots', slot.condition), raw = JSON.stringify(slot), digest = hash(raw);
@@ -282,7 +313,7 @@ function resealEditedSlots(report, root) {
 }
 
 test('mixed closed slots advance catalog24 regardless of first nonpass order and retain unknown quality', async t => {
-  const f = fixture(t, 'catalog24'), m = f.manifest();
+  const f = fixture(t, primaryFixtureIdsForSet('catalog24')), m = f.manifest();
   let index = 0;
   const a = adapters({ editReport(report, root) {
     const unknown = index++ % 3, failed = (unknown + 1) % 3;
@@ -326,7 +357,7 @@ test('contradictory closed slots stop before grading even when the overall label
 
 
 test('catalog24 uses the existing batch entrance and preserves task failures, manual requirements and later results', async t => {
-  const f = fixture(t, 'catalog24'), m = f.manifest(), a = adapters();
+  const f = fixture(t, primaryFixtureIdsForSet('catalog24')), m = f.manifest(), a = adapters();
   const baseStart = a.startComparison;
   a.startComparison = async (root, digest) => {
     const report = await baseStart(root, digest), index = f.blocks.findIndex(block => block.root === root);
