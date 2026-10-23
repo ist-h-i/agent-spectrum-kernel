@@ -30,6 +30,15 @@ consumer-closure/docs-v1 observation limits, see
 Selection remains disabled; an ordinary change to these two CI documents is
 outside the closed docs allowlist and therefore proposes full execution.
 
+## Sufficient-scope regression coverage
+
+The sufficient-scope change adds one unconditional command to the existing
+Validate/common job: `node --test scripts/test-sufficient-change-scope-fixtures.mjs`.
+It calibrates local artificial behavior checks for incomplete scope, incorrect
+policy sharing and a follow-up change. It starts no model and adds no workflow
+or job. The historical inventories and measurements below remain unchanged;
+the current workflow and receipt registry include this additional command.
+
 ## Cross-workflow duplicate reduction
 
 Baseline: main `e54baee215ee613227baba337da13bb8b5268537` after #441.

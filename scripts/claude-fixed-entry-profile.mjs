@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { canonicalPathSetDigest, canonicalValueDigest } from "./installer-lifecycle.mjs";
 import {
   FIXED_ENTRY_CONTROL_IDS,
   FIXED_ENTRY_NAMES,
@@ -141,10 +142,11 @@ export function parseClaudeFixedEntryHeader(content) {
 
 export function renderClaudePluginFixedEntryProfiles() {
   const canonicalAssetRefs = fixedEntryAssetReferences();
+  const canonicalPaths = [...new Set(FIXED_ENTRY_NAMES.flatMap((entryName) => fixedEntryCanonicalPaths(entryName)))].sort();
   const canonicalContract = {
     revision: "ask-fixed-entry-assets-v1",
-    source_digest: fixedEntrySha256(JSON.stringify(canonicalAssetRefs)),
-    source_paths: [...new Set(FIXED_ENTRY_NAMES.flatMap((entryName) => fixedEntryCanonicalPaths(entryName)))].sort(),
+    source_digest: canonicalPathSetDigest(ROOT, canonicalPaths),
+    source_paths: canonicalPaths,
   };
   const templates = FIXED_ENTRY_NAMES.map((entryName) => {
     const pluginName = CLAUDE_PLUGIN_FIXED_ENTRY_MAP[entryName];
@@ -152,10 +154,16 @@ export function renderClaudePluginFixedEntryProfiles() {
     const sourceBody = readFileSync(resolve(ROOT, path), "utf8");
     return { entryName, pluginName, path, sourceBody };
   });
-  const profileFingerprint = fixedEntrySha256(JSON.stringify({
+  const profileFingerprint = canonicalValueDigest({
+    canonical_source_digest: canonicalContract.source_digest,
+    renderer_source_digest: canonicalPathSetDigest(ROOT, [
+      "scripts/claude-fixed-entry-profile.mjs",
+      "scripts/fixed-entry-profile.mjs",
+      "scripts/installer-lifecycle.mjs",
+    ]),
     canonical_asset_refs: canonicalAssetRefs,
     templates: templates.map(({ path, sourceBody }) => ({ path, sha256: fixedEntrySha256(sourceBody) })),
-  }));
+  });
   return templates.map(({ entryName, pluginName, sourceBody }) => renderClaudeFixedEntryProfile(entryName, {
     sourceBody,
     canonicalContract,

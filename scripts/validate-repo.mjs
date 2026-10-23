@@ -1861,10 +1861,8 @@ export function inspectVerificationProofPolicyContract(root, manifest = null) {
       runtimePrompt?.prompt_name !== promptProxy?.candidate_prompt_name
       || runtimePrompt?.rendered_bytes !== promptProxy?.candidate_expected_bytes
       || runtimePrompt?.rendered_sha256 !== `sha256:${promptProxy?.candidate_sha256}`
-      || typeof promptProxy?.maximum_candidate_ratio !== "number"
-      || promptProxy.candidate_expected_bytes > promptProxy.baseline_expected_bytes * promptProxy.maximum_candidate_ratio
     ) {
-      issues.push("verification proof generated localized prompt does not match the runtime fixture or material-size threshold");
+      issues.push("verification proof generated localized prompt bytes or digest do not match the runtime fixture");
     }
   }
 
@@ -1951,6 +1949,7 @@ export function inspectVerificationProofPolicyContract(root, manifest = null) {
     }
   }
 
+  const promptSize = fixture?.size_proxy?.generated_localized_prompt;
   return {
     issues,
     policyRef: metadata?.ref ?? "missing",
@@ -1960,8 +1959,11 @@ export function inspectVerificationProofPolicyContract(root, manifest = null) {
     protectedCompactClaimCount: Array.isArray(metadata?.protected_compact_claim_types) ? metadata.protected_compact_claim_types.length : 0,
     compactBytes: fixture?.size_proxy?.compact_expected_bytes ?? "unknown",
     formalBaselineBytes: fixture?.size_proxy?.formal_expected_bytes ?? "unknown",
-    generatedPromptBytes: fixture?.size_proxy?.generated_localized_prompt?.candidate_expected_bytes ?? "unknown",
-    generatedPromptBaselineBytes: fixture?.size_proxy?.generated_localized_prompt?.baseline_expected_bytes ?? "unknown",
+    generatedPromptBytes: promptSize?.candidate_expected_bytes ?? "unknown",
+    generatedPromptBaselineBytes: promptSize?.baseline_expected_bytes ?? "unknown",
+    generatedPromptByteDelta: Number.isInteger(promptSize?.candidate_expected_bytes) && Number.isInteger(promptSize?.baseline_expected_bytes)
+      ? promptSize.candidate_expected_bytes - promptSize.baseline_expected_bytes
+      : "unknown",
   };
 }
 
@@ -1979,6 +1981,7 @@ function validateVerificationProofPolicyContract(root, manifest, errors) {
       formalBaselineBytes: "not applicable",
       generatedPromptBytes: "not applicable",
       generatedPromptBaselineBytes: "not applicable",
+      generatedPromptByteDelta: "not applicable",
     };
   }
   const result = inspectVerificationProofPolicyContract(root, manifest);
@@ -5802,6 +5805,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     `- compact eligibility facts / formal triggers / protected compact claims: ${verificationProofPolicyChecks.compactEligibilityFactCount} / ${verificationProofPolicyChecks.formalTriggerCount} / ${verificationProofPolicyChecks.protectedCompactClaimCount}`,
     `- Compact Proof / formal baseline artifact bytes: ${verificationProofPolicyChecks.compactBytes} / ${verificationProofPolicyChecks.formalBaselineBytes}`,
     `- generated localized / immutable pre-compact verification prompt bytes: ${verificationProofPolicyChecks.generatedPromptBytes} / ${verificationProofPolicyChecks.generatedPromptBaselineBytes}`,
+    `- whole-prompt byte difference (current minus historical baseline): ${verificationProofPolicyChecks.generatedPromptByteDelta}; descriptive comparison, no reduction threshold or effectiveness claim`,
     "",
     "## Lifecycle artifact contract checks",
     "",

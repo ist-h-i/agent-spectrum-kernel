@@ -139,3 +139,8 @@ metric/unit/type/dimension drift, missing comparison/materiality/effect
   evidence, caller-supplied delta/impact drift, an unknown or evidence-drifted
   direct effect, unknown-to-zero conversion, harm-masking recommendations,
   routing-only expansion, and unbound evidence.
+
+For a runnable implementation and follow-up maintenance exercise, see
+[Sufficient change scope](sufficient-change-scope-evaluation.md). Its behavioral
+checks and human structural review complement this contract; fixture calibration
+is not evidence of live model effectiveness.

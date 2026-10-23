@@ -1,6 +1,6 @@
 ---
 name: controlled-implementation
-description: Execute a scoped implementation with minimal diff, repository conventions, and verification checkpoints. Use after scope/spec are clear or for medium-risk code changes.
+description: Execute a sufficient authorized change with repository conventions, current-need structural decisions, and verification checkpoints. Use after scope/spec are clear or for medium-risk code changes.
 ---
 
 # Controlled Implementation
@@ -64,11 +64,12 @@ Stop before implementation when:
 - boundary mechanics are unresolved; route to `application-boundary-architecture`,
 - a verification path is missing or cannot produce sufficient evidence,
 - stack-specific implementation uncertainty exists and a relevant overlay is available,
-- public API, schema, migration, dependency, auth, permission, billing, email, telemetry, production config, or infrastructure changes are needed,
+- public API, schema, migration, dependency, auth, permission, billing, email, telemetry, production config, or infrastructure changes require an unresolved decision or authorization,
 - generated/manual-edit boundaries are unclear,
 - a human decision is required.
 
 Do not treat passing tests as permission to expand scope beyond the contract.
+Re-plan necessary work within existing authorization without asking again; an explicit forbidden boundary or unresolved upstream decision still blocks the affected work.
 
 2. Inspect nearby patterns.
 
@@ -82,13 +83,19 @@ Before editing, inspect:
 - dependency patterns,
 - stack or project overlay constraints when the contract selected an overlay.
 
-3. Make the smallest valid change.
+3. Choose and implement the smallest sufficient change.
+
+Before minimizing the diff, identify the current invariants, owners, and affected providers/consumers that must be covered together. Inspect runtime or configuration connections when relevant. Use `scope-control` when the sufficient boundary is unclear and `application-boundary-architecture` when boundary mechanics need a decision; reuse decisions already made upstream.
+
+When a material structural choice exists, compare adequate options by their ongoing investigation, maintenance, verification, and operation burden before diff size. Keep meaningful responsibility distinctions. A local fix with no structural choice needs no additional alternatives or design report.
 
 Rules:
 
 - preserve public contracts unless explicitly changing them,
 - avoid new abstractions unless justified by observed duplication or boundary pressure,
-- keep behavior change and cleanup separate,
+- include structural cleanup required for the authorized outcome; keep unrelated cleanup separate,
+- retire paths, state, and configuration made obsolete by this change after checking their consumers; retained compatibility or rollout paths need a current reason and retirement condition,
+- investigate unknown usage instead of deleting blindly or inventing a compatibility requirement,
 - do not touch generated/vendor files unless required,
 - prefer local reversible changes.
 
@@ -102,9 +109,13 @@ Run the narrowest relevant check first. Then run broader checks proportional to 
 
 6. Complete the Implementation Contract with implementation-only facts, then inspect the final diff.
 
+For structural changes only, use the existing implementation-decision and actual-boundary fields to record a concise before/after, current structural need, and expected maintenance/investigation effect. Reference applicable upstream decisions and record obsolete structures retired or retained with their reason and retirement condition. Do not add a mandatory report, lifecycle field, or full architecture review.
+
 Check for:
 
 - unintended files,
+- omitted required invariant, owner, or provider/consumer changes,
+- obsolete paths, state, or configuration left without a current retention reason and retirement condition,
 - formatting churn,
 - hidden behavior changes,
 - stale comments/docs,
@@ -132,8 +143,9 @@ Conditional fields, omit when irrelevant:
 Implementation is complete only when:
 
 - the Implementation Contract was created and followed or a stop condition was reported,
-- the requested behavior is implemented,
+- the requested behavior and preserved invariants are implemented across the sufficient authorized scope,
 - the diff stays inside scope,
+- structural choices have current reasons and change-obsoleted structures are retired or explicitly accounted for,
 - verification evidence is recorded or limitation is explicit,
 - risks and assumptions are visible,
 - next step is narrow.

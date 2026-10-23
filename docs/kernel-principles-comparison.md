@@ -37,6 +37,34 @@ scope; human approval alone does not fabricate that capability. All safety and
 evidence principles still apply. Availability means structural entry availability,
 not observed model obedience, quality, runtime gate enforcement or product value.
 
+### Reviewed source revisions
+
+The scope-policy update uses renderer revision 2: establish sufficient authorized
+scope from current requirements and affected contracts before comparing maintenance
+burden and diff size; retire structures made obsolete by that change. The existing
+section mapping, procedure exclusions and admission boundaries are unchanged.
+
+Revision 1 remains reproducible from the exact `AGENTS.md` bytes at
+`5f36081e6f89072482ef721efbbc210849845838`, retained as
+`docs/fixtures/kernel-principles-source-5f36081.md` for compatibility tests only.
+The closed source seals select revision 1 or 2; unknown bytes still stop generation.
+Both v2 projections inherit the selected revision. Historical generated bodies and
+generation records remain byte-identical; existing plans, results, task catalogs
+and admission evidence are not rewritten. Current JSON and readable reports expose
+the validated `kernel_generation`: source/generated digests and renderer revision.
+Aggregation partitions by evidence kind, condition ID and that complete identity
+before building per-group summaries; equal principles generations can share a
+group, while revisions 1 and 2 cannot. Legacy `kernel_only` grouping and standalone
+operator-authored pragmatic notes retain their existing meaning. This identity
+does not grant replay authority or establish measured model benefit, and the
+separately frozen Core Bundle 1.0.0 product is not refreshed.
+
+Saved v2 comparison plans also bind the complete renderer closure and require
+it to match the executing checkout. Reopen those plans with their matching
+source/controller checkout; reproducing an old body does not make a changed
+renderer closure identical. That existing check remains in place, and old
+plans and evidence are not re-signed for the new checkout.
+
 ## Comparison connection
 
 Existing `prepare` accepts `--kernel-condition kernel_principles_v1` (programmatic
@@ -61,7 +89,7 @@ that dependent scope. Static admission does not infer semantic task signals.
 
 Use a new run ID and output directory after separate execution approval. Old
 plans, runs, missing-route receipts, exit 3 and unknown values remain readable and
-unchanged. Aggregation separates the old and new condition sets and never aliases
+unchanged. Aggregation separates condition sets and principles generations, and never aliases
 the candidate to `kernel_only`. The candidate uses existing sequential execution,
 checkpoint/resume, receipt integrity, independent Node verification and reporting.
 No new Router, runner, capability registry, installer or product package is added.

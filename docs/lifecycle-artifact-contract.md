@@ -217,6 +217,8 @@ Conditional fields:
 
 Do not copy goal, non-goals, expected behavior, acceptance criteria, allowed/forbidden scope, or proof obligations when upstream references already provide them.
 
+For structural changes, use the existing implementation-decision and actual-boundary fields for a concise before/after, current structural need, and expected maintenance/investigation effect. Record change-obsoleted paths, state, or configuration retired or retained for a current compatibility/rollout reason with a retirement condition. This is conditional content, not a new lifecycle field, artifact, or report; reference decisions already owned upstream.
+
 ## Missing and compact paths
 
 Missing upstream artifacts do not force synthetic reconstruction. Produce the smallest artifact required by the current task and set `upstream_refs` only for artifacts that exist.

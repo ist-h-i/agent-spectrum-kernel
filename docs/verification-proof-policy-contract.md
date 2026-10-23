@@ -162,11 +162,16 @@ policy Asset revision; neither owns per-task proof-path selection.
   by this policy.
 - Adapters must project the same policy revision and both path values, then
   reject a projected path that disagrees with the canonical selection.
-- Deterministic byte comparisons establish two separate proxies: the Compact
-  Proof rendering is smaller than a fixed formal block, and the generated
-  localized Codex verification prompt is smaller than its immutable
-  pre-compact formal-prompt fixture. Neither establishes token, latency,
-  quality, runtime activation, or benchmark effectiveness.
+- The deterministic artifact-shape comparison requires the Compact Proof
+  rendering to remain smaller than the fixed formal block. This reduction
+  applies to those shapes, not to populated proof records or complete prompts.
+- The generated localized Codex verification prompt is separately bound by
+  exact current bytes and digest, with its difference from the immutable
+  pre-compact fixture reported. It includes shared controls beyond proof
+  rendering, so the whole-prompt comparison has no reduction threshold and
+  does not isolate Compact Proof's contribution.
+- Neither byte comparison establishes token, latency, quality, runtime
+  activation, or benchmark effectiveness.
 - Rolling back adapter projections restores the prior formal-selection behavior;
   it does not erase selection history, rewrite evidence, or reinterpret an
   existing formal artifact.

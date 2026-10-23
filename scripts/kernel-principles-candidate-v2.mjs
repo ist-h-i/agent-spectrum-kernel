@@ -19,7 +19,7 @@ export function renderKernelPrinciplesV2Candidate(source) {
     .replace(oldScope, newScope);
   assert.ok(!/(?:skills|docs|schemas|scripts)\/|SKILL\.md|ask\.[a-z-]+@/u.test(body), "external candidate dependency");
   return { body, generation: { ...base.generation,
-    id: KERNEL_PRINCIPLES_V2_CANDIDATE_ID, renderer_revision: 1, proposal_status: "unadopted",
+    id: KERNEL_PRINCIPLES_V2_CANDIDATE_ID, proposal_status: "unadopted",
     generated_digest: hash(body), supported_task_classes: [...supported],
     contract_delta: {
       base_id: base.generation.id, base_generated_digest: base.generation.generated_digest,

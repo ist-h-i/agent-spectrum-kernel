@@ -814,6 +814,10 @@ export function reportUserComparison(output) {
     loaded=readUserComparisonPlan(output,{ignoreStart:true}); headerError=sanitizeComparisonLog(error.message);
   }
   const {root,plan,plan_digest}=loaded;
+  // readUserComparisonPlan validates this generation against its saved source/body.
+  const generation = plan.kernel_definition?.generation;
+  const kernelGeneration = generation ? { source_digest: generation.source_digest,
+    generated_digest: generation.generated_digest, renderer_revision: generation.renderer_revision } : null;
   const execution=inspectComparisonExecution(root,plan,plan_digest);
   const slots = comparisonConditions(plan.config.kernel_condition).map(id => {
     const result = evidencePath(root, id, "result.json");
@@ -892,6 +896,7 @@ export function reportUserComparison(output) {
         output_tokens: slot.metrics?.output_tokens ?? null, cached_tokens: slot.metrics?.cached_tokens ?? null,
         human_review_minutes: null, rework_minutes: null } })) };
   return { kind: "ask_user_comparison_report_v1", root, run_id: plan.run_id, plan_digest, evidence_kind: notes.evidence_kind,
+    ...(kernelGeneration ? { kernel_generation: kernelGeneration } : {}),
     source: plan.source, slots, execution, overall, limits:comparisonLimits(plan), usage_budget:usageBudget, configuration: plan.config, condition_differences: plan.condition_differences, unknowns: plan.unknowns,
     summary: { ...buildPragmaticEvaluationReport(notes), plain_scope: plan.arms.plain.configuration },
     limitations: ["one task is not general ASK effectiveness, operational success, or v1 completion", "global settings and read isolation are not proven",
@@ -899,18 +904,19 @@ export function reportUserComparison(output) {
       "patch.diff is a credential-redacted review view and may not apply; an unchanged retained control/patch-workspaces/<condition> copy provides the full local diff"] };
 }
 
-/** Separate distributions by evidence kind; never pool fake and model observations. */
+/** Separate evidence kinds, condition sets and validated principles generations. */
 export function aggregateUserComparisons(outputs) {
   const reports = outputs.map(reportUserComparison);
   assert.equal(new Set(reports.map(report => report.run_id)).size, reports.length, "duplicate run IDs cannot be counted twice");
-  const kinds = [...new Set(reports.map(report => JSON.stringify([report.evidence_kind, report.configuration.kernel_condition ?? "kernel_only"])))];
+  const groupKey = report => JSON.stringify([report.evidence_kind, report.configuration.kernel_condition ?? "kernel_only", report.kernel_generation ?? null]);
+  const kinds = [...new Set(reports.map(groupKey))];
   return { kind: "ask_user_comparison_collection_v1", reports, groups: kinds.map(key => {
-    const [evidence_kind, kernel_condition] = JSON.parse(key);
-    const members = reports.filter(report => report.evidence_kind === evidence_kind && (report.configuration.kernel_condition ?? "kernel_only") === kernel_condition);
+    const [evidence_kind, kernel_condition, kernel_generation] = JSON.parse(key);
+    const members = reports.filter(report => groupKey(report) === key);
     const notes = { ...members[0].summary.supplied_notes, planned_blocks: members.map(report => report.run_id),
       trials: members.flatMap(report => report.summary.supplied_notes.trials) };
-    return { evidence_kind, ...(isKernelPrinciplesCondition(kernel_condition) ? { kernel_condition } : {}), summary: { ...buildPragmaticEvaluationReport(notes), plain_scope: members[0].summary.plain_scope } };
-  }), mixed_evidence_pooled: false, mixed_kernel_conditions_pooled: false };
+    return { evidence_kind, ...(isKernelPrinciplesCondition(kernel_condition) ? { kernel_condition, kernel_generation } : {}), summary: { ...buildPragmaticEvaluationReport(notes), plain_scope: members[0].summary.plain_scope } };
+  }), mixed_evidence_pooled: false, mixed_kernel_conditions_pooled: false, mixed_kernel_generations_pooled: false };
 }
 
 function parseOptions(argv) {
@@ -934,6 +940,10 @@ function parseOptions(argv) {
 function formatReport(report) {
   const lines=[`Run: ${report.run_id}\nEvidence: ${report.evidence_kind}\nSource: ${report.source?.repo??"unknown"}@${report.source?.commit??"unknown"}\nSaved: ${report.root}`,
     `Overall: ${report.overall.state}; exit=${report.overall.exit_code}; ${report.overall.reason}`];
+  if (report.kernel_generation) {
+    const generation = report.kernel_generation;
+    lines.push(`Kernel generation: ${report.configuration.kernel_condition}; renderer_revision=${generation.renderer_revision}; source_digest=${generation.source_digest}; generated_digest=${generation.generated_digest}`);
+  }
   for (const slot of report.slots) {
     lines.push(`${slot.condition}: ${slot.state}; quality=${slot.outcome}; request=${slot.launch_requested??"unknown"}; start=${slot.spawn_observed??"unknown"}; exit=${slot.exit_code??"unknown"}; time=${slot.metrics?.duration_ms??"unknown"}; tokens=${slot.metrics?.input_tokens??"unknown"}/${slot.metrics?.output_tokens??"unknown"}\n  ${slot.reason}`);
     for(const check of slot.verification?.checks??[]) lines.push(`  ${check.id}: test=${check.test_result}; evidence=${check.status}; exit=${check.exit_code??"unknown"}; logs=${(check.logs??[check.log]).join(",")}; view_truncated=${check.log_metadata?.view?.truncated??"unknown"}; full_log_evidence=${check.log_metadata?.full_evidence_available??"unknown"}`);

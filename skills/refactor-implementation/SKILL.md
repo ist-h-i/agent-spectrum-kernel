@@ -61,13 +61,15 @@ This skill is for safe refactor execution after a candidate exists. It does not 
    - Do not claim no regression without executed evidence.
 
 6. Implement the smallest safe refactor.
+   - Compare adequate options by ongoing investigation, maintenance, verification, and operation burden before diff size; code-size reduction alone is not an improvement criterion.
    - Prefer mechanical, local, reversible steps.
    - Preserve names and public surfaces unless the approved objective is a local rename.
    - Avoid new abstractions unless they remove observed duplication, clarify ownership, or match an approved boundary decision.
    - Do not mix unrelated cleanup with the refactor.
+   - Retire paths, state, and configuration made obsolete by the refactor after checking their consumers. Retention needs a current compatibility or rollout reason and retirement condition; investigate unknown usage before deletion.
 
 7. Compare before and after.
-   - Explain what structure changed and what behavior was preserved.
+   - Use the existing before/after summary to explain what structure changed, its current necessity, expected maintenance/investigation effect, and what behavior was preserved; include any retained obsolete structure and its retirement condition.
    - Inspect the final diff for hidden behavior changes, formatting churn, unrelated files, and stale comments.
 
 8. Route follow-up.
