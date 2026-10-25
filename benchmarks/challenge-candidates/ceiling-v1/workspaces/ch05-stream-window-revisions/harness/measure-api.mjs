@@ -8,21 +8,31 @@ const memoryUsage = process.memoryUsage.bind(process);
 const now = performance.now.bind(performance);
 const append = Function.call.bind(Array.prototype.push);
 const maximum = Math.max;
+const nullPrototype = Object.setPrototypeOf;
+const nextInput = Function.call.bind(Object.getPrototypeOf(Object.getPrototypeOf(steadyLoad(recipePlaceholder()))).next);
+function recipePlaceholder(){return {steadyRounds:0}}
+const dataArray = () => nullPrototype([], null);
 const collect = global.gc?.bind(global);
 const recipe = JSON.parse(readFileSync(new URL('../data/load.json', import.meta.url)));
 export async function runMeasurement() {
   if (!collect) throw new Error('Run with node --expose-gc');
   const { createProcessor } = await import('../src/processor.mjs');
-  const records = [];
-  for (const [mode, generator] of [['steady', steadyLoad], ['active_growth', activeGrowthLoad]]) {
+  const records = dataArray();
+  for (let profile = 0; profile < 2; profile++) {
+    const mode = profile === 0 ? 'steady' : 'active_growth';
+    const generator = profile === 0 ? steadyLoad : activeGrowthLoad;
     for (let repetition = 0; repetition < recipe.repetitions; repetition++) {
       const sink = createSink({ collect: false });
       const processor = createProcessor({ ...recipe, sink });
       collect();
-      const baseline = memoryUsage(), samples = [];
+      const baseline = memoryUsage(), samples = dataArray();
       let count = 0;
       const start = now();
-      for (const input of generator(recipe)) {
+      const inputs = generator(recipe);
+      for (;;) {
+        const next = nextInput(inputs);
+        if (next.done) break;
+        const input = next.value;
         consume(processor, input); count++;
         if (input.kind === 'watermark' || count % 4096 === 0) {
           collect(); const memory = memoryUsage();

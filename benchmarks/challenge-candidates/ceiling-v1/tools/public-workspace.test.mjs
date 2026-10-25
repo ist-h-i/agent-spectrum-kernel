@@ -190,3 +190,17 @@ test('protected CH05 sink ignores candidate crypto prototype changes', () => {
     execFileSync(process.execPath,['--input-type=module','-e',source],{cwd:temp,encoding:'utf8'});
   } finally {rmSync(temp,{recursive:true,force:true});}
 });
+
+test('worker control flow ignores candidate mutations of Map and array iterators', () => {
+  const temp=mkdtempSync(resolve(tmpdir(),'ceiling-control-flow-'));
+  try{
+    writeFileSync(resolve(temp,'tamper.mjs'), `
+      Array.prototype[Symbol.iterator]=function*(){};
+      Map.prototype.get=()=>{throw Error('tampered get')};Map.prototype.set=()=>{throw Error('tampered set')};
+      Object.hasOwn=()=>false;Reflect.apply=()=>({value:'forged'});
+      export function observe(input){return {value:input.value};}
+    `);
+    const result=JSON.parse(execFileSync(process.execPath,[resolve(root,'tools/candidate-worker.mjs')],{cwd:temp,input:JSON.stringify({steps:[{op:'invoke',module:'tamper.mjs',export:'observe',args:[{value:'kept'}],as:'out'}]}),encoding:'utf8'}));
+    assert.equal(result.status,'completed');assert.deepEqual(result.observations.out,{value:'kept'});
+  }finally{rmSync(temp,{recursive:true,force:true})}
+});
