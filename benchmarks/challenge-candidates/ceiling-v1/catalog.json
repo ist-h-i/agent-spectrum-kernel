@@ -2,7 +2,7 @@
   "format_version": "1.0.0",
   "artifact_kind": "challenge_design_catalog",
   "catalog_id": "ceiling-v1",
-  "status": "public_seed_implemented_private_pending",
+  "status": "public_seed_verified_private_validation_incomplete",
   "baseline_repository_revision": "514bf21aa2c955ec44dcaa3db67abe86f397b98e",
   "candidate_count": 6,
   "existing_primary_count_unchanged": 24,
@@ -63,7 +63,7 @@
       "measured_score": null,
       "ready_for_measurement": false,
       "input_manifest_path": "input-manifests/ch01-optimistic-edit-history.json",
-      "private_validation_status": "pending_private_root"
+      "private_validation_status": "incomplete_execution_boundary_stopped"
     },
     {
       "id": "ch02-durable-job-recovery",
@@ -81,7 +81,7 @@
       "measured_score": null,
       "ready_for_measurement": false,
       "input_manifest_path": "input-manifests/ch02-durable-job-recovery.json",
-      "private_validation_status": "pending_private_root"
+      "private_validation_status": "incomplete_execution_boundary_stopped"
     },
     {
       "id": "ch03-online-schema-cutover",
@@ -99,7 +99,7 @@
       "measured_score": null,
       "ready_for_measurement": false,
       "input_manifest_path": "input-manifests/ch03-online-schema-cutover.json",
-      "private_validation_status": "pending_private_root"
+      "private_validation_status": "incomplete_execution_boundary_stopped"
     },
     {
       "id": "ch04-authorization-revocation",
@@ -117,7 +117,7 @@
       "measured_score": null,
       "ready_for_measurement": false,
       "input_manifest_path": "input-manifests/ch04-authorization-revocation.json",
-      "private_validation_status": "pending_private_root"
+      "private_validation_status": "incomplete_execution_boundary_stopped"
     },
     {
       "id": "ch05-stream-window-revisions",
@@ -135,7 +135,7 @@
       "measured_score": null,
       "ready_for_measurement": false,
       "input_manifest_path": "input-manifests/ch05-stream-window-revisions.json",
-      "private_validation_status": "pending_private_root"
+      "private_validation_status": "incomplete_execution_boundary_stopped"
     },
     {
       "id": "ch06-incremental-build-generations",
@@ -153,7 +153,7 @@
       "measured_score": null,
       "ready_for_measurement": false,
       "input_manifest_path": "input-manifests/ch06-incremental-build-generations.json",
-      "private_validation_status": "pending_private_root"
+      "private_validation_status": "incomplete_execution_boundary_stopped"
     }
   ],
   "public_runtime": "v24.19.0",

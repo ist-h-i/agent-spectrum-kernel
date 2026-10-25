@@ -4,6 +4,7 @@ import { createQueue } from '../src/queue.mjs';
 import { DurableStore } from '../harness/store.mjs';
 import { IdempotentSink } from '../harness/sink.mjs';
 import { submitReport, workerTick } from '../harness/client.mjs';
+import { render } from '../harness/renderer.mjs';
 test('one report is rendered and recorded with a receipt', () => {
   const store = new DurableStore(), sink = new IdempotentSink(), queue = createQueue({ store, sink });
   const job = submitReport(queue, { tenantId: 'north', requestId: 'r1', payload: { title: 'Weekly', rows: [2,4] } });
@@ -24,4 +25,9 @@ test('permanent renderer failure is observable without stopping unrelated work',
   queue.enqueue('north', 'bad', { rows: [] }); queue.enqueue('north', 'good', { title: 'Good', rows: [] });
   assert.equal(workerTick(queue, 'w').state, 'failed');
   assert.equal(workerTick(queue, 'w').state, 'succeeded');
+});
+test('renderer classifies malformed JSON payloads as permanent failures', () => {
+  for (const payload of [null, false, 0, 'text', [], {}, { title: 'No rows' }]) {
+    assert.throws(() => render(payload), error => error.code === 'PERMANENT');
+  }
 });

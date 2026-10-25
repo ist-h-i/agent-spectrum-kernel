@@ -19,10 +19,22 @@ Implementation Contract: `ceiling-v1-implementation-r1`。上流は `codex-work-
 - Verified: 最新 PR HEAD は受領時 HEAD と一致。main の最新は `514bf21aa2c955ec44dcaa3db67abe86f397b98e`。rebase は不要。
 - Verified: 既存 checkout は main 上で作業差分なし。専用 checkout に既存 PR branch を取得した。新規 PR は作成していない。
 - Verified: `.agents/`、active adapter install-state は存在しない。repo の `skills/skill-router` から、既存 work package を用いる `controlled-implementation` と `test-first-verification` を選択。
-- 実装中: CH01/02、CH03/04、CH05/06 の公開 workspace を担当別に作成。共有 materializer と manifest は統合担当が所有する。
-- Pending: 非公開 root の指定。work package の「非公開rootが未指定ならその部分だけを止め」に従い、非公開採点器・正解・mutant は未作成。
+- Verified: CH01/02、CH03/04、CH05/06 の公開 workspace を担当別に作成。共有 materializer と manifest は統合担当が所有する。公開テスト・新規準備・提出固定・範囲外変更拒否を検証した。
+- Verified: 追加指示により保存先を選択し、非公開採点資材を repo 外で作成した。各問に別構造の正解例 2 件、意味的人工不良 12 件以上、同一追加テストを用意した。初期保管は一時領域だったため、書込み権限内の repo 外の永続的な作業領域にも保存した。
+- Pending: 採点実行境界の確認。native sandbox は親の停止指示に従いコード上も無効化した。既存 Docker Desktop・既存固定イメージ・既存 ASK の public-file-only transport を read-only で確認。今回の一時コンテナによる合成検証は未承認・未実行。
 - Unknown: モデル難度、30〜70 点の達成、モデルでの実測。今回の実装・採点器検証はモデル校正の証拠にしない。
 
 ## 実行制約
 
 既存認証での PR 読取と clone/fetch は成功。追加モデル実行、Codex CLI ベンチマーク推論、認証・セキュリティ設定変更、merge は行わない。既存 branch への通常 push は依頼で承認済み。
+
+## 検証記録と残件
+
+- 公開統合: `node --test benchmarks/challenge-candidates/ceiling-v1/tools/public-workspace.test.mjs`。全 6 問の新規準備と通常テスト、manifest、freeze、protected 改変、範囲逸脱、誤 ID、symlink/hardlink を検査。generic worker と test reporter の制御試験も追加。
+- `node scripts/validate-repo.mjs` は成功。`node scripts/test-ask-benchmark-portfolio-catalog.mjs` は成功。既存 portfolio・fixtures・登録コードは受領 HEAD と差分なし。
+- `node scripts/test-ask-benchmark-admitted-fixture-invariance.mjs` は 14/16 成功。2 件は履歴 commit `b290feb25cc1aa2fe3b04bebbd001558cc7846e1` に schema が存在しないため失敗し、受領 HEAD の clean clone でも同じ 2 件を再現した。既存 24 問の履歴契約は変更していない。
+- `test-ask-benchmark-materialize.mjs` は作業中の tracked 差分を拒否した。clean snapshot での完走は別途記録する。
+- 公開独立レビュー（`0cb160d1d5b687d5713bb79ab65d737869827e26`）: CH06 protected glob の prefix/suffix 重なり（Major）、CH02 renderer の null 分類（Minor）。両方を修正し公開 adapter 回帰テストを追加、manifest を更新した。修正後の fresh review は別途記録する。
+- 非公開側の trusted author 検証は各問の正解 2 構造・対応不良検出・追加テストを確認した。native 隔離では CH05/CH06 の全検証が通ったが、CH01/CH03 は空テスト対照判定、CH04 は worker の primitive serialization の不良で停止し、CH02 は未完走。共通不良は修正済みだが、停止指示後の native 再実行はしていない。部分的証拠を全問完了と扱わない。
+- 自動承認レビューは、sandbox の読取範囲を広げる提案を「非公開 root 読取防止を確認できない」として拒否した。提案は未適用。以後に限定 allowlist による一部検証証拠は得たが、親の追加指示に従い native 経路を停止した。拒否された広域読取を別経路で実行しない。
+- Docker の新規実行・image pull・設定変更・モデル推論は行っていない。全問の最終採点境界での検証、独立した非公開検証、CH05 の資源閾値固定、正式採点結果の発行は残件。品質点・blocker・難度は未確定のまま保持する。

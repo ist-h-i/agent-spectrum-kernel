@@ -26,3 +26,11 @@ test('watch changes create independent snapshots and deletion changes glob membe
   assert.equal(before.files['plugins/p'].text, 'p');
   assert.deepEqual(createCompiler().inspect(after, 'app').globMatches, []);
 });
+
+test('glob literals never overlap and wildcard never consumes a slash', () => {
+  const snapshot = { generation: 1, compilerVersion: '1', config: {}, files: {
+    entry: { text: '', globs: ['a*a'] }, a: { text: '' }, aa: { text: '' },
+    aba: { text: '' }, 'a/x/a': { text: '' }
+  } };
+  assert.deepEqual(createCompiler().inspect(snapshot, 'entry').globMatches, ['aa', 'aba']);
+});

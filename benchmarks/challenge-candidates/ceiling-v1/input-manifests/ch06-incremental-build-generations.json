@@ -4,7 +4,7 @@
   "namespace": "ceiling-v1",
   "scope": "public task.md and standalone workspace; no git history or evaluator",
   "runtime": "v24.19.0",
-  "input_digest": "sha256:79d1c3d1729a6c9dbc5a4e7bf8188c52222897508cd09d841093e221cffe09b3",
+  "input_digest": "sha256:bfcb4cda93a6cb95dc7aedf9b9c68abc5428ccb96494a66d69e9778cdb5b7dd8",
   "protected": [
     "data/monorepo.json",
     "data/watch-events.json",
@@ -37,8 +37,8 @@
     },
     {
       "path": "harness/compiler.mjs",
-      "sha256": "f81774e78d9a8ba85f46bbb571c10dfa5a49dfa686d2b95463cee3839f7b7339",
-      "bytes": 2868
+      "sha256": "a282a3c75cba308ca00e576ac4a42e5a45a0e91b208719f03b5e38e2984fd496",
+      "bytes": 2926
     },
     {
       "path": "harness/consumer.mjs",
@@ -82,8 +82,8 @@
     },
     {
       "path": "test/harness.test.mjs",
-      "sha256": "f8df91d57c5574a45ce8db060643c3d6d4b48cbf0f68dfbb3824556e816f2d1e",
-      "bytes": 1574
+      "sha256": "48c3455ddca721791eb947f7758b2c4df317607829e046275019d6e358d71100",
+      "bytes": 1958
     },
     {
       "path": "test/normal.test.mjs",

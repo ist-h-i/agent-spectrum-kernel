@@ -4,7 +4,7 @@
   "namespace": "ceiling-v1",
   "scope": "public task.md and standalone workspace; no git history or evaluator",
   "runtime": "v24.19.0",
-  "input_digest": "sha256:e6e6b9b8baf5f954dc77223db18246c6d2d049f7b1f4f079ada5eb18ad1a77ce",
+  "input_digest": "sha256:e46cbc28ec72ca15412ea693f8bd69a34ebf0035f2783326291e216865c735d3",
   "protected": [
     "data/requests.json",
     "harness/client.mjs",
@@ -41,8 +41,8 @@
     },
     {
       "path": "harness/renderer.mjs",
-      "sha256": "7dc8ab42427fd118948f44f157c4ca305e6a1166bfe368ba59a0e4db146da217",
-      "bytes": 722
+      "sha256": "65ec4231a8ef411aec451923ed93fb251b7b4ffa8c700fe92bf27d71aefede4c",
+      "bytes": 773
     },
     {
       "path": "harness/sink.mjs",
@@ -96,8 +96,8 @@
     },
     {
       "path": "test/normal.test.mjs",
-      "sha256": "63ca6ca88ab117e067a686a508c0c1f268b4b05766a72159e472691d671db10f",
-      "bytes": 1628
+      "sha256": "2f116e076a002b4bb268e4a8d6658ee8b4bddeaff9a7c234a872cfd2d358498b",
+      "bytes": 1929
     }
   ]
 }

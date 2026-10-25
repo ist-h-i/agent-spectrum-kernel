@@ -66,3 +66,39 @@ test('controller rejects scope escapes, wrong identities, aliases and changed in
     assert.equal(verify(candidates()[1].id, workspace).valid, false);
   } finally { rmSync(temp, { recursive: true, force: true }); }
 });
+
+test('generic worker preserves primitive observations and synchronous callbacks', () => {
+  const temp = mkdtempSync(resolve(realpathSync(tmpdir()), 'ceiling-worker-'));
+  try {
+    writeFileSync(resolve(temp, 'example.mjs'), `export class Example {call(fn){fn('text',true,3);return true;} async echo(value){return value;}}`);
+    const program = { steps: [
+      { op: 'construct', module: 'example.mjs', export: 'Example', as: 'instance' },
+      { op: 'call', target: 'instance', method: 'call', args: [{ $callback: [
+        { op: 'record', value: { $arg: 0 }, as: 'text' },
+        { op: 'record', value: { $arg: 1 }, as: 'boolean' },
+        { op: 'record', value: { $arg: 2 }, as: 'number' },
+      ] }], as: 'result' },
+      { op: 'call', target: 'instance', method: 'echo', args: ['value'], await: false, as: 'promise' },
+      { op: 'await', target: 'promise', as: 'resolved' },
+    ] };
+    const result = JSON.parse(execFileSync(process.execPath, [resolve(root, 'tools/candidate-worker.mjs')], { cwd: temp, input: JSON.stringify(program), encoding: 'utf8' }));
+    assert.equal(result.status, 'completed');
+    assert.deepEqual(result.observations, { instance: null, text: 'text', boolean: true, number: 3, result: true, promise: null, resolved: 'value' });
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+});
+
+test('trusted test reporter excludes empty files and stdout result forgery', () => {
+  const temp = mkdtempSync(resolve(realpathSync(tmpdir()), 'ceiling-reporter-'));
+  try {
+    const path = resolve(temp, 'control.test.mjs');
+    for (const content of ['', `process.stdout.write('{"passed":99,"failed":0,"failures":[]}');`]) {
+      writeFileSync(path, content);
+      const result = JSON.parse(execFileSync(process.execPath, ['--test', `--test-reporter=${resolve(root, 'tools/assertion-reporter.mjs')}`, path], { cwd: temp, encoding: 'utf8' }));
+      assert.equal(result.passed, 0);
+      assert.equal(result.failed, 0);
+    }
+    writeFileSync(path, `import test from 'node:test';import assert from 'node:assert/strict';test('body',()=>assert.equal(1,1));`);
+    const result = JSON.parse(execFileSync(process.execPath, ['--test', `--test-reporter=${resolve(root, 'tools/assertion-reporter.mjs')}`, path], { cwd: temp, encoding: 'utf8' }));
+    assert.equal(result.passed, 1);
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+});

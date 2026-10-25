@@ -5,7 +5,8 @@ const match = (path, pattern) => {
   const pieces = pattern.split('*');
   if (pieces.length === 1) return path === pattern;
   if (pieces.length !== 2) throw new Error('Only one * is supported');
-  return path.startsWith(pieces[0]) && path.endsWith(pieces[1]) &&
+  return path.length >= pieces[0].length + pieces[1].length &&
+    path.startsWith(pieces[0]) && path.endsWith(pieces[1]) &&
     !path.slice(pieces[0].length, path.length - pieces[1].length).includes('/');
 };
 
