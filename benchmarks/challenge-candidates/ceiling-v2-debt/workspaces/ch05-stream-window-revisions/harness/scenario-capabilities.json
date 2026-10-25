@@ -1,0 +1,101 @@
+{
+  "version": "ceiling-scenario-v1",
+  "modules": {
+    "src/processor.mjs": {
+      "invoke": {
+        "createProcessor": "processor"
+      }
+    },
+    "harness/sink.mjs": {
+      "invoke": {
+        "createSink": "sink"
+      }
+    },
+    "harness/consumer.mjs": {
+      "invoke": {
+        "consume": "json"
+      }
+    },
+    "harness/small-check.mjs": {
+      "invoke": {
+        "smallWindowSum": "json"
+      }
+    },
+    "harness/generator.mjs": {
+      "invoke": {
+        "steadyLoad": "eventIterator",
+        "activeGrowthLoad": "eventIterator"
+      }
+    },
+    "src/pipeline.mjs": {
+      "invoke": {
+        "createPipeline": "pipeline"
+      }
+    },
+    "src/legacy.mjs": {
+      "invoke": {
+        "createLegacyConsumer": "legacyConsumer"
+      }
+    },
+    "harness/measure-api.mjs": {
+      "invoke": {
+        "runMeasurement": "json",
+        "runProfile": "json"
+      }
+    },
+    "harness/checkpoint-client.mjs": {
+      "invoke": {
+        "alterExport": "json"
+      }
+    }
+  },
+  "calls": {
+    "processor": {
+      "ingest": "json",
+      "advanceWatermark": "json",
+      "stats": "json"
+    },
+    "sink": {
+      "finalize": "json",
+      "reject": "json",
+      "snapshot": "json"
+    },
+    "eventIterator": {
+      "next": "json"
+    },
+    "pipeline": {
+      "ingest": "json",
+      "ingestBatch": "json",
+      "advanceWatermark": "json",
+      "exportCheckpoint": "json",
+      "stats": "json"
+    },
+    "legacyConsumer": {
+      "push": "json",
+      "watermark": "json"
+    }
+  },
+  "get": {},
+  "functionKinds": [],
+  "references": {
+    "invoke:src/processor.mjs:createProcessor": {
+      "/0/sink": "sink"
+    },
+    "invoke:harness/consumer.mjs:consume": {
+      "/0": "processor"
+    },
+    "invoke:src/pipeline.mjs:createPipeline": {
+      "/0/sink": "sink"
+    },
+    "invoke:src/legacy.mjs:createLegacyConsumer": {
+      "/0": "pipeline"
+    }
+  },
+  "datasets": [
+    "data/load.json",
+    "data/normal.json"
+  ],
+  "resourceProfiles": [
+    "ch05-debt-load-v2"
+  ]
+}

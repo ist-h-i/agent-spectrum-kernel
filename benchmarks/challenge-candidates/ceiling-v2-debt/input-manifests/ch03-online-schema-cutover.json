@@ -1,0 +1,132 @@
+{
+  "version": "ceiling-public-v2-debt",
+  "id": "ch03-online-schema-cutover",
+  "input_digest": "sha256:df6a62280eea9fb1699de9ba2185bbacdcd5281566422eea2b309b76ae677f98",
+  "files": [
+    {
+      "path": "data/normal-scenario.json",
+      "sha256": "91bf14ab1f4d704e2aa54eb455caee72c9e4f3c0d7e4493cb179f92c6367bb51",
+      "bytes": 1193
+    },
+    {
+      "path": "data/prices.json",
+      "sha256": "50d5b36ee0b6fbbbed0f804493ac5398865462ec4851d006e9ba62f35a84ad14",
+      "bytes": 152
+    },
+    {
+      "path": "harness/consumers.mjs",
+      "sha256": "73f147ae606b3727b9dfe15294a0bedc391af341d32b53e195ad808bb6f2410d",
+      "bytes": 907
+    },
+    {
+      "path": "harness/scenario-capabilities.json",
+      "sha256": "b539729ac98337f7326f4761dab73582fce6ba622a838f7c83936f06bd2db415",
+      "bytes": 2060
+    },
+    {
+      "path": "harness/scenario-engine.mjs",
+      "sha256": "6fd3d208090e5dcf69b6187cad1afebb4a18100a1a4b312ba0afd1a8a3514c67",
+      "bytes": 6861
+    },
+    {
+      "path": "harness/scenario-protocol.mjs",
+      "sha256": "a2b568ecd7f3b2d0bd0ccae19a7d1c54ceadec030305759a8649a3cf197318c6",
+      "bytes": 6021
+    },
+    {
+      "path": "harness/scenario-reporter.mjs",
+      "sha256": "0e2ce3f9618494897ac247c46c470444f326b12fc13910cb73bece53f7d976a7",
+      "bytes": 1122
+    },
+    {
+      "path": "harness/scenario-worker.mjs",
+      "sha256": "fc56f76c84be97256e7f3af919a804dd215cf5876e194ab68bebd064185f5fa0",
+      "bytes": 1068
+    },
+    {
+      "path": "harness/scenario.mjs",
+      "sha256": "621c442afd8e9f59c2bb4a60d0159cd9053454e89e158bd0a3ad654b0386d802",
+      "bytes": 1794
+    },
+    {
+      "path": "harness/store.mjs",
+      "sha256": "1bd2fbcef21bff9947207abe3caf5de0f86139d1e7188d9a42bccb8f7554a64c",
+      "bytes": 3117
+    },
+    {
+      "path": "package.json",
+      "sha256": "93eacdfbd14e6cc40b2fe65ce8ebb848a6a207c50856b4757f2a8751cec23bc1",
+      "bytes": 186
+    },
+    {
+      "path": "RESULT.md",
+      "sha256": "ad6e9f25e6fd81599b5d25d12567263c76419516ef969e6d17a382aab119c90f",
+      "bytes": 72
+    },
+    {
+      "path": "spec/api.md",
+      "sha256": "3b3d75eea29630417cc7292ada7c6b62254f365d5b1063982a1ca157dfe33589",
+      "bytes": 7335
+    },
+    {
+      "path": "spec/scenario-tests.md",
+      "sha256": "453a1874fd29bcd6bd7f5fbf71fbebc1b2b3d55edb287770deb6e4ee85fd9295",
+      "bytes": 2879
+    },
+    {
+      "path": "src/backfill.mjs",
+      "sha256": "0b982eaf9c673becb8c6f06f52b2142c4f3c169b3738bbbe0417921cf44c61c7",
+      "bytes": 1102
+    },
+    {
+      "path": "src/legacy.mjs",
+      "sha256": "7c4b716a3b8711531c594ff10fe0f52b6f8431026cbf301f82802dac6344da32",
+      "bytes": 384
+    },
+    {
+      "path": "src/lifecycle.mjs",
+      "sha256": "dab3fb4824eccb8b24c0245637b8eb7f1a51c301c7abd2289214686a8354759f",
+      "bytes": 1082
+    },
+    {
+      "path": "src/migration.mjs",
+      "sha256": "4cc946306150fa251c353cc7d68ef106ee9bdc9143f76a3389e03fc5c1f7928a",
+      "bytes": 989
+    },
+    {
+      "path": "src/money.mjs",
+      "sha256": "121a05f41efb57df9c607c1ab49fb7ccbf9d1730290f15270a8ee74e25d7c0ac",
+      "bytes": 1401
+    },
+    {
+      "path": "src/result.mjs",
+      "sha256": "9d9001165b1324b4ee8501bc6136d65674e6eade8a2b847ef11a865603fbf450",
+      "bytes": 245
+    },
+    {
+      "path": "src/writers.mjs",
+      "sha256": "5efb2f2d7a2cdf12306531df91d5359d796c5a90cc56df645282e04c220f8123",
+      "bytes": 1301
+    },
+    {
+      "path": "task.md",
+      "sha256": "90374ac21cd091f1bc5e31cd401c93a2d0cdb8698ceafcc5ee2e4706fec78682",
+      "bytes": 1387
+    },
+    {
+      "path": "test/added/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "test/legacy-import-contract.test.mjs",
+      "sha256": "cbdcc779625e5d8c058c211a1f7fea486009e2255e2c5a12bb8d054c4bdad37e",
+      "bytes": 706
+    },
+    {
+      "path": "test/normal.test.mjs",
+      "sha256": "3cf98766c612aca2da13f619ec6c856f7abb311a74818eafb2ff675b445111d3",
+      "bytes": 566
+    }
+  ]
+}

@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'benchmarks/challenge-candidates/ceiling-v1/**'
+      - 'benchmarks/challenge-candidates/ceiling-v2-debt/**'
       - 'scripts/**'
       - '.github/workflows/ceiling-public-fixtures.yml'
   workflow_dispatch:
@@ -20,3 +21,5 @@ jobs:
         run: node benchmarks/challenge-candidates/ceiling-v1/tools/seal-public-inputs.mjs
       - name: Verify fresh workspaces, public tests and submission boundaries
         run: node --test benchmarks/challenge-candidates/ceiling-v1/tools/public-workspace.test.mjs benchmarks/challenge-candidates/ceiling-v1/tools/scenario-protocol.test.mjs benchmarks/challenge-candidates/ceiling-v1/tools/scenario-replay.test.mjs
+      - name: Check versioned debt inputs and execution boundaries
+        run: node --test benchmarks/challenge-candidates/ceiling-v2-debt/tools/public-workspace.test.mjs

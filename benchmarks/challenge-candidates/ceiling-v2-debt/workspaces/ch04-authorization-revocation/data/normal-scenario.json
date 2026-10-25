@@ -1,0 +1,99 @@
+{
+  "steps": [
+    {
+      "op": "dataset",
+      "path": "data/policies.json",
+      "as": "data"
+    },
+    {
+      "op": "construct",
+      "module": "harness/policy-store.mjs",
+      "export": "PolicyStore",
+      "args": [
+        {
+          "$ref": "data"
+        }
+      ],
+      "as": "policies"
+    },
+    {
+      "op": "construct",
+      "module": "harness/policy-store.mjs",
+      "export": "ContextStore",
+      "args": [],
+      "as": "contexts"
+    },
+    {
+      "op": "construct",
+      "module": "harness/policy-store.mjs",
+      "export": "ChunkAdapter",
+      "args": [
+        {
+          "$ref": "policies"
+        },
+        {
+          "$ref": "contexts"
+        }
+      ],
+      "as": "sink"
+    },
+    {
+      "op": "construct",
+      "module": "src/service.mjs",
+      "export": "DocumentService",
+      "args": [
+        {
+          "$ref": "policies"
+        },
+        {
+          "$ref": "contexts"
+        },
+        {
+          "$ref": "sink"
+        }
+      ],
+      "as": "service"
+    },
+    {
+      "op": "call",
+      "target": "service",
+      "method": "openContext",
+      "args": [
+        {
+          "tenant": "north",
+          "user": "alice"
+        }
+      ],
+      "as": "context"
+    },
+    {
+      "op": "invoke",
+      "module": "harness/consumers.mjs",
+      "export": "legacyLookup",
+      "args": [
+        {
+          "$ref": "service"
+        },
+        {
+          "$ref": "context"
+        }
+      ],
+      "as": "legacy"
+    },
+    {
+      "op": "call",
+      "target": "legacy",
+      "method": "read",
+      "args": [
+        "report"
+      ],
+      "as": "body"
+    },
+    {
+      "op": "call",
+      "target": "service",
+      "method": "close",
+      "args": []
+    }
+  ]
+}

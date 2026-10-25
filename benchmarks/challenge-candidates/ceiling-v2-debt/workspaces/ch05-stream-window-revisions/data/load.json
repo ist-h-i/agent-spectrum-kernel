@@ -1,0 +1,28 @@
+{
+  "recipeVersion": "ch05-debt-load-v2",
+  "windowSize": 1000,
+  "allowedLateness": 200,
+  "tenants": 4,
+  "idsPerTenantPerRound": 128,
+  "revisionsPerId": 3,
+  "steadyRounds": 200,
+  "activeGrowthIdsPerTenant": 8192,
+  "repetitions": 3,
+  "timingLimitMs": 10000,
+  "heapLimitBytes": null,
+  "rssLimitBytes": null,
+  "thresholdStatus": "proposed_pending_two_correct_runtime_qualification_v2",
+  "profiles": {
+    "steady": {
+      "timingLimitMs": 10000,
+      "heapLimitBytes": 33554432,
+      "rssLimitBytes": 201326592
+    },
+    "active_growth": {
+      "timingLimitMs": 10000,
+      "heapLimitBytes": 67108864,
+      "rssLimitBytes": 268435456
+    }
+  },
+  "ready_for_measurement": false
+}
