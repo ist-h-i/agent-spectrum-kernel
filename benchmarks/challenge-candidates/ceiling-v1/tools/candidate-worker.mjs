@@ -6,10 +6,11 @@ import { pathToFileURL } from 'node:url';
 const root = process.cwd(), program = JSON.parse(readFileSync(0, 'utf8'));
 const modules = new Map(), refs = new Map(), observations = {};
 const trustedError = Error, invalidPrograms = new WeakSet();
+const isInvalidProgram = invalidPrograms.has.bind(invalidPrograms), addInvalidProgram = invalidPrograms.add.bind(invalidPrograms);
 const encode = JSON.stringify, createRecord = Object.create, assignFields = Object.assign;
 const writeOutput = process.stdout.write.bind(process.stdout), transportNonce = program.transportNonce ?? null;
 function send(fields) { writeOutput(encode(assignFields(createRecord(null), fields, { transportNonce })) + '\n'); }
-function programError(message) { const error = new trustedError(message); invalidPrograms.add(error); return error; }
+function programError(message) { const error = new trustedError(message); addInvalidProgram(error); return error; }
 function scan(value) {
   if (!value || typeof value !== 'object') return;
   if (typeof value.module === 'string') modules.set(value.module, null);
@@ -23,7 +24,7 @@ try {
     modules.set(name, await import(pathToFileURL(path).href));
   }
 } catch (error) {
-  send({ status: invalidPrograms.has(error) ? 'evaluator_input_error' : 'candidate_load_error', error: { name: error?.name ?? null, code: error?.code ?? null } });
+  send({ status: isInvalidProgram(error) ? 'evaluator_input_error' : 'candidate_load_error', error: { name: error?.name ?? null, code: error?.code ?? null } });
   process.exit(0);
 }
 function snapshot(value) {
@@ -73,5 +74,5 @@ try {
   }
   send({ status: 'completed', observations });
 } catch (error) {
-  send({ status: invalidPrograms.has(error) ? 'evaluator_input_error' : 'candidate_error', error: errorResult(error), observations });
+  send({ status: isInvalidProgram(error) ? 'evaluator_input_error' : 'candidate_error', error: errorResult(error), observations });
 }

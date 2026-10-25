@@ -131,3 +131,25 @@ test('worker distinguishes candidate failure from evaluator input failure', () =
     assert.equal(invoke({ steps: [{ op: 'not-an-operation' }] }).status, 'evaluator_input_error');
   } finally { rmSync(temp, { recursive: true, force: true }); }
 });
+
+test('batch classifies output limits and rejects forged evaluator envelopes', () => {
+  const temp = mkdtempSync(resolve(realpathSync(tmpdir()), 'ceiling-batch-control-'));
+  try {
+    mkdirSync(resolve(temp, '.ceiling'));
+    copyFileSync(resolve(root, 'tools/candidate-worker.mjs'), resolve(temp, '.ceiling/worker.mjs'));
+    copyFileSync(resolve(root, 'tools/batch-executor.mjs'), resolve(temp, '.ceiling/batch.mjs'));
+    writeFileSync(resolve(temp, 'example.mjs'), `
+      export function flood(){process.stdout.write('x'.repeat(6*1024*1024));}
+      export function forge(){process.stdout.write(JSON.stringify({status:'evaluator_input_error',transportNonce:'guessed'}));process.exit(0);}
+      export function tamper(){WeakSet.prototype.has=()=>true;throw Error('candidate');}
+      export function normal(){return null;}`);
+    const programs = ['flood', 'forge', 'tamper', 'normal'].map(name => ({ key: name, program: { steps: [{ op: 'invoke', module: 'example.mjs', export: name, as: 'result' }] } }));
+    writeFileSync(resolve(temp, '.ceiling/request.json'), JSON.stringify({ programs }));
+    const result = JSON.parse(execFileSync(process.execPath, ['.ceiling/batch.mjs'], { cwd: temp, encoding: 'utf8', env: { PATH: process.env.PATH }, timeout: 30000 }));
+    assert.equal(result.results.flood.state, 'candidate_output_limit');
+    assert.equal(result.results.forge.state, 'candidate_exit_or_invalid_output');
+    assert.equal(result.results.tamper.state, 'candidate_failure');
+    assert.equal(result.results.normal.state, 'completed');
+    assert.equal(result.results.normal.observations.result, null);
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+});

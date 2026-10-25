@@ -3,11 +3,12 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 const request = JSON.parse(readFileSync('.ceiling/request.json', 'utf8'));
+const workspace = process.cwd();
 const results = {};
 for (const item of request.programs ?? []) {
   const transportNonce = randomBytes(32).toString('hex');
-  const result = spawnSync(process.execPath, ['--permission', '--allow-fs-read=/work', '.ceiling/worker.mjs'], {
-    cwd: '/work', input: JSON.stringify({ ...item.program, transportNonce }), encoding: 'utf8', timeout: 15000, maxBuffer: 4 * 1024 * 1024,
+  const result = spawnSync(process.execPath, ['--permission', `--allow-fs-read=${workspace}`, '.ceiling/worker.mjs'], {
+    cwd: workspace, input: JSON.stringify({ ...item.program, transportNonce }), encoding: 'utf8', timeout: 15000, maxBuffer: 4 * 1024 * 1024,
     env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/tmp', LANG: 'C' },
   });
   let output = null;
@@ -17,15 +18,16 @@ for (const item of request.programs ?? []) {
     : ['candidate_error', 'candidate_load_error'].includes(output?.status) ? 'candidate_failure'
     : output?.status === 'evaluator_input_error' ? 'evaluator_input_error'
     : result.error?.code === 'ETIMEDOUT' ? 'candidate_timeout'
+    : result.error?.code === 'ENOBUFS' ? 'candidate_output_limit'
     : result.error ? 'execution_error' : 'candidate_exit_or_invalid_output';
   results[item.key] = { state, observations: output?.observations ?? null,
     status: result.status, signal: result.signal, error: result.error?.code ?? null };
 }
 let tests = null;
 if (request.tests?.length) {
-  const result = spawnSync(process.execPath, ['--permission', '--allow-child-process', '--allow-fs-read=/work',
+  const result = spawnSync(process.execPath, ['--permission', '--allow-child-process', `--allow-fs-read=${workspace}`,
     '--test', '--test-reporter=./.ceiling/reporter.mjs', ...request.tests], {
-    cwd: '/work', encoding: 'utf8', timeout: 20000, maxBuffer: 4 * 1024 * 1024,
+    cwd: workspace, encoding: 'utf8', timeout: 20000, maxBuffer: 4 * 1024 * 1024,
     env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/tmp', LANG: 'C' },
   });
   let report = null;

@@ -10,7 +10,8 @@ export default async function* report(source) {
       failed++;
       failures.push({ name: event.data.name, type: error?.failureType ?? null,
         code: error?.cause?.code ?? error?.code ?? null,
-        operator: error?.cause?.operator ?? error?.operator ?? null });
+        operator: error?.cause?.operator ?? error?.operator ?? null,
+        file: event.data.file ?? null, line: event.data.line ?? null });
     }
   }
   yield JSON.stringify({ passed, failed, failures }) + '\n';
