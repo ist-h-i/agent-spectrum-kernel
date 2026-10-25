@@ -5,16 +5,26 @@ import { pathToFileURL } from 'node:url';
 
 const root = process.cwd(), program = JSON.parse(readFileSync(0, 'utf8'));
 const modules = new Map(), refs = new Map(), observations = {};
+const trustedError = Error, invalidPrograms = new WeakSet();
+const encode = JSON.stringify, createRecord = Object.create, assignFields = Object.assign;
+const writeOutput = process.stdout.write.bind(process.stdout), transportNonce = program.transportNonce ?? null;
+function send(fields) { writeOutput(encode(assignFields(createRecord(null), fields, { transportNonce })) + '\n'); }
+function programError(message) { const error = new trustedError(message); invalidPrograms.add(error); return error; }
 function scan(value) {
   if (!value || typeof value !== 'object') return;
   if (typeof value.module === 'string') modules.set(value.module, null);
   for (const child of Object.values(value)) scan(child);
 }
 scan(program);
-for (const name of modules.keys()) {
-  const path = resolve(root, name);
-  if (!path.startsWith(root + sep) || !name.endsWith('.mjs')) throw new Error('module outside workspace');
-  modules.set(name, await import(pathToFileURL(path).href));
+try {
+  for (const name of modules.keys()) {
+    const path = resolve(root, name);
+    if (!path.startsWith(root + sep) || !name.endsWith('.mjs')) throw programError('module outside workspace');
+    modules.set(name, await import(pathToFileURL(path).href));
+  }
+} catch (error) {
+  send({ status: invalidPrograms.has(error) ? 'evaluator_input_error' : 'candidate_load_error', error: { name: error?.name ?? null, code: error?.code ?? null } });
+  process.exit(0);
 }
 function snapshot(value) {
   if (value === undefined || typeof value === 'function' || value instanceof Promise) return null;
@@ -25,7 +35,7 @@ function pathValue(value, path = []) { for (const key of path) value = value?.[k
 function value(input, args = []) {
   if (!input || typeof input !== 'object') return input;
   if (Object.hasOwn(input, '$ref')) {
-    if (!refs.has(input.$ref)) throw new Error(`unknown ref ${input.$ref}`);
+    if (!refs.has(input.$ref)) throw programError(`unknown ref ${input.$ref}`);
     return pathValue(refs.get(input.$ref), input.path);
   }
   if (Object.hasOwn(input, '$arg')) return pathValue(args[input.$arg], input.path);
@@ -44,12 +54,12 @@ function raw(step, args) {
     const next = snapshot(value(step.value, args));
     return step.append ? [...(refs.get(step.as) ?? []), next] : next;
   }
-  throw new Error(`unknown operation ${step.op}`);
+  throw programError(`unknown operation ${step.op}`);
 }
 function store(step, result) {
   if (step.as) { refs.set(step.as, result); observations[step.as] = snapshot(result); }
 }
-function errorResult(error) { return { error: { name: error.name, code: error.code ?? null, message: error.message } }; }
+function errorResult(error) { return { error: { name: error?.name ?? null, code: error?.code ?? null, message: error?.message ?? String(error) } }; }
 function executeSync(step, args = []) {
   try { store(step, raw(step, args)); }
   catch (error) { if (!step.catch) throw error; store(step, errorResult(error)); }
@@ -61,8 +71,7 @@ try {
       store(step, step.await === false ? result : await result);
     } catch (error) { if (!step.catch) throw error; store(step, errorResult(error)); }
   }
-  process.stdout.write(JSON.stringify({ status: 'completed', observations }) + '\n');
+  send({ status: 'completed', observations });
 } catch (error) {
-  process.stdout.write(JSON.stringify({ status: 'execution_error', error: errorResult(error), observations }) + '\n');
-  process.exitCode = 1;
+  send({ status: invalidPrograms.has(error) ? 'evaluator_input_error' : 'candidate_error', error: errorResult(error), observations });
 }

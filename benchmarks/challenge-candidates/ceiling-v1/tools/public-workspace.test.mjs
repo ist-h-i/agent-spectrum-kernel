@@ -119,3 +119,15 @@ test('reporter distinguishes nested body assertions and broad exception wrappers
     assert.equal(JSON.parse(wrapper.stdout).failures[0].operator, 'doesNotThrow');
   } finally { rmSync(temp, { recursive: true, force: true }); }
 });
+
+test('worker distinguishes candidate failure from evaluator input failure', () => {
+  const temp = mkdtempSync(resolve(realpathSync(tmpdir()), 'ceiling-failure-class-'));
+  try {
+    writeFileSync(resolve(temp, 'example.mjs'), `export function fail(){throw Error('candidate failure');}export function fake(){throw Object.assign(Error('fake'),{code:'INVALID_PROGRAM'});}`);
+    const invoke = program => JSON.parse(execFileSync(process.execPath, [resolve(root, 'tools/candidate-worker.mjs')], { cwd: temp, input: JSON.stringify(program), encoding: 'utf8', env: { PATH: process.env.PATH } }));
+    assert.equal(invoke({ steps: [{ op: 'invoke', module: 'example.mjs', export: 'fail' }] }).status, 'candidate_error');
+    assert.equal(invoke({ steps: [{ op: 'invoke', module: 'example.mjs', export: 'fake' }] }).status, 'candidate_error');
+    assert.equal(invoke({ steps: [{ op: 'invoke', module: 'missing.mjs', export: 'fail' }] }).status, 'candidate_load_error');
+    assert.equal(invoke({ steps: [{ op: 'not-an-operation' }] }).status, 'evaluator_input_error');
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+});

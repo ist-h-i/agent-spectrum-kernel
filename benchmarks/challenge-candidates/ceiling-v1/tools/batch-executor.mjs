@@ -1,18 +1,25 @@
 // Public transport adapter: inputs only; expectations remain with the controller.
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 const request = JSON.parse(readFileSync('.ceiling/request.json', 'utf8'));
 const results = {};
 for (const item of request.programs ?? []) {
+  const transportNonce = randomBytes(32).toString('hex');
   const result = spawnSync(process.execPath, ['--permission', '--allow-fs-read=/work', '.ceiling/worker.mjs'], {
-    cwd: '/work', input: JSON.stringify(item.program), encoding: 'utf8', timeout: 15000, maxBuffer: 4 * 1024 * 1024,
+    cwd: '/work', input: JSON.stringify({ ...item.program, transportNonce }), encoding: 'utf8', timeout: 15000, maxBuffer: 4 * 1024 * 1024,
     env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/tmp', LANG: 'C' },
   });
   let output = null;
   try { output = JSON.parse(result.stdout); } catch {}
-  results[item.key] = result.status === 0 && !result.error && output?.status === 'completed'
-    ? { state: 'completed', observations: output.observations }
-    : { state: 'execution_error', status: result.status, signal: result.signal, error: result.error?.code ?? null };
+  if (output?.transportNonce !== transportNonce) output = null;
+  const state = result.status === 0 && !result.error && output?.status === 'completed' ? 'completed'
+    : ['candidate_error', 'candidate_load_error'].includes(output?.status) ? 'candidate_failure'
+    : output?.status === 'evaluator_input_error' ? 'evaluator_input_error'
+    : result.error?.code === 'ETIMEDOUT' ? 'candidate_timeout'
+    : result.error ? 'execution_error' : 'candidate_exit_or_invalid_output';
+  results[item.key] = { state, observations: output?.observations ?? null,
+    status: result.status, signal: result.signal, error: result.error?.code ?? null };
 }
 let tests = null;
 if (request.tests?.length) {
