@@ -14,4 +14,6 @@ An active ID retains its latest revision including a deletion marker until closu
 
 `harness/consumer.mjs` is the fixed client. `data/normal.json` is ordinary input. `small-check.mjs` is only a small-input calculator for one tenant/window and valid, contradiction-free input; it does not implement watermark/rejection semantics.
 
-Run `npm test` (Node 24.19.0; no installation needed). Add tests under `test/added/` and submit src, those tests, and RESULT.md. Do not modify spec/data/harness/original test/package files.
+Run `npm test` (Node 24.21.0; no installation needed). Add tests under `test/added/` and submit src, those tests, and RESULT.md. Do not modify spec/data/harness/original test/package files.
+
+追加テストの有効性 10 点の提出形式・分離実行は `scenario-tests.md` に従う。通常の追加テストは `test/added/` で実行でき、採点用 scenario は `test/added/scenarios/` に置く。

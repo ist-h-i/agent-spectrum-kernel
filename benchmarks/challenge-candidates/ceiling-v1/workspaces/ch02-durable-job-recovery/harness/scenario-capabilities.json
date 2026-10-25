@@ -1,0 +1,103 @@
+{
+  "version": "ceiling-scenario-v1",
+  "modules": {
+    "harness/store.mjs": {
+      "construct": {
+        "DurableStore": "store"
+      },
+      "invoke": {
+        "jobKey": "json"
+      }
+    },
+    "harness/sink.mjs": {
+      "construct": {
+        "IdempotentSink": "sink"
+      },
+      "invoke": {}
+    },
+    "harness/faults.mjs": {
+      "construct": {
+        "Faults": "faults"
+      },
+      "invoke": {}
+    },
+    "harness/renderer.mjs": {
+      "construct": {},
+      "invoke": {
+        "payloadDigest": "json",
+        "render": "json"
+      }
+    },
+    "harness/client.mjs": {
+      "construct": {},
+      "invoke": {
+        "submitReport": "json",
+        "workerTick": "json",
+        "jobView": "json"
+      }
+    },
+    "src/queue.mjs": {
+      "construct": {},
+      "invoke": {
+        "createQueue": "queue"
+      }
+    }
+  },
+  "calls": {
+    "store": {
+      "now": "json",
+      "advance": "json",
+      "read": "json",
+      "scan": "json",
+      "putIfAbsent": "json",
+      "cas": "json",
+      "transaction": "json"
+    },
+    "sink": {
+      "loseNextReply": "json",
+      "lookup": "json",
+      "putIfAbsent": "json",
+      "closeIfAbsent": "json",
+      "entries": "json"
+    },
+    "faults": {
+      "stop": "json",
+      "hook": "json",
+      "hit": "json"
+    },
+    "queue": {
+      "enqueue": "json",
+      "claim": "json",
+      "run": "json",
+      "cancel": "json",
+      "recover": "json",
+      "snapshot": "json"
+    }
+  },
+  "get": {
+    "store": [],
+    "sink": [],
+    "faults": [],
+    "queue": []
+  },
+  "functionKinds": [],
+  "references": {
+    "invoke:harness/client.mjs:submitReport": {
+      "/0": "queue"
+    },
+    "invoke:harness/client.mjs:workerTick": {
+      "/0": "queue"
+    },
+    "invoke:harness/client.mjs:jobView": {
+      "/0": "queue"
+    },
+    "invoke:src/queue.mjs:createQueue": {
+      "/0/store": "store",
+      "/0/sink": "sink",
+      "/0/faults": "faults"
+    }
+  },
+  "datasets": [
+    "data/requests.json"
+  ]
+}

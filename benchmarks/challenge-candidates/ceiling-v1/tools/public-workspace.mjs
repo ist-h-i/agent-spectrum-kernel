@@ -48,7 +48,8 @@ export function executionAdapterDigest() {
   const names = new Set(['public-workspace.mjs', 'candidate-worker.mjs', 'assertion-reporter.mjs', 'batch-executor.mjs']);
   const files = inventory(resolve(root, 'tools')).filter(file => names.has(file.path));
   if (files.length !== names.size) throw new Error('execution adapter inventory incomplete');
-  return canonicalDigest(files);
+  return canonicalDigest([...files.map(file => ({ ...file, path: 'tools/' + file.path })),
+    ...inventory(resolve(root, 'runtime')).map(file => ({ ...file, path: 'runtime/' + file.path }))]);
 }
 
 function candidate(id) {
@@ -140,7 +141,7 @@ export function freeze(id, workspace, out, metadata) {
   // are what downstream evaluators must consume.
   const frozen = verify(id, resolve(target, 'workspace'));
   if (!frozen.valid || canonicalDigest(observed.files) !== canonicalDigest(frozen.files) || adapterDigest !== executionAdapterDigest()) throw new Error('workspace or adapter changed during freeze');
-  const record = { version, ...metadata, id, runtime: process.version, input_digest: observed.input_digest,
+  const record = { version, ...metadata, id, controller_runtime: process.version, expected_runtime: 'v24.21.0', observed_runtime: null, input_digest: observed.input_digest,
     submission_digest: observed.submission_digest, workspace_digest: canonicalDigest(frozen.files), execution_adapter_digest: adapterDigest, files: frozen.files,
     evaluator_reference: null, quality_score: null, safety_blocker: null, ready_for_measurement: false };
   writeJson(resolve(target, 'submission.json'), record);

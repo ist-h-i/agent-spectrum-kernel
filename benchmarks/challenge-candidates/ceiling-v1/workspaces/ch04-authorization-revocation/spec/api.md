@@ -1,6 +1,6 @@
 # Document authorization API
 
-Node 24.19.0。`npm test` で公開テストを実行する。外部依存はない。
+Node 24.21.0。`npm test` で公開テストを実行する。外部依存はない。
 提出可能なのは `src/**`, `test/added/**`, `RESULT.md`。他のファイルは固定。
 
 ## Policy data
@@ -37,3 +37,5 @@ Node 24.19.0。`npm test` で公開テストを実行する。外部依存はな
 `beforeAccept(fn)` は次の beginChunk の不可分区間の直前に一度だけ同期実行される。ここで replace できるため「権限判定後、受理前の失効」を決定的に再現できる。比較失敗は `{status:'revision-conflict'}` であり何も受理しない。比較成功は `{status:'accepted',receipt}` で accepted map に保存。失効前に受理済みの chunk は、その後 `finish(receipt)` により完了できる。`finish` は completed 配列へ receipt ごとに一度だけ記録する。
 
 `loseNextReply()` は次の比較成功時、受理後に `{status:'unknown'}` を返す。accepted/completed は観測用で、サービスが unknown の解決や権限判定の代用として参照しない。`harness/clients.mjs` は固定利用側である。
+
+追加テストの有効性 10 点の提出形式・分離実行は `scenario-tests.md` に従う。通常の追加テストは `test/added/` で実行でき、採点用 scenario は `test/added/scenarios/` に置く。

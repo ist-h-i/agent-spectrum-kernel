@@ -19,3 +19,5 @@ transportの `load(t,r)` は行のcopy、`lookup(t,id)` は受理済み `{status
 `EditTransport(server)` は `accept(id,attempt?)` と `deliver(id,attempt?)` を分ける。acceptはサーバー確定、deliverは応答。sendの返すattemptは同operationId内の0起点通番で、省略時は最新の送信を選ぶ。再送後も古いattemptを受付・配信できる。duplicateはdeliverと同じ。disconnectは指定attemptの応答のみ停止する。pendingは全送信requestのcopy配列。有限の順序列で動作を確認する。
 
 `test/added/*.test.mjs` にはnode:testで回帰テストを追加できる。公開通常テストはseedで成功しても、全契約の成立を意味しない。
+
+追加テストの有効性 10 点の提出形式・分離実行は `scenario-tests.md` に従う。通常の追加テストは `test/added/` で実行でき、採点用 scenario は `test/added/scenarios/` に置く。

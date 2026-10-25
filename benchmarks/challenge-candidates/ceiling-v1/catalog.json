@@ -156,6 +156,6 @@
       "private_validation_status": "incomplete_execution_boundary_stopped"
     }
   ],
-  "public_runtime": "v24.19.0",
+  "public_runtime": "v24.21.0",
   "public_controller_path": "tools/public-workspace.mjs"
 }

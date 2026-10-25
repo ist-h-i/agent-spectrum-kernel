@@ -18,3 +18,5 @@
 固定rendererはJSON payloadを決定的bytes（文字列）へ変換する。title文字列とrows配列がなければ `code='PERMANENT'`。渡されたrendererがRETRYABLEをthrowする場合は再試行できる。全jobに公平なtickと回復後の十分な有限再試行がある場合、無関係なjobの処理と完了を妨げない。全拒否/常時停止は契約を満たさない。
 
 公開通常テストはseedの一般動作のみを確認する。追加回帰テストは `test/added/*.test.mjs`、確認記録はRESULT.mdへ。
+
+追加テストの有効性 10 点の提出形式・分離実行は `scenario-tests.md` に従う。通常の追加テストは `test/added/` で実行でき、採点用 scenario は `test/added/scenarios/` に置く。

@@ -16,7 +16,7 @@
 
 ## 公開 workspace の準備と確認
 
-Node `v24.19.0` を使います。依存 package の追加やネットワーク接続は不要です。repo root で以下を実行できます。
+新規 6 問の実行版は、既存の固定 Docker image で確認した Node `v24.21.0` です。公開準備ツールの host 検証には Node 24 系も使えます。依存 package の追加やネットワーク接続は不要です。repo root で以下を実行できます。
 
 ```sh
 node benchmarks/challenge-candidates/ceiling-v1/tools/seal-public-inputs.mjs

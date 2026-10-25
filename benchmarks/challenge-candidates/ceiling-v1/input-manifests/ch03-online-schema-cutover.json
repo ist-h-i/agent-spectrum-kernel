@@ -3,16 +3,24 @@
   "id": "ch03-online-schema-cutover",
   "namespace": "ceiling-v1",
   "scope": "public task.md and standalone workspace; no git history or evaluator",
-  "runtime": "v24.19.0",
-  "input_digest": "sha256:d100d2760e35e4742ecebdceb13b0e9c4a06114c1188a911fe361aa194d77b72",
+  "runtime": "v24.21.0",
+  "input_digest": "sha256:14b4ca69bac945a0ae53f3060a4acee23052e7cb653515f83548cd6b673746ac",
   "protected": [
     "data/prices.json",
     "harness/clients.mjs",
+    "harness/scenario-capabilities.json",
+    "harness/scenario-engine.mjs",
+    "harness/scenario-protocol.mjs",
+    "harness/scenario-reporter.mjs",
+    "harness/scenario-worker.mjs",
+    "harness/scenario.mjs",
     "harness/store.mjs",
     "package.json",
     "spec/api.md",
+    "spec/scenario-tests.md",
     "task.md",
-    "test/normal.test.mjs"
+    "test/normal.test.mjs",
+    "test/scenario-public.test.mjs"
   ],
   "submission": [
     "src/**",
@@ -31,19 +39,54 @@
       "bytes": 680
     },
     {
+      "path": "harness/scenario-capabilities.json",
+      "sha256": "15a2997b43babc1b3483619b388be8b214a1b673f81c0911b97d49ca4891735e",
+      "bytes": 1705
+    },
+    {
+      "path": "harness/scenario-engine.mjs",
+      "sha256": "6fd3d208090e5dcf69b6187cad1afebb4a18100a1a4b312ba0afd1a8a3514c67",
+      "bytes": 6861
+    },
+    {
+      "path": "harness/scenario-protocol.mjs",
+      "sha256": "a2b568ecd7f3b2d0bd0ccae19a7d1c54ceadec030305759a8649a3cf197318c6",
+      "bytes": 6021
+    },
+    {
+      "path": "harness/scenario-reporter.mjs",
+      "sha256": "0e2ce3f9618494897ac247c46c470444f326b12fc13910cb73bece53f7d976a7",
+      "bytes": 1122
+    },
+    {
+      "path": "harness/scenario-worker.mjs",
+      "sha256": "fc56f76c84be97256e7f3af919a804dd215cf5876e194ab68bebd064185f5fa0",
+      "bytes": 1068
+    },
+    {
+      "path": "harness/scenario.mjs",
+      "sha256": "621c442afd8e9f59c2bb4a60d0159cd9053454e89e158bd0a3ad654b0386d802",
+      "bytes": 1794
+    },
+    {
       "path": "harness/store.mjs",
       "sha256": "d205e8edf023546bc5d5b65804a016b381c40b04a323b7a85562b1315c66beb1",
       "bytes": 2029
     },
     {
       "path": "package.json",
-      "sha256": "32f5699d0c7872ec258fe7249a0bd2f33b9921b6598e29c00c20bb5f83d524a0",
+      "sha256": "891c44d65b75c53831da44b224142ea1c7a50ea5a98b06f747a133828b177f29",
       "bytes": 135
     },
     {
       "path": "spec/api.md",
-      "sha256": "be39608896f3ce62efd6aac6357b91ea4a28c9fa3bdea2d9e2ec0563af2185dd",
-      "bytes": 4940
+      "sha256": "7348f408c77d8f8ef6f9e1aa6dca9c679c89253366f3baf9b8f22f52fc483c6b",
+      "bytes": 5161
+    },
+    {
+      "path": "spec/scenario-tests.md",
+      "sha256": "453a1874fd29bcd6bd7f5fbf71fbebc1b2b3d55edb287770deb6e4ee85fd9295",
+      "bytes": 2879
     },
     {
       "path": "src/migration.mjs",
@@ -69,6 +112,11 @@
       "path": "test/normal.test.mjs",
       "sha256": "4799b78ecb2adb33c1606a14be6ca9c01e37ccb1578c57e22b6cb3da4b938aad",
       "bytes": 1445
+    },
+    {
+      "path": "test/scenario-public.test.mjs",
+      "sha256": "e14aa9c2f10d7b036d8d43dcdbabaef62543dd7d9c516488d5c7da568683d766",
+      "bytes": 1173
     }
   ]
 }

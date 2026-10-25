@@ -15,8 +15,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: '24.19.0'
+          node-version: '24.21.0'
       - name: Check public input seals
         run: node benchmarks/challenge-candidates/ceiling-v1/tools/seal-public-inputs.mjs
       - name: Verify fresh workspaces, public tests and submission boundaries
-        run: node --test benchmarks/challenge-candidates/ceiling-v1/tools/public-workspace.test.mjs
+        run: node --test benchmarks/challenge-candidates/ceiling-v1/tools/public-workspace.test.mjs benchmarks/challenge-candidates/ceiling-v1/tools/scenario-protocol.test.mjs benchmarks/challenge-candidates/ceiling-v1/tools/scenario-replay.test.mjs

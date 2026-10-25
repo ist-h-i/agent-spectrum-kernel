@@ -1,6 +1,6 @@
 # Price migration API
 
-Node 24.19.0。`npm test` で公開テストを実行する。外部依存はない。
+Node 24.21.0。`npm test` で公開テストを実行する。外部依存はない。
 提出可能なのは `src/**`, `test/added/**`, `RESULT.md`。その他は固定入力である。
 
 `src/migration.mjs` は `MigrationService` を export する。constructor は `PriceStore` を受け取る。各メソッドは同期処理で、非同期処理は checkpoint で再現する。公開利用側を変えずに内部の module を追加・変更できる。
@@ -29,3 +29,5 @@ control は `{revision,phase:'mixed'|'v2',epoch,writers,queue}`。
 `once('backfill:read',fn)` の fn は次の `checkpoint('backfill:read')` で一度だけ同期実行する。backfill は各候補 record を読み、CAS 前にこの checkpoint を呼ぶ。これで writer と backfill の交互実行を指定する。中断は hook から throw で再現し、サービスを同じ store で作り直せる。
 
 `harness/clients.mjs` は固定 reader/writer。現代版 client は cutover 後に新たに登録して新 epoch を取得する。古い client の失敗を勝手な再登録や queue 消去で隠さない。
+
+追加テストの有効性 10 点の提出形式・分離実行は `scenario-tests.md` に従う。通常の追加テストは `test/added/` で実行でき、採点用 scenario は `test/added/scenarios/` に置く。

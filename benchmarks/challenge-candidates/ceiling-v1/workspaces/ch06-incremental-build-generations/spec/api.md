@@ -16,4 +16,6 @@ Publisher: `publisher.publish({generation,results})` synchronously records a dee
 
 Cache reuse is allowed only for matching path, source, compiler version, config and dependency set/outputs; generation alone does not invalidate equivalent content. A successful repeated build with identical inputs must make zero additional compiler calls. After a local text edit, targets with unchanged inputs and dependency artifacts must reuse cache; unaffected independent targets make zero additional calls. Cold discovery can require an extra call, so efficiency is compared after one completed warm build. Never reuse a failed output as success. The total active compiler calls across overlapping generations must not exceed concurrency. Independent ready targets must progress once pending calls are fairly completed.
 
-Run `npm test` using Node 24.19.0, no dependency installation. Mutable submission paths are src/, test/added/, RESULT.md. Do not change fixed compiler, scheduler, clients, data, spec, package or original tests. `watch.mjs` materializes the finite artificial changes from data/watch-events.json.
+Run `npm test` using Node 24.21.0, no dependency installation. Mutable submission paths are src/, test/added/, RESULT.md. Do not change fixed compiler, scheduler, clients, data, spec, package or original tests. `watch.mjs` materializes the finite artificial changes from data/watch-events.json.
+
+追加テストの有効性 10 点の提出形式・分離実行は `scenario-tests.md` に従う。通常の追加テストは `test/added/` で実行でき、採点用 scenario は `test/added/scenarios/` に置く。

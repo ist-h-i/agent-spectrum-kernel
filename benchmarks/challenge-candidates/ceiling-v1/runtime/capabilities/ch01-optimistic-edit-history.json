@@ -1,0 +1,100 @@
+{
+  "version": "ceiling-scenario-v1",
+  "modules": {
+    "harness/server.mjs": {
+      "construct": {
+        "EditServer": "server"
+      },
+      "invoke": {
+        "rowKey": "json"
+      }
+    },
+    "harness/transport.mjs": {
+      "construct": {
+        "EditTransport": "transport"
+      },
+      "invoke": {}
+    },
+    "harness/views.mjs": {
+      "construct": {},
+      "invoke": {
+        "mountList": "view",
+        "mountDetail": "view"
+      }
+    },
+    "src/editor.mjs": {
+      "construct": {},
+      "invoke": {
+        "createEditor": "editor"
+      }
+    }
+  },
+  "calls": {
+    "server": {
+      "load": "json",
+      "lookup": "json",
+      "changesSince": "json",
+      "request": "json",
+      "external": "json"
+    },
+    "transport": {
+      "load": "json",
+      "lookup": "json",
+      "changesSince": "json",
+      "send": "transmission",
+      "accept": "json",
+      "deliver": "json",
+      "duplicate": "json",
+      "disconnect": "json",
+      "pending": "json"
+    },
+    "editor": {
+      "open": "unsubscribe",
+      "snapshot": "json",
+      "edit": "json",
+      "flush": "json",
+      "receive": "json",
+      "undo": "json",
+      "switchTenant": "json"
+    },
+    "view": {
+      "close": "json",
+      "current": "json"
+    },
+    "transmission": {
+      "cancel": "json"
+    }
+  },
+  "get": {
+    "server": [],
+    "transport": [],
+    "editor": [],
+    "view": [
+      "kind",
+      "frames"
+    ],
+    "transmission": [
+      "attempt"
+    ]
+  },
+  "functionKinds": [
+    "unsubscribe"
+  ],
+  "references": {
+    "construct:harness/transport.mjs:EditTransport": {
+      "/0": "server"
+    },
+    "invoke:harness/views.mjs:mountList": {
+      "/0": "editor"
+    },
+    "invoke:harness/views.mjs:mountDetail": {
+      "/0": "editor"
+    },
+    "invoke:src/editor.mjs:createEditor": {
+      "/0/transport": "transport"
+    }
+  },
+  "datasets": [
+    "data/rows.json"
+  ]
+}

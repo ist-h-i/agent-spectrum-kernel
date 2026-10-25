@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { candidates, executionAdapterDigest, freeze, prepare, root, verify } from './public-workspace.mjs';
 
 test('all six public seeds prepare, run and freeze separately from portfolio', () => {
-  assert.equal(process.version, 'v24.19.0', 'use the pinned fixture runtime');
+  assert.equal(Number(process.versions.node.split('.')[0]), 24, 'controller requires Node 24; fixture runtime is independently qualified');
   assert.equal(candidates().length, 6);
   for (const { id } of candidates()) {
     const temp = mkdtempSync(resolve(realpathSync(tmpdir()), 'ceiling-public-'));

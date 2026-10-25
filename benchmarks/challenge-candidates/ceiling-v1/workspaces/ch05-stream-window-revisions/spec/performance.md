@@ -1,6 +1,6 @@
 # Fixed measurement recipe ch05-load-v1
 
-Use Node **24.19.0**, one process, no competing benchmark, `node --expose-gc harness/measure.mjs`. Retain full JSON lines, OS/CPU/RAM identity and resource limits. Inputs come lazily from generator.mjs, not a retained array. No network or external dependency is needed. The sink uses a rolling digest and counts; it does not collect rows. The recipe is data/load.json and must not change after reference calibration or during model comparison.
+Use Node **24.21.0**, one process, no competing benchmark, `node --expose-gc harness/measure.mjs`. Retain full JSON lines, OS/CPU/RAM identity and resource limits. Inputs come lazily from generator.mjs, not a retained array. No network or external dependency is needed. The sink uses a rolling digest and counts; it does not collect rows. The recipe is data/load.json and must not change after reference calibration or during model comparison.
 
 Steady load: 4 tenants, 200 rounds, 128 new IDs/tenant/round, three revisions/ID (revision 2 deletes every seventh ID), width 1000 ms and L=200 ms. Times are round*1000+id. For each tenant/round, ingest revisions in increasing order, then advance only that tenant to (round+1)*1000+200. Thus at most 128 active IDs per currently loaded tenant/window, with bounded live cardinality and increasing closed history. This measures disposal of closed history separately from increasing live state.
 
