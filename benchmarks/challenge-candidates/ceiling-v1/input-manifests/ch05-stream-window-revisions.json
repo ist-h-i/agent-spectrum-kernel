@@ -4,13 +4,15 @@
   "namespace": "ceiling-v1",
   "scope": "public task.md and standalone workspace; no git history or evaluator",
   "runtime": "v24.21.0",
-  "input_digest": "sha256:8b09bbf6e77aca30f2b86a7c7b952356caf8222171f583118571406f6db67eec",
+  "input_digest": "sha256:55a90d23bfda170e5ea35c6d75950b4dd59ff21f1fd5fc70c8a97458f4021f49",
   "protected": [
     "data/load.json",
     "data/normal.json",
     "harness/consumer.mjs",
     "harness/generator.mjs",
+    "harness/measure-api.mjs",
     "harness/measure.mjs",
+    "harness/safe-json.mjs",
     "harness/scenario-capabilities.json",
     "harness/scenario-engine.mjs",
     "harness/scenario-protocol.mjs",
@@ -36,8 +38,8 @@
   "files": [
     {
       "path": "data/load.json",
-      "sha256": "8a53619ddfbe7482e2c49fccb0a464f43381bf760bef62fd81aa4c26bc8bcd56",
-      "bytes": 381
+      "sha256": "c30b678a36ee58a0c82e67b87e76b92f2a3a6dfb5f443165d1fecb6823f55dfd",
+      "bytes": 645
     },
     {
       "path": "data/normal.json",
@@ -55,9 +57,19 @@
       "bytes": 1052
     },
     {
+      "path": "harness/measure-api.mjs",
+      "sha256": "e9489ba6b0ff931b2cfd858a8bebe63bf77b5c854aa8604ef99fc65e00333183",
+      "bytes": 2273
+    },
+    {
       "path": "harness/measure.mjs",
-      "sha256": "3ffab4062c30089f31537808db1b2bef1c45c7c26d91e8ff2b9759da7d303a61",
-      "bytes": 1793
+      "sha256": "e2f4b2b8753adccabe4746486a4f06a4f429dd9432b55577aeb7418d7e256372",
+      "bytes": 134
+    },
+    {
+      "path": "harness/safe-json.mjs",
+      "sha256": "03e371c3d8cbb52bd15b17e60b6af5c8de94e6feb69674bd92602cc7aede4baf",
+      "bytes": 2264
     },
     {
       "path": "harness/scenario-capabilities.json",
@@ -91,8 +103,8 @@
     },
     {
       "path": "harness/sink.mjs",
-      "sha256": "dee9352c28fe99f86392c6c304e7d4c680ffd35a9137e9e31b40c72e681dbf3b",
-      "bytes": 802
+      "sha256": "731e2334b21c2d2bf5f0cf8929d306cdf1bf954d9df3e6e9e95d5e2ce27df844",
+      "bytes": 1168
     },
     {
       "path": "harness/small-check.mjs",
@@ -111,8 +123,8 @@
     },
     {
       "path": "spec/performance.md",
-      "sha256": "01697929e0bd315d3a871ac064a4da03a746e2992bf904ac01799607463481b7",
-      "bytes": 2411
+      "sha256": "da173111ab778c46ef2dbc47d4b429999e7fc57fbddfe46e36170a2ecee1cc96",
+      "bytes": 2880
     },
     {
       "path": "spec/scenario-tests.md",

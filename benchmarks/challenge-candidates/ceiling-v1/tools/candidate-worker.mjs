@@ -1,5 +1,6 @@
 // Public execution adapter. It receives inputs, never expected outputs or grading rules.
 import { readFileSync } from 'node:fs';
+import { safeData, safeStringify } from './safe-json.mjs';
 import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -7,9 +8,9 @@ const root = process.cwd(), program = JSON.parse(readFileSync(0, 'utf8'));
 const modules = new Map(), refs = new Map(), observations = {};
 const trustedError = Error, invalidPrograms = new WeakSet();
 const isInvalidProgram = invalidPrograms.has.bind(invalidPrograms), addInvalidProgram = invalidPrograms.add.bind(invalidPrograms);
-const encode = JSON.stringify, createRecord = Object.create, assignFields = Object.assign;
+const createRecord = Object.create, assignFields = Object.assign;
 const writeOutput = process.stdout.write.bind(process.stdout), transportNonce = program.transportNonce ?? null;
-function send(fields) { writeOutput(encode(assignFields(createRecord(null), fields, { transportNonce })) + '\n'); }
+function send(fields) { writeOutput(safeStringify(assignFields(createRecord(null), fields, { transportNonce })) + '\n'); }
 function programError(message) { const error = new trustedError(message); addInvalidProgram(error); return error; }
 function scan(value) {
   if (!value || typeof value !== 'object') return;
@@ -27,11 +28,7 @@ try {
   send({ status: isInvalidProgram(error) ? 'evaluator_input_error' : 'candidate_load_error', error: { name: error?.name ?? null, code: error?.code ?? null } });
   process.exit(0);
 }
-function snapshot(value) {
-  if (value === undefined || typeof value === 'function' || value instanceof Promise) return null;
-  if (value && typeof value === 'object' && !Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return null;
-  return JSON.parse(JSON.stringify(value, (_key, item) => typeof item === 'bigint' ? String(item) : item));
-}
+function snapshot(value) { return safeData(value); }
 function pathValue(value, path = []) { for (const key of path) value = value?.[key]; return value; }
 function value(input, args = []) {
   if (!input || typeof input !== 'object') return input;

@@ -6,9 +6,10 @@ const request = JSON.parse(readFileSync('.ceiling/request.json', 'utf8'));
 const workspace = process.cwd();
 const results = {};
 for (const item of request.programs ?? []) {
+  const resource = item.program.resourceProfile === 'ch05-load-v1';
   const transportNonce = randomBytes(32).toString('hex');
-  const result = spawnSync(process.execPath, ['--permission', `--allow-fs-read=${workspace}`, '.ceiling/worker.mjs'], {
-    cwd: workspace, input: JSON.stringify({ ...item.program, transportNonce }), encoding: 'utf8', timeout: 15000, maxBuffer: 4 * 1024 * 1024,
+  const result = spawnSync(process.execPath, [...(resource ? ['--expose-gc'] : []), '--permission', `--allow-fs-read=${workspace}`, '.ceiling/worker.mjs'], {
+    cwd: workspace, input: JSON.stringify({ ...item.program, transportNonce }), encoding: 'utf8', timeout: resource ? 90000 : 15000, maxBuffer: 4 * 1024 * 1024,
     env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/tmp', LANG: 'C' },
   });
   let output = null;

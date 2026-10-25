@@ -45,7 +45,7 @@ export function inventory(directory) {
 export function candidates() { return readJson(resolve(root, 'catalog.json')).candidates; }
 
 export function executionAdapterDigest() {
-  const names = new Set(['public-workspace.mjs', 'candidate-worker.mjs', 'assertion-reporter.mjs', 'batch-executor.mjs']);
+  const names = new Set(['public-workspace.mjs', 'candidate-worker.mjs', 'assertion-reporter.mjs', 'batch-executor.mjs', 'safe-json.mjs']);
   const files = inventory(resolve(root, 'tools')).filter(file => names.has(file.path));
   if (files.length !== names.size) throw new Error('execution adapter inventory incomplete');
   return canonicalDigest([...files.map(file => ({ ...file, path: 'tools/' + file.path })),

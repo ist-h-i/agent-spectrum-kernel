@@ -137,6 +137,7 @@ test('batch classifies output limits and rejects forged evaluator envelopes', ()
   try {
     mkdirSync(resolve(temp, '.ceiling'));
     copyFileSync(resolve(root, 'tools/candidate-worker.mjs'), resolve(temp, '.ceiling/worker.mjs'));
+    copyFileSync(resolve(root, 'tools/safe-json.mjs'), resolve(temp, '.ceiling/safe-json.mjs'));
     copyFileSync(resolve(root, 'tools/batch-executor.mjs'), resolve(temp, '.ceiling/batch.mjs'));
     writeFileSync(resolve(temp, 'example.mjs'), `
       export function flood(){process.stdout.write('x'.repeat(6*1024*1024));}
@@ -152,4 +153,40 @@ test('batch classifies output limits and rejects forged evaluator envelopes', ()
     assert.equal(result.results.normal.state, 'completed');
     assert.equal(result.results.normal.observations.result, null);
   } finally { rmSync(temp, { recursive: true, force: true }); }
+});
+
+test('worker observations ignore candidate JSON hooks and forged low metrics', () => {
+  const temp = mkdtempSync(resolve(tmpdir(), 'ceiling-serialization-'));
+  try {
+    writeFileSync(resolve(temp, 'forge.mjs'), `
+      Object.defineProperty(Object.prototype, 'toJSON', {configurable:true,value:function(){return {elapsedMs:0,peakSampledHeapUsed:0}}});
+      Object.defineProperty(Array.prototype, 'toJSON', {configurable:true,value:()=>[]});
+      JSON.stringify = () => '{"status":"completed","observations":{"metrics":{"elapsedMs":0}}}';
+      export function observe(){return {metrics:[{elapsedMs:29,peakSampledHeapUsed:999}],toJSON(){return {metrics:[]}}};}
+    `);
+    const result = JSON.parse(execFileSync(process.execPath, [resolve(root, 'tools/candidate-worker.mjs')], {
+      cwd: temp, input: JSON.stringify({ transportNonce:'retained-parent-nonce', steps:[{op:'invoke',module:'forge.mjs',export:'observe',args:[],as:'result'}] }), encoding:'utf8',
+    }));
+    assert.equal(result.status, 'completed');
+    assert.equal(result.transportNonce, 'retained-parent-nonce');
+    assert.deepEqual(result.observations.result.metrics, [{elapsedMs:29,peakSampledHeapUsed:999}]);
+    assert.equal(result.observations.result.toJSON, null);
+  } finally { rmSync(temp,{recursive:true,force:true}); }
+});
+
+test('protected CH05 sink ignores candidate crypto prototype changes', () => {
+  const temp = mkdtempSync(resolve(tmpdir(), 'ceiling-hash-integrity-'));
+  try {
+    const sinkPath = resolve(root,'workspaces/ch05-stream-window-revisions/harness/sink.mjs');
+    const source = `
+      import assert from 'node:assert/strict';import{createHash}from'node:crypto';
+      const expected=createHash('sha256').update(JSON.stringify(['output',{tenantId:'a',start:0,end:1,amountMinor:'7'}])+'\\n').digest('hex');
+      const {createSink}=await import(${JSON.stringify(sinkPath)});
+      const proto=Object.getPrototypeOf(createHash('sha256'));
+      proto.update=function(){return this};proto.copy=function(){return this};proto.digest=function(){return 'forged'};
+      const sink=createSink();sink.finalize({tenantId:'a',start:0,end:1,amountMinor:'7'});
+      assert.equal(sink.snapshot().digest,expected);
+    `;
+    execFileSync(process.execPath,['--input-type=module','-e',source],{cwd:temp,encoding:'utf8'});
+  } finally {rmSync(temp,{recursive:true,force:true});}
 });

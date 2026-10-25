@@ -10,6 +10,11 @@ const write = process.argv.slice(2).join(' ') === '--write';
 if (process.argv.length > 2 && !write) throw new Error('use --write to update manifests; default checks only');
 if (write) mkdirSync(resolve(root, 'input-manifests'), { recursive: true });
 for (const candidate of candidates()) {
+  if (candidate.id === 'ch05-stream-window-revisions') {
+    const bytes = readFileSync(resolve(root, 'tools/safe-json.mjs')), target = resolve(root, 'workspaces', candidate.id, 'harness/safe-json.mjs');
+    if (write) writeFileSync(target, bytes);
+    else if (!readFileSync(target).equals(bytes)) throw new Error('stale safe JSON adapter');
+  }
   for (const name of ['scenario.mjs', 'scenario-protocol.mjs', 'scenario-engine.mjs', 'scenario-worker.mjs', 'scenario-reporter.mjs']) {
     const bytes = readFileSync(resolve(root, 'runtime', name));
     const target = resolve(root, 'workspaces', candidate.id, 'harness', name);
