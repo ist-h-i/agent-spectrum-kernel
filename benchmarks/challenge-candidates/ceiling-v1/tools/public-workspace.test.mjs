@@ -93,12 +93,12 @@ test('trusted test reporter excludes empty files and stdout result forgery', () 
     const path = resolve(temp, 'control.test.mjs');
     for (const content of ['', `process.stdout.write('{"passed":99,"failed":0,"failures":[]}');`]) {
       writeFileSync(path, content);
-      const result = JSON.parse(execFileSync(process.execPath, ['--test', `--test-reporter=${resolve(root, 'tools/assertion-reporter.mjs')}`, path], { cwd: temp, encoding: 'utf8' }));
+      const result = JSON.parse(execFileSync(process.execPath, ['--test', `--test-reporter=${resolve(root, 'tools/assertion-reporter.mjs')}`, path], { cwd: temp, encoding: 'utf8', env: { PATH: process.env.PATH } }));
       assert.equal(result.passed, 0);
       assert.equal(result.failed, 0);
     }
     writeFileSync(path, `import test from 'node:test';import assert from 'node:assert/strict';test('body',()=>assert.equal(1,1));`);
-    const result = JSON.parse(execFileSync(process.execPath, ['--test', `--test-reporter=${resolve(root, 'tools/assertion-reporter.mjs')}`, path], { cwd: temp, encoding: 'utf8' }));
+    const result = JSON.parse(execFileSync(process.execPath, ['--test', `--test-reporter=${resolve(root, 'tools/assertion-reporter.mjs')}`, path], { cwd: temp, encoding: 'utf8', env: { PATH: process.env.PATH } }));
     assert.equal(result.passed, 1);
   } finally { rmSync(temp, { recursive: true, force: true }); }
 });
