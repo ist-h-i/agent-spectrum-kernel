@@ -1,0 +1,15 @@
+{
+  "recipeVersion": "ch05-load-v1",
+  "windowSize": 1000,
+  "allowedLateness": 200,
+  "tenants": 4,
+  "idsPerTenantPerRound": 128,
+  "revisionsPerId": 3,
+  "steadyRounds": 200,
+  "activeGrowthIdsPerTenant": 8192,
+  "repetitions": 3,
+  "timingLimitMs": null,
+  "heapLimitBytes": null,
+  "rssLimitBytes": null,
+  "thresholdStatus": "reference_and_environment_calibration_pending"
+}

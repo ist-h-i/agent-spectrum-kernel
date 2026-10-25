@@ -1,0 +1,11 @@
+{
+  "name": "ceiling-ch01-workspace",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.19.0"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

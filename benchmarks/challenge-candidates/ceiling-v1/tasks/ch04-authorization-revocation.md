@@ -16,6 +16,8 @@ policy storeはtenantごとに単調増加するrevisionを持ちます。権限
 
 exportは受付時と実行時の両方で権限を確認します。chunk開始はadapterの `beginChunk` 受付を境界とします。失効完了後に開始するchunkは新revisionで判定し、古い許可を使ってはいけません。失効前に開始した1chunkは完了を許します。結果不明の状態を成功として記録せず、取消・拒否の状態を利用者が確認できるようにします。
 
+権限判定に使ったrevisionの確認とchunk受理の間に失効する競合は、protected adapterが処理します。`beginChunk({expectedRevision,...})` は、policy変更と直列化した不可分な区間で現在revisionを比較し、一致する場合だけchunkを受理します。不一致なら受理せず `revision-conflict` を返します。提出コードは判定に使ったrevisionを渡し、不一致時は新しいpolicyで再判定します。判定後・受理前の失効は固定schedulerで再現できます。原子的保証を提出側の単なる「直前の確認」に依存させません。
+
 権限の追加やdeny解除も反映してください。すべてのキャッシュを無効化して常に拒否する変更は、正当な利用者の機能を壊します。ログに文書本文、秘密のリンクtoken、他tenantの情報を記録してはいけません。
 
 ## 提供資料

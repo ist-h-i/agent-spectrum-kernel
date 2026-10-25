@@ -1,0 +1,103 @@
+{
+  "version": "ceiling-public-v1",
+  "id": "ch02-durable-job-recovery",
+  "namespace": "ceiling-v1",
+  "scope": "public task.md and standalone workspace; no git history or evaluator",
+  "runtime": "v24.19.0",
+  "input_digest": "sha256:e6e6b9b8baf5f954dc77223db18246c6d2d049f7b1f4f079ada5eb18ad1a77ce",
+  "protected": [
+    "data/requests.json",
+    "harness/client.mjs",
+    "harness/faults.mjs",
+    "harness/renderer.mjs",
+    "harness/sink.mjs",
+    "harness/store.mjs",
+    "package-lock.json",
+    "package.json",
+    "spec/api.md",
+    "task.md",
+    "test/normal.test.mjs"
+  ],
+  "submission": [
+    "src/**",
+    "test/added/**",
+    "RESULT.md"
+  ],
+  "files": [
+    {
+      "path": "data/requests.json",
+      "sha256": "4920b9d6e64beb1d2ddc0a045da54cf6b61482eb33b06a587fdb63a90dca12d3",
+      "bytes": 159
+    },
+    {
+      "path": "harness/client.mjs",
+      "sha256": "dae86571c730a14a44f508707d42bdb58e785dad0a2105d224b89cfed9ff5cb1",
+      "bytes": 321
+    },
+    {
+      "path": "harness/faults.mjs",
+      "sha256": "50b9291f9f315ecebdae7a3fddbdeae83c611034b312c9f06992d197b3555779",
+      "bytes": 453
+    },
+    {
+      "path": "harness/renderer.mjs",
+      "sha256": "7dc8ab42427fd118948f44f157c4ca305e6a1166bfe368ba59a0e4db146da217",
+      "bytes": 722
+    },
+    {
+      "path": "harness/sink.mjs",
+      "sha256": "7d881f2649a54fe63941a4a75d1f016f939a72da19b946ad34f971ddcc31270b",
+      "bytes": 1183
+    },
+    {
+      "path": "harness/store.mjs",
+      "sha256": "6dbd6ceb9067f8d0cc292470e1346f630833d42b1dbf12f69f43162820360084",
+      "bytes": 1118
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "c227832530439806335fabadf7d6cf9e1d14db153213198aa26ed62b31caf139",
+      "bytes": 213
+    },
+    {
+      "path": "package.json",
+      "sha256": "ff5d6cc94fa535326cc00d4c6dd2b72721f3ba9cfc45d6134897593cf044e8eb",
+      "bytes": 166
+    },
+    {
+      "path": "RESULT.md",
+      "sha256": "ba9ebb859cfeecce1206fa7074df57005c7cd03138a111fddf39318348806838",
+      "bytes": 86
+    },
+    {
+      "path": "spec/api.md",
+      "sha256": "6666141e169b0b5f3ced829b7908aa8bc68dd3a446560a908772caeaa621c903",
+      "bytes": 4350
+    },
+    {
+      "path": "src/jobs.mjs",
+      "sha256": "473e08e63cb46461babd09df96010ff0e05032349372b0d54f6b7ffb5c3f2624",
+      "bytes": 510
+    },
+    {
+      "path": "src/queue.mjs",
+      "sha256": "555a2228ce073df1f9d067668e2c87d33cbbf17e71329da11ca9b77c97cf333d",
+      "bytes": 1911
+    },
+    {
+      "path": "task.md",
+      "sha256": "776fe125930514a0ff3f4f503e6768e15bb4ce0611af7954bd900374ce221f74",
+      "bytes": 3450
+    },
+    {
+      "path": "test/added/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "test/normal.test.mjs",
+      "sha256": "63ca6ca88ab117e067a686a508c0c1f268b4b05766a72159e472691d671db10f",
+      "bytes": 1628
+    }
+  ]
+}

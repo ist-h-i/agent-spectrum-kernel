@@ -1,0 +1,100 @@
+{
+  "version": "ceiling-public-v1",
+  "id": "ch05-stream-window-revisions",
+  "namespace": "ceiling-v1",
+  "scope": "public task.md and standalone workspace; no git history or evaluator",
+  "runtime": "v24.19.0",
+  "input_digest": "sha256:992daf9150146b546ba995c5deb9bf341b17d96cee5bf1a042efb0dc0a214e96",
+  "protected": [
+    "data/load.json",
+    "data/normal.json",
+    "harness/consumer.mjs",
+    "harness/generator.mjs",
+    "harness/measure.mjs",
+    "harness/sink.mjs",
+    "harness/small-check.mjs",
+    "package.json",
+    "spec/api.md",
+    "spec/performance.md",
+    "task.md",
+    "test/harness.test.mjs",
+    "test/normal.test.mjs"
+  ],
+  "submission": [
+    "src/**",
+    "test/added/**",
+    "RESULT.md"
+  ],
+  "files": [
+    {
+      "path": "data/load.json",
+      "sha256": "8a53619ddfbe7482e2c49fccb0a464f43381bf760bef62fd81aa4c26bc8bcd56",
+      "bytes": 381
+    },
+    {
+      "path": "data/normal.json",
+      "sha256": "2fc20f74c3f27abc6a9699870d1b032008cbf2c07eab21ff06fccea0566cc45b",
+      "bytes": 305
+    },
+    {
+      "path": "harness/consumer.mjs",
+      "sha256": "68b7280a7b9fcaf456bc031eaa9b40277b72f3e108b37f15336ea5e4955afb74",
+      "bytes": 175
+    },
+    {
+      "path": "harness/generator.mjs",
+      "sha256": "ad0fd99670bbae7baf6965dcdf53cef66c22dc903a44b4247536ce3ea3bc98b5",
+      "bytes": 1052
+    },
+    {
+      "path": "harness/measure.mjs",
+      "sha256": "3ffab4062c30089f31537808db1b2bef1c45c7c26d91e8ff2b9759da7d303a61",
+      "bytes": 1793
+    },
+    {
+      "path": "harness/sink.mjs",
+      "sha256": "dee9352c28fe99f86392c6c304e7d4c680ffd35a9137e9e31b40c72e681dbf3b",
+      "bytes": 802
+    },
+    {
+      "path": "harness/small-check.mjs",
+      "sha256": "9842b1cac209278c151ec114cb680932964a6b87f4d777932b8dff88038965a9",
+      "bytes": 500
+    },
+    {
+      "path": "package.json",
+      "sha256": "17d8ba8e7001b17ee69ef4e6174c6963a7ef30e2d7e733d1ebd32bf510b5c0d0",
+      "bytes": 219
+    },
+    {
+      "path": "spec/api.md",
+      "sha256": "1e911a7f241b3d7ce374b94c867f156fc60bba03a3129f2db8bc374d69bd6053",
+      "bytes": 3146
+    },
+    {
+      "path": "spec/performance.md",
+      "sha256": "46a14edf515ac78ba87a5892225f71fa0957e64f5f8fdc4cacbc16ada9fbe0d9",
+      "bytes": 2411
+    },
+    {
+      "path": "src/processor.mjs",
+      "sha256": "a6446e2267cf39e06968ecf0534112d040646e0c438cfd2ed07f62345f94fff4",
+      "bytes": 1524
+    },
+    {
+      "path": "task.md",
+      "sha256": "02401900cd801cb22265e12eadf6e6daadc93e3d28a744ff1eaa54d5f9fe4bb0",
+      "bytes": 3946
+    },
+    {
+      "path": "test/harness.test.mjs",
+      "sha256": "2fe601fa46b4bee77d0405cabe1a2ebb974ecd43c55d41a9b85ab07ce3d20807",
+      "bytes": 1448
+    },
+    {
+      "path": "test/normal.test.mjs",
+      "sha256": "14f2d4e70eb40f5fc3d0a97b83ce2e3e6c08991c50f7074c0e823193a6b72ccf",
+      "bytes": 1547
+    }
+  ]
+}

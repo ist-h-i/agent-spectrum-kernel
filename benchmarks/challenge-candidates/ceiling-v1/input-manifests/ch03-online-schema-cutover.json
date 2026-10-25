@@ -1,0 +1,74 @@
+{
+  "version": "ceiling-public-v1",
+  "id": "ch03-online-schema-cutover",
+  "namespace": "ceiling-v1",
+  "scope": "public task.md and standalone workspace; no git history or evaluator",
+  "runtime": "v24.19.0",
+  "input_digest": "sha256:d100d2760e35e4742ecebdceb13b0e9c4a06114c1188a911fe361aa194d77b72",
+  "protected": [
+    "data/prices.json",
+    "harness/clients.mjs",
+    "harness/store.mjs",
+    "package.json",
+    "spec/api.md",
+    "task.md",
+    "test/normal.test.mjs"
+  ],
+  "submission": [
+    "src/**",
+    "test/added/**",
+    "RESULT.md"
+  ],
+  "files": [
+    {
+      "path": "data/prices.json",
+      "sha256": "dbaa9cb36401e89715850ac6cb68ed20b07695d53f5facedcaf66dc3cc8864c5",
+      "bytes": 153
+    },
+    {
+      "path": "harness/clients.mjs",
+      "sha256": "24f6e245a8fa2c4dcdbd12597f8e73899b3a421486ce67357bb459d215486645",
+      "bytes": 680
+    },
+    {
+      "path": "harness/store.mjs",
+      "sha256": "d205e8edf023546bc5d5b65804a016b381c40b04a323b7a85562b1315c66beb1",
+      "bytes": 2029
+    },
+    {
+      "path": "package.json",
+      "sha256": "32f5699d0c7872ec258fe7249a0bd2f33b9921b6598e29c00c20bb5f83d524a0",
+      "bytes": 135
+    },
+    {
+      "path": "spec/api.md",
+      "sha256": "be39608896f3ce62efd6aac6357b91ea4a28c9fa3bdea2d9e2ec0563af2185dd",
+      "bytes": 4940
+    },
+    {
+      "path": "src/migration.mjs",
+      "sha256": "5962df921fe8154871c6c13d6ce93c61a512ae7f15a9373d0cc3ebd984ab70be",
+      "bytes": 2276
+    },
+    {
+      "path": "src/money.mjs",
+      "sha256": "f6cc69a442528a6ab2cc36fa1eb093c774a8ad67766611d81db86bf4cf83246d",
+      "bytes": 595
+    },
+    {
+      "path": "task.md",
+      "sha256": "6d35a0a55ae23960294dd1e20551bc96dfa73142061afdec8cc13b9de3bf4d34",
+      "bytes": 3118
+    },
+    {
+      "path": "test/added/.gitkeep",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "path": "test/normal.test.mjs",
+      "sha256": "4799b78ecb2adb33c1606a14be6ca9c01e37ccb1578c57e22b6cb3da4b938aad",
+      "bytes": 1445
+    }
+  ]
+}

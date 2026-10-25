@@ -1,17 +1,33 @@
-# Ceiling v1: 追加高難度課題の設計候補
+# Ceiling v1: 追加課題の公開 seed
 
 既存24問を維持したまま、天井効果の検証に使う6問を追加するための設計パッケージです。狙いはASKの得点を人為的に下げることではなく、通常動作だけでは満点にならない、解ける問題を用意することです。
 
 ## 現在の状態
 
-- 作成済み: 6問の問題文、公開入力の作成仕様、採点・校正方針、Codex向け作業指示。
-- 未作成: 実行用seed、公開回帰テスト、非公開evaluator、実行アダプターへの接続。
-- 未実施: 独立レビュー、モデル実行、採点器の不良検出検証、難易度の校正。
-- 本パッケージは `design_candidate`。実行可能なfixtureでも、既存portfolioの登録情報でもありません。
+- 作成済み: 6問の問題文、公開 seed、API・固定利用側・決定的 adapter、公開通常テスト、入力 manifest、準備・提出固定用 controller。
+- 未作成: 非公開 evaluator、正解例・別構造の正解、意味的人工不良、モデル実行との接続。非公開 root の指定待ちです。
+- 未実施: 採点器の不良検出検証、モデル実行、難易度校正、CH05 の正解実装による資源閾値の校正。
+- 状態は `public_seed_implemented_private_pending`。全問 `ready_for_measurement=false`、点数は null のままです。実装・検証・独立レビューの記録は [実装記録](implementation-status.md) に分けて残します。
 
 **追加6問について、固定したFull ASK条件で各課題の平均品質点30〜70点を探索的な校正目標とします。予測値や達成済みの結果ではありません。** 全条件・全試行がこの範囲に入る保証はなく、100点になる正しい解答も必須です。既存24問と合算した平均を30〜70点にする目標ではありません。
 
-依頼時の途中レポートは、共通20課題・9設定・各1回の固定R2参考採点です。24問すべての完了証拠としては扱いません。個人の実行ログやアップロードされたHTMLは、この公開PRに転載しません。
+既存24問の216試行は別成果物として完了済みです。この追加6問の実装や難度の証拠とは混同しません。個人の実行ログやアップロードされたHTMLは、この公開PRに転載しません。
+
+## 公開 workspace の準備と確認
+
+Node `v24.19.0` を使います。依存 package の追加やネットワーク接続は不要です。repo root で以下を実行できます。
+
+```sh
+node benchmarks/challenge-candidates/ceiling-v1/tools/seal-public-inputs.mjs
+node --test benchmarks/challenge-candidates/ceiling-v1/tools/public-workspace.test.mjs
+node benchmarks/challenge-candidates/ceiling-v1/tools/public-workspace.mjs list
+```
+
+`public-workspace.mjs prepare --id <ID> --out <新規の絶対パス>` は該当問題の task.md と公開 workspace だけを新規ディレクトリへコピーします。Git 履歴、設計文書、controller、manifest、採点器はコピーしません。出力先の親は事前に存在する必要があり、既存出力・symlink 経由のパスは拒否します。macOS の `/tmp`、`/var` など OS の alias も含め、親の実パスを使用してください。workspace 内で `npm test` を実行できます。seed の通常テスト成功は全契約の解決を意味しません。
+
+`verify --id <ID> --workspace <パス>` は、controller 側の固定 manifest に対して protected ファイルと提出範囲を検証します。`freeze --id <ID> --workspace <パス> --out <新規パス> --trial-id <ID> --model <実モデルID> --condition <条件ID>` は提出全体のコピーと digest、入力 digest、実行版の対応を保存します。合成検証ではモデル欄を `not-executed` とし、モデル試行として数えません。制御側の検証とコピーの間に入力が変われば完了 manifest を発行しません。
+
+この controller は提出コードを実行せず、採点やモデル推論を行いません。freeze は OS による不変化や実行隔離の代替ではありません。測定側は許可された公開入力だけを持つ別実行環境を使用し、採点側は固定コピーの digest を確認してから、提出コードが非公開 root を読めない境界で実行する必要があります。既存の evaluator authority・入場・採点を迂回して正式スコアを発行する接続ではありません。
 
 ## 追加する問題
 

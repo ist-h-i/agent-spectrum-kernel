@@ -1,0 +1,22 @@
+name: Ceiling public fixtures
+
+on:
+  pull_request:
+    paths:
+      - 'benchmarks/challenge-candidates/ceiling-v1/**'
+      - 'scripts/**'
+      - '.github/workflows/ceiling-public-fixtures.yml'
+  workflow_dispatch:
+
+jobs:
+  public-inputs:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24.19.0'
+      - name: Check public input seals
+        run: node benchmarks/challenge-candidates/ceiling-v1/tools/seal-public-inputs.mjs
+      - name: Verify fresh workspaces, public tests and submission boundaries
+        run: node --test benchmarks/challenge-candidates/ceiling-v1/tools/public-workspace.test.mjs

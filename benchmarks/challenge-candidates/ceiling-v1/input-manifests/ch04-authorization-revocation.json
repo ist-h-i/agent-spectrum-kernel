@@ -1,0 +1,74 @@
+{
+  "version": "ceiling-public-v1",
+  "id": "ch04-authorization-revocation",
+  "namespace": "ceiling-v1",
+  "scope": "public task.md and standalone workspace; no git history or evaluator",
+  "runtime": "v24.19.0",
+  "input_digest": "sha256:737eb4935d7ba2c2626b2e759b8c49381d54d6ad1dfdf0e70f424b070e9e3f56",
+  "protected": [
+    "data/policies.json",
+    "harness/clients.mjs",
+    "harness/policy-store.mjs",
+    "package.json",
+    "spec/api.md",
+    "task.md",
+    "test/normal.test.mjs"
+  ],
+  "submission": [
+    "src/**",
+    "test/added/**",
+    "RESULT.md"
+  ],
+  "files": [
+    {
+      "path": "data/policies.json",
+      "sha256": "df352feb3c09494f505cf60a52be6be7eae3456f8eb3a24b7247fc5bba9c267f",
+      "bytes": 501
+    },
+    {
+      "path": "harness/clients.mjs",
+      "sha256": "e79069f3e57e48ecc309156b7f8c8014168286523aba495224273243b4320197",
+      "bytes": 471
+    },
+    {
+      "path": "harness/policy-store.mjs",
+      "sha256": "3ed39d4e70945b594de4b8b4039dd0d86fdf3c2ccea4c6fe14ddaad915d3a449",
+      "bytes": 1975
+    },
+    {
+      "path": "package.json",
+      "sha256": "e7ec1d1091d372538625548d3cf59c7e27130939787d55c71a44f7f9b07ade67",
+      "bytes": 135
+    },
+    {
+      "path": "spec/api.md",
+      "sha256": "d49d7c723ec2d9dc4c9bd01a3ff4e240970fb0133817ced31660320574d9dfd5",
+      "bytes": 5871
+    },
+    {
+      "path": "src/policy.mjs",
+      "sha256": "1fd83b2c095062de5644edc3d92bf7ab92347bfc74b95c47f066556cf9683290",
+      "bytes": 320
+    },
+    {
+      "path": "src/service.mjs",
+      "sha256": "360f41ee197534c4f8af6e8ddbc7b03668e6bf154e6105b01f5beb33e33d49f5",
+      "bytes": 2659
+    },
+    {
+      "path": "task.md",
+      "sha256": "cc28d4c3075f9b0719300b53cb3e8e9cd5ac7dda9ed05ee3a2f70a11bd121742",
+      "bytes": 3723
+    },
+    {
+      "path": "test/added/.gitkeep",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "path": "test/normal.test.mjs",
+      "sha256": "3c1fa921ee926bbe6613967441113349e4a8a5a1f8f20d8aecf225e3bec8de04",
+      "bytes": 2653
+    }
+  ]
+}
