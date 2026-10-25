@@ -4,7 +4,7 @@ import { copyFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSyn
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
-import { candidates, freeze, prepare, root, verify } from './public-workspace.mjs';
+import { candidates, executionAdapterDigest, freeze, prepare, root, verify } from './public-workspace.mjs';
 
 test('all six public seeds prepare, run and freeze separately from portfolio', () => {
   assert.equal(process.version, 'v24.19.0', 'use the pinned fixture runtime');
@@ -30,6 +30,7 @@ test('all six public seeds prepare, run and freeze separately from portfolio', (
       assert.equal(record.evaluator_reference, null);
       assert.equal(record.ready_for_measurement, false);
       assert.equal(record.submission_digest, verify(id, workspace).submission_digest);
+      assert.equal(record.execution_adapter_digest, executionAdapterDigest());
       assert.equal(verify(id, resolve(temp, 'frozen/workspace')).valid, true);
       assert.throws(() => prepare(id, workspace), /EEXIST/u);
       assert.throws(() => freeze(id, workspace, resolve(temp, 'missing-fields'), {}), /missing trial_id/u);

@@ -44,6 +44,13 @@ export function inventory(directory) {
 
 export function candidates() { return readJson(resolve(root, 'catalog.json')).candidates; }
 
+export function executionAdapterDigest() {
+  const names = new Set(['public-workspace.mjs', 'candidate-worker.mjs', 'assertion-reporter.mjs', 'batch-executor.mjs']);
+  const files = inventory(resolve(root, 'tools')).filter(file => names.has(file.path));
+  if (files.length !== names.size) throw new Error('execution adapter inventory incomplete');
+  return canonicalDigest(files);
+}
+
 function candidate(id) {
   const record = candidates().find(item => item.id === id);
   if (!record) throw new Error(`unknown ceiling candidate: ${id}`);
@@ -121,6 +128,7 @@ export function freeze(id, workspace, out, metadata) {
     if (typeof metadata?.[field] !== 'string' || !metadata[field].trim()) throw new Error(`missing ${field}`);
   }
   const observed = verify(id, workspace);
+  const adapterDigest = executionAdapterDigest();
   if (!observed.valid) throw new Error(observed.violations.join('\n'));
   const target = newOutput(out);
   for (const file of observed.files) {
@@ -131,9 +139,9 @@ export function freeze(id, workspace, out, metadata) {
   // Detect input changes during capture; the frozen bytes, rather than source paths,
   // are what downstream evaluators must consume.
   const frozen = verify(id, resolve(target, 'workspace'));
-  if (!frozen.valid || canonicalDigest(observed.files) !== canonicalDigest(frozen.files)) throw new Error('workspace changed during freeze');
+  if (!frozen.valid || canonicalDigest(observed.files) !== canonicalDigest(frozen.files) || adapterDigest !== executionAdapterDigest()) throw new Error('workspace or adapter changed during freeze');
   const record = { version, ...metadata, id, runtime: process.version, input_digest: observed.input_digest,
-    submission_digest: observed.submission_digest, workspace_digest: canonicalDigest(frozen.files), files: frozen.files,
+    submission_digest: observed.submission_digest, workspace_digest: canonicalDigest(frozen.files), execution_adapter_digest: adapterDigest, files: frozen.files,
     evaluator_reference: null, quality_score: null, safety_blocker: null, ready_for_measurement: false };
   writeJson(resolve(target, 'submission.json'), record);
   return record;

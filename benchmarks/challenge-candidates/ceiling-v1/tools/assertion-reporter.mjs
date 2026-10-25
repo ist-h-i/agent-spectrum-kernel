@@ -8,7 +8,8 @@ export default async function* report(source) {
       failed++;
       const error = event.data.details?.error;
       failures.push({ name: event.data.name, type: error?.failureType ?? null,
-        code: error?.cause?.code ?? error?.code ?? null });
+        code: error?.cause?.code ?? error?.code ?? null,
+        operator: error?.cause?.operator ?? error?.operator ?? null });
     }
   }
   yield JSON.stringify({ passed, failed, failures }) + '\n';
