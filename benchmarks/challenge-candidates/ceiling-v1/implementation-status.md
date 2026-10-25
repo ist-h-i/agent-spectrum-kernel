@@ -40,3 +40,4 @@ Implementation Contract: `ceiling-v1-implementation-r1`。上流は `codex-work-
 - Docker の新規実行・image pull・設定変更・モデル推論は行っていない。全問の最終採点境界での検証、独立した非公開検証、CH05 の資源閾値固定、正式採点結果の発行は残件。品質点・blocker・難度は未確定のまま保持する。
 - 追加の独立静的レビューは公開 `e94fce95`、非公開 authoring manifest を対象に実施。公開テスト 4/4・非公開 syntax 40/40 を確認した。追加テストの例外を広く assertion へ変換する経路に関する指摘を受け、該当 wrapper を撤去し、reporter に assertion operator の分類を追加した。修正版の動作は承認済み境界で再検証するまで未確認。
 - Docker 検証の準備: 既存 transport の source と static import closure を digest 固定。予定は各問 2 正解・103 意味ケース・90 独立不良・seed・追加テスト制御を含む本体 150 コンテナ、資源・隔離・独立確認を含め最大 192 コンテナ。bundle 全体 120 秒、個別 program 15 秒、追加テスト 20 秒、cleanup 予約 15 秒。各 create 前に消費枠を原子的に記録し、終了・削除の確認がない場合は不成立のまま保持する。全結果は repo 外に保存する。Docker 実行は承認回答まで保留。
+- 最終静的レビューは公開 `b0f1b4ea` と非公開 authoring digest を対象に実施。入れ子テストの親失敗の重複、欠測結果の扱い、採点 semantics と実行版の結合に関する 3 指摘を受け、対応を実装した。公開テストは 5/5 成功。非公開側は構文確認のみで、修正版全体の動作・再独立確認は未完了。

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -101,5 +101,21 @@ test('trusted test reporter excludes empty files and stdout result forgery', () 
     writeFileSync(path, `import test from 'node:test';import assert from 'node:assert/strict';test('body',()=>assert.equal(1,1));`);
     const result = JSON.parse(execFileSync(process.execPath, ['--test', `--test-reporter=${resolve(root, 'tools/assertion-reporter.mjs')}`, path], { cwd: temp, encoding: 'utf8', env: { PATH: process.env.PATH } }));
     assert.equal(result.passed, 1);
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+});
+
+test('reporter distinguishes nested body assertions and broad exception wrappers', () => {
+  const temp = mkdtempSync(resolve(realpathSync(tmpdir()), 'ceiling-nested-reporter-'));
+  try {
+    const path = resolve(temp, 'nested.test.mjs');
+    writeFileSync(path, `import{describe,it}from'node:test';import assert from'node:assert/strict';describe('suite',()=>it('body',()=>assert.equal(1,2)));`);
+    const result = spawnSync(process.execPath, ['--test', `--test-reporter=${resolve(root, 'tools/assertion-reporter.mjs')}`, path], { cwd: temp, encoding: 'utf8', env: { PATH: process.env.PATH } });
+    assert.equal(result.status, 1);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.failed, 1);
+    assert.deepEqual(report.failures.map(item => [item.type, item.code, item.operator]), [['testCodeFailure', 'ERR_ASSERTION', 'strictEqual']]);
+    writeFileSync(path, `import test from'node:test';import assert from'node:assert/strict';test('wrapped',()=>assert.doesNotThrow(()=>{throw Error('setup')}));`);
+    const wrapper = spawnSync(process.execPath, ['--test', `--test-reporter=${resolve(root, 'tools/assertion-reporter.mjs')}`, path], { cwd: temp, encoding: 'utf8', env: { PATH: process.env.PATH } });
+    assert.equal(JSON.parse(wrapper.stdout).failures[0].operator, 'doesNotThrow');
   } finally { rmSync(temp, { recursive: true, force: true }); }
 });
