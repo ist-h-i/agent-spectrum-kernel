@@ -6,7 +6,7 @@
 
 - 作成済み: 6問の問題文、公開 seed、API・固定利用側・決定的 adapter、公開通常テスト、入力 manifest、準備・提出固定用 controller。
 - 作成済み（repo 外）: 非公開 evaluator の初期実装、各問 2 構造の正解例、各問 12 件以上の意味的人工不良、同一追加テスト。秘密内容は公開しません。
-- 未完了: 全問の承認済み実行境界での採点器検証・独立検証、モデル実行との接続、CH05 の最終採点環境での資源閾値固定。native sandbox 経路は停止し、既存 Docker の再利用を read-only で確認しました。
+- 未完了: 全問の承認済み実行境界での採点器検証・独立検証、追加テスト 10 点のソース非開示境界、モデル実行との接続、CH05 の最終採点環境での資源閾値固定。native sandbox 経路は停止し、既存 Docker の再利用を read-only で確認しました。非公開解のソースを提出テストへ渡す route は停止しています。
 - 未実施: モデル実行、難易度校正。
 - 状態は `public_seed_verified_private_validation_incomplete`。全問 `ready_for_measurement=false`、点数は null のままです。実装・検証・独立レビューの記録は [実装記録](implementation-status.md) に分けて残します。
 
