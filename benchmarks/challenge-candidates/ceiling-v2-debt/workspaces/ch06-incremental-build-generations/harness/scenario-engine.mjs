@@ -3,6 +3,8 @@ import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateScenario } from './scenario-protocol.mjs';
 
+const mapArray = Function.call.bind(Array.prototype.map);
+
 export async function executeScenario(input, capabilities, workspace = process.cwd()) {
   const program = validateScenario(input, capabilities), refs = new Map(), observations = Object.create(null), modules = new Map();
   let executed = 0;
@@ -10,10 +12,10 @@ export async function executeScenario(input, capabilities, workspace = process.c
   function project(value) {
     if (value === undefined || typeof value === 'function') return null;
     if (typeof value === 'bigint') return String(value);
-    if (value instanceof Map) return { size: value.size, entries: [...value].map(([key, item]) => [project(key), project(item)]) };
-    if (Array.isArray(value)) return value.map(project);
+    if (value instanceof Map) return { size: value.size, entries: mapArray([...value], ([key, item]) => [project(key), project(item)]) };
+    if (Array.isArray(value)) return mapArray(value, project);
     if (value && typeof value === 'object') {
-      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, project(item)]));
+      return Object.fromEntries(mapArray(Object.entries(value), ([key, item]) => [key, project(item)]));
     }
     return value;
   }

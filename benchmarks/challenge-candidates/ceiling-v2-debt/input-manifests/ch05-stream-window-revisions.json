@@ -1,7 +1,7 @@
 {
   "version": "ceiling-public-v2-debt",
   "id": "ch05-stream-window-revisions",
-  "input_digest": "sha256:d274bc758fc0626e379da625a8e6f4d6053713d55bd4c780a79b98ef57b2108b",
+  "input_digest": "sha256:4103a865db1aeccbf99d9de82f32191e6e99ebd6a104acd62d0dc3f6e1c5860e",
   "files": [
     {
       "path": "data/load.json",
@@ -50,8 +50,8 @@
     },
     {
       "path": "harness/scenario-engine.mjs",
-      "sha256": "6fd3d208090e5dcf69b6187cad1afebb4a18100a1a4b312ba0afd1a8a3514c67",
-      "bytes": 6861
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
     },
     {
       "path": "harness/scenario-protocol.mjs",

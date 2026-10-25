@@ -1,7 +1,7 @@
 {
   "version": "ceiling-public-v2-debt",
   "id": "ch03-online-schema-cutover",
-  "input_digest": "sha256:df6a62280eea9fb1699de9ba2185bbacdcd5281566422eea2b309b76ae677f98",
+  "input_digest": "sha256:8b8544a1440ef4a92bd3837de5a987bcbf352921513b9a28c000a6edbe7169f8",
   "files": [
     {
       "path": "data/normal-scenario.json",
@@ -25,8 +25,8 @@
     },
     {
       "path": "harness/scenario-engine.mjs",
-      "sha256": "6fd3d208090e5dcf69b6187cad1afebb4a18100a1a4b312ba0afd1a8a3514c67",
-      "bytes": 6861
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
     },
     {
       "path": "harness/scenario-protocol.mjs",

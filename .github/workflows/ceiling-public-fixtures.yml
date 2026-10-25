@@ -22,4 +22,4 @@ jobs:
       - name: Verify fresh workspaces, public tests and submission boundaries
         run: node --test benchmarks/challenge-candidates/ceiling-v1/tools/public-workspace.test.mjs benchmarks/challenge-candidates/ceiling-v1/tools/scenario-protocol.test.mjs benchmarks/challenge-candidates/ceiling-v1/tools/scenario-replay.test.mjs
       - name: Check versioned debt inputs and execution boundaries
-        run: node --test benchmarks/challenge-candidates/ceiling-v2-debt/tools/public-workspace.test.mjs
+        run: node --test benchmarks/challenge-candidates/ceiling-v2-debt/tools/public-workspace.test.mjs benchmarks/challenge-candidates/ceiling-v2-debt/tools/array-projection.test.mjs

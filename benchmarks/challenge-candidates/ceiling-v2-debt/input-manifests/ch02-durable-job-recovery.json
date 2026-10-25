@@ -1,7 +1,7 @@
 {
   "version": "ceiling-public-v2-debt",
   "id": "ch02-durable-job-recovery",
-  "input_digest": "sha256:54db51345ed7f2e72cd6c1863ec02f3f4a2633a24e76e03bb13953602503e888",
+  "input_digest": "sha256:eb70d268a64449f90a926589d56b04f95fd96e3b8ec82bee19ae45bd83343f8c",
   "files": [
     {
       "path": "data/legacy-jobs-v1.json",
@@ -45,8 +45,8 @@
     },
     {
       "path": "harness/scenario-engine.mjs",
-      "sha256": "6fd3d208090e5dcf69b6187cad1afebb4a18100a1a4b312ba0afd1a8a3514c67",
-      "bytes": 6861
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
     },
     {
       "path": "harness/scenario-protocol.mjs",

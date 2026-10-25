@@ -1,7 +1,7 @@
 {
   "version": "ceiling-public-v2-debt",
   "id": "ch06-incremental-build-generations",
-  "input_digest": "sha256:506f6803163cf3e03f2808a2097b903e855157186aee2687cd83d23fcfc40fb2",
+  "input_digest": "sha256:1f49f559887b28a1aee31e9beaef4bbb7d056fda0b2e827fefbaeb0f218e31ea",
   "files": [
     {
       "path": "data/monorepo.json",
@@ -40,8 +40,8 @@
     },
     {
       "path": "harness/scenario-engine.mjs",
-      "sha256": "6fd3d208090e5dcf69b6187cad1afebb4a18100a1a4b312ba0afd1a8a3514c67",
-      "bytes": 6861
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
     },
     {
       "path": "harness/scenario-protocol.mjs",

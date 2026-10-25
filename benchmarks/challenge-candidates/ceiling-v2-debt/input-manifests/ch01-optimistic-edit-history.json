@@ -1,7 +1,7 @@
 {
   "version": "ceiling-public-v2-debt",
   "id": "ch01-optimistic-edit-history",
-  "input_digest": "sha256:c450b7570868249a01b97fb8f8a6f9b518657288f8f0da383457b9db18054758",
+  "input_digest": "sha256:7fc1e38ff3638ab93c13ceae4234128aa3d77011f06598bc2c2af33784d4c547",
   "files": [
     {
       "path": "data/legacy-drafts-v1.json",
@@ -30,8 +30,8 @@
     },
     {
       "path": "harness/scenario-engine.mjs",
-      "sha256": "6fd3d208090e5dcf69b6187cad1afebb4a18100a1a4b312ba0afd1a8a3514c67",
-      "bytes": 6861
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
     },
     {
       "path": "harness/scenario-protocol.mjs",

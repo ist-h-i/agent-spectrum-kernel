@@ -1,7 +1,7 @@
 {
   "version": "ceiling-public-v2-debt",
   "id": "ch04-authorization-revocation",
-  "input_digest": "sha256:ec479ff40661ccc50995cde81236bf057479235b63e347ee19f19e56acbf10a4",
+  "input_digest": "sha256:f4e80f11d4597a832f43faf55d9822b73d6fa84c6dfff737e933d2cf1c7175bf",
   "files": [
     {
       "path": "data/normal-scenario.json",
@@ -30,8 +30,8 @@
     },
     {
       "path": "harness/scenario-engine.mjs",
-      "sha256": "6fd3d208090e5dcf69b6187cad1afebb4a18100a1a4b312ba0afd1a8a3514c67",
-      "bytes": 6861
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
     },
     {
       "path": "harness/scenario-protocol.mjs",
