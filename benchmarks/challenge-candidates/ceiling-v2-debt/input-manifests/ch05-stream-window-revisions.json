@@ -1,7 +1,7 @@
 {
   "version": "ceiling-public-v2-debt",
   "id": "ch05-stream-window-revisions",
-  "input_digest": "sha256:4103a865db1aeccbf99d9de82f32191e6e99ebd6a104acd62d0dc3f6e1c5860e",
+  "input_digest": "sha256:aa5328767bb93f94ac2883d271d729f3f08cf0f196ba48790aaed1dfec1d6380",
   "files": [
     {
       "path": "data/load.json",
@@ -15,8 +15,8 @@
     },
     {
       "path": "harness/checkpoint-client.mjs",
-      "sha256": "bc795c06571c2332b6fc63e2628434101a3d2da1693811df3e1a8a8eeb79e236",
-      "bytes": 147
+      "sha256": "ed39ff2f8f5afe3580a06da4cccfb4d985732d143ba6c432843b83779e787f0d",
+      "bytes": 385
     },
     {
       "path": "harness/consumer.mjs",
@@ -45,8 +45,8 @@
     },
     {
       "path": "harness/scenario-capabilities.json",
-      "sha256": "b8135f3e2f144a9e5a42c1276956bcd17bbe8d0ba7676b87c9b6ee1c06ca17e9",
-      "bytes": 2025
+      "sha256": "833ebfa74e33cb4db666944a67facc5c28ab1323e8c088b38f9011c59e3568bd",
+      "bytes": 2164
     },
     {
       "path": "harness/scenario-engine.mjs",

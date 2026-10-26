@@ -45,7 +45,8 @@
     },
     "harness/checkpoint-client.mjs": {
       "invoke": {
-        "alterExport": "json"
+        "alterExport": "json",
+        "alterExportThenIngest": "json"
       }
     }
   },
@@ -88,6 +89,9 @@
       "/0/sink": "sink"
     },
     "invoke:src/legacy.mjs:createLegacyConsumer": {
+      "/0": "pipeline"
+    },
+    "invoke:harness/checkpoint-client.mjs:alterExportThenIngest": {
       "/0": "pipeline"
     }
   },
