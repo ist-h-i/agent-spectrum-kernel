@@ -5,6 +5,7 @@ on:
     paths:
       - 'benchmarks/challenge-candidates/ceiling-v1/**'
       - 'benchmarks/challenge-candidates/ceiling-v2-debt/**'
+      - 'benchmarks/challenge-candidates/ceiling-v3-causal/**'
       - 'scripts/**'
       - '.github/workflows/ceiling-public-fixtures.yml'
   workflow_dispatch:
@@ -23,3 +24,5 @@ jobs:
         run: node --test benchmarks/challenge-candidates/ceiling-v1/tools/public-workspace.test.mjs benchmarks/challenge-candidates/ceiling-v1/tools/scenario-protocol.test.mjs benchmarks/challenge-candidates/ceiling-v1/tools/scenario-replay.test.mjs
       - name: Check versioned debt inputs and execution boundaries
         run: node --test benchmarks/challenge-candidates/ceiling-v2-debt/tools/public-workspace.test.mjs benchmarks/challenge-candidates/ceiling-v2-debt/tools/array-projection.test.mjs
+      - name: Check causal version input seals and protocol boundaries
+        run: node --test benchmarks/challenge-candidates/ceiling-v3-causal/tools/public-workspace.test.mjs benchmarks/challenge-candidates/ceiling-v3-causal/tools/array-projection.test.mjs

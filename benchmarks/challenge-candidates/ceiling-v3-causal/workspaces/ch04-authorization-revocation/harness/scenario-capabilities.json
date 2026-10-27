@@ -1,0 +1,152 @@
+{
+  "version": "ceiling-scenario-v1",
+  "modules": {
+    "harness/policy-store.mjs": {
+      "construct": {
+        "PolicyStore": "policies",
+        "ContextStore": "contexts",
+        "ChunkAdapter": "sink",
+        "CapabilityStore": "capabilities"
+      },
+      "invoke": {}
+    },
+    "src/service.mjs": {
+      "construct": {
+        "DocumentService": "service"
+      },
+      "invoke": {}
+    },
+    "src/legacy.mjs": {
+      "construct": {},
+      "invoke": {
+        "createLegacyLookup": "legacyLookup"
+      }
+    },
+    "harness/consumers.mjs": {
+      "construct": {},
+      "invoke": {
+        "mountList": "view",
+        "mountDetail": "view",
+        "legacyLookup": "legacyLookup",
+        "legacyExport": "legacyExport"
+      }
+    }
+  },
+  "calls": {
+    "policies": {
+      "snapshot": "json",
+      "revision": "json",
+      "replace": "json",
+      "deliver": "json",
+      "subscribe": "release",
+      "stats": "json"
+    },
+    "contexts": {
+      "open": "json",
+      "get": "json",
+      "replace": "json",
+      "close": "json"
+    },
+    "sink": {
+      "beforeAccept": "json",
+      "loseNextReply": "json",
+      "beginChunk": "json",
+      "finish": "json",
+      "receipt": "json",
+      "cancel": "json",
+      "snapshot": "json"
+    },
+    "service": {
+      "openContext": "json",
+      "switchContext": "json",
+      "closeContext": "json",
+      "decide": "json",
+      "list": "json",
+      "detail": "json",
+      "refresh": "json",
+      "requestExport": "json",
+      "runChunk": "json",
+      "completeChunk": "json",
+      "cancelExport": "json",
+      "exportStatus": "json",
+      "close": "json",
+      "subscribe": "release"
+    },
+    "view": {
+      "getLast": "json",
+      "close": "json"
+    },
+    "legacyLookup": {
+      "read": "json"
+    },
+    "legacyExport": {
+      "start": "json",
+      "tick": "json",
+      "ack": "json",
+      "cancel": "json",
+      "status": "json"
+    },
+    "capabilities": {
+      "get": "json",
+      "now": "json",
+      "grant": "json",
+      "replace": "json",
+      "revoke": "json",
+      "advance": "json",
+      "revisions": "json",
+      "deliver": "json",
+      "stats": "json",
+      "subscribe": "release"
+    }
+  },
+  "get": {
+    "policies": [],
+    "contexts": [],
+    "sink": [
+      "accepted",
+      "completed"
+    ],
+    "service": [],
+    "view": [
+      "frames"
+    ],
+    "legacyLookup": [],
+    "legacyExport": [],
+    "capabilities": []
+  },
+  "functionKinds": [
+    "release"
+  ],
+  "references": {
+    "construct:harness/policy-store.mjs:ChunkAdapter": {
+      "/0": "policies",
+      "/1": "contexts",
+      "/2": "capabilities"
+    },
+    "construct:src/service.mjs:DocumentService": {
+      "/0": "policies",
+      "/1": "contexts",
+      "/2": "capabilities",
+      "/3": "sink"
+    },
+    "invoke:src/legacy.mjs:createLegacyLookup": {
+      "/0": "service"
+    },
+    "invoke:harness/consumers.mjs:mountList": {
+      "/0": "service"
+    },
+    "invoke:harness/consumers.mjs:mountDetail": {
+      "/0": "service"
+    },
+    "invoke:harness/consumers.mjs:legacyLookup": {
+      "/0": "service"
+    },
+    "invoke:harness/consumers.mjs:legacyExport": {
+      "/0": "service"
+    }
+  },
+  "datasets": [
+    "data/policies.json",
+    "data/normal-scenario.json"
+  ]
+}

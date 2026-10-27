@@ -1,0 +1,31 @@
+{
+  "north": {
+    "revision": 1,
+    "users": [
+      "alice",
+      "bob"
+    ],
+    "groups": {},
+    "resources": {
+      "report": {
+        "parent": null,
+        "body": "monthly bulletin"
+      }
+    },
+    "rules": [
+      {
+        "subject": "user:alice",
+        "resource": "report",
+        "action": "read",
+        "effect": "allow"
+      },
+      {
+        "subject": "user:alice",
+        "resource": "report",
+        "action": "export",
+        "effect": "allow"
+      }
+    ],
+    "links": {}
+  }
+}

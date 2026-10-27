@@ -1,0 +1,157 @@
+{
+  "version": "ceiling-public-v3-causal",
+  "id": "ch06-incremental-build-generations",
+  "input_digest": "sha256:eddff82a053bcf888c41c0dfb3bb290254d782f2a829b2a30055da1e70fa0254",
+  "files": [
+    {
+      "path": "data/monorepo.json",
+      "sha256": "88c66dfa8cb5bf782977d3bcaa64db2482339d5c78af04b26306e84f0a6d8609",
+      "bytes": 313
+    },
+    {
+      "path": "data/watch-events.json",
+      "sha256": "ead73198a3ff9af15a99730aeb61e0b4efb30dd4bdeea9df9f3bc3deb35b4ba2",
+      "bytes": 331
+    },
+    {
+      "path": "harness/compiler.mjs",
+      "sha256": "59988aaccca4759ba58511fdaf58e52fe550ea8ca6190a759857efa95f338fe3",
+      "bytes": 3922
+    },
+    {
+      "path": "harness/consumer.mjs",
+      "sha256": "475d5d7b4f42485c4345c1c1295ffed8f0bd2d3dec7bb5842c6ca959e64aacb2",
+      "bytes": 413
+    },
+    {
+      "path": "harness/publisher.mjs",
+      "sha256": "24f72badc164ac425be8506d8e54156c012c838f823fdf86593dc1215d5026c5",
+      "bytes": 586
+    },
+    {
+      "path": "harness/safe-json.mjs",
+      "sha256": "03e371c3d8cbb52bd15b17e60b6af5c8de94e6feb69674bd92602cc7aede4baf",
+      "bytes": 2264
+    },
+    {
+      "path": "harness/scenario-capabilities.json",
+      "sha256": "d4983a44e785ff40d66a9a757b50f45f8b3d243dcd3474a073155ea4015db1f5",
+      "bytes": 1768
+    },
+    {
+      "path": "harness/scenario-engine.mjs",
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
+    },
+    {
+      "path": "harness/scenario-protocol.mjs",
+      "sha256": "a2b568ecd7f3b2d0bd0ccae19a7d1c54ceadec030305759a8649a3cf197318c6",
+      "bytes": 6021
+    },
+    {
+      "path": "harness/scenario-reporter.mjs",
+      "sha256": "0e2ce3f9618494897ac247c46c470444f326b12fc13910cb73bece53f7d976a7",
+      "bytes": 1122
+    },
+    {
+      "path": "harness/scenario-worker.mjs",
+      "sha256": "fc56f76c84be97256e7f3af919a804dd215cf5876e194ab68bebd064185f5fa0",
+      "bytes": 1068
+    },
+    {
+      "path": "harness/scenario.mjs",
+      "sha256": "621c442afd8e9f59c2bb4a60d0159cd9053454e89e158bd0a3ad654b0386d802",
+      "bytes": 1794
+    },
+    {
+      "path": "harness/scheduler.mjs",
+      "sha256": "0f822455bc8a8579a71b42d3e89a4e574d26b9ff70f6acec5c43e22a789c427d",
+      "bytes": 518
+    },
+    {
+      "path": "harness/watch.mjs",
+      "sha256": "e66a8c5ecee309c1025d4b4969318f322ee62c029e826f2ec0407d09bc245725",
+      "bytes": 445
+    },
+    {
+      "path": "package.json",
+      "sha256": "e676339a9bdf238add650990809ab403a048c14c33599addaf9fc78e8d818480",
+      "bytes": 146
+    },
+    {
+      "path": "RESULT.md",
+      "sha256": "50b70761b78e199d11e7260a3ec71f66e5cd120786045c9a832b62b74362ea95",
+      "bytes": 134
+    },
+    {
+      "path": "spec/api.md",
+      "sha256": "0662f8059c0e3a89a105a1071e61a63f20631c60b7a588a322f46551c8a6df81",
+      "bytes": 4055
+    },
+    {
+      "path": "spec/index.md",
+      "sha256": "96ea8c64900ec5dc9aff0a5df37b0c25f47d51172f707468c62d38a7a310cfbf",
+      "bytes": 453
+    },
+    {
+      "path": "spec/provider.md",
+      "sha256": "a202dc397d790d0253db91e7de1eded37ac3f8288ee2c17dd0a67e30ee6f3e09",
+      "bytes": 2230
+    },
+    {
+      "path": "spec/resources.md",
+      "sha256": "7080005aa060683645f373e931ae26150163e4983ac9f394f3100620b1fc31eb",
+      "bytes": 1947
+    },
+    {
+      "path": "spec/scenario-tests.md",
+      "sha256": "453a1874fd29bcd6bd7f5fbf71fbebc1b2b3d55edb287770deb6e4ee85fd9295",
+      "bytes": 2879
+    },
+    {
+      "path": "src/builder.mjs",
+      "sha256": "f1063d675db939e79a028fd283e473544728202d261212c3effde96640b499b8",
+      "bytes": 303
+    },
+    {
+      "path": "src/engine.mjs",
+      "sha256": "a100b4576ccc6819016647bdd9f2013865dca7578332f8299a928a4a9a9561cb",
+      "bytes": 5047
+    },
+    {
+      "path": "src/normalize.mjs",
+      "sha256": "e5a3471e219b7b77e9ca46726b642236d01a106e59f13a3548ca0b91d5623686",
+      "bytes": 1316
+    },
+    {
+      "path": "src/pool.mjs",
+      "sha256": "8782beac8641a48b15ba18b7ea97d686beee3c076e1713f5549196eef4fd5f18",
+      "bytes": 583
+    },
+    {
+      "path": "src/workspace.mjs",
+      "sha256": "e15a9dfd15f2eafa29276e2512f972b282aabcb689ca122182a3de7792dc1934",
+      "bytes": 2793
+    },
+    {
+      "path": "task.md",
+      "sha256": "fbba3182df2edadad7eb6dbb97646b6ddd0118f76b2183de8ca452e5bef7172e",
+      "bytes": 1027
+    },
+    {
+      "path": "test/added/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "test/normal.test.mjs",
+      "sha256": "d51b9aff0e520d2caa718794264d91d99c3da7ec8b5f1ee8d4c3462317691afd",
+      "bytes": 1101
+    },
+    {
+      "path": "test/scenario-public.test.mjs",
+      "sha256": "832f841942683e49bafcb74106acbd66775e2295b7e97042db6d4dd0671b5626",
+      "bytes": 697
+    }
+  ]
+}

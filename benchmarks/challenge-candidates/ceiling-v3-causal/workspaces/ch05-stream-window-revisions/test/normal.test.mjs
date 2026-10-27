@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {createPipeline} from '../src/pipeline.mjs';import {createLegacyConsumer} from '../src/legacy.mjs';import {createSink} from '../harness/sink.mjs';
+test('mixed clients replace a revision once',()=>{const sink=createSink(),p=createPipeline({windowSize:100,allowedLateness:20,sink}),old=createLegacyConsumer(p);p.ingest({tenantId:'a',eventId:'e',revision:0,eventTime:10,amountMinor:'7',deleted:false});old.push({tenant:'a',id:'e',rev:1,at:10,cents:'9',remove:false});p.advanceWatermark('a',120);assert.equal(sink.snapshot().outputs[0].amountMinor,'9');});
+test('ordinary batch returns accepted count',()=>{const p=createPipeline({windowSize:100,allowedLateness:20,sink:createSink()});assert.deepEqual(p.ingestBatch([]),{accepted:true,count:0});});

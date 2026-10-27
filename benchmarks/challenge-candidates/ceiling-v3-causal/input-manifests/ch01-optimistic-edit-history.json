@@ -1,0 +1,167 @@
+{
+  "version": "ceiling-public-v3-causal",
+  "id": "ch01-optimistic-edit-history",
+  "input_digest": "sha256:f18acd825c2264c5ed96124c0a9ae7a8549dc1ab7b0e2ad25f8b41897acabcb4",
+  "files": [
+    {
+      "path": "data/legacy-drafts-v1.json",
+      "sha256": "87168033826a5b12a5823057b792a78595718b5b9adc51586e93fa965d4e7955",
+      "bytes": 319
+    },
+    {
+      "path": "data/rows.json",
+      "sha256": "39ecbc29bcd9f946a52624cea537d18bfdd63c9a98bde6ef92594adc0dd3a967",
+      "bytes": 227
+    },
+    {
+      "path": "harness/legacy-clients.mjs",
+      "sha256": "fa8852b0de781f08ad73d954cc9fe102d0dfe0c8f999edd6c342607b7a742b4f",
+      "bytes": 467
+    },
+    {
+      "path": "harness/safe-json.mjs",
+      "sha256": "03e371c3d8cbb52bd15b17e60b6af5c8de94e6feb69674bd92602cc7aede4baf",
+      "bytes": 2264
+    },
+    {
+      "path": "harness/scenario-capabilities.json",
+      "sha256": "d929ac52e2b15fe27a45cfbf1219dc9ba5d2677d0b020a7b6705cde5da999a91",
+      "bytes": 3237
+    },
+    {
+      "path": "harness/scenario-engine.mjs",
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
+    },
+    {
+      "path": "harness/scenario-protocol.mjs",
+      "sha256": "a2b568ecd7f3b2d0bd0ccae19a7d1c54ceadec030305759a8649a3cf197318c6",
+      "bytes": 6021
+    },
+    {
+      "path": "harness/scenario-reporter.mjs",
+      "sha256": "0e2ce3f9618494897ac247c46c470444f326b12fc13910cb73bece53f7d976a7",
+      "bytes": 1122
+    },
+    {
+      "path": "harness/scenario-worker.mjs",
+      "sha256": "fc56f76c84be97256e7f3af919a804dd215cf5876e194ab68bebd064185f5fa0",
+      "bytes": 1068
+    },
+    {
+      "path": "harness/scenario.mjs",
+      "sha256": "621c442afd8e9f59c2bb4a60d0159cd9053454e89e158bd0a3ad654b0386d802",
+      "bytes": 1794
+    },
+    {
+      "path": "harness/server.mjs",
+      "sha256": "7f5d0b2bf0c739e49e21aa88d5b6df1d87f0718e5984208fe68afad6f3249488",
+      "bytes": 2405
+    },
+    {
+      "path": "harness/session-store.mjs",
+      "sha256": "95b94e4d70101b9fb6c23157b30803dd0a7aac2a144a87d394cd1e8b67d11872",
+      "bytes": 753
+    },
+    {
+      "path": "harness/transport.mjs",
+      "sha256": "00d462457bbbec97ab0820ef4377ddbf4198adce68c61fe4372b920a0a81a8be",
+      "bytes": 1714
+    },
+    {
+      "path": "harness/views.mjs",
+      "sha256": "e87fe48a9f5e1f2b0bd6480a853daa7ee7866e8a75c424548c4b6e87e4cd8c4d",
+      "bytes": 392
+    },
+    {
+      "path": "package.json",
+      "sha256": "30c22ab1533b889db95f5ca83cc0b2bf2087a72a77020271ef35da9dc1630b50",
+      "bytes": 166
+    },
+    {
+      "path": "RESULT.md",
+      "sha256": "7058d380d27ad2bf6188ea4b77767355aacdc14207544630193098ff19d0263b",
+      "bytes": 83
+    },
+    {
+      "path": "spec/adapters.md",
+      "sha256": "6e7bd64e1fbd54355f7820d0b2b9281ea395a46cf4abfddeb31773cb2d9ff962",
+      "bytes": 2363
+    },
+    {
+      "path": "spec/api.md",
+      "sha256": "f0c180f48aacad1107109e8218d5fb1a6629c5df604713a61f0fa246da04c100",
+      "bytes": 602
+    },
+    {
+      "path": "spec/behavior.md",
+      "sha256": "764b7001fb87977747e385ba2c150307009942cf35e114b8f5118b9bc5b40a27",
+      "bytes": 2738
+    },
+    {
+      "path": "spec/continuity.md",
+      "sha256": "a3bec75d9b1cefff07da1ec81df3fc805710a756a1ecd6250ae974fe09df9fa9",
+      "bytes": 3074
+    },
+    {
+      "path": "spec/scenario-tests.md",
+      "sha256": "453a1874fd29bcd6bd7f5fbf71fbebc1b2b3d55edb287770deb6e4ee85fd9295",
+      "bytes": 2879
+    },
+    {
+      "path": "src/core.mjs",
+      "sha256": "1b857864925b3a833e6a1586c823b8eb3dad5498e7a9e4a6025b35cc32fd6bc6",
+      "bytes": 3608
+    },
+    {
+      "path": "src/editor.mjs",
+      "sha256": "6072afd59dc6590c494ca8bef71404ef5685f131fc5b201c28f491c7309b0696",
+      "bytes": 1419
+    },
+    {
+      "path": "src/history.mjs",
+      "sha256": "4802cf89d310327225fd71a4bb1fa70688e52eb79c82fd29914277bb15a384dc",
+      "bytes": 186
+    },
+    {
+      "path": "src/legacy.mjs",
+      "sha256": "95572bd3d8364f2f28673ece120808671d30815595ee244b745f8654909e7e77",
+      "bytes": 603
+    },
+    {
+      "path": "src/session.mjs",
+      "sha256": "11a53d26c8a86aeeaea44832a3dd8e748751cc20acd6106828e1448911c9dfef",
+      "bytes": 402
+    },
+    {
+      "path": "task.md",
+      "sha256": "75c589fb4adc2eb0ef41345fa273cf2bf76583bd9a7eabf34a72f5a5e8d328d9",
+      "bytes": 1080
+    },
+    {
+      "path": "test/added/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "test/compatibility.test.mjs",
+      "sha256": "5b41ba109220ab60db81eb25850bfeaadcc861f0d76760aa8e5d7c158822bc07",
+      "bytes": 891
+    },
+    {
+      "path": "test/normal.test.mjs",
+      "sha256": "f3bd368c6f8d55b6f7ff61a9faf4a8a8c3f0a0a4f7b3ac4ec572f2e7bfe6944b",
+      "bytes": 1547
+    },
+    {
+      "path": "test/provider-contract.test.mjs",
+      "sha256": "a8a405ccdce5c3ebfd197ec13c56a9a14aa7fe97585315e61d36916037ff881b",
+      "bytes": 486
+    },
+    {
+      "path": "test/scenario-public.test.mjs",
+      "sha256": "03a33c9ca1109a1ad23887e4e82ad81e9a65f03ca2e2cf797810df2b61052e8c",
+      "bytes": 2152
+    }
+  ]
+}
