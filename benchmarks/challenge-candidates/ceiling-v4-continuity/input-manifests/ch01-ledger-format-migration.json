@@ -1,0 +1,117 @@
+{
+  "version": "ceiling-public-v4-continuity",
+  "id": "ch01-ledger-format-migration",
+  "input_digest": "sha256:02e96f8c9c11dc080d584319bc664173e1c9c049fb43ca2890922e1c7da69258",
+  "files": [
+    {
+      "path": "harness/consumers.mjs",
+      "sha256": "bf32367142094bbdba0216cb5b3b25a617b4fc26b90cf91c5a6a3f31db7ef569",
+      "bytes": 223
+    },
+    {
+      "path": "harness/journal.mjs",
+      "sha256": "e7a4a1a77e43c2dd1481bdcbac5049ba055c1b1baa60c4e889b3d026ce26e9f6",
+      "bytes": 2662
+    },
+    {
+      "path": "harness/legacy.mjs",
+      "sha256": "e577d6dd1315eb74a398abcddf599e79355a5ce57fe54a2308be50e17b91d2bd",
+      "bytes": 1501
+    },
+    {
+      "path": "harness/scenario-capabilities.json",
+      "sha256": "785cc7d4b28d363c3559509b3caf9cfaaba85b8204906e9b31d9472301c4bb21",
+      "bytes": 1490
+    },
+    {
+      "path": "harness/scenario-engine.mjs",
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
+    },
+    {
+      "path": "harness/scenario-protocol.mjs",
+      "sha256": "a2b568ecd7f3b2d0bd0ccae19a7d1c54ceadec030305759a8649a3cf197318c6",
+      "bytes": 6021
+    },
+    {
+      "path": "harness/scenario-reporter.mjs",
+      "sha256": "0e2ce3f9618494897ac247c46c470444f326b12fc13910cb73bece53f7d976a7",
+      "bytes": 1122
+    },
+    {
+      "path": "harness/scenario-worker.mjs",
+      "sha256": "fc56f76c84be97256e7f3af919a804dd215cf5876e194ab68bebd064185f5fa0",
+      "bytes": 1068
+    },
+    {
+      "path": "harness/scenario.mjs",
+      "sha256": "621c442afd8e9f59c2bb4a60d0159cd9053454e89e158bd0a3ad654b0386d802",
+      "bytes": 1794
+    },
+    {
+      "path": "package.json",
+      "sha256": "a5c563ad84b50c14bcee945b601d72aa8401a88782f03ea027f7d8cd8c72c281",
+      "bytes": 171
+    },
+    {
+      "path": "spec/api.md",
+      "sha256": "d56235c82349dfc745ea370d800e2945fc8201f2703077158fa2ab5f337d8e67",
+      "bytes": 3845
+    },
+    {
+      "path": "spec/durability.md",
+      "sha256": "c38e2579a3aed28cb18818e3513275127e066af65b55a9c98a20341423725509",
+      "bytes": 2037
+    },
+    {
+      "path": "spec/providers.md",
+      "sha256": "770167dfef9e4b521baca6c9be09c82f281dd8706dbfee75d36a6433f3e89fcf",
+      "bytes": 3221
+    },
+    {
+      "path": "spec/requirements.md",
+      "sha256": "35a604bf1aa24d3376adac8a475376f8fef205834dd1f8ac9d143bcb2714fc0f",
+      "bytes": 2709
+    },
+    {
+      "path": "spec/scenario-tests.md",
+      "sha256": "33e0b22113fb3dfacd26b19b8e806ea8b093d9f3c9b94a55f488d82d071a6f0a",
+      "bytes": 1156
+    },
+    {
+      "path": "src/codec.mjs",
+      "sha256": "007749133425422110bb72289062d2bfe3e907d82aa07d3ac3e0a07da88059e3",
+      "bytes": 965
+    },
+    {
+      "path": "src/events.mjs",
+      "sha256": "18b12806dd55b9c65372499e9f2bd58336216f9a9db6221bea058bb6c5bc6ea4",
+      "bytes": 332
+    },
+    {
+      "path": "src/ledger.mjs",
+      "sha256": "f25de5f50fd117e133692ec56bd51cc0239108312db7a2a197b4c8ec7f6fa898",
+      "bytes": 1415
+    },
+    {
+      "path": "src/migration.mjs",
+      "sha256": "74db70fee69acf8afcf8a484705cec5ae7bd8c5268953823889330d98a412344",
+      "bytes": 630
+    },
+    {
+      "path": "src/read.mjs",
+      "sha256": "7486c85793db0c0f69bbb1e2d2a6c4e5ef1f9033e257f920dd233f94a1d00b04",
+      "bytes": 162
+    },
+    {
+      "path": "task.md",
+      "sha256": "79b14f4ffbf4f2d665e61e2e00bd1f06d074910388bfa8239a52a0180ebb9b47",
+      "bytes": 1131
+    },
+    {
+      "path": "test/contract.test.mjs",
+      "sha256": "698a7fd36286f3a748a13c45ee0c3774f9b59266a949ce5f4a9894e1642a4b62",
+      "bytes": 1043
+    }
+  ]
+}

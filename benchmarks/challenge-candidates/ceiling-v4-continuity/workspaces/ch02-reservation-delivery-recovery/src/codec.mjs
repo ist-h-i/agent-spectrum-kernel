@@ -1,0 +1,6 @@
+export const error = code => { throw Object.assign(new Error(code),{code}); };
+export const text = value => typeof value==='string'&&/^[\x21-\x7e]{1,40}$/.test(value);
+export function identity(tenant,id){if(!text(tenant)||!text(id))error('INVALID_INPUT');return JSON.stringify([tenant,id]);}
+export function order(tenant,id,payload){const key=identity(tenant,id);if(!payload||typeof payload!=='object'||!text(payload.sku)||!Number.isInteger(payload.quantity)||payload.quantity<1||payload.quantity>100)error('INVALID_INPUT');return {key,tenant,id,sku:payload.sku,quantity:payload.quantity,digest:JSON.stringify([tenant,id,payload.sku,payload.quantity])};}
+export function decode(row){if(!row)return null;if(row.format===2)return structuredClone(row);if(row.format!==1)error('INCONSISTENT');const state={pending:'queued',working:'running',done:'delivered',aborted:'cancelled',error:'rejected'}[row.status];if(!state)error('INCONSISTENT');const base=order(row.tenant,row.id,{sku:row.item,quantity:row.count});return {...base,format:2,revision:row.revision,state,token:0,lease:state==='running'?{worker:row.owner,token:0,until:row.deadline}:null,receipt:state==='delivered'?row.receipt:null,reason:state==='rejected'?row.error:null};}
+export const terminal = row => ['delivered','cancelled','rejected'].includes(row.state);

@@ -1,0 +1,129 @@
+{
+  "version": "ceiling-scenario-v1",
+  "modules": {
+    "harness/providers.mjs": {
+      "construct": {
+        "Journal": "journal",
+        "Inventory": "inventory",
+        "Delivery": "delivery",
+        "Faults": "faults"
+      },
+      "invoke": {}
+    },
+    "src/service.mjs": {
+      "construct": {},
+      "invoke": {
+        "createService": "service"
+      }
+    },
+    "src/worker.mjs": {
+      "construct": {},
+      "invoke": {
+        "workerTick": "json"
+      }
+    },
+    "src/legacy.mjs": {
+      "construct": {},
+      "invoke": {
+        "createLegacy": "legacy"
+      }
+    },
+    "harness/clients.mjs": {
+      "construct": {},
+      "invoke": {
+        "legacySubmit": "json",
+        "legacyPoll": "json",
+        "legacyCancel": "json",
+        "audit": "json"
+      }
+    }
+  },
+  "calls": {
+    "journal": {
+      "now": "json",
+      "advance": "json",
+      "read": "json",
+      "insert": "json",
+      "cas": "json",
+      "page": "json",
+      "dump": "json",
+      "stats": "json",
+      "once": "json",
+      "loseNextReply": "json"
+    },
+    "inventory": {
+      "reserve": "json",
+      "finish": "json",
+      "lookup": "json",
+      "dump": "json",
+      "stats": "json",
+      "once": "json",
+      "loseNextReply": "json"
+    },
+    "delivery": {
+      "putIfAbsent": "json",
+      "closeIfAbsent": "json",
+      "lookup": "json",
+      "dump": "json",
+      "stats": "json",
+      "once": "json",
+      "loseNextReply": "json"
+    },
+    "faults": {
+      "stop": "json",
+      "hook": "json",
+      "hit": "json"
+    },
+    "service": {
+      "submit": "json",
+      "claim": "json",
+      "run": "json",
+      "cancel": "json",
+      "recover": "json",
+      "snapshot": "json",
+      "recoverPage": "json"
+    },
+    "legacy": {
+      "submit": "json",
+      "poll": "json",
+      "cancel": "json"
+    }
+  },
+  "get": {
+    "journal": [],
+    "inventory": [],
+    "delivery": [],
+    "faults": [],
+    "service": [],
+    "legacy": []
+  },
+  "functionKinds": [],
+  "references": {
+    "invoke:src/service.mjs:createService": {
+      "/0/journal": "journal",
+      "/0/inventory": "inventory",
+      "/0/delivery": "delivery",
+      "/0/faults": "faults"
+    },
+    "invoke:src/worker.mjs:workerTick": {
+      "/0": "service"
+    },
+    "invoke:src/legacy.mjs:createLegacy": {
+      "/0": "service",
+      "/1": "journal"
+    },
+    "invoke:harness/clients.mjs:legacySubmit": {
+      "/0": "service"
+    },
+    "invoke:harness/clients.mjs:legacyCancel": {
+      "/0": "service"
+    },
+    "invoke:harness/clients.mjs:legacyPoll": {
+      "/0": "journal"
+    },
+    "invoke:harness/clients.mjs:audit": {
+      "/0": "journal"
+    }
+  },
+  "datasets": []
+}

@@ -1,0 +1,9 @@
+# 継続稼働中の注文配送サービス
+
+既存の注文クライアントと監査ジョブを維持し、在庫の予約・配送・取消・再開を一貫した結果へ収束させてください。サービスの生成し直しや、provider imageからの復元でも同じ要求を扱います。公開契約はspec/、既存callerはharness/clients.mjs、永続providerはharness/providers.mjsです。
+
+変更対象はsrc/とtest/added/です。harness/、spec/、data/、既存test/は固定です。srcの内部構造は自由ですが、公開factory、既存caller、永続wireは互換である必要があります。providerに跨るtransactionはありません。
+
+通常要件85点は公開requirementごとの固定重み、変更範囲5点、提出追加テスト10点です。ケース追加で要求の重みは変わりません。重大な外部副作用違反は点数とは別に判定します。実装の方式や非公開採点内容への依存は要求しません。
+
+提出追加テストはspec/scenario-tests.mdのデータ形式を使い、最大16の異なるscenarioを登録できます。各scenarioは正しい実装で通り意味のある不良でassertionが失敗する必要があります。import/setup失敗や常時失敗は検出に数えません。
