@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { verifyBuildOptionBaseline } from "./test-helpers-build-option-baseline.mjs";
+import { assertBuildOptionBaselineChecks } from "./test-build-option-baseline.mjs";
 import { createHash } from "node:crypto";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createRequire, syncBuiltinESMExports } from "node:module";
@@ -140,6 +142,7 @@ const NORMALIZED_TELEMETRY_FIELDS = [
   "subagent_activity", "evaluator_quality_metrics",
 ];
 const canonicalTempRoot = realpathSync(tmpdir());
+assertBuildOptionBaselineChecks();
 const work = mkdtempSync(resolve(tmpdir(), "ask-mn-build-option-update-"));
 const temporaryAuthorityRoots = new Set();
 const privateRootArgumentIndex = process.argv.indexOf("--private-root");
@@ -1594,8 +1597,9 @@ async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAut
 }
 
 async function runPersistentFullEvaluatorAuthority(privateRoot, state, { isolatedPathNegativeLabel = null, expectedEvaluationStatus = state === "invalid" ? "invalid_input" : "completed" } = {}) {
-  const authorityRoot = createPortableAuthorityRoot(`ask-mn-r21-${state}-`);
   const standardCompletedSuccess = state === "executed_success" && expectedEvaluationStatus === "completed";
+  assert.ok(!isolatedPathNegativeLabel || standardCompletedSuccess, "isolated path negatives require a completed baseline");
+  const authorityRoot = createPortableAuthorityRoot(`ask-mn-r21-${state}-`);
   const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot, state });
   const scoringRoot = mkdtempSync(resolve(root, `.ask-mn-r21-scoring-${state}-`));
   temporaryAuthorityRoots.add(scoringRoot);
@@ -1748,11 +1752,14 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { isolate
       stderr: "",
     };
   }]));
-  const verifiedResult = verifyEvaluatorBoundary({ ...common, ...fakeExecutorOptions });
-  const verifiedAuthority = verifyEvaluatorAuthority(common);
-  assert.equal(verifiedAuthority.evaluationReady, verifiedResult.scoringReady, `binary evaluation completeness must match the admitted compatibility boundary for ${state}`);
-  assert.equal(Object.hasOwn(verifiedAuthority, "scoringReady"), false, `binary evaluator authority must not expose scoring readiness for ${state}`);
-  if (standardCompletedSuccess) {
+  const verifyBaseline = () => verifyBuildOptionBaseline(
+    () => verifyEvaluatorBoundary({ ...common, ...fakeExecutorOptions }),
+    () => verifyEvaluatorAuthority(common),
+    state,
+  );
+  // Isolated cases verify their fresh root once, immediately before mutation.
+  let verifiedResult = isolatedPathNegativeLabel ? undefined : verifyBaseline();
+  if (standardCompletedSuccess && !isolatedPathNegativeLabel) {
     for (const missingField of ["privateEvaluationRoot", "privateEvaluationRecordPath", "privateFragmentPath"]) {
       const incompleteAuthority = { ...common };
       delete incompleteAuthority[missingField];
@@ -1778,10 +1785,13 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { isolate
       }
     }
   }
-  assert.deepEqual(chain.snapshot(), before, `full evaluator authority must be read-only for ${state}`);
-  if (standardCompletedSuccess) {
-    for (const property of Object.keys(fakeExecutorCalls)) assert.equal(fakeExecutorCalls[property], 0, `production verifier must not invoke caller-supplied ${property}`);
-  }
+  const assertBaselineReadOnly = () => {
+    assert.deepEqual(chain.snapshot(), before, `full evaluator authority must be read-only for ${state}`);
+    if (standardCompletedSuccess) {
+      for (const property of Object.keys(fakeExecutorCalls)) assert.equal(fakeExecutorCalls[property], 0, `production verifier must not invoke caller-supplied ${property}`);
+    }
+  };
+  if (!isolatedPathNegativeLabel) assertBaselineReadOnly();
   const originalResultBytes = readFileSync(chain.evaluatorResultPath);
   if (!isolatedPathNegativeLabel) {
   const expectPersistentFailure = (label, mutate, pattern, { allowAdapterOutput = true } = {}) => {
@@ -1857,8 +1867,10 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { isolate
     const expectPathFailure = (label, mutate, restore, pattern = /private evaluation|private evaluator|inode|symlink|missing|path|artifact/u, postRestore = () => {}) => {
       if (isolatedPathNegativeLabel !== label) return;
       assert.equal(matchedIsolatedPathNegative, false, `isolated private path authority negative must select exactly one case: ${label}`);
-      assert.doesNotThrow(() => verifyEvaluatorBoundary(common), `isolated private path authority baseline must pass admitted verifier before ${label}`);
-      assert.doesNotThrow(() => verifyEvaluatorAuthority(common), `isolated private path authority baseline must pass authority verifier before ${label}`);
+      assert.doesNotThrow(() => {
+        verifiedResult = verifyBaseline();
+        assertBaselineReadOnly();
+      }, `isolated private path authority baseline must pass both live verifiers before ${label}`);
       const repositoryStatusBefore = spawnSync("git", ["status", "--porcelain=v1"], { cwd: root, encoding: "utf8" });
       assert.equal(repositoryStatusBefore.status, 0, `repository status must be readable before ${label}`);
       try {
