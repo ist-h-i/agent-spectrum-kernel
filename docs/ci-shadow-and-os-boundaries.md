@@ -318,3 +318,19 @@ Other three workflows and lifecycle source/generated files were unchanged
 relative to #439. This was a local composition, not #439 CI evidence or a
 publication. After lifecycle integration, only its seven-file delta was carried
 onto main `e68432bb` and published as #440; the verified result is recorded above.
+
+## Bound comparison record (observation only)
+
+The existing successful `validate` gate now writes a shadow/full comparison to
+its GitHub step summary. It reuses the strict full gate: all five actual workers,
+exact current descriptors, receipts, policy, registry, run/attempt and checkout
+identity must verify before a record can be written. Failed, skipped, cancelled,
+missing or stale evidence is rejected. The CLI stdout plan remains unchanged.
+`docs-shadow-full-pass` identifies a docs-v1 proposal whose actual full workers
+passed within `scope=validate-workers`; it does not attest the separate local-eval,
+context-rollover or verification-completion workflows. `full-only` identifies the conservative full fallback and has no proposed
+omissions. This is evidence for that run only, not proof of arbitrary consumer
+closure, historical regression detection or sufficient observation samples.
+Both `selection_enabled` and `selection_ready` remain false. No workflow/job or
+skip condition changes. A mixed CI-code PR cannot supply the still-missing actual
+eligible-docs observation. No time or runner-minute saving is claimed here.

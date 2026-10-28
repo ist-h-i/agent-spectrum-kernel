@@ -110,6 +110,20 @@ function verify({ needs, context, registry }, hypothetical) {
   return plan;
 }
 export const verifyShadowGate = input => verify(input, false);
+// Observation derived from the actual strict full gate, never a skip permit.
+export function compareShadowExecution(input) {
+  const plan = verifyShadowGate(input);
+  return {
+    schema_version: 1, scope: 'validate-workers', comparison: plan.proposal === 'docs-v1' ? 'docs-shadow-full-pass' : 'full-only',
+    binding: plan.binding, policy_digest: plan.policy_digest,
+    registry_digest: plan.registry_digest, plan_digest: plan.plan_digest,
+    proposal: plan.proposal, full_jobs: [...plan.required_jobs],
+    proposed_omissions: plan.required_jobs.filter(id => !plan.proposed_jobs.includes(id)),
+    selection_enabled: false, selection_ready: false,
+    unproven: ['consumer_closure', 'historical_regression_retention', 'sufficient_hosted_observations'],
+  };
+}
+
 // Fixture-only simulation. There is deliberately no CLI entry point for this function.
 export const verifyHypotheticalGate = input => verify(input, true);
 
@@ -136,6 +150,11 @@ function main() {
   const action = process.argv[2];
   const value = action === 'plan' ? createShadowPlan(context, registry) : action === 'receipt' ? createReceipt(process.env.CI_RECEIPT_JOB, JSON.parse(process.env.CI_STEP_RESULTS), context.identity, registry) : verifyShadowGate({ needs: JSON.parse(process.env.CI_NEEDS), context, registry });
   console.log(JSON.stringify(value));
+  if (action === 'gate' && process.env.GITHUB_STEP_SUMMARY) {
+    const comparison = compareShadowExecution({ needs: JSON.parse(process.env.CI_NEEDS), context, registry });
+    const escaped = JSON.stringify(comparison, null, 2).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Shadow/full comparison (observation only)\n\n<pre>' + escaped + '</pre>\n');
+  }
   if (action !== 'gate' && process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `${action}=${JSON.stringify(value)}\n`);
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) { try { main(); } catch (error) { console.error(error.message); process.exitCode = 1; } }
