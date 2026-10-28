@@ -5,7 +5,7 @@ import { readFileSync, mkdtempSync, rmSync, writeFileSync, mkdirSync, copyFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { WORKERS, parseRegistry, createShadowPlan, createReceipt, verifyShadowGate, verifyHypotheticalGate, captureContext } from './ci-execution-plan.mjs';
+import { WORKERS, parseRegistry, createShadowPlan, createReceipt, verifyShadowGate, compareShadowExecution, verifyHypotheticalGate, captureContext } from './ci-execution-plan.mjs';
 
 const sha = digit => digit.repeat(40);
 const workflow = 'jobs:\n' + WORKERS.map(id => `  ${id}:\n    steps:\n      - name: Check\n        id: check\n        run: node scripts/check-${id}.mjs\n      - name: Receipt\n        id: ci_receipt\n        run: node scripts/ci-execution-plan.mjs receipt\n`).join('');
@@ -112,7 +112,7 @@ test('CLI round trip transports bound plans and receipts and rejects invalid gat
   try {
   const script = join(root, 'scripts/ci-execution-plan.mjs');
   const current = parseRegistry(readFileSync(new URL('../.github/workflows/validate.yml', import.meta.url), 'utf8'));
-  const invoke = (action, extra = {}) => spawnSync(process.execPath, [script, action], { cwd: root, encoding: 'utf8', env: { ...process.env, GITHUB_EVENT_PATH: '/nonexistent/ask-fixture-event', GITHUB_OUTPUT: '', ...extra } });
+  const invoke = (action, extra = {}) => spawnSync(process.execPath, [script, action], { cwd: root, encoding: 'utf8', env: { ...process.env, GITHUB_EVENT_PATH: '/nonexistent/ask-fixture-event', GITHUB_OUTPUT: '', GITHUB_STEP_SUMMARY: '', ...extra } });
   const plan = invoke('plan'); assert.equal(plan.status, 0, plan.stderr); assert.equal(JSON.parse(plan.stdout).selection_enabled, false);
   const needs = { plan: { result: 'success', outputs: { plan: plan.stdout.trim() } } };
   for (const id of WORKERS) {
@@ -121,8 +121,12 @@ test('CLI round trip transports bound plans and receipts and rejects invalid gat
     assert.equal(receipt.status, 0, receipt.stderr);
     needs[id] = { result: 'success', outputs: { receipt: receipt.stdout.trim() } };
   }
-  const gate = invoke('gate', { CI_NEEDS: JSON.stringify(needs) }); assert.equal(gate.status, 0, gate.stderr);
-  needs.common.result = 'skipped'; assert.equal(invoke('gate', { CI_NEEDS: JSON.stringify(needs) }).status, 1);
+  const summary = join(root, 'comparison.md');
+  const gate = invoke('gate', { CI_NEEDS: JSON.stringify(needs), GITHUB_STEP_SUMMARY: summary }); assert.equal(gate.status, 0, gate.stderr);
+  assert.deepEqual(JSON.parse(gate.stdout), JSON.parse(plan.stdout), 'stdout remains the bound plan');
+  const saved = readFileSync(summary, 'utf8'); assert.match(saved, /full-only/); assert.match(saved, /"selection_ready": false/);
+  assert.match(saved, /consumer_closure/); assert.match(saved, /observation only/);
+  needs.common.result = 'skipped'; assert.equal(invoke('gate', { CI_NEEDS: JSON.stringify(needs), GITHUB_STEP_SUMMARY: summary }).status, 1); assert.equal(readFileSync(summary, 'utf8'), saved, 'failed gate cannot add successful observations');
   assert.equal(invoke('--selective').status, 1);
   writeFileSync(join(root, 'scripts/ci-change-shadow.mjs'), '// dirty tracked input');
   assert.equal(invoke('receipt', { CI_RECEIPT_JOB: 'common', CI_STEP_RESULTS: '{}' }).status, 1);
@@ -152,4 +156,27 @@ test('real merge checkout must match candidate bytes; dirty tracked inputs rejec
     assert.equal(createShadowPlan(dirty, registry).proposal, 'full');
     assert.throws(() => createReceipt('common', { check: { outcome: 'success', conclusion: 'success' } }, dirty.identity, registry));
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('shadow/full comparison is evidence bound and never authorizes omission', () => {
+  const f = fixture(), result = compareShadowExecution(f);
+  assert.equal(result.comparison, 'docs-shadow-full-pass');
+  assert.equal(result.scope, 'validate-workers');
+  assert.equal(result.selection_enabled, false);
+  assert.equal(result.selection_ready, false);
+  assert.deepEqual(result.proposed_omissions, ['common', 'repository-tests', 'personal-cli']);
+  assert.equal(result.plan_digest, createShadowPlan(f.context, f.registry).plan_digest);
+  assert.deepEqual(result.binding, f.context.identity);
+  assert.deepEqual(result.full_jobs, WORKERS);
+  assert.deepEqual(result.unproven, ['consumer_closure', 'historical_regression_retention', 'sufficient_hosted_observations']);
+  const other = context(); other.observation.changes[0].path = 'scripts/core.mjs';
+  const full = compareShadowExecution(fixture(other));
+  assert.equal(full.comparison, 'full-only'); assert.deepEqual(full.proposed_omissions, []);
+  for (const id of ['plan', ...WORKERS]) for (const state of ['skipped', 'cancelled', 'failure', undefined]) {
+    const bad = fixture(); if (state === undefined) delete bad.needs[id]; else bad.needs[id].result = state;
+    assert.throws(() => compareShadowExecution(bad));
+  }
+  const bad = fixture(); const receipt = JSON.parse(bad.needs.common.outputs.receipt);
+  receipt.binding.run_attempt = '2'; bad.needs.common.outputs.receipt = JSON.stringify(receipt);
+  assert.throws(() => compareShadowExecution(bad));
 });
