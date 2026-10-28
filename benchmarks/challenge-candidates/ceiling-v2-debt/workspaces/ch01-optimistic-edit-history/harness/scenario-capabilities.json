@@ -1,0 +1,143 @@
+{
+  "version": "ceiling-scenario-v1",
+  "modules": {
+    "harness/server.mjs": {
+      "construct": {
+        "EditServer": "server"
+      },
+      "invoke": {
+        "rowKey": "json"
+      }
+    },
+    "harness/transport.mjs": {
+      "construct": {
+        "EditTransport": "transport"
+      },
+      "invoke": {}
+    },
+    "harness/views.mjs": {
+      "construct": {},
+      "invoke": {
+        "mountList": "view",
+        "mountDetail": "view"
+      }
+    },
+    "src/editor.mjs": {
+      "construct": {},
+      "invoke": {
+        "createEditor": "editor"
+      }
+    },
+    "src/session.mjs": {
+      "construct": {},
+      "invoke": {
+        "decodeDrafts": "json",
+        "encodeDrafts": "json"
+      }
+    },
+    "src/legacy.mjs": {
+      "construct": {},
+      "invoke": {
+        "createLegacyAdapter": "legacy"
+      }
+    },
+    "harness/legacy-clients.mjs": {
+      "construct": {},
+      "invoke": {
+        "legacyEdit": "json",
+        "legacyRead": "json",
+        "legacyUndoAndSend": "json"
+      }
+    }
+  },
+  "calls": {
+    "server": {
+      "load": "json",
+      "lookup": "json",
+      "changesSince": "json",
+      "request": "json",
+      "external": "json"
+    },
+    "transport": {
+      "load": "json",
+      "lookup": "json",
+      "changesSince": "json",
+      "send": "transmission",
+      "accept": "json",
+      "deliver": "json",
+      "duplicate": "json",
+      "disconnect": "json",
+      "pending": "json"
+    },
+    "editor": {
+      "open": "unsubscribe",
+      "snapshot": "json",
+      "edit": "json",
+      "flush": "json",
+      "receive": "json",
+      "undo": "json",
+      "switchTenant": "json",
+      "saveDrafts": "json",
+      "restoreDrafts": "json"
+    },
+    "view": {
+      "close": "json",
+      "current": "json"
+    },
+    "transmission": {
+      "cancel": "json"
+    },
+    "legacy": {
+      "setCell": "json",
+      "send": "json",
+      "undo": "json",
+      "view": "json"
+    }
+  },
+  "get": {
+    "server": [],
+    "transport": [],
+    "editor": [],
+    "view": [
+      "kind",
+      "frames"
+    ],
+    "transmission": [
+      "attempt"
+    ],
+    "legacy": []
+  },
+  "functionKinds": [
+    "unsubscribe"
+  ],
+  "references": {
+    "construct:harness/transport.mjs:EditTransport": {
+      "/0": "server"
+    },
+    "invoke:harness/views.mjs:mountList": {
+      "/0": "editor"
+    },
+    "invoke:harness/views.mjs:mountDetail": {
+      "/0": "editor"
+    },
+    "invoke:src/editor.mjs:createEditor": {
+      "/0/transport": "transport"
+    },
+    "invoke:harness/legacy-clients.mjs:legacyEdit": {
+      "/0": "editor"
+    },
+    "invoke:harness/legacy-clients.mjs:legacyRead": {
+      "/0": "editor"
+    },
+    "invoke:harness/legacy-clients.mjs:legacyUndoAndSend": {
+      "/0": "editor"
+    },
+    "invoke:src/legacy.mjs:createLegacyAdapter": {
+      "/0": "editor"
+    }
+  },
+  "datasets": [
+    "data/rows.json",
+    "data/legacy-drafts-v1.json"
+  ]
+}

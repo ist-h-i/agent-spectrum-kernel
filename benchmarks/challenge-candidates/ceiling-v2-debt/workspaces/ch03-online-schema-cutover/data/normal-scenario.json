@@ -1,0 +1,72 @@
+{
+  "steps": [
+    {
+      "op": "dataset",
+      "path": "data/prices.json",
+      "as": "rows"
+    },
+    {
+      "op": "construct",
+      "module": "harness/store.mjs",
+      "export": "PriceStore",
+      "args": [
+        {
+          "$ref": "rows"
+        }
+      ],
+      "as": "store"
+    },
+    {
+      "op": "construct",
+      "module": "src/migration.mjs",
+      "export": "MigrationService",
+      "args": [
+        {
+          "$ref": "store"
+        }
+      ],
+      "as": "service"
+    },
+    {
+      "op": "call",
+      "target": "service",
+      "method": "backfillPage",
+      "args": [
+        "shop",
+        2
+      ],
+      "as": "page"
+    },
+    {
+      "op": "invoke",
+      "module": "harness/consumers.mjs",
+      "export": "legacyScreen",
+      "args": [
+        {
+          "$ref": "service"
+        },
+        "shop"
+      ],
+      "as": "screen"
+    },
+    {
+      "op": "call",
+      "target": "screen",
+      "method": "load",
+      "args": [
+        "tea"
+      ],
+      "as": "legacy"
+    },
+    {
+      "op": "call",
+      "target": "service",
+      "method": "readV2",
+      "args": [
+        "shop",
+        "tea"
+      ],
+      "as": "modern"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+# Record and legacy contract
+
+Current records are {format:2,key,version,tenantId,requestId,payload,digest,state,lease,receipt,reason}; implementations may retain additional private fields. Version is positive-safe and increases on successful store CAS. payloadDigest is protected deterministic JSON meaning. Every record's key, identity, digest, state, lease and receipt/reason shape must agree. Invalid records yield code INVALID_RECORD. Field validation must distinguish a missing/invalid value from a legitimate false/null where the schema allows it.
+
+Old format1 uses body/fingerprint/status/owner/deadline/generation/error. Its status mapping is pending->queued,working->running,done->succeeded,aborted->cancelled,error->failed. A valid working record retains its exact worker/token/deadline; an old completed receipt/reason and identity are preserved. A record's payload is not re-rendered or replaced by another tenant's data during migration. Conversion is idempotent for current records. A page containing any invalid record has no store or sink effects.
+
+The fixed legacy wire maps document to payload, uses tenant/request, and returns {id,status,receipt,error}; statuses pending,working,waiting,done,aborted,error correspond to current queued,running,confirming,succeeded,cancelled,failed. Legacy poll and current snapshot must describe the same durable outcome. Unknown optional wire fields may be ignored; tenant/request/document are required. Existing submitReport,workerTick,jobView,legacySubmit,legacyPoll,legacyCancel callers are protected.

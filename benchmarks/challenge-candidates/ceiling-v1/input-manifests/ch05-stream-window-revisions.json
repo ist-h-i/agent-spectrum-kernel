@@ -1,0 +1,160 @@
+{
+  "version": "ceiling-public-v1",
+  "id": "ch05-stream-window-revisions",
+  "namespace": "ceiling-v1",
+  "scope": "public task.md and standalone workspace; no git history or evaluator",
+  "runtime": "v24.21.0",
+  "input_digest": "sha256:bbdae9b5ab47fdf96324b9fd5b11aecf711277781d5f5cb251d2008c0cfa7b66",
+  "protected": [
+    "data/load.json",
+    "data/normal.json",
+    "harness/consumer.mjs",
+    "harness/generator.mjs",
+    "harness/measure-api.mjs",
+    "harness/measure.mjs",
+    "harness/safe-json.mjs",
+    "harness/scenario-capabilities.json",
+    "harness/scenario-engine.mjs",
+    "harness/scenario-protocol.mjs",
+    "harness/scenario-reporter.mjs",
+    "harness/scenario-worker.mjs",
+    "harness/scenario.mjs",
+    "harness/sink.mjs",
+    "harness/small-check.mjs",
+    "package.json",
+    "spec/api.md",
+    "spec/performance.md",
+    "spec/scenario-tests.md",
+    "task.md",
+    "test/harness.test.mjs",
+    "test/normal.test.mjs",
+    "test/scenario-public.test.mjs"
+  ],
+  "submission": [
+    "src/**",
+    "test/added/**",
+    "RESULT.md"
+  ],
+  "files": [
+    {
+      "path": "data/load.json",
+      "sha256": "c30b678a36ee58a0c82e67b87e76b92f2a3a6dfb5f443165d1fecb6823f55dfd",
+      "bytes": 645
+    },
+    {
+      "path": "data/normal.json",
+      "sha256": "2fc20f74c3f27abc6a9699870d1b032008cbf2c07eab21ff06fccea0566cc45b",
+      "bytes": 305
+    },
+    {
+      "path": "harness/consumer.mjs",
+      "sha256": "68b7280a7b9fcaf456bc031eaa9b40277b72f3e108b37f15336ea5e4955afb74",
+      "bytes": 175
+    },
+    {
+      "path": "harness/generator.mjs",
+      "sha256": "5456293e1a1a638f59656c320cca3e885a6a5389823ae960ce5e288b317580e3",
+      "bytes": 1103
+    },
+    {
+      "path": "harness/measure-api.mjs",
+      "sha256": "a140f40731197308edab83fce159f52dbde24361a020f5bdc411f7faab12c7cf",
+      "bytes": 2756
+    },
+    {
+      "path": "harness/measure.mjs",
+      "sha256": "e2f4b2b8753adccabe4746486a4f06a4f429dd9432b55577aeb7418d7e256372",
+      "bytes": 134
+    },
+    {
+      "path": "harness/safe-json.mjs",
+      "sha256": "03e371c3d8cbb52bd15b17e60b6af5c8de94e6feb69674bd92602cc7aede4baf",
+      "bytes": 2264
+    },
+    {
+      "path": "harness/scenario-capabilities.json",
+      "sha256": "a36ca94cb6e5e5a10bff655de2af323384077336a4b7fe1081ec66a45afaf48d",
+      "bytes": 1131
+    },
+    {
+      "path": "harness/scenario-engine.mjs",
+      "sha256": "6fd3d208090e5dcf69b6187cad1afebb4a18100a1a4b312ba0afd1a8a3514c67",
+      "bytes": 6861
+    },
+    {
+      "path": "harness/scenario-protocol.mjs",
+      "sha256": "a2b568ecd7f3b2d0bd0ccae19a7d1c54ceadec030305759a8649a3cf197318c6",
+      "bytes": 6021
+    },
+    {
+      "path": "harness/scenario-reporter.mjs",
+      "sha256": "0e2ce3f9618494897ac247c46c470444f326b12fc13910cb73bece53f7d976a7",
+      "bytes": 1122
+    },
+    {
+      "path": "harness/scenario-worker.mjs",
+      "sha256": "fc56f76c84be97256e7f3af919a804dd215cf5876e194ab68bebd064185f5fa0",
+      "bytes": 1068
+    },
+    {
+      "path": "harness/scenario.mjs",
+      "sha256": "621c442afd8e9f59c2bb4a60d0159cd9053454e89e158bd0a3ad654b0386d802",
+      "bytes": 1794
+    },
+    {
+      "path": "harness/sink.mjs",
+      "sha256": "5a79223ba8f802574ce260e3282cef82e902953f126e3778a0dcff71db9260b5",
+      "bytes": 1356
+    },
+    {
+      "path": "harness/small-check.mjs",
+      "sha256": "9842b1cac209278c151ec114cb680932964a6b87f4d777932b8dff88038965a9",
+      "bytes": 500
+    },
+    {
+      "path": "package.json",
+      "sha256": "a25b51e6797ea18133e910d8c9a6c8d207050a132f054758843da6f9ba05576a",
+      "bytes": 219
+    },
+    {
+      "path": "spec/api.md",
+      "sha256": "4410c2559f6f2c0800757ff9082f567d64ca9cd8e9b97d12fe5cd903b5097ade",
+      "bytes": 3367
+    },
+    {
+      "path": "spec/performance.md",
+      "sha256": "da173111ab778c46ef2dbc47d4b429999e7fc57fbddfe46e36170a2ecee1cc96",
+      "bytes": 2880
+    },
+    {
+      "path": "spec/scenario-tests.md",
+      "sha256": "453a1874fd29bcd6bd7f5fbf71fbebc1b2b3d55edb287770deb6e4ee85fd9295",
+      "bytes": 2879
+    },
+    {
+      "path": "src/processor.mjs",
+      "sha256": "a6446e2267cf39e06968ecf0534112d040646e0c438cfd2ed07f62345f94fff4",
+      "bytes": 1524
+    },
+    {
+      "path": "task.md",
+      "sha256": "02401900cd801cb22265e12eadf6e6daadc93e3d28a744ff1eaa54d5f9fe4bb0",
+      "bytes": 3946
+    },
+    {
+      "path": "test/harness.test.mjs",
+      "sha256": "2fe601fa46b4bee77d0405cabe1a2ebb974ecd43c55d41a9b85ab07ce3d20807",
+      "bytes": 1448
+    },
+    {
+      "path": "test/normal.test.mjs",
+      "sha256": "14f2d4e70eb40f5fc3d0a97b83ce2e3e6c08991c50f7074c0e823193a6b72ccf",
+      "bytes": 1547
+    },
+    {
+      "path": "test/scenario-public.test.mjs",
+      "sha256": "afa3ec5a1eae6febff9fcdac2420e6781e2ef5a978e3745afcbc35e029bdece0",
+      "bytes": 1823
+    }
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "version": "ceiling-public-v3-causal",
+  "id": "ch02-durable-job-recovery",
+  "input_digest": "sha256:dbc0021e4029c883f4384ccadb2fac9bc3725f1b4d007fe8e7ddc4474d7e7d62",
+  "files": [
+    {
+      "path": "data/legacy-jobs-v1.json",
+      "sha256": "0c1718e902f7c41edf11ce4f35d72d5ae8d95b458af17a53942c0c0a074ea29d",
+      "bytes": 401
+    },
+    {
+      "path": "data/requests.json",
+      "sha256": "4920b9d6e64beb1d2ddc0a045da54cf6b61482eb33b06a587fdb63a90dca12d3",
+      "bytes": 159
+    },
+    {
+      "path": "harness/client.mjs",
+      "sha256": "dae86571c730a14a44f508707d42bdb58e785dad0a2105d224b89cfed9ff5cb1",
+      "bytes": 321
+    },
+    {
+      "path": "harness/faults.mjs",
+      "sha256": "50b9291f9f315ecebdae7a3fddbdeae83c611034b312c9f06992d197b3555779",
+      "bytes": 453
+    },
+    {
+      "path": "harness/legacy-clients.mjs",
+      "sha256": "71280a95060b21cb192a4591d67f38580a17c9d574811593a542edc8d5b0322c",
+      "bytes": 353
+    },
+    {
+      "path": "harness/renderer.mjs",
+      "sha256": "65ec4231a8ef411aec451923ed93fb251b7b4ffa8c700fe92bf27d71aefede4c",
+      "bytes": 773
+    },
+    {
+      "path": "harness/safe-json.mjs",
+      "sha256": "03e371c3d8cbb52bd15b17e60b6af5c8de94e6feb69674bd92602cc7aede4baf",
+      "bytes": 2264
+    },
+    {
+      "path": "harness/scenario-capabilities.json",
+      "sha256": "637af2840a23fe7cfa6c148d2e76d57075785baab05c32baf9e89e53a2bd0cce",
+      "bytes": 2960
+    },
+    {
+      "path": "harness/scenario-engine.mjs",
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
+    },
+    {
+      "path": "harness/scenario-protocol.mjs",
+      "sha256": "a2b568ecd7f3b2d0bd0ccae19a7d1c54ceadec030305759a8649a3cf197318c6",
+      "bytes": 6021
+    },
+    {
+      "path": "harness/scenario-reporter.mjs",
+      "sha256": "0e2ce3f9618494897ac247c46c470444f326b12fc13910cb73bece53f7d976a7",
+      "bytes": 1122
+    },
+    {
+      "path": "harness/scenario-worker.mjs",
+      "sha256": "fc56f76c84be97256e7f3af919a804dd215cf5876e194ab68bebd064185f5fa0",
+      "bytes": 1068
+    },
+    {
+      "path": "harness/scenario.mjs",
+      "sha256": "621c442afd8e9f59c2bb4a60d0159cd9053454e89e158bd0a3ad654b0386d802",
+      "bytes": 1794
+    },
+    {
+      "path": "harness/sink.mjs",
+      "sha256": "7d881f2649a54fe63941a4a75d1f016f939a72da19b946ad34f971ddcc31270b",
+      "bytes": 1183
+    },
+    {
+      "path": "harness/store.mjs",
+      "sha256": "d49c2a3d7d6b2ee38c461402f059f052165c09c1062da498075adbddcb234360",
+      "bytes": 2410
+    },
+    {
+      "path": "package.json",
+      "sha256": "88b25aacadb36c52e96cb041ba6074cba9735010f5c49bea9e26c90556557ab8",
+      "bytes": 166
+    },
+    {
+      "path": "RESULT.md",
+      "sha256": "7058d380d27ad2bf6188ea4b77767355aacdc14207544630193098ff19d0263b",
+      "bytes": 83
+    },
+    {
+      "path": "spec/api.md",
+      "sha256": "3b06a272a7db960be59210d0aad08050b5de7a2caf01d673e9f5e70a7ab7d6d5",
+      "bytes": 562
+    },
+    {
+      "path": "spec/jobs.md",
+      "sha256": "a112f1fa5e539bfdb428e0e2b635b253eb3270d1964ced06ffe47979fb92cda5",
+      "bytes": 5868
+    },
+    {
+      "path": "spec/records.md",
+      "sha256": "c516dfcadc8adad05e68750407164a16fd6d41c7955bb7d765a85b238566f877",
+      "bytes": 1558
+    },
+    {
+      "path": "spec/recovery.md",
+      "sha256": "a28813838483b5ca7cb6533ea80f7037e708451a8956ab51e168a436760b8af1",
+      "bytes": 2931
+    },
+    {
+      "path": "spec/scenario-tests.md",
+      "sha256": "453a1874fd29bcd6bd7f5fbf71fbebc1b2b3d55edb287770deb6e4ee85fd9295",
+      "bytes": 2879
+    },
+    {
+      "path": "src/jobs.mjs",
+      "sha256": "473e08e63cb46461babd09df96010ff0e05032349372b0d54f6b7ffb5c3f2624",
+      "bytes": 510
+    },
+    {
+      "path": "src/legacy.mjs",
+      "sha256": "b821265db8d04ed1b4da7b95b6ea88fa8466f622855d74b28c06b2ce97531e0b",
+      "bytes": 594
+    },
+    {
+      "path": "src/queue.mjs",
+      "sha256": "1dc3d4c278ec1805e1291180f7a8115c132e728d8dffa533a9b754d0623d36a0",
+      "bytes": 2434
+    },
+    {
+      "path": "src/records.mjs",
+      "sha256": "94ae65b95ff92bca48bb9660e074696a59cb4c8e99fb1fd158eb8ed5f746c01f",
+      "bytes": 670
+    },
+    {
+      "path": "task.md",
+      "sha256": "9af847ca36cd72eb0dde3393bb61b78a55ee9e2b4a7c730133a8f6bd850b446b",
+      "bytes": 952
+    },
+    {
+      "path": "test/added/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "test/compatibility.test.mjs",
+      "sha256": "d260a5a3f92347414c2848e405a83d44f2e8d928660f8e249c48173a41e97806",
+      "bytes": 635
+    },
+    {
+      "path": "test/normal.test.mjs",
+      "sha256": "2f116e076a002b4bb268e4a8d6658ee8b4bddeaff9a7c234a872cfd2d358498b",
+      "bytes": 1929
+    },
+    {
+      "path": "test/provider-contract.test.mjs",
+      "sha256": "d860fd40dd1f2f081da8e5138f92a95fa50fa3aef61554f40b72c9f274f96695",
+      "bytes": 378
+    },
+    {
+      "path": "test/scenario-public.test.mjs",
+      "sha256": "31361f23acbb373b4f8bc4890ee214aceb96f049c4512ba6b234a5f2f473efd6",
+      "bytes": 1552
+    }
+  ]
+}

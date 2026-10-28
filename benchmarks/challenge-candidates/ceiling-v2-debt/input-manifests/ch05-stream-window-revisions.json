@@ -1,0 +1,157 @@
+{
+  "version": "ceiling-public-v2-debt",
+  "id": "ch05-stream-window-revisions",
+  "input_digest": "sha256:aa5328767bb93f94ac2883d271d729f3f08cf0f196ba48790aaed1dfec1d6380",
+  "files": [
+    {
+      "path": "data/load.json",
+      "sha256": "1c0894d026d4d9ad7947f83b244823b9e600a48ae28b4ec1cf066d66848c63df",
+      "bytes": 696
+    },
+    {
+      "path": "data/normal.json",
+      "sha256": "2fc20f74c3f27abc6a9699870d1b032008cbf2c07eab21ff06fccea0566cc45b",
+      "bytes": 305
+    },
+    {
+      "path": "harness/checkpoint-client.mjs",
+      "sha256": "ed39ff2f8f5afe3580a06da4cccfb4d985732d143ba6c432843b83779e787f0d",
+      "bytes": 385
+    },
+    {
+      "path": "harness/consumer.mjs",
+      "sha256": "68b7280a7b9fcaf456bc031eaa9b40277b72f3e108b37f15336ea5e4955afb74",
+      "bytes": 175
+    },
+    {
+      "path": "harness/generator.mjs",
+      "sha256": "5456293e1a1a638f59656c320cca3e885a6a5389823ae960ce5e288b317580e3",
+      "bytes": 1103
+    },
+    {
+      "path": "harness/measure-api.mjs",
+      "sha256": "5be7689a15d9b4eaafd86054e1861846208ed7d120bee93e4b0c331839c7a6fa",
+      "bytes": 2543
+    },
+    {
+      "path": "harness/measure.mjs",
+      "sha256": "8e53618a7a7e0a224da2922e634f77ca8771719edc8db0847b67d8f43e29d4df",
+      "bytes": 124
+    },
+    {
+      "path": "harness/safe-json.mjs",
+      "sha256": "03e371c3d8cbb52bd15b17e60b6af5c8de94e6feb69674bd92602cc7aede4baf",
+      "bytes": 2264
+    },
+    {
+      "path": "harness/scenario-capabilities.json",
+      "sha256": "833ebfa74e33cb4db666944a67facc5c28ab1323e8c088b38f9011c59e3568bd",
+      "bytes": 2164
+    },
+    {
+      "path": "harness/scenario-engine.mjs",
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
+    },
+    {
+      "path": "harness/scenario-protocol.mjs",
+      "sha256": "a2b568ecd7f3b2d0bd0ccae19a7d1c54ceadec030305759a8649a3cf197318c6",
+      "bytes": 6021
+    },
+    {
+      "path": "harness/scenario-reporter.mjs",
+      "sha256": "0e2ce3f9618494897ac247c46c470444f326b12fc13910cb73bece53f7d976a7",
+      "bytes": 1122
+    },
+    {
+      "path": "harness/scenario-worker.mjs",
+      "sha256": "fc56f76c84be97256e7f3af919a804dd215cf5876e194ab68bebd064185f5fa0",
+      "bytes": 1068
+    },
+    {
+      "path": "harness/scenario.mjs",
+      "sha256": "621c442afd8e9f59c2bb4a60d0159cd9053454e89e158bd0a3ad654b0386d802",
+      "bytes": 1794
+    },
+    {
+      "path": "harness/sink.mjs",
+      "sha256": "5a79223ba8f802574ce260e3282cef82e902953f126e3778a0dcff71db9260b5",
+      "bytes": 1356
+    },
+    {
+      "path": "harness/small-check.mjs",
+      "sha256": "9842b1cac209278c151ec114cb680932964a6b87f4d777932b8dff88038965a9",
+      "bytes": 500
+    },
+    {
+      "path": "package.json",
+      "sha256": "8b0be04f529e9db625dd27e800f980041bbff997ae1ca2c984c961d771d3c49c",
+      "bytes": 138
+    },
+    {
+      "path": "RESULT.md",
+      "sha256": "1592a4cd1d23f971a76251c9ce685c7fd729570f8f10442b886b08b49473af17",
+      "bytes": 106
+    },
+    {
+      "path": "spec/api.md",
+      "sha256": "5aebe2b52c131542423774f556464c3513e5f6aff3b9f8bcdadf84bc51e7bcfe",
+      "bytes": 4934
+    },
+    {
+      "path": "spec/performance.md",
+      "sha256": "f88c2aac4a0fb4e640193fd8a304499a04d7365de2e15337100d104a16298c4b",
+      "bytes": 2027
+    },
+    {
+      "path": "spec/scenario-tests.md",
+      "sha256": "453a1874fd29bcd6bd7f5fbf71fbebc1b2b3d55edb287770deb6e4ee85fd9295",
+      "bytes": 2879
+    },
+    {
+      "path": "src/checkpoint.mjs",
+      "sha256": "6bef3a11fb3eba013051a165c69e3fe23fd11ed922517a5f3ef616ab6c233ef5",
+      "bytes": 1026
+    },
+    {
+      "path": "src/codec.mjs",
+      "sha256": "bd58f3e88fbb1d57dbdd8d22f5e4769af3d11ed18da330ec4e90ec5c8af03e56",
+      "bytes": 785
+    },
+    {
+      "path": "src/ledger.mjs",
+      "sha256": "da90241ace86510120d0b00d847f05490dafdb317e33fff6100c633bf1aaad57",
+      "bytes": 2078
+    },
+    {
+      "path": "src/legacy.mjs",
+      "sha256": "1b2b747ac4f3fa9e643af09c9d312611ddd4daddd4c9f354d90e55d59cdecae3",
+      "bytes": 343
+    },
+    {
+      "path": "src/pipeline.mjs",
+      "sha256": "5914b3eab6fcef51ef572f20df8edac0844cdc669e641919d1bb9950f8786427",
+      "bytes": 1434
+    },
+    {
+      "path": "src/processor.mjs",
+      "sha256": "19f45c2a530b028271bce8e17aab7f9324dfca4e1b79fa56a3b1007cb032f532",
+      "bytes": 121
+    },
+    {
+      "path": "task.md",
+      "sha256": "746a64381a090ed6ff577762c774beffb47a815e8103b78e2cf04f1f66847648",
+      "bytes": 1613
+    },
+    {
+      "path": "test/normal.test.mjs",
+      "sha256": "ad1071cdd2efcfa9e22031f4824b0ee3487e9a246058d1e7dbe0c7a4904729e0",
+      "bytes": 1088
+    },
+    {
+      "path": "test/scenario-public.test.mjs",
+      "sha256": "a0764d34cbce27551c248f52b4ff4c147e10360acad73a5e3d84854df26e1274",
+      "bytes": 677
+    }
+  ]
+}

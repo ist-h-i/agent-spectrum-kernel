@@ -1,0 +1,129 @@
+{
+  "steps": [
+    {
+      "op": "construct",
+      "module": "harness/policy-store.mjs",
+      "export": "PolicyStore",
+      "args": [
+        {
+          "east": {
+            "revision": 1,
+            "users": [
+              "u",
+              "v"
+            ],
+            "groups": {},
+            "resources": {
+              "root": {
+                "parent": null,
+                "body": ""
+              },
+              "doc": {
+                "parent": "root",
+                "body": "ABCDEFGH"
+              },
+              "other": {
+                "parent": "root",
+                "body": "OTHER"
+              }
+            },
+            "rules": [
+              {
+                "effect": "allow",
+                "subject": "user:u",
+                "resource": "root",
+                "action": "read"
+              },
+              {
+                "effect": "allow",
+                "subject": "user:u",
+                "resource": "root",
+                "action": "export"
+              }
+            ],
+            "links": {}
+          }
+        }
+      ],
+      "as": "policies"
+    },
+    {
+      "op": "construct",
+      "module": "harness/policy-store.mjs",
+      "export": "ContextStore",
+      "args": [],
+      "as": "contexts"
+    },
+    {
+      "op": "construct",
+      "module": "harness/policy-store.mjs",
+      "export": "CapabilityStore",
+      "args": [],
+      "as": "caps"
+    },
+    {
+      "op": "construct",
+      "module": "harness/policy-store.mjs",
+      "export": "ChunkAdapter",
+      "args": [
+        {
+          "$ref": "policies"
+        },
+        {
+          "$ref": "contexts"
+        },
+        {
+          "$ref": "caps"
+        }
+      ],
+      "as": "sink"
+    },
+    {
+      "op": "construct",
+      "module": "src/service.mjs",
+      "export": "DocumentService",
+      "args": [
+        {
+          "$ref": "policies"
+        },
+        {
+          "$ref": "contexts"
+        },
+        {
+          "$ref": "caps"
+        },
+        {
+          "$ref": "sink"
+        },
+        {
+          "chunkSize": 4
+        }
+      ],
+      "as": "service"
+    },
+    {
+      "op": "call",
+      "target": "service",
+      "method": "openContext",
+      "args": [
+        {
+          "tenant": "east",
+          "user": "u"
+        }
+      ],
+      "as": "ctx"
+    },
+    {
+      "op": "call",
+      "target": "service",
+      "method": "detail",
+      "args": [
+        {
+          "$ref": "ctx"
+        },
+        "doc"
+      ],
+      "as": "read"
+    }
+  ]
+}

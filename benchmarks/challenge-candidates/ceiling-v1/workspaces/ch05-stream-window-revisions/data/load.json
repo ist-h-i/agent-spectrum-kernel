@@ -1,0 +1,27 @@
+{
+  "recipeVersion": "ch05-load-v1",
+  "windowSize": 1000,
+  "allowedLateness": 200,
+  "tenants": 4,
+  "idsPerTenantPerRound": 128,
+  "revisionsPerId": 3,
+  "steadyRounds": 200,
+  "activeGrowthIdsPerTenant": 8192,
+  "repetitions": 3,
+  "timingLimitMs": 15000,
+  "heapLimitBytes": null,
+  "rssLimitBytes": null,
+  "thresholdStatus": "frozen_pre_model_synthetic_calibration_v1",
+  "profiles": {
+    "steady": {
+      "timingLimitMs": 15000,
+      "heapLimitBytes": 33554432,
+      "rssLimitBytes": 201326592
+    },
+    "active_growth": {
+      "timingLimitMs": 15000,
+      "heapLimitBytes": 67108864,
+      "rssLimitBytes": 268435456
+    }
+  }
+}

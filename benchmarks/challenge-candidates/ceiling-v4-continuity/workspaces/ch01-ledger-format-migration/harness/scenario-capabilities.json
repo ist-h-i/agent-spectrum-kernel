@@ -1,0 +1,78 @@
+{
+  "version": "ceiling-scenario-v1",
+  "modules": {
+    "harness/journal.mjs": {
+      "construct": {
+        "LedgerJournal": "journal"
+      },
+      "invoke": {}
+    },
+    "harness/legacy.mjs": {
+      "construct": {},
+      "invoke": {
+        "legacyClient": "legacy"
+      }
+    },
+    "harness/consumers.mjs": {
+      "construct": {},
+      "invoke": {
+        "accountingScreen": "screen"
+      }
+    },
+    "src/ledger.mjs": {
+      "construct": {
+        "Ledger": "ledger"
+      },
+      "invoke": {}
+    }
+  },
+  "calls": {
+    "journal": {
+      "inspect": "json",
+      "request": "json",
+      "append": "json",
+      "scan": "json",
+      "row": "json",
+      "snapshot": "json",
+      "commit": "json",
+      "activate": "json",
+      "export": "json",
+      "stats": "json",
+      "once": "json"
+    },
+    "legacy": {
+      "write": "json",
+      "read": "json"
+    },
+    "screen": {
+      "load": "json"
+    },
+    "ledger": {
+      "read": "json",
+      "apply": "json",
+      "migratePage": "json",
+      "activate": "json",
+      "state": "json",
+      "history": "json"
+    }
+  },
+  "get": {
+    "journal": [],
+    "legacy": [],
+    "screen": [],
+    "ledger": []
+  },
+  "functionKinds": [],
+  "references": {
+    "construct:src/ledger.mjs:Ledger": {
+      "/0": "journal"
+    },
+    "invoke:harness/legacy.mjs:legacyClient": {
+      "/0": "journal"
+    },
+    "invoke:harness/consumers.mjs:accountingScreen": {
+      "/0": "ledger"
+    }
+  },
+  "datasets": []
+}

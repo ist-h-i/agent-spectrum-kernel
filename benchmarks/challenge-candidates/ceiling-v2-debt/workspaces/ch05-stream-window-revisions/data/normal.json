@@ -1,0 +1,5 @@
+[
+  { "tenantId": "north", "eventId": "sale-a", "revision": 0, "eventTime": 10, "amountMinor": "350", "deleted": false },
+  { "tenantId": "north", "eventId": "sale-b", "revision": 0, "eventTime": 70, "amountMinor": "-25", "deleted": false },
+  { "kind": "watermark", "tenantId": "north", "value": 120 }
+]

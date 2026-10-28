@@ -1,0 +1,161 @@
+{
+  "format_version": "1.0.0",
+  "artifact_kind": "challenge_design_catalog",
+  "catalog_id": "ceiling-v1",
+  "status": "synthetic_grader_verified_model_calibration_not_run",
+  "baseline_repository_revision": "514bf21aa2c955ec44dcaa3db67abe86f397b98e",
+  "candidate_count": 6,
+  "existing_primary_count_unchanged": 24,
+  "existing_calibration_count_unchanged": 4,
+  "runtime_config": false,
+  "ready_for_measurement": false,
+  "calibration_target": {
+    "scope": "each_new_task",
+    "condition_label": "6.1-sol high / F",
+    "resolved_model_id": null,
+    "metric": "mean_quality_score_of_valid_repetitions",
+    "minimum": 30,
+    "maximum": 70,
+    "guaranteed": false,
+    "measured": false
+  },
+  "scoring_dimensions": [
+    {
+      "id": "required_behavior",
+      "points": 30
+    },
+    {
+      "id": "integration_compatibility",
+      "points": 30
+    },
+    {
+      "id": "failure_boundary_recovery",
+      "points": 25
+    },
+    {
+      "id": "added_test_effectiveness",
+      "points": 10
+    },
+    {
+      "id": "scope_maintainability",
+      "points": 5
+    }
+  ],
+  "quality_maximum": 100,
+  "safety_blockers_separate": true,
+  "protocol_path": "evaluation-protocol.md",
+  "fixture_blueprints_path": "fixture-blueprints.md",
+  "implementation_work_package_path": "codex-work-package.md",
+  "candidates": [
+    {
+      "id": "ch01-optimistic-edit-history",
+      "title": "非同期編集と取り消しの整合性",
+      "task_path": "tasks/ch01-optimistic-edit-history.md",
+      "task_class": "investigation_implementation",
+      "domain": "frontend",
+      "related_existing_fixture_id": "pf-frontend-async-state",
+      "relationship": "conceptual_only_no_input_or_oracle_reuse",
+      "difficulty_status": "uncalibrated",
+      "state": "public_seed_implemented",
+      "workspace_path": "workspaces/ch01-optimistic-edit-history",
+      "public_tests_path": "workspaces/ch01-optimistic-edit-history/test",
+      "evaluator_reference_path": null,
+      "measured_score": null,
+      "ready_for_measurement": false,
+      "input_manifest_path": "input-manifests/ch01-optimistic-edit-history.json",
+      "private_validation_status": "synthetic_grader_verified_model_calibration_not_run"
+    },
+    {
+      "id": "ch02-durable-job-recovery",
+      "title": "クラッシュ後も重複しないジョブ実行",
+      "task_path": "tasks/ch02-durable-job-recovery.md",
+      "task_class": "investigation_implementation",
+      "domain": "durable_execution",
+      "related_existing_fixture_id": "hi-external-action-approval",
+      "relationship": "conceptual_only_no_input_or_oracle_reuse",
+      "difficulty_status": "uncalibrated",
+      "state": "public_seed_implemented",
+      "workspace_path": "workspaces/ch02-durable-job-recovery",
+      "public_tests_path": "workspaces/ch02-durable-job-recovery/test",
+      "evaluator_reference_path": null,
+      "measured_score": null,
+      "ready_for_measurement": false,
+      "input_manifest_path": "input-manifests/ch02-durable-job-recovery.json",
+      "private_validation_status": "synthetic_grader_verified_model_calibration_not_run"
+    },
+    {
+      "id": "ch03-online-schema-cutover",
+      "title": "稼働中のスキーマ移行とロールバック",
+      "task_path": "tasks/ch03-online-schema-cutover.md",
+      "task_class": "investigation_implementation",
+      "domain": "data_schema",
+      "related_existing_fixture_id": "hi-versioned-migration-safety",
+      "relationship": "conceptual_only_no_input_or_oracle_reuse",
+      "difficulty_status": "uncalibrated",
+      "state": "public_seed_implemented",
+      "workspace_path": "workspaces/ch03-online-schema-cutover",
+      "public_tests_path": "workspaces/ch03-online-schema-cutover/test",
+      "evaluator_reference_path": null,
+      "measured_score": null,
+      "ready_for_measurement": false,
+      "input_manifest_path": "input-manifests/ch03-online-schema-cutover.json",
+      "private_validation_status": "synthetic_grader_verified_model_calibration_not_run"
+    },
+    {
+      "id": "ch04-authorization-revocation",
+      "title": "権限キャッシュと失効の一貫性",
+      "task_path": "tasks/ch04-authorization-revocation.md",
+      "task_class": "investigation_implementation",
+      "domain": "security_authorization",
+      "related_existing_fixture_id": "hi-authorization-exception",
+      "relationship": "conceptual_only_no_input_or_oracle_reuse",
+      "difficulty_status": "uncalibrated",
+      "state": "public_seed_implemented",
+      "workspace_path": "workspaces/ch04-authorization-revocation",
+      "public_tests_path": "workspaces/ch04-authorization-revocation/test",
+      "evaluator_reference_path": null,
+      "measured_score": null,
+      "ready_for_measurement": false,
+      "input_manifest_path": "input-manifests/ch04-authorization-revocation.json",
+      "private_validation_status": "synthetic_grader_verified_model_calibration_not_run"
+    },
+    {
+      "id": "ch05-stream-window-revisions",
+      "title": "訂正可能なストリーム集計",
+      "task_path": "tasks/ch05-stream-window-revisions.md",
+      "task_class": "investigation_implementation",
+      "domain": "stream_processing",
+      "related_existing_fixture_id": "pf-performance-regression",
+      "relationship": "conceptual_only_no_input_or_oracle_reuse",
+      "difficulty_status": "uncalibrated",
+      "state": "public_seed_implemented",
+      "workspace_path": "workspaces/ch05-stream-window-revisions",
+      "public_tests_path": "workspaces/ch05-stream-window-revisions/test",
+      "evaluator_reference_path": null,
+      "measured_score": null,
+      "ready_for_measurement": false,
+      "input_manifest_path": "input-manifests/ch05-stream-window-revisions.json",
+      "private_validation_status": "synthetic_grader_verified_model_calibration_not_run"
+    },
+    {
+      "id": "ch06-incremental-build-generations",
+      "title": "増分ビルドの依存関係と世代管理",
+      "task_path": "tasks/ch06-incremental-build-generations.md",
+      "task_class": "investigation_implementation",
+      "domain": "ci_build",
+      "related_existing_fixture_id": "pf-ci-cache-flake",
+      "relationship": "conceptual_only_no_input_or_oracle_reuse",
+      "difficulty_status": "uncalibrated",
+      "state": "public_seed_implemented",
+      "workspace_path": "workspaces/ch06-incremental-build-generations",
+      "public_tests_path": "workspaces/ch06-incremental-build-generations/test",
+      "evaluator_reference_path": null,
+      "measured_score": null,
+      "ready_for_measurement": false,
+      "input_manifest_path": "input-manifests/ch06-incremental-build-generations.json",
+      "private_validation_status": "synthetic_grader_verified_model_calibration_not_run"
+    }
+  ],
+  "public_runtime": "v24.21.0",
+  "public_controller_path": "tools/public-workspace.mjs"
+}
