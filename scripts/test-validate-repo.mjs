@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
 import { CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
+import { assertAdapterCapabilityClaims } from "./test-validate-repo-capability-claims.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import {
@@ -20,6 +21,7 @@ import { canonicalDigest, putContentAddressedJson } from "./content-addressed-st
 import { REQUIRED_TRACEABILITY_SCENARIOS, computeAdapterAppliedProvenanceFingerprint, computeAdapterProfileFingerprint, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectClaimEvidencePluginProjection, inspectLifecycleScenario, inspectTraceabilityScenarioResult, inspectVerificationProofPolicyContract, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+assertAdapterCapabilityClaims();
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
 const doctorScript = resolve(repoRoot, "scripts/ask-doctor.mjs");
 const sensorsScript = resolve(repoRoot, "scripts/ask-sensors.mjs");
