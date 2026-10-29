@@ -5,7 +5,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSy
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ADAPTER_RENDERER_METADATA } from "./adapter-runtime-inventory.mjs";
-import { APPROVAL_REQUIRED_SURFACE_IDS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
+import { APPROVAL_REQUIRED_SURFACE_IDS, OPERATING_MODES, TASK_CLASSES, findUnsupportedCapabilityClaims } from "./ask-shared.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { codexCompactProfileCanonicalPaths } from "./codex-runtime-profile.mjs";
@@ -802,6 +802,12 @@ Options:
 
 function fail(errors, section, message) {
   errors.push({ section, message });
+}
+
+export function validateAdapterCapabilityClaims(root, errors) {
+  for (const finding of findUnsupportedCapabilityClaims(root, root)) {
+    fail(errors, "adapter capability claims", `${finding.file}: ${finding.adapter} claim exceeds ${finding.status} evidence for ${finding.capability}`);
+  }
 }
 
 export function validateAskAutomationActionPinsText(text) {
@@ -6065,6 +6071,7 @@ export function validateRepository(options) {
   const planeChecks = validatePlaneModel(root, manifest, errors);
   const routingChecks = validateRoutingManifest(root, manifest, errors);
   validateManifestPaths(root, manifest, errors);
+  validateAdapterCapabilityClaims(root, errors);
   validateClaimEvidenceStatusContract(root, manifest, errors);
   validateSkillEffectivenessOutcomeContract(root, manifest, errors);
   const skillChecks = validateSkills(root, skillDirectories, errors);

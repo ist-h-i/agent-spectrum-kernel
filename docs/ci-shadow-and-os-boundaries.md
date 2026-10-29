@@ -1,6 +1,90 @@
 # CI shadow classification and OS boundaries
 
-## Verified state after PR #440
+## Current operation and completion scope — 2026-10-29
+
+All pull requests and manual `Validate repository` runs continue the full job
+graph. Selection is intentionally disabled. The fixed `validate` gate requires
+the plan and all five workers, and rejects missing, failed, cancelled, skipped,
+stale or contradictory completion evidence. The other three workflows and Mac
+process, stdio, filesystem, permission and historical-source checks are retained.
+Real-model/API evaluation is not enabled by CI; artificial fixtures verify
+infrastructure contracts, not LLM quality or native sandbox acceptance.
+
+[PR #449](https://github.com/ist-h-i/agent-spectrum-kernel/pull/449), at its
+original head `c140be361b0904426db4d00b6f69089bf79ff957`, supplied the first
+eligible `docs-v1`/full observation after #448: five successful receipts, 109
+successful required descriptors, matching Git/run/attempt/policy/registry and
+the strict gate. The saved outputs reconstruct `docs-shadow-full-pass`; the
+rendered step-summary body was not directly retrieved. The legacy `docs`
+classifier record has a different scope and is not this comparison. This is one
+transport observation, not a general detection-rate or performance guarantee.
+The expanded #449 change requires its own final-head checks; that earlier green
+run is not reused as evidence for later code.
+
+The retained complete validator now also calls the existing shared capability
+claim check with the validation root and that root's capability matrix. This
+closes a concrete gap: guide text could trigger a sensor regression while the
+previous complete validator accepted it. Focused positive/negative tests cover
+both allowlisted guides and matrix/read-error behavior, and run from the existing
+repository regression command. No matching rules, jobs or parallel validator
+framework are added. Existing parser semantics remain unchanged.
+
+### Intentional deferral of selective execution
+
+The first bounded omission candidate is `repository-tests` alone; common and
+personal input domains are not certified omissions. In the saved #449 batch the
+repository worker used 28m39s, but common and Mac determined completion, so
+removing only that worker has zero wall saving under fixed timestamps. Adding a
+whole-source audit/fingerprint framework for this limited benefit is not the
+current priority. Keep full execution rather than accumulate an unlimited audit.
+This is an efficiency tradeoff, not a claim that all future readers must first
+be proved independent or that selective execution has been implemented.
+
+A future narrow implementation can reuse the current two-file content-change
+allowlist, retained validator/common/personal owners and plan/gate. It must accept
+only the plan's explicit non-selected worker skip, reject selected worker
+failure/skip/cancel/missing/stale evidence, and run full for uncertain diff,
+unknown/shared/dependency/CI/Skill/core changes, deletion, rename or mixed scope.
+Changes to an audited consumer require reviewing its document inputs before
+retaining the exception. Broader omissions need their own concrete responsibility
+review. No new automatic source approval or unlimited dependency-closure gate is
+required. Revisit this work when runner usage or the actual critical path makes
+the benefit worthwhile; require focused negative tests and an ordinary reviewed
+PR, not repeated CI solely to accumulate green observations.
+
+### Full-run, recovery and measurements
+
+- Normal PR runs already provide full regression coverage. Manual
+  `workflow_dispatch` also runs full and is the recovery path for unavailable
+  classification evidence. No periodic duplicate full run is added while every
+  PR is full. A future selective policy must decide its periodic full cadence
+  before enablement; no real evaluation is scheduled by that decision.
+- Uncertain classification falls back to full. Invalid execution identity,
+  plan or receipt fails the aggregate; it is not converted to a successful
+  fallback. Investigate the source/log defect and fix the same PR. Do not disable
+  checks, repair unrelated frozen manifests or repeatedly rerun unchanged code.
+- Cancellation/concurrency optimization is deferred. If introduced later, scope
+  it to obsolete runs of the same PR; never cancel evaluations, another PR or
+  an unrelated process. Current runs are not cancelled by this work.
+- #450 merged as `999b14a77b27a70f76713e129669fa3312fe36d7`. Its local complete
+  build-option comparison was 28m04s to 17m00s (n=1 each), preserving all 33 fresh
+  negative cases. On hosted CI the target interval was 11m40.4s to 7m17.5s and
+  common 78m44s to 74m20s versus #449. Overall wall instead rose from 79m01s to
+  85m18s and unweighted runner total from 228.50 to 241.42 minutes; Mac was the
+  final critical job at 80m12s. Different workers, Ubuntu images/regions, load
+  and cache state prevent a causal or sustained saving claim. These scopes are
+  not added together or converted to billed cost.
+
+The completed foundation is coverage-preserving deduplication, conservative
+classification, exact full-run completion checks, one real docs observation and
+the concrete retained-validator fix. Selective execution, provisional docs/core
+turnaround targets and stable median/p95 improvements remain unmet/deferred.
+Issue #433 may be closed as this bounded foundation only after that scope
+adjustment and the final PR are accepted; unchecked original goals are not
+silently marked complete. Critical-path performance and any selective rollout
+are follow-up work, not extra gates for personal V1 or real evaluation.
+
+## Historical verified state after PR #440
 
 Implementation baseline: [PR #440](https://github.com/ist-h-i/agent-spectrum-kernel/pull/440),
 reviewed/tested head `d3a67907a089ab16009072bf0be0dbcdff250bdc`, normally merged
