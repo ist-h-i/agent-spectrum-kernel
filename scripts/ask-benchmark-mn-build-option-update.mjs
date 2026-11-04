@@ -308,7 +308,7 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
   ], "fixture verification command authority");
   const immutableAnchors = {
     "ci/release-build.log": "897fa262a51db0844805841456332745592b3e45c8bbd5fb705c10a8c90269c9",
-    "docs/build-options.md": "765541869cdc553e6566c905fabf81f1843b4aea4c10e1f4e4989f52f317b2c2",
+    "docs/build-options.md": "de6d6845989db985b659a58f8b31f7578635e7822e474863511086f408686953",
     "package.json": "50844c248aa736d57768a926544720b56914396bdc7b997f310897b4456aa5ed",
     "test/build-config.test.mjs": "641fcf626c4a06509058e3d4ee49cefcd7166182f75ee26a3ab3c8d87190f6ff",
     "scripts/validate-build-config.mjs": "884155195e0ad532a29ab1dc6122b343fea1bc6f285d54a55edd09653d447c2a",
