@@ -1,7 +1,7 @@
 # Primary 24: practical task revision
 
-Artifact ID: `spec-primary24-practical-20261104`  
-Artifact type: `spec`  
+Artifact ID: `spec-primary24-practical-20261104`
+Artifact type: `spec`
 Upstream refs: the user's November 4 request to improve all 24 tasks, measure
 GPT-6.1 Terra low with and without ASK, submit results and a separate draft PR,
 and merge only after the user's review and approval;
@@ -104,9 +104,9 @@ larger application to equalize file formats.
 
 ## Verification contract
 
-Artifact ID: `verification-primary24-practical-20261104`  
-Artifact type: `verification`  
-Upstream refs: `spec-primary24-practical-20261104`  
+Artifact ID: `verification-primary24-practical-20261104`
+Artifact type: `verification`
+Upstream refs: `spec-primary24-practical-20261104`
 Selected proof: `formal_verification_contract` (public contracts, performance
 measurement, multiple sessions and a merge claim).
 
