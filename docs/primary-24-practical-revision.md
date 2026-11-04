@@ -132,6 +132,14 @@ automatic retry or hidden replacement. This is one observation per condition,
 not a replicated estimate of ASK's general effect. The optional goal-pr delivery
 mode is not an additional set of trials.
 
+The proposed native-runner policy retains ephemeral sessions and disables both
+agent features in both arms, using one root Terra low session per trial and no
+nested model or reviewer sessions. This differs from earlier agent-enabled
+trials. It measures ASK under that shared constraint; ASK's independent-review
+workflow is not measured, and self-review does not satisfy an independent review
+requirement. This execution choice is pending confirmation, not a completed
+environment qualification.
+
 Before the first trial, freeze the revised public-input version and per-file
 hashes, common prompt, exact ASK installation revision/inventory, CLI and runner
 identities, model/effort, tool/subagent policy, permissions, network and source
