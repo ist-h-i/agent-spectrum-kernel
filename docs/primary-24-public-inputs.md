@@ -1,5 +1,9 @@
 # 既存24課題の公開入力をまとめて点検する
 
+2026-11-04の[実務用公開改訂](primary-24-practical-revision.md)でも、この既存の準備入口と24件のIDを使う。
+`one-shot` と任意の `goal-pr` は提供方法のラベルであり、課題・採点条件・実行資格を追加する登録ではない。
+旧版の再読取りには旧Git SHAのコードと入力を揃える。公開改訂の成功から旧private admissionやモデル実行成功を推測しない。
+
 正本は [portfolio-catalog.json](../benchmarks/portfolio-catalog.json) の primary 24件
 （機構あり6、軽量抑制6、実務頻度8、高影響4）。
 この入口は、各課題の公開入力・成果物契約・要件・検証コマンドを列挙し、契約も揃う入力を
