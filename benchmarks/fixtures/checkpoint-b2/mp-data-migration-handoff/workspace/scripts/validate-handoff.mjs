@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const path = process.argv[2];
@@ -8,6 +8,19 @@ if (!path) throw new Error("usage: validate-handoff.mjs <handoff.json>");
 const handoff = JSON.parse(readFileSync(path, "utf8"));
 const workspace = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const policy = JSON.parse(readFileSync(resolve(workspace, "state/handoff-policy.json"), "utf8"));
+const commands = JSON.parse(readFileSync(resolve(workspace, "operations/commands.json"), "utf8")).commands;
+const evidenceIds = new Set([
+  JSON.parse(readFileSync(resolve(workspace, "evidence/batch-42-verification.json"), "utf8")).evidence_id,
+  JSON.parse(readFileSync(resolve(workspace, "state/compatibility-matrix.json"), "utf8")).evidence_id,
+]);
+function suppliedReference(value) {
+  if (evidenceIds.has(value)) return true;
+  if (typeof value !== "string" || value.trim() !== value || isAbsolute(value) || value.includes("\\")) return false;
+  const normalized = value.replace(/^\.\//u, "").replace(/^workspace\//u, "");
+  if (!normalized || normalized === "handoff.json" || normalized.split("/").some((part) => !part || part === "." || part === "..")) return false;
+  const absolute = resolve(workspace, normalized);
+  return existsSync(absolute) && realpathSync(absolute) === absolute && lstatSync(absolute).isFile();
+}
 const exactKeys = (value, keys, label) => {
   if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join("\0") !== [...keys].sort().join("\0")) throw new Error(`${label} fields are not closed`);
 };
@@ -41,6 +54,9 @@ string(handoff.safe_next_action.command_id, "safe_next_action command_id");
 if (!new Set(["read_only", "write"]).has(handoff.safe_next_action.mode)) throw new Error("safe_next_action mode is invalid");
 string(handoff.safe_next_action.owner, "safe_next_action owner");
 stringArray(handoff.safe_next_action.required_evidence_ids, "safe_next_action required_evidence_ids");
+const command = commands.find(({ command_id }) => command_id === handoff.safe_next_action.command_id);
+if (!command || command.mode !== handoff.safe_next_action.mode || command.owner !== handoff.safe_next_action.owner) throw new Error("next action does not reference a supplied command, mode, and owner");
+if (!handoff.safe_next_action.required_evidence_ids.every((id) => evidenceIds.has(id))) throw new Error("next action evidence IDs are not supplied");
 
 exactKeys(handoff.resume_gate, ["approval_role", "required_condition_ids"], "resume_gate");
 string(handoff.resume_gate.approval_role, "resume_gate approval_role");
@@ -54,6 +70,7 @@ string(handoff.rollback.data_preservation, "rollback data_preservation");
 exactKeys(handoff.continuation, ["stop_condition_ids", "verification_states", "evidence_references", "open_questions"], "continuation");
 stringArray(handoff.continuation.stop_condition_ids, "continuation stop_condition_ids");
 stringArray(handoff.continuation.evidence_references, "continuation evidence_references");
+if (!handoff.continuation.evidence_references.every(suppliedReference)) throw new Error("continuation evidence references are not supplied");
 stringArray(handoff.continuation.open_questions, "continuation open_questions");
 if (!Array.isArray(handoff.continuation.verification_states) || handoff.continuation.verification_states.length === 0) throw new Error("continuation verification_states is invalid");
 const verificationIds = [];

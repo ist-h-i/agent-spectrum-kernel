@@ -16,25 +16,34 @@
       "const": "prepare_only"
     },
     "read_policy": {
-      "const": "fallback_until_verified"
+      "enum": [
+        "fallback_until_verified",
+        "legacy_only",
+        "new_field_only"
+      ]
     },
     "writer_policy": {
-      "const": "dual_write_until_contract"
+      "enum": [
+        "dual_write_until_contract",
+        "legacy_only",
+        "new_field_only"
+      ]
     },
     "rollout_steps": {
       "type": "array",
       "uniqueItems": true,
       "items": {
         "enum": [
-          "expand_optional_field",
-          "deploy_dual_writer",
           "backfill",
-          "drain_legacy_writers",
-          "verify_fresh_backfill",
           "cutover_reads",
-          "drop_legacy_field"
+          "deploy_dual_writer",
+          "drain_legacy_writers",
+          "drop_legacy_field",
+          "expand_optional_field",
+          "verify_fresh_backfill"
         ]
-      }
+      },
+      "minItems": 1
     },
     "execute_requires_specific_approval": {
       "const": true

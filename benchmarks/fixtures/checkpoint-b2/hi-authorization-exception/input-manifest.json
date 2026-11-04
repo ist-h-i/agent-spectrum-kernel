@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "c6aad90c430b4a8a48c3ad8ef5722e80a856118de4d37621008275a1eefc341b",
-          "bytes": 1892
+          "sha256": "d63648ae9c68342c8ab6d06129ddea0126794c5cb1ed0501d171828975d0da04",
+          "bytes": 2688
         },
         {
           "path": "workspace/base/authorization.mjs",
@@ -25,8 +25,8 @@
         },
         {
           "path": "workspace/docs/ownership-contract.md",
-          "sha256": "9e4e640a30fda00d28d99116d6a38a3af59d3e5d0da4453c47386845cfd686f7",
-          "bytes": 2357
+          "sha256": "8ab1c12fc9597a42f5a7415900a0f7db6b6ecd359b8d2ebee04a4f7c05578107",
+          "bytes": 2218
         },
         {
           "path": "workspace/package.json",

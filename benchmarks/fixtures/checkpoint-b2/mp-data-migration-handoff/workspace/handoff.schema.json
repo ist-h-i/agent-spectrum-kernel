@@ -57,8 +57,7 @@
         "stop_condition_ids": { "$ref": "#/$defs/nonEmptyStringArray" },
         "verification_states": {
           "type": "array",
-          "minItems": 4,
-          "maxItems": 4,
+          "minItems": 1,
           "uniqueItems": true,
           "items": {
             "type": "object",

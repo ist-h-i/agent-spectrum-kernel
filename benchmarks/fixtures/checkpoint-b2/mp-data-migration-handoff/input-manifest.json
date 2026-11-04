@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "2e210dad20cda5c2c4a0c935b96769f20a72f199bf6d64126924d80a7cdc4c8e",
-          "bytes": 1058
+          "sha256": "74e2875dd5a4f57cf8f78737381ae0b7e485a7149443f221db05375aab21f7c0",
+          "bytes": 3592
         },
         {
           "path": "workspace/docs/migration-plan.md",
@@ -20,8 +20,8 @@
         },
         {
           "path": "workspace/docs/rollback-runbook.md",
-          "sha256": "38ab5b0be197f1e6e1a91c1854668ec2cb9c2dac3b03d478f26ba0ed376cdff1",
-          "bytes": 656
+          "sha256": "4cb069492547eed44e905718a3ff16c4e551fe08d6cc2e9cb9b9e06c930bd868",
+          "bytes": 730
         },
         {
           "path": "workspace/evidence/batch-42-verification.json",
@@ -30,8 +30,8 @@
         },
         {
           "path": "workspace/handoff.schema.json",
-          "sha256": "43f6d048a4301c616a96aa1e3d700a8ad473526fa3b8f7435a6b7ede2ea27578",
-          "bytes": 3468
+          "sha256": "3c7d9bf4de2ca655278c189bef7221c479336ad7db9fc86608029efb6d1022cf",
+          "bytes": 3443
         },
         {
           "path": "workspace/operations/commands.json",
@@ -50,8 +50,8 @@
         },
         {
           "path": "workspace/scripts/validate-handoff.mjs",
-          "sha256": "e417e0863ad446fef9c2aa8688240e3447863c11a5a86ffac68c61d5a8e4c676",
-          "bytes": 5142
+          "sha256": "c1da3b49de4b21720ced6f7de2bf88fd18e5e5167fd8b0694420bd312e10d209",
+          "bytes": 6718
         },
         {
           "path": "workspace/state/approval-state.json",
@@ -65,8 +65,8 @@
         },
         {
           "path": "workspace/state/handoff-policy.json",
-          "sha256": "02b6ac7da6360dbf8ef48068ee5f060a6bf4f0d77967c7231b9e0e3870777fc0",
-          "bytes": 899
+          "sha256": "2af601848e25d17308c948184620b3d2a168bf14d9a4253e881e8639d63f1cbe",
+          "bytes": 151
         },
         {
           "path": "workspace/state/operation-state.json",

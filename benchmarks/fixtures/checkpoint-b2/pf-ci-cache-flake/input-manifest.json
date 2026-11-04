@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "d514b2e3db7112454ea34247b3632d995dd1fa7173b7e98cb3ecba462ef3904c",
-          "bytes": 2050
+          "sha256": "2a71b04e7cba6076a01ec9a818d217d97a5ac1179d142ba67927079939484aa5",
+          "bytes": 3006
         },
         {
           "path": "workspace/ci/build-config.json",
@@ -30,13 +30,13 @@
         },
         {
           "path": "workspace/docs/investigation-contract.md",
-          "sha256": "fc5dfce5bc59ff14aaa66b4fbe3edf209ef7e71e35c98b4a367fe02e17d0de6f",
-          "bytes": 3324
+          "sha256": "ba8b371bddb2e52e773438dc18c3de295fd01f56852252de9137df3820254f11",
+          "bytes": 3572
         },
         {
           "path": "workspace/investigation.schema.json",
-          "sha256": "cd971cd4f36c060ea521946dd0819edbae726c57f8ac5786a7595f5fcf583270",
-          "bytes": 12222
+          "sha256": "23b2da0e485d964192af7f1b3fc738234f78d1fd59db1577d55ea28d1aace03b",
+          "bytes": 12215
         },
         {
           "path": "workspace/package.json",
@@ -60,8 +60,8 @@
         },
         {
           "path": "workspace/test/cache-observation.test.mjs",
-          "sha256": "42ced262a0783c01baa689ba209e11d1122e899055d0ae624e2f56ad908dfcad",
-          "bytes": 695
+          "sha256": "85a00bcd43efcb002d7874c1106b556232a07550e762684252f4ce7e9e89c71f",
+          "bytes": 1722
         },
         {
           "path": "workspace/test/report-structure.test.mjs",

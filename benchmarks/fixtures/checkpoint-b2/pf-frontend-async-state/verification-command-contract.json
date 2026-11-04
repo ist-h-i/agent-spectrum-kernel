@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
   "program": "adaptive_ask_verification_command_contract",
   "fixture_id": "pf-frontend-async-state",
-  "fixture_input_digest": "sha256:604ebe507a4ca285311f9bce2b92ae4839467f2b27c341cca4bccb043b0fc636",
+  "fixture_input_digest": "sha256:e671ccac3576d1889062ae9ce7db68e552c5c0d8c23c4b717bf22dc59143f272",
   "commands": [
     {
       "command_id": "async-search-validation",
@@ -30,5 +30,5 @@
       "command_contract_digest": "sha256:6ac5b805e3d131cab18e83d547a730d33dd4b46f7b0854c5466f416b260ff88a"
     }
   ],
-  "contract_digest": "sha256:6b39dfe8c4f10b3f3c95a68247f75fdc68d0989b3d63fc913dd15175b895e3e0"
+  "contract_digest": "sha256:e242963c70be05ab63b6e48b1666a8163ace1cfe90e925dfcb44f691051e51ee"
 }

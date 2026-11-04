@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "4247670f22a882a630aadc8688e6ed9a7c7040fb31aad17bbab7a6bb831fa435",
-          "bytes": 437
+          "sha256": "9d8a5c2ddc36525e2d059b7f7bce786a10123324b4c6e576db3dca52f25bf756",
+          "bytes": 2991
         },
         {
           "path": "workspace/.github/workflows/pull-request.yml",
@@ -25,8 +25,8 @@
         },
         {
           "path": "workspace/docs/verification.md",
-          "sha256": "04b970363da50dd818517c0be65bd5e832e791d98d420bc978e9d1b5da702639",
-          "bytes": 529
+          "sha256": "fe1e2db5b00085d6e3d59cffd3a191a1bd2f9f149f86ff898ad893b4fb9b69bf",
+          "bytes": 449
         },
         {
           "path": "workspace/package-lock.json",
@@ -55,8 +55,8 @@
         },
         {
           "path": "workspace/scripts/validate-review.mjs",
-          "sha256": "008cd831c8e38041af31be0cbbdc8fcb3b42ba45006492fbf32b870814882422",
-          "bytes": 2210
+          "sha256": "04596758f6cf4269b7681001d21bb211bee07b992c71ab759af1d9712bb9c682",
+          "bytes": 2981
         },
         {
           "path": "workspace/src/quote-order.mjs",

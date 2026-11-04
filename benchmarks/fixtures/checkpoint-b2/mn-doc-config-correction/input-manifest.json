@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "f3e064f9588b58e558b8c30ce35a979021f604b34fac40c2eff60207ad0d4e3d",
-          "bytes": 398
+          "sha256": "49dcb3c95ed0bca2c1339c24bb415a536f0fe9e6be69e31bc3929d17b36e4b68",
+          "bytes": 1497
         },
         {
           "path": "workspace/config/retry-policy.json",

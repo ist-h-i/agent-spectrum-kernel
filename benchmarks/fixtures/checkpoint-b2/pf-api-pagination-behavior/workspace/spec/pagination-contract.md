@@ -4,6 +4,6 @@
 
 The caller supplies a valid v2 base URL without retired parameters. On the first request, preserve the initial URL's path and other query parameters, set `limit` to the configured page size, and do not introduce the retired `page_size` parameter. A size must be an integer from 1 through 100; the default and caller signature stay unchanged.
 
-Subsequent requests use the supplied `links.next` string exactly. It can contain an opaque cursor and its own query parameters. Do not calculate a page number, reconstruct a URL, or reapply the first-request options to it. An empty `items` array can still have a continuation. Stop only when the decoded continuation is null.
+For every response with a non-null `links.next`, the next request URL must equal that string exactly, including its opaque cursor and query parameters. This applies even when `items` is empty. A null continuation means there is no further page. First-request options do not change service-supplied continuation URLs.
 
 Preserve the existing bound of ten requests and reject a repeated request URL before making that request again. Propagate request/decoder failures. The decoder's same-origin HTTPS boundary is fixed. This is a fictional local API contract; the request doubles use only example.test URLs and never access the network.

@@ -4,7 +4,7 @@ The inbox list, selection, and detail pane are one rendered state.
 
 - `filter` is either `all` or `unread`.
 - `selectedMessageId` is either `null` or the ID of a message currently visible under `filter`.
-- A filter change that hides the selected message clears `selectedMessageId` before rendering.
+- After a filter change, a message hidden by the new filter is not selected in the resulting state or rendered view.
 - The detail pane renders exactly the message represented by the one selected visible row. When no visible row is selected, the detail pane is empty.
 - A selection request for a hidden or unknown message is rejected.
 

@@ -24,17 +24,7 @@
         "required": ["id", "mechanism", "state", "confidence", "evidence"],
         "properties": {
           "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
-          "mechanism": {
-            "enum": [
-              "request_scoped_cache_identity",
-              "traffic_volume",
-              "database_contention",
-              "garbage_collection",
-              "network_or_scheduler",
-              "memory_pressure",
-              "other"
-            ]
-          },
+          "mechanism": { "type": "string", "minLength": 1, "pattern": "\\S" },
           "state": { "enum": ["supported", "weakened", "falsified", "unresolved"] },
           "confidence": { "enum": ["high", "medium", "low"] },
           "evidence": {
@@ -72,25 +62,17 @@
       "properties": {
         "hypothesis_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
         "environment": { "enum": ["local_replay", "staging_read_only"] },
-        "action_type": { "enum": ["compare_cache_identity_variants", "observe_cache_identity_variants", "state_mutation", "other"] },
-        "candidate_identity": { "enum": ["tenant_window", "current_request_scoped", "other"] },
+        "action_type": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "candidate_identity": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "expected_signals": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "enum": [
-              "cache_reuse_increase",
-              "summary_builds_decrease",
-              "latency_decrease",
-              "request_rate_decrease",
-              "database_latency_decrease",
-              "gc_pause_decrease",
-              "memory_usage_decrease"
-            ]
+            "type": "string", "minLength": 1, "pattern": "\\S"
           }
         },
-        "stop_condition": { "enum": ["signals_do_not_move_together", "time_box_exceeded", "manual_completion", "other"] },
+        "stop_condition": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "read_only": { "type": "boolean" },
         "customer_traffic_change": { "type": "boolean" },
         "runtime_configuration_change": { "type": "boolean" },

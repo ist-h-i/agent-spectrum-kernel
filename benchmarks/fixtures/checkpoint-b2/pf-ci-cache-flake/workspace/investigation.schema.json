@@ -27,7 +27,7 @@
     },
     "experiments": {
       "type": "array",
-      "minItems": 4,
+      "minItems": 2,
       "maxItems": 10,
       "items": {
         "type": "object",
@@ -307,9 +307,8 @@
       ],
       "properties": {
         "claim": {
-          "enum": [
-            "runtime_alone"
-          ]
+          "type": "string",
+          "minLength": 1
         },
         "status": {
           "enum": [

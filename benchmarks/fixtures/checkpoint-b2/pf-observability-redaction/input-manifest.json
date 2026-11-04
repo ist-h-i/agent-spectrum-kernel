@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "eca02950ba10488accb9529ead7f622dff91ca94d130789e8a21904fa7f31b66",
-          "bytes": 2128
+          "sha256": "79b4aacb74fbdb14fd096abaeb5e73c2c5854f873bba7fa3462cf679f18f36cf",
+          "bytes": 2954
         },
         {
           "path": "workspace/base/projection-policy.json",
@@ -40,8 +40,8 @@
         },
         {
           "path": "workspace/docs/projection-contract.md",
-          "sha256": "aecc2018eff6ae94be37d81928454b07cb73274d7766b194d0e084569ae9d65c",
-          "bytes": 2735
+          "sha256": "fe216125f1c50d0dc8ad3cdd127dc518cc6f6092a9ca7382ac60bd054c02f711",
+          "bytes": 3032
         },
         {
           "path": "workspace/package.json",

@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "ad441a90a6e8a0ac878e5873b99b14010077f1610bfa7d814c4b17e17a34ba66",
-          "bytes": 1474
+          "sha256": "40c4bcb69ef647878b8e655d132326aa1691869d7925a0ee7d615074d8456999",
+          "bytes": 2090
         },
         {
           "path": "workspace/package.json",
@@ -20,8 +20,8 @@
         },
         {
           "path": "workspace/spec/pagination-contract.md",
-          "sha256": "a9d105ef7beecbff0b70ba61b5b4f4d13bfc023d39a126adf2ec76c13e2a9095",
-          "bytes": 1380
+          "sha256": "b1b8f5488704c2d04f2342a3c0c6b67dc68915955612f3a85fbb4418797ed88c",
+          "bytes": 1371
         },
         {
           "path": "workspace/src/api-pages.mjs",

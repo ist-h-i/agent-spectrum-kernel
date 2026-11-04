@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
   "program": "adaptive_ask_verification_command_contract",
   "fixture_id": "mn-client-compatibility-fix",
-  "fixture_input_digest": "sha256:ad578de2b1f36a8d742f20e0adbf570ad14090fccf86e5d03a2101cad749ac63",
+  "fixture_input_digest": "sha256:4397dc1b5d16f282e72591e90bdfb41ee50d05462034c6a58ebf255329636dd3",
   "commands": [
     {
       "command_id": "preferences-focused-test",
@@ -30,5 +30,5 @@
       "command_contract_digest": "sha256:5736d09eccec78f8e9880d4da739523c87f38f4b4484e50aaca43b0d9ce69630"
     }
   ],
-  "contract_digest": "sha256:2da0688817612db0c95ff87b0ea882ce3d0866aeaf5c415b2cd2b08c837b43ad"
+  "contract_digest": "sha256:36d8b5f400dcd4b1e188801ed7300165840881fea3a52b60b31608026312f607"
 }

@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "aa2cd52eeb1b3581fb914a6f157423e408b7bebdb73b6d19980cdf0fcc709cc8",
-          "bytes": 462
+          "sha256": "00d8bcc12a931a3cab4cedf814c6ea991fe2c858a32da24c675dec9870870560",
+          "bytes": 2957
         },
         {
           "path": "workspace/docs/interaction-notes.md",
@@ -40,8 +40,8 @@
         },
         {
           "path": "workspace/scripts/validate-review.mjs",
-          "sha256": "008cd831c8e38041af31be0cbbdc8fcb3b42ba45006492fbf32b870814882422",
-          "bytes": 2210
+          "sha256": "04596758f6cf4269b7681001d21bb211bee07b992c71ab759af1d9712bb9c682",
+          "bytes": 2981
         },
         {
           "path": "workspace/src/format-toolbar.html",

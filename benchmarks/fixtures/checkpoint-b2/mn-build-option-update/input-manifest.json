@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "e4f7f7b74f2f10d68ffa29ba32fde96687bf7b157224cb3e86c3ebc4b966fd60",
-          "bytes": 501
+          "sha256": "58eae6ff164e72913e5bbf16234c5a530773612e63c967b16c08262661d824a9",
+          "bytes": 2582
         },
         {
           "path": "workspace/build.config.json",
@@ -25,8 +25,8 @@
         },
         {
           "path": "workspace/docs/build-options.md",
-          "sha256": "765541869cdc553e6566c905fabf81f1843b4aea4c10e1f4e4989f52f317b2c2",
-          "bytes": 565
+          "sha256": "de6d6845989db985b659a58f8b31f7578635e7822e474863511086f408686953",
+          "bytes": 697
         },
         {
           "path": "workspace/package.json",
