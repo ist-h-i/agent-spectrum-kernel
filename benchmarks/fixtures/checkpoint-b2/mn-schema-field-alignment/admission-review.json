@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
   "fixture_id": "mn-schema-field-alignment",
-  "candidate_input_digest": "sha256:bb41c0b2c89cf749d8f07e179554689c2c9fb3bde6b7fd26fc82a09cc8cb15a8",
-  "candidate_evaluator_digest": "sha256:874b268a15106d4e521040509947240808ecb1a3d0932526010769d54716e7bd",
+  "candidate_input_digest": "sha256:0bcc8b28dc643617b22879431c1e6bbda21ec1cf3d2c3ddc10a740bd0e64c516",
+  "candidate_evaluator_digest": "sha256:12193a78236ec879ad56757d285f6bf8ebc77f3c5347c6cd9fbcb3d9d67d2bdf",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -111,5 +111,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:5fc0a2b65f9a5bb68e8e507bd26e5bbf0af1ecef7aa6a2080e15577bc44b76ef"
+  "review_package_digest": "sha256:a25834a0157ac1d639505a18d4476617c0d6dfb33f0058f2d7314eaa20850ca5"
 }

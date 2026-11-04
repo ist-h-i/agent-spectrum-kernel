@@ -6,18 +6,18 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mp-accessibility-interaction-review/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:824fe8fa3894dbd986d2a16b9ed01bf0a9f4457ca802b4c86479ce178c817023",
+  "evaluator_public_reference_digest": "sha256:0b010afea2bfdd6c8fb468e9e18d553de19cf4abbc99487a82215ac6aff1b60b",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mp-accessibility-interaction-review/verification-command-contract.json",
   "verification_command_contract_digest": "sha256:b878b24e92a068445165479a6d69e67d704571a3b43755e2823a14df5f705b81",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mp-accessibility-interaction-review/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:41a99cc70e7381ece7bc1d7d5822976d98e5dc6fc1b8c410e2482e4e1f52fdbd",
   "result_profile": {
-    "name": "binary_scope_verification_v1",
-    "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
+    "name": "requirement_scope_verification_v2",
+    "digest": "sha256:4b3b058c7eebda5c8cbb483cf1bec5c557ac6b1c41834d81675fffd5b39abdbc"
   },
   "declares_findings": true,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-accessibility-interaction-review/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:06860b9e9f5e9825194ed275dbe6db5f31a09504b8ac4c4856a4e82152517534",
-  "evaluator_authority_manifest_digest": "sha256:d0a6ad7ce7bf2b80c770b4262833abfbf2ff3aa006ba43fac4ceef0543a95110",
-  "output_contract_digest": "sha256:56dacc4e66679ca1a0d8fdfdcb9f390350fb80622a3e9318c29aebf225a410e3"
+  "evaluator_authority_manifest_raw_sha256": "sha256:f70259d782cd82a3a7e3fbc742eec2799d36dc55062bc7bb9730b32e6dfd3ee6",
+  "evaluator_authority_manifest_digest": "sha256:11931874ec72088d5fe21cce3ef2b4ef853a9ad4dde2d0f5d28740ec4da76246",
+  "output_contract_digest": "sha256:c6a6b2af691a1ff51eef9795cfe555d64b807135041f662fa124dc859df7da13"
 }

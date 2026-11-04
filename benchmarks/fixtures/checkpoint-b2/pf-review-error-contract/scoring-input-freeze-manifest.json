@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
   "program": "adaptive_ask_scoring_input_freeze",
   "fixture_id": "pf-review-error-contract",
-  "fixture_input_digest": "sha256:395fd2a624d1b1743657f0e59ddc7ac1d7b9a1e18bafd55cddcdd259cb9e9ec9",
+  "fixture_input_digest": "sha256:dc61e15e826b9dbd5bfcbcf27608214d64f8848947075956f898893cab2c5916",
   "catalog": {
     "path": "benchmarks/portfolio-catalog.json",
     "raw_byte_digest": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
@@ -21,29 +21,29 @@
   },
   "admission_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/final-admission-record.json",
-    "raw_byte_digest": "sha256:3d69f261ea67cc38a9cc09763424251e19a032839bccdeebb99eb140fe844260",
-    "semantic_digest": "sha256:685ddc8e85b155d7d2c0ce22706aadc29167afa2ea2d58a17f966fbf8bcb27b0"
+    "raw_byte_digest": "sha256:a8929a8b1b7d3abc0f0160a39f17007bd48df2f6fe8585d9ff0327fe5379506a",
+    "semantic_digest": "sha256:ebb36158560c950d3e78f390a5f259a84d344d9964f4877f2b0fb7178067b691"
   },
   "requirement_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/requirement-record.json",
-    "raw_byte_digest": "sha256:5f2461f1e0eaeee82facd065c8da56f5115a227fc629b7b309b7d9fa55e9c273",
-    "record_digest": "sha256:1ac682113aaf9557b6ca8e4c2e0711e9282ba6615baf04b6b55e552385366c99",
+    "raw_byte_digest": "sha256:07788510ca62833cafe5b5a0c8a0f68a78bfbca2f23f3112a055ad779b5ff747",
+    "record_digest": "sha256:a0b4bfac95909c342536f77bcb422aa4b925584ecabc1287853d776ec95373af",
     "set_digest": "sha256:62aec47a5de8ecd3512012ecf73981013ed41646e667cb58c5d9b61617fde63d"
   },
   "output_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/output-contract.json",
-    "raw_byte_digest": "sha256:cc046489b5667b2dde02406a4ab82caf3ce9545cfd95c29c39b71ea77c957c5c",
-    "semantic_digest": "sha256:5dc8e6fa0cd5d47f72174e46ce7d6b5fc4b3116f565351c8af04b13c9fddbae5"
+    "raw_byte_digest": "sha256:8efe4d631b46a8032717c84e354f45430823e9c4dd55988626ea6c7759b170e4",
+    "semantic_digest": "sha256:c7e1dbf242db478b5bd6a583db01d8649e9305fcb6ca097175a8ea33e38617f0"
   },
   "evaluator_public_reference": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evaluator-reference.json",
-    "raw_byte_digest": "sha256:cc208498f789c7d2b5dbaafb9a49eebb8923c010731295f46ef68f1ab6fb005a",
-    "semantic_digest": "sha256:a2ccc16b2f7b40abd285f42cb1f188176da1065dec5124e3935f2c094dc69fde"
+    "raw_byte_digest": "sha256:67445863720bb2df86dc9fd3e2ab97323679d6f9b7b9c99e2a8b6406614de4ed",
+    "semantic_digest": "sha256:9786142dcdcedd8c3dead96e3ed4515926d4a6386e39b3f9ce4e86a247e9a14d"
   },
   "verification_command_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/verification-command-contract.json",
-    "raw_byte_digest": "sha256:59db954bfa31cebef5653ba20562e1ba407772f6e38b111462a266df9d75a622",
-    "semantic_digest": "sha256:0eb96e5c525c11cde265e69d241fcb502623049c34836be46df215994bdaa176"
+    "raw_byte_digest": "sha256:8a3f4d71aaef335ef3a86e88ab88288d243cd5a6b26226b209014ccbd6d32777",
+    "semantic_digest": "sha256:c82a0998450c6a63945623cff646030e60c133bf7e02dae3c78f916506ebdf7d"
   },
   "evidence_map": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evidence-map.json",
@@ -52,13 +52,13 @@
   },
   "evaluator_authority_manifest": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evaluator-authority-manifest.json",
-    "raw_byte_digest": "sha256:f745c9b579c92daa2d9321411146c071541df4c70056794c2487dc0262275a44",
-    "semantic_digest": "sha256:124a0c249e672cd2df6de0ee8f0e993df02b813bb242ec281982d29ccf34884f"
+    "raw_byte_digest": "sha256:0c08f44cea6685fbb08069c38787e7563cec4c246bbd1a204558028d7247db94",
+    "semantic_digest": "sha256:87fb844136acbd2f747e855edced57d79db79c2df7b9c78ca66d576427f1844a"
   },
   "result_profile": {
-    "name": "binary_scope_verification_v1",
-    "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
+    "name": "requirement_scope_verification_v2",
+    "digest": "sha256:4b3b058c7eebda5c8cbb483cf1bec5c557ac6b1c41834d81675fffd5b39abdbc"
   },
   "freeze_revision": "issue-208-pf-review-error-contract-r4",
-  "manifest_digest": "sha256:be2c36cad8093c63a059368a6ac03f9a878e5cc7960810dbbe8de1774c867789"
+  "manifest_digest": "sha256:2b21338365b8ec7adf8bba9f3ca6628ba5d2c3aa8a6f696d15f40aba19b3d34d"
 }

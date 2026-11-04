@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
   "fixture_id": "pf-data-schema-evolution",
-  "candidate_input_digest": "sha256:391d06c142ff90c5a4aaf811d551cbe62b87490db9499da77db3fecfc89d03b4",
-  "candidate_evaluator_digest": "sha256:e2e8c89a536aa7e53fce673eef9dc31b8294326e689c62bcbbc923795f99b596",
+  "candidate_input_digest": "sha256:46e5fa91cf83de28296c4216729a6fddff714c25ccb4d85fda81cef7f05ca0fc",
+  "candidate_evaluator_digest": "sha256:111ee42dd67b4b016158cea31934a05277485ad99c71dfafdc26d64bf5b50b3d",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -115,5 +115,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:4560a5f66bffa4a31fd6f712fec3838e8b4c5d32c4c737262038de1a4bba8f3f"
+  "review_package_digest": "sha256:de21eeca41270222f2e35a27c716c3c35cc028337027a1931d53f98c8d2c02eb"
 }

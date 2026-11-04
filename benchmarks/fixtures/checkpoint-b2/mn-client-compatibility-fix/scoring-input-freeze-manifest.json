@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
   "program": "adaptive_ask_scoring_input_freeze",
   "fixture_id": "mn-client-compatibility-fix",
-  "fixture_input_digest": "sha256:ad578de2b1f36a8d742f20e0adbf570ad14090fccf86e5d03a2101cad749ac63",
+  "fixture_input_digest": "sha256:4397dc1b5d16f282e72591e90bdfb41ee50d05462034c6a58ebf255329636dd3",
   "catalog": {
     "path": "benchmarks/portfolio-catalog.json",
     "raw_byte_digest": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
@@ -21,29 +21,29 @@
   },
   "admission_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/final-admission-record.json",
-    "raw_byte_digest": "sha256:ce3843941593e2946b52f046f63bbeb9d57cc66c7e91fe8d5f654ae4b1a82c28",
-    "semantic_digest": "sha256:72775a40fa3bb16597bbbd12e3939666dcd64aa6f9a6af170ac2241cb85f3707"
+    "raw_byte_digest": "sha256:c5cf3d0b621dbf64e04fd0106c45ed46e4295f63277a9eea2e383d06a7a1bab0",
+    "semantic_digest": "sha256:3767729ddea395c0a38c44ba6b70d12e70484657db0cba4a6b21e67255574310"
   },
   "requirement_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/requirement-record.json",
-    "raw_byte_digest": "sha256:2689df37785b7820f9d50024941eb52b923d6fb2e020bf80016005cd711c01ff",
-    "record_digest": "sha256:03093190125ac14413dc0c769f5e707d8229ade2078d06f08b80a4e303c2abcc",
+    "raw_byte_digest": "sha256:781233807f1acb51021e15607ee08b44ad1bc9646c521c92f0f56f778cf016cd",
+    "record_digest": "sha256:d63994f7bf32086b185c94a7ab6b10baa9bd01617843b8fc664e08aba9e3f606",
     "set_digest": "sha256:d758186ee15f663d1025aea0a1d5fffdc25e63f205317cc48e7c44933c441546"
   },
   "output_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/output-contract.json",
-    "raw_byte_digest": "sha256:490597964e2450012764daea9d7adedc62efb8cb10fd9d43ddbe25103806aab9",
-    "semantic_digest": "sha256:a3997a55c04f45dd3840b697ccdead2537343a5479fd2b0a238f4c232e7f8d48"
+    "raw_byte_digest": "sha256:07240a34770e050a02535e29d1c5fc490a2a82e45a4d1c0d4e764c851537cd05",
+    "semantic_digest": "sha256:a679061a2b96ea68a90dea94d9012f7c823f5b2759b7f7481c03dcdd895231be"
   },
   "evaluator_public_reference": {
     "path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/evaluator-reference.json",
-    "raw_byte_digest": "sha256:101b7a9b6818c8f1f3edf91668bc65ea48ab273c4c1336e9c013a4391ac76fee",
-    "semantic_digest": "sha256:0dac35c3556402f456c14817429ff7f2816951affe4aa209cadd0b7b608568cb"
+    "raw_byte_digest": "sha256:c0db6a229567d3bfa2083f36f561ae932bedbecdbea943dd722e28f8f7eaf9e4",
+    "semantic_digest": "sha256:c790294e2d9c9dd055a62d6819cbf25e103e238c906321c4d7784fc682e092d6"
   },
   "verification_command_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/verification-command-contract.json",
-    "raw_byte_digest": "sha256:c802442ff9fd16299ba7ebf4af44656cd2e5796b01a3c9ae1355426fbd94177c",
-    "semantic_digest": "sha256:2da0688817612db0c95ff87b0ea882ce3d0866aeaf5c415b2cd2b08c837b43ad"
+    "raw_byte_digest": "sha256:b3f09364993a8370322b9312399864062c973cd2c3dbf5839eab6e11a7f57efc",
+    "semantic_digest": "sha256:36d8b5f400dcd4b1e188801ed7300165840881fea3a52b60b31608026312f607"
   },
   "evidence_map": {
     "path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/evidence-map.json",
@@ -52,13 +52,13 @@
   },
   "evaluator_authority_manifest": {
     "path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/evaluator-authority-manifest.json",
-    "raw_byte_digest": "sha256:839b7b33d23ae2b4a6fab944f422865ee2884070ea79c266f1bb962d3f408b32",
-    "semantic_digest": "sha256:6de719a599ebb348dfc5f6d9bf112a28298bc6a513485ab32f0cc766a0ab405c"
+    "raw_byte_digest": "sha256:912e04079a53a5f5c49c8432328b7df335783a845433713694347013cfeaa9e1",
+    "semantic_digest": "sha256:1f908448310608774f98c3b1dd6797429a44b9f51d9e07b7cd62e81862245978"
   },
   "result_profile": {
-    "name": "binary_scope_verification_v1",
-    "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
+    "name": "requirement_scope_verification_v2",
+    "digest": "sha256:4b3b058c7eebda5c8cbb483cf1bec5c557ac6b1c41834d81675fffd5b39abdbc"
   },
   "freeze_revision": "issue-207-mn-client-compatibility-fix-r6",
-  "manifest_digest": "sha256:40288c21b7e74fc1719bb91ba6ee0116d176649287692ed662868f7a2e7b2b85"
+  "manifest_digest": "sha256:f9da1c90cb5b39be0131861b8ee6f9238c24bf9e03a081b17f9b913f4ed703a8"
 }

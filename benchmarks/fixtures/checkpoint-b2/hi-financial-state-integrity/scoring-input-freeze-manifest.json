@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
   "program": "adaptive_ask_scoring_input_freeze",
   "fixture_id": "hi-financial-state-integrity",
-  "fixture_input_digest": "sha256:234a13b9ccae089553d56b0e512220dfea8fe42a3c0c2f8eb0666295faceebda",
+  "fixture_input_digest": "sha256:6f94452c6998b670871ee61ad4165b5d172829b46c7b52f66fcc1a4aa64df77b",
   "catalog": {
     "path": "benchmarks/portfolio-catalog.json",
     "raw_byte_digest": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
@@ -21,29 +21,29 @@
   },
   "admission_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/final-admission-record.json",
-    "raw_byte_digest": "sha256:177242b8056cd1cccaa1c941c6f3c4e5761a1d37e50fd9c6660b19f3debb6c33",
-    "semantic_digest": "sha256:c64687f1846bd822415f42b3928feeb17e3a6e951d53c1ad1c3e5d3424dd7d9b"
+    "raw_byte_digest": "sha256:5fcf72f1f74c8b1289cd5a5cf23e5113cc53e013e3b36659f76f166230ad2186",
+    "semantic_digest": "sha256:ccae1077827230e5f62d8fac8b7a053fdcb1f596f49ab9a2c16f4964f54123f7"
   },
   "requirement_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/requirement-record.json",
-    "raw_byte_digest": "sha256:7b853ea2c4826faa7a9cb1a2a84f3e078ff950fc30af096b2f9a1577703ffde3",
-    "record_digest": "sha256:920d1a16c693721ce14744b03b1a89ec772831fe05270aa9f8d70874b7f19e25",
+    "raw_byte_digest": "sha256:c70e1ef584517b02e8dcead8b20f98818d7a73a4bc518bdd13542e36f81cfa09",
+    "record_digest": "sha256:c3049e95c81d30c976622a84e72ec0676a6daef1909b367c47dfdf45d0517fa9",
     "set_digest": "sha256:34c6a8096e199bbc0f3bbfa1d56cced8220c0b49f8e99d26177e530f08ef0a21"
   },
   "output_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/output-contract.json",
-    "raw_byte_digest": "sha256:1059d8a5b83b2dd6c90afff6f88a1cc5c8abdb18266de724fc1599cb752489ab",
-    "semantic_digest": "sha256:e74389d3bc087698fa530ef65efb4ad76828db991a9a36f533480215ae6c4c3b"
+    "raw_byte_digest": "sha256:7cd9ddbe2957cd9d80efa077a9437e1b7981c375375e2108c911cbfe081a36e9",
+    "semantic_digest": "sha256:23b4ce4f3daac6b28de0957ce61a099044550219bd346fc82ca45f623611d865"
   },
   "evaluator_public_reference": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/evaluator-reference.json",
-    "raw_byte_digest": "sha256:78f47e211c179d298b00d39bca8bf34db2b8a29f0b0f870325b44f63050cafc2",
-    "semantic_digest": "sha256:e48de705eb8b950a3c1adf06db3fe7714e53a7011f8f36120487441b68a68bd5"
+    "raw_byte_digest": "sha256:2b717ecce28f17ef592624da973278dd4de707b3030eeadaeaca0e5eb4459ddd",
+    "semantic_digest": "sha256:9559926838fc1f1b283d5a1fafb08f8b530c37f74458170375171fefa256e85f"
   },
   "verification_command_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/verification-command-contract.json",
-    "raw_byte_digest": "sha256:e1a8ccd7e9d987e72c1a3e567e60a783f88c3e8f03abdfcfbeb019ade1a1c6fc",
-    "semantic_digest": "sha256:98679fb0e3e6034f120934ebb687af14340c6d63e791e21929269d13dffc7f4d"
+    "raw_byte_digest": "sha256:2e938359a0d01d5bba248c22fe2279038fed7df980bf0f14c62d0a1704e9ed9f",
+    "semantic_digest": "sha256:236b5e536ab20d26b45eb659a2f316453ae16832deb7c15be8e3bd5ecf40478b"
   },
   "evidence_map": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/evidence-map.json",
@@ -52,13 +52,13 @@
   },
   "evaluator_authority_manifest": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/evaluator-authority-manifest.json",
-    "raw_byte_digest": "sha256:bfedba6eded446a7c50fc0bd62306315416d9eae5fc47d9a88527046353b236a",
-    "semantic_digest": "sha256:930e2b4bfea11bd526872014a02f996989b9f3862d57702ee67bef4ba28f44af"
+    "raw_byte_digest": "sha256:6156e0e1860c4824627b86b6db6f73a81356cc427b1fb7308901d795be8facf9",
+    "semantic_digest": "sha256:93577b3da66f7ae17317476fec67297ae5aecab3d93d0142d1beeea40a935f01"
   },
   "result_profile": {
-    "name": "binary_scope_verification_v1",
-    "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
+    "name": "requirement_scope_verification_v2",
+    "digest": "sha256:4b3b058c7eebda5c8cbb483cf1bec5c557ac6b1c41834d81675fffd5b39abdbc"
   },
   "freeze_revision": "issue-209-hi-financial-state-integrity-r1",
-  "manifest_digest": "sha256:f66dad75e0192e2a17c2481f7a3b4c4df55b64b9d3c65e2e3290cf8494009b4b"
+  "manifest_digest": "sha256:5674415a6481554001f41f814b7cc64d8ae89d7d50ae8ddca204336a522a3606"
 }

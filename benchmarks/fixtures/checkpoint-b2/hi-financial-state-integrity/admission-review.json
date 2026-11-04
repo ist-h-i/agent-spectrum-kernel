@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
   "fixture_id": "hi-financial-state-integrity",
-  "candidate_input_digest": "sha256:234a13b9ccae089553d56b0e512220dfea8fe42a3c0c2f8eb0666295faceebda",
-  "candidate_evaluator_digest": "sha256:258f914c7722465b12d95ed4cd08e4c1aa25c6d78d29e3f52a277cea52c707e9",
+  "candidate_input_digest": "sha256:6f94452c6998b670871ee61ad4165b5d172829b46c7b52f66fcc1a4aa64df77b",
+  "candidate_evaluator_digest": "sha256:9a53d891af32e23c17497a39a3ea5292cd5f85b8aae80e200c7caaf07eb87624",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -109,5 +109,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:6794deb50ea92982cb0e8aa8028f31e62c3d193eeab9794ae2fc018a47d21966"
+  "review_package_digest": "sha256:afd2e9d090a830bf27975c2e4a323f37290e44032d7dcc086152859725c3fccb"
 }

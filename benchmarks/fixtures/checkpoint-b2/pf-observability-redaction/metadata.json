@@ -23,10 +23,10 @@
   "output_contract_type": "findings_producing",
   "requirement_record_id": "requirement-record-pf-observability-redaction",
   "output_contract_id": "output-contract-pf-observability-redaction",
-  "evaluator_bundle_id": "evaluator-2d79614c5539592e380bedf63596702b09b0693cbd0e1baa4cc1ad7ebb71bf78",
-  "evaluator_bundle_digest": "sha256:50340952358b206888f8be588e120f6d0d33897547fc5f652a27912b7e06c1d4",
-  "evaluator_byte_count": 396988,
+  "evaluator_bundle_id": "evaluator-f920478d62fcb22d6d793913cd6680fe7e0be1dded7dd8ef317be5cd75eddb76",
+  "evaluator_bundle_digest": "sha256:7ff37e091fea63d3cfff9add44f1e94470632c57788f5ef6e3cb417d5e01672e",
+  "evaluator_byte_count": 618614,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:277f5477d50743e2413992d1786100c5866d6574ba2d149b03556548c95c13cd"
+  "metadata_digest": "sha256:60c97f19b19c0a8897c8033c4e6856bb5c8e868f808873750cc27f4849a235fa"
 }

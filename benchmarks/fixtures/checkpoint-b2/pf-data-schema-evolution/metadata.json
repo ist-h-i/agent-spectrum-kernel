@@ -23,10 +23,10 @@
   "output_contract_type": "implementation_producing",
   "requirement_record_id": "requirement-record-pf-data-schema-evolution",
   "output_contract_id": "output-contract-pf-data-schema-evolution",
-  "evaluator_bundle_id": "evaluator-0b5278ceda945aea7528019178f5fd14021333dc1609e83cae4870189006d193",
-  "evaluator_bundle_digest": "sha256:e2e8c89a536aa7e53fce673eef9dc31b8294326e689c62bcbbc923795f99b596",
-  "evaluator_byte_count": 391578,
+  "evaluator_bundle_id": "evaluator-0fc5f8fc83239d0a4ec538aa15f2b9cdaeaf53b68348b2e022cd271278e6acbe",
+  "evaluator_bundle_digest": "sha256:111ee42dd67b4b016158cea31934a05277485ad99c71dfafdc26d64bf5b50b3d",
+  "evaluator_byte_count": 613202,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:b69335ce59784eea4903d60068dfdeb475cfbe2ff62d57d3192f03c45ef55b64"
+  "metadata_digest": "sha256:5ec6bf360adb67153582ab53b32932aa757e42d827fcf3d7926f733471e4ae30"
 }

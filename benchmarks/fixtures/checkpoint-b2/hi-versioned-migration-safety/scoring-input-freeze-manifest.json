@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
   "program": "adaptive_ask_scoring_input_freeze",
   "fixture_id": "hi-versioned-migration-safety",
-  "fixture_input_digest": "sha256:db88f4f33b022546f07e9d20fd3a18814aff4e7642dd58a0c92f9a5bfcb9e584",
+  "fixture_input_digest": "sha256:8041b58cf541711924b8e9c2716adc3b65113d924a93a327e5f73b3a81cc878e",
   "catalog": {
     "path": "benchmarks/portfolio-catalog.json",
     "raw_byte_digest": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
@@ -21,29 +21,29 @@
   },
   "admission_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/final-admission-record.json",
-    "raw_byte_digest": "sha256:0635656f566e0ff881c03c06f527a99d3df6508d66e2b85c929dbac6d28973f6",
-    "semantic_digest": "sha256:cb9c97f03e5260b616f92c87dfc0bf4036fd917a428f5ecfa5e7f6ef0974979d"
+    "raw_byte_digest": "sha256:47c806c6095a26c2717499fdcfd0d952b600be64e6e48c934d63dc4248124647",
+    "semantic_digest": "sha256:da7a41ff11ef5aec2ee357bb9c8537cf2a5a0584a8b7a7e6a12453e65434eced"
   },
   "requirement_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/requirement-record.json",
-    "raw_byte_digest": "sha256:1ada93bfcfbbfb517d22814f940ffad957f6dd70aeca64b981fd1ccbe24ce529",
-    "record_digest": "sha256:dfce637a2a8a6c0547277ff3f9c118b4c10e521f7d0f8f9d287db8c778734aeb",
+    "raw_byte_digest": "sha256:7ec6ec1f9044b3ba40c05e5111773610788368e4a6f9e23dd0f0d9bb9d444ec1",
+    "record_digest": "sha256:1eee08d277c7b37bd1ca7ea7e6852b06b6ece45c881e9146479c96ce627526b0",
     "set_digest": "sha256:98b0174ca34c8bce4e23b7e2c99d3480929ffa94714f3b5736e0e5e805305bc8"
   },
   "output_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/output-contract.json",
-    "raw_byte_digest": "sha256:dc7c8bb19d843b119e65b6606d00d84d653bd876db1224a76da89897039b0e77",
-    "semantic_digest": "sha256:21c5cf67fa3e46c8c83a837e573eba07233d07a2b70662cb807efa4567588e4e"
+    "raw_byte_digest": "sha256:8c4c2bd1338a0cfe41bb1f36a761a5c8e2e863a73c708d68b1f5f707e5e92c48",
+    "semantic_digest": "sha256:bb75bf9f3c5239e1aa4b2a84eb60040b9e46b85fe9732e4ff47e8859975ff8ae"
   },
   "evaluator_public_reference": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/evaluator-reference.json",
-    "raw_byte_digest": "sha256:b2fa61dbf25f0ce430d062861d175457089c17ddbf50db98ac228ea2fbfe4c5e",
-    "semantic_digest": "sha256:702c13287868d46f14e2ab9e88162bc4f42cc2e91bb3dc48807a91f30af9c94c"
+    "raw_byte_digest": "sha256:06df178d19a6884e50abda9f951497733c5fef429bf375e98b0e25525853a72b",
+    "semantic_digest": "sha256:2d5126a5b68525bb5a34a0bc48887658b1f78dbf9a604e7e1c6bd91e8babe5b0"
   },
   "verification_command_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/verification-command-contract.json",
-    "raw_byte_digest": "sha256:886270b08153cbb40ee2b953cabe17509018fc1ce69f35799b354659cbc619f4",
-    "semantic_digest": "sha256:7957b6cea8d77a023887f29846a32163e7f577e6b37d17271da25ed797ed74f1"
+    "raw_byte_digest": "sha256:d72063c17030ebd1a59205e1241398712843f370b7b2e45411a70b6019fb5c7a",
+    "semantic_digest": "sha256:6106413cbee8ddd46548484c04a922da832a7be3a1baf1704427bf27b3ae9d1c"
   },
   "evidence_map": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/evidence-map.json",
@@ -52,13 +52,13 @@
   },
   "evaluator_authority_manifest": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/evaluator-authority-manifest.json",
-    "raw_byte_digest": "sha256:1f019e0846583328e9c1947d5706fb02c2943767a8e981c6aca59ae3e4f1e700",
-    "semantic_digest": "sha256:cac7b40e1b61428aa846a7f422efac969c350b89db4129f63a510a79d70d4c93"
+    "raw_byte_digest": "sha256:0c25418375a692dc4e971a6a23f71743c8fe0d010986f1e87f3f4d324b5a0626",
+    "semantic_digest": "sha256:ef0bddfe48444a0d221986913f0e513f9a08cf0daddf95fc7626dab467e1c6fc"
   },
   "result_profile": {
-    "name": "binary_scope_verification_v1",
-    "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
+    "name": "requirement_scope_verification_v2",
+    "digest": "sha256:4b3b058c7eebda5c8cbb483cf1bec5c557ac6b1c41834d81675fffd5b39abdbc"
   },
   "freeze_revision": "issue-209-hi-versioned-migration-safety-r1",
-  "manifest_digest": "sha256:9eb59927357fe22398fcfea6eb7da16893fe46f30492aa2eead3d9113f312576"
+  "manifest_digest": "sha256:9b8066b7543266d9bc8671f609d2be6d5974109598f6453a3f64bcacfdbc0556"
 }

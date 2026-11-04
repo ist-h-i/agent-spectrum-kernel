@@ -23,10 +23,10 @@
   "output_contract_type": "implementation_producing",
   "requirement_record_id": "requirement-record-hi-financial-state-integrity",
   "output_contract_id": "output-contract-hi-financial-state-integrity",
-  "evaluator_bundle_id": "evaluator-33da992ef6fb4c957eae85222e1e38c648e0c6923cde6e76c5253398570b2a8b",
-  "evaluator_bundle_digest": "sha256:258f914c7722465b12d95ed4cd08e4c1aa25c6d78d29e3f52a277cea52c707e9",
-  "evaluator_byte_count": 837402,
+  "evaluator_bundle_id": "evaluator-625843f2bbf8ffdfac51823d272eeaa637d199de6c94a930479d344ddf239f64",
+  "evaluator_bundle_digest": "sha256:9a53d891af32e23c17497a39a3ea5292cd5f85b8aae80e200c7caaf07eb87624",
+  "evaluator_byte_count": 1059030,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:7d671f79be8bda5dfc079861fb534b9db03da676b71976174ad1ae83afc13dd3"
+  "metadata_digest": "sha256:6ee632c2d3f59b738861964b8b91cae3aec0ac941e2a71bd12d1d51cdc3524e2"
 }

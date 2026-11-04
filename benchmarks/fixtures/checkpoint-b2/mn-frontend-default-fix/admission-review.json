@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
   "fixture_id": "mn-frontend-default-fix",
-  "candidate_input_digest": "sha256:db98cb9c81e50afe4f39169d722eec0e344483809176b810a118e096fa6ca2ca",
-  "candidate_evaluator_digest": "sha256:7758a981091fb4409b676487d98e8a05c4998ab3c6f7878a086ca612a6512798",
+  "candidate_input_digest": "sha256:ea3d0a27127c32bc23cf94ee1265a10b3f69f7f174e9024ed0760078e46d8655",
+  "candidate_evaluator_digest": "sha256:5b5a1fe228335f74d435a708196b0038bed2debda836bf52dc640977324bc9a5",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -107,5 +107,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:5fd365de03cb5f8c1f67cce6635d73d9237f2dfc7d66c4c60b08d6cb03b3c120"
+  "review_package_digest": "sha256:059a90fbd35608036366b36bb429cf3d14ba04309553dbd2b42a886ec89ea40c"
 }
