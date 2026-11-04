@@ -3,7 +3,7 @@
 Public revision base: `9068e22a1c48378d0c266a103e3f8fb93861942e`.
 Public inputs and catalog registration: `2e3c42d2f6ae5b4408d127ba5bee64f9d7b7e8ce`.
 Build immutable anchor: `483d861b376835e52f65138d39d9eb3a113d9bdd`.
-Pending authority metadata: `8319689c7b27e02c009a4c450aa2f1e5f55aac09`.
+Pending authority metadata: `b0e3e99829255106a74d8516d58179886df7ee8e`.
 This is an implementation inventory, not a measured model-effect report.
 
 | Task | Preserved work and mandatory result | Public revision |
@@ -48,15 +48,19 @@ again on the final head. Focused public checks and preserved intentional seed
 failures are recorded separately in the operator evidence.
 
 Controller-side compatibility was revised independently in a new private area.
-There were 506 passing pure checks over 241 synthetic inputs, including explicit
+There were 511 passing pure checks over 241 synthetic inputs, including explicit
 manual/null handling where free-form semantic equivalence is not established.
 All 24 static resource, source-identity, public-semantic and freeze checks passed
 on an independent checkout with the exact integrated tree. The 288 metadata
 files passed declared private-payload boundary checks with zero findings. No
 private body was copied into this repository. Old private assets remain unchanged.
 These are static compatibility checks; admission and runtime qualification remain
-pending. Historical selectors and results retain their matching old source and
-resources.
+pending. The original `binary_scope_verification_v1` profile, requirement arrays
+and scope are preserved for all 24 tasks. An intermediate regeneration selected
+the existing v2 profile and failed the strict build-authority regression; that
+profile migration was removed. The original regression remains unchanged, and an
+additional all-24 profile guard covers this preservation obligation. Historical
+selectors and results retain their matching old source and resources.
 
 No implementation model trial has started. The proposed practical measurement
 is 24 tasks × ASK off/full × one Terra low trial = 48 sequential trials, separate

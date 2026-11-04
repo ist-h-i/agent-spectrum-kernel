@@ -16,9 +16,24 @@ import { producePrimaryEvaluationArtifacts, verifyPrimaryEvaluationProducer, bui
 import { activePrimaryProducer, withPrimaryHistoricalEvaluatorResources, primaryEvaluatorDependencyGraphParameters } from './ask-primary-evaluation-scope.mjs';
 import { runPrimaryEvaluationPrivateGrading } from './ask-primary-evaluation-private-grading.mjs';
 import { setupPrimaryScoringVersion as setup, scoringVersionFixtureMode as mode } from './test-helpers-primary-scoring-version.mjs';
+import { PRIMARY_FIXTURE_REGISTRY } from './ask-primary-fixture-registry.mjs';
+import { computeResultProfileDigest } from './ask-benchmark-scoring-contract.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('../', import.meta.url))), raw = value => `${JSON.stringify(value, null, 2)}\n`;
 const json = path => JSON.parse(readFileSync(path));
+
+test('practical primary revision preserves all 24 checked-in binary scoring profiles', () => {
+  const expected = { name: 'binary_scope_verification_v1' };
+  expected.digest = computeResultProfileDigest(expected);
+  assert.equal(PRIMARY_FIXTURE_REGISTRY.length, 24);
+  for (const [fixtureId] of PRIMARY_FIXTURE_REGISTRY) {
+    const fixture = join(ROOT, 'benchmarks/fixtures/checkpoint-b2', fixtureId);
+    const output = json(join(fixture, 'output-contract.json'));
+    const freeze = json(join(fixture, 'scoring-input-freeze-manifest.json'));
+    assert.deepEqual(output.result_profile, expected, `${fixtureId}: preserve the original scoring profile`);
+    assert.deepEqual(freeze.result_profile, expected, `${fixtureId}: freeze the same original scoring profile`);
+  }
+});
 
 const processingFiles = ['scripts/ask-benchmark-command-evidence.mjs', 'scripts/ask-review-target-requirement.mjs',
   'benchmarks/schemas/primary-saved-v2-portfolio-command-evidence.schema.json',

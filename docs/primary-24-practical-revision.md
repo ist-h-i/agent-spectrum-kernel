@@ -23,6 +23,9 @@ case-specific completed answers, finding counts, selected verdicts/severities,
 reference decision tables and prescribed implementation/experiment recipes.
 The solver must still select and justify its answer from the supplied facts.
 Structural validation must not be described as semantic correctness.
+Preserve the checked-in `binary_scope_verification_v1` result profile, requirement
+arrays and scoring scope; binding refreshes do not authorize a scoring-profile
+migration. Versioned historical selectors remain separate.
 
 Retain output interfaces when they serve a real consumer. JSON is appropriate
 for a machine-consumed review, migration plan or handoff; it does not by itself
