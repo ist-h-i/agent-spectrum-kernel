@@ -165,6 +165,11 @@ user has reviewed the actual changes and measurement results and explicitly
 approved the merge. After approval, recheck the remote base/head, required tests,
 CI and final-head review before the normal merge.
 
-Current state: public revision in progress; no model trials started. The final
-input hashes, execution plan, grading compatibility and measured results have
-not yet been established by this document.
+Current state: all 24 public tasks are revised and the 241 distributed model
+input files are prepared and reverified. Pending authority metadata has been
+refreshed using the existing writers, with static compatibility verified for all
+24 tasks. See the [per-task change and evidence inventory](primary-24-practical-review.md).
+No implementation model trial has started. The proposed 48-trial practical
+execution method, effective isolation, final installed ASK identity, full CI and
+measured results remain unverified or pending. This work does not establish
+formal primary admission or authorize merging before the user reviews results.
