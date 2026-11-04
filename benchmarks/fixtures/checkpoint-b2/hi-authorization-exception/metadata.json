@@ -23,10 +23,10 @@
   "output_contract_type": "findings_producing",
   "requirement_record_id": "requirement-record-hi-authorization-exception",
   "output_contract_id": "output-contract-hi-authorization-exception",
-  "evaluator_bundle_id": "evaluator-4b406933d57772731f007324149f6bb9575b60fe12bc04516326674783c1fcbd",
-  "evaluator_bundle_digest": "sha256:cceb5fb70def3af52057b2c712ec06223e08f7e71cf6056e66f2a49aa3e77726",
-  "evaluator_byte_count": 619283,
+  "evaluator_bundle_id": "evaluator-7e139b536c5174ac4e3e87477b066a0a7539d3421fc2ed6fe2714f28abe0131d",
+  "evaluator_bundle_digest": "sha256:e02c63563f0dbfa1f7493a080a69a3076408baea3c1ba28ddc6ad8efb64f9221",
+  "evaluator_byte_count": 606380,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:b4fb154225a30503b9073b572327ca7cadbeaac5b39ec5056c23e9ff60c07c6e"
+  "metadata_digest": "sha256:1a2e30c25b31e2118404def94a96d2987fa93568ad2c07f33c03fcee9c6d427f"
 }

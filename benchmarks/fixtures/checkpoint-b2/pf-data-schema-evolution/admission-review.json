@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "pf-data-schema-evolution",
   "candidate_input_digest": "sha256:46e5fa91cf83de28296c4216729a6fddff714c25ccb4d85fda81cef7f05ca0fc",
-  "candidate_evaluator_digest": "sha256:111ee42dd67b4b016158cea31934a05277485ad99c71dfafdc26d64bf5b50b3d",
+  "candidate_evaluator_digest": "sha256:34dffd9ed8d5429108cb5a41a60e8acc89e688136dda98c218352e1db2c3a0cb",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -115,5 +115,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:de21eeca41270222f2e35a27c716c3c35cc028337027a1931d53f98c8d2c02eb"
+  "review_package_digest": "sha256:eff3ebf562af5d2dd02090dbabd7f374d6621e89e6dd607f690629d3f3c41d42"
 }

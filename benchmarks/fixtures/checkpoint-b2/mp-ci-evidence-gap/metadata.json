@@ -23,10 +23,10 @@
   "output_contract_type": "findings_producing",
   "requirement_record_id": "requirement-record-mp-ci-evidence-gap",
   "output_contract_id": "output-contract-mp-ci-evidence-gap",
-  "evaluator_bundle_id": "evaluator-5be85cc0931c8a7f3f1d1aa3166c815b2f990dd070ffa5c39071861e742edfad",
-  "evaluator_bundle_digest": "sha256:d54d56ccd74ad274213ef59ebf34278696b70dd6aa86b2a37896082efd075a1b",
-  "evaluator_byte_count": 565986,
+  "evaluator_bundle_id": "evaluator-2dde38caed2abe7a56483a5d4f76797f8afa766b0a4a4ea95bcb0648a89c4115",
+  "evaluator_bundle_digest": "sha256:3c21eb40a744b77ace8f4988e3593ac794797500dc23c78bc512067f71b69532",
+  "evaluator_byte_count": 553091,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:e562a9f19b0fb2bbe4283eb91bd3a11548711a8fa90de22d0266b24d82bf4e1e"
+  "metadata_digest": "sha256:0a71f00c3cb9288f9f84b096a22f5eacc1ff5a0f1be5561cd416b38113151d29"
 }

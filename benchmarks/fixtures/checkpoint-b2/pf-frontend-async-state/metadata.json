@@ -23,10 +23,10 @@
   "output_contract_type": "implementation_producing",
   "requirement_record_id": "requirement-record-pf-frontend-async-state",
   "output_contract_id": "output-contract-pf-frontend-async-state",
-  "evaluator_bundle_id": "evaluator-c3ceccc85540712e9b3c61947f92472d8eae1e651bcb0f7229dbeb039af4a474",
-  "evaluator_bundle_digest": "sha256:b7c645194e5d3fd5ba8877d2c2b722f015e1bea6109407c19cc0f426c8e6e84e",
-  "evaluator_byte_count": 952843,
+  "evaluator_bundle_id": "evaluator-7644d1fa89530104f045137f16c5cf6c1575528529df17a368bfefa858627a85",
+  "evaluator_bundle_digest": "sha256:6299cf80b52d50191cac7f4790ef87bdbe61720b00fafea39ddfabd4b32c6621",
+  "evaluator_byte_count": 939943,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:a4a52c80ace4fdf0a8218b0f6b396cc6a06d9872300f6d91fb39c0c23378d662"
+  "metadata_digest": "sha256:aafd398a218793f8e8eb8e45032a9c2a342cec070b7c2ee04ab2b89e130691e5"
 }

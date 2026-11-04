@@ -6,18 +6,18 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:c790294e2d9c9dd055a62d6819cbf25e103e238c906321c4d7784fc682e092d6",
+  "evaluator_public_reference_digest": "sha256:20e3b8c2f62a9b6d5c5b4e0bee69ba93dfd3e8c43815a7c7b1069df92b268b01",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/verification-command-contract.json",
   "verification_command_contract_digest": "sha256:36d8b5f400dcd4b1e188801ed7300165840881fea3a52b60b31608026312f607",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:c8cfea00121292d527f80a6154e654013a3fcdaa237263677279c53ac29fbed4",
   "result_profile": {
-    "name": "requirement_scope_verification_v2",
-    "digest": "sha256:4b3b058c7eebda5c8cbb483cf1bec5c557ac6b1c41834d81675fffd5b39abdbc"
+    "name": "binary_scope_verification_v1",
+    "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
   },
   "declares_findings": false,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-client-compatibility-fix/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:912e04079a53a5f5c49c8432328b7df335783a845433713694347013cfeaa9e1",
-  "evaluator_authority_manifest_digest": "sha256:1f908448310608774f98c3b1dd6797429a44b9f51d9e07b7cd62e81862245978",
-  "output_contract_digest": "sha256:a679061a2b96ea68a90dea94d9012f7c823f5b2759b7f7481c03dcdd895231be"
+  "evaluator_authority_manifest_raw_sha256": "sha256:a9c51b8e42edee20a867952c8f135c4b318a1e5f0d97ab9ed9ba5d54c625b05b",
+  "evaluator_authority_manifest_digest": "sha256:160d7007b41b4ac92402cda24461682c8c37c23eb3b26c937958f813ef0b6377",
+  "output_contract_digest": "sha256:c634d3d5243f131619fe7eec46d2f2499b7208fd163ecc4b2792cd936211f860"
 }

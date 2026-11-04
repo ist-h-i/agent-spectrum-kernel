@@ -45,12 +45,12 @@
     {
       "path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/requirement-record.json",
       "bytes": 2712,
-      "raw_sha256": "sha256:7c6e3310a99d9e6377f79e50bde6728b93abd391d60b1f77ba972cb3e863d7c6",
-      "semantic_digest": "sha256:5ea9e22810ecc366c1cd38b81127092a90334c9cc43ec7332ef7707d1179e9c5",
+      "raw_sha256": "sha256:37319fe5e9bdeddcb458a67ec28e9cb31b155ca62d2a9e9574570716aab3f269",
+      "semantic_digest": "sha256:4862b33c668c060ca4388294fb53583f3c3f8f65c9b3614d7d0ecbb5f86f4524",
       "authority_role": "requirement_record",
-      "requirement_record_digest": "sha256:5ea9e22810ecc366c1cd38b81127092a90334c9cc43ec7332ef7707d1179e9c5",
+      "requirement_record_digest": "sha256:4862b33c668c060ca4388294fb53583f3c3f8f65c9b3614d7d0ecbb5f86f4524",
       "requirement_set_digest": "sha256:73d0da5e1b1b548b5a57758724ec0038d120f2b46b56798ab07af89c6220866b"
     }
   ],
-  "manifest_digest": "sha256:e72fdaaa96f9e4480af87b6462192e11f1a37416d2ae627ef8efc72e68bcc5dd"
+  "manifest_digest": "sha256:b9bd9b6a01a2a894dee56c3f72b7d8a7595e9f5b89f059e73e0fde852a2ac8dc"
 }

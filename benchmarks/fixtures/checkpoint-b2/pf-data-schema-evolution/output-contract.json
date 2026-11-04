@@ -6,18 +6,18 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:c95dfca179ea36f3c63dab3e1b43c0246202bf1e86200c6328af2f6c1707c138",
+  "evaluator_public_reference_digest": "sha256:dc2d4bba9daeec10384cde03185cf1394fa58e821d8952fbc70383a80bc2a9c0",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/verification-command-contract.json",
   "verification_command_contract_digest": "sha256:f2470de009b367e2ea2535b6043ff2ebe8d40a3ab140dd4e95306f84a4221843",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:24261cf9c77806f04e5a2f983af5598c40bd294ac9c608cf92a4e79af27d9ebc",
   "result_profile": {
-    "name": "requirement_scope_verification_v2",
-    "digest": "sha256:4b3b058c7eebda5c8cbb483cf1bec5c557ac6b1c41834d81675fffd5b39abdbc"
+    "name": "binary_scope_verification_v1",
+    "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
   },
   "declares_findings": false,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:0b41c20acc54f03e8edfc39ed6b6c1a26c3fc4cdabc88d1698f990e083fe0f8c",
-  "evaluator_authority_manifest_digest": "sha256:ae691cd3b152987b6415a240d0deea685ceeede099e70a69d199838a81a3319c",
-  "output_contract_digest": "sha256:027fb3cac9fe844d585ce26fee3f5367803c992ee21d3b681b058c5f80fbcf27"
+  "evaluator_authority_manifest_raw_sha256": "sha256:74dbe27375b509f4e284edf75c89ad073ee7833a3874435e5574216c3eff6348",
+  "evaluator_authority_manifest_digest": "sha256:48448c6f7312ab620d482e7be30745973617dbed19e256245fb3999d4f1be905",
+  "output_contract_digest": "sha256:e226f7e1087ea397c6d284768da819bf942f80cf8039c399356759a7d60baa79"
 }

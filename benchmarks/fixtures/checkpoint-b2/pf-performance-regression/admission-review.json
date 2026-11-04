@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "pf-performance-regression",
   "candidate_input_digest": "sha256:d3026db8f15b1bfdee8bfd3ee9841dfd13b8f58cd0ae50194934597a3258e329",
-  "candidate_evaluator_digest": "sha256:77c9a155bb72936d13b41b4cedfe99be764938e0161c2939f25eb2235b91118e",
+  "candidate_evaluator_digest": "sha256:e64be67bc700bfe8cd054063c9d497b5c630dfe26bc910a8b5584e312eb80eb7",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -113,5 +113,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:0a48aaf99809fca258a4b1e224ba0d3de4d8f8a4f32259ca0a45e7fa5d53e7c2"
+  "review_package_digest": "sha256:e2fcc42185de58e67675e53833f64f2787a397b0dd9d14037432c9aecaebdd41"
 }

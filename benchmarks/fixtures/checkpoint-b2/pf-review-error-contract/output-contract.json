@@ -6,18 +6,18 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:9786142dcdcedd8c3dead96e3ed4515926d4a6386e39b3f9ce4e86a247e9a14d",
+  "evaluator_public_reference_digest": "sha256:22b61e9c3ea304e6be339d46feffa1df68584d1ffa7812c049e5c79e04ddc423",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/verification-command-contract.json",
   "verification_command_contract_digest": "sha256:c82a0998450c6a63945623cff646030e60c133bf7e02dae3c78f916506ebdf7d",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:ab378a51efb7f64389265315b6911730b3e41655cf78b8588763f48ab4c6cb8d",
   "result_profile": {
-    "name": "requirement_scope_verification_v2",
-    "digest": "sha256:4b3b058c7eebda5c8cbb483cf1bec5c557ac6b1c41834d81675fffd5b39abdbc"
+    "name": "binary_scope_verification_v1",
+    "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
   },
   "declares_findings": true,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:0c08f44cea6685fbb08069c38787e7563cec4c246bbd1a204558028d7247db94",
-  "evaluator_authority_manifest_digest": "sha256:87fb844136acbd2f747e855edced57d79db79c2df7b9c78ca66d576427f1844a",
-  "output_contract_digest": "sha256:c7e1dbf242db478b5bd6a583db01d8649e9305fcb6ca097175a8ea33e38617f0"
+  "evaluator_authority_manifest_raw_sha256": "sha256:ea9f2cd75722ba45a052988a3488d51312875939f7d2f509659defc261242fa1",
+  "evaluator_authority_manifest_digest": "sha256:cd69957eb697af298cf5eede049310507a46da1a151725d8c4379fe9fda0d66d",
+  "output_contract_digest": "sha256:b9d2805d355b1379daaa5fc86ccfc32b9c8735cedfc4d3bcae70cb6a2da4e60a"
 }
