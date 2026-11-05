@@ -30,7 +30,7 @@ export function verifyEnvironmentSavedResults(options) {
   assert.ok(['synthetic', 'observed'].includes(binding.evidence_kind), 'pre-result evidence provenance required');
   assert.ok(binding.grading_bindings?.length, 'pre-result original grading input inventory required');
   const observations = [], pairs = [], blocks = {}, executions = {};
-  let incomplete = 0, pending = 0;
+  let incomplete = 0, pending = 0, recordedRuntimeDigest = null, recordedRuntimeCount = 0;
   for (const role of ['baseline', 'challenger']) {
     const supplied = options.results[role];
     for (const key of Object.keys(supplied.execution ?? {})) assert.ok(roleExecutionKeys.has(key), `unsupported role execution override: ${key}`);
@@ -47,6 +47,10 @@ export function verifyEnvironmentSavedResults(options) {
     assert.equal(runtime.model, ctx.environment.runtime.model, 'saved runtime model differs from frozen environment');
     const version = runtime.executable.observed_version, expectedVersion = ctx.environment.runtime.cli_version;
     assert.ok(version === expectedVersion || version?.endsWith(' ' + expectedVersion), 'saved CLI version differs from frozen environment');
+    const actualRuntimeDigest = canonicalDigest(runtime);
+    if (recordedRuntimeDigest !== null) assert.equal(actualRuntimeDigest, recordedRuntimeDigest, 'saved roles have different recorded runtime contracts');
+    recordedRuntimeDigest = actualRuntimeDigest;
+    recordedRuntimeCount++;
     const normalized = verifyNormalizedPortfolioResults({ ...execution, outputPath: supplied.resultSet.normalizedResultsPath });
     assert.ok(supplied.resultSet.mode === undefined || supplied.resultSet.mode === 'environment_scope', 'unknown saved result scope');
     // The generic aggregate deliberately requires all four conditions. An
@@ -107,7 +111,8 @@ export function verifyEnvironmentSavedResults(options) {
   }
   const report = { kind: 'instruction_environment_saved_readout_v1', pair_digest: experiment.projection.projection_evidence_digest,
     status: pending || incomplete ? 'hold_incomplete' : 'saved_pair_verified', evidence_kind: binding.evidence_kind,
-    pairs, observations, pending_role_count: pending, incomplete_role_count: incomplete, causal_attribution: 'not_claimed', formal_aggregate_eligible: false };
+    pairs, observations, recorded_runtime_contract_digest: recordedRuntimeCount === 2 ? recordedRuntimeDigest : null,
+    pending_role_count: pending, incomplete_role_count: incomplete, causal_attribution: 'not_claimed', formal_aggregate_eligible: false };
   const evidence = buildSavedInstructionPairEvidence({ candidate, experiment, blocks,
     registration: { pair_digest: report.pair_digest, description: { evidence_kind: binding.evidence_kind } } }, report, options.evaluationAuthority);
   const recommendation = deriveEvolutionRecommendation({ experiment, evidence });

@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSy
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { CLAUDE_NATIVE_KIND, validateNativeClaudeRuntime, nativeClaudeCommand, nativeClaudeSettings,
-  nativeClaudeEnvironment, decodeNativeClaudeResult, assertNativeClaudeInstructions, assertNativeClaudeAuthentication } from './claude-native-runtime.mjs';
+  nativeClaudeEnvironment, decodeNativeClaudeResult, assertNativeClaudeInstructions, assertNativeClaudeAuthentication, nativeClaudeInput } from './claude-native-runtime.mjs';
 import { executeContainedAgent, inspectPortfolioRuntimeContract, executePortfolio, OUTPUT_SCHEMA_PATH } from './ask-benchmark-execution.mjs';
 import { canonicalDigest } from './content-addressed-store.mjs';
 import { assertBenchmarkSchemaInstance } from './ask-benchmark-schema.mjs';
@@ -23,7 +23,7 @@ function fixture(t) {
 test('native Claude has a closed, versioned, restricted file-tool policy and redacted explicit authentication', t => {
   const { runtime } = fixture(t); validateNativeClaudeRuntime(runtime);
   const command = nativeClaudeCommand(runtime, canonicalDigest('schema'));
-  assert.equal(command.task_transport, 'stdin'); assert.equal(command.output_transport, 'structured_stdout');
+  assert.equal(command.task_transport, 'file'); assert.equal(command.output_transport, 'structured_stdout');
   assert.ok(command.argv.includes('--restricted')); assert.ok(command.argv.includes('--bare'));
   assert.equal(command.argv[command.argv.indexOf('--add-dir') + 1], '.'); assert.ok(!command.argv.includes('--dangerously-skip-permissions'));
   assert.deepEqual(nativeClaudeSettings(runtime).permissions.allow, ['Read', 'Glob', 'Grep', 'Skill', 'Edit', 'Write']);
@@ -40,6 +40,10 @@ test('native Claude has a closed, versioned, restricted file-tool policy and red
   const environment = nativeClaudeEnvironment({ ANTHROPIC_API_KEY: 'artificial-only' }, '/private/fixture');
   assert.equal(environment.CLAUDE_CONFIG_DIR, '/private/fixture'); assert.equal(environment.DISABLE_TELEMETRY, '1');
   assert.throws(() => nativeClaudeEnvironment({ ANTHROPIC_API_KEY: 'artificial-only', ANTHROPIC_BASE_URL: 'foreign' }, '/private/fixture'), /expansion/);
+  for (const task of ['/plugin install untrusted', '! touch outside']) {
+    const input = nativeClaudeInput(task); assert.ok(!/^[!\/]/.test(input)); assert.ok(input.includes('BENCHMARK_TASK.md'));
+    assert.ok(!input.includes(task)); assert.equal(input, nativeClaudeInput());
+  }
 });
 test('native result decoding keeps error/duplicate/invalid UTF-8/oversized outputs out of the original output boundary', () => {
   const packet = { type: 'result', subtype: 'success', is_error: false, structured_output: { summary: 'artificial' } };

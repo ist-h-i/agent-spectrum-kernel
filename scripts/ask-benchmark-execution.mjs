@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { coreProducerInspection } from './ask-core-producer-scope.mjs';
 import { CLAUDE_NATIVE_KIND, isNativeClaudeRuntime, validateNativeClaudeRuntime, nativeClaudeCommand,
   nativeClaudeEnvironment, nativeClaudeProbeEnvironment, decodeNativeClaudeResult, assertNativeClaudeAuthentication,
-  assertNativeClaudeInstructions, validateNativeClaudeEnvironmentPolicy } from './claude-native-runtime.mjs';
+  assertNativeClaudeInstructions, validateNativeClaudeEnvironmentPolicy, nativeClaudeInput } from './claude-native-runtime.mjs';
 import { verifyCoreProducedTerminal } from './ask-core-capture-producer.mjs';
 import { primaryProducerInspection } from './ask-primary-evaluation-scope.mjs';
 import { verifyPrimaryProducedTerminal } from './ask-primary-evaluation-producer.mjs';
@@ -1175,7 +1175,7 @@ function executeAgent({ root, runtime, executable, workspace, outputTemporary, c
     chmodSync(configDirectory, 0o700);
     try {
       const raw = executeContainedAgent(executable, materializeCommand(root, command, runtime, outputTemporary), {
-        cwd: workspace, input: task, env: nativeClaudeEnvironment(environment, configDirectory),
+        cwd: workspace, input: nativeClaudeInput(), env: nativeClaudeEnvironment(environment, configDirectory),
         timeout: runtime.case_timeout_ms, maxBuffer: MAX_PROCESS_OUTPUT_BYTES,
       });
       return raw;

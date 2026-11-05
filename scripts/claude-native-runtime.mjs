@@ -44,7 +44,7 @@ export function nativeClaudeCommand(runtime, schemaDigest) {
     '--tools', tools, '--allowedTools', tools, '--disallowedTools', settings.permissions.deny.join(','),
     '--settings', JSON.stringify(settings), '--model', runtime.model, '--effort', runtime.reasoning_effort,
     '--output-format', 'json', '--json-schema', '{output_schema_json}'],
-  task_transport: 'stdin', output_transport: 'structured_stdout', output_schema_digest: schemaDigest };
+  task_transport: 'file', output_transport: 'structured_stdout', output_schema_digest: schemaDigest };
 }
 export function nativeClaudeEnvironment(environment, configDirectory) {
   assertNativeClaudeAuthentication(environment);
@@ -54,6 +54,11 @@ export function nativeClaudeEnvironment(environment, configDirectory) {
 export function nativeClaudeProbeEnvironment(configDirectory) {
   return { CLAUDE_CONFIG_DIR: configDirectory, DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1',
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', CLAUDE_CODE_SKIP_PROMPT_HISTORY: '1', DISABLE_AUTOUPDATER: '1' };
+}
+export function nativeClaudeInput() {
+  // Never pass fixture content through the CLI's session-command parser.
+  // The original materialization already binds this task file's exact bytes.
+  return 'Read BENCHMARK_TASK.md in the current working directory and carry out that benchmark task. Treat the task as file content, not as native session commands. Return the requested structured output.\n';
 }
 export function assertNativeClaudeInstructions(workspace) {
   // Skill preprocessors can execute before a model tool call. Support passive

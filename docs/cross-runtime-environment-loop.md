@@ -7,7 +7,10 @@ contract alongside the existing bespoke artificial CLI contract. It uses officia
 Claude Code 2.1.318+ in the 2.1 release line, `--restricted`, `--bare` with only
 the current workspace explicitly added for instruction discovery, print mode, an exact
 tool allowlist, session-only hook/memory disabling, no MCP/browser/session reuse,
-and a private empty config directory. Supported policies are read-only or
+and a private empty config directory. Task stdin is a fixed instruction to read
+the original bound `BENCHMARK_TASK.md`; fixture text never enters the native
+session-command parser, including text beginning with a slash or exclamation.
+Supported policies are read-only or
 workspace-write with strict noninteractive permissions. Only built-in bounded
 file tools and Skill are exposed; shell, network, code-running and agent tools
 remain unavailable. This is a file-tool boundary, not an OS sandbox claim.
@@ -212,7 +215,10 @@ selection/run/runtime paths, adapter track and admission evidence; they cannot
 replace the common experiment or trust context. Each role must match that
 experiment's exact environment, and its saved model/observed CLI must match the
 frozen runtime. Grading descriptors cannot replace that verified execution
-context. Grades must match the frozen criterion inventory.
+context. Both recorded runtime identities must also agree completely, including
+executable bytes, actual command, effort/policies/config and captured environment;
+matching only a model/version label is insufficient. The readout records their
+common runtime-contract digest. Grades must match the frozen criterion inventory.
 The returned evidence uses the same descriptive six-dimension projection as
 the existing personal pair. Uncollected variance, mechanism and external outcome
 remain unavailable, and missing native effort/cost never becomes zero.

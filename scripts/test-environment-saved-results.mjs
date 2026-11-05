@@ -9,11 +9,11 @@ import { buildEvolutionExperiment, publishEvolutionExperiment } from './evolutio
 import { environmentFixture } from './test-helpers-instruction-environment.mjs';
 const originals = await Promise.all(['./environment-evaluation.mjs', './ask-benchmark-execution.mjs', './ask-benchmark-normalized-results.mjs',
   './ask-benchmark-portfolio-result-set.mjs', './ask-benchmark-evaluator-boundary.mjs', './ask-benchmark-portfolio-score.mjs'].map(p => import(p)));
-let data, plans, nativeCalls, environments, frozenRuntime, observedRuntime, environmentOverride, altered = false;
+let data, plans, nativeCalls, environments, frozenRuntime, observedRuntime, runtimeOverrides, environmentOverride, altered = false;
 mock.module('./environment-evaluation.mjs', { namedExports: { ...originals[0], verifyEnvironmentEvaluation: o => ({ cases: plans[o.role], adapter: o.adapterTrack,
   environmentObjectDigest: environmentOverride ?? environments[o.role], environment: { runtime: frozenRuntime } }) } });
 mock.module('./ask-benchmark-execution.mjs', { namedExports: { ...originals[1], inspectVerifiedPortfolioExecution: o => ({ identity: {
-  run_instance_id: `run-${o.role}`, plan: { digest: canonicalDigest(`plan-${o.role}`) } }, adapter_identities: new Map([[o.adapterTrack, observedRuntime]]) }) } });
+  run_instance_id: `run-${o.role}`, plan: { digest: canonicalDigest(`plan-${o.role}`) } }, adapter_identities: new Map([[o.adapterTrack, runtimeOverrides[o.role] ?? observedRuntime]]) }) } });
 mock.module('./ask-benchmark-normalized-results.mjs', { namedExports: { ...originals[2], verifyNormalizedPortfolioResults: o => ({ manifest: {
   source_snapshot_digest: canonicalDigest(`snapshot-${o.role}`), source: { run_instance_id: `run-${o.role}`, plan_digest: canonicalDigest(`plan-${o.role}`) },
   cases: [...data[o.role].map(e => ({ case_id: e.result.case_id, terminal_attempt: e.result.attempt })), { case_id: 'unrelated-plain', status: 'pending', terminal_attempt: null }] } }) } });
@@ -28,7 +28,8 @@ for (const track of ['codex', 'claude']) test(`${track}: saved results re-enter 
   const draft = structuredClone(readContentAddressedJson({ storeRoot: a.storeRoot, digest: a.adapter.evolution.experiment_object_digest }).value);
   a.options.runtime.cli_version = b.options.runtime.cli_version = draft.protocol.cli.version;
   environments = { baseline: captureInstructionEnvironment(a.options).object_digest, challenger: captureInstructionEnvironment(b.options).object_digest };
-  frozenRuntime = a.options.runtime; observedRuntime = { model: frozenRuntime.model, executable: { observed_version: frozenRuntime.cli_version } }; environmentOverride = null;
+  frozenRuntime = a.options.runtime; observedRuntime = { model: frozenRuntime.model, executable: { observed_version: frozenRuntime.cli_version },
+    runtime_config_sha256: canonicalDigest('same runtime config').slice(7) }; environmentOverride = null; runtimeOverrides = {};
   const gradingBindings = draft.protocol.fixture_ids.map(fixture_id => ({ fixture_id, evaluator_bundle_digest: canonicalDigest('original-bundle'),
     scoring_input_freeze_manifest_source_digest: canonicalDigest('original-freeze'), scoring_policy_digest: draft.protocol.scoring_policy_digest }));
   draft.projection = buildEnvironmentEvolutionProjection({ ...a.options, roles: draft.roles, environments, gradingBindings, evidenceKind: 'synthetic' });
@@ -54,8 +55,11 @@ for (const track of ['codex', 'claude']) test(`${track}: saved results re-enter 
   }
   const checked = verifyEnvironmentSavedResults(options);
   assert.equal(nativeCalls, data.baseline.length + data.challenger.length); assert.equal(checked.report.status, 'saved_pair_verified');
+  assert.equal(checked.report.recorded_runtime_contract_digest, canonicalDigest(observedRuntime));
   assert.equal(checked.evidence.dimensions.quality.status, 'complete'); assert.equal(checked.evidence.dimensions.variance.status, 'unavailable');
   assert.equal(checked.evidence.dimensions.mechanism.status, 'unavailable'); assert.equal(checked.evidence.causal_attribution.status, 'not_claimed');
+  runtimeOverrides.challenger = { ...observedRuntime, runtime_config_sha256: canonicalDigest('foreign runtime config').slice(7) };
+  assert.throws(() => verifyEnvironmentSavedResults(options), /different recorded runtime contracts/); runtimeOverrides = {};
   const scoped = structuredClone(options);
   for (const role of ['baseline', 'challenger']) {
     scoped.results[role].resultSet.mode = 'environment_scope';
@@ -83,6 +87,7 @@ for (const track of ['codex', 'claude']) test(`${track}: saved results re-enter 
   assert.throws(() => verifyEnvironmentSavedResults({ ...options, trustedSavedEngineeringResultDigests: [] }), /receipt/);
   const unstarted = structuredClone(options); unstarted.results.baseline.resultSet = null; unstarted.results.baseline.grading = [];
   const held = verifyEnvironmentSavedResults(unstarted); assert.equal(held.report.status, 'hold_incomplete');
+  assert.equal(held.report.recorded_runtime_contract_digest, null);
   assert.equal(held.evidence.dimensions.quality.status, 'insufficient_evidence');
   const tampered = structuredClone(data.challenger[0].result); data.challenger[0].result.scoring_policy_digest = canonicalDigest('foreign');
   assert.throws(() => verifyEnvironmentSavedResults(options), /pre-result criterion/); data.challenger[0].result = tampered;
