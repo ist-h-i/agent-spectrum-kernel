@@ -6,9 +6,9 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const prefix = 'kernel_principles_v2.task_signal@catalog24-1:';
 const fixtures = new Map([
   ["hi-authorization-exception", "pr_review", "review", "security_boundary", "d63648ae9c68342c8ab6d06129ddea0126794c5cb1ed0501d171828975d0da04", "214e37d7f3c7f2f10a9acc5f0a9cce32ad6d88eaa0de1cdc8fe831f3d2062a39"],
-  ["hi-external-action-approval", "operation_boundary", "design", "external_effect", "1099c2d166c9bd1d24d8ac0a0860424f57dd268b43c4232e462459a71d9869b5", "b48edeb557a042a2f50aa68d782de93c7758c23b602bce86a123705fb31d96b2"],
+  ["hi-external-action-approval", "operation_boundary", "design", "external_effect", "aac0e8939e90ca010a094d0a1b9b9c97620024a336a6114a65d8ee938089df63", "f41663faf1437f359dd0d52a8bc32c36f9c88102739e19b29b5fc8a7268bf715"],
   ["hi-financial-state-integrity", "investigation_implementation", "implementation", "financial_integrity", "27f0fa070778accebc11dc3cc97037b7582a71a478c87eb2b4728f147a80418c", "97e049730a530e52cf512f971ad9be20e491b8312c1914afc6ca663b57b5bc48"],
-  ["hi-versioned-migration-safety", "migration_design", "design", "data_integrity", "b048b5741c13272dac8836aebb4495e60e6213dffbcf456c7eb7a95a7c8ab713", "b5d3b16a8cd0d6eb3b5d59d4ed5c9c4bdb363f23355d77c74d4101b1ee56f19c"],
+  ["hi-versioned-migration-safety", "migration_design", "design", "data_integrity", "e471420832367631d065d04d53cd94fed1f1b0aba7863a1418cab515ca5c0a34", "34f5df9ea2b83e1f83ef1c37227344165f45be42a6c15fe549f56917db4a6b70"],
   ["mn-client-compatibility-fix", "local_implementation", "implementation", "none", "3cdefd561b94e3f6a78df193c93555eeed5b46a69bfc1a98f3ccb94a143216c7", "32eb52eb50f561d2aa46f5ce33f5c32b817d6751b4b08d6aea86af6dd0aaf4c0"],
   ["mn-frontend-default-fix", "local_bug_fix", "implementation", "none", "ff61638ce2f18e9b8734646ea7af5f2ebbb5c62c4e8457151b143426bc536150", "51adde148cdd6ee95a630583d286aaaaa12b9832d5c7ac8b8fea656b5060f1dc"],
   ["mn-schema-field-alignment", "small_feature", "implementation", "none", "1172c442e52f22fe633cf337455d9dedbf0ae29e377507cafcb6574bf4c01dcc", "824eb45ccc25139650cb76bc733fbc18f666de16061c4d9648cdc5e52b2bf4cb"],
