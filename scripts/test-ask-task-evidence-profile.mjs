@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { computeRequirementRecordDigest } from './ask-benchmark-scoring-contract.mjs';
+import { computeRequirementRecordDigest, resolveRequirementAdmissionBindingDigest,
+  validateRequirementRecordContract, validateFrozenFinalAdmissionRecordContract } from './ask-benchmark-scoring-contract.mjs';
 import { assertBenchmarkSchemaInstance } from './ask-benchmark-schema.mjs';
 import { selectTaskEvidenceProfile, readTaskEvidencePartialResult, projectTaskEvidencePartialResultForTest,
   assertTaskEvidenceResultSet, TASK_EVIDENCE_PROFILE_ID, TASK_EVIDENCE_PROFILE_VERSION } from './ask-task-evidence-profile.mjs';
@@ -18,10 +19,11 @@ const fixtures = ['pf-review-error-contract', 'pf-data-schema-evolution', 'pf-li
   'hi-financial-state-integrity', 'hi-versioned-migration-safety'];
 
 // Public synthetic requirements, not a private oracle or evaluator execution.
-function fixture(t, fixtureId = fixtures[0]) {
+function fixture(t, fixtureId = fixtures[0], requirementRecordRoot = root) {
   const temporary = mkdtempSync(join(tmpdir(), 'ask-task-evidence-public-'));
   t.after(() => rmSync(temporary, { recursive: true, force: true }));
-  const record = json('benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/requirement-record.json');
+  const record = JSON.parse(readFileSync(join(requirementRecordRoot,
+    'benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/requirement-record.json'), 'utf8'));
   record.fixture_id = fixtureId;
   record.requirement_record_id = `requirement-record-synthetic-${fixtureId}`;
   record.requirement_record_path = `requirements/${fixtureId}.json`;
@@ -279,11 +281,41 @@ test('new readouts cannot mix with legacy aggregation or an altered version', t 
   assert.throws(() => assertBenchmarkSchemaInstance(value, { schemaPath: join(root, 'benchmarks/schemas/portfolio-engineering-result.schema.json') }));
 });
 
-test('legacy public policy, profiles, scorer and hash-bearing input bytes stay fixed', () => {
+test('legacy public policy, profiles, scorer and hash-bearing input bytes stay fixed', t => {
   const base = 'f465699181f8dbaced9a64b31144147fdd2a17ed';
   const paths = ['benchmarks/portfolio-catalog.json', 'benchmarks/portfolio-policy-manifest.json', 'benchmarks/portfolio-admission-policy.json',
     'benchmarks/portfolio-scoring-policy.json', 'scripts/ask-benchmark-portfolio-policy.mjs', 'scripts/ask-benchmark-portfolio-score.mjs',
     'scripts/ask-primary-evaluation-profile.mjs', 'benchmarks/schemas/primary-evaluator-result-envelope.schema.json',
-    'benchmarks/schemas/primary-k2-evaluator-result-envelope.schema.json', 'benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/requirement-record.json'];
+    'benchmarks/schemas/primary-k2-evaluator-result-envelope.schema.json'];
   for (const path of paths) assert.deepEqual(readFileSync(join(root, path)), execFileSync('git', ['show', `${base}:${path}`], { cwd: root }), path);
+
+  // The legacy consumer receives its matching public snapshot; current tests above
+  // continue to consume the current record, whose two derived bindings may change.
+  const path = 'benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/requirement-record.json';
+  const frozen = mkdtempSync(join(tmpdir(), 'ask-task-evidence-legacy-'));
+  t.after(() => rmSync(frozen, { recursive: true, force: true }));
+  const expected = execFileSync('git', ['show', `${base}:${path}`], { cwd: root });
+  mkdirSync(join(frozen, 'benchmarks/fixtures/checkpoint-b2/pf-review-error-contract'), { recursive: true });
+  writeFileSync(join(frozen, path), expected, { flag: 'wx' });
+  assert.deepEqual(readFileSync(join(frozen, path)), expected, path);
+  const previous = JSON.parse(expected), current = json(path);
+  const semantics = ({ admission_record_digest, requirement_record_digest, ...record }) => record;
+  assert.deepEqual(semantics(current), semantics(previous), 'only derived admission/record bindings may change');
+  validateRequirementRecordContract({ scoringPolicy: json('benchmarks/portfolio-scoring-policy.json'), requirementRecord: current });
+  const admission = json('benchmarks/fixtures/checkpoint-b2/pf-review-error-contract/final-admission-record.json');
+  validateFrozenFinalAdmissionRecordContract({ admissionPolicy: json('benchmarks/portfolio-admission-policy.json'), admissionRecord: admission });
+  assert.equal(current.admission_record_digest, resolveRequirementAdmissionBindingDigest(admission), 'current requirement admission binding');
+
+  const legacyConsumer = fixture(t, fixtures[0], frozen), currentConsumer = fixture(t);
+  assert.equal(legacyConsumer.record.admission_record_digest, previous.admission_record_digest);
+  assert.equal(currentConsumer.record.admission_record_digest, current.admission_record_digest);
+  assert.deepEqual(currentConsumer.selection.task_contract, legacyConsumer.selection.task_contract);
+  const legacyReadout = legacyConsumer.readout(), currentReadout = currentConsumer.readout();
+  assert.deepEqual(currentReadout.original_requirement_results, legacyReadout.original_requirement_results);
+  assert.deepEqual(currentReadout.capability_rows, legacyReadout.capability_rows);
+  assert.deepEqual(currentReadout.totals, legacyReadout.totals);
+  assert.deepEqual(currentReadout.boundaries, legacyReadout.boundaries);
+  assert.equal(currentReadout.profile_id, TASK_EVIDENCE_PROFILE_ID);
+  assert.equal(currentReadout.profile_version, TASK_EVIDENCE_PROFILE_VERSION);
+  assert.equal(currentReadout.effective_admission_status, 'unknown');
 });
