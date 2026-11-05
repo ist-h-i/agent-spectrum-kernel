@@ -12,7 +12,7 @@ const lifetimeCommand = 'node --test scripts/test-ask-primary-performance-execut
 const publicSandboxFile = 'scripts/test-ask-user-comparison-public-sandbox.mjs';
 const manualComparisonCommand = 'node --test scripts/test-ask-primary-evaluation-start.mjs scripts/test-ask-primary-nine-condition-report.mjs';
 const environmentCommands = [
-  'node --test scripts/test-instruction-environment.mjs scripts/test-skill-usage-evidence.mjs scripts/test-environment-evolution.mjs scripts/test-environment-target.mjs scripts/test-environment-materialization.mjs scripts/test-instruction-environment-compiler.mjs scripts/test-environment-membership-adoption.mjs scripts/test-environment-owner-transfer.mjs scripts/test-environment-runtime-contract.mjs',
+  'node --test scripts/test-instruction-environment.mjs scripts/test-skill-usage-evidence.mjs scripts/test-environment-evolution.mjs scripts/test-environment-target.mjs scripts/test-environment-materialization.mjs scripts/test-instruction-environment-compiler.mjs scripts/test-environment-membership-adoption.mjs scripts/test-environment-owner-transfer.mjs scripts/test-environment-runtime-contract.mjs scripts/test-claude-native-runtime.mjs',
   'node --experimental-test-module-mocks --test scripts/test-environment-evaluation.mjs scripts/test-environment-saved-results.mjs',
 ];
 const commands = text => text.split('\n').map(line => line.trim().replace(/^run: /, '')).filter(line => /^node (?:--\S+ )*scripts\//.test(line)).sort();

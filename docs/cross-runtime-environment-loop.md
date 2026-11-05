@@ -1,6 +1,32 @@
 # Cross-runtime instruction environment loop
 
-Spec `cross-runtime-environment-loop-spec-v1`, revision 2.
+Spec `cross-runtime-environment-loop-spec-v1`, revision 3.
+
+Native continuation, ENV-9: add an explicit `claude_code_restricted_v1` runtime
+contract alongside the existing bespoke artificial CLI contract. It uses official
+Claude Code 2.1.318+ in the 2.1 release line, `--restricted`, print mode, an exact
+tool allowlist, session-only hook/memory disabling, no MCP/browser/session reuse,
+and a private empty config directory. Supported policies are read-only or
+workspace-write with strict noninteractive permissions. Only built-in bounded
+file tools and Skill are exposed; shell, network, code-running and agent tools
+remain unavailable. This is a file-tool boundary, not an OS sandbox claim.
+Only passive Skill/command headers (`name` and `description`, single-line
+scalars) are supported. Dynamic command preprocessing, fork/agent/hooks metadata,
+advanced YAML and linked instruction files refuse before the native process.
+Source Skills requiring shell commands retain an explicit unavailable command
+evidence status. No global settings are changed and no credentials are copied
+from user files. Authentication must be supplied explicitly through a redacted
+API-key or OAuth-token environment entry; absence refuses before case allocation.
+
+ENV-9 acceptance: exact runtime/schema/policy identity; native version/help
+preflight; bounded strict UTF-8 structured JSON result decoding followed by the
+existing output schema/terminal/normalization checks; refusal of authentication
+absence, unsafe/unknown config, policy changes, native error envelopes and output
+drift; immutable-source fake transport roundtrip and real model-free CLI probes.
+Authenticated execution and effectiveness remain separate evidence, and no
+formal model comparison may overlap the separate24-task measurements. Rollback
+is selection of the unchanged legacy runtime kind; existing runs cannot switch
+kind because the runtime identity changes.
 
 Continuation design, revision 2: compile the actual runtime instruction files
 into the existing `rendered_prompt_bundle` Asset, with exact individual
@@ -245,14 +271,41 @@ existing version and required execution-help contract with zero model calls.
 That proves available CLI surfaces, not Skill-event emission, full environment
 execution or quality. Official Claude Code `2.1.318` was temporarily installed
 under `/tmp` with npm install scripts disabled; global installation, authentication
-and user settings were untouched. Its real version/help preflight returned
+and user settings were untouched. The legacy bespoke contract's preflight returned
 `availability: unavailable`, `reason: help_contract_mismatch`, with zero model
-calls. The current generic Claude runtime contract requires `--benchmark-output`,
+calls. That legacy Claude runtime contract requires `--benchmark-output`,
 `--benchmark-task` and explicit sandbox/permission arguments that this official
-CLI does not provide. Consequently this PR does not establish a working native
-Claude model execution path. A separately reviewed native transport/containment
-contract and authenticated acceptance remain required; unavailable evidence
-must not become a pass by dropping security checks.
+CLI does not provide. The new explicit native contract passed the same actual
+CLI version/help probe with zero model calls (binary SHA256
+`677a2ea7bf576cedd20e191d973914ed8a41796f53a63b1923381ddc4d5b5e7d`).
+This proves required CLI surfaces, not actual enforcement, Skill activation,
+authenticated execution or quality. API-key and OAuth-token environment entries
+are absent on the selected host, so model execution remains unverified. Existing
+login files are not copied or used as implicit authentication.
+
+To select it in the existing runtime configuration, set:
+
+```json
+{
+  "adapter": "claude",
+  "expected_executable_version": "2.1.318 (Claude Code)",
+  "sandbox_policy": "workspace-write",
+  "permission_policy": "strict",
+  "claude_cli": { "kind": "claude_code_restricted_v1" },
+  "environment_allowlist": ["PATH", "ANTHROPIC_API_KEY"],
+  "environment_value_allowlist": []
+}
+```
+
+Keep the remaining required runtime fields and explicit unsupported command
+evidence contract. Set authentication locally; never put credential values in
+this JSON or logs. `CLAUDE_CODE_OAUTH_TOKEN` can replace the API-key entry;
+supplying both actual credentials is refused. `runtime-inspect` is model-free;
+evaluation start still requires its independently bound experiment and explicit
+confirmation. No automatic authentication, exporter, hook or security-policy
+expansion occurs. [Official CLI flags](https://code.claude.com/docs/en/cli-reference)
+and [working-directory boundaries](https://code.claude.com/docs/en/permissions#block-file-tool-reads-and-writes-outside-the-working-directories)
+are upstream contracts; these restrictions do not cover arbitrary host code.
 
 - Codex's [v0.162.1 OTEL source](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/otel/README.md#skill-invocation-logs)
   documents explicit injection and best-effort implicit/read detection with

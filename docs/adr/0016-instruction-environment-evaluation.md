@@ -44,6 +44,18 @@ Alternatives rejected: individual-Skill scores as environment effectiveness;
 LLM self-report as mechanical evidence; a new environment Registry or grader;
 and overwriting files still owned by a normal installer.
 
+The official Claude CLI uses a separate explicit restricted-file-tool runtime
+kind, rather than reinterpreting the bespoke artificial CLI flags. Exact native
+argv, session settings, tool set, model/effort and output schema bind its identity.
+Restricted mode confines file tools to working directories; arbitrary execution,
+network, MCP, hooks, agents and user config are not enabled. A private empty
+config directory and explicitly supplied redacted authentication isolate session
+state. Structured stdout is decoded by the harness then re-enters the original
+final-output and terminal verifiers. No wrapper executable acquires authority,
+no CLI version/help result proves enforcement or quality, and shell evidence
+remains unavailable. This bounded native contract can be extended only after
+review; enabling shell execution is not implied by workspace-write file access.
+
 Review before additional normal-owner profiles/source migrations, automatic telemetry enablement, unbounded
 ambient configuration capture, cross-adapter score pooling, causal attribution,
 new-Asset adoption semantics or automatic partial-write recovery.

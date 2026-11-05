@@ -55,19 +55,55 @@
     },
     "thermal_state": { "enum": ["cold", "warm"] },
     "claude_cli": {
-      "type": ["object", "null"],
-      "additionalProperties": false,
-      "required": ["help_marker", "command", "sandbox_argument", "permission_argument"],
-      "properties": {
-        "help_marker": { "type": "string", "minLength": 1 },
-        "sandbox_argument": { "type": "string", "pattern": "^--[a-z0-9-]+$" },
-        "permission_argument": { "type": "string", "pattern": "^--[a-z0-9-]+$" },
-        "command": {
-          "type": "array",
-          "minItems": 1,
-          "items": { "type": "string", "minLength": 1 }
+      "oneOf": [
+        {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "help_marker",
+            "command",
+            "sandbox_argument",
+            "permission_argument"
+          ],
+          "properties": {
+            "help_marker": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sandbox_argument": {
+              "type": "string",
+              "pattern": "^--[a-z0-9-]+$"
+            },
+            "permission_argument": {
+              "type": "string",
+              "pattern": "^--[a-z0-9-]+$"
+            },
+            "command": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "claude_code_restricted_v1"
+            }
+          }
         }
-      }
+      ]
     },
     "command_evidence": {
       "type": "object",

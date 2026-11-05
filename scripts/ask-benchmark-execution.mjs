@@ -1,5 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { coreProducerInspection } from './ask-core-producer-scope.mjs';
+import { CLAUDE_NATIVE_KIND, isNativeClaudeRuntime, validateNativeClaudeRuntime, nativeClaudeCommand,
+  nativeClaudeEnvironment, nativeClaudeProbeEnvironment, decodeNativeClaudeResult, assertNativeClaudeAuthentication,
+  assertNativeClaudeInstructions } from './claude-native-runtime.mjs';
 import { verifyCoreProducedTerminal } from './ask-core-capture-producer.mjs';
 import { primaryProducerInspection } from './ask-primary-evaluation-scope.mjs';
 import { verifyPrimaryProducedTerminal } from './ask-primary-evaluation-producer.mjs';
@@ -335,6 +338,7 @@ function placeholderCount(command, placeholder) {
 }
 
 function validateClaudeCommandTemplate(runtime) {
+  if (isNativeClaudeRuntime(runtime)) { validateNativeClaudeRuntime(runtime); return; }
   const contract = runtime.claude_cli;
   if (!contract) throw new Error("available Claude runtime requires a CLI contract");
   for (const placeholder of ["{task}", "{output}", "{sandbox_policy}", "{permission_policy}"]) {
@@ -402,6 +406,7 @@ export function effectiveCommand(root, runtime) {
     };
   }
   validateClaudeCommandTemplate(runtime);
+  if (isNativeClaudeRuntime(runtime)) return nativeClaudeCommand(runtime, `sha256:${fileDigest(schema(root, OUTPUT_SCHEMA_PATH))}`);
   return {
     argv: runtime.claude_cli.command,
     task_transport: "file",
@@ -436,8 +441,15 @@ function assertExecutableIdentity(verifiedExecutable) {
 }
 
 function probeAvailableRuntime(runtime, verifiedExecutable, command, environmentSnapshot, successorRuntime = null) {
+  if (!isNativeClaudeRuntime(runtime)) return probeRuntimeCommands(runtime, verifiedExecutable, command, environmentSnapshot, successorRuntime);
+  const directory = mkdtempSync(resolve(TEMP_ROOT, 'ask-claude-probe-')); chmodSync(directory, 0o700);
+  try { return probeRuntimeCommands(runtime, verifiedExecutable, command, environmentSnapshot, successorRuntime, nativeClaudeProbeEnvironment(directory)); }
+  finally { rmSync(directory, { recursive: true, force: true }); }
+}
+
+function probeRuntimeCommands(runtime, verifiedExecutable, command, environmentSnapshot, successorRuntime = null, extraEnvironment = {}) {
   const executable = assertExecutableIdentity(verifiedExecutable);
-  const version = spawnSync(executable, ["--version"], { encoding: "utf8", env: environmentFor(environmentSnapshot), timeout: 10000, killSignal: "SIGKILL", maxBuffer: 1024 * 1024 });
+  const version = spawnSync(executable, ["--version"], { encoding: "utf8", env: environmentFor(environmentSnapshot, extraEnvironment), timeout: 10000, killSignal: "SIGKILL", maxBuffer: 1024 * 1024 });
   assertExecutableIdentity(verifiedExecutable);
   const observedVersionOutput = `${version.stdout ?? ""}${version.stderr ?? ""}`;
   let successorVersion = null;
@@ -461,13 +473,13 @@ function probeAvailableRuntime(runtime, verifiedExecutable, command, environment
   {
     const helpArgs = runtime.adapter === "codex" ? ["exec", "--help"] : ["--help"];
     assertExecutableIdentity(verifiedExecutable);
-    const help = spawnSync(executable, helpArgs, { encoding: "utf8", env: environmentFor(environmentSnapshot), timeout: 10000, killSignal: "SIGKILL", maxBuffer: 1024 * 1024 });
+    const help = spawnSync(executable, helpArgs, { encoding: "utf8", env: environmentFor(environmentSnapshot, extraEnvironment), timeout: 10000, killSignal: "SIGKILL", maxBuffer: 1024 * 1024 });
     assertExecutableIdentity(verifiedExecutable);
     const helpOutput = `${help.stdout ?? ""}${help.stderr ?? ""}`;
     const requiredFlags = runtime.adapter === "codex"
       ? ["--ephemeral", "--ignore-user-config", "--ignore-rules", "--skip-git-repo-check", "--json", "--model", "--config", "--sandbox", "--output-schema", "--output-last-message"]
       : command.argv.filter((part) => part.startsWith("-") && part !== "-");
-    const markerMatches = runtime.adapter === "codex" || helpOutput.includes(runtime.claude_cli.help_marker);
+    const markerMatches = runtime.adapter === "codex" || (isNativeClaudeRuntime(runtime) ? helpOutput.includes('Claude') : helpOutput.includes(runtime.claude_cli.help_marker));
     if (help.status !== 0 || !markerMatches || !requiredFlags.every((flag) => helpOutput.includes(flag))) {
       throw new RuntimeContractError("help_contract_mismatch", executableEvidence);
     }
@@ -518,8 +530,8 @@ function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable, co
     policy_enforcement: {
       sandbox_policy: runtime.sandbox_policy,
       permission_policy: runtime.permission_policy,
-      ephemeral: adapter === "codex",
-      user_config_isolated: adapter === "codex",
+      ephemeral: adapter === "codex" || isNativeClaudeRuntime(runtime),
+      user_config_isolated: adapter === "codex" || isNativeClaudeRuntime(runtime),
       rules_isolated: adapter === "codex",
     },
     availability_evidence: availabilityEvidence ?? (runtime.availability === "available" ? "local_version_and_contract_probe" : "declared_unavailable"),
@@ -736,11 +748,17 @@ function readAdapterIdentity(root, runDir, adapter) {
   if (capture.support !== "supported" && (capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null || capture.evidence_level !== "unavailable" || capture.shell_capability.support_status !== capture.support || capture.shell_capability.family !== null || capture.shell_capability.executable !== null || capture.shell_capability.envelope_arguments !== null || capture.shell_capability.authority_source !== "none" || capture.shell_capability.downgrade_reason === null)) throw new Error(`${adapter} unsupported command evidence identity is inconsistent`);
   if (identity.availability === "available" && adapter === "codex") {
     const argv = identity.effective_command.argv;
+    if (identity.effective_command.task_transport !== 'stdin' || identity.effective_command.output_transport !== 'file') throw new Error('Codex effective transport is invalid');
     if (!argv.includes("--ephemeral") || !argv.includes("--ignore-user-config") || !argv.includes("--ignore-rules") || !argv.includes("--skip-git-repo-check") || !argv.includes("--json") || argv[argv.indexOf("--sandbox") + 1] !== identity.sandbox_policy || !argv.includes(`approval_policy=\"${identity.permission_policy}\"`) || argv[argv.indexOf("--output-schema") + 1] !== "{output_schema}") throw new Error("Codex effective command does not enforce its runtime policy");
   }
   if (identity.availability === "available" && adapter === "claude") {
     const argv = identity.effective_command.argv;
-    if (placeholderCount(argv, "{task}") !== 1 || placeholderCount(argv, "{output}") !== 1 || placeholderCount(argv, "{sandbox_policy}") !== 1 || placeholderCount(argv, "{permission_policy}") !== 1) throw new Error("Claude effective command contract is incomplete");
+    if (identity.effective_command.output_transport === 'structured_stdout') {
+      const expected = nativeClaudeCommand({ ...identity, expected_executable_version: identity.executable?.observed_version,
+        claude_cli: { kind: CLAUDE_NATIVE_KIND } }, `sha256:${fileDigest(schema(root, OUTPUT_SCHEMA_PATH))}`);
+      assertCanonicalEqual(identity.effective_command, expected, 'native Claude effective command');
+      if (!identity.policy_enforcement.ephemeral || !identity.policy_enforcement.user_config_isolated || identity.policy_enforcement.rules_isolated) throw new Error('native Claude policy identity drift');
+    } else if (placeholderCount(argv, "{task}") !== 1 || placeholderCount(argv, "{output}") !== 1 || placeholderCount(argv, "{sandbox_policy}") !== 1 || placeholderCount(argv, "{permission_policy}") !== 1) throw new Error("Claude effective command contract is incomplete");
   }
   return identity;
 }
@@ -1081,6 +1099,7 @@ function materializeCommand(root, command, runtime, outputTemporary) {
   return command.argv.map((part) => part
     .replaceAll("{output}", outputTemporary)
     .replaceAll("{output_schema}", resolve(root, OUTPUT_SCHEMA_PATH))
+    .replaceAll("{output_schema_json}", JSON.stringify(readJson(schema(root, OUTPUT_SCHEMA_PATH))))
     .replaceAll("{task}", "BENCHMARK_TASK.md")
     .replaceAll("{sandbox_policy}", runtime.sandbox_policy)
     .replaceAll("{permission_policy}", runtime.permission_policy));
@@ -1147,6 +1166,18 @@ function executeAgent({ root, runtime, executable, workspace, outputTemporary, c
     } finally {
       rmSync(codexHome, { recursive: true, force: true });
     }
+  }
+  if (isNativeClaudeRuntime(runtime)) {
+    assertNativeClaudeInstructions(workspace);
+    const configDirectory = mkdtempSync(resolve(TEMP_ROOT, 'ask-portfolio-claude-config-'));
+    chmodSync(configDirectory, 0o700);
+    try {
+      const raw = executeContainedAgent(executable, materializeCommand(root, command, runtime, outputTemporary), {
+        cwd: workspace, input: task, env: nativeClaudeEnvironment(environment, configDirectory),
+        timeout: runtime.case_timeout_ms, maxBuffer: MAX_PROCESS_OUTPUT_BYTES,
+      });
+      return raw;
+    } finally { rmSync(configDirectory, { recursive: true, force: true }); }
   }
   const args = materializeCommand(root, command, runtime, outputTemporary);
   return executeContainedAgent(executable, args, {
@@ -1912,6 +1943,11 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     if (sealedCommandEvidence.captureError) throw new Error(`command evidence invalid:${sealedCommandEvidence.captureError.code ?? "unclassified"}`);
     if (processResult.error?.code === "ETIMEDOUT") throw new Error("case timeout");
     if (processResult.status !== 0) throw new Error(`agent exited ${processResult.status}`);
+    if (isNativeClaudeRuntime(runtime)) {
+      const output = decodeNativeClaudeResult(processResult.stdout);
+      validate(root, JSON.parse(output), OUTPUT_SCHEMA_PATH, 'native Claude structured output');
+      writeFileSync(temporaryOutput, output, { flag: 'wx', mode: 0o600 });
+    }
     const finalOutput = inspectFinal(root, temporaryOutput).record;
     completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, commandEvidence: sealedCommandEvidence.reference, status: "completed", processResult, finalOutput, terminalWorkspaceAuthority, successorUsage: context.successorPromptInput !== null }), finalSource: temporaryOutput });
     return "completed";
@@ -2014,6 +2050,7 @@ export function executePortfolio({ root, config, planPath, materializedPath, sel
   if (maxCases !== null && (!Number.isInteger(maxCases) || maxCases < 1)) throw new Error("--max-cases must be a positive integer");
   const runtimeConfig = readRuntimeConfig(root, runtimeConfigPath, adapter);
   const environmentSnapshot = captureEnvironment(runtimeConfig.value);
+  if (isNativeClaudeRuntime(runtimeConfig.value) && runtimeConfig.value.availability === 'available') assertNativeClaudeAuthentication(environmentSnapshot.values);
   const verifiedExecutable = runtimeConfig.value.availability === "available" ? validateAgentExecutable(agentBin) : null;
   const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, executionAdmissionEvidenceByFixture });
   fault("after_run_initialized");

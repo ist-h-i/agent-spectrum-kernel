@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
+import { testNativeClaudeExecution } from './test-helpers-claude-native-execution.mjs';
 import { createHash } from "node:crypto";
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
@@ -478,6 +479,10 @@ try {
     run(["seal-selection", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--state-dir", selectionState, "--case-id", entry.case_id, "--input", input]);
   }
 
+  testNativeClaudeExecution({ root, work, config: { ...config, _kind: 'portfolio', _configPath: configPath, _protocolPath: resolve(root, config.protocol_path) },
+    planPath, materializedPath: materialized, selectionState, plan, runtimeTemplate: runtimeConfig('claude') });
+  const nativeOnly = process.argv.includes('--native-claude-only');
+  if (!nativeOnly) {
   const runDir = resolve(work, "run");
   const common = ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", runDir];
   const env = { FAKE_EXEC_LOG: logPath, FAKE_PUBLIC_MODE: "fixture" };
@@ -1992,7 +1997,8 @@ exit 64
   writeFileSync(sealPath, sealedBytes);
   chmodSync(sealPath, 0o444);
 
-  console.log("ASK benchmark execution tests passed");
+  }
+  console.log(nativeOnly ? 'Native Claude original execution/terminal/normalization tests passed (fake CLI only)' : "ASK benchmark execution tests passed");
 } finally {
   rmSync(work, { recursive: true, force: true });
   rmSync(candidateOutputs, { recursive: true, force: true });
