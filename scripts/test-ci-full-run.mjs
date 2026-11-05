@@ -11,13 +11,26 @@ const baseline = JSON.parse(readFileSync(new URL('../docs/fixtures/ci-full-run-i
 const lifetimeCommand = 'node --test scripts/test-ask-primary-performance-execution.mjs scripts/test-ask-primary-performance-lifetime.mjs';
 const publicSandboxFile = 'scripts/test-ask-user-comparison-public-sandbox.mjs';
 const manualComparisonCommand = 'node --test scripts/test-ask-primary-evaluation-start.mjs scripts/test-ask-primary-nine-condition-report.mjs';
+const environmentCommands = [
+  'node --test scripts/test-instruction-environment.mjs scripts/test-skill-usage-evidence.mjs scripts/test-environment-evolution.mjs scripts/test-environment-target.mjs scripts/test-environment-materialization.mjs',
+  'node --experimental-test-module-mocks --test scripts/test-environment-evaluation.mjs',
+];
 const commands = text => text.split('\n').map(line => line.trim().replace(/^run: /, '')).filter(line => /^node (?:--\S+ )*scripts\//.test(line)).sort();
 
 test('all original validate commands remain, including flags and frozen sources', () => {
-  const additions = [lifetimeCommand, manualComparisonCommand, 'node --test scripts/test-sufficient-change-scope-fixtures.mjs', 'node --test scripts/test-ci-full-run.mjs', 'node --test scripts/test-ci-change-shadow.mjs', 'node scripts/ci-change-shadow.mjs', 'node --test scripts/test-ask-personal-evolution-trace.mjs', 'node --test scripts/test-codex-metrics-collector.mjs', 'node --test scripts/test-ci-execution-plan.mjs', 'node scripts/ci-execution-plan.mjs plan', 'node scripts/ci-execution-plan.mjs gate', 'node scripts/ci-execution-plan.mjs receipt'];
+  const additions = [...environmentCommands, lifetimeCommand, manualComparisonCommand, 'node --test scripts/test-sufficient-change-scope-fixtures.mjs', 'node --test scripts/test-ci-full-run.mjs', 'node --test scripts/test-ci-change-shadow.mjs', 'node scripts/ci-change-shadow.mjs', 'node --test scripts/test-ask-personal-evolution-trace.mjs', 'node --test scripts/test-codex-metrics-collector.mjs', 'node --test scripts/test-ci-execution-plan.mjs', 'node scripts/ci-execution-plan.mjs plan', 'node scripts/ci-execution-plan.mjs gate', 'node scripts/ci-execution-plan.mjs receipt'];
   for (const command of additions) assert.equal(commands(validate).filter(c => c === command).length, command.endsWith(' receipt') ? 5 : 1, command);
   assert.deepEqual(commands(validate).filter(c => !additions.includes(c)), baseline.validate_commands);
   assert.match(validate, /git fetch --no-tags origin a06e96f8/);
+});
+
+test('cross-runtime environment checks have one unconditional common owner', () => {
+  const registry = parseRegistry(validate);
+  for (const command of environmentCommands) {
+    const owners = Object.entries(registry.jobs).flatMap(([job, value]) => value.steps
+      .filter(step => commands(step.run).includes(command)).map(() => job));
+    assert.deepEqual(owners, ['common']);
+  }
 });
 
 test('manual start and saved-report tests have one unconditional common owner without new jobs', () => {
