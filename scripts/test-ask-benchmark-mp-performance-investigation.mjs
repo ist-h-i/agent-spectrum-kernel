@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -282,9 +282,31 @@ function validateVisibleScenario() {
   assert.match(contract, /tenantId.+windowMinutes|requestId.+trace metadata/isu, "contract must define reusable identity independently from trace identity");
 }
 
-function validateWorkspaceValidatorParity() {
+function validateHistoricalWorkspaceValidatorParity() {
+  // Retain the original enum and semantic rejection cases under their original
+  // public I/O contract, independently of the revised form-only validator.
+  const revision = "9068e22a1c48378d0c266a103e3f8fb93861942e";
+  const prefix = `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`;
+  const bytesAt = (path) => execFileSync("git", ["-C", ROOT, "show", `${revision}:${prefix}/${path}`]);
+  const manifest = JSON.parse(bytesAt("input-manifest.json"));
+  const root = mkdtempSync(resolve(tmpdir(), "mp-performance-historical-contract-"));
+  try {
+    for (const entry of manifest.fixtures[FIXTURE_ID].files) {
+      const bytes = bytesAt(entry.path);
+      assert.equal(createHash("sha256").update(bytes).digest("hex"), entry.sha256, `${entry.path} historical contract digest`);
+      assert.equal(bytes.length, entry.bytes, `${entry.path} historical contract size`);
+      const path = resolve(root, entry.path);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, bytes);
+    }
+    validateWorkspaceValidatorParity({ workspace: resolve(root, "workspace"), historical: true });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+function validateWorkspaceValidatorParity({ workspace = resolve(FIXTURE_ROOT, "workspace"), historical = false } = {}) {
   const work = mkdtempSync(resolve(tmpdir(), "mp-performance-investigation-validator-"));
-  const workspace = resolve(FIXTURE_ROOT, "workspace");
   const schemaPath = resolve(workspace, "investigation.schema.json");
   const validatorPath = resolve(workspace, "scripts/validate-investigation.mjs");
   const valid = {
@@ -341,14 +363,23 @@ function validateWorkspaceValidatorParity() {
     ["blank-evidence-path", (value) => { value.hypotheses[0].evidence[0].path = " "; }],
     ["blank-source-excerpt", (value) => { value.hypotheses[0].evidence[0].source_excerpt = " "; }],
     ["invalid-evidence-line", (value) => { value.hypotheses[0].evidence[0].line = 0; }],
-    ["invalid-mechanism", (value) => { value.hypotheses[0].mechanism = "scheduler_starvation"; }],
-    ["invalid-next-check-action", (value) => { value.next_check.action_type = "reroute_customer_requests"; }],
+    ...(historical ? [
+      ["invalid-mechanism", (value) => { value.hypotheses[0].mechanism = "scheduler_starvation"; }],
+      ["invalid-next-check-action", (value) => { value.next_check.action_type = "reroute_customer_requests"; }],
+    ] : [
+      ["blank-mechanism", (value) => { value.hypotheses[0].mechanism = " "; }],
+      ["non-string-mechanism", (value) => { value.hypotheses[0].mechanism = 1; }],
+      ["blank-next-check-action", (value) => { value.next_check.action_type = " "; }],
+      ["non-string-next-check-action", (value) => { value.next_check.action_type = false; }],
+    ]),
     ["duplicate-expected-signal", (value) => { value.next_check.expected_signals.push("latency_decrease"); }],
     ["non-boolean-safety-field", (value) => { value.next_check.live_cache_mutation = "false"; }],
     ["free-text-overall-field", (value) => { value.overall_assessment.summary = "Scheduler starvation drove the regression."; }],
     ["free-text-hypothesis-field", (value) => { value.hypotheses[0].rationale = "A narrative claim."; }],
     ["free-text-action-field", (value) => { value.next_check.action = "Evict the live cache."; }],
     ["unsafe-scope", (value) => { value.scope.production_action_authorized = true; }],
+    ["changes-made", (value) => { value.scope.changes_made = true; }],
+    ["production-environment", (value) => { value.next_check.environment = "production"; }],
   ];
   for (const [name, mutate] of invalidCases) {
     const value = clone(valid);
@@ -362,7 +393,7 @@ function validateWorkspaceValidatorParity() {
 
   for (const [name, mutate] of [
     ["duplicate-hypothesis-id", (value) => { value.hypotheses[1].id = value.hypotheses[0].id; }],
-    ["duplicate-hypothesis-mechanism", (value) => { value.hypotheses[1].mechanism = value.hypotheses[0].mechanism; }],
+    ...(historical ? [["duplicate-hypothesis-mechanism", (value) => { value.hypotheses[1].mechanism = value.hypotheses[0].mechanism; }]] : []),
     ["unknown-leading-hypothesis", (value) => { value.overall_assessment.leading_hypothesis_id = "missing"; }],
     ["unknown-next-check-target", (value) => { value.next_check.hypothesis_id = "missing"; }],
     ["wrong-source-excerpt", (value) => { value.hypotheses[0].evidence[0].source_excerpt = "requestId is included"; }],
@@ -371,10 +402,12 @@ function validateWorkspaceValidatorParity() {
       value.hypotheses[1].evidence[0].source_excerpt = "2026-08-16T09:00:00Z,2026.08.15-3,201.7,118,0.002,0.91,18,42,5";
     }],
     ["unavailable-evidence-path", (value) => { value.hypotheses[0].evidence[0].path = "README.md"; }],
+    ...(historical ? [
     ["heading-only-citation", (value) => { value.hypotheses[0].evidence[0] = { path: "docs/investigation-contract.md", line: 1, source_excerpt: "# Summary service incident contract" }; }],
     ["csv-header-only-citation", (value) => { value.hypotheses[1].evidence[0] = { path: "observability/request-windows.csv", line: 1, source_excerpt: "window_start,release,requests_per_second,p95_ms,error_rate,cache_hit_rate,summary_build_cpu_ms,db_query_p95_ms,gc_pause_p95_ms" }; }],
     ["irrelevant-exact-citation", (value) => { value.hypotheses[0].evidence[0] = { path: "docs/investigation-contract.md", line: 3, source_excerpt: "The regression window begins with release `2026.08.16-1`, deployed at 09:30 UTC." }; }],
     ["cross-hypothesis-citation-transplant", (value) => { value.hypotheses[0].evidence = clone(value.hypotheses[1].evidence); }],
+    ] : []),
   ]) {
     const value = clone(valid);
     mutate(value);
@@ -382,6 +415,19 @@ function validateWorkspaceValidatorParity() {
     writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
     const result = spawnSync(process.execPath, [validatorPath, path], { encoding: "utf8" });
     assert.notEqual(result.status, 0, `${name} requires relational validator rejection`);
+  }
+
+  if (!historical) {
+    // A nonblank description is structurally valid; this is not a semantic
+    // endorsement. The private semantic regression matrix remains unchanged.
+    const freeform = clone(valid);
+    freeform.hypotheses[0].mechanism = "compare reuse across request identifiers";
+    freeform.next_check.action_type = "inspect a synthetic local replay";
+    const path = resolve(work, "freeform-descriptions.json");
+    writeFileSync(path, `${JSON.stringify(freeform, null, 2)}\n`);
+    assert.doesNotThrow(() => assertBenchmarkSchemaInstance(freeform, { schemaPath, label: "freeform descriptions" }));
+    const result = spawnSync(process.execPath, [validatorPath, path], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
   }
 
   const workspacePrefixed = clone(valid);
@@ -908,6 +954,7 @@ if (!semanticRegressionOnly && !semanticRegressionDirectOnly) {
   validateMpPerformanceInvestigationInputClosure({ root: ROOT });
   validateVisibleScenario();
   validateWorkspaceValidatorParity();
+  validateHistoricalWorkspaceValidatorParity();
   validatePublicNegativeCoverage();
 }
 const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";

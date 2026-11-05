@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -302,12 +302,37 @@ function validateVisibleScenario() {
   assert.equal(state.observations.executed_rollout_records, 0);
   assert.equal(state.observations.executed_rollback_records, 0);
   assert.match(readFileSync(resolve(workspace, "docs/knowledge-policy.md"), "utf8"), /trigger.+destination.+owner.+evidence boundary|promotion trigger/isu);
-  assert.match(readFileSync(resolve(FIXTURE_ROOT, "task.md"), "utf8"), /local names chosen by the author.+spelling does not establish correctness.+each preparation step/isu, "task must expose the local-label and per-step evidence contract");
+  const historicalTask = spawnSync("git", ["show", "58ef346cf552b3977244a7b1d29055abead8461b:benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/task.md"], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(historicalTask.status, 0, historicalTask.stderr);
+  assert.match(historicalTask.stdout, /local names chosen by the author.+spelling does not establish correctness.+each preparation step/isu, "retained reviewed task must preserve its original local-label and per-step evidence contract");
+  assert.match(readFileSync(resolve(FIXTURE_ROOT, "task.md"), "utf8"), /Labels for reasons.+are local names.+ground each section, including preparation.+supplied paths, lines, and exact trimmed source excerpts.+Each preparation step must use a supplied non-mutating command and its exact mode/isu, "current task must expose the local-label and per-step evidence and command-safety contract");
 }
 
-function validateWorkspaceValidatorParity() {
+function validateHistoricalWorkspaceValidatorParity() {
+  // The pre-revision base includes the later citation-binding regressions;
+  // the older admission-reviewed head predates those validator guarantees.
+  const revision = "9068e22a1c48378d0c266a103e3f8fb93861942e";
+  const prefix = `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`;
+  const bytesAt = (path) => execFileSync("git", ["-C", ROOT, "show", `${revision}:${prefix}/${path}`]);
+  const manifest = JSON.parse(bytesAt("input-manifest.json"));
+  const root = mkdtempSync(resolve(tmpdir(), "mp-iac-historical-contract-"));
+  try {
+    for (const entry of manifest.fixtures[FIXTURE_ID].files) {
+      const bytes = bytesAt(entry.path);
+      assert.equal(createHash("sha256").update(bytes).digest("hex"), entry.sha256, `${entry.path} historical contract digest`);
+      assert.equal(bytes.length, entry.bytes, `${entry.path} historical contract size`);
+      const path = resolve(root, entry.path);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, bytes);
+    }
+    validateWorkspaceValidatorParity({ workspace: resolve(root, "workspace"), historical: true });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+function validateWorkspaceValidatorParity({ workspace = resolve(FIXTURE_ROOT, "workspace"), historical = false } = {}) {
   const work = mkdtempSync(resolve(tmpdir(), "mp-iac-rollback-design-validator-"));
-  const workspace = resolve(FIXTURE_ROOT, "workspace");
   const schemaPath = resolve(workspace, "change-plan.schema.json");
   const validatorPath = resolve(workspace, "scripts/validate-change-plan.mjs");
   const valid = {
@@ -412,9 +437,15 @@ function validateWorkspaceValidatorParity() {
     ["unavailable-evidence-path", (value) => { value.evidence[0].path = "README.md"; }],
     ["traversal-evidence-path", (value) => { value.evidence[0].path = "../plans/candidate-plan.json"; }],
     ["preparation-mode-swap", (value) => { value.preparation[0].mode = "remote_read"; }],
+    ["unknown-preparation-command", (value) => { value.preparation[0].command_id = "unknown-command"; }],
+    ["production-command-as-preparation", (value) => { value.preparation[0].command_id = "apply-saved-plan"; }],
+    // Semantic role-of-citation checks belong to the retained historical public
+    // validator and the unchanged private grading cases, not the current form checker.
+    ...(historical ? [
     ["preparation-command-evidence-transplant", (value) => { value.preparation[0].command_id = "validate-config"; }],
     ["preparation-mode-evidence-transplant", (value) => { value.evidence[2].line = 11; }],
     ["preparation-section-evidence-transplant", (value) => { value.preparation[0].evidence_ids = ["approval-pending"]; }],
+    ] : []),
   ];
   for (const [name, mutate] of relationalInvalidCases) {
     const value = clone(valid);
@@ -423,6 +454,20 @@ function validateWorkspaceValidatorParity() {
     writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
     const result = spawnSync(process.execPath, [validatorPath, path], { encoding: "utf8" });
     assert.notEqual(result.status, 0, `${name} requires relational validator rejection`);
+  }
+
+  if (!historical) {
+    for (const flag of ["production_mutation", "approval_required"]) {
+      const isolated = resolve(work, `unsafe-command-${flag}`);
+      cpSync(workspace, isolated, { recursive: true });
+      const catalogPath = resolve(isolated, "operations/commands.json");
+      const catalog = readJson(catalogPath);
+      catalog.commands.find(({ command_id }) => command_id === valid.preparation[0].command_id)[flag] = true;
+      writeFileSync(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
+      const result = spawnSync(process.execPath, [resolve(isolated, "scripts/validate-change-plan.mjs"), validPath], { encoding: "utf8" });
+      assert.notEqual(result.status, 0, `preparation must reject a supplied command with ${flag}`);
+      assert.match(result.stderr, /preparation step is invalid/u);
+    }
   }
 
   const workspacePrefixed = clone(valid);
@@ -919,6 +964,7 @@ if (!semanticRegressionOnly && !semanticRegressionDirectOnly) {
   validateMpIacRollbackDesignInputClosure({ root: ROOT });
   validateVisibleScenario();
   validateWorkspaceValidatorParity();
+  validateHistoricalWorkspaceValidatorParity();
   validatePublicNegativeCoverage();
 }
 const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";

@@ -57,9 +57,31 @@ function gitBytes(revision, path) {
 }
 
 function validateHistoricalPublicInputInvariance() {
-  const manifest = readJson(resolve(FIXTURE_ROOT, "input-manifest.json"));
-  const paths = [`${FIXTURE_ROOT_RELATIVE}/task.md`, `${FIXTURE_ROOT_RELATIVE}/input-manifest.json`, `${FIXTURE_ROOT_RELATIVE}/verification-command-contract.json`, ...manifest.fixtures[FIXTURE_ID].files.map(({ path }) => `${FIXTURE_ROOT_RELATIVE}/${path}`)];
-  for (const path of paths) assert.deepEqual(readFileSync(resolve(ROOT, path)), gitBytes(HISTORICAL_REVIEWED_HEAD, path), `${path} must remain byte-identical to the historical reviewed public input`);
+  // The retained reviewed version has its own manifest; the revised public task
+  // is checked independently by the current input-closure validator.
+  const manifest = JSON.parse(gitBytes(HISTORICAL_REVIEWED_HEAD, `${FIXTURE_ROOT_RELATIVE}/input-manifest.json`));
+  const fixture = manifest.fixtures[FIXTURE_ID];
+  const historicalContract = JSON.parse(gitBytes(HISTORICAL_REVIEWED_HEAD, `${FIXTURE_ROOT_RELATIVE}/verification-command-contract.json`));
+  assert.equal(historicalContract.fixture_input_digest, `sha256:${createHash("sha256").update(gitBytes(HISTORICAL_REVIEWED_HEAD, `${FIXTURE_ROOT_RELATIVE}/input-manifest.json`)).digest("hex")}`, "historical verification must bind its own public input manifest");
+  const historicalRoot = mkdtempSync(resolve(tmpdir(), `${FIXTURE_ID}-historical-input-`));
+  try {
+    for (const entry of fixture.files) {
+      const bytes = gitBytes(HISTORICAL_REVIEWED_HEAD, `${FIXTURE_ROOT_RELATIVE}/${entry.path}`);
+      assert.equal(createHash("sha256").update(bytes).digest("hex"), entry.sha256, `${entry.path} historical inventory digest`);
+      assert.equal(bytes.length, entry.bytes, `${entry.path} historical inventory size`);
+      const destination = resolve(historicalRoot, entry.path);
+      mkdirSync(dirname(destination), { recursive: true });
+      writeFileSync(destination, bytes);
+    }
+    const assertHistoricalBytes = () => {
+      for (const { path } of fixture.files) assert.deepEqual(readFileSync(resolve(historicalRoot, path)), gitBytes(HISTORICAL_REVIEWED_HEAD, `${FIXTURE_ROOT_RELATIVE}/${path}`), `${path} must remain byte-identical to the historical reviewed public input`);
+    };
+    assertHistoricalBytes();
+    writeFileSync(resolve(historicalRoot, "task.md"), "synthetic historical task drift\n");
+    assert.throws(assertHistoricalBytes, /historical reviewed public input/u, "historical task drift must still fail closed");
+  } finally {
+    rmSync(historicalRoot, { recursive: true, force: true });
+  }
 }
 
 function validateFreshPrivateSourceContract({ privateRoot, caseRoot }, { sourceOnly }) {

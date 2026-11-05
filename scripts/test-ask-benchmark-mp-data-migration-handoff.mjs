@@ -15,7 +15,7 @@ import {
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { resolvePortfolioExecutionAdmission, resolvePortfolioExecutionFixtures } from "./ask-benchmark-plan.mjs";
 import { computeResultProfileDigest, deriveBinaryScopeVerificationClassification } from "./ask-benchmark-scoring-contract.mjs";
-import { validateEquivalenceAuthority, validateMatchedEquivalenceIds, validateMutationAuthority } from "./ask-benchmark-mn-build-option-update.mjs";
+import { evaluateEvidenceRemoval, validateEquivalenceAuthority, validateMatchedEquivalenceIds, validateMutationAuthority } from "./ask-benchmark-mn-build-option-update.mjs";
 import { validateMpDataMigrationHandoffInputClosure } from "./ask-benchmark-mp-data-migration-handoff.mjs";
 import { buildMpDataMigrationHandoffAuthority, validateMpDataMigrationHandoffProductionAuthority } from "./ask-benchmark-mp-data-migration-handoff-authority.mjs";
 import {
@@ -428,15 +428,32 @@ function validateSafeNextActionMutationCoverage() {
   assert.deepEqual(safeMap.agent_visible_paths, directSources, "safe-next-action evidence map must include every direct source");
   assert.deepEqual(mutation.remove_paths, directSources, "safe-next-action mutation must remove every direct source");
   assert.deepEqual(directSources.filter((path) => !mutation.remove_paths.includes(path)), [], "safe-next-action must not remain directly recoverable after mutation");
-  const policy = readJson(resolve(FIXTURE_ROOT, "workspace/state/handoff-policy.json"));
-  const compatibility = readJson(resolve(FIXTURE_ROOT, "workspace/state/compatibility-matrix.json"));
-  assert.ok(policy.safe_next_action.required_evidence_ids.includes(compatibility.evidence_id), "safe-next-action required evidence must be recoverable from its declared map");
+  // The public policy supplies verification IDs, not a completed next-action
+  // answer. Test recoverability against the actual authority map instead.
+  assert.equal(evaluateEvidenceRemoval({ evidenceMap: safeMap, removedPaths: mutation.remove_paths, expectedRecoverabilityState: "not_recoverable" }), "not_recoverable");
+  for (const retainedPath of directSources) {
+    const partialRemoval = mutation.remove_paths.filter((path) => path !== retainedPath);
+    assert.equal(evaluateEvidenceRemoval({ evidenceMap: safeMap, removedPaths: partialRemoval, expectedRecoverabilityState: "recoverable" }), "recoverable", `${retainedPath} remains a direct source`);
+    assert.throws(() => evaluateEvidenceRemoval({ evidenceMap: safeMap, removedPaths: partialRemoval, expectedRecoverabilityState: "not_recoverable" }), /recoverability expectation/u, `incomplete removal retaining ${retainedPath} must not claim unrecoverability`);
+  }
 }
 
 function validateWorkspaceValidatorParity() {
   const work = mkdtempSync(resolve(tmpdir(), "mp-data-migration-handoff-validator-"));
-  const validator = resolve(FIXTURE_ROOT, "workspace/scripts/validate-handoff.mjs");
-  const schema = resolve(FIXTURE_ROOT, "workspace/handoff.schema.json");
+  // Use an independent synthetic input namespace. No completed task answer is
+  // added to the distributable workspace or recovered from private cases.
+  const workspace = resolve(work, "workspace");
+  for (const directory of ["scripts", "state", "evidence", "operations"]) mkdirSync(resolve(workspace, directory), { recursive: true });
+  const validator = resolve(workspace, "scripts/validate-handoff.mjs");
+  const schema = resolve(workspace, "handoff.schema.json");
+  cpSync(resolve(FIXTURE_ROOT, "workspace/scripts/validate-handoff.mjs"), validator);
+  cpSync(resolve(FIXTURE_ROOT, "workspace/handoff.schema.json"), schema);
+  const writeSynthetic = (path, value) => writeFileSync(resolve(workspace, path), `${JSON.stringify(value, null, 2)}\n`);
+  const verificationIds = ["synthetic-check-one", "synthetic-check-two", "synthetic-check-three", "synthetic-check-four"];
+  writeSynthetic("state/handoff-policy.json", { verification_ids: verificationIds });
+  writeSynthetic("operations/commands.json", { commands: [{ command_id: "synthetic-read", mode: "read_only", owner: "synthetic-owner" }] });
+  writeSynthetic("evidence/batch-42-verification.json", { evidence_id: "synthetic-evidence" });
+  writeSynthetic("state/compatibility-matrix.json", { evidence_id: "synthetic-compatibility" });
   const valid = {
     current_state: {
       phase: "synthetic",
@@ -453,10 +470,10 @@ function validateWorkspaceValidatorParity() {
     continuation: {
       stop_condition_ids: ["synthetic-stop"],
       verification_states: [
-        { verification_id: "batch-42-checksum", state: "failed" },
-        { verification_id: "batch-42-unresolved-row-reconciliation", state: "not_run" },
-        { verification_id: "rollback-drill", state: "passed" },
-        { verification_id: "compatibility-smoke", state: "passed" },
+        { verification_id: "synthetic-check-one", state: "failed" },
+        { verification_id: "synthetic-check-two", state: "not_run" },
+        { verification_id: "synthetic-check-three", state: "passed" },
+        { verification_id: "synthetic-check-four", state: "passed" },
       ],
       evidence_references: ["synthetic-evidence"],
       open_questions: ["synthetic-question"],
@@ -482,6 +499,11 @@ function validateWorkspaceValidatorParity() {
     ["conflicting-duplicate-verification", (value) => { value.continuation.verification_states.push({ ...value.continuation.verification_states[0], state: "passed" }); }, false],
     ["missing-verification", (value) => { value.continuation.verification_states.pop(); }, false],
     ["unknown-verification", (value) => { value.continuation.verification_states[0].verification_id = "unknown-verification"; }, false],
+    ["unknown-command", (value) => { value.safe_next_action.command_id = "synthetic-missing"; }, false],
+    ["wrong-command-mode", (value) => { value.safe_next_action.mode = "write"; }, false],
+    ["wrong-command-owner", (value) => { value.safe_next_action.owner = "synthetic-other-owner"; }, false],
+    ["unknown-action-evidence", (value) => { value.safe_next_action.required_evidence_ids = ["synthetic-missing"]; }, false],
+    ["unknown-continuation-evidence", (value) => { value.continuation.evidence_references = ["synthetic-missing"]; }, false],
   ]) {
     const candidate = clone(valid);
     mutate(candidate);

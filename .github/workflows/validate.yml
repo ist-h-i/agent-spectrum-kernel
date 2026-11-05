@@ -543,6 +543,11 @@ jobs:
         id: ci_44ce49332dae
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-frontend-state-review.mjs
 
+      - name: Fetch retained public IaC reviewed head
+        id: ci_iac_reviewed_head
+        run: |
+          git fetch --no-tags origin 58ef346cf552b3977244a7b1d29055abead8461b
+
       - name: Run IaC rollback design fixture source-freeze tests
         id: ci_e81a2fc5e721
         run: node scripts/test-frozen-evaluator-fixture.mjs test-ask-benchmark-mp-iac-rollback-design.mjs
