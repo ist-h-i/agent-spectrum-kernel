@@ -6,6 +6,9 @@ import { canonicalDigest, listContentAddressedJson, readJsonFileStrict } from '.
 import { createEmptyAssetRegistry, registerAsset, exportAssetRegistryReference } from './asset-registry.mjs';
 import { captureInstructionEnvironment, verifyInstructionEnvironment, exportInstructionEnvironment } from './instruction-environment.mjs';
 import { importSkillUsageEvidence } from './skill-usage-evidence.mjs';
+import { registerInstructionEnvironmentBundle } from './instruction-environment-compiler.mjs';
+import { verifyEnvironmentSavedResults } from './environment-saved-results.mjs';
+import { inspectPortfolioRuntimeContract } from './ask-benchmark-execution.mjs';
 import { buildEnvironmentEvolutionProjection } from './environment-evolution-binding.mjs';
 import { planEnvironmentTargetApply, applyEnvironmentTargetPlan, restoreEnvironmentTarget } from './environment-target.mjs';
 import { preparePersonalEvolutionGenerationRequest, importPersonalEvolutionGenerationResult } from './ask-personal-evolution-generation.mjs';
@@ -27,6 +30,7 @@ export function runInstructionEnvironmentCommand(command, input) {
     case 'export': return exportInstructionEnvironment(input);
     case 'register-asset': return registerAsset(input);
     case 'registry-create': return createEmptyAssetRegistry(input);
+    case 'bundle-register': return registerInstructionEnvironmentBundle(input);
     case 'assets': return exportAssetRegistryReference(input);
     case 'usage-import': return importSkillUsageEvidence(input);
     case 'usage-list': return listContentAddressedJson({ storeRoot: input.storeRoot }).filter(item => item.value?.object_kind === 'skill_usage_evidence'
@@ -37,6 +41,8 @@ export function runInstructionEnvironmentCommand(command, input) {
     case 'evaluation-verify': return verifyEnvironmentEvaluation(input);
     case 'evaluation-start': return executeEnvironmentEvaluation(input);
     case 'evaluation-status': return inspectEnvironmentEvaluation(input);
+    case 'evaluation-results': return verifyEnvironmentSavedResults(input);
+    case 'runtime-inspect': return inspectPortfolioRuntimeContract(input);
     case 'experiment': {
       const projection = buildEnvironmentEvolutionProjection({ ...input, roles: input.draft.roles });
       const experiment = buildEvolutionExperiment({ ...input.draft, projection });

@@ -1,6 +1,22 @@
 # Cross-runtime instruction environment loop
 
-Spec `cross-runtime-environment-loop-spec-v1`, revision 1.
+Spec `cross-runtime-environment-loop-spec-v1`, revision 2.
+
+Continuation design, revision 2: compile the actual runtime instruction files
+into the existing `rendered_prompt_bundle` Asset, with exact individual
+Skill/Prompt dependencies and a CAS renderer-input manifest. The environment
+bundle is the revision-lineage target; a newly added Skill remains a root Asset.
+This is an actual instruction projection, not a fabricated Skill parent or a
+new Asset/Portfolio authority. Reuse existing verified engineering result sets
+for the saved evaluation bridge. Generalize the existing paired owner lease to
+the exact instruction paths while preserving normal installers' other assets.
+No live exporter/global/security setting is changed by compilation or leasing.
+
+Additional obligations: ENV-6 covers new root Skill membership through genuine
+environment-bundle revision lineage; ENV-7 covers saved engineering-result
+verification, six-dimension readout and missing-data holds; ENV-8 covers pinned
+normal installer handover, candidate selection metadata, explicit rollback,
+exact owner return and partial-write refusal on both adapters.
 
 An evaluation compares two complete, explicitly bounded instruction environments
 on one adapter at a time. Individual Skill and Prompt Assets remain independently
@@ -32,8 +48,10 @@ Acceptance obligations:
 
 Implementation Contract `cross-runtime-environment-loop-implementation-v1`.
 Upstream: the spec above; source `9068e22a`.
-Boundary: additive environment and usage-evidence modules, a local JSON CLI,
-focused tests, documentation and CI registration. Existing Asset, Portfolio,
+Boundary: environment and usage-evidence modules, a local JSON CLI,
+shared saved-evidence projection, model-free runtime inspection, paired normal
+installer ownership and shared mutation locking, focused tests, documentation
+and CI registration. Existing Asset, Portfolio,
 Evolution, CAS and installer lifecycle remain the owners of their contracts.
 The source checkout has no `.agents/skills`; canonical Skills are in `skills/`.
 Implementation context is the repository's uninitialized template, so current
@@ -42,10 +60,16 @@ nearby modules and tests supply implementation evidence.
 Verification Contract `cross-runtime-environment-loop-verification-v1`.
 Selected proof path: `formal_verification_contract`; triggers
 `state_concurrency_persistence_lifecycle_or_cross_module` and
-`multi_session_multi_agent_or_handoff`. Verify ENV-1–5 with fresh artificial
+`multi_session_multi_agent_or_handoff`. Verify ENV-1–8 with fresh artificial
 inputs, both adapter projections, existing Evolution fixtures and negative
 tests. Command: `node --test scripts/test-instruction-environment.mjs
 scripts/test-skill-usage-evidence.mjs scripts/test-environment-evolution.mjs`.
+Also run the target/materialization/compiler/membership-adoption/owner-transfer/
+runtime-contract suites in the unconditional common CI step, and the evaluation
+and saved-results suites using `--experimental-test-module-mocks`. Saved-results
+tests mock native transport boundaries, retain real Registry/Evolution binding
+checks, and check refusal of experiment, environment, model and CLI transplants.
+The original native grader/verifier implementations retain their own suites.
 Run affected existing Registry/Portfolio/Evolution/installer checks and repository
 validation. Artificial approval and evidence are never actual owner approval.
 
@@ -64,6 +88,7 @@ personal Prompt CLI's one-time configuration.
 | Step | Command / existing owner |
 | --- | --- |
 | Register a new Skill/Prompt or complete revised text | `registry-create`, `register-asset`; existing Asset descriptor/lineage contract |
+| Compose active instruction files with individual dependency identities | `bundle-register`; existing rendered Prompt bundle, genuine environment revision lineage |
 | Inspect individual exact references | `assets`; no promotion or installation |
 | Freeze the environment | `capture`; immutable CAS object digest identifies the version |
 | Inspect/export exact bytes | `inspect`, `export`; export requires a fresh directory |
@@ -72,8 +97,10 @@ personal Prompt CLI's one-time configuration.
 | Fix a comparison before outcomes | `experiment`; existing experiment draft plus both environment object digests |
 | Prepare exact runtime projections | `evaluation-materialize`; existing generic benchmark materializer |
 | Check the prepared environment | `evaluation-verify` |
+| Inspect installed CLI version/help capabilities without a model | `runtime-inspect`; same preflight as the existing runner |
 | Explicitly start an approved comparison | `evaluation-start`; existing contained runner and per-case attempt state |
 | Inspect saved execution | `evaluation-status`; execution is not grading |
+| Automatically verify original saved grades and project six evidence dimensions | `evaluation-results`; original normalized/result-set/evaluator/scorer verifiers |
 | Import independent evaluation and derive policy result | `recommend`; existing six-dimension evidence and separately trusted evaluation authority |
 | Prepare action and record human judgment | `propose`, `decision`; decision recording does not authenticate itself |
 | Apply approved Portfolio action / close approved no-op | `portfolio-apply`, `noop`; existing authority verifiers |
@@ -97,14 +124,26 @@ inventory when claiming a whole-environment evaluation.
 
 An authoring capture uses `selectionObjectDigest: null` and may export a single
 new candidate Skill, including `SKILL.md` and `references/`, on either adapter.
-It cannot enter an evaluation binding. Existing Evolution candidate lineage
-still compares revisions of one stable Asset ID; proposing an entirely new
-Asset and evaluating/adopting its new membership needs an explicit Portfolio
-and lineage design. This implementation does not invent a parent for a root
-Asset or equate registration with adoption.
+It cannot enter an evaluation binding. To evaluate new membership, first
+register individual root/revised Assets, then `bundle-register` their complete
+`components: [{asset, files: [{source,target}]}]` with an explicit existing Asset
+`descriptor`. Compilation preserves actual instruction bytes in runtime paths,
+sets the exact dependency inventory and records its renderer inputs in CAS.
+The first bundle is a root; subsequent bundle revisions name that genuine
+environment parent and exact rollback target. The added Skill keeps its own
+root lineage. Select the bundle in the existing Portfolio and capture it with
+identity source/target mappings. Component identity remains available for usage
+evidence and individual export. Registration/compilation grant no safety,
+source authenticity, individual admission or efficacy authority. The approved
+bundle is the runtime instruction product; component state is not silently
+promoted. Removing or revising a component creates another bundle revision.
 
 `experiment` takes `draft` (the existing Evolution experiment draft) and
-`environments: {baseline: <digest>, challenger: <digest>}`. Its selected changed
+`environments: {baseline: <digest>, challenger: <digest>}`, explicit
+`evidenceKind` (`synthetic` or `observed`) and, for saved grading consumption,
+`gradingBindings` covering each fixture's exact `evaluator_bundle_digest`,
+`scoring_input_freeze_manifest_source_digest`, and `scoring_policy_digest`.
+Its selected changed
 Asset can be a Skill or Prompt. Models/CLI versions must agree with both
 environments. A declared one-factor revision also retains identical supporting
 files and other Asset mappings. Compare Codex and Claude in separate experiments;
@@ -125,20 +164,41 @@ containment checks remain active. Unavailable capabilities stay unavailable;
 this entry does not relax them to make a Claude run pass. Inspect existing
 attempt state after uncertainty; do not reset/retry it.
 
-Use the original independent graders for execution artifacts. The new CLI does
-not synthesize full-verifier authority from raw stdout, self-report or usage
-events. Automatic conversion of these new environment pairs into the existing
-Codex-primary saved-result pipeline is not implemented; `recommend` requires
-independently verified, separately trusted six-dimension evidence. Missing
-native evidence remains insufficient rather than a manufactured score.
+Use the original independent graders for execution artifacts. `evaluation-results`
+takes both roles' existing `execution` options, `resultSet` verification options
+(or null when uncollected), and original `grading` descriptors keyed by case and
+attempt. It re-verifies actual environment bytes/run lineage, normalized
+execution, the complete engineering result set, and every selected result with
+the original full evaluator/scorer. Independently pin the original grade receipt
+digests in `trustedSavedEngineeringResultDigests`, and pin the pre-result
+experiment separately. Per-role execution overrides accept only plan/materialized/
+selection/run/runtime paths, adapter track and admission evidence; they cannot
+replace the common experiment or trust context. Each role must match that
+experiment's exact environment, and its saved model/observed CLI must match the
+frozen runtime. Grading descriptors cannot replace that verified execution
+context. Grades must match the frozen criterion inventory.
+The returned evidence uses the same descriptive six-dimension projection as
+the existing personal pair. Uncollected variance, mechanism and external outcome
+remain unavailable, and missing native effort/cost never becomes zero.
+`recommend` still requires independent evaluation trust; returned records never
+insert themselves into that trust list. This connection neither aliases the
+new pair to a historical Codex-primary run nor re-executes a grader or model.
 
-Physical application currently supports fresh/manual environment targets whose
-baseline bytes exactly match the snapshot. It refuses any normal installer
-owner and preserves unrelated project files. General Skill/Claude transfer from
-an existing normal installation is not implemented. The existing Codex-specific
-five-Prompt ownership-transfer path remains separate. Do not remove owner state
-to bypass this refusal. Pending lifecycle markers block automatic retry; inspect
-the retained state/snapshots and use a separately reviewed recovery procedure.
+Physical application supports exact fresh/manual baselines and full normal
+Codex/Claude installations. For a normal owner, pass the independently reviewed
+raw owner-state digest as `ownerStateDigest` on every leased mutation. The
+baseline must cover all normal instruction files (active bindings plus explicit
+unchanged support), and the reviewed source/projection must match. Only the
+reviewed bound instruction paths transfer; other files, owner states, settings
+and managed hook subsets stay protected. The delegated normal state advertises
+the actual selected Skill names while ordinary Kernel/adapter mutations are
+blocked by the shared lock/owner state. Restore requires separate fresh rollback
+authority and returns the exact original owner bytes. Unrelated project files
+are preserved. An immutable local operation history prevents replay of a
+consumed adoption receipt after restoration. Partial journals/markers block
+automatic retry and retain both owner snapshots for separately reviewed recovery.
+Other profiles or source-version migrations fail closed; do not remove owner
+state to bypass refusal. The historical Codex five-Prompt lease is unchanged.
 
 ## Optional Skill evidence
 
@@ -170,6 +230,14 @@ No exporter is enabled, no log destination is changed, and no
 `OTEL_LOG_TOOL_DETAILS` setting is enabled by ASK.
 
 Compatibility evidence checked 2026-11-05:
+
+The installed Codex CLI is `codex-cli 0.162.1`. `runtime-inspect` passed the
+existing version and required execution-help contract with zero model calls.
+That proves available CLI surfaces, not Skill-event emission, full environment
+execution or quality. Claude CLI is absent from the selected Mac's PATH.
+Its native acceptance requires installation/authentication and a compatible
+explicit runtime contract; ASK does not install it, change permissions or enable
+an exporter to turn that missing evidence into a pass.
 
 - Codex's [v0.162.1 OTEL source](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/otel/README.md#skill-invocation-logs)
   documents explicit injection and best-effort implicit/read detection with

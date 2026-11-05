@@ -29,7 +29,7 @@ for (const track of ['codex', 'claude']) test(`${track}: exact environment evalu
   a.options.runtime.cli_version = b.options.runtime.cli_version = draft.protocol.cli.version;
   const baseline = captureInstructionEnvironment(a.options), challenger = captureInstructionEnvironment(b.options);
   const environments = { baseline: baseline.object_digest, challenger: challenger.object_digest };
-  draft.projection = buildEnvironmentEvolutionProjection({ ...a.options, roles: draft.roles, environments });
+  draft.projection = buildEnvironmentEvolutionProjection({ ...a.options, roles: draft.roles, environments, evidenceKind: 'synthetic' });
   const published = publishEvolutionExperiment({ storeRoot: a.storeRoot, experiment: buildEvolutionExperiment(draft) });
   const cases = draft.protocol.fixture_ids.flatMap(fixture_id => Array.from({ length: draft.protocol.repetitions }, (_, index) => ({
     fixture_id, adapter_track: track, condition: 'full_ask', task_class: draft.protocol.task_classes[0], case_id: `${fixture_id}-${index}` })));

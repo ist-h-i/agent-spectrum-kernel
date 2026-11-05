@@ -475,6 +475,25 @@ function probeAvailableRuntime(runtime, verifiedExecutable, command, environment
   return executableEvidence;
 }
 
+// Public no-model preflight over the same executable/config/version/help
+// boundary as execution. It creates no run, request, grading or runtime trust.
+export function inspectPortfolioRuntimeContract({ root, runtimeConfigPath, adapter, agentBin = null }) {
+  const runtime = readRuntimeConfig(root, runtimeConfigPath, adapter);
+  if (runtime.value.availability === 'unavailable' || agentBin === null) return {
+    availability: 'unavailable', reason: runtime.value.availability === 'unavailable' ? runtime.value.unavailable_reason : 'cli_not_supplied',
+    model_calls: 0, runtime_execution_implied: false, command_events_observed: false };
+  const verified = validateAgentExecutable(agentBin), command = effectiveCommand(root, runtime.value);
+  const snapshot = captureEnvironment(runtime.value);
+  try {
+    const executable = probeAvailableRuntime(runtime.value, verified, command, snapshot);
+    return { availability: 'available', reason: null, executable, runtime_config_digest: `sha256:${runtime.digest}`,
+      effective_command_digest: canonicalDigest(command), model_calls: 0, runtime_execution_implied: false, command_events_observed: false };
+  } catch (error) {
+    if (!(error instanceof RuntimeContractError)) throw error;
+    return { availability: 'unavailable', reason: error.contractReason, model_calls: 0, runtime_execution_implied: false, command_events_observed: false };
+  }
+}
+
 function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable, command, environmentSnapshot, availabilityEvidence = null }) {
   const captureSupported = runtime.command_evidence.support === "supported";
   return {

@@ -22,17 +22,28 @@ Mechanical invocation evidence, tool results, command expansion, self-report and
 quality outcomes remain separate. Missing events are unobserved. A local import
 never turns exporter configuration on or authenticates the supplied log.
 
-Fresh/manual environment targets use the existing installer file lifecycle and
-the existing target lock/state slot. Normal installer owners are refused rather
-than left with stale ownership hashes. Generalizing the current-full Codex
-five-Prompt lease to arbitrary Skills and Claude is a separate remaining task;
-this boundary does not silently extend ADR-0014's lease. Partial application is
-left marked for inspection, with no automatic retry/repair.
+Fresh/manual targets use the existing installer lifecycle and lock/state slot.
+The continuation also explicitly generalizes the paired lease to exact
+instruction paths in current full Codex/Claude installations: independently pin
+the original normal owner, preserve protected files/settings/other owners,
+advertise the actual selected capabilities in the delegated state, and require
+separate rollback authority before exact owner return. Immutable operation
+history prevents adoption-receipt replay. Kernel/adapter entry points refuse
+mutation while delegated or partial. ADR-0014's five-Prompt lease stays separate.
+Unreviewed profiles/source migrations and automatic partial repair remain refused.
+
+Root Skill membership is represented by a real environment revision: compile
+the actual runtime instruction files into the existing rendered Prompt bundle,
+with the individual Assets as exact dependencies and a verified CAS renderer
+input inventory. Compare environment bundle revisions; never invent a Skill
+parent or promote component lifecycle/effectiveness from compilation. Saved
+grades re-enter the existing original verifiers and descriptive evidence mapper;
+the adapter grants no evaluation trust and invents no unobserved dimensions.
 
 Alternatives rejected: individual-Skill scores as environment effectiveness;
 LLM self-report as mechanical evidence; a new environment Registry or grader;
 and overwriting files still owned by a normal installer.
 
-Review before normal-owner transfer, automatic telemetry enablement, unbounded
+Review before additional normal-owner profiles/source migrations, automatic telemetry enablement, unbounded
 ambient configuration capture, cross-adapter score pooling, causal attribution,
 new-Asset adoption semantics or automatic partial-write recovery.

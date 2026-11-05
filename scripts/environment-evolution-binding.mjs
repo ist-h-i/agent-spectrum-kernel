@@ -7,7 +7,18 @@ export const ENVIRONMENT_EVOLUTION_MAPPING = Object.freeze({ mode: 'instruction_
 export const ENVIRONMENT_EVOLUTION_MAPPING_DIGEST = canonicalDigest(ENVIRONMENT_EVOLUTION_MAPPING);
 const same = (a, b) => canonicalDigest(a) === canonicalDigest(b);
 function verifyPair(options, binding) {
-  assert.deepEqual(Object.keys(binding).sort(), ['environments', 'object_kind', 'roles', 'schema_version']);
+  assert.deepEqual(Object.keys(binding).sort(), ['environments', 'object_kind', 'roles', 'schema_version',
+    ...(Object.hasOwn(binding, 'evidence_kind') ? ['evidence_kind'] : []), ...(Object.hasOwn(binding, 'grading_bindings') ? ['grading_bindings'] : [])].sort());
+  assert.ok(['unknown', 'synthetic', 'observed'].includes(binding.evidence_kind ?? 'unknown'), 'invalid environment evidence kind');
+  if (binding.grading_bindings) {
+    assert.ok(Array.isArray(binding.grading_bindings) && binding.grading_bindings.length > 0 && binding.grading_bindings.length <= 256);
+    const ids = new Set();
+    for (const item of binding.grading_bindings) {
+      assert.deepEqual(Object.keys(item).sort(), ['evaluator_bundle_digest', 'fixture_id', 'scoring_input_freeze_manifest_source_digest', 'scoring_policy_digest']);
+      assert.ok(typeof item.fixture_id === 'string' && !ids.has(item.fixture_id)); ids.add(item.fixture_id);
+      for (const key of ['evaluator_bundle_digest', 'scoring_input_freeze_manifest_source_digest', 'scoring_policy_digest']) assert.match(item[key], /^sha256:[a-f0-9]{64}$/);
+    }
+  }
   assert.equal(binding.schema_version, '1.0.0'); assert.equal(binding.object_kind, 'instruction_environment_evolution_binding');
   assert.deepEqual(Object.keys(binding.environments).sort(), ['baseline', 'challenger']);
   const result = {};
@@ -25,7 +36,8 @@ function verifyPair(options, binding) {
 }
 export function buildEnvironmentEvolutionProjection(options) {
   const binding = { schema_version: '1.0.0', object_kind: 'instruction_environment_evolution_binding',
-    roles: structuredClone(options.roles), environments: structuredClone(options.environments) };
+    roles: structuredClone(options.roles), environments: structuredClone(options.environments), evidence_kind: options.evidenceKind ?? 'unknown',
+    ...(options.gradingBindings ? { grading_bindings: structuredClone(options.gradingBindings).sort((a, b) => a.fixture_id.localeCompare(b.fixture_id)) } : {}) };
   verifyPair(options, binding);
   const saved = putContentAddressedJson({ storeRoot: options.storeRoot, artifact: binding });
   return { ...ENVIRONMENT_EVOLUTION_MAPPING, mapping_digest: ENVIRONMENT_EVOLUTION_MAPPING_DIGEST, projection_evidence_digest: saved.digest };
@@ -34,6 +46,10 @@ export function verifyEnvironmentEvolutionBinding(options, experiment) {
   const binding = readContentAddressedJson({ storeRoot: options.storeRoot, digest: experiment.projection.projection_evidence_digest }).value;
   assert.ok(same(binding.roles, experiment.roles), 'environment experiment roles drifted');
   const pair = verifyPair(options, binding);
+  if (binding.grading_bindings) {
+    assert.deepEqual(binding.grading_bindings.map(g => g.fixture_id).sort(), [...experiment.protocol.fixture_ids].sort(), 'grading inventory must exactly cover the pre-result task scope');
+    assert.ok(binding.grading_bindings.every(g => g.scoring_policy_digest === experiment.protocol.scoring_policy_digest), 'pre-result grading policy drift');
+  }
   for (const role of ['baseline', 'challenger']) {
     assert.equal(pair[role].environment.adapter, experiment.protocol.adapter.name, 'environment experiment adapter drift');
     assert.equal(pair[role].environment.runtime.model, experiment.protocol.model, 'environment experiment model drift');

@@ -350,8 +350,8 @@ jobs:
       - name: Verify exact cross-runtime instruction environments (model-free)
         id: ci_instruction_environment
         run: |
-          node --test scripts/test-instruction-environment.mjs scripts/test-skill-usage-evidence.mjs scripts/test-environment-evolution.mjs scripts/test-environment-target.mjs scripts/test-environment-materialization.mjs
-          node --experimental-test-module-mocks --test scripts/test-environment-evaluation.mjs
+          node --test scripts/test-instruction-environment.mjs scripts/test-skill-usage-evidence.mjs scripts/test-environment-evolution.mjs scripts/test-environment-target.mjs scripts/test-environment-materialization.mjs scripts/test-instruction-environment-compiler.mjs scripts/test-environment-membership-adoption.mjs scripts/test-environment-owner-transfer.mjs scripts/test-environment-runtime-contract.mjs
+          node --experimental-test-module-mocks --test scripts/test-environment-evaluation.mjs scripts/test-environment-saved-results.mjs
 
       - name: Run governed Evolution full-closure integration tests
         id: ci_03d015271360

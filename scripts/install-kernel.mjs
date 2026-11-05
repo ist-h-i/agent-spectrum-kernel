@@ -2,6 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { personalPromptTargetActive, withPersonalPromptTargetLock } from './ask-personal-prompt-target-lock.mjs';
 import {
   buildAgentsBlock,
   CORE_OWNED_IMMUTABLE_ASSETS,
@@ -369,8 +370,7 @@ function printPlan(args, plan) {
   console.log("Safety defaults: local file projection only; no hooks, telemetry, secrets, deploys, external publication, or Git commands.");
 }
 
-function main() {
-  const args = parseArgs(process.argv.slice(2));
+function runMain(args) {
   if (args.rollback) {
     const operations = rollbackLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force });
     console.log(`${args.dryRun || args.check ? "Kernel rollback dry run" : "Kernel rolled back"}: ${args.target}`);
@@ -389,6 +389,15 @@ function main() {
   const plan = buildPlan(args);
   applyLifecyclePlan({ target: args.target, statePath: STATE_PATH, operations: plan.operations, state: plan.state, dryRun: args.dryRun || args.check });
   printPlan(args, plan);
+}
+
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (!existsSync(args.target)) return runMain(args);
+  return withPersonalPromptTargetLock(args.target, () => {
+    if (personalPromptTargetActive(args.target, { excludeOwnedLock: true })) throw new Error('instruction environment ownership or partial operation requires explicit owner return; ordinary Kernel mutation refused');
+    return runMain(args);
+  });
 }
 
 try {

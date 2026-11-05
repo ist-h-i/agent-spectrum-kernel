@@ -1097,7 +1097,7 @@ export function claudeManagedAssetsForProfile(profileName) {
   return buildClaudeProjectionPlan({ profileName }).projectedManagedAssets;
 }
 
-function normalizeHooks(hooks) {
+export function normalizeClaudeManagedHooks(hooks) {
   const normalized = [];
   for (const [eventName, groups] of Object.entries(hooks ?? {})) {
     for (const group of Array.isArray(groups) ? groups : []) {
@@ -1116,6 +1116,7 @@ function normalizeHooks(hooks) {
   }
   return normalized.sort((a, b) => `${a.event}:${a.matcher}:${a.command}`.localeCompare(`${b.event}:${b.matcher}:${b.command}`));
 }
+const normalizeHooks = normalizeClaudeManagedHooks;
 
 function hooksFromManagedRecords(records) {
   const hooks = {};

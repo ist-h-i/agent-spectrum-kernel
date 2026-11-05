@@ -6,25 +6,15 @@ import { dirname, resolve } from 'node:path';
 import { assertNoSymlinkPathSegments, canonicalDigest, putContentAddressedJson, readContentAddressedJson, readStableBytes } from './content-addressed-store.mjs';
 import { verifyAssetRegistry } from './asset-registry.mjs';
 import { verifyPortfolioSelection } from './portfolio-manager.mjs';
+import { instructionPath, instructionTargetPath as targetPath } from './instruction-projection-paths.mjs';
+import { inspectCompiledInstructionComponents } from './instruction-environment-compiler.mjs';
+export { instructionPath };
 
 export const exactInstructionAsset = a => Object.fromEntries(['asset_type', 'stable_id', 'version', 'record_digest', 'content_digest'].map(k => [k, a[k]]));
 export const instructionBytesDigest = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex');
 const same = (a, b) => canonicalDigest(a) === canonicalDigest(b);
 const order = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 const read = (storeRoot, digest) => readContentAddressedJson({ storeRoot, digest }).value;
-export function instructionPath(path) {
-  assert.equal(typeof path, 'string', 'instruction path required');
-  assert.ok(path.length <= 512 && /^(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+$/.test(path)
-    && !path.split('/').some(p => ['.', '..', '.git', '.env'].includes(p)), 'unsafe instruction path');
-  return path;
-}
-function targetPath(adapter, path, support = false) {
-  instructionPath(path);
-  const prefix = adapter === 'codex' ? '.agents' : '.claude';
-  const asset = new RegExp(`^\\${prefix}/(?:skills|${adapter === 'codex' ? 'prompts' : 'commands'})/.+`);
-  assert.ok(asset.test(path) || support && (/^(?:AGENTS|CLAUDE)\.md$/.test(path) || /^(?:docs|schemas|scripts)\/.+/.test(path)), 'unsupported or other-adapter instruction path');
-  return path;
-}
 function runtime(value) {
   assert.deepEqual(Object.keys(value).sort(), ['ambient_config', 'cli_version', 'model']);
   for (const k of ['cli_version', 'model']) assert.ok(typeof value[k] === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:+-]{0,127}$/.test(value[k]), 'bounded runtime identity required');
@@ -39,7 +29,7 @@ function body(options, support) {
   assert.ok(Array.isArray(options.bindings) && options.bindings.length <= 256, 'bounded Asset bindings required');
   const bindings = structuredClone(options.bindings).sort((a, b) => order(a.asset.stable_id, b.asset.stable_id));
   const bound = new Set(), targets = new Set();
-  const files = [];
+  const files = [], components = [];
   for (const binding of bindings) {
     assert.deepEqual(Object.keys(binding).sort(), ['asset', 'files']);
     const asset = registry.assets.find(a => same(exactInstructionAsset(a), binding.asset));
@@ -50,6 +40,7 @@ function body(options, support) {
     assert.ok(Array.isArray(binding.files), 'Asset file mapping required');
     binding.files.sort((a, b) => order(a.source, b.source));
     assert.deepEqual(binding.files.map(f => f.source), asset.content.files.map(f => f.path).sort(order), 'complete Asset content mapping required');
+    components.push(...inspectCompiledInstructionComponents(options, asset, binding.files));
     for (const mapping of binding.files) {
       assert.deepEqual(Object.keys(mapping).sort(), ['source', 'target']);
       targetPath(options.adapter, mapping.target);
@@ -91,6 +82,7 @@ function body(options, support) {
     adapter: options.adapter, runtime: structuredClone(options.runtime), registry_snapshot_digest: options.registrySnapshotDigest,
     selection_object_digest: options.selectionObjectDigest, bindings, support: [...support].sort((a, b) => order(a.path, b.path)),
     projection_digest: canonicalDigest(files.map(({ path, raw_digest }) => ({ path, raw_digest }))),
+    ...(components.length ? { components } : {}),
     runtime_use_implied: false, effectiveness_implied: false },
     files: files.map(f => ({ path: f.path, raw_digest: f.raw_digest, text: Buffer.from(f.bytes_base64, 'base64').toString('utf8') })) };
 }

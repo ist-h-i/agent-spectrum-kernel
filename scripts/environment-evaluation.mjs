@@ -21,7 +21,7 @@ function context(options) {
   assert.deepEqual([...new Set(cases.map(c => c.fixture_id))].sort(), [...experiment.protocol.fixture_ids].sort(), 'environment evaluation fixture scope drift');
   assert.ok(cases.every(c => experiment.protocol.task_classes.includes(c.task_class)), 'environment task class scope drift');
   for (const id of experiment.protocol.fixture_ids) assert.equal(cases.filter(c => c.fixture_id === id).length, experiment.protocol.repetitions, 'environment repetition scope drift');
-  return { experiment, environment, adapter, cases, environmentObjectDigest: binding.environments[options.role] };
+  return { experiment, environment, adapter, cases, evidenceKind: binding.evidence_kind ?? 'unknown', environmentObjectDigest: binding.environments[options.role] };
 }
 export function materializeEnvironmentEvaluation(options) {
   const c = context(options);
@@ -47,6 +47,7 @@ export function verifyEnvironmentEvaluation(options) {
 export function executeEnvironmentEvaluation(options) {
   const c = verifyEnvironmentEvaluation(options);
   assert.equal(options.confirmedExperimentObjectDigest, options.experimentObjectDigest, 'exact evaluation start confirmation required');
+  assert.ok(['synthetic', 'observed'].includes(c.evidenceKind), 'explicit pre-result evidence kind required before execution');
   assert.ok(!options.retryFailed && options.successorPromptInput == null, 'environment evaluation cannot request retry or successor transport');
   const runtime = readJsonFileStrict(options.runtimeConfigPath, 'environment evaluation runtime');
   assert.equal(runtime.adapter, c.adapter, 'runtime adapter drift');

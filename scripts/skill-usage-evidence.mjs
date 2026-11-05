@@ -21,7 +21,8 @@ export function buildSkillUsageEvidence({ environmentObjectDigest, environment, 
   assert.match(environmentObjectDigest, /^sha256:[a-f0-9]{64}$/);
   assert.equal(canonicalDigest(environment), environmentObjectDigest, 'exact environment binding required');
   const names = new Map();
-  for (const binding of environment.bindings) {
+  for (const binding of [...environment.bindings, ...(environment.components ?? [])]) {
+    if (binding.asset.asset_type !== 'skill') continue;
     for (const f of binding.files) {
       const match = f.target.match(/^\.(?:agents|claude)\/skills\/([^/]+)\/SKILL\.md$/);
       if (match) {
@@ -60,7 +61,7 @@ export function buildSkillUsageEvidence({ environmentObjectDigest, environment, 
   }
   if (selfReportedSkillIds !== null) {
     assert.ok(Array.isArray(selfReportedSkillIds) && selfReportedSkillIds.length <= 256 && new Set(selfReportedSkillIds).size === selfReportedSkillIds.length, 'bounded unique self-report required');
-    const allowed = new Set(environment.bindings.filter(b => b.asset.asset_type === 'skill').map(b => b.asset.stable_id));
+    const allowed = new Set([...environment.bindings, ...(environment.components ?? [])].filter(b => b.asset.asset_type === 'skill').map(b => b.asset.stable_id));
     assert.ok(selfReportedSkillIds.every(id => allowed.has(id)), 'self-report must reference registered environment Skills');
   }
   return { schema_version: '1.0.0', object_kind: 'skill_usage_evidence', adapter: environment.adapter,

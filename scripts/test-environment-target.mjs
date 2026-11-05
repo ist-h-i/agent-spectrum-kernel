@@ -14,14 +14,14 @@ for (const adapterTrack of ['codex', 'claude']) test(`${adapterTrack}: existing 
   assert.throws(() => planEnvironmentTargetApply({ ...options, trustedHumanDecisionAuthorities: [] }), /trust/i);
   const first = planEnvironmentTargetApply(options);
   assert.throws(() => applyEnvironmentTargetPlan(first.handle, 'wrong'), /confirmation/);
+  const path = first.plan.files[0], original = readFileSync(join(root, path));
+  writeFileSync(join(root, path), 'local edit');
+  assert.throws(() => applyEnvironmentTargetPlan(first.handle, first.digest), /drift/);
+  assert.equal(readFileSync(join(root, path), 'utf8'), 'local edit'); writeFileSync(join(root, path), original);
   assert.equal(applyEnvironmentTargetPlan(first.handle, first.digest).status, 'applied');
   assert.throws(() => applyEnvironmentTargetPlan(first.handle, first.digest), /owned/);
   assert.throws(() => restoreEnvironmentTarget({ ...options, rollbackLockDigest: f.candidateSelection }));
   assert.equal(restoreEnvironmentTarget(options).status, 'restored');
   assert.equal(readFileSync(join(root, 'README.md'), 'utf8'), 'Project-owned work.\n');
-  // A plan never grants authority to overwrite a subsequent local edit.
-  const next = planEnvironmentTargetApply(options);
-  const path = first.plan.files[0]; writeFileSync(join(root, path), 'local edit');
-  assert.throws(() => applyEnvironmentTargetPlan(next.handle, next.digest), /drift/);
-  assert.equal(readFileSync(join(root, path), 'utf8'), 'local edit');
+  assert.throws(() => planEnvironmentTargetApply(options), /already consumed/);
 });
