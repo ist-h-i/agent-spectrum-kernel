@@ -105,6 +105,28 @@ the real consumer is a reviewer or operator importing a structured result. The
 review, investigation and operational-planning work rather than inventing a
 larger application to equalize file formats.
 
+## Host preparation and frozen grading source
+
+The current host descriptors pin the reviewed task and raw metadata bytes for
+all 24 revised inputs. Their task classes, risk boundaries, capability checks,
+reference format and principles renderer remain unchanged. The original exact
+lookup bytes are retained with their historical Git source, not silently reused
+against revised task bytes.
+
+Keep the pending grading runtime in a separate checkout at
+`b0e3e99829255106a74d8516d58179886df7ee8e` (tree
+`c557de7a0a0a0f72ed7fa159a9fd78f644ddba3e`). It contains the revised 241 model
+input files and closed v1 metadata, with runtime sources pinned to
+`483d861b376835e52f65138d39d9eb3a113d9bdd`. Use the existing explicit
+`frozenSourceRoot` resource boundary. The live host checkout must not substitute
+for that evaluator runtime after its preparation descriptors change.
+
+Do not regenerate the private chain merely to follow host descriptor pins:
+the descriptor's metadata hash and the evaluator graph's module hash would form
+a dependency cycle. Keep exact drift rejection and immutable source checks.
+This separation reuses an existing API; it does not establish resource admission,
+formal runtime qualification or a completed measurement.
+
 ## Verification contract
 
 Artifact ID: `verification-primary24-practical-20261104`

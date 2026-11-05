@@ -51,7 +51,8 @@ Controller-side compatibility was revised independently in a new private area.
 There were 511 passing pure checks over 241 synthetic inputs, including explicit
 manual/null handling where free-form semantic equivalence is not established.
 All 24 static resource, source-identity, public-semantic and freeze checks passed
-on an independent checkout with the exact integrated tree. The 288 metadata
+on the independent frozen-runtime checkout for `b0e3e998` and its exact tree.
+The current host classification pins are synchronized separately. The 288 metadata
 files passed declared private-payload boundary checks with zero findings. No
 private body was copied into this repository. Old private assets remain unchanged.
 These are static compatibility checks; admission and runtime qualification remain
