@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
   "program": "adaptive_ask_scoring_input_freeze",
   "fixture_id": "hi-external-action-approval",
-  "fixture_input_digest": "sha256:13b837ee1f46aef452678a7b156a60534200ccdf83b1dadb27efc95bc2f89ed4",
+  "fixture_input_digest": "sha256:24ec8367b57fd7571024adf1a09507f9030d160284fad7ca161100e2136b1a72",
   "catalog": {
     "path": "benchmarks/portfolio-catalog.json",
     "raw_byte_digest": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
@@ -21,29 +21,29 @@
   },
   "admission_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/final-admission-record.json",
-    "raw_byte_digest": "sha256:941bfb307c149f31d91a485b352dec447338d346c8a1491e53318c1e00d00459",
-    "semantic_digest": "sha256:ce353d26f1bda3c9fc561289c48f825976f4aaae478c071003edbcfb7f831c84"
+    "raw_byte_digest": "sha256:429f148eff319ba689a166dce07c3788698f2e39212a26368e1956926eb5d574",
+    "semantic_digest": "sha256:4e6c8ea2bd478a9e0b0cdfc5883b0d5c390eddb9d68a101b3d2e8f4c90586aea"
   },
   "requirement_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/requirement-record.json",
-    "raw_byte_digest": "sha256:b9ccea5ddea4c2c3d281f607ec82d4c67614bd2d010649f304f1c3c8dd87fb38",
-    "record_digest": "sha256:f072ef1317fd399ee6f3e6d9483df7474deb5ef63e691a207429723de38231bf",
+    "raw_byte_digest": "sha256:989a00fae16e72b36cd5116ab9ff58eda7c0c599a9b93c3bb251dcd708399a4d",
+    "record_digest": "sha256:8e0788ed5aed5fe6ab566413af4eaa9cf8fd23019282ca016b9f39295ceb93c5",
     "set_digest": "sha256:661ffebd031eecf8d5579c98665b5eb2ae2a3cd6257306b67bab5c2720a6fb0f"
   },
   "output_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/output-contract.json",
-    "raw_byte_digest": "sha256:0961dec3a45ff460cce1d0835b5b0cb3f680486b0a8e56eab86c218fb3f0a01f",
-    "semantic_digest": "sha256:5c778ec5959dc4135c0a194e4a2a768af1ff2366237adf34351438fbfafd240e"
+    "raw_byte_digest": "sha256:2fff63c19dead3527d955d6cca6790404b8d582414e225448a2db00c9bc22405",
+    "semantic_digest": "sha256:5e0217c7f0f3a61ae97f39945977ff2417360445ca103b747bb892502f274e96"
   },
   "evaluator_public_reference": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/evaluator-reference.json",
-    "raw_byte_digest": "sha256:d89b3e3def34d550b2cd2979f91c5b6eeb54738c4227228cc3e14009979523fc",
-    "semantic_digest": "sha256:62770262e34156a831a2096a2a66a0764e71b8087232c1d34ca8b8b4d45336ea"
+    "raw_byte_digest": "sha256:fe57e36a83fd87cc95790538944fdd5cc1693fb72bb544b367d17faafd88c534",
+    "semantic_digest": "sha256:cf3f06ab6b8d0397d89c860aa073a15287a07976928b016a8593a454dccfa511"
   },
   "verification_command_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/verification-command-contract.json",
-    "raw_byte_digest": "sha256:1fc5ea1fafcec8525957cb78b910d4b32fc0cc88e9ec9948989290f6178ae2af",
-    "semantic_digest": "sha256:e95e8a48ef37f56a7d1f124e49be9010a58401017b6fdabb1ce09044ae9fb7cd"
+    "raw_byte_digest": "sha256:df7c3bd1d1025523a5548b2e25b966cb3233e052014eccfd958a59c3662d2ea1",
+    "semantic_digest": "sha256:59b8063c5ebe025a3a514a5f224f09c66ca1df541dc9837b350a3420dde1f0de"
   },
   "evidence_map": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/evidence-map.json",
@@ -52,13 +52,13 @@
   },
   "evaluator_authority_manifest": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/evaluator-authority-manifest.json",
-    "raw_byte_digest": "sha256:d5c2b8433e7d8b1a90b42398631a0a99202f22a57ba5e1172daadfee68f61161",
-    "semantic_digest": "sha256:87f2a64cc7ab8962f5ba313556e75fe9557c92d7e4dc56c5259d860d00326137"
+    "raw_byte_digest": "sha256:bd0790bc70fd2441359a0d362929492fc11f5487b896815ffaf2e53cb25c48b9",
+    "semantic_digest": "sha256:38b24aa175113f568bba4c973e6d918c9e20ddf088067f06a11920352c5bb03a"
   },
   "result_profile": {
     "name": "binary_scope_verification_v1",
     "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
   },
   "freeze_revision": "issue-209-hi-external-action-approval-r1",
-  "manifest_digest": "sha256:ff7c004202be60f57e341da768f742f97e53896c894e2c18256add9b1ef577fc"
+  "manifest_digest": "sha256:23937c1f9f17f8ff2fa9b989939b23abf7f204b73acd39891ce40cdafee678b3"
 }

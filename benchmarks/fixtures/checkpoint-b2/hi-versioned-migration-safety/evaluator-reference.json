@@ -2,17 +2,17 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-6308939fb140e9cdeb64603dbf7e7de12197983fec74f09dfbaaf6198901f402",
-  "evaluator_bundle_digest": "sha256:1f507cf87d00a2e33f65ff5d297030335c87826b6b4c044f914a367df745217b",
+  "evaluator_bundle_id": "evaluator-8e704f78d476638b488582f90b3c7f302ab1479e4eccf31b84868ec26ef14e8d",
+  "evaluator_bundle_digest": "sha256:d267fe1a1f89ebd1fdd70f9d111535ceb49f9dbdf35d2e164355270f92292205",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "hi-versioned-migration-safety",
-  "fixture_input_digest": "sha256:8041b58cf541711924b8e9c2716adc3b65113d924a93a327e5f73b3a81cc878e",
+  "fixture_input_digest": "sha256:6493fc195524d46fee7c99101082bcf3c2d3b05b17968cd4e18857c209093a5f",
   "task_class": "migration_design",
   "suite": "high_impact",
-  "evaluator_revision": "483d861b376835e52f65138d39d9eb3a113d9bdd",
+  "evaluator_revision": "f71286a1369c4c36aca01116c2e36465cf5d9995",
   "evaluator_source_identity": {
-    "base_git_revision": "483d861b376835e52f65138d39d9eb3a113d9bdd",
-    "source_tree_digest": "sha256:fbd0936e6732baae2d3161b0be3b1c65e6709ea26bfb201c0c8f23d89ca7a7fc",
+    "base_git_revision": "f71286a1369c4c36aca01116c2e36465cf5d9995",
+    "source_tree_digest": "sha256:c1b0186100f0c4458101c137d397436bfee34c17515ba0b8a7ac788c09d54775",
     "generator_source_digest": "sha256:50fca9309993030bdcf13b837028ab025706b0614e910b57cf6a3b6eba8e7c3d",
     "source_files": [
       {
@@ -538,7 +538,7 @@
       {
         "path": "scripts/ask-primary-unsafe-action-contract.mjs",
         "bytes": 5975,
-        "sha256": "sha256:edf6eeeb2307c80e22c4798c2ea499130eb3b61f5d9fbacd6f8b03b07002852c"
+        "sha256": "sha256:6a46f85a9bfd190168dc73bbfafbfb0fdc2b453b846ca823a37791efa1354fd1"
       },
       {
         "path": "scripts/ask-setup-apply-state.mjs",
@@ -672,13 +672,13 @@
       },
       {
         "path": "scripts/kernel-principles-v2-catalog24.mjs",
-        "bytes": 6294,
-        "sha256": "sha256:9ff3e6cec640a063631c6efe12c4b4a6efb7a2a77b2ee7350222b52659fb0ec1"
+        "bytes": 6309,
+        "sha256": "sha256:6588da264a2e19fb7ae33e231b879de5f06f84fffc4ed9ba32f680b8608684c5"
       },
       {
         "path": "scripts/kernel-principles-v2.mjs",
         "bytes": 9806,
-        "sha256": "sha256:b87bc1925bd2f777fab64e5ef7ac08c45ad9e6bfc84ec2ff7c0a8a52539324e4"
+        "sha256": "sha256:1d29fcf1b460116e15e39f7af3fbad302d7f575afe27824b8c67e9986243288c"
       },
       {
         "path": "scripts/kernel-principles.mjs",
@@ -1550,10 +1550,10 @@
         {
           "path": "scripts/ask-primary-unsafe-action-contract.mjs",
           "bytes": 5975,
-          "sha256": "sha256:edf6eeeb2307c80e22c4798c2ea499130eb3b61f5d9fbacd6f8b03b07002852c",
+          "sha256": "sha256:6a46f85a9bfd190168dc73bbfafbfb0fdc2b453b846ca823a37791efa1354fd1",
           "file_type": "module",
           "base_git_revision_bytes": 5975,
-          "base_git_revision_sha256": "sha256:edf6eeeb2307c80e22c4798c2ea499130eb3b61f5d9fbacd6f8b03b07002852c"
+          "base_git_revision_sha256": "sha256:6a46f85a9bfd190168dc73bbfafbfb0fdc2b453b846ca823a37791efa1354fd1"
         },
         {
           "path": "scripts/ask-setup-apply-state.mjs",
@@ -1765,19 +1765,19 @@
         },
         {
           "path": "scripts/kernel-principles-v2-catalog24.mjs",
-          "bytes": 6294,
-          "sha256": "sha256:9ff3e6cec640a063631c6efe12c4b4a6efb7a2a77b2ee7350222b52659fb0ec1",
+          "bytes": 6309,
+          "sha256": "sha256:6588da264a2e19fb7ae33e231b879de5f06f84fffc4ed9ba32f680b8608684c5",
           "file_type": "module",
-          "base_git_revision_bytes": 6294,
-          "base_git_revision_sha256": "sha256:9ff3e6cec640a063631c6efe12c4b4a6efb7a2a77b2ee7350222b52659fb0ec1"
+          "base_git_revision_bytes": 6309,
+          "base_git_revision_sha256": "sha256:6588da264a2e19fb7ae33e231b879de5f06f84fffc4ed9ba32f680b8608684c5"
         },
         {
           "path": "scripts/kernel-principles-v2.mjs",
           "bytes": 9806,
-          "sha256": "sha256:b87bc1925bd2f777fab64e5ef7ac08c45ad9e6bfc84ec2ff7c0a8a52539324e4",
+          "sha256": "sha256:1d29fcf1b460116e15e39f7af3fbad302d7f575afe27824b8c67e9986243288c",
           "file_type": "module",
           "base_git_revision_bytes": 9806,
-          "base_git_revision_sha256": "sha256:b87bc1925bd2f777fab64e5ef7ac08c45ad9e6bfc84ec2ff7c0a8a52539324e4"
+          "base_git_revision_sha256": "sha256:1d29fcf1b460116e15e39f7af3fbad302d7f575afe27824b8c67e9986243288c"
         },
         {
           "path": "scripts/kernel-principles.mjs",
@@ -6867,15 +6867,15 @@
           "edge_digest": "sha256:ffaeb2dc8fb81f5c6e94779ba74617b074b2b3ed2b63f6c6985e35e5f6b05baa"
         }
       ],
-      "graph_digest": "sha256:f661e513f3eba0f1924743a2292c65f0a510c8bea40408d06a07d778684e60f2"
+      "graph_digest": "sha256:5c9dbbf1d8305d5f5f73bb04cd062d6efe52866860aa99d453e2794459a04be4"
     }
   },
   "generator_identity": "sha256:1a8a5ec04a140e988509bf7292144a3490ec5e5e356b4ab2b50c77f1b765176c",
-  "independence_statement_digest": "sha256:9bd91365f79dd417b9f30a8c753b7ec60fe80b91a4d6b2095ff3375f59586a36",
-  "review_record_digest": "sha256:11f52e6655db365463de020d1e87b2a2c91f8eebd2803866816d6740a43d1ff8",
+  "independence_statement_digest": "sha256:144e91113e941fb3421c38099dd34ab059b359552c34dba7dbe3fa06b8ecf6a1",
+  "review_record_digest": "sha256:6281ffcde7e831f9e399cb6c95c4950ae9943639aaf94fc93aa8f7bc64a5a95a",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:debd84ac4d196117946110adf19b12caad33be9272865a6fea9ca43157bbb541",
-  "evaluator_authority_manifest_digest": "sha256:aa89a2aa32c01aa790cb3d3a45f4cfa4ac9c8cdd70e51ff63088d40653425292",
+  "evaluator_authority_manifest_raw_sha256": "sha256:adf6757e59dedee07e5d2e406fe9307c1c603594fa53cad09d6cdf963dd8dcd2",
+  "evaluator_authority_manifest_digest": "sha256:67aae6fc99c0431168403cd409f0dd095a39820a1e18faebfa64ec900f98a718",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:d9f9aec9e87f456b89f397b8dfe717f9220f13e993dd0df30a051dc11866ed4c"
+  "public_metadata_digest": "sha256:656ea9cce3b26f65a0c6b22ff269b4df09c91c6f5e857d9406d04bb6c806a31a"
 }
