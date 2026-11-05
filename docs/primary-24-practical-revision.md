@@ -153,19 +153,21 @@ remains missing; it is not a zero score, successful run or model defect.
 
 ## Measurement plan
 
-The proposed practical measurement is 24 canonical tasks × two actual conditions
+The practical measurement plan is 24 canonical tasks × two actual conditions
 (`ASK off`, `ASK full`) × one fresh implementation trial: **48 trials**. Use
 `gpt-6.1-terra` with `low` reasoning. Run trials sequentially, with no Sol trial,
 automatic retry or hidden replacement. This is one observation per condition,
 not a replicated estimate of ASK's general effect. The optional goal-pr delivery
 mode is not an additional set of trials.
 
-The proposed native-runner policy retains ephemeral sessions and disables both
+The native-runner plan retains ephemeral sessions and disables both
 agent features in both arms, using one root Terra low session per trial and no
 nested model or reviewer sessions. This differs from earlier agent-enabled
 trials. It measures ASK under that shared constraint; ASK's independent-review
 workflow is not measured, and self-review does not satisfy an independent review
-requirement. This execution choice is pending confirmation, not a completed
+requirement. The user's continuation instruction authorizes preparation and
+execution of this comparison. Effective isolation and the final installed ASK
+identity still require verification before dispatch; authorization is not
 environment qualification.
 
 Before the first trial, freeze the revised public-input version and per-file

@@ -66,7 +66,18 @@ test('all authority modules retain default validation with their historical boun
   const cloned = spawnSync('git', ['clone', '--no-hardlinks', '--no-checkout', ROOT, repository], { encoding: 'utf8', maxBuffer: 16777216 });
   assert.equal(cloned.status, 0, cloned.stderr);
   git(repository, 'checkout', '--detach', git(ROOT, 'rev-parse', 'HEAD'));
+  // This checks compatibility with the pre-resource-API boundary, so select its
+  // matching public fixtures explicitly. Current references deliberately point
+  // to newer dependencies and cannot prove that the old API is unavailable.
+  // Only this owned test checkout changes; current writers/tests stay at HEAD.
+  const historicalRevision = '9068e22a1c48378d0c266a103e3f8fb93861942e';
+  const fixturePaths = ids.map(id => `benchmarks/fixtures/checkpoint-b2/${id}`);
+  git(repository, 'checkout', historicalRevision, '--', ...fixturePaths, 'benchmarks/adaptive-portfolio.config.json');
+  git(repository, '-c', 'user.name=ASK historical compatibility test', '-c', 'user.email=synthetic-test@example.invalid',
+    '-c', 'commit.gpgsign=false', 'commit', '--quiet', '--allow-empty', '-m', 'test-only pre-resource-API public fixture context');
   for (const fixtureId of ids) {
+    const referencePath = `benchmarks/fixtures/checkpoint-b2/${fixtureId}/evaluator-reference.json`;
+    assert.equal(readFileSync(join(repository, referencePath), 'utf8'), git(ROOT, 'show', `${historicalRevision}:${referencePath}`) + '\n');
     const context = prepareFrozenEvaluatorTestRoot({ root: repository, fixtureId, testPath: 'scripts/test-ask-primary-resource-authority-writers.mjs' });
     try {
       // Project the exact frozen dependency closure, then test the working
