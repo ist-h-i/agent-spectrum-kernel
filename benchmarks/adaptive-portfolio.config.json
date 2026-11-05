@@ -311,10 +311,10 @@
       "repetitions": 3,
       "aggregate_eligible": true,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/input-manifest.json",
-      "input_manifest_sha256": "13b837ee1f46aef452678a7b156a60534200ccdf83b1dadb27efc95bc2f89ed4",
+      "input_manifest_sha256": "24ec8367b57fd7571024adf1a09507f9030d160284fad7ca161100e2136b1a72",
       "verification_command_contract": {
         "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/verification-command-contract.json",
-        "sha256": "1fc5ea1fafcec8525957cb78b910d4b32fc0cc88e9ec9948989290f6178ae2af"
+        "sha256": "df7c3bd1d1025523a5548b2e25b966cb3233e052014eccfd958a59c3662d2ea1"
       }
     },
     {
@@ -339,10 +339,10 @@
       "repetitions": 5,
       "aggregate_eligible": true,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/input-manifest.json",
-      "input_manifest_sha256": "8041b58cf541711924b8e9c2716adc3b65113d924a93a327e5f73b3a81cc878e",
+      "input_manifest_sha256": "6493fc195524d46fee7c99101082bcf3c2d3b05b17968cd4e18857c209093a5f",
       "verification_command_contract": {
         "path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/verification-command-contract.json",
-        "sha256": "d72063c17030ebd1a59205e1241398712843f370b7b2e45411a70b6019fb5c7a"
+        "sha256": "50446cb4844c09734284fdf1478e96105b9778a9dddc2a840470126d471e1b2e"
       }
     },
     {

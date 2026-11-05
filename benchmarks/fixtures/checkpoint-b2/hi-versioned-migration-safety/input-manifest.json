@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "b048b5741c13272dac8836aebb4495e60e6213dffbcf456c7eb7a95a7c8ab713",
-          "bytes": 2828
+          "sha256": "e471420832367631d065d04d53cd94fed1f1b0aba7863a1418cab515ca5c0a34",
+          "bytes": 2846
         },
         {
           "path": "workspace/data/mixed-state.json",
@@ -30,8 +30,8 @@
         },
         {
           "path": "workspace/docs/migration-contract.md",
-          "sha256": "98f3ee6f16c615da0d5364aa8e11e86675948edbdd24614a80c2ec8e1b23923a",
-          "bytes": 3489
+          "sha256": "fad7681dee939e8fb4385977de072335be73043dc1fd7deb086431c63b4e6c48",
+          "bytes": 3713
         },
         {
           "path": "workspace/migration-plan.json",
@@ -50,8 +50,8 @@
         },
         {
           "path": "workspace/scripts/compatibility.mjs",
-          "sha256": "6602c7008cb7e324def70a09798796d341afe0cc79a1cef4fad96b5a41a39614",
-          "bytes": 1649
+          "sha256": "c588ca58e23c94df10735fc26a6f6458234fa2bf5aa2dc0db1b6d82ad46a096a",
+          "bytes": 4739
         },
         {
           "path": "workspace/scripts/dry-run.mjs",
@@ -70,8 +70,8 @@
         },
         {
           "path": "workspace/test/mixed-version.test.mjs",
-          "sha256": "741381929f39fb00a4a929b13daa6bf1189cbfd44923b4baf3a3c6189074669b",
-          "bytes": 3312
+          "sha256": "1aa063740e6229df33e6ea2a3e787cb1525663f42efded695c567f7c08979d69",
+          "bytes": 4815
         }
       ]
     }

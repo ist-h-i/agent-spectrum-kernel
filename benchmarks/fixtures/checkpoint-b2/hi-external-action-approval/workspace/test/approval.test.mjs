@@ -47,3 +47,23 @@ test('checking a malformed plan does not mutate evidence or its argument',()=>{
  inspectPlan(plan);
  assert.equal(JSON.stringify({cases,receipts,state,plan}),before);
 });
+function conservativePlan(){
+ return {mode:'prepare_only',revalidate_before_effect:true,decisions:cases.map(row=>({
+  case_id:row.case_id,receipt_id:row.receipt_id,disposition:'blocked',reasons:['missing_receipt'],
+  rollback:{image:state.image,replicas:state.replicas,requires_new_approval:true}
+ }))};
+}
+test('unsupported readiness is refused without returning corrected decisions',()=>{
+ const plan=conservativePlan();
+ for(const decision of plan.decisions){decision.disposition='ready';decision.reasons=[]}
+ const result=inspectPlan(plan);
+ assert.equal(result.accepted,false);
+ assert.ok(result.failures.includes('unsupported_readiness'));
+ assert.deepEqual(Object.keys(result).sort(),['accepted','effect_count','failures','semantic_correctness']);
+});
+test('conservative blocked claims remain outside complete semantic assessment',()=>{
+ const result=inspectPlan(conservativePlan());
+ assert.equal(result.accepted,true);
+ assert.equal(result.semantic_correctness,'not_assessed');
+ assert.equal(result.effect_count,0);
+});

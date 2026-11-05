@@ -59,3 +59,28 @@ test('reader, writer and plan checks leave evidence unchanged',()=>{
  inspectPlan({mode:'execute'});
  assert.equal(JSON.stringify({state,phases,cases}),before);
 });
+function conservativePlan(rollout_steps){
+ return {mode:'prepare_only',read_policy:'fallback_until_verified',writer_policy:'dual_write_until_contract',
+  rollout_steps,execute_requires_specific_approval:true,restore_requires_new_approval:true,revalidate_current_state:true,
+  rollback_cases:cases.map(row=>({case_id:row.case_id,cutover_ready:false,rollback_possible:null,
+   action:'manual_review',snapshot_id:null,loss_risk:'unknown'}))};
+}
+test('operations cannot bypass freshness, cutover or completed migration safeguards',()=>{
+ for(const [steps,category] of [[['verify_fresh_backfill'],'freshness_preconditions'],
+  [['cutover_reads'],'cutover_preconditions'],[['drop_legacy_field'],'retirement_preconditions'],
+  [['expand_optional_field'],'incomplete_migration']]){
+  const result=inspectPlan(conservativePlan(steps));
+  assert.equal(result.accepted,false);
+  assert.ok(result.failures.includes(category));
+  assert.equal(result.semantic_correctness,'not_assessed');
+ }
+});
+test('missing write evidence cannot establish a definite contracted recovery claim',()=>{
+ const plan=conservativePlan(['expand_optional_field']);
+ const unknown=cases.find(row=>row.post_snapshot_writes===null&&!phases.find(phase=>phase.phase===row.phase).fields.name);
+ assert.ok(unknown);
+ plan.rollback_cases.find(row=>row.case_id===unknown.case_id).rollback_possible=false;
+ const result=inspectPlan(plan);
+ assert.ok(result.failures.includes('unsupported_recovery_claim'));
+ assert.equal(result.effect_count,0);
+});

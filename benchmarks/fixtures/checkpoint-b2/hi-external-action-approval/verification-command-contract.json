@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
   "program": "adaptive_ask_verification_command_contract",
   "fixture_id": "hi-external-action-approval",
-  "fixture_input_digest": "sha256:13b837ee1f46aef452678a7b156a60534200ccdf83b1dadb27efc95bc2f89ed4",
+  "fixture_input_digest": "sha256:24ec8367b57fd7571024adf1a09507f9030d160284fad7ca161100e2136b1a72",
   "commands": [
     {
       "command_id": "external-action-approval-validation",
@@ -21,14 +21,14 @@
           "-lc"
         ]
       },
-      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"data/approval-receipts.json\":\"059a91b51e7e98fb901a907c9bb49ab6bc1e0980c3883d2aab9813a0e21e5375\",\"data/operation-cases.json\":\"8a603853b5e0a322d5562e2ea8f24dc008659ec66862961564060aaf1e6179d0\",\"data/state.json\":\"94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655\",\"docs/action-contract.md\":\"01ae1089ce40b5e5a1bf7a01e7926856f702bb0c41cb205abc06379290888a12\",\"package.json\":\"310e7caaeff8888c806cd5b9529e7c695e3f75a347b15f85bdc34bbe5d534055\",\"plan.schema.json\":\"651998e23bc0294565a79f42403ebc670781a0133ab661f581f5c737fd9fdd6f\",\"scripts/controller.mjs\":\"a75734cebe7aa1c9ab82ca15751e6a61952c465334f56ad86afc76ab1e442591\",\"scripts/dry-run.mjs\":\"dcd960028408017a39df66341a44cd6dc99561ab4a9b16f57abe519b44e82379\",\"scripts/validate-plan.mjs\":\"72e1ae6be29ef14a2e4d2501eab21fe0bd03a0129d0d74b455ea6c3918cb0652\",\"scripts/validate-shape.mjs\":\"8be02af93a38354e49810d94cb9ef170b6d21b7d7f737408d4126bac9f3bcd9d\",\"test/approval.test.mjs\":\"1c3909500c5d52907cc6eda3de581e6dac96beb225eb527312fbd5601689aa36\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm test && npm run dry-run && npm run validate:plan",
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"data/approval-receipts.json\":\"059a91b51e7e98fb901a907c9bb49ab6bc1e0980c3883d2aab9813a0e21e5375\",\"data/operation-cases.json\":\"8a603853b5e0a322d5562e2ea8f24dc008659ec66862961564060aaf1e6179d0\",\"data/state.json\":\"94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655\",\"docs/action-contract.md\":\"f84f1450daef12f830b968952eb24a2dbaaeadcf30230577b1fb78c68aa38e73\",\"package.json\":\"310e7caaeff8888c806cd5b9529e7c695e3f75a347b15f85bdc34bbe5d534055\",\"plan.schema.json\":\"651998e23bc0294565a79f42403ebc670781a0133ab661f581f5c737fd9fdd6f\",\"scripts/controller.mjs\":\"151f495a67e95db5a0d6d437de1f0db5ef18d9b720819cf14d7052c1f752be66\",\"scripts/dry-run.mjs\":\"dcd960028408017a39df66341a44cd6dc99561ab4a9b16f57abe519b44e82379\",\"scripts/validate-plan.mjs\":\"72e1ae6be29ef14a2e4d2501eab21fe0bd03a0129d0d74b455ea6c3918cb0652\",\"scripts/validate-shape.mjs\":\"8be02af93a38354e49810d94cb9ef170b6d21b7d7f737408d4126bac9f3bcd9d\",\"test/approval.test.mjs\":\"e28196b5aebeb5058e683df82f23a4b2e7410c292e635e1612c8a2a60e3971a9\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm test && npm run dry-run && npm run validate:plan",
       "requirement": "required",
       "alternative_group_id": null,
       "timeout_ms": 60000,
-      "logical_command_digest": "sha256:7907a4f9d73b53971ca45b1ee6666a0ae50cce3a61743f4f133e59904f64fb79",
-      "rendered_event_command_digest": "sha256:c4b5addcaebf21df08aa2e188a9bd15b65a918f376ecd137d88945a86235baa0",
-      "command_contract_digest": "sha256:bac3ee09c840fdc07d936980196810709eb5c96250746771e6035359543cd293"
+      "logical_command_digest": "sha256:4f25126d271ca887e82e40d30885ce7b69cfc5e97e95a5bbd06eaccf8bdc9c39",
+      "rendered_event_command_digest": "sha256:82a93c2f6e9360a23bc636dc6a50a37a5f9549e74656fc7e06ace1a1cbbb601e",
+      "command_contract_digest": "sha256:6180e9308da17d73586f07fc0f4b194ed0fe795d303afbb38d201639b277fd18"
     }
   ],
-  "contract_digest": "sha256:e95e8a48ef37f56a7d1f124e49be9010a58401017b6fdabb1ce09044ae9fb7cd"
+  "contract_digest": "sha256:59b8063c5ebe025a3a514a5f224f09c66ca1df541dc9837b350a3420dde1f0de"
 }
