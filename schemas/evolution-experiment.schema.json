@@ -156,7 +156,7 @@
       "properties": {
         "mode": {
           "type": "string",
-          "enum": ["fixed_b1_exact", "prompt_v2_exact"]
+          "enum": ["fixed_b1_exact", "prompt_v2_exact", "instruction_environment_v1_exact"]
         },
         "baseline_condition": { "$ref": "#/$defs/stableId" },
         "challenger_condition": { "$ref": "#/$defs/stableId" },

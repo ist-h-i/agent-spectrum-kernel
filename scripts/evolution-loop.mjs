@@ -16,6 +16,7 @@ import {
   verifyPortfolioSelection,
 } from "./portfolio-manager.mjs";
 import { validateJsonSchema } from "./execution-envelope.mjs";
+import { ENVIRONMENT_EVOLUTION_MAPPING, ENVIRONMENT_EVOLUTION_MAPPING_DIGEST, verifyEnvironmentEvolutionBinding } from "./environment-evolution-binding.mjs";
 
 const RUNTIME_ROOT = dirname(fileURLToPath(import.meta.url));
 const SCHEMA_VERSION = "1.0.0";
@@ -464,6 +465,13 @@ export function validateEvolutionExperiment(experiment) {
       throw new Error("prompt_v2_exact projection evidence digest drift rejected");
     }
   }
+  if (experiment.projection.mode === "instruction_environment_v1_exact") {
+    if (experiment.projection.mapping_digest !== ENVIRONMENT_EVOLUTION_MAPPING_DIGEST
+      || experiment.projection.baseline_condition !== ENVIRONMENT_EVOLUTION_MAPPING.baseline_condition
+      || experiment.projection.challenger_condition !== ENVIRONMENT_EVOLUTION_MAPPING.challenger_condition) {
+      throw new Error("instruction environment projection mapping drift rejected");
+    }
+  }
   for (const mapping of experiment.action_mapping) {
     if (!RECOMMENDATIONS.has(mapping.recommendation) || mapping.actions.some((action) => !ACTIONS.has(action))) {
       throw new Error("Evolution action mapping uses an unsupported recommendation or action");
@@ -568,6 +576,10 @@ export function verifyEvolutionExperiment({
     costPolicies.add(verified.selection.cost_policy ?? null);
   }
   if (costPolicies.size !== 1) throw new Error("Evolution baseline and challenger must use the same cost policy");
+  if (experiment.projection.mode === "instruction_environment_v1_exact") {
+    verifyEnvironmentEvolutionBinding({ storeRoot, trustedAssetAuthorityContexts,
+      trustedPortfolioAuthorityContexts, trustedHighImpactApprovalGrants }, experiment);
+  }
   return deepFreeze({ experiment_object_digest: experimentObjectDigest, experiment: cloneJson(experiment), candidate: cloneJson(candidateVerified.candidate) });
 }
 

@@ -4,6 +4,7 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
 import { skillAssets } from "./skill-assets.mjs";
+import { personalPromptTargetActive, withPersonalPromptTargetLock } from './ask-personal-prompt-target-lock.mjs';
 import { ADAPTER_RENDERER_METADATA, CLAUDE_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 import { renderClaudeFixedEntryProfile, measureClaudeFixedEntryProfiles } from "./claude-fixed-entry-profile.mjs";
 import { FIXED_ENTRY_NAMES, fixedEntryCanonicalPaths, fixedEntryDirectTriggers } from "./fixed-entry-profile.mjs";
@@ -1325,8 +1326,7 @@ function buildState(args, manifest) {
   });
 }
 
-function main() {
-  const args = parseArgs(process.argv.slice(2));
+function runMain(args) {
   const writes = [];
 
   if (args.rollback) {
@@ -1416,6 +1416,17 @@ function main() {
   lifecycle.printOperations(args.target, args.operations);
   console.log(`- ${STATE_PATH}`);
   console.log("Privacy defaults: local project storage, no external publication, no raw prompt storage.");
+}
+
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (!existsSync(args.target)) return runMain(args); // Preserve prerequisite diagnostics.
+  return withPersonalPromptTargetLock(args.target, () => {
+    if (personalPromptTargetActive(args.target, { excludeOwnedLock: true })) {
+      throw new Error('instruction environment or personal Prompt ownership/partial operation requires explicit owner return; ordinary Claude mutation refused');
+    }
+    return runMain(args);
+  });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
