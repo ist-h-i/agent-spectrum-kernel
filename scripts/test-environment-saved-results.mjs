@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test, { mock } from 'node:test';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { canonicalDigest, readContentAddressedJson } from './content-addressed-store.mjs';
-import { captureInstructionEnvironment } from './instruction-environment.mjs';
+import { captureInstructionEnvironment, instructionBytesDigest } from './instruction-environment.mjs';
 import { buildEnvironmentEvolutionProjection } from './environment-evolution-binding.mjs';
 import { buildEvolutionExperiment, publishEvolutionExperiment } from './evolution-loop.mjs';
 import { environmentFixture } from './test-helpers-instruction-environment.mjs';
@@ -12,7 +14,9 @@ mock.module('./environment-evaluation.mjs', { namedExports: { ...originals[0], v
   environmentObjectDigest: environmentOverride ?? environments[o.role], environment: { runtime: frozenRuntime } }) } });
 mock.module('./ask-benchmark-execution.mjs', { namedExports: { ...originals[1], inspectVerifiedPortfolioExecution: o => ({ identity: {
   run_instance_id: `run-${o.role}`, plan: { digest: canonicalDigest(`plan-${o.role}`) } }, adapter_identities: new Map([[o.adapterTrack, observedRuntime]]) }) } });
-mock.module('./ask-benchmark-normalized-results.mjs', { namedExports: { ...originals[2], verifyNormalizedPortfolioResults: o => ({ manifest: { source_snapshot_digest: canonicalDigest(`snapshot-${o.role}`) } }) } });
+mock.module('./ask-benchmark-normalized-results.mjs', { namedExports: { ...originals[2], verifyNormalizedPortfolioResults: o => ({ manifest: {
+  source_snapshot_digest: canonicalDigest(`snapshot-${o.role}`), source: { run_instance_id: `run-${o.role}`, plan_digest: canonicalDigest(`plan-${o.role}`) },
+  cases: [...data[o.role].map(e => ({ case_id: e.result.case_id, terminal_attempt: e.result.attempt })), { case_id: 'unrelated-plain', status: 'pending', terminal_attempt: null }] } }) } });
 mock.module('./ask-benchmark-portfolio-result-set.mjs', { namedExports: { ...originals[3], verifyEngineeringResultSet: o => ({ artifact: {
   run_instance_id: `run-${o.role}`, plan_digest: canonicalDigest(`plan-${o.role}`), source_snapshot_digest: canonicalDigest(`snapshot-${o.role}`) },
   verified_results: data[o.role] }) } });
@@ -37,7 +41,8 @@ for (const track of ['codex', 'claude']) test(`${track}: saved results re-enter 
     plans[role] = draft.protocol.fixture_ids.flatMap(fixture_id => Array.from({ length: draft.protocol.repetitions }, (_, index) => ({ fixture_id,
       repetition: index + 1, case_id: `${role}-${fixture_id}-${index}` })));
     data[role] = plans[role].map(c => {
-      const result = { fixture_id: c.fixture_id, case_id: c.case_id, repetition: c.repetition, attempt: 1, condition: 'full_ask',
+      const result = { fixture_id: c.fixture_id, case_id: c.case_id, repetition: c.repetition, attempt: '0001', condition: 'full_ask', adapter: track,
+        run_instance_id: `run-${role}`, plan_digest: canonicalDigest(`plan-${role}`), source_snapshot_digest: canonicalDigest(`snapshot-${role}`),
         ...gradingBindings.find(g => g.fixture_id === c.fixture_id), fixture_input_digest: canonicalDigest(c.fixture_id), scoring_status: 'complete',
         safety_blocker: { status: 'pass' }, blockers: { gate_status: 'pass' }, requirement_score: { normalized_requirement_score: role === 'baseline' ? 0.5 : 0.6 },
         overhead_telemetry: Object.fromEntries(['input_tokens', 'output_tokens', 'duration_ms', 'human_effort', 'monetary_cost'].map(k => [k, { status: 'known', value: 1 }])) };
@@ -51,6 +56,18 @@ for (const track of ['codex', 'claude']) test(`${track}: saved results re-enter 
   assert.equal(nativeCalls, data.baseline.length + data.challenger.length); assert.equal(checked.report.status, 'saved_pair_verified');
   assert.equal(checked.evidence.dimensions.quality.status, 'complete'); assert.equal(checked.evidence.dimensions.variance.status, 'unavailable');
   assert.equal(checked.evidence.dimensions.mechanism.status, 'unavailable'); assert.equal(checked.evidence.causal_attribution.status, 'not_claimed');
+  const scoped = structuredClone(options);
+  for (const role of ['baseline', 'challenger']) {
+    scoped.results[role].resultSet.mode = 'environment_scope';
+    scoped.results[role].grading.forEach((g, index) => {
+      const bytes = Buffer.from(JSON.stringify(data[role][index].result));
+      g.resultPath = join(a.root, `${role}-${index}-engineering.json`); writeFileSync(g.resultPath, bytes);
+      scoped.trustedSavedEngineeringResultDigests.push(instructionBytesDigest(bytes));
+    });
+  }
+  assert.equal(verifyEnvironmentSavedResults(scoped).report.status, 'saved_pair_verified', 'unrelated pending conditions cannot force extra model calls');
+  const omitted = structuredClone(scoped); omitted.results.baseline.grading.pop();
+  assert.throws(() => verifyEnvironmentSavedResults(omitted), /cover every registered case/);
   for (const key of ['experimentObjectDigest', 'trustedExperimentObjectDigests', 'root']) {
     const foreign = structuredClone(options); foreign.results.baseline.execution[key] = key === 'trustedExperimentObjectDigests' ? [] : 'foreign';
     assert.throws(() => verifyEnvironmentSavedResults(foreign), /unsupported role execution override/);

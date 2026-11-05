@@ -6,7 +6,7 @@ import { dirname, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { effectiveCommand, verifyExecutionTerminalWorkspaceAuthority } from "./ask-benchmark-execution.mjs";
+import { effectiveCommand, executePortfolio, verifyExecutionTerminalWorkspaceAuthority } from "./ask-benchmark-execution.mjs";
 import { createTerminalCandidateOutputBoundaryForTest, materializeVerifiedTerminalCandidate, materializeVerifiedTerminalCandidateForTest, verifyTerminalWorkspaceAuthority } from "./ask-benchmark-terminal-candidate.mjs";
 import {
   computeCommandContractDigest,
@@ -1260,6 +1260,10 @@ exit 64
   assert.equal(recoveryState.attempt_count, 1, "recovery replay must not append attempts");
   assert.equal(existsSync(abandonedWorkspace), false, "stale recovery must delete the abandoned ephemeral workspace");
   assert.deepEqual(terminalInventory(recoveryRun, recoveryCase.case_id, recoveryState.terminal_attempt), ["command-evidence.json", "commit.json", "request.json", "result.json"], "interrupted recovery must retain only approved durable artifacts");
+  const firstOnlyOptions = { root, config: verifiedConfig, planPath, materializedPath: materialized, selectionState, runDir: recoveryRun,
+    adapter: 'codex', runtimeConfigPath: codexRuntime, agentBin: codexBin, caseId: recoveryCase.case_id, firstAttemptOnly: true };
+  assert.throws(() => executePortfolio(firstOnlyOptions), /first-attempt execution refuses/);
+  assert.equal(JSON.parse(readFileSync(resolve(recoveryRun, 'cases', recoveryCase.case_id, 'state.json'))).attempt_count, 1);
   run(recoveryExecute, { env });
   const resumedState = JSON.parse(readFileSync(resolve(recoveryRun, "cases", recoveryCase.case_id, "state.json"), "utf8"));
   assert.equal(resumedState.status, "completed", "interrupted recovery must resume with a new attempt");

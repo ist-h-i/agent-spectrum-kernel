@@ -58,7 +58,7 @@ export function executeEnvironmentEvaluation(options) {
   // Each case has existing once-attempt state; terminal/unknown work is not reset.
   const outcomes = [];
   for (const entry of c.cases) outcomes.push(executePortfolio({ ...options, adapter: c.adapter,
-    caseId: entry.case_id, maxCases: 1, retryFailed: false, successorPromptInput: null }));
+    caseId: entry.case_id, maxCases: 1, retryFailed: false, firstAttemptOnly: true, successorPromptInput: null }));
   return { outcomes, quality_implied: false, environment_object_digest: c.environmentObjectDigest };
 }
 export function inspectEnvironmentEvaluation(options) {

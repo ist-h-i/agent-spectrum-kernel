@@ -1,7 +1,8 @@
 // Re-verifies saved native engineering artifacts with their original owners.
 // No new grader, model call, result-derived policy or automatic trust grant.
 import assert from 'node:assert/strict';
-import { canonicalDigest, putContentAddressedJson } from './content-addressed-store.mjs';
+import { canonicalDigest, putContentAddressedJson, readStableBytes, parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
+import { instructionBytesDigest } from './instruction-environment.mjs';
 import { verifyEvolutionExperiment, deriveEvolutionRecommendation } from './evolution-loop.mjs';
 import { verifyEnvironmentEvolutionBinding } from './environment-evolution-binding.mjs';
 import { verifyEnvironmentEvaluation } from './environment-evaluation.mjs';
@@ -47,7 +48,18 @@ export function verifyEnvironmentSavedResults(options) {
     const version = runtime.executable.observed_version, expectedVersion = ctx.environment.runtime.cli_version;
     assert.ok(version === expectedVersion || version?.endsWith(' ' + expectedVersion), 'saved CLI version differs from frozen environment');
     const normalized = verifyNormalizedPortfolioResults({ ...execution, outputPath: supplied.resultSet.normalizedResultsPath });
-    const checked = verifyEngineeringResultSet({ ...withFixedContext(execution, supplied.resultSet), adapter: ctx.adapter });
+    assert.ok(supplied.resultSet.mode === undefined || supplied.resultSet.mode === 'environment_scope', 'unknown saved result scope');
+    // The generic aggregate deliberately requires all four conditions. An
+    // environment comparison executes only its pre-registered full_ask cases;
+    // re-enter each original evaluator/scorer rather than forging an aggregate
+    // or running unrelated model conditions to satisfy that aggregate contract.
+    const scoped = supplied.resultSet.mode === 'environment_scope';
+    const checked = scoped ? { artifact: { run_instance_id: normalized.manifest.source.run_instance_id,
+      plan_digest: normalized.manifest.source.plan_digest, source_snapshot_digest: normalized.manifest.source_snapshot_digest },
+      verified_results: (supplied.grading ?? []).map(g => {
+        const bytes = readStableBytes(g.resultPath, 'original scoped engineering receipt', 16 * 1024 * 1024);
+        return { result: parseJsonRejectDuplicateKeys(bytes, 'original scoped engineering receipt'), raw_byte_digest: instructionBytesDigest(bytes) };
+      }) } : verifyEngineeringResultSet({ ...withFixedContext(execution, supplied.resultSet), adapter: ctx.adapter });
     assert.equal(checked.artifact.run_instance_id, inspected.identity.run_instance_id, 'saved run transplant');
     assert.equal(checked.artifact.plan_digest, inspected.identity.plan.digest, 'saved plan transplant');
     assert.equal(checked.artifact.source_snapshot_digest, normalized.manifest.source_snapshot_digest, 'saved normalized snapshot transplant');
@@ -57,6 +69,14 @@ export function verifyEnvironmentSavedResults(options) {
     const used = new Set();
     for (const entry of checked.verified_results.filter(e => e.result.condition === 'full_ask')) {
       const result = entry.result, planned = expected.get(result.case_id);
+      assert.equal(result.run_instance_id, inspected.identity.run_instance_id, 'saved result run transplant');
+      assert.equal(result.plan_digest, inspected.identity.plan.digest, 'saved result plan transplant');
+      assert.equal(result.source_snapshot_digest, normalized.manifest.source_snapshot_digest, 'saved result snapshot transplant');
+      assert.equal(result.adapter, ctx.adapter, 'saved result adapter transplant');
+      if (scoped) {
+        const terminal = normalized.manifest.cases.find(c => c.case_id === result.case_id);
+        assert.ok(terminal && terminal.terminal_attempt === result.attempt, 'saved scope requires the authoritative terminal attempt');
+      }
       assert.ok(planned && planned.fixture_id === result.fixture_id && planned.repetition === result.repetition, 'foreign saved task/repetition');
       assert.ok(!used.has(result.case_id), 'multiple attempts cannot become an environment outcome'); used.add(result.case_id);
       const key = `${result.case_id}:${result.attempt}`, original = grading.find(g => `${g.case_id}:${g.attempt}` === key);
@@ -72,6 +92,7 @@ export function verifyEnvironmentSavedResults(options) {
       observations.push({ role, fixture_id: result.fixture_id, engineering: result });
       if (result.scoring_status !== 'complete') incomplete++;
     }
+    if (scoped) assert.equal(used.size, ctx.cases.length, 'saved environment scope must cover every registered case');
     assert.equal(grading.length, used.size, 'extra grading inputs outside selected environment outcome scope');
     pending += expected.size - used.size;
   }

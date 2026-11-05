@@ -159,6 +159,10 @@ role's selected adapter/full_ask cases are dispatched by this entry. It verifies
 actual projection bytes, fixture population, task classes, repetitions, source,
 model and expected CLI version. `evaluation-start` additionally requires
 `confirmedExperimentObjectDigest` equal to the inspected exact experiment.
+Environment dispatch sets the original runner's opt-in `firstAttemptOnly`
+guard. Interrupted, active or otherwise attempted cases cannot allocate another
+attempt, including after explicit stale-claim recovery. Generic runner retry
+behavior remains unchanged for callers that do not select this guard.
 Original runtime capability, sandbox, permission, identity, failure and
 containment checks remain active. Unavailable capabilities stay unavailable;
 this entry does not relax them to make a Claude run pass. Inspect existing
@@ -167,9 +171,14 @@ attempt state after uncertainty; do not reset/retry it.
 Use the original independent graders for execution artifacts. `evaluation-results`
 takes both roles' existing `execution` options, `resultSet` verification options
 (or null when uncollected), and original `grading` descriptors keyed by case and
-attempt. It re-verifies actual environment bytes/run lineage, normalized
-execution, the complete engineering result set, and every selected result with
-the original full evaluator/scorer. Independently pin the original grade receipt
+attempt. For environment-only execution set `resultSet.mode` to
+`environment_scope`, provide its `normalizedResultsPath`, and each grading
+descriptor's original public engineering `resultPath`. This verifies the exact
+registered full_ask inventory and terminal attempts without requiring unrelated
+conditions to execute. Every selected result re-enters the original full
+evaluator/scorer and matches the re-derived bytes, run, plan and snapshot.
+Omitting the mode retains the original complete four-condition result-set
+verification; no partial set is relabeled as that aggregate. Independently pin the original grade receipt
 digests in `trustedSavedEngineeringResultDigests`, and pin the pre-result
 experiment separately. Per-role execution overrides accept only plan/materialized/
 selection/run/runtime paths, adapter track and admission evidence; they cannot
@@ -234,10 +243,16 @@ Compatibility evidence checked 2026-11-05:
 The installed Codex CLI is `codex-cli 0.162.1`. `runtime-inspect` passed the
 existing version and required execution-help contract with zero model calls.
 That proves available CLI surfaces, not Skill-event emission, full environment
-execution or quality. Claude CLI is absent from the selected Mac's PATH.
-Its native acceptance requires installation/authentication and a compatible
-explicit runtime contract; ASK does not install it, change permissions or enable
-an exporter to turn that missing evidence into a pass.
+execution or quality. Official Claude Code `2.1.318` was temporarily installed
+under `/tmp` with npm install scripts disabled; global installation, authentication
+and user settings were untouched. Its real version/help preflight returned
+`availability: unavailable`, `reason: help_contract_mismatch`, with zero model
+calls. The current generic Claude runtime contract requires `--benchmark-output`,
+`--benchmark-task` and explicit sandbox/permission arguments that this official
+CLI does not provide. Consequently this PR does not establish a working native
+Claude model execution path. A separately reviewed native transport/containment
+contract and authenticated acceptance remain required; unavailable evidence
+must not become a pass by dropping security checks.
 
 - Codex's [v0.162.1 OTEL source](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/otel/README.md#skill-invocation-logs)
   documents explicit injection and best-effort implicit/read detection with

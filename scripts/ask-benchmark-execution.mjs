@@ -1795,6 +1795,7 @@ function preflightCaseClaim({ root, context, entry, state }) {
 }
 
 function markUnavailable({ root, context, entry, state, runtime, adapter }) {
+  if (context.firstAttemptOnly && (state.status !== 'pending' || state.attempt_count !== 0)) throw new Error('first-attempt execution refuses attempted or uncertain cases');
   if (["completed", "unavailable"].includes(state.status)) return;
   if (preflightCaseClaim({ root, context, entry, state })) return "active";
   const attempt = nextAttempt(context.runDir, entry);
@@ -1817,6 +1818,7 @@ function markUnavailable({ root, context, entry, state, runtime, adapter }) {
 
 function executeCase({ root, config, context, entry, runtime, verifiedExecutable, adapter, environmentSnapshot }) {
   const state = readCaseState(root, context.runDir, entry);
+  if (context.firstAttemptOnly && (state.status !== 'pending' || state.attempt_count !== 0)) throw new Error('first-attempt execution refuses attempted or uncertain cases');
   if (context.successorPromptInput && state.status !== "pending") throw new Error("successor cases cannot be silently retried or resumed after an uncertain attempt");
   if (TERMINAL_STATUSES.has(state.status)) validateTerminalCase({ root, context, entry, state });
   if (preflightCaseClaim({ root, context, entry, state })) return "active";
@@ -1986,7 +1988,8 @@ export function prepareSuccessorPortfolioSource({ root, config, planPath, materi
   };
 }
 
-export function executePortfolio({ root, config, planPath, materializedPath, selectionState, runDir, adapter, runtimeConfigPath, agentBin, caseId = null, maxCases = null, retryFailed = false, successorPromptInput = null, executionAdmissionEvidenceByFixture = null }) {
+export function executePortfolio({ root, config, planPath, materializedPath, selectionState, runDir, adapter, runtimeConfigPath, agentBin, caseId = null, maxCases = null, retryFailed = false, firstAttemptOnly = false, successorPromptInput = null, executionAdmissionEvidenceByFixture = null }) {
+  if (typeof firstAttemptOnly !== 'boolean' || (firstAttemptOnly && retryFailed)) throw new Error('invalid first-attempt execution policy');
   if (successorPromptInput !== null) assertSuccessorInputRun(successorPromptInput, { adapter, caseId, retryFailed, maxCases });
   if (!adapter || !["codex", "claude"].includes(adapter)) throw new Error("execute-portfolio requires --adapter codex or claude");
   if (maxCases !== null && (!Number.isInteger(maxCases) || maxCases < 1)) throw new Error("--max-cases must be a positive integer");
@@ -1999,10 +2002,15 @@ export function executePortfolio({ root, config, planPath, materializedPath, sel
   context.materializedPath = materializedPath;
   context.selectionState = selectionState;
   context.retryFailed = retryFailed;
+  context.firstAttemptOnly = firstAttemptOnly;
   context.successorPromptInput = successorPromptInput;
-  const runtimeIdentity = ensureAdapterIdentity({ root, runDir: context.runDir, plan: context.plan, adapter, runtimeConfig, verifiedExecutable, environmentSnapshot, successorRuntime: successorPromptInput === null ? null : successorRuntimeForInput(successorPromptInput) });
   const cases = context.plan.cases.filter((entry) => entry.adapter_track === adapter && (!caseId || entry.case_id === caseId));
   if (caseId && cases.length === 0) throw new Error(`case ${caseId} does not belong to adapter ${adapter}`);
+  if (firstAttemptOnly && cases.some(entry => {
+    const state = readCaseState(root, context.runDir, entry);
+    return state.status !== 'pending' || state.attempt_count !== 0;
+  })) throw new Error('first-attempt execution refuses attempted or uncertain cases');
+  const runtimeIdentity = ensureAdapterIdentity({ root, runDir: context.runDir, plan: context.plan, adapter, runtimeConfig, verifiedExecutable, environmentSnapshot, successorRuntime: successorPromptInput === null ? null : successorRuntimeForInput(successorPromptInput) });
   const outcomes = [];
   let executed = 0;
   if (runtimeIdentity.identity.availability === "unavailable") {

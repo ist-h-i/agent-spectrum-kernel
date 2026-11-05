@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chmodSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { inspectPortfolioRuntimeContract } from './ask-benchmark-execution.mjs';
@@ -20,4 +20,12 @@ test('no-model runtime preflight uses original version/help contract and fails c
   assert.equal(result.runtime_execution_implied, false); assert.equal(result.command_events_observed, false);
   writeFileSync(executable, script('other-cli')); assert.equal(inspectPortfolioRuntimeContract(options).reason, 'version_mismatch');
   assert.equal(inspectPortfolioRuntimeContract({ ...options, agentBin: null }).reason, 'cli_not_supplied');
+  const claude = JSON.parse(readFileSync(config));
+  claude.adapter = 'claude'; claude.permission_policy = 'strict';
+  claude.claude_cli = { help_marker: 'fixture-cli', sandbox_argument: '--sandbox', permission_argument: '--permission-policy',
+    command: ['--benchmark-output', '{output}', '--benchmark-task', '{task}', '--sandbox', '{sandbox_policy}', '--permission-policy', '{permission_policy}'] };
+  claude.command_evidence.support = 'unsupported';
+  Object.assign(claude.command_evidence.shell_capability, { support_status: 'unsupported', probe_status: 'unsupported' });
+  writeFileSync(config, JSON.stringify(claude)); writeFileSync(executable, script('fixture-cli-v1'));
+  assert.equal(inspectPortfolioRuntimeContract({ ...options, adapter: 'claude' }).reason, 'help_contract_mismatch', 'missing native Claude contract cannot become available');
 });

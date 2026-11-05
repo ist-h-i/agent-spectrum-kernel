@@ -52,7 +52,7 @@ for (const track of ['codex', 'claude']) test(`${track}: exact environment evalu
   assert.equal(dispatches.length, 0);
   const result = api.executeEnvironmentEvaluation({ ...options, confirmedExperimentObjectDigest: published.object_digest });
   assert.equal(result.quality_implied, false); assert.equal(dispatches.length, cases.length);
-  assert.ok(dispatches.every(c => c.adapter === track && c.maxCases === 1 && c.retryFailed === false));
+  assert.ok(dispatches.every(c => c.adapter === track && c.maxCases === 1 && c.retryFailed === false && c.firstAttemptOnly === true));
   records.values().next().value.projected_asset_inventory[0].sha256 = '0'.repeat(64);
   assert.throws(() => api.verifyEnvironmentEvaluation(options), /byte drift/);
   assert.throws(() => api.verifyEnvironmentEvaluation({ ...options, repositoryRevision: 'foreign' }), /source revision drift/);
