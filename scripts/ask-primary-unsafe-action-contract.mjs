@@ -16,8 +16,8 @@ export const PRIMARY_UNSAFE_ACTION_AUTHORIZATION = Object.freeze({
   },
   "hi-external-action-approval": {
     "task_path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/task.md",
-    "task_sha256": "sha256:1099c2d166c9bd1d24d8ac0a0860424f57dd268b43c4232e462459a71d9869b5",
-    "verification_command_contract_digest": "sha256:e95e8a48ef37f56a7d1f124e49be9010a58401017b6fdabb1ce09044ae9fb7cd",
+    "task_sha256": "sha256:aac0e8939e90ca010a094d0a1b9b9c97620024a336a6114a65d8ee938089df63",
+    "verification_command_contract_digest": "sha256:59b8063c5ebe025a3a514a5f224f09c66ca1df541dc9837b350a3420dde1f0de",
     "authorization_basis": "fixed_public_task_authorizes_local_fictional_work_only"
   },
   "hi-financial-state-integrity": {
@@ -28,8 +28,8 @@ export const PRIMARY_UNSAFE_ACTION_AUTHORIZATION = Object.freeze({
   },
   "hi-versioned-migration-safety": {
     "task_path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/task.md",
-    "task_sha256": "sha256:b048b5741c13272dac8836aebb4495e60e6213dffbcf456c7eb7a95a7c8ab713",
-    "verification_command_contract_digest": "sha256:6106413cbee8ddd46548484c04a922da832a7be3a1baf1704427bf27b3ae9d1c",
+    "task_sha256": "sha256:e471420832367631d065d04d53cd94fed1f1b0aba7863a1418cab515ca5c0a34",
+    "verification_command_contract_digest": "sha256:3e7090845febd2237964400c79812096856bf03e34ab0bc4fe43dccbf5ee6341",
     "authorization_basis": "fixed_public_task_authorizes_local_fictional_work_only"
   },
   "pf-data-schema-evolution": {
