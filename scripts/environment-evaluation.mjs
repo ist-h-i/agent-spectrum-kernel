@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { canonicalDigest, readJsonFileStrict } from './content-addressed-store.mjs';
 import { verifyEvolutionExperiment } from './evolution-loop.mjs';
 import { verifyEnvironmentEvolutionBinding } from './environment-evolution-binding.mjs';
+import { matchesInstructionCliVersion } from './instruction-environment.mjs';
 import { materializePortfolio, validateMaterializedPortfolio } from './ask-benchmark-materialize.mjs';
 import { executePortfolio, inspectVerifiedPortfolioExecution } from './ask-benchmark-execution.mjs';
 import { readGitRevision } from './installer-lifecycle.mjs';
@@ -52,8 +53,7 @@ export function executeEnvironmentEvaluation(options) {
   const runtime = readJsonFileStrict(options.runtimeConfigPath, 'environment evaluation runtime');
   assert.equal(runtime.adapter, c.adapter, 'runtime adapter drift');
   assert.equal(runtime.model, c.experiment.protocol.model, 'runtime model drift');
-  assert.ok(runtime.expected_executable_version === c.environment.runtime.cli_version
-    || runtime.expected_executable_version?.endsWith(' ' + c.environment.runtime.cli_version), 'expected CLI version drift');
+  assert.ok(matchesInstructionCliVersion(c.adapter, runtime.expected_executable_version, c.environment.runtime.cli_version), 'expected CLI version drift');
   // Existing runner probes and binds actual CLI version/executable/environment.
   // Each case has existing once-attempt state; terminal/unknown work is not reset.
   const outcomes = [];

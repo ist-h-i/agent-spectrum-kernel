@@ -2,7 +2,7 @@
 // No new grader, model call, result-derived policy or automatic trust grant.
 import assert from 'node:assert/strict';
 import { canonicalDigest, putContentAddressedJson, readStableBytes, parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
-import { instructionBytesDigest } from './instruction-environment.mjs';
+import { instructionBytesDigest, matchesInstructionCliVersion } from './instruction-environment.mjs';
 import { verifyEvolutionExperiment, deriveEvolutionRecommendation } from './evolution-loop.mjs';
 import { verifyEnvironmentEvolutionBinding } from './environment-evolution-binding.mjs';
 import { verifyEnvironmentEvaluation } from './environment-evaluation.mjs';
@@ -46,7 +46,7 @@ export function verifyEnvironmentSavedResults(options) {
     assert.ok(runtime, 'saved runtime identity required');
     assert.equal(runtime.model, ctx.environment.runtime.model, 'saved runtime model differs from frozen environment');
     const version = runtime.executable.observed_version, expectedVersion = ctx.environment.runtime.cli_version;
-    assert.ok(version === expectedVersion || version?.endsWith(' ' + expectedVersion), 'saved CLI version differs from frozen environment');
+    assert.ok(matchesInstructionCliVersion(ctx.adapter, version, expectedVersion), 'saved CLI version differs from frozen environment');
     const actualRuntimeDigest = canonicalDigest(runtime);
     if (recordedRuntimeDigest !== null) assert.equal(actualRuntimeDigest, recordedRuntimeDigest, 'saved roles have different recorded runtime contracts');
     recordedRuntimeDigest = actualRuntimeDigest;

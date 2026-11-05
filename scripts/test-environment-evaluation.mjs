@@ -26,6 +26,7 @@ for (const track of ['codex', 'claude']) test(`${track}: exact environment evalu
   const draft = structuredClone(readContentAddressedJson({ storeRoot: a.storeRoot, digest: a.adapter.evolution.experiment_object_digest }).value);
   const root = resolve(import.meta.dirname, '..'), repositoryRevision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
   draft.protocol.source_revision = repositoryRevision;
+  if (track === 'claude') draft.protocol.cli.version = '2.1.318';
   a.options.runtime.cli_version = b.options.runtime.cli_version = draft.protocol.cli.version;
   const baseline = captureInstructionEnvironment(a.options), challenger = captureInstructionEnvironment(b.options);
   const environments = { baseline: baseline.object_digest, challenger: challenger.object_digest };
@@ -35,7 +36,9 @@ for (const track of ['codex', 'claude']) test(`${track}: exact environment evalu
     fixture_id, adapter_track: track, condition: 'full_ask', task_class: draft.protocol.task_classes[0], case_id: `${fixture_id}-${index}` })));
   const planPath = join(a.root, 'plan.json'), runtimeConfigPath = join(a.root, 'runtime.json');
   writeFileSync(planPath, JSON.stringify({ cases }));
-  writeFileSync(runtimeConfigPath, JSON.stringify({ adapter: track, model: draft.protocol.model, expected_executable_version: draft.protocol.cli.version }));
+  const runtime = { adapter: track, model: draft.protocol.model, expected_executable_version: track === 'claude'
+    ? `${draft.protocol.cli.version} (Claude Code)` : `codex-cli ${draft.protocol.cli.version}` };
+  writeFileSync(runtimeConfigPath, JSON.stringify(runtime));
   const options = { ...a.options, root, repositoryRevision, planPath, runtimeConfigPath, role: 'baseline',
     experimentObjectDigest: published.object_digest, trustedExperimentAuthorities: [draft.authority] };
   materialization = null; dispatches = [];
@@ -53,6 +56,15 @@ for (const track of ['codex', 'claude']) test(`${track}: exact environment evalu
   const result = api.executeEnvironmentEvaluation({ ...options, confirmedExperimentObjectDigest: published.object_digest });
   assert.equal(result.quality_implied, false); assert.equal(dispatches.length, cases.length);
   assert.ok(dispatches.every(c => c.adapter === track && c.maxCases === 1 && c.retryFailed === false && c.firstAttemptOnly === true));
+  writeFileSync(runtimeConfigPath, JSON.stringify({ ...runtime, expected_executable_version: draft.protocol.cli.version }));
+  api.executeEnvironmentEvaluation({ ...options, confirmedExperimentObjectDigest: published.object_digest });
+  assert.equal(dispatches.length, cases.length * 2, 'the undecorated pin remains accepted');
+  for (const version of track === 'claude' ? ['2.1.317 (Claude Code)', '2.1.319 (Claude Code)', '3.0.0 (Claude Code)',
+    '2.1.318 (Claude Beta)', 'Claude 2.1.318 (Claude Code)'] : ['codex-cli foreign', `${draft.protocol.cli.version} (Claude Code)`]) {
+    writeFileSync(runtimeConfigPath, JSON.stringify({ ...runtime, expected_executable_version: version }));
+    assert.throws(() => api.executeEnvironmentEvaluation({ ...options, confirmedExperimentObjectDigest: published.object_digest }), /expected CLI version drift/);
+    assert.equal(dispatches.length, cases.length * 2, 'version mismatch must refuse before dispatch');
+  }
   records.values().next().value.projected_asset_inventory[0].sha256 = '0'.repeat(64);
   assert.throws(() => api.verifyEnvironmentEvaluation(options), /byte drift/);
   assert.throws(() => api.verifyEnvironmentEvaluation({ ...options, repositoryRevision: 'foreign' }), /source revision drift/);

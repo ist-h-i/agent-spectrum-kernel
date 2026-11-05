@@ -12,6 +12,13 @@ export { instructionPath };
 
 export const exactInstructionAsset = a => Object.fromEntries(['asset_type', 'stable_id', 'version', 'record_digest', 'content_digest'].map(k => [k, a[k]]));
 export const instructionBytesDigest = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex');
+export function matchesInstructionCliVersion(adapter, version, pin) {
+  if (!['codex', 'claude'].includes(adapter) || typeof version !== 'string' || typeof pin !== 'string') return false;
+  if (version === pin || version.endsWith(' ' + pin)) return true;
+  // Match known Claude branding without rewriting the recorded runtime identity.
+  const claude = adapter === 'claude' && /^(\d+\.\d+\.\d+) \(Claude Code\)$/.exec(version);
+  return Boolean(claude && claude[1] === pin);
+}
 const same = (a, b) => canonicalDigest(a) === canonicalDigest(b);
 const order = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 const read = (storeRoot, digest) => readContentAddressedJson({ storeRoot, digest }).value;

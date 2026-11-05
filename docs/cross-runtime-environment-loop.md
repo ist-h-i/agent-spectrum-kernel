@@ -1,6 +1,6 @@
 # Cross-runtime instruction environment loop
 
-Spec `cross-runtime-environment-loop-spec-v1`, revision 3.
+Spec `cross-runtime-environment-loop-spec-v1`, revision 4.
 
 Native continuation, ENV-9: add an explicit `claude_code_restricted_v1` runtime
 contract alongside the existing bespoke artificial CLI contract. It uses official
@@ -100,6 +100,12 @@ and saved-results suites using `--experimental-test-module-mocks`. Saved-results
 tests mock native transport boundaries, retain real Registry/Evolution binding
 checks, and check refusal of experiment, environment, model and CLI transplants.
 The original native grader/verifier implementations retain their own suites.
+ENV-9-VERSION (review4476998316) verifies the documented Claude version label at
+both evaluation dispatch and saved-result consumption. The focused commands are
+`node --experimental-test-module-mocks --test scripts/test-environment-evaluation.mjs
+scripts/test-environment-saved-results.mjs`. Accept the exact undecorated pin and
+known CLI branding; reject version/unknown-suffix drift before dispatch or grading.
+Keep full recorded-runtime equality intact when two equivalent labels differ.
 Run affected existing Registry/Portfolio/Evolution/installer checks and repository
 validation. Artificial approval and evidence are never actual owner approval.
 
@@ -310,7 +316,15 @@ this JSON or logs. `CLAUDE_CODE_OAUTH_TOKEN` can replace the API-key entry;
 supplying both actual credentials is refused. `runtime-inspect` is model-free;
 evaluation start still requires its independently bound experiment and explicit
 confirmation. No automatic authentication, exporter, hook or security-policy
-expansion occurs. [Official CLI flags](https://code.claude.com/docs/en/cli-reference)
+expansion occurs.
+
+The environment's `runtime.cli_version` uses the undecorated pin, for example
+`2.1.318`. Evaluation start and saved-result verification recognize the known
+`2.1.318 (Claude Code)` label as that exact version. Different patch/release
+versions and unknown suffixes remain mismatches. This comparison does not rewrite
+recorded runtime identities, executable/configuration pins or the complete
+baseline/challenger runtime-contract equality check.
+[Official CLI flags](https://code.claude.com/docs/en/cli-reference)
 and [working-directory boundaries](https://code.claude.com/docs/en/permissions#block-file-tool-reads-and-writes-outside-the-working-directories)
 are upstream contracts; these restrictions do not cover arbitrary host code.
 

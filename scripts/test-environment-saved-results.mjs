@@ -26,9 +26,11 @@ const { verifyEnvironmentSavedResults } = await import('./environment-saved-resu
 for (const track of ['codex', 'claude']) test(`${track}: saved results re-enter original verifiers; missing dimensions stay unavailable`, t => {
   const a = environmentFixture(t, track), b = environmentFixture(t, track, 'challenger', a);
   const draft = structuredClone(readContentAddressedJson({ storeRoot: a.storeRoot, digest: a.adapter.evolution.experiment_object_digest }).value);
+  if (track === 'claude') draft.protocol.cli.version = '2.1.318';
   a.options.runtime.cli_version = b.options.runtime.cli_version = draft.protocol.cli.version;
   environments = { baseline: captureInstructionEnvironment(a.options).object_digest, challenger: captureInstructionEnvironment(b.options).object_digest };
-  frozenRuntime = a.options.runtime; observedRuntime = { model: frozenRuntime.model, executable: { observed_version: frozenRuntime.cli_version },
+  frozenRuntime = a.options.runtime; observedRuntime = { model: frozenRuntime.model, executable: { observed_version: track === 'claude'
+    ? `${frozenRuntime.cli_version} (Claude Code)` : `codex-cli ${frozenRuntime.cli_version}` },
     runtime_config_sha256: canonicalDigest('same runtime config').slice(7) }; environmentOverride = null; runtimeOverrides = {};
   const gradingBindings = draft.protocol.fixture_ids.map(fixture_id => ({ fixture_id, evaluator_bundle_digest: canonicalDigest('original-bundle'),
     scoring_input_freeze_manifest_source_digest: canonicalDigest('original-freeze'), scoring_policy_digest: draft.protocol.scoring_policy_digest }));
@@ -56,10 +58,25 @@ for (const track of ['codex', 'claude']) test(`${track}: saved results re-enter 
   const checked = verifyEnvironmentSavedResults(options);
   assert.equal(nativeCalls, data.baseline.length + data.challenger.length); assert.equal(checked.report.status, 'saved_pair_verified');
   assert.equal(checked.report.recorded_runtime_contract_digest, canonicalDigest(observedRuntime));
+  const originalVersion = observedRuntime.executable.observed_version;
+  observedRuntime.executable.observed_version = frozenRuntime.cli_version;
+  assert.equal(verifyEnvironmentSavedResults(options).report.status, 'saved_pair_verified', 'undecorated saved version remains accepted');
+  observedRuntime.executable.observed_version = originalVersion;
+  for (const version of track === 'claude' ? ['2.1.317 (Claude Code)', '2.1.319 (Claude Code)', '3.0.0 (Claude Code)',
+    '2.1.318 (Claude Beta)', 'Claude 2.1.318 (Claude Code)'] : ['codex-cli foreign', `${frozenRuntime.cli_version} (Claude Code)`]) {
+    observedRuntime.executable.observed_version = version;
+    const before = nativeCalls;
+    assert.throws(() => verifyEnvironmentSavedResults(options), /saved CLI version/);
+    assert.equal(nativeCalls, before, 'version mismatch must refuse before original grading');
+  }
+  observedRuntime.executable.observed_version = originalVersion;
   assert.equal(checked.evidence.dimensions.quality.status, 'complete'); assert.equal(checked.evidence.dimensions.variance.status, 'unavailable');
   assert.equal(checked.evidence.dimensions.mechanism.status, 'unavailable'); assert.equal(checked.evidence.causal_attribution.status, 'not_claimed');
   runtimeOverrides.challenger = { ...observedRuntime, runtime_config_sha256: canonicalDigest('foreign runtime config').slice(7) };
   assert.throws(() => verifyEnvironmentSavedResults(options), /different recorded runtime contracts/); runtimeOverrides = {};
+  runtimeOverrides.challenger = { ...observedRuntime, executable: { observed_version: frozenRuntime.cli_version } };
+  assert.throws(() => verifyEnvironmentSavedResults(options), /different recorded runtime contracts/, 'equivalent version labels cannot erase recorded runtime drift');
+  runtimeOverrides = {};
   const scoped = structuredClone(options);
   for (const role of ['baseline', 'challenger']) {
     scoped.results[role].resultSet.mode = 'environment_scope';
