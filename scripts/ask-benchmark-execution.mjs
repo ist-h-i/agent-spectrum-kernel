@@ -1794,6 +1794,23 @@ function preflightCaseClaim({ root, context, entry, state }) {
   return claim;
 }
 
+function verifyFirstAttemptClaim({ root, context, entry, claim }) {
+  if (!context.firstAttemptOnly) return;
+  // Re-read while holding the exclusive existing claim. A competing worker
+  // may have completed between the earlier state read and claim publication.
+  try {
+    const state = readCaseState(root, context.runDir, entry);
+    if (claim.attempt !== '0001' || state.status !== 'pending' || state.attempt_count !== 0
+      || readdirSync(resolve(caseRootPath(context.runDir, entry.case_id), 'attempts')).length !== 0) {
+      throw new Error('first-attempt execution refuses attempted or uncertain cases');
+    }
+  } catch (error) {
+    releaseClaim(root, context.runDir, entry.case_id, claim.claim_id);
+    removeEphemeralWorkspace(claim, context.identity);
+    throw error;
+  }
+}
+
 function markUnavailable({ root, context, entry, state, runtime, adapter }) {
   if (context.firstAttemptOnly && (state.status !== 'pending' || state.attempt_count !== 0)) throw new Error('first-attempt execution refuses attempted or uncertain cases');
   if (["completed", "unavailable"].includes(state.status)) return;
@@ -1801,6 +1818,7 @@ function markUnavailable({ root, context, entry, state, runtime, adapter }) {
   const attempt = nextAttempt(context.runDir, entry);
   const claim = acquireClaim({ root, context, entry, attempt, runtime, adapter });
   if (!claim) return "active";
+  verifyFirstAttemptClaim({ root, context, entry, claim });
   const activeState = { ...state, status: "active", attempt_count: Number(attempt), active_claim_id: claim.claim_id, terminal_attempt: null, terminal_commit_digest: null };
   writeCaseState(context.runDir, entry, activeState);
   const attemptRoot = attemptRootPath(context.runDir, entry.case_id, attempt);
@@ -1826,6 +1844,7 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
   const attempt = nextAttempt(context.runDir, entry);
   const claim = acquireClaim({ root, context, entry, attempt, runtime, adapter });
   if (!claim) return "active";
+  verifyFirstAttemptClaim({ root, context, entry, claim });
   const activeState = { ...state, status: "active", attempt_count: Number(attempt), active_claim_id: claim.claim_id, terminal_attempt: null, terminal_commit_digest: null };
   writeCaseState(context.runDir, entry, activeState);
   const attemptRoot = attemptRootPath(context.runDir, entry.case_id, attempt);
