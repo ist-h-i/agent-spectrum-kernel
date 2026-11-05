@@ -19,7 +19,7 @@ export function testNativeClaudeExecution({ root, work, config, planPath, materi
 const args=process.argv.slice(2); if(args[0]==='--version'){console.log('2.1.318 (Claude Code)');process.exit(0)}
 if(args[0]==='--help'){console.log(${JSON.stringify(help)});process.exit(0)}
 const value=k=>args[args.indexOf(k)+1];let task='';for await(const chunk of process.stdin)task+=chunk;
-assert.ok(task.length>0);assert.ok(args.includes('--restricted'));assert.ok(args.includes('--no-session-persistence'));
+assert.ok(task.length>0);assert.ok(args.includes('--restricted'));assert.ok(args.includes('--bare'));assert.equal(value('--add-dir'),'.');assert.ok(args.includes('--no-session-persistence'));
 assert.equal(value('--permission-mode'),'dontAsk');assert.equal(value('--permission-prompts'),'none');
 assert.equal(value('--tools'),'Read,Glob,Grep,Skill,Edit,Write');assert.deepEqual(JSON.parse(value('--mcp-config')),{mcpServers:{}});
 const settings=JSON.parse(value('--settings'));assert.equal(settings.disableAllHooks,true);assert.equal(settings.permissions.blockWritesOutsideWorkingDirectories,true);

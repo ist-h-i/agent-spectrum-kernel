@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { coreProducerInspection } from './ask-core-producer-scope.mjs';
 import { CLAUDE_NATIVE_KIND, isNativeClaudeRuntime, validateNativeClaudeRuntime, nativeClaudeCommand,
   nativeClaudeEnvironment, nativeClaudeProbeEnvironment, decodeNativeClaudeResult, assertNativeClaudeAuthentication,
-  assertNativeClaudeInstructions } from './claude-native-runtime.mjs';
+  assertNativeClaudeInstructions, validateNativeClaudeEnvironmentPolicy } from './claude-native-runtime.mjs';
 import { verifyCoreProducedTerminal } from './ask-core-capture-producer.mjs';
 import { primaryProducerInspection } from './ask-primary-evaluation-scope.mjs';
 import { verifyPrimaryProducedTerminal } from './ask-primary-evaluation-producer.mjs';
@@ -317,6 +317,8 @@ function readRuntimeConfig(root, path, adapter) {
   const value = JSON.parse(bytes);
   validate(root, value, RUNTIME_CONFIG_SCHEMA_PATH, "runtime config");
   if (value.adapter !== adapter) throw new Error(`runtime config adapter ${value.adapter} does not match --adapter ${adapter}`);
+  // Environment snapshots exist even for declared-unavailable runtimes.
+  if (isNativeClaudeRuntime(value)) validateNativeClaudeEnvironmentPolicy(value);
   if (value.availability === "available" && (!value.expected_executable_version || (adapter === "claude" && !value.claude_cli))) {
     throw new Error("available runtime config requires expected executable version and an explicit Claude CLI contract where applicable");
   }

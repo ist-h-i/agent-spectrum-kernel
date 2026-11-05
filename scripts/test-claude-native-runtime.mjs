@@ -24,7 +24,8 @@ test('native Claude has a closed, versioned, restricted file-tool policy and red
   const { runtime } = fixture(t); validateNativeClaudeRuntime(runtime);
   const command = nativeClaudeCommand(runtime, canonicalDigest('schema'));
   assert.equal(command.task_transport, 'stdin'); assert.equal(command.output_transport, 'structured_stdout');
-  assert.ok(command.argv.includes('--restricted')); assert.ok(!command.argv.includes('--dangerously-skip-permissions'));
+  assert.ok(command.argv.includes('--restricted')); assert.ok(command.argv.includes('--bare'));
+  assert.equal(command.argv[command.argv.indexOf('--add-dir') + 1], '.'); assert.ok(!command.argv.includes('--dangerously-skip-permissions'));
   assert.deepEqual(nativeClaudeSettings(runtime).permissions.allow, ['Read', 'Glob', 'Grep', 'Skill', 'Edit', 'Write']);
   const readonly = nativeClaudeSettings({ ...runtime, sandbox_policy: 'read-only' });
   assert.ok(!readonly.permissions.allow.includes('Write') && readonly.permissions.deny.includes('Write'));
@@ -61,7 +62,11 @@ test('passive native Skills cannot smuggle preprocessing, fork/agent/hooks heade
     assert.throws(() => assertNativeClaudeInstructions(directory), /header/);
   }
   writeFileSync(path, 'The result is !`touch outside`'); assert.throws(() => assertNativeClaudeInstructions(directory), /preprocessing/);
-  rmSync(path); symlinkSync('/etc/passwd', path); assert.throws(() => assertNativeClaudeInstructions(directory), /link/);
+  const hiddenHeader = '---\nname: sample\ndescription: Passive\n---: ignored\ncontext: fork\nhooks: {}\n---\nText';
+  writeFileSync(path, hiddenHeader); assert.throws(() => assertNativeClaudeInstructions(directory), /header/);
+  rmSync(path); const foldedPath = join(skills, 'skill.md'); writeFileSync(foldedPath, hiddenHeader);
+  assert.throws(() => assertNativeClaudeInstructions(directory), /header/); rmSync(foldedPath);
+  symlinkSync('/etc/passwd', path); assert.throws(() => assertNativeClaudeInstructions(directory), /link/);
 });
 test('real contained fake process exercises official argv/stdin/JSON transport; version/help needs no auth and start refuses missing auth before run creation', t => {
   const { directory, runtime } = fixture(t), executable = join(directory, 'native-claude.mjs'), runtimePath = join(directory, 'runtime.json');
@@ -76,6 +81,13 @@ test('real contained fake process exercises official argv/stdin/JSON transport; 
   const runDir = join(directory, 'must-not-create');
   assert.throws(() => executePortfolio({ root, runtimeConfigPath: runtimePath, adapter: 'claude', agentBin: executable, runDir }), /explicit_authentication/);
   assert.equal(existsSync(runDir), false);
+  for (const secretName of ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN']) {
+    writeFileSync(runtimePath, JSON.stringify({ ...runtime, availability: 'unavailable', unavailable_reason: 'artificial unavailable',
+      expected_executable_version: null, environment_allowlist: [secretName], environment_value_allowlist: [secretName] }));
+    assert.throws(() => executePortfolio({ root, runtimeConfigPath: runtimePath, adapter: 'claude', agentBin: executable, runDir }), /remain redacted/);
+    assert.equal(existsSync(runDir), false, 'unavailable runtime cannot publish a credential snapshot');
+  }
+  writeFileSync(runtimePath, JSON.stringify(runtime));
   const raw = executeContainedAgent(executable, command.argv.map(a => a === '{output_schema_json}' ? readFileSync(join(root, OUTPUT_SCHEMA_PATH), 'utf8') : a),
     { cwd: directory, input: 'artificial task', env: nativeClaudeEnvironment({ ANTHROPIC_API_KEY: 'artificial-only' }, join(directory, 'config')),
       timeout: 5000, maxBuffer: 1024 * 1024 });

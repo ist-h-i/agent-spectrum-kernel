@@ -4,7 +4,8 @@ Spec `cross-runtime-environment-loop-spec-v1`, revision 3.
 
 Native continuation, ENV-9: add an explicit `claude_code_restricted_v1` runtime
 contract alongside the existing bespoke artificial CLI contract. It uses official
-Claude Code 2.1.318+ in the 2.1 release line, `--restricted`, print mode, an exact
+Claude Code 2.1.318+ in the 2.1 release line, `--restricted`, `--bare` with only
+the current workspace explicitly added for instruction discovery, print mode, an exact
 tool allowlist, session-only hook/memory disabling, no MCP/browser/session reuse,
 and a private empty config directory. Supported policies are read-only or
 workspace-write with strict noninteractive permissions. Only built-in bounded

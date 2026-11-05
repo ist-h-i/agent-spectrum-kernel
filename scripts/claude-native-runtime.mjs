@@ -10,6 +10,10 @@ const environmentKeys = new Set(['PATH', ...authenticationKeys]);
 const readonlyTools = ['Read', 'Glob', 'Grep', 'Skill'];
 const deniedTools = ['Bash', 'PowerShell', 'Agent', 'Task', 'WebFetch', 'WebSearch', 'NotebookEdit'];
 export const isNativeClaudeRuntime = runtime => runtime.adapter === 'claude' && runtime.claude_cli?.kind === CLAUDE_NATIVE_KIND;
+export function validateNativeClaudeEnvironmentPolicy(runtime) {
+  assert.ok(runtime.environment_allowlist.every(key => environmentKeys.has(key)), 'unsupported native Claude environment entry');
+  assert.ok(runtime.environment_value_allowlist.every(key => !authenticationKeys.includes(key)), 'native Claude authentication must remain redacted');
+}
 export function validateNativeClaudeRuntime(runtime) {
   assert.ok(isNativeClaudeRuntime(runtime), 'explicit native Claude runtime kind required');
   assert.deepEqual(Object.keys(runtime.claude_cli), ['kind'], 'native Claude command/settings are owned by the runner');
@@ -19,8 +23,7 @@ export function validateNativeClaudeRuntime(runtime) {
   assert.match(runtime.model, /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/, 'invalid native Claude model');
   const version = /^(\d+)\.(\d+)\.(\d+)(?: \(Claude Code\))?$/.exec(runtime.expected_executable_version ?? '');
   assert.ok(version && version[1] === '2' && version[2] === '1' && Number(version[3]) >= 318, 'native Claude requires a pinned supported 2.1.318+ version');
-  assert.ok(runtime.environment_allowlist.every(key => environmentKeys.has(key)), 'unsupported native Claude environment entry');
-  assert.ok(runtime.environment_value_allowlist.every(key => !authenticationKeys.includes(key)), 'native Claude authentication must remain redacted');
+  validateNativeClaudeEnvironmentPolicy(runtime);
 }
 export function assertNativeClaudeAuthentication(environment) {
   assert.equal(authenticationKeys.filter(key => typeof environment[key] === 'string' && environment[key].length > 0).length, 1,
@@ -36,7 +39,7 @@ export function nativeClaudeSettings(runtime) {
 export function nativeClaudeCommand(runtime, schemaDigest) {
   validateNativeClaudeRuntime(runtime);
   const settings = nativeClaudeSettings(runtime), tools = settings.permissions.allow.join(',');
-  return { argv: ['--print', '--restricted', '--no-session-persistence', '--no-chrome',
+  return { argv: ['--print', '--restricted', '--bare', '--add-dir', '.', '--no-session-persistence', '--no-chrome',
     '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--permission-mode', 'dontAsk', '--permission-prompts', 'none',
     '--tools', tools, '--allowedTools', tools, '--disallowedTools', settings.permissions.deny.join(','),
     '--settings', JSON.stringify(settings), '--model', runtime.model, '--effort', runtime.reasoning_effort,
@@ -65,14 +68,15 @@ export function assertNativeClaudeInstructions(workspace) {
       const path = join(directory, entry.name);
       assert.ok(!entry.isSymbolicLink(), 'native Claude instruction link refused');
       if (entry.isDirectory()) inspect(path, commands, depth + 1);
-      else if (entry.isFile() && (entry.name === 'SKILL.md' || (commands && entry.name.endsWith('.md')))) {
+      else if (entry.isFile() && (entry.name.toLowerCase() === 'skill.md' || (commands && entry.name.toLowerCase().endsWith('.md')))) {
         const bytes = readFileSync(path); assert.ok(bytes.length <= 1024 * 1024, 'native Claude instruction size refused');
         const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').trimStart();
         assert.ok(!text.includes('!`'), 'native Claude dynamic command preprocessing is unsupported');
         if (text.startsWith('---')) {
           assert.ok(text.startsWith('---\n'), 'native Claude instruction header refused');
-          const end = text.indexOf('\n---', 4); assert.ok(end !== -1, 'native Claude instruction header refused');
-          const lines = text.slice(4, end).split('\n').filter(line => line.trim());
+          const header = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(text);
+          assert.ok(header, 'native Claude instruction header refused');
+          const lines = header[1].split('\n').filter(line => line.trim());
           assert.ok(lines.every(line => /^(name|description):\s+[^\s|>&*!{}\[\]].*$/.test(line) && !line.includes('\\')), 'native Claude requires passive name/description headers only');
           assert.equal(new Set(lines.map(line => line.split(':')[0])).size, lines.length, 'native Claude duplicate instruction header');
         }
