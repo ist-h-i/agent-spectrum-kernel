@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "version": "business-five-20261105-draft1",
+  "task_id": "ch04-document-access",
+  "modes": {
+    "one_shot": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03",
+          "bytes": 5509
+        },
+        {
+          "path": "public/tasks/ch04-document-access/TASK.md",
+          "sha256": "c20713cb72cd6a294cf313fb676a668aa37b96a28b774f7df238af358235c8fd",
+          "bytes": 1197
+        },
+        {
+          "path": "public/tasks/ch04-document-access/acceptance.md",
+          "sha256": "185ecf0c212b7ca57450fa89e73d8b7ebd17e1ce3195e91fd34d7e8a4fc91ef7",
+          "bytes": 1188
+        },
+        {
+          "path": "public/tasks/ch04-document-access/contract.md",
+          "sha256": "6da889ee992d6c111a9a5f083e0efe67ba49983ad3cfb48ecc88abef1227270d",
+          "bytes": 3535
+        },
+        {
+          "path": "public/tasks/ch04-document-access/fixture-format.md",
+          "sha256": "eb3b8923cbe293982b3b2282d3c7fa7a642822a0c411c5923f804790c4ae2b72",
+          "bytes": 1698
+        },
+        {
+          "path": "public/tasks/ch04-document-access/fixtures/example.json",
+          "sha256": "811f72961116a7b84c600b80c7c96f18acecdfd809cabbf6fbff174652603869",
+          "bytes": 3953
+        },
+        {
+          "path": "public/tasks/ch04-document-access/nonfunctional.md",
+          "sha256": "ad51ce94141b334e54439126065d0d1d71417206e016a55972f2500911805ebc",
+          "bytes": 618
+        },
+        {
+          "path": "public/tasks/ch04-document-access/prompt.txt",
+          "sha256": "5d7a8ac53dd6f017017ccf9d7e9bbb0a5b5dc27a1288de276be6363004585a32",
+          "bytes": 432
+        },
+        {
+          "path": "public/tasks/ch04-document-access/roles.md",
+          "sha256": "139f7b727f96e6e76503dd307cf6ae5fdd675be4fbd811a16b68f52529f77ea3",
+          "bytes": 1281
+        }
+      ],
+      "inventory_sha256": "7915701fcc34ed519deb69adc40cc5cd8c9f3782216100925c972ac4b4d6def4"
+    },
+    "goal_with_pr": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03",
+          "bytes": 5509
+        },
+        {
+          "path": "public/tasks/ch04-document-access/TASK.md",
+          "sha256": "c20713cb72cd6a294cf313fb676a668aa37b96a28b774f7df238af358235c8fd",
+          "bytes": 1197
+        },
+        {
+          "path": "public/tasks/ch04-document-access/acceptance.md",
+          "sha256": "185ecf0c212b7ca57450fa89e73d8b7ebd17e1ce3195e91fd34d7e8a4fc91ef7",
+          "bytes": 1188
+        },
+        {
+          "path": "public/tasks/ch04-document-access/contract.md",
+          "sha256": "6da889ee992d6c111a9a5f083e0efe67ba49983ad3cfb48ecc88abef1227270d",
+          "bytes": 3535
+        },
+        {
+          "path": "public/tasks/ch04-document-access/fixture-format.md",
+          "sha256": "eb3b8923cbe293982b3b2282d3c7fa7a642822a0c411c5923f804790c4ae2b72",
+          "bytes": 1698
+        },
+        {
+          "path": "public/tasks/ch04-document-access/fixtures/example.json",
+          "sha256": "811f72961116a7b84c600b80c7c96f18acecdfd809cabbf6fbff174652603869",
+          "bytes": 3953
+        },
+        {
+          "path": "public/tasks/ch04-document-access/goal-pr.txt",
+          "sha256": "260641051f787b597f958369975d313c2e1c0b69585e72b0a4065b68a81e01cc",
+          "bytes": 704
+        },
+        {
+          "path": "public/tasks/ch04-document-access/nonfunctional.md",
+          "sha256": "ad51ce94141b334e54439126065d0d1d71417206e016a55972f2500911805ebc",
+          "bytes": 618
+        },
+        {
+          "path": "public/tasks/ch04-document-access/roles.md",
+          "sha256": "139f7b727f96e6e76503dd307cf6ae5fdd675be4fbd811a16b68f52529f77ea3",
+          "bytes": 1281
+        }
+      ],
+      "inventory_sha256": "6aace55d0e8861bfda8a36a4aec8cbbafeb29daa77587a702e84f7a116f0e328"
+    }
+  },
+  "working_directory": "public/tasks/ch04-document-access"
+}

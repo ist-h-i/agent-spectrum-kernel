@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "version": "business-five-20261105-draft1",
+  "task_id": "ch05-sales-reconciliation",
+  "modes": {
+    "one_shot": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03",
+          "bytes": 5509
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/TASK.md",
+          "sha256": "a2666df1481b962050207cdd80b1d474ed612374de40774ff181bbd1022f93e1",
+          "bytes": 1223
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/acceptance.md",
+          "sha256": "4b096268bb5e109788711780c4459f7ddd37eab6b121536573d260844b344587",
+          "bytes": 1202
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/contract.md",
+          "sha256": "35467e9afd408f57dbea46c91ef34691795f5db10ee2add1ba7bef9f3504e38d",
+          "bytes": 3610
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/fixture-format.md",
+          "sha256": "570370a4cc7e18af2e4fc5ed43412809be4fa7eae98c313d22c749f96465d4e1",
+          "bytes": 1655
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/fixtures/example.json",
+          "sha256": "1ab784ce8fdbde4db9a94b96627857d8667650bcaa376d1be2c3bfa9f65ddc44",
+          "bytes": 3462
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/nonfunctional.md",
+          "sha256": "ee9dd91364c05f33695a919781b4b4942a4446666416dcab669153c7edeea11b",
+          "bytes": 692
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/prompt.txt",
+          "sha256": "5d7a8ac53dd6f017017ccf9d7e9bbb0a5b5dc27a1288de276be6363004585a32",
+          "bytes": 432
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/roles.md",
+          "sha256": "9ab6397ba4f023ae7fa52ec4d1e0270949b04e5d7130b1ed00ba6423e1a30c9e",
+          "bytes": 1057
+        }
+      ],
+      "inventory_sha256": "800901bda3e7c63e54855d7f80ea5948a5d24609f44b789fd2514f60da77b0c3"
+    },
+    "goal_with_pr": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03",
+          "bytes": 5509
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/TASK.md",
+          "sha256": "a2666df1481b962050207cdd80b1d474ed612374de40774ff181bbd1022f93e1",
+          "bytes": 1223
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/acceptance.md",
+          "sha256": "4b096268bb5e109788711780c4459f7ddd37eab6b121536573d260844b344587",
+          "bytes": 1202
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/contract.md",
+          "sha256": "35467e9afd408f57dbea46c91ef34691795f5db10ee2add1ba7bef9f3504e38d",
+          "bytes": 3610
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/fixture-format.md",
+          "sha256": "570370a4cc7e18af2e4fc5ed43412809be4fa7eae98c313d22c749f96465d4e1",
+          "bytes": 1655
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/fixtures/example.json",
+          "sha256": "1ab784ce8fdbde4db9a94b96627857d8667650bcaa376d1be2c3bfa9f65ddc44",
+          "bytes": 3462
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/goal-pr.txt",
+          "sha256": "260641051f787b597f958369975d313c2e1c0b69585e72b0a4065b68a81e01cc",
+          "bytes": 704
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/nonfunctional.md",
+          "sha256": "ee9dd91364c05f33695a919781b4b4942a4446666416dcab669153c7edeea11b",
+          "bytes": 692
+        },
+        {
+          "path": "public/tasks/ch05-sales-reconciliation/roles.md",
+          "sha256": "9ab6397ba4f023ae7fa52ec4d1e0270949b04e5d7130b1ed00ba6423e1a30c9e",
+          "bytes": 1057
+        }
+      ],
+      "inventory_sha256": "f4a56c5bf86f18fa631a589f027dc4ff7846ab6721b76abca2cf5cbe95d0ea3b"
+    }
+  },
+  "working_directory": "public/tasks/ch05-sales-reconciliation"
+}

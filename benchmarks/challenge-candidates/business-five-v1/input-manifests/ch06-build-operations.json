@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "version": "business-five-20261105-draft1",
+  "task_id": "ch06-build-operations",
+  "modes": {
+    "one_shot": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03",
+          "bytes": 5509
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/TASK.md",
+          "sha256": "a73fdd68048d39a47eaf210a7d6cadfe9637cdfe14ca1e4bda57ab2b52446b4a",
+          "bytes": 1234
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/acceptance.md",
+          "sha256": "990e6287059067e8d3c67abb0d9a1b5314855b1fc7d2eb1801f9b5125796661c",
+          "bytes": 1197
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/compiler-provider.md",
+          "sha256": "082834fdc0eee4931907e367d9c647a6fa58d8fdea3b77c905b362657901d905",
+          "bytes": 2083
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/contract.md",
+          "sha256": "62449f44221f2403aee1eb08b4b55f92779e8ea3ea066decd855bb436cb8aba9",
+          "bytes": 3279
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/fixture-format.md",
+          "sha256": "0401580e454f61e15c92cd0f7c6bfd5e6a0072a90dc492b39025f9c59307e797",
+          "bytes": 1637
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/fixtures/example.json",
+          "sha256": "5a5dea61604e700bcbf7158f83c9d1247284b716c03064a7f6932f65267b87d0",
+          "bytes": 3054
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/nonfunctional.md",
+          "sha256": "71e749c3e10ecd692713be5b2839f996ca3a808ef2e4a089872719cb133006dc",
+          "bytes": 653
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/prompt.txt",
+          "sha256": "5d7a8ac53dd6f017017ccf9d7e9bbb0a5b5dc27a1288de276be6363004585a32",
+          "bytes": 432
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/roles.md",
+          "sha256": "e2246f0e4a0dff3288718cd1deae596a3a65e69204e11385bed593cb9e8572d0",
+          "bytes": 1126
+        }
+      ],
+      "inventory_sha256": "8bd6cc895b7f674c5cf0e9c11cb6cbe8f373fab3e58d60a8a9a2908bf0240ff8"
+    },
+    "goal_with_pr": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03",
+          "bytes": 5509
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/TASK.md",
+          "sha256": "a73fdd68048d39a47eaf210a7d6cadfe9637cdfe14ca1e4bda57ab2b52446b4a",
+          "bytes": 1234
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/acceptance.md",
+          "sha256": "990e6287059067e8d3c67abb0d9a1b5314855b1fc7d2eb1801f9b5125796661c",
+          "bytes": 1197
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/compiler-provider.md",
+          "sha256": "082834fdc0eee4931907e367d9c647a6fa58d8fdea3b77c905b362657901d905",
+          "bytes": 2083
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/contract.md",
+          "sha256": "62449f44221f2403aee1eb08b4b55f92779e8ea3ea066decd855bb436cb8aba9",
+          "bytes": 3279
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/fixture-format.md",
+          "sha256": "0401580e454f61e15c92cd0f7c6bfd5e6a0072a90dc492b39025f9c59307e797",
+          "bytes": 1637
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/fixtures/example.json",
+          "sha256": "5a5dea61604e700bcbf7158f83c9d1247284b716c03064a7f6932f65267b87d0",
+          "bytes": 3054
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/goal-pr.txt",
+          "sha256": "260641051f787b597f958369975d313c2e1c0b69585e72b0a4065b68a81e01cc",
+          "bytes": 704
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/nonfunctional.md",
+          "sha256": "71e749c3e10ecd692713be5b2839f996ca3a808ef2e4a089872719cb133006dc",
+          "bytes": 653
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/roles.md",
+          "sha256": "e2246f0e4a0dff3288718cd1deae596a3a65e69204e11385bed593cb9e8572d0",
+          "bytes": 1126
+        }
+      ],
+      "inventory_sha256": "1c756d96bfa71b34a4261918dc11c2acf6f4b5b61d44913a8c7cae442bd8296d"
+    }
+  },
+  "working_directory": "public/tasks/ch06-build-operations"
+}

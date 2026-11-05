@@ -1,0 +1,9 @@
+# 評価用compilerの境界
+
+ASK_COMPILER_URLは評価側が管理するHTTP compilerである。候補は入力を送るmethod/pathと次の意味を固定adapterへ説明する。要求はproject、source ID/版、source本文、config、現在利用可能な依存artifactを含む。返答は成功artifactと追加で必要なsource IDまたはglob query、もしくは明示失敗。依存が不足する返答はまだ成功artifactの確定ではない。artifactはJSONの不透明な値であり、候補が中身を推測して偽造しない。project、source ID/版/本文、config、依存artifact、公開source集合とその版が全て同じ場合の返答は決定的である。
+
+sourceは実行すべき候補コードではなくfixtureの文字列で、評価側はその意味に対応する有限のimport/discoveryと結果を持つ。globはproject内のsource IDに対し `*` が任意長、他の文字がそのまま一致するqueryである。空集合も正当結果で、削除で集合が減る。評価側はsourceやconfigが変わったときの返答を変更できる。アプリは現在のsource集合と公開compiler応答だけを根拠に処理する。
+
+compilerが他sourceを参照する関係は、返答で宣言したneeded ID/glob queryと入力で渡した依存artifactに限る。これらの関係に含まれないsourceの追加/削除/変更は当該artifactや必要依存を変えない。source集合全体を入力の識別へ含めても、未宣言の隠れた依存を作らない。これにより無関係な変更に対するB06の再利用条件を満たせる。
+
+局所compiler呼出しは成否と開始/終了を独立記録し、完了順を制御できる。停止・再開・一時失敗は許すが、有限障害後に正当な処理は完了する。compilerは依存の探索順、全体graphの構築、cache、同時実行枠、世代、公開/取消、UI/履歴を代行しない。compilerの返した成功値だけを表示しても業務アプリとしての受入条件は満たさない。

@@ -1,0 +1,165 @@
+{
+  "clock": "2026-11-01T10:00:00Z",
+  "actors": [
+    {
+      "id": "developer-north",
+      "tenant": "north",
+      "role": "developer"
+    },
+    {
+      "id": "operator-north",
+      "tenant": "north",
+      "role": "operator"
+    },
+    {
+      "id": "auditor-north",
+      "tenant": "north",
+      "role": "auditor"
+    },
+    {
+      "id": "developer-south",
+      "tenant": "south",
+      "role": "developer"
+    },
+    {
+      "id": "operator-south",
+      "tenant": "south",
+      "role": "operator"
+    },
+    {
+      "id": "auditor-south",
+      "tenant": "south",
+      "role": "auditor"
+    }
+  ],
+  "grants": [
+    {
+      "actor": "developer-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "build",
+        "cancelOwn"
+      ]
+    },
+    {
+      "actor": "operator-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "cancel",
+        "setConcurrency"
+      ]
+    },
+    {
+      "actor": "auditor-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "audit"
+      ]
+    },
+    {
+      "actor": "developer-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "build",
+        "cancelOwn"
+      ]
+    },
+    {
+      "actor": "operator-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "cancel",
+        "setConcurrency"
+      ]
+    },
+    {
+      "actor": "auditor-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "audit"
+      ]
+    }
+  ],
+  "data": {
+    "projects": [
+      {
+        "id": "north",
+        "sources": {
+          "lib": {
+            "version": "src-v1-lib",
+            "text": "value"
+          },
+          "app": {
+            "version": "src-v1-app",
+            "text": "import lib"
+          }
+        },
+        "targets": [
+          "app"
+        ],
+        "sourceVersion": "src-v1",
+        "config": {
+          "mode": "debug"
+        },
+        "tenant": "north"
+      },
+      {
+        "id": "south",
+        "sources": {
+          "app": {
+            "version": "src-v2-app",
+            "text": "standalone"
+          }
+        },
+        "targets": [
+          "app"
+        ],
+        "sourceVersion": "src-v2",
+        "config": {
+          "mode": "release"
+        },
+        "tenant": "south"
+      }
+    ],
+    "requests": [],
+    "published": [],
+    "defaultProject": "north",
+    "initialConcurrency": 2,
+    "compilerExamples": [
+      {
+        "project": "north",
+        "sourceId": "app",
+        "sourceVersion": "src-v1-app",
+        "config": {
+          "mode": "debug"
+        },
+        "dependencies": {},
+        "reply": {
+          "needed": [
+            "lib"
+          ]
+        }
+      },
+      {
+        "project": "north",
+        "sourceId": "lib",
+        "sourceVersion": "src-v1-lib",
+        "config": {
+          "mode": "debug"
+        },
+        "dependencies": {},
+        "reply": {
+          "artifact": {
+            "opaque": "compiled-lib-v1"
+          }
+        }
+      }
+    ]
+  }
+}
