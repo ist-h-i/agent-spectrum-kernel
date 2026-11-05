@@ -1,6 +1,7 @@
 // Public contracts and independently authored artificial captures only.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -165,7 +166,17 @@ test('AC6-5 completion drift diagnoses actual completion bytes; failure diagnost
 });
 
 test('AC6-1 earlier wire bytes retain the independently observed main253100e artificial golden values', () => {
-  const command = evidence.renderCommandEvent(contract.commands[0]);
+  // These golden bytes describe the original public contract and capture, not
+  // a later task revision's protected command body or input/contract identity.
+  // Keep current parser code under test with the independently pinned case.
+  const goldenRevision = '253100e833a6aad5bddb115b124c8f384d01dbf4';
+  const goldenContractBytes = execFileSync('git', ['-C', root, 'show', `${goldenRevision}:benchmarks/fixtures/checkpoint-b2/mn-build-option-update/verification-command-contract.json`],
+    { timeout: 60000, maxBuffer: 1048576, stdio: ['ignore', 'pipe', 'pipe'] });
+  assert.equal(hash(goldenContractBytes), 'sha256:eb2eee7170452eff1d0e131f4ac8a25a285f050a7e8e23ab23286376b31dc620');
+  const goldenContract = JSON.parse(goldenContractBytes);
+  const goldenIdentity = { ...identity, fixture_id: goldenContract.fixture_id, fixture_input_digest: goldenContract.fixture_input_digest,
+    verification_command_contract_digest: goldenContract.contract_digest };
+  const command = evidence.renderCommandEvent(goldenContract.commands[0]);
   const value = [{ type: 'thread.started', thread_id: 'fresh-artificial-golden-thread' }, { type: 'turn.started' },
     { type: 'item.started', item: { id: 'fresh-artificial-golden-check', type: 'command_execution', command, status: 'in_progress' } },
     { type: 'item.completed', item: { id: 'fresh-artificial-golden-check', type: 'command_execution', command, status: 'completed', exit_code: 0, aggregated_output: 'fresh artificial golden output' } },
@@ -179,7 +190,7 @@ test('AC6-1 earlier wire bytes retain the independently observed main253100e art
     '1.8.0-primary-saved': '91a4dc768e426e4f3df4b4df7d25069e1c6ce2b2423725a7c5c4d103ea7a2664',
   };
   for (const [parserRevision, digest] of Object.entries(golden)) {
-    const manifest = evidence.buildCodexCommandEvidence({ identity, stream: encode(value), contract, parserRevision });
+    const manifest = evidence.buildCodexCommandEvidence({ identity: goldenIdentity, stream: encode(value), contract: goldenContract, parserRevision });
     assert.equal(hash(JSON.stringify(manifest) + '\n'), 'sha256:' + digest);
     assert.equal(Object.hasOwn(manifest.capture, 'failure_diagnostic'), false);
   }
