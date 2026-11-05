@@ -108,8 +108,11 @@ larger application to equalize file formats.
 ## Host preparation and frozen grading source
 
 The current host descriptors pin the reviewed task and raw metadata bytes for
-all 24 revised inputs. Their task classes, risk boundaries, capability checks,
-reference format and principles renderer remain unchanged. The original exact
+all 24 revised inputs. Retained-event authorization observations also pin the
+reviewed task and verification-contract versions for the seven scoped fixtures;
+they classify local fictional work and grant no execution permission. Task
+classes, risk boundaries, action rules, capability checks, reference format and
+the principles renderer remain unchanged. The original exact
 lookup bytes are retained with their historical Git source, not silently reused
 against revised task bytes.
 

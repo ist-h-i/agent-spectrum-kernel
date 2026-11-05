@@ -67,12 +67,12 @@ test("descriptor is closed, explicit and cannot be repaired by declared global c
 
 // Public-source admission matrix; no private oracle, scoring, model or CLI use.
 const matrix = [
-  ["mp-frontend-state-review", "pr_review", "review", "none", "48998c1b9eda7a59e7034077d8e084baca41c2aab735b47b350ae00c924d3701", "d99e80a39f0aa85a5fe49361cb4382650f8777d10059d223f4d563e53de8dcc2"],
-  ["mp-accessibility-interaction-review", "pr_review", "review", "none", "aa2cd52eeb1b3581fb914a6f157423e408b7bebdb73b6d19980cdf0fcc709cc8", "b8b8d8f9b51621e7d4d1a6d6312d133240f03cfa468cf5f91619539c10a53398"],
-  ["mp-performance-investigation", "investigation", "investigation", "none", "7ac91dd8122102759075a20d0a583739722c7b547584e66897a40e7db9aa2733", "66c50ce462a75330c31b30d14174c7e0102f97dcc79e0d674589e24237b905a8"],
-  ["mp-ci-evidence-gap", "review_verification", "review", "none", "4247670f22a882a630aadc8688e6ed9a7c7040fb31aad17bbab7a6bb831fa435", "42fe52179c50670c5cb5627d7b352c0b4e0635f36908862c8a48ef6d0559dda0"],
-  ["mp-iac-rollback-design", "design_gate", "design", "approval_required", "f713dc3e6273195a6f726a9c72d55430901a706256fe8894cc4adb2b1c8c877c", "8de3dd391aacf46204f04a6ba4c70a4a55e17ed25e3d250d9fe726a48fcca7e9"],
-  ["mp-data-migration-handoff", "handoff_resume", "handoff", "rollback_required", "2e210dad20cda5c2c4a0c935b96769f20a72f199bf6d64126924d80a7cdc4c8e", "5d4431e47a6ec083eebe9de9d552a61c08bbefd25a888ad938d7aa907261fb6a"],
+  ["mp-frontend-state-review", "pr_review", "review", "none", "c1eb8df947c8fbc5c3a19101077b2abde4f43d40b730178e39a27a4a3c38305a", "df8669bdbd460445b7ca9947aaed09ed48a843e811923b32e645fb1dfe552319"],
+  ["mp-accessibility-interaction-review", "pr_review", "review", "none", "00d8bcc12a931a3cab4cedf814c6ea991fe2c858a32da24c675dec9870870560", "a004f95ba13278593341fdf56b0423dae01f7cb114f540ed050cb19851080e62"],
+  ["mp-performance-investigation", "investigation", "investigation", "none", "6d18d0a525823f4c29c262d77f94e7b4f0e030990a3c5d334d4edf2838edff86", "8f1b161330eadd58c3c999972b3b1e1c9cd55cfafa4465d80f5f952289ba993e"],
+  ["mp-ci-evidence-gap", "review_verification", "review", "none", "9d8a5c2ddc36525e2d059b7f7bce786a10123324b4c6e576db3dca52f25bf756", "2c6d359bc8fd2f85c2f7951eb45f4d6bb4b52d359350ff962c9a438af5cd4848"],
+  ["mp-iac-rollback-design", "design_gate", "design", "approval_required", "13641db79dd2206a5632ef502c1024cf2159b2ca45ef02c7c392d26e731ec76a", "897c2895d26cccb21736450d4e2380f0d1465a50673c626979b3536ff8b34aa7"],
+  ["mp-data-migration-handoff", "handoff_resume", "handoff", "rollback_required", "74e2875dd5a4f57cf8f78737381ae0b7e485a7149443f221db05375aab21f7c0", "18600d5eee1cbc860d8c7c2b5e5acdf7159b314f88fd1f91aee8398c0dbb4802"],
 ];
 for (const [id, publicClass, taskClass, riskBoundary, taskDigest, metadataDigest] of matrix) test(`public task signal admission: ${id}`, () => {
   const root = `benchmarks/fixtures/checkpoint-b2/${id}`;

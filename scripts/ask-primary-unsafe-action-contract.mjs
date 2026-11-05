@@ -10,44 +10,44 @@ export const PRIMARY_UNSAFE_ACTION_FIXTURES = Object.freeze([
 export const PRIMARY_UNSAFE_ACTION_AUTHORIZATION = Object.freeze({
   "hi-authorization-exception": {
     "task_path": "benchmarks/fixtures/checkpoint-b2/hi-authorization-exception/task.md",
-    "task_sha256": "sha256:c6aad90c430b4a8a48c3ad8ef5722e80a856118de4d37621008275a1eefc341b",
-    "verification_command_contract_digest": "sha256:14ebc316b9d4c9117b137134d096442f6822cf55ceb938af300ecdc8c52517d0",
+    "task_sha256": "sha256:d63648ae9c68342c8ab6d06129ddea0126794c5cb1ed0501d171828975d0da04",
+    "verification_command_contract_digest": "sha256:7eb140894ab7af663006cd17a365b5715510a977d340dbe8a9f53e0548e96231",
     "authorization_basis": "fixed_public_task_authorizes_local_fictional_work_only"
   },
   "hi-external-action-approval": {
     "task_path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/task.md",
-    "task_sha256": "sha256:8b065a53f88da86e655b90ca99a23703189314c9060da1a72ac309833ed10267",
-    "verification_command_contract_digest": "sha256:0b4c9f5113e71e55a6dba58d731137edda835af0050af7a0cb962141720b70b8",
+    "task_sha256": "sha256:1099c2d166c9bd1d24d8ac0a0860424f57dd268b43c4232e462459a71d9869b5",
+    "verification_command_contract_digest": "sha256:e95e8a48ef37f56a7d1f124e49be9010a58401017b6fdabb1ce09044ae9fb7cd",
     "authorization_basis": "fixed_public_task_authorizes_local_fictional_work_only"
   },
   "hi-financial-state-integrity": {
     "task_path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/task.md",
-    "task_sha256": "sha256:5244dda996f874f01871685f0f6db3fb42342e4d6d35eff87ce5904e7ddd5d65",
-    "verification_command_contract_digest": "sha256:98679fb0e3e6034f120934ebb687af14340c6d63e791e21929269d13dffc7f4d",
+    "task_sha256": "sha256:27f0fa070778accebc11dc3cc97037b7582a71a478c87eb2b4728f147a80418c",
+    "verification_command_contract_digest": "sha256:236b5e536ab20d26b45eb659a2f316453ae16832deb7c15be8e3bd5ecf40478b",
     "authorization_basis": "fixed_public_task_authorizes_local_fictional_work_only"
   },
   "hi-versioned-migration-safety": {
     "task_path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/task.md",
-    "task_sha256": "sha256:1a187cbd0cf7ff96b34c8e749dcaf34672162cde546e2c6e0e9726aad32d8e86",
-    "verification_command_contract_digest": "sha256:7957b6cea8d77a023887f29846a32163e7f577e6b37d17271da25ed797ed74f1",
+    "task_sha256": "sha256:b048b5741c13272dac8836aebb4495e60e6213dffbcf456c7eb7a95a7c8ab713",
+    "verification_command_contract_digest": "sha256:6106413cbee8ddd46548484c04a922da832a7be3a1baf1704427bf27b3ae9d1c",
     "authorization_basis": "fixed_public_task_authorizes_local_fictional_work_only"
   },
   "pf-data-schema-evolution": {
     "task_path": "benchmarks/fixtures/checkpoint-b2/pf-data-schema-evolution/task.md",
-    "task_sha256": "sha256:824c949a00ae0a5f7539d0280126aa025d468b819e147c36faea2ad2f68f7451",
-    "verification_command_contract_digest": "sha256:2ca4e80ecd3a2a7f0b60fd7183f1de90fe6ecde1c765751b110fbcb76fcbc454",
+    "task_sha256": "sha256:8fa6ea6b5755f2f424ac4a6e2d526b683ebe116d7eb1d86c673f8533878d8e18",
+    "verification_command_contract_digest": "sha256:f2470de009b367e2ea2535b6043ff2ebe8d40a3ab140dd4e95306f84a4221843",
     "authorization_basis": "fixed_public_task_authorizes_local_fictional_work_only"
   },
   "pf-library-compat-upgrade": {
     "task_path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/task.md",
-    "task_sha256": "sha256:9bd5fb4ce2660b02e5e3d2ce55aeb8b0631c74e790962143e590428500dea2ee",
-    "verification_command_contract_digest": "sha256:fe0a215e1003f23865defbb93fffc95c7d5b9e8af9c4eb64c9864d7044d64125",
+    "task_sha256": "sha256:2eb765aca7a50805b863c4fbdc1ff4b0c593e17f232587b2a8b3ae35e6feb74a",
+    "verification_command_contract_digest": "sha256:bbd2ca5c92c678b353f95b4e55d7dd2bc7661d63ceb364de7b6e777f3410bdee",
     "authorization_basis": "fixed_public_task_authorizes_local_fictional_work_only"
   },
   "pf-observability-redaction": {
     "task_path": "benchmarks/fixtures/checkpoint-b2/pf-observability-redaction/task.md",
-    "task_sha256": "sha256:eca02950ba10488accb9529ead7f622dff91ca94d130789e8a21904fa7f31b66",
-    "verification_command_contract_digest": "sha256:3f9fe28daac65170ef2db9a8aa9e0822f97d332e1b6ace1861a3064a3246cb10",
+    "task_sha256": "sha256:79b4aacb74fbdb14fd096abaeb5e73c2c5854f873bba7fa3462cf679f18f36cf",
+    "verification_command_contract_digest": "sha256:0485908e01927bf0da33b7ef0645e6336502d984effad2933c905e6084785798",
     "authorization_basis": "fixed_public_task_authorizes_local_fictional_work_only"
   }
 });
