@@ -1,6 +1,5 @@
 // Explicit official CLI transport. No model/grading/authority owner lives here.
 import assert from 'node:assert/strict';
-import { TextDecoder } from 'node:util';
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseJsonRejectDuplicateKeys } from './content-addressed-store.mjs';
