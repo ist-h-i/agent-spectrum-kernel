@@ -48,6 +48,44 @@ test('automatic stages stop at exactly the two human judgments; approval applies
   const count=f.calls.length;assert.deepEqual(await f.run(),c);assert.equal(f.calls.length,count);
   assert.equal(c.report.full_hierarchical_usage,null);assert.equal(c.report.formal_score,null);
 });
+for(const disposition of ['approved','rejected'])test(`unselected owner permits result ${disposition} without planning, applying or disposing`,async t=>{
+  const f=fixture(t);f.policy.normal_target=null;
+  let s=await f.run();assert.equal(s.status,'awaiting_evaluation_approval');
+  s=await f.run({decision:decision(s)});assert.equal(s.status,'awaiting_result_review');
+  assert.equal(s.completed_trials,8);assert.equal(s.pending_gate.kind,'result');
+  assert.equal(s.pending_gate.packet.application_available,false);assert.equal(s.pending_gate.packet.normal_target,null);
+  assert.deepEqual(f.calls.slice(-1).map(j=>j.kind),['report']);
+  const end=await f.run({decision:decision(s,disposition)});
+  assert.equal(end.final.outcome,`result_${disposition}_retained`);assert.equal(end.application,null);
+  assert.equal(f.calls.some(j=>['plan','apply','version','cleanup','restore'].includes(j.kind)),false);
+  const count=f.calls.length;assert.deepEqual(await f.run(),end);assert.equal(f.calls.length,count);
+});
+test('a deferred result remains at the exact review gate across resume without consuming a decision',async t=>{
+  const f=fixture(t);f.policy.normal_target=null;let s=await f.run();s=await f.run({decision:decision(s)});
+  const packet=canonicalDigest(s.pending_gate),count=f.calls.length;
+  s=await f.run({decision:decision(s,'deferred')});assert.equal(s.status,'awaiting_result_review');
+  assert.equal(canonicalDigest(s.pending_gate),packet);assert.equal(f.calls.length,count);
+  assert.deepEqual(await f.run(),s);assert.equal(f.calls.length,count);
+  s=await f.run({decision:decision(s)});assert.equal(s.final.outcome,'result_approved_retained');
+});
+test('unselected-owner Eval rejection retains evidence and cannot dispatch owner cleanup',async t=>{
+  const f=fixture(t);f.policy.normal_target=null;const s=await f.run();
+  const end=await f.run({decision:decision(s,'rejected')});assert.equal(end.final.outcome,'evaluation_rejected_retained');
+  assert.deepEqual(f.calls.map(j=>j.kind),['generate','register','select']);
+});
+test('result packet cannot approve another target, and deferral is not an Eval approval',async t=>{
+  const f=fixture(t);f.policy.normal_target=null;let s=await f.run();
+  await assert.rejects(f.run({decision:decision(s,'deferred')}),/deferral requires a result or change gate/);
+  s=await f.run({decision:decision(s)});const approved=decision(s);f.policy.normal_target=join(f.dir,'new-owner');
+  await assert.rejects(f.run({decision:approved}),/resume cannot change policy/);
+  assert.equal(f.calls.some(j=>['plan','apply','version','cleanup'].includes(j.kind)),false);
+});
+test('target-bound change can be deferred without applying or changing its exact packet',async t=>{
+  const f=fixture(t);let s=await f.run();s=await f.run({decision:decision(s)});const packet=canonicalDigest(s.pending_gate),count=f.calls.length;
+  s=await f.run({decision:decision(s,'deferred')});assert.equal(s.status,'awaiting_change_approval');
+  assert.equal(canonicalDigest(s.pending_gate),packet);assert.equal(f.calls.length,count);
+  assert.equal((await f.run({decision:decision(s,'rejected')})).final.outcome,'change_rejected');
+});
 for(const gate of ['evaluation','change'])test(`${gate} rejection automatically retires and cleans without applying`,async t=>{
   const f=fixture(t);let s=await f.run();if(gate==='change')s=await f.run({decision:decision(s)});
   const end=await f.run({decision:decision(s,'rejected')});assert.equal(end.final.outcome,`${gate}_rejected`);

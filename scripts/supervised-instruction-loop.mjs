@@ -23,7 +23,8 @@ function checkedPolicy(p){
   assert.ok(Number.isSafeInteger(p.repetitions)&&p.repetitions>0&&p.repetitions<=10);
   assert.ok(Number.isSafeInteger(p.max_trials)&&p.max_trials>0&&p.max_trials<=256);
   assert.equal(p.formal_admission_implied,false);
-  assert.ok(typeof p.normal_target==='string'&&resolve(p.normal_target)===p.normal_target);
+  assert.ok(p.normal_target===null||typeof p.normal_target==='string'&&resolve(p.normal_target)===p.normal_target,
+    'normal_target must be an absolute path or explicit null for result review');
   return p;
 }
 function journal(root){
@@ -96,6 +97,7 @@ function next(s){
       normal_target:p.normal_target,formal_admission_implied:false}};return null;
   }
   if(s.evaluation_decision.disposition==='rejected'){
+    if(p.normal_target===null)return 'evaluation_rejected_retained';
     if(!o.retire)return schedule(s,'version','retire',{action:'retire',candidate:o.register,reason:'evaluation_rejected'});
     if(!o.cleanup)return schedule(s,'cleanup','cleanup',{disposition:'rejected',candidate:o.register,retirement:o.retire});
     return 'evaluation_rejected';
@@ -106,6 +108,13 @@ function next(s){
   }
   if(!o.report)return schedule(s,'report','report',{candidate:o.register,selection:o.select,rows:s.rows,trials:s.trials,
     formal_score:null,complete_hierarchical_usage:null});
+  if(p.normal_target===null){
+    if(!s.result_decision){
+      s.gate={kind:'result',packet:{candidate:o.register,report:o.report,normal_target:null,
+        application_available:false,candidate_disposition:'retain',formal_admission_implied:false}};return null;
+    }
+    return `result_${s.result_decision.disposition}_retained`;
+  }
   if(!o.plan)return schedule(s,'plan','plan',{candidate:o.register,report:o.report,target:p.normal_target});
   if(!s.change_decision){
     s.gate={kind:'change',packet:{candidate:o.register,report:o.report,plan:o.plan,
@@ -184,9 +193,13 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
       assert.ok(s.gate,'no human judgment is pending');
       assert.deepEqual(Object.keys(decision).sort(),['disposition','packet_digest','reason']);
       assert.equal(decision.packet_digest,canonicalDigest(s.gate),'human decision bound to a different packet');
-      assert.ok(['approved','rejected'].includes(decision.disposition));
+      assert.ok(['approved','rejected','deferred'].includes(decision.disposition));
       assert.ok(typeof decision.reason==='string'&&decision.reason.trim());
-      const key=s.gate.kind==='evaluation'?'evaluation_decision':s.restore_requested?'restore_decision':'change_decision';
+      if(decision.disposition==='deferred'){
+        assert.ok(['result','change'].includes(s.gate.kind),'deferral requires a result or change gate');
+        append(root,'human_deferred',s,{decision:copy(decision)});return summary(s);
+      }
+      const key=s.gate.kind==='evaluation'?'evaluation_decision':s.gate.kind==='result'?'result_decision':s.restore_requested?'restore_decision':'change_decision';
       assert.equal(s[key],undefined,'decision already consumed');s[key]=copy(decision);s.gate=null;s.status='advancing';
       append(root,'human_decision',s,{kind:key});
     }
@@ -201,11 +214,11 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
         }
       }else{
         const n=next(s);
-        if(n===null){s.status=s.gate.kind==='evaluation'?'awaiting_evaluation_approval':'awaiting_change_approval';
+        if(n===null){s.status=s.gate.kind==='evaluation'?'awaiting_evaluation_approval':s.gate.kind==='result'?'awaiting_result_review':'awaiting_change_approval';
           append(root,'human_stop',s);return summary(s);}
         if(typeof n==='string'){
           s.status='completed';s.outputs.final={outcome:n,candidate:s.outputs.register,report:s.outputs.report??null,
-            application:s.outputs.apply??null,restoration:s.outputs.restore??null,cleanup:s.outputs.cleanup,
+            application:s.outputs.apply??null,restoration:s.outputs.restore??null,cleanup:s.outputs.cleanup??null,
             formal_admission_implied:false};append(root,'completed',s);return summary(s);
         }
         assert.ok(!Object.hasOwn(s.outputs,n.key),'completed operation cannot be reserved again');

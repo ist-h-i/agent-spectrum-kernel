@@ -13,6 +13,9 @@ The two human judgment types are:
 2. Approve or reject the reported change and exact normal-owner application
    plan. A later restoration is another occurrence of this same change judgment,
    with its own exact packet; an earlier approval cannot authorize another target.
+   When no application owner has been selected, explicit `normal_target: null`
+   instead presents a result-review packet without an application plan. Approving
+   that result does not authorize installation.
 
 Between these stops, `advanceSupervisedInstructionLoop` automatically invokes
 generation, registration, public-catalog case selection, one trial at a time,
@@ -20,6 +23,16 @@ reporting, and normal application planning. On change approval it invokes exact
 apply, Registry version activation, owned-staging cleanup and final reporting.
 On either rejection it retires the unused candidate, cleans owned staging and
 reports completion. It does not finish at `decision_declined`.
+
+An explicitly unselected owner is a result-review-only run. After reporting it
+stops at `awaiting_result_review`, without invoking plan or any owner operation.
+Result approval or rejection finishes with `result_approved_retained` or
+`result_rejected_retained`; both retain candidate materializations and evidence.
+Eval rejection in this mode also retains them: without an owner boundary, the
+host cannot establish the existing disposal preconditions. No fake owner path
+is needed or created. Target-bound runs keep the existing apply/reject/cleanup
+behavior. A nonexistent string path is still a target error, not an implicit
+request to create an owner or switch to result-only mode.
 
 The public case selector ranks changed-instruction coverage, domain diversity
 and previous observed cost. People review its result. It never reads private
@@ -78,6 +91,15 @@ also require `--allow-model-calls`, reflecting pre-existing execution permission
 this flag does not bypass the Eval stop. It must not be supplied for work whose
 model-call budget is exhausted. `--request-restore` constructs a new change
 packet after a successful application. It never means approval to restore.
+
+At a result or change gate, `--decision deferred` records a human deferral and
+leaves the same packet pending. It does not consume approval, retire or clean a
+candidate, or dispatch workers; a later decision must match that packet. Eval
+approval cannot be deferred through this flag. A saved result approval cannot
+be transplanted to a selected owner: policy drift is refused. To later select an
+actual owner, initialize a separately recorded historical-import review with the
+verified completed trials, generate the exact owner plan and obtain its change
+approval. Never rewrite the original journal or replay its consumed failed job.
 
 The runtime has ten stage bindings: `generate`, `register`, `select`, `trial`,
 `report`, `plan`, `apply`, `version`, `cleanup`, `restore`. All are required;
@@ -187,6 +209,10 @@ are still rejected.
 - `normal.target` and `assetAuthority`: the scoped owner and existing owner lifecycle
   capability. The exact target/plan still requires the second human judgment;
   a producer or a JSON record is not an independent authority.
+  For result-review-only runs set both `normal.target` and
+  `policy.normal_target` to explicit `null`; the native worker rejects direct
+  plan/apply/restore/cleanup requests without a target. Omitted targets are not
+  accepted as an implicit mode change.
 
 Model-call flags grant only an already authorized execution budget. The concrete
 worker also checks the host runtime's child-only execution capability before real

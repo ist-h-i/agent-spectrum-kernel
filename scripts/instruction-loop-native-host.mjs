@@ -24,7 +24,7 @@ function publication(path,result){if(existsSync(path)){assert.equal(canonicalDig
 function sourceInputs(p){
   assert.equal(p.kind,'full_native_reference_loop_profile_v1');
   assert.equal(p.generator.storeRoot,p.storeRoot);assert.equal(p.native.protectedRoot,p.protectedRoot);
-  for(const path of [p.stateRoot,p.protectedRoot,p.generator.candidateRoot,p.generator.fullRoot,p.generator.stagingRoot,p.normal.target,p.native.root,p.native.workRoot]){
+  for(const path of [p.stateRoot,p.protectedRoot,p.generator.candidateRoot,p.generator.fullRoot,p.generator.stagingRoot,...(p.normal.target===null?[]:[p.normal.target]),p.native.root,p.native.workRoot]){
     assert.equal(resolve(path),path,'absolute native host path required');assertNoSymlinkPathSegments(path,'native host path',{allowMissingLeaf:true});
   }
   assert.ok(p.stateRoot.startsWith(p.protectedRoot+'/')&&p.generator.candidateRoot.startsWith(p.protectedRoot+'/'),'operator inputs must remain under the protected root');
@@ -116,6 +116,7 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
     return report;
   }
   if(['plan','apply','restore','cleanup'].includes(job.kind)){
+    assert.notEqual(p.normal.target,null,'normal owner target required for owner operations');
     if(job.kind==='cleanup'&&job.input.disposition==='rejected')bindMeasuredNormalOwnerSource({sourceRoot:p.generator.candidateRoot,candidate:job.input.candidate});
     const value=await runNormalOwnerLoopOperation({sourceRoot:p.generator.candidateRoot,baselineSourceRoot:p.generator.baselineSourceRoot,target:p.normal.target,stagingRoot:p.generator.stagingRoot,job});
     if(job.kind==='cleanup'&&job.input.disposition==='rejected'){
