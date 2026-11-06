@@ -85,3 +85,18 @@ test('learning projection is report-bound and cannot carry arbitrary logs or fab
     const bad=structuredClone(observation);mutate(bad.previous.evaluation_summary);assert.throws(()=>projectInstructionLoopObservation(bad));
   }
 });
+
+test('case identity preserves existing long catalog labels and the summary byte budget',()=>{
+  const reference=id=>({kind:'supervised_instruction_reference_report_v1',rows:[{fixture_id:id,role:'baseline',repetition:1,state:'completed',
+    confirmed_points:1,unknown_points:0,unmet_points:0,maximum_points:1,mandatory_final_validation:true,cli_seconds:null}],limits:[]});
+  for(const length of [99,100,101,256,1024]){
+    const id='a'.repeat(length),report=reference(id),s=feedbackModule.summarizeInstructionLoopEvaluation(report);
+    assert.equal(s.cases[0].case_id,id);assert.equal(s.omitted_case_count,0);
+    assert.equal(s.report_digest,canonicalDigest(report));
+    feedbackModule.validateInstructionEvaluationSummary(s,canonicalDigest(report));
+  }
+  const oversized=reference('a'.repeat(40000)),s=feedbackModule.summarizeInstructionLoopEvaluation(oversized);
+  assert.equal(s.total_case_count,1);assert.equal(s.omitted_case_count,1);assert.deepEqual(s.cases,[]);
+  assert.equal(s.report_digest,canonicalDigest(oversized));assert.ok(Buffer.byteLength(JSON.stringify(s))<=32768);
+  for(const id of ['', 'has space', 'path/label', 'a\nb', '非ASCII'])assert.throws(()=>feedbackModule.summarizeInstructionLoopEvaluation(reference(id)));
+});

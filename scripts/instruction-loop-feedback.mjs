@@ -99,7 +99,9 @@ export function validateInstructionEvaluationSummary(s,reportDigest){
   assert.ok(Array.isArray(s.cases)&&s.cases.length<=32);integer(s.total_case_count);integer(s.omitted_case_count);integer(s.omitted_limit_count);
   assert.equal(s.total_case_count,s.cases.length+s.omitted_case_count);const seen=new Set();
   for(const c of s.cases){
-    keys(c,['case_id','repetition','conditions','comparison']);assert.match(c.case_id,/^[A-Za-z0-9._-]{1,100}$/u);integer(c.repetition);assert.ok(c.repetition>0);
+    // Match the existing supervisor/native catalog vocabulary. The summary's
+    // byte budget bounds long labels without truncating or renaming identities.
+    keys(c,['case_id','repetition','conditions','comparison']);assert.match(c.case_id,/^[A-Za-z0-9._-]+$/u);integer(c.repetition);assert.ok(c.repetition>0);
     const key=JSON.stringify([c.case_id,c.repetition]);assert.ok(!seen.has(key));seen.add(key);
     assert.ok(Array.isArray(c.conditions)&&c.conditions.length>0&&c.conditions.length<=2);const conditions=new Set();
     for(const v of c.conditions){

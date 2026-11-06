@@ -207,3 +207,26 @@ test('shipped public selector and Registry worker CLI consume exact requests wit
     {kind:'select',input:{catalog:[{id:'public-a',tags:['routing'],domain:'local'}]}},3);
   assert.deepEqual(selected.case_ids,['public-a']);
 });
+
+test('long case ID in a completed native reference cycle prepares the next cycle without inherited approval',async t=>{
+  const f=fixture(t),id='a'.repeat(101);f.policy.catalog[0].id=id;f.policy.normal_target=null;
+  const report=f.runtime.report;
+  f.runtime.report=async(job,context)=>{
+    const result=await report(job,context);
+    result.output={kind:'supervised_instruction_reference_report_v1',formal_score:null,limits:['Synthetic reference only.'],
+      rows:job.input.rows.map(row=>({fixture_id:row.case.id,role:row.condition==='baseline'?'baseline':'challenger',repetition:row.repetition,
+        state:'completed',confirmed_points:1,unknown_points:0,unmet_points:0,maximum_points:1,mandatory_final_validation:true,cli_seconds:1}))};
+    f.receipts.set(canonicalDigest(job),result);return result;
+  };
+  let state=await f.run();state=await f.run({decision:decision(state)});state=await f.run({decision:decision(state)});
+  assert.equal(state.status,'completed');const before=readCompletedInstructionLoopContinuation(f.root);
+  const next=prepareNextSupervisedInstructionLoop({root:f.root,nextPolicy:{...f.policy,id:'next-long-case'}});
+  assert.equal(next.approval_carried_forward,false);
+  assert.equal(next.policy.observation.previous.evaluation_summary.cases.filter(c=>c.case_id===id).length,2);
+  assert.equal(next.policy.observation.previous.evaluation_summary.report_digest,canonicalDigest(before.report));
+  assert.deepEqual(readCompletedInstructionLoopContinuation(f.root),before,'preparation does not mutate the completed source journal');
+  const nextState=await advanceSupervisedInstructionLoop({root:join(f.dir,'next-long-case'),policy:next.policy,runtime:f.runtime});
+  assert.equal(nextState.status,'awaiting_evaluation_approval');assert.equal(f.calls.filter(j=>j.kind==='trial').length,8);
+  const input=f.calls.filter(j=>j.kind==='generate').at(-1).input.observation;
+  assert.equal(input.previous.evaluation_summary.cases.find(c=>c.case_id===id).case_id,id);
+});

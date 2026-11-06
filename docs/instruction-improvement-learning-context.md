@@ -56,6 +56,13 @@ Full practical and retained-reference/native continuations all use this boundary
 Old continuations without the new field remain valid. No earlier history or
 approval becomes authorization for the fresh cycle.
 
+Case labels retain the existing supervisor/native catalog character grammar
+without a new per-label 100-character cap. Run IDs and practical-plan admission
+keep their own existing contracts. A valid long case label remains unchanged if
+it fits the aggregate summary budget; an oversized group is omitted with its
+count and original report digest, rather than truncating an identity or blocking
+preparation of the next cycle.
+
 The projection contains case/repetition identifiers and condition-level selected
 outcomes, attempt/exclusion/execution-failure counts, selected result digests and
 known duration/input/output metrics. Missing metrics stay null. Retained reference
@@ -87,6 +94,7 @@ persisted cross-cycle flow and its independent-review findings.
 | LCTX-02 | Practical selected pass/fail, unknown/excluded attempts, per-case metrics and reference points survive the projection into the real next-cycle policy/generation observation. |
 | LCTX-03 | Oversized UTF-8 text and many cases stay bounded with explicit truncation; private limits/raw answers are absent; nulls and report-digest binding survive; arbitrary fields refuse. |
 | LCTX-04 | Existing requests/continuations, two fresh approval judgments, prepared-runtime pins, receiving flow, normal-owner apply/restore and uncertain-completion inspection retain their boundaries. |
+| LCTX-05 | 99/100/101/256/1024-character case labels preserve identity; oversized groups respect the summary byte budget; a completed cycle with a 101-character label prepares a fresh cycle and still requires new case approval. |
 
 Focused checks: `scripts/test-instruction-environment-authoring.mjs`,
 `scripts/test-instruction-loop-feedback.mjs`, and the real two-cycle assertion in
