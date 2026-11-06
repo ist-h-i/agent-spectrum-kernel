@@ -23,10 +23,10 @@
   "output_contract_type": "implementation_producing",
   "requirement_record_id": "requirement-record-mn-doc-config-correction",
   "output_contract_id": "output-contract-mn-doc-config-correction",
-  "evaluator_bundle_id": "evaluator-bb62474e39f655f3d160d82cb5353816c068f5590257685520130ca4296b301e",
-  "evaluator_bundle_digest": "sha256:39f01a345eddaf8f609d2579cc36863dab405fd1529076fef0ef2226033d7c85",
-  "evaluator_byte_count": 167622,
+  "evaluator_bundle_id": "evaluator-8081857abf1d69db01d5bf6f99dec5e1c1c7574d3f0ba52d65faf6b91f402a25",
+  "evaluator_bundle_digest": "sha256:ded78e45bd4ddc7d5a8d63896d1d400d9898ee750caf14cf5efc7b2cc44a0aee",
+  "evaluator_byte_count": 539368,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:f37214b5fcff37b91daa97aa3ba3f92e32391aa0579ec832a6e701a799215039"
+  "metadata_digest": "sha256:d048726618cc7dfe6238dcdc49ff7e2083883177d8e7de0e78eba354507bf4e3"
 }

@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
   "program": "adaptive_ask_verification_command_contract",
   "fixture_id": "mn-focused-regression-test",
-  "fixture_input_digest": "sha256:065c84ece98ef98807a63b14790abd368ace054f0194f3e5bcf40e9c0fd9797b",
+  "fixture_input_digest": "sha256:17287435688a42200c13aa6307872c21bc66e1bd770cef39ad09afb67da314fd",
   "commands": [
     {
       "command_id": "session-key-focused-test",
@@ -30,5 +30,5 @@
       "command_contract_digest": "sha256:be6097bb76160f75c736deac90e1890aeacabc9b785b61b9c732a9f109f6b766"
     }
   ],
-  "contract_digest": "sha256:aa2b0f76782ab2bb55a03b9e157d2694c8e829b2263fe2cf91807532daa1118a"
+  "contract_digest": "sha256:603649add83a568a34573287bad00abb169ed298f58190829d6dc63fbb4ebaf9"
 }

@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "1a187cbd0cf7ff96b34c8e749dcaf34672162cde546e2c6e0e9726aad32d8e86",
-          "bytes": 1879
+          "sha256": "e471420832367631d065d04d53cd94fed1f1b0aba7863a1418cab515ca5c0a34",
+          "bytes": 2846
         },
         {
           "path": "workspace/data/mixed-state.json",
@@ -30,13 +30,13 @@
         },
         {
           "path": "workspace/docs/migration-contract.md",
-          "sha256": "3a19c14af551caaf6bcb9c95eb32d6396a3e156d08d09396cc40fb975951a31e",
-          "bytes": 2764
+          "sha256": "fad7681dee939e8fb4385977de072335be73043dc1fd7deb086431c63b4e6c48",
+          "bytes": 3713
         },
         {
           "path": "workspace/migration-plan.json",
-          "sha256": "56857531147269171849b60070d9a855c21eeeaaeacc00c1d139295a0e6704f8",
-          "bytes": 291
+          "sha256": "ba8fc6d9457074016bcc292d05bbac78feaa504ad770175a76adcc90fbb8b8dc",
+          "bytes": 247
         },
         {
           "path": "workspace/package.json",
@@ -45,13 +45,13 @@
         },
         {
           "path": "workspace/plan.schema.json",
-          "sha256": "0fd6314b39087fe49879904ad75562efd1d0149f7e933f1278f03f16ee075c1e",
-          "bytes": 2181
+          "sha256": "ccdb5cbb2ee55e3bc5ad3ed64f06e6563b99c7b7a7614821b310a536d4abfb36",
+          "bytes": 2334
         },
         {
           "path": "workspace/scripts/compatibility.mjs",
-          "sha256": "ae9277baa485e9a2729d51315774060a05dc705074ff03ca92c524789e884cbf",
-          "bytes": 3032
+          "sha256": "c588ca58e23c94df10735fc26a6f6458234fa2bf5aa2dc0db1b6d82ad46a096a",
+          "bytes": 4739
         },
         {
           "path": "workspace/scripts/dry-run.mjs",
@@ -65,13 +65,13 @@
         },
         {
           "path": "workspace/scripts/validate-shape.mjs",
-          "sha256": "4b086ae717b90bdae6c86fa2c78fe7f4fdce9927486e8ee9c92b5eeb89c40248",
-          "bytes": 1750
+          "sha256": "9061ca8fbe62c4f9ceec72bc6946f4432b84ef2dd6cf8390be557fd7e333e68e",
+          "bytes": 1877
         },
         {
           "path": "workspace/test/mixed-version.test.mjs",
-          "sha256": "a75a53a26d26b1c9490771f4ba5459dcf151d1481ee92a678698e30558b784cb",
-          "bytes": 1640
+          "sha256": "1aa063740e6229df33e6ea2a3e787cb1525663f42efded695c567f7c08979d69",
+          "bytes": 4815
         }
       ]
     }

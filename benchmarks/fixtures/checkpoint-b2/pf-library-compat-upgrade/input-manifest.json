@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "9bd5fb4ce2660b02e5e3d2ce55aeb8b0631c74e790962143e590428500dea2ee",
-          "bytes": 1916
+          "sha256": "2eb765aca7a50805b863c4fbdc1ff4b0c593e17f232587b2a8b3ae35e6feb74a",
+          "bytes": 2661
         },
         {
           "path": "workspace/config/migration-settings.json",

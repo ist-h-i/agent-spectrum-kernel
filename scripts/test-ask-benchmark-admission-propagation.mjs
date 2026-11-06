@@ -17,6 +17,7 @@ const git = (args) => execFileSync("git", ["-c", "core.hooksPath=/dev/null", "-C
 const actualEvidenceIndex = process.argv.indexOf("--actual-evidence");
 const actualEvidencePath = actualEvidenceIndex < 0 ? null : resolve(process.argv[actualEvidenceIndex + 1]);
 const keep = process.argv.includes("--keep-proof");
+let fixtureSourceRevision = null;
 try {
   execFileSync("git", ["-c", "core.hooksPath=/dev/null", "clone", "--no-hardlinks", "--", origin, root], { stdio: "pipe" });
   // During a red/green check, copy only the declared code under test. Never copy private evaluator assets.
@@ -37,6 +38,30 @@ try {
     // in this independent test checkout. Production source/assets stay intact.
     const selected = authorityModule.resolveRepositoryAdmissionDecision({ root, repositoryRevision: git(["rev-parse", "HEAD"]), fixtureId });
     assert.ok(selected, "synthetic preparation requires an existing decision lineage");
+    // Exercise current controller code against the unchanged admitted fixture,
+    // not a later public-task revision that the retained decision never admitted.
+    // This restoration is confined to the independent synthetic test checkout.
+    fixtureSourceRevision = selected.decision.reviewed_head_revision;
+    assert.match(fixtureSourceRevision, /^[a-f0-9]{40}$/u);
+    const fixturePath = `benchmarks/fixtures/checkpoint-b2/${fixtureId}`;
+    git(["restore", "--source", fixtureSourceRevision, "--worktree", "--", fixturePath]);
+    for (const [field, name] of [["frozen_admission_authority", "admission_digest"], ["frozen_requirement_record", "requirement_record_digest"], ["frozen_scoring_input_manifest", "manifest_digest"]]) {
+      const pin = selected.decision[field], bytes = readFileSync(resolve(root, pin.path));
+      assert.equal(hash(bytes), pin.raw_byte_digest, "historical fixture must match the admitted raw authority");
+      assert.equal(JSON.parse(bytes)[name], pin.semantic_digest ?? pin.record_digest, "historical fixture must match the admitted semantic authority");
+    }
+    const reference = read(resolve(root, fixturePath, "evaluator-reference.json"));
+    assert.equal(reference.public_metadata_digest, selected.decision.evaluator_public_reference_digest);
+    for (const field of ["evaluator_revision", "evaluator_bundle_id", "evaluator_bundle_digest"]) assert.equal(reference[field], selected.decision.evaluator[field]);
+    const reviewedConfig = JSON.parse(git(["show", `${fixtureSourceRevision}:benchmarks/adaptive-portfolio.config.json`]));
+    const reviewedFixture = reviewedConfig.fixtures.find(({ id }) => id === fixtureId);
+    assert.ok(reviewedFixture, "admitted fixture configuration must exist at its reviewed revision");
+    const currentFixture = configFile.fixtures[0];
+    assert.deepEqual({ ...reviewedFixture, input_manifest_sha256: currentFixture.input_manifest_sha256,
+      verification_command_contract: { ...reviewedFixture.verification_command_contract, sha256: currentFixture.verification_command_contract.sha256 } }, currentFixture,
+    "historical fixture selection may change only the two public input bindings");
+    configFile.fixtures = [reviewedFixture];
+    write(configPath, configFile);
     const predecessorBytes = readFileSync(resolve(root, selected.path));
     const decision = structuredClone(selected.decision);
     decision.decision_revision += 1;
@@ -62,7 +87,7 @@ try {
     const reviewPath = resolve(work, "synthetic-review-authority.json"); write(reviewPath, review);
     write(evidencePath, { [fixtureId]: { review_authority_path: reviewPath, review_authority_source_digest: hash(readFileSync(reviewPath)), review_archive_path: archivePath } });
   }
-  git(["add", "--", "scripts", relative(root, configPath), ...(actualEvidencePath ? [] : ["benchmarks/fixtures/admission-decision"])]);
+  git(["add", "--", "scripts", relative(root, configPath), ...(actualEvidencePath ? [] : ["benchmarks/fixtures/admission-decision", `benchmarks/fixtures/checkpoint-b2/${fixtureIds[0]}`])]);
   git(["-c", "user.name=ASK synthetic verification", "-c", "user.email=synthetic@example.invalid", "commit", "-m", "Synthetic verification checkout only: admission propagation"]);
   const revision = git(["rev-parse", "HEAD"]);
   const originRevision = git(["rev-parse", "HEAD^"]);
@@ -153,7 +178,7 @@ try {
   git(["checkout", "--detach", revision]);
   assert.equal(git(["status", "--porcelain"]), "");
 
-  const receipt = { kind: "ask.admission-propagation-nonmodel-proof@1", actual_external_evidence: Boolean(actualEvidencePath), source_context: "Independent test-only configuration/source commit; controller preparation only, not grader processing admission", source_revision: revision, source_file_digests: Object.fromEntries(["ask-benchmark.mjs", "ask-benchmark-selection.mjs", "ask-benchmark-execution.mjs", "ask-benchmark-normalized-results.mjs", "ask-benchmark-terminal-candidate.mjs", "ask-benchmark-evaluator-boundary.mjs"].map((name) => [name, hash(readFileSync(resolve(root, "scripts", name)))])), source_origin_revision: originRevision, fixture_ids: fixtureIds, case_count: plan.cases.length, adaptive_selection_count: adaptive.length, checks: ["admitted normal plan", "materialization", "missing-evidence selection refused before writes", "all adaptive selection seals and verification", "missing-evidence preparation refused before writes", "pending execution preparation/inspection", "normalization and freshness verification", "wrong-authority digest refused before writes", "existing run preparation refused", "dangling existing run symlink refused without writes", "partial evidence refused", "changed archive refused", ...(fixtureIds.length > 1 ? ["cross-fixture evidence refused"] : []), "tracked source byte mismatch refused", "different exact source revision refused"], models_started: 0, agent_binary_resolved_or_probed: false, actual_comparison_started: false, private_workers_started: 0, all_attempts_empty: true, source_root: keep ? root : null };
+  const receipt = { kind: "ask.admission-propagation-nonmodel-proof@1", actual_external_evidence: Boolean(actualEvidencePath), source_context: "Independent test-only configuration/source commit; controller preparation only, not grader processing admission", source_revision: revision, source_file_digests: Object.fromEntries(["ask-benchmark.mjs", "ask-benchmark-selection.mjs", "ask-benchmark-execution.mjs", "ask-benchmark-normalized-results.mjs", "ask-benchmark-terminal-candidate.mjs", "ask-benchmark-evaluator-boundary.mjs"].map((name) => [name, hash(readFileSync(resolve(root, "scripts", name)))])), source_origin_revision: originRevision, fixture_source_revision: fixtureSourceRevision, fixture_ids: fixtureIds, case_count: plan.cases.length, adaptive_selection_count: adaptive.length, checks: ["admitted normal plan", "materialization", "missing-evidence selection refused before writes", "all adaptive selection seals and verification", "missing-evidence preparation refused before writes", "pending execution preparation/inspection", "normalization and freshness verification", "wrong-authority digest refused before writes", "existing run preparation refused", "dangling existing run symlink refused without writes", "partial evidence refused", "changed archive refused", ...(fixtureIds.length > 1 ? ["cross-fixture evidence refused"] : []), "tracked source byte mismatch refused", "different exact source revision refused"], models_started: 0, agent_binary_resolved_or_probed: false, actual_comparison_started: false, private_workers_started: 0, all_attempts_empty: true, source_root: keep ? root : null };
   if (keep) write(resolve(work, "proof.json"), receipt);
   console.log(JSON.stringify({ ...receipt, retained_proof: keep ? resolve(work, "proof.json") : null }));
 } finally { if (!keep) rmSync(work, { recursive: true, force: true }); }

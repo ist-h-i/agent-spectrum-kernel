@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
   "fixture_id": "hi-external-action-approval",
-  "candidate_input_digest": "sha256:274483c68faf1e5634e4a52b128cce51c9770f83c924a30af5df947dd62c4dd6",
-  "candidate_evaluator_digest": "sha256:ccf5fa3d5ad44f7516aa0d3de24ee4e792eb19032d038e28925b26aa71dff1cf",
+  "candidate_input_digest": "sha256:24ec8367b57fd7571024adf1a09507f9030d160284fad7ca161100e2136b1a72",
+  "candidate_evaluator_digest": "sha256:feb59051dcf90b18c89c799e6dec188bad9da2c3ab9b954e7f4dbac8502f8b2c",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -121,5 +121,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:1673efc254ea229d0aa6c67f220b7c7be626ccdec1c097d28ed53e91d6de6ee0"
+  "review_package_digest": "sha256:897d8b3351f30ba50a218a383bb9e87805a7acec2f16540781792032c0184d40"
 }

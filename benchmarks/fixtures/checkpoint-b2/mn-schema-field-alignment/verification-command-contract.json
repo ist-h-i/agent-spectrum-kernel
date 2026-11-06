@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
   "program": "adaptive_ask_verification_command_contract",
   "fixture_id": "mn-schema-field-alignment",
-  "fixture_input_digest": "sha256:bb41c0b2c89cf749d8f07e179554689c2c9fb3bde6b7fd26fc82a09cc8cb15a8",
+  "fixture_input_digest": "sha256:0bcc8b28dc643617b22879431c1e6bbda21ec1cf3d2c3ddc10a740bd0e64c516",
   "commands": [
     {
       "command_id": "member-record-focused-test",
@@ -21,14 +21,14 @@
           "-lc"
         ]
       },
-      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"package.json\":\"4efed0d52aedcfad81aa2ea9735c6e9eb69b2ebead0fea04344c4e4e111eb77c\",\"spec/member-contract.md\":\"1bd41e23d822b0c0b18c9ec96e2eff69958f5fe321f9e5778cd8d17e7b6a182e\",\"spec/schema-alignment-plan.md\":\"2fb332652d4c7349ba8ce1cd8f9429bccbafdda54695dbb3bfbb1aef2ef83c31\",\"src/member-import.mjs\":\"23229f637aa314e5d798baf42eb32dcba56251e8dcaf0c26b9d01969756f7816\",\"src/member-export.mjs\":\"bee56827d7d03d2db64102b6607136b4655b2ceb1a9a0bb3111349f8acb41bb6\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && [ -f test/member-record.test.mjs ] && npm test",
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"package.json\":\"4efed0d52aedcfad81aa2ea9735c6e9eb69b2ebead0fea04344c4e4e111eb77c\",\"spec/member-contract.md\":\"1bd41e23d822b0c0b18c9ec96e2eff69958f5fe321f9e5778cd8d17e7b6a182e\",\"spec/schema-alignment-plan.md\":\"0dc0a6fd2fa954172df56ffe36133a29c618de2349aa4b34be9a96f5ee651039\",\"src/member-import.mjs\":\"23229f637aa314e5d798baf42eb32dcba56251e8dcaf0c26b9d01969756f7816\",\"src/member-export.mjs\":\"bee56827d7d03d2db64102b6607136b4655b2ceb1a9a0bb3111349f8acb41bb6\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && [ -f test/member-record.test.mjs ] && npm test",
       "requirement": "required",
       "alternative_group_id": null,
       "timeout_ms": 60000,
-      "logical_command_digest": "sha256:99753a232fa8932244a7df2be4034ce4d2cc43929700c5153fbe1e60f5ee8ea6",
-      "rendered_event_command_digest": "sha256:ffa01da21d7a153762dc49cca2b6c24a6276b174991424f5f63387cd2f5059ef",
-      "command_contract_digest": "sha256:a3d3d41a7ec5a5b4672af1a80a40e00ee8435f2f25fddf659787a65234e11910"
+      "logical_command_digest": "sha256:1dfb1b9a72966ee391eeee728a669a9de880b984c5062b112f5d821c6600b883",
+      "rendered_event_command_digest": "sha256:05baa00a3829024d7e4ad2904acb00788b051bb943f72d6923093f5a78970514",
+      "command_contract_digest": "sha256:74704e3598578441d19fb2c8dc8afbd989cce5881150ee4096a8f0219d638eba"
     }
   ],
-  "contract_digest": "sha256:21c3238448cf8d3bf72f339ce46ae21428c8cc7f61aaa8610abae4c2a0eae01d"
+  "contract_digest": "sha256:c1a73268422d7246100e98dae1f8104c0e155cdd1983f2a8abcdee5e12b53db3"
 }

@@ -47,10 +47,10 @@
       "repetitions": 5,
       "aggregate_eligible": true,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/input-manifest.json",
-      "input_manifest_sha256": "234a13b9ccae089553d56b0e512220dfea8fe42a3c0c2f8eb0666295faceebda",
+      "input_manifest_sha256": "6f94452c6998b670871ee61ad4165b5d172829b46c7b52f66fcc1a4aa64df77b",
       "verification_command_contract": {
         "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/verification-command-contract.json",
-        "sha256": "e1a8ccd7e9d987e72c1a3e567e60a783f88c3e8f03abdfcfbeb019ade1a1c6fc"
+        "sha256": "2e938359a0d01d5bba248c22fe2279038fed7df980bf0f14c62d0a1704e9ed9f"
       }
     }
   ],

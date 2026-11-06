@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
   "program": "adaptive_ask_scoring_input_freeze",
   "fixture_id": "hi-authorization-exception",
-  "fixture_input_digest": "sha256:b5e1aeb49f71d8fde3e58f553b93e57b73beda92c44dc713b89f6959b1de0592",
+  "fixture_input_digest": "sha256:4804b79ea229cfff5862317eb36703d77250a56714cf8e8e6cbacec0e01cc539",
   "catalog": {
     "path": "benchmarks/portfolio-catalog.json",
     "raw_byte_digest": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
@@ -21,29 +21,29 @@
   },
   "admission_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-authorization-exception/final-admission-record.json",
-    "raw_byte_digest": "sha256:bf2e06ffc3bea9e3ae9cb50f904e7d26eced95f79cebee49cb675e005cba2f02",
-    "semantic_digest": "sha256:e803f83291f849ae50e5fec9bea9509926ba1de895ca4dcaebeec4804a0e81a1"
+    "raw_byte_digest": "sha256:91d186eada9dbaa7a8592e51d411830e7f9b1d9c7ecb6551867e95a7b403974e",
+    "semantic_digest": "sha256:d68d16c93d71e78377cc7d2df4c1c5656ad94f5b2c4811ad7f8395fb1f6e611e"
   },
   "requirement_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-authorization-exception/requirement-record.json",
-    "raw_byte_digest": "sha256:731b51ba18cae8affce106c685d9a7d80de9f5763ba8edeb8ba3d2c2c0b6517e",
-    "record_digest": "sha256:3a0bc7514a116709a9a05e2cdcd0362687828325138d1b355b7926ed7ba3efc3",
+    "raw_byte_digest": "sha256:f95c0b03807ee1c297ef02fc5b24e3477fbce4b98c3d6948d4dbc3b69b0ec88c",
+    "record_digest": "sha256:dbf9d0872da4a39af7865a372fabebb62e0e5a086db092a10848632032b53bcb",
     "set_digest": "sha256:e285b228b87d9a9b69d94029b8e84581edd76ca5206500d072136e9beb6255b1"
   },
   "output_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-authorization-exception/output-contract.json",
-    "raw_byte_digest": "sha256:be49885a4550d5337243d735c3796337317d916477c9eaa7f695600f46bb6317",
-    "semantic_digest": "sha256:5176dbc124336d49e0c045def0513f3503842657a41f460ff515c0222c3a764e"
+    "raw_byte_digest": "sha256:fae731d53cea13b38289951089b7e54daa43b498ae35885cfea37940864d19f5",
+    "semantic_digest": "sha256:c5a934ab77d248e2b3c2aff98f048e9e16d11c96ebf4e5bbc1f1325c8eee9f5d"
   },
   "evaluator_public_reference": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-authorization-exception/evaluator-reference.json",
-    "raw_byte_digest": "sha256:3d2308040984c285b28e6c87244e7a116dc44a97fd61e1155b72620ecca78bed",
-    "semantic_digest": "sha256:d7bbfebac6b3297016e60a4b41861c65785da6d3b97c320719724491a99337d3"
+    "raw_byte_digest": "sha256:a526c56dbac7ff08e681647fc9e0534a48cd4e365aaf58359cb3892fad1e358c",
+    "semantic_digest": "sha256:18048addca8f4fe6425ac5685856a2904dfcb3eb662be640e8b0638db2f474d0"
   },
   "verification_command_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-authorization-exception/verification-command-contract.json",
-    "raw_byte_digest": "sha256:2e85e4390a79cc3a5918736901c39946ec4bb9030ff6df7acb3585b24090767d",
-    "semantic_digest": "sha256:14ebc316b9d4c9117b137134d096442f6822cf55ceb938af300ecdc8c52517d0"
+    "raw_byte_digest": "sha256:f745f61b1202fc39ddc9ec957199356f734651e527ae8c1d9d472da6616114ea",
+    "semantic_digest": "sha256:7eb140894ab7af663006cd17a365b5715510a977d340dbe8a9f53e0548e96231"
   },
   "evidence_map": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-authorization-exception/evidence-map.json",
@@ -52,13 +52,13 @@
   },
   "evaluator_authority_manifest": {
     "path": "benchmarks/fixtures/checkpoint-b2/hi-authorization-exception/evaluator-authority-manifest.json",
-    "raw_byte_digest": "sha256:249e7a4a68e9ad9721f7039a8241f3b5b0fa8769c858998ec3502d7557ebbdb5",
-    "semantic_digest": "sha256:072a9a424879ee23dbab1808f1e5c1e0c7ec189666d23783bfc859e94d3a8465"
+    "raw_byte_digest": "sha256:c391a96728a521484422f7f6c179b4704ed99f9d2725cc155e94c258fcd3cf5c",
+    "semantic_digest": "sha256:f4f5bc86bbcbf819da45966486e403b6a5f9f5f92a6323b4545c2992232df9ac"
   },
   "result_profile": {
     "name": "binary_scope_verification_v1",
     "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
   },
   "freeze_revision": "issue-209-hi-authorization-exception-r1",
-  "manifest_digest": "sha256:6b97713fd29faf2e99e6b218dc4d20ba0f04126d79c4c696a751ca0168daa254"
+  "manifest_digest": "sha256:a40e1b92736c9eafc93d6c9d141cc21a5dd6570e04f7badc4bf2c850e1099619"
 }

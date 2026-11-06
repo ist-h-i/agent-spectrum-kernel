@@ -10,13 +10,13 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "48998c1b9eda7a59e7034077d8e084baca41c2aab735b47b350ae00c924d3701",
-          "bytes": 423
+          "sha256": "c1eb8df947c8fbc5c3a19101077b2abde4f43d40b730178e39a27a4a3c38305a",
+          "bytes": 2870
         },
         {
           "path": "workspace/docs/state-contract.md",
-          "sha256": "cacedf533bf4164824dfd04b29f64c4463c7d0f52089d5525f2bede79045e03b",
-          "bytes": 942
+          "sha256": "ab05bd78bb495c3c9b5aead02696f28bdb0c9241b8301915536d0605bc813333",
+          "bytes": 964
         },
         {
           "path": "workspace/package-lock.json",
@@ -40,8 +40,8 @@
         },
         {
           "path": "workspace/scripts/validate-review.mjs",
-          "sha256": "3a4a509dd4a4b79208e8c635616c21863eafcd1a9fc51d975928ebb736e15a3c",
-          "bytes": 2360
+          "sha256": "04596758f6cf4269b7681001d21bb211bee07b992c71ab759af1d9712bb9c682",
+          "bytes": 2981
         },
         {
           "path": "workspace/src/inbox-state.mjs",

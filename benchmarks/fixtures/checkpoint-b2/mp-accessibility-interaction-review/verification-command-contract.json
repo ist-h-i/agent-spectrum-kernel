@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
   "program": "adaptive_ask_verification_command_contract",
   "fixture_id": "mp-accessibility-interaction-review",
-  "fixture_input_digest": "sha256:36b74950deefa7445136bfbc49859cbae10e06d502a316c8d2be3d33b6c1da33",
+  "fixture_input_digest": "sha256:fd5a81c97345facec19c541934ebff27157923cd79c17c73e9159033d6dae24f",
   "commands": [
     {
       "command_id": "review-contract-validation",
@@ -21,14 +21,14 @@
           "-lc"
         ]
       },
-      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"docs/interaction-notes.md\":\"7ad466f4c94e36eab22e582e000bcfc4c319bf7f114d898c0411c852678d6d6f\",\"package-lock.json\":\"c6b3a3cb44bf02b66312be43e3e7bc3bff0eb3968ef9e65c1a44de3163ed1588\",\"package.json\":\"5744d8cb38e85ae586c4f71f61400fc7394b93cade8efc2bafa00e7996712a33\",\"pr.diff\":\"fbf9df8302ac97dbf8917340fa8b329d70ee71f53fef042189924a20838e9766\",\"review.schema.json\":\"63574a07fb0ff2a67e8839c5356bfa30e777955596ad0309589f14767371cd81\",\"scripts/validate-review.mjs\":\"008cd831c8e38041af31be0cbbdc8fcb3b42ba45006492fbf32b870814882422\",\"src/format-toolbar.html\":\"18719ebf6c7e82dbf5953b9f214742ffa4ffab42ca1feef6872d2d2972e595c5\",\"src/format-toolbar.mjs\":\"c5378f1d4de5933fb5841961a69a3fae9eee9a9da4e21d5512607b7897d76fb2\",\"test/helpers/toolbar-fixture.mjs\":\"9dd81fdbfa3d425c76976f34ccbd56404c48519d44b139f0e34ce8481f1752af\",\"test/integration/format-toolbar.test.mjs\":\"fb0d1a44160de4180098b35a6392068a85012f21e1180dbf32896717af52a256\",\"test/unit/format-toolbar.test.mjs\":\"e610d2250c51216e2b6c2f1be86d19ff4766e9440f75aff5b85cbe07550344fe\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm run validate:review",
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"docs/interaction-notes.md\":\"7ad466f4c94e36eab22e582e000bcfc4c319bf7f114d898c0411c852678d6d6f\",\"package-lock.json\":\"c6b3a3cb44bf02b66312be43e3e7bc3bff0eb3968ef9e65c1a44de3163ed1588\",\"package.json\":\"5744d8cb38e85ae586c4f71f61400fc7394b93cade8efc2bafa00e7996712a33\",\"pr.diff\":\"fbf9df8302ac97dbf8917340fa8b329d70ee71f53fef042189924a20838e9766\",\"review.schema.json\":\"63574a07fb0ff2a67e8839c5356bfa30e777955596ad0309589f14767371cd81\",\"scripts/validate-review.mjs\":\"04596758f6cf4269b7681001d21bb211bee07b992c71ab759af1d9712bb9c682\",\"src/format-toolbar.html\":\"18719ebf6c7e82dbf5953b9f214742ffa4ffab42ca1feef6872d2d2972e595c5\",\"src/format-toolbar.mjs\":\"c5378f1d4de5933fb5841961a69a3fae9eee9a9da4e21d5512607b7897d76fb2\",\"test/helpers/toolbar-fixture.mjs\":\"9dd81fdbfa3d425c76976f34ccbd56404c48519d44b139f0e34ce8481f1752af\",\"test/integration/format-toolbar.test.mjs\":\"fb0d1a44160de4180098b35a6392068a85012f21e1180dbf32896717af52a256\",\"test/unit/format-toolbar.test.mjs\":\"e610d2250c51216e2b6c2f1be86d19ff4766e9440f75aff5b85cbe07550344fe\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm run validate:review",
       "requirement": "required",
       "alternative_group_id": null,
       "timeout_ms": 60000,
-      "logical_command_digest": "sha256:995ff8e0907d50fadc408cddaf15586d31ededad47f77897d55f00c69a7ba23f",
-      "rendered_event_command_digest": "sha256:92d753ecbcb13bb55a05a5f53b21cb3053234486d3a6b3d907fdcd4ce0cd9fa3",
-      "command_contract_digest": "sha256:6263a899965c32fcd3585a22b87726f96802122455403f32be0248dc8778d88d"
+      "logical_command_digest": "sha256:e233b2b30261370cdbe5c548c9919936fda4c9075bde417c7bed08985a30e4d0",
+      "rendered_event_command_digest": "sha256:1635a6f83b197876104ac30e7d54ec34657085664a2eb7c4126dcf36cec9f419",
+      "command_contract_digest": "sha256:44ea9f5a3cc8de218f5b3fdff9a838bece30ca9e1076bffd172c4f2f697b77f1"
     }
   ],
-  "contract_digest": "sha256:f2bd1d9cf7fc10488d956fa9b63f7225d6b08966fe08cba3e1c58b1f6ef8a692"
+  "contract_digest": "sha256:b878b24e92a068445165479a6d69e67d704571a3b43755e2823a14df5f705b81"
 }

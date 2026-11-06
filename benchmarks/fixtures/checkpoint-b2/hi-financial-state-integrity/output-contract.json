@@ -6,9 +6,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:e48de705eb8b950a3c1adf06db3fe7714e53a7011f8f36120487441b68a68bd5",
+  "evaluator_public_reference_digest": "sha256:7dac74b6832c7d100124e83a793c840fadaca347e8abdc097295f1d51bf09d9c",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/verification-command-contract.json",
-  "verification_command_contract_digest": "sha256:98679fb0e3e6034f120934ebb687af14340c6d63e791e21929269d13dffc7f4d",
+  "verification_command_contract_digest": "sha256:236b5e536ab20d26b45eb659a2f316453ae16832deb7c15be8e3bd5ecf40478b",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:dec7262c7cb20b2d0f031dfbc03194f0c299b4f9e47df3e9d285553ec48163ec",
   "result_profile": {
@@ -17,7 +17,7 @@
   },
   "declares_findings": false,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:bfedba6eded446a7c50fc0bd62306315416d9eae5fc47d9a88527046353b236a",
-  "evaluator_authority_manifest_digest": "sha256:930e2b4bfea11bd526872014a02f996989b9f3862d57702ee67bef4ba28f44af",
-  "output_contract_digest": "sha256:e74389d3bc087698fa530ef65efb4ad76828db991a9a36f533480215ae6c4c3b"
+  "evaluator_authority_manifest_raw_sha256": "sha256:290e53d02aab9ccfc2ee49607e1efff9f5a46a81bab1c1fa3c15cbae9f0a2fe1",
+  "evaluator_authority_manifest_digest": "sha256:1ac3feabc0714945dc2d5483f5fbf3e6c778de5cd2e626d2a37aac4728c90be6",
+  "output_contract_digest": "sha256:14abaee031d87dbdda04e3ca461233628b85727bf444ecc9edde53f6ca5e94ff"
 }

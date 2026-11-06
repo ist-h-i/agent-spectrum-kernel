@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
   "fixture_id": "hi-authorization-exception",
-  "candidate_input_digest": "sha256:b5e1aeb49f71d8fde3e58f553b93e57b73beda92c44dc713b89f6959b1de0592",
-  "candidate_evaluator_digest": "sha256:ffe614507a8c6611b716c41c6249065bf2fb87c62b7a9a0cfcc5b89b2305bbfc",
+  "candidate_input_digest": "sha256:4804b79ea229cfff5862317eb36703d77250a56714cf8e8e6cbacec0e01cc539",
+  "candidate_evaluator_digest": "sha256:e02c63563f0dbfa1f7493a080a69a3076408baea3c1ba28ddc6ad8efb64f9221",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -117,5 +117,5 @@
       "result": "unknown"
     }
   ],
-  "review_package_digest": "sha256:74550d21a26c070f1de499807212968eb3cad238c47071e7ba3158948f247858"
+  "review_package_digest": "sha256:9e81156c8dccc4c9f7e6220c4d916823221be31b134125cadf9cf039c9c87003"
 }

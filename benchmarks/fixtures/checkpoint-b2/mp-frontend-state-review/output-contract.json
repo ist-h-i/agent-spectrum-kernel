@@ -6,9 +6,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mp-frontend-state-review/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:2b1569b737c6f62b96430acce6f6662437a61096b2680fc9bf25283c64f432e6",
+  "evaluator_public_reference_digest": "sha256:8ddf43517b117403ac9955506bcd7c7689d58359f0d86fac728cabccebfab245",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mp-frontend-state-review/verification-command-contract.json",
-  "verification_command_contract_digest": "sha256:7e3d4033d868d5daa7974c133d1293d85c484b2060e14d05f236a15db0bedd88",
+  "verification_command_contract_digest": "sha256:969b603b9f5a16b8a99110b235dee882857d4401d14579e845ce0b8f60299db6",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mp-frontend-state-review/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:9ae16c5b738c0cafd6eec8062f0d1efb77ad2ace081762c1619d95747677ff8a",
   "result_profile": {
@@ -17,7 +17,7 @@
   },
   "declares_findings": true,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-frontend-state-review/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:0214c395c9856dd5ec7c59eae4afdc64b328fd8b484fc9fc955eace4e1b03f5f",
-  "evaluator_authority_manifest_digest": "sha256:e6cfb1e0a29ce8960002bc31d20a994d20e800417304d3be9167fb83ffb02725",
-  "output_contract_digest": "sha256:cf87cad76e30e7dc9166996d39cb3f6c84336ac7f2e55e3fec4c7839f2d5c584"
+  "evaluator_authority_manifest_raw_sha256": "sha256:951cd3e77d85471d3523e4f15cdc3c600110882ef744278bc0d2e89c70a0472d",
+  "evaluator_authority_manifest_digest": "sha256:afbdd1a1be506478e32af17b14246b8a53a0c130738c02917f702f3f321cbe67",
+  "output_contract_digest": "sha256:174fc3e2ada270b4f74f56823a4aa25d78e0ca2241ad314fc742829ea48dbf04"
 }

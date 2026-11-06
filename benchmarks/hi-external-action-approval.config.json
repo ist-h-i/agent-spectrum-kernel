@@ -47,10 +47,10 @@
       "repetitions": 3,
       "aggregate_eligible": true,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/input-manifest.json",
-      "input_manifest_sha256": "274483c68faf1e5634e4a52b128cce51c9770f83c924a30af5df947dd62c4dd6",
+      "input_manifest_sha256": "24ec8367b57fd7571024adf1a09507f9030d160284fad7ca161100e2136b1a72",
       "verification_command_contract": {
         "path": "benchmarks/fixtures/checkpoint-b2/hi-external-action-approval/verification-command-contract.json",
-        "sha256": "ebb416d1dd3f580fedce6a255664780213fad88f1ba089ae916f3e64e238d2c1"
+        "sha256": "df7c3bd1d1025523a5548b2e25b966cb3233e052014eccfd958a59c3662d2ea1"
       }
     }
   ],

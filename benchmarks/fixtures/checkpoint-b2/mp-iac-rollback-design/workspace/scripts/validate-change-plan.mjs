@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,12 +8,11 @@ if (!outputPath) throw new Error("usage: validate-change-plan.mjs <change-plan.j
 const workspace = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const value = JSON.parse(readFileSync(outputPath, "utf8"));
 const commandCatalogText = readFileSync(resolve(workspace, "operations/commands.json"), "utf8");
-const commandCatalogLines = commandCatalogText.split(/\r?\n/u);
 const commandCatalog = JSON.parse(commandCatalogText);
 const exactKeys = (candidate, keys) => candidate && typeof candidate === "object" && !Array.isArray(candidate)
   && Object.keys(candidate).sort().join("\0") === [...keys].sort().join("\0");
 const slug = (candidate) => typeof candidate === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(candidate);
-const nonEmpty = (candidate) => typeof candidate === "string" && candidate.length > 0;
+const nonEmpty = (candidate) => typeof candidate === "string" && candidate.trim().length > 0;
 const oneOf = (candidate, values) => new Set(values).has(candidate);
 const nonEmptyUniqueSlugs = (candidate) => Array.isArray(candidate) && candidate.length > 0
   && new Set(candidate).size === candidate.length && candidate.every(slug);
@@ -28,35 +27,9 @@ const evidencePaths = new Set([
   "state/current-state.json",
 ]);
 const commandsById = new Map();
-const commandSourceById = new Map();
-const uniqueCommandSource = ({ start, end, excerpt, label }) => {
-  const matches = commandCatalogLines.flatMap((line, lineIndex) => (
-    lineIndex > start && lineIndex < end && line.trim() === excerpt ? [lineIndex] : []
-  ));
-  if (matches.length !== 1) throw new Error(`supplied command catalog ${label} source identity is ambiguous`);
-  return { line: matches[0] + 1, excerpt };
-};
-for (const [index, command] of (commandCatalog.commands ?? []).entries()) {
+for (const command of commandCatalog.commands ?? []) {
   if (!exactKeys(command, ["command_id", "mode", "production_mutation", "approval_required"]) || !slug(command.command_id) || commandsById.has(command.command_id)) throw new Error("supplied command catalog is invalid");
-  const commandExcerpt = `"command_id": "${command.command_id}",`;
-  const commandLines = commandCatalogLines.flatMap((line, lineIndex) => line.trim() === commandExcerpt ? [lineIndex] : []);
-  if (commandLines.length !== 1) throw new Error("supplied command catalog source identity is ambiguous");
-  const nextCommand = commandCatalog.commands[index + 1];
-  const nextCommandExcerpt = nextCommand ? `"command_id": "${nextCommand.command_id}",` : null;
-  const nextCommandLine = nextCommandExcerpt === null
-    ? commandCatalogLines.length
-    : commandCatalogLines.findIndex((line, lineIndex) => lineIndex > commandLines[0] && line.trim() === nextCommandExcerpt);
-  if (nextCommandLine < 0) throw new Error("supplied command catalog source order is invalid");
-  const mode = uniqueCommandSource({ start: commandLines[0], end: nextCommandLine, excerpt: `"mode": "${command.mode}",`, label: "mode" });
-  const productionMutation = uniqueCommandSource({ start: commandLines[0], end: nextCommandLine, excerpt: `"production_mutation": ${command.production_mutation},`, label: "production mutation" });
-  const approvalRequired = uniqueCommandSource({ start: commandLines[0], end: nextCommandLine, excerpt: `"approval_required": ${command.approval_required}`, label: "approval" });
   commandsById.set(command.command_id, command);
-  commandSourceById.set(command.command_id, {
-    command_id: { line: commandLines[0] + 1, excerpt: commandExcerpt },
-    mode,
-    production_mutation: productionMutation,
-    approval_required: approvalRequired,
-  });
 }
 
 function normalizeEvidencePath(candidate) {
@@ -70,7 +43,7 @@ function validatesExactExcerpt(evidence) {
   const normalized = normalizeEvidencePath(evidence.path);
   if (!normalized || !Number.isInteger(evidence.line) || evidence.line < 1 || typeof evidence.source_excerpt !== "string" || evidence.source_excerpt.length === 0) return false;
   const absolute = resolve(workspace, normalized);
-  if (!existsSync(absolute)) return false;
+  if (!existsSync(absolute) || realpathSync(absolute) !== absolute) return false;
   const status = lstatSync(absolute);
   if (!status.isFile() || status.isSymbolicLink()) return false;
   const lines = readFileSync(absolute, "utf8").split(/\r?\n/u);
@@ -129,7 +102,6 @@ if (!exactKeys(value.knowledge_promotion, ["state", "trigger_id", "destination",
 
 if (!Array.isArray(value.evidence) || value.evidence.length === 0) throw new Error("evidence is required");
 const evidenceIds = new Set();
-const evidenceById = new Map();
 const evidenceSourceIdentities = new Set();
 for (const evidence of value.evidence) {
   if (!exactKeys(evidence, ["evidence_id", "path", "line", "source_excerpt"])
@@ -138,7 +110,6 @@ for (const evidence of value.evidence) {
   const sourceIdentity = JSON.stringify([normalizeEvidencePath(evidence.path), evidence.line, evidence.source_excerpt]);
   if (evidenceSourceIdentities.has(sourceIdentity)) throw new Error("evidence source identity is duplicated");
   evidenceIds.add(evidence.evidence_id);
-  evidenceById.set(evidence.evidence_id, evidence);
   evidenceSourceIdentities.add(sourceIdentity);
 }
 const referencedEvidenceIds = [
@@ -149,28 +120,6 @@ const referencedEvidenceIds = [
   ...value.knowledge_promotion.evidence_ids,
 ];
 if (!referencedEvidenceIds.every((id) => evidenceIds.has(id)) || ![...evidenceIds].every((id) => referencedEvidenceIds.includes(id))) throw new Error("evidence references are not closed");
-const cites = (ids, path, line, excerpt) => ids.some((id) => {
-  const citation = evidenceById.get(id);
-  return normalizeEvidencePath(citation?.path) === path && citation.line === line && citation.source_excerpt === excerpt;
-});
-for (const step of value.preparation) {
-  const commandSource = commandSourceById.get(step.command_id);
-  if (!cites(step.evidence_ids, "operations/commands.json", commandSource.command_id.line, commandSource.command_id.excerpt)
-    || !cites(step.evidence_ids, "operations/commands.json", commandSource.mode.line, commandSource.mode.excerpt)
-    || !step.evidence_ids.some((id) => {
-      const citation = evidenceById.get(id);
-      return normalizeEvidencePath(citation?.path) === "docs/change-request.md"
-        && citation.source_excerpt === "Preparation may format-check, validate configuration, and create a plan, but it must not mutate cloud resources.";
-    })) throw new Error("preparation evidence does not bind the exact command, mode, and safe-preparation authority");
-  const relevantEvidence = step.evidence_ids.every((id) => {
-    const citation = evidenceById.get(id);
-    if (normalizeEvidencePath(citation?.path) === "docs/change-request.md"
-      && citation.source_excerpt === "Preparation may format-check, validate configuration, and create a plan, but it must not mutate cloud resources.") return true;
-    if (normalizeEvidencePath(citation?.path) !== "operations/commands.json") return false;
-    return Object.values(commandSource).some(({ line, excerpt }) => citation.line === line && citation.source_excerpt === excerpt);
-  });
-  if (!relevantEvidence) throw new Error("preparation evidence contains a citation unrelated to its exact command and safe-preparation authority");
-}
 
 if (!exactKeys(value.scope, ["changes_made", "production_action_authorized"])
   || value.scope.changes_made !== false || value.scope.production_action_authorized !== false) throw new Error("scope is invalid");

@@ -6,9 +6,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:8fd998bdd8ac760bdaff46622e9ad95a77bab1dd449fd5d0461f5f00b06cf188",
+  "evaluator_public_reference_digest": "sha256:3aba9d8989841b0e04705b64c070d0131c4da7fb07e1d008d245365d284c62d5",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/verification-command-contract.json",
-  "verification_command_contract_digest": "sha256:aa2b0f76782ab2bb55a03b9e157d2694c8e829b2263fe2cf91807532daa1118a",
+  "verification_command_contract_digest": "sha256:603649add83a568a34573287bad00abb169ed298f58190829d6dc63fbb4ebaf9",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:2a5a54130efe26a8460821dba341c869a7453c63967c59fbb7f66a344486981e",
   "result_profile": {
@@ -17,7 +17,7 @@
   },
   "declares_findings": false,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:9df361de0823c9cdb0fc29f26f86af6b7add8f12ab220cccb6839485e37d966a",
-  "evaluator_authority_manifest_digest": "sha256:70d04340a5ab6d062de6381356c395731044a958ec26e51f4ceb22a7ef36a5fe",
-  "output_contract_digest": "sha256:111d3bf1dd9db61691de6e5c45d6b34fea56111b5f362ce8d6e9f251f2bad66e"
+  "evaluator_authority_manifest_raw_sha256": "sha256:e2190a0010d414d8c4847b280674a94ac290204d7c24042d952510090540b8a9",
+  "evaluator_authority_manifest_digest": "sha256:6ca7ac6918efae25758e4b9184c79b6c7ff9a6fe6863e42cde9f667844e19f8a",
+  "output_contract_digest": "sha256:5e43a2cfe72d0664f975789c91b1d4ada281421002c530284a1f0accacb81f7d"
 }

@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "824c949a00ae0a5f7539d0280126aa025d468b819e147c36faea2ad2f68f7451",
-          "bytes": 1514
+          "sha256": "8fa6ea6b5755f2f424ac4a6e2d526b683ebe116d7eb1d86c673f8533878d8e18",
+          "bytes": 2346
         },
         {
           "path": "workspace/data/legacy-customers.json",
@@ -40,8 +40,8 @@
         },
         {
           "path": "workspace/spec/evolution-contract.md",
-          "sha256": "cdceb75aeb4dc35cf1905f811e54a4f462db1c7e6edeeb85ca8d94615ac0565c",
-          "bytes": 1550
+          "sha256": "a1eb5adb21d054b74999d117927ecde61e723a402001dad0775ffc922df80d74",
+          "bytes": 2034
         },
         {
           "path": "workspace/src/readers.mjs",

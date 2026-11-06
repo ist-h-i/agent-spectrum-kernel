@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:34a8c09ba47817d8c6db30f4623727a13b386a4d8f7e887a79096735d1d2c681",
+  "admission_record_digest": "sha256:3ca86ecd90fbcd7b2f374a4621f3a988b805ebb1b5e22d5badfbb44371ea9b69",
   "requirements": [
     {
       "requirement_id": "cache-causal-assessment",
@@ -64,5 +64,5 @@
     }
   ],
   "requirement_set_digest": "sha256:53544063ad126e3f3b74a87cfdd95deef1571c56882334d42a7496a9f0f1b635",
-  "requirement_record_digest": "sha256:ac7b4fa2e7991e3b4acc65f130457380c04cd5167ebf2585db3515a2a3f8f84b"
+  "requirement_record_digest": "sha256:8f9da16739436617a8fdf03dd4b1e23e9e10ffc031f2772b3320c64b9ca0f358"
 }

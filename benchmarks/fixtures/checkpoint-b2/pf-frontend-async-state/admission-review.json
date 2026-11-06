@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
   "fixture_id": "pf-frontend-async-state",
-  "candidate_input_digest": "sha256:604ebe507a4ca285311f9bce2b92ae4839467f2b27c341cca4bccb043b0fc636",
-  "candidate_evaluator_digest": "sha256:a689cc75575c5d7d6b04f3627a85066f696ef0b5cff80277aac51e7fe4b53175",
+  "candidate_input_digest": "sha256:e671ccac3576d1889062ae9ce7db68e552c5c0d8c23c4b717bf22dc59143f272",
+  "candidate_evaluator_digest": "sha256:6299cf80b52d50191cac7f4790ef87bdbe61720b00fafea39ddfabd4b32c6621",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -107,5 +107,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:8995954beb25e6bf6a6d69d3d11dd8d30365403b8d22fe4eeb7297946b412535"
+  "review_package_digest": "sha256:d885f3afeaf1b5e9f2670dc9ae02967e2ac799cc2ea78d1298046f15e179527b"
 }

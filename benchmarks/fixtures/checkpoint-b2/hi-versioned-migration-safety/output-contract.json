@@ -6,9 +6,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:702c13287868d46f14e2ab9e88162bc4f42cc2e91bb3dc48807a91f30af9c94c",
+  "evaluator_public_reference_digest": "sha256:656ea9cce3b26f65a0c6b22ff269b4df09c91c6f5e857d9406d04bb6c806a31a",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/verification-command-contract.json",
-  "verification_command_contract_digest": "sha256:7957b6cea8d77a023887f29846a32163e7f577e6b37d17271da25ed797ed74f1",
+  "verification_command_contract_digest": "sha256:3e7090845febd2237964400c79812096856bf03e34ab0bc4fe43dccbf5ee6341",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:fe8a17801ea9931dcbc5001773f79c94838a2566aa361bf98db1745d3a1848fa",
   "result_profile": {
@@ -17,7 +17,7 @@
   },
   "declares_findings": false,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/hi-versioned-migration-safety/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:1f019e0846583328e9c1947d5706fb02c2943767a8e981c6aca59ae3e4f1e700",
-  "evaluator_authority_manifest_digest": "sha256:cac7b40e1b61428aa846a7f422efac969c350b89db4129f63a510a79d70d4c93",
-  "output_contract_digest": "sha256:21c5cf67fa3e46c8c83a837e573eba07233d07a2b70662cb807efa4567588e4e"
+  "evaluator_authority_manifest_raw_sha256": "sha256:adf6757e59dedee07e5d2e406fe9307c1c603594fa53cad09d6cdf963dd8dcd2",
+  "evaluator_authority_manifest_digest": "sha256:67aae6fc99c0431168403cd409f0dd095a39820a1e18faebfa64ec900f98a718",
+  "output_contract_digest": "sha256:1afd9bbe1a0ad4b644ead41f65329abf45a1d58627f625c26bba3ae2bdca71cd"
 }

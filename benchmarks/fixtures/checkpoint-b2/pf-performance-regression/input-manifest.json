@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "5cc8c8ea485e46b9931006a75ccc7cbf9ba971e915757ae7737c167df87d8465",
-          "bytes": 1679
+          "sha256": "46bb7cda29d207deb0460791710f53378ad4eedca49b5e675f54b3726f8c1782",
+          "bytes": 2476
         },
         {
           "path": "workspace/data/measurement-config.json",
@@ -20,8 +20,8 @@
         },
         {
           "path": "workspace/docs/lookup-contract.md",
-          "sha256": "95ff21fa7c5fb4486b692b0516a35e4d2ab56d79e64d31ecd0392220a969a374",
-          "bytes": 2734
+          "sha256": "0f2b77ad07258d6b9089c381dd48fac6d38aa20de4d18f0a2d3d88520bb02821",
+          "bytes": 2756
         },
         {
           "path": "workspace/package.json",

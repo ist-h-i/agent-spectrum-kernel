@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
   "program": "adaptive_ask_scoring_input_freeze",
   "fixture_id": "pf-api-pagination-behavior",
-  "fixture_input_digest": "sha256:3f087aabe9d3bf1af6b1ccb7ba425469c7b9e5a7038cb350f94696a664a10386",
+  "fixture_input_digest": "sha256:3e81d55c87acca05c053b5b3b0e94b9f869b8e0b7cbaaf68a6a862525a32e107",
   "catalog": {
     "path": "benchmarks/portfolio-catalog.json",
     "raw_byte_digest": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
@@ -21,29 +21,29 @@
   },
   "admission_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/final-admission-record.json",
-    "raw_byte_digest": "sha256:3f984ac5df6e34d12f2b5cad73ed4e3a5cb8a19d6420f81fc42bf8f14f9f3c4c",
-    "semantic_digest": "sha256:de926c3d8b06993f1a0d142aebce6d5b4f7be5098de8601f878563f91cf7e24e"
+    "raw_byte_digest": "sha256:33718bb02d0e76044f39384f42e2ea74904e40059dd3e7137c1427aa0351b5fc",
+    "semantic_digest": "sha256:8dccecc4d823625b91f4b5795fd18689e42ce5682b738599e634d1372012008c"
   },
   "requirement_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/requirement-record.json",
-    "raw_byte_digest": "sha256:1ec3961395e6b836935fc84688222aec089926b2dd73c76fc393757686117f8c",
-    "record_digest": "sha256:c17019ad0ec2f3238d2b9a7b6eaa00886704b70d15e4250195729716b3c21fe7",
+    "raw_byte_digest": "sha256:b9a6e92b38feb2e5b64378be50b2f5d2be9ab1f79d89a1b4cfbdc00a9607e427",
+    "record_digest": "sha256:53f5836712b12cf820877854f65236c72bc0623f4ef28967254c22c1bc95bdc0",
     "set_digest": "sha256:2662298546d18014be34d4033e161f431f8bae1a79c517a1eac3318098735031"
   },
   "output_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/output-contract.json",
-    "raw_byte_digest": "sha256:544f28cd0eaaf362219641ea59af43612715a1f7d9031b054eb56fa54087b411",
-    "semantic_digest": "sha256:9216ce90d1d92e065cd5f0e0b1799e56645b7c1cd9d64d9ed958bf9244f7b60b"
+    "raw_byte_digest": "sha256:ac94d5539ffbef81594b73f40927fdd317e7af1e72016bc71969cc7922c0b57b",
+    "semantic_digest": "sha256:49314cff39c46e34d4bbc2761bb92942dbb92a2d4d501e0a8957741eea37006e"
   },
   "evaluator_public_reference": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/evaluator-reference.json",
-    "raw_byte_digest": "sha256:554ba381749032ea6ae1d514fd763e1efe4f247cd0cf1bbf5d7f279f82e3f6d1",
-    "semantic_digest": "sha256:239037e8a3888467fc748f43033ef1039f06377b4d31b37a4ca2442536a54fe3"
+    "raw_byte_digest": "sha256:faf607509de9ec56ec436f4cb8c7bfbfed10a971e2b01f0d05f2cde6008ad508",
+    "semantic_digest": "sha256:89685adf4f7b447ded105437f9ad861598375842935447c783b3a08842146f24"
   },
   "verification_command_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/verification-command-contract.json",
-    "raw_byte_digest": "sha256:8a7f8c4880deace5ce83ae5ba0e62d3d0086ea5cbfd1c078c1c05812d2df4dcc",
-    "semantic_digest": "sha256:9fc322fdabfced41a0e42139c54cfc6e4792ab6b3238d977ef649cadd7750d2e"
+    "raw_byte_digest": "sha256:21356e0a42de27ae0a0f94a48b1bbb77454a8ae5d31f4aed84161a6dc308fea0",
+    "semantic_digest": "sha256:12877fe5a4ec8126eec12af9231ff64264d28817da2dd030a5038e60c9a061af"
   },
   "evidence_map": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/evidence-map.json",
@@ -52,13 +52,13 @@
   },
   "evaluator_authority_manifest": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-api-pagination-behavior/evaluator-authority-manifest.json",
-    "raw_byte_digest": "sha256:5ac2eda66ecee40303d0471c01979b293d8bb8ba05dc8ad57fd95a694dde7ee1",
-    "semantic_digest": "sha256:86aeab3ca1223b3a0a95f21ca6eb177f62e013b96ee76199a2822c80df4ee144"
+    "raw_byte_digest": "sha256:71e3e45b5ad96cd773dfa81c57442936d0941a101f1af7a1818055b46016afc7",
+    "semantic_digest": "sha256:17d7ea88fc4b0d57580e643bcb5bb06996fbf2f8ec7b281396c07f7a3cbc3090"
   },
   "result_profile": {
     "name": "binary_scope_verification_v1",
     "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
   },
   "freeze_revision": "issue-207-pf-api-pagination-behavior-r1",
-  "manifest_digest": "sha256:8d30aedb1a4ef1cf16de0826a26e8342deaa72656ab223701b53ab46134bceb7"
+  "manifest_digest": "sha256:273a600a056aeb4cbfbb50a729558a89956e8c37c60ce688b1d11be39b087229"
 }

@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "5244dda996f874f01871685f0f6db3fb42342e4d6d35eff87ce5904e7ddd5d65",
-          "bytes": 1209
+          "sha256": "27f0fa070778accebc11dc3cc97037b7582a71a478c87eb2b4728f147a80418c",
+          "bytes": 2193
         },
         {
           "path": "workspace/data/incident.json",
@@ -25,8 +25,8 @@
         },
         {
           "path": "workspace/docs/ledger-contract.md",
-          "sha256": "236ae38d35685890be54aba7ea910477ad9748a51a924182a7a1ca96e95f5775",
-          "bytes": 2473
+          "sha256": "68ec21a9b07c506eabc47cb567250b1e409407fabce77cd6bca9105dc2fab8b4",
+          "bytes": 2677
         },
         {
           "path": "workspace/package.json",

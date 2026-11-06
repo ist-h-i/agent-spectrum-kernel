@@ -1,25 +1,25 @@
-// Additive exact-source task descriptors. The v2 renderer and legacy nine closure stay byte-exact.
+// Reviewed current public task/metadata pins; historical closures remain in their matching Git sources/resources.
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {kernelPrinciplesV2FixtureDescriptor as legacyDescriptor, principlesV2Capability as legacyCapability} from './kernel-principles-v2.mjs';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const prefix = 'kernel_principles_v2.task_signal@catalog24-1:';
 const fixtures = new Map([
-  ["hi-authorization-exception", "pr_review", "review", "security_boundary", "c6aad90c430b4a8a48c3ad8ef5722e80a856118de4d37621008275a1eefc341b", "b14ddb23d2d9c2e81efc18fbcc67ab7495a2b161b3089bcfe92a472b21d3b2ce"],
-  ["hi-external-action-approval", "operation_boundary", "design", "external_effect", "8b065a53f88da86e655b90ca99a23703189314c9060da1a72ac309833ed10267", "52f6ec9df34f0e2fa8fea2b5d32fcac57e8e578f79b0b2a342a18d6e05347770"],
-  ["hi-financial-state-integrity", "investigation_implementation", "implementation", "financial_integrity", "5244dda996f874f01871685f0f6db3fb42342e4d6d35eff87ce5904e7ddd5d65", "e6bbf3b307cb24aa7f4dbf10ccbc047cb28d4a90d1a931ad80fcfdb857bbdb78"],
-  ["hi-versioned-migration-safety", "migration_design", "design", "data_integrity", "1a187cbd0cf7ff96b34c8e749dcaf34672162cde546e2c6e0e9726aad32d8e86", "840b9bb3e73f1ffece0cef8a21edadf2165b8b3015763b2452da4dbafb8631a8"],
-  ["mn-client-compatibility-fix", "local_implementation", "implementation", "none", "5257ecb3066b8382766d5a4193fa1ee0eeb6b25a0bd3f405882eb8ace3189356", "08b06312ceefa59b7133b9df51814a90cad82a47898aff9e1a216da9744b57ce"],
-  ["mn-frontend-default-fix", "local_bug_fix", "implementation", "none", "83573d35a482fe08277dc6a19b8d476f6cca035ea8609fa248b2db101ae43ba1", "1246cb2b29232a3ccad9116d10e574d957becb44d5cf00fd605d72a486e3fb19"],
-  ["mn-schema-field-alignment", "small_feature", "implementation", "none", "83473c67c7aa4762b1f2d861ae26e6f4a4de03468fbf2ab7a7aeaa40bd2b3b97", "37eb7275d39f4f4765c1df95ae4c387a9758ccf10c667a84a88c2b74d97f069d"],
-  ["pf-api-pagination-behavior", "implementation_verification", "implementation", "none", "ad441a90a6e8a0ac878e5873b99b14010077f1610bfa7d814c4b17e17a34ba66", "2c04911ec32d3997a7beb7a93404e805e66e7aa24fc1e28fc1e765f9eb2ef1a0"],
-  ["pf-ci-cache-flake", "investigation", "investigation", "none", "d514b2e3db7112454ea34247b3632d995dd1fa7173b7e98cb3ecba462ef3904c", "9b096cf6f5dcb9d24ec7534732f1bd63a956851f224feb055b197b7e14ed7b5f"],
-  ["pf-data-schema-evolution", "implementation_verification", "implementation", "rollback_required", "824c949a00ae0a5f7539d0280126aa025d468b819e147c36faea2ad2f68f7451", "41dea0e7273d33ebe4d312722e15ea4af6a8e7e2c4c12662daf15c4c402ee68a"],
-  ["pf-frontend-async-state", "investigation_implementation", "implementation", "none", "bbf8c0fcc5db005958a0ddc531279a7a5bfc4a5f7ed424441dea629dd72d89dd", "5bda94e51b82acc23ddabd5472aa2d9101e8d5336f47d8c2ee6e33b6440b5b06"],
-  ["pf-library-compat-upgrade", "dependency_migration", "implementation", "rollback_required", "9bd5fb4ce2660b02e5e3d2ce55aeb8b0631c74e790962143e590428500dea2ee", "faa0aa58e94fd40aa07187eddedee77b9a6517d9196e2e7e8e907f0849975d7f"],
-  ["pf-observability-redaction", "implementation_review", "review", "security_boundary", "eca02950ba10488accb9529ead7f622dff91ca94d130789e8a21904fa7f31b66", "552d9ccfe54fa319800bff1648bae94110a8b08516374d55cf37efd015babdf4"],
-  ["pf-performance-regression", "investigation_implementation", "implementation", "none", "5cc8c8ea485e46b9931006a75ccc7cbf9ba971e915757ae7737c167df87d8465", "35eda9b698e574636d06bdc83b17b06c2aa79d9500a3b31dfc39b067c551533b"],
-  ["pf-review-error-contract", "pr_review", "review", "none", "26059d1c2ed472de461778213f77cbc172a69e6946a9ff711e2393e0fabf3928", "1f9c1a0b0d0ff439d9a10d23339cce637756138b23aa1dd97687d1a6e2dd1869"],
+  ["hi-authorization-exception", "pr_review", "review", "security_boundary", "d63648ae9c68342c8ab6d06129ddea0126794c5cb1ed0501d171828975d0da04", "214e37d7f3c7f2f10a9acc5f0a9cce32ad6d88eaa0de1cdc8fe831f3d2062a39"],
+  ["hi-external-action-approval", "operation_boundary", "design", "external_effect", "aac0e8939e90ca010a094d0a1b9b9c97620024a336a6114a65d8ee938089df63", "f41663faf1437f359dd0d52a8bc32c36f9c88102739e19b29b5fc8a7268bf715"],
+  ["hi-financial-state-integrity", "investigation_implementation", "implementation", "financial_integrity", "27f0fa070778accebc11dc3cc97037b7582a71a478c87eb2b4728f147a80418c", "97e049730a530e52cf512f971ad9be20e491b8312c1914afc6ca663b57b5bc48"],
+  ["hi-versioned-migration-safety", "migration_design", "design", "data_integrity", "e471420832367631d065d04d53cd94fed1f1b0aba7863a1418cab515ca5c0a34", "34f5df9ea2b83e1f83ef1c37227344165f45be42a6c15fe549f56917db4a6b70"],
+  ["mn-client-compatibility-fix", "local_implementation", "implementation", "none", "3cdefd561b94e3f6a78df193c93555eeed5b46a69bfc1a98f3ccb94a143216c7", "32eb52eb50f561d2aa46f5ce33f5c32b817d6751b4b08d6aea86af6dd0aaf4c0"],
+  ["mn-frontend-default-fix", "local_bug_fix", "implementation", "none", "ff61638ce2f18e9b8734646ea7af5f2ebbb5c62c4e8457151b143426bc536150", "51adde148cdd6ee95a630583d286aaaaa12b9832d5c7ac8b8fea656b5060f1dc"],
+  ["mn-schema-field-alignment", "small_feature", "implementation", "none", "1172c442e52f22fe633cf337455d9dedbf0ae29e377507cafcb6574bf4c01dcc", "824eb45ccc25139650cb76bc733fbc18f666de16061c4d9648cdc5e52b2bf4cb"],
+  ["pf-api-pagination-behavior", "implementation_verification", "implementation", "none", "40c4bcb69ef647878b8e655d132326aa1691869d7925a0ee7d615074d8456999", "664de0da41a0f557e9a704fb6ecc782fa79e11e6d75104c9467713fdf57790d7"],
+  ["pf-ci-cache-flake", "investigation", "investigation", "none", "2a71b04e7cba6076a01ec9a818d217d97a5ac1179d142ba67927079939484aa5", "3fe263ba476ec8ee954a69f4cfc4e8a45bbcbed4e7762912e7e1cc4d5ff8b88d"],
+  ["pf-data-schema-evolution", "implementation_verification", "implementation", "rollback_required", "8fa6ea6b5755f2f424ac4a6e2d526b683ebe116d7eb1d86c673f8533878d8e18", "b3cf829f19f9944c4f97174c28a16345157de55571d2f932ca25200f6e621a65"],
+  ["pf-frontend-async-state", "investigation_implementation", "implementation", "none", "a1aaa101028939b31f171d8dc7531a1aa1b605c67dc2356162f6dc0b051b0127", "77972b4372115cb6750ab13aaa240db5cedcb7a8089a7d6a19e3643a88b637c1"],
+  ["pf-library-compat-upgrade", "dependency_migration", "implementation", "rollback_required", "2eb765aca7a50805b863c4fbdc1ff4b0c593e17f232587b2a8b3ae35e6feb74a", "d06eb6da883d2e2093b56ce6620e852f385c69b5aff062c3b4befb82b47d0229"],
+  ["pf-observability-redaction", "implementation_review", "review", "security_boundary", "79b4aacb74fbdb14fd096abaeb5e73c2c5854f873bba7fa3462cf679f18f36cf", "e09f6e5d1dbc07c67da4c39035e3c79e54b8f99249b6a7825436729ac301f0f9"],
+  ["pf-performance-regression", "investigation_implementation", "implementation", "none", "46bb7cda29d207deb0460791710f53378ad4eedca49b5e675f54b3726f8c1782", "bf14482e073cccbf22f9a2699391c8ecf5365a0bf8b345e0badab30d4c8b5587"],
+  ["pf-review-error-contract", "pr_review", "review", "none", "800778683315b66db315c3cc691fa79c8502302dd5217b43085bf7cfb918d622", "c26f291c5c6e9b4bc410bbed20d8106dcc09d9679adad0a795c6e88fad885823"],
 ].map(([id,declared,selected,risk,taskDigest,metadataDigest])=>[id,{declared,selected,risk,taskDigest,metadataDigest}]));
 const refsFor=(id,f)=>[`benchmarks/fixtures/checkpoint-b2/${id}/task.md#sha256:${f.taskDigest}`,
  `benchmarks/fixtures/checkpoint-b2/${id}/metadata.json#sha256:${f.metadataDigest}`,

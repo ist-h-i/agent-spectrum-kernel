@@ -10,8 +10,8 @@
       "files": [
         {
           "path": "task.md",
-          "sha256": "83473c67c7aa4762b1f2d861ae26e6f4a4de03468fbf2ab7a7aeaa40bd2b3b97",
-          "bytes": 1540
+          "sha256": "1172c442e52f22fe633cf337455d9dedbf0ae29e377507cafcb6574bf4c01dcc",
+          "bytes": 1977
         },
         {
           "path": "workspace/package.json",
@@ -30,8 +30,8 @@
         },
         {
           "path": "workspace/spec/schema-alignment-plan.md",
-          "sha256": "2fb332652d4c7349ba8ce1cd8f9429bccbafdda54695dbb3bfbb1aef2ef83c31",
-          "bytes": 727
+          "sha256": "0dc0a6fd2fa954172df56ffe36133a29c618de2349aa4b34be9a96f5ee651039",
+          "bytes": 663
         },
         {
           "path": "workspace/src/member-export.mjs",

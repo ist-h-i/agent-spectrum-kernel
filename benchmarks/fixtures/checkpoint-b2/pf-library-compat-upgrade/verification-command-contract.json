@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
   "program": "adaptive_ask_verification_command_contract",
   "fixture_id": "pf-library-compat-upgrade",
-  "fixture_input_digest": "sha256:4d6f715172603e41a5e774ef1143cb367e39b882cb3ab01df168933c1c781253",
+  "fixture_input_digest": "sha256:a5ff97be249d09a723a78d68e9d25c297fdc5cdfbce682ce5cbbb4a59b5a9fac",
   "commands": [
     {
       "command_id": "library-compat-migration-validation",
@@ -30,5 +30,5 @@
       "command_contract_digest": "sha256:c5d7c9aaea6b64ab038f071e74b13e72ff8cba0382e2aa62dd30ce651998aac4"
     }
   ],
-  "contract_digest": "sha256:fe0a215e1003f23865defbb93fffc95c7d5b9e8af9c4eb64c9864d7044d64125"
+  "contract_digest": "sha256:bbd2ca5c92c678b353f95b4e55d7dd2bc7661d63ceb364de7b6e777f3410bdee"
 }

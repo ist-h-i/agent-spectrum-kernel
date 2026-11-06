@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
   "program": "adaptive_ask_scoring_input_freeze",
   "fixture_id": "pf-library-compat-upgrade",
-  "fixture_input_digest": "sha256:4d6f715172603e41a5e774ef1143cb367e39b882cb3ab01df168933c1c781253",
+  "fixture_input_digest": "sha256:a5ff97be249d09a723a78d68e9d25c297fdc5cdfbce682ce5cbbb4a59b5a9fac",
   "catalog": {
     "path": "benchmarks/portfolio-catalog.json",
     "raw_byte_digest": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
@@ -21,29 +21,29 @@
   },
   "admission_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/final-admission-record.json",
-    "raw_byte_digest": "sha256:c87f92968b53466a4787c60828358163906a7391be6c78433126089366d4f55e",
-    "semantic_digest": "sha256:999d755f024032190bcdc1676dc3907183dda39be1bc7f6ee10a4d9711765e6a"
+    "raw_byte_digest": "sha256:df5a3c77d5e8ce6a1285f7bcfe36a23aca8373b4c8876df1dc7db1308d155f11",
+    "semantic_digest": "sha256:f29bfc45f46a46c12a10094ef9615e9aae9c048dd5c0957bfc02500c9db56e49"
   },
   "requirement_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/requirement-record.json",
-    "raw_byte_digest": "sha256:081c8afa32bf44765cc948aff21679eef490f5ebc11baabcbaf222a67a9afefb",
-    "record_digest": "sha256:dbb29a9bbe8a09089d9c4690902515324e1a00c6e6f4c8a23fa2746948590577",
+    "raw_byte_digest": "sha256:718d55a4dcaafc953339d7edc3237660a82b0475e16d50009746191045bc6a11",
+    "record_digest": "sha256:2538ba5807df841c41576d8ebc7c486c9d7c4143708731b0478e5b355d8b7381",
     "set_digest": "sha256:a3a653b2d199f06af311fde46a67b2a9425303e98fe0705b0268666a32934ee5"
   },
   "output_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/output-contract.json",
-    "raw_byte_digest": "sha256:c58c7e2eeabeda1d7b4b8a84a28b3e812d2f72d929a93cabe0ad36ef9d88e69f",
-    "semantic_digest": "sha256:823c8c039d306bc2896cb07385c7e7d037f3798b3dbecb34bd7f998eedfac59e"
+    "raw_byte_digest": "sha256:d83ccab5a2ec76319221c103865ac4a2a7cb93183e7b3915b271405678e7135d",
+    "semantic_digest": "sha256:02b6668085bf00120687840ecb4df39ed367e3cad3c5056f2d61ceb5fd1ab85e"
   },
   "evaluator_public_reference": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/evaluator-reference.json",
-    "raw_byte_digest": "sha256:f6fe53295a2ad0bc7a99bb1a884ddf79ab9381db0853f4c6786e46cb9408a388",
-    "semantic_digest": "sha256:5f72305fa5ed3ef8df9fa4882fcc595c13b737dacea5909951937fb8873f4fc9"
+    "raw_byte_digest": "sha256:af82e42fded21cdc5ea4dbd6bcf74b43774374c57f327777de7912fa472e76df",
+    "semantic_digest": "sha256:7286180775bd4c896ee65420ade8434356e67c8fd186c8e65cc7bb0bd6424d89"
   },
   "verification_command_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/verification-command-contract.json",
-    "raw_byte_digest": "sha256:2979e361d43c903805c9e3389abf07b01c5a97921bb1f4553dbe97667b8615f2",
-    "semantic_digest": "sha256:fe0a215e1003f23865defbb93fffc95c7d5b9e8af9c4eb64c9864d7044d64125"
+    "raw_byte_digest": "sha256:1d8b72cb01b0c933b553e10f36566ae7954ae1602b6ccbed8cbe4cc069c90c5f",
+    "semantic_digest": "sha256:bbd2ca5c92c678b353f95b4e55d7dd2bc7661d63ceb364de7b6e777f3410bdee"
   },
   "evidence_map": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/evidence-map.json",
@@ -52,13 +52,13 @@
   },
   "evaluator_authority_manifest": {
     "path": "benchmarks/fixtures/checkpoint-b2/pf-library-compat-upgrade/evaluator-authority-manifest.json",
-    "raw_byte_digest": "sha256:baf37529aea3bde4751a6941f7bd123e64d29466f14e4f21c43fe4eb609c6d4e",
-    "semantic_digest": "sha256:fb11a7f007345fc84c25a8bdfda4697280280247c418353be48635ae687b3606"
+    "raw_byte_digest": "sha256:a33d78607eeca434b8c1ec818c73e5c31cb6062c1ef0ecfe4014aab9195700a9",
+    "semantic_digest": "sha256:b32c59aea9ac68419c733543f245cf2c8b4b51deedc29a0c7e9a2ad5d52d1339"
   },
   "result_profile": {
     "name": "binary_scope_verification_v1",
     "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
   },
   "freeze_revision": "issue-208-pf-library-compat-upgrade-r1",
-  "manifest_digest": "sha256:d2c24d90da878c437c1d494f8917c403b805615766186719ff44535af00863be"
+  "manifest_digest": "sha256:cce557b3e880061eb214dc1dbd228459258f096f5dd8eae254d6346525ce6393"
 }

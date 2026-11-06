@@ -23,10 +23,10 @@
   "output_contract_type": "implementation_producing",
   "requirement_record_id": "requirement-record-pf-performance-regression",
   "output_contract_id": "output-contract-pf-performance-regression",
-  "evaluator_bundle_id": "evaluator-6467cb12ac07440d3ce88e6a60d9fbe6de2763805e192b0d9893ece017bb8682",
-  "evaluator_bundle_digest": "sha256:a51a23ee2fd21dd9620b62fda6f8f3961fbc6d947c32cb1a15f6d440b40c4d18",
-  "evaluator_byte_count": 834416,
+  "evaluator_bundle_id": "evaluator-2f3264d0b50176a2b5ca18a698e2bec0d5dae63478be54cd64817654073903b2",
+  "evaluator_bundle_digest": "sha256:e64be67bc700bfe8cd054063c9d497b5c630dfe26bc910a8b5584e312eb80eb7",
+  "evaluator_byte_count": 931680,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:5edb06cde2771f0b981e3092c3d1d81537a87406cf00361bf55664854da7fdca"
+  "metadata_digest": "sha256:d609e88f1a52c0388cd2bae861195c7e50edae78ea2d48a27f3a61652d8fe60b"
 }
