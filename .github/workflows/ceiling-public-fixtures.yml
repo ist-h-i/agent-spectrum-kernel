@@ -8,6 +8,7 @@ on:
       - 'benchmarks/challenge-candidates/ceiling-v3-causal/**'
       - 'benchmarks/challenge-candidates/business-five-v1/**'
       - 'benchmarks/challenge-candidates/business-five-v2-workflows/**'
+      - 'benchmarks/challenge-candidates/business-five-v3-decisions/**'
       - 'scripts/**'
       - '.github/workflows/ceiling-public-fixtures.yml'
   workflow_dispatch:
@@ -34,3 +35,6 @@ jobs:
 
       - name: Check integrated business workflow public inputs
         run: node --test benchmarks/challenge-candidates/business-five-v2-workflows/tools/public-package.test.mjs
+
+      - name: Check business decision public inputs
+        run: node --test benchmarks/challenge-candidates/business-five-v3-decisions/tools/public-package.test.mjs

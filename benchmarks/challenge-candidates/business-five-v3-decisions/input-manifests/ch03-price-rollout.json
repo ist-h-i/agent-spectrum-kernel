@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "version": "business-five-20261106-decisions1",
+  "task_id": "ch03-price-rollout",
+  "modes": {
+    "one_shot": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03",
+          "bytes": 5509
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/TASK.md",
+          "sha256": "029cfde9eeaa57039f6303089537cb6fdf0d78adf6b0d1764d40f4258470d0f3",
+          "bytes": 1580
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/acceptance.md",
+          "sha256": "74b61e0f333fc08e2b317f0c8f4cab957fda380b79b2c87d0017ee46fe47f899",
+          "bytes": 1462
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/business-decisions.md",
+          "sha256": "f8900bb3e9d7a50f85b3b243f95fd48739c3a32291dbc99ebc26e511f0ef821d",
+          "bytes": 3755
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/contract.md",
+          "sha256": "205a732c4f8b810782d4460f12a08df38731adf23cfec3fecfdfbdca7f39ad0e",
+          "bytes": 4416
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/fixture-format.md",
+          "sha256": "c595f5d7524d824cb3ff7819004ff883ce673b49d63092398de1ac0a812c4a8f",
+          "bytes": 2429
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/fixtures/example.json",
+          "sha256": "5956cf8f3470737ba3659b498a22ea47ff54dde43da26eb39f2afc18d0ca9c14",
+          "bytes": 5972
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/nonfunctional.md",
+          "sha256": "746dd57599f4c6491acb3146a0789171b0031fd53a42053910a44c256da5e20b",
+          "bytes": 603
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/prompt.txt",
+          "sha256": "38c96737f9c4164bfbfaf479cd9d85738e82b529cba1425f0f32d5f857f3a761",
+          "bytes": 852
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/roles.md",
+          "sha256": "ede60a526e2f58dcc71897b9b96b867a2422b9f1a82711af3cc4c3d49a2047a6",
+          "bytes": 2608
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/workflows.md",
+          "sha256": "ed7db9d75571375572273f563fa2ba5d4021b37ffae34dee9555086788c4a433",
+          "bytes": 3849
+        }
+      ],
+      "inventory_sha256": "ac271007755ba7b08ea530843ef4317902344cf646a7a21fec7b8c00d9923e2d"
+    },
+    "goal_with_pr": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03",
+          "bytes": 5509
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/TASK.md",
+          "sha256": "029cfde9eeaa57039f6303089537cb6fdf0d78adf6b0d1764d40f4258470d0f3",
+          "bytes": 1580
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/acceptance.md",
+          "sha256": "74b61e0f333fc08e2b317f0c8f4cab957fda380b79b2c87d0017ee46fe47f899",
+          "bytes": 1462
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/business-decisions.md",
+          "sha256": "f8900bb3e9d7a50f85b3b243f95fd48739c3a32291dbc99ebc26e511f0ef821d",
+          "bytes": 3755
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/contract.md",
+          "sha256": "205a732c4f8b810782d4460f12a08df38731adf23cfec3fecfdfbdca7f39ad0e",
+          "bytes": 4416
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/fixture-format.md",
+          "sha256": "c595f5d7524d824cb3ff7819004ff883ce673b49d63092398de1ac0a812c4a8f",
+          "bytes": 2429
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/fixtures/example.json",
+          "sha256": "5956cf8f3470737ba3659b498a22ea47ff54dde43da26eb39f2afc18d0ca9c14",
+          "bytes": 5972
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/goal-pr.txt",
+          "sha256": "b976be84a4cf26f1beb324a10297fa6c202ec643631d575d5e5422add354fbb0",
+          "bytes": 858
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/nonfunctional.md",
+          "sha256": "746dd57599f4c6491acb3146a0789171b0031fd53a42053910a44c256da5e20b",
+          "bytes": 603
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/roles.md",
+          "sha256": "ede60a526e2f58dcc71897b9b96b867a2422b9f1a82711af3cc4c3d49a2047a6",
+          "bytes": 2608
+        },
+        {
+          "path": "public/tasks/ch03-price-rollout/workflows.md",
+          "sha256": "ed7db9d75571375572273f563fa2ba5d4021b37ffae34dee9555086788c4a433",
+          "bytes": 3849
+        }
+      ],
+      "inventory_sha256": "d1d493361db84b6b0d98c766c725f11cc305355e03998486023ec7cbcc074b5b"
+    }
+  },
+  "working_directory": "public/tasks/ch03-price-rollout"
+}

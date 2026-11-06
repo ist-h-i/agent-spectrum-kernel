@@ -1,0 +1,276 @@
+{
+  "clock": "2026-11-01T10:00:00Z",
+  "actors": [
+    {
+      "id": "producer-north",
+      "tenant": "north",
+      "role": "producer"
+    },
+    {
+      "id": "reconciler-north",
+      "tenant": "north",
+      "role": "reconciler"
+    },
+    {
+      "id": "closer-north",
+      "tenant": "north",
+      "role": "closer"
+    },
+    {
+      "id": "auditor-north",
+      "tenant": "north",
+      "role": "auditor"
+    },
+    {
+      "id": "producer-south",
+      "tenant": "south",
+      "role": "producer"
+    },
+    {
+      "id": "reconciler-south",
+      "tenant": "south",
+      "role": "reconciler"
+    },
+    {
+      "id": "closer-south",
+      "tenant": "south",
+      "role": "closer"
+    },
+    {
+      "id": "auditor-south",
+      "tenant": "south",
+      "role": "auditor"
+    },
+    {
+      "id": "operator-north",
+      "tenant": "north",
+      "role": "operator"
+    },
+    {
+      "id": "refundApprover-north",
+      "tenant": "north",
+      "role": "refundApprover"
+    },
+    {
+      "id": "refundApprover-south",
+      "tenant": "south",
+      "role": "refundApprover"
+    },
+    {
+      "id": "businessOperator-north",
+      "tenant": "north",
+      "role": "businessOperator"
+    },
+    {
+      "id": "businessOperator-south",
+      "tenant": "south",
+      "role": "businessOperator"
+    }
+  ],
+  "grants": [
+    {
+      "actor": "producer-north",
+      "tenant": "north",
+      "operations": [
+        "ingest",
+        "ingestBatch",
+        "readOwnDelivery"
+      ]
+    },
+    {
+      "actor": "reconciler-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "proposeRefund",
+        "readRefund"
+      ]
+    },
+    {
+      "actor": "closer-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "advanceWatermark"
+      ]
+    },
+    {
+      "actor": "auditor-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "audit",
+        "readRefund",
+        "readSettlement",
+        "auditRefund"
+      ]
+    },
+    {
+      "actor": "producer-south",
+      "tenant": "south",
+      "operations": [
+        "ingest",
+        "ingestBatch",
+        "readOwnDelivery"
+      ]
+    },
+    {
+      "actor": "reconciler-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "proposeRefund",
+        "readRefund"
+      ]
+    },
+    {
+      "actor": "closer-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "advanceWatermark"
+      ]
+    },
+    {
+      "actor": "auditor-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "audit",
+        "readRefund",
+        "readSettlement",
+        "auditRefund"
+      ]
+    },
+    {
+      "actor": "operator-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "importCheckpoint",
+        "exportCheckpoint",
+        "proposeRefund",
+        "sendRefund",
+        "withdrawRefund",
+        "settle",
+        "readRefund",
+        "readSettlement"
+      ]
+    },
+    {
+      "actor": "refundApprover-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "approveRefund",
+        "readRefund",
+        "readSettlement",
+        "auditRefund"
+      ]
+    },
+    {
+      "actor": "refundApprover-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "approveRefund",
+        "readRefund",
+        "readSettlement",
+        "auditRefund"
+      ]
+    },
+    {
+      "actor": "businessOperator-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "proposeRefund",
+        "sendRefund",
+        "withdrawRefund",
+        "settle",
+        "amendRefund",
+        "readRefund",
+        "readSettlement",
+        "auditRefund"
+      ]
+    },
+    {
+      "actor": "businessOperator-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "proposeRefund",
+        "sendRefund",
+        "withdrawRefund",
+        "settle",
+        "amendRefund",
+        "readRefund",
+        "readSettlement",
+        "auditRefund"
+      ]
+    }
+  ],
+  "data": {
+    "tenants": [
+      "north",
+      "south"
+    ],
+    "events": [
+      {
+        "tenant": "north",
+        "eventId": "e1",
+        "revision": 0,
+        "eventTime": "2026-11-01T10:15:00Z",
+        "amount": "1200",
+        "deleted": false
+      }
+    ],
+    "watermarks": [],
+    "producers": [],
+    "checkpointExamples": [
+      {
+        "format": 1,
+        "events": [
+          {
+            "tenant": "north",
+            "eventId": "e1",
+            "revision": 0,
+            "eventTime": "2026-11-01T10:15:00Z",
+            "amount": "1200",
+            "deleted": false
+          }
+        ],
+        "watermarks": []
+      },
+      {
+        "format": 3,
+        "events": [
+          {
+            "tenant": "north",
+            "eventId": "e1",
+            "revision": 0,
+            "eventTime": "2026-11-01T10:15:00Z",
+            "amount": "1200",
+            "deleted": false
+          }
+        ],
+        "watermarks": [],
+        "producers": [
+          {
+            "tenant": "north",
+            "producerId": "pos-1",
+            "lastSequence": 0,
+            "lastBody": [],
+            "lastResult": {
+              "accepted": true
+            }
+          }
+        ]
+      }
+    ],
+    "windowOutputs": [],
+    "closedCharges": [],
+    "refunds": [],
+    "settlements": []
+  }
+}
