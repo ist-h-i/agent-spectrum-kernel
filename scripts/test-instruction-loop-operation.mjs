@@ -20,6 +20,10 @@ test('bounded operation actually authors, evaluates and adopts two fresh cycles,
   assert.equal(s.cycle_number,2);assert.equal(s.completed_cycles[0].outcome,'applied');assert.notEqual(canonicalDigest(s.pending_gate),firstPacket);
   const secondRun=s.current_cycle.root;assert.notEqual(firstRun,secondRun);
   const nextProfile=JSON.parse(readFileSync(s.current_cycle.profile_path));assert.equal(nextProfile.previousAppliedRun,firstRun);
+  const learning=nextProfile.policy.observation.previous.evaluation_summary;
+  assert.equal(learning.report_digest,canonicalDigest(readRunJournal(firstRun).state.outputs.report));
+  assert.equal(learning.cases[0].case_id,'public');assert.deepEqual(learning.cases[0].conditions.map(c=>c.outcome),['pass','pass']);
+  assert.equal(learning.formal_admission_implied,false);
   assert.equal(nextProfile.candidate.packageImports.length,0);assert.equal(nextProfile.candidate.authoring.additions.length,0);
   const nextJournal=readRunJournal(secondRun);assert.equal(nextJournal.state.evaluation_decision,undefined,'previous approval is not authority for this cycle');
   const before=readRunJournal(firstRun).previous;

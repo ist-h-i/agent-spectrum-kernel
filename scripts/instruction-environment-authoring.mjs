@@ -9,8 +9,9 @@ import { verifyInstructionEnvironment, exactInstructionAsset, instructionBytesDi
 import { instructionPath, instructionTargetPath } from './instruction-projection-paths.mjs';
 import { verifyAssetRegistry, registerAsset } from './asset-registry.mjs';
 import { registerInstructionEnvironmentBundle, resolveInstructionComponents } from './instruction-environment-compiler.mjs';
-import { projectInstructionLoopObservation } from './instruction-loop-feedback.mjs';
+import { projectInstructionLoopObservation, assertPublicInstructionSummary } from './instruction-loop-feedback.mjs';
 import { commitInstructionSource } from './instruction-source-version.mjs';
+import { verifyInstructionComposition } from './instruction-composition.mjs';
 
 const same = (a, b) => canonicalDigest(a) === canonicalDigest(b);
 const keys = (value, expected) => assert.deepEqual(Object.keys(value).sort(), [...expected].sort());
@@ -23,16 +24,17 @@ function resetClaims(d) {
   return d;
 }
 function context(options) {
-  const { environment } = verifyInstructionEnvironment(options);
+  const { environment, files } = verifyInstructionEnvironment(options);
   assert.equal(environment.registry_snapshot_digest, options.registrySnapshotDigest, 'authoring Registry snapshot drift');
   const local = verifyAssetRegistry({ storeRoot: options.storeRoot, snapshotDigest: options.registrySnapshotDigest,
     trustedAuthorityContexts: options.trustedAssetAuthorityContexts ?? [] });
   const components = environment.components?.length ? environment.components : environment.bindings;
   resolveInstructionComponents({ ...options, adapter: environment.adapter, components });
-  return { environment, local, components };
+  return { environment, local, components, files };
 }
 function validateSpec(options, spec) {
-  keys(spec, ['kind', 'baseline_environment_digest', 'registry_snapshot_digest', 'editable_ids', 'removable_ids', 'additions', 'observation', 'bundle_descriptor']);
+  keys(spec, ['kind', 'baseline_environment_digest', 'registry_snapshot_digest', 'editable_ids', 'removable_ids', 'additions', 'observation', 'bundle_descriptor',
+    ...(spec.composition_object_digest === undefined ? [] : ['composition_object_digest'])]);
   assert.equal(spec.kind, 'instruction_environment_authoring_v1');
   assert.equal(spec.baseline_environment_digest, options.environmentObjectDigest);
   assert.equal(spec.registry_snapshot_digest, options.registrySnapshotDigest);
@@ -70,13 +72,95 @@ function validateSpec(options, spec) {
     assert.ok(same(lineage.parent,c.environment.bindings[0].asset),'bundle parent differs from baseline environment');
     assert.ok(same(spec.bundle_descriptor.maintenance.rollback.target,lineage.parent),'bundle rollback differs from baseline');
   }else assert.equal(lineage.kind,'root','first environment bundle must be a genuine root');
+  if (spec.composition_object_digest !== undefined) {
+    const {lock} = verifyInstructionComposition({...options,compositionObjectDigest:spec.composition_object_digest});
+    assert.equal(lock.kind,'instruction_composition_lock_v1');assert.equal(lock.adapter,c.environment.adapter);
+    assert.ok(same(lock.components,c.components),'authoring composition differs from declared environment');
+    c.layers=lock.layers.map(l=>({id:l.id,kind:l.kind,asset_ids:l.components.map(a=>a.asset.stable_id).filter(id=>ids.includes(id))}));
+  }
   return c;
+}
+
+// Read-only context is data, never an enlargement of the editable inventory.
+// Share the text budget across all fixed Markdown files so one common layer
+// cannot consume the entire budget before a personal/application layer appears.
+function readOnlyEnvironment(c,spec) {
+  const textFiles=[];let declarationBytes=8192;
+  const publicList=values=>{
+    const result={count:values.length,inventory_digest:canonicalDigest(values),values:[],redacted_count:0,omitted_count:0};
+    for(const value of values){
+      let safe=true;try{assertPublicInstructionSummary(value);if(/https?:\/\/|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/u.test(value))safe=false;}catch{safe=false;}
+      if(!safe){result.redacted_count++;continue;}
+      const bytes=Buffer.byteLength(value);
+      if(result.values.length>=16||bytes>256||bytes>declarationBytes){result.omitted_count++;continue;}
+      declarationBytes-=bytes;result.values.push(value);
+    }
+    return result;
+  };
+  const assets=c.components.map(component=>{
+    const a=c.local.assets.find(a=>same(exactInstructionAsset(a),component.asset)),editable=spec.editable_ids.includes(a.stable_id);
+    const files=a.content.files.map(f=>{
+      const bytes=Buffer.from(f.bytes_base64,'base64'),item={path:f.path,raw_digest:f.raw_digest,byte_count:bytes.length};
+      if(f.path.endsWith('.md')&&!editable)textFiles.push({item,text:new TextDecoder('utf-8',{fatal:true}).decode(bytes)});
+      return item;
+    });
+    const refs={constraint_refs:a.record.safety.constraint_refs,permission_refs:a.record.permissions_and_effects.permission_refs,effect_refs:a.record.permissions_and_effects.effect_refs};
+    return {asset:component.asset,editable,mappings:component.files,files,inventory_digest:canonicalDigest(component),file_count:files.length,omitted_file_count:0,
+      known_constraints:{safety_status:a.record.safety.status,permission_status:a.record.permissions_and_effects.status,
+        classifications:publicList(a.record.safety.classifications),requested_permissions:publicList(a.record.permissions_and_effects.requested_permissions),
+        possible_effects:publicList(a.record.permissions_and_effects.possible_effects),
+        references:Object.fromEntries(Object.entries(refs).map(([key,values])=>[key,{count:values.length,inventory_digest:canonicalDigest(values)}]))}};
+  });
+  const support=c.environment.support.map(f=>{
+    const file=c.files.find(item=>item.path===f.path),item={path:f.path,raw_digest:f.raw_digest,byte_count:Buffer.byteLength(file.text)};
+    if(f.path.endsWith('.md'))textFiles.push({item,text:file.text});return item;
+  });
+  const textBudget=32768,perFile=4096,share=textFiles.length?Math.floor(textBudget/textFiles.length):0;
+  for(const {item,text} of textFiles){
+    const bytes=Buffer.from(text);let length=Math.min(bytes.length,perFile,share);
+    while(length){try{item.text=new TextDecoder('utf-8',{fatal:true}).decode(bytes.subarray(0,length));break;}catch{length--;}}
+    item.text??='';item.text_truncated=length<bytes.length;
+  }
+  const context={environment_digest:spec.baseline_environment_digest,projection_digest:c.environment.projection_digest,
+    composition_digest:spec.composition_object_digest??null,layers:structuredClone(c.layers??null),layer_inventory_digest:canonicalDigest(c.layers??null),
+    layer_count:c.layers?.length??0,omitted_layer_count:0,
+    assets,asset_inventory_digest:canonicalDigest(c.components),asset_count:assets.length,omitted_asset_count:0,
+    support,support_inventory_digest:canonicalDigest(c.environment.support),support_count:support.length,omitted_support_count:0,
+    text_budget_bytes:textBudget,byte_budget_bytes:131072,included_text_bytes:0,text_truncated:false,metadata_truncated:false,context_incomplete:false,
+    helpers_are_inventory_only:true,references_are_inventory_only:true,edit_authority_implied:false};
+  const lists=assets.flatMap(a=>['classifications','requested_permissions','possible_effects'].map(k=>a.known_constraints[k]));
+  const refresh=()=>{
+    context.included_text_bytes=[...context.assets.flatMap(a=>a.files),...context.support].reduce((n,f)=>n+Buffer.byteLength(f.text??''),0);
+    context.text_truncated=textFiles.some(({item})=>item.text_truncated);
+    context.context_incomplete=context.text_truncated||context.metadata_truncated||lists.some(v=>v.redacted_count||v.omitted_count);
+    return Buffer.byteLength(JSON.stringify(context))>context.byte_budget_bytes;
+  };
+  // Oversized inventories degrade to counted/digested references, never fail a
+  // consumed generation merely because context is large. Full CAS is unchanged.
+  if(refresh()){
+    context.metadata_truncated=true;
+    for(const list of lists){list.omitted_count+=list.values.length;list.values=[];}
+  }
+  if(refresh())for(const {item} of textFiles){item.text='';item.text_truncated=item.byte_count>0;}
+  if(refresh()){
+    for(const a of [...assets.filter(a=>!a.editable),...assets.filter(a=>a.editable)]){
+      a.omitted_file_count=a.file_count;a.files=[];a.mappings=[];context.metadata_truncated=true;
+      if(!refresh())break;
+    }
+  }
+  if(refresh()){
+    context.layers=context.layers?.map(l=>({id:l.id,kind:l.kind,asset_count:l.asset_ids.length,asset_inventory_digest:canonicalDigest(l.asset_ids)}))??null;
+    context.support=[];context.omitted_support_count=context.support_count;context.metadata_truncated=true;
+  }
+  while(refresh()&&context.assets.length){context.assets.pop();context.omitted_asset_count++;context.metadata_truncated=true;}
+  refresh();return context;
 }
 export function prepareInstructionEnvironmentAuthoring(options) {
   const spec = { kind: 'instruction_environment_authoring_v1', baseline_environment_digest: options.environmentObjectDigest,
     registry_snapshot_digest: options.registrySnapshotDigest, editable_ids: [...options.editableStableIds].sort(),
     removable_ids: [...(options.removableStableIds ?? [])].sort(), additions: structuredClone(options.additions ?? []),
-    observation: structuredClone(options.observation), bundle_descriptor: structuredClone(options.bundleDescriptor) };
+    observation: structuredClone(options.observation), bundle_descriptor: structuredClone(options.bundleDescriptor),
+    ...(options.compositionObjectDigest===undefined?{}:{composition_object_digest:options.compositionObjectDigest}) };
   const c = validateSpec(options, spec);
   const editable = c.components.filter(a => spec.editable_ids.includes(a.asset.stable_id)).map(component => {
     const a = c.local.assets.find(a => same(exactInstructionAsset(a), component.asset));
@@ -89,6 +173,7 @@ export function prepareInstructionEnvironmentAuthoring(options) {
   const requestDigest = putContentAddressedJson({ storeRoot: options.storeRoot, artifact: spec }).digest;
   return { request_object_digest: requestDigest, generation_input: { kind: spec.kind, request_digest: requestDigest,
     adapter: c.environment.adapter, feedback: projectInstructionLoopObservation(spec.observation), editable,
+    read_only_environment:readOnlyEnvironment(c,spec),
     removable_ids: spec.removable_ids, additions: spec.additions.map(a => ({ stable_id: a.descriptor.stable_id,
       asset_type: a.descriptor.asset_type, files: a.files })),
     response_contract: '{request_digest, changes:[{operation:revise|create,stable_id,files:[{path,text}]}|{operation:exclude,stable_id}]}',

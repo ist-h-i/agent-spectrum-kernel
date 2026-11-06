@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { canonicalDigest, assertNoSymlinkPathSegments, readJsonFileStrict,
   writeCanonicalJsonNoReplace } from './content-addressed-store.mjs';
 import { readRunJournal as journal, appendRunJournal as append, lockRunJournal as lock } from './instruction-run-journal.mjs';
-import { projectInstructionLoopObservation, assertPublicInstructionSummary } from './instruction-loop-feedback.mjs';
+import { projectInstructionLoopObservation, assertPublicInstructionSummary, summarizeInstructionLoopEvaluation } from './instruction-loop-feedback.mjs';
 
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b);
 const digest=/^sha256:[a-f0-9]{64}$/u;
@@ -265,9 +265,11 @@ export function prepareNextSupervisedInstructionLoop({root,nextPolicy,resultSumm
   const decisions=['evaluation_decision','result_decision','change_decision','restore_decision'].filter(k=>s[k]).map(k=>({
     kind:k,disposition:s[k].disposition,digest:canonicalDigest(s[k]),
     reason_summary:assertPublicInstructionSummary(decisionSummaries[canonicalDigest(s[k])]??s[k].reason??'Historical prior approval; original public reason unavailable.')}));
+  const evaluationSummary=summarizeInstructionLoopEvaluation(s.outputs.report);
   const observation={kind:'instruction_loop_continuation_v1',feedback:copy(nextPolicy.observation),previous:{
     run_id:s.policy.id,journal_digest:previous,policy_digest:canonicalDigest(s.policy),outcome:s.outputs.final.outcome,
     candidate_digest:canonicalDigest(s.outputs.register),report_digest:s.outputs.report?canonicalDigest(s.outputs.report):null,
+    ...(evaluationSummary===null?{}:{evaluation_summary:evaluationSummary}),
     decisions,failure_count:s.trials.filter(t=>t.status!=='completed'||t.state==='failed_or_interrupted').length,
     unknown_quality:s.outputs.report?.formal_score==null,
     result_summary:assertPublicInstructionSummary(resultSummary??`Previous cycle outcome: ${s.outputs.final.outcome}. Completed ${s.trials.length} trial records; ${s.trials.filter(t=>t.status!=='completed'||t.state==='failed_or_interrupted').length} failed or interrupted. Formal quality is not established by this reference loop.`)}};

@@ -7,6 +7,11 @@ This report describes implementation and verification scope. It does not grant
 case approval, owner adoption, export permission or merge authority. Actual final
 command outcomes and the exact source revision accompany the delivery handoff.
 
+The independent-review follow-up adds [bounded environment and case-result
+context](instruction-improvement-learning-context.md) to the actual authoring
+input and shared next-cycle observation. Its separate verification contract and
+source-bound outcomes supplement the earlier mechanical-cycle evidence.
+
 ## Requested outcomes
 
 | Outcome | Connected behavior | Evidence boundary |
