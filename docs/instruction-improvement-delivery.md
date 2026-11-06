@@ -48,7 +48,8 @@ termination are not inferred.
 
 ## Verification evidence
 
-The final source checks are recorded in the Draft PR's validation section.
+The final source checks are recorded in the accompanying validation record and,
+when publication is authorized, the Draft PR's validation section.
 Reproduction commands for the affected areas:
 
 ```sh
@@ -95,4 +96,5 @@ Implementation Contract:
 - Selected Formal Verification Contract ref:
   `instruction-improvement-continuity-verification@1` and
   `practical-evaluation-recovery-verification@1` in the upstream documents.
-- Handoff state: Draft PR for review; merge and live acceptance remain separate.
+- Handoff state: locally reviewable commits prepared for Draft PR; publication,
+  merge and live acceptance are reported separately.
