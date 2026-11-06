@@ -1,0 +1,42 @@
+[
+  {
+    "id": "R1",
+    "weight": 10,
+    "title": "identity and legacy wire"
+  },
+  {
+    "id": "R2",
+    "weight": 10,
+    "title": "durable claim fencing"
+  },
+  {
+    "id": "R3",
+    "weight": 10,
+    "title": "stock conservation"
+  },
+  {
+    "id": "R4",
+    "weight": 10,
+    "title": "receipt consistency"
+  },
+  {
+    "id": "R5",
+    "weight": 15,
+    "title": "cancellation linearization"
+  },
+  {
+    "id": "R6",
+    "weight": 15,
+    "title": "crash/restart recovery"
+  },
+  {
+    "id": "R7",
+    "weight": 10,
+    "title": "legacy durable adoption"
+  },
+  {
+    "id": "R8",
+    "weight": 5,
+    "title": "bounded traversal"
+  }
+]

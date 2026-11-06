@@ -1,0 +1,8 @@
+{
+  "name": "ch05-stream-window-revisions-causal-v3",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

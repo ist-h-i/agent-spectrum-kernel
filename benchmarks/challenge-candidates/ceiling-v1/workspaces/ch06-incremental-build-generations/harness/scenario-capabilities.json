@@ -1,0 +1,72 @@
+{
+  "version": "ceiling-scenario-v1",
+  "modules": {
+    "src/builder.mjs": {
+      "invoke": {
+        "createBuildSystem": "builder"
+      }
+    },
+    "harness/compiler.mjs": {
+      "invoke": {
+        "createCompiler": "compiler",
+        "inspect": "json"
+      }
+    },
+    "harness/publisher.mjs": {
+      "invoke": {
+        "createPublisher": "publisher"
+      }
+    },
+    "harness/scheduler.mjs": {
+      "invoke": {
+        "flushMicrotasks": "json",
+        "drain": "json"
+      }
+    },
+    "harness/consumer.mjs": {
+      "invoke": {
+        "buildView": "json"
+      }
+    },
+    "harness/watch.mjs": {
+      "invoke": {
+        "nextSnapshot": "json"
+      }
+    }
+  },
+  "calls": {
+    "builder": {
+      "build": "json"
+    },
+    "compiler": {
+      "inspect": "json",
+      "compile": "json",
+      "pending": "json",
+      "complete": "json",
+      "observation": "json"
+    },
+    "publisher": {
+      "publish": "json",
+      "latest": "json",
+      "history": "json"
+    }
+  },
+  "get": {},
+  "functionKinds": [],
+  "references": {
+    "invoke:src/builder.mjs:createBuildSystem": {
+      "/0/compiler": "compiler",
+      "/0/publisher": "publisher"
+    },
+    "invoke:harness/scheduler.mjs:drain": {
+      "/0": "compiler"
+    },
+    "invoke:harness/consumer.mjs:buildView": {
+      "/0": "publisher"
+    }
+  },
+  "datasets": [
+    "data/monorepo.json",
+    "data/watch-events.json"
+  ]
+}

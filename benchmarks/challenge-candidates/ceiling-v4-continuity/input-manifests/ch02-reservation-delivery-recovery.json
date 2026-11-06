@@ -1,0 +1,117 @@
+{
+  "version": "ceiling-public-v4-continuity",
+  "id": "ch02-reservation-delivery-recovery",
+  "input_digest": "sha256:ccf07b766dca7e7916964d9ba1caaa15c07d572446c07e91dfc5c09fe9ecb0b6",
+  "files": [
+    {
+      "path": "harness/clients.mjs",
+      "sha256": "8e709da7e2c47878c9eb1ee66ad213a497abb150cc1e3666c777ed3376646fea",
+      "bytes": 927
+    },
+    {
+      "path": "harness/providers.mjs",
+      "sha256": "231622dbb23c75a84e9f8ea778612a5e6da23c4eab362a3c91cb69b4d315d5be",
+      "bytes": 4323
+    },
+    {
+      "path": "harness/safe-json.mjs",
+      "sha256": "03e371c3d8cbb52bd15b17e60b6af5c8de94e6feb69674bd92602cc7aede4baf",
+      "bytes": 2264
+    },
+    {
+      "path": "harness/scenario-capabilities.json",
+      "sha256": "24d7d2b0582edf157425a381716eaa80e65f5f7948b03a5eb62d9ca02a7050dc",
+      "bytes": 2701
+    },
+    {
+      "path": "harness/scenario-engine.mjs",
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
+    },
+    {
+      "path": "harness/scenario-protocol.mjs",
+      "sha256": "a2b568ecd7f3b2d0bd0ccae19a7d1c54ceadec030305759a8649a3cf197318c6",
+      "bytes": 6021
+    },
+    {
+      "path": "harness/scenario-reporter.mjs",
+      "sha256": "0e2ce3f9618494897ac247c46c470444f326b12fc13910cb73bece53f7d976a7",
+      "bytes": 1122
+    },
+    {
+      "path": "harness/scenario-worker.mjs",
+      "sha256": "fc56f76c84be97256e7f3af919a804dd215cf5876e194ab68bebd064185f5fa0",
+      "bytes": 1068
+    },
+    {
+      "path": "harness/scenario.mjs",
+      "sha256": "621c442afd8e9f59c2bb4a60d0159cd9053454e89e158bd0a3ad654b0386d802",
+      "bytes": 1794
+    },
+    {
+      "path": "package.json",
+      "sha256": "6c7938e1ab9f945ee281c897ba3567274e7da7bcadd78c93fb47b3acca6ec95c",
+      "bytes": 145
+    },
+    {
+      "path": "requirements.json",
+      "sha256": "ead467b585f989ad809b87d5b2cb2cf057753dc4cbb1b994e4b7f7d920702a7f",
+      "bytes": 644
+    },
+    {
+      "path": "spec/contracts.md",
+      "sha256": "72939cab07c4bf9c41be9795565dcbac11c80aea61990cbbb886991d29a794dc",
+      "bytes": 6453
+    },
+    {
+      "path": "spec/providers.md",
+      "sha256": "063d47d9c501097adcd4bd6a27c6632aeb4b72d015e26f6a0e24f42cb9b95dea",
+      "bytes": 3634
+    },
+    {
+      "path": "spec/scenario-tests.md",
+      "sha256": "59035a5ec0ef0835265ffa0f0e5511934165bb33c83f7f36cd5e577f178dff1e",
+      "bytes": 2973
+    },
+    {
+      "path": "src/cancellation.mjs",
+      "sha256": "b047ef9f51269c0a106fcc1e48e252a294cba14f420a569ab995fffed52032c2",
+      "bytes": 448
+    },
+    {
+      "path": "src/codec.mjs",
+      "sha256": "172c0f353f62dc684fc4fcc5dbae5cc8007c505970f96f481512be5c895aed6d",
+      "bytes": 1320
+    },
+    {
+      "path": "src/legacy.mjs",
+      "sha256": "83b6024f5ac7d687824c266e83616bc7658507844b19a456def5d6bbe3297b97",
+      "bytes": 491
+    },
+    {
+      "path": "src/recovery.mjs",
+      "sha256": "ea6f30df70e8a4070521837ed75dbc0298eed370b9ab64b6f617a6334b7ad9f1",
+      "bytes": 651
+    },
+    {
+      "path": "src/service.mjs",
+      "sha256": "997c10e8be2ee06065efb68c8b603951cfae2f4cb89b8947ce01bad823793b22",
+      "bytes": 1548
+    },
+    {
+      "path": "src/worker.mjs",
+      "sha256": "e82e53d35553216d8a349b784460f5f41df03ce9a3987f00ebe7b93560734dab",
+      "bytes": 1180
+    },
+    {
+      "path": "task.md",
+      "sha256": "41f57c690b428f843c3596dcb918cb73665b18d3e1435096b08fbb7c88997015",
+      "bytes": 1309
+    },
+    {
+      "path": "test/scenario-public.test.mjs",
+      "sha256": "87c587f15d6f9d82d3ebb3778dc3108a302b2e31ec6ce33d82a0f86f8e6895d7",
+      "bytes": 3499
+    }
+  ]
+}

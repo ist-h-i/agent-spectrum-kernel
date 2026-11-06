@@ -1,0 +1,1 @@
+export function accountingScreen(ledger){return {load(tenant,id){const row=ledger.read(tenant,id);return row===null||row.deleted?null:{id:row.id,currency:row.value.currency,minor:row.value.minor,revision:row.revision};}};}

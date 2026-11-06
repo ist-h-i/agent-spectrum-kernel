@@ -1,0 +1,98 @@
+{
+  "version": "ceiling-scenario-v1",
+  "modules": {
+    "harness/store.mjs": {
+      "construct": {
+        "PriceStore": "store"
+      },
+      "invoke": {}
+    },
+    "src/migration.mjs": {
+      "construct": {
+        "MigrationService": "migration"
+      },
+      "invoke": {}
+    },
+    "src/legacy.mjs": {
+      "construct": {},
+      "invoke": {
+        "createLegacyGateway": "legacy"
+      }
+    },
+    "harness/consumers.mjs": {
+      "construct": {},
+      "invoke": {
+        "legacyScreen": "legacy",
+        "modernForm": "modern",
+        "legacyBatchImport": "json"
+      }
+    }
+  },
+  "calls": {
+    "store": {
+      "read": "json",
+      "all": "json",
+      "scan": "json",
+      "state": "json",
+      "changes": "json",
+      "writePrice": "json",
+      "backfill": "json",
+      "setCheckpoint": "json",
+      "transition": "json",
+      "registerWriter": "json",
+      "retireWriter": "json",
+      "enqueue": "json",
+      "settle": "json",
+      "once": "json",
+      "checkpoint": "json"
+    },
+    "migration": {
+      "readV1": "json",
+      "readV2": "json",
+      "writeV1": "json",
+      "writeV2": "json",
+      "backfillPage": "json",
+      "drainQueue": "json",
+      "activateV2": "json",
+      "rollback": "json"
+    },
+    "legacy": {
+      "load": "json",
+      "save": "json"
+    },
+    "modern": {
+      "read": "json",
+      "save": "json",
+      "refresh": "json"
+    }
+  },
+  "get": {
+    "store": [],
+    "migration": [],
+    "legacy": [],
+    "modern": []
+  },
+  "functionKinds": [],
+  "references": {
+    "construct:src/migration.mjs:MigrationService": {
+      "/0": "store"
+    },
+    "invoke:src/legacy.mjs:createLegacyGateway": {
+      "/0": "migration"
+    },
+    "invoke:harness/consumers.mjs:legacyScreen": {
+      "/0": "migration"
+    },
+    "invoke:harness/consumers.mjs:modernForm": {
+      "/0": "migration",
+      "/1": "store"
+    },
+    "invoke:harness/consumers.mjs:legacyBatchImport": {
+      "/0": "store"
+    }
+  },
+  "datasets": [
+    "data/prices.json",
+    "data/normal-scenario.json"
+  ]
+}

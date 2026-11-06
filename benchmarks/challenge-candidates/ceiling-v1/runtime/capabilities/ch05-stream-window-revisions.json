@@ -1,0 +1,60 @@
+{
+  "version": "ceiling-scenario-v1",
+  "modules": {
+    "src/processor.mjs": {
+      "invoke": {
+        "createProcessor": "processor"
+      }
+    },
+    "harness/sink.mjs": {
+      "invoke": {
+        "createSink": "sink"
+      }
+    },
+    "harness/consumer.mjs": {
+      "invoke": {
+        "consume": "json"
+      }
+    },
+    "harness/small-check.mjs": {
+      "invoke": {
+        "smallWindowSum": "json"
+      }
+    },
+    "harness/generator.mjs": {
+      "invoke": {
+        "steadyLoad": "eventIterator",
+        "activeGrowthLoad": "eventIterator"
+      }
+    }
+  },
+  "calls": {
+    "processor": {
+      "ingest": "json",
+      "advanceWatermark": "json",
+      "stats": "json"
+    },
+    "sink": {
+      "finalize": "json",
+      "reject": "json",
+      "snapshot": "json"
+    },
+    "eventIterator": {
+      "next": "json"
+    }
+  },
+  "get": {},
+  "functionKinds": [],
+  "references": {
+    "invoke:src/processor.mjs:createProcessor": {
+      "/0/sink": "sink"
+    },
+    "invoke:harness/consumer.mjs:consume": {
+      "/0": "processor"
+    }
+  },
+  "datasets": [
+    "data/load.json",
+    "data/normal.json"
+  ]
+}

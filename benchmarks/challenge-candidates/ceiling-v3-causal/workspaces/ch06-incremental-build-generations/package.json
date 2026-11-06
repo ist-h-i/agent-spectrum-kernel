@@ -1,0 +1,8 @@
+{
+  "name": "ch06-incremental-build-generations-causal-v3",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

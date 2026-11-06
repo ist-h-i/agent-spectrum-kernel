@@ -1,0 +1,118 @@
+{
+  "format_version": "1.0.0",
+  "artifact_kind": "challenge_design_catalog",
+  "catalog_id": "ceiling-v2-debt",
+  "input_version": "ceiling-public-v2-debt",
+  "status": "public_private_static_preparation_runtime_unverified",
+  "input_freeze_status": "authoring",
+  "baseline_repository_revision": "0678141aa3e28490dbecb2963f2108017fde8165",
+  "candidate_count": 6,
+  "existing_primary_count_unchanged": 24,
+  "previous_ceiling_version_unchanged": "ceiling-v1",
+  "runtime_config": false,
+  "ready_for_measurement": false,
+  "calibration_target": {
+    "condition": "P / gpt-6.1-sol / low",
+    "first_trials_per_task": 1,
+    "score_aim": "roughly_half_prior_valid_scores",
+    "guaranteed": false,
+    "adoption_gate": false,
+    "measured": false
+  },
+  "quality_maximum": 100,
+  "safety_blockers_separate": true,
+  "scoring_dimensions": [
+    {
+      "id": "required_behavior",
+      "points": 30
+    },
+    {
+      "id": "integration_compatibility",
+      "points": 30
+    },
+    {
+      "id": "failure_boundary_recovery",
+      "points": 25
+    },
+    {
+      "id": "added_test_effectiveness",
+      "points": 10
+    },
+    {
+      "id": "scope_maintainability",
+      "points": 5
+    }
+  ],
+  "candidates": [
+    {
+      "id": "ch01-optimistic-edit-history",
+      "title": "編集・履歴・通知の互換性と状態所有",
+      "task_path": "tasks/CH01.md",
+      "workspace_path": "workspaces/ch01-optimistic-edit-history",
+      "input_manifest_path": "input-manifests/ch01-optimistic-edit-history.json",
+      "state": "authoring",
+      "ready_for_measurement": false,
+      "measured_score": null,
+      "private_validation_status": "unverified"
+    },
+    {
+      "id": "ch02-durable-job-recovery",
+      "title": "旧形式ジョブと再起動・lease回復",
+      "task_path": "tasks/CH02.md",
+      "workspace_path": "workspaces/ch02-durable-job-recovery",
+      "input_manifest_path": "input-manifests/ch02-durable-job-recovery.json",
+      "state": "authoring",
+      "ready_for_measurement": false,
+      "measured_score": null,
+      "private_validation_status": "unverified"
+    },
+    {
+      "id": "ch03-online-schema-cutover",
+      "title": "稼働中データ移行と旧新利用者の整合",
+      "task_path": "tasks/CH03.md",
+      "workspace_path": "workspaces/ch03-online-schema-cutover",
+      "input_manifest_path": "input-manifests/ch03-online-schema-cutover.json",
+      "state": "authoring",
+      "ready_for_measurement": false,
+      "measured_score": null,
+      "private_validation_status": "unverified"
+    },
+    {
+      "id": "ch04-authorization-revocation",
+      "title": "複数認可利用者と失効・取消・遅着",
+      "task_path": "tasks/CH04.md",
+      "workspace_path": "workspaces/ch04-authorization-revocation",
+      "input_manifest_path": "input-manifests/ch04-authorization-revocation.json",
+      "state": "authoring",
+      "ready_for_measurement": false,
+      "measured_score": null,
+      "private_validation_status": "unverified"
+    },
+    {
+      "id": "ch05-stream-window-revisions",
+      "title": "互換入力と訂正集計・履歴破棄・計測",
+      "task_path": "tasks/CH05.md",
+      "workspace_path": "workspaces/ch05-stream-window-revisions",
+      "input_manifest_path": "input-manifests/ch05-stream-window-revisions.json",
+      "state": "authoring",
+      "ready_for_measurement": false,
+      "measured_score": null,
+      "private_validation_status": "unverified"
+    },
+    {
+      "id": "ch06-incremental-build-generations",
+      "title": "旧利用者を保つ依存graphと世代公開",
+      "task_path": "tasks/CH06.md",
+      "workspace_path": "workspaces/ch06-incremental-build-generations",
+      "input_manifest_path": "input-manifests/ch06-incremental-build-generations.json",
+      "state": "authoring",
+      "ready_for_measurement": false,
+      "measured_score": null,
+      "private_validation_status": "unverified"
+    }
+  ],
+  "public_runtime": "v24.21.0",
+  "public_controller_path": "tools/public-workspace.mjs",
+  "protocol_path": "evaluation-protocol.md",
+  "implementation_work_package_path": "codex-work-package.md"
+}

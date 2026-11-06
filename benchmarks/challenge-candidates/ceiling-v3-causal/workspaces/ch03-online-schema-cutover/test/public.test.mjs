@@ -1,0 +1,3 @@
+import assert from'node:assert/strict';
+import{scenarioTest}from'../harness/scenario.mjs';
+scenarioTest('ordinary contract example',{program:{"steps":[{"op":"construct","module":"harness/store.mjs","export":"PriceStore","args":[[{"tenant":"east","id":"b","revision":1,"incarnation":1,"deleted":false,"v1":{"price":"12.50","currency":"USD"},"v2":null}]],"as":"store"},{"op":"construct","module":"src/migration.mjs","export":"MigrationService","args":[{"$ref":"store"}],"as":"service"},{"op":"call","target":"service","method":"readV1","args":["east","b"],"as":"read"}]},check(o){assert.deepEqual(o.read,{ok:true,value:{price:'12.50',currency:'USD'}});}});

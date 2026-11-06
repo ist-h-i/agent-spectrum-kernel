@@ -1,0 +1,13 @@
+# 初期fixtureの意味
+
+共通外形はclock(UTC)、actors、grants、dataです。actor IDは一意、tenantはrealm、role名は表示・操作案内のための情報で、認可は明示grantで行います。grantはactor ID、tenant、operations文字列配列、必要ならscope(ID配列)、deny(boolean、省略false)。参照は同じfixture内の同tenant対象を指し、特に定義した循環だけを許します。未知fieldは評価要件に使いません。data内の以下の配列は、省略時は空配列です。起動時に意味不正なfixtureが渡された場合は評価側の準備不良であり、候補の業務違反にはしません。
+
+reportsは初期要求配列。各行のtenant/idはidentity、versionは不透明版、formatは1または2、stateはqueued/running/done/cancelled。format1はparams、format2はpayloadに同じ業務JSONを持つ。runningのleaseはworker(actor ID)、claimToken(不透明値)、until(UTC)を持ち、その他の状態はlease:null。doneだけreceiptに非空の配信receiptを持つ。他状態のreceiptはnull。要求内容は確定後変更しない。deliveriesは配信先の初期受理事実で、tenant/id、content（業務JSON）、state:stored/closed、storedの場合receiptを持つ。providerとappを同じ初期事実で準備し、アプリ操作でproviderを直接書き換えない。要求なしの配信事実は不整合として運用に示し、架空の受付履歴を作らない。
+
+fixtures/example.jsonはこれらの構造の公開例です。token対応表はfixtureと別に評価側が渡し、実アカウントは不要です。
+
+初期reportのownerは任意のactor IDで、省略時は所有利用者不明である。所有者不明を任意のrequesterへ割り当てず、明示read/audit/cancel等を持つ運用・監査者が扱う。新規受付では認証したrequesterをownerとして保持する。workerはアプリに接続するactorとして扱い、複数独立アプリprocessが同じ保存ファイルへ書く構成は必須ではない。
+
+## 追加業務データ
+
+packages は追加業務の状態です。初期入力は空配列とし、評価側も公開操作で準備します。既存データのimport/restore契約は維持します。追加データの保存形式を固定せず、対応は提出説明で示してください。

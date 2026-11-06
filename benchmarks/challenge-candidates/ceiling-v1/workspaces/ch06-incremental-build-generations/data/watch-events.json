@@ -1,0 +1,6 @@
+[
+  { "generation": 2, "put": { "path": "libs/price", "file": { "text": "price v1" } } },
+  { "generation": 3, "put": { "path": "apps/shop", "file": { "text": "shop entry", "imports": ["libs/price"] } } },
+  { "generation": 4, "config": { "target": "portable", "optimize": true } },
+  { "generation": 5, "delete": "libs/price" }
+]

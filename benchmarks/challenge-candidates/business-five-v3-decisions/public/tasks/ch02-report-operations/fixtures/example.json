@@ -1,0 +1,237 @@
+{
+  "clock": "2026-11-01T10:00:00Z",
+  "actors": [
+    {
+      "id": "requester-north",
+      "tenant": "north",
+      "role": "requester"
+    },
+    {
+      "id": "operator-north",
+      "tenant": "north",
+      "role": "operator"
+    },
+    {
+      "id": "auditor-north",
+      "tenant": "north",
+      "role": "auditor"
+    },
+    {
+      "id": "requester-south",
+      "tenant": "south",
+      "role": "requester"
+    },
+    {
+      "id": "operator-south",
+      "tenant": "south",
+      "role": "operator"
+    },
+    {
+      "id": "auditor-south",
+      "tenant": "south",
+      "role": "auditor"
+    },
+    {
+      "id": "releaseReviewer-north",
+      "tenant": "north",
+      "role": "releaseReviewer"
+    },
+    {
+      "id": "releaseReviewer-south",
+      "tenant": "south",
+      "role": "releaseReviewer"
+    },
+    {
+      "id": "businessOperator-north",
+      "tenant": "north",
+      "role": "businessOperator"
+    },
+    {
+      "id": "businessOperator-south",
+      "tenant": "south",
+      "role": "businessOperator"
+    }
+  ],
+  "grants": [
+    {
+      "actor": "requester-north",
+      "tenant": "north",
+      "operations": [
+        "submit",
+        "readOwn",
+        "cancelOwn",
+        "proposePackage",
+        "readPackage"
+      ]
+    },
+    {
+      "actor": "operator-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "claim",
+        "recover",
+        "cancel",
+        "proposePackage",
+        "amendPackage",
+        "releasePackage",
+        "withdrawPackage",
+        "readPackage"
+      ]
+    },
+    {
+      "actor": "auditor-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "audit",
+        "readPackage",
+        "auditPackage"
+      ]
+    },
+    {
+      "actor": "requester-south",
+      "tenant": "south",
+      "operations": [
+        "submit",
+        "readOwn",
+        "cancelOwn",
+        "proposePackage",
+        "readPackage"
+      ]
+    },
+    {
+      "actor": "operator-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "claim",
+        "recover",
+        "cancel",
+        "proposePackage",
+        "amendPackage",
+        "releasePackage",
+        "withdrawPackage",
+        "readPackage"
+      ]
+    },
+    {
+      "actor": "auditor-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "audit",
+        "readPackage",
+        "auditPackage"
+      ]
+    },
+    {
+      "actor": "releaseReviewer-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "approvePackage",
+        "readPackage",
+        "auditPackage"
+      ]
+    },
+    {
+      "actor": "releaseReviewer-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "approvePackage",
+        "readPackage",
+        "auditPackage"
+      ]
+    },
+    {
+      "actor": "businessOperator-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "proposePackage",
+        "amendPackage",
+        "releasePackage",
+        "withdrawPackage",
+        "readPackage",
+        "auditPackage",
+        "claim"
+      ]
+    },
+    {
+      "actor": "businessOperator-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "proposePackage",
+        "amendPackage",
+        "releasePackage",
+        "withdrawPackage",
+        "readPackage",
+        "auditPackage",
+        "claim"
+      ]
+    }
+  ],
+  "data": {
+    "tenants": [
+      "north",
+      "south"
+    ],
+    "reports": [
+      {
+        "tenant": "north",
+        "id": "r-old",
+        "format": 1,
+        "state": "queued",
+        "params": {
+          "month": "2026-10"
+        },
+        "version": "rv1",
+        "lease": null,
+        "receipt": null
+      },
+      {
+        "tenant": "north",
+        "id": "r-working",
+        "format": 2,
+        "state": "running",
+        "payload": {
+          "month": "2026-09"
+        },
+        "version": "rv2",
+        "lease": {
+          "worker": "operator-north",
+          "claimToken": "claim-1",
+          "until": "2026-11-01T10:10:00Z"
+        },
+        "receipt": null
+      },
+      {
+        "tenant": "south",
+        "id": "r-done",
+        "format": 1,
+        "state": "done",
+        "params": {
+          "month": "2026-08"
+        },
+        "version": "rv3",
+        "lease": null,
+        "receipt": "receipt-done"
+      }
+    ],
+    "deliveries": [
+      {
+        "tenant": "south",
+        "id": "r-done",
+        "content": {
+          "month": "2026-08"
+        },
+        "state": "stored",
+        "receipt": "receipt-done"
+      }
+    ],
+    "packages": []
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "version": "ceiling-scenario-v1",
+  "modules": {
+    "harness/store.mjs": {
+      "construct": {
+        "PriceStore": "store"
+      },
+      "invoke": {}
+    },
+    "harness/clients.mjs": {
+      "construct": {},
+      "invoke": {
+        "legacyClient": "legacyClient",
+        "modernClient": "modernClient"
+      }
+    },
+    "src/migration.mjs": {
+      "construct": {
+        "MigrationService": "migration"
+      },
+      "invoke": {}
+    }
+  },
+  "calls": {
+    "store": {
+      "read": "json",
+      "scan": "json",
+      "state": "json",
+      "compareAndSet": "json",
+      "updateControl": "json",
+      "registerWriter": "json",
+      "retireWriter": "json",
+      "enqueue": "json",
+      "settle": "json",
+      "once": "json",
+      "checkpoint": "json"
+    },
+    "migration": {
+      "readV1": "json",
+      "readV2": "json",
+      "writeV1": "json",
+      "writeV2": "json",
+      "backfill": "json",
+      "drainQueue": "json",
+      "activateV2": "json",
+      "rollback": "json"
+    },
+    "legacyClient": {
+      "read": "json",
+      "write": "json",
+      "queue": "json",
+      "close": "json"
+    },
+    "modernClient": {
+      "read": "json",
+      "write": "json",
+      "close": "json"
+    }
+  },
+  "get": {
+    "store": [],
+    "migration": [],
+    "legacyClient": [],
+    "modernClient": []
+  },
+  "functionKinds": [],
+  "references": {
+    "construct:src/migration.mjs:MigrationService": {
+      "/0": "store"
+    },
+    "invoke:harness/clients.mjs:legacyClient": {
+      "/0": "migration",
+      "/1": "store"
+    },
+    "invoke:harness/clients.mjs:modernClient": {
+      "/0": "migration",
+      "/1": "store"
+    }
+  },
+  "datasets": [
+    "data/prices.json"
+  ]
+}

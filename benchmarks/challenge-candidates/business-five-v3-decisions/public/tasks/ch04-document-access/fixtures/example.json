@@ -1,0 +1,289 @@
+{
+  "clock": "2026-11-01T10:00:00Z",
+  "actors": [
+    {
+      "id": "reader-north",
+      "tenant": "north",
+      "role": "reader"
+    },
+    {
+      "id": "delegator-north",
+      "tenant": "north",
+      "role": "delegator"
+    },
+    {
+      "id": "policyAdmin-north",
+      "tenant": "north",
+      "role": "policyAdmin"
+    },
+    {
+      "id": "auditor-north",
+      "tenant": "north",
+      "role": "auditor"
+    },
+    {
+      "id": "reader-south",
+      "tenant": "south",
+      "role": "reader"
+    },
+    {
+      "id": "delegator-south",
+      "tenant": "south",
+      "role": "delegator"
+    },
+    {
+      "id": "policyAdmin-south",
+      "tenant": "south",
+      "role": "policyAdmin"
+    },
+    {
+      "id": "auditor-south",
+      "tenant": "south",
+      "role": "auditor"
+    },
+    {
+      "id": "documentReviewer-north",
+      "tenant": "north",
+      "role": "documentReviewer"
+    },
+    {
+      "id": "documentReviewer-south",
+      "tenant": "south",
+      "role": "documentReviewer"
+    },
+    {
+      "id": "businessOperator-north",
+      "tenant": "north",
+      "role": "businessOperator"
+    },
+    {
+      "id": "businessOperator-south",
+      "tenant": "south",
+      "role": "businessOperator"
+    }
+  ],
+  "grants": [
+    {
+      "actor": "reader-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "export",
+        "cancelOwn"
+      ]
+    },
+    {
+      "actor": "delegator-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "grantDelegation",
+        "revokeOwnDelegation"
+      ]
+    },
+    {
+      "actor": "policyAdmin-north",
+      "tenant": "north",
+      "operations": [
+        "readPolicy",
+        "setPolicy",
+        "revokeDelegation"
+      ]
+    },
+    {
+      "actor": "auditor-north",
+      "tenant": "north",
+      "operations": [
+        "audit",
+        "readDossier",
+        "auditDossier"
+      ]
+    },
+    {
+      "actor": "reader-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "export",
+        "cancelOwn"
+      ]
+    },
+    {
+      "actor": "delegator-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "grantDelegation",
+        "revokeOwnDelegation"
+      ]
+    },
+    {
+      "actor": "policyAdmin-south",
+      "tenant": "south",
+      "operations": [
+        "readPolicy",
+        "setPolicy",
+        "revokeDelegation"
+      ]
+    },
+    {
+      "actor": "auditor-south",
+      "tenant": "south",
+      "operations": [
+        "audit",
+        "readDossier",
+        "auditDossier"
+      ]
+    },
+    {
+      "actor": "documentReviewer-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "approveDossier",
+        "readDossier",
+        "auditDossier"
+      ]
+    },
+    {
+      "actor": "documentReviewer-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "approveDossier",
+        "readDossier",
+        "auditDossier"
+      ]
+    },
+    {
+      "actor": "businessOperator-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "editDocument",
+        "proposeDossier",
+        "amendDossier",
+        "deliverDossier",
+        "cancelDossier",
+        "readDossier",
+        "auditDossier",
+        "export"
+      ]
+    },
+    {
+      "actor": "businessOperator-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "editDocument",
+        "proposeDossier",
+        "amendDossier",
+        "deliverDossier",
+        "cancelDossier",
+        "readDossier",
+        "auditDossier",
+        "export"
+      ]
+    }
+  ],
+  "data": {
+    "tenants": [
+      "north",
+      "south"
+    ],
+    "documents": [
+      {
+        "tenant": "north",
+        "id": "d1",
+        "body": "公開fixture本文",
+        "version": "doc-v1"
+      },
+      {
+        "tenant": "south",
+        "id": "d2",
+        "body": "別tenant本文",
+        "version": "doc-v2"
+      }
+    ],
+    "groups": [
+      {
+        "id": "g1",
+        "tenant": "north",
+        "members": [
+          "reader-north"
+        ],
+        "includes": [],
+        "version": "gv1"
+      }
+    ],
+    "delegations": [
+      {
+        "id": "cap1",
+        "tenant": "north",
+        "issuer": "delegator-north",
+        "recipient": "reader-north",
+        "parentId": null,
+        "resourceIds": [
+          "d1"
+        ],
+        "operations": [
+          "read"
+        ],
+        "expiresAt": "2026-11-01T11:00:00Z",
+        "active": true,
+        "version": "cap-v1"
+      }
+    ],
+    "resources": [
+      {
+        "id": "f1",
+        "tenant": "north",
+        "parentId": null,
+        "kind": "folder",
+        "version": "fv1"
+      },
+      {
+        "id": "d1",
+        "tenant": "north",
+        "parentId": "f1",
+        "kind": "document",
+        "version": "doc-v1"
+      },
+      {
+        "id": "d2",
+        "tenant": "south",
+        "parentId": null,
+        "kind": "document",
+        "version": "doc-v2"
+      }
+    ],
+    "policies": [
+      {
+        "id": "pol1",
+        "tenant": "north",
+        "subject": {
+          "kind": "group",
+          "id": "g1"
+        },
+        "resourceId": "f1",
+        "operations": [
+          "read",
+          "export"
+        ],
+        "effect": "allow",
+        "version": "pol-v1"
+      }
+    ],
+    "contexts": [
+      {
+        "id": "ctx1",
+        "actor": "reader-north",
+        "tenant": "north",
+        "version": "ctx-v1",
+        "active": true
+      }
+    ],
+    "dossiers": [],
+    "documentVersions": []
+  }
+}

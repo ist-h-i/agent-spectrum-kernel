@@ -1,0 +1,137 @@
+{
+  "version": "ceiling-public-v3-causal",
+  "id": "ch04-authorization-revocation",
+  "input_digest": "sha256:ee9f1997e05b6c3f6a8717e57c7d03bc03993c9e7e4aaa5df74781bdace14d38",
+  "files": [
+    {
+      "path": "data/normal-scenario.json",
+      "sha256": "bd3b13e1c38404882918fd089c5dcb1b2bad2f1478c1500d8cab6cee6d6b5f47",
+      "bytes": 2527
+    },
+    {
+      "path": "data/policies.json",
+      "sha256": "4b2f67629f83c0bd91447886c305922be0369c22c76ac65ba66aaafc8440120f",
+      "bytes": 521
+    },
+    {
+      "path": "harness/consumers.mjs",
+      "sha256": "0a92795bf77f95ac24e822c6a2f5a9c674876e86378c34aa04707dd8378aa389",
+      "bytes": 849
+    },
+    {
+      "path": "harness/policy-store.mjs",
+      "sha256": "5697c16972675c01f931bef2660e0f1bc7631e199284ca7a90d791e2ca27d500",
+      "bytes": 5307
+    },
+    {
+      "path": "harness/scenario-capabilities.json",
+      "sha256": "c49f3d13bd8541993b2355cad92b007780f463cd78dd4248fa6969e214d5c0c2",
+      "bytes": 3289
+    },
+    {
+      "path": "harness/scenario-engine.mjs",
+      "sha256": "2216731a07a915e577c423a527043ddfc587d6eb92fab21334b1d39223de2993",
+      "bytes": 6938
+    },
+    {
+      "path": "harness/scenario-protocol.mjs",
+      "sha256": "a2b568ecd7f3b2d0bd0ccae19a7d1c54ceadec030305759a8649a3cf197318c6",
+      "bytes": 6021
+    },
+    {
+      "path": "harness/scenario-reporter.mjs",
+      "sha256": "0e2ce3f9618494897ac247c46c470444f326b12fc13910cb73bece53f7d976a7",
+      "bytes": 1122
+    },
+    {
+      "path": "harness/scenario-worker.mjs",
+      "sha256": "fc56f76c84be97256e7f3af919a804dd215cf5876e194ab68bebd064185f5fa0",
+      "bytes": 1068
+    },
+    {
+      "path": "harness/scenario.mjs",
+      "sha256": "621c442afd8e9f59c2bb4a60d0159cd9053454e89e158bd0a3ad654b0386d802",
+      "bytes": 1794
+    },
+    {
+      "path": "package.json",
+      "sha256": "31e4bc4fcf70eaa08bc00bcf2d1631440e12c46a03d571f428d5627b7248b516",
+      "bytes": 188
+    },
+    {
+      "path": "RESULT.md",
+      "sha256": "d8bc7c3ae73e68b1b3070f81618ccf1ac2dbc8415be31a974844d655981a19d2",
+      "bytes": 98
+    },
+    {
+      "path": "spec/api.md",
+      "sha256": "d9dbd74788d28d8263fe54326bb63cf29ca843338fc2cbd67009f56490dfb6e7",
+      "bytes": 4345
+    },
+    {
+      "path": "spec/index.md",
+      "sha256": "8522e2b6159ea1e45dfa92922e3fc0c396963c312a200fd4475c1a060f5f702f",
+      "bytes": 492
+    },
+    {
+      "path": "spec/policy.md",
+      "sha256": "c87a3dc08aaa0b47e0c1cf4c6ef872ff683e274ce525c581571c0cc6ada27845",
+      "bytes": 1678
+    },
+    {
+      "path": "spec/providers.md",
+      "sha256": "267f19bc263934eecb46b11e4a7bbcbb51fcac1c49090987ac7f2eddcab64067",
+      "bytes": 3136
+    },
+    {
+      "path": "spec/scenario-tests.md",
+      "sha256": "4daef633a97320b9233255476c896fb5d42956d98df1a9aa95b89bc579125f9c",
+      "bytes": 2870
+    },
+    {
+      "path": "src/cache.mjs",
+      "sha256": "45ed540bcd7880a7cdd494efa084ae537302b94ce4b77a49d3b0a55e4213f62a",
+      "bytes": 353
+    },
+    {
+      "path": "src/contexts.mjs",
+      "sha256": "dded4d24a2c7c7b15163ca8e607fdb4468178e209d0df3fe16f879f3bf348101",
+      "bytes": 604
+    },
+    {
+      "path": "src/exports.mjs",
+      "sha256": "971899b4255d3ec527303ca7947bf8d76ed3b7ea37141fda1348fb920cc33032",
+      "bytes": 2739
+    },
+    {
+      "path": "src/legacy.mjs",
+      "sha256": "91cf7226816cf3868f23c3223b7c615c51dc690c99f6f463b793758c1eba15d1",
+      "bytes": 202
+    },
+    {
+      "path": "src/policy.mjs",
+      "sha256": "73ff81c0fe6d8f7f33439fa9bcb6c76f11a1b3ee2c2944a49ba02b0d106200f1",
+      "bytes": 1357
+    },
+    {
+      "path": "src/service.mjs",
+      "sha256": "ed6cf37da0afc3d237b8bb64a1972121bf07976f281e97c7337efef5d80ceab3",
+      "bytes": 2791
+    },
+    {
+      "path": "task.md",
+      "sha256": "d93b2c4884ae1a74b7b2170e6ee2bc47335c77af55e069e245e6fad90c968408",
+      "bytes": 917
+    },
+    {
+      "path": "test/added/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "test/public.test.mjs",
+      "sha256": "37709a6ea6a2acacc745811d4126b2a4ca223db487e6f4832d337d36f4e28c30",
+      "bytes": 1446
+    }
+  ]
+}

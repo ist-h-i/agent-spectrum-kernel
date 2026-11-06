@@ -1,0 +1,521 @@
+{
+  "schema_version": 1,
+  "version": "business-five-20261106-workflows1",
+  "package": "business-five-v2-workflows",
+  "task_count": 5,
+  "task_type": "business_application_implementation",
+  "existing_tasks_modified": false,
+  "distribution_state": "workflow_integrated_candidate",
+  "ready_for_measurement": false,
+  "difficulty_calibrated": false,
+  "model_trials": 0,
+  "private_assessment_included": false,
+  "tasks": [
+    {
+      "id": "ch02-report-operations",
+      "title": "帳票の配信・取消・復旧を行う業務アプリ",
+      "primary_axis": "durable_compatibility_recovery",
+      "task_type": "business_application_implementation",
+      "legacy_domain_ref": "ch02",
+      "delivery_modes": [
+        "one_shot",
+        "goal_with_pr"
+      ],
+      "requirements": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C06",
+        "J01",
+        "J02",
+        "J03",
+        "J04",
+        "J05",
+        "J06",
+        "J07",
+        "J08"
+      ],
+      "task_path": "public/tasks/ch02-report-operations/TASK.md",
+      "roles_path": "public/tasks/ch02-report-operations/roles.md",
+      "one_shot_prompt": "public/tasks/ch02-report-operations/prompt.txt",
+      "goal_with_pr_prompt": "public/tasks/ch02-report-operations/goal-pr.txt",
+      "input_manifest": "input-manifests/ch02-report-operations.json",
+      "workflow_path": "public/tasks/ch02-report-operations/workflows.md",
+      "workflows": [
+        {
+          "id": "J-W1",
+          "requirements": [
+            "J01",
+            "J02",
+            "J03",
+            "J07",
+            "J08",
+            "C01",
+            "C02",
+            "C03"
+          ]
+        },
+        {
+          "id": "J-W2",
+          "requirements": [
+            "J04",
+            "J05",
+            "J07",
+            "J08",
+            "C01",
+            "C04"
+          ]
+        },
+        {
+          "id": "J-W3",
+          "requirements": [
+            "J02",
+            "J06",
+            "J07",
+            "J08",
+            "C02",
+            "C05",
+            "C06"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ch03-price-rollout",
+      "title": "店舗価格カタログの移行・切替・差戻しアプリ",
+      "primary_axis": "live_migration_rollback",
+      "task_type": "business_application_implementation",
+      "legacy_domain_ref": "ch03",
+      "delivery_modes": [
+        "one_shot",
+        "goal_with_pr"
+      ],
+      "requirements": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C06",
+        "M01",
+        "M02",
+        "M03",
+        "M04",
+        "M05",
+        "M06",
+        "M07",
+        "M08"
+      ],
+      "task_path": "public/tasks/ch03-price-rollout/TASK.md",
+      "roles_path": "public/tasks/ch03-price-rollout/roles.md",
+      "one_shot_prompt": "public/tasks/ch03-price-rollout/prompt.txt",
+      "goal_with_pr_prompt": "public/tasks/ch03-price-rollout/goal-pr.txt",
+      "input_manifest": "input-manifests/ch03-price-rollout.json",
+      "workflow_path": "public/tasks/ch03-price-rollout/workflows.md",
+      "workflows": [
+        {
+          "id": "M-W1",
+          "requirements": [
+            "M01",
+            "M02",
+            "M03",
+            "M08",
+            "C01",
+            "C02",
+            "C03",
+            "C04"
+          ]
+        },
+        {
+          "id": "M-W2",
+          "requirements": [
+            "M03",
+            "M04",
+            "M05",
+            "M06",
+            "M08",
+            "C01",
+            "C03",
+            "C05",
+            "C06"
+          ]
+        },
+        {
+          "id": "M-W3",
+          "requirements": [
+            "M01",
+            "M02",
+            "M07",
+            "M08",
+            "C02",
+            "C04",
+            "C05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ch04-document-access",
+      "title": "委譲権限のある文書閲覧・配信アプリ",
+      "primary_axis": "authorization_lifetime",
+      "task_type": "business_application_implementation",
+      "legacy_domain_ref": "ch04",
+      "delivery_modes": [
+        "one_shot",
+        "goal_with_pr"
+      ],
+      "requirements": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C06",
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "A07",
+        "A08"
+      ],
+      "task_path": "public/tasks/ch04-document-access/TASK.md",
+      "roles_path": "public/tasks/ch04-document-access/roles.md",
+      "one_shot_prompt": "public/tasks/ch04-document-access/prompt.txt",
+      "goal_with_pr_prompt": "public/tasks/ch04-document-access/goal-pr.txt",
+      "input_manifest": "input-manifests/ch04-document-access.json",
+      "workflow_path": "public/tasks/ch04-document-access/workflows.md",
+      "workflows": [
+        {
+          "id": "A-W1",
+          "requirements": [
+            "A01",
+            "A02",
+            "A04",
+            "A05",
+            "A07",
+            "C01",
+            "C02",
+            "C03"
+          ]
+        },
+        {
+          "id": "A-W2",
+          "requirements": [
+            "A01",
+            "A03",
+            "A08",
+            "C02",
+            "C04",
+            "C05"
+          ]
+        },
+        {
+          "id": "A-W3",
+          "requirements": [
+            "A04",
+            "A05",
+            "A06",
+            "A07",
+            "A08",
+            "C01",
+            "C04",
+            "C06"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ch05-sales-reconciliation",
+      "title": "訂正売上の照合・締め・再接続アプリ",
+      "primary_axis": "stream_reconciliation_space",
+      "task_type": "business_application_implementation",
+      "legacy_domain_ref": "ch05",
+      "delivery_modes": [
+        "one_shot",
+        "goal_with_pr"
+      ],
+      "requirements": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C06",
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08"
+      ],
+      "task_path": "public/tasks/ch05-sales-reconciliation/TASK.md",
+      "roles_path": "public/tasks/ch05-sales-reconciliation/roles.md",
+      "one_shot_prompt": "public/tasks/ch05-sales-reconciliation/prompt.txt",
+      "goal_with_pr_prompt": "public/tasks/ch05-sales-reconciliation/goal-pr.txt",
+      "input_manifest": "input-manifests/ch05-sales-reconciliation.json",
+      "workflow_path": "public/tasks/ch05-sales-reconciliation/workflows.md",
+      "workflows": [
+        {
+          "id": "S-W1",
+          "requirements": [
+            "S01",
+            "S02",
+            "S03",
+            "S08",
+            "C01",
+            "C02",
+            "C03",
+            "C05"
+          ]
+        },
+        {
+          "id": "S-W2",
+          "requirements": [
+            "S02",
+            "S04",
+            "S06",
+            "S08",
+            "C01",
+            "C04"
+          ]
+        },
+        {
+          "id": "S-W3",
+          "requirements": [
+            "S01",
+            "S02",
+            "S04",
+            "S05",
+            "S06",
+            "S07",
+            "S08",
+            "C01",
+            "C02",
+            "C06"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ch06-build-operations",
+      "title": "複数プロジェクトのビルド・成果物公開アプリ",
+      "primary_axis": "build_release_dependencies",
+      "task_type": "business_application_implementation",
+      "legacy_domain_ref": "ch06",
+      "delivery_modes": [
+        "one_shot",
+        "goal_with_pr"
+      ],
+      "requirements": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C06",
+        "B01",
+        "B02",
+        "B03",
+        "B04",
+        "B05",
+        "B06",
+        "B07",
+        "B08"
+      ],
+      "task_path": "public/tasks/ch06-build-operations/TASK.md",
+      "roles_path": "public/tasks/ch06-build-operations/roles.md",
+      "one_shot_prompt": "public/tasks/ch06-build-operations/prompt.txt",
+      "goal_with_pr_prompt": "public/tasks/ch06-build-operations/goal-pr.txt",
+      "input_manifest": "input-manifests/ch06-build-operations.json",
+      "workflow_path": "public/tasks/ch06-build-operations/workflows.md",
+      "workflows": [
+        {
+          "id": "B-W1",
+          "requirements": [
+            "B01",
+            "B02",
+            "B03",
+            "B06",
+            "B08",
+            "C01",
+            "C02",
+            "C05",
+            "C06"
+          ]
+        },
+        {
+          "id": "B-W2",
+          "requirements": [
+            "B03",
+            "B04",
+            "B05",
+            "B07",
+            "B08",
+            "C01",
+            "C03",
+            "C04"
+          ]
+        },
+        {
+          "id": "B-W3",
+          "requirements": [
+            "B01",
+            "B02",
+            "B03",
+            "B04",
+            "B07",
+            "B08",
+            "C01",
+            "C02",
+            "C04"
+          ]
+        }
+      ]
+    }
+  ],
+  "ready_for_test_cycle": true,
+  "contract_origin": {
+    "package": "business-five-v1",
+    "commit": "6ba19e39d4a9bcdf3059766f14f7630a99d7069a",
+    "unchanged_inputs": [
+      {
+        "path": "public/common/operation-and-observation.md",
+        "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03"
+      },
+      {
+        "path": "public/tasks/ch02-report-operations/acceptance.md",
+        "sha256": "f477ac066a90eb78a6c5d1bf3af6a92aad05b2b75c7370cc5353c802f98aa9e5"
+      },
+      {
+        "path": "public/tasks/ch02-report-operations/contract.md",
+        "sha256": "d813c45c9dd465bf012f3ff3a3a6b1a1a910bcd43c92f1e9fe7f43112e90d221"
+      },
+      {
+        "path": "public/tasks/ch02-report-operations/delivery-provider.md",
+        "sha256": "eb02fce3ce0201d0723dac22856497e31680afbac45955ff3d7e49dc026a4689"
+      },
+      {
+        "path": "public/tasks/ch02-report-operations/fixture-format.md",
+        "sha256": "1c3d96fc2fc4902079336d91655ae531c098ba22353bed64f0328142c408d8fd"
+      },
+      {
+        "path": "public/tasks/ch02-report-operations/fixtures/example.json",
+        "sha256": "6e11eb36bd8b1024d095a19739483f38ee8aaeb3692226cae1fcee11f622f387"
+      },
+      {
+        "path": "public/tasks/ch02-report-operations/nonfunctional.md",
+        "sha256": "76d81d6f1611504881342662f9bd91ad72d9a881d484d78e8fd85a83dac0c20b"
+      },
+      {
+        "path": "public/tasks/ch02-report-operations/roles.md",
+        "sha256": "0890060cb5ee9ae8ba901bfbb201ae848a08ba9482fc3f1efba53da24a6e9839"
+      },
+      {
+        "path": "public/tasks/ch03-price-rollout/acceptance.md",
+        "sha256": "4bbc0b28e19394bf0945d803a823e6fd68ebbdbd377bea77fd7bd91959da9290"
+      },
+      {
+        "path": "public/tasks/ch03-price-rollout/contract.md",
+        "sha256": "205a732c4f8b810782d4460f12a08df38731adf23cfec3fecfdfbdca7f39ad0e"
+      },
+      {
+        "path": "public/tasks/ch03-price-rollout/fixture-format.md",
+        "sha256": "0ee611fa5e9c453ddfecf687269d0e532fa3fb2cf347c009b81cafae6e0767ff"
+      },
+      {
+        "path": "public/tasks/ch03-price-rollout/fixtures/example.json",
+        "sha256": "4c2d8345f8c26b258e6840705e99e538a049ead6549f91c31e5a1281103edcdc"
+      },
+      {
+        "path": "public/tasks/ch03-price-rollout/nonfunctional.md",
+        "sha256": "746dd57599f4c6491acb3146a0789171b0031fd53a42053910a44c256da5e20b"
+      },
+      {
+        "path": "public/tasks/ch03-price-rollout/roles.md",
+        "sha256": "7d42b32a448a5e17427c61b69713a94df898284d288443d7ec6d16400c86409a"
+      },
+      {
+        "path": "public/tasks/ch04-document-access/acceptance.md",
+        "sha256": "185ecf0c212b7ca57450fa89e73d8b7ebd17e1ce3195e91fd34d7e8a4fc91ef7"
+      },
+      {
+        "path": "public/tasks/ch04-document-access/contract.md",
+        "sha256": "6da889ee992d6c111a9a5f083e0efe67ba49983ad3cfb48ecc88abef1227270d"
+      },
+      {
+        "path": "public/tasks/ch04-document-access/fixture-format.md",
+        "sha256": "eb3b8923cbe293982b3b2282d3c7fa7a642822a0c411c5923f804790c4ae2b72"
+      },
+      {
+        "path": "public/tasks/ch04-document-access/fixtures/example.json",
+        "sha256": "811f72961116a7b84c600b80c7c96f18acecdfd809cabbf6fbff174652603869"
+      },
+      {
+        "path": "public/tasks/ch04-document-access/nonfunctional.md",
+        "sha256": "ad51ce94141b334e54439126065d0d1d71417206e016a55972f2500911805ebc"
+      },
+      {
+        "path": "public/tasks/ch04-document-access/roles.md",
+        "sha256": "139f7b727f96e6e76503dd307cf6ae5fdd675be4fbd811a16b68f52529f77ea3"
+      },
+      {
+        "path": "public/tasks/ch05-sales-reconciliation/acceptance.md",
+        "sha256": "4b096268bb5e109788711780c4459f7ddd37eab6b121536573d260844b344587"
+      },
+      {
+        "path": "public/tasks/ch05-sales-reconciliation/contract.md",
+        "sha256": "35467e9afd408f57dbea46c91ef34691795f5db10ee2add1ba7bef9f3504e38d"
+      },
+      {
+        "path": "public/tasks/ch05-sales-reconciliation/fixture-format.md",
+        "sha256": "570370a4cc7e18af2e4fc5ed43412809be4fa7eae98c313d22c749f96465d4e1"
+      },
+      {
+        "path": "public/tasks/ch05-sales-reconciliation/fixtures/example.json",
+        "sha256": "1ab784ce8fdbde4db9a94b96627857d8667650bcaa376d1be2c3bfa9f65ddc44"
+      },
+      {
+        "path": "public/tasks/ch05-sales-reconciliation/nonfunctional.md",
+        "sha256": "ee9dd91364c05f33695a919781b4b4942a4446666416dcab669153c7edeea11b"
+      },
+      {
+        "path": "public/tasks/ch05-sales-reconciliation/roles.md",
+        "sha256": "9ab6397ba4f023ae7fa52ec4d1e0270949b04e5d7130b1ed00ba6423e1a30c9e"
+      },
+      {
+        "path": "public/tasks/ch06-build-operations/acceptance.md",
+        "sha256": "990e6287059067e8d3c67abb0d9a1b5314855b1fc7d2eb1801f9b5125796661c"
+      },
+      {
+        "path": "public/tasks/ch06-build-operations/compiler-provider.md",
+        "sha256": "082834fdc0eee4931907e367d9c647a6fa58d8fdea3b77c905b362657901d905"
+      },
+      {
+        "path": "public/tasks/ch06-build-operations/contract.md",
+        "sha256": "62449f44221f2403aee1eb08b4b55f92779e8ea3ea066decd855bb436cb8aba9"
+      },
+      {
+        "path": "public/tasks/ch06-build-operations/fixture-format.md",
+        "sha256": "0401580e454f61e15c92cd0f7c6bfd5e6a0072a90dc492b39025f9c59307e797"
+      },
+      {
+        "path": "public/tasks/ch06-build-operations/fixtures/example.json",
+        "sha256": "5a5dea61604e700bcbf7158f83c9d1247284b716c03064a7f6932f65267b87d0"
+      },
+      {
+        "path": "public/tasks/ch06-build-operations/nonfunctional.md",
+        "sha256": "71e749c3e10ecd692713be5b2839f996ca3a808ef2e4a089872719cb133006dc"
+      },
+      {
+        "path": "public/tasks/ch06-build-operations/roles.md",
+        "sha256": "e2246f0e4a0dff3288718cd1deae596a3a65e69204e11385bed593cb9e8572d0"
+      }
+    ]
+  }
+}

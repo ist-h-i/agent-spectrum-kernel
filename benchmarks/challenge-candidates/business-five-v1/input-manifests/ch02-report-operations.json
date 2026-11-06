@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "version": "business-five-20261105-draft1",
+  "task_id": "ch02-report-operations",
+  "modes": {
+    "one_shot": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03",
+          "bytes": 5509
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/TASK.md",
+          "sha256": "303e8e1433b63b795ebfb8386e6d824128744f5438369d00406c410f1cf5215e",
+          "bytes": 1217
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/acceptance.md",
+          "sha256": "f477ac066a90eb78a6c5d1bf3af6a92aad05b2b75c7370cc5353c802f98aa9e5",
+          "bytes": 1188
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/contract.md",
+          "sha256": "d813c45c9dd465bf012f3ff3a3a6b1a1a910bcd43c92f1e9fe7f43112e90d221",
+          "bytes": 2918
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/delivery-provider.md",
+          "sha256": "eb02fce3ce0201d0723dac22856497e31680afbac45955ff3d7e49dc026a4689",
+          "bytes": 1285
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/fixture-format.md",
+          "sha256": "1c3d96fc2fc4902079336d91655ae531c098ba22353bed64f0328142c408d8fd",
+          "bytes": 2089
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/fixtures/example.json",
+          "sha256": "6e11eb36bd8b1024d095a19739483f38ee8aaeb3692226cae1fcee11f622f387",
+          "bytes": 2743
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/nonfunctional.md",
+          "sha256": "76d81d6f1611504881342662f9bd91ad72d9a881d484d78e8fd85a83dac0c20b",
+          "bytes": 632
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/prompt.txt",
+          "sha256": "5d7a8ac53dd6f017017ccf9d7e9bbb0a5b5dc27a1288de276be6363004585a32",
+          "bytes": 432
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/roles.md",
+          "sha256": "0890060cb5ee9ae8ba901bfbb201ae848a08ba9482fc3f1efba53da24a6e9839",
+          "bytes": 978
+        }
+      ],
+      "inventory_sha256": "c06245d733e2b8ec9db60e996e1a0f747df8687c7b7f52919c912f6e94b1502a"
+    },
+    "goal_with_pr": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03",
+          "bytes": 5509
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/TASK.md",
+          "sha256": "303e8e1433b63b795ebfb8386e6d824128744f5438369d00406c410f1cf5215e",
+          "bytes": 1217
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/acceptance.md",
+          "sha256": "f477ac066a90eb78a6c5d1bf3af6a92aad05b2b75c7370cc5353c802f98aa9e5",
+          "bytes": 1188
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/contract.md",
+          "sha256": "d813c45c9dd465bf012f3ff3a3a6b1a1a910bcd43c92f1e9fe7f43112e90d221",
+          "bytes": 2918
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/delivery-provider.md",
+          "sha256": "eb02fce3ce0201d0723dac22856497e31680afbac45955ff3d7e49dc026a4689",
+          "bytes": 1285
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/fixture-format.md",
+          "sha256": "1c3d96fc2fc4902079336d91655ae531c098ba22353bed64f0328142c408d8fd",
+          "bytes": 2089
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/fixtures/example.json",
+          "sha256": "6e11eb36bd8b1024d095a19739483f38ee8aaeb3692226cae1fcee11f622f387",
+          "bytes": 2743
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/goal-pr.txt",
+          "sha256": "260641051f787b597f958369975d313c2e1c0b69585e72b0a4065b68a81e01cc",
+          "bytes": 704
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/nonfunctional.md",
+          "sha256": "76d81d6f1611504881342662f9bd91ad72d9a881d484d78e8fd85a83dac0c20b",
+          "bytes": 632
+        },
+        {
+          "path": "public/tasks/ch02-report-operations/roles.md",
+          "sha256": "0890060cb5ee9ae8ba901bfbb201ae848a08ba9482fc3f1efba53da24a6e9839",
+          "bytes": 978
+        }
+      ],
+      "inventory_sha256": "71f9e98dcbae6813e4af9e41b0275a18536e4ddc34652d038ec4bc59ae305b9d"
+    }
+  },
+  "working_directory": "public/tasks/ch02-report-operations"
+}

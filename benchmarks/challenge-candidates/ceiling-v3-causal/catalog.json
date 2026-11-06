@@ -1,0 +1,85 @@
+{
+  "format_version": "1.0.0",
+  "artifact_kind": "challenge_design_catalog",
+  "catalog_id": "ceiling-v3-causal",
+  "input_version": "ceiling-public-v3-causal",
+  "status": "source_authoring_runtime_unverified",
+  "input_freeze_status": "authoring",
+  "baseline_repository_revision": "71aadb908feaf9c400aa520c9b1dfc6ac665e178",
+  "candidate_count": 6,
+  "existing_primary_count_unchanged": 24,
+  "previous_versions_unchanged": [
+    "ceiling-v1",
+    "ceiling-v2-debt"
+  ],
+  "runtime_config": false,
+  "ready_for_measurement": false,
+  "difficulty_calibrated": false,
+  "scoring_dimensions": [
+    {
+      "id": "required_behavior",
+      "points": 30
+    },
+    {
+      "id": "integration_compatibility",
+      "points": 30
+    },
+    {
+      "id": "failure_boundary_recovery",
+      "points": 25
+    },
+    {
+      "id": "added_test_effectiveness",
+      "points": 10
+    },
+    {
+      "id": "scope_maintainability",
+      "points": 5
+    }
+  ],
+  "safety_blockers_separate": true,
+  "candidates": [
+    {
+      "id": "ch01-optimistic-edit-history",
+      "task_path": "tasks/CH01.md",
+      "workspace_path": "workspaces/ch01-optimistic-edit-history",
+      "title": "durable collaborative edit handoff",
+      "status": "authoring_runtime_unverified"
+    },
+    {
+      "id": "ch02-durable-job-recovery",
+      "task_path": "tasks/CH02.md",
+      "workspace_path": "workspaces/ch02-durable-job-recovery",
+      "title": "paged durable job recovery",
+      "status": "authoring_runtime_unverified"
+    },
+    {
+      "id": "ch03-online-schema-cutover",
+      "task_path": "tasks/CH03.md",
+      "workspace_path": "workspaces/ch03-online-schema-cutover",
+      "title": "tenant cutover and record incarnation",
+      "status": "authoring_runtime_unverified"
+    },
+    {
+      "id": "ch04-authorization-revocation",
+      "task_path": "tasks/CH04.md",
+      "workspace_path": "workspaces/ch04-authorization-revocation",
+      "title": "delegated capability lifetime",
+      "status": "authoring_runtime_unverified"
+    },
+    {
+      "id": "ch05-stream-window-revisions",
+      "task_path": "tasks/CH05.md",
+      "workspace_path": "workspaces/ch05-stream-window-revisions",
+      "title": "receipt-aware bounded stream state",
+      "status": "authoring_runtime_unverified"
+    },
+    {
+      "id": "ch06-incremental-build-generations",
+      "task_path": "tasks/CH06.md",
+      "workspace_path": "workspaces/ch06-incremental-build-generations",
+      "title": "targeted incremental build generations",
+      "status": "authoring_runtime_unverified"
+    }
+  ]
+}

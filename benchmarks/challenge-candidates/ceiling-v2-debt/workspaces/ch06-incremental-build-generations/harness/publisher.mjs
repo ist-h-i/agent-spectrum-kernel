@@ -1,0 +1,1 @@
+const clone=structuredClone;export function createPublisher(){const history=[];return {publish(value){history.push(clone(value));},latest(projectId='default'){return clone(history.filter(x=>(x.projectId??'default')===projectId).at(-1)??null);},history(projectId){return clone(projectId===undefined?history:history.filter(x=>(x.projectId??'default')===projectId));}};}

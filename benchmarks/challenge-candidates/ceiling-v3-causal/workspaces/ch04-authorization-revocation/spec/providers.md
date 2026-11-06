@@ -1,0 +1,13 @@
+# Providerの保証と負荷
+
+B1 PolicyStore(policies)はsnapshot/revision/replace/subscribe/deliver。replaceは現revision+1を保存して完了し、通知は後に任意順でdeliver(index=0,duplicate=false)。ContextStoreはopen/get/replace/close。IDはstore内で一意、revisionは単調。返却JSONはcopy。CapabilityStoreはnow/get/grant/replace/revoke/advance/subscribe/deliver。grantはrevision1、replace/revokeはrevision+1、advanceは非負safe integerだけclockを増やし、累計がsafe integerを超える操作はINVALID_CLOCKをthrowして不変。clockの巻き戻しはない。P2のJSON入力の識別子は有効な非空文字列、actionsはread/export配列、expiresAtは非負safe integer、parent:null|ID。未知ID/cycleは有効な拒否入力に含む。
+
+B2 ChunkAdapter(policies,contexts,capabilities)のbeginChunkは `{jobId,attemptId,contextId,expectedContextRevision,tenant,expectedPolicyRevision,expectedCapabilities:[{id,revision}],resource,bytes}` を受け取る。新規attemptについて、sink取消・context active/revision/tenant・policy revision・capability chainの全revision/active/expiryと比較を同じ不可分区間で行い、一致時だけ受理する。比較失敗の優先順はcancelled > context-conflict > revision-conflict > capability-conflict。expectedCapabilitiesはP2対象chainのid昇順、capability未指定なら空配列。不正な権限の意味の判定はadapterが肩代わりしない。
+
+B3 同job/attemptの同内容再要求は同receipt、異内容はconflict。これは過去の受理事実の再返却であり新規受理ではない。finishはcompleted事実を一度保存、receiptはそのcopy。cancel(jobId)は新規attemptの受理を閉じる。loseNextReplyは次の受理直後にunknownを返す。snapshotはaccepted/completed/closed/attemptsのcopyでテスト観測専用。サービスはsnapshot/acceptedからunknownを解決しない。
+
+B4 beforeAccept(callback)は次の新規beginChunkの比較直前に一度同期実行される。callbackでpolicy/context/capability/clock/cancelを動かせる。他の暗黙割込はない。途中でthrowさせるscenarioは基盤故障ではなく指定停止を表す場合だけ使う。
+
+B5 PolicyStore.statsはsnapshots/listeners、CapabilityStore.statsはreads/listeners、ChunkAdapter.snapshotはattempts/受理事実。counterと状態はprotected #private fieldにあり、instance/prototypeはfreeze済みで差し替えできない。候補の自己申告数値は使わない。サービス呼出を挟んだ差分を測る。
+
+B6 固定有限負荷: 4tenant、各32resources/16groups、chain32、8contexts、16views、16jobs、bodyはASCII 128文字以下、64providerイベント以内。hooks停止後の一回のdetail/decideはpolicy snapshot4回以下、capability get128回以下、runChunkはbeginChunk4回以下。close後のauthority listener数は、そのserviceの登録分だけ減る。無限event、実ネットワーク、providerの強制abort、capability forgery・暗号検証は対象外。walltime単独の性能点を設けない。

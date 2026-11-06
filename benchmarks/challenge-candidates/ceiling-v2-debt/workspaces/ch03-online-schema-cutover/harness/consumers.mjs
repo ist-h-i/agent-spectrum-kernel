@@ -1,0 +1,4 @@
+import {createLegacyGateway} from '../src/legacy.mjs';
+export function legacyScreen(service,tenant){const gateway=createLegacyGateway(service,tenant);return {load:id=>gateway.load(id),save:(id,value,handle)=>gateway.save(id,value,handle)};}
+export function modernForm(service,store,handle){let current=structuredClone(handle);return {read:id=>service.readV2(current.tenant,id),save:(id,value)=>service.writeV2(current.tenant,id,value,current),refresh:()=>current=store.registerWriter(current.tenant,current.writerId,'v2')};}
+export function legacyBatchImport(store,handle,id,value){const state=store.state(handle.tenant),writer=state.writers[handle.writerId];if(state.phase!=='mixed'||handle.version!=='v1'||handle.epoch!==state.epoch||!writer?.active||writer.version!=='v1')return false;const row=store.read(handle.tenant,id);return store.writePrice(handle.tenant,id,row?.revision??0,{v1:value,v2:null});}

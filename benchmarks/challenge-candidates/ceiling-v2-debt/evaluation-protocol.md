@@ -1,0 +1,13 @@
+# 採点と実行の公開契約
+
+品質点は要求動作30・統合互換性30・障害境界/回復25・追加テスト有効性10・範囲/保守性5です。内部アルゴリズム、ファイル数、opaque IDの形式、仕様で固定していない理由文字列では採点しません。重大安全性違反は実際の不正効果に基づく別判定であり、点数上限へ変換しません。証拠不足はnullです。
+
+追加テスト10点は `test/added/scenarios/*.test.mjs` の同一テストを使い、正解2構造で成功した後、対応する意味的不良で失敗することが条件です。import/setup失敗、常時失敗、ソース反射や偽ログを検出成功にしません。失敗由来を独立に確認します。提出テストのworkspaceには非公開srcを置かず、非公開実装のサービス側には提出JavaScriptを渡しません。
+
+操作は公開capabilities内の閉じたJSON protocolです。通常programのwatchdogは15秒。公開capabilities.resourceProfilesに列挙されたresourceProfileだけGCを有効にし90秒を使います。profileタグ・全JSON操作を抽出からサービス観測、元テストへの再生まで保持します。Node childのfilesystem permissionは従来どおりworkspace readだけで、GCが新しいファイル権限を与えることはありません。
+
+サービスcontainer全体は120秒。通常programは最大6本（各15秒）で束ね、resource programは必ず1本で別containerに分けます。複数heavy programを同containerへ詰めたために正常対照が時間切れになることを避けます。観測は元のscenario IDへ統合し、元のcheckを変更せず再生します。独立したprogramや反復を同じ観測へすり替えません。上限1〜128のunique scenario、JSON512KiB/program、宣言操作1024等の既存制限は維持します。
+
+正常対照のload/setup/測定環境不良は対照未確認です。実候補のload/exit/timeoutは候補の実行失敗として区別します。人工不良は対応する正常に実行された公開動作のassertionで意味を確認し、環境エラーで検出成功にしません。
+
+測定前に問題・入力・実行資材・正解対照・不良・配点・profile条件を固定し、要求と不良の対応、誤検出/見逃し、別設計の受理を確認します。holdoutと固定後確認は調整に使う集合と分離します。Full ASKだけによる校正は選択バイアスを持ちます。現在の各問1回P試行は初回観測にとどまり、安定難度や条件の優劣を証明しません。

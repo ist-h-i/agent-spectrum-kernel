@@ -1,0 +1,7 @@
+{
+  "name": "ceiling-ch05-stream-window-revisions",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "24.21.0" },
+  "scripts": { "test": "node --test", "measure": "node --expose-gc harness/measure.mjs" }
+}

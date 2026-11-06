@@ -1,0 +1,7 @@
+{
+  "name": "ceiling-ch06-incremental-build-generations",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "24.21.0" },
+  "scripts": { "test": "node --test" }
+}

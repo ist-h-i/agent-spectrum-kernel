@@ -1,0 +1,84 @@
+{
+  "version": "ceiling-scenario-v1",
+  "modules": {
+    "harness/policy-store.mjs": {
+      "construct": {
+        "PolicyStore": "store",
+        "ChunkAdapter": "chunks"
+      },
+      "invoke": {}
+    },
+    "harness/clients.mjs": {
+      "construct": {},
+      "invoke": {
+        "documentClient": "documentClient"
+      }
+    },
+    "src/service.mjs": {
+      "construct": {
+        "DocumentService": "documents"
+      },
+      "invoke": {}
+    }
+  },
+  "calls": {
+    "store": {
+      "revision": "json",
+      "snapshot": "json",
+      "replace": "json",
+      "subscribe": "unsubscribe",
+      "deliver": "json"
+    },
+    "chunks": {
+      "beforeAccept": "json",
+      "loseNextReply": "json",
+      "beginChunk": "json",
+      "finish": "json"
+    },
+    "documents": {
+      "decide": "json",
+      "list": "json",
+      "detail": "json",
+      "requestExport": "json",
+      "runChunk": "json",
+      "cancelExport": "json",
+      "exportStatus": "json",
+      "close": "json"
+    },
+    "documentClient": {
+      "list": "json",
+      "detail": "json",
+      "export": "json",
+      "next": "json",
+      "cancel": "json",
+      "status": "json"
+    }
+  },
+  "get": {
+    "store": [],
+    "chunks": [
+      "accepted",
+      "completed"
+    ],
+    "documents": [],
+    "documentClient": []
+  },
+  "functionKinds": [
+    "unsubscribe"
+  ],
+  "references": {
+    "construct:harness/policy-store.mjs:ChunkAdapter": {
+      "/0": "store"
+    },
+    "construct:src/service.mjs:DocumentService": {
+      "/0": "store",
+      "/1": "chunks"
+    },
+    "invoke:harness/clients.mjs:documentClient": {
+      "/0": "documents"
+    }
+  },
+  "datasets": [
+    "data/policies.json"
+  ]
+}

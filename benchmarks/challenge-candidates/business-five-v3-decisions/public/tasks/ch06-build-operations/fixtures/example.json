@@ -1,0 +1,292 @@
+{
+  "clock": "2026-11-01T10:00:00Z",
+  "actors": [
+    {
+      "id": "developer-north",
+      "tenant": "north",
+      "role": "developer"
+    },
+    {
+      "id": "operator-north",
+      "tenant": "north",
+      "role": "operator"
+    },
+    {
+      "id": "auditor-north",
+      "tenant": "north",
+      "role": "auditor"
+    },
+    {
+      "id": "developer-south",
+      "tenant": "south",
+      "role": "developer"
+    },
+    {
+      "id": "operator-south",
+      "tenant": "south",
+      "role": "operator"
+    },
+    {
+      "id": "auditor-south",
+      "tenant": "south",
+      "role": "auditor"
+    },
+    {
+      "id": "releaseApprover-north",
+      "tenant": "north",
+      "role": "releaseApprover"
+    },
+    {
+      "id": "releaseApprover-south",
+      "tenant": "south",
+      "role": "releaseApprover"
+    },
+    {
+      "id": "businessOperator-north",
+      "tenant": "north",
+      "role": "businessOperator"
+    },
+    {
+      "id": "businessOperator-south",
+      "tenant": "south",
+      "role": "businessOperator"
+    }
+  ],
+  "grants": [
+    {
+      "actor": "developer-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "build",
+        "cancelOwn",
+        "proposeRelease",
+        "readChannel",
+        "readRelease"
+      ]
+    },
+    {
+      "actor": "operator-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "cancel",
+        "setConcurrency",
+        "publishRelease",
+        "setChannelRequirements",
+        "readChannel",
+        "readRelease"
+      ]
+    },
+    {
+      "actor": "auditor-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "audit",
+        "readChannel",
+        "readRelease",
+        "auditRelease"
+      ]
+    },
+    {
+      "actor": "developer-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "build",
+        "cancelOwn",
+        "proposeRelease",
+        "readChannel",
+        "readRelease"
+      ]
+    },
+    {
+      "actor": "operator-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "cancel",
+        "setConcurrency",
+        "publishRelease",
+        "setChannelRequirements",
+        "readChannel",
+        "readRelease"
+      ]
+    },
+    {
+      "actor": "auditor-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "audit",
+        "readChannel",
+        "readRelease",
+        "auditRelease"
+      ]
+    },
+    {
+      "actor": "releaseApprover-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "approveRelease",
+        "readChannel",
+        "readRelease",
+        "auditRelease"
+      ]
+    },
+    {
+      "actor": "releaseApprover-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "approveRelease",
+        "readChannel",
+        "readRelease",
+        "auditRelease"
+      ]
+    },
+    {
+      "actor": "businessOperator-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "proposeRelease",
+        "publishRelease",
+        "setChannelRequirements",
+        "readChannel",
+        "readRelease",
+        "auditRelease"
+      ]
+    },
+    {
+      "actor": "businessOperator-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "proposeRelease",
+        "publishRelease",
+        "setChannelRequirements",
+        "readChannel",
+        "readRelease",
+        "auditRelease"
+      ]
+    }
+  ],
+  "data": {
+    "projects": [
+      {
+        "id": "north",
+        "sources": {
+          "lib": {
+            "version": "src-v1-lib",
+            "text": "value"
+          },
+          "app": {
+            "version": "src-v1-app",
+            "text": "import lib"
+          }
+        },
+        "targets": [
+          "app"
+        ],
+        "sourceVersion": "src-v1",
+        "config": {
+          "mode": "debug"
+        },
+        "tenant": "north"
+      },
+      {
+        "id": "south",
+        "sources": {
+          "app": {
+            "version": "src-v2-app",
+            "text": "standalone"
+          }
+        },
+        "targets": [
+          "app"
+        ],
+        "sourceVersion": "src-v2",
+        "config": {
+          "mode": "release"
+        },
+        "tenant": "south"
+      },
+      {
+        "id": "north-shared",
+        "sources": {
+          "lib": {
+            "version": "src-v1-lib",
+            "text": "value"
+          },
+          "app": {
+            "version": "src-v1-app",
+            "text": "import lib"
+          }
+        },
+        "targets": [
+          "app"
+        ],
+        "sourceVersion": "src-v1-shared",
+        "config": {
+          "mode": "debug"
+        },
+        "tenant": "north"
+      }
+    ],
+    "requests": [],
+    "published": [],
+    "defaultProject": "north",
+    "initialConcurrency": 2,
+    "compilerExamples": [
+      {
+        "project": "north",
+        "sourceId": "app",
+        "sourceVersion": "src-v1-app",
+        "config": {
+          "mode": "debug"
+        },
+        "dependencies": {},
+        "reply": {
+          "needed": [
+            "lib"
+          ]
+        }
+      },
+      {
+        "project": "north",
+        "sourceId": "lib",
+        "sourceVersion": "src-v1-lib",
+        "config": {
+          "mode": "debug"
+        },
+        "dependencies": {},
+        "reply": {
+          "artifact": {
+            "opaque": "compiled-lib-v1"
+          }
+        }
+      }
+    ],
+    "channels": [
+      {
+        "id": "staging-north",
+        "tenant": "north",
+        "version": "channel-initial-north",
+        "requiredTags": [],
+        "releaseId": null
+      },
+      {
+        "id": "staging-south",
+        "tenant": "south",
+        "version": "channel-initial-south",
+        "requiredTags": [],
+        "releaseId": null
+      }
+    ],
+    "releasePlans": [],
+    "releases": []
+  }
+}

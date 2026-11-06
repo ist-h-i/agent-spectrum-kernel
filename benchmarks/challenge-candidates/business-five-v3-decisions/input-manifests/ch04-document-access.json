@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "version": "business-five-20261106-decisions1",
+  "task_id": "ch04-document-access",
+  "modes": {
+    "one_shot": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03",
+          "bytes": 5509
+        },
+        {
+          "path": "public/tasks/ch04-document-access/TASK.md",
+          "sha256": "f67b8ab7629504d393b7224c5e4c64dcfcdcd7e3daf0397958a5d6ea59a44d68",
+          "bytes": 1583
+        },
+        {
+          "path": "public/tasks/ch04-document-access/acceptance.md",
+          "sha256": "7139d5a07cc57c1c4dc49ea415c8ab42e1541f9ac0e393f86545500481f45593",
+          "bytes": 1478
+        },
+        {
+          "path": "public/tasks/ch04-document-access/business-decisions.md",
+          "sha256": "6165d181e2768c6ee160958078d0be7eb41e54fa6d1c70463f1f6ffc5cba1f34",
+          "bytes": 4023
+        },
+        {
+          "path": "public/tasks/ch04-document-access/contract.md",
+          "sha256": "6da889ee992d6c111a9a5f083e0efe67ba49983ad3cfb48ecc88abef1227270d",
+          "bytes": 3535
+        },
+        {
+          "path": "public/tasks/ch04-document-access/fixture-format.md",
+          "sha256": "8a539f231a51a3eab0a0e25f4c06606e46e6b289f936e3a324ba9b409b655c14",
+          "bytes": 2019
+        },
+        {
+          "path": "public/tasks/ch04-document-access/fixtures/example.json",
+          "sha256": "d3d2a2b6533c810cebd5a7cd4e7746a0df52ad7e870af1a22f16fd89f39f62e9",
+          "bytes": 5553
+        },
+        {
+          "path": "public/tasks/ch04-document-access/nonfunctional.md",
+          "sha256": "ad51ce94141b334e54439126065d0d1d71417206e016a55972f2500911805ebc",
+          "bytes": 618
+        },
+        {
+          "path": "public/tasks/ch04-document-access/prompt.txt",
+          "sha256": "38c96737f9c4164bfbfaf479cd9d85738e82b529cba1425f0f32d5f857f3a761",
+          "bytes": 852
+        },
+        {
+          "path": "public/tasks/ch04-document-access/roles.md",
+          "sha256": "bf7dc3ab85dd3bc6a61735641001c84bffc9f46be7d39de5163e8cd7ab762bbe",
+          "bytes": 2455
+        },
+        {
+          "path": "public/tasks/ch04-document-access/workflows.md",
+          "sha256": "07d60a9f04a0678512972ff089cdf8bc80b4cec34737860b592732fb6fafe7e5",
+          "bytes": 3712
+        }
+      ],
+      "inventory_sha256": "ffdf4eea42993de4b490ec176ebe25750c5b10b2eee9c5a2ee6a46acba800f18"
+    },
+    "goal_with_pr": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03",
+          "bytes": 5509
+        },
+        {
+          "path": "public/tasks/ch04-document-access/TASK.md",
+          "sha256": "f67b8ab7629504d393b7224c5e4c64dcfcdcd7e3daf0397958a5d6ea59a44d68",
+          "bytes": 1583
+        },
+        {
+          "path": "public/tasks/ch04-document-access/acceptance.md",
+          "sha256": "7139d5a07cc57c1c4dc49ea415c8ab42e1541f9ac0e393f86545500481f45593",
+          "bytes": 1478
+        },
+        {
+          "path": "public/tasks/ch04-document-access/business-decisions.md",
+          "sha256": "6165d181e2768c6ee160958078d0be7eb41e54fa6d1c70463f1f6ffc5cba1f34",
+          "bytes": 4023
+        },
+        {
+          "path": "public/tasks/ch04-document-access/contract.md",
+          "sha256": "6da889ee992d6c111a9a5f083e0efe67ba49983ad3cfb48ecc88abef1227270d",
+          "bytes": 3535
+        },
+        {
+          "path": "public/tasks/ch04-document-access/fixture-format.md",
+          "sha256": "8a539f231a51a3eab0a0e25f4c06606e46e6b289f936e3a324ba9b409b655c14",
+          "bytes": 2019
+        },
+        {
+          "path": "public/tasks/ch04-document-access/fixtures/example.json",
+          "sha256": "d3d2a2b6533c810cebd5a7cd4e7746a0df52ad7e870af1a22f16fd89f39f62e9",
+          "bytes": 5553
+        },
+        {
+          "path": "public/tasks/ch04-document-access/goal-pr.txt",
+          "sha256": "b976be84a4cf26f1beb324a10297fa6c202ec643631d575d5e5422add354fbb0",
+          "bytes": 858
+        },
+        {
+          "path": "public/tasks/ch04-document-access/nonfunctional.md",
+          "sha256": "ad51ce94141b334e54439126065d0d1d71417206e016a55972f2500911805ebc",
+          "bytes": 618
+        },
+        {
+          "path": "public/tasks/ch04-document-access/roles.md",
+          "sha256": "bf7dc3ab85dd3bc6a61735641001c84bffc9f46be7d39de5163e8cd7ab762bbe",
+          "bytes": 2455
+        },
+        {
+          "path": "public/tasks/ch04-document-access/workflows.md",
+          "sha256": "07d60a9f04a0678512972ff089cdf8bc80b4cec34737860b592732fb6fafe7e5",
+          "bytes": 3712
+        }
+      ],
+      "inventory_sha256": "b1ad8ad2fe4133010ba9c0c9b240b69c73f1e4eed1750b67baf2f9074f522e70"
+    }
+  },
+  "working_directory": "public/tasks/ch04-document-access"
+}

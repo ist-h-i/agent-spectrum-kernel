@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "version": "business-five-20261105-draft1",
+  "package": "business-five-v1",
+  "task_count": 5,
+  "task_type": "business_application_implementation",
+  "existing_tasks_modified": false,
+  "distribution_state": "public_specification_draft",
+  "ready_for_measurement": false,
+  "difficulty_calibrated": false,
+  "model_trials": 0,
+  "private_assessment_included": false,
+  "tasks": [
+    {
+      "id": "ch02-report-operations",
+      "title": "帳票の配信・取消・復旧を行う業務アプリ",
+      "primary_axis": "durable_compatibility_recovery",
+      "task_type": "business_application_implementation",
+      "legacy_domain_ref": "ch02",
+      "delivery_modes": [
+        "one_shot",
+        "goal_with_pr"
+      ],
+      "requirements": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C06",
+        "J01",
+        "J02",
+        "J03",
+        "J04",
+        "J05",
+        "J06",
+        "J07",
+        "J08"
+      ],
+      "task_path": "public/tasks/ch02-report-operations/TASK.md",
+      "roles_path": "public/tasks/ch02-report-operations/roles.md",
+      "one_shot_prompt": "public/tasks/ch02-report-operations/prompt.txt",
+      "goal_with_pr_prompt": "public/tasks/ch02-report-operations/goal-pr.txt",
+      "input_manifest": "input-manifests/ch02-report-operations.json"
+    },
+    {
+      "id": "ch03-price-rollout",
+      "title": "店舗価格カタログの移行・切替・差戻しアプリ",
+      "primary_axis": "live_migration_rollback",
+      "task_type": "business_application_implementation",
+      "legacy_domain_ref": "ch03",
+      "delivery_modes": [
+        "one_shot",
+        "goal_with_pr"
+      ],
+      "requirements": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C06",
+        "M01",
+        "M02",
+        "M03",
+        "M04",
+        "M05",
+        "M06",
+        "M07",
+        "M08"
+      ],
+      "task_path": "public/tasks/ch03-price-rollout/TASK.md",
+      "roles_path": "public/tasks/ch03-price-rollout/roles.md",
+      "one_shot_prompt": "public/tasks/ch03-price-rollout/prompt.txt",
+      "goal_with_pr_prompt": "public/tasks/ch03-price-rollout/goal-pr.txt",
+      "input_manifest": "input-manifests/ch03-price-rollout.json"
+    },
+    {
+      "id": "ch04-document-access",
+      "title": "委譲権限のある文書閲覧・配信アプリ",
+      "primary_axis": "authorization_lifetime",
+      "task_type": "business_application_implementation",
+      "legacy_domain_ref": "ch04",
+      "delivery_modes": [
+        "one_shot",
+        "goal_with_pr"
+      ],
+      "requirements": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C06",
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "A07",
+        "A08"
+      ],
+      "task_path": "public/tasks/ch04-document-access/TASK.md",
+      "roles_path": "public/tasks/ch04-document-access/roles.md",
+      "one_shot_prompt": "public/tasks/ch04-document-access/prompt.txt",
+      "goal_with_pr_prompt": "public/tasks/ch04-document-access/goal-pr.txt",
+      "input_manifest": "input-manifests/ch04-document-access.json"
+    },
+    {
+      "id": "ch05-sales-reconciliation",
+      "title": "訂正売上の照合・締め・再接続アプリ",
+      "primary_axis": "stream_reconciliation_space",
+      "task_type": "business_application_implementation",
+      "legacy_domain_ref": "ch05",
+      "delivery_modes": [
+        "one_shot",
+        "goal_with_pr"
+      ],
+      "requirements": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C06",
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08"
+      ],
+      "task_path": "public/tasks/ch05-sales-reconciliation/TASK.md",
+      "roles_path": "public/tasks/ch05-sales-reconciliation/roles.md",
+      "one_shot_prompt": "public/tasks/ch05-sales-reconciliation/prompt.txt",
+      "goal_with_pr_prompt": "public/tasks/ch05-sales-reconciliation/goal-pr.txt",
+      "input_manifest": "input-manifests/ch05-sales-reconciliation.json"
+    },
+    {
+      "id": "ch06-build-operations",
+      "title": "複数プロジェクトのビルド・成果物公開アプリ",
+      "primary_axis": "build_release_dependencies",
+      "task_type": "business_application_implementation",
+      "legacy_domain_ref": "ch06",
+      "delivery_modes": [
+        "one_shot",
+        "goal_with_pr"
+      ],
+      "requirements": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C06",
+        "B01",
+        "B02",
+        "B03",
+        "B04",
+        "B05",
+        "B06",
+        "B07",
+        "B08"
+      ],
+      "task_path": "public/tasks/ch06-build-operations/TASK.md",
+      "roles_path": "public/tasks/ch06-build-operations/roles.md",
+      "one_shot_prompt": "public/tasks/ch06-build-operations/prompt.txt",
+      "goal_with_pr_prompt": "public/tasks/ch06-build-operations/goal-pr.txt",
+      "input_manifest": "input-manifests/ch06-build-operations.json"
+    }
+  ]
+}

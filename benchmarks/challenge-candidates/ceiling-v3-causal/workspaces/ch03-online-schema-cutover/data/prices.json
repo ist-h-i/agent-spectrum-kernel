@@ -1,0 +1,12 @@
+[
+  {
+    "tenant": "shop",
+    "id": "tea",
+    "revision": 1,
+    "v1": {
+      "price": "12.50",
+      "currency": "USD"
+    },
+    "v2": null
+  }
+]

@@ -1,0 +1,1 @@
+{"name":"ceiling-ch04","version":"1.0.0","private":true,"type":"module","engines":{"node":"24.21.0"},"scripts":{"test":"node --test"}}

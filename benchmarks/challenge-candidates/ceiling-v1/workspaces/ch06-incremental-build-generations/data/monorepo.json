@@ -1,0 +1,9 @@
+{
+  "generation": 1,
+  "compilerVersion": "local-compiler-1",
+  "config": { "target": "portable", "optimize": false },
+  "files": {
+    "apps/admin": { "text": "admin entry", "imports": [], "discover": [], "globs": [] },
+    "apps/shop": { "text": "shop entry", "imports": [], "discover": [], "globs": [] }
+  }
+}
