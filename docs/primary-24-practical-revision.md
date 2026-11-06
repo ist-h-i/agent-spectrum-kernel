@@ -107,7 +107,10 @@ larger application to equalize file formats.
 
 ## Host preparation and frozen grading source
 
-The current host descriptors pin the reviewed task and raw metadata bytes for
+The next two paragraphs record the initial preparation boundary. The integration
+update below identifies the later frozen grading checkout.
+
+The initial host descriptors pinned the reviewed task and raw metadata bytes for
 all 24 revised inputs. Retained-event authorization observations also pin the
 reviewed task and verification-contract versions for the seven scoped fixtures;
 they classify local fictional work and grant no execution permission. Task
@@ -116,7 +119,7 @@ the principles renderer remain unchanged. The original exact
 lookup bytes are retained with their historical Git source, not silently reused
 against revised task bytes.
 
-Keep the pending grading runtime in a separate checkout at
+The initial pending grading runtime was retained in a separate checkout at
 `b0e3e99829255106a74d8516d58179886df7ee8e` (tree
 `c557de7a0a0a0f72ed7fa159a9fd78f644ddba3e`). It contains the revised 241 model
 input files and closed v1 metadata, with runtime sources pinned to
@@ -127,8 +130,9 @@ for that evaluator runtime after its preparation descriptors change.
 Do not regenerate the private chain merely to follow host descriptor pins:
 the descriptor's metadata hash and the evaluator graph's module hash would form
 a dependency cycle. Keep exact drift rejection and immutable source checks.
-This separation reuses an existing API; it does not establish resource admission,
-formal runtime qualification or a completed measurement.
+This separation reuses an existing API; it does not itself establish resource
+admission or formal runtime qualification. The later practical measurement is
+recorded below and does not change those authority limits.
 
 ## Verification contract
 
@@ -151,7 +155,13 @@ Passing public validators proves only their declared scope. Missing native
 qualification, semantic grading authority, official usage or terminal evidence
 remains missing; it is not a zero score, successful run or model defect.
 
-## Measurement plan
+## Measurement plan and executed series
+
+### Original plan and superseded child policy
+
+The following records the original planning requirements. The completed
+`normal24-v2` series below used a later execution policy; the original
+child-disabled policy is not a description of those 48 trials.
 
 The practical measurement plan is 24 canonical tasks × two actual conditions
 (`ASK off`, `ASK full`) × one fresh implementation trial: **48 trials**. Use
@@ -160,15 +170,13 @@ automatic retry or hidden replacement. This is one observation per condition,
 not a replicated estimate of ASK's general effect. The optional goal-pr delivery
 mode is not an additional set of trials.
 
-The native-runner plan retains ephemeral sessions and disables both
-agent features in both arms, using one root Terra low session per trial and no
-nested model or reviewer sessions. This differs from earlier agent-enabled
-trials. It measures ASK under that shared constraint; ASK's independent-review
-workflow is not measured, and self-review does not satisfy an independent review
-requirement. The user's continuation instruction authorizes preparation and
-execution of this comparison. Effective isolation and the final installed ASK
-identity still require verification before dispatch; authorization is not
-environment qualification.
+The initial native-runner plan proposed ephemeral sessions with both agent
+features disabled in both arms: one root Terra low session per trial and no
+nested model or reviewer sessions. That policy was superseded for the completed
+comparison. The older 15 ephemeral/declared-child-disabled trials remain a
+separate historical series and are excluded from the reported 48. Self-review
+does not satisfy an independent-review requirement, and execution authorization
+does not establish environment qualification.
 
 Before the first trial, freeze the revised public-input version and per-file
 hashes, common prompt, exact ASK installation revision/inventory, CLI and runner
@@ -194,20 +202,57 @@ admission or a comparable historical primary score. The final plan must identify
 the actual supported execution route and remaining grading limitations before
 any model dispatch.
 
+### Completed practical measurement (2026-11-05)
+
+The clean `normal24-v2-terra-low` series completed **48/48 root CLI trials**:
+24 tasks, once with ASK off and once with ASK full, requested as
+`gpt-6.1-terra` / `low`, in fixed off-before-on order. The model-facing source
+was frozen at `f71286a1369c4c36aca01116c2e36465cf5d9995`. Later integration
+repairs through `303d242dcde51e494ea81ec7b806bdf731146474` did not change those
+model inputs. The later pending grading runtime is the separate frozen checkout
+at `8d589ceebef5777494c0ef0eb655d9e00d7f618b`; this supersedes the initial
+`b0e3e998` preparation reference above, without granting formal admission. The root CLI intervals did not overlap, all 48 exited zero, and
+all 48 retained-work archives and receipts were hash-verified. CLI exit zero
+is execution evidence, not proof that every task outcome was met.
+
+The actual route used persistent sessions and normal child-agent behavior.
+Child use, history inheritance, child model and reasoning effort were left to
+the model; parent-child matching was not forced. The recorded stable feature
+settings were `multi_agent=true`, `multi_agent_v2=false`, with neither overridden.
+Both conditions shared prompt, CLI settings, permissions and public inputs;
+the fixed ASK assets were the intended difference. Sixteen child records were
+observed (eight per arm): 15 normal terminals and one interruption, with observed
+Terra/low settings. Observed records do not establish complete child coverage or
+that every requested independent review occurred.
+
+The CLI window was 2026-11-05 11:58:15–13:30:59 UTC. Two operator-only process
+classifier stops were repaired and reviewed, and already-started trials were
+adopted once. No automatic model retry or time cutoff was used. The initial
+environment-affected pair and the older 15 trials are retained separately and
+excluded. Sol remains on hold.
+
+The [completed measurement and integration inventory](primary-24-practical-review.md#completed-measurement-and-integration-2026-11-06)
+records observed duration and root usage, reference content judgments, mandatory
+verification gaps and evidence locations. Four answers retain partial assessments;
+formal scores and full parent/child token totals and costs remain null. One
+fixed-order observation per condition does not establish ASK's causal effect.
+The practical results do not establish formal primary admission.
+
 ## Completion and human review
 
-The implementation record will link the exact changed files, executed checks,
-per-task deltas, trial records, unavailable evidence and independent reviews.
-Prepare a separate draft PR from the ceiling work. Keep it unmerged until the
-user has reviewed the actual changes and measurement results and explicitly
-approved the merge. After approval, recheck the remote base/head, required tests,
-CI and final-head review before the normal merge.
+All 24 public tasks are revised and the 241 distributed model input files are
+prepared and reverified. Pending authority metadata was refreshed with the
+existing writers; static compatibility and practical execution are separate
+from formal grading admission. See the [per-task change and evidence inventory](primary-24-practical-review.md).
 
-Current state: all 24 public tasks are revised and the 241 distributed model
-input files are prepared and reverified. Pending authority metadata has been
-refreshed using the existing writers, with static compatibility verified for all
-24 tasks. See the [per-task change and evidence inventory](primary-24-practical-review.md).
-No implementation model trial has started. The proposed 48-trial practical
-execution method, effective isolation, final installed ASK identity, full CI and
-measured results remain unverified or pending. This work does not establish
-formal primary admission or authorize merging before the user reviews results.
+At integration head `303d242dcde51e494ea81ec7b806bdf731146474`, all four CI
+workflows completed successfully. Those historical results do not certify a
+later documentation commit; final-head CI and independent review must be checked
+again before merging [PR #451](https://github.com/ist-h-i/agent-spectrum-kernel/pull/451).
+
+The original plan required explicit approval after result review. On 2026-11-06
+the user requested independent review and merge. That authorization covers the
+normal merge after findings are resolved and the remote base/head, required
+checks and final-head review are verified; it does not turn the remaining
+measurement unknowns into confirmed results. This update does not claim that
+merge or final-head review has completed.
