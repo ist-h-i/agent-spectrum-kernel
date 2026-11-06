@@ -49,6 +49,8 @@ ASKは、共通の判断原則、必要時に使う工程、プロジェクト�
 
 [Evolutionの契約](docs/evolution-loop-contract.md) は候補・比較・判断・適用の責任を分けます。現在の [個人改善CLI](docs/personal-evolution-cli.md) は **Promptを対象とする入口**で、事前の管理設定後に問題要約、候補生成、ソース確認、保存比較、評価確認、人の判断をつなぎます。任意のSkillを自律的に改善したり、Macへ自動適用したりする機能ではありません。実モデルの生成・比較を始めるには本人の直接承認が必要です。公開の合成試験と [保存済み一巡の説明](docs/demos/personal-loop-saved-demo-ja.md) は区別して確認します。保存runの処理完了は、品質改善や反復運用の受入を示しません。
 
+別の [人間の判断を挟む環境改善ループ](docs/supervised-instruction-loop.md) は、選択済みSkillの生成、環境比較、採否、版管理を接続します。[継続・持ち運び・構成の操作](docs/instruction-improvement-continuity.md) には、業務の公開フィードバック、次サイクルの準備、Skill/Promptの追加・変更・除外の候補作成、承認された個別アセットのローカルexport/import、共通・専門チーム・アプリ・個人の版固定を用意しています。importは受け入れ先の未評価候補を作り、採用やネットワーク転送は行いません。Claude向けの候補受け渡しも準備できますが、認証済み環境での一巡と実利用先への適用・復元は別途確認が必要です。
+
 ## Kernel・Skills・プロジェクト固有設定
 
 | 層 | 役割 | 正本・入口 |

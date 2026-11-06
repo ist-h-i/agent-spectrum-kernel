@@ -17,11 +17,14 @@ export function resolveInstructionComponents(options) {
   assert.ok(Array.isArray(options.components) && options.components.length && options.components.length <= 256, 'bounded nonempty components required');
   const components = structuredClone(options.components).sort((a, b) => sorted(a.asset.stable_id, b.asset.stable_id));
   const ids = new Set(), targets = new Set(), files = [];
+  const restrictions={classifications:[],constraint_refs:[],requested_permissions:[],possible_effects:[]};
   for (const component of components) {
     assert.deepEqual(Object.keys(component).sort(), ['asset', 'files']);
     const asset = registry.assets.find(a => same(ref(a), component.asset));
     assert.ok(asset && ['skill', 'prompt'].includes(asset.asset_type), 'component must be a registered instruction Asset');
     assert.notEqual(asset.record.type_extension.renderer?.id, ENVIRONMENT_COMPILER, 'nested environment composition is not supported');
+    for(const k of ['classifications','constraint_refs'])restrictions[k].push(...asset.record.safety[k]);
+    for(const k of ['requested_permissions','possible_effects'])restrictions[k].push(...asset.record.permissions_and_effects[k]);
     assert.ok(!ids.has(asset.stable_id), 'duplicate component stable ID'); ids.add(asset.stable_id);
     const adapter = asset.record.type_extension.adapter;
     assert.ok(!adapter || ['shared', options.adapter].includes(adapter), 'component adapter mismatch');
@@ -36,16 +39,20 @@ export function resolveInstructionComponents(options) {
   }
   files.sort((a, b) => sorted(a.path, b.path));
   assert.ok(files.length <= 256 && !files.some(a => files.some(b => b.path.startsWith(a.path + '/'))), 'compiled instruction inventory exceeds package bounds or collides');
-  return { components, files };
+  for(const k of Object.keys(restrictions))restrictions[k]=[...new Set(restrictions[k])].sort(sorted);
+  return { components, files, restrictions };
 }
 export function registerInstructionEnvironmentBundle(options) {
-  const { components, files } = resolveInstructionComponents(options);
+  const { components, files, restrictions } = resolveInstructionComponents(options);
   const input = { schema_version: '1.0.0', object_kind: 'instruction_environment_components', adapter: options.adapter, components };
   const inputDigest = putContentAddressedJson({ storeRoot: options.storeRoot, artifact: input }).digest;
   const descriptor = structuredClone(options.descriptor);
   assert.equal(descriptor.asset_type, 'prompt', 'environment lineage uses an actual rendered Prompt bundle');
-  // Metadata/authority declarations remain caller-owned. Compilation never
-  // promotes safety, effectiveness, lifecycle state or source authenticity.
+  // Caller declarations may add restrictions, but a bundle cannot conceal a
+  // component's known high-impact classification, constraints or effects.
+  // This union grants no safety/effectiveness/activation authority.
+  for(const k of ['classifications','constraint_refs'])descriptor.safety[k]=[...new Set([...descriptor.safety[k],...restrictions[k]])].sort(sorted);
+  for(const k of ['requested_permissions','possible_effects'])descriptor.permissions_and_effects[k]=[...new Set([...descriptor.permissions_and_effects[k],...restrictions[k]])].sort(sorted);
   descriptor.dependencies = components.map(c => c.asset);
   descriptor.content = { package_format: 'canonical_json_base64_files', files: files.map(f => ({ path: f.path, media_type: f.media_type, raw_digest: f.raw_digest })) };
   descriptor.type_extension = { kind: 'rendered_prompt_bundle', adapter: options.adapter, entrypoints: files.map(f => f.path),

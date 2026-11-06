@@ -16,18 +16,22 @@ import {transitionInstructionLoopAssets} from './instruction-loop-assets.mjs';
 import {verifyRetainedInstructionLayout} from './retained-instruction-layout.mjs';
 import {verifyAssetRegistry} from './asset-registry.mjs';
 import {bindMeasuredNormalOwnerSource} from './instruction-loop-source-binding.mjs';
+import {projectInstructionLoopObservation} from './instruction-loop-feedback.mjs';
 const pause=()=>new Promise(r=>setTimeout(r,500));
 const checked=r=>{assert.equal(hash(readStableBytes(r.path,'pinned native host input',16*1024*1024)),r.digest,'native host input drift');return readJsonFileStrict(r.path);};
 const save=(path,artifact)=>writeCanonicalJsonNoReplace({outputPath:path,artifact,label:'native loop stage result',maximumBytes:16*1024*1024});
 const preparedPath=p=>join(p.stateRoot,'native-selection.json');
 function publication(path,result){if(existsSync(path)){assert.equal(canonicalDigest(readJsonFileStrict(path)),canonicalDigest(result),'terminal result conflict');return;}save(path,result);}
 function sourceInputs(p){
-  assert.equal(p.kind,'full_native_reference_loop_profile_v1');
-  assert.equal(p.generator.storeRoot,p.storeRoot);assert.equal(p.native.protectedRoot,p.protectedRoot);
-  for(const path of [p.stateRoot,p.protectedRoot,p.generator.candidateRoot,p.generator.fullRoot,p.generator.stagingRoot,...(p.normal.target===null?[]:[p.normal.target]),p.native.root,p.native.workRoot]){
+  assert.ok(['full_native_reference_loop_profile_v1','full_practical_instruction_loop_profile_v1'].includes(p.kind));
+  assert.equal(p.generator.storeRoot,p.storeRoot);
+  if(p.kind==='full_native_reference_loop_profile_v1')assert.equal(p.native.protectedRoot,p.protectedRoot);
+  for(const path of [p.stateRoot,p.protectedRoot,p.generator.candidateRoot,p.generator.fullRoot,p.generator.stagingRoot,...(p.normal.target===null?[]:[p.normal.target]),
+    ...(p.kind==='full_native_reference_loop_profile_v1'?[p.native.root,p.native.workRoot]:[p.practical.root])]){
     assert.equal(resolve(path),path,'absolute native host path required');assertNoSymlinkPathSegments(path,'native host path',{allowMissingLeaf:true});
   }
   assert.ok(p.stateRoot.startsWith(p.protectedRoot+'/')&&p.generator.candidateRoot.startsWith(p.protectedRoot+'/'),'operator inputs must remain under the protected root');
+  if(p.kind==='full_practical_instruction_loop_profile_v1')return;
   if(p.native.executionKind==='model_free_fixture'){
     const fixture=join(import.meta.dirname,'fixtures/instruction-loop/fake-codex.py');
     assert.equal(hash(readStableBytes(p.native.fixtureExecutable,'pinned fixture executable')),p.native.fixtureExecutableDigest,'fixture executable drift');
@@ -47,11 +51,13 @@ async function readTrial(p,job,recovered=false){
 export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthorized=false}={}){
   sourceInputs(p);mkdirSync(p.stateRoot,{recursive:true,mode:0o700});
   if(job.kind==='generate'){
+    assert.equal(canonicalDigest(job.input.observation),canonicalDigest(p.policy.observation),'controller observation differs from pinned profile');
+    projectInstructionLoopObservation(job.input.observation);
     let provider;
     if(p.generator.provider.kind==='fixture')provider=async()=>({response:checked(p.generator.provider.response),execution:{kind:'model_free_fixture',model_calls:0}});
     else {assert.equal(p.generator.provider.kind,'codex');assert.equal(modelCallsAuthorized,true,'Full generation model call not authorized');
       provider=input=>codexFullInstructionProvider({...p.generator.provider,modelCallsAuthorized},input);}
-    const generated=await generateFullInstructionCandidate(p.generator,provider);
+    const generated=await generateFullInstructionCandidate({...p.generator,observation:job.input.observation},provider);
     // Archive the private, independently owned version before it can be
     // retired/deleted. Original repositories and immutable trial logs are not
     // cleanup targets. This archive is local and is never sent externally.
@@ -66,7 +72,9 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
   if(job.kind==='register')return registerFullInstructionCandidate(p.generator,job.input.candidate);
   if(job.kind==='select'){
     const fairness=compareFullInstructionContext({baselineRoot:p.native.baselineFullRoot,candidateRoot:job.input.candidate.full_root,skills:p.generator.skills});
-    const selected=selectInstructionLoopCases({...p.selection,catalog:job.input.catalog});
+    const feedback=projectInstructionLoopObservation(job.input.observation);
+    const selected=selectInstructionLoopCases({...p.selection,catalog:job.input.catalog,
+      changedTags:[...new Set([...(p.selection.changedTags??[]),...feedback.tags])]});
     const fixedCriteria=checked(p.report.criteria);
     for(const id of selected.case_ids)assert.ok(fixedCriteria.some(f=>f.fixture_id===id&&Array.isArray(f.requirements)&&f.requirements.length>0),'selected case lacks its fixed reporting criteria');
     const template=checked({path:p.native.templateConfig,digest:p.native.templateConfigDigest});

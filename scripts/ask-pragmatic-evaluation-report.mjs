@@ -63,7 +63,9 @@ export function buildPragmaticEvaluationReport(notes) {
   assert.ok(["unknown", "observed", "not_observed"].includes(notes.global_context?.ask_presence), "global ASK presence must stay explicit");
   assert.ok(["unknown", "observed", "none_observed"].includes(notes.global_context?.change_status), "global change status must stay explicit");
   assert.ok(typeof notes.next_improvement === "string", "next_improvement must retain the operator's next action or undecided note");
-  const conditions = comparisonConditions(notes.kernel_condition);
+  const conditions = notes.condition_ids??comparisonConditions(notes.kernel_condition);
+  assert.ok(Array.isArray(conditions)&&conditions.length>=2&&conditions.length<=16&&new Set(conditions).size===conditions.length
+    &&conditions.every(id=>typeof id==='string'&&/^[A-Za-z0-9._-]{1,100}$/u.test(id)), 'bounded unique conditions required');
   const supplied = new Map();
   for (const trial of notes.trials) {
     checkTrial(trial, notes.planned_blocks, conditions);
@@ -73,7 +75,8 @@ export function buildPragmaticEvaluationReport(notes) {
   }
   const blocks = notes.planned_blocks.map(block_id => {
     const trials = conditions.map(condition => supplied.get(JSON.stringify([block_id, condition])) ?? missingTrial(block_id, condition));
-    return { block_id, trials, contrasts: [contrast(trials[0], trials[1]), contrast(trials[1], trials[2]), contrast(trials[0], trials[2])] };
+    const pairs=conditions.length===3?[[0,1],[1,2],[0,2]]:trials.flatMap((_,i)=>trials.slice(i+1).map((_,j)=>[i,i+j+1]));
+    return { block_id, trials, contrasts: pairs.map(([i,j])=>contrast(trials[i],trials[j])) };
   });
   // Keep task/input/rubric strata separate; unknown identities never form a pool.
   const groups = new Map();
@@ -96,7 +99,7 @@ export function buildPragmaticEvaluationReport(notes) {
     })) }));
   return { kind: "ask_pragmatic_evaluation_report_v1", evidence_kind: notes.evidence_kind,
     supplied_notes: clone(notes), blocks, summaries,
-    plain_scope: "project-local ASK absent by design; global ASK is not excluded, whether observed or unknown",
+    plain_scope: notes.condition_ids?"Caller-declared conditions; global context and differences remain explicit.":"project-local ASK absent by design; global ASK is not excluded, whether observed or unknown",
     limitations: { global_ask_presence: notes.global_context.ask_presence, global_change_status: notes.global_context.change_status,
       environment_differences_are_not_automatic_stops: true, usage_unknown_is_not_zero: true,
       causal_effect_claim: false, generalized_product_value_claim: false, evaluator_verification_performed: false,

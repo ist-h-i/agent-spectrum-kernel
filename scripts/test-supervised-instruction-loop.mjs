@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join,resolve } from 'node:path';
 import {spawnSync} from 'node:child_process';
 import { canonicalDigest,putContentAddressedJson } from './content-addressed-store.mjs';
-import { advanceSupervisedInstructionLoop,inspectSupervisedInstructionLoop } from './supervised-instruction-loop.mjs';
+import { advanceSupervisedInstructionLoop,inspectSupervisedInstructionLoop,prepareNextSupervisedInstructionLoop } from './supervised-instruction-loop.mjs';
 import { createInstructionLoopCommandRuntime } from './instruction-loop-command-runtime.mjs';
 import { selectInstructionLoopCases } from './instruction-loop-case-selection.mjs';
 import { transitionInstructionLoopAssets } from './instruction-loop-assets.mjs';
@@ -37,6 +37,26 @@ function fixture(t){
   return {dir,calls,receipts,policy,runtime,run,root:join(dir,'run')};
 }
 const decision=(state,disposition='approved')=>({disposition,packet_digest:canonicalDigest(state.pending_gate),reason:'Synthetic owner decision, fixture only'});
+test('completed result feeds a fresh second cycle without inherited approvals or repeated trials',async t=>{
+  const f=fixture(t);f.policy.normal_target=null;let s=await f.run();
+  assert.throws(()=>prepareNextSupervisedInstructionLoop({root:f.root,nextPolicy:{...f.policy,id:'next'}}),/completed/);
+  s=await f.run({decision:decision(s)});s=await f.run({decision:decision(s,'rejected')});
+  const original=inspectSupervisedInstructionLoop(f.root);
+  const next=prepareNextSupervisedInstructionLoop({root:f.root,nextPolicy:{...f.policy,id:'next'}});
+  assert.equal(next.models_started,false);assert.equal(next.approval_carried_forward,false);
+  assert.equal(next.policy.observation.previous.outcome,'result_rejected_retained');
+  assert.equal(next.policy.observation.previous.unknown_quality,true);
+  assert.equal(next.policy.observation.previous.decisions[1].disposition,'rejected');
+  assert.deepEqual(inspectSupervisedInstructionLoop(f.root),original);
+  const run=extra=>advanceSupervisedInstructionLoop({root:join(f.dir,'next'),policy:next.policy,runtime:f.runtime,...extra});
+  let second=await run();assert.equal(second.status,'awaiting_evaluation_approval');
+  await assert.rejects(run({decision:decision(s)}),/different packet/);
+  second=await run({decision:decision(second)});assert.equal(second.status,'awaiting_result_review');
+  second=await run({decision:decision(second)});assert.equal(second.final.outcome,'result_approved_retained');
+  const trialIds=f.calls.filter(j=>j.kind==='trial').map(j=>j.input.row.id);
+  assert.equal(trialIds.length,16);assert.equal(new Set(trialIds).size,16);
+  assert.equal(f.calls.filter(j=>j.kind==='generate').at(-1).input.observation.previous.outcome,'result_rejected_retained');
+});
 test('automatic stages stop at exactly the two human judgments; approval applies, cleans and reports',async t=>{
   const f=fixture(t),a=await f.run();assert.equal(a.status,'awaiting_evaluation_approval');
   assert.deepEqual(f.calls.map(j=>j.kind),['generate','register','select']);

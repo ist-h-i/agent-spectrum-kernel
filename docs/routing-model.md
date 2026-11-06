@@ -228,6 +228,7 @@ For `daily`, ordinary implementation and review fixtures are available. Knowledg
 - Normal development tasks route to `delivery_quality` and then to `skill-router`.
 - First-time rollout tasks route to `adoption_bootstrap` and then to `project-adoption-pack-generation`.
 - One-task retrospective questions route to `observability_metrics` and then to `skill-effectiveness-evaluation`.
+- Explicit practical instruction-environment comparisons and their recovery use that Skill's practical Eval mode. Ordinary application tests remain delivery verification.
 - Multi-task adoption measurement routes to `observability_metrics` and then to `skill-adoption-metrics`.
 - Evidence-backed full-layer capability evaluation routes to `observability_metrics` and then to `engineering-capability-evaluation`.
 - Weekly/monthly report generation is an operation cadence, not a separate delivery skill.
