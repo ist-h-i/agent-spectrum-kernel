@@ -1,7 +1,7 @@
 // Entirely synthetic adoption/rollback fixture; never actual deployment authority.
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
-import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { canonicalDigest, readContentAddressedJson } from "./content-addressed-store.mjs";
@@ -11,18 +11,44 @@ import { buildEvolutionExperiment, publishEvolutionExperiment, deriveEvolutionRe
   applyApprovedEvolutionPortfolioAction, verifyEvolutionApplicationReceipt } from "./evolution-loop.mjs";
 import { publishPortfolioManifest, buildPortfolioAuthorityContext, applyPortfolioTransitions, resolvePortfolioSelection, computePortfolioSelectionBasisDigest } from "./portfolio-manager.mjs";
 import { freshCompactAdoptionSeed } from "./test-helpers-personal-compact-adoption.mjs";
+import { environmentFixture } from './test-helpers-instruction-environment.mjs';
+import { captureInstructionEnvironment } from './instruction-environment.mjs';
+import { buildEnvironmentEvolutionProjection } from './environment-evolution-binding.mjs';
 const repo=resolve(import.meta.dirname,".."),fixture=join(repo,"docs/fixtures/prompt-v2-preregistration");
 const reference=JSON.parse(readFileSync(join(fixture,"reference.json"))),adapter=reference.adapters[0];
 const read=(storeRoot,digest)=>readContentAddressedJson({storeRoot,digest}).value;
 const ref=p=>Object.fromEntries(["portfolio_id","revision","manifest_digest","asset_set_digest"].map(key=>[key,p[key]]));
-export function syntheticClosure(t, { renderedSeed = null, candidateAppendOnly = true } = {}) {
-  const root = mkdtempSync(join(tmpdir(), "personal-artificial-closure-")); t.after(() => rmSync(root, { recursive: true, force: true }));
+export function syntheticClosure(t, { renderedSeed = null, candidateAppendOnly = true, adapterTrack = 'codex', environmentProjection = false,
+  environmentSupportRoot = null, environmentSupportPaths = null, compositionSeed = null } = {}) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "personal-artificial-closure-"))); t.after(() => rmSync(root, { recursive: true, force: true }));
   const storeRoot = join(root, "store"); cpSync(join(fixture, "store"), storeRoot, { recursive: true });
-  const track = renderedSeed ? freshCompactAdoptionSeed({ root, storeRoot, renderedSeed, candidateAppendOnly, reference, adapter }) : adapter;
+  if (compositionSeed) cpSync(compositionSeed.storeRoot, storeRoot, { recursive: true });
+  const selectedAdapter = reference.adapters.find(a => a.adapter_track === adapterTrack);
+  const track = renderedSeed || compositionSeed ? freshCompactAdoptionSeed({ root, storeRoot, renderedSeed, candidateAppendOnly,
+    reference, adapter: selectedAdapter, registeredSeed: compositionSeed }) : selectedAdapter;
   const sampleRoot = join(repo, "docs/fixtures/evolution-loop"), sample = JSON.parse(readFileSync(join(sampleRoot, "reference.json")));
   const candidate = read(storeRoot, track.evolution.candidate_object_digest);
   const draft = structuredClone(read(storeRoot, track.evolution.experiment_object_digest));
   draft.recommendation_policy = read(join(sampleRoot, "store"), sample.artifacts.experiment.object_digest).recommendation_policy;
+  let environments = null;
+  if (environmentProjection) {
+    const a = environmentFixture(t, adapterTrack, 'baseline', { root });
+    const b = environmentFixture(t, adapterTrack, 'challenger', { root });
+    for (const [entry, role] of [[a, 'baseline'], [b, 'challenger']]) {
+      const asset = role === 'baseline' ? candidate.parent_asset : candidate.candidate_asset;
+      const content = read(storeRoot, asset.content_digest);
+      const compiled = read(storeRoot, asset.record_digest).type_extension.renderer?.id === 'ask-instruction-environment-compiler';
+      Object.assign(entry.options, { sourceRoot: environmentSupportRoot ?? root, supportPaths: environmentSupportPaths ?? ['AGENTS.md'],
+        registrySnapshotDigest: candidate.registry.snapshot_digest,
+        selectionObjectDigest: track[`${role}_selection`].selection_object_digest,
+        trustedPortfolioAuthorityContexts: track.portfolio_authority_contexts,
+        bindings: [{ asset, files: content.files.map(f => ({ source: f.path, target: compiled ? f.path : `${adapterTrack === 'codex' ? '.agents/prompts' : '.claude/commands'}/${f.path.split('/').at(-1)}` })) }] });
+    }
+    a.options.runtime.cli_version = b.options.runtime.cli_version = draft.protocol.cli.version;
+    environments = { baseline: captureInstructionEnvironment(a.options).object_digest,
+      challenger: captureInstructionEnvironment(b.options).object_digest };
+    draft.projection = buildEnvironmentEvolutionProjection({ ...a.options, roles: draft.roles, environments });
+  }
   const experiment = publishEvolutionExperiment({ storeRoot, experiment: buildEvolutionExperiment(draft) });
   const evidence = structuredClone(sample.trusted_contexts.evaluation[0]);
   evidence.authority.experiment_digest = experiment.experiment_digest;
@@ -91,5 +117,6 @@ export function syntheticClosure(t, { renderedSeed = null, candidateAppendOnly =
     selectorContext: { ...context, portfolio_lock_digest: restored.lock_digest } });
   assert.equal(rollbackSelection.selection.decision, "selected");
   return { closure, parentSelection: track.baseline_selection.selection_object_digest,
-    candidateSelection: selected.selection_object_digest, rollbackSelection: rollbackSelection.selection_object_digest, candidate };
+    candidateSelection: selected.selection_object_digest, rollbackSelection: rollbackSelection.selection_object_digest, candidate,
+    environments, root, rollbackLockDigest: restored.lock_digest };
 }

@@ -62,7 +62,7 @@
       "properties": {
         "argv": { "type": "array", "items": { "type": "string" } },
         "task_transport": { "enum": ["stdin", "file", "none"] },
-        "output_transport": { "enum": ["file", "none"] },
+        "output_transport": { "enum": ["file", "structured_stdout", "none"] },
         "output_schema_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" }
       }
     },

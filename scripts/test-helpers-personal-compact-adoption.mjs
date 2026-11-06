@@ -9,8 +9,10 @@ import { createEmptyPortfolioLock, publishPortfolioManifest, buildPortfolioAutho
 import { buildEvolutionCandidate, publishEvolutionCandidate, buildEvolutionExperiment, publishEvolutionExperiment, computePromptV2ExactProjectionDigests } from "./evolution-loop.mjs";
 const ref = value => Object.fromEntries(["portfolio_id", "revision", "manifest_digest", "asset_set_digest"].map(key => [key, value[key]]));
 const assetRef = (d, publication) => ({ asset_type: d.asset_type, stable_id: d.stable_id, version: d.version, record_digest: publication.record_digest, content_digest: publication.content_digest });
-export function freshCompactAdoptionSeed({ root, storeRoot, renderedSeed, candidateAppendOnly, reference, adapter }) {
+export function freshCompactAdoptionSeed({ root, storeRoot, renderedSeed, candidateAppendOnly, reference, adapter, registeredSeed = null }) {
   const read = digest => readContentAddressedJson({ storeRoot, digest }).value;
+  let preparedSeed = registeredSeed;
+  if (!preparedSeed) {
   const contents = read(adapter.baseline_asset.content_digest), descriptor = structuredClone(read(adapter.baseline_asset.record_digest));
   delete descriptor.object_kind; descriptor.version = "synthetic-compact-parent";
   descriptor.safety = { status: "supported", classifications: ["synthetic_source_review_only"], constraint_refs: [canonicalDigest("synthetic compact controls; not actual approval")] };
@@ -35,6 +37,9 @@ export function freshCompactAdoptionSeed({ root, storeRoot, renderedSeed, candid
   child.maintenance.rollback.target = parentAsset;
   const candidateAssetPublication = register(child, join(root, "compact-candidate"), parent.snapshot_digest, true), childAsset = assetRef(child, candidateAssetPublication);
   const registry = { ...reference.registry, registry_id: "synthetic-compact", snapshot_digest: candidateAssetPublication.snapshot_digest, snapshot_revision: candidateAssetPublication.snapshot_revision };
+    preparedSeed = { parentAsset, childAsset, registry };
+  }
+  const { parentAsset, childAsset, registry } = preparedSeed;
   const source = "f".repeat(40), authorityContexts = [];
   const parentDraft = structuredClone(read(adapter.baseline_portfolio.manifest_digest));
   delete parentDraft.asset_set_digest; delete parentDraft.selection_basis_digest;
@@ -75,6 +80,7 @@ export function freshCompactAdoptionSeed({ root, storeRoot, renderedSeed, candid
   experiment.roles = { baseline: role("baseline", parentAsset, baseline, baselineLock, baselineSelection), challenger: role("challenger", childAsset, challenger, challengerLock, challengerSelection) };
   Object.assign(experiment.projection, computePromptV2ExactProjectionDigests(experiment.roles));
   const exp = publishEvolutionExperiment({ storeRoot, experiment: buildEvolutionExperiment(experiment) });
-  return { ...adapter, baseline_selection: baselineSelection, challenger_portfolio: ref(challenger), portfolio_authority_contexts: authorityContexts,
+  return { ...adapter, baseline_selection: baselineSelection, challenger_selection: challengerSelection,
+    baseline_asset: parentAsset, candidate_asset: childAsset, baseline_portfolio: ref(baseline), challenger_portfolio: ref(challenger), portfolio_authority_contexts: authorityContexts,
     evolution: { candidate_object_digest: published.object_digest, experiment_object_digest: exp.object_digest } };
 }

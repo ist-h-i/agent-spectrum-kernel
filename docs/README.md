@@ -35,6 +35,7 @@
 | 調べたいこと | 資料 |
 | --- | --- |
 | Promptの個人改善を始める・再開する | [個人改善CLI](personal-evolution-cli.md)、[一巡の手順](personal-evolution-primary-loop.md)、[保存結果](personal-evolution-saved-results.md) |
+| Codex / Claudeの環境版・個別資産・使用証拠を扱う | [共通環境ループの実装・操作・検証範囲](cross-runtime-environment-loop.md)（環境の構成・新規Skill追加・保存採点・full導入の適用復元。実モデル受入は別途） |
 | 保存された一巡を説明する | [生成から判断保存・次回までのデモ素材](demos/personal-loop-saved-demo-ja.md) |
 | 生成の準備・実行接続・状態を調べる | [生成契約](personal-evolution-generation.md)、[connector](personal-evolution-generation-connector.md)、[Codex接続](personal-evolution-codex-generation.md)、[状態確認](personal-evolution-generation-status.md) |
 | 独立した候補確認・比較処理の接続 | [source reviewer](personal-evolution-source-reviewer.md)、[pair契約](personal-evolution-primary-pair-contract.md)、[driver](personal-evolution-driver.md)、[bridge](personal-evolution-bridge.md)、[無人処理の範囲](personal-evolution-unattended.md) |

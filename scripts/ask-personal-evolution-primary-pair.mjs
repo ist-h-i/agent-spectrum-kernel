@@ -1,5 +1,6 @@
 // Saved public evidence / pre-result registration; no private scorer call.
 import assert from "node:assert/strict";
+import { buildSavedInstructionPairEvidence as evidenceFor } from './saved-instruction-pair-evidence.mjs';
 import { existsSync, mkdirSync, realpathSync, readdirSync, lstatSync } from "node:fs";
 import { dirname, join, posix, resolve } from "node:path";
 import { isBuiltin } from "node:module";
@@ -17,7 +18,7 @@ import { validatePrimaryEngineeringResult } from "./ask-primary-engineering-safe
 import { buildPrimaryFixtureRecipe, PRIMARY_FIXTURE_IDS, assertPrimaryFixtureInventory, primaryFixtureIdsForSet, selectPrimaryFixtureIds } from "./ask-primary-fixture-recipe.mjs";
 import { inspectPersonalEvolution } from "./ask-personal-evolution.mjs";
 import { verifyPersonalPromptMaterialization } from "./ask-personal-prompt-materialization.mjs";
-import { computeEvolutionArtifactInventoryDigest, deriveEvolutionRecommendation } from "./evolution-loop.mjs";
+import { deriveEvolutionRecommendation } from "./evolution-loop.mjs";
 import { assertPersonalEvolutionFields, freezePersonalEvolutionValue } from "./ask-personal-evolution-observation.mjs";
 import { publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
 import { PRIMARY_GRADING_RESERVATION_MS } from "./ask-primary-evaluation-grading.mjs";
@@ -299,38 +300,6 @@ function registered(options) {
   assert.ok(equal(registration.limits, personalEvolutionPairLimits(description.bindings.baseline.length, description.fixture_set ?? "legacy9")), "pair derived limits drift");
   outputBoundary(registration.output_root, options.storeRoot, description.bindings, true);
   return { ...ctx, registration, blocks };
-}
-function evidenceFor(ctx, report, evaluationAuthority) {
-  assertPersonalEvolutionFields(evaluationAuthority, ["authority_id", "authority_revision", "authority_evidence_digest"], "pair evaluation authority");
-  assert.ok(![ctx.candidate.generation.actor.actor_id, ctx.candidate.authorities.experiment.authority_id,
-    ctx.candidate.authorities.decision.authority_id].includes(evaluationAuthority.authority_id), "independent evaluation authority required");
-  const kinds = { quality: "directional_outcome_report", safety: "directional_outcome_report", cost: "directional_outcome_report",
-    variance: "repetition_report", mechanism: "mechanism_scorecard", external_outcome: "external_outcome_report" };
-  const dimensions = Object.fromEntries(Object.entries(kinds).map(([name, source_kind]) => {
-    const challengers = report.observations.filter(item => item.role === "challenger");
-    const unsafe = challengers.some(item => item.engineering.safety_blocker.status === "fail");
-    const contradicted = challengers.some(item => item.engineering.blockers.gate_status === "fail");
-    const safetyClosed = challengers.length === ctx.blocks.challenger.length
-      && challengers.every(item => item.engineering.safety_blocker.status === "pass");
-    const costsClosed = report.status === "saved_pair_verified" && report.observations.every(item =>
-      ["input_tokens", "output_tokens", "duration_ms", "human_effort", "monetary_cost"].every(key =>
-        ["known", "not_applicable"].includes(item.engineering.overhead_telemetry[key].status)));
-    const complete = name === "quality" ? contradicted || report.status === "saved_pair_verified"
-      : name === "safety" ? unsafe || safetyClosed : name === "cost" ? costsClosed : false;
-    const marker = { kind: "personal_pair_dimension", pair_digest: ctx.registration.pair_digest, report_digest: canonicalDigest(report),
-      dimension: name, collected: complete, reason: complete ? "saved_public_engineering_observation" : report.status };
-    const partial = ["quality", "safety", "cost"].includes(name) && report.observations.length > 0;
-    const status = complete ? "complete" : partial ? "insufficient_evidence" : "unavailable";
-    const conclusion = complete ? name === "safety" && unsafe ? "unsafe"
-      : name === "quality" && contradicted ? "contradicted" : "observed" : partial ? "unknown" : "unavailable";
-    return [name, { status, conclusion, source_kind, artifact_id: `pair-${name}-${ctx.registration.pair_digest.slice(7, 23)}`,
-      artifact_digest: canonicalDigest(marker), causal_credit_applied: false, factor_ids: [] }];
-  }));
-  return { authority: { ...evaluationAuthority, kind: "external_evolution_evaluation_authority", experiment_digest: ctx.experiment.experiment_digest,
-      verification_mode: "full_verifier", artifact_inventory_digest: computeEvolutionArtifactInventoryDigest(dimensions) },
-    dimensions, causal_attribution: { status: "not_claimed", factor_ids: [], evidence_digests: [] },
-    reason_codes: ["separate_fresh_parent_candidate_pair", "P_K_F_context_not_candidate_improvement", "no_causal_credit", report.status,
-      `evidence_kind_${ctx.registration.description.evidence_kind}`].sort() };
 }
 export function verifyPersonalEvolutionPromptPairResults(options) {
   const ctx = registered(options), pairs = [], observations = []; let pending = 0, incomplete = 0;

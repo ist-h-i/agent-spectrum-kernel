@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+import { testNativeClaudeExecution } from './test-helpers-claude-native-execution.mjs';
 import { createHash } from "node:crypto";
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { effectiveCommand, verifyExecutionTerminalWorkspaceAuthority } from "./ask-benchmark-execution.mjs";
+import { effectiveCommand, executePortfolio, verifyExecutionTerminalWorkspaceAuthority } from "./ask-benchmark-execution.mjs";
 import { createTerminalCandidateOutputBoundaryForTest, materializeVerifiedTerminalCandidate, materializeVerifiedTerminalCandidateForTest, verifyTerminalWorkspaceAuthority } from "./ask-benchmark-terminal-candidate.mjs";
 import {
   computeCommandContractDigest,
@@ -476,6 +479,10 @@ try {
     run(["seal-selection", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--state-dir", selectionState, "--case-id", entry.case_id, "--input", input]);
   }
 
+  testNativeClaudeExecution({ root, work, config: { ...config, _kind: 'portfolio', _configPath: configPath, _protocolPath: resolve(root, config.protocol_path) },
+    planPath, materializedPath: materialized, selectionState, plan, runtimeTemplate: runtimeConfig('claude') });
+  const nativeOnly = process.argv.includes('--native-claude-only');
+  if (!nativeOnly) {
   const runDir = resolve(work, "run");
   const common = ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", runDir];
   const env = { FAKE_EXEC_LOG: logPath, FAKE_PUBLIC_MODE: "fixture" };
@@ -1260,6 +1267,36 @@ exit 64
   assert.equal(recoveryState.attempt_count, 1, "recovery replay must not append attempts");
   assert.equal(existsSync(abandonedWorkspace), false, "stale recovery must delete the abandoned ephemeral workspace");
   assert.deepEqual(terminalInventory(recoveryRun, recoveryCase.case_id, recoveryState.terminal_attempt), ["command-evidence.json", "commit.json", "request.json", "result.json"], "interrupted recovery must retain only approved durable artifacts");
+  const firstOnlyOptions = { root, config: verifiedConfig, planPath, materializedPath: materialized, selectionState, runDir: recoveryRun,
+    adapter: 'codex', runtimeConfigPath: codexRuntime, agentBin: codexBin, caseId: recoveryCase.case_id, firstAttemptOnly: true };
+  assert.throws(() => executePortfolio(firstOnlyOptions), /first-attempt execution refuses/);
+  assert.equal(JSON.parse(readFileSync(resolve(recoveryRun, 'cases', recoveryCase.case_id, 'state.json'))).attempt_count, 1);
+  const raceCase = codexCases.find(c => c.case_id !== recoveryCase.case_id);
+  const raceStatePath = resolve(recoveryRun, 'cases', raceCase.case_id, 'state.json');
+  const raceBefore = readFileSync(raceStatePath), raceState = JSON.parse(raceBefore), originalRename = fs.renameSync;
+  const priorEnvironment = Object.fromEntries(Object.keys(env).map(k => [k, process.env[k]]));
+  const beforeRaceLog = readFileSync(logPath); let raced = false;
+  try {
+    Object.assign(process.env, env);
+    fs.renameSync = (from, to) => {
+      const result = originalRename(from, to);
+      if (to === resolve(recoveryRun, 'cases', raceCase.case_id, 'claim')) {
+        raced = true;
+        writeFileSync(raceStatePath, JSON.stringify({ ...raceState, status: 'interrupted', attempt_count: 1,
+          terminal_attempt: '0001', terminal_commit_digest: canonicalDigest('competing terminal commit') }));
+      }
+      return result;
+    };
+    syncBuiltinESMExports();
+    assert.throws(() => executePortfolio({ ...firstOnlyOptions, caseId: raceCase.case_id }), /first-attempt execution refuses/);
+    assert.equal(raced, true, 'race occurs after exclusive claim publication');
+    assert.equal(existsSync(resolve(recoveryRun, 'cases', raceCase.case_id, 'claim')), false, 'refused worker releases only its own claim');
+    assert.deepEqual(readdirSync(resolve(recoveryRun, 'cases', raceCase.case_id, 'attempts')), []);
+    assert.deepEqual(readFileSync(logPath), beforeRaceLog, 'claim race cannot start another model attempt');
+  } finally {
+    fs.renameSync = originalRename; syncBuiltinESMExports(); writeFileSync(raceStatePath, raceBefore);
+    for (const [key, value] of Object.entries(priorEnvironment)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  }
   run(recoveryExecute, { env });
   const resumedState = JSON.parse(readFileSync(resolve(recoveryRun, "cases", recoveryCase.case_id, "state.json"), "utf8"));
   assert.equal(resumedState.status, "completed", "interrupted recovery must resume with a new attempt");
@@ -1960,7 +1997,8 @@ exit 64
   writeFileSync(sealPath, sealedBytes);
   chmodSync(sealPath, 0o444);
 
-  console.log("ASK benchmark execution tests passed");
+  }
+  console.log(nativeOnly ? 'Native Claude original execution/terminal/normalization tests passed (fake CLI only)' : "ASK benchmark execution tests passed");
 } finally {
   rmSync(work, { recursive: true, force: true });
   rmSync(candidateOutputs, { recursive: true, force: true });

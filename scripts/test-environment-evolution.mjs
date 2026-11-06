@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { readContentAddressedJson } from './content-addressed-store.mjs';
+import { captureInstructionEnvironment } from './instruction-environment.mjs';
+import { buildEnvironmentEvolutionProjection } from './environment-evolution-binding.mjs';
+import { buildEvolutionExperiment, publishEvolutionExperiment, verifyEvolutionExperiment } from './evolution-loop.mjs';
+import { environmentFixture } from './test-helpers-instruction-environment.mjs';
+for (const track of ['codex', 'claude']) test(`${track}: entire environments bind existing Evolution roles and authority`, t => {
+  const a = environmentFixture(t, track), b = environmentFixture(t, track, 'challenger', a);
+  const draft = structuredClone(readContentAddressedJson({ storeRoot: a.storeRoot, digest: a.adapter.evolution.experiment_object_digest }).value);
+  a.options.runtime.cli_version = b.options.runtime.cli_version = draft.protocol.cli.version;
+  const baseline = captureInstructionEnvironment(a.options), challenger = captureInstructionEnvironment(b.options);
+  const options = { ...a.options, roles: draft.roles, environments: { baseline: baseline.object_digest, challenger: challenger.object_digest } };
+  draft.projection = buildEnvironmentEvolutionProjection(options);
+  const experiment = buildEvolutionExperiment(draft), published = publishEvolutionExperiment({ storeRoot: a.storeRoot, experiment });
+  const context = { ...a.options, experimentObjectDigest: published.object_digest, trustedExperimentAuthorities: [draft.authority] };
+  const verified = verifyEvolutionExperiment(context);
+  assert.equal(verified.experiment.projection.mode, 'instruction_environment_v1_exact');
+  assert.throws(() => buildEnvironmentEvolutionProjection({ ...options, environments: { baseline: challenger.object_digest, challenger: baseline.object_digest } }), /selection transplant/);
+  assert.throws(() => verifyEvolutionExperiment({ ...context, trustedExperimentAuthorities: [] }), /trust/i);
+  const drift = structuredClone(draft); drift.protocol.cli.version = 'changed';
+  const changed = publishEvolutionExperiment({ storeRoot: a.storeRoot, experiment: buildEvolutionExperiment(drift) });
+  assert.throws(() => verifyEvolutionExperiment({ ...context, experimentObjectDigest: changed.object_digest }), /CLI drift/);
+});

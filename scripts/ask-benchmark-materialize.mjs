@@ -22,6 +22,7 @@ import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { buildPortfolioPlan } from "./ask-benchmark-plan.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
+import { verifyInstructionEnvironment, exportInstructionEnvironment } from './instruction-environment.mjs';
 
 export const MATERIALIZER_VERSION = "1.0.0";
 export const MATERIALIZATION_SCHEMA_PATH = "benchmarks/schemas/materialization-manifest.schema.json";
@@ -478,18 +479,31 @@ export function validateMaterializedPortfolio({ root, config, plan, materialized
   return { manifest, manifestDigest, manifestPath, casesById: new Map(manifest.cases.map((entry) => [entry.case_id, entry])) };
 }
 
-export function materializePortfolio({ root, config, planPath, outputPath, repositoryRevision, executionAdmissionEvidenceByFixture = null }) {
+export function materializePortfolio({ root, config, planPath, outputPath, repositoryRevision, executionAdmissionEvidenceByFixture = null, instructionEnvironment = null }) {
   if (!planPath || !outputPath) throw new Error("materialize requires --plan and --output");
   assertTrackedRepositoryMatchesHead(root);
   const plan = readJson(planPath);
   assertExactPlanIdentity({ root, config, plan, repositoryRevision, executionAdmissionEvidenceByFixture });
   const fixtures = validateFixtureInputs({ root, config, plan });
+  const frozenEnvironment = instructionEnvironment === null ? null : verifyInstructionEnvironment(instructionEnvironment);
   const outputBoundary = validateOutputBoundary(outputPath);
   const parent = dirname(outputPath);
   const staging = mkdtempSync(resolve(parent, `.${basename(outputPath)}.staging-`));
   try {
     const templateRoot = resolve(staging, ".projection-templates");
     const templates = buildProjectionTemplates({ root, templateRoot });
+    if (frozenEnvironment) {
+      const adapter = frozenEnvironment.environment.adapter === 'codex' ? 'codex' : 'claude';
+      const key = `${adapter}:full_ask`, template = templates.get(key);
+      // Only the private staging template is replaced. Frozen fixture bytes,
+      // the other conditions and the other adapter retain their existing path.
+      rmSync(template.root, { recursive: true });
+      exportInstructionEnvironment({ ...instructionEnvironment, outputRoot: template.root });
+      template.inventory = fileInventory(template.root);
+      template.projectionPlan = null;
+      template.environment = { object_digest: instructionEnvironment.environmentObjectDigest,
+        projection_digest: frozenEnvironment.environment.projection_digest };
+    }
     const cases = [];
     for (const planned of plan.cases) {
       const caseRoot = assertInside(staging, resolve(staging, planned.case_id), `${planned.case_id} output`);
@@ -523,7 +537,12 @@ export function materializePortfolio({ root, config, planPath, outputPath, repos
         condition_projection_digest: digestInventory(projectedInventory),
         agent_visible_files: frozenInventory,
         projected_asset_inventory: projectedInventory,
-        projection_evidence: buildProjectionEvidence({ root, adapter: planned.adapter_track, condition: planned.condition, inventory: projectedInventory, projectionPlan: template.projectionPlan }),
+        projection_evidence: template.environment ? {
+          ...buildProjectionEvidence({ root, adapter: planned.adapter_track, condition: planned.condition, inventory: projectedInventory }),
+          renderer_id: 'instruction-environment-export', renderer_version: '1',
+          projection_fingerprint: canonicalDigest(template.environment),
+          canonical_source_digests: [{ path: `environments/${template.environment.object_digest.slice(7)}.json`, sha256: template.environment.object_digest }],
+        } : buildProjectionEvidence({ root, adapter: planned.adapter_track, condition: planned.condition, inventory: projectedInventory, projectionPlan: template.projectionPlan }),
         evaluator_leakage_status: "passed",
         path_validation_status: "passed",
         symlink_validation_status: "passed",

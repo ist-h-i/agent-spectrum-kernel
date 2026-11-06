@@ -22,11 +22,11 @@
         "adapters/claude-code/project/.claude/hooks/hooks.json",
         "scripts/install-claude-adapter.mjs"
       ],
-      "subject_digest": "sha256:f5719c027e2833014f75ce9f00295e976e243d77cae1f342e30eb5c73d7c6fa2",
+      "subject_digest": "sha256:fd9b7cce98418ddc80ced92e60196543caece7aa2523835b769347f39ef3443b",
       "scope": "profile_projection",
       "profile_id": "claude-code-local-observed-v1",
       "renderer_profile": "observability",
-      "profile_fingerprint": "sha256:1213291880384af590068d7186ee73e02550077b638484191e1067d26a1b337d"
+      "profile_fingerprint": "sha256:ffe55fa8c17c434517c39e11c5dccba27a0ff059749d968550f107d52859b63b"
     },
     {
       "record_id": "codex-projection-manifest",
