@@ -1,0 +1,11 @@
+# 初期fixtureの意味
+
+共通外形はclock(UTC)、actors、grants、dataです。actor IDは一意、tenantはrealm、role名は表示・操作案内のための情報で、認可は明示grantで行います。grantはactor ID、tenant、operations文字列配列、必要ならscope(ID配列)、deny(boolean、省略false)。参照は同じfixture内の同tenant対象を指し、特に定義した循環だけを許します。未知fieldは評価要件に使いません。data内の以下の配列は、省略時は空配列です。起動時に意味不正なfixtureが渡された場合は評価側の準備不良であり、候補の業務違反にはしません。
+
+storesはid、phase:mixed/v2、epoch、versionを持つ。productsはstore/id/incarnation/version、format:1/2、currencyを持つ。format1はdecimal文字列で税込、format2はminor整数文字列とtax:included/excludedを持つ。削除行はdeleted:trueで過去のincarnationを示し、現存はdeleted:false。writersはid、store、actor、format、epoch、active:boolean、version。pendingUpdatesはid、store、writerId、epoch、targetId、incarnation、expectedVersion、operation:write/remove、payload、state:pending/applied/rejectedを持つ。writeのpayloadはwriter形式の価格、removeのpayloadはnull。確定行は結果と履歴を保持する。enqueue順は配列順で、後続追加は末尾へ入る。移行checkpointがない店舗は未開始である。
+
+fixtures/example.jsonはこれらの構造の公開例です。token対応表はfixtureと別に評価側が渡し、実アカウントは不要です。
+
+未設定価格はformat1のdecimal:null、またはformat2のminor:nullかつtax:null。通貨は保持する。pendingUpdatesはinitiatorに予約者actor IDを持つ。評価fixtureは有効な予約者を明示し、省略は準備不良とする。候補に非公開の補完規則を推測させない。
+
+この課題のstore IDは認可realmのtenant IDとしても用いる。actorとgrantのtenantは対象storeを表し、本文の別store指定だけで越境できない。

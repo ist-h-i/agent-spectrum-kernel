@@ -1,0 +1,7 @@
+# 初期fixtureの意味
+
+共通外形はclock(UTC)、actors、grants、dataです。actor IDは一意、tenantはrealm、role名は表示・操作案内のための情報で、認可は明示grantで行います。grantはactor ID、tenant、operations文字列配列、必要ならscope(ID配列)、deny(boolean、省略false)。参照は同じfixture内の同tenant対象を指し、特に定義した循環だけを許します。未知fieldは評価要件に使いません。data内の以下の配列は、省略時は空配列です。起動時に意味不正なfixtureが渡された場合は評価側の準備不良であり、候補の業務違反にはしません。
+
+eventsはtenant/eventId、非負整数revision、不変eventTime(UTC)、amount(符号付き整数文字列)、deleted:booleanを持つ。watermarksはtenant/time(UTC)の配列。producersはtenant/producerId、lastSequence(非負整数)、lastBody(元deliveryのbatch)、lastResult(受理/拒否と理由)を持つ。記録なしの初回期待sequenceは0である。windowOutputsはtenant、start/end(UTC)、amount整数文字列、effectIdと受理済みreceiptの配列。checkpointExamplesはimport検証に使える独立の保存例で、初期live状態ではない。format1はevents/watermarks、format3はevents/watermarks/producersを持つ。未定義formatは状態を変えず拒否。checkpoint import/exportは運用権限者のみ操作でき、一般producerに生存状態の置換を許さない。
+
+fixtures/example.jsonはこれらの構造の公開例です。token対応表はfixtureと別に評価側が渡し、実アカウントは不要です。

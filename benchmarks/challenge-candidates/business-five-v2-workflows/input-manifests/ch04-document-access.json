@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "version": "business-five-20261106-workflows1",
+  "task_id": "ch04-document-access",
+  "modes": {
+    "one_shot": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "bytes": 5509,
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/TASK.md",
+          "bytes": 1343,
+          "sha256": "a5a0bd3e21601641f100ce5e79d9d30d126ad0ca43113743edba27d6d0456755"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/acceptance.md",
+          "bytes": 1188,
+          "sha256": "185ecf0c212b7ca57450fa89e73d8b7ebd17e1ce3195e91fd34d7e8a4fc91ef7"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/contract.md",
+          "bytes": 3535,
+          "sha256": "6da889ee992d6c111a9a5f083e0efe67ba49983ad3cfb48ecc88abef1227270d"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/fixture-format.md",
+          "bytes": 1698,
+          "sha256": "eb3b8923cbe293982b3b2282d3c7fa7a642822a0c411c5923f804790c4ae2b72"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/fixtures/example.json",
+          "bytes": 3953,
+          "sha256": "811f72961116a7b84c600b80c7c96f18acecdfd809cabbf6fbff174652603869"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/nonfunctional.md",
+          "bytes": 618,
+          "sha256": "ad51ce94141b334e54439126065d0d1d71417206e016a55972f2500911805ebc"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/prompt.txt",
+          "bytes": 715,
+          "sha256": "f0d01a023b3a178ad04d17e76dac69750e261bf988798d7f7ee857243fa8416f"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/roles.md",
+          "bytes": 1281,
+          "sha256": "139f7b727f96e6e76503dd307cf6ae5fdd675be4fbd811a16b68f52529f77ea3"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/workflows.md",
+          "bytes": 3357,
+          "sha256": "f3b84fb3adf4f6f3baf7f9deeb5a76a9dea20bc7b404b97862a88f094893a274"
+        }
+      ],
+      "inventory_sha256": "6940df408bbb486627f0112b93adeb4a342d7b9236f3846a2b61dccac7897a62"
+    },
+    "goal_with_pr": {
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "bytes": 5509,
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/TASK.md",
+          "bytes": 1343,
+          "sha256": "a5a0bd3e21601641f100ce5e79d9d30d126ad0ca43113743edba27d6d0456755"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/acceptance.md",
+          "bytes": 1188,
+          "sha256": "185ecf0c212b7ca57450fa89e73d8b7ebd17e1ce3195e91fd34d7e8a4fc91ef7"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/contract.md",
+          "bytes": 3535,
+          "sha256": "6da889ee992d6c111a9a5f083e0efe67ba49983ad3cfb48ecc88abef1227270d"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/fixture-format.md",
+          "bytes": 1698,
+          "sha256": "eb3b8923cbe293982b3b2282d3c7fa7a642822a0c411c5923f804790c4ae2b72"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/fixtures/example.json",
+          "bytes": 3953,
+          "sha256": "811f72961116a7b84c600b80c7c96f18acecdfd809cabbf6fbff174652603869"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/goal-pr.txt",
+          "bytes": 987,
+          "sha256": "dc14a62d4ceb63e53f4e2b2a2f76370c4d90f09edca4056bd9152742ebf1b680"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/nonfunctional.md",
+          "bytes": 618,
+          "sha256": "ad51ce94141b334e54439126065d0d1d71417206e016a55972f2500911805ebc"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/roles.md",
+          "bytes": 1281,
+          "sha256": "139f7b727f96e6e76503dd307cf6ae5fdd675be4fbd811a16b68f52529f77ea3"
+        },
+        {
+          "path": "public/tasks/ch04-document-access/workflows.md",
+          "bytes": 3357,
+          "sha256": "f3b84fb3adf4f6f3baf7f9deeb5a76a9dea20bc7b404b97862a88f094893a274"
+        }
+      ],
+      "inventory_sha256": "b1b7baa10b32e1c793e3c36d2e061ea727779a0e247cb646de35bfb8dd67f8dd"
+    }
+  },
+  "working_directory": "public/tasks/ch04-document-access"
+}
