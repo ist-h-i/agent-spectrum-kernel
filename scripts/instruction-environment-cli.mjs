@@ -5,6 +5,8 @@ import { pathToFileURL } from 'node:url';
 import { canonicalDigest, listContentAddressedJson, readJsonFileStrict } from './content-addressed-store.mjs';
 import { createEmptyAssetRegistry, registerAsset, exportAssetRegistryReference } from './asset-registry.mjs';
 import { captureInstructionEnvironment, verifyInstructionEnvironment, exportInstructionEnvironment } from './instruction-environment.mjs';
+import { captureRetainedInstructionLayout, verifyRetainedInstructionLayout } from './retained-instruction-layout.mjs';
+import { prepareRetainedInstructionComparison, verifyRetainedInstructionComparison, readRetainedInstructionResults } from './retained-instruction-comparison.mjs';
 import { importSkillUsageEvidence } from './skill-usage-evidence.mjs';
 import { registerInstructionEnvironmentBundle } from './instruction-environment-compiler.mjs';
 import { verifyEnvironmentSavedResults } from './environment-saved-results.mjs';
@@ -22,6 +24,14 @@ import { buildEvolutionExperiment, publishEvolutionExperiment, verifyEvolutionEx
 
 export function runInstructionEnvironmentCommand(command, input) {
   switch (command) {
+    case 'retained-prepare': return prepareRetainedInstructionComparison(input);
+    case 'retained-verify': { const {plan}=verifyRetainedInstructionComparison(input); return {plan,models_started:false}; }
+    case 'retained-results': return readRetainedInstructionResults(input);
+    case 'retained-layout-capture': return captureRetainedInstructionLayout(input);
+    case 'retained-layout-inspect': {
+      const checked=verifyRetainedInstructionLayout(input);
+      return {layout:checked.layout,models_started:false,admission_implied:false};
+    }
     case 'capture': return captureInstructionEnvironment(input);
     case 'inspect': {
       const { environment, files } = verifyInstructionEnvironment(input);

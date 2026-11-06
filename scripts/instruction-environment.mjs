@@ -8,6 +8,7 @@ import { verifyAssetRegistry } from './asset-registry.mjs';
 import { verifyPortfolioSelection } from './portfolio-manager.mjs';
 import { instructionPath, instructionTargetPath as targetPath } from './instruction-projection-paths.mjs';
 import { inspectCompiledInstructionComponents } from './instruction-environment-compiler.mjs';
+import { retainedInstructionPath, verifyRetainedInstructionLayout, verifyRetainedEnvironmentClosure } from './retained-instruction-layout.mjs';
 export { instructionPath };
 
 export const exactInstructionAsset = a => Object.fromEntries(['asset_type', 'stable_id', 'version', 'record_digest', 'content_digest'].map(k => [k, a[k]]));
@@ -31,6 +32,10 @@ function body(options, support) {
   assert.ok(['codex', 'claude_code'].includes(options.adapter), 'unsupported adapter');
   assert.ok(typeof options.environmentId === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(options.environmentId), 'bounded environment ID required');
   runtime(options.runtime);
+  if (options.retainedLayoutObjectDigest) {
+    assert.equal(options.adapter, 'codex', 'retained reference layout is Codex only');
+    verifyRetainedInstructionLayout({storeRoot:options.storeRoot,layoutObjectDigest:options.retainedLayoutObjectDigest});
+  }
   const registry = verifyAssetRegistry({ storeRoot: options.storeRoot, snapshotDigest: options.registrySnapshotDigest,
     trustedAuthorityContexts: options.trustedAssetAuthorityContexts ?? [] });
   assert.ok(Array.isArray(options.bindings) && options.bindings.length <= 256, 'bounded Asset bindings required');
@@ -60,7 +65,8 @@ function body(options, support) {
   // projected (a candidate may depend on its historical parent bundle).
   for (const item of support) {
     assert.deepEqual(Object.keys(item).sort(), ['object_digest', 'path', 'raw_digest']);
-    targetPath(options.adapter, item.path, true);
+    if (options.retainedLayoutObjectDigest) retainedInstructionPath(item.path);
+    else targetPath(options.adapter, item.path, true);
     const blob = read(options.storeRoot, item.object_digest);
     assert.deepEqual(Object.keys(blob).sort(), ['bytes_base64', 'object_kind']);
     assert.equal(blob.object_kind, 'instruction_environment_file');
@@ -76,6 +82,8 @@ function body(options, support) {
     new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   }
   assert.ok(!files.some(a => files.some(b => b.path.startsWith(a.path + '/'))), 'file/directory path collision');
+  if (options.retainedLayoutObjectDigest) verifyRetainedEnvironmentClosure({storeRoot:options.storeRoot,
+    layoutObjectDigest:options.retainedLayoutObjectDigest},files);
   if (options.selectionObjectDigest !== null) {
     const selection = verifyPortfolioSelection({ ...options, selectionObjectDigest: options.selectionObjectDigest }).selection;
     assert.equal(selection.decision, 'selected', 'environment requires an eligible exact selection');
@@ -90,13 +98,15 @@ function body(options, support) {
     selection_object_digest: options.selectionObjectDigest, bindings, support: [...support].sort((a, b) => order(a.path, b.path)),
     projection_digest: canonicalDigest(files.map(({ path, raw_digest }) => ({ path, raw_digest }))),
     ...(components.length ? { components } : {}),
+    ...(options.retainedLayoutObjectDigest ? {retained_layout_object_digest:options.retainedLayoutObjectDigest} : {}),
     runtime_use_implied: false, effectiveness_implied: false },
     files: files.map(f => ({ path: f.path, raw_digest: f.raw_digest, text: Buffer.from(f.bytes_base64, 'base64').toString('utf8') })) };
 }
 export function captureInstructionEnvironment(options) {
   assert.ok(Array.isArray(options.supportPaths) && options.supportPaths.length <= 2048 && new Set(options.supportPaths).size === options.supportPaths.length, 'bounded unique support paths required');
   const support = options.supportPaths.map(path => {
-    targetPath(options.adapter, path, true);
+    if (options.retainedLayoutObjectDigest) retainedInstructionPath(path);
+    else targetPath(options.adapter, path, true);
     const bytes = readStableBytes(resolve(options.sourceRoot, path), 'environment support file');
     const blob = putContentAddressedJson({ storeRoot: options.storeRoot,
       artifact: { object_kind: 'instruction_environment_file', bytes_base64: bytes.toString('base64') } });
@@ -108,7 +118,8 @@ export function captureInstructionEnvironment(options) {
 export function verifyInstructionEnvironment(options) {
   const saved = read(options.storeRoot, options.environmentObjectDigest);
   const result = body({ ...options, environmentId: saved.environment_id, adapter: saved.adapter, runtime: saved.runtime,
-    registrySnapshotDigest: saved.registry_snapshot_digest, selectionObjectDigest: saved.selection_object_digest, bindings: saved.bindings }, saved.support);
+    registrySnapshotDigest: saved.registry_snapshot_digest, selectionObjectDigest: saved.selection_object_digest, bindings: saved.bindings,
+    retainedLayoutObjectDigest:saved.retained_layout_object_digest }, saved.support);
   assert.ok(same(result.environment, saved), 'saved environment shape or bytes drifted');
   return result;
 }

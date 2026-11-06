@@ -22,6 +22,9 @@ function checked(options) {
   assert.equal(closure.decision.disposition, 'approved', 'approved adoption required');
   assert.equal(closure.experiment.projection.mode, 'instruction_environment_v1_exact');
   const binding = verifyEnvironmentEvolutionBinding(options, closure.experiment);
+  assert.ok(!binding.pair.baseline.environment.retained_layout_object_digest
+    && !binding.pair.challenger.environment.retained_layout_object_digest,
+  'retained reference snapshots do not authorize normal-owner mutation');
   return { closure, ...binding };
 }
 const HISTORY = '.agent-spectrum-kernel/environment-operation-history';

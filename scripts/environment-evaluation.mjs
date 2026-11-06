@@ -16,6 +16,7 @@ function context(options) {
   assert.equal(readGitRevision(options.root), options.repositoryRevision, 'evaluation checkout revision drift');
   const { binding, pair } = verifyEnvironmentEvolutionBinding(options, experiment);
   const environment = pair[options.role].environment;
+  assert.ok(!environment.retained_layout_object_digest, 'retained reference layout requires its unchanged external runner; generic dispatch refused');
   const adapter = environment.adapter === 'codex' ? 'codex' : 'claude';
   const plan = readJsonFileStrict(options.planPath, 'environment evaluation plan');
   const cases = plan.cases.filter(c => c.adapter_track === adapter && c.condition === 'full_ask');
