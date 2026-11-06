@@ -28,7 +28,7 @@ for(const track of ['codex','claude'])test(`${track}: two component cycles prese
   const descriptor=structuredClone(registry.assets.find(a=>a.asset_type==='prompt'&&a.record.type_extension.kind==='prompt_template').record);delete descriptor.object_kind;
   descriptor.stable_id='ask.prompt.normal-chain-'+track;descriptor.derivation={kind:'root',parent:null,delta:null};descriptor.dependencies=[];descriptor.maintenance.rollback.target=null;
   descriptor.type_extension={kind:'prompt_template',adapter:f.profile.adapter,entrypoint:path,rendered_runtime_content:false};
-  descriptor.applicability.adapters={status:'bounded',included:[track==='codex'?'codex':'claude-code'],excluded:[]};
+  descriptor.applicability.adapters={status:'bounded',included:[f.profile.adapter],excluded:[]};
   descriptor.content={package_format:'canonical_json_base64_files',files:[{path,raw_digest:hash(Buffer.from(before)),media_type:'text/markdown; charset=utf-8'}]};
   const registered=registerAsset({storeRoot:f.storeRoot,sourceRoot:owner,predecessorSnapshotDigest:f.profile.registrySnapshotDigest,descriptor}),asset=exactInstructionAsset({...descriptor,...registered});
   const support=[...new Set([...Object.keys(ownerState.managed_files),...Object.keys(kernel.managed_files),'AGENTS.md'])].filter(p=>{
