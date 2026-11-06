@@ -28,7 +28,31 @@ missing capability and restore/configure the runtime before dispatch.
    assessment overhead and uncertainty. Bring it to the existing human
    application decision. No report or recovery judgment installs assets.
 
-For a Full self-improvement profile, select
+For individual Skill/Prompt creation, revision, exclusion, configuration layers
+or reviewed incoming assets, select
+`component_practical_instruction_loop_profile_v1`. The host fixes allowed
+identities, mappings, helpers, permissions and runtime; the AI chooses bounded
+instruction changes. Confirmed package imports remain inert until their local
+Eval cases are approved. Imported helpers are copied as text, not automatically
+executed or granted foreign authority.
+
+Prepare the pinned configuration with supervised `configure --profile PROFILE
+--root CONFIG_DIRECTORY`. Start/resume `operate --profile PROFILE --config CONFIG
+--root OPERATION --cycles N` with an explicit budget of 1..10 cycles. Submit the
+actual case/change judgment with the same `--decision`, `--packet`, `--reason`
+flags. Completion advances to a fresh cycle's case gate automatically; old
+approvals are not reused. `operation-status --root OPERATION` reads status only.
+Runtime setup uses canonical absolute local paths; the consumer does not need
+an ASK source branch. The host/admin supplies the initial trusted configuration.
+
+Inspect owned completion receipts after response loss. Pending execution or
+owner markers and local drift remain explicit; do not blindly retry or alter
+user files. A declined restore keeps the actual adopted baseline. A later
+restore request needs a new change packet. No-op ends the bounded operation
+without inventing trials. Review preserved per-cycle reports and all-attempt
+costs; do not pool quality across changing environments.
+
+For scoped source-backed Full Skill revision, select
 `full_practical_instruction_loop_profile_v1` with
 `policy.evaluation_mode: practical_v1` in the same configured ASK runtime. It
 uses the existing generation/Registry/owner lifecycle and the public practical

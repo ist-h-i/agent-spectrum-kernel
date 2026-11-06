@@ -95,3 +95,9 @@ export function verifyReturnedEnvironmentOwner({ root, lease, ownerStateDigest }
   assert.ok(readStableBytes(join(root, lease.owner_path), 'returned normal owner state', 32 * 1024 * 1024).equals(bytes), 'returned owner state drift');
   checkInitialBytes(root, initialOwner(root, lease.adapter, bytes));
 }
+export function chainEnvironmentOwnerLease({root,lease,ownerStateDigest,environment,paths,receiptObjectDigest,environments}){
+  verifyEnvironmentOwnerLease({root,lease,ownerStateDigest,environment});
+  const {lease_id,...previous}=lease;
+  const base={...previous,paths:[...new Set([...lease.paths,...paths])].sort(),receipt_object_digest:receiptObjectDigest,environments};
+  return {...base,lease_id:canonicalDigest(base)};
+}

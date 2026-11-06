@@ -5,9 +5,11 @@ import {readJsonFileStrict,readStableBytes,canonicalDigest,assertNoSymlinkPathSe
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {prepareNextSupervisedInstructionLoop,readCompletedInstructionLoopContinuation} from './supervised-instruction-loop.mjs';
 import {createFullPracticalInstructionLoopConfiguration} from './instruction-loop-practical-runtime.mjs';
+import {createComponentInstructionLoopConfiguration} from './instruction-loop-component-runtime.mjs';
 // A complete set of executable bindings. No ports/no-op placeholders remain.
 export function createNativeInstructionLoopConfiguration(profilePath){
   profilePath=resolve(profilePath);const p=readJsonFileStrict(profilePath);
+  if(p.kind==='component_practical_instruction_loop_profile_v1')return createComponentInstructionLoopConfiguration(profilePath);
   if(p.kind==='full_practical_instruction_loop_profile_v1')return createFullPracticalInstructionLoopConfiguration(profilePath);
   assert.equal(p.kind,'full_native_reference_loop_profile_v1');assert.equal(p.normal.target,p.policy.normal_target);
   const paths=['instruction-loop-native-worker.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-reference-report.mjs',
@@ -24,7 +26,7 @@ export function createNativeInstructionLoopConfiguration(profilePath){
 
 // Allocate the next private profile/config, including new source/Registry pins.
 // This is preparation only: no generation, trial, grading or owner mutation.
-export function prepareNextNativeInstructionLoopConfiguration({root,profilePath,configPath,outputRoot,id,feedback=null,decisionSummaries={},resultSummary=null}){
+export function buildNextNativeInstructionLoopProfile({root,profilePath,configPath,outputRoot,id,feedback=null,decisionSummaries={},resultSummary=null}){
   const old=readJsonFileStrict(resolve(profilePath)),history=readCompletedInstructionLoopContinuation(root);
   const previousConfig=readJsonFileStrict(resolve(configPath));
   assert.equal(canonicalDigest(previousConfig.policy),canonicalDigest(history.policy),'previous configuration policy differs from completed run');
@@ -40,7 +42,6 @@ export function prepareNextNativeInstructionLoopConfiguration({root,profilePath,
   assert.match(id,/^[a-zA-Z0-9._-]{1,100}$/u);assert.notEqual(id,old.policy.id);
   outputRoot=resolve(outputRoot);assertNoSymlinkPathSegments(outputRoot,'fresh next-cycle configuration',{allowMissingLeaf:true});
   assert.ok(outputRoot.startsWith(old.protectedRoot+'/'),'next cycle remains inside the protected host root');
-  assert.ok(!existsSync(outputRoot),'fresh next-cycle configuration required');
   for(const path of [resolve(root),old.generator.baselineSourceRoot,old.generator.candidateRoot,old.generator.fullRoot,
     old.generator.stagingRoot,old.stateRoot,...(practical?[old.practical.root,old.practical.baselineRoot]:[old.native.root,old.native.workRoot]),...(old.normal.target===null?[]:[old.normal.target])])
     assert.ok(outputRoot!==path&&!outputRoot.startsWith(path+'/')&&!path.startsWith(outputRoot+'/'),'next-cycle configuration overlaps an existing source, run or owner');
@@ -60,7 +61,7 @@ export function prepareNextNativeInstructionLoopConfiguration({root,profilePath,
   assert.ok(history.registry?.snapshot_digest,'completed run lacks Registry version closure');
   p.generator.registrySnapshotDigest=history.registry.snapshot_digest;
   p.generator.trustedAuthorityContexts=history.registry.trusted_authority_contexts??[];
-  if(history.outcome==='applied'){
+  if(history.application_active){
     const c=history.candidate;
     p.generator.baselineSourceRoot=c.source_root;p.generator.baselineRevision=c.source_revision;
     p.generator.parentAssets=c.candidate_assets;
@@ -93,6 +94,11 @@ export function prepareNextNativeInstructionLoopConfiguration({root,profilePath,
     resultSummary:resultSummary??`Previous observed result metrics (not formal admission): ${JSON.stringify(metrics)}. Missing components remain unknown.`});
   assert.equal(prepared.policy.observation.previous.journal_digest,history.journal_digest,'previous cycle changed during preparation');
   p.policy=prepared.policy;delete p.policy.runtime_digest;
+  return {profile:p,output_root:outputRoot};
+}
+export function prepareNextNativeInstructionLoopConfiguration(options){
+  const built=buildNextNativeInstructionLoopProfile(options),p=built.profile,outputRoot=built.output_root;
+  assert.ok(!existsSync(outputRoot),'fresh next-cycle configuration required');
   mkdirSync(outputRoot,{mode:0o700});
   const nextProfilePath=join(outputRoot,'profile.json');
   writeCanonicalJsonNoReplace({outputPath:nextProfilePath,artifact:p,label:'next-cycle native profile',maximumBytes:16*1024*1024});

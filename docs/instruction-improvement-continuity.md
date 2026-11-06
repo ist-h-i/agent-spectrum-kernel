@@ -3,11 +3,33 @@
 Implementation scope, acceptance mapping and verification limits:
 [delivery evidence](instruction-improvement-delivery.md).
 
-Spec `instruction-improvement-continuity-spec`, revision 1. Upstream: the
+Spec `instruction-improvement-continuity-spec`, revision 2. Upstream: the
 owner's eight-item implementation request, #176 and #180, and the existing
 `cross-runtime-environment-loop-spec-v1` / supervised loop contracts.
 
 ## Behavior and acceptance
+
+Revision 2 closes the integration gaps identified after the first implementation:
+component authoring/composition/import are executable supervised candidate stages,
+their whole-environment practical result reaches exact local apply/restore, and
+a bounded operation advances fresh cycles without another routine human gate.
+Portable text helpers remain inert during import and are visible in the exact
+reviewed preview. Existing v1 packages and Full/native profiles remain supported.
+
+- AC-CONNECT: a component profile automatically imports only exact confirmed
+  local plans, composes host-declared layers, invokes the bounded authoring
+  provider for revise/create/exclude, captures both whole environments, evaluates
+  them after the case gate, and plans application before the change gate.
+  Neither source package authority nor a generated response can approve adoption.
+- AC-OPERATE: an explicitly bounded operation automatically prepares/starts its
+  next cycle after completion, retaining actual results/baseline and reserving
+  unique cycle destinations. Recovery never copies a previous human decision,
+  replays a consumed model/owner command, or changes a finished ledger.
+- AC-HELPERS: selected, bounded UTF-8 helper files can travel with an instruction
+  in a versioned package. Include exact bytes/media type in preview and plan;
+  reject unsafe paths, binaries, secrets and unselected dependencies. Import
+  does not execute helpers, preserve executable mode, or trust foreign evidence.
+  Receiver Eval cases and change decisions still govern execution/adoption.
 
 - AC-FEEDBACK: bounded, explicitly supplied work summaries retain evidence
   digests and applicability, group repeated findings and propose the narrowest
@@ -56,14 +78,14 @@ approved here and no real owner application is performed.
 
 ## Implementation and verification contracts
 
-Implementation `instruction-improvement-continuity-implementation`, revision 1;
-upstream `instruction-improvement-continuity-spec@1`. Reuse CAS, Registry,
+Implementation `instruction-improvement-continuity-implementation`, revision 2;
+upstream `instruction-improvement-continuity-spec@2`. Reuse CAS, Registry,
 instruction compiler, Portfolio and supervised host boundaries. Add small local
 feedback, continuation, portable-package and composition entry points; do not
 change scoring, original evaluations, credentials, runner settings or installers.
 
-Verification `instruction-improvement-continuity-verification`, revision 1;
-upstream `instruction-improvement-continuity-spec@1`. Selected path:
+Verification `instruction-improvement-continuity-verification`, revision 2;
+upstream `instruction-improvement-continuity-spec@2`. Selected path:
 `formal_verification_contract`, triggers
 `state_concurrency_persistence_lifecycle_or_cross_module` and
 `multi_session_multi_agent_or_handoff`. Each AC maps to the corresponding new
@@ -73,6 +95,13 @@ missing dependencies, stale approval/plans, path traversal/symlinks, foreign
 scope, unsupported adapters and uncertain previous operations. Run repository
 validation and an independent diff review. Record actual commands/results in
 the delivery report; artificial approvals never confer live authority.
+
+Revision 2 adds real model-free component authoring/import/composition through
+whole-environment evaluation and actual temporary-target apply/restore, two
+adopted cycles under the bounded operation, public target API bypass negatives,
+normal-installer lease chaining, v1/v1.1 package compatibility and unsafe helpers.
+These checks supplement, rather than replace, the existing formal Evolution,
+native Full, Registry, Portfolio and saved-result regression owners.
 
 Real model quality, effective ambient context, real target adoption/restore and
 repeated live operation remain separate acceptance evidence. #176's broader
@@ -122,6 +151,26 @@ components so renderer input/dependency authority cannot be smuggled as claims.
 Asset Markdown is the explicitly selected product, not a default dump of raw
 work source or conversation material.
 
+Packages containing text helpers use contract `1.1.0`; Markdown-only `1.0.0`
+packages remain readable and are still the default without helpers. A v1.1 file
+adds an exact `media_type`. Supported UTF-8 helper types include JavaScript,
+TypeScript, Python, shell, JSON, YAML, TOML, text and SQL within the selected
+instruction's directory. Explicit `.agents`/`.claude` instruction namespaces
+are supported; hidden configuration, binaries, archives, traversal and symlinks
+are refused. Helper bytes and media types are shown in preview/import plans.
+v1.1 permits code fences in selected files; metadata and files still undergo
+secret/identifier checks, including quoted JSON secret keys. The scanner is
+conservative and is neither malware analysis nor proof of lawful portability.
+
+Import writes helpers as inert text without executable mode and does not run
+them. The receiving `component_practical_instruction_loop_profile_v1` can consume
+an exact confirmed import plan, map every accepted Asset into explicit local
+layers and evaluate the resulting complete environment before change approval.
+Only a caller-owned approved Eval command can execute a helper in its fresh
+workspace; adoption copies it into the owner and does not execute it. External
+runtime/dependency requirements must be declared and locally checked, not
+automatically installed or inferred from source claims.
+
 Import's `ready` means ready to register *candidates*, not ready to execute or
 adopt. Adapter/runtime/capability constraints remain explicit. Source applicability
 summaries are retained as untrusted package metadata; project/model/domain
@@ -169,6 +218,11 @@ accept `claude_code` environments and `.claude` mappings. This prepares exact
 candidate requests and imports for an authenticated Claude host without changing
 its app configuration or obtaining credentials. The existing restricted Claude
 evaluation/runtime and saved-result verification remain the evaluation path.
+The component pipeline supports Claude-shaped authoring requests, composition,
+packages, local evaluation/application and normal-owner leases. Its subprocess
+authoring and automatic-assessor model ports are currently Codex ports; an
+authenticated Claude host can use the adapter-neutral request/import handoff.
+No authenticated Claude-app dispatch or real-model cycle is claimed here.
 The retained Full/native reference runner remains Codex-specific; a Claude
 handoff is not mislabeled as a completed Full/native Claude run. Fully unattended
 Claude host dispatch and authenticated end-to-end acceptance remain unverified

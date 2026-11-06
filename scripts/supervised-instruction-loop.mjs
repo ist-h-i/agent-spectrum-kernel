@@ -26,6 +26,10 @@ function checkedPolicy(p){
   assert.ok(Number.isSafeInteger(p.max_trials)&&p.max_trials>0&&p.max_trials<=256);
   assert.equal(p.formal_admission_implied,false);
   if(p.evaluation_mode!==undefined)assert.equal(p.evaluation_mode,'practical_v1');
+  if(p.application_anchor!=null){
+    assert.deepEqual(Object.keys(p.application_anchor).sort(),['journal_digest','run_root']);
+    assert.equal(resolve(p.application_anchor.run_root),p.application_anchor.run_root);assert.match(p.application_anchor.journal_digest,digest);
+  }
   assert.ok(p.normal_target===null||typeof p.normal_target==='string'&&resolve(p.normal_target)===p.normal_target,
     'normal_target must be an absolute path or explicit null for result review');
   return p;
@@ -59,6 +63,10 @@ function next(s){
   const p=s.policy,o=s.outputs;
   if(!o.generate)return schedule(s,'generate','generate',{observation:p.observation});
   if(!o.register)return schedule(s,'register','register',{candidate:o.generate});
+  if(o.register.no_change===true){
+    if(!o.cleanup)return schedule(s,'cleanup','cleanup',{disposition:'unchanged',candidate:o.register});
+    return 'no_change';
+  }
   if(!o.select)return schedule(s,'select','select',{observation:p.observation,candidate:o.register,catalog:p.catalog});
   if(!s.evaluation_decision){
     s.gate={kind:'evaluation',packet:{candidate:o.register,selection:o.select,rows:s.rows,runtime_digest:p.runtime_digest,
@@ -102,11 +110,11 @@ function next(s){
     decision:s.change_decision});
   if(!o.cleanup)return schedule(s,'cleanup','cleanup',{disposition:'applied',candidate:o.register});
   if(s.restore_requested){
-    if(!s.restore_decision){s.gate={kind:'change',packet:{action:'restore',application:o.apply,plan:o.plan,
+    if(!s.restore_decision){s.gate={kind:'change',packet:{action:'restore',request_index:s.restore_request_index??1,application:o.apply,plan:o.plan,
       version:o.activate,normal_target:p.normal_target,formal_admission_implied:false}};return null;}
     if(s.restore_decision.disposition==='rejected')return 'restoration_declined';
     if(!o.restore)return schedule(s,'restore','restore',{plan:o.plan,application:o.apply,decision:s.restore_decision});
-    if(!o.switch_back)return schedule(s,'version','switch_back',{action:'restore',restoration:o.restore,candidate:o.register,previous_version:o.activate});
+    if(!o.switch_back)return schedule(s,'version','switch_back',{action:'restore',restoration:o.restore,candidate:o.register,previous_version:o.cleanup?.registry??o.activate});
     return 'restored';
   }
   return 'applied';
@@ -162,8 +170,12 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
     assert.ok(same(s.policy,policy),'resume cannot change policy');
     if(assessment)assert.equal(s.pending?.kind,'evaluate','AI assessment requires an active practical evaluation');
     if(requestRestore){
-      assert.equal(s.status,'completed');assert.equal(s.outputs.final.outcome,'applied');
-      assert.equal(s.restore_requested,undefined);s.restore_requested=true;s.status='advancing';delete s.outputs.final;
+      assert.equal(s.status,'completed');assert.ok(completedInstructionLoopApplicationIsActive(s),'restoration requires a still-active application');
+      if(s.restore_requested){
+        assert.equal(s.restore_decision?.disposition,'rejected');s.restore_history??=[];assert.ok(s.restore_history.length<16,'bounded restore request history');
+        s.restore_history.push({request_index:s.restore_request_index??1,decision:copy(s.restore_decision)});delete s.restore_decision;
+      }
+      s.restore_request_index=(s.restore_request_index??0)+1;s.restore_requested=true;s.status='advancing';delete s.outputs.final;
       append(root,'restoration_requested',s);
     }
     if(decision){
@@ -229,12 +241,16 @@ export function inspectSupervisedInstructionLoop(root){
   return {...summary(state),journal_records:events.length,policy_digest:canonicalDigest(state.policy)};
 }
 
+export function completedInstructionLoopApplicationIsActive(s){
+  if(s?.status!=='completed'||!s.outputs.apply||s.outputs.restore||s.outputs.switch_back)return false;
+  return s.outputs.final?.outcome==='applied'||s.outputs.final?.outcome==='restoration_declined'&&s.restore_decision?.disposition==='rejected';
+}
 export function readCompletedInstructionLoopContinuation(root){
   assertNoSymlinkPathSegments(resolve(root),'previous loop root');
   const {state:s,previous}=journal(resolve(root));
   assert.ok(s&&s.status==='completed'&&!s.pending&&!s.gate,'previous cycle must be completed, with no uncertain operation');
-  return copy({policy:s.policy,journal_digest:previous,candidate:s.outputs.register,report:s.outputs.report??null,outcome:s.outputs.final.outcome,
-    registry:s.outputs.switch_back??s.outputs.activate??s.outputs.retire??s.outputs.register.registry});
+  return copy({policy:s.policy,journal_digest:previous,candidate:s.outputs.register,report:s.outputs.report??null,outcome:s.outputs.final.outcome,application_active:completedInstructionLoopApplicationIsActive(s),
+    registry:s.outputs.switch_back??s.outputs.cleanup?.registry??s.outputs.activate??s.outputs.retire??s.outputs.register.registry});
 }
 
 // Preparation is read-only. The host must allocate fresh worker destinations

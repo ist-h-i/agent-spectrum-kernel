@@ -63,7 +63,11 @@ An AI recovery decision is not a third human approval or permission to install.
    supplied rubric/AI grader or explicitly unknown quality is allowed. Resource
    observations alone do not establish quality. Present the exact case packet to
    the human before dispatch.
-3. Advance `scripts/practical-evaluation-cli.mjs`. At `awaiting_ai_recovery`,
+3. For a standalone comparison, advance `scripts/practical-evaluation-cli.mjs`.
+   For an improvement including individual asset authoring, composition or
+   reviewed imports, use the component profile and supervised `operate` workflow
+   in the linked reference. Set an explicit cycle budget; routine completion
+   prepares the next cycle, with fresh case/change judgments. At `awaiting_ai_recovery`,
    read the packet and available evidence, choose an action and submit the
    structured assessment yourself; do not ask the human to perform routine
    recovery. A configured automatic assessor can perform this step as a worker.
@@ -85,6 +89,19 @@ An AI recovery decision is not a third human approval or permission to install.
    catalog fit; `insufficient_evidence` for that contract is not an instruction
    to stop collecting or using useful practical evidence. Bring the resulting
    report to the existing human change/application decision.
+
+Before that change judgment, resolve the exact baseline/candidate environments
+and show the added, revised and excluded files, layer/version differences and
+declared permissions/effects. Use the existing composition diff and Registry
+inspection; do not ask the human to approve an opaque digest without its actual
+content and consequences. Include received helper files in this review.
+
+Keep the latest improvement result separate from the currently applied owner
+anchor: a rejected candidate or a declined restoration does not change the
+installed baseline. For lost final responses use the runtime's owned completion
+inspection. Never infer completion from matching bytes alone, repeat an owner
+write, or overwrite a local edit to make a saved plan fit. A no-op is a valid
+outcome; do not manufacture a revision or an Eval simply to consume the budget.
 
 Frozen historical `single_shot_v1` primary plans retain their contract and
 original evidence. For a new practical evaluation use the new execution lane;

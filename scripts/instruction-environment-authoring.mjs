@@ -98,7 +98,7 @@ export function importInstructionEnvironmentAuthoring(options) {
   const spec = readContentAddressedJson({ storeRoot: options.storeRoot, digest: options.requestObjectDigest }).value;
   const c = validateSpec(options, spec), response = structuredClone(options.response);
   keys(response, ['request_digest', 'changes']); assert.equal(response.request_digest, options.requestObjectDigest, 'authoring request transplant');
-  assert.ok(Array.isArray(response.changes) && response.changes.length && response.changes.length <= 64);
+  assert.ok(Array.isArray(response.changes) && response.changes.length <= 64);
   const seen = new Set(), prepared = []; let bytes = 0;
   for (const change of response.changes) {
     assert.ok(!seen.has(change.stable_id), 'duplicate Asset change'); seen.add(change.stable_id);
@@ -129,6 +129,16 @@ export function importInstructionEnvironmentAuthoring(options) {
     }
     prepared.push({ change, descriptor: resetClaims(descriptor), mappings, fixedFiles });
   }
+  const unchanged=response.changes.every(change=>change.operation==='revise'&&change.files.every(f=>{
+    const component=c.components.find(a=>a.asset.stable_id===change.stable_id),asset=c.local.assets.find(a=>same(exactInstructionAsset(a),component.asset));
+    return asset.content.files.find(original=>original.path===f.path)?.raw_digest===instructionBytesDigest(Buffer.from(f.text));
+  }));
+  if(unchanged&&c.environment.components?.length){
+    const asset=c.environment.bindings[0].asset,record=c.local.assets.find(a=>same(exactInstructionAsset(a),asset)).record;
+    return {snapshot_digest:options.registrySnapshotDigest,asset,descriptor:record,components:c.components,individual_assets:[],created:false,no_change:true,
+      baseline_environment_digest:spec.baseline_environment_digest,request_object_digest:options.requestObjectDigest,response_digest:canonicalDigest(response),
+      models_started:false,activation_implied:false,validation_required:false};
+  }
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'ask-authoring-')));
   const components = c.components.filter(a => !response.changes.some(x => x.operation === 'exclude' && x.stable_id === a.asset.stable_id));
   let snapshot = options.registrySnapshotDigest; const assets = [];
@@ -137,7 +147,7 @@ export function importInstructionEnvironmentAuthoring(options) {
       const source = join(root, String(i)); mkdirSync(source);
       for (const f of item.change.files) { const path = join(source, f.path); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, f.text, { flag: 'wx', mode: 0o600 }); }
       for(const f of item.fixedFiles){instructionPath(f.path);const path=join(source,f.path);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,f.bytes,{flag:'wx',mode:0o600});}
-      const d = item.descriptor, revision = commitInstructionSource(source);
+      const d = item.descriptor, revision = commitInstructionSource(source,{contextDigest:options.requestObjectDigest});
       d.source.revision = revision; d.version = 'git:' + revision; d.version_scheme = 'git_revision';
       d.content = { package_format: 'canonical_json_base64_files', files: item.change.files.map(f => ({ path: f.path,
         media_type: 'text/markdown; charset=utf-8', raw_digest: instructionBytesDigest(Buffer.from(f.text)) })).concat(item.fixedFiles.map(f=>({path:f.path,media_type:f.media_type,raw_digest:instructionBytesDigest(f.bytes)}))) };

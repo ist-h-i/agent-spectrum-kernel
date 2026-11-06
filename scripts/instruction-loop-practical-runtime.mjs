@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {existsSync,mkdirSync} from 'node:fs';
 import {join,resolve,dirname} from 'node:path';
 import {canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
-import {instructionBytesDigest as hash,verifyInstructionEnvironment} from './instruction-environment.mjs';
+import {instructionBytesDigest as hash,verifyInstructionEnvironment,instructionEnvironmentTrustOptions} from './instruction-environment.mjs';
 import {executeNativeInstructionLoopStage} from './instruction-loop-native-host.mjs';
 import {fullInstructionInventory,compareFullInstructionContext} from './instruction-loop-full-candidate.mjs';
 import {selectInstructionLoopCases} from './instruction-loop-case-selection.mjs';
@@ -21,6 +21,7 @@ const sourceNames=['instruction-loop-practical-runtime.mjs','instruction-loop-na
   'instruction-loop-command-runtime.mjs','instruction-run-journal.mjs','ask-pragmatic-evaluation-report.mjs','content-addressed-store.mjs','asset-registry.mjs','codex-exec-runner.mjs'];
 const pin=path=>({path,digest:hash(readStableBytes(path,'practical runtime input',16*1024*1024))});
 function validateProfilePaths(p){
+  instructionEnvironmentTrustOptions(p.practical.environmentTrust);
   const evaluation=resolve(p.practical.root);assert.equal(evaluation,p.practical.root,'absolute evaluation root required');
   assertNoSymlinkPathSegments(evaluation,'practical evaluation root',{allowMissingLeaf:true});
   for(const path of [p.storeRoot,p.stateRoot,p.practical.baselineRoot,p.generator.baselineSourceRoot,p.generator.candidateRoot,p.generator.fullRoot,p.generator.stagingRoot,
@@ -47,13 +48,14 @@ function checkedProfile(definition){
 function save(path,value){writeCanonicalJsonNoReplace({outputPath:path,artifact:value,label:'Full practical lifecycle result',maximumBytes:16*1024*1024});}
 function selectionPath(p){return join(p.stateRoot,'practical-selection.json');}
 export function prepareFullPracticalInstructionSelection(p,job){
-  const fairness=compareFullInstructionContext({baselineRoot:p.practical.baselineRoot,candidateRoot:job.input.candidate.full_root,skills:p.generator.skills});
+  const fairness=p.kind==='full_practical_instruction_loop_profile_v1'?compareFullInstructionContext({baselineRoot:p.practical.baselineRoot,candidateRoot:job.input.candidate.full_root,skills:p.generator.skills}):
+    {comparison:'complete_declared_component_environments',ambient_context:'Unknown',per_asset_causality_implied:false};
   const feedback=projectInstructionLoopObservation(job.input.observation);
   const selected=selectInstructionLoopCases({...p.selection,catalog:job.input.catalog,changedTags:[...new Set([...(p.selection.changedTags??[]),...feedback.tags])]});
   const environments={baseline:{root:p.practical.baselineRoot,digest:p.baselineEnvironmentObjectDigest},candidate:{root:job.input.candidate.full_root,digest:job.input.candidate.environment_object_digest}};
   const conditions=Object.entries(environments).map(([id,source])=>{
     const {environment,files}=verifyInstructionEnvironment({storeRoot:p.storeRoot,environmentObjectDigest:source.digest,
-      trustedAssetAuthorityContexts:p.generator.trustedAuthorityContexts??[],...(p.practical.environmentTrust??{})});
+      trustedAssetAuthorityContexts:p.generator?.trustedAuthorityContexts??p.environmentTrust?.trustedAssetAuthorityContexts??[],...instructionEnvironmentTrustOptions(p.practical.environmentTrust),...instructionEnvironmentTrustOptions(p.environmentTrust)});
     const inventory=fullInstructionInventory(source.root);
     assert.equal(canonicalDigest(inventory.map(f=>({path:f.path,raw_digest:f.sha256}))),canonicalDigest(files.map(f=>({path:f.path,raw_digest:f.raw_digest}))),'practical source projection drift');
     const configured=p.practical.conditions[id];assert.ok(configured,'both practical conditions required');
@@ -75,7 +77,7 @@ export function prepareFullPracticalInstructionSelection(p,job){
   const plan={kind:'practical_evaluation_plan_v1',id:p.policy.id,goal:feedback.goal,runtime_digest:canonicalDigest(runtime),evidence_kind:p.practical.evidence_kind,
     conditions:conditions.map(({id,context})=>({id,context})),cases:cases.map(({id,task_ref,input_ref,success_criteria_ref})=>({id,task_ref,input_ref,success_criteria_ref,
       public_input_digest:job.input.catalog.find(c=>c.id===id).public_input_digest})),repetitions:p.policy.repetitions,recovery:p.practical.recovery,global_context:p.practical.global_context};
-  const value={...selected,full_context_comparison:fairness,practical_plan:plan,practical_plan_digest:canonicalDigest(plan),
+  const value={...selected,source_request_digest:canonicalDigest(job),source_profile_digest:canonicalDigest(p),full_context_comparison:fairness,practical_plan:plan,practical_plan_digest:canonicalDigest(plan),
     practical_runtime:runtime,practical_root:p.practical.root,quality_plan:'User-owned public checks/rubrics; unavailable quality stays unknown. Not formal primary admission.'};
   save(selectionPath(p),value);return value;
 }
@@ -86,7 +88,14 @@ function evaluationOutput(job,state){
     {practical_status:state.status,pending_recovery:state.pending_recovery,pending_recovery_digest:state.pending_recovery_digest}};
 }
 export function createFullPracticalInstructionLoopRuntime({definition,modelCallsAuthorized=false}){
-  const p=checkedProfile(definition),digest=canonicalDigest(definition);
+  return createPracticalLifecycleRuntime({definition,modelCallsAuthorized,readProfile:()=>checkedProfile(definition),executeStage:executeNativeInstructionLoopStage,
+    validateCoordinatorRoot(root,p){
+      for(const path of [p.practical.root,p.storeRoot,p.stateRoot,p.practical.baselineRoot,p.generator.baselineSourceRoot,p.generator.candidateRoot,p.generator.fullRoot,p.generator.stagingRoot,
+        ...(p.normal.target===null?[]:[p.normal.target])])assert.ok(root!==path&&!root.startsWith(path+'/')&&!path.startsWith(root+'/'),'coordinator overlaps evaluation, source, state or owner');
+    }});
+}
+export function createPracticalLifecycleRuntime({definition,modelCallsAuthorized=false,readProfile,executeStage,validateCoordinatorRoot,inspectStage=null}){
+  const p=readProfile(),digest=canonicalDigest(definition);
   const folder=job=>join(p.stateRoot,'stages',canonicalDigest(job).slice(7)),resultPath=job=>join(folder(job),'result.json');
   const prepared=job=>{const stored=readJsonFileStrict(selectionPath(p),'practical selection',16*1024*1024);assert.equal(canonicalDigest(stored),canonicalDigest(job.input.selection),'approved practical selection drift');return stored;};
   const allocate=(job,resumable=false)=>{assertNoSymlinkPathSegments(folder(job),'practical lifecycle stage',{allowMissingLeaf:true});
@@ -94,17 +103,14 @@ export function createFullPracticalInstructionLoopRuntime({definition,modelCalls
     if(!existsSync(folder(job)))mkdirSync(folder(job),{mode:0o700});else assert.ok(resumable,'stage already allocated; inspect instead of replay');
     save(join(folder(job),'request.json'),job);};
   const evaluate=async(job,{root,assessment=null})=>{
-    checkedProfile(definition);allocate(job,true);const selection=prepared(job),runtime=createPracticalEvaluationCommandRuntime({definition:selection.practical_runtime,modelCallsAuthorized});
+    readProfile();allocate(job,true);const selection=prepared(job),runtime=createPracticalEvaluationCommandRuntime({definition:selection.practical_runtime,modelCallsAuthorized});
     const state=await advancePracticalEvaluation({root:selection.practical_root,plan:selection.practical_plan,runtime,assessment,
       inheritedApproval:{root,job_digest:canonicalDigest(job)}});
     const result=evaluationOutput(job,state);if(result.status==='completed')save(resultPath(job),result);return result;
   };
   const runtime={digest,evaluate,resumeEvaluation:evaluate,
-    validateCoordinatorRoot(root){
-      for(const path of [p.practical.root,p.storeRoot,p.stateRoot,p.practical.baselineRoot,p.generator.baselineSourceRoot,p.generator.candidateRoot,p.generator.fullRoot,p.generator.stagingRoot,
-        ...(p.normal.target===null?[]:[p.normal.target])])assert.ok(root!==path&&!root.startsWith(path+'/')&&!path.startsWith(root+'/'),'coordinator overlaps evaluation, source, state or owner');
-    },
-    async inspect(job){checkedProfile(definition);if(existsSync(resultPath(job)))return readJsonFileStrict(resultPath(job),'lifecycle result',16*1024*1024);
+    validateCoordinatorRoot(root){validateCoordinatorRoot(root,p);},
+    async inspect(job,context={}){readProfile();if(existsSync(resultPath(job)))return readJsonFileStrict(resultPath(job),'lifecycle result',16*1024*1024);
       if(job.kind==='evaluate'){
         const selection=prepared(job);
         if(existsSync(selection.practical_root)){
@@ -114,13 +120,21 @@ export function createFullPracticalInstructionLoopRuntime({definition,modelCalls
         }
         return {request_digest:canonicalDigest(job),status:'resumable'};
       }
+      if(inspectStage)try{
+        const output=await inspectStage(p,job,context);
+        if(output!==null){const result={request_digest:canonicalDigest(job),status:'completed',output,inspection:{recovered_from_owned_evidence:true}};save(resultPath(job),result);return result;}
+      }catch(error){
+        const issue={request_digest:canonicalDigest(job),reason:String(error.message).slice(0,2048)};
+        save(join(folder(job),'inspection-'+canonicalDigest(issue).slice(7)+'.json'),issue);
+        return {request_digest:canonicalDigest(job),status:'unknown',inspection_issue:issue};
+      }
       return {request_digest:canonicalDigest(job),status:'unknown'};},
-    async preflight(job){checkedProfile(definition);assert.ok(!existsSync(folder(job)),'stage already allocated; inspect instead of replay');
-      if(job.kind==='generate'&&p.generator.provider.kind==='codex')assert.equal(modelCallsAuthorized,true,'generation model calls not authorized');
+    async preflight(job){readProfile();assert.ok(!existsSync(folder(job)),'stage already allocated; inspect instead of replay');
+      if(job.kind==='generate'&&(p.generator?.provider.kind==='codex'||p.candidate?.authoring?.provider.kind==='codex'))assert.equal(modelCallsAuthorized,true,'generation model calls not authorized');
       assertNoSymlinkPathSegments(folder(job),'practical lifecycle stage',{allowMissingLeaf:true});}
   };
-  for(const kind of stages)runtime[kind]=async job=>{
-    checkedProfile(definition);allocate(job);const output=kind==='select'?prepareFullPracticalInstructionSelection(p,job):await executeNativeInstructionLoopStage(p,job,{modelCallsAuthorized});
+  for(const kind of stages)runtime[kind]=async(job,context={})=>{
+    readProfile();allocate(job);const output=kind==='select'?prepareFullPracticalInstructionSelection(p,job):await executeStage(p,job,{...context,modelCallsAuthorized});
     const result={request_digest:canonicalDigest(job),status:'completed',output};save(resultPath(job),result);return result;};
   return runtime;
 }

@@ -127,6 +127,19 @@
         },
         "raw_digest": {
           "$ref": "#/$defs/digest"
+        },
+        "media_type": {
+          "type": "string",
+          "enum": [
+            "text/markdown; charset=utf-8",
+            "text/javascript",
+            "text/x-python",
+            "text/x-shellscript",
+            "text/typescript",
+            "application/json",
+            "text/yaml",
+            "text/plain"
+          ]
         }
       }
     },
@@ -304,7 +317,10 @@
           "const": "offline_instruction_asset_package"
         },
         "contract_version": {
-          "const": "1.0.0"
+          "enum": [
+            "1.0.0",
+            "1.1.0"
+          ]
         },
         "source_scope_digest": {
           "$ref": "#/$defs/digest"

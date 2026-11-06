@@ -152,3 +152,33 @@ test('portable candidates retain declared risk/effects and unresolved safety ref
   const constrained=registerAsset({storeRoot:x.f.storeRoot,sourceRoot:x.f.root,predecessorSnapshotDigest:saved.snapshot_digest,descriptor:d}),cref=exactInstructionAsset({...d,...constrained});
   assert.throws(()=>previewInstructionAssetPackage({...source,registrySnapshotDigest:constrained.snapshot_digest,selectedAssets:[cref],portability:{[cref.stable_id]:metadata}}),/unresolved safety/);
 });
+test('v1.1 transfers exact text helpers inertly and rejects unsafe helper content and types',t=>{
+  const x=fixture(t),old=verifyAssetRegistry({storeRoot:x.f.storeRoot,snapshotDigest:x.source.registrySnapshotDigest}).assets.find(a=>a.stable_id===x.f.rootAsset.stable_id);
+  const d=structuredClone(old.record);delete d.object_kind;d.stable_id='ask.skill.helper-package';
+  const entry=d.type_extension.entrypoint,helper=dirname(entry)+'/scripts/check.mjs',text='export const value = 42;\n';
+  mkdirSync(dirname(join(x.f.root,helper)),{recursive:true});writeFileSync(join(x.f.root,helper),text);
+  d.content={package_format:'canonical_json_base64_files',files:[...old.content.files.map(({path,raw_digest,media_type})=>({path,raw_digest,media_type})),{path:helper,raw_digest:instructionBytesDigest(Buffer.from(text)),media_type:'text/javascript'}]};
+  const saved=registerAsset({storeRoot:x.f.storeRoot,sourceRoot:x.f.root,predecessorSnapshotDigest:x.source.registrySnapshotDigest,descriptor:d}),ref=exactInstructionAsset({...d,...saved});
+  const source={...x.source,registrySnapshotDigest:saved.snapshot_digest,selectedAssets:[ref],portability:{[ref.stable_id]:metadata}};
+  const preview=previewInstructionAssetPackage(source);assert.equal(preview.payload.contract_version,'1.1.0');
+  exportInstructionAssetPackage({...source,outputPath:x.outputPath,approval:{preview_digest:preview.preview_digest,evidence_digest:canonicalDigest('synthetic'),intended_scope:'receiver'}});
+  receiveInstructionAssetPackage({packagePath:x.outputPath,quarantineRoot:x.receive.quarantineRoot});
+  const o={...x.receive,resolutions:{[ref.stable_id]:{action:'accept'}}},plan=planInstructionAssetImport(o);
+  assert.equal(plan.plan.helper_execution_implied,false);assert.equal(plan.plan.helper_files.length,1);
+  const result=applyInstructionAssetImport({...o,confirmedPlanDigest:plan.plan_digest});
+  const asset=verifyAssetRegistry({storeRoot:o.storeRoot,snapshotDigest:result.snapshot_digest}).assets[0];
+  const copied=asset.content.files.find(f=>f.path===helper);assert.equal(Buffer.from(copied.bytes_base64,'base64').toString(),text);assert.equal(copied.media_type,'text/javascript');
+  const original=JSON.parse(readFileSync(x.outputPath));
+  for(const mutate of [p=>{p.payload.assets[0].files.find(f=>f.path===helper).path=dirname(entry)+'/scripts/check.exe';},
+    p=>{const f=p.payload.assets[0].files.find(f=>f.path===helper);f.text='const password="private";';f.raw_digest=instructionBytesDigest(Buffer.from(f.text));},
+    p=>{const f=p.payload.assets[0].files.find(f=>f.path===helper);f.path=dirname(entry)+'/resources/settings.json';f.media_type='application/json';f.text='{"api_key":"private-value"}';f.raw_digest=instructionBytesDigest(Buffer.from(f.text));},
+    p=>{p.payload.assets[0].files.find(f=>f.path===helper).path='.claude/settings.json';}]){
+    const p=structuredClone(original);mutate(p);p.approval.preview_digest=canonicalDigest(p.payload);p.package_digest=canonicalDigest({payload:p.payload,approval:p.approval});
+    const path=join(x.f.root,'unsafe.json');writeFileSync(path,JSON.stringify(p));assert.throws(()=>receiveInstructionAssetPackage({packagePath:path,quarantineRoot:join(x.f.root,'unsafe-quarantine')}));
+  }
+  const projected=structuredClone(original);projected.payload.assets[0].entrypoint='.agents/'+projected.payload.assets[0].entrypoint;
+  for(const file of projected.payload.assets[0].files)file.path='.agents/'+file.path;
+  projected.approval.preview_digest=canonicalDigest(projected.payload);projected.package_digest=canonicalDigest({payload:projected.payload,approval:projected.approval});
+  const projectedPath=join(x.f.root,'projected.json');writeFileSync(projectedPath,JSON.stringify(projected));
+  assert.equal(receiveInstructionAssetPackage({packagePath:projectedPath,quarantineRoot:join(x.f.root,'projected-quarantine')}).status,'quarantined');
+});

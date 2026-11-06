@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, extname, join, resolve } from 'node:path';
 import { canonicalDigest, readJsonFileStrict, writeCanonicalJsonNoReplace, assertNoSymlinkPathSegments } from './content-addressed-store.mjs';
 import { verifyAssetRegistry, registerAsset } from './asset-registry.mjs';
 import { exactInstructionAsset, instructionBytesDigest } from './instruction-environment.mjs';
@@ -19,23 +19,31 @@ const metadataKeys = ['title', 'rationale', 'applicability', 'non_applicability'
 const registry = o => verifyAssetRegistry({ storeRoot: o.storeRoot, snapshotDigest: o.registrySnapshotDigest,
   trustedAuthorityContexts: o.trustedAssetAuthorityContexts ?? [] });
 
-export function inspectInstructionPortability(text) {
+export function inspectInstructionPortability(text, {allowCode=false}={}) {
   // A conservative aid, not a detector for every customer identifier. The host
   // reviews the entire preview and remains responsible for lawful portability.
   const checks = {
-    secret: /(?:\b(?:token|secret|password|credential|api[_-]?key)[\w-]*\s*[=:]|-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:sk-|ghp_)[A-Za-z0-9]{16,})/iu,
+    secret: /(?:\b(?:token|secret|password|credential|api[_-]?key)[\w-]*["']?\s*[=:]|-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:sk-|ghp_)[A-Za-z0-9]{16,})/iu,
     identifier: /(?:https?:\/\/|file:\/\/|\/(?:Users|home|private|var|tmp)\/|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\b(?:customer|client|ticket)[-_ :#]+[A-Za-z0-9]+)/iu,
     raw_material: /(?:```|<\|(?:user|assistant|system)\|>|\bBearer\s+[A-Za-z0-9._-]+)/u,
   };
-  return Object.entries(checks).filter(([, pattern]) => pattern.test(text)).map(([code]) => code);
+  return Object.entries(checks).filter(([code, pattern]) => (code!=='raw_material'||!allowCode?pattern:/<\|(?:user|assistant|system)\|>|\bBearer\s+[A-Za-z0-9._-]+/u).test(text)).map(([code]) => code);
 }
-function publicText(value, max = 8192) {
+function publicText(value, max = 8192, allowCode=false) {
   assert.ok(typeof value === 'string' && value.trim() && Buffer.byteLength(value) <= max && !value.includes('\0'), 'bounded public package text required');
-  assert.deepEqual(inspectInstructionPortability(value), [], 'potentially prohibited content; redact before preview');
+  assert.deepEqual(inspectInstructionPortability(value,{allowCode}), [], 'potentially prohibited content; redact before preview');
+}
+const helperTypes={'.js':'text/javascript','.mjs':'text/javascript','.cjs':'text/javascript','.py':'text/x-python','.sh':'text/x-shellscript','.bash':'text/x-shellscript','.ts':'text/typescript','.json':'application/json','.yaml':'text/yaml','.yml':'text/yaml','.toml':'text/plain','.txt':'text/plain','.sql':'text/plain'};
+function portableFile(path,entrypoint){
+  instructionPath(path);const parts=path.split('/'),namespace=/^\.(?:agents|claude)\/(?:skills|prompts|commands)\//u;
+  assert.ok(!parts.some((p,i)=>p.startsWith('.')&&!(i===0&&namespace.test(path)&&entrypoint.startsWith(parts[0]+'/'))),'hidden helper/configuration paths are not portable');
+  if(path.endsWith('.md'))return 'text/markdown; charset=utf-8';
+  const prefix=dirname(entrypoint);assert.ok(prefix!=='.'&&path.startsWith(prefix+'/'),'helper must belong to its instruction directory');
+  const type=helperTypes[extname(path)];assert.ok(type,'unsupported helper type; binaries and archives are not portable');return type;
 }
 function validatePayload(p) {
   keys(p, ['kind', 'contract_version', 'source_scope_digest', 'intended_scope', 'assets']);
-  assert.equal(p.kind, 'offline_instruction_asset_package'); assert.equal(p.contract_version, '1.0.0');
+  assert.equal(p.kind, 'offline_instruction_asset_package'); assert.ok(['1.0.0','1.1.0'].includes(p.contract_version));
   assert.match(p.source_scope_digest, digest); assert.match(p.intended_scope, id);
   assert.ok(Array.isArray(p.assets) && p.assets.length && p.assets.length <= 64);
   const identities = new Set(), references = new Set(); let size = 0;
@@ -69,10 +77,11 @@ function validatePayload(p) {
     assert.ok(Array.isArray(a.files) && a.files.length && a.files.length <= 256);
     const paths = new Set();
     for (const f of a.files) {
-      keys(f, ['path', 'text', 'raw_digest']); instructionPath(f.path);
-      assert.ok(/\.md$/u.test(f.path), 'only selected instruction Markdown, not executable/raw evidence files');
+      keys(f, p.contract_version==='1.0.0'?['path', 'text', 'raw_digest']:['path','text','raw_digest','media_type']); instructionPath(f.path);
+      if(p.contract_version==='1.0.0')assert.ok(/\.md$/u.test(f.path), 'v1 packages contain instruction Markdown only');
+      else assert.equal(f.media_type,portableFile(f.path,a.entrypoint),'helper media type mismatch');
       assert.ok(!paths.has(f.path.toLowerCase()), 'package path collision'); paths.add(f.path.toLowerCase());
-      publicText(f.text, 128 * 1024); size += Buffer.byteLength(f.text);
+      publicText(f.text, 128 * 1024,p.contract_version==='1.1.0'); size += Buffer.byteLength(f.text);
       assert.equal(instructionBytesDigest(Buffer.from(f.text)), f.raw_digest, 'package file checksum drift');
     }
     assert.ok(a.files.some(f => f.path === a.entrypoint), 'missing entrypoint');
@@ -93,6 +102,7 @@ export function previewInstructionAssetPackage(options) {
   const local = registry(options);
   assert.ok(Array.isArray(options.selectedAssets) && options.selectedAssets.length, 'explicit Asset selection required');
   assert.ok(options.portability && typeof options.portability === 'object');
+  const version=options.contractVersion??(options.selectedAssets.some(ref=>local.assets.find(a=>same(exactInstructionAsset(a),ref))?.content.files.some(f=>!f.path.endsWith('.md')))?'1.1.0':'1.0.0');
   const assets = options.selectedAssets.map(ref => {
     const a = local.assets.find(a => same(exactInstructionAsset(a), ref)); assert.ok(a, 'selected Asset is not registered');
     assert.ok(['skill', 'prompt'].includes(a.asset_type));
@@ -106,9 +116,10 @@ export function previewInstructionAssetPackage(options) {
       restrictions:{requested_permissions:[...a.record.permissions_and_effects.requested_permissions].sort(),possible_effects:[...a.record.permissions_and_effects.possible_effects].sort(),classifications:[...a.record.safety.classifications].sort()},
       dependencies: a.record.dependencies.map(d => canonicalDigest(d)).sort(),
       required_capabilities: [...a.record.applicability.required_capabilities].sort(), metadata,
-      files: a.content.files.map(f => ({ path: f.path, text: new TextDecoder('utf-8', { fatal: true }).decode(Buffer.from(f.bytes_base64, 'base64')), raw_digest: f.raw_digest })) };
+      files: a.content.files.map(f => ({ path: f.path, text: new TextDecoder('utf-8', { fatal: true }).decode(Buffer.from(f.bytes_base64, 'base64')), raw_digest: f.raw_digest,
+        ...(version==='1.1.0'?{media_type:portableFile(f.path,a.record.type_extension.entrypoint)}:{}) })) };
   }).sort((a, b) => a.stable_id.localeCompare(b.stable_id));
-  const payload = validatePayload({ kind: 'offline_instruction_asset_package', contract_version: '1.0.0',
+  const payload = validatePayload({ kind: 'offline_instruction_asset_package', contract_version: version,
     source_scope_digest: canonicalDigest({ repository: local.repository_id, scope: local.scope_id }), intended_scope: options.intendedScope, assets });
   return { payload, preview_digest: canonicalDigest(payload), export_permission_implied: false, network_operations: 0 };
 }
@@ -182,6 +193,7 @@ export function planInstructionAssetImport(options) {
     available_runtime_profiles: [...(options.availableRuntimeProfiles ?? [])].sort(),
     // Human-readable full before/after preview; never silently merge content.
     preview: p.payload.assets.map(a => ({ stable_id: a.stable_id, metadata: a.metadata, files: a.files })),
+    ...(p.payload.contract_version==='1.1.0'?{helper_files:p.payload.assets.flatMap(a=>a.files.filter(f=>!f.path.endsWith('.md')).map(f=>({stable_id:a.stable_id,path:f.path,raw_digest:f.raw_digest,media_type:f.media_type}))),helper_execution_implied:false}:{}),
     activation_implied: false, rollback_snapshot_digest: options.registrySnapshotDigest };
   return { plan, plan_digest: canonicalDigest(plan), ready: accepted.length > 0 && accepted.every(r => !r.blockers.length) };
 }
@@ -194,7 +206,7 @@ function localDescriptor(a, row, version, local, dependencies, packageDigest, re
     derivation: { kind: 'root', parent: null, delta: null }, dependencies,
     type_extension: a.asset_type === 'skill' ? { kind: 'skill', entrypoint: a.entrypoint }
       : { kind: 'prompt_template', adapter: a.adapter, entrypoint: a.entrypoint, rendered_runtime_content: false },
-    content: { package_format: 'canonical_json_base64_files', files: a.files.map(({ path, raw_digest }) => ({ path, raw_digest, media_type: 'text/markdown; charset=utf-8' })) },
+    content: { package_format: 'canonical_json_base64_files', files: a.files.map(({ path, raw_digest,media_type }) => ({ path, raw_digest, media_type: media_type??'text/markdown; charset=utf-8' })) },
     compatibility: { asset_contract_versions: ['1.0.0'], runtime_profiles: a.runtime_profiles },
     applicability: { models: unknown(), adapters: a.adapter === 'shared' ? structuredClone(a.adapter_constraints)
       : { status: 'bounded', included: [a.adapter], excluded: a.adapter_constraints.excluded }, stacks: unknown(), domains: unknown(), projects: unknown(), task_classes: unknown(),

@@ -172,6 +172,91 @@ The command prepares configuration only and never copies old approval to a new
 cycle. A consumer uses the configured complete ASK runtime; installation of the
 Skill alone does not place all source CLIs into the adopting project's scripts.
 
+## Connected component operation
+
+For individual Skill/Prompt create/revise/exclude, configuration composition or
+reviewed incoming assets, use `component_practical_instruction_loop_profile_v1`.
+The scoped `full_practical_instruction_loop_profile_v1` remains compatible for
+source-backed Full Skill revision. Both use the same practical runner and two
+human decision types; they have different candidate and application adapters.
+
+The component profile fixes these host-owned fields:
+
+- `protectedRoot`, disjoint `stateRoot`, `storeRoot`, `candidateRoot`,
+  `registrySnapshotDigest`, `baselineEnvironmentObjectDigest`, `adapter`,
+  instruction `runtime`, `supportPaths`, `environmentTrust`, `bundleDescriptor`,
+  `assetAuthority`, and `normal: {target,ownerStateDigest?}`. Null target retains
+  the existing result-only review behavior. An independent normal-installer
+  state pin is required when leasing an existing installer owner.
+- The existing `policy`, `selection` and `practical` public-case configuration.
+  A case packet binds the entire baseline/candidate file inventory, including
+  helpers, exact public inputs and recovery budget.
+- `candidate.composition?: {layers,excludedStableIds?}` and
+  `candidate.packageImports?: [{options,confirmedPlanDigest,layer:{id,kind},
+  mappings:[{stable_id,files:[{source,target}]}]}]`. Each import uses the existing
+  reviewed local plan. Every accepted asset needs explicit receiving mappings;
+  identity/dependency/conflict checks run before any owner operation.
+- `candidate.authoring?: {editableStableIds,removableStableIds?,additions,
+  provider}`. The provider is an explicitly synthetic `fixture` for mechanical
+  proof, or `codex` with a pinned executable/model/timeout for authorized calls.
+  Host inventories and descriptors constrain the response; the model can choose
+  revise/create/exclude text operations, including a justified no-op. It cannot
+  generate executable helpers, metadata, permissions or adoption authority.
+
+Generation automatically imports confirmed candidates, composes layers, invokes
+authoring when configured and freezes the whole environment. It then evaluates
+after case approval and builds an exact target plan before change approval.
+Empty or byte-identical authoring does not create a fake full-content revision.
+An unchanged environment finishes with `no_change`, preserves its observations
+and cleans only its private copies; no pointless Eval or application is claimed.
+
+Component adoption explicitly verifies the current supervisor's case decision,
+report, target, exact plan and actual change decision. It uses the existing
+environment target planner/file lifecycle and optional normal-owner lease; it
+does not create or impersonate a formal Evolution application receipt. Preview
+handles cannot apply. Restoration requires a fresh change-type decision, checks
+the recorded applied state before writes and restores original Registry states.
+In particular an initially captured candidate is not retroactively called a
+formally admitted/current baseline.
+
+Use supervised `configure --profile PROFILE --root CONFIG_DIRECTORY` to build
+the pinned `config.json` without starting a model or changing the owner.
+Use the configured runtime's supervised CLI `operate --root OPERATION --profile
+PROFILE --config CONFIG --cycles N`, with the usual `--decision`, `--packet`,
+`--reason`, `--assessment` and authorized `--allow-model-calls` flags. `N` is an
+explicit budget from 1 through 10. `operation-status --root OPERATION` is read-only.
+After a cycle completes, `operate` prepares and starts the next cycle and stops
+at its new case packet without asking for another routine continuation decision.
+It carries the actual applied baseline, decisions, uncertainty and observed
+costs. It consumes import confirmations only once and updates the editable
+inventory to the receiving configuration. No-op or requested restoration ends
+the operation. The operation report links preserved cycle reports and sums
+observed attempt resources without pooling quality across different cycles or
+inventing missing costs.
+
+The next configuration and fresh destinations are reserved before dispatch.
+Current and reserved profile/config digests are checked on resume; old human
+decisions are never copied as authority. A response loss in an already consumed
+model/owner stage still uses inspection rather than replay. Chained local
+overlays bind the previous completed journal, exact applied state and approved
+lease; rollback restores the immediately preceding overlay and its owner bytes.
+The original formal Evolution application APIs retain their separate checks.
+
+The current improvement-result history and the active owner anchor are separate.
+A rejected proposal or declined restoration does not select an uninstalled
+baseline. A new restoration request after refusal receives a distinct packet;
+the old decision cannot authorize it. The next cycle still needs both its own
+case and change judgments.
+
+Owned completion inspection recovers a lost final stage result without repeating
+generation or owner writes. Target completion receipts bind the approved plan,
+state hash, inode, bytes/removals and owner lease; generation receipts bind the
+request/profile and private directory identities. Pure preparation and immutable
+Registry operations can be reconstructed. Refusal cleanup checks exact retired
+Assets and private ownership before finishing a partial cleanup. Missing positive
+completion evidence, pending owner markers/locks or local edits remain uncertain;
+the runner does not clear them or overwrite user work to make a plan fit.
+
 ## Execution and context limits
 
 Instruction checks cover the declared condition files' bytes/modes and a bounded

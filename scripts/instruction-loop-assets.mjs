@@ -6,7 +6,7 @@ import { verifyAssetRegistry, buildAssetLifecycleAuthorityContext,
   applyAssetLifecycleTransitions } from './asset-registry.mjs';
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b);
 export function transitionInstructionLoopAssets({storeRoot,snapshotDigest,trustedAuthorityContexts=[],
-  candidateAssets,baselineAssets=[],action,authority}){
+  candidateAssets,baselineAssets=[],action,authority,baselineSnapshotDigest=null}){
   assert.ok(['activate','retire','restore'].includes(action));
   assert.equal(authority.kind,'external_asset_lifecycle_authority');
   assert.ok(candidateAssets.length>0);
@@ -24,10 +24,19 @@ export function transitionInstructionLoopAssets({storeRoot,snapshotDigest,truste
     snapshot=verifyAssetRegistry({storeRoot,snapshotDigest,trustedAuthorityContexts:trusted});
   };
   const move=(assets,from,to)=>assets.filter(a=>entry(a).state===from).map(asset=>({asset,from_state:from,to_state:to}));
+  let originalStates=null;
   if(action==='restore'){
-    assert.ok(baselineAssets.length>0,'baseline Asset bindings required for restore');
-    assert.ok(baselineAssets.every(a=>['current','historical','superseded'].includes(entry(a).state)),
-      'baseline was never an authorized current version');
+    if(baselineSnapshotDigest){
+      const original=verifyAssetRegistry({storeRoot,snapshotDigest:baselineSnapshotDigest,trustedAuthorityContexts});
+      originalStates=new Map(baselineAssets.map(asset=>{
+        const found=original.assets.find(a=>same(ref(a),asset));assert.ok(found&&['candidate','admitted','current','historical','superseded'].includes(found.state),'baseline lifecycle anchor missing or retired');
+        assert.equal(entry(asset).state,found.state==='current'?'historical':found.state,'baseline lifecycle changed after application');return [canonicalDigest(asset),found.state];
+      }));
+    }else{
+      assert.ok(baselineAssets.length>0,'baseline Asset bindings required for restore');
+      assert.ok(baselineAssets.every(a=>['current','historical','superseded'].includes(entry(a).state)),
+        'baseline was never an authorized current version');
+    }
   }
   if(action==='activate'){
     change(move(candidateAssets,'candidate','admitted'));
@@ -37,12 +46,13 @@ export function transitionInstructionLoopAssets({storeRoot,snapshotDigest,truste
     assert.ok(candidateAssets.every(a=>entry(a).state!=='current'),'cannot clean an active candidate');
     change(candidateAssets.filter(a=>entry(a).state!=='retired').map(asset=>({asset,from_state:entry(asset).state,to_state:'retired'})));
   }else{
-    assert.ok(baselineAssets.length>0,'baseline Asset bindings required for restore');
+    assert.ok(originalStates||baselineAssets.length>0,'baseline Asset bindings required for restore');
     change(move(candidateAssets,'current','historical'));
-    change([...move(baselineAssets,'historical','current'),...move(baselineAssets,'superseded','current')],'external_asset_rollback_authority');
+    const restore=originalStates?baselineAssets.filter(a=>originalStates.get(canonicalDigest(a))==='current'):baselineAssets;
+    change([...move(restore,'historical','current'),...move(restore,'superseded','current')],'external_asset_rollback_authority');
     // A baseline captured only as a candidate is not silently promoted into a
     // historical current version. Its lifecycle needs an explicit owner basis.
-    assert.ok(baselineAssets.every(a=>entry(a).state==='current'),'baseline was never an authorized current version');
+    assert.ok(baselineAssets.every(a=>entry(a).state===(originalStates?.get(canonicalDigest(a))??'current')),'baseline lifecycle was not exactly restored');
   }
   return {snapshot_digest:snapshotDigest,trusted_authority_contexts:trusted,history,action,
     physical_application_claimed:false,formal_quality_admission_implied:false};

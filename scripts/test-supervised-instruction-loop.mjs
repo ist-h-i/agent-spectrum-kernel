@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join,resolve } from 'node:path';
 import {spawnSync} from 'node:child_process';
 import { canonicalDigest,putContentAddressedJson } from './content-addressed-store.mjs';
-import { advanceSupervisedInstructionLoop,inspectSupervisedInstructionLoop,prepareNextSupervisedInstructionLoop } from './supervised-instruction-loop.mjs';
+import { advanceSupervisedInstructionLoop,inspectSupervisedInstructionLoop,prepareNextSupervisedInstructionLoop,readCompletedInstructionLoopContinuation } from './supervised-instruction-loop.mjs';
 import { createInstructionLoopCommandRuntime } from './instruction-loop-command-runtime.mjs';
 import { selectInstructionLoopCases } from './instruction-loop-case-selection.mjs';
 import { transitionInstructionLoopAssets } from './instruction-loop-assets.mjs';
@@ -37,6 +37,16 @@ function fixture(t){
   return {dir,calls,receipts,policy,runtime,run,root:join(dir,'run')};
 }
 const decision=(state,disposition='approved')=>({disposition,packet_digest:canonicalDigest(state.pending_gate),reason:'Synthetic owner decision, fixture only'});
+test('declining restoration preserves the adopted baseline, and a later restore needs a new distinct judgment',async t=>{
+  const f=fixture(t);let s=await f.run();s=await f.run({decision:decision(s)});s=await f.run({decision:decision(s)});
+  s=await f.run({requestRestore:true});const refused=s.pending_gate;s=await f.run({decision:decision(s,'rejected')});
+  assert.equal(s.final.outcome,'restoration_declined');assert.equal(readCompletedInstructionLoopContinuation(f.root).application_active,true);
+  assert.equal(f.calls.filter(c=>c.kind==='apply').length,1);assert.equal(f.calls.filter(c=>c.kind==='restore').length,0);
+  s=await f.run({requestRestore:true});assert.notEqual(canonicalDigest(s.pending_gate),canonicalDigest(refused));
+  await assert.rejects(f.run({decision:{...decision(s),packet_digest:canonicalDigest(refused)}}),/different packet/);
+  s=await f.run({decision:decision(s)});assert.equal(s.final.outcome,'restored');assert.equal(readCompletedInstructionLoopContinuation(f.root).application_active,false);
+  assert.equal(f.calls.filter(c=>c.kind==='apply').length,1);assert.equal(f.calls.filter(c=>c.kind==='restore').length,1);
+});
 test('completed result feeds a fresh second cycle without inherited approvals or repeated trials',async t=>{
   const f=fixture(t);f.policy.normal_target=null;let s=await f.run();
   assert.throws(()=>prepareNextSupervisedInstructionLoop({root:f.root,nextPolicy:{...f.policy,id:'next'}}),/completed/);
