@@ -28,6 +28,9 @@ export function createPracticalEvaluationCommandRuntime({definition,modelCallsAu
   const requiredKinds=definition.commands.assess?['trial','assess']:['trial'];
   return createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKinds});
 }
+export function createReferenceScoringCommandRuntime({definition,modelCallsAuthorized=false}){
+  return createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKinds:['grade']});
+}
 function createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKinds}){
   definition=JSON.parse(JSON.stringify(definition));checkedDefinition(definition,requiredKinds);
   const digest=canonicalDigest(definition);

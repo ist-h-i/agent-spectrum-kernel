@@ -85,3 +85,23 @@ See the runtime's `docs/practical-evaluation-recovery.md` for the profile fields
 
 Frozen historical primary batches keep their original single-shot policy. New
 attempts and a new practical ledger do not rewrite old source, scores or records.
+
+For an existing native fixed source grader, use the runtime's optional
+`report.fixedScoring` and pinned `referenceScoringCommand` ports. Preserve partial
+credit, exact lower/upper ranges, mandatory/critical findings and runtime Unknown
+in their separate reference lane; never translate partial scores into binary
+passes. Verify retained source, packet, calculator/dependency source and the
+independent review. These are reference judgments, not formal admission or proof
+that the evidence is true. See `docs/instruction-loop-fixed-reference-scoring.md`.
+A consumed unknown grader is inspected; a local worker exit alone cannot close a
+provider. Missing optional judgments retain usable execution evidence as Unknown.
+
+After a positively closed model-free native preparation failure, the host AI can
+use `recover-preparation --root OLD_RUN --profile OLD_PROFILE --config OLD_CONFIG
+--replacement-profile CORRECTED_PROFILE --output-root FRESH --id NEW_ID` on the
+supervised CLI. It prepares only fresh configuration/run paths and preserves the
+old failed journal and artifacts. It carries no approval. Resume normal `advance`
+or `operate` at the new case gate and obtain the normal result/change judgment.
+It refuses model uncertainty, after-case/owner effects, overlap and altered
+prepared authority. Use the existing practical runner for individual trial
+recovery. See `docs/instruction-loop-failed-preparation.md` for the bounded scope.

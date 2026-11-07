@@ -16,6 +16,7 @@ import {transitionInstructionLoopAssets} from './instruction-loop-assets.mjs';
 import {verifyRetainedInstructionLayout} from './retained-instruction-layout.mjs';
 import {verifyAssetRegistry} from './asset-registry.mjs';
 import {bindMeasuredNormalOwnerSource} from './instruction-loop-source-binding.mjs';
+import {runInstructionReferenceScoring} from './instruction-loop-reference-scoring-runtime.mjs';
 import {bindNativePublicInputs} from './instruction-loop-native-public-inputs.mjs';
 import {projectInstructionLoopObservation} from './instruction-loop-feedback.mjs';
 const pause=()=>new Promise(r=>setTimeout(r,500));
@@ -49,7 +50,7 @@ async function readTrial(p,job,recovered=false){
   return {...c,ready_for_next_root:true,execution_kind:p.native.executionKind,root_usage:c.root_usage,
     full_hierarchical_usage:null,recovered_from_native_records:recovered};
 }
-export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthorized=false}={}){
+export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthorized=false,inspectOnly=false}={}){
   sourceInputs(p);mkdirSync(p.stateRoot,{recursive:true,mode:0o700});
   if(job.kind==='generate'){
     assert.equal(canonicalDigest(job.input.observation),canonicalDigest(p.policy.observation),'controller observation differs from pinned profile');
@@ -118,8 +119,11 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
       await pause();}
   }
   if(job.kind==='report'){
-    const report=buildInstructionLoopReferenceReport({...p.report,storeRoot:p.storeRoot,planObjectDigest:job.input.selection.execution_binding.plan_object_digest,
+    const scored=await runInstructionReferenceScoring(p,job,{modelCallsAuthorized,inspectOnly});
+    if(scored===null)return {report_pending:true};
+    const report=buildInstructionLoopReferenceReport({...p.report,...(p.report.fixedScoring?{fixedScoring:{...p.report.fixedScoring,assessments:scored.assessments}}:{}),storeRoot:p.storeRoot,planObjectDigest:job.input.selection.execution_binding.plan_object_digest,
       trustedAssetAuthorityContexts:p.generator.trustedAuthorityContexts??[],executionKind:p.native.executionKind});
+    report.fixed_scoring_execution=scored.execution;
     report.worker_incidents=job.input.trials.filter(t=>t.transport_interruption).map(t=>({trial_id:t.trial_id,transport_interruption:t.transport_interruption,
       root_result:t.state,recovered_from_native_records:t.recovered_from_native_records}));
     report.measured_context=`Full frozen native snapshot; declared supporting context is retained. Normal owner uses the existing source-backed installer projection. Candidate source ${job.input.candidate.source_revision}; no performance claim for a different projection.`;
@@ -158,6 +162,11 @@ export async function nativeInstructionLoopWorker({profile,job,resultPath,action
   const sidecar=join(profile.stateRoot,'stage-'+canonicalDigest(job).slice(7)+'.json');
   if(existsSync(sidecar)){const result=readJsonFileStrict(sidecar);assert.equal(result.request_digest,canonicalDigest(job));publication(resultPath,result);return;}
   if(action==='inspect'){
+    if(job.kind==='report'&&profile.report.referenceScoringCommand){
+      let out;try{out=await executeNativeInstructionLoopStage(profile,job,{inspectOnly:true});}
+      catch(error){if(error.code==='REFERENCE_SCORING_PENDING')return;throw error;}
+      if(!out.report_pending){const result={request_digest:canonicalDigest(job),status:'completed',output:out};publication(sidecar,result);publication(resultPath,result);}
+    }
     if(job.kind==='trial'){const out=await readTrial(profile,job,true);if(out){const result={request_digest:canonicalDigest(job),status:out.state==='completed'?'completed':'failed',output:out};publication(sidecar,result);publication(resultPath,result);}}
     return; // Other unknown partial operations remain uncertain; no replay.
   }
@@ -167,5 +176,11 @@ export async function nativeInstructionLoopWorker({profile,job,resultPath,action
     if(output.worker_exit_without_result){process.exitCode=83;return;}
     const result={request_digest:canonicalDigest(job),status:output.state==='failed_or_interrupted'?'failed':'completed',output};
     publication(sidecar,result);publication(resultPath,result);
-  }catch(error){const result={request_digest:canonicalDigest(job),status:'failed',output:{reason:String(error.message).slice(0,2048)}};publication(sidecar,result);publication(resultPath,result);process.exitCode=1;}
+  }catch(error){if(job.kind==='report'&&error.code==='REFERENCE_SCORING_PENDING'){
+      // Exit normally without a terminal result; later positive grade receipts
+      // must not be downgraded by a failed outer transport or re-dispatched.
+      const path=join(profile.stateRoot,'stage-'+canonicalDigest(job).slice(7)+'-grading-pending.json');
+      if(!existsSync(path))publication(path,{request_digest:canonicalDigest(job),status:'pending_reference_scoring',reason:String(error.message).slice(0,512)});return;
+    }
+    const result={request_digest:canonicalDigest(job),status:'failed',output:{reason:String(error.message).slice(0,2048)}};publication(sidecar,result);publication(resultPath,result);process.exitCode=1;}
 }

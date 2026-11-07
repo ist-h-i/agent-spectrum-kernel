@@ -15,7 +15,7 @@ import {advancePracticalEvaluation,inspectPracticalEvaluation} from './practical
 import {readRunJournal} from './instruction-run-journal.mjs';
 
 const stages=['generate','register','select','plan','apply','version','cleanup','restore'];
-const sourceNames=['instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs',
+const sourceNames=['instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs',
   'instruction-loop-feedback.mjs','ask-personal-evolution-observation.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
   'instruction-loop-assets.mjs','instruction-loop-source-binding.mjs','instruction-environment.mjs','instruction-environment-compiler.mjs',
   'practical-evaluation-runner.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',
