@@ -87,13 +87,14 @@ try{
     console.log(JSON.stringify({...s,pending_packet_digest:s.pending_gate?canonicalDigest(s.pending_gate):null},null,2));
   }
   else if(command==='operate'){
-    assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--cycles','--allow-model-calls','--request-restore','--decision','--packet','--reason','--assessment','--feedback'].includes(k)));
+    assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--cycles','--allow-model-calls','--request-restore','--decision','--packet','--reason','--assessment','--feedback','--report-revision'].includes(k)));
     assert.ok(options['--profile']&&options['--config']);
     const decision=options['--decision']?{disposition:options['--decision'],packet_digest:options['--packet'],reason:options['--reason']}:null;
     assert.ok(decision||(!options['--packet']&&!options['--reason']));
     const result=await advanceInstructionLoopOperation({root,profilePath:options['--profile'],configPath:options['--config'],maxCycles:Number(options['--cycles']),
       modelCallsAuthorized:options['--allow-model-calls']===true,decision,requestRestore:options['--request-restore']===true,
       assessment:options['--assessment']?readJsonFileStrict(resolve(options['--assessment'])):null,
+      reportRevision:options['--report-revision']?readInstructionLoopJson(resolve(options['--report-revision'])):null,
       feedback:options['--feedback']?readJsonFileStrict(resolve(options['--feedback'])):null});
     console.log(JSON.stringify({...result,pending_packet_digest:result.pending_gate?canonicalDigest(result.pending_gate):null},null,2));
   }
@@ -131,7 +132,7 @@ try{
   }
   else{
     assert.equal(command,'advance');assert.ok(options['--config']);
-    assert.ok(Object.keys(options).every(k=>['--root','--config','--allow-model-calls','--request-restore','--decision','--packet','--reason','--import','--assessment'].includes(k)));
+    assert.ok(Object.keys(options).every(k=>['--root','--config','--allow-model-calls','--request-restore','--decision','--packet','--reason','--import','--assessment','--report-revision'].includes(k)));
     const config=readInstructionLoopJson(resolve(options['--config']));
     assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
     const runtime=createConfiguredInstructionLoopRuntime({definition:config.runtime,modelCallsAuthorized:options['--allow-model-calls']===true});
@@ -140,6 +141,7 @@ try{
     const result=await advanceSupervisedInstructionLoop({root,policy:config.policy,runtime,decision,
       requestRestore:options['--request-restore']===true,
       assessment:options['--assessment']?readJsonFileStrict(resolve(options['--assessment'])):null,
+      reportRevision:options['--report-revision']?readInstructionLoopJson(resolve(options['--report-revision'])):null,
       completedImport:options['--import']?readInstructionLoopJson(resolve(options['--import'])):null});
     console.log(JSON.stringify({...result,pending_packet_digest:result.pending_gate?canonicalDigest(result.pending_gate):null},null,2));
   }

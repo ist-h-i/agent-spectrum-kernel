@@ -32,7 +32,7 @@ export function inspectInstructionLoopOperation(root){
   root=resolve(root);assertNoSymlinkPathSegments(root,'operation journal');const s=readRunJournal(root).state;assert.ok(s,'operation not initialized');
   return summary(s,inspectSupervisedInstructionLoop(s.current.root));
 }
-export async function advanceInstructionLoopOperation({root,profilePath,configPath,maxCycles,modelCallsAuthorized=false,decision=null,assessment=null,feedback=null,requestRestore=false}){
+export async function advanceInstructionLoopOperation({root,profilePath,configPath,maxCycles,modelCallsAuthorized=false,decision=null,assessment=null,feedback=null,requestRestore=false,reportRevision=null}){
   root=resolve(root);profilePath=resolve(profilePath);configPath=resolve(configPath);
   assert.ok(Number.isSafeInteger(maxCycles)&&maxCycles>=1&&maxCycles<=10,'explicit operation budget of 1..10 cycles required');
   assertNoSymlinkPathSegments(root,'operation root',{allowMissingLeaf:true});
@@ -85,10 +85,10 @@ export async function advanceInstructionLoopOperation({root,profilePath,configPa
       const config=checkedConfig(s.current.config_path);
       assert.equal(canonicalDigest(config),s.current.config_digest,'operation current configuration drift');
       assert.equal(filePin(s.current.profile_path).digest,s.current.profile_digest,'operation current profile drift');
-      if(s.status==='completed'&&!requestRestore){assert.ok(!decision&&!assessment,'completed operation has no pending judgment');return summary(s,inspectSupervisedInstructionLoop(s.current.root));}
+      if(s.status==='completed'&&!requestRestore){assert.ok(!decision&&!assessment&&!reportRevision,'completed operation has no pending judgment');return summary(s,inspectSupervisedInstructionLoop(s.current.root));}
       const runtime=createConfiguredInstructionLoopRuntime({definition:config.runtime,modelCallsAuthorized});
-      const cycle=await advanceSupervisedInstructionLoop({root:s.current.root,policy:config.policy,runtime,decision,assessment,requestRestore});
-      decision=null;assessment=null;requestRestore=false;
+      const cycle=await advanceSupervisedInstructionLoop({root:s.current.root,policy:config.policy,runtime,decision,assessment,requestRestore,reportRevision});
+      decision=null;assessment=null;requestRestore=false;reportRevision=null;
       if(cycle.status!=='completed'){s.status=cycle.status;appendRunJournal(root,'cycle_paused',s);return summary(s,cycle);}
       if(cycle.final.outcome==='no_change'||s.records.length+1>=maxCycles||cycle.final.outcome==='restored'){
         s.status='completed';appendRunJournal(root,'operation_completed',s);return summary(s,cycle);

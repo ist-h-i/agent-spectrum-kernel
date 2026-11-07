@@ -34,7 +34,7 @@ function coordinatorRoots(root,c){
  assert.equal(s?.outputs?.select?.practical_root,root,'foreign parent selection');assert.ok(same(s.outputs.select.practical_runtime,c.original_runtime));
  const parents=[operation,cycle].sort();if(c.coordinator_roots!==undefined)assert.ok(same([...c.coordinator_roots].sort(),parents),'parent roots must exactly match bound operation');return parents;
 }
-function quiescent(root,parents,{held=false}={}){
+function quiescent(root,parents,{held=false,allowOwnedCoordinatorLocks=false}={}){
  const h=readRunJournal(root),s=h.state;assert.ok(s&&s.status==='completed'&&s.active===null&&!s.recovery,'original evaluation is not completed/quiescent');
  assert.ok(!s.suspended&&!s.report?.execution_suspended,'completed evaluation contains suspended execution');
  assert.ok(s.evaluation_decision?.disposition==='approved','original case approval required');
@@ -47,7 +47,7 @@ function quiescent(root,parents,{held=false}={}){
   if(q.kind==='assess')assert.equal(r.status,'completed','original assessment provider closure unresolved');
   if(q.kind==='trial'){assert.equal(r.output?.ready_for_next_root,true);assert.ok(closed(r.output.task));if(r.output.grade)assert.ok(closed(r.output.grade));}
  }
- for(const p of [root,...parents]){rootPath(p);if(!held)assert.equal(existsSync(join(p,'.advance-lock')),false,'original coordinator is running or unresolved');}
+ for(const p of [root,...parents]){rootPath(p);if(!held&&existsSync(join(p,'.advance-lock'))){assert.ok(allowOwnedCoordinatorLocks&&p!==root,'original coordinator is running or unresolved');const owner=join(p,'.advance-lock/pid');assertNoSymlinkPathSegments(owner,'owned coordinator lock');assert.equal(readStableFile(owner,'owned coordinator lock',64).bytes.toString('utf8'),String(process.pid),'coordinator lock is owned by another process');}}
  return h;
 }
 function eligible(s,id){
@@ -105,8 +105,8 @@ export function prepareOperationPracticalGradeSupplement({operationRoot,attemptI
  return preparePracticalGradeSupplement({runRoot:selection.practical_root,attemptId,contract:{kind:'practical_grade_recovery_contract_v1',original_runtime:selection.practical_runtime,
   grader_settings:{path:grader.argv[2],digest:grader.argv[3]},parent:{operation_root:operation,cycle_root:cycleRoot}}});
 }
-function checkedRecipe(recipe,{held=false}={}){
- assert.equal(recipe.kind,'practical_grade_supplement_recipe_v1');const {state:s}=quiescent(recipe.run_root,coordinatorRoots(recipe.run_root,recipe.contract),{held});
+function checkedRecipe(recipe,{held=false,allowOwnedCoordinatorLocks=false}={}){
+ assert.equal(recipe.kind,'practical_grade_supplement_recipe_v1');const {state:s}=quiescent(recipe.run_root,coordinatorRoots(recipe.run_root,recipe.contract),{held,allowOwnedCoordinatorLocks});
  const a=eligible(s,recipe.attempt_id);assert.equal(canonicalDigest(s.plan),recipe.plan_digest);assert.equal(canonicalDigest(s.evaluation_decision),recipe.case_approval_digest);assert.equal(canonicalDigest(s.report),recipe.original_report_digest);
  assert.equal(canonicalDigest(a.job),recipe.original_job_digest);assert.equal(canonicalDigest(a.result),recipe.original_result_digest);assert.ok(same(a.row,recipe.row));
  assert.ok(same(originalContract(s,a,recipe.contract,recipe.run_root),recipe.binding),'original grading contract drift');return {s,a};
@@ -223,8 +223,8 @@ export async function inspectPracticalGradeSupplement({reference,recipe:allocate
  }finally{for(const unlock of unlocks.reverse())unlock();}
 }
 
-function receiptInput(reference){
- const r=checkedRef(reference);assert.equal(r.kind,'practical_grade_supplement_receipt_v1');const {s,a}=checkedRecipe(r.recipe);
+function receiptInput(reference,options={}){
+ const r=checkedRef(reference);assert.equal(r.kind,'practical_grade_supplement_receipt_v1');const {s,a}=checkedRecipe(r.recipe,options);
  const slot=slotPath(r.recipe.run_root,a);assert.equal(r.directory,slot);assert.ok(reference.path===join(slot,'receipt.json')||new RegExp('^'+slot.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'/observations/[0-9]{6}/receipt\\.json$','u').test(reference.path),'supplement receipt transplanted outside canonical slot');
  const definition=json(join(r.directory,'definition.json')),runtime=createReferenceScoringCommandRuntime({definition,modelCallsAuthorized:false});
  const job={kind:'grade',input:{recipe:r.recipe,recipe_digest:canonicalDigest(r.recipe),maximum_model_calls:1,task_calls:0,primary_calls:0}};
@@ -237,8 +237,8 @@ function effectiveResult(a,r){
  out.grade={...out.grade,provider_observation:{...out.grade.provider_observation,artifacts:copy(r.result.output.artifacts)}};
  return {...copy(a.result),output:out};
 }
-export function practicalGradeSupplementSelectionPacket(reference){
- const {r,s,a}=receiptInput(reference);assert.ok(r.quality,'unusable supplement cannot receive a new quality disposition');
+export function practicalGradeSupplementSelectionPacket(reference,options={}){
+ const {r,s,a}=receiptInput(reference,options);assert.ok(r.quality,'unusable supplement cannot receive a new quality disposition');
  const result=effectiveResult(a,r),packet=buildInstructionRecoveryPacket({policy:s.plan.recovery,job:a.job,result,logicalRow:a.row,retriesUsed:(s.counts?.[JSON.stringify([a.row.block_id,a.row.condition])]??1)-1,extraTrialsUsed:s.extra_trials??0,retrySupported:false});
  return {...packet,allowed_actions:packet.allowed_actions.filter(v=>['use','reference','exclude'].includes(v)),retry_available:false,
   supplement_reference:copy(reference),original_result_digest:r.original_result_digest,original_assessment:copy(a.assessment??null),
@@ -260,13 +260,13 @@ function consumedSnapshot(root){
   return {directory,allocation:existsSync(join(directory,'allocation.json'))?ref(join(directory,'allocation.json')):null,observation:inspectSlot(directory)?.reference??null};
  });
 }
-function executionLedger(root,snapshot){
+function executionLedger(root,snapshot,options={}){
  const s=readRunJournal(root).state,seen=new Set();return snapshot.map(entry=>{
   assert.deepEqual(Object.keys(entry).sort(),['allocation','directory','observation']);assert.ok(!seen.has(entry.directory));seen.add(entry.directory);
   const a=s.attempts.find(a=>slotPath(root,a)===entry.directory);assert.ok(a,'foreign consumed grade slot');let allocation=null,r=null;
   if(entry.allocation){assert.equal(entry.allocation.path,join(entry.directory,'allocation.json'));allocation=checkedRef(entry.allocation);assert.equal(allocation.original_attempt_id,a.id);}
   if(entry.observation){
-   r=checkedRef(entry.observation);assert.equal(r.directory,entry.directory);assert.equal(r.recipe.run_root,root);assert.equal(r.attempt_id,a.id);checkedRecipe(r.recipe);
+   r=checkedRef(entry.observation);assert.equal(r.directory,entry.directory);assert.equal(r.recipe.run_root,root);assert.equal(r.attempt_id,a.id);checkedRecipe(r.recipe,options);
    assert.ok(entry.observation.path===join(entry.directory,'receipt.json')||new RegExp('^'+entry.directory.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'/observations/[0-9]{6}/receipt\\.json$','u').test(entry.observation.path));
    assert.equal(r.recipe_digest,allocation.recipe_digest);const definition=json(join(entry.directory,'definition.json')),runtime=createReferenceScoringCommandRuntime({definition,modelCallsAuthorized:false});assert.equal(runtime.digest,allocation.runtime_digest);
    const job={kind:'grade',input:{recipe:r.recipe,recipe_digest:canonicalDigest(r.recipe),maximum_model_calls:1,task_calls:0,primary_calls:0}};checkStoredReceipt(r,r.recipe,job,runtime);
@@ -275,20 +275,20 @@ function executionLedger(root,snapshot){
  });
 }
 export function buildPracticalGradeSupplementReport(input){return buildSupplementReport(input);}
-function buildSupplementReport({runRoot,supplements,selections=[]},historicalSnapshot=null){
+function buildSupplementReport({runRoot,supplements,selections=[]},historicalSnapshot=null,options={}){
 
  const root=rootPath(runRoot),base=readRunJournal(root).state;assert.equal(base.status,'completed');assert.ok(Array.isArray(supplements)&&supplements.length<=256);assert.ok(Array.isArray(selections)&&selections.length<=supplements.length);
- assert.ok(supplements.length,'explicit supplement references required');const first=checkedRef(supplements[0]),cycleRoot=first.recipe.contract.parent.cycle_root,cycleReport=readRunJournal(cycleRoot).state.outputs.report;
+ assert.ok(supplements.length,'explicit supplement references required');const first=checkedRef(supplements[0]),cycleRoot=first.recipe.contract.parent.cycle_root,cycleState=readRunJournal(cycleRoot).state,cycleReport=cycleState.outputs.original_report??cycleState.outputs.report;
  const {measured_context,...normalized}=cycleReport??{};assert.ok(same(normalized,base.report),'parent report differs from original practical result');
  const report=copy(cycleReport),seen=new Set(),ledger=[];assert.equal(report.kind,'practical_evaluation_run_report_v1');
  for(const reference of supplements){
-  const {r,s,a}=receiptInput(reference);assert.equal(r.recipe.run_root,root);assert.ok(!seen.has(a.id),'duplicate supplement for original attempt');seen.add(a.id);
+  const {r,s,a}=receiptInput(reference,options);assert.equal(r.recipe.run_root,root);assert.ok(!seen.has(a.id),'duplicate supplement for original attempt');seen.add(a.id);
   const target=report.all_attempts.find(v=>v.id===a.id);assert.ok(target,'original report omitted the attempt');assert.ok(same(target.row,a.row)&&same(target.original_result,a.result));assert.equal(target.result_digest,canonicalDigest(a.result),'original report result drift');
   const selection=selections.find(v=>v.supplement_digest===reference.digest);assert.ok(selections.filter(v=>v.supplement_digest===reference.digest).length<=1,'multiple supplement dispositions');
   const entry={reference:copy(reference),attempt_id:a.id,original_result_digest:canonicalDigest(a.result),original_disposition:copy(a.assessment??null),quality:copy(r.quality),issue:r.issue,
    execution:copy(r.result.output),assessment:selection?copy(selection):null,included_in_comparison:target.included_in_comparison};
   if(selection){
-   assert.ok(r.quality,'cannot select missing quality');const packet=practicalGradeSupplementSelectionPacket(reference);validateInstructionRecoveryAssessment(packet,selection.assessment);
+   assert.ok(r.quality,'cannot select missing quality');const packet=practicalGradeSupplementSelectionPacket(reference,options);validateInstructionRecoveryAssessment(packet,selection.assessment);
    assert.ok(['use','reference','exclude'].includes(selection.assessment.action));
    assert.equal(selection.execution?.kind,'host_ai','this port accepts host-AI selections, not unrecorded extra model dispatch');
    assert.equal(selection.execution.model_calls,null);assert.equal(selection.execution.usage,null);assert.equal(selection.execution.usage_status,'not_collected');
@@ -309,7 +309,7 @@ function buildSupplementReport({runRoot,supplements,selections=[]},historicalSna
   planned_blocks:[...new Set(base.rows.map(v=>v.block_id))],trials:report.all_attempts.filter(v=>v.included_in_comparison).map(v=>v.observation),global_context:base.plan.global_context,
   next_improvement:'Review the original and supplemented judgments, costs and limitations before a fresh human change decision.'});
  report.original_report_digest=canonicalDigest(base.report);report.grade_supplement_ledger=ledger;
- const consumed_slots=historicalSnapshot??consumedSnapshot(root),executions=executionLedger(root,consumed_slots);report.supplement_execution_ledger=executions;
+ const consumed_slots=historicalSnapshot??consumedSnapshot(root),executions=executionLedger(root,consumed_slots,options);report.supplement_execution_ledger=executions;
  report.supplemental_grading_overhead={not_in_task_metrics:true,consumed_slots:executions.length,unclosed_slots:executions.filter(v=>!v.closed).length,model_calls:sumResource(executions.map(v=>v.execution?.model_calls)),duration_ms:sumResource(executions.map(v=>v.execution?.duration_ms)),
   resources:Object.fromEntries(['input_tokens','output_tokens','cached_tokens'].map(k=>[k,sumResource(executions.map(v=>{const m=v.execution?.metrics??{},value=m[k];return Number.isSafeInteger(value)&&value>=0&&!(k==='cached_tokens'&&Number.isSafeInteger(m.input_tokens)&&value>m.input_tokens)?value:null;}))])),complete_cost:null};
  report.supplemental_assessment_overhead={kind:'host_ai',count:selections.length,model_calls:null,usage:null,usage_status:'not_collected',not_in_task_metrics:true};
@@ -324,10 +324,26 @@ export function publishPracticalGradeSupplementReport(input){
  if(existsSync(output))assert.ok(same(json(output),readout),'supplement report drift');else save(output,readout);
  return {reference:ref(output),readout};
 }
-export function readPracticalGradeSupplementContinuation({reference,cycleRoot,originalReport}){
+export function readPracticalGradeSupplementContinuation({reference,cycleRoot,originalReport,allowOwnedCoordinatorLocks=false}){
  const readout=checkedRef(reference);assert.equal(readout.kind,'practical_grade_supplement_readout_v1');assert.equal(readout.cycle_root,rootPath(cycleRoot));assert.equal(readout.original_cycle_report_digest,canonicalDigest(originalReport),'revision belongs to a different original report');
- const expected=buildSupplementReport({runRoot:readout.run_root,supplements:readout.supplements,selections:readout.selections},readout.consumed_slots);assert.ok(same(readout,expected),'supplement report lineage drift');
+ const expected=buildSupplementReport({runRoot:readout.run_root,supplements:readout.supplements,selections:readout.selections},readout.consumed_slots,{allowOwnedCoordinatorLocks});assert.ok(same(readout,expected),'supplement report lineage drift');
  assert.equal(reference.path,join(practicalGradeSupplementStore(readout.run_root),'reports',canonicalDigest(readout).slice(7),'readout.json'),'revision is outside its canonical store');
+ const cycle=readRunJournal(cycleRoot).state,attached=cycle.report_revision?.reference?.digest===reference.digest;
+ if(attached)assert.ok(same(cycle.outputs.report,readout.report),'attached revision report drift');
  return {report:readout.report,provenance:{original_report_digest:canonicalDigest(originalReport),effective_report_digest:readout.report_digest,readout_digest:reference.digest,
-  ledger_digest:canonicalDigest(readout.report.grade_supplement_ledger),selection_digest:canonicalDigest(readout.selections),human_decision_scope:'original_packet_only',approval_carried_forward:false}};
+  ledger_digest:canonicalDigest(readout.report.grade_supplement_ledger),selection_digest:canonicalDigest(readout.selections),human_decision_scope:attached?'explicit_revised_packet':'original_packet_only',approval_carried_forward:false}};
+}
+
+// A recorded admission is data authority for review/resume/feedback only.
+// It grants no grading slot and does not revisit a completed provider or owner.
+export function readAdmittedPracticalGradeSupplement({cycleRoot,reference}){
+ const root=rootPath(cycleRoot),history=readRunJournal(root),state=history.state,marker=state?.report_revision;
+ assert.ok(marker&&same(marker.reference,reference),'revision was not admitted to this cycle');assert.ok(Number.isSafeInteger(marker.index)&&marker.index>0&&marker.index<=256);
+ const readout=checkedRef(reference);assert.equal(readout.kind,'practical_grade_supplement_readout_v1');assert.equal(readout.cycle_root,root);
+ assert.equal(reference.path,join(practicalGradeSupplementStore(readout.run_root),'reports',canonicalDigest(readout).slice(7),'readout.json'),'revision is outside its canonical store');
+ assert.equal(canonicalDigest(state.outputs.original_report),readout.original_cycle_report_digest);assert.equal(canonicalDigest(state.outputs.report),readout.report_digest);assert.ok(same(state.outputs.report,readout.report));
+ const p=marker.provenance;assert.equal(p.original_report_digest,readout.original_cycle_report_digest);assert.equal(p.effective_report_digest,readout.report_digest);assert.equal(p.readout_digest,reference.digest);
+ assert.equal(p.ledger_digest,canonicalDigest(readout.report.grade_supplement_ledger));assert.equal(p.selection_digest,canonicalDigest(readout.selections));assert.equal(p.human_decision_scope,'explicit_revised_packet');assert.equal(p.approval_carried_forward,false);
+ const admission=history.events.find(e=>e.kind==='report_revision_received'&&same(e.state.report_revision,marker)&&same(e.state.outputs.original_report,state.outputs.original_report)&&same(e.state.outputs.report,readout.report));assert.ok(admission,'revision lacks its exact original admission event');
+ return {report:copy(readout.report),provenance:copy(p),admission_journal_digest:admission.record_digest};
 }
