@@ -7,7 +7,7 @@ import { canonicalDigest, assertNoSymlinkPathSegments, readJsonFileStrict,
   writeCanonicalJsonNoReplace } from './content-addressed-store.mjs';
 import { readRunJournal as journal, appendRunJournal as append, lockRunJournal as lock } from './instruction-run-journal.mjs';
 import { projectInstructionLoopObservation, assertPublicInstructionSummary, summarizeInstructionLoopEvaluation } from './instruction-loop-feedback.mjs';
-import {readPracticalGradeSupplementContinuation} from './practical-grade-supplement.mjs';
+import {readPracticalGradeSupplementContinuation,readAdmittedPracticalGradeSupplement} from './practical-grade-supplement.mjs';
 
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b);
 const digest=/^sha256:[a-f0-9]{64}$/u;
@@ -38,6 +38,7 @@ function checkedPolicy(p){
 function summary(state){
   return {status:state.status,run_id:state.policy.id,pending_gate:state.gate??null,
     pending_authoring:state.authoring_progress??null,
+    ...(state.report_revision?{report_revision:copy(state.report_revision)}:{}),
     pending_recovery:state.evaluation_progress?.pending_recovery??null,
     pending_recovery_digest:state.evaluation_progress?.pending_recovery_digest??null,
     active_job:state.pending??null,completed_trials:state.trials.length,
@@ -92,14 +93,14 @@ function next(s){
   if(p.normal_target===null){
     if(!s.result_decision){
       s.gate={kind:'result',packet:{candidate:o.register,report:o.report,normal_target:null,
-        application_available:false,candidate_disposition:'retain',formal_admission_implied:false}};return null;
+        application_available:false,candidate_disposition:'retain',...(s.report_revision?{report_revision:s.report_revision}:{}),formal_admission_implied:false}};return null;
     }
     return `result_${s.result_decision.disposition}_retained`;
   }
   if(!o.plan)return schedule(s,'plan','plan',{candidate:o.register,report:o.report,target:p.normal_target});
   if(!s.change_decision){
     s.gate={kind:'change',packet:{candidate:o.register,report:o.report,plan:o.plan,
-      post_approval:['exact_normal_apply','activate_version','clean_owned_staging','final_report'],
+      ...(s.report_revision?{report_revision:s.report_revision}:{}),post_approval:['exact_normal_apply','activate_version','clean_owned_staging','final_report'],
       rejection:['retire_candidate','clean_owned_staging','final_report'],formal_admission_implied:false}};return null;
   }
   if(s.change_decision.disposition==='rejected'){
@@ -144,7 +145,7 @@ function accept(s,job,result){
 /** runtime is a host-owned capability, not data loaded from model output/CAS.
  * Every operation must have durable inspect(job) evidence. An unknown consumed
  * operation is a safety stop, not permission to repeat it. */
-export async function advanceSupervisedInstructionLoop({root,policy,runtime,decision=null,requestRestore=false,completedImport=null,assessment=null}){
+export async function advanceSupervisedInstructionLoop({root,policy,runtime,decision=null,requestRestore=false,completedImport=null,assessment=null,reportRevision=null}){
   root=resolve(root);if(runtime.validateCoordinatorRoot)await runtime.validateCoordinatorRoot(root);
   assertNoSymlinkPathSegments(root,'loop root',{allowMissingLeaf:true});
   if(!existsSync(root))mkdirSync(root,{mode:0o700});
@@ -171,6 +172,31 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
     }else assert.equal(completedImport,null,'historical import is initialization only');
     assert.ok(same(s.policy,policy),'resume cannot change policy');
     if(assessment)assert.equal(s.pending?.kind,'evaluate','AI assessment requires an active practical evaluation');
+    if(reportRevision){
+      assert.equal(decision,null,'review the revised packet before submitting a human decision');assert.equal(assessment,null);assert.equal(requestRestore,false);
+      assert.equal(policy.evaluation_mode,'practical_v1');assert.equal(s.evaluation_decision?.disposition,'approved','original case approval required for revised result');
+      for(const key of ['result_decision','change_decision','restore_decision'])assert.equal(s[key],undefined,'a consumed human decision cannot approve revised evidence');
+      for(const key of ['apply','activate','retire','restore'])assert.equal(s.outputs[key],undefined,'report revision cannot change an applied/retired cycle');
+      const attached=s.report_revision&&same(s.report_revision.reference,reportRevision);
+      if(attached){
+        assert.ok(['advancing','operation_uncertain','awaiting_result_review','awaiting_change_approval'].includes(s.status),'admitted revision requires an unfinished review');
+        assert.ok(!s.pending||s.pending.kind==='plan','admitted revision may inspect only its pending plan');readAdmittedPracticalGradeSupplement({cycleRoot:root,reference:reportRevision});
+      }else{
+        assert.equal(s.pending,null);assert.ok(['awaiting_result_review','awaiting_change_approval'].includes(s.status),'report revision requires a pending result/change judgment');
+        assert.equal(s.gate?.kind,policy.normal_target===null?'result':'change','report revision requires its current judgment packet');
+      const originalReport=s.outputs.original_report??s.outputs.report;
+      const revised=readPracticalGradeSupplementContinuation({reference:reportRevision,cycleRoot:root,originalReport,allowOwnedCoordinatorLocks:true});
+      if(!s.report_revision||!same(s.report_revision.reference,reportRevision)){
+        const index=(s.report_revision?.index??0)+1;assert.ok(index<=256,'bounded report revision history');
+        if(s.report_revision){s.report_revision_history??=[];s.report_revision_history.push({reference:copy(s.report_revision.reference),gate_digest:canonicalDigest(s.gate),report_digest:canonicalDigest(s.outputs.report)});}
+        if(s.outputs.plan){s.outputs.report_revision_plans??=[];s.outputs.report_revision_plans.push({report_digest:canonicalDigest(s.outputs.report),plan:copy(s.outputs.plan)});delete s.outputs.plan;}
+        s.outputs.original_report??=copy(s.outputs.report);s.outputs.report=copy(revised.report);
+        s.report_revision={reference:copy(reportRevision),provenance:{...revised.provenance,human_decision_scope:'explicit_revised_packet'},index,previous_gate_digest:canonicalDigest(s.gate)};
+        s.gate=null;s.status='advancing';append(root,'report_revision_received',s);
+      }
+      }
+    }
+
     if(requestRestore){
       assert.equal(s.status,'completed');assert.ok(completedInstructionLoopApplicationIsActive(s),'restoration requires a still-active application');
       if(s.restore_requested){
@@ -274,11 +300,13 @@ export function prepareNextSupervisedInstructionLoop({root,nextPolicy,resultSumm
   const decisions=['evaluation_decision','result_decision','change_decision','restore_decision'].filter(k=>s[k]).map(k=>({
     kind:k,disposition:s[k].disposition,digest:canonicalDigest(s[k]),
     reason_summary:assertPublicInstructionSummary(decisionSummaries[canonicalDigest(s[k])]??s[k].reason??'Historical prior approval; original public reason unavailable.')}));
-  const revised=reportRevision?readPracticalGradeSupplementContinuation({reference:reportRevision,cycleRoot:resolve(root),originalReport:s.outputs.report}):null;
+  const originalReport=s.outputs.original_report??s.outputs.report,revisionRef=reportRevision??s.report_revision?.reference;
+  const attached=s.report_revision&&revisionRef&&same(s.report_revision.reference,revisionRef);
+  const revised=attached?readAdmittedPracticalGradeSupplement({cycleRoot:resolve(root),reference:revisionRef}):revisionRef?readPracticalGradeSupplementContinuation({reference:revisionRef,cycleRoot:resolve(root),originalReport}):null;
   const evaluationSummary=summarizeInstructionLoopEvaluation(revised?.report??s.outputs.report);
   const observation={kind:'instruction_loop_continuation_v1',feedback:copy(nextPolicy.observation),previous:{
     run_id:s.policy.id,journal_digest:previous,policy_digest:canonicalDigest(s.policy),outcome:s.outputs.final.outcome,
-    candidate_digest:canonicalDigest(s.outputs.register),report_digest:s.outputs.report?canonicalDigest(s.outputs.report):null,
+    candidate_digest:canonicalDigest(s.outputs.register),report_digest:originalReport?canonicalDigest(originalReport):null,
     ...(revised?{report_revision:revised.provenance}:{}),
     ...(evaluationSummary===null?{}:{evaluation_summary:evaluationSummary}),
     decisions,failure_count:s.trials.filter(t=>t.status!=='completed'||t.state==='failed_or_interrupted').length,

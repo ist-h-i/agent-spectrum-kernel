@@ -188,7 +188,7 @@ export function projectInstructionLoopObservation(observation) {
     assertPublicInstructionSummary(p.result_summary);
     if(p.report_revision!==undefined){const r=p.report_revision;assert.deepEqual(Object.keys(r).sort(),['original_report_digest','effective_report_digest','readout_digest','ledger_digest','selection_digest','human_decision_scope','approval_carried_forward'].sort());
       for(const k of ['original_report_digest','effective_report_digest','readout_digest','ledger_digest','selection_digest'])assert.match(r[k],/^sha256:[a-f0-9]{64}$/u);
-      assert.equal(r.original_report_digest,p.report_digest);assert.equal(r.human_decision_scope,'original_packet_only');assert.equal(r.approval_carried_forward,false);}
+      assert.equal(r.original_report_digest,p.report_digest);assert.ok(['original_packet_only','explicit_revised_packet'].includes(r.human_decision_scope));assert.equal(r.approval_carried_forward,false);}
     if(p.evaluation_summary!==undefined)validateInstructionEvaluationSummary(p.evaluation_summary,p.report_revision?.effective_report_digest??p.report_digest);
     assert.ok(Array.isArray(p.decisions) && p.decisions.length <= 4);
     for (const d of p.decisions) {

@@ -4,9 +4,9 @@ import {tmpdir} from 'node:os';import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {canonicalDigest} from './content-addressed-store.mjs';import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {appendRunJournal,readRunJournal} from './instruction-run-journal.mjs';
-import {preparePracticalGradeSupplement,runPracticalGradeSupplement,inspectPracticalGradeSupplement,practicalGradeSupplementStore,practicalGradeSupplementSelectionPacket,buildPracticalGradeSupplementReport,publishPracticalGradeSupplementReport,recordPracticalGradeSupplementSelection,readPracticalGradeSupplementContinuation} from './practical-grade-supplement.mjs';
+import {preparePracticalGradeSupplement,runPracticalGradeSupplement,inspectPracticalGradeSupplement,practicalGradeSupplementStore,practicalGradeSupplementSelectionPacket,buildPracticalGradeSupplementReport,publishPracticalGradeSupplementReport,recordPracticalGradeSupplementSelection,readPracticalGradeSupplementContinuation,readAdmittedPracticalGradeSupplement} from './practical-grade-supplement.mjs';
 import {summarizeInstructionLoopEvaluation} from './instruction-loop-feedback.mjs';
-import {prepareNextSupervisedInstructionLoop} from './supervised-instruction-loop.mjs';
+import {prepareNextSupervisedInstructionLoop,advanceSupervisedInstructionLoop} from './supervised-instruction-loop.mjs';
 const write=(p,v)=>{mkdirSync(join(p,'..'),{recursive:true});writeFileSync(p,JSON.stringify(v));};
 const pin=p=>({path:p,digest:hash(readFileSync(p))});
 const phase={ready_for_next_root:true,process_group_closed:true,provider_terminal_confirmed:true,exit_code:0};
@@ -194,4 +194,81 @@ test('CLI rejects outputs inside original run or coordinators before writing or 
 test('original grader pins preserve existing module alias metadata through actual transport',async t=>{
  const f=fixture(t,{modulePin:true});usableProvider(f);const recipe=f.recipe(),module=recipe.binding.grader_pins.find(p=>p.module);assert.equal(module.module,'synthetic_fixed_dependency');f.definition.commands.grade.pins.push(module);
  const observed=await runPracticalGradeSupplement({recipe,definition:f.definition});assert.equal(observed.receipt.closed,true);assert.equal(observed.receipt.issue,null);assert.equal(observed.receipt.recipe.binding.grader_pins.find(p=>p.module).module,module.module);
+});
+async function reviewFixture(t,{target=null}={}){
+ const f=fixture(t),profilePath=join(f.dir,'profile.json'),configPath=join(f.dir,'config.json'),profile=jsonFile(profilePath);profile.protectedRoot=f.dir;profile.normal={target};profile.policy.evaluation_mode='practical_v1';profile.policy.normal_target=target;write(profilePath,profile);
+ const parentRuntime={profile_path:profilePath,profile_digest:pin(profilePath).digest},policy={...profile.policy,runtime_digest:canonicalDigest(parentRuntime)};write(configPath,{runtime:parentRuntime,policy});
+ const parent=readRunJournal(f.parent).state;parent.policy=policy;parent.status=target===null?'awaiting_result_review':'awaiting_change_approval';parent.trials=[];parent.rows=[];parent.evaluation_decision={disposition:'approved',packet_digest:canonicalDigest('original-cases'),reason:'Synthetic prior case approval.'};parent.outputs.generate={synthetic:true};parent.outputs.register={synthetic_candidate:true};parent.outputs.evaluate={practical_status:'completed',report:parent.outputs.report,trials:[]};
+ if(target!==null)parent.outputs.plan={synthetic_plan:'original'};
+ parent.gate={kind:target===null?'result':'change',packet:{candidate:parent.outputs.register,report:parent.outputs.report,...(target===null?{normal_target:null}:{plan:parent.outputs.plan})}};
+ appendRunJournal(f.parent,'synthetic-review-ready',parent);
+ const operation=f.contract.parent.operation_root,op=readRunJournal(operation).state;op.status=parent.status;op.binding.profile_digest=pin(profilePath).digest;op.binding.config_digest=canonicalDigest(jsonFile(configPath));op.binding.max_cycles=1;op.binding.source_pins=[];op.records=[];op.current={root:f.parent,profile_path:profilePath,profile_digest:pin(profilePath).digest,config_path:configPath,config_digest:canonicalDigest(jsonFile(configPath))};appendRunJournal(operation,'synthetic-review-operation',op);
+ usableProvider(f);const graded=await runPracticalGradeSupplement({recipe:f.recipe(),definition:f.definition}),packet=practicalGradeSupplementSelectionPacket(graded.reference),selected=recordPracticalGradeSupplementSelection({reference:graded.reference,assessment:{packet_digest:canonicalDigest(packet),action:'use',retry_scope:null,reason:'Use all fixed correction evidence, including low source points.',selection_basis:'missing_evidence',used_dimensions:packet.available_dimensions,comparison_limits:['Source only; runtime remains unknown.']}}),published=publishPracticalGradeSupplementReport({runRoot:f.root,supplements:[graded.reference],selections:[selected.selection]});
+ const calls=[],results=new Map(),runtime={digest:policy.runtime_digest};
+ for(const kind of ['generate','register','select','trial','report','plan','apply','version','cleanup','restore','evaluate','resumeEvaluation'])runtime[kind]=async job=>{calls.push(kind);const result={request_digest:canonicalDigest(job),status:'completed',output:kind==='plan'?{synthetic_plan:'revised',report_digest:canonicalDigest(job.input.report)}:{synthetic_stage:kind}};results.set(canonicalDigest(job),result);return result;};runtime.inspect=async job=>results.get(canonicalDigest(job));
+ return {...f,policy,runtime,calls,published,originalParent:parent,originalGate:canonicalDigest(parent.gate)};
+}
+test('a retained report revision creates a fresh result packet, preserves the original, and feeds next after a fresh decision',async t=>{
+ const f=await reviewFixture(t),inner=readRunJournal(f.root).previous;
+ const updated=await advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference});assert.equal(updated.status,'awaiting_result_review');assert.equal(updated.pending_gate.kind,'result');assert.notEqual(canonicalDigest(updated.pending_gate),f.originalGate);assert.equal(canonicalDigest(updated.pending_gate.packet.report),f.published.readout.report_digest);assert.equal(updated.pending_gate.packet.application_available,false);assert.equal(f.calls.length,0);
+ const state=readRunJournal(f.parent).state;assert.deepEqual(state.outputs.original_report,f.originalParent.outputs.report);assert.equal(readRunJournal(f.root).previous,inner);assert.equal(state.evaluation_decision.packet_digest,f.originalParent.evaluation_decision.packet_digest);assert.equal(state.report_revision.index,1);
+ const duplicate=await advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference});assert.equal(duplicate.report_revision.index,1);assert.equal(canonicalDigest(duplicate.pending_gate),canonicalDigest(updated.pending_gate));
+ await assert.rejects(advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,decision:{disposition:'approved',packet_digest:f.originalGate,reason:'Stale approval must reject.'}}),/different packet/);
+ await assert.rejects(advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference,decision:{disposition:'approved',packet_digest:canonicalDigest(updated.pending_gate),reason:'Must review separately.'}}),/review the revised packet/);
+ const completed=await advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,decision:{disposition:'approved',packet_digest:canonicalDigest(updated.pending_gate),reason:'Reviewed the revised source evidence and its unknowns.'}});assert.equal(completed.status,'completed');assert.equal(canonicalDigest(completed.final.report),f.published.readout.report_digest);assert.equal(f.calls.length,0);
+ const op=readRunJournal(f.contract.parent.operation_root).state;op.status='completed';appendRunJournal(f.contract.parent.operation_root,'synthetic-complete',op);
+ const next=prepareNextSupervisedInstructionLoop({root:f.parent,nextPolicy:{...f.policy,id:'fresh-next'}});assert.equal(next.policy.observation.previous.report_digest,canonicalDigest(f.originalParent.outputs.report));assert.equal(next.policy.observation.previous.report_revision.human_decision_scope,'explicit_revised_packet');assert.equal(next.approval_carried_forward,false);
+});
+test('a revised change packet replans before fresh approval and keeps the original plan',async t=>{
+ const f=await reviewFixture(t,{target:join(realpathSync(tmpdir()),'synthetic-owner-never-written')}),updated=await advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference});
+ assert.equal(updated.status,'awaiting_change_approval');assert.deepEqual(f.calls,['plan']);assert.equal(updated.pending_gate.packet.plan.report_digest,f.published.readout.report_digest);assert.equal(readRunJournal(f.parent).state.outputs.report_revision_plans[0].plan.synthetic_plan,'original');
+ await assert.rejects(advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,decision:{disposition:'approved',packet_digest:f.originalGate,reason:'Old change packet.'}}),/different packet/);assert.deepEqual(f.calls,['plan']);
+ const completed=await advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,decision:{disposition:'approved',packet_digest:canonicalDigest(updated.pending_gate),reason:'Approve exact new source report and newly prepared plan in this synthetic test.'}});assert.equal(completed.final.outcome,'applied');assert.deepEqual(f.calls,['plan','apply','version','cleanup']);
+});
+test('consumed human judgments and foreign coordinator locks cannot be bypassed by report revision',async t=>{
+ const f=await reviewFixture(t),state=readRunJournal(f.parent).state;state.result_decision={disposition:'rejected',packet_digest:f.originalGate,reason:'Original decision.'};appendRunJournal(f.parent,'synthetic-consumed',state);
+ await assert.rejects(advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference}),/consumed human decision/);assert.equal(f.calls.length,0);
+ delete state.result_decision;appendRunJournal(f.parent,'synthetic-unconsumed-control',state);const lock=join(f.contract.parent.operation_root,'.advance-lock');mkdirSync(lock);writeFileSync(join(lock,'pid'),'1');
+ await assert.rejects(advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference}),/owned by another process/);assert.equal(f.calls.length,0);
+});
+
+test('standard operation forwards the revision while holding both coordinator locks and pauses for the new human packet',async t=>{
+ const f=await reviewFixture(t);t.mock.module('./instruction-loop-runtime.mjs',{namedExports:{createConfiguredInstructionLoopRuntime:()=>f.runtime}});
+ const {advanceInstructionLoopOperation}=await import('./instruction-loop-operation.mjs?report-revision-operation');
+ const options={root:f.contract.parent.operation_root,profilePath:join(f.dir,'profile.json'),configPath:join(f.dir,'config.json'),maxCycles:1};
+ const updated=await advanceInstructionLoopOperation({...options,reportRevision:f.published.reference});assert.equal(updated.operation_status,'awaiting_result_review');assert.equal(updated.pending_gate.packet.report_revision.reference.digest,f.published.reference.digest);assert.equal(f.calls.length,0);
+ const completed=await advanceInstructionLoopOperation({...options,decision:{disposition:'rejected',packet_digest:canonicalDigest(updated.pending_gate),reason:'Reject the revised source result in this synthetic workflow.'}});assert.equal(completed.operation_status,'completed');assert.equal(completed.final.outcome,'result_rejected_retained');assert.equal(canonicalDigest(completed.final.report),f.published.readout.report_digest);assert.equal(f.calls.length,0);
+});
+test('the same admitted revision resumes an interruption immediately after admission without replaying grading',async t=>{
+ const f=await reviewFixture(t,{target:join(realpathSync(tmpdir()),'synthetic-owner-never-written')}),inner=readRunJournal(f.root).previous;let fail=true;f.runtime.preflight=async job=>{if(job.kind==='plan'&&fail){fail=false;throw Error('synthetic interruption after admission');}};
+ await assert.rejects(advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference}),/interruption after admission/);assert.equal(readRunJournal(f.parent).state.status,'advancing');assert.equal(readRunJournal(f.parent).state.gate,null);assert.equal(f.calls.length,0);
+ const resumed=await advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference});assert.equal(resumed.status,'awaiting_change_approval');assert.deepEqual(f.calls,['plan']);assert.equal(resumed.report_revision.index,1);assert.equal(readRunJournal(f.root).previous,inner);assert.equal(readFileSync(f.counter,'utf8'),'called');
+});
+test('the same admitted revision inspects a lost plan response without a second dispatch',async t=>{
+ const f=await reviewFixture(t,{target:join(realpathSync(tmpdir()),'synthetic-owner-never-written')}),plan=f.runtime.plan,inspect=f.runtime.inspect;let unknown=true;f.runtime.plan=async job=>{await plan(job);return {request_digest:canonicalDigest(job),status:'unknown'};};f.runtime.inspect=async job=>unknown?{request_digest:canonicalDigest(job),status:'unknown'}:inspect(job);
+ const first=await advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference});assert.equal(first.status,'operation_uncertain');assert.deepEqual(f.calls,['plan']);
+ const stillUnknown=await advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference});assert.equal(stillUnknown.status,'operation_uncertain');assert.deepEqual(f.calls,['plan']);
+ await assert.rejects(advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:{...f.published.reference,digest:canonicalDigest('another revision')}}));assert.deepEqual(f.calls,['plan']);
+ unknown=false;const recovered=await advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference});assert.equal(recovered.status,'awaiting_change_approval');assert.deepEqual(f.calls,['plan']);assert.equal(recovered.pending_gate.packet.plan.report_digest,f.published.readout.report_digest);
+});
+for(const disposition of ['approved','rejected'])test('a revised '+disposition+' cycle advances within the same two-cycle operation without carrying approval',async t=>{
+ const f=await reviewFixture(t),operation=f.contract.parent.operation_root,op=readRunJournal(operation).state;op.binding.max_cycles=2;appendRunJournal(operation,'synthetic-two-cycle-budget',op);
+ const native=await import('./instruction-loop-native-configuration.mjs');
+ t.mock.module('./instruction-loop-native-configuration.mjs',{namedExports:{...native,
+  createNativeInstructionLoopConfiguration:path=>{const p=jsonFile(path),runtime={profile_path:path,profile_digest:pin(path).digest};return {runtime,policy:{...p.policy,runtime_digest:canonicalDigest(runtime)}};},
+  buildNextNativeInstructionLoopProfile:args=>{const prepared=prepareNextSupervisedInstructionLoop({root:args.root,nextPolicy:{...f.policy,id:args.id,observation:{goal:'Learn from the explicitly reviewed revised report.'}}});return {profile:{...jsonFile(join(f.dir,'profile.json')),policy:prepared.policy}};}
+ }});
+ const originalGenerate=f.runtime.generate,originalRegister=f.runtime.register;f.runtime.generate=async job=>originalGenerate(job);f.runtime.register=async job=>originalRegister(job);f.runtime.select=async job=>{f.calls.push('select');return{request_digest:canonicalDigest(job),status:'completed',output:{case_ids:['case']}};};
+ t.mock.module('./instruction-loop-runtime.mjs',{namedExports:{createConfiguredInstructionLoopRuntime:({definition})=>({...f.runtime,digest:canonicalDigest(definition)})}});
+ const {advanceInstructionLoopOperation}=await import('./instruction-loop-operation.mjs?two-cycle-revision-'+disposition),options={root:operation,profilePath:join(f.dir,'profile.json'),configPath:join(f.dir,'config.json'),maxCycles:2};
+ const reviewed=await advanceInstructionLoopOperation({...options,reportRevision:f.published.reference});assert.equal(reviewed.status,'awaiting_result_review');
+ const next=await advanceInstructionLoopOperation({...options,decision:{disposition,packet_digest:canonicalDigest(reviewed.pending_gate),reason:'Synthetic fresh revised-report decision.'}});assert.equal(next.cycle_number,2);assert.equal(next.status,'awaiting_evaluation_approval');assert.equal(next.pending_gate.kind,'evaluation');assert.deepEqual(f.calls,['generate','register','select']);
+ const state=readRunJournal(next.current_cycle.root).state;assert.equal(state.evaluation_decision,undefined);assert.equal(state.result_decision,undefined);assert.equal(state.change_decision,undefined);assert.equal(state.policy.observation.previous.report_revision.human_decision_scope,'explicit_revised_packet');assert.equal(state.policy.observation.previous.report_revision.approval_carried_forward,false);assert.equal(state.policy.observation.previous.evaluation_summary.report_digest,f.published.readout.report_digest);
+});
+
+test('the admitted data reader requires the exact recorded admission and cannot admit an unreviewed report',async t=>{
+ const f=await reviewFixture(t);assert.throws(()=>readAdmittedPracticalGradeSupplement({cycleRoot:f.parent,reference:f.published.reference}),/not admitted/);
+ const current=await advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference}),state=readRunJournal(f.parent).state;
+ assert.equal(readAdmittedPracticalGradeSupplement({cycleRoot:f.parent,reference:f.published.reference}).provenance.readout_digest,f.published.reference.digest);
+ state.report_revision.index++;appendRunJournal(f.parent,'synthetic-invalid-admission-marker',state);assert.throws(()=>readAdmittedPracticalGradeSupplement({cycleRoot:f.parent,reference:f.published.reference}),/exact original admission/);assert.equal(f.calls.length,0);
 });

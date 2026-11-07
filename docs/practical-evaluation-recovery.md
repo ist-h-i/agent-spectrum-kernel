@@ -293,6 +293,24 @@ Assets and private ownership before finishing a partial cleanup. Missing positiv
 completion evidence, pending owner markers/locks or local edits remain uncertain;
 the runner does not clear them or overwrite user work to make a plan fit.
 
+## Complete retained grading before the human judgment
+
+A closed primary consistency failure does not require another Task. For a
+supported retained grading protocol with an unused original verifier, the host
+AI can use [the retained grading workflow](practical-grade-supplement.md) after
+the original evaluation and parent coordinators are quiescent. Preserve the
+answer, primary judgment, rules, all outcomes and costs; inspect uncertainty
+instead of replaying a consumed slot. Valid low or range scores are not eligible
+for this correction path. Existing caller graders retain their own protocols.
+
+The AI records use/reference/exclude and publishes the revised readout. Before
+submitting any human decision, pass its saved reference file through standard
+`operate --report-revision FILE` using the original configuration and cycle
+budget. The controller retains the original report and plans, then presents a
+fresh result/change packet; an earlier packet's approval cannot authorize it.
+The AI owns correction and reporting. The human still judges the exact eventual
+application; this creates no extra routine approval or permission to install.
+
 ## Execution and context limits
 
 Instruction checks cover the declared condition files' bytes/modes and a bounded
