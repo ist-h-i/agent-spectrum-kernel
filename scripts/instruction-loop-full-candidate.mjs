@@ -11,6 +11,7 @@ import {instructionBytesDigest as hash,captureInstructionEnvironment} from './in
 import {captureRetainedInstructionLayout,retainedInstructionPath} from './retained-instruction-layout.mjs';
 import {verifyAssetRegistry,registerAsset} from './asset-registry.mjs';
 import {executeCodexSession} from './codex-exec-runner.mjs';
+import {readStableFile} from './ask-benchmark-stable-file.mjs';
 import {projectInstructionLoopObservation} from './instruction-loop-feedback.mjs';
 
 const gitEnv=()=>({...Object.fromEntries(['PATH','TMPDIR','LANG','TZ'].filter(k=>process.env[k]).map(k=>[k,process.env[k]])),
@@ -22,11 +23,48 @@ export function fullInstructionInventory(root,relative=''){
     if(name==='.git')return [];
     const path=relative?relative+'/'+name:name,s=lstatSync(join(root,path));assert.ok(!s.isSymbolicLink(),'Full source symlink');
     if(s.isDirectory())return fullInstructionInventory(root,path);
-    assert.ok(s.isFile());const b=readStableBytes(join(root,path),'Full source file',16*1024*1024);
+    assert.ok(s.isFile());const b=readStableFile(join(root,path),'Full source file',16*1024*1024).bytes;
     return [{path,bytes:b.length,mode:s.mode&0o777,sha256:hash(b)}];
   }).sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
 }
 function allowed(path,skills){return typeof path==='string'&&skills.some(s=>path===`skills/${s}/SKILL.md`||new RegExp(`^skills/${s}/references/[A-Za-z0-9._/-]+\\.md$`,'u').test(path))&&path.split('/').every(x=>/^[A-Za-z0-9_][A-Za-z0-9._-]*$/u.test(x));}
+function sourceValidation(p){
+  if(p.sourceValidation===undefined)return null;
+  assert.deepEqual(Object.keys(p.sourceValidation).sort(),['kind'],'closed source validation setting required');
+  assert.equal(p.sourceValidation.kind,'ask_repository_v1','unsupported source validation contract');
+  assert.equal(git(p.baselineSourceRoot,['rev-parse','--is-shallow-repository']),'false','source validation requires complete local history before authoring');
+  for(const path of ['scripts/validate-repo.mjs','docs/validation-report.md']){
+    assert.ok(existsSync(join(p.baselineSourceRoot,path)),'source validation input missing: '+path);
+    readStableBytes(join(p.baselineSourceRoot,path),'trusted source validation input',16*1024*1024);
+    assert.equal(git(p.baselineSourceRoot,['ls-files','--error-unmatch','--',path]),path,'source validation input must be tracked');
+  }
+  return {kind:'ask_repository_v1',validator_digest:hash(readStableBytes(join(p.baselineSourceRoot,'scripts/validate-repo.mjs'),'trusted source validator',16*1024*1024)),entrypoint_contracts:'Preserve existing required entrypoint headers, exact contract references and proof tokens. Moving them only to a reference does not satisfy unchanged repository validation. The host regenerates the validation report.'};
+}
+function assertDerivedSourceChanges(authored,root,derivedPaths){
+  const before=new Map(authored.map(f=>[f.path,f])),after=new Map(fullInstructionInventory(root).map(f=>[f.path,f]));
+  for(const path of new Set([...before.keys(),...after.keys()])){
+    const a=before.get(path),b=after.get(path);
+    if(a&&b)assert.equal(a.mode,b.mode,'source writer changed file mode: '+path);
+    if(a?.sha256===b?.sha256)continue;
+    assert.ok(derivedPaths.includes(path),'source writer changed unexpected path: '+path);
+    assert.ok(b,'source writer removed derived path: '+path);
+  }
+}
+function validateGeneratedSource(p,expectedValidatorDigest){
+  const script=join(p.candidateRoot,'scripts/validate-repo.mjs'),started=Date.now();
+  const validatorDigest=hash(readStableBytes(script,'trusted source validator',16*1024*1024));
+  assert.equal(validatorDigest,expectedValidatorDigest,'source validator drift before execution');
+  const result=spawnSync(process.execPath,[script,'--write-report'],{cwd:p.candidateRoot,encoding:'utf8',maxBuffer:4*1024*1024,timeout:120000});
+  const bounded=value=>{const b=Buffer.from(String(value??''));return {text:b.subarray(0,128*1024).toString('utf8'),total_bytes:b.length,truncated:b.length>128*1024};};
+  const receipt={kind:'full_source_validation_receipt_v1',contract:'ask_repository_v1',validator_digest:validatorDigest,
+    baseline_revision:p.baselineRevision,exit_code:result.status,signal:result.signal??null,error:result.error?String(result.error.message).slice(0,1024):null,
+    duration_ms:Date.now()-started,stdout:bounded(result.stdout),stderr:bounded(result.stderr),runtime_or_effectiveness_implied:false};
+  const path=join(p.stagingRoot,'source-validation.json');
+  writeCanonicalJsonNoReplace({outputPath:path,artifact:receipt,label:'private source validation receipt'});
+  assert.equal(result.status,0,'source validation failed; preserve source-validation.json and consumed authoring, do not replay');
+  return {status:'passed',kind:'ask_repository_v1',record:receipt,receipt:{path,digest:hash(readStableBytes(path,'source validation receipt'))},
+    report_digest:hash(readStableBytes(join(p.candidateRoot,'docs/validation-report.md'),'generated validation report',16*1024*1024)),runtime_or_effectiveness_implied:false};
+}
 export function compareFullInstructionContext({baselineRoot,candidateRoot,skills}){
   const before=new Map(fullInstructionInventory(baselineRoot).map(f=>[f.path,f])),after=new Map(fullInstructionInventory(candidateRoot).map(f=>[f.path,f]));
   const changed=[];
@@ -53,6 +91,7 @@ export function fullGenerationInput(p){
   assert.equal(resolve(p.baselineSourceRoot),p.baselineSourceRoot);assertNoSymlinkPathSegments(p.baselineSourceRoot,'baseline source');
   assert.equal(git(p.baselineSourceRoot,['rev-parse','HEAD']),p.baselineRevision,'baseline revision drift');
   assert.equal(git(p.baselineSourceRoot,['status','--porcelain','--untracked-files=no']),'','baseline source must be clean');
+  const validation=sourceValidation(p);
   assert.ok(p.skills.length>0&&p.skills.length<=64&&new Set(p.skills).size===p.skills.length);
   for(const s of p.skills)assert.match(s,/^[a-z0-9-]+$/u);
   assert.ok(typeof p.goal==='string'&&p.goal.length>0&&p.goal.length<=8192);
@@ -62,6 +101,7 @@ export function fullGenerationInput(p){
   const feedback=p.observation===undefined?null:projectInstructionLoopObservation(p.observation);
   return {kind:'full_skill_revision_request_v1',goal:feedback?.goal??p.goal,baseline_revision:p.baselineRevision,skills:p.skills,files,
     ...(feedback?{work_feedback:feedback,host_goal:p.goal}:{}),
+    ...(validation?{source_validation:validation}:{}),
     response_contract:{changes:'write/delete canonical skills/<selected>/SKILL.md or references/*.md only',entrypoints_must_remain:true},
     raw_logs_included:false,private_answers_included:false,formal_admission_implied:false};
 }
@@ -93,14 +133,19 @@ export async function generateFullInstructionCandidate(p,provider){
   assert.ok(bytes<=2*1024*1024);
   for(const dir of [p.candidateRoot,p.fullRoot,p.stagingRoot]){assertNoSymlinkPathSegments(dir,'fresh owned materialization',{allowMissingLeaf:true});assert.ok(!existsSync(dir),'fresh owned materialization required');mkdirSync(dir,{mode:0o700});}
   git(p.candidateRoot,['init','--quiet','--template=']);
-  git(p.candidateRoot,['fetch','--quiet','--depth=1','--no-tags',p.baselineSourceRoot,p.baselineRevision]);
+  git(p.candidateRoot,['fetch','--quiet',...(p.sourceValidation?[]:['--depth=1']),'--no-tags',p.baselineSourceRoot,p.baselineRevision]);
   git(p.candidateRoot,['checkout','--quiet','--detach','FETCH_HEAD']);
   // The provider never receives candidateRoot or this executable checkout.
   for(const c of changes){const path=join(p.candidateRoot,c.path);assertNoSymlinkPathSegments(path,'canonical generated file',{allowMissingLeaf:true});
     if(c.operation==='delete')rmSync(path);else{mkdirSync(dirname(path),{recursive:true});writeFileSync(path,c.text,{mode:0o644});}}
   const derivedPaths=['docs/fixtures/adapter-runtime-bundle.json','docs/fixtures/adapter-runtime-evidence.json','docs/fixtures/adapter-runtime-profiles.json','docs/verification-proof-policy-contract.md'];
+  if(p.sourceValidation)derivedPaths.push('docs/validation-report.md');
+  const authored=p.sourceValidation?fullInstructionInventory(p.candidateRoot):null;
   const refresh=spawnSync(process.execPath,[join(p.candidateRoot,'scripts/update-adapter-runtime-fixtures.mjs')],{encoding:'utf8',maxBuffer:4*1024*1024});
   assert.equal(refresh.status,0,'existing adapter fixture writer failed');
+  if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
+  const validation=p.sourceValidation?validateGeneratedSource(p,input.source_validation.validator_digest):null;
+  if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
   git(p.candidateRoot,['add','--','skills',...derivedPaths]);
   git(p.candidateRoot,['-c','user.name=ASK local versioning','-c','user.email=ask-local@invalid','commit','--quiet','--allow-empty','-m','Generated scoped Full instruction candidate']);
   const revision=git(p.candidateRoot,['rev-parse','HEAD']);
@@ -121,10 +166,11 @@ export async function generateFullInstructionCandidate(p,provider){
   const files=fullInstructionInventory(p.fullRoot);
   const layout=captureRetainedInstructionLayout({storeRoot:p.storeRoot,sourceRoot:p.fullRoot,expectedFiles:files,expectedInventoryDigest:canonicalDigest(files)});
   writeCanonicalJsonNoReplace({outputPath:join(p.stagingRoot,'changes.json'),artifact:{input_digest:canonicalDigest(input),changes},label:'owned generation changes',maximumBytes:4*1024*1024});
-  writeCanonicalJsonNoReplace({outputPath:join(p.stagingRoot,'owned-files.json'),artifact:{files:[{path:'changes.json',digest:hash(readStableBytes(join(p.stagingRoot,'changes.json'),'owned changes',4*1024*1024))}]},label:'owned generation staging'});
+  writeCanonicalJsonNoReplace({outputPath:join(p.stagingRoot,'owned-files.json'),artifact:{files:[{path:'changes.json',digest:hash(readStableBytes(join(p.stagingRoot,'changes.json'),'owned changes',4*1024*1024))},
+    ...(validation?[{path:'source-validation.json',digest:validation.receipt.digest}]:[])]},label:'owned generation staging'});
   return {kind:'generated_full_instruction_candidate_v1',source_root:p.candidateRoot,source_revision:revision,baseline_revision:p.baselineRevision,
     full_root:p.fullRoot,staging_root:p.stagingRoot,changed_paths:changed,derived_binding_paths:changed.filter(path=>derivedPaths.includes(path)),layout_object_digest:layout.object_digest,
-    generated_by_this_loop:true,execution:provided.execution,formal_admission_implied:false};
+    generated_by_this_loop:true,execution:provided.execution,...(validation?{source_validation:validation}:{}),formal_admission_implied:false};
 }
 export function registerFullInstructionCandidate(p,candidate){
   assert.equal(candidate.source_root,p.candidateRoot);assert.equal(candidate.full_root,p.fullRoot);

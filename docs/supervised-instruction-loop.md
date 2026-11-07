@@ -193,6 +193,11 @@ are still rejected.
   fresh candidate/Full/staging roots, existing Registry parents and trusted owner
   contexts, runtime metadata, and frozen public support files. `provider.kind` is
   `codex` or the explicitly model-free pinned `fixture` response.
+  For repository-contract checks before registration, opt into
+  `generator.sourceValidation: {kind: "ask_repository_v1"}` with a complete
+  local baseline history. The [source validation contract](instruction-loop-source-validation.md)
+  retains failed diagnostics and derives the validation report without weakening
+  entrypoint rules. This is source validation, not efficacy or case approval.
 - `native`: original prepared config/digest, wrapper digest, original
   control/monitor/prompt hashes, Python executable, sibling preparation root and
   a fresh work population. The existing protected operator root, permission
