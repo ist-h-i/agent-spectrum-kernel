@@ -31,6 +31,9 @@ function retainExecutionObservation({session,settings,job,prompt,response:r}){
     artifacts,answer_observation_issue:answerIssue},label:'AI recovery execution observation'});
   return {reference:{path,digest:hash(readStableBytes(path,'AI recovery execution observation'))},answerBytes,answerIssue};
 }
+export function buildPracticalEvaluationAssessmentPrompt(job){
+  const packet=job.input.packet;return 'Judge this evaluation irregularity against the practical goal, using available evidence. Prefer useful partial/reference results or exclusion when another run has little value. Retry one trial or the whole case only to repair a failure, missing evidence or an unfair comparison within the given budget. Never optimize selection for a better score. Preserve original outcomes. Process closure and allowed actions are enforced by the runner. Return only JSON {packet_digest,action,reason,selection_basis,retry_scope,used_dimensions,comparison_limits}. used_dimensions and comparison_limits must be arrays of strings, for example used_dimensions:["execution","duration"] and comparison_limits:["quality remains unknown"]. retry_scope is trial or case only for retry, otherwise null. selection_basis is execution_failure, missing_evidence, environment_mismatch, fair_comparison, practical_reference or no_value_in_more_runs.\n'+JSON.stringify({...job.input,packet_digest:canonicalDigest(packet)});
+}
 export async function assessPracticalEvaluation(settings,job,resultPath){
   assert.equal(job.kind,'assess');const packet=job.input.packet;let assessment,shapeRepair=null,execution={kind:'model_free_fixture',duration_ms:null,usage:null,model_calls:0};
   if(settings.kind==='fixture')assessment={...settings.assessment,packet_digest:canonicalDigest(packet)};
@@ -43,7 +46,7 @@ export async function assessPracticalEvaluation(settings,job,resultPath){
     }
     const session=join(dirname(resultPath),'assessment-session');mkdirSync(session,{mode:0o700});
     const final=join(session,'answer.json');
-    const prompt='Judge this evaluation irregularity against the practical goal, using available evidence. Prefer useful partial/reference results or exclusion when another run has little value. Retry one trial or the whole case only to repair a failure, missing evidence or an unfair comparison within the given budget. Never optimize selection for a better score. Preserve original outcomes. Process closure and allowed actions are enforced by the runner. Return only JSON {packet_digest,action,reason,selection_basis,retry_scope,used_dimensions,comparison_limits}. used_dimensions and comparison_limits must be arrays of strings, for example used_dimensions:["execution","duration"] and comparison_limits:["quality remains unknown"]. retry_scope is trial or case only for retry, otherwise null. selection_basis is execution_failure, missing_evidence, environment_mismatch, fair_comparison, practical_reference or no_value_in_more_runs.\n'+JSON.stringify({...job.input,packet_digest:canonicalDigest(packet)});
+    const prompt=buildPracticalEvaluationAssessmentPrompt(job);
     let r;
     try{r=await executeCodexSession({executable:settings.executable,argv:['exec','--json','--skip-git-repo-check','--sandbox','read-only','-o',final,...(settings.model?['--model',settings.model]:[]),'-'],
       cwd:session,input:prompt,timeoutMs:settings.timeout_ms,terminationScope:'direct_child'});}

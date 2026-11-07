@@ -8,6 +8,7 @@ import { readRunJournal, appendRunJournal, lockRunJournal } from './instruction-
 import { buildPragmaticEvaluationReport } from './ask-pragmatic-evaluation-report.mjs';
 import { buildInstructionRecoveryPacket, validateInstructionRecoveryPolicy, validateInstructionRecoveryAssessment } from './instruction-evaluation-recovery.mjs';
 import {inspectPracticalQualityObservation} from './practical-quality-observation.mjs';
+import {validatePracticalInitializationClearance} from './practical-initialization-clearance.mjs';
 
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b),copy=v=>structuredClone(v);
 const metrics=['duration_ms','human_review_minutes','rework_minutes','input_tokens','output_tokens','cached_tokens'];
@@ -39,8 +40,14 @@ function view(s){return {status:s.status,pending_gate:s.gate??null,pending_recov
   pending_recovery_digest:s.recovery?canonicalDigest(s.recovery.packet):null,active_job:s.active??null,
   assessment_rejections:s.rejected_assessments??[],last_ai_stop:s.last_stop??null,
   attempts:s.attempts.length,recovery_decisions:s.decisions,report:s.report??null,change_approval_required:true,application_performed:false};}
-function packet(s,runtime){const r=s.recovery;return buildInstructionRecoveryPacket({policy:s.plan.recovery,job:r.job,result:r.result,
-  logicalRow:r.row,retriesUsed:(s.counts[rowKey(r.row)]??1)-1,extraTrialsUsed:s.extra_trials,retrySupported:runtime.retrySupported!==false});}
+function clearanceFor(s,attemptId){return(s.continuation_clearances??[]).find(c=>c.original_attempt_id===attemptId);}
+function packet(s,runtime){const r=s.recovery,p=buildInstructionRecoveryPacket({policy:s.plan.recovery,job:r.job,result:r.result,
+  logicalRow:r.row,retriesUsed:(s.counts[rowKey(r.row)]??1)-1,extraTrialsUsed:s.extra_trials,retrySupported:runtime.retrySupported!==false});
+ const clearance=clearanceFor(s,r.entry_id);
+ if(clearance){p.continuation_clearance_digest=canonicalDigest(clearance);p.safe_to_continue=true;p.continuation_scope=clearance.scope;
+  p.comparison_constraints=clearance.limits;
+  if(runtime.retrySupported!==false&&(s.counts[rowKey(r.row)]??1)<=s.plan.recovery.max_retries_per_row&&s.extra_trials<s.plan.recovery.max_extra_trials){p.retry_available=true;if(!p.allowed_actions.includes('retry'))p.allowed_actions.push('retry');}}
+ return p;}
 async function refreshRecovery(s,runtime,root,save){
   if(!s.recovery)return;
   let inspected;try{inspected=await runtime.inspect(s.recovery.job,{root});}catch{return;}
@@ -80,7 +87,7 @@ function report(s){
     result_observation_history:a.result_history??[],
     assessment:a.assessment??null,observation:notes(s,a),quality_observation:inspectPracticalQualityObservation(a.result.output).value,
     quality_observation_issue:inspectPracticalQualityObservation(a.result.output).issue})),recovery_decisions:s.decisions,
-    execution_suspended:s.suspended??false,extra_trials:s.extra_trials,
+    execution_suspended:s.suspended??false,extra_trials:s.extra_trials,continuation_clearances:s.continuation_clearances??[],
     resources_all_attempts:Object.fromEntries(metrics.map(k=>{
       const values=s.attempts.map(a=>notes(s,a).metrics[k]),known=values.filter(v=>v!==null);
       return [k,{known_total:known.length?known.reduce((a,b)=>a+b,0):null,observed_count:known.length,unknown_count:values.length-known.length}];})),
@@ -107,11 +114,12 @@ function applyAssessment(s,assessment){
   const record={attempt_id:r.entry_id,packet_digest:canonicalDigest(r.packet),assessment:copy(assessment)};
   let targets=null,cohort=null;
   if(assessment.action==='retry'){
+    if(clearanceFor(s,r.entry_id))assert.equal(assessment.retry_scope,'trial','initialization exception permits only the failed logical row');
     targets=assessment.retry_scope==='case'?s.rows.filter(row=>row.block_id===r.row.block_id):[r.row];
     const additional=targets.filter(row=>(s.counts[rowKey(row)]??0)>0).length;
     assert.ok(s.extra_trials+additional<=s.plan.recovery.max_extra_trials,'paired retry exceeds approved extra-trial budget');
     assert.ok(targets.every(row=>(s.counts[rowKey(row)]??0)<=s.plan.recovery.max_retries_per_row),'per-row retry budget exhausted');
-    assert.ok(targets.every(row=>!s.attempts.some(a=>rowKey(a.row)===rowKey(row)&&a.result.output?.ready_for_next_root!==true)),
+    assert.ok(targets.every(row=>!s.attempts.some(a=>rowKey(a.row)===rowKey(row)&&a.result.output?.ready_for_next_root!==true&&!clearanceFor(s,a.id))),
       'a target has an unresolved process; AI cannot authorize duplicate execution');
     cohort=Math.max(0,...s.attempts.filter(a=>a.row.block_id===r.row.block_id).map(a=>a.cohort))+1;
   }
@@ -123,17 +131,18 @@ function applyAssessment(s,assessment){
   }else{
     if(assessment.action==='use')s.selected[rowKey(r.row)]=r.entry_id;
     else delete s.selected[rowKey(r.row)];
-    if(!r.packet.process_closed){s.suspended=true;s.queue=[];}
+    if(!r.packet.process_closed&&!clearanceFor(s,r.entry_id)){s.suspended=true;s.queue=[];}
   }
   s.recovery=null;s.status='advancing';return true;
 }
 export function inspectPracticalEvaluation(root){const {state}=readRunJournal(resolve(root));assert.ok(state,'evaluation not prepared');return view(state);}
-export async function advancePracticalEvaluation({root,plan,runtime,decision=null,assessment=null,inheritedApproval=null}){
+export async function advancePracticalEvaluation({root,plan,runtime,decision=null,assessment=null,inheritedApproval=null,continuationClearance=null}){
   checkedPlan(plan);assert.equal(runtime.digest,plan.runtime_digest,'evaluation runtime drift');
   root=resolve(root);assertNoSymlinkPathSegments(root,'practical evaluation root',{allowMissingLeaf:true});if(!existsSync(root))mkdirSync(root,{mode:0o700});
   const unlock=lockRunJournal(root),save=(s,kind,detail={})=>appendRunJournal(root,kind,s,detail);
   try{
     let s=readRunJournal(root).state;
+    if(s){assert.ok(same(s.plan,plan),'resume cannot change approved plan');if(s.status==='completed')return view(s);}
     if(!s){const planned=rows(plan);s={plan:copy(plan),rows:planned,queue:planned.map(row=>({row,cohort:1})),attempts:[],counts:{},selected:{},decisions:[],extra_trials:0,
       active:null,recovery:null,assessed_packets:[],assessments:[],status:'awaiting_evaluation_approval',gate:{kind:'evaluation',packet:{plan:copy(plan),planned_rows:planned,max_extra_trials:plan.recovery.max_extra_trials}}};save(s,'prepared');}
     assert.ok(same(s.plan,plan),'resume cannot change approved plan');
@@ -153,6 +162,20 @@ export async function advancePracticalEvaluation({root,plan,runtime,decision=nul
       assert.equal(decision.packet_digest,canonicalDigest(s.gate));assert.ok(['approved','rejected'].includes(decision.disposition));assert.ok(typeof decision.reason==='string'&&decision.reason.trim());
       s.evaluation_decision=copy(decision);s.gate=null;if(decision.disposition==='rejected'){s.status='completed';s.queue=[];s.report=report(s);save(s,'evaluation_rejected');return view(s);}s.status='advancing';save(s,'human_case_approval');}
     if(s.gate)return view(s);if(s.status==='completed')return view(s);
+    if(continuationClearance){
+      assert.equal(assessment,null,'admit the exception and review its fresh packet before submitting an AI judgment');
+      const checked=validatePracticalInitializationClearance(continuationClearance,{root,state:s,checkProcesses:true});
+      const prior=clearanceFor(s,continuationClearance.original_attempt_id);
+      if(prior)assert.ok(same(prior,continuationClearance),'this original attempt already has a different continuation exception');
+      else{assert.equal(s.status,'ai_assessment_uncertain');assert.ok(same(s.active,continuationClearance.original_assessor_job));
+        s.continuation_clearances??=[];s.continuation_clearances.push(copy(continuationClearance));save(s,'initialization_continuation_admitted',{local_observation:checked.observation});}
+      if(s.recovery?.entry_id===continuationClearance.original_attempt_id){
+        const fresh=packet(s,runtime);if(!same(fresh,s.recovery.packet)||s.status!=='awaiting_ai_recovery'){
+          s.recovery.packet=fresh;s.status='awaiting_ai_recovery';save(s,'initialization_recovery_packet_refreshed');}}
+      return view(s);
+    }
+    for(const c of s.continuation_clearances??[]){const checked=validatePracticalInitializationClearance(c,{root,state:s,checkProcesses:true});
+      save(s,'initialization_continuation_reinspected',{clearance_digest:canonicalDigest(c),local_observation:checked.observation});}
     if(assessment){assert.ok(s.recovery,'no AI recovery judgment pending');
       await refreshRecovery(s,runtime,root,save);
       if(s.active?.kind==='assess'){save(s,'ai_assessment_superseded',{job:s.active});s.active=null;}

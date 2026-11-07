@@ -27,8 +27,10 @@ never rewrite their journals, results, profiles or environments.
 
 Keep original outcomes and dispositions. A separate revision binds the original
 report, supplement receipts and fresh host-AI use/reference/exclude choices.
-Only the latest cohort/attempt may be selected, with one selection per logical
-row. A grade does not repair Task, context or input failures. Record supplemental
+Only the latest attempt of each logical row may be selected. A trial-only retry
+does not supersede the other condition's retained attempt; a case-wide retry
+replaces each row through its own new attempt. A grade does not repair Task,
+context or input failures. Record supplemental
 grading and selection overhead separately; host-AI usage is unknown, not zero.
 
 An explicit continuation input verifies both report digests and the revision's
@@ -43,6 +45,25 @@ This changes the review view through an append-only journal event; grading and
 readout generation themselves leave original records unchanged. Read-only lineage
 validation can recognize only coordinator locks owned by the current process,
 never an active evaluation lock or another process's coordinator lock.
+
+A separate, explicit host continuation exception may handle a first-attempt
+Codex CLI initialization EPERM before a session, with empty stdout, a closed
+local Task group, no grade, and the linked incomplete read-only assessor. Bind
+the approved plan, original command/invocation, parent configuration and every
+native result/transport. Recheck original worker PIDs and a successful same-UID
+cwd scan including the observer before admission and later dispatch gates.
+Record this as `safe_to_continue`, preserving `process_closed:false`, the failed
+Task, unknown assessor and unknown remote cost. It is an accepted operational
+exception, not provider closure, quality evidence or owner authority. Only that
+Task's trial retry can consume one existing extra/per-row slot in a fresh
+workspace; the original assessor is retired without replay. Generic timeouts,
+returned assessor evidence, owner targets and incomplete local observations
+remain outside this exception. Supplement quiescence recognizes the same
+validated exception for these exact retired jobs, retaining all uncertainty.
+Retained assessor initialization diagnostics are admitted only through their
+exact request/settings/prompt and output bindings, with no answer and unchanged
+unknown provider state. They are the evidence-preserving successor of the empty
+legacy session; arbitrary saved sessions do not expand the exception.
 
 ## Alternatives and consequences
 
