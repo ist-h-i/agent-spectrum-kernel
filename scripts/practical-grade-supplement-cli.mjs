@@ -11,7 +11,7 @@ const protectOutput=path=>{if(!path)return;path=resolve(path);assertNoSymlinkPat
 const save=(path,value)=>{protectOutput(path);path=resolve(path);assertNoSymlinkPathSegments(path,'supplement CLI output',{allowMissingLeaf:true});writeCanonicalJsonNoReplace({outputPath:path,artifact:value,label:'grade supplement CLI',maximumBytes:16*1024*1024});return {path,digest:hash(readStableFile(path,'supplement CLI output',16*1024*1024).bytes)};};
 try{
  const args=process.argv.slice(2),command=args.shift(),o={};while(args.length){const k=args.shift();assert.match(k,/^--[a-z-]+$/u);assert.equal(o[k],undefined,'duplicate argument');o[k]=k==='--allow-model-calls'?true:args.shift();assert.notEqual(o[k],undefined,'argument needs a value');}
- const allowed={prepare:['--root','--operation','--attempt','--contract','--output'],run:['--recipe','--provider','--allow-model-calls','--output'],inspect:['--receipt','--recipe','--provider','--output'],
+ const allowed={prepare:['--root','--operation','--attempt','--contract','--output'],run:['--recipe','--provider','--allow-model-calls','--output'],inspect:['--receipt','--recipe','--provider','--observer','--output'],
   'selection-packet':['--receipt','--output'],select:['--receipt','--assessment','--output'],report:['--root','--receipts','--selections','--output']};
  assert.ok(allowed[command],'use prepare, run, inspect, selection-packet, select or report');assert.ok(Object.keys(o).every(k=>allowed[command].includes(k)),'unknown argument');
  let output;
@@ -25,7 +25,7 @@ try{
   output=result.reference?{receipt:result.reference,closed:result.receipt.closed,quality_available:result.receipt.quality!==null,issue:result.receipt.issue}:result;
   if(result.reference&&o['--output'])output.reference_file=save(o['--output'],result.reference);
  }else if(command==='inspect'){
-  assert.ok(o['--receipt']||(o['--recipe']&&o['--provider']));assert.ok(!o['--receipt']||(!o['--recipe']&&!o['--provider']),'choose receipt or consumed recipe/provider');protectedRecipes=[o['--receipt']?readReference(read(o['--receipt'])).recipe:read(o['--recipe'])];protectOutput(o['--output']);const result=await inspectPracticalGradeSupplement(o['--receipt']?{reference:read(o['--receipt'])}:{recipe:read(o['--recipe']),definition:read(o['--provider'])});output=result.reference?{receipt:result.reference,closed:result.receipt.closed,inspection_model_calls:0}:result;if(result.reference&&o['--output'])output.reference_file=save(o['--output'],result.reference);
+  assert.ok(o['--receipt']||(o['--recipe']&&o['--provider']));assert.ok(!o['--receipt']||(!o['--recipe']&&!o['--provider']),'choose receipt or consumed recipe/provider');protectedRecipes=[o['--receipt']?readReference(read(o['--receipt'])).recipe:read(o['--recipe'])];protectOutput(o['--output']);const result=await inspectPracticalGradeSupplement(o['--receipt']?{reference:read(o['--receipt']),observerDefinition:o['--observer']?read(o['--observer']):null}:{recipe:read(o['--recipe']),definition:read(o['--provider']),observerDefinition:o['--observer']?read(o['--observer']):null});output=result.reference?{receipt:result.reference,closed:result.receipt.closed,inspection_model_calls:0}:result;if(result.reference&&o['--output'])output.reference_file=save(o['--output'],result.reference);
  }else if(command==='selection-packet'){
   assert.ok(o['--receipt']&&o['--output']);protectedRecipes=[readReference(read(o['--receipt'])).recipe];output={packet:save(o['--output'],practicalGradeSupplementSelectionPacket(read(o['--receipt'])))};
  }else if(command==='select'){

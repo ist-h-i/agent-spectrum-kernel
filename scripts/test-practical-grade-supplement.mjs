@@ -10,7 +10,7 @@ import {prepareNextSupervisedInstructionLoop,advanceSupervisedInstructionLoop} f
 const write=(p,v)=>{mkdirSync(join(p,'..'),{recursive:true});writeFileSync(p,JSON.stringify(v));};
 const pin=p=>({path:p,digest:hash(readFileSync(p))});
 const phase={ready_for_next_root:true,process_group_closed:true,provider_terminal_confirmed:true,exit_code:0};
-function fixture(t,{emptyPin=false,modulePin=false}={}){
+export function fixture(t,{emptyPin=false,modulePin=false}={}){
  const dir=realpathSync(mkdtempSync(join(tmpdir(),'ask-grade-supplement-')));t.after(()=>rmSync(dir,{recursive:true,force:true}));const root=join(dir,'run'),parent=join(dir,'operation/first-run');mkdirSync(root);mkdirSync(parent,{recursive:true});
  const settings=join(dir,'grader.json');write(settings,{config:{model:'synthetic',reasoning:'low'},backend:{kind:'synthetic'}});
  const workerFile=join(dir,'practical-worker.json'),publicInput=join(dir,'public.json');write(publicInput,{public:true});
@@ -291,4 +291,55 @@ test('the admitted data reader requires the exact recorded admission and cannot 
  const current=await advanceSupervisedInstructionLoop({root:f.parent,policy:f.policy,runtime:f.runtime,reportRevision:f.published.reference}),state=readRunJournal(f.parent).state;
  assert.equal(readAdmittedPracticalGradeSupplement({cycleRoot:f.parent,reference:f.published.reference}).provenance.readout_digest,f.published.reference.digest);
  state.report_revision.index++;appendRunJournal(f.parent,'synthetic-invalid-admission-marker',state);assert.throws(()=>readAdmittedPracticalGradeSupplement({cycleRoot:f.parent,reference:f.published.reference}),/exact original admission/);assert.equal(f.calls.length,0);
+});
+
+function preDispatchFailureProvider(f){
+ writeFileSync(f.provider,`import{readFileSync,writeFileSync}from'node:fs';import{canonicalDigest}from ${JSON.stringify(new URL('./content-addressed-store.mjs',import.meta.url).href)};const[a,b]=process.argv.slice(2),q=JSON.parse(readFileSync(a)),r=q.input.recipe;writeFileSync(${JSON.stringify(f.counter)},'called',{flag:'wx'});writeFileSync(b,JSON.stringify({request_digest:canonicalDigest(q),status:'failed',output:{ready_for_next_root:false,provider_terminal_confirmed:false,process_group_closed:false,recipe_digest:canonicalDigest(r),original_result_digest:r.original_result_digest,grading_contract_digest:canonicalDigest(r.binding),model_calls:1,task_calls:0,primary_calls:0,model:'synthetic',reasoning:'low',duration_ms:7,metrics:{input_tokens:null,output_tokens:null,cached_tokens:null},artifacts:[],issue:'Synthetic input guard rejected before provider dispatch.'}}));`);
+ f.definition.commands.grade.pins=[pin(f.provider),pin(f.settings)];
+}
+export function closureObserverFixture(f,mode='valid'){
+ const script=join(f.dir,'closure-observer-'+mode+'.mjs'),counter=join(f.dir,'closure-observer-count-'+mode+'.txt');
+ writeFileSync(script,`import assert from'node:assert/strict';import{readFileSync,writeFileSync}from'node:fs';import{canonicalDigest}from ${JSON.stringify(new URL('./content-addressed-store.mjs',import.meta.url).href)};assert.equal(process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED,'0');const[a,b]=process.argv.slice(2),q=JSON.parse(readFileSync(a)),i=q.input,old=JSON.parse(readFileSync(i.original_receipt.path)),w={kind:'verified_pre_dispatch_rejection_v1',no_provider_dispatch:true,local_termination_confirmed:true,reason:'Synthetic reviewed guard witness; no actual model.',duration_ms:1,evidence_refs:[i.original_native_result],...Object.fromEntries(['original_allocation','original_native_request','original_native_result','original_native_transport'].map(k=>[k,i[k]]))},out={original_request_digest:canonicalDigest(i.original_job),original_receipt_digest:i.original_receipt.digest,model_calls:0,task_calls:0,primary_calls:0,result:old.result,closure_observation:w};const mode=${JSON.stringify(mode)};if(mode==='provider-flags')out.result.output.provider_terminal_confirmed=true;if(mode==='model-call')out.model_calls=1;if(mode==='unknown-dispatch')w.no_provider_dispatch=false;if(mode==='binding')w.original_native_result={...w.original_native_result,digest:'sha256:'+'0'.repeat(64)};writeFileSync(${JSON.stringify(counter)},'observed',{flag:'wx'});writeFileSync(b,JSON.stringify({request_digest:canonicalDigest(q),status:'completed',output:out}));`);
+ return {definition:{commands:{grade:{argv:[process.execPath,script],pins:[pin(script)],model_calls:false}}},counter};
+}
+export {preDispatchFailureProvider};
+test('separate model-free observer closes only the failed slot and preserves raw provider flags/cost',async t=>{
+ const f=fixture(t);preDispatchFailureProvider(f);const first=await runPracticalGradeSupplement({recipe:f.recipe(),definition:f.definition}),raw=readFileSync(first.reference.path),native=structuredClone(first.receipt.result),before=readRunJournal(f.root).previous;
+ const observer=closureObserverFixture(f),observed=await inspectPracticalGradeSupplement({reference:first.reference,observerDefinition:observer.definition});
+ assert.equal(observed.receipt.closed,true);assert.equal(observed.receipt.quality,null);assert.equal(observed.receipt.result.status,'failed');assert.equal(observed.receipt.result.output.provider_terminal_confirmed,false);assert.deepEqual(observed.receipt.result,native);assert.equal(observed.receipt.closure_observation.kind,'verified_pre_dispatch_rejection_v1');assert.equal(observed.receipt.inspection_model_calls,0);assert.deepEqual(readFileSync(first.reference.path),raw);assert.equal(readRunJournal(f.root).previous,before);
+ const cached=await runPracticalGradeSupplement({recipe:f.recipe(),definition:f.definition});assert.equal(cached.reference.digest,observed.reference.digest);assert.equal(readFileSync(f.counter,'utf8'),'called');
+ const readout=buildPracticalGradeSupplementReport({runRoot:f.root,supplements:[observed.reference]});assert.equal(readout.report.supplemental_grading_overhead.unclosed_slots,0);assert.equal(readout.report.supplemental_grading_overhead.model_calls.known_total,1);assert.equal(readout.report.supplemental_grading_overhead.resources.input_tokens.unknown_count,1);assert.equal(readout.report.all_attempts[0].included_in_comparison,false);
+ await assert.rejects(inspectPracticalGradeSupplement({reference:first.reference,observerDefinition:observer.definition}),/latest/);
+ await assert.rejects(inspectPracticalGradeSupplement({reference:observed.reference,observerDefinition:observer.definition}),/closed verification/);
+});
+for(const mode of ['provider-flags','model-call','unknown-dispatch','binding'])test('closure-only observer rejects unsupported upgrade: '+mode,async t=>{
+ const f=fixture(t);preDispatchFailureProvider(f);const first=await runPracticalGradeSupplement({recipe:f.recipe(),definition:f.definition}),observer=closureObserverFixture(f,mode);
+ const rejected=await inspectPracticalGradeSupplement({reference:first.reference,observerDefinition:observer.definition});assert.equal(rejected.receipt.closed,false);assert.equal(rejected.receipt.inspection_error,true);assert.equal(JSON.parse(readFileSync(first.reference.path)).closed,false);assert.equal(readFileSync(f.counter,'utf8'),'called');
+ const good=closureObserverFixture(f),final=await inspectPracticalGradeSupplement({reference:rejected.reference,observerDefinition:good.definition});assert.equal(final.receipt.closed,true);assert.deepEqual(final.receipt.result,first.receipt.result);
+});
+test('observer with a model grant is rejected before an observation allocation',async t=>{
+ const f=fixture(t);preDispatchFailureProvider(f);const first=await runPracticalGradeSupplement({recipe:f.recipe(),definition:f.definition}),observer=closureObserverFixture(f);observer.definition.commands.grade.model_calls=true;
+ await assert.rejects(inspectPracticalGradeSupplement({reference:first.reference,observerDefinition:observer.definition}),/model-free/);assert.equal(existsSync(join(first.receipt.directory,'observations')),false);assert.equal(existsSync(observer.counter),false);
+});
+for(const occupied of [false,true])test('observer reservation-only crash is recoverable only before any execution evidence: '+occupied,async t=>{
+ const f=fixture(t);preDispatchFailureProvider(f);const first=await runPracticalGradeSupplement({recipe:f.recipe(),definition:f.definition}),observer=closureObserverFixture(f),current=join(first.receipt.directory,'observations/000000');mkdirSync(current,{recursive:true});
+ if(occupied){mkdirSync(join(current,'execution'));await assert.rejects(inspectPracticalGradeSupplement({reference:first.reference,observerDefinition:observer.definition}),/nonempty pending/);assert.equal(existsSync(observer.counter),false);}
+ else{const r=await inspectPracticalGradeSupplement({reference:first.reference,observerDefinition:observer.definition});assert.equal(r.receipt.closed,true);assert.equal(r.receipt.inspection_model_calls,0);assert.deepEqual(r.receipt.result,first.receipt.result);}
+});
+export {usableProvider};
+export function secondLogicalAttemptFixture(f){
+ const old=f.state.attempts[0],job=structuredClone(old.job);job.key='fixture-second';job.input.row={...old.row,id:'candidate-row',condition:'candidate'};
+ const directory=join(f.root,'jobs',canonicalDigest(job).slice(7)),result=structuredClone(old.result);result.request_digest=canonicalDigest(job);result.output.evidence_root=directory;cpSync(f.jobRoot,directory,{recursive:true});write(join(directory,'request.json'),job);write(join(directory,'result.json'),result);write(join(directory,'transport.json'),{request_digest:canonicalDigest(job),exit_code:0,signal:null});
+ const dispatch=jsonFile(join(directory,'private-grade/dispatch.json'));dispatch.trial_id=canonicalDigest(job);write(join(directory,'private-grade/dispatch.json'),dispatch);
+ const id='fixture-candidate-attempt-1',report=structuredClone(f.state.report.all_attempts[0]);Object.assign(report,{id,row:job.input.row,original_result:result,result_digest:canonicalDigest(result)});report.observation.condition='candidate';
+ f.mutate(s=>{s.attempts.push({id,job,row:job.input.row,cohort:1,result,assessment:{action:'reference',selection_basis:'missing_evidence'}});s.rows.push(job.input.row);s.report.all_attempts.push(report);s.report.resources_all_attempts.duration_ms={known_total:2000,observed_count:2,unknown_count:0};});
+ const parent=readRunJournal(f.parent).state;parent.outputs.report={...structuredClone(f.state.report),measured_context:'Synthetic scope.'};appendRunJournal(f.parent,'synthetic-second-row',parent);
+ return {id,recipe:()=>preparePracticalGradeSupplement({runRoot:f.root,attemptId:id,contract:f.contract})};
+}
+test('a no-dispatch observation releases only other unconsumed logical slots and preserves all attempted cost',async t=>{
+ const f=fixture(t),second=secondLogicalAttemptFixture(f);preDispatchFailureProvider(f);const first=await runPracticalGradeSupplement({recipe:f.recipe(),definition:f.definition}),next={...f,provider:join(f.dir,'second-provider.mjs'),counter:join(f.dir,'second-counter.txt'),definition:structuredClone(f.definition)};next.definition.commands.grade.argv=[process.execPath,next.provider];usableProvider(next);
+ await assert.rejects(runPracticalGradeSupplement({recipe:second.recipe(),definition:next.definition}),/unconfirmed provider work/);assert.equal(existsSync(next.counter),false);
+ const observer=closureObserverFixture(f),closed=await inspectPracticalGradeSupplement({reference:first.reference,observerDefinition:observer.definition});
+ const result=await runPracticalGradeSupplement({recipe:second.recipe(),definition:next.definition});assert.equal(result.receipt.closed,true);assert.equal(readFileSync(next.counter,'utf8'),'called');assert.equal(readFileSync(f.counter,'utf8'),'called');assert.deepEqual(closed.receipt.result,first.receipt.result);
+ const report=buildPracticalGradeSupplementReport({runRoot:f.root,supplements:[closed.reference,result.reference]}).report;assert.equal(report.supplemental_grading_overhead.consumed_slots,2);assert.equal(report.supplemental_grading_overhead.unclosed_slots,0);assert.equal(report.supplemental_grading_overhead.model_calls.known_total,2);assert.equal(report.supplemental_grading_overhead.resources.input_tokens.unknown_count,1);
 });
