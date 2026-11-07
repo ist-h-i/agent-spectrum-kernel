@@ -14,6 +14,11 @@ export async function assessPracticalEvaluation(settings,job,resultPath){
   if(settings.kind==='fixture')assessment={...settings.assessment,packet_digest:canonicalDigest(packet)};
   else{
     assert.equal(settings.kind,'codex');assert.equal(process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED,'1','AI recovery model call not authorized');
+    if(settings.executableDigest!==undefined){
+      assert.equal(resolve(settings.executable),settings.executable,'absolute pinned recovery executable required');
+      assert.match(settings.executableDigest,/^sha256:[a-f0-9]{64}$/u);
+      assert.equal(hash(readStableBytes(settings.executable,'pinned recovery executable',16*1024*1024)),settings.executableDigest,'recovery executable drift');
+    }
     const session=join(dirname(resultPath),'assessment-session');mkdirSync(session,{mode:0o700});
     const final=join(session,'answer.json');
     const prompt='Judge this evaluation irregularity against the practical goal, using available evidence. Prefer useful partial/reference results or exclusion when another run has little value. Retry one trial or the whole case only to repair a failure, missing evidence or an unfair comparison within the given budget. Never optimize selection for a better score. Preserve original outcomes. Process closure and allowed actions are enforced by the runner. Return only JSON {packet_digest,action,reason,selection_basis,retry_scope,used_dimensions,comparison_limits}. retry_scope is trial or case only for retry, otherwise null. selection_basis is execution_failure, missing_evidence, environment_mismatch, fair_comparison, practical_reference or no_value_in_more_runs.\n'+JSON.stringify({...job.input,packet_digest:canonicalDigest(packet)});

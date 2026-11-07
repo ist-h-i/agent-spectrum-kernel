@@ -78,9 +78,15 @@ export function prepareFullPracticalInstructionSelection(p,job){
   save(settingsPath,settings);const settingsPin=pin(settingsPath);
   const runtime={commands:{trial:{argv:[process.execPath,worker,settingsPath,settingsPin.digest,'execute'],inspect_argv:[process.execPath,worker,settingsPath,settingsPin.digest,'inspect'],
     pins:[settingsPin,pin(worker)],model_calls:conditions.some(c=>c.command.model_calls)||cases.some(c=>c.grader?.model_calls)}}};
-  if(p.practical.assessor){const settings=join(p.stateRoot,'practical-assessor-settings.json');save(settings,p.practical.assessor);
+  if(p.practical.assessor){const settings=join(p.stateRoot,'practical-assessor-settings.json'),providerPins=[];
+    if(p.practical.assessor.kind==='codex'&&p.practical.assessor.executableDigest!==undefined){
+      assert.equal(resolve(p.practical.assessor.executable),p.practical.assessor.executable,'absolute pinned recovery executable required');
+      assert.match(p.practical.assessor.executableDigest,/^sha256:[a-f0-9]{64}$/u);
+      const provider=pin(p.practical.assessor.executable);assert.equal(provider.digest,p.practical.assessor.executableDigest,'recovery executable drift');providerPins.push(provider);
+    }
+    save(settings,p.practical.assessor);
     const assessor=join(import.meta.dirname,'practical-evaluation-assessor.mjs'),settingsPin=pin(settings);
-    runtime.commands.assess={argv:[process.execPath,assessor,settings,settingsPin.digest],pins:[settingsPin,pin(assessor)],model_calls:p.practical.assessor.kind!=='fixture'};}
+    runtime.commands.assess={argv:[process.execPath,assessor,settings,settingsPin.digest],pins:[settingsPin,pin(assessor),...providerPins],model_calls:p.practical.assessor.kind!=='fixture'};}
   const plan={kind:'practical_evaluation_plan_v1',id:p.policy.id,goal:feedback.goal,runtime_digest:canonicalDigest(runtime),evidence_kind:p.practical.evidence_kind,
     conditions:conditions.map(({id,context})=>({id,context})),cases:cases.map(({id,task_ref,input_ref,success_criteria_ref})=>({id,task_ref,input_ref,success_criteria_ref,
       public_input_digest:job.input.catalog.find(c=>c.id===id).public_input_digest})),repetitions:p.policy.repetitions,recovery:p.practical.recovery,global_context:p.practical.global_context};

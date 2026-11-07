@@ -1,5 +1,25 @@
 # Practical Eval and AI recovery
 
+An optional Codex assessor `executableDigest` binds the caller's executable to
+its SHA-256 bytes. Selection verifies the absolute path/digest and includes it
+in runtime command pins; the assessor verifies it again before allocating its
+session or starting the provider. Profiles omitting this setting retain their
+existing caller-selected executable behavior. This does not authenticate a
+remote model or close arbitrary interpreter/dependency/configuration files.
+The check does not close a concurrent replacement race between checking and exec.
+
+Formal recovery-executable-pin@1: R01 unchanged legacy/fixture behavior; R02
+opt-in drift refused in runtime preparation and before provider dispatch/session
+allocation; R03 matching pins participate in the runtime digest and allow the
+existing assessment flow. Verification is in test-instruction-loop-practical-runtime.
+This reversible opt-in reuses the existing local provider boundary; no new ADR.
+
+Implementation Contract: Artifact recovery-executable-pin@1; upstream R01..R03
+and reviewed host-profile drift gap; boundary optional provider-byte checking,
+runtime pins and regressions; verification focused failure first, compatibility
+and repository validation; evidence recorded with delivery; Formal R01..R03;
+handoff no new human gate, model/Eval/owner authorization unchanged.
+
 Spec `practical-evaluation-recovery-spec`, revision 1. Upstream: the owner's
 instruction to prioritize real-work value, keep useful incomplete evidence and
 let the AI choose individual/all-condition retries, exclusion or reference use

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {writeFileSync,readFileSync,existsSync} from 'node:fs';
+import {writeFileSync,readFileSync,existsSync,mkdirSync} from 'node:fs';
 import {join} from 'node:path';
 import {canonicalDigest} from './content-addressed-store.mjs';
 import {environmentFixture} from './test-helpers-instruction-environment.mjs';
@@ -34,7 +34,7 @@ test('public practical Eval inherits exactly the case approval and returns to th
   const lifecycle=[];
   t.mock.module('./instruction-loop-native-host.mjs',{namedExports:{executeNativeInstructionLoopStage:async(p,job)=>{
     lifecycle.push(job.kind);assert.ok(['generate','register'].includes(job.kind),'owner operation must not run without the second decision');return generated;}}});
-  const {createFullPracticalInstructionLoopConfiguration,createFullPracticalInstructionLoopRuntime}=await import('./instruction-loop-practical-runtime.mjs?integration');
+  const {createFullPracticalInstructionLoopConfiguration,createFullPracticalInstructionLoopRuntime,prepareFullPracticalInstructionSelection}=await import('./instruction-loop-practical-runtime.mjs?integration');
   const profilePath=join(f.root,'profile.json');writeFileSync(profilePath,JSON.stringify(profile));
   const config=createFullPracticalInstructionLoopConfiguration(profilePath),configPath=join(f.root,'config.json');writeFileSync(configPath,JSON.stringify(config));
   const runtime=createFullPracticalInstructionLoopRuntime({definition:config.runtime});
@@ -59,4 +59,28 @@ test('public practical Eval inherits exactly the case approval and returns to th
   const nextProfile=JSON.parse(readFileSync(next.profile_path));assert.equal(nextProfile.policy.evaluation_mode,'practical_v1');
   assert.equal(next.models_started,false);assert.equal(nextProfile.practical.baselineRoot,baselineRoot);
   assert.notEqual(nextProfile.practical.root,profile.practical.root);
+  const executable=join(f.root,'recovery-provider');writeFileSync(executable,'trusted model-free executable pin fixture');
+  const pinned=structuredClone(profile);pinned.stateRoot=join(f.root,'pin-selection-state');mkdirSync(pinned.stateRoot);
+  pinned.practical.assessor={kind:'codex',executable,executableDigest:hash(readFileSync(executable)),model:null,timeout_ms:5000};
+  const selectionJob={input:{candidate:generated,observation:policy.observation,catalog:policy.catalog}};
+  const selected=prepareFullPracticalInstructionSelection(pinned,selectionJob);
+  assert.ok(selected.practical_runtime.commands.assess.pins.some(p=>p.path===executable&&p.digest===pinned.practical.assessor.executableDigest),'recovery executable must participate in runtime digest and preflight');
+  pinned.stateRoot=join(f.root,'drift-selection-state');mkdirSync(pinned.stateRoot);writeFileSync(executable,'changed caller adapter');
+  assert.throws(()=>prepareFullPracticalInstructionSelection(pinned,selectionJob),/recovery executable drift/);
+});
+
+test('optional recovery executable pin refuses drift before allocation or provider dispatch and preserves legacy callers',async t=>{
+ const f=environmentFixture(t),executable=join(f.root,'caller-provider'),result=join(f.root,'assessment-result.json');writeFileSync(executable,'trusted caller adapter');
+ const digest=hash(readFileSync(executable));let calls=0;
+ t.mock.module('./codex-exec-runner.mjs',{namedExports:{executeCodexSession:async ({argv})=>{calls++;writeFileSync(argv[argv.indexOf('-o')+1],JSON.stringify({action:'reference'}));return {spawnObserved:true,terminationConfirmed:true,exitCode:0,durationMs:1};}}});
+ const {assessPracticalEvaluation}=await import('./practical-evaluation-assessor.mjs?executable-pin');
+ const settings={kind:'codex',executable,executableDigest:digest,model:null,timeout_ms:5000},job={kind:'assess',input:{packet:{case_id:'synthetic'}}};
+ const old=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';
+ try{
+  writeFileSync(executable,'changed caller adapter');
+  await assert.rejects(assessPracticalEvaluation(settings,job,result),/recovery executable drift/);assert.equal(calls,0);assert.equal(existsSync(join(f.root,'assessment-session')),false);
+  writeFileSync(executable,'trusted caller adapter');const good=await assessPracticalEvaluation(settings,job,result);assert.equal(good.output.assessment.action,'reference');assert.equal(calls,1);
+  const legacyRoot=join(f.root,'legacy');mkdirSync(legacyRoot);const {executableDigest,...legacy}=settings;writeFileSync(executable,'legacy caller-selected adapter');
+  await assessPracticalEvaluation(legacy,job,join(legacyRoot,'result.json'));assert.equal(calls,2);
+ }finally{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;}
 });
