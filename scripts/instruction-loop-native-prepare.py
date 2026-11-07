@@ -48,7 +48,8 @@ def prepare(request):
     # The unchanged legacy control derives its monitor placeholders from this
     # host-root depth. Refuse a profile that could retain a different workspace.
     assert compatible_native_host_root(n,p['templateConfig']), 'native root must preserve the existing control host-root depth'
-    n.mkdir(exist_ok=False);population.mkdir(exist_ok=False)
+    assert n.is_absolute() and population.is_absolute() and n.resolve()==n and population.resolve()==population, 'native preparation roots must be canonical and non-symlink'
+    n.mkdir(parents=True,exist_ok=False);population.mkdir(parents=True,exist_ok=False)
     (n/'wrappers').mkdir()
     templates={'baseline':Path(p['baselineFullRoot']),'candidate':Path(candidate['full_root'])}
     rows=[]
