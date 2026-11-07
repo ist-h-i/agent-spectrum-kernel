@@ -1,12 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,realpathSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync,cpSync} from 'node:fs';
+import {mkdtempSync,realpathSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync,cpSync,chmodSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {canonicalDigest} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {prepareGitBaseline} from './ask-user-comparison-prepare.mjs';
 import {fullGenerationInput,generateFullInstructionCandidate,codexFullInstructionProvider,compareFullInstructionContext} from './instruction-loop-full-candidate.mjs';
+
+test('authorized inline Full generation passes a scoped child grant without changing the parent environment',async t=>{
+ const root=fixture(t),executable=join(root,'grant-provider.mjs');writeFileSync(executable,'#!'+process.execPath+'\n'+`import{writeFileSync}from'node:fs';if(process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED!=='1'){console.error('child model grant missing');process.exit(41);}const a=process.argv.slice(2);writeFileSync(a[a.indexOf('-o')+1],'{"changes":[]}');`);chmodSync(executable,0o700);
+ const before=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED,p={executable,sessionRoot:join(root,'grant-session'),modelCallsAuthorized:true,timeoutMs:5000};
+ assert.deepEqual((await codexFullInstructionProvider(p,{})).response,{changes:[]});assert.equal(process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED,before);
+});
+test('failed Full provider retains bounded private closure diagnostics without replay',async t=>{
+ const root=fixture(t),executable=join(root,'failed-provider.mjs');writeFileSync(executable,'#!'+process.execPath+'\n'+`import{writeFileSync}from'node:fs';writeFileSync(1,'s'.repeat(200000));writeFileSync(2,'diagnostic failure');process.exit(23);`);chmodSync(executable,0o700);
+ const p={executable,sessionRoot:join(root,'failed-session'),modelCallsAuthorized:true,timeoutMs:5000};
+ await assert.rejects(codexFullInstructionProvider(p,{}),/Full generation incomplete/);
+ const receipt=JSON.parse(readFileSync(join(p.sessionRoot,'provider-execution.json')));assert.equal(receipt.kind,'full_authoring_execution_v1');assert.equal(receipt.exit_code,23);assert.equal(receipt.termination_confirmed,true);assert.equal(receipt.stdout.truncated,true);assert.equal(receipt.stderr.text,'diagnostic failure');
+ await assert.rejects(codexFullInstructionProvider(p,{}),/EEXIST/);assert.equal(receipt.exit_code,23);
+});
 import {createInstructionLoopCommandRuntime} from './instruction-loop-command-runtime.mjs';
 import {createNativeInstructionLoopConfiguration,prepareNextNativeInstructionLoopConfiguration} from './instruction-loop-native-configuration.mjs';
 import {advanceSupervisedInstructionLoop} from './supervised-instruction-loop.mjs';
