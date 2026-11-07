@@ -34,7 +34,7 @@ export function createNativeInstructionLoopConfiguration(profilePath){
 
 // Allocate the next private profile/config, including new source/Registry pins.
 // This is preparation only: no generation, trial, grading or owner mutation.
-export function buildNextNativeInstructionLoopProfile({root,profilePath,configPath,outputRoot,id,feedback=null,decisionSummaries={},resultSummary=null}){
+export function buildNextNativeInstructionLoopProfile({root,profilePath,configPath,outputRoot,id,feedback=null,decisionSummaries={},resultSummary=null,reportRevision=null}){
   const old=readJsonFileStrict(resolve(profilePath)),history=readCompletedInstructionLoopContinuation(root);
   const previousConfig=readJsonFileStrict(resolve(configPath));
   assert.equal(canonicalDigest(previousConfig.policy),canonicalDigest(history.policy),'previous configuration policy differs from completed run');
@@ -99,7 +99,7 @@ export function buildNextNativeInstructionLoopProfile({root,profilePath,configPa
     metrics.assessment_cost='Unknown unless supplied by provider; excluded from trial metrics';
   }
   const freshFeedback=feedback??(old.policy.observation.kind==='instruction_loop_continuation_v1'?old.policy.observation.feedback:old.policy.observation);
-  const prepared=prepareNextSupervisedInstructionLoop({root,nextPolicy:{...history.policy,id,observation:freshFeedback},decisionSummaries,
+  const prepared=prepareNextSupervisedInstructionLoop({root,nextPolicy:{...history.policy,id,observation:freshFeedback},decisionSummaries,reportRevision,
     resultSummary:resultSummary??`Previous observed result metrics (not formal admission): ${JSON.stringify(metrics)}. Missing components remain unknown.`});
   assert.equal(prepared.policy.observation.previous.journal_digest,history.journal_digest,'previous cycle changed during preparation');
   p.policy=prepared.policy;delete p.policy.runtime_digest;

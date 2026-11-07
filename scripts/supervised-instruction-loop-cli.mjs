@@ -102,10 +102,10 @@ try{
     console.log(JSON.stringify({...s,pending_packet_digest:s.pending_gate?canonicalDigest(s.pending_gate):null},null,2));
   }
   else if(command==='next-policy'){
-    assert.deepEqual(Object.keys(options).sort(),['--config','--root']);
+    assert.ok(Object.keys(options).every(k=>['--config','--root','--report-revision'].includes(k)));assert.ok(options['--config']);
     const config=readInstructionLoopJson(resolve(options['--config']));
     assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
-    console.log(JSON.stringify(prepareNextSupervisedInstructionLoop({root,nextPolicy:config.policy}),null,2));
+    console.log(JSON.stringify(prepareNextSupervisedInstructionLoop({root,nextPolicy:config.policy,reportRevision:options['--report-revision']?readInstructionLoopJson(resolve(options['--report-revision'])):null}),null,2));
   }
   else if(command==='recover-authoring'){
     assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--replacement-profile','--output-root','--id'].includes(k)));
@@ -119,14 +119,15 @@ try{
       replacementProfilePath:options['--replacement-profile']??options['--profile'],outputRoot:options['--output-root'],id:options['--id']}),null,2));
   }
   else if(command==='next'){
-    assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--output-root','--id','--feedback'].includes(k)));
+    assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--output-root','--id','--feedback','--report-revision'].includes(k)));
     assert.ok(options['--profile']&&options['--config']&&options['--output-root']&&options['--id']);
     const profile=readInstructionLoopJson(resolve(options['--profile']));
     const prepare=profile.kind==='component_practical_instruction_loop_profile_v1'?prepareNextComponentInstructionLoopConfiguration:prepareNextNativeInstructionLoopConfiguration;
     console.log(JSON.stringify(prepare({root,profilePath:resolve(options['--profile']),
       configPath:resolve(options['--config']),
       outputRoot:resolve(options['--output-root']),id:options['--id'],
-      feedback:options['--feedback']?readJsonFileStrict(resolve(options['--feedback'])):null}),null,2));
+      feedback:options['--feedback']?readJsonFileStrict(resolve(options['--feedback'])):null,
+      reportRevision:options['--report-revision']?readInstructionLoopJson(resolve(options['--report-revision'])):null}),null,2));
   }
   else{
     assert.equal(command,'advance');assert.ok(options['--config']);
