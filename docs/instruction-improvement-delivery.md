@@ -103,10 +103,14 @@ adoption permission.
 Claude-format authoring handoff/import, composition, local target operations and
 existing restricted runtime contracts are supported. Subprocess authoring and
 automatic-assessor model ports here are Codex ports. Authenticated Claude-app
-dispatch and real-model one/repeated cycles remain acceptance work for the
-owner-provided environment. Real owner application/restore and measured business
+dispatch is not implemented; real-model one/repeated cycles remain acceptance
+work for the owner-provided environment. See the explicit missing ports and
+execution order in [the readiness audit](instruction-improvement-readiness.md).
+Real owner application/restore and measured business
 value were not tested. No original 36-trial source/process/authentication/conditions
-were changed, no new live cases were approved, and no merge was performed.
+were changed, no new live cases were approved, and those implementation tests
+performed no merge. PR454 was subsequently merged as `24da9de3`; this audit's
+configuration-only follow-up is a separate change.
 Publication and remote CI status must be taken from the actual delivery result.
 
 Implementation Contract:

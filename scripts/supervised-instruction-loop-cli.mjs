@@ -7,14 +7,18 @@ import { canonicalDigest, readJsonFileStrict,writeCanonicalJsonNoReplace } from 
 import {createConfiguredInstructionLoopRuntime} from './instruction-loop-runtime.mjs';
 import {advanceInstructionLoopOperation,inspectInstructionLoopOperation} from './instruction-loop-operation.mjs';
 import {prepareNextComponentInstructionLoopConfiguration} from './instruction-loop-component-continuation.mjs';
-import { prepareNextNativeInstructionLoopConfiguration,createNativeInstructionLoopConfiguration } from './instruction-loop-native-configuration.mjs';
+import { prepareNextNativeInstructionLoopConfiguration,createNativeInstructionLoopConfiguration,inspectInstructionLoopReadiness } from './instruction-loop-native-configuration.mjs';
 import { advanceSupervisedInstructionLoop, inspectSupervisedInstructionLoop, prepareNextSupervisedInstructionLoop } from './supervised-instruction-loop.mjs';
 const args=process.argv.slice(2),command=args.shift(),options={};
 try{
   while(args.length){const key=args.shift();assert.match(key,/^--[a-z-]+$/u);assert.equal(options[key],undefined,'duplicate argument');
     options[key]=['--allow-model-calls','--request-restore'].includes(key)?true:args.shift();}
-  assert.ok(options['--root']);const root=resolve(options['--root']);
-  if(command==='configure'){
+  assert.ok(options['--root']||command==='readiness');const root=options['--root']?resolve(options['--root']):null;
+  if(command==='readiness'){
+    assert.deepEqual(Object.keys(options),['--profile']);assert.ok(options['--profile'],'--profile required');
+    console.log(JSON.stringify(inspectInstructionLoopReadiness(resolve(options['--profile'])),null,2));
+  }
+  else if(command==='configure'){
     assert.deepEqual(Object.keys(options).sort(),['--profile','--root']);
     const config=createNativeInstructionLoopConfiguration(resolve(options['--profile'])),path=resolve(root,'config.json');
     writeCanonicalJsonNoReplace({outputPath:path,artifact:config,label:'supervised runtime configuration',maximumBytes:16*1024*1024});

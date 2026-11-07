@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import {inspectInstructionLoopProviderSelection} from './instruction-loop-provider-policy.mjs';
 import {join,resolve,dirname} from 'node:path';
 import {existsSync,mkdirSync} from 'node:fs';
-import {readJsonFileStrict,readStableBytes,canonicalDigest,assertNoSymlinkPathSegments,writeCanonicalJsonNoReplace} from './content-addressed-store.mjs';
+import {readJsonFileStrict,readStableBytes,parseJsonRejectDuplicateKeys,canonicalDigest,assertNoSymlinkPathSegments,writeCanonicalJsonNoReplace} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {prepareNextSupervisedInstructionLoop,readCompletedInstructionLoopContinuation} from './supervised-instruction-loop.mjs';
 import {createFullPracticalInstructionLoopConfiguration} from './instruction-loop-practical-runtime.mjs';
@@ -11,8 +12,8 @@ export function createNativeInstructionLoopConfiguration(profilePath){
   profilePath=resolve(profilePath);const p=readJsonFileStrict(profilePath);
   if(p.kind==='component_practical_instruction_loop_profile_v1')return createComponentInstructionLoopConfiguration(profilePath);
   if(p.kind==='full_practical_instruction_loop_profile_v1')return createFullPracticalInstructionLoopConfiguration(profilePath);
-  assert.equal(p.kind,'full_native_reference_loop_profile_v1');assert.equal(p.normal.target,p.policy.normal_target);
-  const paths=['instruction-loop-native-worker.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-reference-report.mjs',
+  assert.equal(p.kind,'full_native_reference_loop_profile_v1');inspectInstructionLoopProviderSelection(p);assert.equal(p.normal.target,p.policy.normal_target);
+  const paths=['instruction-loop-provider-policy.mjs','instruction-loop-native-worker.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-reference-report.mjs',
     'instruction-loop-native-prepare.py','instruction-loop-assets.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
     'retained-instruction-comparison.mjs','retained-instruction-layout.mjs','instruction-environment.mjs','codex-exec-runner.mjs','asset-registry.mjs','content-addressed-store.mjs','instruction-loop-source-binding.mjs','instruction-loop-feedback.mjs','ask-personal-evolution-observation.mjs'];
   const pins=[{path:profilePath,digest:hash(readStableBytes(profilePath,'Full/native profile',16*1024*1024))},...paths.map(name=>({path:join(import.meta.dirname,name),digest:hash(readStableBytes(join(import.meta.dirname,name),'Full/native adapter'))}))];
@@ -106,4 +107,19 @@ export function prepareNextNativeInstructionLoopConfiguration(options){
   writeCanonicalJsonNoReplace({outputPath:nextConfigPath,artifact:config,label:'next-cycle native configuration',maximumBytes:16*1024*1024});
   return {status:'prepared',profile_path:nextProfilePath,config_path:nextConfigPath,run_root:join(outputRoot,'run'),
     policy_digest:canonicalDigest(config.policy),models_started:false,approval_carried_forward:false};
+}
+
+// Configuration inspection is preparation, not an executable/authentication probe.
+export function inspectInstructionLoopReadiness(profilePath){
+  profilePath=resolve(profilePath);
+  const config=createNativeInstructionLoopConfiguration(profilePath),bytes=readStableBytes(profilePath,'readiness profile',16*1024*1024);
+  const p=parseJsonRejectDuplicateKeys(bytes,'readiness profile'),digest=hash(bytes);
+  assert.ok(config.runtime.profile_digest?config.runtime.profile_digest===digest:
+    Object.values(config.runtime.commands).every(c=>c.pins.some(pin=>pin.path===profilePath&&pin.digest===digest)),'profile changed during readiness inspection');
+  assert.equal(canonicalDigest(config.policy),canonicalDigest({...p.policy,runtime_digest:canonicalDigest(config.runtime)}),'profile policy changed during readiness inspection');
+  return {kind:'instruction_loop_readiness_v1',profile_kind:p.kind,profile_digest:digest,configuration_digest:canonicalDigest(config),
+    selected:inspectInstructionLoopProviderSelection(p),capabilities:{automatic_authoring_ports:['codex'],automatic_recovery_ports:['codex'],
+      standalone_authoring_handoff:'prepare_import_only',claude_app_dispatch:'not_implemented'},
+    execution_readiness:'not_probed',not_probed:['executable_availability','authentication','actual_instruction_use','provider_closure','actual_owner_acceptance'],
+    human_decision_types:['evaluation_cases','change_or_result'],models_started:false,trials_started:0,owner_mutated:false,files_written:false};
 }
