@@ -17,7 +17,7 @@ import {advancePracticalEvaluation,inspectPracticalEvaluation} from './practical
 import {readRunJournal} from './instruction-run-journal.mjs';
 
 const stages=['generate','register','select','plan','apply','version','cleanup','restore'];
-const sourceNames=['instruction-loop-host-scoring.mjs','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-artifact.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','practical-codex-adapter.mjs','ask-user-comparison.mjs',
+const sourceNames=['instruction-loop-host-scoring.mjs','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-artifact.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-retained-authoring.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','practical-codex-adapter.mjs','ask-user-comparison.mjs',
   'instruction-loop-feedback.mjs','ask-personal-evolution-observation.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
   'instruction-loop-assets.mjs','instruction-loop-source-binding.mjs','instruction-environment.mjs','instruction-environment-compiler.mjs',
   'practical-evaluation-runner.mjs','practical-quality-observation.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',

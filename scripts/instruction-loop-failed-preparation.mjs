@@ -4,6 +4,7 @@ import {existsSync,mkdirSync} from 'node:fs';
 import {join,resolve,dirname} from 'node:path';
 import {canonicalDigest,stableCanonicalJson,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
+import {inspectClosedFullAuthoring} from './instruction-loop-retained-authoring.mjs';
 import {readRunJournal} from './instruction-run-journal.mjs';
 import {createNativeInstructionLoopConfiguration} from './instruction-loop-native-configuration.mjs';
 import {projectInstructionLoopObservation,assertPublicInstructionSummary} from './instruction-loop-feedback.mjs';
@@ -63,4 +64,47 @@ export function prepareFailedInstructionLoopConfiguration({root,profilePath,conf
  const next=createNativeInstructionLoopConfiguration(nextProfile);writeCanonicalJsonNoReplace({outputPath:nextConfig,artifact:next,label:'fresh failed-run config',maximumBytes:16*1024*1024});
 
  writeCanonicalJsonNoReplace({outputPath:receiptPath,artifact:{intent_digest:canonicalDigest(intent),profile:pin(nextProfile),config:pin(nextConfig),result:prepared},label:'failed recovery preparation receipt'});return prepared;
+}
+
+// A distinct admission path: local provider completion is positive, but its
+// already saved answer failed trusted source materialization. No model replay.
+export function prepareRetainedFullAuthoringConfiguration({root,profilePath,configPath,replacementProfilePath=profilePath,outputRoot,id}){
+ root=resolve(root);profilePath=resolve(profilePath);configPath=resolve(configPath);replacementProfilePath=resolve(replacementProfilePath);outputRoot=resolve(outputRoot);
+ for(const path of [root,profilePath,configPath,replacementProfilePath,outputRoot])assertNoSymlinkPathSegments(path,'retained authoring preparation',{allowMissingLeaf:true});
+ const inspected=inspectClosedFullAuthoring({root,profilePath,configPath}),old=inspected.profile,p=json(replacementProfilePath);
+ const withoutCommands=v=>{const q=structuredClone(v);delete q.practical.conditions;return q;};
+ assert.equal(canonicalDigest(withoutCommands(p)),canonicalDigest(withoutCommands(old)),'replacement may change only pre-case task command conditions; authoring request and baseline remain fixed');
+ assert.match(id,/^[A-Za-z0-9._-]{1,100}$/u);assert.notEqual(id,old.policy.id);assert.ok(outputRoot.startsWith(old.protectedRoot+'/'));
+ const protectedPaths=[root,old.storeRoot,old.stateRoot,old.generator.baselineSourceRoot,old.generator.candidateRoot,old.generator.fullRoot,
+  old.generator.stagingRoot,old.generator.provider.sessionRoot,old.practical.root,old.practical.baselineRoot,old.normal.target,profilePath,configPath,replacementProfilePath].filter(Boolean);
+ for(const path of protectedPaths)assert.ok(!overlap(outputRoot,resolve(path)),'fresh recovery overlaps prior work/source/owner');
+ const intent={origin:inspected.origin,replacement:pin(replacementProfilePath),id,output_root:outputRoot},receiptPath=join(outputRoot,'recovery-prepared.json');
+ p.stateRoot=join(outputRoot,'state');p.generator.candidateRoot=join(outputRoot,'candidate');p.generator.fullRoot=join(outputRoot,'full');p.generator.stagingRoot=join(outputRoot,'staging');
+ p.generator.environmentId='instruction-recovery-'+canonicalDigest(intent).slice(7,39);p.practical.root=join(outputRoot,'evaluation');
+ const originPath=join(outputRoot,'authoring-origin.json'),originBytes=Buffer.from(stableCanonicalJson(inspected.origin)+'\n');
+ p.generator.provider={kind:'fixture',response:inspected.origin.response,retainedAuthoring:{path:originPath,digest:hash(originBytes)}};
+ p.policy={...p.policy,id};delete p.policy.runtime_digest;
+ // Keep the exact authoring request; failure provenance is in the pinned origin,
+ // never inserted into a request that this retained answer did not receive.
+ for(const path of [p.stateRoot,p.generator.candidateRoot,p.generator.fullRoot,p.generator.stagingRoot,p.practical.root]){
+  assertNoSymlinkPathSegments(path,'fresh retained response destination',{allowMissingLeaf:true});
+  assert.ok(!existsSync(path),'fresh retained response destination required');
+ }
+ const nextProfile=join(outputRoot,'profile.json'),nextConfig=join(outputRoot,'config.json');
+ const prepared={status:'prepared',profile_path:nextProfile,config_path:nextConfig,run_root:join(outputRoot,'run'),
+  previous_journal_digest:inspected.origin.journal_digest,previous_state_completed:false,models_started:false,retained_authoring:true,approval_carried_forward:false};
+ if(existsSync(outputRoot)){
+  assert.ok(existsSync(receiptPath),'partial recovery preparation preserved; select a fresh output root');
+  const receipt=json(receiptPath);assert.equal(receipt.intent_digest,canonicalDigest(intent),'different retained recovery intent');
+  assert.equal(pin(originPath).digest,hash(originBytes),'prepared authoring origin changed');
+  assert.equal(pin(nextProfile).digest,hash(Buffer.from(stableCanonicalJson(p)+'\n')),'prepared recovery profile changed');
+  const expected=createNativeInstructionLoopConfiguration(nextProfile);
+  assert.equal(pin(nextConfig).digest,hash(Buffer.from(stableCanonicalJson(expected)+'\n')),'prepared recovery config changed');
+  assert.deepEqual(receipt,{intent_digest:canonicalDigest(intent),profile:pin(nextProfile),config:pin(nextConfig),result:prepared},'prepared recovery receipt changed');return prepared;
+ }
+ mkdirSync(outputRoot,{mode:0o700});
+ writeCanonicalJsonNoReplace({outputPath:originPath,artifact:inspected.origin,label:'retained Full authoring origin',maximumBytes:16*1024*1024});
+ writeCanonicalJsonNoReplace({outputPath:nextProfile,artifact:p,label:'retained Full authoring profile',maximumBytes:16*1024*1024});
+ const next=createNativeInstructionLoopConfiguration(nextProfile);writeCanonicalJsonNoReplace({outputPath:nextConfig,artifact:next,label:'retained Full authoring config',maximumBytes:16*1024*1024});
+ writeCanonicalJsonNoReplace({outputPath:receiptPath,artifact:{intent_digest:canonicalDigest(intent),profile:pin(nextProfile),config:pin(nextConfig),result:prepared},label:'retained authoring preparation receipt'});return prepared;
 }
