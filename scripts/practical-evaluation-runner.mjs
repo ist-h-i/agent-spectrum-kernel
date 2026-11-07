@@ -7,11 +7,13 @@ import { canonicalDigest, assertNoSymlinkPathSegments } from './content-addresse
 import { readRunJournal, appendRunJournal, lockRunJournal } from './instruction-run-journal.mjs';
 import { buildPragmaticEvaluationReport } from './ask-pragmatic-evaluation-report.mjs';
 import { buildInstructionRecoveryPacket, validateInstructionRecoveryPolicy, validateInstructionRecoveryAssessment } from './instruction-evaluation-recovery.mjs';
+import {inspectPracticalQualityObservation} from './practical-quality-observation.mjs';
 
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b),copy=v=>structuredClone(v);
 const metrics=['duration_ms','human_review_minutes','rework_minutes','input_tokens','output_tokens','cached_tokens'];
 const labels=['cli_version','model','reasoning','platform','global_context_ref'];
 const rowKey=r=>JSON.stringify([r.block_id,r.condition]);
+const resource=values=>{const known=values.filter(v=>Number.isFinite(v)&&v>=0);return {known_total:known.length?known.reduce((a,b)=>a+b,0):null,observed_count:known.length,unknown_count:values.length-known.length};};
 function checkedPlan(p){
   assert.equal(p.kind,'practical_evaluation_plan_v1');assert.match(p.id,/^[A-Za-z0-9._-]{1,100}$/u);
   assert.ok(typeof p.goal==='string'&&p.goal.trim()&&p.goal.length<=8192);
@@ -53,6 +55,8 @@ function notes(s,entry){
   const evidence=(Array.isArray(provided.evidence_refs)?provided.evidence_refs:[]).filter(v=>typeof v==='string'&&v.trim()&&v.length<=512);
   const completed=entry.result.status==='completed'||out.execution_completed===true;
   let outcome=['pass','fail','unknown'].includes(provided.outcome)?provided.outcome:'unknown';
+  const quality=inspectPracticalQualityObservation(out);
+  if(quality.issue)outcome='unknown';else if(quality.value)outcome=quality.value.scope==='source_reference'&&quality.value.outcome==='pass'?'unknown':quality.value.outcome;
   if(!completed||outcome==='pass'&&!evidence.length)outcome='unknown';
   const observed=Object.fromEntries(metrics.map(k=>{let v=provided.metrics?.[k];
     if(v==null&&k==='duration_ms'&&Number.isFinite(out.cli_seconds))v=out.cli_seconds*1000;
@@ -70,19 +74,30 @@ function report(s){
     global_context:s.plan.global_context,next_improvement:'Review practical benefit, uncertainty, extra cost and the recorded AI decisions before the existing human change decision.'});
   const grades=s.attempts.filter(a=>a.result.output?.grading_execution_state==='completed'||a.result.output?.grading_execution_state==='unknown');
   const gradeDurations=grades.map(a=>a.result.output?.grade?.duration_ms).filter(v=>Number.isFinite(v)&&v>=0);
+  const assessments=s.assessments??[],assessmentDuration=resource(assessments.map(a=>a.execution?.duration_ms??a.duration_ms??null));
   return {kind:'practical_evaluation_run_report_v1',pragmatic,all_attempts:s.attempts.map(a=>({id:a.id,row:a.row,cohort:a.cohort,
     original_result:a.result,result_digest:canonicalDigest(a.result),included_in_comparison:s.selected[rowKey(a.row)]===a.id,
     result_observation_history:a.result_history??[],
-    assessment:a.assessment??null,observation:notes(s,a)})),recovery_decisions:s.decisions,
+    assessment:a.assessment??null,observation:notes(s,a),quality_observation:inspectPracticalQualityObservation(a.result.output).value,
+    quality_observation_issue:inspectPracticalQualityObservation(a.result.output).issue})),recovery_decisions:s.decisions,
     execution_suspended:s.suspended??false,extra_trials:s.extra_trials,
     resources_all_attempts:Object.fromEntries(metrics.map(k=>{
       const values=s.attempts.map(a=>notes(s,a).metrics[k]),known=values.filter(v=>v!==null);
       return [k,{known_total:known.length?known.reduce((a,b)=>a+b,0):null,observed_count:known.length,unknown_count:values.length-known.length}];})),
     assessment_attempts:s.assessments??[],assessment_overhead:{trial_metrics_include_assessments:false,
-      usage_status:'not_collected_or_provider_supplied; never treated as zero',complete_cost:null},
+      usage_status:'not_collected_or_provider_supplied; never treated as zero',complete_cost:null,
+      duration_ms:assessmentDuration,
+      reported_root_model_calls:resource(assessments.map(a=>Number.isSafeInteger(a.execution?.model_calls)&&a.execution.model_calls>=0?a.execution.model_calls:null)),
+      resources:Object.fromEntries(['input_tokens','output_tokens','cached_tokens'].map(k=>[k,resource(assessments.map(a=>{
+       const m=a.execution?.usage,v=m?.[k]??(k==='cached_tokens'?m?.cached_input_tokens:null);return Number.isSafeInteger(v)&&v>=0&&!(k==='cached_tokens'&&Number.isSafeInteger(m.input_tokens)&&v>m.input_tokens)?v:null;
+      }))]))},
     rejected_assessments:s.rejected_assessments??[],
     grading_overhead:{known_local_duration_ms:gradeDurations.length?gradeDurations.reduce((a,b)=>a+b,0):null,
-      observed_count:gradeDurations.length,unknown_count:grades.length-gradeDurations.length,remote_cost:null,not_in_task_duration:true},
+      observed_count:gradeDurations.length,unknown_count:grades.length-gradeDurations.length,remote_cost:null,not_in_task_duration:true,
+      resources:Object.fromEntries(['input_tokens','output_tokens','cached_tokens'].map(k=>{
+       const values=grades.map(a=>{const m=a.result.output?.grade?.provider_observation?.metrics,v=m?.[k];return Number.isSafeInteger(v)&&v>=0&&!(k==='cached_tokens'&&Number.isSafeInteger(m.input_tokens)&&v>m.input_tokens)?v:null;}),known=values.filter(v=>v!==null);
+       return [k,{known_total:known.length?known.reduce((a,b)=>a+b,0):null,observed_count:known.length,unknown_count:values.length-known.length}];})),
+      usage_scope:'caller-reported grading observations only; cached is an input subset; complete hierarchy and billed cost remain unknown'},
     comparison_limits:s.decisions.flatMap(d=>d.assessment.comparison_limits),
     completeness_required:false,formal_admission_implied:false,application_performed:false};
 }

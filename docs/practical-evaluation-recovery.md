@@ -131,6 +131,13 @@ before execution. A `check` or a supplied grader may establish the caller's
 declared criterion; an ungraded task retains unknown quality. The optional
 `observation_path` supplies explicit token counters, never guessed from stdout.
 The executable test includes a complete, runnable model-free configuration.
+An optional [typed grader observation](practical-quality-observations.md) carries
+scope, outcome and the existing fixed-point summary in a verified provider
+receipt. Source-only positive judgments remain overall Unknown for runtime
+acceptance; valid partial evidence need not cause a task rerun. Invalid optional
+quality stays Unknown while useful execution/usage survives. Reported grading
+and assessment resources remain separate from every task attempt.
+
 Pin the grader's criterion code and dependencies, separately from editable
 application code. When a pin's source is copied into the task workspace, the
 worker also verifies that copy's bytes and mode immediately before each command.
