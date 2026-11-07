@@ -1,9 +1,11 @@
 #!/usr/bin/env node
+import {readHostReferenceScoringRequest,claimHostReferenceScoring,completeHostReferenceScoring} from './instruction-loop-host-scoring.mjs';
+import {instructionReferenceScoringJob,instructionReferenceScoringCommand} from './instruction-loop-reference-scoring-runtime.mjs';
 import {readInstructionLoopJson} from './instruction-loop-artifact.mjs';
 // Operator entry point. A config is trusted local executable configuration, not
 // an imported candidate artifact. Human flags must be supplied by the host.
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
+import { resolve,join } from 'node:path';
 import { canonicalDigest, readJsonFileStrict,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments } from './content-addressed-store.mjs';
 import {createConfiguredInstructionLoopRuntime} from './instruction-loop-runtime.mjs';
 import {readRunJournal,appendRunJournal,lockRunJournal} from './instruction-run-journal.mjs';
@@ -20,6 +22,33 @@ try{
   if(command==='readiness'){
     assert.deepEqual(Object.keys(options),['--profile']);assert.ok(options['--profile'],'--profile required');
     console.log(JSON.stringify(inspectInstructionLoopReadiness(resolve(options['--profile'])),null,2));
+  }
+  else if(['scoring-request','scoring-claim','scoring-complete'].includes(command)){
+    const allowed=['--root','--profile','--config',...(command==='scoring-claim'?['--claim','--allow-model-calls']:command==='scoring-complete'?['--submission']:[])];
+    assert.ok(Object.keys(options).every(k=>allowed.includes(k)));assert.ok(options['--profile']&&options['--config']);
+    const p=readInstructionLoopJson(resolve(options['--profile'])),config=readInstructionLoopJson(resolve(options['--config']));
+    assert.equal(p.kind,'full_native_reference_loop_profile_v1','host scoring is native-only');assert.equal(p.report.scoringProvider?.kind,'external_host','not a shipped host scoring profile');
+    assert.equal(canonicalDigest(config),canonicalDigest(createNativeInstructionLoopConfiguration(resolve(options['--profile']))),'host scoring configuration drift');
+    assertNoSymlinkPathSegments(root,'host scoring coordinator');
+    const unlock=lockRunJournal(root);
+    try{const {state}=readRunJournal(root);assert.equal(canonicalDigest(state.policy),canonicalDigest(config.policy));assert.equal(state.pending?.kind,'report','no exact pending scoring report');
+      const job=instructionReferenceScoringJob(p,state.pending),directory=join(p.stateRoot,'reference-scoring/jobs',canonicalDigest(job).slice(7)),request=readHostReferenceScoringRequest(directory);
+      assert.equal(request.grade_job_digest,canonicalDigest(job),'host scoring job transplant');
+      const commandDefinition=instructionReferenceScoringCommand(p,{parent:{root,report_job_digest:canonicalDigest(state.pending)}}),settings=JSON.parse(commandDefinition.argv[3]);
+      assert.equal(canonicalDigest(request.handoff),canonicalDigest({kind:'host_reference_scoring_handoff_v1',job_digest:canonicalDigest(job),settings:{inline:settings},evidence_kind:settings.evidence_kind,model_calls_authorized:commandDefinition.model_calls}),'host scoring authority differs from configured pending runtime');
+      const old=state.reference_scoring_progress;
+      if(old){assert.equal(old.job_digest,canonicalDigest(job));assert.equal(old.handoff_digest,request.handoff_digest);
+        if(old.claim_digest){assert.ok(request.existing_claim,'checkpointed scoring claim missing');assert.equal(old.claim_digest,canonicalDigest(request.existing_claim));}
+        if(old.completion_digest)assert.equal(old.completion_digest,request.completion_digest,'checkpointed scoring completion missing or changed');}
+      let result=request;
+      if(command==='scoring-claim'){assert.ok(options['--claim']);const value=readInstructionLoopJson(resolve(options['--claim']));
+        result=claimHostReferenceScoring(directory,value,{modelCallsAuthorized:options['--allow-model-calls']===true});
+        state.reference_scoring_progress={...old,job_digest:canonicalDigest(job),handoff_digest:request.handoff_digest,claim_digest:result.claim_digest};appendRunJournal(root,'reference_scoring_claimed',state);
+      }else if(command==='scoring-complete'){assert.ok(options['--submission']);const value=readInstructionLoopJson(resolve(options['--submission']));result=completeHostReferenceScoring(directory,value);
+        state.reference_scoring_progress={...old,job_digest:canonicalDigest(job),handoff_digest:request.handoff_digest,claim_digest:value.claim_digest,completion_digest:result.completion_digest};appendRunJournal(root,'reference_scoring_completed',state);
+      }
+      console.log(JSON.stringify(result,null,2));
+    }finally{unlock();}
   }
   else if(['authoring-request','authoring-claim','authoring-complete'].includes(command)){
     const allowed=['--root','--config',...(command==='authoring-claim'?['--claim','--allow-model-calls']:command==='authoring-complete'?['--submission']:[])];

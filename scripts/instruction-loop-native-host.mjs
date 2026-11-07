@@ -4,7 +4,7 @@ import {readInstructionLoopJson,INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES} from './ins
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {mkdirSync,existsSync,writeFileSync,rmSync} from 'node:fs';
-import {join,resolve} from 'node:path';
+import {join,resolve,dirname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
@@ -51,7 +51,7 @@ async function readTrial(p,job,recovered=false){
   return {...c,ready_for_next_root:true,execution_kind:p.native.executionKind,root_usage:c.root_usage,
     full_hierarchical_usage:null,recovered_from_native_records:recovered};
 }
-export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthorized=false,inspectOnly=false}={}){
+export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthorized=false,inspectOnly=false,coordinatorRoot=null}={}){
   sourceInputs(p);mkdirSync(p.stateRoot,{recursive:true,mode:0o700});
   if(job.kind==='generate'){
     assert.equal(canonicalDigest(job.input.observation),canonicalDigest(p.policy.observation),'controller observation differs from pinned profile');
@@ -120,12 +120,12 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
       await pause();}
   }
   if(job.kind==='report'){
-    const scored=await runInstructionReferenceScoring(p,job,{modelCallsAuthorized,inspectOnly});
+    const scored=await runInstructionReferenceScoring(p,job,{modelCallsAuthorized,inspectOnly,coordinatorRoot});
     if(scored===null)return {report_pending:true};
-    const report=buildInstructionLoopReferenceReport({...p.report,...(p.report.fixedScoring?{fixedScoring:{...p.report.fixedScoring,assessments:scored.assessments}}:{}),storeRoot:p.storeRoot,planObjectDigest:job.input.selection.execution_binding.plan_object_digest,
+    const report=buildInstructionLoopReferenceReport({...p.report,...(p.report.fixedScoring?{fixedScoring:{...p.report.fixedScoring,assessments:scored.assessments}}:{}),dynamicAssessments:scored.referenceAssessments??[],storeRoot:p.storeRoot,planObjectDigest:job.input.selection.execution_binding.plan_object_digest,
       trustedAssetAuthorityContexts:p.generator.trustedAuthorityContexts??[],executionKind:p.native.executionKind});
     report.fixed_scoring_execution=scored.execution;
-    if(scored.execution?.output_issue||scored.execution?.status==='failed')report.limits=[...(report.limits??[]),'Fixed reference grading has no usable optional judgments; retained trial evidence remains available and missing source quality stays Unknown.'];
+    if(scored.execution?.output_issue||scored.execution?.reference_output_issue||scored.execution?.status==='failed')report.limits=[...(report.limits??[]),'Fixed reference grading has no usable optional judgments; retained trial evidence remains available and missing source quality stays Unknown.'];
     report.worker_incidents=job.input.trials.filter(t=>t.transport_interruption).map(t=>({trial_id:t.trial_id,transport_interruption:t.transport_interruption,
       root_result:t.state,recovered_from_native_records:t.recovered_from_native_records}));
     report.measured_context=`Full frozen native snapshot; declared supporting context is retained. Normal owner uses the existing source-backed installer projection. Candidate source ${job.input.candidate.source_revision}; no performance claim for a different projection.`;
@@ -161,11 +161,12 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
 }
 export async function nativeInstructionLoopWorker({profile,job,resultPath,action='execute',modelCallsAuthorized=false}){
   sourceInputs(profile);mkdirSync(profile.stateRoot,{recursive:true,mode:0o700});
+  let coordinatorRoot=null;if(profile.report?.scoringProvider&&job.kind==='report'){assert.equal(resultPath,join(dirname(resultPath),'result.json'));assert.equal(dirname(resultPath).split('/').at(-1),canonicalDigest(job).slice(7));coordinatorRoot=dirname(dirname(dirname(resultPath)));}
   const sidecar=join(profile.stateRoot,'stage-'+canonicalDigest(job).slice(7)+'.json');
   if(existsSync(sidecar)){const result=readInstructionLoopJson(sidecar);assert.equal(result.request_digest,canonicalDigest(job));publication(resultPath,result);return;}
   if(action==='inspect'){
-    if(job.kind==='report'&&profile.report.referenceScoringCommand){
-      let out;try{out=await executeNativeInstructionLoopStage(profile,job,{inspectOnly:true});}
+    if(job.kind==='report'&&(profile.report.referenceScoringCommand||profile.report.scoringProvider)){
+      let out;try{out=await executeNativeInstructionLoopStage(profile,job,{inspectOnly:true,coordinatorRoot});}
       catch(error){if(error.code==='REFERENCE_SCORING_PENDING')return;throw error;}
       if(!out.report_pending){const result={request_digest:canonicalDigest(job),status:'completed',output:out};publication(sidecar,result);publication(resultPath,result);}
     }
@@ -174,7 +175,7 @@ export async function nativeInstructionLoopWorker({profile,job,resultPath,action
   }
   assert.equal(action,'execute');
   try{
-    const output=await executeNativeInstructionLoopStage(profile,job,{modelCallsAuthorized});
+    const output=await executeNativeInstructionLoopStage(profile,job,{modelCallsAuthorized,coordinatorRoot});
     if(output.worker_exit_without_result){process.exitCode=83;return;}
     const result={request_digest:canonicalDigest(job),status:output.state==='failed_or_interrupted'?'failed':'completed',output};
     publication(sidecar,result);publication(resultPath,result);

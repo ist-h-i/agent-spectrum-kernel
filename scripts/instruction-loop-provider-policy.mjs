@@ -8,6 +8,7 @@ function providerKind(provider,role,externalHost=false){
   return provider.kind;
 }
 export function inspectInstructionLoopProviderSelection(p){
+  if(p.report?.scoringProvider)assert.equal(p.kind,'full_native_reference_loop_profile_v1','host scoring provider is native-only');
   assert.ok(['component_practical_instruction_loop_profile_v1','full_practical_instruction_loop_profile_v1','full_native_reference_loop_profile_v1'].includes(p.kind),'unsupported standard instruction-loop profile');
   const component=p.kind==='component_practical_instruction_loop_profile_v1';
   const authoring=component?(p.candidate?.authoring?providerKind(p.candidate.authoring.provider,'authoring',true):'not_configured'):providerKind(p.generator?.provider,'authoring');

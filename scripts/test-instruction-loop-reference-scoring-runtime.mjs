@@ -80,3 +80,7 @@ test('a missing model provider closure stays pending instead of becoming an opti
  const f=fixture(t),path=f.p.report.referenceScoringCommand.argv[1];writeFileSync(path,readFileSync(path,'utf8').replace('output:{fixed_point_assessments:[],ready_for_next_root:true}','output:null'));f.p.report.referenceScoringCommand.pins[0].digest=hash(readFileSync(path));
  await assert.rejects(runInstructionReferenceScoring(f.p,f.job,{modelCallsAuthorized:true}),error=>error.code==='REFERENCE_SCORING_PENDING');assert.equal(readFileSync(f.counter,'utf8'),'one dispatch');
 });
+test('malformed dynamic binary list remains Unknown without discarding separately valid fixed output',async t=>{
+ const f=fixture(t,{models:false}),path=f.p.report.referenceScoringCommand.argv[1];writeFileSync(path,readFileSync(path,'utf8').replace('fixed_point_assessments:[]','reference_assessments:[null],fixed_point_assessments:[]'));f.p.report.referenceScoringCommand.pins[0].digest=hash(readFileSync(path));
+ const r=await runInstructionReferenceScoring(f.p,f.job);assert.deepEqual(r.referenceAssessments,[]);assert.equal(r.execution.reference_output_issue,'reference_assessments_invalid');assert.equal(r.execution.output_issue,null);assert.equal(r.execution.status,'completed');
+});
