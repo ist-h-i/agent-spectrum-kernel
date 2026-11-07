@@ -35,7 +35,14 @@ An explicit continuation input verifies both report digests and the revision's
 lineage before supplying new feedback. It carries no old case/change approval.
 The original human decision remains scoped to its original packet; a subsequent
 cycle has fresh gates. A readout revision does not apply an asset or authorize
-using an earlier change approval against new evidence.
+using an earlier change approval against new evidence. An explicit standard
+operator revision transition may update the pending review before any decision
+is consumed. It retains the original report and plan, refreshes the packet and
+replans when applicable. Only its fresh packet can receive a human decision.
+This changes the review view through an append-only journal event; grading and
+readout generation themselves leave original records unchanged. Read-only lineage
+validation can recognize only coordinator locks owned by the current process,
+never an active evaluation lock or another process's coordinator lock.
 
 ## Alternatives and consequences
 

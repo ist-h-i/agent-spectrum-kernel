@@ -75,12 +75,32 @@ duration are separate from the original Task metrics.
 
 Report generation makes no model call. The revision retains the original report,
 result digest, dispositions, quality, Task duration and usage, plus every supplied
-supplement, selection, cost and limitation. It never changes the original journal
-or human decision packet. Report the revision to the user before asking for a
-change decision; an earlier decision applies only to its original packet.
+supplement, selection, cost and limitation. Report generation does not change the original journal or human decision
+packet. To present the revised evidence through the existing pending judgment,
+run the standard operator before submitting a decision:
+
+```sh
+node scripts/supervised-instruction-loop-cli.mjs operate \
+  --root /absolute/operation --profile /absolute/profile.json \
+  --config /absolute/config.json --cycles 1 \
+  --report-revision /absolute/recovery/report-revision-ref.json
+```
+
+Use the operation's original cycle budget; this option does not extend it. The
+operation must be paused at result/change review with no consumed decision or
+pending work. The controller appends a revision transition, retaining the original
+report, prior packet digest and any previous plan. It publishes a fresh result
+packet, or recomputes the plan before a fresh change packet. No owner apply occurs
+until the human approves that exact new packet. Submit the decision in a separate
+operator invocation after reviewing it; a decision and report revision in the same
+invocation reject. Old packet digests, consumed decisions and applied/retired
+cycles cannot be reused. Repeating the same revision before a decision is
+idempotent. The normal result-only configuration still retains the candidate and
+cannot apply it to an owner target.
 
 For subsequent feedback, pass the saved revision reference explicitly to the
-standard `next` or `next-policy` CLI as `--report-revision`. Both original and
+standard `next` or `next-policy` CLI as `--report-revision`. A revision already
+attached to the pending judgment is carried into feedback automatically. Both original and
 revised report digests enter the next-cycle provenance. Case and change approvals
 are not inherited. Omitting the option preserves the existing continuation path.
 
@@ -108,3 +128,10 @@ The cost ledger snapshots all consumed canonical slots, including failed,
 unclosed and unselected work; absent metrics remain unknown. Explicit quality
 references choose what to discuss, not which executions to charge. A published
 revision retains its historical snapshot when later supplements are attempted.
+
+An interruption after revision admission can be resumed with the same option.
+A reserved plan is inspected, never dispatched twice. Later review and feedback
+read the admitted report by its immutable digest and exact journal admission
+event, so moving to a subsequent cycle or cleaning owned staging does not require
+re-running old graders. This data reader cannot admit a new revision or grant
+another verification call.
