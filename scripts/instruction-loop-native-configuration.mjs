@@ -71,7 +71,7 @@ export function buildNextNativeInstructionLoopProfile({root,profilePath,configPa
   if(history.application_active){
     const c=history.candidate;
     p.generator.baselineSourceRoot=c.source_root;p.generator.baselineRevision=c.source_revision;
-    p.generator.parentAssets=c.candidate_assets;
+    p.generator.parentAssets=c.environment_assets??c.candidate_assets;
     if(practical)p.practical.baselineRoot=c.full_root;else p.native.baselineFullRoot=c.full_root;
     p.baselineEnvironmentObjectDigest=c.environment_object_digest;
   }

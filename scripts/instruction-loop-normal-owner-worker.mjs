@@ -11,6 +11,23 @@ import { canonicalDigest, readJsonFileStrict, writeCanonicalJsonNoReplace,
 import { instructionBytesDigest } from './instruction-environment.mjs';
 import {bindMeasuredNormalOwnerSource,verifyNormalOwnerSourceBinding} from './instruction-loop-source-binding.mjs';
 
+export function cleanOwnedInstructionLoopStaging(stagingRoot,disposition){
+  assert.equal(resolve(stagingRoot),stagingRoot);assertNoSymlinkPathSegments(stagingRoot,'owned staging');
+    // Delete only paths declared in this privately created ownership manifest;
+    // never a generated path, source checkout, CAS blob, report or raw trial.
+    const manifest=readJsonFileStrict(join(stagingRoot,'owned-files.json'));
+    const actual=[];
+    const walk=(path,prefix='')=>{for(const n of readdirSync(path)){
+      const rel=prefix?prefix+'/'+n:n,p=join(path,n),s=lstatSync(p);assert.ok(!s.isSymbolicLink(),'cleanup refuses symlink');
+      if(s.isDirectory())walk(p,rel);else {assert.ok(s.isFile());if(rel!=='owned-files.json')actual.push({path:rel,digest:instructionBytesDigest(readStableBytes(p,'owned staging'))});}
+    }};walk(stagingRoot);
+    const expected=new Map(manifest.files.map(f=>[f.path,f.digest]));assert.equal(expected.size,manifest.files.length,'duplicate owned staging path');
+    for(const f of actual)assert.equal(expected.get(f.path),f.digest,'owned staging changed; no cleanup');
+    for(const f of actual)rmSync(join(stagingRoot,f.path));
+    // Keep manifest/root as the audit record. Empty directories are harmless.
+    return {disposition:disposition,deleted_files:actual.map(x=>x.path),already_absent_owned_files:manifest.files.filter(f=>!actual.some(a=>a.path===f.path)).map(f=>f.path),evidence_preserved:true};
+}
+
 export async function runNormalOwnerLoopOperation({sourceRoot,baselineSourceRoot,target,stagingRoot,job}){
   for(const path of [sourceRoot,baselineSourceRoot,target,stagingRoot]){
     assert.equal(resolve(path),path);assertNoSymlinkPathSegments(path,'normal owner runtime');
@@ -64,21 +81,7 @@ export async function runNormalOwnerLoopOperation({sourceRoot,baselineSourceRoot
     assert.equal(canonicalDigest(restored),canonicalDigest(packet.baseline_managed),'baseline owner not restored');
     return {status:'restored',target,baseline_managed:restored};
   }
-  if(job.kind==='cleanup'){
-    // Delete only paths declared in this privately created ownership manifest;
-    // never a generated path, source checkout, CAS blob, report or raw trial.
-    const manifest=readJsonFileStrict(join(stagingRoot,'owned-files.json'));
-    const actual=[];
-    const walk=(path,prefix='')=>{for(const n of readdirSync(path)){
-      const rel=prefix?prefix+'/'+n:n,p=join(path,n),s=lstatSync(p);assert.ok(!s.isSymbolicLink(),'cleanup refuses symlink');
-      if(s.isDirectory())walk(p,rel);else {assert.ok(s.isFile());if(rel!=='owned-files.json')actual.push({path:rel,digest:instructionBytesDigest(readStableBytes(p,'owned staging'))});}
-    }};walk(stagingRoot);
-    const expected=new Map(manifest.files.map(f=>[f.path,f.digest]));assert.equal(expected.size,manifest.files.length,'duplicate owned staging path');
-    for(const f of actual)assert.equal(expected.get(f.path),f.digest,'owned staging changed; no cleanup');
-    for(const f of actual)rmSync(join(stagingRoot,f.path));
-    // Keep manifest/root as the audit record. Empty directories are harmless.
-    return {disposition:job.input.disposition,deleted_files:actual.map(x=>x.path),already_absent_owned_files:manifest.files.filter(f=>!actual.some(a=>a.path===f.path)).map(f=>f.path),evidence_preserved:true};
-  }
+  if(job.kind==='cleanup')return cleanOwnedInstructionLoopStaging(stagingRoot,job.input.disposition);
   throw new Error('unsupported normal-owner operation');
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
