@@ -72,11 +72,18 @@ export async function codexFullInstructionProvider(p,input){
   const final=join(p.sessionRoot,'last-message.json');
   const prompt='Revise the supplied public Skill source for the stated goal. Return only JSON {"changes":[{"operation":"write","path":"...","text":"..."}]} (or operation delete for an existing reference). Preserve essential safety and capability boundaries. Do not edit executable code, test cases, scoring, owner state or mirrors.\n'+JSON.stringify(input);
   const argv=['exec','--json','--skip-git-repo-check','--sandbox','read-only','-o',final,...(p.model?['--model',p.model]:[]),'-'];
-  const result=await executeCodexSession({executable:p.executable,argv,cwd:p.sessionRoot,input:prompt,timeoutMs:p.timeoutMs,terminationScope:'direct_child'});
+  const result=await executeCodexSession({executable:p.executable,argv,cwd:p.sessionRoot,input:prompt,timeoutMs:p.timeoutMs,terminationScope:'direct_child',
+    env:{...process.env,ASK_LOOP_MODEL_CALLS_AUTHORIZED:'1'}});
+  const bounded=value=>{const b=Buffer.from(value??'');return {text:b.subarray(0,128*1024).toString('utf8'),total_bytes:b.length,truncated:b.length>128*1024};};
+  const receiptPath=join(p.sessionRoot,'provider-execution.json'),receipt={kind:'full_authoring_execution_v1',model_call_authorized:true,
+    spawn_observed:result.spawnObserved??null,termination_confirmed:result.terminationConfirmed??null,exit_code:result.exitCode??null,signal:result.signal??null,
+    error:result.error??null,timed_out:result.timedOut??false,interrupted:result.interrupted??false,output_limited:result.outputLimited??false,duration_ms:result.durationMs??null,
+    stdout:bounded(result.stdout),stderr:bounded(result.stderr),closure_scope:'direct local child only; remote work not inferred',private_diagnostics_not_feedback:true};
+  writeCanonicalJsonNoReplace({outputPath:receiptPath,artifact:receipt,label:'private Full authoring execution'});
   assert.ok(result.spawnObserved&&result.terminationConfirmed&&result.exitCode===0&&!result.error&&!result.timedOut&&!result.interrupted&&!result.outputLimited,'Full generation incomplete; preserve session, never retry automatically');
   return {response:readJsonFileStrict(final,'Full generator response',8*1024*1024),execution:{kind:'codex',duration_ms:result.durationMs,model_requested:p.model??null,
     reasoning_configuration:'ordinary CLI configuration, not inspected',root_usage:null,full_hierarchical_usage:null,
-    process_lifetime_scope:'direct_child',ambient_read_isolation:'Unknown'}};
+    process_lifetime_scope:'direct_child',ambient_read_isolation:'Unknown',receipt:{path:receiptPath,digest:hash(readStableBytes(receiptPath,'Full authoring execution receipt'))}}};
 }
 export async function generateFullInstructionCandidate(p,provider){
   const roots=[p.baselineSourceRoot,p.storeRoot,p.candidateRoot,p.fullRoot,p.stagingRoot];

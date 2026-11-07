@@ -8,6 +8,15 @@ existing caller-selected executable behavior. This does not authenticate a
 remote model or close arbitrary interpreter/dependency/configuration files.
 The check does not close a concurrent replacement race between checking and exec.
 
+Authorized inline Full authoring also passes the model grant in its child-only
+environment, matching pinned input-only wrappers without changing the parent
+process environment. After the synchronous child returns, its fresh private
+session retains bounded stdout/stderr, exit and closure diagnostics, including
+failures. These records neither approve cases nor prove remote model completion;
+they are not raw feedback to future candidates. A consumed session is not replayed.
+Formal R04: authorized child grant only; R05: bounded failure diagnostics and
+fresh-session replay refusal. Native-binding model-free regressions cover both.
+
 Formal recovery-executable-pin@1: R01 unchanged legacy/fixture behavior; R02
 opt-in drift refused in runtime preparation and before provider dispatch/session
 allocation; R03 matching pins participate in the runtime digest and allow the
