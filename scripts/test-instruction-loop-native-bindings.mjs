@@ -96,3 +96,17 @@ else if(existsSync(${JSON.stringify(done)}))writeFileSync(result,JSON.stringify(
   const recovered=await runtime.inspect(job,{root});assert.equal(recovered.status,'completed');assert.equal(recovered.output.transport_interruption.exit_code,83);assert.equal(readFileSync(counter,'utf8'),'one dispatch');
   await assert.rejects(runtime.trial(job,{root}),/already allocated/);
 });
+test('optional Full authoring executable pin refuses drift before session creation and retains unpinned compatibility',async t=>{
+ const {chmodSync}=await import('node:fs'),root=fixture(t),executable=join(root,'fake-authoring'),marker=join(root,'started');
+ writeFileSync(executable,'#!'+process.execPath+'\n'+`const fs=require('node:fs');let input='';process.stdin.on('data',x=>input+=x);process.stdin.on('end',()=>{fs.writeFileSync(${JSON.stringify(marker)},'started');const args=process.argv.slice(2);fs.writeFileSync(args[args.indexOf('-o')+1],JSON.stringify({changes:[]}));});`);chmodSync(executable,0o700);
+ const digest=hash(readFileSync(executable)),p={executable,executableDigest:digest,modelCallsAuthorized:true,model:'synthetic-model',timeoutMs:5000,sessionRoot:join(root,'refused-session')};
+ writeFileSync(executable,readFileSync(executable,'utf8')+'\n// drift\n');await assert.rejects(codexFullInstructionProvider(p,{}),/executable drift/);assert.equal(existsSync(p.sessionRoot),false);assert.equal(existsSync(marker),false);
+ const correct={...p,executableDigest:hash(readFileSync(executable)),sessionRoot:join(root,'pinned-session')};assert.deepEqual((await codexFullInstructionProvider(correct,{})).response,{changes:[]});
+ const legacy={...correct,sessionRoot:join(root,'legacy-session')};delete legacy.executableDigest;assert.deepEqual((await codexFullInstructionProvider(legacy,{})).response,{changes:[]});
+});
+test('Full authoring executable pin rejects malformed digests, non-regular paths, missing files and symlinks before allocation',async t=>{
+ const root=fixture(t),{symlinkSync}=await import('node:fs'),file=join(root,'file'),link=join(root,'link');writeFileSync(file,'unused');symlinkSync(file,link);
+ for(const [executable,executableDigest] of [[file,'invalid'],['./scripts/instruction-loop-full-candidate.mjs',hash(readFileSync(join(import.meta.dirname,'instruction-loop-full-candidate.mjs')))],[root,hash(Buffer.from('x'))],[join(root,'missing'),hash(Buffer.from('x'))],[link,hash(readFileSync(file))]]){
+  const sessionRoot=join(root,'not-created');await assert.rejects(codexFullInstructionProvider({executable,executableDigest,sessionRoot,modelCallsAuthorized:true},{}));assert.equal(existsSync(sessionRoot),false);
+ }
+});
