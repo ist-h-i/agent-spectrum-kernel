@@ -18,7 +18,7 @@ import {verifyAssetRegistry} from './asset-registry.mjs';
 import {bindMeasuredNormalOwnerSource} from './instruction-loop-source-binding.mjs';
 import {projectInstructionLoopObservation} from './instruction-loop-feedback.mjs';
 const pause=()=>new Promise(r=>setTimeout(r,500));
-const checked=r=>{assert.equal(hash(readStableBytes(r.path,'pinned native host input',16*1024*1024)),r.digest,'native host input drift');return readJsonFileStrict(r.path);};
+const checked=r=>{assert.equal(hash(readStableBytes(r.path,'pinned native host input',16*1024*1024)),r.digest,'native host input drift');return readJsonFileStrict(r.path,'pinned native host input',16*1024*1024);};
 const save=(path,artifact)=>writeCanonicalJsonNoReplace({outputPath:path,artifact,label:'native loop stage result',maximumBytes:16*1024*1024});
 const preparedPath=p=>join(p.stateRoot,'native-selection.json');
 function publication(path,result){if(existsSync(path)){assert.equal(canonicalDigest(readJsonFileStrict(path)),canonicalDigest(result),'terminal result conflict');return;}save(path,result);}
@@ -96,7 +96,7 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
     assert.equal(job.input.evaluation_decision.disposition,'approved');
     if(p.native.executionKind==='real_codex')assert.equal(modelCallsAuthorized,true,'new implementation model trial not authorized');
     assert.equal(canonicalDigest(job.input.selection),canonicalDigest(readJsonFileStrict(preparedPath(p))),'approved native selection drift');
-    const config=readJsonFileStrict(join(p.native.root,'config.json')),row=config.rows.find(r=>r.trial_id===job.input.row.id);assert.ok(row);
+    const config=readJsonFileStrict(join(p.native.root,'config.json'),'prepared native configuration',16*1024*1024),row=config.rows.find(r=>r.trial_id===job.input.row.id);assert.ok(row);
     assert.equal(row.fixture_id,job.input.row.case.id);assert.equal(row.variant,job.input.row.condition);assert.equal(row.repetition,job.input.row.repetition);
     // The original control repeats the same nonblocking mutex check atomically
     // while launching. This probe does not assert global process visibility.
