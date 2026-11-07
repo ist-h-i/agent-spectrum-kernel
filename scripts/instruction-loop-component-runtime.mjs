@@ -2,6 +2,7 @@
 // practical evaluator, with the existing exact environment file lifecycle.
 import assert from 'node:assert/strict';
 import {inspectInstructionLoopProviderSelection} from './instruction-loop-provider-policy.mjs';
+import {validatePracticalModelConditions} from './practical-codex-adapter.mjs';
 import {existsSync,readdirSync,lstatSync,rmSync} from 'node:fs';
 import {join,resolve,dirname} from 'node:path';
 import {canonicalDigest,readStableBytes,readJsonFileStrict,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
@@ -14,7 +15,7 @@ import {generateComponentInstructionCandidate,resumeHostComponentInstructionCand
 import {readHostInstructionAuthoringRequest,claimHostInstructionAuthoring,completeHostInstructionAuthoring} from './instruction-loop-host-authoring.mjs';
 import {supervisedEnvironmentReceipt} from './instruction-loop-environment-approval.mjs';
 import {planEnvironmentTargetApply,applyEnvironmentTargetPlan,restoreEnvironmentTarget,inspectSupervisedEnvironmentTarget} from './environment-target.mjs';
-const sourceNames=['instruction-loop-host-authoring.mjs','instruction-loop-provider-policy.mjs','instruction-loop-component-runtime.mjs','instruction-loop-component-candidate.mjs','instruction-loop-environment-approval.mjs',
+const sourceNames=['ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','practical-codex-adapter.mjs','ask-user-comparison.mjs','instruction-loop-host-authoring.mjs','instruction-loop-provider-policy.mjs','instruction-loop-component-runtime.mjs','instruction-loop-component-candidate.mjs','instruction-loop-environment-approval.mjs',
   'instruction-loop-practical-runtime.mjs','instruction-environment-authoring.mjs','instruction-composition.mjs','instruction-asset-package.mjs',
   'instruction-environment.mjs','instruction-environment-compiler.mjs','environment-target.mjs','environment-target-owner.mjs',
   'instruction-source-version.mjs','instruction-loop-assets.mjs','instruction-run-journal.mjs','supervised-instruction-loop.mjs',
@@ -25,6 +26,7 @@ const sourceNames=['instruction-loop-host-authoring.mjs','instruction-loop-provi
 const pin=path=>({path,digest:hash(readStableBytes(path,'component runtime source',16*1024*1024))});
 function checkedPaths(p){
   inspectInstructionLoopProviderSelection(p);
+  validatePracticalModelConditions(p);
   componentEnvironmentOptions(p);
   assert.equal(p.kind,'component_practical_instruction_loop_profile_v1');assert.equal(p.policy.evaluation_mode,'practical_v1');
   assert.equal(p.normal.target,p.policy.normal_target);assert.ok(['codex','claude_code'].includes(p.adapter));

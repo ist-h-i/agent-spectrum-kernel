@@ -2,6 +2,7 @@
 // Eval engine in place of a private fixed-catalog grading dependency.
 import assert from 'node:assert/strict';
 import {inspectInstructionLoopProviderSelection} from './instruction-loop-provider-policy.mjs';
+import {createCodexPracticalCommand,validatePracticalModelConditions} from './practical-codex-adapter.mjs';
 import {existsSync,mkdirSync} from 'node:fs';
 import {join,resolve,dirname} from 'node:path';
 import {canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
@@ -15,7 +16,7 @@ import {advancePracticalEvaluation,inspectPracticalEvaluation} from './practical
 import {readRunJournal} from './instruction-run-journal.mjs';
 
 const stages=['generate','register','select','plan','apply','version','cleanup','restore'];
-const sourceNames=['instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs',
+const sourceNames=['ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','practical-codex-adapter.mjs','ask-user-comparison.mjs','instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs',
   'instruction-loop-feedback.mjs','ask-personal-evolution-observation.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
   'instruction-loop-assets.mjs','instruction-loop-source-binding.mjs','instruction-environment.mjs','instruction-environment-compiler.mjs',
   'practical-evaluation-runner.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',
@@ -23,6 +24,7 @@ const sourceNames=['instruction-loop-provider-policy.mjs','instruction-loop-prac
 const pin=path=>({path,digest:hash(readStableBytes(path,'practical runtime input',16*1024*1024))});
 function validateProfilePaths(p){
   inspectInstructionLoopProviderSelection(p);
+  validatePracticalModelConditions(p);
   instructionEnvironmentTrustOptions(p.practical.environmentTrust);
   const evaluation=resolve(p.practical.root);assert.equal(evaluation,p.practical.root,'absolute evaluation root required');
   assertNoSymlinkPathSegments(evaluation,'practical evaluation root',{allowMissingLeaf:true});
@@ -63,13 +65,15 @@ export function prepareFullPracticalInstructionSelection(p,job){
     const configured=p.practical.conditions[id];assert.ok(configured,'both practical conditions required');
     return {id,context:{...configured.context,environment_ref:source.digest,projection_inventory_digest:canonicalDigest(inventory)},
       files:inventory.map(f=>({source:join(source.root,f.path),target:f.path,digest:f.sha256,mode:f.mode})),
-      command:configured.command,command_role:configured.command_role??'task',environment_id:environment.environment_id};
+      command:configured.codex?createCodexPracticalCommand({settingsPath:join(p.stateRoot,'codex-'+id+'-settings.json'),options:configured.codex,evidenceKind:p.practical.evidence_kind}):configured.command,
+      command_role:configured.codex?'task':configured.command_role??'task',environment_id:environment.environment_id};
   });
   const cases=selected.case_ids.map(id=>{const spec=p.practical.cases.find(c=>c.id===id),catalog=job.input.catalog.find(c=>c.id===id);assert.ok(spec,'selected case missing public local configuration');
     assert.equal(canonicalDigest(spec.files.map(({target,digest})=>({target,digest}))),catalog.public_input_digest,'case file inventory differs from approved catalog');return spec;});
   const worker=join(import.meta.dirname,'practical-evaluation-worker.mjs'),settingsPath=join(p.stateRoot,'practical-worker-settings.json');
   const settings={cases:Object.fromEntries(cases.map(c=>[c.id,{files:c.files,...(c.grader?{grader:c.grader}:{})}])),
-    conditions:Object.fromEntries(conditions.map(c=>[c.id,{files:c.files,command:c.command,command_role:c.command_role}]))};
+    conditions:Object.fromEntries(conditions.map(c=>[c.id,{files:c.files,command:c.command,command_role:c.command_role}])),
+    ...(p.practical.observation_path===undefined?{}:{observation_path:p.practical.observation_path})};
   save(settingsPath,settings);const settingsPin=pin(settingsPath);
   const runtime={commands:{trial:{argv:[process.execPath,worker,settingsPath,settingsPin.digest,'execute'],inspect_argv:[process.execPath,worker,settingsPath,settingsPin.digest,'inspect'],
     pins:[settingsPin,pin(worker)],model_calls:conditions.some(c=>c.command.model_calls)||cases.some(c=>c.grader?.model_calls)}}};
