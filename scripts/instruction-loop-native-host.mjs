@@ -125,6 +125,7 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
     const report=buildInstructionLoopReferenceReport({...p.report,...(p.report.fixedScoring?{fixedScoring:{...p.report.fixedScoring,assessments:scored.assessments}}:{}),storeRoot:p.storeRoot,planObjectDigest:job.input.selection.execution_binding.plan_object_digest,
       trustedAssetAuthorityContexts:p.generator.trustedAuthorityContexts??[],executionKind:p.native.executionKind});
     report.fixed_scoring_execution=scored.execution;
+    if(scored.execution?.output_issue||scored.execution?.status==='failed')report.limits=[...(report.limits??[]),'Fixed reference grading has no usable optional judgments; retained trial evidence remains available and missing source quality stays Unknown.'];
     report.worker_incidents=job.input.trials.filter(t=>t.transport_interruption).map(t=>({trial_id:t.trial_id,transport_interruption:t.transport_interruption,
       root_result:t.state,recovered_from_native_records:t.recovered_from_native_records}));
     report.measured_context=`Full frozen native snapshot; declared supporting context is retained. Normal owner uses the existing source-backed installer projection. Candidate source ${job.input.candidate.source_revision}; no performance claim for a different projection.`;

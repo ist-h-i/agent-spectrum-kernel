@@ -19,7 +19,13 @@ provider authentication, evidence-truth verification or runtime acceptance.
 
 Keep exact lower/upper fractions, partial/undetermined item statuses, mandatory,
 critical, observation and runtime-unknown fields in a separate typed report lane.
-Binary report fields remain binary. Missing judgments stay unknown. Next-cycle
+Binary report fields remain binary. Missing judgments stay unknown. Once execution
+closure is confirmed, missing/null/malformed or excessive optional reference
+lists remain Unknown with a fixed issue and bounded report limit; no partial or
+favorable slice of a malformed list is selected. The raw result/digest is kept.
+Malformed static entries become JSON-safe incidents while separately verified
+judgments remain usable. Job binding, source pins, model grants and unknown
+provider closure are not relaxed. Next-cycle
 feedback retains a bounded point/range/mandatory/critical summary without private
 rubric bodies, source code, raw assessment reasons or local paths.
 

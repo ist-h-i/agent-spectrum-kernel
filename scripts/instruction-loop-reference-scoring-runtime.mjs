@@ -1,7 +1,7 @@
 // Reuse the existing once-only worker transport; unknown grading is inspected.
 import assert from 'node:assert/strict';
 import {existsSync,mkdirSync} from 'node:fs';
-import {join} from 'node:path';
+import {join,resolve} from 'node:path';
 import {canonicalDigest} from './content-addressed-store.mjs';
 import {createReferenceScoringCommandRuntime} from './instruction-loop-command-runtime.mjs';
 const pending=message=>Object.assign(new Error(message),{code:'REFERENCE_SCORING_PENDING'});
@@ -18,10 +18,12 @@ export async function runInstructionReferenceScoring(p,job,{modelCallsAuthorized
   mkdirSync(root,{recursive:true,mode:0o700});result=await runtime.grade(gradeJob,{root});
  }
  if(!['completed','failed'].includes(result.status))throw pending('reference grading completion unknown');
- if(command.model_calls&&result.output.ready_for_next_root!==true)throw pending('model grading provider completion unconfirmed');
- const refs=result.status==='completed'?result.output.fixed_point_assessments:[];
- assert.ok(Array.isArray(refs)&&refs.length<=256,'bounded fixed point references required');
+ if(command.model_calls&&result.output?.ready_for_next_root!==true)throw pending('model grading provider completion unconfirmed');
+ const refs=result.status==='completed'?result.output?.fixed_point_assessments:[];
+ const validReference=r=>r!==null&&typeof r==='object'&&!Array.isArray(r)&&typeof r.path==='string'&&!r.path.includes('\0')&&resolve(r.path)===r.path&&typeof r.digest==='string'&&/^sha256:[a-f0-9]{64}$/u.test(r.digest);
+ const usable=Array.isArray(refs)&&refs.length<=256&&refs.every(validReference);
+ const outputIssue=usable?null:'fixed_point_references_invalid_or_missing';
  const execution={request_digest:canonicalDigest(gradeJob),runtime_digest:runtime.digest,result_digest:canonicalDigest(result),
-  status:result.status,resources:result.output.resources??null,complete_cost:null,model_calls_declared:command.model_calls};
- return {assessments:refs,execution};
+  status:result.status,output_issue:outputIssue,resources:result.output?.resources??null,complete_cost:null,model_calls_declared:command.model_calls};
+ return {assessments:usable?refs.map(({path,digest})=>({path,digest})):[],execution};
 }

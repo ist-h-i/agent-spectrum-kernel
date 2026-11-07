@@ -69,3 +69,9 @@ test('pinned calculator and local Python dependencies execute verified source ra
  const unchecked=spawnSync(f.config.python,['-I','-B','-c','import sys;sys.path.insert(0,sys.argv[1]);import factor',f.root],{encoding:'utf8'});assert.notEqual(unchecked.status,0,'fixture must contain usable unpinned cache');
  assert.equal(readFixedPointReference(f).summary.exact_lower,'5/2');
 });
+test('malformed static reference elements remain JSON-safe incidents while independent valid judgments survive',async t=>{
+ const f=fixture(t);t.mock.module('./retained-instruction-comparison.mjs',{namedExports:{readRetainedInstructionResults:()=>({rows:[f.row,{...f.row,trial_id:'candidate-1',role:'challenger'}]})}});
+ const {buildInstructionLoopReferenceReport:build}=await import('./instruction-loop-reference-report.mjs?malformed-static');
+ const criteria=f.json('criteria.json',[{fixture_id:'case',requirements:[{requirement_id:'binary',max_points:10}]}]);f.config.assessments=[null,{},f.reference];
+ const report=build({storeRoot:f.root,planObjectDigest:canonicalDigest('plan'),criteria,fixedScoring:f.config});assert.equal(report.fixed_scoring_incidents.length,2);assert.equal(report.rows[0].fixed_reference.summary.exact_lower,'5/2');assert.match(canonicalDigest(report),/^sha256:/);
+});

@@ -58,3 +58,25 @@ test('outer report transport stays closed successfully while pending and accepts
  const gradeResult=join(f.p.stateRoot,'reference-scoring/jobs',canonicalDigest(gradeJob).slice(7),'result.json');writeFileSync(gradeResult,JSON.stringify({request_digest:canonicalDigest(gradeJob),status:'completed',output:{fixed_point_assessments:[],ready_for_next_root:true}}),{flag:'wx'});
  state=await runtime.inspect(f.job,{root});assert.equal(state.status,'completed');assert.equal(readFileSync(f.counter,'utf8'),'one dispatch');
 });
+for(const shape of ['missing','null-ref','empty-ref','oversized','null-output','missing-output'])test(`closed optional grading ${shape} retains its result and usable trials as Unknown`,async t=>{
+ const models=!shape.endsWith('output'),f=fixture(t,{models}),path=f.p.report.referenceScoringCommand.argv[1];let code=readFileSync(path,'utf8');
+ if(shape==='null-output')code=code.replace('output:{fixed_point_assessments:[],ready_for_next_root:true}','output:null');
+ else if(shape==='missing-output')code=code.replace('output:{fixed_point_assessments:[],ready_for_next_root:true}','output:undefined');
+ else code=code.replace('fixed_point_assessments:[]',shape==='missing'?'unused_optional_field:null':'fixed_point_assessments:'+JSON.stringify(shape==='null-ref'?[null]:shape==='empty-ref'?[{}]:Array(257).fill({})));
+ writeFileSync(path,code);f.p.report.referenceScoringCommand.pins[0].digest=hash(readFileSync(path));
+ const result=await runInstructionReferenceScoring(f.p,f.job,{modelCallsAuthorized:models});assert.deepEqual(result.assessments,[]);assert.equal(result.execution.output_issue,'fixed_point_references_invalid_or_missing');
+ assert.equal(result.execution.status,'completed');assert.match(result.execution.result_digest,/^sha256:/);assert.equal((await runInstructionReferenceScoring(f.p,f.job,{inspectOnly:true})).execution.result_digest,result.execution.result_digest);assert.equal(readFileSync(f.counter,'utf8'),'one dispatch');
+});
+test('closed malformed grading reaches a completed native report with a bounded Unknown limit, not a failed sidecar',async t=>{
+ const f=fixture(t),worker=f.p.report.referenceScoringCommand.argv[1];writeFileSync(worker,readFileSync(worker,'utf8').replace('fixed_point_assessments:[]','fixed_point_assessments:[null]'));f.p.report.referenceScoringCommand.pins[0].digest=hash(readFileSync(worker));
+ f.p.kind='full_native_reference_loop_profile_v1';f.p.protectedRoot=f.root;f.p.normal={target:null};f.p.generator={storeRoot:f.p.storeRoot,candidateRoot:join(f.root,'candidate'),fullRoot:join(f.root,'full'),stagingRoot:join(f.root,'staging')};f.p.native={protectedRoot:f.root,root:join(f.root,'native'),workRoot:join(f.root,'work'),executionKind:'real_codex'};
+ f.job.input.selection={execution_binding:{plan_object_digest:canonicalDigest('plan')}};f.job.input.candidate={source_revision:'synthetic'};
+ t.mock.module('./instruction-loop-reference-report.mjs',{namedExports:{buildInstructionLoopReferenceReport:()=>({kind:'synthetic-reference-report',rows:[],limits:[]})}});
+ const {nativeInstructionLoopWorker}=await import('./instruction-loop-native-host.mjs?optional-grade-payload');const resultPath=join(f.root,'report-result.json');
+ await nativeInstructionLoopWorker({profile:f.p,job:f.job,resultPath,modelCallsAuthorized:true});const result=JSON.parse(readFileSync(resultPath));assert.equal(result.status,'completed');assert.equal(result.output.fixed_scoring_execution.output_issue,'fixed_point_references_invalid_or_missing');assert.match(result.output.limits[0],/quality stays Unknown/);
+ await nativeInstructionLoopWorker({profile:f.p,job:f.job,resultPath,action:'inspect'});assert.equal(readFileSync(f.counter,'utf8'),'one dispatch');
+});
+test('a missing model provider closure stays pending instead of becoming an optional-quality fallback',async t=>{
+ const f=fixture(t),path=f.p.report.referenceScoringCommand.argv[1];writeFileSync(path,readFileSync(path,'utf8').replace('output:{fixed_point_assessments:[],ready_for_next_root:true}','output:null'));f.p.report.referenceScoringCommand.pins[0].digest=hash(readFileSync(path));
+ await assert.rejects(runInstructionReferenceScoring(f.p,f.job,{modelCallsAuthorized:true}),error=>error.code==='REFERENCE_SCORING_PENDING');assert.equal(readFileSync(f.counter,'utf8'),'one dispatch');
+});

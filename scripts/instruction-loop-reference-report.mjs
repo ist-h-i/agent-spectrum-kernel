@@ -8,6 +8,7 @@ import {readFixedPointReference} from './instruction-loop-fixed-scoring.mjs';
 import {readRetainedInstructionResults} from './retained-instruction-comparison.mjs';
 const keys=['input_tokens','cached_input_tokens','output_tokens'];
 const checked=r=>{assert.equal(hash(readStableBytes(r.path,'fixed report input',16*1024*1024)),r.digest,'report input drift');return readJsonFileStrict(r.path,'fixed report input',16*1024*1024);};
+const referenceDigest=ref=>typeof ref?.digest==='string'&&/^sha256:[a-f0-9]{64}$/u.test(ref.digest)?ref.digest:canonicalDigest(ref??null);
 const total=(rows,key)=>rows.every(r=>Number.isFinite(r[key]))?rows.reduce((n,r)=>n+r[key],0):null;
 export function buildInstructionLoopReferenceReport({storeRoot,planObjectDigest,trustedAssetAuthorityContexts=[],criteria,assessments=[],recovery=null,limits=[],executionKind='real_codex',fixedScoring=null}){
   const retained=readRetainedInstructionResults({storeRoot,planObjectDigest,trustedAssetAuthorityContexts}),fixed=checked(criteria);
@@ -20,7 +21,7 @@ export function buildInstructionLoopReferenceReport({storeRoot,planObjectDigest,
   for(const ref of fixedScoring?.assessments??[]){
     try{const a=checked(ref);assert.ok(retained.rows.some(r=>r.trial_id===a.trial_id),'fixed point reference has an unknown trial');
       if(pointRefs.has(a.trial_id)||duplicatePointTrials.has(a.trial_id)){pointRefs.delete(a.trial_id);duplicatePointTrials.add(a.trial_id);throw new Error('duplicate fixed point reference; no ambiguous result selected');}pointRefs.set(a.trial_id,ref);
-    }catch(error){fixedScoringIncidents.push({reference_digest:ref.digest,reason:String(error.message).slice(0,512)});}
+    }catch(error){fixedScoringIncidents.push({reference_digest:referenceDigest(ref),reason:String(error.message).slice(0,512)});}
   }
   const rows=retained.rows.map(r=>{
     const f=fixed.find(f=>f.fixture_id===r.fixture_id);assert.ok(f,'fixed criterion missing');
