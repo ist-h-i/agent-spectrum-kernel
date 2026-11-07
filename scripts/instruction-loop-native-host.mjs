@@ -9,6 +9,7 @@ import {pathToFileURL} from 'node:url';
 import {canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {fullInstructionInventory,generateFullInstructionCandidate,codexFullInstructionProvider,registerFullInstructionCandidate,compareFullInstructionContext} from './instruction-loop-full-candidate.mjs';
+import {retainedFullAuthoringProvider} from './instruction-loop-retained-authoring.mjs';
 import {selectInstructionLoopCases} from './instruction-loop-case-selection.mjs';
 import {prepareRetainedInstructionComparison,readRetainedInstructionResults} from './retained-instruction-comparison.mjs';
 import {buildInstructionLoopReferenceReport} from './instruction-loop-reference-report.mjs';
@@ -70,7 +71,7 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
     assert.equal(canonicalDigest(job.input.observation),canonicalDigest(p.policy.observation),'controller observation differs from pinned profile');
     projectInstructionLoopObservation(job.input.observation);
     let provider;
-    if(p.generator.provider.kind==='fixture')provider=async()=>({response:checked(p.generator.provider.response),execution:{kind:'model_free_fixture',model_calls:0}});
+    if(p.generator.provider.kind==='fixture')provider=async input=>p.generator.provider.retainedAuthoring?retainedFullAuthoringProvider(p.generator.provider,input):({response:checked(p.generator.provider.response),execution:{kind:'model_free_fixture',model_calls:0}});
     else {assert.equal(p.generator.provider.kind,'codex');assert.equal(modelCallsAuthorized,true,'Full generation model call not authorized');
       provider=input=>codexFullInstructionProvider({...p.generator.provider,modelCallsAuthorized},input);}
     const generated=await generateFullInstructionCandidate({...p.generator,observation:job.input.observation},provider);

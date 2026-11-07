@@ -115,7 +115,8 @@ export async function codexFullInstructionProvider(p,input){
   const result=await executeCodexSession({executable:p.executable,argv,cwd:p.sessionRoot,input:prompt,timeoutMs:p.timeoutMs,terminationScope:'direct_child',
     env:{...process.env,ASK_LOOP_MODEL_CALLS_AUTHORIZED:'1'}});
   const bounded=value=>{const b=Buffer.from(value??'');return {text:b.subarray(0,128*1024).toString('utf8'),total_bytes:b.length,truncated:b.length>128*1024};};
-  const receiptPath=join(p.sessionRoot,'provider-execution.json'),receipt={kind:'full_authoring_execution_v1',model_call_authorized:true,
+  let responseRef;try{responseRef={path:final,digest:hash(readStableBytes(final,'Full generator response',8*1024*1024))};}catch{}
+  const receiptPath=join(p.sessionRoot,'provider-execution.json'),receipt={kind:'full_authoring_execution_v1',model_call_authorized:true,input_digest:canonicalDigest(input),...(responseRef?{response_ref:responseRef}:{}),
     spawn_observed:result.spawnObserved??null,termination_confirmed:result.terminationConfirmed??null,exit_code:result.exitCode??null,signal:result.signal??null,
     error:result.error??null,timed_out:result.timedOut??false,interrupted:result.interrupted??false,output_limited:result.outputLimited??false,duration_ms:result.durationMs??null,
     stdout:bounded(result.stdout),stderr:bounded(result.stderr),closure_scope:'direct local child only; remote work not inferred',private_diagnostics_not_feedback:true};
@@ -145,7 +146,7 @@ export async function generateFullInstructionCandidate(p,provider){
   // The provider never receives candidateRoot or this executable checkout.
   for(const c of changes){const path=join(p.candidateRoot,c.path);assertNoSymlinkPathSegments(path,'canonical generated file',{allowMissingLeaf:true});
     if(c.operation==='delete')rmSync(path);else{mkdirSync(dirname(path),{recursive:true});writeFileSync(path,c.text,{mode:0o644});}}
-  const derivedPaths=['docs/fixtures/adapter-runtime-bundle.json','docs/fixtures/adapter-runtime-evidence.json','docs/fixtures/adapter-runtime-profiles.json','docs/verification-proof-policy-contract.md'];
+  const derivedPaths=['docs/fixtures/adapter-runtime-bundle.json','docs/fixtures/adapter-runtime-evidence.json','docs/fixtures/adapter-runtime-profiles.json','docs/fixtures/verification-proof-policy-cases.json','docs/verification-proof-policy-contract.md'];
   if(p.sourceValidation)derivedPaths.push('docs/validation-report.md');
   const authored=p.sourceValidation?fullInstructionInventory(p.candidateRoot):null;
   const refresh=spawnSync(process.execPath,[join(p.candidateRoot,'scripts/update-adapter-runtime-fixtures.mjs')],{encoding:'utf8',maxBuffer:4*1024*1024});
@@ -153,7 +154,7 @@ export async function generateFullInstructionCandidate(p,provider){
   if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
   const validation=p.sourceValidation?validateGeneratedSource(p,input.source_validation.validator_digest):null;
   if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
-  git(p.candidateRoot,['add','--','skills',...derivedPaths]);
+  git(p.candidateRoot,['add','--','skills',...derivedPaths.filter(path=>existsSync(join(p.candidateRoot,path)))]);
   git(p.candidateRoot,['-c','user.name=ASK local versioning','-c','user.email=ask-local@invalid','commit','--quiet','--allow-empty','-m','Generated scoped Full instruction candidate']);
   const revision=git(p.candidateRoot,['rev-parse','HEAD']);
   const changed=git(p.candidateRoot,['diff','--name-only',p.baselineRevision,'HEAD']).split('\n').filter(Boolean);

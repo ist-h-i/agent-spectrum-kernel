@@ -1,5 +1,6 @@
 import {readInstructionLoopJson as readJsonFileStrict,INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES} from './instruction-loop-artifact.mjs';
 import assert from 'node:assert/strict';
+import {readRetainedFullAuthoring} from './instruction-loop-retained-authoring.mjs';
 import {instructionReferenceScoringCommand} from './instruction-loop-reference-scoring-runtime.mjs';
 import {inspectInstructionLoopProviderSelection} from './instruction-loop-provider-policy.mjs';
 import {join,resolve,dirname} from 'node:path';
@@ -16,7 +17,7 @@ export function createNativeInstructionLoopConfiguration(profilePath){
   if(p.kind==='component_practical_instruction_loop_profile_v1')return createComponentInstructionLoopConfiguration(profilePath);
   if(p.kind==='full_practical_instruction_loop_profile_v1')return createFullPracticalInstructionLoopConfiguration(profilePath);
   assert.equal(p.kind,'full_native_reference_loop_profile_v1');inspectInstructionLoopProviderSelection(p);assert.equal(p.normal.target,p.policy.normal_target);
-  const paths=['instruction-loop-artifact.mjs','instruction-projection-paths.mjs','instruction-loop-native-public-inputs.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','instruction-loop-provider-policy.mjs','instruction-loop-native-worker.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-reference-report.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-host-scoring.mjs','instruction-loop-command-runtime.mjs',
+  const paths=['instruction-loop-artifact.mjs','instruction-projection-paths.mjs','instruction-loop-native-public-inputs.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','instruction-loop-provider-policy.mjs','instruction-loop-native-worker.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-retained-authoring.mjs','instruction-loop-reference-report.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-host-scoring.mjs','instruction-loop-command-runtime.mjs',
     'instruction-loop-native-prepare.py','instruction-loop-assets.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
     'retained-instruction-comparison.mjs','retained-instruction-layout.mjs','instruction-environment.mjs','codex-exec-runner.mjs','asset-registry.mjs','content-addressed-store.mjs','instruction-loop-source-binding.mjs','instruction-loop-feedback.mjs','ask-personal-evolution-observation.mjs'];
   const pins=[{path:profilePath,digest:hash(readStableBytes(profilePath,'Full/native profile',16*1024*1024))},...paths.map(name=>({path:join(import.meta.dirname,name),digest:hash(readStableBytes(join(import.meta.dirname,name),'Full/native adapter'))}))];
@@ -57,6 +58,7 @@ export function buildNextNativeInstructionLoopProfile({root,profilePath,configPa
   p.generator.fullRoot=join(outputRoot,'full');p.generator.stagingRoot=join(outputRoot,'staging');
   const cycleKey=canonicalDigest({previous_journal:history.journal_digest,id}).slice(7,47);
   p.generator.environmentId='instruction-cycle-'+cycleKey;
+  if(p.generator.provider.retainedAuthoring)p.generator.provider=structuredClone(readRetainedFullAuthoring(p.generator.provider.retainedAuthoring).profile.generator.provider);
   if(p.generator.provider.kind==='codex')p.generator.provider.sessionRoot=join(outputRoot,'generation-session');
   // Native preparation requires the existing template's sibling/depth layout.
   if(practical)p.practical.root=join(dirname(old.practical.root),'ask-practical-cycle-'+cycleKey);

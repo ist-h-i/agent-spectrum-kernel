@@ -12,7 +12,7 @@ import {readRunJournal,appendRunJournal,lockRunJournal} from './instruction-run-
 import {advanceInstructionLoopOperation,inspectInstructionLoopOperation} from './instruction-loop-operation.mjs';
 import {prepareNextComponentInstructionLoopConfiguration} from './instruction-loop-component-continuation.mjs';
 import { prepareNextNativeInstructionLoopConfiguration,createNativeInstructionLoopConfiguration,inspectInstructionLoopReadiness } from './instruction-loop-native-configuration.mjs';
-import {prepareFailedInstructionLoopConfiguration} from './instruction-loop-failed-preparation.mjs';
+import {prepareFailedInstructionLoopConfiguration,prepareRetainedFullAuthoringConfiguration} from './instruction-loop-failed-preparation.mjs';
 import { advanceSupervisedInstructionLoop, inspectSupervisedInstructionLoop, prepareNextSupervisedInstructionLoop } from './supervised-instruction-loop.mjs';
 const args=process.argv.slice(2),command=args.shift(),options={};
 try{
@@ -106,6 +106,11 @@ try{
     const config=readInstructionLoopJson(resolve(options['--config']));
     assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
     console.log(JSON.stringify(prepareNextSupervisedInstructionLoop({root,nextPolicy:config.policy}),null,2));
+  }
+  else if(command==='recover-authoring'){
+    assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--replacement-profile','--output-root','--id'].includes(k)));
+    assert.ok(options['--profile']&&options['--config']&&options['--output-root']&&options['--id']);
+    console.log(JSON.stringify(prepareRetainedFullAuthoringConfiguration({root,profilePath:resolve(options['--profile']),configPath:resolve(options['--config']),replacementProfilePath:options['--replacement-profile']?resolve(options['--replacement-profile']):resolve(options['--profile']),outputRoot:resolve(options['--output-root']),id:options['--id']}),null,2));
   }
   else if(command==='recover-preparation'){
     assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--replacement-profile','--output-root','--id'].includes(k)));

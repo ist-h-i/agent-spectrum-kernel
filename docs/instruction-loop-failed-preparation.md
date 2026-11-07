@@ -39,3 +39,7 @@ Implementation Contract:
 - Verification attempted / evidence: source-bound software results accompany delivery.
 - Selected proof: Formal `failed-loop-preparation@1` above.
 - Handoff state: implementation in progress; no real failed run is resumed.
+
+A separate [retained Full authoring recovery](instruction-loop-retained-authoring.md)
+port handles positive closed inline authoring followed by materialization failure,
+without weakening this model-free native admission or replaying its model.

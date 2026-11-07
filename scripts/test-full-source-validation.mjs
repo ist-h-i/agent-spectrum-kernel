@@ -81,3 +81,11 @@ for(const [label,validatorSuffix,expected] of [
  assert.equal(existsSync(join(p.fullRoot,'AGENTS.md')),false);assert.equal(JSON.parse(readFileSync(join(p.stagingRoot,'source-validation.json'))).exit_code,0,'validator exit alone does not approve the source writer boundary');
  const head=spawnSync('git',['rev-parse','HEAD'],{cwd:p.candidateRoot,encoding:'utf8'});assert.equal(head.stdout.trim(),p.baselineRevision);
 });
+
+test('trusted fixture refresh commits the derived verification cases without broadening writer authority',async t=>{
+ const {p}=fixture(t,{writerSuffix:`writeFileSync(new URL('../docs/fixtures/verification-proof-policy-cases.json',import.meta.url),'{}');`});
+ const c=await generateFullInstructionCandidate(p,provider('## Goal\nChanged.\n'));
+ assert.ok(c.derived_binding_paths.includes('docs/fixtures/verification-proof-policy-cases.json'));
+ const status=spawnSync('git',['status','--porcelain'],{cwd:p.candidateRoot,encoding:'utf8'});assert.equal(status.status,0);assert.equal(status.stdout,'');
+ assert.equal(c.source_validation.status,'passed');
+});
