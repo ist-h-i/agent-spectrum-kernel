@@ -36,6 +36,7 @@ function checkedPolicy(p){
 }
 function summary(state){
   return {status:state.status,run_id:state.policy.id,pending_gate:state.gate??null,
+    pending_authoring:state.authoring_progress??null,
     pending_recovery:state.evaluation_progress?.pending_recovery??null,
     pending_recovery_digest:state.evaluation_progress?.pending_recovery_digest??null,
     active_job:state.pending??null,completed_trials:state.trials.length,
@@ -197,6 +198,9 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
       let job=s.pending,result;
       if(job){
         result=await runtime.inspect(job,{root});
+        if(job.kind==='generate'&&result?.status==='awaiting_authoring'){
+          assert.equal(result.request_digest,canonicalDigest(job));s.authoring_progress=copy(result.output);s.status='awaiting_authoring';append(root,'authoring_host_stop',s);return summary(s);
+        }
         if(job.kind==='evaluate'&&result?.status!=='completed'&&(assessment||result?.status==='resumable')){
           result=await runtime.resumeEvaluation(job,{root,assessment});assessment=null;
         }
@@ -223,6 +227,9 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
         job=n;s.pending=job;s.status='advancing';append(root,'operation_reserved',s);
         try{result=await runtime[job.kind](job,{root});}
         catch(error){s.status='operation_uncertain';append(root,'operation_uncertain',s,{reason:String(error.message).slice(0,512)});return summary(s);}
+        if(job.kind==='generate'&&result?.status==='awaiting_authoring'){
+          assert.equal(result.request_digest,canonicalDigest(job));s.authoring_progress=copy(result.output);s.status='awaiting_authoring';append(root,'authoring_host_stop',s);return summary(s);
+        }
         if(job.kind==='evaluate'&&result?.status==='awaiting_ai_recovery'){
           assert.equal(result.request_digest,canonicalDigest(job));s.evaluation_progress=copy(result.output);s.status='awaiting_ai_recovery';append(root,'evaluation_ai_stop',s);return summary(s);
         }
@@ -230,6 +237,7 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
       }
       try{accept(s,job,result);}
       catch(error){s.status='operation_uncertain';append(root,'invalid_or_partial_result',s,{reason:String(error.message).slice(0,512)});return summary(s);}
+      if(job.kind==='generate')delete s.authoring_progress;
       s.pending=null;s.status='advancing';append(root,'operation_completed',s,{key:job.key,result_digest:canonicalDigest(result)});
     }
   }finally{unlock();}

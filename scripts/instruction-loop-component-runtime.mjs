@@ -10,10 +10,11 @@ import {verifyAssetRegistry} from './asset-registry.mjs';
 import {readRunJournal} from './instruction-run-journal.mjs';
 import {transitionInstructionLoopAssets} from './instruction-loop-assets.mjs';
 import {createPracticalLifecycleRuntime,prepareFullPracticalInstructionSelection} from './instruction-loop-practical-runtime.mjs';
-import {generateComponentInstructionCandidate,componentEnvironmentOptions} from './instruction-loop-component-candidate.mjs';
+import {generateComponentInstructionCandidate,resumeHostComponentInstructionCandidate,componentEnvironmentOptions} from './instruction-loop-component-candidate.mjs';
+import {readHostInstructionAuthoringRequest,claimHostInstructionAuthoring,completeHostInstructionAuthoring} from './instruction-loop-host-authoring.mjs';
 import {supervisedEnvironmentReceipt} from './instruction-loop-environment-approval.mjs';
 import {planEnvironmentTargetApply,applyEnvironmentTargetPlan,restoreEnvironmentTarget,inspectSupervisedEnvironmentTarget} from './environment-target.mjs';
-const sourceNames=['instruction-loop-provider-policy.mjs','instruction-loop-component-runtime.mjs','instruction-loop-component-candidate.mjs','instruction-loop-environment-approval.mjs',
+const sourceNames=['instruction-loop-host-authoring.mjs','instruction-loop-provider-policy.mjs','instruction-loop-component-runtime.mjs','instruction-loop-component-candidate.mjs','instruction-loop-environment-approval.mjs',
   'instruction-loop-practical-runtime.mjs','instruction-environment-authoring.mjs','instruction-composition.mjs','instruction-asset-package.mjs',
   'instruction-environment.mjs','instruction-environment-compiler.mjs','environment-target.mjs','environment-target-owner.mjs',
   'instruction-source-version.mjs','instruction-loop-assets.mjs','instruction-run-journal.mjs','supervised-instruction-loop.mjs',
@@ -119,9 +120,9 @@ export async function executeComponentInstructionLoopStage(p,job,{root,modelCall
   }
   return {disposition:job.input.disposition,registry,owned_materializations_removed:['rejected','unchanged'].includes(job.input.disposition),evidence_preserved:true};
 }
-async function inspectComponentStage(p,job,{root}){
+async function inspectComponentStage(p,job,{root,preparedHandoffDigest}){
   if(job.kind==='generate'){
-    const path=join(p.stateRoot,'component-candidate.json');if(!existsSync(path))return null;
+    const path=join(p.stateRoot,'component-candidate.json');if(!existsSync(path))return p.candidate.authoring?.provider.kind==='external_host'?resumeHostComponentInstructionCandidate(p,job,{root,preparedHandoffDigest}):null;
     const c=candidate(p,readJsonFileStrict(path));assert.equal(c.generation_request_digest,canonicalDigest(job));assert.equal(c.generation_profile_digest,canonicalDigest(p));
     ownedRoot(p,c,p.candidateRoot);ownedRoot(p,c,p.practical.baselineRoot);return c;
   }
@@ -138,6 +139,9 @@ async function inspectComponentStage(p,job,{root}){
   return null;
 }
 export function createComponentInstructionLoopRuntime({definition,modelCallsAuthorized=false}){
-  return createPracticalLifecycleRuntime({definition,modelCallsAuthorized,readProfile:()=>checkedProfile(definition),executeStage:executeComponentInstructionLoopStage,inspectStage:inspectComponentStage,
+  const runtime=createPracticalLifecycleRuntime({definition,modelCallsAuthorized,readProfile:()=>checkedProfile(definition),executeStage:executeComponentInstructionLoopStage,inspectStage:inspectComponentStage,
     validateCoordinatorRoot(root,p){for(const path of checkedPaths(p))assert.ok(root!==path&&!root.startsWith(path+'/')&&!path.startsWith(root+'/'),'component coordinator overlaps source, state or owner');}});
+  return {...runtime,authoringRequest:(job,context)=>readHostInstructionAuthoringRequest(checkedProfile(definition),job,context),
+    authoringClaim:(job,claim,context)=>claimHostInstructionAuthoring(checkedProfile(definition),job,claim,{...context,modelCallsAuthorized}),
+    authoringComplete:(job,submission,context)=>completeHostInstructionAuthoring(checkedProfile(definition),job,submission,context)};
 }

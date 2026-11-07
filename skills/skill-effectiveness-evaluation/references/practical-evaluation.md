@@ -45,6 +45,19 @@ and standalone prepare/import do not supply a Claude application dispatcher.
 Use host-AI assessments when no automatic assessor is configured. Do not infer
 permission to invoke an unavailable app from a compatible instruction format.
 
+For an already available host AI/app, a component authoring provider can select
+`external_host`. At `awaiting_authoring`, use the current cycle root/config with
+supervised `authoring-request`, then `authoring-claim --claim FILE`. The AI host
+creates the structured files; these are routine work, not a third human judgment.
+A real claim uses the existing host model-call grant `--allow-model-calls`.
+Only `claim_created: true` reserves a new external execution; after response loss
+or a repeated claim, inspect the same execution ID and never relaunch it blindly.
+Submit the exact bounded response and positive host-reported closure with
+`authoring-complete --submission FILE`, then resume `advance`/`operate`.
+If completion is unknown, retain the claim and evidence. This port dispatches no
+app, authenticates no provider and bypasses neither case nor change approval.
+See the runtime's `docs/instruction-loop-host-authoring.md` for exact JSON shapes.
+
 Prepare the pinned configuration with supervised `configure --profile PROFILE
 --root CONFIG_DIRECTORY`. Start/resume `operate --profile PROFILE --config CONFIG
 --root OPERATION --cycles N` with an explicit budget of 1..10 cycles. Submit the

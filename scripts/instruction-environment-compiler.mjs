@@ -11,12 +11,24 @@ const same = (a, b) => canonicalDigest(a) === canonicalDigest(b);
 const ref = a => Object.fromEntries(['asset_type', 'stable_id', 'version', 'record_digest', 'content_digest'].map(k => [k, a[k]]));
 const sorted = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 export const ENVIRONMENT_COMPILER = 'ask-instruction-environment-compiler';
+// Shared pure admission for both compiled assets and uncommitted authoring results.
+export function validateInstructionComponentMappings({adapter,components}) {
+  assert.ok(Array.isArray(components)&&components.length&&components.length<=256,'bounded nonempty components required');
+  const ids=new Set(),targets=new Set(),paths=[];
+  for(const c of components){
+    assert.deepEqual(Object.keys(c).sort(),['asset','files']);assert.ok(!ids.has(c.asset.stable_id),'duplicate component stable ID');ids.add(c.asset.stable_id);
+    assert.ok(Array.isArray(c.files));
+    for(const f of c.files){assert.deepEqual(Object.keys(f).sort(),['source','target']);instructionTargetPath(adapter,f.target);
+      assert.ok(!targets.has(f.target.toLowerCase()),'colliding compiled instruction paths');targets.add(f.target.toLowerCase());paths.push(f.target);}
+  }
+  assert.ok(paths.length<=256&&!paths.some(a=>paths.some(b=>b.startsWith(a+'/'))),'compiled instruction inventory exceeds package bounds or collides');
+}
 export function resolveInstructionComponents(options) {
   const registry = verifyAssetRegistry({ storeRoot: options.storeRoot, snapshotDigest: options.registrySnapshotDigest,
     trustedAuthorityContexts: options.trustedAssetAuthorityContexts ?? [] });
-  assert.ok(Array.isArray(options.components) && options.components.length && options.components.length <= 256, 'bounded nonempty components required');
+  validateInstructionComponentMappings(options);
   const components = structuredClone(options.components).sort((a, b) => sorted(a.asset.stable_id, b.asset.stable_id));
-  const ids = new Set(), targets = new Set(), files = [];
+  const files = [];
   const restrictions={classifications:[],constraint_refs:[],requested_permissions:[],possible_effects:[]};
   for (const component of components) {
     assert.deepEqual(Object.keys(component).sort(), ['asset', 'files']);
@@ -25,20 +37,16 @@ export function resolveInstructionComponents(options) {
     assert.notEqual(asset.record.type_extension.renderer?.id, ENVIRONMENT_COMPILER, 'nested environment composition is not supported');
     for(const k of ['classifications','constraint_refs'])restrictions[k].push(...asset.record.safety[k]);
     for(const k of ['requested_permissions','possible_effects'])restrictions[k].push(...asset.record.permissions_and_effects[k]);
-    assert.ok(!ids.has(asset.stable_id), 'duplicate component stable ID'); ids.add(asset.stable_id);
     const adapter = asset.record.type_extension.adapter;
     assert.ok(!adapter || ['shared', options.adapter].includes(adapter), 'component adapter mismatch');
     assert.ok(Array.isArray(component.files)); component.files.sort((a, b) => sorted(a.source, b.source));
     assert.deepEqual(component.files.map(f => f.source), asset.content.files.map(f => f.path).sort(sorted), 'complete component bytes required');
     for (const mapping of component.files) {
-      assert.deepEqual(Object.keys(mapping).sort(), ['source', 'target']); instructionTargetPath(options.adapter, mapping.target);
-      assert.ok(!targets.has(mapping.target.toLowerCase()), 'colliding compiled instruction paths'); targets.add(mapping.target.toLowerCase());
       const file = asset.content.files.find(f => f.path === mapping.source);
       files.push({ ...file, path: mapping.target });
     }
   }
   files.sort((a, b) => sorted(a.path, b.path));
-  assert.ok(files.length <= 256 && !files.some(a => files.some(b => b.path.startsWith(a.path + '/'))), 'compiled instruction inventory exceeds package bounds or collides');
   for(const k of Object.keys(restrictions))restrictions[k]=[...new Set(restrictions[k])].sort(sorted);
   return { components, files, restrictions };
 }

@@ -226,8 +226,11 @@ handoff, which is not connected to automatic component generation.
 No authenticated Claude-app dispatch or real-model cycle is claimed here.
 The retained Full/native reference runner remains Codex-specific; a Claude
 handoff is not mislabeled as a completed Full/native Claude run. Automatic Claude
-app dispatch, external-host authoring completion inside the supervised loop and
-app-specific closure capture are not implemented. Authenticated end-to-end
+app dispatch and app-specific closure capture are not implemented. The additive
+[`external_host` component port](instruction-loop-host-authoring.md) now retains
+preparation, one execution claim and a bound completion inside the supervised
+loop. The host AI supplies the response and host-reported closure; this port
+neither launches nor authenticates a Claude app. Authenticated end-to-end
 acceptance is separately unperformed until the owner supplies that environment.
 See [the implementation/acceptance audit](instruction-improvement-readiness.md).
 No live comparison or installation
