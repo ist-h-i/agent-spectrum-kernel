@@ -84,3 +84,101 @@ test('optional recovery executable pin refuses drift before allocation or provid
   await assessPracticalEvaluation(legacy,job,join(legacyRoot,'result.json'));assert.equal(calls,2);
  }finally{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;}
 });
+
+test('failed automatic assessment retains bound transport evidence before rejecting, without promoting provider closure or replay',async t=>{
+ const f=environmentFixture(t),result=join(f.root,'result.json');let calls=0;
+ const response={spawnObserved:true,terminationConfirmed:true,exitCode:1,durationMs:350,stdout:Buffer.alloc(0),stderr:Buffer.from('Error: failed to initialize in-process app-server client: Operation not permitted (os error 1)\n')};
+ t.mock.module('./codex-exec-runner.mjs',{namedExports:{executeCodexSession:async()=>{calls++;return response;}}});
+ const {assessPracticalEvaluation}=await import('./practical-evaluation-assessor.mjs?failed-evidence');
+ const settings={kind:'codex',executable:process.execPath,model:'fixture-only',timeout_ms:1000},job={kind:'assess',key:'failed-observation',input:{packet:{attempt_key:'fixture'}}};
+ const old=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';
+ try{
+  await assert.rejects(assessPracticalEvaluation(settings,job,result),/assessment incomplete/);
+  const root=join(f.root,'assessment-session'),path=join(root,'execution-observation.json'),e=JSON.parse(readFileSync(path));
+  assert.equal(e.request_digest,canonicalDigest(job));assert.equal(e.settings_digest,canonicalDigest(settings));assert.match(e.prompt_digest,/^sha256:/);
+  assert.equal(e.local.spawn_observed,true);assert.equal(e.local.termination_confirmed,true);assert.equal(e.local.exit_code,1);assert.equal(e.duration_ms,350);
+  assert.equal(e.provider_terminal_confirmed,null);assert.equal(e.model_calls,null);assert.equal(e.usage,null);assert.equal(e.replay_authorized,false);
+  for(const a of e.artifacts)assert.equal(hash(readFileSync(join(root,a.path))),a.digest);
+  assert.equal(readFileSync(join(root,'stdout.jsonl')).length,0);assert.deepEqual(readFileSync(join(root,'stderr.log')),response.stderr);
+  const before=readFileSync(path);await assert.rejects(assessPracticalEvaluation(settings,job,result),/EEXIST/);assert.equal(calls,1);assert.deepEqual(readFileSync(path),before);assert.equal(existsSync(result),false);
+ }finally{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;}
+});
+
+test('assessor evidence preserves interrupted, limited and thrown outcomes as unknown rather than clean completion',async t=>{
+ const f=environmentFixture(t);let response;
+ t.mock.module('./codex-exec-runner.mjs',{namedExports:{executeCodexSession:async()=>{if(response instanceof Error)throw response;return response;}}});
+ const {assessPracticalEvaluation}=await import('./practical-evaluation-assessor.mjs?unknown-evidence');
+ const settings={kind:'codex',executable:process.execPath,model:null,timeout_ms:1000},job={kind:'assess',input:{packet:{}}};
+ const old=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';
+ try{
+  for(const [id,extra]of [['timeout',{timedOut:true}],['interrupt',{interrupted:true}],['limited',{outputLimited:true}],['thrown',new Error('fixture transport failure')]]){
+   const root=join(f.root,id);mkdirSync(root);response=extra instanceof Error?extra:{spawnObserved:true,terminationConfirmed:true,exitCode:0,durationMs:7,stdout:Buffer.from('retained output'),stderr:Buffer.alloc(0),...extra};
+   await assert.rejects(assessPracticalEvaluation(settings,job,join(root,'result.json')),/assessment incomplete/);
+   const e=JSON.parse(readFileSync(join(root,'assessment-session/execution-observation.json')));assert.equal(e.provider_terminal_confirmed,null);assert.equal(e.replay_authorized,false);assert.equal(e.usage,null);
+   if(extra instanceof Error){assert.equal(e.local.spawn_observed,null);assert.equal(e.local.termination_confirmed,null);assert.match(e.local.error.message,/fixture transport failure/);}
+   else assert.equal(e.local[({timeout:'timed_out',interrupt:'interrupted',limited:'output_limited'})[id]],true);
+  }
+ }finally{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;}
+});
+
+test('positive no-spawn and malformed successful response retain distinct closure facts without inventing a judgment',async t=>{
+ const f=environmentFixture(t);let noSpawn=true;
+ t.mock.module('./codex-exec-runner.mjs',{namedExports:{executeCodexSession:async({argv})=>{if(noSpawn)return {spawnObserved:false,terminationConfirmed:true,exitCode:null,error:{code:'ENOENT',message:'fixture provider missing'},durationMs:2};writeFileSync(argv[argv.indexOf('-o')+1],'{invalid');return {spawnObserved:true,terminationConfirmed:true,exitCode:0,durationMs:4};}}});
+ const {assessPracticalEvaluation}=await import('./practical-evaluation-assessor.mjs?no-spawn-evidence');
+ const settings={kind:'codex',executable:process.execPath,model:null,timeout_ms:1000},job={kind:'assess',input:{packet:{}}};
+ const old=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';
+ try{
+  for(const id of ['no-spawn','invalid-answer']){
+   const root=join(f.root,id);mkdirSync(root);await assert.rejects(assessPracticalEvaluation(settings,job,join(root,'result.json')));
+   const e=JSON.parse(readFileSync(join(root,'assessment-session/execution-observation.json')));assert.equal(e.provider_terminal_confirmed,true);assert.equal(e.replay_authorized,false);assert.equal(e.model_calls,null);assert.equal(e.usage,null);
+   assert.equal(e.closure_scope,noSpawn?'positive_local_no_spawn':'synchronous_cli_completion');assert.equal(e.local.spawn_observed,!noSpawn);assert.equal(existsSync(join(root,'result.json')),false);
+   if(!noSpawn){const a=e.artifacts.find(a=>a.path==='captured-answer.json');assert.equal(a.digest,hash(Buffer.from('{invalid')));}
+   noSpawn=false;
+  }
+ }finally{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;}
+});
+
+test('successful assessor retains the same observation reference and final answer bytes before response validation',async t=>{
+ const f=environmentFixture(t),settings={kind:'codex',executable:process.execPath,model:null,timeout_ms:1000},job={kind:'assess',input:{packet:{fixture:1}}};
+ const answer={action:'reference',comparison_limits:['source only']};
+ t.mock.module('./codex-exec-runner.mjs',{namedExports:{executeCodexSession:async({argv})=>{writeFileSync(argv[argv.indexOf('-o')+1],JSON.stringify(answer));return {spawnObserved:true,terminationConfirmed:true,exitCode:0,durationMs:9,stdout:Buffer.from('{"type":"turn.completed"}\n'),stderr:Buffer.alloc(0)};}}});
+ const {assessPracticalEvaluation}=await import('./practical-evaluation-assessor.mjs?success-evidence');
+ const old=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';
+ try{
+  const r=await assessPracticalEvaluation(settings,job,join(f.root,'result.json'));assert.deepEqual(r.output.assessment,answer);
+  const ref=r.output.assessment_execution.execution_observation;assert.equal(hash(readFileSync(ref.path)),ref.digest);
+  const e=JSON.parse(readFileSync(ref.path));assert.equal(e.provider_terminal_confirmed,true);assert.equal(e.duration_ms,9);assert.equal(e.replay_authorized,false);
+  const final=e.artifacts.find(a=>a.path==='captured-answer.json');assert.ok(final);assert.equal(final.digest,hash(readFileSync(join(f.root,'assessment-session/answer.json'))));assert.equal(r.output.assessment_execution.model_calls,1);
+ }finally{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;}
+});
+
+test('assessor hashes, parses and shape-repairs one captured answer even if the provider file changes after capture',async t=>{
+ const f=environmentFixture(t),settings={kind:'codex',executable:process.execPath,model:null,timeout_ms:1000},job={kind:'assess',input:{packet:{fixture:'capture'}}};
+ const original={action:'reference',comparison_limits:'Quality unknown'},replacement={action:'retry',comparison_limits:['different judgment']};let reads=0;
+ const store=await import('./content-addressed-store.mjs');
+ t.mock.module('./content-addressed-store.mjs',{namedExports:{...store,readStableBytes:(path,...args)=>{const bytes=store.readStableBytes(path,...args);if(path.endsWith('/answer.json')){reads++;writeFileSync(path,JSON.stringify(replacement));}return bytes;}}});
+ t.mock.module('./codex-exec-runner.mjs',{namedExports:{executeCodexSession:async({argv})=>{writeFileSync(argv[argv.indexOf('-o')+1],JSON.stringify(original));return {spawnObserved:true,terminationConfirmed:true,exitCode:0,durationMs:3};}}});
+ const {assessPracticalEvaluation}=await import('./practical-evaluation-assessor.mjs?capture-once');
+ const old=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';
+ try{
+  const r=await assessPracticalEvaluation(settings,job,join(f.root,'result.json'));assert.equal(reads,1);assert.deepEqual(r.output.assessment,{...original,comparison_limits:[original.comparison_limits]});
+  const root=join(f.root,'assessment-session'),observation=JSON.parse(readFileSync(r.output.assessment_execution.execution_observation.path));
+  assert.deepEqual(JSON.parse(readFileSync(join(root,'answer.json'))),replacement);assert.deepEqual(JSON.parse(readFileSync(join(root,'captured-answer.json'))),original);
+  const raw=observation.artifacts.find(a=>a.path==='captured-answer.json');assert.equal(raw.digest,hash(Buffer.from(JSON.stringify(original))));
+  const repair=JSON.parse(readFileSync(r.output.assessment_execution.output_shape_repair.path));assert.equal(repair.original_response.path,join(root,'captured-answer.json'));assert.equal(repair.original_response.digest,raw.digest);assert.equal(repair.original_assessment_digest,canonicalDigest(original));
+ }finally{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;}
+});
+
+test('retained assessor answer keeps the existing semantic byte limit and duplicate-key rejection',async t=>{
+ const f=environmentFixture(t);let answer;
+ t.mock.module('./codex-exec-runner.mjs',{namedExports:{executeCodexSession:async({argv})=>{writeFileSync(argv[argv.indexOf('-o')+1],answer);return {spawnObserved:true,terminationConfirmed:true,exitCode:0,durationMs:3};}}});
+ const {assessPracticalEvaluation}=await import('./practical-evaluation-assessor.mjs?answer-boundary');
+ const settings={kind:'codex',executable:process.execPath,model:null,timeout_ms:1000},job={kind:'assess',input:{packet:{}}};
+ const old=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';
+ try{
+  for(const [id,value,error]of [['duplicate','{"action":"reference","action":"retry"}',/duplicate/i],['limit',JSON.stringify({reason:'x'.repeat(1024*1024)}),/byte limit/]]){
+   const root=join(f.root,id);mkdirSync(root);answer=value;await assert.rejects(assessPracticalEvaluation(settings,job,join(root,'result.json')),error);
+   const e=JSON.parse(readFileSync(join(root,'assessment-session/execution-observation.json'))),raw=e.artifacts.find(a=>a.path==='captured-answer.json');assert.equal(raw.digest,hash(Buffer.from(answer)));assert.equal(e.provider_terminal_confirmed,true);assert.equal(existsSync(join(root,'result.json')),false);
+  }
+ }finally{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;}
+});

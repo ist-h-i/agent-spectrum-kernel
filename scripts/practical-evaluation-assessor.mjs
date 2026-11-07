@@ -3,12 +3,34 @@ import {readInstructionLoopJson,readInstructionLoopBytes,INSTRUCTION_LOOP_ARTIFA
 // Optional automatic AI port. The current host AI may instead submit the same
 // assessment through the CLI, without adding a third human approval gate.
 import assert from 'node:assert/strict';
-import {mkdirSync} from 'node:fs';
+import {mkdirSync,existsSync,openSync,writeFileSync,fsyncSync,closeSync} from 'node:fs';
 import {join,dirname,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace} from './content-addressed-store.mjs';
+import {canonicalDigest,readStableBytes,writeCanonicalJsonNoReplace,parseJsonRejectDuplicateKeys,DEFAULT_CONTENT_ADDRESSED_OBJECT_MAX_BYTES} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {executeCodexSession} from './codex-exec-runner.mjs';
+function retainExecutionObservation({session,settings,job,prompt,response:r}){
+  const artifacts=[];
+  function retain(path,bytes){const fd=openSync(join(session,path),'wx',0o600);try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}artifacts.push({path,digest:hash(bytes)});}
+  for(const [path,data]of [['stdout.jsonl',r.stdout??Buffer.alloc(0)],['stderr.log',r.stderr??Buffer.alloc(0)]]){
+    retain(path,Buffer.from(data));
+  }
+  const final=join(session,'answer.json');let answerIssue=null,answerBytes=null;
+  if(existsSync(final))try{answerBytes=readStableBytes(final,'retained AI recovery answer',INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES);retain('captured-answer.json',answerBytes);}
+  catch(error){answerIssue=String(error.message).slice(0,2048);}
+  const clean=r.spawnObserved===true&&r.terminationConfirmed===true&&r.exitCode===0&&!r.error&&!r.timedOut&&!r.interrupted&&!r.outputLimited;
+  const noSpawn=r.spawnObserved===false&&r.terminationConfirmed===true;
+  const path=join(session,'execution-observation.json');
+  writeCanonicalJsonNoReplace({outputPath:path,artifact:{kind:'practical_assessor_execution_observation_v1',request_digest:canonicalDigest(job),
+    settings_digest:canonicalDigest(settings),prompt_digest:hash(Buffer.from(prompt)),
+    local:{spawn_observed:r.spawnObserved??null,termination_confirmed:r.terminationConfirmed??null,pid:r.pid??null,exit_code:r.exitCode??null,signal:r.signal??null,
+      error:r.error??null,cleanup_error:r.cleanupError??null,timed_out:r.timedOut??null,interrupted:r.interrupted??null,output_limited:r.outputLimited??null},
+    duration_ms:r.durationMs??null,provider_terminal_confirmed:clean||noSpawn?true:null,
+    closure_scope:clean?'synchronous_cli_completion':noSpawn?'positive_local_no_spawn':'unconfirmed',
+    model_calls:null,model_calls_status:'not_observed',usage:null,usage_status:'not_collected',replay_authorized:false,
+    artifacts,answer_observation_issue:answerIssue},label:'AI recovery execution observation'});
+  return {reference:{path,digest:hash(readStableBytes(path,'AI recovery execution observation'))},answerBytes,answerIssue};
+}
 export async function assessPracticalEvaluation(settings,job,resultPath){
   assert.equal(job.kind,'assess');const packet=job.input.packet;let assessment,shapeRepair=null,execution={kind:'model_free_fixture',duration_ms:null,usage:null,model_calls:0};
   if(settings.kind==='fixture')assessment={...settings.assessment,packet_digest:canonicalDigest(packet)};
@@ -22,10 +44,17 @@ export async function assessPracticalEvaluation(settings,job,resultPath){
     const session=join(dirname(resultPath),'assessment-session');mkdirSync(session,{mode:0o700});
     const final=join(session,'answer.json');
     const prompt='Judge this evaluation irregularity against the practical goal, using available evidence. Prefer useful partial/reference results or exclusion when another run has little value. Retry one trial or the whole case only to repair a failure, missing evidence or an unfair comparison within the given budget. Never optimize selection for a better score. Preserve original outcomes. Process closure and allowed actions are enforced by the runner. Return only JSON {packet_digest,action,reason,selection_basis,retry_scope,used_dimensions,comparison_limits}. used_dimensions and comparison_limits must be arrays of strings, for example used_dimensions:["execution","duration"] and comparison_limits:["quality remains unknown"]. retry_scope is trial or case only for retry, otherwise null. selection_basis is execution_failure, missing_evidence, environment_mismatch, fair_comparison, practical_reference or no_value_in_more_runs.\n'+JSON.stringify({...job.input,packet_digest:canonicalDigest(packet)});
-    const r=await executeCodexSession({executable:settings.executable,argv:['exec','--json','--skip-git-repo-check','--sandbox','read-only','-o',final,...(settings.model?['--model',settings.model]:[]),'-'],
-      cwd:session,input:prompt,timeoutMs:settings.timeout_ms,terminationScope:'direct_child'});
+    let r;
+    try{r=await executeCodexSession({executable:settings.executable,argv:['exec','--json','--skip-git-repo-check','--sandbox','read-only','-o',final,...(settings.model?['--model',settings.model]:[]),'-'],
+      cwd:session,input:prompt,timeoutMs:settings.timeout_ms,terminationScope:'direct_child'});}
+    catch(error){r={error:{message:String(error.message).slice(0,2048)},spawnObserved:null,terminationConfirmed:null};}
+    // Save what the bounded executor actually observed before any success or
+    // response-shape assertion. Failure diagnostics do not prove remote closure.
+    const captured=retainExecutionObservation({session,settings,job,prompt,response:r}),executionObservation=captured.reference;
     assert.ok(r.spawnObserved&&r.terminationConfirmed&&r.exitCode===0&&!r.error&&!r.timedOut&&!r.interrupted&&!r.outputLimited,'assessment incomplete; inspect saved session, do not replay automatically');
-    assessment=readJsonFileStrict(final,'AI recovery assessment');
+    assert.ok(captured.answerBytes!==null&&!captured.answerIssue,'AI recovery answer was not captured: '+(captured.answerIssue??'missing answer'));
+    assert.ok(captured.answerBytes.length<=DEFAULT_CONTENT_ADDRESSED_OBJECT_MAX_BYTES,'AI recovery assessment exceeds the byte limit');
+    assessment=parseJsonRejectDuplicateKeys(captured.answerBytes,'AI recovery assessment');
     // A model may express one comparison limit as a scalar. Preserve its text
     // and decision, record the exact shape repair, and leave admission to the
     // runner's unchanged full packet/action/dimension/budget validator.
@@ -34,12 +63,12 @@ export async function assessPracticalEvaluation(settings,job,resultPath){
       const typed=join(session,'typed-assessment.json'),receipt=join(session,'assessment-shape-repair.json');
       writeCanonicalJsonNoReplace({outputPath:typed,artifact:assessment,label:'typed AI recovery assessment'});
       writeCanonicalJsonNoReplace({outputPath:receipt,artifact:{kind:'ai_recovery_shape_repair_v1',packet_digest:canonicalDigest(packet),
-        original_response:{path:final,digest:hash(readStableBytes(final,'original AI recovery answer'))},original_assessment_digest:canonicalDigest(original),
+        original_response:{path:join(session,'captured-answer.json'),digest:hash(captured.answerBytes)},original_assessment_digest:canonicalDigest(original),
         repaired_response:{path:typed,digest:hash(readStableBytes(typed,'typed AI recovery answer'))},repaired_assessment_digest:canonicalDigest(assessment),
         change:'comparison_limits nonempty string to singleton array; no text or other field changes',additional_model_calls:0},label:'AI recovery shape repair receipt'});
       shapeRepair={path:receipt,digest:hash(readStableBytes(receipt,'AI recovery shape repair receipt'))};
     }
-    execution={kind:'codex',duration_ms:r.durationMs??null,usage:null,model_calls:1,usage_status:'not_collected',process_lifetime_scope:'direct_child',...(shapeRepair?{output_shape_repair:shapeRepair}:{})};
+    execution={kind:'codex',duration_ms:r.durationMs??null,usage:null,model_calls:1,usage_status:'not_collected',process_lifetime_scope:'direct_child',execution_observation:executionObservation,...(shapeRepair?{output_shape_repair:shapeRepair}:{})};
   }
   return {request_digest:canonicalDigest(job),status:'completed',output:{assessment,
     assessment_execution:execution,assessment_usage_not_trial_usage:true,ambient_context:'Unknown',formal_admission_implied:false}};
