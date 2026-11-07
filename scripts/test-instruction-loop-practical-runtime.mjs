@@ -37,6 +37,7 @@ test('public practical Eval inherits exactly the case approval and returns to th
   const {createFullPracticalInstructionLoopConfiguration,createFullPracticalInstructionLoopRuntime,prepareFullPracticalInstructionSelection}=await import('./instruction-loop-practical-runtime.mjs?integration');
   const profilePath=join(f.root,'profile.json');writeFileSync(profilePath,JSON.stringify(profile));
   const config=createFullPracticalInstructionLoopConfiguration(profilePath),configPath=join(f.root,'config.json');writeFileSync(configPath,JSON.stringify(config));
+  assert.ok(config.runtime.source_pins.some(p=>p.path.endsWith('/practical-initialization-clearance.mjs')),'new runtime pins the transitive recovery validator');
   const runtime=createFullPracticalInstructionLoopRuntime({definition:config.runtime});
   await assert.rejects(advanceSupervisedInstructionLoop({root:baselineRoot,policy:config.policy,runtime}),/coordinator overlaps/);
   assert.equal(existsSync(join(baselineRoot,'000000.json')),false);

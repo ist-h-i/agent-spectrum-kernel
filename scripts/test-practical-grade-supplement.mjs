@@ -58,6 +58,26 @@ function usableProvider(f){
  f.definition.commands.grade.pins=[pin(f.provider),pin(f.settings)];
 }
 test('recipe binds an approved original attempt and preserves every original byte',t=>{const f=fixture(t),before=readRunJournal(f.root).previous,r=f.recipe();assert.equal(r.original_result_digest,canonicalDigest(f.state.attempts[0].result));assert.equal(r.binding.maximum_new_model_calls,1);assert.equal(r.binding.remaining_role,'verification');assert.equal(readRunJournal(f.root).previous,before);});
+for(const sameRow of [false,true])test('supplement eligibility uses the latest logical row rather than a sibling trial-only retry cohort: '+sameRow,t=>{
+ const f=fixture(t),old=f.state.attempts[0],job=structuredClone(old.job);job.key='later-attempt';job.input.row={...old.row,...(sameRow?{}:{id:'candidate-row',condition:'candidate'})};
+ const d=join(f.root,'jobs',canonicalDigest(job).slice(7)),result=structuredClone(old.result);result.request_digest=canonicalDigest(job);result.output.evidence_root=d;mkdirSync(d);
+ write(join(d,'request.json'),job);write(join(d,'result.json'),result);write(join(d,'transport.json'),{request_digest:canonicalDigest(job),exit_code:0,signal:null});
+ f.mutate(s=>s.attempts.push({id:'later-attempt',row:job.input.row,job,cohort:2,result,assessment:null}));
+ if(sameRow)assert.throws(()=>f.recipe(),/superseded attempt/);else assert.equal(f.recipe().attempt_id,f.id);
+});
+test('supplement quiescence consumes an independently validated host exception without upgrading original failed/unknown records',async t=>{
+ const f=fixture(t),failedJob={kind:'trial',key:'failed-initialization',input:{row:{...f.state.attempts[0].row,id:'failed-row',condition:'candidate'}}},failedDigest=canonicalDigest(failedJob),badRoot=join(f.root,'jobs',failedDigest.slice(7));mkdirSync(badRoot);
+ const failed={request_digest:failedDigest,status:'failed',output:{ready_for_next_root:false,execution_completed:false,task:{provider_terminal_confirmed:false,process_group_closed:true},grade:null}};
+ write(join(badRoot,'request.json'),failedJob);write(join(badRoot,'result.json'),failed);write(join(badRoot,'transport.json'),{request_digest:failedDigest,exit_code:0,signal:null});
+ const assessor={kind:'assess',key:'retired-read-only-assessor',input:{}},assessorDigest=canonicalDigest(assessor),assessRoot=join(f.root,'jobs',assessorDigest.slice(7));mkdirSync(assessRoot);write(join(assessRoot,'request.json'),assessor);write(join(assessRoot,'transport.json'),{request_digest:assessorDigest,exit_code:1,signal:null});
+ f.mutate(s=>s.attempts.push({id:'failed-initialization',job:failedJob,row:failedJob.input.row,cohort:1,result:failed}));assert.throws(()=>f.recipe(),/unresolved/);
+ const clearance={original_attempt_id:'failed-initialization',original_job_digest:failedDigest,original_assessor_job_digest:assessorDigest};f.mutate(s=>s.continuation_clearances=[clearance]);let checked=0;
+ const actual=await import('./practical-initialization-clearance.mjs');
+ t.mock.module('./practical-initialization-clearance.mjs',{namedExports:{...actual,validatePracticalInitializationClearance:(c,o)=>{assert.deepEqual(c,clearance);assert.equal(o.root,f.root);assert.equal(o.checkProcesses,true);checked++;return {attempt:o.state.attempts[1],observation:{fixture:true}};}}});
+ const {preparePracticalGradeSupplement:prepare}=await import('./practical-grade-supplement.mjs?validated-clearance-consumer');
+ const before=readRunJournal(f.root).previous,r=prepare({runRoot:f.root,attemptId:f.id,contract:f.contract});assert.equal(r.attempt_id,f.id);assert.ok(checked>0);assert.equal(readRunJournal(f.root).previous,before);
+ assert.deepEqual(readRunJournal(f.root).state.attempts[1].result,failed);assert.equal(existsSync(join(assessRoot,'result.json')),false);assert.equal(existsSync(f.counter),false);
+});
 test('a complete worker directory cannot be transplanted outside its original job root',t=>{
  const f=fixture(t),foreign=join(f.dir,'foreign');cpSync(f.jobRoot,foreign,{recursive:true});
  f.mutate(s=>{s.attempts[0].result.output.evidence_root=foreign;write(join(foreign,'result.json'),s.attempts[0].result);});

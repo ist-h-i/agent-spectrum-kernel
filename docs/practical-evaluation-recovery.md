@@ -359,3 +359,48 @@ validation may still fail after a closed CLI; the original answer bytes remain
 available. Model calls and token usage that the executor cannot observe remain
 unknown. This evidence does not reconstruct logs lost by an older assessor, add
 an after-the-fact closure-admission port or authorize changing a frozen run.
+
+## Bounded continuation after a CLI initialization failure
+
+The host AI can use `practical-initialization-recovery-cli.mjs` for a first Task
+attempt that failed specifically while initializing the in-process app-server
+with EPERM before any session output. This port is an explicit operational
+exception, separate from provider closure. It requires no grade, the linked
+incomplete read-only assessor, preserved native command/result/transport files,
+unchanged approved inputs, no owner target, and a live local process observation.
+Generic remote timeouts and returned assessor evidence require ordinary
+inspection instead.
+
+```sh
+node scripts/practical-initialization-recovery-cli.mjs prepare \
+  --operation /absolute/original-operation --reason "Recorded initialization failure; retain unknowns and retry only its isolated row." \
+  --output /absolute/recovery/continuation-clearance.json
+node scripts/practical-initialization-recovery-cli.mjs admit \
+  --operation /absolute/original-operation --clearance /absolute/recovery/continuation-clearance.json
+node scripts/practical-initialization-recovery-cli.mjs advance \
+  --operation /absolute/original-operation --assessment /absolute/recovery/fresh-ai-assessment.json --allow-model-calls
+```
+
+`prepare` and `admit` make no model call. Admission retains the operational
+exception and a fresh recovery packet; the host AI must judge that packet before
+`advance`. A trial retry creates attempt2 in a fresh workspace and consumes one
+of the existing extra/per-row slots. Case-wide retry through this exception is
+refused. Repeated submission, interruption or a missing response cannot grant
+another dispatch. The unknown assessor is retired without replay. Continue this
+inner lane using `advance` with the original pinned execution commands; after
+its report completes, the normal parent operation resumes at its existing
+human result/change gate. No case or change approval is replaced or inherited.
+
+The raw failed Task, provider `terminal:false`, assessor Unknown, usage gaps and
+all consumed costs remain in the report. `safe_to_continue:true` does not change
+`process_closed:false` or certify quality. Process observation covers known worker
+PIDs and same-UID processes whose cwd is within the original owned job roots;
+it is not proof about every descriptor from other cwd or remote computation.
+Incomplete/failed observations block this port. Later supplement dispatch reuses
+the same evidence validation, and trial-only retry preserves the other
+condition's latest attempt even when its cohort differs.
+
+The host AI records the exception, reason, changed coordinator version and
+comparison limits for the user. The user's two judgments remain evaluation-case
+approval and eventual change approval; routine failure recovery adds no third
+human gate.

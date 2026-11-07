@@ -11,6 +11,7 @@ import {buildInstructionRecoveryPacket,validateInstructionRecoveryAssessment} fr
 import {buildPragmaticEvaluationReport} from './ask-pragmatic-evaluation-report.mjs';
 import {verifyRetainedPracticalGradeSource} from './practical-grade-source-binding.mjs';
 import {readStableFile} from './ask-benchmark-stable-file.mjs';
+import {validatePracticalInitializationClearance} from './practical-initialization-clearance.mjs';
 
 const copy=v=>structuredClone(v),same=(a,b)=>canonicalDigest(a)===canonicalDigest(b),json=p=>readJsonFileStrict(p,'grade supplement',16*1024*1024);
 const save=(p,v)=>writeCanonicalJsonNoReplace({outputPath:p,artifact:v,label:'grade supplement',maximumBytes:16*1024*1024});
@@ -38,14 +39,19 @@ function quiescent(root,parents,{held=false,allowOwnedCoordinatorLocks=false}={}
  const h=readRunJournal(root),s=h.state;assert.ok(s&&s.status==='completed'&&s.active===null&&!s.recovery,'original evaluation is not completed/quiescent');
  assert.ok(!s.suspended&&!s.report?.execution_suspended,'completed evaluation contains suspended execution');
  assert.ok(s.evaluation_decision?.disposition==='approved','original case approval required');
- for(const a of s.attempts){assert.equal(a.result.output?.ready_for_next_root,true,'original trial completion unresolved');assert.ok(closed(a.result.output?.task),'original Task closure unresolved');if(a.result.output?.grade)assert.ok(closed(a.result.output.grade),'original grade closure unresolved');}
+ const exceptions=s.continuation_clearances??[];
+ for(const c of exceptions)validatePracticalInitializationClearance(c,{root,state:s,checkProcesses:true});
+ const exceptedTrial=d=>exceptions.some(c=>c.original_job_digest===d),exceptedAssessor=d=>exceptions.some(c=>c.original_assessor_job_digest===d);
+ for(const a of s.attempts){if(exceptedTrial(canonicalDigest(a.job)))continue;assert.equal(a.result.output?.ready_for_next_root,true,'original trial completion unresolved');assert.ok(closed(a.result.output?.task),'original Task closure unresolved');if(a.result.output?.grade)assert.ok(closed(a.result.output.grade),'original grade closure unresolved');}
  const jobs=join(root,'jobs');assert.ok(existsSync(jobs),'original command receipts required');
  for(const name of readdirSync(jobs)){
-  assert.match(name,/^[a-f0-9]{64}$/u);const d=join(jobs,name),q=json(join(d,'request.json')),r=json(join(d,'result.json')),t=json(join(d,'transport.json'));
+  assert.match(name,/^[a-f0-9]{64}$/u);const d=join(jobs,name),q=json(join(d,'request.json'));
+  if(exceptedAssessor(canonicalDigest(q)))continue; // Validated read-only retirement, not a closure assertion.
+  const r=json(join(d,'result.json')),t=json(join(d,'transport.json'));
   assert.equal(canonicalDigest(q),'sha256:'+name);assert.equal(r.request_digest,canonicalDigest(q));assert.equal(t.request_digest,r.request_digest);
   assert.ok(['completed','failed','interrupted'].includes(r.status),'original command completion unresolved');assert.equal(t.exit_code,0,'original transport requires inspection');assert.equal(t.signal,null);
   if(q.kind==='assess')assert.equal(r.status,'completed','original assessment provider closure unresolved');
-  if(q.kind==='trial'){assert.equal(r.output?.ready_for_next_root,true);assert.ok(closed(r.output.task));if(r.output.grade)assert.ok(closed(r.output.grade));}
+  if(q.kind==='trial'&&!exceptedTrial(canonicalDigest(q))){assert.equal(r.output?.ready_for_next_root,true);assert.ok(closed(r.output.task));if(r.output.grade)assert.ok(closed(r.output.grade));}
  }
  for(const p of [root,...parents]){rootPath(p);if(!held&&existsSync(join(p,'.advance-lock'))){assert.ok(allowOwnedCoordinatorLocks&&p!==root,'original coordinator is running or unresolved');const owner=join(p,'.advance-lock/pid');assertNoSymlinkPathSegments(owner,'owned coordinator lock');assert.equal(readStableFile(owner,'owned coordinator lock',64).bytes.toString('utf8'),String(process.pid),'coordinator lock is owned by another process');}}
  return h;
@@ -57,8 +63,8 @@ function eligible(s,id){
  assert.ok(closed(a.result.output.task)&&closed(a.result.output.grade));
  assert.ok(same(a.job.input.condition_context,s.plan.conditions.find(v=>v.id===a.row.condition)?.context),'original environment mismatch');
  const q=inspectPracticalQualityObservation(a.result.output);assert.ok(q.issue||!q.value||(q.value.fixed_reference===null&&q.value.evidence_refs.length===0),'valid low or range judgments cannot be regraded');
- const siblings=s.attempts.filter(v=>v.row.block_id===a.row.block_id),row=siblings.filter(v=>v.row.condition===a.row.condition);
- assert.equal(row.at(-1).id,a.id,'superseded attempt');assert.equal(a.cohort,Math.max(...siblings.map(v=>v.cohort)),'superseded retry cohort');
+ const row=s.attempts.filter(v=>v.row.block_id===a.row.block_id&&v.row.condition===a.row.condition);
+ assert.equal(row.at(-1).id,a.id,'superseded attempt');
  const issue=a.assessment?.selection_basis;assert.ok(!issue||['practical_reference','missing_evidence','no_value_in_more_runs'].includes(issue),'grading cannot repair an execution/fairness exclusion');
  return a;
 }
