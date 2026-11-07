@@ -123,7 +123,10 @@ export function inspectInstructionLoopReadiness(profilePath){
   assert.equal(canonicalDigest(config.policy),canonicalDigest({...p.policy,runtime_digest:canonicalDigest(config.runtime)}),'profile policy changed during readiness inspection');
   return {kind:'instruction_loop_readiness_v1',profile_kind:p.kind,profile_digest:digest,configuration_digest:canonicalDigest(config),
     selected:inspectInstructionLoopProviderSelection(p),capabilities:{automatic_authoring_ports:['codex'],automatic_recovery_ports:['codex'],
-      standalone_authoring_handoff:'prepare_import_only',external_host_authoring:'durable_component_handoff',claude_app_dispatch:'not_implemented'},
+      standalone_authoring_handoff:'prepare_import_only',external_host_authoring:'durable_component_handoff',claude_app_dispatch:'not_implemented',standard_practical_trial_ports:['codex']},
+    setup_responsibility:{host_or_admin:['trusted_runtime_and_registry','exact_baseline_and_asset_mappings','provider_executable_and_context','eventual_target'],
+      host_ai:['public_tasks_and_criteria','candidate_and_feedback_inputs','bounded_time_and_retry_budget','routine_recovery_and_handoff_files'],
+      human:['evaluation_cases','change_or_result']},
     execution_readiness:'not_probed',not_probed:['executable_availability','authentication','actual_instruction_use','provider_closure','actual_owner_acceptance'],
     human_decision_types:['evaluation_cases','change_or_result'],models_started:false,trials_started:0,owner_mutated:false,files_written:false};
 }

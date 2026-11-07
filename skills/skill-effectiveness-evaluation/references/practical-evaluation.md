@@ -83,6 +83,26 @@ runner. Submit routine AI judgments through the normal supervised CLI's
 `--assessment` option; it returns to the existing result/change gate afterward.
 See the runtime's `docs/practical-evaluation-recovery.md` for the profile fields.
 
+For Codex practical trials the host AI can select the shipped condition port
+`codex: {executable, model, reasoning, task_file, timeout_ms}` instead of writing
+a model command/closure/metrics wrapper. Use explicit model/reasoning values (or
+null) matching the declared condition context. `task_file` must occur in each
+case's frozen public input files. It stays a task, never an implicit quality
+check: supply the case's own pinned grader or preserve quality Unknown. The
+standard worker captures job-bound closure and partial root-turn usage from the
+existing Codex transport. Missing usage stays null; failed/interrupted attempts
+keep lower-bound evidence and enter normal AI recovery without unsafe replay.
+`readiness` reports `standard_codex`, caller commands, or a mixture, plus host/
+admin and host-AI setup responsibilities. Only case and change judgments belong
+to the human. See `docs/instruction-loop-standard-execution.md` in the runtime
+for the execution-side intake and deferred actual-environment checks.
+
+File-based sharing is sufficient: use explicit package preview/export and
+receive/import. Preserve the file unchanged through handoff, inspect its local
+diff/dependencies/conflicts in quarantine, and run receiving cases and change
+approval before adoption. Automatic transfer or remote synchronization is not
+required; an imported package grants no execution or authority.
+
 Frozen historical primary batches keep their original single-shot policy. New
 attempts and a new practical ledger do not rewrite old source, scores or records.
 

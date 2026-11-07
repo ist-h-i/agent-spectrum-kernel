@@ -11,6 +11,21 @@ import { pathToFileURL } from 'node:url';
 import { canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace } from './content-addressed-store.mjs';
 import { instructionPath } from './instruction-projection-paths.mjs';
 import { instructionBytesDigest as hash } from './instruction-environment.mjs';
+import {readStableFile} from './ask-benchmark-stable-file.mjs';
+
+function providerObservation(receipt,controlRoot){
+ const o=receipt.observation;if(o===undefined)return null;
+ assert.equal(o.kind,'provider_observation_v1');assert.ok(typeof o.scope==='string'&&o.scope.length<=256);
+ assert.ok(o.metrics&&typeof o.metrics==='object');const invalid_fields=[];
+ const metrics=Object.fromEntries(['input_tokens','output_tokens','cached_tokens'].map(k=>{
+  const v=o.metrics[k];if(v!==null&&v!==undefined&&(!Number.isSafeInteger(v)||v<0))invalid_fields.push(k);
+  return [k,Number.isSafeInteger(v)&&v>=0?v:null];
+ }));
+ if(metrics.cached_tokens!==null&&metrics.input_tokens!==null&&metrics.cached_tokens>metrics.input_tokens){metrics.cached_tokens=null;invalid_fields.push('cached_tokens');}
+ assert.ok(Array.isArray(o.artifacts)&&o.artifacts.length<=16);
+ for(const a of o.artifacts){instructionPath(a.path);assert.equal(hash(readStableFile(join(controlRoot,a.path),'provider observation artifact',10*1024*1024).bytes),a.digest,'provider observation artifact changed');}
+ return {...o,metrics,invalid_fields};
+}
 
 function instructionDiscovery(root){
   const inventory=[];let count=0,complete=true;
@@ -73,18 +88,22 @@ async function command(definition,workspace,label,job,frozenFiles=[]){
     if(process.platform!=='win32')try{process.kill(-child.pid,0);}catch(error){if(error.code==='ESRCH')groupClosed=true;}
     let providerClosed=!definition.model_calls;
     if(definition.model_calls&&definition.model_terminal_contract==='synchronous_cli_completion'&&closed.exit_code===0&&!closed.signal&&!timedOut)providerClosed=true;
-    let providerEvidenceError=null;
+    let providerEvidenceError=null,observation=null,observationIssue=null,observationReason=null;
     if(providerPath){
       const path=join(dirname(workspace),providerPath);
       if(existsSync(path))try{const receipt=readJsonFileStrict(path,'provider closure receipt');
         assert.equal(receipt.request_digest,canonicalDigest(job));assert.equal(receipt.command_digest,canonicalDigest(definition));
-        assert.equal(receipt.invocation_digest,invocation);assert.equal(receipt.terminal,true);
-        assert.ok(typeof receipt.provider_ref==='string'&&receipt.provider_ref.trim());providerClosed=true;
-      }catch{providerClosed=false;providerEvidenceError='provider_receipt_invalid_or_unavailable';}
+        assert.equal(receipt.invocation_digest,invocation);assert.ok(typeof receipt.terminal==='boolean');
+        assert.ok(typeof receipt.provider_ref==='string'&&receipt.provider_ref.trim());providerClosed=receipt.terminal;
+        if(!providerClosed)providerEvidenceError='provider_completion_not_confirmed';
+        try{observation=providerObservation(receipt,dirname(workspace));}catch(error){observationIssue='provider_observation_invalid_or_unavailable';observationReason=String(error.message).slice(0,512);}
+      }catch{providerClosed=false;providerEvidenceError='provider_receipt_invalid_or_unavailable';observationIssue=providerEvidenceError;}
+      else{providerClosed=false;providerEvidenceError='provider_receipt_missing';observationIssue=providerEvidenceError;}
     }
     const result={...closed,timed_out:timedOut,duration_ms:Date.now()-started,process_group_closed:groupClosed,
       provider_terminal_confirmed:definition.model_calls?providerClosed:null,ready_for_next_root:groupClosed&&providerClosed,
       provider_evidence_error:providerEvidenceError,
+      provider_observation:observation,provider_observation_issue:observationIssue,provider_observation_reason:observationReason,
       closure_scope:'local_owned_process_group_only; remote provider work is not inferred',stdout_ref:label+'.stdout.log',stderr_ref:label+'.stderr.log'};
     writeCanonicalJsonNoReplace({outputPath:join(dirname(workspace),label+'-completion.json'),artifact:result,label:'practical command closure'});
     return result;
@@ -113,8 +132,12 @@ export async function executePracticalEvaluationWorker(settings,job,resultPath){
   const executed=(task.exit_code===0||condition.command_role==='check'&&task.exit_code===1)&&!task.timed_out&&!task.signal;
   const check=grade??(condition.command_role==='check'?task:null);
   const outcome=executed&&check&&!check.timed_out&&!check.signal&&[0,1].includes(check.exit_code)?(check.exit_code===0?'pass':'fail'):'unknown';
-  const observation=settings.observation_path&&existsSync(join(workspace,settings.observation_path))?
-    readJsonFileStrict(join(workspace,instructionPath(settings.observation_path))):null;
+  let workspaceObservation=null,workspaceObservationIssue=null;
+  if(!task.provider_observation&&!task.provider_observation_issue&&settings.observation_path&&existsSync(join(workspace,settings.observation_path))){
+    try{workspaceObservation=readJsonFileStrict(join(workspace,instructionPath(settings.observation_path)));}
+    catch{workspaceObservationIssue='caller_workspace_observation_invalid_or_unavailable';}
+  }
+  const observation=task.provider_observation?.metrics??(task.provider_observation_issue?null:workspaceObservation);
   const contextIntact=(condition.files??[]).every(f=>{try{return hash(readStableBytes(join(workspace,f.target),'post-trial instruction'))===f.digest
     &&(lstatSync(join(workspace,f.target)).mode&0o777)===(f.mode??0o600);}catch{return false;}});
   const discoveryAfter=instructionDiscovery(workspace),discoveryChanged=canonicalDigest(discoveryBefore.inventory)!==canonicalDigest(discoveryAfter.inventory);
@@ -122,8 +145,9 @@ export async function executePracticalEvaluationWorker(settings,job,resultPath){
     context_integrity:!contextIntact||discoveryChanged?'changed':discoveryBefore.complete&&discoveryAfter.complete?'preserved':'unverified',
     context_integrity_scope:'Declared condition files bytes/modes and bounded AGENTS/CLAUDE plus .agents/.claude instruction/settings inventory; runtime logs, .git/node_modules/.tmp and ambient/global inputs excluded.',
     grading_execution_state:grade?'completed':'not_started',
-    cli_seconds:task.duration_ms/1000,root_usage:null,task,grade,
-    notes:{outcome,evidence_refs:[task.stdout_ref,task.stderr_ref,...(grade?[grade.stdout_ref,grade.stderr_ref]:[])],
+    evidence_root:dirname(resultPath),workspace_observation_issue:workspaceObservationIssue,metrics_source:task.provider_observation?'provider_closure_receipt':task.provider_observation_issue?'provider_observation_unusable':workspaceObservation?'caller_workspace_observation':workspaceObservationIssue?'caller_workspace_observation_unusable':'not_collected',
+    cli_seconds:task.duration_ms/1000,root_usage:task.provider_observation?{input_tokens:observation.input_tokens,output_tokens:observation.output_tokens,cached_input_tokens:observation.cached_tokens}:null,task,grade,
+    notes:{outcome,evidence_refs:[task.stdout_ref,task.stderr_ref,...(task.provider_observation?.artifacts??[]).map(a=>a.path),...(grade?[grade.stdout_ref,grade.stderr_ref,...(grade.provider_observation?.artifacts??[]).map(a=>a.path)]:[])],
       metrics:{duration_ms:task.duration_ms,human_review_minutes:null,rework_minutes:null,
         input_tokens:observation?.input_tokens??null,output_tokens:observation?.output_tokens??null,cached_tokens:observation?.cached_tokens??null}}}};
 }
