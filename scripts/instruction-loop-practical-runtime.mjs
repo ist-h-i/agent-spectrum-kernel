@@ -1,3 +1,4 @@
+import {readInstructionLoopJson} from './instruction-loop-artifact.mjs';
 // Existing Full generation/Registry/normal-owner lifecycle, with the practical
 // Eval engine in place of a private fixed-catalog grading dependency.
 import assert from 'node:assert/strict';
@@ -15,7 +16,7 @@ import {advancePracticalEvaluation,inspectPracticalEvaluation} from './practical
 import {readRunJournal} from './instruction-run-journal.mjs';
 
 const stages=['generate','register','select','plan','apply','version','cleanup','restore'];
-const sourceNames=['instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs',
+const sourceNames=['instruction-loop-artifact.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs',
   'instruction-loop-feedback.mjs','ask-personal-evolution-observation.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
   'instruction-loop-assets.mjs','instruction-loop-source-binding.mjs','instruction-environment.mjs','instruction-environment-compiler.mjs',
   'practical-evaluation-runner.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',
@@ -126,7 +127,7 @@ export function createPracticalLifecycleRuntime({definition,modelCallsAuthorized
       }
       if(inspectStage)try{
         let preparedHandoffDigest;
-        if(job.kind==='generate'&&existsSync(handoffPath(job))){const receipt=readJsonFileStrict(handoffPath(job),'prepared host handoff');
+        if(job.kind==='generate'&&existsSync(handoffPath(job))){const receipt=readInstructionLoopJson(handoffPath(job),'prepared host handoff');
           assert.equal(receipt.request_digest,canonicalDigest(job));assert.equal(receipt.status,'awaiting_authoring');assert.equal(receipt.output.kind,'component_authoring_pending_v1');preparedHandoffDigest=receipt.output.handoff_digest;}
         const output=await inspectStage(p,job,{...context,preparedHandoffDigest});
         if(output!==null){const result={...stageResult(job,output),inspection:{recovered_from_owned_evidence:true}};if(result.status==='completed')save(resultPath(job),result);return result;}

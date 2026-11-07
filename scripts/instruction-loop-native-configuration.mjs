@@ -1,8 +1,9 @@
+import {readInstructionLoopJson as readJsonFileStrict,INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES} from './instruction-loop-artifact.mjs';
 import assert from 'node:assert/strict';
 import {inspectInstructionLoopProviderSelection} from './instruction-loop-provider-policy.mjs';
 import {join,resolve,dirname} from 'node:path';
 import {existsSync,mkdirSync} from 'node:fs';
-import {readJsonFileStrict,readStableBytes,parseJsonRejectDuplicateKeys,canonicalDigest,assertNoSymlinkPathSegments,writeCanonicalJsonNoReplace} from './content-addressed-store.mjs';
+import {readStableBytes,parseJsonRejectDuplicateKeys,canonicalDigest,assertNoSymlinkPathSegments,writeCanonicalJsonNoReplace} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {prepareNextSupervisedInstructionLoop,readCompletedInstructionLoopContinuation} from './supervised-instruction-loop.mjs';
 import {createFullPracticalInstructionLoopConfiguration} from './instruction-loop-practical-runtime.mjs';
@@ -13,7 +14,7 @@ export function createNativeInstructionLoopConfiguration(profilePath){
   if(p.kind==='component_practical_instruction_loop_profile_v1')return createComponentInstructionLoopConfiguration(profilePath);
   if(p.kind==='full_practical_instruction_loop_profile_v1')return createFullPracticalInstructionLoopConfiguration(profilePath);
   assert.equal(p.kind,'full_native_reference_loop_profile_v1');inspectInstructionLoopProviderSelection(p);assert.equal(p.normal.target,p.policy.normal_target);
-  const paths=['instruction-projection-paths.mjs','instruction-loop-native-public-inputs.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','instruction-loop-provider-policy.mjs','instruction-loop-native-worker.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-reference-report.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-command-runtime.mjs',
+  const paths=['instruction-loop-artifact.mjs','instruction-projection-paths.mjs','instruction-loop-native-public-inputs.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','instruction-loop-provider-policy.mjs','instruction-loop-native-worker.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-reference-report.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-command-runtime.mjs',
     'instruction-loop-native-prepare.py','instruction-loop-assets.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
     'retained-instruction-comparison.mjs','retained-instruction-layout.mjs','instruction-environment.mjs','codex-exec-runner.mjs','asset-registry.mjs','content-addressed-store.mjs','instruction-loop-source-binding.mjs','instruction-loop-feedback.mjs','ask-personal-evolution-observation.mjs'];
   const pins=[{path:profilePath,digest:hash(readStableBytes(profilePath,'Full/native profile',16*1024*1024))},...paths.map(name=>({path:join(import.meta.dirname,name),digest:hash(readStableBytes(join(import.meta.dirname,name),'Full/native adapter'))}))];
@@ -105,9 +106,9 @@ export function prepareNextNativeInstructionLoopConfiguration(options){
   assert.ok(!existsSync(outputRoot),'fresh next-cycle configuration required');
   mkdirSync(outputRoot,{mode:0o700});
   const nextProfilePath=join(outputRoot,'profile.json');
-  writeCanonicalJsonNoReplace({outputPath:nextProfilePath,artifact:p,label:'next-cycle native profile',maximumBytes:16*1024*1024});
+  writeCanonicalJsonNoReplace({outputPath:nextProfilePath,artifact:p,label:'next-cycle native profile',maximumBytes:INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES});
   const config=createNativeInstructionLoopConfiguration(nextProfilePath),nextConfigPath=join(outputRoot,'config.json');
-  writeCanonicalJsonNoReplace({outputPath:nextConfigPath,artifact:config,label:'next-cycle native configuration',maximumBytes:16*1024*1024});
+  writeCanonicalJsonNoReplace({outputPath:nextConfigPath,artifact:config,label:'next-cycle native configuration',maximumBytes:INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES});
   return {status:'prepared',profile_path:nextProfilePath,config_path:nextConfigPath,run_root:join(outputRoot,'run'),
     policy_digest:canonicalDigest(config.policy),models_started:false,approval_carried_forward:false};
 }

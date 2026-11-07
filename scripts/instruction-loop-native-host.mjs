@@ -1,3 +1,4 @@
+import {readInstructionLoopJson,INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES} from './instruction-loop-artifact.mjs';
 // Concrete Full/native/reference bindings for the supervised controller.
 // Native execution still uses the original Python runner/control/monitor.
 import assert from 'node:assert/strict';
@@ -21,9 +22,9 @@ import {bindNativePublicInputs} from './instruction-loop-native-public-inputs.mj
 import {projectInstructionLoopObservation} from './instruction-loop-feedback.mjs';
 const pause=()=>new Promise(r=>setTimeout(r,500));
 const checked=r=>{assert.equal(hash(readStableBytes(r.path,'pinned native host input',16*1024*1024)),r.digest,'native host input drift');return readJsonFileStrict(r.path,'pinned native host input',16*1024*1024);};
-const save=(path,artifact)=>writeCanonicalJsonNoReplace({outputPath:path,artifact,label:'native loop stage result',maximumBytes:16*1024*1024});
+const save=(path,artifact)=>writeCanonicalJsonNoReplace({outputPath:path,artifact,label:'native loop stage result',maximumBytes:INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES});
 const preparedPath=p=>join(p.stateRoot,'native-selection.json');
-function publication(path,result){if(existsSync(path)){assert.equal(canonicalDigest(readJsonFileStrict(path)),canonicalDigest(result),'terminal result conflict');return;}save(path,result);}
+function publication(path,result){if(existsSync(path)){assert.equal(canonicalDigest(readInstructionLoopJson(path)),canonicalDigest(result),'terminal result conflict');return;}save(path,result);}
 function sourceInputs(p){
   assert.ok(['full_native_reference_loop_profile_v1','full_practical_instruction_loop_profile_v1'].includes(p.kind));
   assert.equal(p.generator.storeRoot,p.storeRoot);
@@ -98,7 +99,7 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
   if(job.kind==='trial'){
     assert.equal(job.input.evaluation_decision.disposition,'approved');
     if(p.native.executionKind==='real_codex')assert.equal(modelCallsAuthorized,true,'new implementation model trial not authorized');
-    assert.equal(canonicalDigest(job.input.selection),canonicalDigest(readJsonFileStrict(preparedPath(p))),'approved native selection drift');
+    assert.equal(canonicalDigest(job.input.selection),canonicalDigest(readInstructionLoopJson(preparedPath(p))),'approved native selection drift');
     const config=readJsonFileStrict(join(p.native.root,'config.json'),'prepared native configuration',16*1024*1024),row=config.rows.find(r=>r.trial_id===job.input.row.id);assert.ok(row);
     assert.equal(row.fixture_id,job.input.row.case.id);assert.equal(row.variant,job.input.row.condition);assert.equal(row.repetition,job.input.row.repetition);
     // The original control repeats the same nonblocking mutex check atomically
@@ -137,7 +138,7 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
       const retirement=job.input.retirement;assert.ok(retirement,'candidate retirement must precede disposal');
       const assets=verifyAssetRegistry({storeRoot:p.storeRoot,snapshotDigest:retirement.snapshot_digest,trustedAuthorityContexts:retirement.trusted_authority_contexts}).assets;
       assert.ok(job.input.candidate.candidate_assets.every(a=>assets.some(e=>e.record_digest===a.record_digest&&e.state==='retired')),'candidate is still active');
-      const owned=readJsonFileStrict(join(p.stateRoot,'owned-version.json'));assert.equal(owned.path,p.generator.candidateRoot);
+      const owned=readInstructionLoopJson(join(p.stateRoot,'owned-version.json'));assert.equal(owned.path,p.generator.candidateRoot);
       assert.equal(canonicalDigest(owned),job.input.candidate.owned_version.manifest_digest,'owned version manifest drift');
       const state=await import(pathToFileURL(join(owned.path,'scripts/ask-setup-apply-state.mjs')).href);
       assert.ok(state.managedSetupIdentities(p.normal.target).every(i=>i.source_revision!==owned.source_revision),'candidate is still installed on the scoped owner');
@@ -160,7 +161,7 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
 export async function nativeInstructionLoopWorker({profile,job,resultPath,action='execute',modelCallsAuthorized=false}){
   sourceInputs(profile);mkdirSync(profile.stateRoot,{recursive:true,mode:0o700});
   const sidecar=join(profile.stateRoot,'stage-'+canonicalDigest(job).slice(7)+'.json');
-  if(existsSync(sidecar)){const result=readJsonFileStrict(sidecar);assert.equal(result.request_digest,canonicalDigest(job));publication(resultPath,result);return;}
+  if(existsSync(sidecar)){const result=readInstructionLoopJson(sidecar);assert.equal(result.request_digest,canonicalDigest(job));publication(resultPath,result);return;}
   if(action==='inspect'){
     if(job.kind==='report'&&profile.report.referenceScoringCommand){
       let out;try{out=await executeNativeInstructionLoopStage(profile,job,{inspectOnly:true});}

@@ -1,3 +1,4 @@
+import {readInstructionLoopJson} from './instruction-loop-artifact.mjs';
 // Host-owned imports/composition and bounded AI authoring form one candidate.
 // This path never executes imported helpers or changes an owner installation.
 import assert from 'node:assert/strict';
@@ -42,7 +43,7 @@ export async function componentAuthoringProvider(provider,input,{modelCallsAutho
   const r=await executeCodexSession({executable:provider.executable,argv:['exec','--json','--skip-git-repo-check','--sandbox','read-only','-o',final,...(provider.model?['--model',provider.model]:[]),'-'],
     cwd:sessionRoot,input:prompt,timeoutMs:provider.timeout_ms,terminationScope:'direct_child'});
   assert.ok(r.spawnObserved&&r.terminationConfirmed&&r.exitCode===0&&!r.error&&!r.timedOut&&!r.interrupted&&!r.outputLimited,'component generation incomplete; inspect, never replay a consumed invocation');
-  return {response:readJsonFileStrict(final,'component authoring response'),execution:{kind:'codex',duration_ms:r.durationMs??null,usage:null,ambient_context:'Unknown'}};
+  return {response:readInstructionLoopJson(final,'component authoring response'),execution:{kind:'codex',duration_ms:r.durationMs??null,usage:null,ambient_context:'Unknown'}};
 }
 export async function generateComponentInstructionCandidate(p,job,{modelCallsAuthorized=false}={}){
   const options=componentEnvironmentOptions(p),baseline=verifyInstructionEnvironment({...options,environmentObjectDigest:p.baselineEnvironmentObjectDigest});

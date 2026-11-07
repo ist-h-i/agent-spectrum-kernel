@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {readInstructionLoopJson,INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES} from './instruction-loop-artifact.mjs';
 // Trusted normal-installer adapter. Source/target arguments are fixed by the
 // host runtime, never selected by generated candidate or report fields.
 import assert from 'node:assert/strict';
@@ -82,10 +83,10 @@ export async function runNormalOwnerLoopOperation({sourceRoot,baselineSourceRoot
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [sourceRoot,baselineSourceRoot,target,stagingRoot,requestFile,resultFile]=process.argv.slice(2);
-  const job=readJsonFileStrict(requestFile);
+  const job=readInstructionLoopJson(requestFile);
   try{
     const output=await runNormalOwnerLoopOperation({sourceRoot,baselineSourceRoot,target,stagingRoot,job});
-    writeCanonicalJsonNoReplace({outputPath:resultFile,artifact:{request_digest:canonicalDigest(job),status:'completed',output},label:'normal owner worker result',maximumBytes:16*1024*1024});
+    writeCanonicalJsonNoReplace({outputPath:resultFile,artifact:{request_digest:canonicalDigest(job),status:'completed',output},label:'normal owner worker result',maximumBytes:INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES});
   }catch(error){
     writeCanonicalJsonNoReplace({outputPath:resultFile,artifact:{request_digest:canonicalDigest(job),status:'failed',output:{reason:String(error.message).slice(0,2048)}},label:'failed normal owner result'});
     process.exitCode=1;

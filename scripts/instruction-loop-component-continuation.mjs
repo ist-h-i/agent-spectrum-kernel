@@ -1,7 +1,8 @@
+import {readInstructionLoopJson as readJsonFileStrict,readInstructionLoopBytes as readStableBytes,INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES} from './instruction-loop-artifact.mjs';
 import assert from 'node:assert/strict';
 import {existsSync,mkdirSync} from 'node:fs';
 import {resolve,join} from 'node:path';
-import {canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
+import {canonicalDigest,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash,verifyInstructionEnvironment} from './instruction-environment.mjs';
 import {verifyAssetRegistry} from './asset-registry.mjs';
 import {readCompletedInstructionLoopContinuation,prepareNextSupervisedInstructionLoop} from './supervised-instruction-loop.mjs';
@@ -52,8 +53,8 @@ export function prepareNextComponentInstructionLoopConfiguration(options){
   const built=buildNextComponentInstructionLoopProfile(options),p=built.profile,outputRoot=built.output_root;
   assert.ok(!existsSync(outputRoot),'fresh next component cycle required');
   mkdirSync(outputRoot,{mode:0o700});const path=join(outputRoot,'profile.json');
-  writeCanonicalJsonNoReplace({outputPath:path,artifact:p,label:'next component profile',maximumBytes:16*1024*1024});
+  writeCanonicalJsonNoReplace({outputPath:path,artifact:p,label:'next component profile',maximumBytes:INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES});
   const next=createComponentInstructionLoopConfiguration(path),nextPath=join(outputRoot,'config.json');
-  writeCanonicalJsonNoReplace({outputPath:nextPath,artifact:next,label:'next component configuration',maximumBytes:16*1024*1024});
+  writeCanonicalJsonNoReplace({outputPath:nextPath,artifact:next,label:'next component configuration',maximumBytes:INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES});
   return {status:'prepared',profile_path:path,config_path:nextPath,run_root:join(outputRoot,'run'),models_started:false,approval_carried_forward:false};
 }
