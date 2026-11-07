@@ -1,3 +1,4 @@
+import {readInstructionLoopJson as readJsonFileStrict,readInstructionLoopBytes as readStableBytes,INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES} from './instruction-loop-artifact.mjs';
 // Host-configured local process transport. Workers receive request/result paths;
 // they publish terminal results themselves so coordinator loss does not require
 // replaying an expensive or mutating operation. No shell or model-selected code.
@@ -5,8 +6,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, closeSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { canonicalDigest, assertNoSymlinkPathSegments, readStableBytes,
-  readJsonFileStrict, writeCanonicalJsonNoReplace } from './content-addressed-store.mjs';
+import {canonicalDigest,stableCanonicalJson,assertNoSymlinkPathSegments,writeCanonicalJsonNoReplace} from './content-addressed-store.mjs';
 import { instructionBytesDigest } from './instruction-environment.mjs';
 
 const kinds=['generate','register','select','trial','report','plan','apply','version','cleanup','restore'];
@@ -27,6 +27,9 @@ export function createInstructionLoopCommandRuntime({definition,modelCallsAuthor
 export function createPracticalEvaluationCommandRuntime({definition,modelCallsAuthorized=false}){
   const requiredKinds=definition.commands.assess?['trial','assess']:['trial'];
   return createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKinds});
+}
+export function createReferenceScoringCommandRuntime({definition,modelCallsAuthorized=false}){
+  return createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKinds:['grade']});
 }
 function createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKinds}){
   definition=JSON.parse(JSON.stringify(definition));checkedDefinition(definition,requiredKinds);
@@ -70,6 +73,7 @@ function createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKin
   function preflight(job,{root}){
     const command=definition.commands[job.kind];verifyPins(command);
     assert.ok(!command.model_calls||modelCallsAuthorized,'model calls not authorized for this runtime');
+    assert.ok(Buffer.byteLength(stableCanonicalJson(job))+1<=INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES,'loop request exceeds16MiB');
     assert.ok(!existsSync(folder(job,root)),'loop job already allocated; inspect before dispatch');
   }
   async function execute(job,{root}){
@@ -78,7 +82,7 @@ function createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKin
     mkdirSync(join(root,'jobs'),{recursive:true,mode:0o700});
     mkdirSync(directory,{mode:0o700}); // Existing allocation is never retried.
     const request=join(directory,'request.json'),result=join(directory,'result.json');
-    writeCanonicalJsonNoReplace({outputPath:request,artifact:job,label:'loop worker request'});
+    writeCanonicalJsonNoReplace({outputPath:request,artifact:job,label:'loop worker request',maximumBytes:INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES});
     const out=openSync(join(directory,'stdout.log'),'wx',0o600),err=openSync(join(directory,'stderr.log'),'wx',0o600);
     try{
       const child=spawn(command.argv[0],[...command.argv.slice(1),request,result],{

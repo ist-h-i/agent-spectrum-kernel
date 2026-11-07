@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {readInstructionLoopJson,INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES} from './instruction-loop-artifact.mjs';
 // Actual invocation of the existing #452 Codex generation connector, rather
 // than treating generation-prepare/import as model execution. Its existing v1
 // fixed-inventory instruction contract remains unchanged.
@@ -28,10 +29,10 @@ export async function generateInstructionLoopCandidate({contextPath,contextDiges
     imported:result.imported,owned_staging:staging,execution:result.execution,formal_admission_implied:false};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
-  const [contextPath,contextDigest,request,resultFile]=process.argv.slice(2),job=readJsonFileStrict(request);
+  const [contextPath,contextDigest,request,resultFile]=process.argv.slice(2),job=readInstructionLoopJson(request);
   try{
     const output=await generateInstructionLoopCandidate({contextPath,contextDigest,job});
-    writeCanonicalJsonNoReplace({outputPath:resultFile,artifact:{request_digest:canonicalDigest(job),status:'completed',output},label:'generation loop result'});
+    writeCanonicalJsonNoReplace({outputPath:resultFile,artifact:{request_digest:canonicalDigest(job),status:'completed',output},label:'generation loop result',maximumBytes:INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES});
   }catch(error){
     writeCanonicalJsonNoReplace({outputPath:resultFile,artifact:{request_digest:canonicalDigest(job),status:'failed',output:{reason:String(error.message).slice(0,2048)}},label:'generation loop failure'});
     process.exitCode=1;

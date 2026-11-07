@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {readInstructionLoopJson,readInstructionLoopBytes,INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES} from './instruction-loop-artifact.mjs';
 // Reference worker for caller-owned public tasks/checks. No private ASK grader
 // or built-in quality score is needed. Model/provider adapters can also implement
 // the same durable trial/inspect protocol using their own closure receipts.
@@ -55,7 +56,7 @@ async function command(definition,workspace,label,job,frozenFiles=[]){
   assert.equal(resolve(definition.argv[0]),definition.argv[0]);
   assert.ok(Array.isArray(definition.pins)&&definition.pins.length);
   for(const pin of definition.pins){
-    assert.equal(hash(readStableBytes(pin.path,'practical command pin')),pin.digest,'practical command drift');
+    assert.equal(hash(readInstructionLoopBytes(pin.path,'practical command pin')),pin.digest,'practical command drift');
     // A pinned source may also be copied into the editable task workspace.
     // Verify that actual executable criterion, not just its untouched source.
     for(const file of frozenFiles.filter(file=>resolve(file.source)===resolve(pin.path))){
@@ -153,20 +154,20 @@ export async function executePracticalEvaluationWorker(settings,job,resultPath){
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [settingsPath,settingsDigest,action,requestPath,resultPath]=process.argv.slice(2);
   try{
-    assert.equal(hash(readStableBytes(settingsPath,'practical worker settings')),settingsDigest);
-    const job=readJsonFileStrict(requestPath),receipt=join(dirname(resultPath),'local-completion.json');
+    assert.equal(hash(readInstructionLoopBytes(settingsPath,'practical worker settings')),settingsDigest);
+    const job=readInstructionLoopJson(requestPath),receipt=join(dirname(resultPath),'local-completion.json');
     if(action==='inspect'){
-      if(existsSync(receipt)){const result=readJsonFileStrict(receipt);assert.equal(result.request_digest,canonicalDigest(job));
+      if(existsSync(receipt)){const result=readInstructionLoopJson(receipt);assert.equal(result.request_digest,canonicalDigest(job));
         writeCanonicalJsonNoReplace({outputPath:resultPath,artifact:result,label:'recovered practical worker result'});}
     }else{
-      assert.equal(action,'execute');const result=await executePracticalEvaluationWorker(readJsonFileStrict(settingsPath),job,resultPath);
+      assert.equal(action,'execute');const result=await executePracticalEvaluationWorker(readInstructionLoopJson(settingsPath),job,resultPath);
       writeCanonicalJsonNoReplace({outputPath:receipt,artifact:result,label:'practical command completion'});
       writeCanonicalJsonNoReplace({outputPath:resultPath,artifact:result,label:'practical worker result'});
     }
   }catch(error){
     // A pre-dispatch failure has positive local evidence of no command start.
     // Otherwise retain uncertainty; never infer closure from a worker exit.
-    try{const job=readJsonFileStrict(requestPath),directory=dirname(resultPath),noStart=!existsSync(join(directory,'task-started.json'));
+    try{const job=readInstructionLoopJson(requestPath),directory=dirname(resultPath),noStart=!existsSync(join(directory,'task-started.json'));
       const task=existsSync(join(directory,'task-completion.json'))?readJsonFileStrict(join(directory,'task-completion.json')):null;
       const gradeStarted=existsSync(join(directory,'grade-started.json')),grade=existsSync(join(directory,'grade-completion.json'))?readJsonFileStrict(join(directory,'grade-completion.json')):null;
       const closed=noStart||task?.ready_for_next_root===true&&(!gradeStarted||grade?.ready_for_next_root===true);

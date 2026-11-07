@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {readInstructionLoopJson} from './instruction-loop-artifact.mjs';
 // Operator entry point. A config is trusted local executable configuration, not
 // an imported candidate artifact. Human flags must be supplied by the host.
 import assert from 'node:assert/strict';
@@ -9,6 +10,7 @@ import {readRunJournal,appendRunJournal,lockRunJournal} from './instruction-run-
 import {advanceInstructionLoopOperation,inspectInstructionLoopOperation} from './instruction-loop-operation.mjs';
 import {prepareNextComponentInstructionLoopConfiguration} from './instruction-loop-component-continuation.mjs';
 import { prepareNextNativeInstructionLoopConfiguration,createNativeInstructionLoopConfiguration,inspectInstructionLoopReadiness } from './instruction-loop-native-configuration.mjs';
+import {prepareFailedInstructionLoopConfiguration} from './instruction-loop-failed-preparation.mjs';
 import { advanceSupervisedInstructionLoop, inspectSupervisedInstructionLoop, prepareNextSupervisedInstructionLoop } from './supervised-instruction-loop.mjs';
 const args=process.argv.slice(2),command=args.shift(),options={};
 try{
@@ -22,7 +24,7 @@ try{
   else if(['authoring-request','authoring-claim','authoring-complete'].includes(command)){
     const allowed=['--root','--config',...(command==='authoring-claim'?['--claim','--allow-model-calls']:command==='authoring-complete'?['--submission']:[])];
     assert.ok(Object.keys(options).every(k=>allowed.includes(k)));assert.ok(options['--config']);
-    const config=readJsonFileStrict(resolve(options['--config']));assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
+    const config=readInstructionLoopJson(resolve(options['--config']));assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
     const runtime=createConfiguredInstructionLoopRuntime({definition:config.runtime,modelCallsAuthorized:options['--allow-model-calls']===true});
     runtime.validateCoordinatorRoot(root);
     assertNoSymlinkPathSegments(root,'host authoring coordinator');
@@ -34,11 +36,11 @@ try{
       let result;
       if(command==='authoring-request')result=runtime.authoringRequest(state.pending,{root});
       else if(command==='authoring-claim'){
-        assert.ok(options['--claim']);result=runtime.authoringClaim(state.pending,readJsonFileStrict(resolve(options['--claim'])),{root});
+        assert.ok(options['--claim']);result=runtime.authoringClaim(state.pending,readInstructionLoopJson(resolve(options['--claim'])),{root});
         state.authoring_progress.claim_digest=result.claim_digest;state.authoring_progress.completion_state='claimed_completion_unknown';
         appendRunJournal(root,'host_authoring_claimed',state,{result});
       }else{
-        assert.ok(options['--submission']);result=runtime.authoringComplete(state.pending,readJsonFileStrict(resolve(options['--submission'])),{root});
+        assert.ok(options['--submission']);result=runtime.authoringComplete(state.pending,readInstructionLoopJson(resolve(options['--submission'])),{root});
         state.authoring_progress.completion_digest=result.completion_digest;
         appendRunJournal(root,'host_authoring_completion',state,{result});
       }
@@ -72,14 +74,20 @@ try{
   }
   else if(command==='next-policy'){
     assert.deepEqual(Object.keys(options).sort(),['--config','--root']);
-    const config=readJsonFileStrict(resolve(options['--config']));
+    const config=readInstructionLoopJson(resolve(options['--config']));
     assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
     console.log(JSON.stringify(prepareNextSupervisedInstructionLoop({root,nextPolicy:config.policy}),null,2));
+  }
+  else if(command==='recover-preparation'){
+    assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--replacement-profile','--output-root','--id'].includes(k)));
+    assert.ok(options['--profile']&&options['--config']&&options['--output-root']&&options['--id']);
+    console.log(JSON.stringify(prepareFailedInstructionLoopConfiguration({root,profilePath:options['--profile'],configPath:options['--config'],
+      replacementProfilePath:options['--replacement-profile']??options['--profile'],outputRoot:options['--output-root'],id:options['--id']}),null,2));
   }
   else if(command==='next'){
     assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--output-root','--id','--feedback'].includes(k)));
     assert.ok(options['--profile']&&options['--config']&&options['--output-root']&&options['--id']);
-    const profile=readJsonFileStrict(resolve(options['--profile']));
+    const profile=readInstructionLoopJson(resolve(options['--profile']));
     const prepare=profile.kind==='component_practical_instruction_loop_profile_v1'?prepareNextComponentInstructionLoopConfiguration:prepareNextNativeInstructionLoopConfiguration;
     console.log(JSON.stringify(prepare({root,profilePath:resolve(options['--profile']),
       configPath:resolve(options['--config']),
@@ -89,7 +97,7 @@ try{
   else{
     assert.equal(command,'advance');assert.ok(options['--config']);
     assert.ok(Object.keys(options).every(k=>['--root','--config','--allow-model-calls','--request-restore','--decision','--packet','--reason','--import','--assessment'].includes(k)));
-    const config=readJsonFileStrict(resolve(options['--config']));
+    const config=readInstructionLoopJson(resolve(options['--config']));
     assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
     const runtime=createConfiguredInstructionLoopRuntime({definition:config.runtime,modelCallsAuthorized:options['--allow-model-calls']===true});
     const decision=options['--decision']?{disposition:options['--decision'],packet_digest:options['--packet'],reason:options['--reason']}:null;
@@ -97,7 +105,7 @@ try{
     const result=await advanceSupervisedInstructionLoop({root,policy:config.policy,runtime,decision,
       requestRestore:options['--request-restore']===true,
       assessment:options['--assessment']?readJsonFileStrict(resolve(options['--assessment'])):null,
-      completedImport:options['--import']?readJsonFileStrict(resolve(options['--import'])):null});
+      completedImport:options['--import']?readInstructionLoopJson(resolve(options['--import'])):null});
     console.log(JSON.stringify({...result,pending_packet_digest:result.pending_gate?canonicalDigest(result.pending_gate):null},null,2));
   }
 }catch(error){console.error(String(error.message));process.exitCode=1;}

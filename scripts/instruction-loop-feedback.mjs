@@ -1,6 +1,7 @@
 // Work summaries are explicitly supplied by the host. Never scrape task logs.
 import assert from 'node:assert/strict';
 import { canonicalDigest } from './content-addressed-store.mjs';
+import {fixedPointReferenceSummary,validateFixedPointReferenceSummary} from './instruction-loop-fixed-scoring.mjs';
 import { validatePersonalEvolutionObservation } from './ask-personal-evolution-observation.mjs';
 
 const destinations = {
@@ -74,6 +75,7 @@ export function summarizeInstructionLoopEvaluation(report){
       c.outcome=practical?outcome(a.observation.outcome):a.state!=='completed'?'unknown':a.unmet_points>0||a.mandatory_final_validation===false?'fail':a.unknown_points>0||a.mandatory_final_validation!==true?'unknown':a.confirmed_points===a.maximum_points?'pass':'unknown';
       c.selected_result_digest=practical?a.result_digest:canonicalDigest(a);
       c.metrics=Object.fromEntries(evaluationMetrics.map(k=>[k,numberOrNull(practical?a.observation.metrics[k]:k==='duration_ms'?(a.cli_seconds==null?null:a.cli_seconds*1000):a[k==='input_tokens'?'root_input_tokens':'root_output_tokens'])]));
+      if(!practical&&a.fixed_reference)c.fixed_reference=fixedPointReferenceSummary(a.fixed_reference);
       if(!practical)c.reference_points=Object.fromEntries(['confirmed','unknown','unmet','maximum'].map(k=>[k,numberOrNull(a[k+'_points'])]));
     }
   }
@@ -105,7 +107,8 @@ export function validateInstructionEvaluationSummary(s,reportDigest){
     const key=JSON.stringify([c.case_id,c.repetition]);assert.ok(!seen.has(key));seen.add(key);
     assert.ok(Array.isArray(c.conditions)&&c.conditions.length>0&&c.conditions.length<=2);const conditions=new Set();
     for(const v of c.conditions){
-      keys(v,['condition','outcome','attempt_count','excluded_count','execution_failures','selected_result_digest','metrics','reference_points']);
+      keys(v,['condition','outcome','attempt_count','excluded_count','execution_failures','selected_result_digest','metrics','reference_points',...(Object.hasOwn(v,'fixed_reference')?['fixed_reference']:[])]);
+      if(Object.hasOwn(v,'fixed_reference'))validateFixedPointReferenceSummary(v.fixed_reference);
       assert.ok(['baseline','candidate','challenger'].includes(v.condition)&&!conditions.has(v.condition));conditions.add(v.condition);
       assert.ok(['pass','fail','unknown','not_selected'].includes(v.outcome));integer(v.attempt_count);integer(v.excluded_count);integer(v.execution_failures);
       assert.ok(v.attempt_count>0&&v.excluded_count<=v.attempt_count&&v.execution_failures<=v.attempt_count);
@@ -162,6 +165,14 @@ export function projectInstructionLoopObservation(observation) {
     for (const v of [selected.summary.correction, selected.summary.intended_mechanism, selected.summary.applicability,
       ...selected.summary.non_applicability]) assertPublicInstructionSummary(v);
     return { goal: body.goal, tags: body.tags, feedback_digest, selected };
+  }
+  if(observation.kind==='instruction_loop_recovery_v1'){
+    assert.deepEqual(Object.keys(observation).sort(),['feedback','kind','previous']);
+    const feedback=projectInstructionLoopObservation(observation.feedback),p=observation.previous;
+    assert.deepEqual(Object.keys(p).sort(),['run_id','journal_digest','policy_digest','failed_stage','failed_job_digest','result_digest','reason_summary','previous_state_completed','approval_carried_forward'].sort());
+    assert.match(p.run_id,/^[A-Za-z0-9._-]+$/u);for(const key of ['journal_digest','policy_digest','failed_job_digest','result_digest'])assert.match(p[key],/^sha256:[a-f0-9]{64}$/u);
+    assert.ok(['generate','register','select'].includes(p.failed_stage));assert.equal(p.previous_state_completed,false);assert.equal(p.approval_carried_forward,false);assertPublicInstructionSummary(p.reason_summary);
+    return {...feedback,previous_failed_run:structuredClone(p)};
   }
   if (observation.kind === 'instruction_loop_continuation_v1') {
     assert.deepEqual(Object.keys(observation).sort(), ['feedback', 'kind', 'previous']);

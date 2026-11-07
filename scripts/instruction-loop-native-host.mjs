@@ -1,3 +1,4 @@
+import {readInstructionLoopJson,INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES} from './instruction-loop-artifact.mjs';
 // Concrete Full/native/reference bindings for the supervised controller.
 // Native execution still uses the original Python runner/control/monitor.
 import assert from 'node:assert/strict';
@@ -16,13 +17,14 @@ import {transitionInstructionLoopAssets} from './instruction-loop-assets.mjs';
 import {verifyRetainedInstructionLayout} from './retained-instruction-layout.mjs';
 import {verifyAssetRegistry} from './asset-registry.mjs';
 import {bindMeasuredNormalOwnerSource} from './instruction-loop-source-binding.mjs';
+import {runInstructionReferenceScoring} from './instruction-loop-reference-scoring-runtime.mjs';
 import {bindNativePublicInputs} from './instruction-loop-native-public-inputs.mjs';
 import {projectInstructionLoopObservation} from './instruction-loop-feedback.mjs';
 const pause=()=>new Promise(r=>setTimeout(r,500));
 const checked=r=>{assert.equal(hash(readStableBytes(r.path,'pinned native host input',16*1024*1024)),r.digest,'native host input drift');return readJsonFileStrict(r.path,'pinned native host input',16*1024*1024);};
-const save=(path,artifact)=>writeCanonicalJsonNoReplace({outputPath:path,artifact,label:'native loop stage result',maximumBytes:16*1024*1024});
+const save=(path,artifact)=>writeCanonicalJsonNoReplace({outputPath:path,artifact,label:'native loop stage result',maximumBytes:INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES});
 const preparedPath=p=>join(p.stateRoot,'native-selection.json');
-function publication(path,result){if(existsSync(path)){assert.equal(canonicalDigest(readJsonFileStrict(path)),canonicalDigest(result),'terminal result conflict');return;}save(path,result);}
+function publication(path,result){if(existsSync(path)){assert.equal(canonicalDigest(readInstructionLoopJson(path)),canonicalDigest(result),'terminal result conflict');return;}save(path,result);}
 function sourceInputs(p){
   assert.ok(['full_native_reference_loop_profile_v1','full_practical_instruction_loop_profile_v1'].includes(p.kind));
   assert.equal(p.generator.storeRoot,p.storeRoot);
@@ -49,7 +51,7 @@ async function readTrial(p,job,recovered=false){
   return {...c,ready_for_next_root:true,execution_kind:p.native.executionKind,root_usage:c.root_usage,
     full_hierarchical_usage:null,recovered_from_native_records:recovered};
 }
-export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthorized=false}={}){
+export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthorized=false,inspectOnly=false}={}){
   sourceInputs(p);mkdirSync(p.stateRoot,{recursive:true,mode:0o700});
   if(job.kind==='generate'){
     assert.equal(canonicalDigest(job.input.observation),canonicalDigest(p.policy.observation),'controller observation differs from pinned profile');
@@ -97,7 +99,7 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
   if(job.kind==='trial'){
     assert.equal(job.input.evaluation_decision.disposition,'approved');
     if(p.native.executionKind==='real_codex')assert.equal(modelCallsAuthorized,true,'new implementation model trial not authorized');
-    assert.equal(canonicalDigest(job.input.selection),canonicalDigest(readJsonFileStrict(preparedPath(p))),'approved native selection drift');
+    assert.equal(canonicalDigest(job.input.selection),canonicalDigest(readInstructionLoopJson(preparedPath(p))),'approved native selection drift');
     const config=readJsonFileStrict(join(p.native.root,'config.json'),'prepared native configuration',16*1024*1024),row=config.rows.find(r=>r.trial_id===job.input.row.id);assert.ok(row);
     assert.equal(row.fixture_id,job.input.row.case.id);assert.equal(row.variant,job.input.row.condition);assert.equal(row.repetition,job.input.row.repetition);
     // The original control repeats the same nonblocking mutex check atomically
@@ -118,8 +120,12 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
       await pause();}
   }
   if(job.kind==='report'){
-    const report=buildInstructionLoopReferenceReport({...p.report,storeRoot:p.storeRoot,planObjectDigest:job.input.selection.execution_binding.plan_object_digest,
+    const scored=await runInstructionReferenceScoring(p,job,{modelCallsAuthorized,inspectOnly});
+    if(scored===null)return {report_pending:true};
+    const report=buildInstructionLoopReferenceReport({...p.report,...(p.report.fixedScoring?{fixedScoring:{...p.report.fixedScoring,assessments:scored.assessments}}:{}),storeRoot:p.storeRoot,planObjectDigest:job.input.selection.execution_binding.plan_object_digest,
       trustedAssetAuthorityContexts:p.generator.trustedAuthorityContexts??[],executionKind:p.native.executionKind});
+    report.fixed_scoring_execution=scored.execution;
+    if(scored.execution?.output_issue||scored.execution?.status==='failed')report.limits=[...(report.limits??[]),'Fixed reference grading has no usable optional judgments; retained trial evidence remains available and missing source quality stays Unknown.'];
     report.worker_incidents=job.input.trials.filter(t=>t.transport_interruption).map(t=>({trial_id:t.trial_id,transport_interruption:t.transport_interruption,
       root_result:t.state,recovered_from_native_records:t.recovered_from_native_records}));
     report.measured_context=`Full frozen native snapshot; declared supporting context is retained. Normal owner uses the existing source-backed installer projection. Candidate source ${job.input.candidate.source_revision}; no performance claim for a different projection.`;
@@ -133,7 +139,7 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
       const retirement=job.input.retirement;assert.ok(retirement,'candidate retirement must precede disposal');
       const assets=verifyAssetRegistry({storeRoot:p.storeRoot,snapshotDigest:retirement.snapshot_digest,trustedAuthorityContexts:retirement.trusted_authority_contexts}).assets;
       assert.ok(job.input.candidate.candidate_assets.every(a=>assets.some(e=>e.record_digest===a.record_digest&&e.state==='retired')),'candidate is still active');
-      const owned=readJsonFileStrict(join(p.stateRoot,'owned-version.json'));assert.equal(owned.path,p.generator.candidateRoot);
+      const owned=readInstructionLoopJson(join(p.stateRoot,'owned-version.json'));assert.equal(owned.path,p.generator.candidateRoot);
       assert.equal(canonicalDigest(owned),job.input.candidate.owned_version.manifest_digest,'owned version manifest drift');
       const state=await import(pathToFileURL(join(owned.path,'scripts/ask-setup-apply-state.mjs')).href);
       assert.ok(state.managedSetupIdentities(p.normal.target).every(i=>i.source_revision!==owned.source_revision),'candidate is still installed on the scoped owner');
@@ -156,8 +162,13 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
 export async function nativeInstructionLoopWorker({profile,job,resultPath,action='execute',modelCallsAuthorized=false}){
   sourceInputs(profile);mkdirSync(profile.stateRoot,{recursive:true,mode:0o700});
   const sidecar=join(profile.stateRoot,'stage-'+canonicalDigest(job).slice(7)+'.json');
-  if(existsSync(sidecar)){const result=readJsonFileStrict(sidecar);assert.equal(result.request_digest,canonicalDigest(job));publication(resultPath,result);return;}
+  if(existsSync(sidecar)){const result=readInstructionLoopJson(sidecar);assert.equal(result.request_digest,canonicalDigest(job));publication(resultPath,result);return;}
   if(action==='inspect'){
+    if(job.kind==='report'&&profile.report.referenceScoringCommand){
+      let out;try{out=await executeNativeInstructionLoopStage(profile,job,{inspectOnly:true});}
+      catch(error){if(error.code==='REFERENCE_SCORING_PENDING')return;throw error;}
+      if(!out.report_pending){const result={request_digest:canonicalDigest(job),status:'completed',output:out};publication(sidecar,result);publication(resultPath,result);}
+    }
     if(job.kind==='trial'){const out=await readTrial(profile,job,true);if(out){const result={request_digest:canonicalDigest(job),status:out.state==='completed'?'completed':'failed',output:out};publication(sidecar,result);publication(resultPath,result);}}
     return; // Other unknown partial operations remain uncertain; no replay.
   }
@@ -167,5 +178,11 @@ export async function nativeInstructionLoopWorker({profile,job,resultPath,action
     if(output.worker_exit_without_result){process.exitCode=83;return;}
     const result={request_digest:canonicalDigest(job),status:output.state==='failed_or_interrupted'?'failed':'completed',output};
     publication(sidecar,result);publication(resultPath,result);
-  }catch(error){const result={request_digest:canonicalDigest(job),status:'failed',output:{reason:String(error.message).slice(0,2048)}};publication(sidecar,result);publication(resultPath,result);process.exitCode=1;}
+  }catch(error){if(job.kind==='report'&&error.code==='REFERENCE_SCORING_PENDING'){
+      // Exit normally without a terminal result; later positive grade receipts
+      // must not be downgraded by a failed outer transport or re-dispatched.
+      const path=join(profile.stateRoot,'stage-'+canonicalDigest(job).slice(7)+'-grading-pending.json');
+      if(!existsSync(path))publication(path,{request_digest:canonicalDigest(job),status:'pending_reference_scoring',reason:String(error.message).slice(0,512)});return;
+    }
+    const result={request_digest:canonicalDigest(job),status:'failed',output:{reason:String(error.message).slice(0,2048)}};publication(sidecar,result);publication(resultPath,result);process.exitCode=1;}
 }

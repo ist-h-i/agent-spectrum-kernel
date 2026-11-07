@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {readInstructionLoopJson,readInstructionLoopBytes,INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES} from './instruction-loop-artifact.mjs';
 // Optional automatic AI port. The current host AI may instead submit the same
 // assessment through the CLI, without adding a third human approval gate.
 import assert from 'node:assert/strict';
@@ -27,8 +28,8 @@ export async function assessPracticalEvaluation(settings,job,resultPath){
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [settingsPath,settingsDigest,requestPath,resultPath]=process.argv.slice(2);
-  try{assert.equal(hash(readStableBytes(settingsPath,'recovery provider settings')),settingsDigest);
-    const result=await assessPracticalEvaluation(readJsonFileStrict(settingsPath),readJsonFileStrict(requestPath),resultPath);
-    writeCanonicalJsonNoReplace({outputPath:resultPath,artifact:result,label:'AI evaluation recovery result'});
+  try{assert.equal(hash(readInstructionLoopBytes(settingsPath,'recovery provider settings')),settingsDigest);
+    const result=await assessPracticalEvaluation(readInstructionLoopJson(settingsPath),readInstructionLoopJson(requestPath),resultPath);
+    writeCanonicalJsonNoReplace({outputPath:resultPath,artifact:result,label:'AI evaluation recovery result',maximumBytes:INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES});
   }catch(error){console.error(String(error.message));process.exitCode=1;}
 }
