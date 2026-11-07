@@ -11,6 +11,7 @@ import {instructionBytesDigest as hash,captureInstructionEnvironment} from './in
 import {captureRetainedInstructionLayout,retainedInstructionPath} from './retained-instruction-layout.mjs';
 import {verifyAssetRegistry,registerAsset} from './asset-registry.mjs';
 import {executeCodexSession} from './codex-exec-runner.mjs';
+import {readStableFile} from './ask-benchmark-stable-file.mjs';
 import {projectInstructionLoopObservation} from './instruction-loop-feedback.mjs';
 
 const gitEnv=()=>({...Object.fromEntries(['PATH','TMPDIR','LANG','TZ'].filter(k=>process.env[k]).map(k=>[k,process.env[k]])),
@@ -22,7 +23,7 @@ export function fullInstructionInventory(root,relative=''){
     if(name==='.git')return [];
     const path=relative?relative+'/'+name:name,s=lstatSync(join(root,path));assert.ok(!s.isSymbolicLink(),'Full source symlink');
     if(s.isDirectory())return fullInstructionInventory(root,path);
-    assert.ok(s.isFile());const b=readStableBytes(join(root,path),'Full source file',16*1024*1024);
+    assert.ok(s.isFile());const b=readStableFile(join(root,path),'Full source file',16*1024*1024).bytes;
     return [{path,bytes:b.length,mode:s.mode&0o777,sha256:hash(b)}];
   }).sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
 }

@@ -38,7 +38,9 @@ Acceptance and Formal Verification Contract:
   runtime behavior, effectiveness, complete usage or actual instruction use.
 - S06: Focused regressions cover invalid contracts, missing history before a
   provider call, report refresh, writer changes to validator/installer/untracked
-  files or file modes, owned receipt cleanup and legacy compatibility.
+  files or file modes, legitimate empty tracked source support files, owned
+  receipt cleanup and legacy compatibility. Empty placeholders retain their
+  exact hash/mode; executable validation inputs still require nonempty bytes.
 
 Implementation Contract:
 

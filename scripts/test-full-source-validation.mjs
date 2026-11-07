@@ -8,10 +8,11 @@ import {prepareGitBaseline} from './ask-user-comparison-prepare.mjs';
 import {generateFullInstructionCandidate,fullGenerationInput} from './instruction-loop-full-candidate.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {cleanOwnedInstructionLoopStaging} from './instruction-loop-normal-owner-worker.mjs';
-function fixture(t,{writerSuffix='',validatorSuffix=''}={}){
+function fixture(t,{writerSuffix='',validatorSuffix='',emptySupport=false}={}){
  const root=realpathSync(mkdtempSync(join(tmpdir(),'ask-full-validation-')));t.after(()=>rmSync(root,{recursive:true,force:true}));
  const base=join(root,'base');mkdirSync(join(base,'skills/demo'),{recursive:true});
  writeFileSync(join(base,'AGENTS.md'),'Synthetic Full instructions.\n');writeFileSync(join(base,'skills/demo/SKILL.md'),'## Goal\nOriginal instruction.\n');
+ if(emptySupport){mkdirSync(join(base,'benchmarks'));writeFileSync(join(base,'benchmarks/.gitkeep'),Buffer.alloc(0));}
  const ancestor=prepareGitBaseline(base);mkdirSync(join(base,'scripts'));mkdirSync(join(base,'docs/fixtures'),{recursive:true});
  writeFileSync(join(base,'docs/validation-report.md'),'stale report');
  for(const name of ['adapter-runtime-evidence.json','adapter-runtime-profiles.json'])writeFileSync(join(base,'docs/fixtures',name),'{}');
@@ -59,6 +60,12 @@ test('shallow baseline and unknown validation contracts stop before provider dis
 test('legacy source generation keeps validation optional and its original derived paths',async t=>{
  const {p}=fixture(t);delete p.sourceValidation;assert.equal(fullGenerationInput(p).source_validation,undefined);
  const c=await generateFullInstructionCandidate(p,provider('Legacy unconstrained text.\n'));assert.equal(c.source_validation,undefined);assert.ok(!c.derived_binding_paths.includes('docs/validation-report.md'));
+});
+test('a legitimate empty tracked source support file is preserved and fingerprinted without changing its bytes',async t=>{
+ const {p}=fixture(t,{emptySupport:true});const c=await generateFullInstructionCandidate(p,provider('## Goal\nChanged.\n'));
+ assert.equal(c.source_validation.status,'passed');assert.equal(readFileSync(join(p.candidateRoot,'benchmarks/.gitkeep')).length,0);
+ const {fullInstructionInventory}=await import('./instruction-loop-full-candidate.mjs'),file=fullInstructionInventory(p.candidateRoot).find(f=>f.path==='benchmarks/.gitkeep');
+ assert.equal(file.bytes,0);assert.equal(file.sha256,hash(Buffer.alloc(0)));
 });
 test('fixture writer cannot replace the validator before it executes',async t=>{
  const {p}=fixture(t,{writerSuffix:`writeFileSync(new URL('../scripts/validate-repo.mjs',import.meta.url),"import{writeFileSync}from'node:fs';writeFileSync(new URL('../forbidden-validator-ran',import.meta.url),'bad');");`});
