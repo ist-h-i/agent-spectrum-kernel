@@ -83,7 +83,8 @@ function originalContract(s,a,c,root){
  assert.equal(primary.terminal,true);assert.equal(primary.completed,true);assert.equal(summary.calls[0].terminal,true);assert.equal(summary.calls[0].completed,true);
  assert.ok(same(primary.metrics??null,summary.calls[0].metrics??null),'primary metrics differ from original bound grade summary');
  assert.ok(primary.text&&JSON.parse(primary.text));assert.equal(existsSync(join(base,'private-grade/verification-backend.json')),false,'original verifier slot already consumed');
- for(const p of grader.pins)verifyRef(p);
+ // Runtime pins may carry a Python module alias; preserve the original metadata.
+ for(const p of grader.pins)verifyRef({path:p.path,digest:p.digest});
  const spec=s.plan.cases.find(v=>v.id===a.row.case_id);assert.equal(spec.public_input_digest,a.row.public_input_digest);
  assert.equal(canonicalDigest(worker.cases[a.row.case_id].files.map(({target,digest})=>({target,digest}))),spec.public_input_digest,'original public input mismatch');
  return {worker:workerRef,grader_settings:c.grader_settings,grader_pins:grader.pins,summary:summaryRef,dispatch:ref(dispatchPath),primary:ref(primaryPath),packet:ref(packetPath),

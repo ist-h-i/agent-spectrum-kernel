@@ -10,7 +10,7 @@ import {prepareNextSupervisedInstructionLoop} from './supervised-instruction-loo
 const write=(p,v)=>{mkdirSync(join(p,'..'),{recursive:true});writeFileSync(p,JSON.stringify(v));};
 const pin=p=>({path:p,digest:hash(readFileSync(p))});
 const phase={ready_for_next_root:true,process_group_closed:true,provider_terminal_confirmed:true,exit_code:0};
-function fixture(t,{emptyPin=false}={}){
+function fixture(t,{emptyPin=false,modulePin=false}={}){
  const dir=realpathSync(mkdtempSync(join(tmpdir(),'ask-grade-supplement-')));t.after(()=>rmSync(dir,{recursive:true,force:true}));const root=join(dir,'run'),parent=join(dir,'operation/first-run');mkdirSync(root);mkdirSync(parent,{recursive:true});
  const settings=join(dir,'grader.json');write(settings,{config:{model:'synthetic',reasoning:'low'},backend:{kind:'synthetic'}});
  const workerFile=join(dir,'practical-worker.json'),publicInput=join(dir,'public.json');write(publicInput,{public:true});
@@ -19,7 +19,7 @@ function fixture(t,{emptyPin=false}={}){
  write(settings,{kind:'host_business_practical_grader_v1',task_id:'case',fixture_id:'case',public_files:files,config:{model:'synthetic',reasoning:'low',capsuleRoot,replyRoot},backend:{kind:'synthetic'}});
  const row={id:'row',block_id:'case.r1',case_id:'case',condition:'baseline',repetition:1,public_input_digest:canonicalDigest(files.map(({target,digest})=>({target,digest})))};
  const empty=join(dir,'empty-dependency.txt');if(emptyPin)writeFileSync(empty,Buffer.alloc(0));
- write(workerFile,{cases:{case:{files,grader:{argv:[process.execPath,'synthetic-grader',settings,pin(settings).digest],pins:[pin(settings),...(emptyPin?[pin(empty)]:[])],model_calls:false}}}});
+ write(workerFile,{cases:{case:{files,grader:{argv:[process.execPath,'synthetic-grader',settings,pin(settings).digest],pins:[pin(settings),...(emptyPin?[pin(empty)]:[]),...(modulePin?[{...pin(publicInput),module:'synthetic_fixed_dependency'}]:[])],model_calls:false}}}});
  const runtime={commands:{trial:{argv:[process.execPath,join(dir,'practical-evaluation-worker.mjs'),workerFile,pin(workerFile).digest],pins:[pin(workerFile)],model_calls:false}}};
  const plan={runtime_digest:canonicalDigest(runtime),goal:'Preserve quality with useful evidence.',evidence_kind:'synthetic',recovery:{max_extra_trials:0,max_retries_per_row:1,allow_reference:true,allow_exclusion:true,required_dimensions:['execution','duration','usage','quality']},conditions:[{id:'baseline',context},{id:'candidate',context}],cases:[{id:'case',public_input_digest:row.public_input_digest,success_criteria_ref:'fixture-rule'}],global_context:{ask_presence:'unknown',change_status:'unknown'}};
  const job={kind:'trial',key:'fixture',input:{row,condition_context:context}},id='fixture-attempt-1',jobRoot=join(root,'jobs',canonicalDigest(job).slice(7));mkdirSync(jobRoot,{recursive:true});
@@ -189,4 +189,9 @@ test('CLI rejects outputs inside original run or coordinators before writing or 
   }
  }
  assert.equal(existsSync(f.counter),false);assert.equal(readRunJournal(f.root).previous,before);assert.equal(existsSync(practicalGradeSupplementStore(f.root)),false);
+});
+
+test('original grader pins preserve existing module alias metadata through actual transport',async t=>{
+ const f=fixture(t,{modulePin:true});usableProvider(f);const recipe=f.recipe(),module=recipe.binding.grader_pins.find(p=>p.module);assert.equal(module.module,'synthetic_fixed_dependency');f.definition.commands.grade.pins.push(module);
+ const observed=await runPracticalGradeSupplement({recipe,definition:f.definition});assert.equal(observed.receipt.closed,true);assert.equal(observed.receipt.issue,null);assert.equal(observed.receipt.recipe.binding.grader_pins.find(p=>p.module).module,module.module);
 });
