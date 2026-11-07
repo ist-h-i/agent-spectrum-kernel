@@ -8,7 +8,7 @@ import { canonicalDigest, putContentAddressedJson, readContentAddressedJson } fr
 import { verifyInstructionEnvironment, exactInstructionAsset, instructionBytesDigest } from './instruction-environment.mjs';
 import { instructionPath, instructionTargetPath } from './instruction-projection-paths.mjs';
 import { verifyAssetRegistry, registerAsset } from './asset-registry.mjs';
-import { registerInstructionEnvironmentBundle, resolveInstructionComponents } from './instruction-environment-compiler.mjs';
+import { registerInstructionEnvironmentBundle, resolveInstructionComponents, validateInstructionComponentMappings } from './instruction-environment-compiler.mjs';
 import { projectInstructionLoopObservation, assertPublicInstructionSummary } from './instruction-loop-feedback.mjs';
 import { commitInstructionSource } from './instruction-source-version.mjs';
 import { verifyInstructionComposition } from './instruction-composition.mjs';
@@ -179,7 +179,7 @@ export function prepareInstructionEnvironmentAuthoring(options) {
     response_contract: '{request_digest, changes:[{operation:revise|create,stable_id,files:[{path,text}]}|{operation:exclude,stable_id}]}',
     excluded_assets_are_not_retired: true, raw_logs_included: false }, models_started: false, activation_implied: false };
 }
-export function importInstructionEnvironmentAuthoring(options) {
+function preparedAuthoringResponse(options) {
   const spec = readContentAddressedJson({ storeRoot: options.storeRoot, digest: options.requestObjectDigest }).value;
   const c = validateSpec(options, spec), response = structuredClone(options.response);
   keys(response, ['request_digest', 'changes']); assert.equal(response.request_digest, options.requestObjectDigest, 'authoring request transplant');
@@ -214,6 +214,18 @@ export function importInstructionEnvironmentAuthoring(options) {
     }
     prepared.push({ change, descriptor: resetClaims(descriptor), mappings, fixedFiles });
   }
+  const components=c.components.filter(a=>!response.changes.some(x=>x.operation==='exclude'&&x.stable_id===a.asset.stable_id));
+  for(const item of prepared){const next={asset:{stable_id:item.change.stable_id},files:item.mappings},i=components.findIndex(a=>a.asset.stable_id===item.change.stable_id);
+    if(i<0)components.push(next);else components[i]=next;}
+  validateInstructionComponentMappings({adapter:c.environment.adapter,components});
+  return {spec,c,response,prepared};
+}
+// Read-only admission: invalid external completions must not consume a receipt.
+export function validateInstructionEnvironmentAuthoringResponse(options) {
+  preparedAuthoringResponse(options);return {valid:true,models_started:false};
+}
+export function importInstructionEnvironmentAuthoring(options) {
+  const {spec,c,response,prepared}=preparedAuthoringResponse(options);
   const unchanged=response.changes.every(change=>change.operation==='revise'&&change.files.every(f=>{
     const component=c.components.find(a=>a.asset.stable_id===change.stable_id),asset=c.local.assets.find(a=>same(exactInstructionAsset(a),component.asset));
     return asset.content.files.find(original=>original.path===f.path)?.raw_digest===instructionBytesDigest(Buffer.from(f.text));

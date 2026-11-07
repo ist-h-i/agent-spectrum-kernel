@@ -98,7 +98,9 @@ export function createFullPracticalInstructionLoopRuntime({definition,modelCalls
 }
 export function createPracticalLifecycleRuntime({definition,modelCallsAuthorized=false,readProfile,executeStage,validateCoordinatorRoot,inspectStage=null}){
   const p=readProfile(),digest=canonicalDigest(definition);
+  const stageResult=(job,output)=>({request_digest:canonicalDigest(job),status:output?.kind==='component_authoring_pending_v1'?'awaiting_authoring':'completed',output});
   const folder=job=>join(p.stateRoot,'stages',canonicalDigest(job).slice(7)),resultPath=job=>join(folder(job),'result.json');
+  const handoffPath=job=>join(folder(job),'authoring-prepared.json');
   const prepared=job=>{const stored=readJsonFileStrict(selectionPath(p),'practical selection',16*1024*1024);assert.equal(canonicalDigest(stored),canonicalDigest(job.input.selection),'approved practical selection drift');return stored;};
   const allocate=(job,resumable=false)=>{assertNoSymlinkPathSegments(folder(job),'practical lifecycle stage',{allowMissingLeaf:true});
     mkdirSync(dirname(folder(job)),{recursive:true,mode:0o700});
@@ -123,8 +125,11 @@ export function createPracticalLifecycleRuntime({definition,modelCallsAuthorized
         return {request_digest:canonicalDigest(job),status:'resumable'};
       }
       if(inspectStage)try{
-        const output=await inspectStage(p,job,context);
-        if(output!==null){const result={request_digest:canonicalDigest(job),status:'completed',output,inspection:{recovered_from_owned_evidence:true}};save(resultPath(job),result);return result;}
+        let preparedHandoffDigest;
+        if(job.kind==='generate'&&existsSync(handoffPath(job))){const receipt=readJsonFileStrict(handoffPath(job),'prepared host handoff');
+          assert.equal(receipt.request_digest,canonicalDigest(job));assert.equal(receipt.status,'awaiting_authoring');assert.equal(receipt.output.kind,'component_authoring_pending_v1');preparedHandoffDigest=receipt.output.handoff_digest;}
+        const output=await inspectStage(p,job,{...context,preparedHandoffDigest});
+        if(output!==null){const result={...stageResult(job,output),inspection:{recovered_from_owned_evidence:true}};if(result.status==='completed')save(resultPath(job),result);return result;}
       }catch(error){
         const issue={request_digest:canonicalDigest(job),reason:String(error.message).slice(0,2048)};
         save(join(folder(job),'inspection-'+canonicalDigest(issue).slice(7)+'.json'),issue);
@@ -137,6 +142,6 @@ export function createPracticalLifecycleRuntime({definition,modelCallsAuthorized
   };
   for(const kind of stages)runtime[kind]=async(job,context={})=>{
     readProfile();allocate(job);const output=kind==='select'?prepareFullPracticalInstructionSelection(p,job):await executeStage(p,job,{...context,modelCallsAuthorized});
-    const result={request_digest:canonicalDigest(job),status:'completed',output};save(resultPath(job),result);return result;};
+    const result=stageResult(job,output);if(result.status==='completed')save(resultPath(job),result);else save(handoffPath(job),result);return result;};
   return runtime;
 }

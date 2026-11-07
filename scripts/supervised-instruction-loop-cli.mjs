@@ -3,8 +3,9 @@
 // an imported candidate artifact. Human flags must be supplied by the host.
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { canonicalDigest, readJsonFileStrict,writeCanonicalJsonNoReplace } from './content-addressed-store.mjs';
+import { canonicalDigest, readJsonFileStrict,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments } from './content-addressed-store.mjs';
 import {createConfiguredInstructionLoopRuntime} from './instruction-loop-runtime.mjs';
+import {readRunJournal,appendRunJournal,lockRunJournal} from './instruction-run-journal.mjs';
 import {advanceInstructionLoopOperation,inspectInstructionLoopOperation} from './instruction-loop-operation.mjs';
 import {prepareNextComponentInstructionLoopConfiguration} from './instruction-loop-component-continuation.mjs';
 import { prepareNextNativeInstructionLoopConfiguration,createNativeInstructionLoopConfiguration,inspectInstructionLoopReadiness } from './instruction-loop-native-configuration.mjs';
@@ -17,6 +18,32 @@ try{
   if(command==='readiness'){
     assert.deepEqual(Object.keys(options),['--profile']);assert.ok(options['--profile'],'--profile required');
     console.log(JSON.stringify(inspectInstructionLoopReadiness(resolve(options['--profile'])),null,2));
+  }
+  else if(['authoring-request','authoring-claim','authoring-complete'].includes(command)){
+    const allowed=['--root','--config',...(command==='authoring-claim'?['--claim','--allow-model-calls']:command==='authoring-complete'?['--submission']:[])];
+    assert.ok(Object.keys(options).every(k=>allowed.includes(k)));assert.ok(options['--config']);
+    const config=readJsonFileStrict(resolve(options['--config']));assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
+    const runtime=createConfiguredInstructionLoopRuntime({definition:config.runtime,modelCallsAuthorized:options['--allow-model-calls']===true});
+    runtime.validateCoordinatorRoot(root);
+    assertNoSymlinkPathSegments(root,'host authoring coordinator');
+    const unlock=lockRunJournal(root);
+    try{
+      const {state}=readRunJournal(root);assert.ok(state,'loop not initialized');assert.equal(canonicalDigest(state.policy),canonicalDigest(config.policy),'host command configuration mismatch');
+      assert.equal(state.pending?.kind,'generate','no active authoring generation');
+      assert.equal(typeof runtime.authoringRequest,'function','runtime has no external authoring port');
+      let result;
+      if(command==='authoring-request')result=runtime.authoringRequest(state.pending,{root});
+      else if(command==='authoring-claim'){
+        assert.ok(options['--claim']);result=runtime.authoringClaim(state.pending,readJsonFileStrict(resolve(options['--claim'])),{root});
+        state.authoring_progress.claim_digest=result.claim_digest;state.authoring_progress.completion_state='claimed_completion_unknown';
+        appendRunJournal(root,'host_authoring_claimed',state,{result});
+      }else{
+        assert.ok(options['--submission']);result=runtime.authoringComplete(state.pending,readJsonFileStrict(resolve(options['--submission'])),{root});
+        state.authoring_progress.completion_digest=result.completion_digest;
+        appendRunJournal(root,'host_authoring_completion',state,{result});
+      }
+      console.log(JSON.stringify(result,null,2));
+    }finally{unlock();}
   }
   else if(command==='configure'){
     assert.deepEqual(Object.keys(options).sort(),['--profile','--root']);

@@ -27,9 +27,12 @@ Claude application dispatcher inside the automatic component loop.
 
 The shipped automatic authoring and recovery-assessor model ports accept Codex,
 with explicit synthetic fixture ports for software tests. A Claude-app model
-port, normal-loop external-host authoring completion, and app-specific result/
-provider-closure capture are missing integration, not merely successful code
-awaiting authentication. Practical task execution has caller-owned pinned command
+port and app-specific result/provider-closure capture are missing integration,
+not merely successful code awaiting authentication. At the audited main baseline,
+normal-loop external-host authoring completion was also missing. The subsequent
+[`external_host` provider port](instruction-loop-host-authoring.md) connects
+durable preparation, execution claim and host-reported completion without app
+dispatch. Practical task execution has caller-owned pinned command
 ports; the retained Full/native reference runner remains Codex-specific. Existing
 restricted Claude runtime/saved-result contracts do not prove the new loop runs
 inside an authenticated Claude app.
@@ -72,9 +75,9 @@ still necessary; copying one Skill does not install the whole runtime.
 1. Finish/review the configuration-only guard/readiness follow-up and prepare
    pinned user configuration plus a human-readable exact case/change packet.
    Do not start an operational Eval while preparing.
-2. Design the external-host/Claude authoring completion port: durable request and
-   response binding, actual provider evidence, unknown completion inspection and
-   no duplicate invocation. Software fixtures may verify the protocol; no app
+2. Accept the new external-host authoring completion protocol with software
+   fixtures: durable request/claim/response binding, unknown completion inspection
+   and no duplicate claim. Actual app evidence/dispatch is still separate; no
    command/authentication convention is guessed before the owner selects it.
 3. Once resource use is coordinated with the separate36 trials and the owner
    authorizes new cases/budget, accept one Codex cycle in an isolated declared

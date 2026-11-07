@@ -10,6 +10,7 @@ import {publishInstructionComposition,registerInstructionComposition} from './in
 import {prepareInstructionEnvironmentAuthoring,importInstructionEnvironmentAuthoring} from './instruction-environment-authoring.mjs';
 import {executeCodexSession} from './codex-exec-runner.mjs';
 import {mkdirSync,lstatSync} from 'node:fs';
+import {prepareHostInstructionAuthoring,inspectHostInstructionAuthoring} from './instruction-loop-host-authoring.mjs';
 const copy=structuredClone;
 const unique=refs=>[...new Map(refs.map(r=>[canonicalDigest(r),r])).values()];
 export function componentEnvironmentOptions(p){return {...instructionEnvironmentTrustOptions(p.environmentTrust),storeRoot:p.storeRoot};}
@@ -71,10 +72,15 @@ export async function generateComponentInstructionCandidate(p,job,{modelCallsAut
       bundleDescriptor:componentBundleDescriptor(p.bundleDescriptor,composed.asset,'cycle:'+token+'.authored')};
     delete authoring.provider;
     request=prepareInstructionEnvironmentAuthoring(authoring);
+    if(p.candidate.authoring.provider.kind==='external_host')return prepareHostInstructionAuthoring(p,job,{authoring,request,continuation:{snapshot,composed,composition,layers,compositionUnchanged,imports,parent,token}});
     const generated=await componentAuthoringProvider(p.candidate.authoring.provider,{...request.generation_input,cycle_index:p.cycleIndex??0},{modelCallsAuthorized,sessionRoot:join(p.stateRoot,'generation-session')});
     execution=generated.execution;
     candidate=importInstructionEnvironmentAuthoring({...authoring,requestObjectDigest:request.request_object_digest,response:generated.response});snapshot=candidate.snapshot_digest;
   }
+  return finishComponentInstructionCandidate(p,job,{candidate,snapshot,execution,request,composition,layers,composed,compositionUnchanged,imports,parent,token,baseline});
+}
+function finishComponentInstructionCandidate(p,job,{candidate,snapshot,execution,request,composition,layers,composed,compositionUnchanged,imports,parent,token}){
+  const options=componentEnvironmentOptions(p),baseline=verifyInstructionEnvironment({...options,environmentObjectDigest:p.baselineEnvironmentObjectDigest});
   const environment=captureComponentBundle(p,snapshot,candidate.asset,p.practical.baselineRoot,'candidate-'+token);
   exportInstructionEnvironment({...options,environmentObjectDigest:environment.object_digest,outputRoot:p.candidateRoot});
   const components=candidate.components??composition.lock.components;
@@ -94,4 +100,16 @@ export async function generateComponentInstructionCandidate(p,job,{modelCallsAut
     composition_object_digest:composition.object_digest,imports,authoring_request_digest:request?.request_object_digest??null,
     components,layers:finalLayers,execution,no_change:environment.environment.projection_digest===baseline.environment.projection_digest,formal_admission_implied:false};
   writeCanonicalJsonNoReplace({outputPath:join(p.stateRoot,'component-candidate.json'),artifact:output,label:'component candidate'});return output;
+}
+
+// Only import a positively completed, bound external response. Never regenerate.
+export function resumeHostComponentInstructionCandidate(p,job,context){
+  const h=inspectHostInstructionAuthoring(p,job,context);if(!h)return null;
+  if(!h.completion)return h.pending;
+  // Exclusive durable reservation: partial local effects require inspection, not replay.
+  mkdirSync(join(p.stateRoot,'host-authoring-finalizing'),{mode:0o700});
+  const candidate=importInstructionEnvironmentAuthoring({...h.prepared.authoring,requestObjectDigest:h.prepared.request.request_object_digest,response:h.completion.response});
+  const execution={kind:'external_host',evidence_kind:h.claim.evidence_kind,provider:h.claim.provider,execution_id:h.claim.execution_id,
+    claim_digest:canonicalDigest(h.claim),closure:h.completion.closure,duration_ms:null,usage:null,authentication:'not_verified_by_runtime'};
+  return finishComponentInstructionCandidate(p,job,{...h.prepared.continuation,candidate,snapshot:candidate.snapshot_digest,request:h.prepared.request,execution});
 }
